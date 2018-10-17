@@ -1,0 +1,13 @@
+{
+  "name": "shardus-enterprise-server",
+  "version": "0.0.0",
+  "description": "The shardus enterprise server",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@gitlab.com:shardus/enterprise/shardus-enterprise-server.git"
+  }
+}
