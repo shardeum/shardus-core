@@ -4,7 +4,8 @@
   "description": "The shardus enterprise server",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test:unit": "echo \"Error: still determining framework to use!\" && exit 1",
+    "test:integration": "echo \"Error: still determining framework to use!\" && exit 1"
   },
   "repository": {
     "type": "git",
