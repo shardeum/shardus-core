@@ -21,6 +21,6 @@
   },
   "dependencies": {
     "shardus-quic-net": "gitlab:shardus/shardus-quic-net",
-    "sqlite3": "^4.0.2"
+    "sqlite": "^3.0.0"
   }
 }
