@@ -9,5 +9,8 @@
   "repository": {
     "type": "git",
     "url": "git@gitlab.com:shardus/enterprise/shardus-enterprise-server.git"
+  },
+  "dependencies": {
+    "sqlite3": "^4.0.2"
   }
 }
