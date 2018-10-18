@@ -20,6 +20,7 @@
     "tap": "12.0.1"
   },
   "dependencies": {
-    "shardus-quic-net": "gitlab:shardus/shardus-quic-net"
+    "shardus-quic-net": "gitlab:shardus/shardus-quic-net",
+    "sqlite3": "^4.0.2"
   }
 }
