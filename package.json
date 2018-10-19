@@ -4,11 +4,15 @@
   "description": "The shardus enterprise server",
   "main": "index.js",
   "scripts": {
-    "test:unit": "echo \"Error: still determining framework to use!\" && exit 1",
-    "test:integration": "echo \"Error: still determining framework to use!\" && exit 1"
+    "test": "tap test/**/*.spec.js",
+    "test:unit": "tap test/unit/**/*.spec.js unit",
+    "test:integration": "tap test/integration/**/*.spec.js unit"
   },
   "repository": {
     "type": "git",
     "url": "git@gitlab.com:shardus/enterprise/shardus-enterprise-server.git"
+  },
+  "devDependencies": {
+    "tap": "^12.0.1"
   }
 }
