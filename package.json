@@ -4,9 +4,9 @@
   "description": "The shardus enterprise server",
   "main": "index.js",
   "scripts": {
-    "test": "tap test/**/*.spec.js",
-    "test:unit": "tap test/unit/**/*.spec.js unit",
-    "test:integration": "tap test/integration/**/*.spec.js unit"
+    "test": "tap 'test/**/*.spec.js'",
+    "test:unit": "tap 'test/unit/**/*.spec.js'",
+    "test:integration": "tap 'test/integration/**/*.spec.js'"
   },
   "repository": {
     "type": "git",
