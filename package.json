@@ -5,14 +5,18 @@
   "main": "index.js",
   "scripts": {
     "test": "tap 'test/**/*.spec.js'",
+    "test:watch": "nodemon -x npm run test",
     "test:unit": "tap 'test/unit/**/*.spec.js'",
-    "test:integration": "tap 'test/integration/**/*.spec.js'"
+    "test:unit:watch": "nodemon -x npm run test:unit",
+    "test:integration": "tap 'test/integration/**/*.spec.js'",
+    "test:integration:watch": "nodemon -x npm run test:integration"
   },
   "repository": {
     "type": "git",
     "url": "git@gitlab.com:shardus/enterprise/shardus-enterprise-server.git"
   },
   "devDependencies": {
+    "nodemon": "1.18.4",
     "tap": "12.0.1"
   },
   "dependencies": {
