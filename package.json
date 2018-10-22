@@ -13,6 +13,6 @@
     "url": "git@gitlab.com:shardus/enterprise/shardus-enterprise-server.git"
   },
   "devDependencies": {
-    "tap": "^12.0.1"
+    "tap": "12.0.1"
   }
 }
