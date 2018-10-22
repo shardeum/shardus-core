@@ -26,6 +26,8 @@ class Storage {
    */
   set (key, val) {
     if (!this.initialized) throw new Error('Storage not initialized.')
+    if (!key || key === undefined) throw new Error('Key cannot be null or undefined.')
+    if (val === undefined) throw new Error('Value cannot be undefined.')
     let stringifiedVal = JSON.stringify(val)
     let setQuery = `INSERT OR REPLACE INTO storage (key, value) VALUES ('${key}', '${stringifiedVal}')`
     return this.db.run(setQuery)
