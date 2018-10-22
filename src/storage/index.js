@@ -39,6 +39,7 @@ class Storage {
     let getQuery = `SELECT value FROM storage WHERE key IS '${key}'`
     let result = await this.db.get(getQuery)
     if (result && result.value) return JSON.parse(result.value)
+    else throw new Error('Key does not exist.')
   }
 }
 
