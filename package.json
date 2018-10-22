@@ -16,6 +16,6 @@
     "tap": "^12.0.1"
   },
   "dependencies": {
-    "sqlite": "^3.0.0"
+    "storage-module": "git+https://gitlab.com/shardus/enterprise/storage-module.git"
   }
 }
