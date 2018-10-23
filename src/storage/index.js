@@ -1,8 +1,15 @@
+const fs = require('fs')
 const path = require('path')
 const sqlite = require('sqlite')
 
 class Storage {
-  constructor () {
+  /* Expects config to have the properties:
+   *   dbDir: <string> Directory that contains the database file.
+   *   dbName: <string> Name of the database file.
+   */
+  constructor (config) {
+    _parseConfig(config)
+    this.config = config
     this.db = null
     this.initialized = false
   }
@@ -11,8 +18,11 @@ class Storage {
    * Returns a promise that is resolved when storage is ready.
    */
   async init () {
-    // Initialize the db with a 'storage' table
-    this.db = await sqlite.open(path.join(__dirname, '/db.sqlite3'))
+    let { dbDir, dbName } = this.config
+    await _ensureExists(dbDir)
+    // Open or create the given db
+    this.db = await sqlite.open(path.join(dbDir, dbName))
+    // Create a 'storage' table if it doesn't exist
     let initTableQuery = `CREATE TABLE IF NOT EXISTS storage (
       key TEXT PRIMARY KEY,
       value BLOB
@@ -43,6 +53,33 @@ class Storage {
     if (result && result.value) return JSON.parse(result.value)
     else throw new Error('Key does not exist.')
   }
+}
+
+function _parseConfig (config) {
+  if (!config.dbDir) throw new Error('dbDir not provided in config.')
+  if (!config.dbName) throw new Error('dbName not provided in config.')
+  try {
+    config.dbDir = path.resolve(config.dbDir)
+  } catch (e) {
+    throw new Error('Invalid dbDir provided.')
+  }
+}
+
+// From: https://stackoverflow.com/a/21196961
+async function _ensureExists (dir) {
+  return new Promise((resolve, reject) => {
+    fs.mkdir(dir, null, (err) => {
+      if (err) {
+        // Ignore err if folder exists
+        if (err.code === 'EEXIST') resolve()
+        // Something else went wrong
+        else reject(err)
+      } else {
+        // Successfully created folder
+        resolve()
+      }
+    })
+  })
 }
 
 module.exports = Storage
