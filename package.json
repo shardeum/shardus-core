@@ -4,12 +4,13 @@
   "description": "The shardus enterprise server",
   "main": "index.js",
   "scripts": {
-    "test": "tap 'test/**/*.spec.js'",
+    "test": "tap \"test/**/*.spec.js\"",
     "test:watch": "nodemon -x npm run test",
-    "test:unit": "tap 'test/unit/**/*.spec.js'",
+    "test:unit": "tap \"test/unit/**/*.spec.js\"",
     "test:unit:watch": "nodemon -x npm run test:unit",
-    "test:integration": "tap 'test/integration/**/*.spec.js'",
-    "test:integration:watch": "nodemon -x npm run test:integration"
+    "test:integration": "tap \"test/integration/**/*.spec.js\"",
+    "test:integration:watch": "nodemon -x npm run test:integration",
+    "cover": "nyc tap \"test/**/*.spec.js\" --coverage-report=html && codecov"
   },
   "repository": {
     "type": "git",
@@ -17,7 +18,9 @@
   },
   "devDependencies": {
     "nodemon": "1.18.4",
-    "tap": "12.0.1"
+    "tap": "12.0.1",
+    "codecov": "^3.1.0",
+    "nyc": "^13.1.0"
   },
   "dependencies": {
     "shardus-quic-net": "gitlab:shardus/shardus-quic-net",
