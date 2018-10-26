@@ -1,67 +1,31 @@
 const fs = require('fs')
 const path = require('path')
-const sqlite = require('sqlite')
+const Sequelize = require('sequelize')
+const models = require('./models')
 
 class Storage {
-  /* Expects config to have the properties:
-   *   dbDir: <string> Directory that contains the database file.
-   *   dbName: <string> Name of the database file.
-   */
   constructor (config) {
-    _parseConfig(config)
-    this.config = config
-    this.db = null
+    let dbDir = path.parse(config[3].storage).dir
+    _ensureExists(dbDir)
+    this.sequelize = new Sequelize(...config)
+    this.models = {}
+    for (let [modelName, attributes] of models) {
+      this.models[modelName] = this.sequelize.define(modelName, attributes)
+    }
     this.initialized = false
   }
 
-  /* Initilizes persistant storage.
-   * Returns a promise that is resolved when storage is ready.
-   */
   async init () {
-    let { dbDir, dbName } = this.config
-    await _ensureExists(dbDir)
-    // Open or create the given db
-    this.db = await sqlite.open(path.join(dbDir, dbName))
-    // Create a 'storage' table if it doesn't exist
-    let initTableQuery = `CREATE TABLE IF NOT EXISTS storage (
-      key TEXT PRIMARY KEY,
-      value BLOB
-    )`
-    await this.db.run(initTableQuery)
+    for (let model of Object.values(this.models)) await model.sync()
     this.initialized = true
   }
 
-  /* Stores the given value with the given key into persistant storage.
-   * Returns a promise that resolves when the store operation completes.
-   */
-  set (key, val) {
+  async addKeypair ({ publicKey, secretKey }) {
     if (!this.initialized) throw new Error('Storage not initialized.')
-    if (!key || key === undefined) throw new Error('Key cannot be null or undefined.')
-    if (val === undefined) throw new Error('Value cannot be undefined.')
-    let stringifiedVal = JSON.stringify(val)
-    let setQuery = `INSERT OR REPLACE INTO storage (key, value) VALUES ('${key}', '${stringifiedVal}')`
-    return this.db.run(setQuery)
-  }
-
-  /* Gets the value referenced by the given key from persistant storage.
-   * Returns a promise that resolves to the value.
-   */
-  async get (key) {
-    if (!this.initialized) throw new Error('Storage not initialized.')
-    let getQuery = `SELECT value FROM storage WHERE key IS '${key}'`
-    let result = await this.db.get(getQuery)
-    if (result && result.value) return JSON.parse(result.value)
-    else return null
-  }
-}
-
-function _parseConfig (config) {
-  if (!config.dbDir) throw new Error('dbDir not provided in config.')
-  if (!config.dbName) throw new Error('dbName not provided in config.')
-  try {
-    config.dbDir = path.resolve(config.dbDir)
-  } catch (e) {
-    throw new Error('Invalid dbDir provided.')
+    await this.models.keypairs.create({
+      publicKey,
+      secretKey
+    })
   }
 }
 
