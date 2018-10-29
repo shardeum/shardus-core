@@ -5,8 +5,10 @@ const models = require('./models')
 
 class Storage {
   constructor (config) {
+    // Create dir if it doesn't exist
     let dbDir = path.parse(config[3].storage).dir
     _ensureExists(dbDir)
+    // Start Sequelize and load models
     this.sequelize = new Sequelize(...config)
     this.models = {}
     for (let [modelName, attributes] of models) {
@@ -16,16 +18,29 @@ class Storage {
   }
 
   async init () {
+    // Create tables for models in DB if they don't exist
     for (let model of Object.values(this.models)) await model.sync()
     this.initialized = true
   }
 
-  async addKeypair ({ publicKey, secretKey }) {
+  async setProperty (key, value) {
     if (!this.initialized) throw new Error('Storage not initialized.')
-    await this.models.keypairs.create({
-      publicKey,
-      secretKey
+    await this.models.properties.create({
+      key,
+      value: JSON.stringify(value)
     })
+  }
+
+  async getProperty (key) {
+    if (!this.initialized) throw new Error('Storage not initialized.')
+    let prop = await this.models.properties.findByPk(key)
+    return JSON.parse(prop.value)
+  }
+
+  async listProperties () {
+    if (!this.initialized) throw new Error('Storage not initialized.')
+    let keys = this.models.properties.findAll({ attributes: ['key'], raw: true })
+    return keys.map(k => k.key)
   }
 }
 
