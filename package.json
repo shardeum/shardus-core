@@ -16,14 +16,19 @@
     "type": "git",
     "url": "git@gitlab.com:shardus/enterprise/shardus-enterprise-server.git"
   },
-  "devDependencies": {
-    "nodemon": "1.18.4",
-    "tap": "12.0.1",
-    "codecov": "^3.1.0",
-    "nyc": "^13.1.0"
-  },
   "dependencies": {
+    "body-parser": "1.18.3",
+    "express": "4.16.4",
+    "log4js": "3.0.6",
+    "shardus-crypto-utils": "gitlab:shardus/shardus-crypto-utils",
     "shardus-quic-net": "gitlab:shardus/shardus-quic-net",
     "sqlite": "3.0.0"
+  },
+  "devDependencies": {
+    "axios": "^0.18.0",
+    "codecov": "3.1.0",
+    "nodemon": "1.18.4",
+    "nyc": "13.1.0",
+    "tap": "12.0.1"
   }
 }

@@ -1,4 +1,4 @@
-const test                  = require('tap').test
+const test = require('tap').test
 const generateNetworkModule = require('../../../src/network')
 
 const DEFAULT_ADDRESS = '127.0.0.1'
@@ -20,6 +20,11 @@ test('Network Module', t => {
   {
     const network = generateNetworkModule(DEFAULT_PORT, DEFAULT_ADDRESS)
     t.ok(network, 'a network object is returned from the constructor')
+  }
+
+  {
+    const network = generateNetworkModule(DEFAULT_PORT, DEFAULT_ADDRESS)
+    t.equal(typeof network, 'object', 'the network should be a type of function')
   }
 
   t.end()

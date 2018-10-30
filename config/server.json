@@ -1,0 +1,18 @@
+{
+  "externalIp": "127.0.0.1",
+  "externalPort": 9001,
+  "ipServer": "api.ipify.org/?format=json",
+  "timeServer": "http://arimaa.com/timestamp/",
+  "syncLimit": 180,
+  "seedList": "https://gitlab.com/shardus/seed-node-lists/raw/master/public/seed-list-local.json",
+  "baseDir": ".",
+  "log": {
+    "dir": "logs",
+    "confFile": "./config/logs.json",
+    "files": {"main": "", "fatal": "", "net": ""}
+  },
+  "storage": {
+    "dbDir": "./db",
+    "dbName": "db.sqlite3"
+  }
+}
