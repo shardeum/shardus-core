@@ -2,7 +2,7 @@
   "name": "shardus-enterprise-server",
   "version": "0.0.0",
   "description": "The shardus enterprise server",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
     "test": "tap \"test/**/*.spec.js\"",
     "test:watch": "nodemon -x npm run test",
