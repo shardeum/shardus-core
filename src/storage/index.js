@@ -82,7 +82,10 @@ class Storage {
   async getProperty (key) {
     this._checkInit()
     let [ prop ] = await this._read(this.models.properties, { key })
-    return JSON.parse(prop.value)
+    if (prop && prop.value) {
+      return JSON.parse(prop.value)
+    }
+    return null
   }
   async deleteProperty (key) {
     this._checkInit()
