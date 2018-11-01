@@ -13,7 +13,6 @@
     "files": {"main": "", "fatal": "", "net": ""}
   },
   "storage": {
-    "dbDir": "./db",
-    "dbName": "db.sqlite3"
+    "confFile": "./config/storage.json"
   }
 }
