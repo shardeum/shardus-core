@@ -40,8 +40,8 @@ class Storage {
   }
   async getCycles (cycle) {
     this._checkInit()
-    let cycles = await this._read(this.models.cycles, cycle, { attributes: { exclude: ['createdAt', 'updatedAt'] }, raw: true })
-    return cycles
+    let cycles = await this._read(this.models.cycles, cycle, { attributes: { exclude: ['createdAt', 'updatedAt'] } })
+    return cycles.map(c => c.dataValues)
   }
   async deleteCycles (cycle) {
     this._checkInit()
@@ -49,8 +49,8 @@ class Storage {
   }
   async listCycles () {
     this._checkInit()
-    let cycles = await this._read(this.models.cycles, null, { attributes: { exclude: ['createdAt', 'updatedAt'] }, raw: true })
-    return cycles
+    let cycles = await this._read(this.models.cycles, null, { attributes: { exclude: ['createdAt', 'updatedAt'] } })
+    return cycles.map(c => c.dataValues)
   }
 
   async addNodes (nodes) {
