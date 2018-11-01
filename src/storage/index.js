@@ -38,10 +38,21 @@ class Storage {
     this._checkInit()
     await this._create(this.models.cycles, cycles)
   }
-  async getCycles (cycle) {
+  async getCycleByCounter (counter) {
     this._checkInit()
-    let cycles = await this._read(this.models.cycles, cycle, { attributes: { exclude: ['createdAt', 'updatedAt'] } })
-    return cycles.map(c => c.dataValues)
+    let [ cycle ] = await this._read(this.models.cycles, { counter }, { attributes: { exclude: ['createdAt', 'updatedAt'] } })
+    if (cycle && cycle.dataValues) {
+      return cycle.dataValues
+    }
+    return null
+  }
+  async getCycleByMarker (marker) {
+    this._checkInit()
+    let [ cycle ] = await this._read(this.models.cycles, { marker }, { attributes: { exclude: ['createdAt', 'updatedAt'] } })
+    if (cycle && cycle.dataValues) {
+      return cycle.dataValues
+    }
+    return null
   }
   async deleteCycles (cycle) {
     this._checkInit()
