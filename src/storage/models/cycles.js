@@ -3,6 +3,7 @@ const Sequelize = require('sequelize')
 module.exports = [
   'cycles',
   {
+    certificate: { type: Sequelize.JSON, allowNull: false },
     previous: { type: Sequelize.TEXT, allowNull: false },
     marker: { type: Sequelize.TEXT, allowNull: false },
     counter: { type: Sequelize.BIGINT, unique: true, primaryKey: true, allowNull: false },
