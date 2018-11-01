@@ -54,9 +54,13 @@ class Storage {
     }
     return null
   }
-  async deleteCycles (cycle) {
+  async deleteCycleByCounter (counter) {
     this._checkInit()
-    await this._delete(this.models.cycles, cycle)
+    await this._delete(this.models.cycles, { counter })
+  }
+  async deleteCycleByMarker (marker) {
+    this._checkInit()
+    await this._delete(this.models.cycles, { marker })
   }
   async listCycles () {
     this._checkInit()
