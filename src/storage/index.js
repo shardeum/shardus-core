@@ -18,12 +18,18 @@ class Storage {
     for (let [modelName, modelAttributes] of models) this.sequelize.define(modelName, modelAttributes)
     this.models = this.sequelize.models
     this.initialized = false
+    // Register with the exitHandler to close database connections gracefully
+    exitHandler.registerAsync('storage', () => {
+      this.mainLogger.info('Closing Database connections.')
+      return this.sequelize.close()
+    })
   }
 
   async init () {
     // Create tables for models in DB if they don't exist
-    for (let model of Object.values(this.models)) await model.sync({ force: true })
+    for (let model of Object.values(this.models)) await model.sync()
     this.initialized = true
+    this.mainLogger.info('Database initialized.')
   }
 
   async addCycles (cycles) {
