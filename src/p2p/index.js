@@ -2,15 +2,17 @@ const utils = require('../utils')
 const http = require('../http')
 
 class P2P {
-  constructor (config, logger, storage) {
-    this.nodes = {}
+  constructor (config, logger, state, crypto) {
     this.mainLogger = logger.getLogger('main')
-    this.storage = storage
+    this.state = state
+    this.crypto = crypto
     this.ipInfo = config.ipInfo
     this.ipServer = config.ipServer
     this.timeServer = config.timeServer
     this.seedList = config.seedList
     this.syncLimit = config.syncLimit
+    this.netadmin = config.netadmin
+    this.joinRequests = []
   }
 
   _verifyIpInfo (ipInfo) {
@@ -39,22 +41,13 @@ class P2P {
     return true
   }
 
-  async _getSeedNodes () {
-    let seedNodes = await http.get(this.seedList)
-    return seedNodes
+  async _getSeedListSigned () {
+    let seedListSigned = await http.get(this.seedList)
+    return seedListSigned
   }
 
   getIpInfo () {
     return this.ipInfo
-  }
-
-  getNodes () {
-    return Object.values(this.nodes)
-  }
-
-  addNode (node) {
-    this.nodes[node.id] = node
-    return true
   }
 
   async discoverNetwork () {
@@ -63,7 +56,9 @@ class P2P {
     if (!this._verifyIpInfo(this.getIpInfo())) {
       this.ipInfo.externalIp = await this._retrieveIp(this.ipServer)
     }
-    let seedNodes = await this._getSeedNodes()
+    let seedListSigned = await this._getSeedListSigned()
+    if (!this.crypto.verify(seedListSigned, this.netadmin)) throw Error('Fatal: Seed list was not signed by specified netadmin!')
+    const seedNodes = seedListSigned.seedNodes
     if (seedNodes.length === 1) {
       let seed = seedNodes[0]
       let { externalIp, externalPort } = this.getIpInfo()

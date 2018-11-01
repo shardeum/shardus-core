@@ -1,0 +1,12 @@
+{
+  "seedNodes": [
+    {
+      "ip": "127.0.0.1",
+      "port": 9001
+    }
+  ],
+  "sign": {
+    "owner": "758b1c119412298802cd28dbfa394cdfeecc4074492d60844cc192d632d84de3",
+    "sig": "cd0f36cf6159a99f4a9051540eb3be66e682cc027ff2bb31e82a04a55be4059c72167248f60e4136b28c22e1cdf356354f16099e1bc385ea20dfa4a0baa8670377e44fb1cf8a313f994dbc2c8bc444d4f79a36cf38bec553fa868e422139d680"
+  }
+}

@@ -52,6 +52,17 @@ test('testing the shutdown method', { timeout: 10000 }, async t => {
   let server = spawn('node', [path.join(__dirname, 'child-process-shutdown.js')])
   // server.stdout.on('data', (data) => console.log(`[stdout] ==> ${data.toString()}`))
   // server.stderr.on('data', (data) => console.log(`[stderr] ==> ${data.toString()}`))
+  await sleep(6000)
+  const log = readLogFile('main')
+  t.notEqual(log.indexOf('Logger shutting down cleanly...'), -1, 'Should terminate the logger within shardus correctly and insert the log entry')
+  t.end()
+})
+
+test('testing the shutdown method', { timeout: 10000 }, async t => {
+  // resetLogFile('main')
+  let server = spawn('node', [path.join(__dirname, 'child-process-shutdown.js')])
+  // server.stdout.on('data', (data) => console.log(`[stdout] ==> ${data.toString()}`))
+  // server.stderr.on('data', (data) => console.log(`[stderr] ==> ${data.toString()}`))
   await sleep(3000)
   const log = readLogFile('main')
   t.notEqual(log.indexOf('Logger shutting down cleanly...'), -1, 'Should terminate the logger within shardus correctly and insert the log entry')

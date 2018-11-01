@@ -40,7 +40,7 @@ test('Should instantiate the Crypto object correctly', async t => {
 test('Should init the object correctly and store the key into the database', async t => {
   await storage.init()
   await crypto.init()
-  const keys = { publicKey: crypto.keypair.publicKey, secretKey: crypto.keypair.secretKey}
+  const keys = { publicKey: crypto.keypair.publicKey, secretKey: crypto.keypair.secretKey }
   const storedKeys = await storage.get('keypair')
   t.deepEqual(crypto.keypair, keys, 'The key object structure should be equal to this structure')
   t.deepEqual(storedKeys, crypto.keypair, 'The keypair should be stored in the database')

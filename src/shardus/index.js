@@ -1,10 +1,12 @@
 const express = require('express')
 const bodyParser = require('body-parser')
+const utils = require('../utils')
 const Logger = require('../logger')
 const ExitHandler = require('../exit-handler')
 const P2P = require('../p2p')
 const Crypto = require('../crypto')
 const Storage = require('../storage')
+const State = require('../state')
 
 class Shardus {
   constructor (config) {
@@ -18,6 +20,7 @@ class Shardus {
     this.app = express()
     this.crypto = {}
     this.p2p = {}
+    this.state = {}
 
     this.exitHandler.addSigListeners()
     this.exitHandler.registerAsync('logger', () => {
@@ -32,6 +35,13 @@ class Shardus {
       app.post('/exit', async (req, res) => {
         res.json({ success: true })
         await this.shutdown()
+      })
+
+      app.get('/cyclemarker', async (req, res) => {
+        const cycleMarker = this.state.getCycleMarker()
+        const nodesToJoin = [] // TODO: implement join request queue in p2p module
+        const currentTime = utils.getTime()
+        res.json({ cycleMarker, currentTime, nodesToJoin })
       })
 
       app.listen(this.externalPort, () => {
@@ -54,7 +64,9 @@ class Shardus {
     await this.storage.init()
     this.crypto = new Crypto(this.logger, this.storage)
     await this.crypto.init()
-    let { ipServer, timeServer, seedList, syncLimit } = config
+    this.state = new State(this.crypto)
+
+    let { ipServer, timeServer, seedList, syncLimit, netadmin } = config
     let ipInfo = { externalIp: config.externalIp || null, externalPort: config.externalPort || null }
     let p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit }
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto)

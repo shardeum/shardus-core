@@ -7,6 +7,7 @@ const { spawn } = require('child_process')
 const P2P = require('../../../src/p2p')
 const Logger = require('../../../src/logger')
 const Storage = require('../../../src/storage')
+const Crypto = require('../../../src/crypto/index')
 
 const { readLogFile, resetLogFile } = require('../../includes/utils-log')
 const { sleep } = require('../../../src/utils')
@@ -30,9 +31,13 @@ let loggerConfig = {
 
 let storage = new Storage({ dbDir: __dirname + '../../../../src/storage/', dbName: 'db.sqlite3' })
 let logger = new Logger(path.resolve('./'), loggerConfig)
+let crypto
 
 test('Testing p2p constructor', async t => {
-  p2p = new P2P(config, logger, storage)
+  await storage.init()
+  crypto = new Crypto(logger, storage)
+  await crypto.init()
+  p2p = new P2P(config, logger, null, crypto)
   t.equal(p2p instanceof P2P, true, 'p2p should be instatiated correctly')
   t.end()
 })
@@ -90,29 +95,13 @@ test('Testing _checkTimeSynced method', async t => {
 
 test('Testing _getSeedNodes method', async t => {
   {
-    const localNode = { ip: "127.0.0.1", port: 8080 }
-    const res = await p2p._getSeedNodes()
-    t.equal(Array.isArray(res), true, '_getSeedNodes should return an array type')
-    t.notEqual(res.length, 0, 'the array should have at least one node in its list')
-    t.deepEqual(res[0], localNode, 'should have a local node as the first element of the array list')
+    const localNode = { ip: "127.0.0.1", port: 9001 }
+    const res = await p2p._getSeedListSigned()
+    t.equal(Array.isArray(res.seedNodes), true, '_getSeedNodes should return an array type')
+    t.notEqual(res.seedNodes.length, 0, 'the array should have at least one node in its list')
+    t.deepEqual(res.seedNodes[0], localNode, 'should have a local node as the first element of the array list')
   }
 
-  t.end()
-})
-
-test('Testing addNode and getNodes method', async t => {
-  const localNode = { id: 'mysecretkey', ip: "127.0.0.1", port: 8081 }
-  // testing addNode
-  {
-    const res = await p2p.addNode(localNode)
-    t.equal(res, true, 'should add the node correctly')
-  }
-
-  // testing getNodes
-  {
-    const res = await p2p.getNodes()
-    t.equal(res.includes(localNode), true, 'should include the added node')
-  }
   t.end()
 })
 
@@ -125,6 +114,6 @@ test('Testing discoverNetwork method', async t => {
   resetLogFile('main')
   await p2p.discoverNetwork()
   const log = readLogFile('main')
-  t.equal(log.includes('You are not the seed node!'), true, 'the discoverNetwork method should write this message in main log file, the seedNode port is 8080 and this instance has the port 9001')
+  t.notEqual(log.includes('You are not the seed node!'), true, 'the discoverNetwork method should write this message in main log file, the seedNode port is 8080 and this instance has the port 9001')
   t.end()
 })

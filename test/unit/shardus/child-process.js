@@ -11,4 +11,4 @@ async function init () {
   await shardus.setup(config)
 }
 
-init ()
+init()

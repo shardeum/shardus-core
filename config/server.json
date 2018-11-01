@@ -6,6 +6,7 @@
   "syncLimit": 180,
   "seedList": "https://gitlab.com/shardus/seed-node-lists/raw/master/public/seed-list-local.json",
   "baseDir": ".",
+  "netadmin": "758b1c119412298802cd28dbfa394cdfeecc4074492d60844cc192d632d84de3",
   "log": {
     "dir": "logs",
     "confFile": "./config/logs.json",
