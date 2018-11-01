@@ -5,12 +5,14 @@ const models = require('./models')
 
 class Storage {
   constructor (exitHandler, logger, baseDir, config) {
+    let absBaseDir = path.join(path.parse(require.main.filename).dir, baseDir)
     // Parse config
-    config = require(path.join(baseDir, config.confFile))
+    config = require(path.join(absBaseDir, config.confFile))
     // Setup logger
     this.mainLogger = logger.getLogger('main')
-    // Create dir if it doesn't exist
-    let dbDir = path.parse(config.options.storage).dir
+    // Create dbDir if it doesn't exist
+    let { dir: dbDir, base: dbFile } = path.parse(path.join(absBaseDir, config.options.storage))
+    config.options.storage = path.join(dbDir, dbFile)
     _ensureExists(dbDir)
     this.mainLogger.info('Created Database directory.')
     // Start Sequelize and load models
@@ -115,7 +117,7 @@ class Storage {
 // From: https://stackoverflow.com/a/21196961
 async function _ensureExists (dir) {
   return new Promise((resolve, reject) => {
-    fs.mkdir(dir, null, (err) => {
+    fs.mkdir(dir, { recursive: true }, (err) => {
       if (err) {
         // Ignore err if folder exists
         if (err.code === 'EEXIST') resolve()
