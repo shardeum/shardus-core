@@ -9,6 +9,7 @@ module.exports = [
     desired: Sequelize.BIGINT,
     joined: Sequelize.JSON,
     removed: Sequelize.JSON,
+    returned: Sequelize.JSON,
     lost: Sequelize.JSON
   }
 ]
