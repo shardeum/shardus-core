@@ -74,4 +74,5 @@ typings/
 .serverless
 
 # Databases
-*.sqlite3
+db
+*.sqlite
