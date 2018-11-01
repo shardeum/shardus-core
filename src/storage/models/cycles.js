@@ -3,13 +3,13 @@ const Sequelize = require('sequelize')
 module.exports = [
   'cycles',
   {
-    counter: Sequelize.BIGINT,
-    marker: Sequelize.TEXT,
-    active: Sequelize.BIGINT,
-    desired: Sequelize.BIGINT,
-    joined: Sequelize.JSON,
-    removed: Sequelize.JSON,
-    returned: Sequelize.JSON,
-    lost: Sequelize.JSON
+    counter: { type: Sequelize.BIGINT, allowNull: false },
+    marker: { type: Sequelize.TEXT, allowNull: false },
+    active: { type: Sequelize.BIGINT, allowNull: false },
+    desired: { type: Sequelize.BIGINT, allowNull: false },
+    joined: { type: Sequelize.JSON, allowNull: false },
+    removed: { type: Sequelize.JSON, allowNull: false },
+    returned: { type: Sequelize.JSON, allowNull: false },
+    lost: { type: Sequelize.JSON, allowNull: false }
   }
 ]
