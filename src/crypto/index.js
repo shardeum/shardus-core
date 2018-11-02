@@ -9,10 +9,10 @@ class Crypto {
 
   async init () {
     crypto('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
-    let keypair = await this.storage.get('keypair')
+    let keypair = await this.storage.getProperty('keypair')
     if (!keypair) {
       this.keypair = this._generateKeypair()
-      await this.storage.set('keypair', this.keypair)
+      await this.storage.setProperty('keypair', this.keypair)
       return
     }
     this.mainLogger.info('Keypair loaded successfully from database.')
@@ -23,6 +23,10 @@ class Crypto {
     let keypair = crypto.generateKeypair()
     this.mainLogger.info('New keypair generated.')
     return keypair
+  }
+
+  getPublicKey () {
+    return this.keypair.publicKey
   }
 
   sign (obj) {

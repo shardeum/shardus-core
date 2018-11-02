@@ -1,18 +1,20 @@
 const utils = require('../utils')
 const http = require('../http')
+const P2PState = require('./p2p-state')
 
 class P2P {
-  constructor (config, logger, state, crypto) {
+  constructor (config, logger, storage, crypto) {
+    this.logger = logger
     this.mainLogger = logger.getLogger('main')
-    this.state = state
+    this.storage = storage
     this.crypto = crypto
     this.ipInfo = config.ipInfo
     this.ipServer = config.ipServer
     this.timeServer = config.timeServer
     this.seedList = config.seedList
     this.syncLimit = config.syncLimit
-    this.netadmin = config.netadmin
-    this.joinRequests = []
+    this.netadmin = config.netadmin || 'default'
+    this.state = new P2PState(this.logger, this.crypto, this.storage)
   }
 
   _verifyIpInfo (ipInfo) {
@@ -50,9 +52,24 @@ class P2P {
     return this.ipInfo
   }
 
+  _getThisNodeInfo () {
+    const { externalIp, externalPort } = this.getIpInfo()
+    // TODO: add actual internal IP and port
+    const internalPort = externalPort
+    const internalIp = externalIp
+    const publicKey = this.crypto.getPublicKey()
+    // TODO: Change this to actual selectable address
+    const address = publicKey
+    // TODO: Incorporate joinRequestTimestamps
+    const joinRequestTimestamp = utils.getTime()
+    const nodeInfo = { externalIp, externalPort, internalIp, internalPort, joinRequestTimestamp, address }
+    this.mainLogger.debug(`Node info of this node: ${nodeInfo}`)
+    return nodeInfo
+  }
+
   async discoverNetwork () {
     let timeSynced = await this._checkTimeSynced(this.timeServer)
-    if (!timeSynced) throw Error('Local time out of sync with time server.')
+    if (!timeSynced) throw new Error('Local time out of sync with time server.')
     if (!this._verifyIpInfo(this.getIpInfo())) {
       this.ipInfo.externalIp = await this._retrieveIp(this.ipServer)
     }
@@ -64,6 +81,12 @@ class P2P {
       let { externalIp, externalPort } = this.getIpInfo()
       if (externalIp === seed.ip && externalPort === seed.port) {
         this.mainLogger.info('You are the seed node!')
+        const thisNode = this._getThisNodeInfo()
+        this.mainLogger.info('Adding this node to node list.')
+        this.state.addJoinRequest(thisNode)
+        this.mainLogger.info('Creating first cycle marker...')
+        // TODO: Make this happen on a given interval, or make this function call itself on a timer
+        this.state.createCycle()
         return
       }
       this.mainLogger.info('You are not the seed node!')

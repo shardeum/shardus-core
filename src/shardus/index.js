@@ -6,7 +6,6 @@ const ExitHandler = require('../exit-handler')
 const P2P = require('../p2p')
 const Crypto = require('../crypto')
 const Storage = require('../storage')
-const State = require('../state')
 
 class Shardus {
   constructor (config) {
@@ -16,11 +15,10 @@ class Shardus {
     this.mainLogger = this.logger.getLogger('main')
     this.fatalLogger = this.logger.getLogger('fatal')
     this.exitHandler = new ExitHandler()
-    this.storage = new Storage(config.storage)
+    this.storage = new Storage(this.exitHandler, this.logger, config.baseDir, config.storage)
     this.app = express()
     this.crypto = {}
     this.p2p = {}
-    this.state = {}
 
     this.exitHandler.addSigListeners()
     this.exitHandler.registerAsync('logger', () => {
@@ -64,11 +62,10 @@ class Shardus {
     await this.storage.init()
     this.crypto = new Crypto(this.logger, this.storage)
     await this.crypto.init()
-    this.state = new State(this.crypto)
 
     let { ipServer, timeServer, seedList, syncLimit, netadmin } = config
     let ipInfo = { externalIp: config.externalIp || null, externalPort: config.externalPort || null }
-    let p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit }
+    let p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin }
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto)
     await this._setupExternalApi(this.app)
     await this.p2p.discoverNetwork()
