@@ -94,7 +94,7 @@ class P2PState {
     const lost = this.getLost()
     const returned = this.getReturned()
 
-    const cmFields = {
+    const cycleInfo = {
       previous,
       counter,
       time,
@@ -106,21 +106,13 @@ class P2PState {
       returned
     }
 
-    const marker = this._deriveCycleMarker(cmFields)
-    const cycle = {
-      counter,
-      marker,
-      active,
-      desired,
-      joined,
-      removed,
-      lost,
-      returned
-    }
+    const marker = this._deriveCycleMarker(cycleInfo)
+    cycleInfo.marker = marker
+
     this._resetCurrentCycle()
     this._acceptNodes(joined)
-    this.cycles.push(cycle)
-    this.storage.addCycles(cycle)
+    this.cycles.push(cycleInfo)
+    this.storage.addCycles(cycleInfo)
   }
 
   getActiveCount () {
