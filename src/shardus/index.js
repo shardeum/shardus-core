@@ -1,6 +1,5 @@
 const express = require('express')
 const bodyParser = require('body-parser')
-const utils = require('../utils')
 const Logger = require('../logger')
 const ExitHandler = require('../exit-handler')
 const P2P = require('../p2p')
