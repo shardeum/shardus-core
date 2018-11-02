@@ -36,10 +36,8 @@ class Shardus {
       })
 
       app.get('/cyclemarker', async (req, res) => {
-        const cycleMarker = this.state.getCycleMarker()
-        const nodesToJoin = [] // TODO: implement join request queue in p2p module
-        const currentTime = utils.getTime()
-        res.json({ cycleMarker, currentTime, nodesToJoin })
+        const cycleMarkerInfo = this.p2p.getCycleMarkerInfo()
+        res.json(cycleMarkerInfo)
       })
 
       app.listen(this.externalPort, () => {

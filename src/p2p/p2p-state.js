@@ -31,7 +31,7 @@ class P2PState {
   }
 
   _addPendingNode (node) {
-    this.nodes.pending.push(node)
+    this.nodes.pending[node.publicKey] = node
     // TODO: For now we are automatically adding to join list, we shouldn't
     this.currentCycle.joined.push(node.publicKey)
   }
@@ -53,6 +53,7 @@ class P2PState {
     delete node.publicKey
     this.nodes.ordered.push(node)
     this.nodes.current[node.id] = node
+    delete this.nodes.pending[node.id]
     // TODO: these should go to syncing and not active: this.nodes.syncing[node.id]= node
     this.nodes.active[node.id] = node
     this.storage.addNodes(node)
@@ -170,6 +171,12 @@ class P2PState {
     const lastCycle = this.getLastCycle()
     if (!lastCycle) return '0'.repeat(64)
     return lastCycle.marker
+  }
+
+  getLastJoined () {
+    const lastCycle = this.getLastCycle()
+    if (!lastCycle) return null
+    return lastCycle.joined
   }
 }
 

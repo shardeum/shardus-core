@@ -29,7 +29,7 @@ class P2P {
 
   async _retrieveIp (ipServer) {
     let { ip } = await http.get(ipServer)
-    console.log(ip)
+    this.mainLogger.debug(`Retrieved IP: ${ip}`)
     return ip
   }
 
@@ -52,6 +52,15 @@ class P2P {
     return this.ipInfo
   }
 
+  getCycleMarkerInfo () {
+    const cycleMarker = this.state.getLastCycleMarker()
+    const joined = this.state.getLastJoined()
+    const currentTime = utils.getTime()
+    const info = { cycleMarker, joined, currentTime }
+    this.mainLogger.debug(`Requested cycle marker info: ${JSON.stringify(info)}`)
+    return info
+  }
+
   _getThisNodeInfo () {
     const { externalIp, externalPort } = this.getIpInfo()
     // TODO: add actual internal IP and port
@@ -62,8 +71,8 @@ class P2P {
     const address = publicKey
     // TODO: Incorporate joinRequestTimestamps
     const joinRequestTimestamp = utils.getTime()
-    const nodeInfo = { externalIp, externalPort, internalIp, internalPort, joinRequestTimestamp, address }
-    this.mainLogger.debug(`Node info of this node: ${nodeInfo}`)
+    const nodeInfo = { publicKey, externalIp, externalPort, internalIp, internalPort, joinRequestTimestamp, address }
+    this.mainLogger.debug(`Node info of this node: ${JSON.stringify(nodeInfo)}`)
     return nodeInfo
   }
 
