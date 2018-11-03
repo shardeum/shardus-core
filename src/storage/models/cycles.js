@@ -1,5 +1,6 @@
 const Sequelize = require('sequelize')
 
+// dont forget to add the certificate field as JSON
 module.exports = [
   'cycles',
   {
