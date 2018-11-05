@@ -13,6 +13,6 @@
       "acquire": 30000,
       "idle": 10000
     },
-    "storage": "db/db.sqlite3"
+    "storage": "db/db.sqlite"
   }
 }

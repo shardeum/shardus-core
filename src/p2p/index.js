@@ -94,8 +94,9 @@ class P2P {
         this.mainLogger.info('Adding this node to node list.')
         this.state.addJoinRequest(thisNode)
         this.mainLogger.info('Creating first cycle marker...')
+        this.state.createCycleMarker()
         // TODO: Make this happen on a given interval, or make this function call itself on a timer
-        this.state.createCycle()
+        await this.state.createCycle()
         return
       }
       this.mainLogger.info('You are not the seed node!')

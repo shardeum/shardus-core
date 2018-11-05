@@ -16,7 +16,8 @@ class P2PState {
       joined: [],
       removed: [],
       lost: [],
-      returned: []
+      returned: [],
+      certificate: {}
     }
     this.cycles = []
     this.joinRequests = []
@@ -82,8 +83,31 @@ class P2PState {
     }
   }
 
-  createCycle () {
-    this.mainLogger.info('Creating new cycle...')
+  createCycleMarker () {
+    this.mainLogger.info('Creating new cycle marker...')
+    const cycleInfo = this.getCycleInfo()
+    const cycleMarker = this._deriveCycleMarker(cycleInfo)
+    const certificate = this.createCertificate(cycleMarker)
+    this.addCertificate(certificate)
+  }
+
+  async createCycle () {
+    this.mainLogger.info('Creating new cycle chain entry...')
+    const cycleInfo = this.getCycleInfo()
+    cycleInfo.marker = this.getCurrentCertificate().marker
+
+    this._resetCurrentCycle()
+    this._acceptNodes(cycleInfo.joined)
+    this.cycles.push(cycleInfo)
+    try {
+      await this.storage.addCycles(cycleInfo)
+      this.mainLogger.info('Added cycle chain entry to database successfully!')
+    } catch (e) {
+      this.mainLogger.error(e)
+    }
+  }
+
+  getCycleInfo () {
     const previous = this.getLastCycleMarker()
     const counter = this.getLastCycleCounter()
     const time = this.getCurrentCycleTime()
@@ -93,6 +117,7 @@ class P2PState {
     const removed = this.getRemoved()
     const lost = this.getLost()
     const returned = this.getReturned()
+    const certificate = this.getCurrentCertificate()
 
     const cycleInfo = {
       previous,
@@ -103,16 +128,36 @@ class P2PState {
       joined,
       removed,
       lost,
-      returned
+      returned,
+      certificate
     }
 
-    const marker = this._deriveCycleMarker(cycleInfo)
-    cycleInfo.marker = marker
+    return cycleInfo
+  }
 
-    this._resetCurrentCycle()
-    this._acceptNodes(joined)
-    this.cycles.push(cycleInfo)
-    this.storage.addCycles(cycleInfo)
+  createCertificate (cycleMarker) {
+    this.mainLogger.info(`Creating certificate for cycle marker ${cycleMarker}...`)
+    const cert = this.crypto.sign({ marker: cycleMarker })
+    return cert
+  }
+
+  addCertificate (certificate) {
+    this.mainLogger.debug('Adding certificate...')
+    // TODO: Should check whether certificate is better or not than current cert
+    this.currentCycle.certificate = certificate
+    this.mainLogger.debug('Certificate added!')
+    return true
+    /*
+      TODO:
+        Should return true or false of whether the cert was added, 
+        will be used when deciding whether to propagate cert or not
+    */
+  }
+
+  getCurrentCertificate () {
+    // TODO: implement certificate propagation
+    const cert = this.currentCycle.certificate
+    return cert
   }
 
   getActiveCount () {
