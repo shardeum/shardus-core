@@ -1,125 +1,237 @@
-const test = require('tap').test
+const { test } = require('tap')
 // The sqlite require will be here until we find necessary to put into a separated util lib
 const sqlite = require('sqlite')
+const fs = require('fs')
 const path = require('path')
 
-const Storage = require('../../../src/storage/index')
+const Storage = require('../../../src/storage')
+const Logger = require('../../../src/logger')
+const ExitHandler = require('../../../src/exit-handler')
 
-let storage = new Storage({ dbDir: __dirname + '../../../../src/storage/', dbName: 'db.sqlite3' })
-let key = '11223344'
-let value = {
-  name: 'Goku',
-  level: 'SSJ Blue'
+const { readLogFile, resetLogFile } = require('../../includes/utils-log')
+const { sleep } = require('../../../src/utils')
+
+const config = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../config/server.json')))
+const models = require('../../../src/storage/models')
+let confStorage, newConfStorage
+let exitHandler = new ExitHandler()
+let logger = new Logger(path.resolve('./'), config.log)
+
+let storage
+let list
+
+// copy the current conf file and then change to use a test db
+function createTestDb () {
+  if (fs.existsSync(path.join(__dirname + '/../../../db', '/db.test.sqlite'))) fs.unlinkSync(path.join(__dirname + '/../../../db', '/db.test.sqlite'))
+  confStorage = module.require(`../../../config/storage.json`)
+  newConfStorage = Object.assign({}, confStorage)
+  newConfStorage.options.storage = 'db/db.test.sqlite'
+  fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(newConfStorage, null, 2))
 }
 
-async function dropTable (table) {
-  let db
-  return new Promise (async (resolve, reject) => {
-    try {
-      db = await sqlite.open(path.join(__dirname + '/../../../src/storage', '/db.sqlite3'))
-      let dropTableQuery = `DROP TABLE IF EXISTS ${table}`
-      await db.run(dropTableQuery)
-      db.close()
-      resolve(true)
-    } catch (e) {
-      db.close()
-      reject(e)
-    }
-  })
-}
-
-async function getAllFromTable (table) {
-  let db
-  return new Promise (async (resolve, reject) => {
-    try {
-      db = await sqlite.open(path.join(__dirname + '/../../../src/storage', '/db.sqlite3'))
-      const query = `SELECT * FROM ${table}`
-      const res = await db.get(query)
-      db.close()
-      resolve(res)
-    } catch (e) {
-      db.close()
-      reject(e)
-    }
-  })
-}
-
-// Testing set fn
-test('should throw an error when inserting something in a inexistent table', async t => {
-  await dropTable('storage')
+test('testing initialization property', async t => {
+  const failStorage = new Storage(
+    exitHandler,
+    logger,
+    '../../../',
+    { confFile: './config/storage.json' }
+  )
   try {
-    const res = await storage.set(key, value)
-    t.fail(res, 'This kind of insertion should throw an error')
+    const res = await failStorage.listProperties()
+    t.fail('Should throw an error')
   } catch (e) {
-    t.notEqual(e, null, 'Should throw an error')
-    t.end()
+    t.pass('Should throw an error querying the db without being initialized')
   }
+  t.end()
 })
 
-// Testing get fn
-test('should throw an error when getting something from a inexistent table', async t => {
-  try {
-    const res = await storage.get(key)
-    t.fail(res, 'This kind of insertion should throw an error')
-  } catch (e) {
-    t.notEqual(e, null, 'Should throw an error')
-    t.end()
-  }
-})
 
 // Drop the database if exists and then test the init fn
 test('testing init fn', async t => {
-  try {
-    await dropTable('storage')
-    await storage.init()
-    const res = await getAllFromTable('storage')
-    t.equal(res, undefined, 'The results should be undefined because the table was dropped before init')
-  } catch (e) {
-    t.threw(e)
+  {
+    try {
+      createTestDb()
+      resetLogFile()
+      storage = new Storage(
+        exitHandler,
+        logger,
+        '../../../',
+        { confFile: './config/storage.json' }
+      )
+      await storage.init()
+      const log = readLogFile('main')
+      t.equal(log.includes('Database initialized.'), true, 'the logs should contain the msg of initialization')
+    } catch (e) {
+      t.threw(e)
+    }
   }
   t.end()
 })
 
-// Testing set fn
-test('create a basic (key, value) and test the set fn', async t => {
-  const res = await storage.set(key, value)
-  t.notEqual(res, undefined, 'The insertion should return a valid result')
-  t.end()
-})
-
-// Testing get fn
-test('uses the insertion from the previous test and test the get fn', async t => {
-  const res = await storage.get(key)
-  t.deepEqual(res, value, 'The value should be the exact from the previous test')
-  t.end()
-})
-
-// Testing get fn
-test('uses the insertion from the previous test and test the get fn', async t => {
-  const res = await storage.get('aaaabbbb')
-  t.deepEqual(res, null, 'Should return null for a inexistent key')
-  t.end()
-})
-
-// Testing inserting a null key
-test('create a basic (key, value) with key as null and test the set fn won\'t allow this kind of insertion', async t => {
-  try {
-    await storage.set(null, value)
-    const res = await storage.get(null)
-    t.fail('The insertion with a null key shouldn\'t be allowed')
-  } catch (e) {
-    t.end()
+// testing set/get cycle methods
+test('testing set and add methods for cycles model', async t => {
+  let cycle, cycle2
+  {
+    cycle = {
+      certificate: [ 'keyNode1', 'keyNode2' ],
+      previous: '00000000',
+      marker: 'marker1',
+      counter: 1,
+      time: Date.now(),
+      active: 20,
+      desired: 20,
+      joined: [ 'new1', 'new2', 'new3' ],
+      removed: [ 'removed1', 'removed2' ],
+      lost: [ 'lost1' ],
+      returned: [ 'returned1' ]
+    }
+    cycle2 = {
+      certificate: [ 'keyNode1', 'keyNode2' ],
+      previous: 'marker1',
+      marker: 'marker2',
+      counter: 2,
+      time: Date.now(),
+      active: 20,
+      desired: 20,
+      joined: [ 'new1', 'new2', 'new3' ],
+      removed: [ 'removed1', 'removed2' ],
+      lost: [ 'lost1' ],
+      returned: [ 'returned1' ]
+    }
+    await storage.addCycles(cycle)
+    const res = await storage.listCycles()
+    await storage.addCycles(cycle2)
+    // remove the id to do the deepEqual comparison
+    delete res[0].id
+    t.deepEqual(res[0], cycle, 'should be equal the first element of res to the inserted cycle')
   }
+
+  // Testing deleteByCounter
+  {
+    await storage.deleteCycleByCounter(cycle.counter)
+    let res = await storage.getCycleByCounter(cycle.counter)
+    t.notDeepEqual(cycle, res, 'Should assure the row was deleted correctly and its not returning by getCycleByCounter')
+    res = await storage.getCycleByMarker(cycle.marker)
+    t.notDeepEqual(cycle, res, 'Should assure the row was deleted correctly and its not returning by getCycleByMarker')
+    res = await storage.listCycles()
+    t.equal(res.length, 1, 'Should have just one row in the cycles table')
+  }
+
+  // Testing deleteByMarker
+  {
+    await storage.deleteCycleByMarker(cycle2.marker)
+    let res = await storage.getCycleByCounter(cycle2.counter)
+    t.notDeepEqual(cycle2, res, 'Should assure the row was deleted correctly and its not returning by getCycleByCounter')
+    res = await storage.getCycleByMarker(cycle2.marker)
+    t.notDeepEqual(cycle2, res, 'Should assure the row was deleted correctly and its not returning by getCycleByMarker')
+    res = await storage.listCycles()
+    t.equal(res.length, 0, 'Should have no row in the cycles table')
+  }
+
+  {
+    let dummyCycle = {
+      counter: 2,
+      marker: 'marker2'
+    }
+    try {
+      await storage.addCycles(dummyCycle)
+      let res = await storage.getCycles(dummyCycle)
+      t.fail(`should throw an error inserting an invalid cycle \n${JSON.stringify(res,null,2)}`)
+    } catch (e) {
+      t.pass('should throw an error inserting an invalid cycle')
+    }
+  }
+
+  t.end()
 })
 
-// Testing inserting a null value
-test('create a basic (key, value) with value as null and test the set fn won\'t allow this kind of insertion', async t => {
-  const key2 = 'freeza'
-  try {
-    await storage.set(key2, undefined)
-    const res = await storage.get(key2)
-    t.fail('The insertion with a null value shouldn\'t be allowed')
-  } catch (e) {
-    t.end()
+// testing set/get nodes methods
+test('testing set and add methods for nodes model', async t => {
+  let node
+  {
+    node = {
+      id: '123456',
+      internalIp: '192.168.0.100',
+      externalIp: '200.20.55.11',
+      internalPort: 9999,
+      externalPort: 443,
+      joinRequestTimestamp: Date.now(),
+      address: 'a1b2c3e4f5'
+    }
+    await storage.addNodes(node)
+    const res = await storage.getNodes(node)
+    t.deepEqual(res[0], node, 'should be equal the first element of res to the inserted cycle')
+    t.pass('passing')
   }
+
+  {
+    await storage.deleteNodes(node)
+    let res = await storage.getNodes(node)
+    t.notDeepEqual(node, res[0], 'Should assure the row was deleted correctly')
+    res = await storage.listNodes()
+    t.equal(res.length, 0, 'Should have a empty node list in the table nodes')
+  }
+
+  {
+    let dummyNode = {
+      ip: '300.300.300.300'
+    }
+    try {
+      await storage.addNodes(dummyNode)
+      t.fail('should throw an error inserting an invalid node')
+    } catch (e) {
+      t.pass('should throw an error inserting an invalid node')
+    }
+  }
+
+  t.end()
+})
+
+// testing set/get properties methods
+test('testing set and add methods for properties model', async t => {
+  let property
+  {
+    property = {
+      key: '123456',
+      value: {
+        ip: '8.8.8.8',
+        port: 8080,
+        nodes: [
+          'node2key', 'node3key'
+        ]
+      }
+    }
+    await storage.setProperty(property.key, property.value)
+    const res = await storage.getProperty(property.key)
+    t.deepEqual(res, property.value, 'should be equal the first element of res to the inserted cycle')
+    t.pass('passing')
+  }
+
+  {
+    await storage.deleteProperty(property.key)
+    let res = await storage.getProperty(property.key)
+    t.notDeepEqual(property.value, res, 'Should assure the row was deleted correctly')
+    res = await storage.listProperties()
+    t.equal(res.length, 0, 'Should have a empty property list in the table property')
+  }
+
+  // // testing listProperties
+  // {
+  //   let dummyProperty = {
+  //     key: '111111',
+  //     value: {
+  //       value: 100
+  //     }
+  //   }
+  //   await storage.setProperty(dummyProperty.key, dummyProperty.value)
+  //   const res = await storage.listProperties()
+  //   t.deepEqual(res[0], dummyProperty, 'Should have the inserted property returning from listProperties method')
+  // }
+
+  if (confStorage) {
+    confStorage.options.storage = 'db/db.sqlite'
+    fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
+  }
+
+  t.end()
 })

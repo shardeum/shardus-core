@@ -8,6 +8,7 @@ const P2P = require('../../../src/p2p')
 const Logger = require('../../../src/logger')
 const Storage = require('../../../src/storage')
 const Crypto = require('../../../src/crypto/index')
+const ExitHandler = require('../../../src/exit-handler')
 
 const { readLogFile, resetLogFile } = require('../../includes/utils-log')
 const { sleep } = require('../../../src/utils')
@@ -29,8 +30,14 @@ let loggerConfig = {
   }
 }
 
-let storage = new Storage({ dbDir: __dirname + '../../../../src/storage/', dbName: 'db.sqlite3' })
+let exitHandler = new ExitHandler()
 let logger = new Logger(path.resolve('./'), loggerConfig)
+let storage = new Storage(
+  exitHandler,
+  logger,
+  '../../../',
+  { confFile: './config/storage.json' }
+)
 let crypto
 
 test('Testing p2p constructor', async t => {

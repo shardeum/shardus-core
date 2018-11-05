@@ -4,6 +4,7 @@ const path = require('path')
 const Logger = require('../../../src/logger/index')
 const Storage = require('../../../src/storage/index')
 const Crypto = require('../../../src/crypto/index')
+const ExitHandler = require('../../../src/exit-handler')
 
 let configFilePath = path.join(__dirname, '../../../config/logs.json')
 let loggerConfig = {
@@ -17,7 +18,13 @@ let loggerConfig = {
 }
 
 let logger = new Logger(path.resolve('./'), loggerConfig)
-let storage = new Storage({ dbDir: __dirname + '../../../../src/storage/', dbName: 'db.sqlite3' })
+let exitHandler = new ExitHandler()
+let storage = new Storage(
+  exitHandler,
+  logger,
+  '../../../',
+  { confFile: './config/storage.json' }
+)
 let crypto = new Crypto(logger, storage)
 
 function isValidHex (str) {
@@ -41,7 +48,7 @@ test('Should init the object correctly and store the key into the database', asy
   await storage.init()
   await crypto.init()
   const keys = { publicKey: crypto.keypair.publicKey, secretKey: crypto.keypair.secretKey }
-  const storedKeys = await storage.get('keypair')
+  const storedKeys = await storage.getProperty('keypair')
   t.deepEqual(crypto.keypair, keys, 'The key object structure should be equal to this structure')
   t.deepEqual(storedKeys, crypto.keypair, 'The keypair should be stored in the database')
   t.end()
