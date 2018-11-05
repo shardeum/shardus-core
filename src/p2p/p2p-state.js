@@ -85,7 +85,7 @@ class P2PState {
 
   createCycleMarker () {
     this.mainLogger.info('Creating new cycle marker...')
-    const cycleInfo = this.getCycleInfo()
+    const cycleInfo = this.getCycleInfo(false)
     const cycleMarker = this._deriveCycleMarker(cycleInfo)
     const certificate = this.createCertificate(cycleMarker)
     this.addCertificate(certificate)
@@ -107,7 +107,7 @@ class P2PState {
     }
   }
 
-  getCycleInfo () {
+  getCycleInfo (withCert = true) {
     const previous = this.getLastCycleMarker()
     const counter = this.getLastCycleCounter()
     const time = this.getCurrentCycleTime()
@@ -117,7 +117,6 @@ class P2PState {
     const removed = this.getRemoved()
     const lost = this.getLost()
     const returned = this.getReturned()
-    const certificate = this.getCurrentCertificate()
 
     const cycleInfo = {
       previous,
@@ -128,8 +127,10 @@ class P2PState {
       joined,
       removed,
       lost,
-      returned,
-      certificate
+      returned
+    }
+    if (withCert) {
+      cycleInfo.certificate = this.getCurrentCertificate()
     }
 
     return cycleInfo
