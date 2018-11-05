@@ -44,7 +44,7 @@ test('Testing p2p constructor', async t => {
   await storage.init()
   crypto = new Crypto(logger, storage)
   await crypto.init()
-  p2p = new P2P(config, logger, null, crypto)
+  p2p = new P2P(config, logger, storage, crypto)
   t.equal(p2p instanceof P2P, true, 'p2p should be instatiated correctly')
   t.end()
 })
