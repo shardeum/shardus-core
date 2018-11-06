@@ -4,6 +4,7 @@
   "ipServer": "api.ipify.org/?format=json",
   "timeServer": "http://arimaa.com/timestamp/",
   "syncLimit": 180,
+  "cycleDuration": 10,
   "seedList": "https://gitlab.com/shardus/seed-node-lists/raw/master/public/seed-list-local.json",
   "baseDir": ".",
   "netadmin": "758b1c119412298802cd28dbfa394cdfeecc4074492d60844cc192d632d84de3",

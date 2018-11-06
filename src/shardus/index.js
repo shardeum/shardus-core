@@ -34,9 +34,14 @@ class Shardus {
         await this.shutdown()
       })
 
-      app.get('/cyclemarker', async (req, res) => {
+      app.get('/cyclemarker', (req, res) => {
         const cycleMarkerInfo = this.p2p.getCycleMarkerInfo()
         res.json(cycleMarkerInfo)
+      })
+
+      app.get('/cyclechain', (req, res) => {
+        const cycleChain = this.p2p.getLatestCycles(10)
+        res.json({ cycleChain })
       })
 
       app.listen(this.externalPort, () => {
@@ -60,9 +65,9 @@ class Shardus {
     this.crypto = new Crypto(this.logger, this.storage)
     await this.crypto.init()
 
-    let { ipServer, timeServer, seedList, syncLimit, netadmin } = config
+    let { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration } = config
     let ipInfo = { externalIp: config.externalIp || null, externalPort: config.externalPort || null }
-    let p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin }
+    let p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration }
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto)
     await this._setupExternalApi(this.app)
     await this.p2p.discoverNetwork()

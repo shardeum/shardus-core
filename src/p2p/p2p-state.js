@@ -1,10 +1,11 @@
 const utils = require('../utils')
 
 class P2PState {
-  constructor (logger, crypto, storage) {
+  constructor (config, logger, storage, crypto) {
     this.mainLogger = logger.getLogger('main')
     this.crypto = crypto
     this.storage = storage
+    this.cycleDuration = config.cycleDuration
     this.nodes = {
       ordered: [],
       current: {},
@@ -17,15 +18,19 @@ class P2PState {
       removed: [],
       lost: [],
       returned: [],
+      activated: [],
       certificate: {}
     }
     this.cycles = []
+    this.acceptJoinReq = false
     this.joinRequests = []
   }
 
   // TODO: add init function that reads from database into memory
 
   addJoinRequest (nodeInfo) {
+    // TODO: check if accepting join requests
+    // if (!acceptJoinReq) return ''
     // TODO: add actual join requests
     this.joinRequests.push(nodeInfo)
     this._addPendingNode(nodeInfo)
@@ -37,7 +42,7 @@ class P2PState {
     this.currentCycle.joined.push(node.publicKey)
   }
 
-  _deriveNodeId (publicKey, cycleMarker) {
+  _computeNodeId (publicKey, cycleMarker) {
     // TODO: Implement actual node ID process
     return publicKey
   }
@@ -49,14 +54,13 @@ class P2PState {
     } catch (e) {
       throw new Error('Node not found in pending.')
     }
-    let nodeId = this._deriveNodeId(publicKey, cycleMarker)
+    let nodeId = this._computeNodeId(publicKey, cycleMarker)
     node.id = nodeId
     delete node.publicKey
     this.nodes.ordered.push(node)
     this.nodes.current[node.id] = node
     delete this.nodes.pending[node.id]
-    // TODO: these should go to syncing and not active: this.nodes.syncing[node.id]= node
-    this.nodes.active[node.id] = node
+    this.nodes.syncing[node.id]= node
     this.storage.addNodes(node)
   }
 
@@ -66,9 +70,8 @@ class P2PState {
     }
   }
 
-  _deriveCycleMarker (fields) {
-    this.mainLogger.info('Creating new cycle marker...')
-    this.mainLogger.debug(`Cycle marker fields: ${JSON.stringify(fields)}`)
+  _computeCycleMarker (fields) {
+    this.mainLogger.debug(`Computing cycle marker... Cycle marker fields: ${JSON.stringify(fields)}`)
     const cycleMarker = this.crypto.hash(fields)
     this.mainLogger.debug(`Created cycle marker: ${cycleMarker}`)
     return cycleMarker
@@ -83,15 +86,59 @@ class P2PState {
     }
   }
 
-  createCycleMarker () {
+  // Kicks off the whole cycle and cycle marker creation system
+  startCycles () {
+    this.mainLogger.info('Starting first cycle...')
+    this._startNewCycle()
+  }
+
+  _startNewCycle () {
+    this.mainLogger.info(`Starting new cycle of duration ${this.cycleDuration}...`)
+    const quarterCycle = Math.ceil(this.cycleDuration * 1000 / 4)
+    this._startJoinPhase(quarterCycle)
+  }
+
+  _startJoinPhase (phaseLen) {
+    this.mainLogger.debug('Starting join phase...')
+    this.acceptJoinReq = true
+    setTimeout(() => {
+      this._endJoinPhase(phaseLen)
+    }, phaseLen)
+  }
+
+  _endJoinPhase (phaseLen) {
+    this.mainLogger.debug('Ending join phase...')
+    this.acceptJoinReq = false
+    setTimeout(() => {
+      this._startCycleSync(phaseLen)
+    }, phaseLen)
+  }
+
+  _startCycleSync (phaseLen) {
+    this.mainLogger.debug('Starting cycle sync phase...')
+    this._createCycleMarker()
+    setTimeout(() => {
+      this._finalizeCycle(phaseLen)
+    }, phaseLen)
+  }
+
+  async _finalizeCycle (phaseLen) {
+    this.mainLogger.debug('Starting cycle finalization phase...')
+    this._createCycle()
+    setTimeout(() => {
+      this._startNewCycle()
+    }, phaseLen)
+  }
+
+  _createCycleMarker () {
     this.mainLogger.info('Creating new cycle marker...')
     const cycleInfo = this.getCycleInfo(false)
-    const cycleMarker = this._deriveCycleMarker(cycleInfo)
-    const certificate = this.createCertificate(cycleMarker)
+    const cycleMarker = this._computeCycleMarker(cycleInfo)
+    const certificate = this._createCertificate(cycleMarker)
     this.addCertificate(certificate)
   }
 
-  async createCycle () {
+  async _createCycle () {
     this.mainLogger.info('Creating new cycle chain entry...')
     const cycleInfo = this.getCycleInfo()
     cycleInfo.marker = this.getCurrentCertificate().marker
@@ -109,7 +156,7 @@ class P2PState {
 
   getCycleInfo (withCert = true) {
     const previous = this.getLastCycleMarker()
-    const counter = this.getLastCycleCounter()
+    const counter = this.getCycleCounter()
     const time = this.getCurrentCycleTime()
     const active = this.getActiveCount()
     const desired = this.getDesiredCount()
@@ -117,6 +164,7 @@ class P2PState {
     const removed = this.getRemoved()
     const lost = this.getLost()
     const returned = this.getReturned()
+    const activated = this.getActivated()
 
     const cycleInfo = {
       previous,
@@ -127,7 +175,8 @@ class P2PState {
       joined,
       removed,
       lost,
-      returned
+      returned,
+      activated
     }
     if (withCert) {
       cycleInfo.certificate = this.getCurrentCertificate()
@@ -136,7 +185,7 @@ class P2PState {
     return cycleInfo
   }
 
-  createCertificate (cycleMarker) {
+  _createCertificate (cycleMarker) {
     this.mainLogger.info(`Creating certificate for cycle marker ${cycleMarker}...`)
     const cert = this.crypto.sign({ marker: cycleMarker })
     return cert
@@ -150,7 +199,7 @@ class P2PState {
     return true
     /*
       TODO:
-        Should return true or false of whether the cert was added, 
+        Should return true or false of whether the cert was added,
         will be used when deciding whether to propagate cert or not
     */
   }
@@ -174,8 +223,15 @@ class P2PState {
 
   getCurrentCycleTime () {
     let currTime = utils.getTime('s')
-    let cycleTime = Math.floor(currTime / 120)
+    let cycleTime = Math.floor(currTime / this.cycleDuration)
     return cycleTime
+  }
+
+  getCycles (amount) {
+    if (this.cycles.length < amount) {
+      return this.cycles
+    }
+    return this.cycles.slice(0 - amount)
   }
 
   getJoined () {
@@ -194,15 +250,19 @@ class P2PState {
     return this.currentCycle.returned
   }
 
+  getActivated () {
+    return this.currentCycle.activated
+  }
+
   getLastCycle () {
     if (!this.cycles.length) return null
     return this.cycles[this.cycles.length - 1]
   }
 
-  getLastCycleCounter () {
+  getCycleCounter () {
     const lastCycle = this.getLastCycle()
     if (!lastCycle) return 0
-    return lastCycle.counter
+    return lastCycle.counter + 1
   }
 
   getLastCycleMarker () {

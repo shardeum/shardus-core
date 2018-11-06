@@ -14,7 +14,7 @@ class P2P {
     this.seedList = config.seedList
     this.syncLimit = config.syncLimit
     this.netadmin = config.netadmin || 'default'
-    this.state = new P2PState(this.logger, this.crypto, this.storage)
+    this.state = new P2PState(config, this.logger, this.storage, this.crypto)
   }
 
   _verifyIpInfo (ipInfo) {
@@ -33,6 +33,7 @@ class P2P {
     return ip
   }
 
+  // TODO: add way to compare time from major server head requests like google.com
   async _checkTimeSynced (timeServer) {
     const localTime = utils.getTime('s')
     let timestamp = await http.get(timeServer)
@@ -59,6 +60,11 @@ class P2P {
     const info = { cycleMarker, joined, currentTime }
     this.mainLogger.debug(`Requested cycle marker info: ${JSON.stringify(info)}`)
     return info
+  }
+
+  getLatestCycles (amount) {
+    const cycles = this.state.getCycles(amount)
+    return cycles
   }
 
   _getThisNodeInfo () {
@@ -91,12 +97,9 @@ class P2P {
       if (externalIp === seed.ip && externalPort === seed.port) {
         this.mainLogger.info('You are the seed node!')
         const thisNode = this._getThisNodeInfo()
-        this.mainLogger.info('Adding this node to node list.')
+        this.mainLogger.info('Adding this node to node list...')
         this.state.addJoinRequest(thisNode)
-        this.mainLogger.info('Creating first cycle marker...')
-        this.state.createCycleMarker()
-        // TODO: Make this happen on a given interval, or make this function call itself on a timer
-        await this.state.createCycle()
+        this.state.startCycles()
         return
       }
       this.mainLogger.info('You are not the seed node!')
