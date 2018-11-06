@@ -1,10 +1,12 @@
 const crypto = require('shardus-crypto-utils')
+const { fork } = require('child_process')
 
 class Crypto {
   constructor (logger, storage) {
     this.mainLogger = logger.getLogger('main')
     this.storage = storage
     this.keypair = {}
+    this.powGenerators = {}
   }
 
   async init () {
@@ -47,6 +49,37 @@ class Crypto {
       return crypto.hashObj(obj)
     }
     return crypto.hashObj(obj, true)
+  }
+
+  getComputeProofOfWork (seed, difficulty) {
+    return this._runProofOfWorkGenerator('./computePowGenerator.js', seed, difficulty)
+  }
+
+  _runProofOfWorkGenerator (generator, seed, difficulty) {
+    // Fork a child process to compute the PoW, if it doesn't exist
+    if (!this.powGenerators[generator]) this.powGenerators[generator] = fork(generator, { cwd: __dirname })
+    let promise = new Promise((resolve, reject) => {
+      this.powGenerators[generator].on('message', (powObj) => {
+        this._stopProofOfWorkGenerator(generator)
+        resolve(powObj)
+      })
+    })
+    // Tell child to compute PoW
+    this.powGenerators[generator].send({ seed, difficulty })
+    // Return a promise the resolves to a valid { nonce, hash }
+    return promise
+  }
+
+  _stopProofOfWorkGenerator (generator) {
+    if (!this.powGenerators[generator]) return Promise.resolve('not running')
+    let promise = new Promise((resolve, reject) => {
+      this.powGenerators[generator].on('close', (signal) => {
+        delete this.powGenerators[generator]
+        resolve(signal)
+      })
+    })
+    this.powGenerators[generator].kill()
+    return promise
   }
 }
 

@@ -39,6 +39,14 @@ function isValidHex (str) {
   return true
 }
 
+function hex2bin (hex) {
+  let bin = ''
+  for (let i = 0; i < hex.length; i++) {
+    bin += parseInt(hex[i], 16).toString(2).padStart(4, '0')
+  }
+  return bin
+}
+
 // testing the instance of crypto
 test('Should instantiate the Crypto object correctly', async t => {
   t.equal(crypto instanceof Crypto, true, 'crypto should be an instance of Crypto')
@@ -100,5 +108,16 @@ test('Should verify a signed object correctly', async t => {
     clearTestDb()
   }
   t.equal(isValidHex(crypto.hash(testTx)), true, 'should generate a valid hex from the hash of an object')
+  t.end()
+})
+
+// testing ProofOfwork methods
+test('Should compute a proof of work correctly', async t => {
+  let seed = 'abc'
+  let difficulty = 16
+  let { nonce, hash } = await crypto.getComputeProofOfWork(seed, difficulty)
+  let verifyHash = crypto.hash({ seed, nonce })
+  t.equal(verifyHash, hash, 'returned hash should match independently computed hash')
+  t.equal(parseInt(hex2bin(hash).substring(0, difficulty), 2), 0, 'returned hash should have at least difficulty number of leading 0 bits')
   t.end()
 })

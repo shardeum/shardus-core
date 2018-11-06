@@ -58,10 +58,10 @@ class P2P {
     return seedListSigned
   }
 
-  async _getSeedNodes () {
-    let seedListSigned = await this._getSeedListSigned()
-    if (!this.crypto.verify(seedListSigned, this.netadmin)) throw Error('Fatal: Seed list was not signed by specified netadmin!')
-    return seedListSigned.seedNodes
+  _getNetworkCycleMarker (nodes) {
+    // TODO: verify cycle marker from multiple nodes
+    let node = nodes[0]
+    return http.get(`${node.ip}:${node.port}/cyclemarker`)
   }
 
   getIpInfo () {
@@ -126,8 +126,9 @@ class P2P {
   // ---   Whatever this function calls from state needs to find from network
   // ---   when it is joined, should start syncing, then it can call startCycles()
   async _attemptJoin () {
-    // this.state.addJoinRequest()
-    // return true
+    // Create a join request which contains a valid proof-of-work.
+    let joinRequest = await this._createJoinRequest()
+    this.state.addJoinRequest(joinRequest)
     this.mainLogger.debug('This is where you would try to join...')
     return false
   }
@@ -150,6 +151,38 @@ class P2P {
       return true
     }
     return false
+  }
+
+  async _createJoinRequest () {
+    // The server makes a /get_cycle_marker request.
+    const seedNodes = await this._getSeedNodes()
+    try {
+      var { cycleMarker, currentTime } = await this._getNetworkCycleMarker(seedNodes)
+    } catch (e) {
+      throw new Error(e)
+    }
+    let difficulty = 16
+    // Checks that the time difference is within syncLimit (as configured).
+    const localTime = utils.getTime('s')
+    this._checkWithinSyncLimit(localTime, currentTime)
+    // Build and return a join request
+    let nodeInfo = this._getThisNodeInfo()
+    delete nodeInfo.joinRequestTimestamp
+    delete nodeInfo.address
+    let selectionNum = this.crypto.hash({ cycleMarker, publicKey: nodeInfo.publicKey })
+    let signedSelectionNum = this.crypto.sign({ selectionNum })
+    let proofOfWork = {
+      compute: await this.crypto.getComputeProofOfWork(cycleMarker, difficulty)
+    }
+    return {
+      // TODO: add a version number at some point
+      // version: '0.0.0',
+      nodeInfo,
+      cycleMarker,
+      proofOfWork,
+      selectionNum,
+      signedSelectionNum
+    }
   }
 
   async discoverNetwork () {
