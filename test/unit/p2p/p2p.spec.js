@@ -190,3 +190,25 @@ test('Testing _createJoinRequest method', async t => {
   }, 'joinRequest should have all expected properties')
   t.end()
 })
+
+test('Testing _createJoinRequest method', async t => {
+  let joinRequest = await p2p._createJoinRequest()
+  t.match(joinRequest, {
+    externalIp: /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/,
+    externalPort: /\d+/,
+    internalIp: /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/,
+    internalPort: /\d+/,
+    publicKey: /[0-9a-fA-F]+/,
+    cycleMarker: /[0-9a-fA-F]+/,
+    nonce: /[0-9a-fA-F]+/,
+    selectionNum: /[0-9a-fA-F]+/,
+    signedSelectionNum: {
+      selectionNum: /[0-9a-fA-F]+/,
+      sign: {
+        owner: /[0-9a-fA-F]+/,
+        sig: /[0-9a-fA-F]+/
+      }
+    }
+  }, 'joinRequest should have all expected properties')
+  t.end()
+})

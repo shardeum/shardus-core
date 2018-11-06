@@ -19,6 +19,7 @@ class Crypto {
     }
     this.mainLogger.info('Keypair loaded successfully from database.')
     this.keypair = keypair
+    this.powGenerator = null
   }
 
   _generateKeypair () {
