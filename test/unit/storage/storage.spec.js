@@ -71,6 +71,7 @@ test('testing set and add methods for cycles model', async t => {
       active: 20,
       desired: 20,
       joined: [ 'new1', 'new2', 'new3' ],
+      activated: [ 'activated1', 'activated2' ],
       removed: [ 'removed1', 'removed2' ],
       lost: [ 'lost1' ],
       returned: [ 'returned1' ]
@@ -84,6 +85,7 @@ test('testing set and add methods for cycles model', async t => {
       active: 20,
       desired: 20,
       joined: [ 'new1', 'new2', 'new3' ],
+      activated: [ 'activated1', 'activated2' ],
       removed: [ 'removed1', 'removed2' ],
       lost: [ 'lost1' ],
       returned: [ 'returned1' ]
