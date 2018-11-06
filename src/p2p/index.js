@@ -38,15 +38,19 @@ class P2P {
     return ip
   }
 
-  // TODO: add way to compare time from major server head requests like google.com
-  async _checkTimeSynced (timeServer) {
-    const localTime = utils.getTime('s')
-    let timestamp = await http.get(timeServer)
-    let timeDif = Math.abs(localTime - timestamp)
+  _checkWithinSyncLimit (time1, time2) {
+    let timeDif = Math.abs(time1 - time2)
     if (timeDif > this.syncLimit) {
       return false
     }
     return true
+  }
+
+  // TODO: add way to compare time from major server head requests like google.com
+  async _checkTimeSynced (timeServer) {
+    const localTime = utils.getTime('s')
+    let timestamp = await http.get(timeServer)
+    return this._checkWithinSyncLimit(localTime, timestamp)
   }
 
   async _getSeedListSigned () {
