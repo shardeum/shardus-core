@@ -175,6 +175,16 @@ class Storage {
     return keys.map(k => k.key)
   }
 
+  async clearP2pState () {
+    this._checkInit()
+    try {
+      await this._delete(this.models.cycles, null, { truncate: true })
+      await this._delete(this.models.nodes, null, { truncate: true })
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
   _checkInit () {
     if (!this.initialized) throw new Error('Storage not initialized.')
   }
@@ -191,6 +201,9 @@ class Storage {
     return table.update(values, { where, ...opts })
   }
   _delete (table, where, opts) {
+    if (!where) {
+      return table.destroy({ ...opts })
+    }
     return table.destroy({ where, ...opts })
   }
 }

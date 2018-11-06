@@ -90,8 +90,6 @@ test('testing set and add methods for cycles model', async t => {
     const res = await storage.listCycles()
     await storage.addCycles(cycle2)
     await t.rejects(storage.addCycles(cycle2), null, 'should throw an error on uniqueKeyConstraint violation')
-    // remove the id to do the deepEqual comparison
-    delete res[0].id
     t.deepEqual(res[0], cycle, 'should be equal the first element of res to the inserted cycle')
   }
 
@@ -224,4 +222,61 @@ test('testing set and add methods for properties model', async t => {
   }
 
   t.end()
+})
+
+// testing clear methods
+test('testing clearP2pState method', async t => {
+  let node = {
+    id: '123456',
+    internalIp: '192.168.0.100',
+    externalIp: '200.20.55.11',
+    internalPort: 9999,
+    externalPort: 443,
+    joinRequestTimestamp: Date.now(),
+    address: 'a1b2c3e4f5'
+  }
+  let cycle = {
+    certificate: [ 'keyNode1', 'keyNode2' ],
+    previous: '00000000',
+    marker: 'marker1',
+    counter: 1,
+    time: Date.now(),
+    active: 20,
+    desired: 20,
+    joined: [ 'new1', 'new2', 'new3' ],
+    activated: [ 'activated1', 'activated2' ],
+    removed: [ 'removed1', 'removed2' ],
+    lost: [ 'lost1' ],
+    returned: [ 'returned1' ]
+  }
+  let cycle2 = {
+    certificate: [ 'keyNode1', 'keyNode2' ],
+    previous: 'marker1',
+    marker: 'marker2',
+    counter: 2,
+    time: Date.now(),
+    active: 20,
+    desired: 20,
+    joined: [ 'new1', 'new2', 'new3' ],
+    activated: [ 'activated1', 'activated2' ],
+    removed: [ 'removed1', 'removed2' ],
+    lost: [ 'lost1' ],
+    returned: [ 'returned1' ]
+  }
+
+  await storage.addNodes(node)
+  await storage.addCycles([cycle, cycle2])
+
+  let res
+  res = await storage.getNodes(node)
+  t.deepEqual(res, [node], 'getNodes should return [node]')
+  res = await storage.listCycles()
+  t.deepEqual(res, [cycle, cycle2], 'listCycles should return [cycle, cycle2]')
+
+  await storage.clearP2pState()
+
+  res = await storage.getNodes(node)
+  t.deepEqual(res, [], 'getNodes should return []')
+  res = await storage.listCycles()
+  t.deepEqual(res, [], 'listCycles should return []')
 })
