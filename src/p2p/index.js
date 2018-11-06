@@ -58,10 +58,11 @@ class P2P {
     return seedListSigned
   }
 
-  _getNetworkCycleMarker (nodes) {
-    // TODO: verify cycle marker from multiple nodes
-    let node = nodes[0]
-    return http.get(`${node.ip}:${node.port}/cyclemarker`)
+  async _getSeedNodes () {
+    let seedListSigned = await this._getSeedListSigned()
+    if (!this.crypto.verify(seedListSigned, this.netadmin)) throw Error('Fatal: Seed list was not signed by specified netadmin!')
+    return seedListSigned.seedNodes
+
   }
 
   getIpInfo () {
