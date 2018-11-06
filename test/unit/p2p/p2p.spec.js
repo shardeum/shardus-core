@@ -11,9 +11,11 @@ const Crypto = require('../../../src/crypto/index')
 const ExitHandler = require('../../../src/exit-handler')
 
 const { readLogFile, resetLogFile } = require('../../includes/utils-log')
+const { createTestDb } = require('../../includes/utils-storage')
 const { sleep } = require('../../../src/utils')
 
 let p2p
+let confStorage = module.require(`../../../config/storage.json`)
 let config = require(path.join(__dirname, '../../../config/server.json'))
 // increase the timeSync limit to avoid issues in the test
 config.syncLimit = 10000
@@ -32,6 +34,7 @@ let loggerConfig = {
 
 let exitHandler = new ExitHandler()
 let logger = new Logger(path.resolve('./'), loggerConfig)
+let newConfStorage = createTestDb(confStorage)
 let storage = new Storage(
   exitHandler,
   logger,
@@ -121,6 +124,10 @@ test('Testing discoverNetwork method', async t => {
   resetLogFile('main')
   await p2p.discoverNetwork()
   const log = readLogFile('main')
+  if (confStorage) {
+    confStorage.options.storage = 'db/db.sqlite'
+    fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
+  }
   t.notEqual(log.includes('You are not the seed node!'), true, 'the discoverNetwork method should write this message in main log file, the seedNode port is 8080 and this instance has the port 9001')
   t.end()
 })

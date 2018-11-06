@@ -1,10 +1,12 @@
 const test = require('tap').test
+const fs = require('fs')
 const path = require('path')
 
 const Logger = require('../../../src/logger/index')
 const Storage = require('../../../src/storage/index')
 const Crypto = require('../../../src/crypto/index')
 const ExitHandler = require('../../../src/exit-handler')
+const { createTestDb } = require('../../includes/utils-storage')
 
 let configFilePath = path.join(__dirname, '../../../config/logs.json')
 let loggerConfig = {
@@ -19,6 +21,8 @@ let loggerConfig = {
 
 let logger = new Logger(path.resolve('./'), loggerConfig)
 let exitHandler = new ExitHandler()
+let confStorage = module.require(`../../../config/storage.json`)
+let newConfStorage = createTestDb(confStorage)
 let storage = new Storage(
   exitHandler,
   logger,
@@ -92,6 +96,10 @@ test('Should verify a signed object correctly', async t => {
 
 // testing hash method
 test('Should verify a signed object correctly', async t => {
+  if (confStorage) {
+    confStorage.options.storage = 'db/db.sqlite'
+    fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
+  }
   t.equal(isValidHex(crypto.hash(testTx)), true, 'should generate a valid hex from the hash of an object')
   t.end()
 })

@@ -9,25 +9,15 @@ const Logger = require('../../../src/logger')
 const ExitHandler = require('../../../src/exit-handler')
 
 const { readLogFile, resetLogFile } = require('../../includes/utils-log')
+const { createTestDb } = require('../../includes/utils-storage')
 const { sleep } = require('../../../src/utils')
 
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../config/server.json')))
 const models = require('../../../src/storage/models')
-let confStorage, newConfStorage
+let confStorage = module.require(`../../../config/storage.json`)
+let newConfStorage, storage
 let exitHandler = new ExitHandler()
 let logger = new Logger(path.resolve('./'), config.log)
-
-let storage
-let list
-
-// copy the current conf file and then change to use a test db
-function createTestDb () {
-  if (fs.existsSync(path.join(__dirname + '/../../../db', '/db.test.sqlite'))) fs.unlinkSync(path.join(__dirname + '/../../../db', '/db.test.sqlite'))
-  confStorage = module.require(`../../../config/storage.json`)
-  newConfStorage = Object.assign({}, confStorage)
-  newConfStorage.options.storage = 'db/db.test.sqlite'
-  fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(newConfStorage, null, 2))
-}
 
 test('testing initialization property', async t => {
   const failStorage = new Storage(
@@ -50,7 +40,7 @@ test('testing initialization property', async t => {
 test('testing init fn', async t => {
   {
     try {
-      createTestDb()
+      newConfStorage = createTestDb(confStorage)
       resetLogFile()
       storage = new Storage(
         exitHandler,
