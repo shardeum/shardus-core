@@ -58,6 +58,12 @@ class P2P {
     return seedListSigned
   }
 
+  async _getSeedNodes () {
+    let seedListSigned = await this._getSeedListSigned()
+    if (!this.crypto.verify(seedListSigned, this.netadmin)) throw Error('Fatal: Seed list was not signed by specified netadmin!')
+    return seedListSigned.seedNodes
+  }
+
   getIpInfo () {
     return this.ipInfo
   }
