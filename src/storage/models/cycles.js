@@ -12,6 +12,7 @@ module.exports = [
     active: { type: Sequelize.BIGINT, allowNull: false },
     desired: { type: Sequelize.BIGINT, allowNull: false },
     joined: { type: Sequelize.JSON, allowNull: false },
+    activated: { type: Sequelize.JSON, allowNull: false },
     removed: { type: Sequelize.JSON, allowNull: false },
     returned: { type: Sequelize.JSON, allowNull: false },
     lost: { type: Sequelize.JSON, allowNull: false }
