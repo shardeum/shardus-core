@@ -65,6 +65,12 @@ class P2P {
 
   }
 
+  _getNetworkCycleMarker (nodes) {
+    // TODO: verify cycle marker from multiple nodes
+    let node = nodes[0]
+    return http.get(`${node.ip}:${node.port}/cyclemarker`)
+  }
+
   getIpInfo () {
     return this.ipInfo
   }
@@ -186,6 +192,38 @@ class P2P {
     }
   }
 
+  async _createJoinRequest () {
+    // The server makes a /get_cycle_marker request.
+    const seedNodes = await this._getSeedNodes()
+    try {
+      var { cycleMarker, currentTime } = await this._getNetworkCycleMarker(seedNodes)
+    } catch (e) {
+      throw new Error(e)
+    }
+    let difficulty = 10
+    // Checks that the time difference is within syncLimit (as configured).
+    const localTime = utils.getTime('s')
+    this._checkWithinSyncLimit(localTime, currentTime)
+    // Build join request
+    let { publicKey, externalIp, externalPort, internalIp, internalPort } = this._getThisNodeInfo()
+    let proofOfWork = await this.crypto.computeProofOfWork(difficulty)
+    let selectionNum = this.crypto.hash({ cycleMarker, publicKey })
+    let signedSelectionNum = this.crypto.sign({ selectionNum })
+    return {
+      // TODO: add a version number at some point
+      // version: '0.0.0',
+      externalIp,
+      externalPort,
+      internalIp,
+      internalPort,
+      publicKey,
+      cycleMarker,
+      proofOfWork,
+      selectionNum,
+      signedSelectionNum
+    }
+  }
+
   async discoverNetwork () {
     // Check if our time is synced to network time server
     let timeSynced = await this._checkTimeSynced(this.timeServer)
@@ -238,6 +276,12 @@ class P2P {
     this.mainLogger.debug('Syncing to network...')
     // TODO: add resyncing
     return false
+  }
+
+  async joinNetwork () {
+    // Create a join request which contains a valid proof-of-work.
+    let joinRequest = await this._createJoinRequest()
+    return joinRequest
   }
 }
 

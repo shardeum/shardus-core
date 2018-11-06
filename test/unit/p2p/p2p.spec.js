@@ -191,6 +191,7 @@ test('Testing _createJoinRequest method', async t => {
   t.end()
 })
 
+
 test('Testing _createJoinRequest method', async t => {
   let joinRequest = await p2p._createJoinRequest()
   t.match(joinRequest, {
@@ -210,5 +211,7 @@ test('Testing _createJoinRequest method', async t => {
       }
     }
   }, 'joinRequest should have all expected properties')
+  let joinRequest = await p2p.joinNetwork()
+  console.log(joinRequest)
   t.end()
 })
