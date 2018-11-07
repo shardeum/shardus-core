@@ -69,6 +69,7 @@ class Shardus {
     let ipInfo = { externalIp: config.externalIp || null, externalPort: config.externalPort || null }
     let p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration }
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto)
+    await this.p2p.init()
     await this._setupExternalApi(this.app)
     await this.p2p.discoverNetwork()
   }

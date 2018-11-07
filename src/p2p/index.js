@@ -17,6 +17,10 @@ class P2P {
     this.state = new P2PState(config, this.logger, this.storage, this.crypto)
   }
 
+  async init () {
+    await this.state.init()
+  }
+
   _verifyIpInfo (ipInfo) {
     if (!ipInfo.externalIp) {
       return false
@@ -82,12 +86,34 @@ class P2P {
     return nodeInfo
   }
 
+  async _checkIfSeedNode () {
+
+  }
+
   async discoverNetwork () {
     let timeSynced = await this._checkTimeSynced(this.timeServer)
     if (!timeSynced) throw new Error('Local time out of sync with time server.')
     if (!this._verifyIpInfo(this.getIpInfo())) {
       this.ipInfo.externalIp = await this._retrieveIp(this.ipServer)
     }
+
+    // const dbExternIp = this.storage.getProperty('externalIp')
+    // const dbExternPort = this.storage.getProperty('externalPort')
+    /*
+    if (dbExternIp && dbExternPort) {
+      const ipInfo = this.getIpInfo()
+      if (dbExternIp !== ipInfo.externalIp || dbExternPort !== ipInfo.externalPort) {
+        // rejoin
+        // reset properties from db
+      } else {
+        // you're good, continue looking at the state
+        // if you're not in nodes list,
+      }
+    } else {
+      // set properties
+      joinNetwork
+    }
+    */
     let seedListSigned = await this._getSeedListSigned()
     if (!this.crypto.verify(seedListSigned, this.netadmin)) throw Error('Fatal: Seed list was not signed by specified netadmin!')
     const seedNodes = seedListSigned.seedNodes
@@ -96,9 +122,8 @@ class P2P {
       let { externalIp, externalPort } = this.getIpInfo()
       if (externalIp === seed.ip && externalPort === seed.port) {
         this.mainLogger.info('You are the seed node!')
-        const thisNode = this._getThisNodeInfo()
-        this.mainLogger.info('Adding this node to node list...')
-        this.state.addJoinRequest(thisNode)
+        // TODO: needs to check if we are already in the nodelist
+        this.state.addJoinRequest(this._getThisNodeInfo())
         this.state.startCycles()
         return
       }

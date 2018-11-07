@@ -24,9 +24,18 @@ class P2PState {
     this.cycles = []
     this.acceptJoinReq = false
     this.joinRequests = []
+    this.shouldStop = false
   }
 
   // TODO: add init function that reads from database into memory
+  async init () {
+    const cycles = await this.storage.listCycles()
+    this.mainLogger.debug(`Loaded the following cycles from database: ${JSON.stringify(cycles)}`)
+    this.cycles = cycles
+    const nodes = await this.storage.listNodes()
+    this.mainLogger.debug(`Loaded the following nodes from database: ${JSON.stringify(nodes)}`)
+    this._addNodesToNodelist(nodes)
+  }
 
   addJoinRequest (nodeInfo) {
     // TODO: check if accepting join requests
@@ -47,7 +56,7 @@ class P2PState {
     return publicKey
   }
 
-  _acceptNode (publicKey, cycleMarker) {
+  async _acceptNode (publicKey, cycleMarker) {
     let node
     try {
       node = this.nodes.pending[publicKey]
@@ -60,15 +69,51 @@ class P2PState {
     this.nodes.ordered.push(node)
     this.nodes.current[node.id] = node
     delete this.nodes.pending[node.id]
-    this.nodes.syncing[node.id]= node
-    this.storage.addNodes(node)
+    // TODO: put this into the _addNodeToNodelist
+    this.nodes.syncing[node.id] = node
+    console.log('we are here')
+    await this.addNode(node)
   }
 
-  _acceptNodes (publicKeys, cycleMarker) {
+  async _acceptNodes (publicKeys, cycleMarker) {
+    const promises = []
     for (const publicKey of publicKeys) {
-      this._acceptNode(publicKey, cycleMarker)
+      promises.push(this._acceptNode(publicKey, cycleMarker))
+    }
+    await Promise.all(promises)
+  }
+
+  // TODO: Take status as a param after status is being stored in DB
+  _addNodeToNodelist (node) {
+    this.nodes.current[node.id] = node
+  }
+
+  _addNodesToNodelist (nodes) {
+    for (const node of nodes) {
+      this._addNodeToNodelist(node)
     }
   }
+
+  // This is for adding a node both in memory and to storage
+  async addNode (node) {
+    this._addNodeToNodelist(node)
+    await this.storage.addNodes(node)
+  }
+
+  // This is for adding nodes both in memory and to storage
+  async addNodes (nodes) {
+    this._addNodesToNodelist(nodes)
+    await this.storage.addNodes(nodes)
+  }
+
+  /* TODO: add this change after status is being stored in DB
+  // Should pass an array of objects containing { node, status }
+  _addNodesToNodelist (nodesInfo) {
+    for (const nodeInfo of nodesInfo) {
+      this._addNodeToNodelist(nodeInfo.node, nodeInfo.status)
+    }
+  }
+  */
 
   _computeCycleMarker (fields) {
     this.mainLogger.debug(`Computing cycle marker... Cycle marker fields: ${JSON.stringify(fields)}`)
@@ -82,14 +127,21 @@ class P2PState {
       joined: [],
       removed: [],
       lost: [],
-      returned: []
+      returned: [],
+      activated: [],
+      certificate: {}
     }
   }
 
   // Kicks off the whole cycle and cycle marker creation system
   startCycles () {
+    this.shouldStop = false
     this.mainLogger.info('Starting first cycle...')
     this._startNewCycle()
+  }
+
+  stopCycles () {
+    this.shouldStop = true
   }
 
   _startNewCycle () {
@@ -126,6 +178,7 @@ class P2PState {
     this.mainLogger.debug('Starting cycle finalization phase...')
     this._createCycle()
     setTimeout(() => {
+      if (this.shouldStop) return
       this._startNewCycle()
     }, phaseLen)
   }
@@ -144,10 +197,12 @@ class P2PState {
     cycleInfo.marker = this.getCurrentCertificate().marker
 
     this._resetCurrentCycle()
-    this._acceptNodes(cycleInfo.joined)
     this.cycles.push(cycleInfo)
+    const accepted = this._acceptNodes(cycleInfo.joined)
+    const cycleAdded = this.storage.addCycles(cycleInfo)
+    const promises = [accepted, cycleAdded]
     try {
-      await this.storage.addCycles(cycleInfo)
+      await Promise.all(promises)
       this.mainLogger.info('Added cycle chain entry to database successfully!')
     } catch (e) {
       this.mainLogger.error(e)
