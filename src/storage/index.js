@@ -36,11 +36,19 @@ class Storage {
 
   async addCycles (cycles) {
     this._checkInit()
-    await this._create(this.models.cycles, cycles)
+    try {
+      await this._create(this.models.cycles, cycles)
+    } catch (e) {
+      throw new Error(e)
+    }
   }
   async getCycleByCounter (counter) {
     this._checkInit()
-    let [ cycle ] = await this._read(this.models.cycles, { counter }, { attributes: { exclude: ['createdAt', 'updatedAt'] } })
+    try {
+      var [ cycle ] = await this._read(this.models.cycles, { counter }, { attributes: { exclude: ['createdAt', 'updatedAt'] } })
+    } catch (e) {
+      throw new Error(e)
+    }
     if (cycle && cycle.dataValues) {
       return cycle.dataValues
     }
@@ -48,7 +56,11 @@ class Storage {
   }
   async getCycleByMarker (marker) {
     this._checkInit()
-    let [ cycle ] = await this._read(this.models.cycles, { marker }, { attributes: { exclude: ['createdAt', 'updatedAt'] } })
+    try {
+      var [ cycle ] = await this._read(this.models.cycles, { marker }, { attributes: { exclude: ['createdAt', 'updatedAt'] } })
+    } catch (e) {
+      throw new Error(e)
+    }
     if (cycle && cycle.dataValues) {
       return cycle.dataValues
     }
@@ -56,47 +68,83 @@ class Storage {
   }
   async deleteCycleByCounter (counter) {
     this._checkInit()
-    await this._delete(this.models.cycles, { counter })
+    try {
+      await this._delete(this.models.cycles, { counter })
+    } catch (e) {
+      throw new Error(e)
+    }
   }
   async deleteCycleByMarker (marker) {
     this._checkInit()
-    await this._delete(this.models.cycles, { marker })
+    try {
+      await this._delete(this.models.cycles, { marker })
+    } catch (e) {
+      throw new Error(e)
+    }
   }
   async listCycles () {
     this._checkInit()
-    let cycles = await this._read(this.models.cycles, null, { attributes: { exclude: ['createdAt', 'updatedAt'] } })
+    try {
+      var cycles = await this._read(this.models.cycles, null, { attributes: { exclude: ['createdAt', 'updatedAt'] } })
+    } catch (e) {
+      throw new Error(e)
+    }
     return cycles.map(c => c.dataValues)
   }
 
   async addNodes (nodes) {
     this._checkInit()
-    await this._create(this.models.nodes, nodes)
+    try {
+      await this._create(this.models.nodes, nodes)
+    } catch (e) {
+      throw new Error(e)
+    }
   }
   async getNodes (node) {
     this._checkInit()
-    let nodes = await this._read(this.models.nodes, node, { attributes: { exclude: ['createdAt', 'updatedAt'] }, raw: true })
+    try {
+      var nodes = await this._read(this.models.nodes, node, { attributes: { exclude: ['createdAt', 'updatedAt'] }, raw: true })
+    } catch (e) {
+      throw new Error(e)
+    }
     return nodes
   }
   async deleteNodes (node) {
     this._checkInit()
-    await this._delete(this.models.nodes, node)
+    try {
+      await this._delete(this.models.nodes, node)
+    } catch (e) {
+      throw new Error(e)
+    }
   }
   async listNodes () {
     this._checkInit()
-    let nodes = await this._read(this.models.nodes, null, { attributes: { exclude: ['createdAt', 'updatedAt'] }, raw: true })
+    try {
+      var nodes = await this._read(this.models.nodes, null, { attributes: { exclude: ['createdAt', 'updatedAt'] }, raw: true })
+    } catch (e) {
+      throw new Error(e)
+    }
     return nodes
   }
 
   async setProperty (key, value) {
     this._checkInit()
-    await this._create(this.models.properties, {
-      key,
-      value: JSON.stringify(value)
-    })
+    try {
+      await this._create(this.models.properties, {
+        key,
+        value: JSON.stringify(value)
+      })
+    } catch (e) {
+      throw new Error(e)
+    }
   }
   async getProperty (key) {
     this._checkInit()
-    let [ prop ] = await this._read(this.models.properties, { key })
+    try {
+      var [ prop ] = await this._read(this.models.properties, { key })
+    } catch (e) {
+      throw new Error(e)
+    }
     if (prop && prop.value) {
       return JSON.parse(prop.value)
     }
@@ -104,11 +152,19 @@ class Storage {
   }
   async deleteProperty (key) {
     this._checkInit()
-    await this._delete(this.models.properties, { key })
+    try {
+      await this._delete(this.models.properties, { key })
+    } catch (e) {
+      throw new Error(e)
+    }
   }
   async listProperties () {
     this._checkInit()
-    let keys = await this._read(this.models.properties, null, { attributes: ['key'], raw: true })
+    try {
+      var keys = await this._read(this.models.properties, null, { attributes: ['key'], raw: true })
+    } catch (e) {
+      throw new Error(e)
+    }
     return keys.map(k => k.key)
   }
 

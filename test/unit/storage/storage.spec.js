@@ -93,6 +93,7 @@ test('testing set and add methods for cycles model', async t => {
     await storage.addCycles(cycle)
     const res = await storage.listCycles()
     await storage.addCycles(cycle2)
+    await t.rejects(storage.addCycles(cycle2), null, 'should throw an error on uniqueKeyConstraint violation')
     // remove the id to do the deepEqual comparison
     delete res[0].id
     t.deepEqual(res[0], cycle, 'should be equal the first element of res to the inserted cycle')
