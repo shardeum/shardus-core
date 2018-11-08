@@ -130,10 +130,18 @@ class Storage {
   async setProperty (key, value) {
     this._checkInit()
     try {
-      await this._create(this.models.properties, {
-        key,
-        value: JSON.stringify(value)
-      })
+      let [ prop ] = await this._read(this.models.properties, { key })
+      if (!prop) {
+        await this._create(this.models.properties, {
+          key,
+          value: JSON.stringify(value)
+        })
+      } else {
+        await this._update(this.models.properties, {
+          key,
+          value: JSON.stringify(value)
+        }, { key })
+      }
     } catch (e) {
       throw new Error(e)
     }

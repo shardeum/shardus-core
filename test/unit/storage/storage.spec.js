@@ -194,6 +194,7 @@ test('testing set and add methods for properties model', async t => {
         ]
       }
     }
+    await storage.setProperty(property.key, 'HELLOO')
     await storage.setProperty(property.key, property.value)
     const res = await storage.getProperty(property.key)
     t.deepEqual(res, property.value, 'should be equal the first element of res to the inserted cycle')
