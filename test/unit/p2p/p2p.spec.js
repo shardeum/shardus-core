@@ -8,7 +8,6 @@ const P2P = require('../../../src/p2p')
 const Logger = require('../../../src/logger')
 const Storage = require('../../../src/storage')
 const Crypto = require('../../../src/crypto/index')
-const ExitHandler = require('../../../src/exit-handler')
 
 const { readLogFile, resetLogFile } = require('../../includes/utils-log')
 const { createTestDb } = require('../../includes/utils-storage')
@@ -32,11 +31,9 @@ let loggerConfig = {
   }
 }
 
-let exitHandler = new ExitHandler()
 let logger = new Logger(path.resolve('./'), loggerConfig)
 let newConfStorage = createTestDb(confStorage)
 let storage = new Storage(
-  exitHandler,
   logger,
   '../../../',
   { confFile: './config/storage.json' }

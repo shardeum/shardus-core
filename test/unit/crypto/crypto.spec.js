@@ -5,7 +5,6 @@ const path = require('path')
 const Logger = require('../../../src/logger/index')
 const Storage = require('../../../src/storage/index')
 const Crypto = require('../../../src/crypto/index')
-const ExitHandler = require('../../../src/exit-handler')
 const { createTestDb } = require('../../includes/utils-storage')
 
 let configFilePath = path.join(__dirname, '../../../config/logs.json')
@@ -20,11 +19,9 @@ let loggerConfig = {
 }
 
 let logger = new Logger(path.resolve('./'), loggerConfig)
-let exitHandler = new ExitHandler()
 let confStorage = module.require(`../../../config/storage.json`)
 let newConfStorage = createTestDb(confStorage)
 let storage = new Storage(
-  exitHandler,
   logger,
   '../../../',
   { confFile: './config/storage.json' }

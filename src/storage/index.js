@@ -4,7 +4,7 @@ const Sequelize = require('sequelize')
 const models = require('./models')
 
 class Storage {
-  constructor (exitHandler, logger, baseDir, config) {
+  constructor (logger, baseDir, config) {
     let absBaseDir = path.join(path.parse(require.main.filename).dir, baseDir)
     // Parse config
     config = require(path.join(absBaseDir, config.confFile))
@@ -20,11 +20,6 @@ class Storage {
     for (let [modelName, modelAttributes] of models) this.sequelize.define(modelName, modelAttributes)
     this.models = this.sequelize.models
     this.initialized = false
-    // Register with the exitHandler to close database connections gracefully
-    exitHandler.registerAsync('storage', () => {
-      this.mainLogger.info('Closing Database connections.')
-      return this.sequelize.close()
-    })
   }
 
   async init () {
@@ -32,6 +27,10 @@ class Storage {
     for (let model of Object.values(this.models)) await model.sync()
     this.initialized = true
     this.mainLogger.info('Database initialized.')
+  }
+  async close () {
+    this.mainLogger.info('Closing Database connections.')
+    await this.sequelize.close()
   }
 
   async addCycles (cycles) {

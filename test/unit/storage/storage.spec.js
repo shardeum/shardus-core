@@ -6,7 +6,6 @@ const path = require('path')
 
 const Storage = require('../../../src/storage')
 const Logger = require('../../../src/logger')
-const ExitHandler = require('../../../src/exit-handler')
 
 const { readLogFile, resetLogFile } = require('../../includes/utils-log')
 const { createTestDb } = require('../../includes/utils-storage')
@@ -16,12 +15,10 @@ const config = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../config/
 const models = require('../../../src/storage/models')
 let confStorage = module.require(`../../../config/storage.json`)
 let newConfStorage, storage
-let exitHandler = new ExitHandler()
 let logger = new Logger(path.resolve('./'), config.log)
 
 test('testing initialization property', async t => {
   const failStorage = new Storage(
-    exitHandler,
     logger,
     '../../../',
     { confFile: './config/storage.json' }
@@ -43,7 +40,6 @@ test('testing init fn', async t => {
       newConfStorage = createTestDb(confStorage)
       resetLogFile()
       storage = new Storage(
-        exitHandler,
         logger,
         '../../../',
         { confFile: './config/storage.json' }

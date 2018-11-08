@@ -14,7 +14,7 @@ class Shardus {
     this.mainLogger = this.logger.getLogger('main')
     this.fatalLogger = this.logger.getLogger('fatal')
     this.exitHandler = new ExitHandler()
-    this.storage = new Storage(this.exitHandler, this.logger, config.baseDir, config.storage)
+    this.storage = new Storage(this.logger, config.baseDir, config.storage)
     this.app = express()
     this.crypto = {}
     this.p2p = {}
