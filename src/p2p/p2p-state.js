@@ -30,11 +30,43 @@ class P2PState {
   // TODO: add init function that reads from database into memory
   async init () {
     const cycles = await this.storage.listCycles()
-    this.mainLogger.debug(`Loaded the following cycles from database: ${JSON.stringify(cycles)}`)
+    this.mainLogger.debug(`Loaded ${cycles.length} cycles from the database.`)
     this.cycles = cycles
     const nodes = await this.storage.listNodes()
-    this.mainLogger.debug(`Loaded the following nodes from database: ${JSON.stringify(nodes)}`)
+    this.mainLogger.debug(`Loaded ${nodes.length} nodes from the database.`)
     this._addNodesToNodelist(nodes)
+  }
+
+  _resetNodelist () {
+    this.nodes = {
+      ordered: [],
+      current: {},
+      active: {},
+      syncing: {},
+      pending: {}
+    }
+  }
+
+  _resetCycles () {
+    this.cycles.length = 0
+  }
+
+  _resetJoinRequests () {
+    this.joinRequests.length = 0
+  }
+
+  _resetState () {
+    this._resetCurrentCycle()
+    this._resetNodelist()
+    this._resetCycles()
+    this._resetJoinRequests()
+  }
+
+  async clear () {
+    this.mainLogger.info('Clearing P2P state in memory and in database...')
+    await this.storage.clearP2pState()
+    this.mainLogger.info('P2P data cleared from database.')
+    this._resetState()
   }
 
   addJoinRequest (nodeInfo) {
@@ -47,8 +79,12 @@ class P2PState {
 
   _addPendingNode (node) {
     this.nodes.pending[node.publicKey] = node
-    // TODO: For now we are automatically adding to join list, we shouldn't
-    this.currentCycle.joined.push(node.publicKey)
+  }
+
+  _addJoiningNodes (nodes) {
+    for (const node of nodes) {
+      this.currentCycle.joined.push(node.publicKey)
+    }
   }
 
   _computeNodeId (publicKey, cycleMarker) {
@@ -56,6 +92,7 @@ class P2PState {
     return publicKey
   }
 
+  // TODO: Check if we are the node being added so we can add our ID to the properties table
   async _acceptNode (publicKey, cycleMarker) {
     let node
     try {
@@ -69,9 +106,8 @@ class P2PState {
     this.nodes.ordered.push(node)
     this.nodes.current[node.id] = node
     delete this.nodes.pending[node.id]
-    // TODO: put this into the _addNodeToNodelist
+    // TODO: Let _addNodeToNode handle this when status is param
     this.nodes.syncing[node.id] = node
-    console.log('we are here')
     await this.addNode(node)
   }
 
@@ -158,9 +194,20 @@ class P2PState {
     }, phaseLen)
   }
 
+  // TODO: implement this to get best nodes based on POW, selection number,
+  // ---   and number of desired nodes
+  _getBestNodes () {
+    const firstNode = Object.values(this.nodes.pending)[0]
+    const bestNodes = firstNode ? [firstNode] : []
+    this.mainLogger.debug(`Best nodes for this cycle: ${JSON.stringify(bestNodes)}`)
+    return bestNodes
+  }
+
   _endJoinPhase (phaseLen) {
     this.mainLogger.debug('Ending join phase...')
     this.acceptJoinReq = false
+    const bestNodes = this._getBestNodes()
+    this._addJoiningNodes(bestNodes)
     setTimeout(() => {
       this._startCycleSync(phaseLen)
     }, phaseLen)

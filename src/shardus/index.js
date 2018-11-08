@@ -5,6 +5,7 @@ const ExitHandler = require('../exit-handler')
 const P2P = require('../p2p')
 const Crypto = require('../crypto')
 const Storage = require('../storage')
+const utils = require('../utils')
 
 class Shardus {
   constructor (config) {
@@ -19,9 +20,16 @@ class Shardus {
     this.crypto = {}
     this.p2p = {}
 
+    this.heartbeatInterval = config.heartbeatInterval
+
     this.exitHandler.addSigListeners()
-    this.exitHandler.registerAsync('logger', () => {
-      return this.logger.shutdown()
+    // TODO: Make registerAsync shut down things in order because of this...
+    this.exitHandler.registerAsync('shardus-storage-logger', () => {
+      return async () => {
+        await this.writeHeartbeat()
+        await this.storage.close()
+        await this.logger.shutdown()
+      }
     })
   }
 
@@ -55,23 +63,40 @@ class Shardus {
 
   registerExceptionHandler () {
     process.on('uncaughtException', (err) => {
-      this.fatalLogger.fatal(err.message)
+      this.fatalLogger.fatal(err)
       this.exitHandler.exitCleanly()
     })
   }
 
+  async writeHeartbeat () {
+    const timestamp = utils.getTime('s')
+    await this.storage.setProperty('heartbeat', timestamp)
+  }
+
+  _setupHeartbeat () {
+    setInterval(async () => {
+      await this.writeHeartbeat()
+    }, this.heartbeatInterval * 1000)
+  }
+
   async setup (config) {
     await this.storage.init()
+    this._setupHeartbeat()
     this.crypto = new Crypto(this.logger, this.storage)
     await this.crypto.init()
-
-    let { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration } = config
+    let { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime } = config
     let ipInfo = { externalIp: config.externalIp || null, externalPort: config.externalPort || null }
-    let p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration }
+    let p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime }
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto)
     await this.p2p.init()
     await this._setupExternalApi(this.app)
-    await this.p2p.discoverNetwork()
+    let joinedNetwork
+    try {
+      joinedNetwork = await this.p2p.discoverNetwork()
+    } catch (e) {
+      throw new Error(e)
+    }
+    if (!joinedNetwork) await this.shutdown()
   }
 
   async shutdown () {
