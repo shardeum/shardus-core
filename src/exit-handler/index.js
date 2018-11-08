@@ -16,11 +16,9 @@ class ExitHandler {
 
   // Cleans up all modules with registered async functions
   async _cleanupAsync () {
-    const promises = []
     for (const func of Object.values(this.asyncFuncs)) {
-      promises.push(func())
+      await func()
     }
-    await Promise.all(promises)
   }
 
   // Cleans up all modules with registered sync functions
@@ -33,20 +31,24 @@ class ExitHandler {
   // Exits after cleaning up with all registered functions
   async exitCleanly () {
     this._cleanupSync()
-    await this._cleanupAsync()
+    try {
+      await this._cleanupAsync()
+    } catch (e) {
+      console.error(e)
+    }
     process.exit()
   }
 
   // Used for adding event listeners for the SIGINT and SIGTERM signals
   addSigListeners (sigint = true, sigterm = true) {
     if (sigint) {
-      process.on('SIGINT', () => {
-        this.exitCleanly()
+      process.on('SIGINT', async () => {
+        await this.exitCleanly()
       })
     }
     if (sigterm) {
-      process.on('SIGTERM', () => {
-        this.exitCleanly()
+      process.on('SIGTERM', async () => {
+        await this.exitCleanly()
       })
     }
   }

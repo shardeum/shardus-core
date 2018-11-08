@@ -21,15 +21,21 @@ class Shardus {
     this.p2p = {}
 
     this.heartbeatInterval = config.heartbeatInterval
+    this.heartbeatTimer = null
 
     this.exitHandler.addSigListeners()
-    // TODO: Make registerAsync shut down things in order because of this...
-    this.exitHandler.registerAsync('shardus-storage-logger', () => {
-      return async () => {
-        await this.writeHeartbeat()
-        await this.storage.close()
-        await this.logger.shutdown()
-      }
+    this.exitHandler.registerSync('shardus', () => {
+      this.stopHeartbeat()
+    })
+    this.exitHandler.registerAsync('shardus', () => {
+      this.mainLogger.info('Writing heartbeat to database before exiting...')
+      return this.writeHeartbeat()
+    })
+    this.exitHandler.registerAsync('storage', () => {
+      return this.storage.close()
+    })
+    this.exitHandler.registerAsync('logger', () => {
+      return this.logger.shutdown()
     })
   }
 
@@ -62,9 +68,14 @@ class Shardus {
   }
 
   registerExceptionHandler () {
-    process.on('uncaughtException', (err) => {
+    process.on('uncaughtException', async (err) => {
       this.fatalLogger.fatal(err)
-      this.exitHandler.exitCleanly()
+      try {
+        await this.exitHandler.exitCleanly()
+      } catch (e) {
+        console.error(e)
+        process.exit(1)
+      }
     })
   }
 
@@ -74,9 +85,14 @@ class Shardus {
   }
 
   _setupHeartbeat () {
-    setInterval(async () => {
+    this._heartbeatTimer = setInterval(async () => {
       await this.writeHeartbeat()
     }, this.heartbeatInterval * 1000)
+  }
+
+  stopHeartbeat () {
+    this.mainLogger.info('Stopping heartbeat...')
+    clearInterval(this.heartbeatTimer)
   }
 
   async setup (config) {
@@ -100,7 +116,11 @@ class Shardus {
   }
 
   async shutdown () {
-    await this.exitHandler.exitCleanly()
+    try {
+      await this.exitHandler.exitCleanly()
+    } catch (e) {
+      throw e
+    }
   }
 }
 
