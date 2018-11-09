@@ -54,7 +54,7 @@ function _getHttps (url) {
       res.on('end', () => {
         let parsed
         try {
-          console.log(data)
+          // console.log(data)
           parsed = JSON.parse(data)
         } catch (e) {
           reject(e)
@@ -95,7 +95,7 @@ function _postHttp (options, payload) {
       res.on('end', () => {
         let parsed
         try {
-          console.log(data)
+          // console.log(data)
           parsed = JSON.parse(data)
         } catch (e) {
           reject(e)
@@ -128,7 +128,7 @@ function _postHttps (options, payload) {
       res.on('end', () => {
         let parsed
         try {
-          console.log(data)
+          // console.log(data)
           parsed = JSON.parse(data)
         } catch (e) {
           reject(e)

@@ -2,9 +2,10 @@ const test = require('tap').test
 const fs = require('fs')
 const path = require('path')
 
-const Logger = require('../../../src/logger/index')
-const Storage = require('../../../src/storage/index')
-const Crypto = require('../../../src/crypto/index')
+const Logger = require('../../../src/logger')
+const Storage = require('../../../src/storage')
+const Crypto = require('../../../src/crypto')
+const ExitHandler = require('../../../src/exit-handler')
 const { createTestDb } = require('../../includes/utils-storage')
 
 let configFilePath = path.join(__dirname, '../../../config/logs.json')

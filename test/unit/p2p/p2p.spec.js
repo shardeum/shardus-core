@@ -12,12 +12,13 @@ const Crypto = require('../../../src/crypto/index')
 const { readLogFile, resetLogFile } = require('../../includes/utils-log')
 const { createTestDb } = require('../../includes/utils-storage')
 const { sleep } = require('../../../src/utils')
+const { isValidHex } = require('../../includes/utils')
 
 let p2p
 let confStorage = module.require(`../../../config/storage.json`)
 let config = require(path.join(__dirname, '../../../config/server.json'))
 // increase the timeSync limit to avoid issues in the test
-config.syncLimit = 10000
+config.syncLimit = 60000
 config.ipInfo = { externalIp: config.externalIp || null, externalPort: config.externalPort || null }
 
 let configFilePath = path.join(__dirname, '../../../config/logs.json')
@@ -100,15 +101,15 @@ test('Testing _checkTimeSynced method', async t => {
   t.end()
 })
 
-test('Testing _getSeedNodes method', async t => {
-  {
-    const localNode = { ip: "127.0.0.1", port: 9001 }
-    const res = await p2p._getSeedListSigned()
-    t.equal(Array.isArray(res.seedNodes), true, '_getSeedNodes should return an array type')
-    t.notEqual(res.seedNodes.length, 0, 'the array should have at least one node in its list')
-    t.deepEqual(res.seedNodes[0], localNode, 'should have a local node as the first element of the array list')
-  }
-
+test('Testing _getSeedListSigned method', async t => {
+  const localNode = { ip: "127.0.0.1", port: 9001 }
+  const res = await p2p._getSeedListSigned()
+  t.equal(Array.isArray(res.seedNodes), true, '_getSeedNodes should return an array type')
+  t.notEqual(res.seedNodes.length, 0, 'the array should have at least one node in its list')
+  t.deepEqual(res.seedNodes[0], localNode, 'should have a local node as the first element of the array list')
+  t.equal(typeof res.sign, 'object', 'the sign property should be an object')
+  t.equal(isValidHex(res.sign.owner), true, 'owner pk should be a valid hex')
+  t.equal(isValidHex(res.sign.sig), true, 'signature should be a valid hex')
   t.end()
 })
 
@@ -121,10 +122,40 @@ test('Testing discoverNetwork method', async t => {
   resetLogFile('main')
   await p2p.discoverNetwork()
   const log = readLogFile('main')
+  t.notEqual(log.includes('You are not the seed node!'), true, 'the discoverNetwork method should write this message in main log file, the seedNode port is 8080 and this instance has the port 9001')
+  t.end()
+})
+
+let nodeAddress
+test('Testing _getThisNodeInfo', t => {
+  const res = p2p._getThisNodeInfo()
+  nodeAddress = res.address
+  const diff = Date.now() - res.joinRequestTimestamp
+  t.equal(typeof res.externalIp, 'string', 'externalIp should be a string')
+  t.notEqual(isIP(res.externalIp), 0, 'externalIp should be a valid ip')
+  t.equal(typeof res.externalPort, 'number', 'externalPort should be a number')
+  t.equal(typeof res.internalIp, 'string', 'internalIp should be a string')
+  t.notEqual(isIP(res.internalIp), 0, 'internalIp should be a valid ip')
+  t.equal(typeof res.internalPort, 'number', 'internalPort should be a number')
+  t.equal(diff > 10000, false, 'the difference of times should not be greater than 10s')
+  t.end()
+})
+
+test('Testing getCycleMarkerInfo', async t => {
+  await sleep(Math.ceil(p2p.state.cycleDuration * 0.75) * 1000)
+  p2p.state.stopCycles()
+  const res = p2p.getCycleMarkerInfo()
+  const diff = Date.now() - res.currentTime
+  t.equal(isValidHex(res.cycleMarker), true, 'cycleMarker should be a valid hex')
+  t.equal(Array.isArray(res.joined), true, 'joined should be an array')
+  t.equal(res.joined.length, 1, 'should have at least one joined node')
+  t.equal(isValidHex(res.joined[0]), true, 'the element 0 of the joined array should be a hex value')
+  t.equal(res.joined[0], nodeAddress, 'the joined node address should be equals to the address of the inserted node')
+  t.equal(isNaN(Number(res.currentTime)), false, 'the currentTime should be a valid time value')
+  t.equal(diff > 10000, false, 'the difference of times should not be greater than 10s')
   if (confStorage) {
     confStorage.options.storage = 'db/db.sqlite'
     fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
   }
-  t.notEqual(log.includes('You are not the seed node!'), true, 'the discoverNetwork method should write this message in main log file, the seedNode port is 8080 and this instance has the port 9001')
   t.end()
 })

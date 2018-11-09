@@ -6,7 +6,7 @@ config.baseDir = '.'
 config.log.confFile = 'config/logs.json'
 config.storage.confFile = '../../../config/storage.json'
 // increase the timeSync limit to avoid issues in the test
-config.syncLimit = 10000
+config.syncLimit = 100000
 
 let shardus = new Shardus(config)
 
