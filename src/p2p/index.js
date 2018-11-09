@@ -233,12 +233,6 @@ class P2P {
     // TODO: add resyncing
     return false
   }
-
-  async joinNetwork () {
-    // Create a join request which contains a valid proof-of-work.
-    let joinRequest = await this._createJoinRequest()
-    return joinRequest
-  }
 }
 
 module.exports = P2P
