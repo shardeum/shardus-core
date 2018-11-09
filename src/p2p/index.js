@@ -62,7 +62,6 @@ class P2P {
     let seedListSigned = await this._getSeedListSigned()
     if (!this.crypto.verify(seedListSigned, this.netadmin)) throw Error('Fatal: Seed list was not signed by specified netadmin!')
     return seedListSigned.seedNodes
-
   }
 
   _getNetworkCycleMarker (nodes) {
@@ -97,9 +96,8 @@ class P2P {
     const publicKey = this.crypto.getPublicKey()
     // TODO: Change this to actual selectable address
     const address = publicKey
-    // TODO: Incorporate joinRequestTimestamps
-    const joinRequestTimestamp = utils.getTime()
-    const nodeInfo = { publicKey, externalIp, externalPort, internalIp, internalPort, joinRequestTimestamp, address }
+    const joinRequestTimestamp = utils.getTime('s')
+    const nodeInfo = { publicKey, externalIp, externalPort, internalIp, internalPort, address, joinRequestTimestamp }
     this.mainLogger.debug(`Node info of this node: ${JSON.stringify(nodeInfo)}`)
     return nodeInfo
   }
@@ -135,16 +133,8 @@ class P2P {
   async _attemptJoin () {
     // Create a join request which contains a valid proof-of-work.
     let joinRequest = await this._createJoinRequest()
-    this.state.addJoinRequest(joinRequest)
-    this.mainLogger.debug('This is where you would try to join...')
+    this.mainLogger.debug(`Join request created... Join request: ${joinRequest}`)
     return false
-  }
-
-  async _getSeedNodes () {
-    const seedListSigned = await this._getSeedListSigned()
-    if (!this.crypto.verify(seedListSigned, this.netadmin)) throw Error('Fatal: Seed list was not signed by specified netadmin!')
-    const seedNodes = seedListSigned.seedNodes
-    return seedNodes
   }
 
   // TODO: Think about exception when there is more than
@@ -160,6 +150,7 @@ class P2P {
     return false
   }
 
+  // TODO: Pass cyclemarker and current time to this func, break pre-req functionality out
   async _createJoinRequest () {
     // The server makes a /get_cycle_marker request.
     const seedNodes = await this._getSeedNodes()
@@ -174,61 +165,23 @@ class P2P {
     this._checkWithinSyncLimit(localTime, currentTime)
     // Build and return a join request
     let nodeInfo = this._getThisNodeInfo()
-    delete nodeInfo.joinRequestTimestamp
-    delete nodeInfo.address
-    let selectionNum = this.crypto.hash({ cycleMarker, publicKey: nodeInfo.publicKey })
-    let signedSelectionNum = this.crypto.sign({ selectionNum })
+    let selectionNum = this.crypto.hash({ cycleMarker, address: nodeInfo.address })
+    // let signedSelectionNum = this.crypto.sign({ selectionNum })
     let proofOfWork = {
       compute: await this.crypto.getComputeProofOfWork(cycleMarker, difficulty)
     }
-    return {
-      // TODO: add a version number at some point
-      // version: '0.0.0',
-      nodeInfo,
-      cycleMarker,
-      proofOfWork,
-      selectionNum,
-      signedSelectionNum
-    }
-  }
-
-  async _createJoinRequest () {
-    // The server makes a /get_cycle_marker request.
-    const seedNodes = await this._getSeedNodes()
-    try {
-      var { cycleMarker, currentTime } = await this._getNetworkCycleMarker(seedNodes)
-    } catch (e) {
-      throw new Error(e)
-    }
-    let difficulty = 10
-    // Checks that the time difference is within syncLimit (as configured).
-    const localTime = utils.getTime('s')
-    this._checkWithinSyncLimit(localTime, currentTime)
-    // Build join request
-    let { publicKey, externalIp, externalPort, internalIp, internalPort } = this._getThisNodeInfo()
-    let proofOfWork = await this.crypto.computeProofOfWork(difficulty)
-    let selectionNum = this.crypto.hash({ cycleMarker, publicKey })
-    let signedSelectionNum = this.crypto.sign({ selectionNum })
-    return {
-      // TODO: add a version number at some point
-      // version: '0.0.0',
-      externalIp,
-      externalPort,
-      internalIp,
-      internalPort,
-      publicKey,
-      cycleMarker,
-      proofOfWork,
-      selectionNum,
-      signedSelectionNum
-    }
+    // TODO: add a version number at some point
+    // version: '0.0.0'
+    const joinReq = { nodeInfo, cycleMarker, proofOfWork, selectionNum }
+    const signedJoinReq = this.crypto.sign(joinReq)
+    return signedJoinReq
   }
 
   async discoverNetwork () {
     // Check if our time is synced to network time server
     let timeSynced = await this._checkTimeSynced(this.timeServer)
     if (!timeSynced) throw new Error('Local time out of sync with time server.')
-    
+
     // Make sure we know our external IP
     await this._ensureExternalIp()
 
@@ -269,6 +222,8 @@ class P2P {
     if (isFirstSeed) {
       this.mainLogger.debug('No rejoin required, starting new cycle...')
       this.state.startCycles()
+      const joinRequest = await this._createJoinRequest()
+      this.state.addJoinRequest(joinRequest)
       return true
     }
 
@@ -276,12 +231,6 @@ class P2P {
     this.mainLogger.debug('Syncing to network...')
     // TODO: add resyncing
     return false
-  }
-
-  async joinNetwork () {
-    // Create a join request which contains a valid proof-of-work.
-    let joinRequest = await this._createJoinRequest()
-    return joinRequest
   }
 }
 

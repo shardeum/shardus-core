@@ -14,6 +14,7 @@ class P2PState {
       pending: {}
     }
     this.currentCycle = {
+      bestJoinRequests: [],
       joined: [],
       removed: [],
       lost: [],
@@ -23,7 +24,6 @@ class P2PState {
     }
     this.cycles = []
     this.acceptJoinReq = false
-    this.joinRequests = []
     this.shouldStop = false
   }
 
@@ -51,15 +51,10 @@ class P2PState {
     this.cycles.length = 0
   }
 
-  _resetJoinRequests () {
-    this.joinRequests.length = 0
-  }
-
   _resetState () {
     this._resetCurrentCycle()
     this._resetNodelist()
     this._resetCycles()
-    this._resetJoinRequests()
   }
 
   async clear () {
@@ -69,12 +64,13 @@ class P2PState {
     this._resetState()
   }
 
-  addJoinRequest (nodeInfo) {
-    // TODO: check if accepting join requests
-    // if (!acceptJoinReq) return ''
-    // TODO: add actual join requests
-    this.joinRequests.push(nodeInfo)
-    this._addPendingNode(nodeInfo)
+  addJoinRequest (joinRequest) {
+    if (!this.acceptJoinReq) return false
+    const bestJoinRequests = this._getBestJoinRequests()
+    bestJoinRequests.push(joinRequest)
+    this._addPendingNode(joinRequest.nodeInfo)
+    // TODO: return if actually added to best join requests
+    return true
   }
 
   _addPendingNode (node) {
@@ -160,6 +156,7 @@ class P2PState {
 
   _resetCurrentCycle () {
     this.currentCycle = {
+      bestJoinRequests: [],
       joined: [],
       removed: [],
       lost: [],
@@ -194,11 +191,18 @@ class P2PState {
     }, phaseLen)
   }
 
+  _getBestJoinRequests () {
+    return this.currentCycle.bestJoinRequests
+  }
+
   // TODO: implement this to get best nodes based on POW, selection number,
   // ---   and number of desired nodes
   _getBestNodes () {
-    const firstNode = Object.values(this.nodes.pending)[0]
-    const bestNodes = firstNode ? [firstNode] : []
+    const bestNodes = []
+    const bestJoinRequests = this._getBestJoinRequests()
+    for (const joinRequest of bestJoinRequests) {
+      bestNodes.push(joinRequest.nodeInfo)
+    }
     this.mainLogger.debug(`Best nodes for this cycle: ${JSON.stringify(bestNodes)}`)
     return bestNodes
   }
@@ -375,7 +379,7 @@ class P2PState {
 
   getLastJoined () {
     const lastCycle = this.getLastCycle()
-    if (!lastCycle) return null
+    if (!lastCycle) return []
     return lastCycle.joined
   }
 }
