@@ -8,7 +8,7 @@ const Storage = require('../../../src/storage')
 const Logger = require('../../../src/logger')
 
 const { readLogFile, resetLogFile } = require('../../includes/utils-log')
-const { createTestDb } = require('../../includes/utils-storage')
+const { clearTestDb, createTestDb } = require('../../includes/utils-storage')
 const { sleep } = require('../../../src/utils')
 
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../config/server.json')))
@@ -215,12 +215,6 @@ test('testing set and add methods for properties model', async t => {
   //   const res = await storage.listProperties()
   //   t.deepEqual(res[0], dummyProperty, 'Should have the inserted property returning from listProperties method')
   // }
-
-  if (confStorage) {
-    confStorage.options.storage = 'db/db.sqlite'
-    fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
-  }
-
   t.end()
 })
 
@@ -279,4 +273,10 @@ test('testing clearP2pState method', async t => {
   t.deepEqual(res, [], 'getNodes should return []')
   res = await storage.listCycles()
   t.deepEqual(res, [], 'listCycles should return []')
+  if (confStorage) {
+    confStorage.options.storage = 'db/db.sqlite'
+    fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
+    clearTestDb()
+  }
+  t.end()
 })

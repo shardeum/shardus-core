@@ -10,7 +10,7 @@ const Storage = require('../../../src/storage')
 const Crypto = require('../../../src/crypto/index')
 
 const { readLogFile, resetLogFile } = require('../../includes/utils-log')
-const { createTestDb } = require('../../includes/utils-storage')
+const { clearTestDb, createTestDb } = require('../../includes/utils-storage')
 const { sleep } = require('../../../src/utils')
 const { isValidHex } = require('../../includes/utils')
 
@@ -156,6 +156,7 @@ test('Testing getCycleMarkerInfo', async t => {
   if (confStorage) {
     confStorage.options.storage = 'db/db.sqlite'
     fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
+    clearTestDb()
   }
   t.end()
 })

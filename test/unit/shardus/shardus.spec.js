@@ -7,7 +7,7 @@ const { spawn } = require('child_process')
 const Shardus = require('../../../src/shardus')
 const { sleep } = require('../../../src/utils')
 const { readLogFile, resetLogFile } = require('../../includes/utils-log')
-const { createTestDb } = require('../../includes/utils-storage')
+const { clearTestDb, createTestDb } = require('../../includes/utils-storage')
 
 let newConfStorage, shardus
 let config = require(path.join(__dirname, '../../../config/server.json'))
@@ -51,6 +51,7 @@ test('testing the shutdown method', { timeout: 10000 }, async t => {
   if (confStorage) {
     confStorage.options.storage = 'db/db.sqlite'
     fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
+    clearTestDb()
   }
   t.notEqual(log.indexOf('Logger shutting down cleanly...'), -1, 'Should terminate the logger within shardus correctly and insert the log entry')
   t.end()

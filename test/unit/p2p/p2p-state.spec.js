@@ -7,7 +7,7 @@ const Storage = require('../../../src/storage')
 const Crypto = require('../../../src/crypto/index')
 const P2PState = require('../../../src/p2p/p2p-state')
 
-const { createTestDb } = require('../../includes/utils-storage')
+const { clearTestDb, createTestDb } = require('../../includes/utils-storage')
 const { sleep } = require('../../../src/utils')
 
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../config/server.json')))
@@ -78,6 +78,7 @@ test('Testing addJoinRequest and getCycleInfo methods', { timeout: 100000 }, asy
   if (confStorage) {
     confStorage.options.storage = 'db/db.sqlite'
     fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
+    clearTestDb()
   }
 
   t.end()

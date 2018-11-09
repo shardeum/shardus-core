@@ -6,7 +6,7 @@ const Logger = require('../../../src/logger')
 const Storage = require('../../../src/storage')
 const Crypto = require('../../../src/crypto')
 const ExitHandler = require('../../../src/exit-handler')
-const { createTestDb } = require('../../includes/utils-storage')
+const { clearTestDb, createTestDb } = require('../../includes/utils-storage')
 
 let configFilePath = path.join(__dirname, '../../../config/logs.json')
 let loggerConfig = {
@@ -97,6 +97,7 @@ test('Should verify a signed object correctly', async t => {
   if (confStorage) {
     confStorage.options.storage = 'db/db.sqlite'
     fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
+    clearTestDb()
   }
   t.equal(isValidHex(crypto.hash(testTx)), true, 'should generate a valid hex from the hash of an object')
   t.end()
