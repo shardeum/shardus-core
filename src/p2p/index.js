@@ -67,6 +67,7 @@ class P2P {
   _getNetworkCycleMarker (nodes) {
     // TODO: verify cycle marker from multiple nodes
     let node = nodes[0]
+    this.mainLogger.debug(`Node to be asked for cycle marker: ${JSON.stringify(node)}`)
     return http.get(`${node.ip}:${node.port}/cyclemarker`)
   }
 
@@ -77,7 +78,7 @@ class P2P {
   getCycleMarkerInfo () {
     const cycleMarker = this.state.getLastCycleMarker()
     const joined = this.state.getLastJoined()
-    const currentTime = utils.getTime()
+    const currentTime = utils.getTime('s')
     const info = { cycleMarker, joined, currentTime }
     this.mainLogger.debug(`Requested cycle marker info: ${JSON.stringify(info)}`)
     return info
@@ -127,14 +128,49 @@ class P2P {
     return false
   }
 
+  async _checkJoined (seedNodes) {
+    // TODO: implement a more robust way to choose a node
+    const { joined } = await this._getNetworkCycleMarker(seedNodes)
+    this.mainLogger.debug(`Nodes joined in this cycle: ${JSON.stringify(joined)}`)
+    const { publicKey } = this._getThisNodeInfo()
+    for (const key of joined) {
+      if (key === publicKey) return true
+    }
+    return false
+  }
+
   // TODO: add actual join procedure
   // ---   Whatever this function calls from state needs to find from network
   // ---   when it is joined, should start syncing, then it can call startCycles()
-  async _attemptJoin () {
+  async _attemptJoin (seedNodes) {
     // Create a join request which contains a valid proof-of-work.
-    let joinRequest = await this._createJoinRequest()
-    this.mainLogger.debug(`Join request created... Join request: ${joinRequest}`)
-    return false
+    try {
+      var { cycleMarker, currentTime } = await this._getNetworkCycleMarker(seedNodes)
+    } catch (e) {
+      throw new Error(e)
+    }
+    // Checks that the time difference is within syncLimit (as configured)
+    const localTime = utils.getTime('s')
+    if (!this._checkWithinSyncLimit(localTime, currentTime)) throw Error('Local time out of sync with network.')
+    let joinRequest = await this._createJoinRequest(cycleMarker, currentTime)
+    this.mainLogger.debug(`Join request created... Join request: ${JSON.stringify(joinRequest)}`)
+  }
+
+  async _join () {
+    const seedNodes = await this._getSeedNodes()
+    let joined = false
+    // TODO: eventually make this a config item
+    const maxAttempts = 5
+    let currentAttempts = 0
+    while (!joined && currentAttempts < maxAttempts) {
+      await this._attemptJoin(seedNodes)
+      const cycleDuration = this.state.getCycleDuration()
+      const waitTime = Math.floor(cycleDuration * 1000 / 4)
+      await utils.sleep(waitTime)
+      joined = await this._checkJoined(seedNodes)
+      currentAttempts += 1
+    }
+    return joined
   }
 
   // TODO: Think about exception when there is more than
@@ -150,19 +186,8 @@ class P2P {
     return false
   }
 
-  // TODO: Pass cyclemarker and current time to this func, break pre-req functionality out
-  async _createJoinRequest () {
-    // The server makes a /get_cycle_marker request.
-    const seedNodes = await this._getSeedNodes()
-    try {
-      var { cycleMarker, currentTime } = await this._getNetworkCycleMarker(seedNodes)
-    } catch (e) {
-      throw new Error(e)
-    }
+  async _createJoinRequest (cycleMarker) {
     let difficulty = 16
-    // Checks that the time difference is within syncLimit (as configured).
-    const localTime = utils.getTime('s')
-    this._checkWithinSyncLimit(localTime, currentTime)
     // Build and return a join request
     let nodeInfo = this._getThisNodeInfo()
     let selectionNum = this.crypto.hash({ cycleMarker, address: nodeInfo.address })
@@ -175,6 +200,17 @@ class P2P {
     const joinReq = { nodeInfo, cycleMarker, proofOfWork, selectionNum }
     const signedJoinReq = this.crypto.sign(joinReq)
     return signedJoinReq
+  }
+
+  _validateJoinRequest (joinRequest) {
+    // TODO: implement actual validation
+    return true
+  }
+
+  addJoinRequest (joinRequest) {
+    const valid = this._validateJoinRequest(joinRequest)
+    if (!valid) return false
+    return this.p2p.addJoinRequest(joinRequest)
   }
 
   async discoverNetwork () {

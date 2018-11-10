@@ -58,6 +58,18 @@ class Shardus {
         res.json({ cycleChain })
       })
 
+      app.post('/join', (req, res) => {
+        const invalidJoinReqErr = 'invalid join request'
+        if (!req.body) {
+          this.mainLogger.error('Invalid join request received.')
+          return res.json({ success: false, error: invalidJoinReqErr })
+        }
+        const joinRequest = req.body
+        this.mainLogger.debug(`Join request received: ${joinRequest}`)
+        res.json({ success: true })
+        this.p2p.addJoinRequest(joinRequest)
+      })
+
       app.listen(this.externalPort, () => {
         const msg = `Server running on port ${this.externalPort}...`
         console.log(msg)

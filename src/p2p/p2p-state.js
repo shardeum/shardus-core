@@ -260,6 +260,10 @@ class P2PState {
     }
   }
 
+  getCycleDuration () {
+    return this.cycleDuration
+  }
+
   getCycleInfo (withCert = true) {
     const previous = this.getLastCycleMarker()
     const counter = this.getCycleCounter()
