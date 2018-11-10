@@ -139,9 +139,6 @@ class P2P {
     return false
   }
 
-  // TODO: add actual join procedure
-  // ---   Whatever this function calls from state needs to find from network
-  // ---   when it is joined, should start syncing, then it can call startCycles()
   async _attemptJoin (seedNodes) {
     // Create a join request which contains a valid proof-of-work.
     try {
