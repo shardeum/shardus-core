@@ -97,13 +97,6 @@ class P2P {
     return seedListSigned.seedNodes
   }
 
-  _getNetworkCycleMarker (nodes) {
-    // TODO: verify cycle marker from multiple nodes
-    let node = nodes[0]
-    this.mainLogger.debug(`Node to be asked for cycle marker: ${JSON.stringify(node)}`)
-    return http.get(`${node.ip}:${node.port}/cyclemarker`)
-  }
-
   async _setNodeId (id, updateDb = true) {
     this.id = id
     this.mainLogger.info(`Your node's ID is ${this.id}`)
@@ -192,7 +185,7 @@ class P2P {
 
   async _fetchNodeId (seedNodes) {
     // TODO: implement a more robust way to choose a node
-    const { nodesJoined, currentCycleMarker } = await this._getNetworkCycleMarker(seedNodes)
+    const { nodesJoined, currentCycleMarker } = await this._fetchCycleMarker(seedNodes)
     this.mainLogger.debug(`Nodes joined in this cycle: ${JSON.stringify(nodesJoined)}`)
     const { publicKey } = this._getThisNodeInfo()
     for (const key of nodesJoined) {
@@ -242,19 +235,19 @@ class P2P {
   async _join () {
     const seedNodes = await this._getSeedNodes()
     const localTime = utils.getTime('s')
-    const { currentTime } = await this._getNetworkCycleMarker(seedNodes)
+    const { currentTime } = await this._fetchCycleMarker(seedNodes)
     if (!this._checkWithinSyncLimit(localTime, currentTime)) throw Error('Local time out of sync with network.')
     const timeOffset = currentTime - localTime
     this.mainLogger.debug(`Time offset with selected node: ${timeOffset}`)
     let nodeId = null
     while (!nodeId) {
-      const { currentCycleMarker, nextCycleMarker, cycleStart, cycleDuration } = await this._getNetworkCycleMarker(seedNodes)
+      const { currentCycleMarker, nextCycleMarker, cycleStart, cycleDuration } = await this._fetchCycleMarker(seedNodes)
       if (nextCycleMarker) {
         // Use next cycle marker
         const joinRequest = await this._createJoinRequest(nextCycleMarker)
         nodeId = await this._attemptJoin(seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration)
         if (!nodeId) {
-          const { cycleStart, cycleDuration } = await this._getNetworkCycleMarker(seedNodes)
+          const { cycleStart, cycleDuration } = await this._fetchCycleMarker(seedNodes)
           nodeId = await this._attemptJoin(seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration)
         }
       } else {
