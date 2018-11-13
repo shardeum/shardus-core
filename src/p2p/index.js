@@ -301,7 +301,8 @@ class P2P {
     if (typeof equalityFn !== 'function') {
       equalityFn = util.isDeepStrictEqual
     }
-    if (!redundancy) redundancy = 3
+    if (!redundancy || redundancy < 1) redundancy = 3
+    redundancy = nodes.length < redundancy ? nodes.length : redundancy
 
     class Tally {
       constructor (winCount, equalFn) {
@@ -315,6 +316,7 @@ class P2P {
           if (item.count >= this.winCount) return item.value
         }
         this.items.push({ value: newItem, count: 1 })
+        if (this.winCount === 1) return newItem
       }
     }
     let responses = new Tally(redundancy, equalityFn)
