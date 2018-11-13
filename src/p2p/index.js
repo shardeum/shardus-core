@@ -1,3 +1,4 @@
+const util = require('util')
 const utils = require('../utils')
 const http = require('../http')
 const P2PState = require('./p2p-state')
@@ -303,33 +304,11 @@ class P2P {
     return true
   }
 
-  _fetchCycleMarker (node) {
-    return http.get(`${node.ip}:${node.port}/cyclemarker`)
-  }
-
-  _fetchCycleChainHash (node, start, end) {
-    // TODO: [AS] Use the internal network to get a chain hash
-    return { chainHash: '' }
-  }
-
-  _fetchCycleChain (node, start, end) {
-    // TODO: [AS] Use the internal network to get a cycle chain
-    return { cycleChain: [] }
-  }
-
-  _verifyCycleChain (cycleChain, chainHash) {
-    return this.cypto.hash({ cycleChain }) !== chainHash
-  }
-
-  async _fetchVerifiedCycleChain (nodeList, start, end, chainHash) {
-    for (let node of nodeList) {
-      let { cycleChain } = await this._fetchCycleChain(node, start, end)
-      if (this._verifyCycleChain(cycleChain, chainHash)) return { cycleChain }
+  async _robustQuery (nodes, redundancy, queryFn, equalityFn) {
+    if (typeof equalityFn !== 'function') {
+      equalityFn = util.isDeepStrictEqual
     }
-    throw new Error('Could not get verified cycle chain from nodes.')
-  }
 
-  async _robustQuery (nodeList, redundancy, queryFn, equalityFn) {
     class Tally {
       constructor (winCount, equalFn) {
         this.winCount = winCount
@@ -347,10 +326,10 @@ class P2P {
     let responses = new Tally(redundancy, equalityFn)
     let errors = 0
 
-    nodeList = [...nodeList]
-    shuffleArray(nodeList)
+    nodes = [...nodes]
+    shuffleArray(nodes)
 
-    for (let node of nodeList) {
+    for (let node of nodes) {
       try {
         let result = responses.add(await queryFn(node))
         if (result) return result
@@ -359,28 +338,69 @@ class P2P {
       }
     }
 
-    throw new Error(`Could not get ${redundancy} redundant responses from nodes. Encountered ${errors} query errors.`)
+    throw new Error(`Could not get ${redundancy} redundant responses from ${nodes.length} nodes. Encountered ${errors} query errors.`)
   }
 
-  async _fetchLatestCycleChain (seedNode, nodeList, redundancy) {
+  async _sequentialQuery (nodes, queryFn, verifyFn) {
+    if (typeof verifyFn !== 'function') {
+      verifyFn = (result) => true
+    }
+
+    let errors = 0
+
+    nodes = [...nodes]
+    shuffleArray(nodes)
+
+    for (let node of nodes) {
+      try {
+        let result = await queryFn(node)
+        if (result && verifyFn(result)) return result
+      } catch (e) {
+        errors++
+      }
+    }
+
+    throw new Error(`Could not get a response from ${nodes.length} nodes. Encountered ${errors} query errors.`)
+  }
+
+  _verifyCycleChain (cycleChain, chainHash) {
+    return this.cypto.hash({ cycleChain }) !== chainHash
+  }
+
+  _fetchCycleMarker (nodes, redundancy) {
+    return this._robustQuery(nodes, redundancy, (node) => http.get(`${node.ip}:${node.port}/cyclemarker`))
+  }
+
+  _fetchCycleChainHash (nodes, redundancy, start, end) {
+    let queryFn = (node) => {
+      // TODO: [AS] Use the internal network to return a chain hash
+      return { chainHash: '' }
+    }
+    return this._robustQuery(nodes, redundancy, queryFn)
+  }
+
+  _fetchVerifiedCycleChain (nodes, chainHash, start, end) {
+    let queryFn = node => {
+      // TODO: [AS] Use the internal network to return a cycle chain
+      return { cycleChain: [] }
+    }
+    let verifyFn = ({ cycleChain }) => this._verifyCycleChain(cycleChain, chainHash)
+    return this._sequentialQuery(nodes, queryFn, verifyFn)
+  }
+
+  async _fetchLatestCycleChain (seedNodes, nodes, redundancy) {
     // Setup redundancy counters
     let actualRedundancy = redundancy
 
-    // Remove seedNode from nodeList
-    nodeList = nodeList.filter(n => n.id !== seedNode.id)
+    // Remove seedNodes from nodes
+    nodes = nodes.filter(n => !(seedNodes.map(s => s.id).includes(n.id)))
 
-    // Get current cycle marker & cycle counter
-    let compareCycleMarkerResults = function (result1, result2) {
-      if (result1.cycleMarker !== result2.cycleMarker) return false
-      if (result1.cycleCounter !== result2.cycleCounter) return false
-      if (result1.currentTime !== result2.currentTime) return false
-      return true
-    }
+    // Get current cycle counter
     let cycleCounter
     try {
-      ({ cycleCounter } = await this._robustQuery(nodeList, redundancy, this._fetchCycleMarker, compareCycleMarkerResults))
+      ({ cycleCounter } = await this._fetchCycleMarker(nodes, redundancy))
     } catch (e) {
-      ({ cycleCounter } = await this._fetchCycleMarker(seedNode))
+      ({ cycleCounter } = await this._fetchCycleMarker(seedNodes, redundancy))
       actualRedundancy = 0
     }
 
@@ -389,25 +409,20 @@ class P2P {
     let chainStart = chainEnd - (cycleCounter < 1000 ? cycleCounter : 1000)
 
     // Get cycle chain hash
-    let compareCycleHashResults = function (result1, result2) {
-      return result1.chainHash === result2.chainHash
-    }
-    let fetchRangeCycleChainHash = node => this._fetchCycleChainHash(node, chainStart, chainEnd)
     let chainHash
     try {
-      ({ chainHash } = await this._robustQuery(nodeList, redundancy, fetchRangeCycleChainHash, compareCycleHashResults))
+      ({ chainHash } = await this._fetchCycleChainHash(nodes, redundancy, chainStart, chainEnd))
     } catch (e) {
-      ({ chainHash } = await fetchRangeCycleChainHash(seedNode))
+      ({ chainHash } = await this._fetchCycleChainHash(seedNodes, redundancy, chainStart, chainEnd))
       actualRedundancy = 0
     }
 
     // Get verified cycle chain
     let cycleChain
     try {
-      ({ cycleChain } = await this._fetchVerifiedCycleChain(nodeList, chainStart, chainEnd, chainHash))
+      ({ cycleChain } = await this._fetchVerifiedCycleChain(nodes, chainHash, chainStart, chainEnd))
     } catch (e) {
-      ({ cycleChain } = await this._fetchCycleChain(seedNode, chainStart, chainEnd))
-      actualRedundancy = 0
+      ({ cycleChain } = await this._fetchVerifiedCycleChain(seedNodes, chainHash, chainStart, chainEnd))
     }
 
     return { cycleChain, redundancy: actualRedundancy }
