@@ -359,20 +359,41 @@ class P2P {
     throw new Error(`Could not get a response from ${nodes.length} nodes. Encountered ${errors} query errors.`)
   }
 
+  _verifyNodeList (nodeList, nodeListHash) {
+    return this.cypto.hash({ nodeList }) === nodeListHash
+  }
+
   _verifyCycleChain (cycleChain, chainHash) {
-    return this.cypto.hash({ cycleChain }) !== chainHash
+    return this.cypto.hash({ cycleChain }) === chainHash
   }
 
-  _fetchCycleMarker (nodes, redundancy) {
-    return this._robustQuery(nodes, (node) => http.get(`${node.ip}:${node.port}/cyclemarker`), redundancy)
+  _fetchNodeListHash (nodes) {
+    let queryFn = (node) => {
+      // TODO: [AS] Use the apporpriate endpoint to get a nodeList hash
+      return { nodeListHash: '' }
+    }
+    return this._robustQuery(nodes, queryFn)
   }
 
-  _fetchCycleChainHash (nodes, start, end, redundancy) {
+  _fetchVerifiedNodeList (nodes, nodeListHash) {
+    let queryFn = node => {
+      // TODO: [AS] Use the appropriate endpoint to get a nodeList
+      return { nodeList: [] }
+    }
+    let verifyFn = ({ nodeList }) => this._verifyNodeList(nodeList, nodeListHash)
+    return this._sequentialQuery(nodes, queryFn, verifyFn)
+  }
+
+  _fetchCycleMarker (nodes) {
+    return this._robustQuery(nodes, (node) => http.get(`${node.ip}:${node.port}/cyclemarker`))
+  }
+
+  _fetchCycleChainHash (nodes, start, end) {
     let queryFn = (node) => {
       // TODO: [AS] Use the internal network to return a chain hash
       return { chainHash: '' }
     }
-    return this._robustQuery(nodes, queryFn, redundancy)
+    return this._robustQuery(nodes, queryFn)
   }
 
   _fetchVerifiedCycleChain (nodes, chainHash, start, end) {
@@ -384,18 +405,18 @@ class P2P {
     return this._sequentialQuery(nodes, queryFn, verifyFn)
   }
 
-  async _fetchLatestCycleChain (seedNodes, nodes, redundancy) {
+  async _fetchLatestCycleChain (seedNodes, nodes) {
     // Remove seedNodes from nodes
     nodes = nodes.filter(n => !(seedNodes.map(s => s.id).includes(n.id)))
 
     // Get current cycle counter
     let cycleCounter
     try {
-      ({ cycleCounter } = await this._fetchCycleMarker(nodes, redundancy))
+      ({ cycleCounter } = await this._fetchCycleMarker(nodes))
     } catch (e) {
       this.mainLogger.info('Could not get cycleMarker from nodes. Querying seedNodes for it...')
       this.mainLogger.debug(e)
-      ({ cycleCounter } = await this._fetchCycleMarker(seedNodes, redundancy))
+      ({ cycleCounter } = await this._fetchCycleMarker(seedNodes))
     }
 
     // Determine cycle counter numbers to get, at most, the last 1000 cycles
