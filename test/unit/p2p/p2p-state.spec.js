@@ -26,6 +26,8 @@ let crypto = new Crypto(logger, storage)
 
 test('Testing constructor P2PState', async t => {
   p2pState = new P2PState(config, logger, storage, crypto)
+  await storage.init()
+  await p2pState.init()
   t.equal(p2pState instanceof P2PState, true, 'should instanciate the object correctly')
 })
 
@@ -38,7 +40,7 @@ test('Testing addJoinRequest and getCycleInfo methods', { timeout: 100000 }, asy
   {
     p2pState.startCycles()
     // fill the array of keypair
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 1; i++) {
       keys.push(p2pState.crypto._generateKeypair())
       joinArray.push({
         publicKey: keys[i].publicKey,
@@ -50,7 +52,7 @@ test('Testing addJoinRequest and getCycleInfo methods', { timeout: 100000 }, asy
         address: keys[i].publicKey
       })
       // add each node created
-      p2pState.addJoinRequest(joinArray[i])
+      p2pState.addJoinRequest({ nodeInfo: joinArray[i] })
     }
     // await the finishing phase
     await sleep((Math.ceil(config.cycleDuration * 0.4) * 1000))
@@ -66,13 +68,13 @@ test('Testing addJoinRequest and getCycleInfo methods', { timeout: 100000 }, asy
     p2pState.stopCycles()
     await sleep((Math.ceil(config.cycleDuration) * 1000))
     let res = p2pState.getCycles(5)
+    console.log('res', JSON.stringify(res, null, 2))
+    // fs.writeFileSync('./file.json', JSON.stringify(res, null, 2))
     t.equal(Array.isArray(res), true, 'Should return an array with this method')
     t.equal(res.length, 2, 'Should have 2 cycles generated with the awaited time')
     t.equal(res[0].previous, '0'.repeat(64), 'the first cycle should point to 000...')
     const cycle0 = Object.assign({}, res[0])
-    delete cycle0.certificate
-    delete cycle0.marker
-    t.equal(res[1].previous, p2pState.crypto.hash(cycle0), 'the 2th cycle should point correctly to the first cycle hash')
+    t.equal(res[1].previous, cycle0.marker, 'the 2th cycle should point correctly to the first cycle hash')
   }
 
   if (confStorage) {
