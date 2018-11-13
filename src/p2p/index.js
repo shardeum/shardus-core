@@ -304,10 +304,11 @@ class P2P {
     return true
   }
 
-  async _robustQuery (nodes, redundancy, queryFn, equalityFn) {
+  async _robustQuery (nodes, queryFn, equalityFn, redundancy) {
     if (typeof equalityFn !== 'function') {
       equalityFn = util.isDeepStrictEqual
     }
+    if (!redundancy) redundancy = 3
 
     class Tally {
       constructor (winCount, equalFn) {
@@ -368,15 +369,15 @@ class P2P {
   }
 
   _fetchCycleMarker (nodes, redundancy) {
-    return this._robustQuery(nodes, redundancy, (node) => http.get(`${node.ip}:${node.port}/cyclemarker`))
+    return this._robustQuery(nodes, (node) => http.get(`${node.ip}:${node.port}/cyclemarker`), redundancy)
   }
 
-  _fetchCycleChainHash (nodes, redundancy, start, end) {
+  _fetchCycleChainHash (nodes, start, end, redundancy) {
     let queryFn = (node) => {
       // TODO: [AS] Use the internal network to return a chain hash
       return { chainHash: '' }
     }
-    return this._robustQuery(nodes, redundancy, queryFn)
+    return this._robustQuery(nodes, queryFn, redundancy)
   }
 
   _fetchVerifiedCycleChain (nodes, chainHash, start, end) {
@@ -389,9 +390,6 @@ class P2P {
   }
 
   async _fetchLatestCycleChain (seedNodes, nodes, redundancy) {
-    // Setup redundancy counters
-    let actualRedundancy = redundancy
-
     // Remove seedNodes from nodes
     nodes = nodes.filter(n => !(seedNodes.map(s => s.id).includes(n.id)))
 
@@ -400,8 +398,9 @@ class P2P {
     try {
       ({ cycleCounter } = await this._fetchCycleMarker(nodes, redundancy))
     } catch (e) {
+      this.mainLogger.info('Could not get cycleMarker from nodes. Querying seedNodes for it...')
+      this.mainLogger.debug(e)
       ({ cycleCounter } = await this._fetchCycleMarker(seedNodes, redundancy))
-      actualRedundancy = 0
     }
 
     // Determine cycle counter numbers to get, at most, the last 1000 cycles
@@ -411,10 +410,11 @@ class P2P {
     // Get cycle chain hash
     let chainHash
     try {
-      ({ chainHash } = await this._fetchCycleChainHash(nodes, redundancy, chainStart, chainEnd))
+      ({ chainHash } = await this._fetchCycleChainHash(nodes, chainStart, chainEnd, redundancy))
     } catch (e) {
-      ({ chainHash } = await this._fetchCycleChainHash(seedNodes, redundancy, chainStart, chainEnd))
-      actualRedundancy = 0
+      this.mainLogger.info('Could not get chainHash from nodes. Querying seedNodes for it...')
+      this.mainLogger.debug(e)
+      ({ chainHash } = await this._fetchCycleChainHash(seedNodes, chainStart, chainEnd, redundancy))
     }
 
     // Get verified cycle chain
@@ -422,10 +422,12 @@ class P2P {
     try {
       ({ cycleChain } = await this._fetchVerifiedCycleChain(nodes, chainHash, chainStart, chainEnd))
     } catch (e) {
+      this.mainLogger.info('Could not get verified cycleChain from nodes. Querying seedNodes for it...')
+      this.mainLogger.debug(e)
       ({ cycleChain } = await this._fetchVerifiedCycleChain(seedNodes, chainHash, chainStart, chainEnd))
     }
 
-    return { cycleChain, redundancy: actualRedundancy }
+    return { cycleChain }
   }
 
   _validateJoinRequest (joinRequest) {
