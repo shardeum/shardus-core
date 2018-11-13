@@ -293,11 +293,6 @@ class P2P {
     return signedJoinReq
   }
 
-  _validateJoinRequest (joinRequest) {
-    // TODO: implement actual validation
-    return true
-  }
-
   _isActive () {
     const active = this.state.getNodeStatus(this.id) === 'active'
     if (!active) {
@@ -305,6 +300,121 @@ class P2P {
       return false
     }
     this.mainLogger.debug('This node is active!')
+    return true
+  }
+
+  _fetchCycleMarker (node) {
+    return http.get(`${node.ip}:${node.port}/cyclemarker`)
+  }
+
+  _fetchCycleChainHash (node, start, end) {
+    // TODO: [AS] Use the internal network to get a chain hash
+    return { chainHash: '' }
+  }
+
+  _fetchCycleChain (node, start, end) {
+    // TODO: [AS] Use the internal network to get a cycle chain
+    return { cycleChain: [] }
+  }
+
+  _verifyCycleChain (cycleChain, chainHash) {
+    return this.cypto.hash({ cycleChain }) !== chainHash
+  }
+
+  async _fetchVerifiedCycleChain (nodeList, start, end, chainHash) {
+    for (let node of nodeList) {
+      let { cycleChain } = await this._fetchCycleChain(node, start, end)
+      if (this._verifyCycleChain(cycleChain, chainHash)) return { cycleChain }
+    }
+    throw new Error('Could not get verified cycle chain from nodes.')
+  }
+
+  async _robustQuery (nodeList, redundancy, queryFn, equalityFn) {
+    class Tally {
+      constructor (winCount, equalFn) {
+        this.winCount = winCount
+        this.equalFn = equalFn
+        this.items = []
+      }
+      add (newItem) {
+        for (let item of this.items) {
+          if (this.equalFn(newItem, item.value)) item.count++
+          if (item.count >= this.winCount) return item.value
+        }
+        this.items.push({ value: newItem, count: 1 })
+      }
+    }
+    let responses = new Tally(redundancy, equalityFn)
+    let errors = 0
+
+    nodeList = [...nodeList]
+    shuffleArray(nodeList)
+
+    for (let node of nodeList) {
+      try {
+        let result = responses.add(await queryFn(node))
+        if (result) return result
+      } catch (e) {
+        errors++
+      }
+    }
+
+    throw new Error(`Could not get ${redundancy} redundant responses from nodes. Encountered ${errors} query errors.`)
+  }
+
+  async _fetchLatestCycleChain (seedNode, nodeList, redundancy) {
+    // Setup redundancy counters
+    let actualRedundancy = redundancy
+
+    // Remove seedNode from nodeList
+    nodeList = nodeList.filter(n => n.id !== seedNode.id)
+
+    // Get current cycle marker & cycle counter
+    let compareCycleMarkerResults = function (result1, result2) {
+      if (result1.cycleMarker !== result2.cycleMarker) return false
+      if (result1.cycleCounter !== result2.cycleCounter) return false
+      if (result1.currentTime !== result2.currentTime) return false
+      return true
+    }
+    let cycleCounter
+    try {
+      ({ cycleCounter } = await this._robustQuery(nodeList, redundancy, this._fetchCycleMarker, compareCycleMarkerResults))
+    } catch (e) {
+      ({ cycleCounter } = await this._fetchCycleMarker(seedNode))
+      actualRedundancy = 0
+    }
+
+    // Determine cycle counter numbers to get, at most, the last 1000 cycles
+    let chainEnd = cycleCounter
+    let chainStart = chainEnd - (cycleCounter < 1000 ? cycleCounter : 1000)
+
+    // Get cycle chain hash
+    let compareCycleHashResults = function (result1, result2) {
+      return result1.chainHash === result2.chainHash
+    }
+    let fetchRangeCycleChainHash = node => this._fetchCycleChainHash(node, chainStart, chainEnd)
+    let chainHash
+    try {
+      ({ chainHash } = await this._robustQuery(nodeList, redundancy, fetchRangeCycleChainHash, compareCycleHashResults))
+    } catch (e) {
+      ({ chainHash } = await fetchRangeCycleChainHash(seedNode))
+      actualRedundancy = 0
+    }
+
+    // Get verified cycle chain
+    let cycleChain
+    try {
+      ({ cycleChain } = await this._fetchVerifiedCycleChain(nodeList, chainStart, chainEnd, chainHash))
+    } catch (e) {
+      ({ cycleChain } = await this._fetchCycleChain(seedNode, chainStart, chainEnd))
+      actualRedundancy = 0
+    }
+
+    return { cycleChain, redundancy: actualRedundancy }
+  }
+
+  _validateJoinRequest (joinRequest) {
+    // TODO: implement actual validation
     return true
   }
 
@@ -398,6 +508,14 @@ class P2P {
     // TODO: add resyncing
     this.mainLogger.debug('Unable to resync... TODO: implement resyncing.')
     return false
+  }
+}
+
+// From: https://stackoverflow.com/a/12646864
+function shuffleArray (array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]]
   }
 }
 
