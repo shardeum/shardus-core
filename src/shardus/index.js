@@ -65,9 +65,11 @@ class Shardus {
           return res.json({ success: false, error: invalidJoinReqErr })
         }
         const joinRequest = req.body
-        this.mainLogger.debug(`Join request received: ${joinRequest}`)
+        this.mainLogger.debug(`Join request received: ${JSON.stringify(joinRequest)}`)
         res.json({ success: true })
-        this.p2p.addJoinRequest(joinRequest)
+        const accepted = this.p2p.addJoinRequest(joinRequest)
+        if (!accepted) return this.mainLogger.debug('Join request not accepted.')
+        this.mainLogger.debug('Join request accepted!')
       })
 
       app.listen(this.externalPort, () => {
@@ -112,9 +114,9 @@ class Shardus {
     this._setupHeartbeat()
     this.crypto = new Crypto(this.logger, this.storage)
     await this.crypto.init()
-    let { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime } = config
-    let ipInfo = { externalIp: config.externalIp || null, externalPort: config.externalPort || null }
-    let p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime }
+    const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay } = config
+    const ipInfo = { externalIp: config.externalIp || null, externalPort: config.externalPort || null }
+    const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay }
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto)
     await this.p2p.init()
     await this._setupExternalApi(this.app)

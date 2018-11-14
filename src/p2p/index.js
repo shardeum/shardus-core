@@ -14,6 +14,8 @@ class P2P {
     this.seedList = config.seedList
     this.syncLimit = config.syncLimit
     this.maxRejoinTime = config.maxRejoinTime
+    this.difficulty = config.difficulty
+    this.queryDelay = config.queryDelay
     this.netadmin = config.netadmin || 'default'
     this.state = new P2PState(config, this.logger, this.storage, this.crypto)
   }
@@ -76,10 +78,13 @@ class P2P {
   }
 
   getCycleMarkerInfo () {
-    const cycleMarker = this.state.getLastCycleMarker()
-    const joined = this.state.getLastJoined()
+    const currentCycleMarker = this.state.getCurrentCycleMarker()
+    const nextCycleMarker = this.state.getNextCycleMarker()
+    const cycleStart = this.state.getCurrentCycleStart()
+    const cycleDuration = this.state.getCurrentCycleDuration()
+    const nodesJoined = this.state.getLastJoined()
     const currentTime = utils.getTime('s')
-    const info = { cycleMarker, joined, currentTime }
+    const info = { currentCycleMarker, nextCycleMarker, cycleStart, cycleDuration, nodesJoined, currentTime }
     this.mainLogger.debug(`Requested cycle marker info: ${JSON.stringify(info)}`)
     return info
   }
@@ -128,44 +133,79 @@ class P2P {
     return false
   }
 
+  async _submitJoin (nodes, joinRequest) {
+    const node = nodes[0]
+    this.mainLogger.debug(`Sending join request to ${node.ip}:${node.port}`)
+    await http.post(`${node.ip}:${node.port}/join`, joinRequest)
+  }
+
   async _checkJoined (seedNodes) {
     // TODO: implement a more robust way to choose a node
-    const { joined } = await this._getNetworkCycleMarker(seedNodes)
-    this.mainLogger.debug(`Nodes joined in this cycle: ${JSON.stringify(joined)}`)
+    const { nodesJoined } = await this._getNetworkCycleMarker(seedNodes)
+    this.mainLogger.debug(`Nodes joined in this cycle: ${JSON.stringify(nodesJoined)}`)
     const { publicKey } = this._getThisNodeInfo()
-    for (const key of joined) {
+    for (const key of nodesJoined) {
       if (key === publicKey) return true
     }
     return false
   }
 
-  async _attemptJoin (seedNodes) {
-    // Create a join request which contains a valid proof-of-work.
-    try {
-      var { cycleMarker, currentTime } = await this._getNetworkCycleMarker(seedNodes)
-    } catch (e) {
-      throw new Error(e)
+  async _waitUntilJoinPhase (currentTime, cycleStart, cycleDuration) {
+    this.mainLogger.debug(`Current time is: ${currentTime}`)
+    this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
+    this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
+    const nextJoinStart = cycleStart + cycleDuration
+    this.mainLogger.debug(`Next join cycle starts at: ${nextJoinStart}`)
+    const timeToWait = (nextJoinStart - currentTime + this.queryDelay) * 1000
+    this.mainLogger.debug(`Waiting for ${timeToWait} ms before next join phase...`)
+    await utils.sleep(timeToWait)
+  }
+
+  async _waitUntilCycleMarker (currentTime, cycleStart, cycleDuration) {
+    const cycleMarker = cycleStart + cycleDuration + (2 * Math.ceil(cycleDuration / 4))
+    let timeToWait
+    if (currentTime < cycleMarker) {
+      timeToWait = (cycleMarker - currentTime + this.queryDelay) * 1000
+    } else {
+      timeToWait = 0
     }
-    // Checks that the time difference is within syncLimit (as configured)
-    const localTime = utils.getTime('s')
-    if (!this._checkWithinSyncLimit(localTime, currentTime)) throw Error('Local time out of sync with network.')
-    let joinRequest = await this._createJoinRequest(cycleMarker, currentTime)
-    this.mainLogger.debug(`Join request created... Join request: ${JSON.stringify(joinRequest)}`)
+    this.mainLogger.debug(`Waiting for ${timeToWait} ms before next cycle marker creation...`)
+    await utils.sleep(timeToWait)
+  }
+
+  async _attemptJoin (seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration) {
+    // TODO: check if we missed join phase
+    const currTime1 = utils.getTime('s') + timeOffset
+    await this._waitUntilJoinPhase(currTime1, cycleStart, cycleDuration)
+    await this._submitJoin(seedNodes, joinRequest)
+    const currTime2 = utils.getTime('s') + timeOffset
+    await this._waitUntilCycleMarker(currTime2, cycleStart, cycleDuration)
+    const joined = await this._checkJoined(seedNodes)
+    return joined
   }
 
   async _join () {
     const seedNodes = await this._getSeedNodes()
+    const localTime = utils.getTime('s')
+    const { currentTime } = await this._getNetworkCycleMarker(seedNodes)
+    if (!this._checkWithinSyncLimit(localTime, currentTime)) throw Error('Local time out of sync with network.')
+    const timeOffset = currentTime - localTime
+    this.mainLogger.debug(`Time offset with selected node: ${timeOffset}`)
     let joined = false
-    // TODO: eventually make this a config item
-    const maxAttempts = 5
-    let currentAttempts = 0
-    while (!joined && currentAttempts < maxAttempts) {
-      await this._attemptJoin(seedNodes)
-      const cycleDuration = this.state.getCycleDuration()
-      const waitTime = Math.floor(cycleDuration * 1000 / 4)
-      await utils.sleep(waitTime)
-      joined = await this._checkJoined(seedNodes)
-      currentAttempts += 1
+    while (!joined) {
+      const { currentCycleMarker, nextCycleMarker, cycleStart, cycleDuration } = await this._getNetworkCycleMarker(seedNodes)
+      if (nextCycleMarker) {
+        // Use next cycle marker
+        const joinRequest = await this._createJoinRequest(nextCycleMarker)
+        joined = await this._attemptJoin(seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration)
+        if (!joined) {
+          const { cycleStart, cycleDuration } = await this._getNetworkCycleMarker(seedNodes)
+          joined = await this._attemptJoin(seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration)
+        }
+      } else {
+        const joinRequest = await this._createJoinRequest(currentCycleMarker)
+        joined = await this._attemptJoin(seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration)
+      }
     }
     return joined
   }
@@ -184,18 +224,18 @@ class P2P {
   }
 
   async _createJoinRequest (cycleMarker) {
-    let difficulty = 16
     // Build and return a join request
     let nodeInfo = this._getThisNodeInfo()
     let selectionNum = this.crypto.hash({ cycleMarker, address: nodeInfo.address })
     // let signedSelectionNum = this.crypto.sign({ selectionNum })
     let proofOfWork = {
-      compute: await this.crypto.getComputeProofOfWork(cycleMarker, difficulty)
+      compute: await this.crypto.getComputeProofOfWork(cycleMarker, this.difficulty)
     }
     // TODO: add a version number at some point
     // version: '0.0.0'
     const joinReq = { nodeInfo, cycleMarker, proofOfWork, selectionNum }
     const signedJoinReq = this.crypto.sign(joinReq)
+    this.mainLogger.debug(`Join request created... Join request: ${JSON.stringify(signedJoinReq)}`)
     return signedJoinReq
   }
 
@@ -207,7 +247,7 @@ class P2P {
   addJoinRequest (joinRequest) {
     const valid = this._validateJoinRequest(joinRequest)
     if (!valid) return false
-    return this.p2p.addJoinRequest(joinRequest)
+    return this.state.addJoinRequest(joinRequest)
   }
 
   async discoverNetwork () {

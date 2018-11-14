@@ -5,7 +5,7 @@ class P2PState {
     this.mainLogger = logger.getLogger('main')
     this.crypto = crypto
     this.storage = storage
-    this.cycleDuration = config.cycleDuration
+    this.defaultCycleDuration = config.cycleDuration
     this.nodes = {
       ordered: [],
       current: {},
@@ -15,6 +15,8 @@ class P2PState {
     }
     this.currentCycle = {
       bestJoinRequests: [],
+      start: null,
+      duration: null,
       joined: [],
       removed: [],
       lost: [],
@@ -157,6 +159,8 @@ class P2PState {
   _resetCurrentCycle () {
     this.currentCycle = {
       bestJoinRequests: [],
+      start: null,
+      duration: null,
       joined: [],
       removed: [],
       lost: [],
@@ -178,8 +182,17 @@ class P2PState {
   }
 
   _startNewCycle () {
-    this.mainLogger.info(`Starting new cycle of duration ${this.cycleDuration}...`)
-    const quarterCycle = Math.ceil(this.cycleDuration * 1000 / 4)
+    this._resetCurrentCycle()
+    const lastCycleDuration = this.getLastCycleDuration()
+    const lastCycleStart = this.getLastCycleStart()
+    const currentTime = utils.getTime('s')
+    this.currentCycle.duration = lastCycleDuration
+    this.currentCycle.start = lastCycleStart ? lastCycleStart + lastCycleDuration : utils.getTime('s')
+    this.mainLogger.info(`Starting new cycle of duration ${this.getCurrentCycleDuration()}...`)
+    this.mainLogger.debug(`Last cycle start time: ${lastCycleStart}`)
+    this.mainLogger.debug(`Last cycle duration: ${lastCycleDuration}`)
+    this.mainLogger.debug(`Current time: ${currentTime}`)
+    const quarterCycle = Math.ceil(this.getCurrentCycleDuration() * 1000 / 4)
     this._startJoinPhase(quarterCycle)
   }
 
@@ -247,7 +260,6 @@ class P2PState {
     const cycleInfo = this.getCycleInfo()
     cycleInfo.marker = this.getCurrentCertificate().marker
 
-    this._resetCurrentCycle()
     this.cycles.push(cycleInfo)
     const accepted = this._acceptNodes(cycleInfo.joined)
     const cycleAdded = this.storage.addCycles(cycleInfo)
@@ -260,14 +272,11 @@ class P2PState {
     }
   }
 
-  getCycleDuration () {
-    return this.cycleDuration
-  }
-
   getCycleInfo (withCert = true) {
-    const previous = this.getLastCycleMarker()
+    const previous = this.getCurrentCycleMarker()
     const counter = this.getCycleCounter()
-    const time = this.getCurrentCycleTime()
+    const start = this.getCurrentCycleStart()
+    const duration = this.getCurrentCycleDuration()
     const active = this.getActiveCount()
     const desired = this.getDesiredCount()
     const joined = this.getJoined()
@@ -279,7 +288,8 @@ class P2PState {
     const cycleInfo = {
       previous,
       counter,
-      time,
+      start,
+      duration,
       active,
       desired,
       joined,
@@ -317,6 +327,7 @@ class P2PState {
   getCurrentCertificate () {
     // TODO: implement certificate propagation
     const cert = this.currentCycle.certificate
+    if (!Object.keys(cert).length) return null
     return cert
   }
 
@@ -329,12 +340,6 @@ class P2PState {
   getDesiredCount () {
     // TODO: Implement an actual calculation
     return 100
-  }
-
-  getCurrentCycleTime () {
-    let currTime = utils.getTime('s')
-    let cycleTime = Math.floor(currTime / this.cycleDuration)
-    return cycleTime
   }
 
   getCycles (amount) {
@@ -375,10 +380,37 @@ class P2PState {
     return lastCycle.counter + 1
   }
 
-  getLastCycleMarker () {
+  getLastCycleStart () {
+    const lastCycle = this.getLastCycle()
+    if (!lastCycle) return null
+    return lastCycle.start
+  }
+
+  getCurrentCycleStart () {
+    return this.currentCycle.start || null
+  }
+
+  getLastCycleDuration () {
+    const lastCycle = this.getLastCycle()
+    if (!lastCycle) return this.defaultCycleDuration
+    return lastCycle.duration
+  }
+
+  getCurrentCycleDuration () {
+    return this.currentCycle.duration
+  }
+
+  getCurrentCycleMarker () {
     const lastCycle = this.getLastCycle()
     if (!lastCycle) return '0'.repeat(64)
     return lastCycle.marker
+  }
+
+  getNextCycleMarker () {
+    const currentCert = this.getCurrentCertificate()
+    if (!currentCert) return null
+    const nextCycleMarker = currentCert.marker
+    return nextCycleMarker
   }
 
   getLastJoined () {
