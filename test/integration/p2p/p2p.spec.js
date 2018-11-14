@@ -5,19 +5,20 @@ const axios = require('axios')
 const { spawn } = require('child_process')
 
 let confStorage = module.require(`../../../config/storage.json`)
-// const { getInstances } = module.require('../../includes/utils-class')
+const { getInstances } = module.require('../../includes/utils-class')
 const { clearTestDb } = module.require('../../includes/utils-storage')
 const { sleep } = require('../../../src/utils')
-// let storage, logger, crypto, p2p, newConfStorage
+// let storage, logger, crypto, newConfStorage
+let p2p
 
 function init (loggerConf = null, externalPort = null) {
   return new Promise(async (resolve) => {
-    // standard cleanup, commenting out unused
-    // const instances = await getInstances(loggerConf, externalPort)
+    // standard cleanup, commenting out unused variables, can add them back in as needed
+    const instances = await getInstances(loggerConf, externalPort)
     // storage = instances.storage
     // logger = instances.logger
     // crypto = instances.Crypto
-    // p2p = instances.p2p
+    p2p = instances.p2p
     // newConfStorage = instances.newConfStorage
     resolve(true)
   })
