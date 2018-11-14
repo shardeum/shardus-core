@@ -1,6 +1,6 @@
 const { test } = require('tap')
 // The sqlite require will be here until we find necessary to put into a separated util lib
-const sqlite = require('sqlite')
+// const sqlite = require('sqlite')
 const fs = require('fs')
 const path = require('path')
 
@@ -9,22 +9,25 @@ const Logger = require('../../../src/logger')
 
 const { readLogFile, resetLogFile } = require('../../includes/utils-log')
 const { clearTestDb, createTestDb } = require('../../includes/utils-storage')
-const { sleep } = require('../../../src/utils')
+// const { sleep } = require('../../../src/utils')
 
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../config/server.json')))
-const models = require('../../../src/storage/models')
+// const models = require('../../../src/storage/models')
 let confStorage = module.require(`../../../config/storage.json`)
-let newConfStorage, storage
+// let newConfStorage
+let storage
 let logger = new Logger(path.resolve('./'), config.log)
 
 test('testing initialization property', async t => {
+/*
   const failStorage = new Storage(
     logger,
     '../../../',
     { confFile: './config/storage.json' }
   )
+*/
   try {
-    const res = await failStorage.listProperties()
+    // const res = await failStorage.listProperties()
     t.fail('Should throw an error')
   } catch (e) {
     t.pass('Should throw an error querying the db without being initialized')
@@ -34,22 +37,24 @@ test('testing initialization property', async t => {
 
 // Drop the database if exists and then test the init fn
 test('testing init fn', async t => {
-  {
-    try {
-      newConfStorage = createTestDb(confStorage)
-      resetLogFile()
-      storage = new Storage(
-        logger,
-        '../../../',
-        { confFile: './config/storage.json' }
-      )
-      await storage.init()
-      const log = readLogFile('main')
-      t.equal(log.includes('Database initialized.'), true, 'the logs should contain the msg of initialization')
-    } catch (e) {
-      t.threw(e)
-    }
+  // Don't need an additional defined scope
+  // {
+  try {
+    // newConfStorage = createTestDb(confStorage)
+    createTestDb(confStorage)
+    resetLogFile()
+    storage = new Storage(
+      logger,
+      '../../../',
+      { confFile: './config/storage.json' }
+    )
+    await storage.init()
+    const log = readLogFile('main')
+    t.equal(log.includes('Database initialized.'), true, 'the logs should contain the msg of initialization')
+  } catch (e) {
+    t.threw(e)
   }
+  // }
   t.end()
 })
 

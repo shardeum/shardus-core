@@ -2,16 +2,16 @@ const test = require('tap').test
 const path = require('path')
 const fs = require('fs')
 const { isIP } = require('net')
-const { spawn } = require('child_process')
+// const { spawn } = require('child_process')
 
 const P2P = require('../../../src/p2p')
 const Logger = require('../../../src/logger')
 const Storage = require('../../../src/storage')
 const Crypto = require('../../../src/crypto/index')
 
-const { readLogFile, resetLogFile } = require('../../includes/utils-log')
+// const { readLogFile, resetLogFile } = require('../../includes/utils-log')
 const { clearTestDb, createTestDb } = require('../../includes/utils-storage')
-const { sleep } = require('../../../src/utils')
+// const { sleep } = require('../../../src/utils')
 const { isValidHex } = require('../../includes/utils')
 
 let p2p
@@ -21,7 +21,7 @@ let config = require(path.join(__dirname, '../../../config/server.json'))
 config.syncLimit = 100000
 config.ipInfo = { externalIp: config.externalIp || null, externalPort: config.externalPort || null }
 
-let configFilePath = path.join(__dirname, '../../../config/logs.json')
+// let configFilePath = path.join(__dirname, '../../../config/logs.json')
 let loggerConfig = {
   dir: '/logs',
   confFile: '/config/logs.json',
@@ -33,7 +33,8 @@ let loggerConfig = {
 }
 
 let logger = new Logger(path.resolve('./'), loggerConfig)
-let newConfStorage = createTestDb(confStorage)
+// let newConfStorage = createTestDb(confStorage)
+createTestDb(confStorage)
 let storage = new Storage(
   logger,
   '../../../',
@@ -51,23 +52,23 @@ test('Testing p2p constructor', async t => {
 })
 
 test('Testing _verifyIpInfo', async t => {
-  {
-    try {
-      p2p._verifyIpInfo()
-      t.fail('this call without args should not be allowed')
-    } catch (e) {
-      t.pass('should throw an error with no args passed')
-    }
+  // {
+  try {
+    p2p._verifyIpInfo()
+    t.fail('this call without args should not be allowed')
+  } catch (e) {
+    t.pass('should throw an error with no args passed')
   }
+  // }
 
-  {
-    try {
-      p2p._verifyIpInfo({ externalIp: '127.0.0.1' })
-      t.fail('this call without port should not be allowed')
-    } catch (e) {
-      t.pass('should throw an error with no property port passed')
-    }
+  // {
+  try {
+    p2p._verifyIpInfo({ externalIp: '127.0.0.1' })
+    t.fail('this call without port should not be allowed')
+  } catch (e) {
+    t.pass('should throw an error with no property port passed')
   }
+  // }
 
   {
     const res = p2p._verifyIpInfo({ externalIp: '127.0.0.1', externalPort: 9001 })
@@ -78,14 +79,15 @@ test('Testing _verifyIpInfo', async t => {
 })
 
 test('Testing _retrieveIp method', async t => {
-  {
-    try {
-      const res = await p2p._retrieveIp('http://google.com')
-      t.fail('should not get an IP from google')
-    } catch (e) {
-      t.pass('should throw an error for an invalid ip server')
-    }
+  // {
+  try {
+    // const res = await p2p._retrieveIp('http://google.com')
+    await p2p._retrieveIp('http://google.com')
+    t.fail('should not get an IP from google')
+  } catch (e) {
+    t.pass('should throw an error for an invalid ip server')
   }
+  // }
 
   {
     const res = await p2p._retrieveIp(config.ipServer)
@@ -95,9 +97,9 @@ test('Testing _retrieveIp method', async t => {
 })
 
 test('Testing _checkTimeSynced method', async t => {
-  {
-    t.equal(await p2p._checkTimeSynced(config.timeServer), true, 'should validate the timeSync verification with arimaa time server')
-  }
+  // {
+  t.equal(await p2p._checkTimeSynced(config.timeServer), true, 'should validate the timeSync verification with arimaa time server')
+  // }
   t.end()
 })
 
@@ -120,10 +122,10 @@ test('Testing getIpInfo method', async t => {
 
 // discorverNetwork is already tested in shardus module unit tests
 
-let nodeAddress
+// let nodeAddress
 test('Testing _getThisNodeInfo', t => {
   const res = p2p._getThisNodeInfo()
-  nodeAddress = res.address
+  // nodeAddress = res.address
   const diff = (Math.floor(Date.now() / 1000)) - res.joinRequestTimestamp
   t.equal(typeof res.externalIp, 'string', 'externalIp should be a string')
   t.notEqual(isIP(res.externalIp), 0, 'externalIp should be a valid ip')

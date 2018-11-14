@@ -9,7 +9,8 @@ const { sleep } = require('../../../src/utils')
 const { readLogFile, resetLogFile } = require('../../includes/utils-log')
 const { clearTestDb, createTestDb } = require('../../includes/utils-storage')
 
-let newConfStorage, shardus
+// let newConfStorage, shardus
+let shardus
 let config = require(path.join(__dirname, '../../../config/server.json'))
 let confStorage = module.require(`../../../config/storage.json`)
 config.baseDir = '.'
@@ -21,7 +22,8 @@ config.syncLimit = 100000
 // Testing constructor
 test('testing Shardus class', async t => {
   // Testing constructor
-  newConfStorage = createTestDb(confStorage, '../../../db/db.test.sqlite')
+  // newConfStorage = createTestDb(confStorage, '../../../db/db.test.sqlite')
+  createTestDb(confStorage, '../../../db/db.test.sqlite')
   shardus = new Shardus(config)
   t.equal(shardus instanceof Shardus, true, 'the object should be an instance of Shardus')
   await shardus.storage.init()
@@ -43,7 +45,7 @@ test('testing methods isolated', { timeout: 20000 }, async t => {
 
 test('testing the shutdown method', { timeout: 10000 }, async t => {
   resetLogFile('main')
-  let server = spawn('node', [path.join(__dirname, 'child-process-shutdown.js')])
+  // let server = spawn('node', [path.join(__dirname, 'child-process-shutdown.js')])
   // server.stdout.on('data', (data) => console.log(`[stdout] ==> ${data.toString()}`))
   // server.stderr.on('data', (data) => console.log(`[stderr] ==> ${data.toString()}`))
   await sleep(6000)

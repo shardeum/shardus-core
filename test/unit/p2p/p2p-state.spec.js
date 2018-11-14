@@ -15,7 +15,8 @@ config.cycleDuration = 10
 let logger = new Logger(path.resolve('./'), config.log)
 let confStorage = module.require(`../../../config/storage.json`)
 let storage, p2pState
-let newConfStorage = createTestDb(confStorage)
+// let newConfStorage = createTestDb(confStorage)
+createTestDb(confStorage)
 
 storage = new Storage(
   logger,
@@ -37,31 +38,32 @@ test('Testing addJoinRequest and getCycleInfo methods', { timeout: 100000 }, asy
   await p2pState.storage.init()
   await p2pState.crypto.init()
   // Testing addJoinRequest and getLastJoined
-  {
-    p2pState.startCycles()
-    // fill the array of keypair
-    for (let i = 0; i < 1; i++) {
-      keys.push(p2pState.crypto._generateKeypair())
-      joinArray.push({
-        publicKey: keys[i].publicKey,
-        internalIp: '127.0.0.1',
-        internalPort: 10000 + i,
-        externalIp: '127.0.0.1',
-        externalPort: 10000 + i,
-        joinRequestTimestamp: Date.now(),
-        address: keys[i].publicKey
-      })
-      // add each node created
-      p2pState.addJoinRequest({ nodeInfo: joinArray[i] })
-    }
-    // await the finishing phase
-    await sleep((Math.ceil(config.cycleDuration * 0.4) * 1000))
-    let res = p2pState.getCycleInfo()
-    // for (let i = 0; i < 10; i++) {
-    //   t.equal(joinArray[i].address, res.joined[i], 'Each adress should be equal')
-    // }
-    t.pass('just pass by now')
+  // {
+  p2pState.startCycles()
+  // fill the array of keypair
+  for (let i = 0; i < 1; i++) {
+    keys.push(p2pState.crypto._generateKeypair())
+    joinArray.push({
+      publicKey: keys[i].publicKey,
+      internalIp: '127.0.0.1',
+      internalPort: 10000 + i,
+      externalIp: '127.0.0.1',
+      externalPort: 10000 + i,
+      joinRequestTimestamp: Date.now(),
+      address: keys[i].publicKey
+    })
+    // add each node created
+    p2pState.addJoinRequest({ nodeInfo: joinArray[i] })
   }
+  // await the finishing phase
+  await sleep((Math.ceil(config.cycleDuration * 0.4) * 1000))
+  // let res = p2pState.getCycleInfo()
+  p2pState.getCycleInfo()
+  // for (let i = 0; i < 10; i++) {
+  //   t.equal(joinArray[i].address, res.joined[i], 'Each adress should be equal')
+  // }
+  t.pass('just pass by now')
+  // }
 
   {
     await sleep((Math.ceil(config.cycleDuration * 0.65) * 1000))

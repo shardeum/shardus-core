@@ -5,7 +5,7 @@ const crypto = require('shardus-crypto-utils')
 
 crypto('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
 
-const { sleep } = require('../../../src/utils')
+// const { sleep } = require('../../../src/utils')
 const config = require('../../../tools/seed-list-gen/config.json')
 let inFile, outFile, keypair
 
@@ -53,7 +53,7 @@ afterEach((done) => {
 
 test('Testing seed list generator without the seed node list', (t) => {
   try {
-    const seedListGen = module.require('../../../tools/seed-list-gen')
+    // const seedListGen = module.require('../../../tools/seed-list-gen')
     t.fail('without the seed list should throw an error')
   } catch (e) {
     t.pass('should throw an error without a seedList')
@@ -70,7 +70,7 @@ test('Testing the seed list generator if gonna create the signed outFile correct
     JSON.stringify({ seedNodes }, null, 2)
   )
 
-  const seedListGen = module.require('../../../tools/seed-list-gen')
+  // const seedListGen = module.require('../../../tools/seed-list-gen')
   const signedList = JSON.parse(fs.readFileSync(path.join(__dirname, `../../../tools/seed-list-gen/${config.outFile.replace('./', '')}`)))
   const keysLib = JSON.parse(fs.readFileSync(path.join(__dirname, `../../../tools/seed-list-gen/${config.keypair.replace('./', '')}`)))
   const expectedSignedList = JSON.parse(fs.readFileSync(path.join(__dirname, `../../../tools/seed-list-gen/${config.inFile.replace('./', '')}`)))
