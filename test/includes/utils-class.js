@@ -6,7 +6,7 @@ const Logger = require('../../src/logger')
 const Storage = require('../../src/storage')
 const Crypto = require('../../src/crypto/index')
 
-// left from legacy code
+// keeping legacy code that does not pass standard: unused var
 const { clearTestDb, createTestDb } = require('../includes/utils-storage')// eslint-disable-line
 
 let p2p

@@ -1,5 +1,5 @@
 const ExitHandler = require('../../../src/exit-handler')
-const { sleep } = require('../../../src/utils')
+// const { sleep } = require('../../../src/utils')
 let exitHandler = new ExitHandler()
 
 function printPow2 () {
