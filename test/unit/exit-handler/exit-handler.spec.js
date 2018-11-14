@@ -11,11 +11,11 @@ let obj = {
   asyncCount: 100
 }
 
-var addSync = function (o) {
+var AddSync = function (o) {
   o.syncCount += 10
 }
 
-var addAsync = function (o) {
+var AddAsync = function (o) {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       o.asyncCount += 100
@@ -24,13 +24,13 @@ var addAsync = function (o) {
   })
 }
 
-var syncFn = new addSync(obj)
-var asyncFn = new addAsync(obj)
+var syncFn = new AddSync(obj)
+var asyncFn = new AddAsync(obj)
 
 // Testing registerAsync
 test('should execute correctly a sync fn passed by the method registerSync', async t => {
   exitHandler.registerSync('module1', syncFn)
-  exitHandler.syncFuncs['module1']
+  // exitHandler.syncFuncs['module1']
   t.equal(obj.syncCount, 10, 'obj.syncCout should be incremented by 10')
   t.end()
 })
