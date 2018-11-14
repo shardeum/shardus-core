@@ -80,11 +80,12 @@ class P2P {
   getCycleMarkerInfo () {
     const currentCycleMarker = this.state.getCurrentCycleMarker()
     const nextCycleMarker = this.state.getNextCycleMarker()
+    const cycleCounter = this.state.getCycleCounter()
     const cycleStart = this.state.getCurrentCycleStart()
     const cycleDuration = this.state.getCurrentCycleDuration()
     const nodesJoined = this.state.getLastJoined()
     const currentTime = utils.getTime('s')
-    const info = { currentCycleMarker, nextCycleMarker, cycleStart, cycleDuration, nodesJoined, currentTime }
+    const info = { currentCycleMarker, nextCycleMarker, cycleCounter, cycleStart, cycleDuration, nodesJoined, currentTime }
     this.mainLogger.debug(`Requested cycle marker info: ${JSON.stringify(info)}`)
     return info
   }
