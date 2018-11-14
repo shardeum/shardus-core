@@ -1,23 +1,24 @@
-const { before, test } = require('tap')
+const { before, test } = require('tap')// eslint-disable-line
 const path = require('path')
 const fs = require('fs')
 const axios = require('axios')
 const { spawn } = require('child_process')
 
 let confStorage = module.require(`../../../config/storage.json`)
-const { getInstances } = module.require('../../includes/utils-class')
+// const { getInstances } = module.require('../../includes/utils-class')
 const { clearTestDb } = module.require('../../includes/utils-storage')
 const { sleep } = require('../../../src/utils')
-let storage, logger, crypto, p2p
+// let storage, logger, crypto, p2p, newConfStorage
 
 function init (loggerConf = null, externalPort = null) {
   return new Promise(async (resolve) => {
-    const instances = await getInstances(loggerConf, externalPort)
-    storage = instances.storage
-    logger = instances.logger
-    crypto = instances.Crypto
-    p2p = instances.p2p
-    newConfStorage = instances.newConfStorage
+    // standard cleanup, commenting out unused
+    // const instances = await getInstances(loggerConf, externalPort)
+    // storage = instances.storage
+    // logger = instances.logger
+    // crypto = instances.Crypto
+    // p2p = instances.p2p
+    // newConfStorage = instances.newConfStorage
     resolve(true)
   })
 }

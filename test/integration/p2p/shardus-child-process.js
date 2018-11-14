@@ -1,7 +1,7 @@
 const path = require('path')
 const Shardus = require('../../../src/shardus')
 
-const { sleep } = require('../../../src/utils')
+// const { sleep } = require('../../../src/utils')
 
 let config = module.require(path.join(__dirname, '../../../config/server.json'))
 config.baseDir = '.'

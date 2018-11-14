@@ -2,7 +2,7 @@ const path = require('path')
 const fs = require('fs')
 
 function clearTestDb () {
-  if (fs.existsSync(path.join(__dirname + '/../../db', '/db.test.sqlite'))) fs.unlinkSync(path.join(__dirname + '/../../db', '/db.test.sqlite'))
+  if (fs.existsSync(path.join(path.join(__dirname, '/../../db'), '/db.test.sqlite'))) fs.unlinkSync(path.join(path.join(__dirname, '/../../db'), '/db.test.sqlite'))
 }
 
 // copy the current conf file and then change to use a test db

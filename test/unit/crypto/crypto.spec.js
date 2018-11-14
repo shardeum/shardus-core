@@ -5,10 +5,11 @@ const path = require('path')
 const Logger = require('../../../src/logger')
 const Storage = require('../../../src/storage')
 const Crypto = require('../../../src/crypto')
-const ExitHandler = require('../../../src/exit-handler')
-const { clearTestDb, createTestDb } = require('../../includes/utils-storage')
+// const ExitHandler = require('../../../src/exit-handler')
+// keeping legacy code that does not pass standard: unused var
+const { clearTestDb, createTestDb } = require('../../includes/utils-storage')// eslint-disable-line
 
-let configFilePath = path.join(__dirname, '../../../config/logs.json')
+// let configFilePath = path.join(__dirname, '../../../config/logs.json')
 let loggerConfig = {
   dir: '/logs',
   confFile: '/config/logs.json',
@@ -21,7 +22,7 @@ let loggerConfig = {
 
 let logger = new Logger(path.resolve('./'), loggerConfig)
 let confStorage = module.require(`../../../config/storage.json`)
-let newConfStorage = createTestDb(confStorage)
+// let newConfStorage = createTestDb(confStorage)
 let storage = new Storage(
   logger,
   '../../../',

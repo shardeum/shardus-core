@@ -1,12 +1,13 @@
 const path = require('path')
-const fs = require('fs')
+// const fs = require('fs')
 
 const P2P = require('../../src/p2p')
 const Logger = require('../../src/logger')
 const Storage = require('../../src/storage')
 const Crypto = require('../../src/crypto/index')
 
-const { clearTestDb, createTestDb } = require('../includes/utils-storage')
+// left from legacy code
+const { clearTestDb, createTestDb } = require('../includes/utils-storage')// eslint-disable-line
 
 let p2p
 let confStorage = module.require(`../../config/storage.json`)
@@ -15,7 +16,7 @@ let config = require(path.join(__dirname, '../../config/server.json'))
 config.syncLimit = 100000
 config.ipInfo = { externalIp: config.externalIp || null, externalPort: config.externalPort || null }
 
-let configFilePath = path.join(__dirname, '../../config/logs.json')
+// let configFilePath = path.join(__dirname, '../../config/logs.json')
 let loggerConfig = {
   dir: '/logs',
   confFile: '/config/logs.json',
@@ -46,7 +47,6 @@ function getInstances (loggerConf = null, externalPort = null) {
     resolve({
       storage,
       logger,
-      storage,
       crypto,
       p2p,
       newConfStorage

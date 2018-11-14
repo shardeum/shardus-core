@@ -2,7 +2,7 @@ const test = require('tap').test
 const Logger = require('../../../src/logger')
 const { sleep } = require('../../../src/utils')
 const path = require('path')
-const fs = require('fs')
+// const fs = require('fs')
 
 const { readLogFile } = require('../../includes/utils-log')
 
@@ -51,7 +51,8 @@ test('Create a debug log entry in main log', async t => {
 
 test('Throw error when instantiate Logger with invalid argument', t => {
   try {
-    let invalidLogger = new Logger(false, loggerConfig)
+    // disable standard lint for line below becaues it expected
+    let invalidLogger = new Logger(false, loggerConfig)// eslint-disable-line
     t.fail('Logger has instanciated with invalid "dir" argument')
   } catch (e) {
     t.pass('Prevent the instanciation of Logger with incorrect "dir" argument')
@@ -61,7 +62,8 @@ test('Throw error when instantiate Logger with invalid argument', t => {
 
 test('Throw error when instantiate Logger with invalid "confFile" in config object', t => {
   try {
-    let invalidLogger = new Logger('/', { confFile: false, ...loggerConfig })
+    // disable standard lint for line below becaues it expected
+    let invalidLogger = new Logger('/', { confFile: false, ...loggerConfig })// eslint-disable-line
     t.fail('Logger has successfuly instanciated with invalid "confFile" argument')
   } catch (e) {
     t.pass('Prevent the instanciation of Logger with incorrect "confFile" argument in config object argument')
@@ -71,7 +73,8 @@ test('Throw error when instantiate Logger with invalid "confFile" in config obje
 
 test('Throw error when instantiate Logger with invalid "files" argument in confFile in config object', t => {
   try {
-    let invalidLogger = new Logger('/', { files: '', ...loggerConfig })
+    // disable standard lint for line below becaues it expected
+    let invalidLogger = new Logger('/', { files: '', ...loggerConfig })// eslint-disable-line
     t.fail('Logger has successfuly instanciated with invalid "files" argument')
   } catch (e) {
     t.pass('Prevent the instanciation of Logger with incorrect "files" argument in config object argument')
@@ -81,7 +84,8 @@ test('Throw error when instantiate Logger with invalid "files" argument in confF
 
 test('Throw error when instantiate Logger with a "confFile" argument for a file that doesn\'t exists', t => {
   try {
-    let invalidLogger = new Logger('/', { confFile: 'config.json', ...loggerConfig })
+    // disable standard lint for line below becaues it expected
+    let invalidLogger = new Logger('/', { confFile: 'config.json', ...loggerConfig })// eslint-disable-line
     t.fail('Logger has successfuly instanciated with a "confFile" argument for a file that doesn\'t exists')
   } catch (e) {
     t.pass('Prevent the instanciation of Logger with a "confFile" argument for a file that doesn\'t exists')
