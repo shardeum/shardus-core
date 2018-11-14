@@ -20,7 +20,7 @@ if (!seedList.seedNodes) throw Error('seedNodes property is undefined in seed no
 
 // Make sure there is a valid keypair
 try {
-  if (!fs.existsSync(keyfile)) throw Error('No valid keypair file found')
+  if (!fs.existsSync(keyFile)) throw Error('No valid keypair file found')
   keys = JSON.parse(fs.readFileSync(keyFile))
   if (!keys.publicKey || !keys.secretKey) throw new Error('Missing pk/sk in the keypair file')
 } catch (e) {
