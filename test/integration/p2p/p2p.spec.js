@@ -11,7 +11,7 @@ const { sleep } = require('../../../src/utils')
 let storage, logger, crypto, p2p
 
 function init (loggerConf = null, externalPort = null) {
-  return new Promise (async (resolve) => {
+  return new Promise(async (resolve) => {
     const instances = await getInstances(loggerConf, externalPort)
     storage = instances.storage
     logger = instances.logger

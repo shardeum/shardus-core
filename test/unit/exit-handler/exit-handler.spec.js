@@ -16,7 +16,7 @@ var addSync = function (o) {
 }
 
 var addAsync = function (o) {
-  return new Promise ((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     setTimeout(() => {
       o.asyncCount += 100
       resolve(true)

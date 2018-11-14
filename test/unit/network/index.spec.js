@@ -2,7 +2,7 @@ const test = require('tap').test
 const generateNetworkModule = require('../../../src/network')
 
 const DEFAULT_ADDRESS = '127.0.0.1'
-const DEFAULT_PORT    = 5000
+const DEFAULT_PORT = 5000
 
 test('Network Module', t => {
   {

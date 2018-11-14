@@ -88,8 +88,8 @@ test('Testing _retrieveIp method', async t => {
   }
 
   {
-     const res = await p2p._retrieveIp(config.ipServer)
-     t.notEqual(isIP(res), 0, 'should return a valid ip from ipServer')
+    const res = await p2p._retrieveIp(config.ipServer)
+    t.notEqual(isIP(res), 0, 'should return a valid ip from ipServer')
   }
   t.end()
 })
@@ -102,7 +102,7 @@ test('Testing _checkTimeSynced method', async t => {
 })
 
 test('Testing _getSeedListSigned method', async t => {
-  const localNode = { ip: "127.0.0.1", port: 9001 }
+  const localNode = { ip: '127.0.0.1', port: 9001 }
   const res = await p2p._getSeedListSigned()
   t.equal(Array.isArray(res.seedNodes), true, '_getSeedNodes should return an array type')
   t.notEqual(res.seedNodes.length, 0, 'the array should have at least one node in its list')
@@ -160,30 +160,30 @@ test('Testing _getThisNodeInfo', t => {
 
 // test('Testing _createJoinRequest method', async t => {
 //   let joinRequest = await p2p._createJoinRequest()
-  // t.match(joinRequest, {
-  //   nodeInfo: {
-  //     externalIp: /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/,
-  //     externalPort: /\d+/,
-  //     internalIp: /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/,
-  //     internalPort: /\d+/,
-  //     publicKey: /[0-9a-fA-F]+/
-  //   },
-  //   cycleMarker: /[0-9a-fA-F]+/,
-  //   proofOfWork: {
-  //     compute: {
-  //       hash: /[0-9a-fA-F]+/,
-  //       nonce: /[0-9a-fA-F]+/
-  //     }
-  //   },
-  //   selectionNum: /[0-9a-fA-F]+/,
-  //   signedSelectionNum: {
-  //     selectionNum: /[0-9a-fA-F]+/,
-  //     sign: {
-  //       owner: /[0-9a-fA-F]+/,
-  //       sig: /[0-9a-fA-F]+/
-  //     }
-  //   }
-  // }, 'joinRequest should have all expected properties')
+// t.match(joinRequest, {
+//   nodeInfo: {
+//     externalIp: /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/,
+//     externalPort: /\d+/,
+//     internalIp: /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/,
+//     internalPort: /\d+/,
+//     publicKey: /[0-9a-fA-F]+/
+//   },
+//   cycleMarker: /[0-9a-fA-F]+/,
+//   proofOfWork: {
+//     compute: {
+//       hash: /[0-9a-fA-F]+/,
+//       nonce: /[0-9a-fA-F]+/
+//     }
+//   },
+//   selectionNum: /[0-9a-fA-F]+/,
+//   signedSelectionNum: {
+//     selectionNum: /[0-9a-fA-F]+/,
+//     sign: {
+//       owner: /[0-9a-fA-F]+/,
+//       sig: /[0-9a-fA-F]+/
+//     }
+//   }
+// }, 'joinRequest should have all expected properties')
 //   t.end()
 // })
 //

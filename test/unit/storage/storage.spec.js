@@ -32,7 +32,6 @@ test('testing initialization property', async t => {
   t.end()
 })
 
-
 // Drop the database if exists and then test the init fn
 test('testing init fn', async t => {
   {
@@ -123,7 +122,7 @@ test('testing set and add methods for cycles model', async t => {
     try {
       await storage.addCycles(dummyCycle)
       let res = await storage.getCycles(dummyCycle)
-      t.fail(`should throw an error inserting an invalid cycle \n${JSON.stringify(res,null,2)}`)
+      t.fail(`should throw an error inserting an invalid cycle \n${JSON.stringify(res, null, 2)}`)
     } catch (e) {
       t.pass('should throw an error inserting an invalid cycle')
     }

@@ -81,9 +81,9 @@ let testTx = {
 // testing sign method
 test('Should sign an object correctly', async t => {
   const newObj = crypto.sign(testTx)
-  t.notEqual(newObj.sign, null,'the new signed object should have the propery sign')
-  t.equal(isValidHex(newObj.sign.owner), true,'the sign.owner property should be a valid hex')
-  t.equal(isValidHex(newObj.sign.sig), true,'the sign.sig property should be a valid hex')
+  t.notEqual(newObj.sign, null, 'the new signed object should have the propery sign')
+  t.equal(isValidHex(newObj.sign.owner), true, 'the sign.owner property should be a valid hex')
+  t.equal(isValidHex(newObj.sign.sig), true, 'the sign.sig property should be a valid hex')
   t.equal(crypto.keypair.publicKey, newObj.sign.owner, 'The sign.owner should be equal to the publicKey of the object')
   t.equal(testTx.sign, undefined, 'the used object should not be changed')
   t.end()

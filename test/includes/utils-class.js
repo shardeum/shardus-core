@@ -30,13 +30,13 @@ let newConfStorage = createTestDb(confStorage)
 
 function getInstances (loggerConf = null, externalPort = null) {
   return new Promise(async (resolve) => {
-    let logger = new Logger(path.resolve('./'), loggerConf ? loggerConf : loggerConfig)
+    let logger = new Logger(path.resolve('./'), loggerConf || loggerConfig)
     let storage = new Storage(
       logger,
       '../../../',
       { confFile: './config/storage.json' }
     )
-    config.externalPort = externalPort ? externalPort : config.externalPort
+    config.externalPort = externalPort || config.externalPort
     let ipInfo = { externalIp: config.externalIp || null, externalPort: config.externalPort || null }
     config.ipInfo = ipInfo
     await storage.init()

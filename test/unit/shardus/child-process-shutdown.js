@@ -15,4 +15,4 @@ async function init () {
   await shardus.shutdown()
 }
 
-init ()
+init()

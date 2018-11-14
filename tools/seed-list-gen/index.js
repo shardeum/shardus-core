@@ -8,8 +8,8 @@ const outputFile = config.outFile
 const keyFile = config.keypair
 let keys
 
-if(fs.existsSync(path.join(__dirname, config.inFile))) {
-   seedList = JSON.parse(fs.readFileSync(path.join(__dirname, config.inFile)))
+if (fs.existsSync(path.join(__dirname, config.inFile))) {
+  seedList = JSON.parse(fs.readFileSync(path.join(__dirname, config.inFile)))
 } else {
   seedList = null
 }

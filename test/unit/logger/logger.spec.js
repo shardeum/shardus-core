@@ -61,7 +61,7 @@ test('Throw error when instantiate Logger with invalid argument', t => {
 
 test('Throw error when instantiate Logger with invalid "confFile" in config object', t => {
   try {
-    let invalidLogger = new Logger('/', {confFile: false, ...loggerConfig})
+    let invalidLogger = new Logger('/', { confFile: false, ...loggerConfig })
     t.fail('Logger has successfuly instanciated with invalid "confFile" argument')
   } catch (e) {
     t.pass('Prevent the instanciation of Logger with incorrect "confFile" argument in config object argument')
@@ -71,7 +71,7 @@ test('Throw error when instantiate Logger with invalid "confFile" in config obje
 
 test('Throw error when instantiate Logger with invalid "files" argument in confFile in config object', t => {
   try {
-    let invalidLogger = new Logger('/', {files: '', ...loggerConfig})
+    let invalidLogger = new Logger('/', { files: '', ...loggerConfig })
     t.fail('Logger has successfuly instanciated with invalid "files" argument')
   } catch (e) {
     t.pass('Prevent the instanciation of Logger with incorrect "files" argument in config object argument')
@@ -81,7 +81,7 @@ test('Throw error when instantiate Logger with invalid "files" argument in confF
 
 test('Throw error when instantiate Logger with a "confFile" argument for a file that doesn\'t exists', t => {
   try {
-    let invalidLogger = new Logger('/', {confFile: 'config.json', ...loggerConfig})
+    let invalidLogger = new Logger('/', { confFile: 'config.json', ...loggerConfig })
     t.fail('Logger has successfuly instanciated with a "confFile" argument for a file that doesn\'t exists')
   } catch (e) {
     t.pass('Prevent the instanciation of Logger with a "confFile" argument for a file that doesn\'t exists')
