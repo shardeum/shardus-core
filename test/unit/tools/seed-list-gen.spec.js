@@ -53,7 +53,8 @@ afterEach((done) => {
 
 test('Testing seed list generator without the seed node list', (t) => {
   try {
-    // const seedListGen = module.require('../../../tools/seed-list-gen')
+    // disable standard lint for line below becaues it expected
+    const seedListGen = module.require('../../../tools/seed-list-gen')// eslint-disable-line
     t.fail('without the seed list should throw an error')
   } catch (e) {
     t.pass('should throw an error without a seedList')
@@ -70,7 +71,8 @@ test('Testing the seed list generator if gonna create the signed outFile correct
     JSON.stringify({ seedNodes }, null, 2)
   )
 
-  // const seedListGen = module.require('../../../tools/seed-list-gen')
+  // disable standard lint for line below becaues it expected
+  const seedListGen = module.require('../../../tools/seed-list-gen') // eslint-disable-line
   const signedList = JSON.parse(fs.readFileSync(path.join(__dirname, `../../../tools/seed-list-gen/${config.outFile.replace('./', '')}`)))
   const keysLib = JSON.parse(fs.readFileSync(path.join(__dirname, `../../../tools/seed-list-gen/${config.keypair.replace('./', '')}`)))
   const expectedSignedList = JSON.parse(fs.readFileSync(path.join(__dirname, `../../../tools/seed-list-gen/${config.inFile.replace('./', '')}`)))

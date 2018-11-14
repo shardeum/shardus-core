@@ -19,15 +19,15 @@ let storage
 let logger = new Logger(path.resolve('./'), config.log)
 
 test('testing initialization property', async t => {
-/*
   const failStorage = new Storage(
     logger,
     '../../../',
     { confFile: './config/storage.json' }
   )
-*/
+
   try {
-    // const res = await failStorage.listProperties()
+    // disable standard lint for line below becaues it expected
+    const res = await failStorage.listProperties()// eslint-disable-line
     t.fail('Should throw an error')
   } catch (e) {
     t.pass('Should throw an error querying the db without being initialized')
