@@ -56,6 +56,3 @@ test('testing the shutdown method', { timeout: 10000 }, async t => {
   t.notEqual(log.indexOf('Logger shutting down cleanly...'), -1, 'Should terminate the logger within shardus correctly and insert the log entry')
   t.end()
 })
-
-// TODO: create a test with more than one shardus, one being the seedNode and the other
-// a normal node connecting to thus seedNode
