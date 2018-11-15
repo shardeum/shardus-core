@@ -205,7 +205,8 @@ class P2P {
       if (isFirstSeed) {
         this.mainLogger.debug('Rejoining network...')
         this.state.startCycles()
-        this.state.addJoinRequest(this._getThisNodeInfo())
+        const joinRequest = await this._createJoinRequest()
+        this.state.addJoinRequest(joinRequest)
         return true
       }
       const joined = await this._attemptJoin()
