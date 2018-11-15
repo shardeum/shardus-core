@@ -1,4 +1,4 @@
-image: node:8.12.0
+image: node:10.13.0
 
 stages:
   - init
