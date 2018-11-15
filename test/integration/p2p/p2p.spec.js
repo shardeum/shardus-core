@@ -11,17 +11,14 @@ const { sleep } = require('../../../src/utils')
 // let storage, logger, crypto, newConfStorage
 let p2p
 
-function init (loggerConf = null, externalPort = null) {
-  return new Promise(async (resolve) => {
-    // standard cleanup, commenting out unused variables, can add them back in as needed
-    const instances = await getInstances(loggerConf, externalPort)
-    // storage = instances.storage
-    // logger = instances.logger
-    // crypto = instances.Crypto
-    p2p = instances.p2p
-    // newConfStorage = instances.newConfStorage
-    resolve(true)
-  })
+async function init (loggerConf = null, externalPort = null) {
+  // standard cleanup, commenting out unused variables, can add them back in as needed
+  const instances = await getInstances(loggerConf, externalPort)
+  // storage = instances.storage
+  // logger = instances.logger
+  // crypto = instances.Crypto
+  p2p = instances.p2p
+  // newConfStorage = instances.newConfStorage
 }
 
 test('Testing P2P integrated methods with a seedNode up', async t => {

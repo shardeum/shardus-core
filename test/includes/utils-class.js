@@ -29,29 +29,27 @@ let loggerConfig = {
 
 let newConfStorage = createTestDb(confStorage)
 
-function getInstances (loggerConf = null, externalPort = null) {
-  return new Promise(async (resolve) => {
-    let logger = new Logger(path.resolve('./'), loggerConf || loggerConfig)
-    let storage = new Storage(
-      logger,
-      '../../../',
-      { confFile: './config/storage.json' }
-    )
-    config.externalPort = externalPort || config.externalPort
-    let ipInfo = { externalIp: config.externalIp || null, externalPort: config.externalPort || null }
-    config.ipInfo = ipInfo
-    await storage.init()
-    let crypto = new Crypto(logger, storage)
-    await crypto.init()
-    p2p = new P2P(config, logger, storage, crypto)
-    resolve({
-      storage,
-      logger,
-      crypto,
-      p2p,
-      newConfStorage
-    })
-  })
+async function getInstances (loggerConf = null, externalPort = null) {
+  let logger = new Logger(path.resolve('./'), loggerConf || loggerConfig)
+  let storage = new Storage(
+    logger,
+    '../../../',
+    { confFile: './config/storage.json' }
+  )
+  config.externalPort = externalPort || config.externalPort
+  let ipInfo = { externalIp: config.externalIp || null, externalPort: config.externalPort || null }
+  config.ipInfo = ipInfo
+  await storage.init()
+  let crypto = new Crypto(logger, storage)
+  await crypto.init()
+  p2p = new P2P(config, logger, storage, crypto)
+  return {
+    storage,
+    logger,
+    crypto,
+    p2p,
+    newConfStorage
+  }
 }
 
 exports.getInstances = getInstances
