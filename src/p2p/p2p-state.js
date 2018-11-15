@@ -102,11 +102,9 @@ class P2PState {
     node.id = nodeId
     delete node.publicKey
     this.nodes.ordered.push(node)
-    this.nodes.current[node.id] = node
     delete this.nodes.pending[node.id]
-    // TODO: Let _addNodeToNode handle this when status is param
-    this.nodes.syncing[node.id] = node
-    await this.addNode(node)
+    node.status = 'syncing'
+    await this.addNode(node, 'syncing')
   }
 
   async _acceptNodes (publicKeys, cycleMarker) {
@@ -118,19 +116,23 @@ class P2PState {
   }
 
   // TODO: Take status as a param after status is being stored in DB
-  _addNodeToNodelist (node) {
-    this.nodes.current[node.id] = node
+  _addNodeToNodelist (node, status) {
+    if (status === 'active' || status === 'syncing' || status === 'pending') {
+      this.nodes[status][node.id] = node
+      this.nodes.current[node.id] = node
+    } else throw new Error('Invalid node status')
   }
 
   _addNodesToNodelist (nodes) {
     for (const node of nodes) {
-      this._addNodeToNodelist(node)
+      if(node.status) this._addNodeToNodelist(node, node.status)
+      else throw new Error('Node does not have status property')
     }
   }
 
   // This is for adding a node both in memory and to storage
-  async addNode (node) {
-    this._addNodeToNodelist(node)
+  async addNode (node, status) {
+    this._addNodeToNodelist(node, status)
     await this.storage.addNodes(node)
   }
 
