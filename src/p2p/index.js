@@ -87,7 +87,21 @@ class P2P {
     return nodeInfo
   }
 
+  async _ensureExternalIp () {
+    if (!this._verifyIpInfo(this.getIpInfo())) {
+      this.ipInfo.externalIp = await this._retrieveIp(this.ipServer)
+    }
+  }
+
   async _checkRejoin () {
+    const currExternIp = this.getIpInfo().externalIp
+    const currExternPort = this.getIpInfo().externalPort
+    const dbExternIp = await this.storage.getProperty('externalIp')
+    const dbExternPort = await this.storage.getProperty('externalPort')
+
+    // Check if our external network info matches what's in the database, otherwise we need to rejoin
+    if (currExternIp !== dbExternIp || currExternPort !== dbExternPort) return true
+
     const currentTime = utils.getTime('s')
     const lastHeartbeat = await this.storage.getProperty('heartbeat') || 0
     // If time since last heartbeat is greater than the max rejoin time, we have to rejoin
@@ -129,75 +143,57 @@ class P2P {
   }
 
   async discoverNetwork () {
+    // Check if our time is synced to network time server
     let timeSynced = await this._checkTimeSynced(this.timeServer)
     if (!timeSynced) throw new Error('Local time out of sync with time server.')
+    
+    // Make sure we know our external IP
+    await this._ensureExternalIp()
 
-    let needsFreshJoin = false
-    let needsResync = false
-    let needsFetchIp = false
+    // Check if we are first seed node
+    const seedNodes = await this._getSeedNodes()
+    const isFirstSeed = this._checkIfFirstSeedNode(seedNodes)
+    if (isFirstSeed) {
+      this.mainLogger.info('You are the first seed node!')
+    } else {
+      this.mainLogger.info('You are not the first seed node...')
+    }
 
     // Check if we need to rejoin
-    const dbExternIp = await this.storage.getProperty('externalIp')
-    const dbExternPort = await this.storage.getProperty('externalPort')
-
     const rejoin = await this._checkRejoin()
     if (rejoin) {
       this.mainLogger.info('Server needs to rejoin...')
-      needsFreshJoin = true
-    } else {
-      if (!this._verifyIpInfo(this.getIpInfo())) {
-        if (dbExternIp && dbExternPort) {
-          needsResync = true
-        } else {
-          needsFetchIp = true
-          needsFreshJoin = true
-        }
-      } else {
-        const currExternIp = this.getIpInfo().externalIp
-        const currExternPort = this.getIpInfo().externalPort
-        if (currExternIp !== dbExternIp || currExternPort !== dbExternPort) {
-          needsFreshJoin = true
-        } else {
-          needsResync = true
-        }
-      }
-    }
-    if (needsFreshJoin) {
       this.mainLogger.debug('Clearing P2P state...')
       await this.state.clear()
+      await this.storage.setProperty('externalIp', this.getIpInfo().externalIp)
+      await this.storage.setProperty('externalPort', this.getIpInfo().externalPort)
+      if (isFirstSeed) {
+        this.mainLogger.debug('Rejoining network...')
+        this.state.startCycles()
+        this.state.addJoinRequest(this._getThisNodeInfo())
+        return true
+      }
+      const joined = await this._attemptJoin()
+      if (!joined) return false
+      return true
     }
-    if (needsFetchIp) {
-      this.ipInfo.externalIp = await this._retrieveIp(this.ipServer)
-    }
-    if (!dbExternIp) await this.storage.setProperty('externalIp', this.getIpInfo().externalIp)
-    if (!dbExternPort) await this.storage.setProperty('externalPort', this.getIpInfo().externalPort)
+    // If we made it this far, we need to sync to the network
 
-    const seedNodes = await this._getSeedNodes()
-    const isFirstSeed = this._checkIfFirstSeedNode(seedNodes)
     // TODO: need to make it robust when resync implemented,
     // ---   currently system would never resync if we were only
     // ---   seed node in the network
+
+    // If you are first node, there is nothing to sync to
     if (isFirstSeed) {
-      this.mainLogger.info('You are the first seed node!')
-      if (needsFreshJoin) {
-        this.mainLogger.debug('Rejoining network...')
-        this.state.addJoinRequest(this._getThisNodeInfo())
-      } else {
-        this.mainLogger.debug('No rejoin required, starting new cycle...')
-      }
+      this.mainLogger.debug('No rejoin required, starting new cycle...')
       this.state.startCycles()
       return true
     }
-    if (needsResync) {
-      this.mainLogger.debug('Resyncing to network...')
-      // TODO: await resync
-      // this.state.startCycles()
-      // TODO: Change this only to return false if resync fails
-      return false
-    }
-    const joined = await this._attemptJoin()
-    if (!joined) return false
-    return true
+
+    // If not first seed, we need to sync to network
+    this.mainLogger.debug('Syncing to network...')
+    // TODO: add resyncing
+    return false
   }
 }
 
