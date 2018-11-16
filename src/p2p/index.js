@@ -1,6 +1,7 @@
 const utils = require('../utils')
 const http = require('../http')
 const P2PState = require('./p2p-state')
+const routes = require('./routes')
 
 class P2P {
   constructor (config, logger, storage, crypto, network) {
@@ -8,6 +9,7 @@ class P2P {
     this.mainLogger = logger.getLogger('main')
     this.storage = storage
     this.crypto = crypto
+    this.network = network
     this.ipInfo = config.ipInfo
     this.ipServer = config.ipServer
     this.timeServer = config.timeServer
@@ -29,6 +31,11 @@ class P2P {
 
     // Set up the network after we are sure we have our current IP info
     await this.network.setup(this.getIpInfo())
+    this._registerRoutes()
+  }
+
+  _registerRoutes () {
+    routes.resgister(this)
   }
 
   _verifyIpInfo (ipInfo) {

@@ -77,6 +77,7 @@ class Shardus {
     const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay }
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network)
     await this.p2p.init()
+    this._registerRoutes()
     let joinedNetwork
     try {
       joinedNetwork = await this.p2p.discoverNetwork()
