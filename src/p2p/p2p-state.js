@@ -104,7 +104,7 @@ class P2PState {
     this.nodes.ordered.push(node)
     delete this.nodes.pending[node.id]
     node.status = 'syncing'
-    await this.addNode(node, 'syncing')
+    await this.addNode(node)
   }
 
   async _acceptNodes (publicKeys, cycleMarker) {
@@ -115,8 +115,8 @@ class P2PState {
     await Promise.all(promises)
   }
 
-  // TODO: Take status as a param after status is being stored in DB
-  _addNodeToNodelist (node, status) {
+  _addNodeToNodelist (node) {
+    const status = node.status
     if (status === 'active' || status === 'syncing' || status === 'pending') {
       this.nodes[status][node.id] = node
       this.nodes.current[node.id] = node
@@ -125,14 +125,14 @@ class P2PState {
 
   _addNodesToNodelist (nodes) {
     for (const node of nodes) {
-      if(node.status) this._addNodeToNodelist(node, node.status)
+      if (node.status) this._addNodeToNodelist(node)
       else throw new Error('Node does not have status property')
     }
   }
 
   // This is for adding a node both in memory and to storage
-  async addNode (node, status) {
-    this._addNodeToNodelist(node, status)
+  async addNode (node) {
+    this._addNodeToNodelist(node)
     await this.storage.addNodes(node)
   }
 
@@ -141,15 +141,6 @@ class P2PState {
     this._addNodesToNodelist(nodes)
     await this.storage.addNodes(nodes)
   }
-
-  /* TODO: add this change after status is being stored in DB
-  // Should pass an array of objects containing { node, status }
-  _addNodesToNodelist (nodesInfo) {
-    for (const nodeInfo of nodesInfo) {
-      this._addNodeToNodelist(nodeInfo.node, nodeInfo.status)
-    }
-  }
-  */
 
   _computeCycleMarker (fields) {
     this.mainLogger.debug(`Computing cycle marker... Cycle marker fields: ${JSON.stringify(fields)}`)
