@@ -57,6 +57,7 @@ class P2P {
 
   async _getSeedListSigned () {
     let seedListSigned = await http.get(this.seedList)
+    this.mainLogger.debug(`Got signed seed list: ${seedListSigned}`)
     return seedListSigned
   }
 
@@ -283,8 +284,12 @@ class P2P {
         this.state.addJoinRequest(joinRequest)
         return true
       }
-      const joined = await this._attemptJoin()
-      if (!joined) return false
+      const joined = await this._join()
+      if (!joined) {
+        this.mainLogger.info('Unable to join network. Shutting down...')
+        return false
+      }
+      this.mainLogger.info('Successfully joined the network!')
       return true
     }
     // If we made it this far, we need to sync to the network
@@ -295,7 +300,7 @@ class P2P {
 
     // If you are first node, there is nothing to sync to
     if (isFirstSeed) {
-      this.mainLogger.debug('No rejoin required, starting new cycle...')
+      this.mainLogger.info('No rejoin required, starting new cycle...')
       this.state.startCycles()
       const joinRequest = await this._createJoinRequest()
       this.state.addJoinRequest(joinRequest)
@@ -303,8 +308,9 @@ class P2P {
     }
 
     // If not first seed, we need to sync to network
-    this.mainLogger.debug('Syncing to network...')
+    this.mainLogger.info('Syncing to network...')
     // TODO: add resyncing
+    this.mainLogger.debug('Unable to resync... TODO: implement resyncing.')
     return false
   }
 }
