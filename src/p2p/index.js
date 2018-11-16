@@ -3,7 +3,7 @@ const http = require('../http')
 const P2PState = require('./p2p-state')
 
 class P2P {
-  constructor (config, logger, storage, crypto) {
+  constructor (config, logger, storage, crypto, network) {
     this.logger = logger
     this.mainLogger = logger.getLogger('main')
     this.storage = storage
@@ -21,7 +21,14 @@ class P2P {
   }
 
   async init () {
+    // Initialize our p2p state
     await this.state.init()
+
+    // Make sure we know our external IP
+    await this._ensureExternalIp()
+
+    // Set up the network after we are sure we have our current IP info
+    await this.network.setup(this.getIpInfo())
   }
 
   _verifyIpInfo (ipInfo) {
@@ -256,9 +263,6 @@ class P2P {
     // Check if our time is synced to network time server
     let timeSynced = await this._checkTimeSynced(this.timeServer)
     if (!timeSynced) throw new Error('Local time out of sync with time server.')
-
-    // Make sure we know our external IP
-    await this._ensureExternalIp()
 
     // Check if we are first seed node
     const seedNodes = await this._getSeedNodes()

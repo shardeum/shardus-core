@@ -1,6 +1,4 @@
 {
-  "externalIp": "127.0.0.1",
-  "externalPort": 9001,
   "ipServer": "api.ipify.org/?format=json",
   "timeServer": "http://arimaa.com/timestamp/",
   "syncLimit": 180,
@@ -12,6 +10,12 @@
   "difficulty": 16,
   "queryDelay": 1,
   "netadmin": "758b1c119412298802cd28dbfa394cdfeecc4074492d60844cc192d632d84de3",
+  "network": {
+    "externalIp": "127.0.0.1",
+    "externalPort": 9001,
+    "internalIp": "127.0.0.1",
+    "internalPort": 9005
+  },
   "log": {
     "dir": "logs",
     "confFile": "./config/logs.json",

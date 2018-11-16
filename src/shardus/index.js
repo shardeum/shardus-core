@@ -1,23 +1,20 @@
-const express = require('express')
-const bodyParser = require('body-parser')
 const Logger = require('../logger')
 const ExitHandler = require('../exit-handler')
 const P2P = require('../p2p')
 const Crypto = require('../crypto')
 const Storage = require('../storage')
+const Network = require('../network')
 const utils = require('../utils')
 
 class Shardus {
   constructor (config) {
-    this.externalPort = config.externalPort || 8080
-
     this.logger = new Logger(config.baseDir, config.log)
     this.mainLogger = this.logger.getLogger('main')
     this.fatalLogger = this.logger.getLogger('fatal')
     this.exitHandler = new ExitHandler()
     this.storage = new Storage(this.logger, config.baseDir, config.storage)
-    this.app = express()
     this.crypto = {}
+    this.network = new Network()
     this.p2p = {}
 
     this.heartbeatInterval = config.heartbeatInterval
@@ -39,48 +36,6 @@ class Shardus {
     })
     this.exitHandler.registerAsync('logger', () => {
       return this.logger.shutdown()
-    })
-  }
-
-  _setupExternalApi (app) {
-    return new Promise((resolve, reject) => {
-      app.use(bodyParser.json())
-
-      app.post('/exit', async (req, res) => {
-        res.json({ success: true })
-        await this.shutdown()
-      })
-
-      app.get('/cyclemarker', (req, res) => {
-        const cycleMarkerInfo = this.p2p.getCycleMarkerInfo()
-        res.json(cycleMarkerInfo)
-      })
-
-      app.get('/cyclechain', (req, res) => {
-        const cycleChain = this.p2p.getLatestCycles(10)
-        res.json({ cycleChain })
-      })
-
-      app.post('/join', (req, res) => {
-        const invalidJoinReqErr = 'invalid join request'
-        if (!req.body) {
-          this.mainLogger.error('Invalid join request received.')
-          return res.json({ success: false, error: invalidJoinReqErr })
-        }
-        const joinRequest = req.body
-        this.mainLogger.debug(`Join request received: ${JSON.stringify(joinRequest)}`)
-        res.json({ success: true })
-        const accepted = this.p2p.addJoinRequest(joinRequest)
-        if (!accepted) return this.mainLogger.debug('Join request not accepted.')
-        this.mainLogger.debug('Join request accepted!')
-      })
-
-      app.listen(this.externalPort, () => {
-        const msg = `Server running on port ${this.externalPort}...`
-        console.log(msg)
-        this.mainLogger.info(msg)
-        resolve()
-      })
     })
   }
 
@@ -118,11 +73,10 @@ class Shardus {
     this.crypto = new Crypto(this.logger, this.storage)
     await this.crypto.init()
     const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay } = config
-    const ipInfo = { externalIp: config.externalIp || null, externalPort: config.externalPort || null }
+    const ipInfo = config.network
     const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay }
-    this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto)
+    this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network)
     await this.p2p.init()
-    await this._setupExternalApi(this.app)
     let joinedNetwork
     try {
       joinedNetwork = await this.p2p.discoverNetwork()

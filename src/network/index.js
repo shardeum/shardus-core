@@ -1,18 +1,59 @@
-const Qn = require('shardus-quic-net')
+// const Qn = require('shardus-quic-net')
+const express = require('express')
 
-module.exports = (localPort, localAddress) => {
-  // both args must be passed in
-  if (!localPort) throw new Error('Fatal: network module requires localPort')
-  if (!localAddress) throw new Error('Fatal: network module requires localAddress')
+class Network {
+  constructor () {
+    this.app = express()
+    this.ipInfo = {}
+  }
 
-  // instantiate the shardus quic net library
-  const qn = Qn({
-    port: localPort,
-    address: localAddress
-  })
+  _setupExternal () {
+    return new Promise((resolve, reject) => {
+      this.app.listen(this.ipInfo.externalPort, this.ipInfo.externalIp, () => {
+        const msg = `Server running on port ${this.externalPort}...`
+        console.log(msg)
+        this.mainLogger.info(msg)
+        resolve()
+      })
+    })
+  }
 
-  // ATTOW this is just a (very, very) thin wrapper around the shardus
-  // quic net library. Once more is required from the network module,
-  // more can / will be added.
-  return qn
+  _registerExternal (method, route, handler) {
+    const formattedRoute = `/${route}`
+    switch (method) {
+      case 'GET':
+        this.app.get(formattedRoute, handler)
+        break
+      case 'POST':
+        this.app.post(formattedRoute, handler)
+        break
+      default:
+        throw Error('FATAL: Invalid HTTP method for handler.')
+    }
+  }
+
+  registerExternalGet (route, handler) {
+    this._registerExternal('GET', route, handler)
+  }
+
+  registerExternalPost (route, handler) {
+    this._registerExternal('POST', route, handler)
+  }
+
+  async setup (ipInfo) {
+    if (!ipInfo.externalIp) throw new Error('Fatal: network module requires externalIp')
+    if (!ipInfo.externalPort) throw new Error('Fatal: network module requires externalPort')
+    if (!ipInfo.internalIp) throw new Error('Fatal: network module requires internalIp')
+    if (!ipInfo.internalPort) throw new Error('Fatal: network module requires internalPort')
+
+    this.ipInfo = ipInfo
+    await this._setupExternal()
+    // instantiate the shardus quic net library
+    /* const qn = Qn({
+      port: ipInfo.internalPort,
+      address: ipInfo.internalIp
+    }) */
+  }
 }
+
+module.exports = Network
