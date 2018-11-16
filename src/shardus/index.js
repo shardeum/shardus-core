@@ -39,6 +39,13 @@ class Shardus {
     })
   }
 
+  _registerRoutes () {
+    this.network.registerExternalPost('/exit', async (req, res) => {
+      res.json({ success: true })
+      await this.shutdown()
+    })
+  }
+
   registerExceptionHandler () {
     process.on('uncaughtException', async (err) => {
       this.fatalLogger.fatal(err)

@@ -3,15 +3,15 @@ exports.register = function (context) {
 }
 
 function setupRoutes () {
-  this.network.registerExternal('/cyclemarker', (req, res) => {
+  this.network.registerExternalGet('/cyclemarker', (req, res) => {
     const cycleMarkerInfo = this.getCycleMarkerInfo()
     res.json(cycleMarkerInfo)
   })
-  this.network.registerExternal('/cyclechain', (req, res) => {
+  this.network.registerExternalGet('/cyclechain', (req, res) => {
     const cycleChain = this.getLatestCycles(10)
     res.json({ cycleChain })
   })
-  this.network.registerExternal('/join', (req, res) => {
+  this.network.registerExternalGet('/join', (req, res) => {
     const invalidJoinReqErr = 'invalid join request'
     if (!req.body) {
       this.mainLogger.error('Invalid join request received.')
