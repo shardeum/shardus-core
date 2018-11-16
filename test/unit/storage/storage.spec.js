@@ -67,7 +67,8 @@ test('testing set and add methods for cycles model', async t => {
       previous: '00000000',
       marker: 'marker1',
       counter: 1,
-      time: Date.now(),
+      start: Date.now(),
+      duration: Date.now() + 10000,
       active: 20,
       desired: 20,
       joined: [ 'new1', 'new2', 'new3' ],
@@ -81,7 +82,8 @@ test('testing set and add methods for cycles model', async t => {
       previous: 'marker1',
       marker: 'marker2',
       counter: 2,
-      time: Date.now(),
+      start: Date.now(),
+      duration: Date.now() + 10000,
       active: 20,
       desired: 20,
       joined: [ 'new1', 'new2', 'new3' ],
@@ -207,18 +209,6 @@ test('testing set and add methods for properties model', async t => {
     t.equal(res.length, 0, 'Should have a empty property list in the table property')
   }
 
-  // // testing listProperties
-  // {
-  //   let dummyProperty = {
-  //     key: '111111',
-  //     value: {
-  //       value: 100
-  //     }
-  //   }
-  //   await storage.setProperty(dummyProperty.key, dummyProperty.value)
-  //   const res = await storage.listProperties()
-  //   t.deepEqual(res[0], dummyProperty, 'Should have the inserted property returning from listProperties method')
-  // }
   t.end()
 })
 
@@ -236,9 +226,10 @@ test('testing clearP2pState method', async t => {
   let cycle = {
     certificate: [ 'keyNode1', 'keyNode2' ],
     previous: '00000000',
-    marker: 'marker1',
-    counter: 1,
-    time: Date.now(),
+    marker: 'marker3',
+    counter: 3,
+    start: Date.now(),
+    duration: Date.now() + 10000,
     active: 20,
     desired: 20,
     joined: [ 'new1', 'new2', 'new3' ],
@@ -249,10 +240,11 @@ test('testing clearP2pState method', async t => {
   }
   let cycle2 = {
     certificate: [ 'keyNode1', 'keyNode2' ],
-    previous: 'marker1',
-    marker: 'marker2',
+    previous: 'marker3',
+    marker: 'marker4',
     counter: 2,
-    time: Date.now(),
+    start: Date.now(),
+    duration: Date.now() + 10000,
     active: 20,
     desired: 20,
     joined: [ 'new1', 'new2', 'new3' ],
