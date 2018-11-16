@@ -426,11 +426,11 @@ class P2P {
     // Get cycle chain hash
     let chainHash
     try {
-      ({ chainHash } = await this._fetchCycleChainHash(nodes, chainStart, chainEnd, redundancy))
+      ;({ chainHash } = await this._fetchCycleChainHash(nodes, chainStart, chainEnd))
     } catch (e) {
       this.mainLogger.info('Could not get chainHash from nodes. Querying seedNodes for it...')
       this.mainLogger.debug(e)
-      ({ chainHash } = await this._fetchCycleChainHash(seedNodes, chainStart, chainEnd, redundancy))
+      ;({ chainHash } = await this._fetchCycleChainHash(seedNodes, chainStart, chainEnd))
     }
 
     // Get verified cycle chain
