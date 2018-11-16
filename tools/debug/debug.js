@@ -1,5 +1,4 @@
 const fs = require('fs')
-const path = require('path')
 const { exec } = require('child_process')
 
 const suffix = 'COPY_S55_DEBUG'
@@ -18,8 +17,8 @@ async function removeCopies () {
     exec(`rm -rf ${baseDir}/${targetDir}${suffix}*`, (err, stdout, stderr) => {
       if (err) { reject(new Error('could not execute the command')) }
       // the *entire* stdout and stderr (buffered)
-      console.log(`stdout: ${stdout}`);
-      console.log(`stderr: ${stderr}`);
+      console.log(`stdout: ${stdout}`)
+      console.log(`stderr: ${stderr}`)
       resolve(true)
     })
   })
@@ -27,11 +26,11 @@ async function removeCopies () {
 
 function createCopy (n) {
   return new Promise((resolve, reject) => {
-    exec(`cp -R ${baseDir}/${targetDir} ${baseDir}/${targetDir+suffix+n}`, (err, stdout, stderr) => {
+    exec(`cp -R ${baseDir}/${targetDir} ${baseDir}/${targetDir + suffix + n}`, (err, stdout, stderr) => {
       if (err) { reject(new Error('could not execute the command')) }
       // the *entire* stdout and stderr (buffered)
-      console.log(`stdout: ${stdout}`);
-      console.log(`stderr: ${stderr}`);
+      console.log(`stdout: ${stdout}`)
+      console.log(`stderr: ${stderr}`)
       resolve(true)
     })
   })
@@ -39,10 +38,10 @@ function createCopy (n) {
 
 function removeLogDb (n) {
   return new Promise((resolve, reject) => {
-    exec(`rm ${baseDir}/${targetDir+suffix+n}/logs/*.log && rm ${baseDir}/${targetDir+suffix+n}/db/*`, (err, stdout, stderr) => {
+    exec(`rm ${baseDir}/${targetDir + suffix + n}/logs/*.log && rm ${baseDir}/${targetDir + suffix + n}/db/*`, (err, stdout, stderr) => {
       if (err) { resolve(new Error('could not remove logs or db, one or more file were not present')) }
-      console.log(`stdout: ${stdout}`);
-      console.log(`stderr: ${stderr}`);
+      console.log(`stdout: ${stdout}`)
+      console.log(`stderr: ${stderr}`)
       resolve(true)
     })
   })
@@ -58,7 +57,7 @@ function changeExternalPort (n) {
 
 async function createCopies () {
   for (let i = 0; i < copiesNumber; i++) {
-    console.log(`[executing] cp -R ${baseDir}/${targetDir} ${baseDir}/${targetDir+suffix+i}`)
+    console.log(`[executing] cp -R ${baseDir}/${targetDir} ${baseDir}/${targetDir + suffix + i}`)
     await createCopy(i)
     try {
       await removeLogDb(i)

@@ -45,7 +45,7 @@ test('testing methods isolated', { timeout: 20000 }, async t => {
 
 test('testing the shutdown method', { timeout: 10000 }, async t => {
   resetLogFile('main')
-  let server = spawn('node', [path.join(__dirname, 'child-process-shutdown.js')])
+  spawn('node', [path.join(__dirname, 'child-process-shutdown.js')])
   // server.stdout.on('data', (data) => console.log(`[stdout] ==> ${data.toString()}`))
   // server.stderr.on('data', (data) => console.log(`[stderr] ==> ${data.toString()}`))
   await sleep(6000)

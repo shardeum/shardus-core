@@ -4,7 +4,7 @@
   "description": "The shardus enterprise server",
   "main": "server.js",
   "scripts": {
-    "test": "tap \"test/**/*.spec.js\"",
+    "test": "standard && tap \"test/**/*.spec.js\"",
     "test:watch": "nodemon -x npm run test",
     "test:unit": "tap \"test/unit/**/*.spec.js\"",
     "test:unit:watch": "nodemon -x npm run test:unit",
