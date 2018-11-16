@@ -40,7 +40,7 @@ class Shardus {
   }
 
   _registerRoutes () {
-    this.network.registerExternalPost('/exit', async (req, res) => {
+    this.network.registerExternalPost('exit', async (req, res) => {
       res.json({ success: true })
       await this.shutdown()
     })

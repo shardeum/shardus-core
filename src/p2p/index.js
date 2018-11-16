@@ -35,7 +35,7 @@ class P2P {
   }
 
   _registerRoutes () {
-    routes.resgister(this)
+    routes.register(this)
   }
 
   _verifyIpInfo (ipInfo) {
