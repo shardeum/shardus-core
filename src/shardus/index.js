@@ -14,7 +14,7 @@ class Shardus {
     this.exitHandler = new ExitHandler()
     this.storage = new Storage(this.logger, config.baseDir, config.storage)
     this.crypto = {}
-    this.network = new Network()
+    this.network = new Network(this.logger)
     this.p2p = {}
 
     this.heartbeatInterval = config.heartbeatInterval

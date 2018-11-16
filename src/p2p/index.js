@@ -71,7 +71,7 @@ class P2P {
 
   async _getSeedListSigned () {
     let seedListSigned = await http.get(this.seedList)
-    this.mainLogger.debug(`Got signed seed list: ${seedListSigned}`)
+    this.mainLogger.debug(`Got signed seed list: ${JSON.stringify(seedListSigned)}`)
     return seedListSigned
   }
 
@@ -313,8 +313,6 @@ class P2P {
     if (isFirstSeed) {
       this.mainLogger.info('No rejoin required, starting new cycle...')
       this.state.startCycles()
-      const joinRequest = await this._createJoinRequest()
-      this.state.addJoinRequest(joinRequest)
       return true
     }
 

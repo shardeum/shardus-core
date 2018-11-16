@@ -2,15 +2,16 @@
 const express = require('express')
 
 class Network {
-  constructor () {
+  constructor (logger) {
     this.app = express()
+    this.mainLogger = logger.getLogger('main')
     this.ipInfo = {}
   }
 
   _setupExternal () {
     return new Promise((resolve, reject) => {
       this.app.listen(this.ipInfo.externalPort, this.ipInfo.externalIp, () => {
-        const msg = `Server running on port ${this.externalPort}...`
+        const msg = `Server running on port ${this.ipInfo.externalPort}...`
         console.log(msg)
         this.mainLogger.info(msg)
         resolve()
