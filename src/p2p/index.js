@@ -416,7 +416,7 @@ class P2P {
     } catch (e) {
       this.mainLogger.info('Could not get cycleMarker from nodes. Querying seedNodes for it...')
       this.mainLogger.debug(e)
-      ({ cycleCounter } = await this._fetchCycleMarker(seedNodes))
+      ;({ cycleCounter } = await this._fetchCycleMarker(seedNodes))
     }
 
     // Determine cycle counter numbers to get, at most, the last 1000 cycles
@@ -440,7 +440,7 @@ class P2P {
     } catch (e) {
       this.mainLogger.info('Could not get verified cycleChain from nodes. Querying seedNodes for it...')
       this.mainLogger.debug(e)
-      ({ cycleChain } = await this._fetchVerifiedCycleChain(seedNodes, chainHash, chainStart, chainEnd))
+      ;({ cycleChain } = await this._fetchVerifiedCycleChain(seedNodes, chainHash, chainStart, chainEnd))
     }
 
     return { cycleChain }
