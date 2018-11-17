@@ -1,4 +1,4 @@
-// const Qn = require('shardus-quic-net')
+const Qn = require('shardus-quic-net')
 const express = require('express')
 
 class Network {
@@ -6,6 +6,7 @@ class Network {
     this.app = express()
     this.mainLogger = logger.getLogger('main')
     this.ipInfo = {}
+    this.internalRoutes = {}
   }
 
   _setupExternal () {
@@ -17,6 +18,24 @@ class Network {
         resolve()
       })
     })
+  }
+
+  _setupInternal () {
+    this.qn = Qn({
+      port: this.ipInfo.internalPort,
+      address: this.ipInfo.internalIp
+    })
+  }
+
+  async setup (ipInfo) {
+    if (!ipInfo.externalIp) throw new Error('Fatal: network module requires externalIp')
+    if (!ipInfo.externalPort) throw new Error('Fatal: network module requires externalPort')
+    if (!ipInfo.internalIp) throw new Error('Fatal: network module requires internalIp')
+    if (!ipInfo.internalPort) throw new Error('Fatal: network module requires internalPort')
+
+    this.ipInfo = ipInfo
+    await this._setupExternal()
+    this._setupInternal()
   }
 
   _registerExternal (method, route, handler) {
@@ -41,20 +60,12 @@ class Network {
     this._registerExternal('POST', route, handler)
   }
 
-  async setup (ipInfo) {
-    if (!ipInfo.externalIp) throw new Error('Fatal: network module requires externalIp')
-    if (!ipInfo.externalPort) throw new Error('Fatal: network module requires externalPort')
-    if (!ipInfo.internalIp) throw new Error('Fatal: network module requires internalIp')
-    if (!ipInfo.internalPort) throw new Error('Fatal: network module requires internalPort')
-
-    this.ipInfo = ipInfo
-    await this._setupExternal()
-    // instantiate the shardus quic net library
-    /* const qn = Qn({
-      port: ipInfo.internalPort,
-      address: ipInfo.internalIp
-    }) */
+  registerInternal (route, handler) {
+    this.internalRoutes[route] = handler
   }
+
+  // TODO: Upon getting a request, we should check to see if a such a route exists,
+  // Then call the appropriate corresponding callback and pass the payload object
 }
 
 module.exports = Network
