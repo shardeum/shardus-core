@@ -107,9 +107,6 @@ class Network {
   registerInternal (route, handler) {
     this.internalRoutes[route] = handler
   }
-
-  // TODO: Upon getting a request, we should check to see if a such a route exists,
-  // Then call the appropriate corresponding callback and pass the payload object
 }
 
 module.exports = Network
