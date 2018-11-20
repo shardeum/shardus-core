@@ -12,11 +12,12 @@ class Network {
     this.internalRoutes = {}
   }
 
+  // TODO: Allow for binding to a specified network interface
   _setupExternal () {
     return new Promise((resolve, reject) => {
       this.app.use(bodyParser.json())
-      this.app.listen(this.ipInfo.externalPort, this.ipInfo.externalIp, () => {
-        const msg = `Server running on port ${this.ipInfo.externalPort}...`
+      this.app.listen(this.ipInfo.externalPort, () => {
+        const msg = `External server running on port ${this.ipInfo.externalPort}...`
         console.log(msg)
         this.mainLogger.info(msg)
         resolve()
@@ -24,10 +25,10 @@ class Network {
     })
   }
 
+  // TODO: Allow for binding to a specified network interface
   async _setupInternal () {
     this.qn = Qn({
-      port: this.ipInfo.internalPort,
-      address: this.ipInfo.internalIp
+      port: this.ipInfo.internalPort
     })
 
     await this.qn.listen(async (data, remote, protocol, respond) => {
@@ -42,6 +43,7 @@ class Network {
       }
       await handler(payload, respond)
     })
+    console.log(`Internal server running on port ${this.ipInfo.internalPort}...`)
   }
 
   async tell (nodes, route, message) {

@@ -27,7 +27,7 @@ class P2P {
     await this.state.init()
 
     // Make sure we know our external IP
-    await this._ensureExternalIp()
+    await this._ensureIpKnown()
 
     // Set up the network after we are sure we have our current IP info
     await this.network.setup(this.getIpInfo())
@@ -38,19 +38,29 @@ class P2P {
     routes.register(this)
   }
 
-  _verifyIpInfo (ipInfo) {
+  _verifyExternalInfo (ipInfo) {
     if (!ipInfo.externalIp) {
       return false
     }
     if (!ipInfo.externalPort) {
-      throw Error('No port specified, unable to start server.')
+      throw Error('Fatal: No external port specified, unable to start server.')
     }
     return true
   }
 
-  async _retrieveIp (ipServer) {
+  _verifyInternalInfo (ipInfo) {
+    if (!ipInfo.internalIp) {
+      return false
+    }
+    if (!ipInfo.internalPort) {
+      throw Error('Fatal: No internal port specified, unable to start server.')
+    }
+    return true
+  }
+
+  async _discoverIp (ipServer) {
     let { ip } = await http.get(ipServer)
-    this.mainLogger.debug(`Retrieved IP: ${ip}`)
+    this.mainLogger.debug(`Discovered IP: ${ip}`)
     return ip
   }
 
@@ -111,10 +121,7 @@ class P2P {
   }
 
   _getThisNodeInfo () {
-    const { externalIp, externalPort } = this.getIpInfo()
-    // TODO: add actual internal IP and port
-    const internalPort = externalPort
-    const internalIp = externalIp
+    const { externalIp, externalPort, internalIp, internalPort } = this.getIpInfo()
     const publicKey = this.crypto.getPublicKey()
     // TODO: Change this to actual selectable address
     const address = publicKey
@@ -124,10 +131,24 @@ class P2P {
     return nodeInfo
   }
 
-  // add functionality for getting internal IP as well
-  async _ensureExternalIp () {
-    if (!this._verifyIpInfo(this.getIpInfo())) {
-      this.ipInfo.externalIp = await this._retrieveIp(this.ipServer)
+  async _ensureIpKnown () {
+    let needsExternal = false
+    let needsInternal = false
+
+    if (!this._verifyExternalInfo(this.getIpInfo())) {
+      needsExternal = true
+    }
+    if (!this._verifyInternalInfo(this.getIpInfo())) {
+      needsInternal = true
+    }
+    if (!needsExternal && !needsInternal) return
+
+    const discoveredIp = await this._discoverIp(this.ipServer)
+    if (needsExternal) {
+      this.ipInfo.externalIp = discoveredIp
+    }
+    if (needsInternal) {
+      this.ipInfo.internalIp = discoveredIp
     }
   }
 
