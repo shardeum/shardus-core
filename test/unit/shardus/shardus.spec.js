@@ -32,8 +32,8 @@ test('testing Shardus class', async t => {
 
 test('testing methods isolated', { timeout: 20000 }, async t => {
   let server = spawn('node', [path.join(__dirname, 'child-process.js')])
-  server.stdout.on('data', (data) => console.log(`[stdout] ==> ${data.toString()}`))
-  server.stderr.on('data', (data) => console.log(`[stderr] ==> ${data.toString()}`))
+  // server.stdout.on('data', (data) => console.log(`[stdout] ==> ${data.toString()}`))
+  // server.stderr.on('data', (data) => console.log(`[stderr] ==> ${data.toString()}`))
   await sleep(6000)
   const res = await axios.post(`http://${config.externalIp}:${config.externalPort}/exit`)
   await sleep(6000)

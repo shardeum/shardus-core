@@ -21,7 +21,7 @@ async function init (loggerConf = null, externalPort = null) {
   // newConfStorage = instances.newConfStorage
 }
 
-test('Testing P2P integrated methods with a seedNode up', async t => {
+test('Testing P2P integrated methods with a seedNode up', { timeout: 50000 }, async t => {
   let server = spawn('node', [path.join(__dirname, 'shardus-child-process.js')])
   let config = module.require(path.join(__dirname, '../../../config/server.json'))
   server.stdout.on('data', (data) => console.log(`[stdout] ==> ${data.toString()}`))
@@ -30,6 +30,7 @@ test('Testing P2P integrated methods with a seedNode up', async t => {
   await init(null, 9002)
   await p2p.discoverNetwork()
   let res = await p2p._createJoinRequest()
+  console.log('res', res)
   t.match(res, {
     cycleMarker: /[0-9a-fA-F]+/,
     nodeInfo: {
@@ -53,8 +54,8 @@ test('Testing P2P integrated methods with a seedNode up', async t => {
       sig: /[0-9a-fA-F]+/
     }
   }, 'joinRequest should have all expected properties')
-  await sleep(10000)
-  const shutdown = await axios.post(`http://${config.externalIp}:${config.externalPort - 1}/exit`)
+  await sleep(5000)
+  const shutdown = await axios.post(`http://${config.externalIp}:${config.externalPort - 1}/exit`, {})
   if (confStorage) {
     confStorage.options.storage = 'db/db.sqlite'
     fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
