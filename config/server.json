@@ -10,11 +10,14 @@
   "difficulty": 16,
   "queryDelay": 1,
   "netadmin": "758b1c119412298802cd28dbfa394cdfeecc4074492d60844cc192d632d84de3",
-  "network": {
+  "ip": {
     "externalIp": "127.0.0.1",
     "externalPort": 9001,
     "internalIp": "127.0.0.1",
     "internalPort": 9005
+  },
+  "network": {
+    "timeout": 10
   },
   "log": {
     "dir": "logs",

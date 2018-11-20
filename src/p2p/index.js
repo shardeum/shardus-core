@@ -124,6 +124,7 @@ class P2P {
     return nodeInfo
   }
 
+  // add functionality for getting internal IP as well
   async _ensureExternalIp () {
     if (!this._verifyIpInfo(this.getIpInfo())) {
       this.ipInfo.externalIp = await this._retrieveIp(this.ipServer)
@@ -301,6 +302,7 @@ class P2P {
         return false
       }
       this.mainLogger.info('Successfully joined the network!')
+      this.network.tell([{ internalIp: '127.0.0.1', internalPort: 9005 }], 'test')
       return true
     }
     // If we made it this far, we need to sync to the network

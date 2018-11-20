@@ -11,7 +11,7 @@ function setupRoutes () {
     const cycleChain = this.getLatestCycles(10)
     res.json({ cycleChain })
   })
-  this.network.registerExternalGet('join', (req, res) => {
+  this.network.registerExternalPost('join', (req, res) => {
     const invalidJoinReqErr = 'invalid join request'
     if (!req.body) {
       this.mainLogger.error('Invalid join request received.')

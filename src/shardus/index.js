@@ -14,7 +14,7 @@ class Shardus {
     this.exitHandler = new ExitHandler()
     this.storage = new Storage(this.logger, config.baseDir, config.storage)
     this.crypto = {}
-    this.network = new Network(this.logger)
+    this.network = new Network(config.network, this.logger)
     this.p2p = {}
 
     this.heartbeatInterval = config.heartbeatInterval
@@ -43,6 +43,10 @@ class Shardus {
     this.network.registerExternalPost('exit', async (req, res) => {
       res.json({ success: true })
       await this.shutdown()
+    })
+
+    this.network.registerInternal('test', async () => {
+      console.log('It works!')
     })
   }
 
@@ -80,7 +84,7 @@ class Shardus {
     this.crypto = new Crypto(this.logger, this.storage)
     await this.crypto.init()
     const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay } = config
-    const ipInfo = config.network
+    const ipInfo = config.ip
     const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay }
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network)
     await this.p2p.init()
