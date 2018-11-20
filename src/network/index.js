@@ -6,8 +6,9 @@ class Network {
   constructor (config, logger) {
     this.app = express()
     this.mainLogger = logger.getLogger('main')
+    this.netLogger = logger.getLogger('net')
     this.ipInfo = {}
-    this.timeout = config.timeout
+    this.timeout = config.timeout * 1000
     this.internalRoutes = {}
   }
 
@@ -51,6 +52,21 @@ class Network {
       promises.push(promise)
     }
     await Promise.all(promises)
+  }
+
+  ask (node, route, message) {
+    return new Promise(async (resolve, reject) => {
+      const data = { route, payload: message }
+      const onRes = (res) => {
+        resolve(res)
+      }
+      const onTimeout = () => {
+        const err = new Error('Request timed out.')
+        this.mainLogger.error(err)
+        reject(err)
+      }
+      await this.qn.send(node.internalPort, node.internalIp, data, this.timeout, onRes, onTimeout)
+    })
   }
 
   async setup (ipInfo) {

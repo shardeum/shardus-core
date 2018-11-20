@@ -302,7 +302,9 @@ class P2P {
         return false
       }
       this.mainLogger.info('Successfully joined the network!')
-      this.network.tell([{ internalIp: '127.0.0.1', internalPort: 9005 }], 'test')
+      await this.network.tell([{ internalIp: '127.0.0.1', internalPort: 9005 }], 'test')
+      const testResponse = await this.network.ask({ internalIp: '127.0.0.1', internalPort: 9005 }, 'test2')
+      console.log(JSON.stringify(testResponse))
       return true
     }
     // If we made it this far, we need to sync to the network
