@@ -149,6 +149,7 @@ test('testing set and add methods for nodes model', async t => {
       internalPort: 9999,
       externalPort: 443,
       joinRequestTimestamp: Date.now(),
+      status: 'ok',
       address: 'a1b2c3e4f5'
     }
     await storage.addNodes(node)
@@ -175,6 +176,16 @@ test('testing set and add methods for nodes model', async t => {
     } catch (e) {
       t.pass('should throw an error inserting an invalid node')
     }
+  }
+
+  {
+    await storage.addNodes(node)
+    await storage.updateNodes(node, {
+      internalPort: 1337
+    })
+    const [ updatedNode ] = await storage.getNodes({ id: '123456' })
+    t.equal(updatedNode.internalPort, 1337, 'should update an existing node correctly')
+    await storage.deleteNodes(updatedNode)
   }
 
   t.end()
@@ -221,6 +232,7 @@ test('testing clearP2pState method', async t => {
     internalPort: 9999,
     externalPort: 443,
     joinRequestTimestamp: Date.now(),
+    status: 'ok',
     address: 'a1b2c3e4f5'
   }
   let cycle = {

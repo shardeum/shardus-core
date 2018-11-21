@@ -107,6 +107,14 @@ class Storage {
     }
     return nodes
   }
+  async updateNodes (node, newNode) {
+    this._checkInit()
+    try {
+      await this._update(this.models.nodes, newNode, node)
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
   async deleteNodes (node) {
     this._checkInit()
     try {
