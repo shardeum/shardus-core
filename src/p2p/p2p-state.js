@@ -6,14 +6,29 @@ class P2PState {
     this.crypto = crypto
     this.storage = storage
     this.defaultCycleDuration = config.cycleDuration
-    this.nodes = {
+
+    this.cycles = []
+
+    // Variables for regulating different phases cycles
+    this.acceptJoinReq = false
+    this.shouldStop = false
+
+    // Specifies valid statuses
+    this.validStatuses = ['active', 'syncing', 'pending']
+
+    // Defines a clean nodelist that we will use for restoring the nodeslist to a clean state
+    this.cleanNodelist = {
       ordered: [],
       current: {},
-      active: {},
-      syncing: {},
-      pending: {}
+      byIp: {}
     }
-    this.currentCycle = {
+    // Populates the clean nodelist with our valid statuses
+    for (const status of this.validStatuses) {
+      this.cleanNodelist[status] = {}
+    }
+
+    // Defines a clean cycle that we will for restoring the current cycle to a clean state
+    this.cleanCycle = {
       bestJoinRequests: [],
       start: null,
       duration: null,
@@ -24,12 +39,12 @@ class P2PState {
       activated: [],
       certificate: {}
     }
-    this.cycles = []
-    this.acceptJoinReq = false
-    this.shouldStop = false
+
+    // Sets nodelist and current cycle to a copy of the clean nodelist and cycle objects
+    this.nodes = utils.deepCopy(this.cleanNodelist)
+    this.currentCycle = utils.deepCopy(this.cleanCycle)
   }
 
-  // TODO: add init function that reads from database into memory
   async init () {
     const cycles = await this.storage.listCycles()
     this.mainLogger.debug(`Loaded ${cycles.length} cycles from the database.`)
@@ -40,13 +55,7 @@ class P2PState {
   }
 
   _resetNodelist () {
-    this.nodes = {
-      ordered: [],
-      current: {},
-      active: {},
-      syncing: {},
-      pending: {}
-    }
+    this.nodes = utils.deepCopy(this.cleanNodelist)
   }
 
   _resetCycles () {
@@ -99,6 +108,46 @@ class P2PState {
     return publicKey
   }
 
+  getNodeStatus (nodeId) {
+    const current = this.nodes.current
+    if (!current[nodeId]) return null
+    return current[nodeId].status
+  }
+
+  async setNodeStatus (nodeId, status) {
+    let node
+    try {
+      node = this.getNode(nodeId)
+    } catch (e) {
+      this.mainLogger.debug(`${nodeId} is not a valid or known node ID.`)
+      return false
+    }
+    let updated
+    try {
+      updated = await this._updateNodeStatus(node, status)
+    } catch (e) {
+      this.mainLogger.error(e)
+      return false
+    }
+    return updated
+  }
+
+  async _updateNodeStatus (node, status, updateDb = true) {
+    if (!this.validStatuses.includes(status)) throw new Error('Invalid node status.')
+    if (node.status === status) return true
+    const oldStatus = node.status
+    this.mainLogger.debug(`Old status of node: ${oldStatus}`)
+    node.status = status
+    this.mainLogger.debug(`New status of node: ${node.status}`)
+    const id = node.id
+    // If the node previously had a status, remove it from that index object
+    if (oldStatus && this.nodes[oldStatus][id]) delete this.nodes[oldStatus][id]
+    this.nodes[status][id] = node
+    if (!updateDb) return true
+    // await this.storage.updateNodes(node, { status })
+    return true
+  }
+
   async _acceptNode (publicKey, cycleMarker) {
     let node
     try {
@@ -111,8 +160,9 @@ class P2PState {
     delete node.publicKey
     this.nodes.ordered.push(node)
     delete this.nodes.pending[node.id]
-    node.status = 'syncing'
+    await this._updateNodeStatus(node, 'syncing', false)
     await this.addNode(node)
+    this.mainLogger.debug(`Nodelist after adding this node: ${JSON.stringify(this.nodes.current)}`)
   }
 
   async _acceptNodes (publicKeys, cycleMarker) {
@@ -123,12 +173,14 @@ class P2PState {
     await Promise.all(promises)
   }
 
+  // TODO: Insert ordered into order subobject
+  // TODO: Pull insertOrdered fn from old codebase
   _addNodeToNodelist (node) {
     const status = node.status
-    if (status === 'active' || status === 'syncing' || status === 'pending') {
-      this.nodes[status][node.id] = node
-      this.nodes.current[node.id] = node
-    } else throw new Error('Invalid node status')
+    if (!this.validStatuses.includes(status)) throw new Error('Invalid node status.')
+    this.nodes[status][node.id] = node
+    this.nodes.current[node.id] = node
+    this.nodes.byIp[`${node.internalIp}:${node.internalPort}`] = node
   }
 
   _addNodesToNodelist (nodes) {
@@ -158,17 +210,7 @@ class P2PState {
   }
 
   _resetCurrentCycle () {
-    this.currentCycle = {
-      bestJoinRequests: [],
-      start: null,
-      duration: null,
-      joined: [],
-      removed: [],
-      lost: [],
-      returned: [],
-      activated: [],
-      certificate: {}
-    }
+    this.currentCycle = utils.deepCopy(this.cleanCycle)
   }
 
   // Kicks off the whole cycle and cycle marker creation system
@@ -209,12 +251,17 @@ class P2PState {
     return this.currentCycle.bestJoinRequests
   }
 
+  _isKnownNode (node) {
+    const internalHost = `${node.internalIp}:${node.internalPort}`
+    if (!this.nodes.byIp[internalHost]) return false
+    return true
+  }
+
   _addToBestJoinRequests (joinRequest) {
     // TODO: implement full logic for filtering join request
     const bestRequests = this._getBestJoinRequests()
-    for (const best of bestRequests) {
-      if (best.publicKey === joinRequest.publicKey) return false
-    }
+    const { nodeInfo } = joinRequest
+    if (this._isKnownNode(nodeInfo)) return false
     bestRequests.push(joinRequest)
     return true
   }
@@ -236,6 +283,7 @@ class P2PState {
     this.acceptJoinReq = false
     const bestNodes = this._getBestNodes()
     this._addJoiningNodes(bestNodes)
+    // TODO: implement clearing out the unaccepted nodes from byIp when clearing pending requests
     setTimeout(() => {
       this._startCycleSync(phaseLen)
     }, phaseLen)
@@ -436,6 +484,12 @@ class P2PState {
       if (!node1[property] || !node2[property]) return false
       if (node1[property] !== node2[property]) return false
     }
+  }
+
+  getNode (id) {
+    const current = this.nodes.current
+    if (!current[id]) throw new Error('Invalid node ID.')
+    return current[id]
   }
 
   getAllNodes (self = null) {

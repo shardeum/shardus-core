@@ -211,11 +211,15 @@ class P2P {
     await utils.sleep(timeToWait)
   }
 
-  async _waitUntilCycleMarker (currentTime, cycleStart, cycleDuration) {
-    const cycleMarker = cycleStart + cycleDuration + (2 * Math.ceil(cycleDuration / 4))
+  async _waitUntilEndOfCycle (currentTime, cycleStart, cycleDuration) {
+    this.mainLogger.debug(`Current time is: ${currentTime}`)
+    this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
+    this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
+    const endOfCycle = cycleStart + (2 * cycleDuration)
+    this.mainLogger.debug(`End of cycle at: ${endOfCycle}`)
     let timeToWait
-    if (currentTime < cycleMarker) {
-      timeToWait = (cycleMarker - currentTime + this.queryDelay) * 1000
+    if (currentTime < endOfCycle) {
+      timeToWait = (endOfCycle - currentTime + this.queryDelay) * 1000
     } else {
       timeToWait = 0
     }
@@ -229,7 +233,7 @@ class P2P {
     await this._waitUntilJoinPhase(currTime1, cycleStart, cycleDuration)
     await this._submitJoin(seedNodes, joinRequest)
     const currTime2 = utils.getTime('s') + timeOffset
-    await this._waitUntilCycleMarker(currTime2, cycleStart, cycleDuration)
+    await this._waitUntilEndOfCycle(currTime2, cycleStart, cycleDuration)
     const nodeId = await this._fetchNodeId(seedNodes)
     return nodeId
   }
@@ -294,17 +298,29 @@ class P2P {
     return true
   }
 
+  _isActive () {
+    const active = this.state.getNodeStatus(this.id) === 'active'
+    if (!active) {
+      this.mainLogger.debug('This node is not currently active...')
+      return false
+    }
+    this.mainLogger.debug('This node is active!')
+    return true
+  }
+
   async addJoinRequest (joinRequest, fromExternal = true) {
     const valid = this._validateJoinRequest(joinRequest)
     if (!valid) return false
     let added
     if (!fromExternal) added = this.state.addGossipedJoinRequest(joinRequest)
     else added = this.state.addNewJoinRequest(joinRequest)
-    if (added) {
-      const allNodes = this.state.getAllNodes(this.id)
-      await this.network.tell(allNodes, 'join', joinRequest)
-    }
-    return added
+    if (!added) return false
+    const active = this._isActive()
+    if (!active) return true
+    const allNodes = this.state.getAllNodes(this.id)
+    this.mainLogger.debug(`Gossiping join request to these nodes: ${JSON.stringify(allNodes)}`)
+    await this.network.tell(allNodes, 'join', joinRequest)
+    return true
   }
 
   async discoverNetwork () {
@@ -331,12 +347,19 @@ class P2P {
       await this.storage.setProperty('externalPort', this.getIpInfo().externalPort)
       if (isFirstSeed) {
         this.mainLogger.debug('Rejoining network...')
-        this.state.startCycles()
         const joinRequest = await this._createJoinRequest()
+        this.state.startCycles()
         this.state.addNewJoinRequest(joinRequest)
-        const cycleInfo = this.getCycleMarkerInfo()
-        const nodeId = this.state.computeNodeId(joinRequest.nodeInfo.publicKey, cycleInfo.marker)
+        const { marker } = this.getCycleMarkerInfo()
+        const nodeId = this.state.computeNodeId(joinRequest.nodeInfo.publicKey, marker)
         this._setNodeId(nodeId)
+        // Sleep for cycle duration before updating status
+        // TODO: Make this more deterministic
+        await utils.sleep(this.state.getCurrentCycleDuration() * 1000)
+        await this.state.setNodeStatus(this.id, 'active')
+
+        // This is for testing purposes
+        console.log('Server ready!')
         return true
       }
       const nodeId = await this._join()

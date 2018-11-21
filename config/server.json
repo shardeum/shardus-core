@@ -2,7 +2,7 @@
   "ipServer": "api.ipify.org/?format=json",
   "timeServer": "http://arimaa.com/timestamp/",
   "syncLimit": 180,
-  "cycleDuration": 10,
+  "cycleDuration": 15,
   "maxRejoinTime": 20,
   "heartbeatInterval": 5,
   "seedList": "https://gitlab.com/shardus/seed-node-lists/raw/master/public/seed-list-local.json",
