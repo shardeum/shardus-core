@@ -32,10 +32,10 @@ class Network {
     })
 
     await this.qn.listen(async (data, remote, protocol, respond) => {
-      if (!data) throw Error('No data provided in request...')
+      if (!data) throw new Error('No data provided in request...')
       const { route, payload } = data
-      if (!route) throw Error('Unable to read request, no route specified.')
-      if (!this.internalRoutes[route]) throw Error('Unable to handle request, invalid route.')
+      if (!route) throw new Error('Unable to read request, no route specified.')
+      if (!this.internalRoutes[route]) throw new Error('Unable to handle request, invalid route.')
       const handler = this.internalRoutes[route]
       if (!data.payload) {
         await handler(respond)
@@ -92,7 +92,7 @@ class Network {
         this.app.post(formattedRoute, handler)
         break
       default:
-        throw Error('Fatal: Invalid HTTP method for handler.')
+        throw new Error('Fatal: Invalid HTTP method for handler.')
     }
   }
 

@@ -11,7 +11,7 @@ function setupRoutes () {
     const cycleChain = this.getLatestCycles(10)
     res.json({ cycleChain })
   })
-  this.network.registerExternalPost('join', (req, res) => {
+  this.network.registerExternalPost('join', async (req, res) => {
     const invalidJoinReqErr = 'invalid join request'
     if (!req.body) {
       this.mainLogger.error('Invalid join request received.')
@@ -20,7 +20,12 @@ function setupRoutes () {
     const joinRequest = req.body
     this.mainLogger.debug(`Join request received: ${JSON.stringify(joinRequest)}`)
     res.json({ success: true })
-    const accepted = this.addJoinRequest(joinRequest)
+    const accepted = await this.addJoinRequest(joinRequest)
+    if (!accepted) return this.mainLogger.debug('Join request not accepted.')
+    this.mainLogger.debug('Join request accepted!')
+  })
+  this.network.registerInternal('join', async (payload) => {
+    const accepted = await this.addJoinRequest(payload, false)
     if (!accepted) return this.mainLogger.debug('Join request not accepted.')
     this.mainLogger.debug('Join request accepted!')
   })

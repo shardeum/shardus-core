@@ -11,6 +11,7 @@ class P2P {
     this.crypto = crypto
     this.network = network
     this.ipInfo = config.ipInfo
+    this.id = null
     this.ipServer = config.ipServer
     this.timeServer = config.timeServer
     this.seedList = config.seedList
@@ -28,6 +29,10 @@ class P2P {
 
     // Make sure we know our external IP
     await this._ensureIpKnown()
+
+    // Load ID from database
+    const id = await this.storage.getProperty('id')
+    if (id) this._setNodeId(id, false)
 
     // Set up the network after we are sure we have our current IP info
     await this.network.setup(this.getIpInfo())
@@ -96,6 +101,13 @@ class P2P {
     let node = nodes[0]
     this.mainLogger.debug(`Node to be asked for cycle marker: ${JSON.stringify(node)}`)
     return http.get(`${node.ip}:${node.port}/cyclemarker`)
+  }
+
+  async _setNodeId (id, updateDb = true) {
+    this.id = id
+    this.mainLogger.info(`Your node's ID is ${this.id}`)
+    if (!updateDb) return
+    await this.storage.setProperty('id', id)
   }
 
   getIpInfo () {
@@ -177,15 +189,15 @@ class P2P {
     await http.post(`${node.ip}:${node.port}/join`, joinRequest)
   }
 
-  async _checkJoined (seedNodes) {
+  async _fetchNodeId (seedNodes) {
     // TODO: implement a more robust way to choose a node
-    const { nodesJoined } = await this._getNetworkCycleMarker(seedNodes)
+    const { nodesJoined, currentCycleMarker } = await this._getNetworkCycleMarker(seedNodes)
     this.mainLogger.debug(`Nodes joined in this cycle: ${JSON.stringify(nodesJoined)}`)
     const { publicKey } = this._getThisNodeInfo()
     for (const key of nodesJoined) {
-      if (key === publicKey) return true
+      if (key === publicKey) return this.state.computeNodeId(publicKey, currentCycleMarker)
     }
-    return false
+    return null
   }
 
   async _waitUntilJoinPhase (currentTime, cycleStart, cycleDuration) {
@@ -218,8 +230,8 @@ class P2P {
     await this._submitJoin(seedNodes, joinRequest)
     const currTime2 = utils.getTime('s') + timeOffset
     await this._waitUntilCycleMarker(currTime2, cycleStart, cycleDuration)
-    const joined = await this._checkJoined(seedNodes)
-    return joined
+    const nodeId = await this._fetchNodeId(seedNodes)
+    return nodeId
   }
 
   async _join () {
@@ -229,23 +241,23 @@ class P2P {
     if (!this._checkWithinSyncLimit(localTime, currentTime)) throw Error('Local time out of sync with network.')
     const timeOffset = currentTime - localTime
     this.mainLogger.debug(`Time offset with selected node: ${timeOffset}`)
-    let joined = false
-    while (!joined) {
+    let nodeId = null
+    while (!nodeId) {
       const { currentCycleMarker, nextCycleMarker, cycleStart, cycleDuration } = await this._getNetworkCycleMarker(seedNodes)
       if (nextCycleMarker) {
         // Use next cycle marker
         const joinRequest = await this._createJoinRequest(nextCycleMarker)
-        joined = await this._attemptJoin(seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration)
-        if (!joined) {
+        nodeId = await this._attemptJoin(seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration)
+        if (!nodeId) {
           const { cycleStart, cycleDuration } = await this._getNetworkCycleMarker(seedNodes)
-          joined = await this._attemptJoin(seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration)
+          nodeId = await this._attemptJoin(seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration)
         }
       } else {
         const joinRequest = await this._createJoinRequest(currentCycleMarker)
-        joined = await this._attemptJoin(seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration)
+        nodeId = await this._attemptJoin(seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration)
       }
     }
-    return joined
+    return nodeId
   }
 
   // TODO: Think about exception when there is more than
@@ -282,10 +294,17 @@ class P2P {
     return true
   }
 
-  addJoinRequest (joinRequest) {
+  async addJoinRequest (joinRequest, fromExternal = true) {
     const valid = this._validateJoinRequest(joinRequest)
     if (!valid) return false
-    return this.state.addJoinRequest(joinRequest)
+    let added
+    if (!fromExternal) added = this.state.addGossipedJoinRequest(joinRequest)
+    else added = this.state.addNewJoinRequest(joinRequest)
+    if (added) {
+      const allNodes = this.state.getAllNodes(this.id)
+      await this.network.tell(allNodes, 'join', joinRequest)
+    }
+    return added
   }
 
   async discoverNetwork () {
@@ -314,18 +333,21 @@ class P2P {
         this.mainLogger.debug('Rejoining network...')
         this.state.startCycles()
         const joinRequest = await this._createJoinRequest()
-        this.state.addJoinRequest(joinRequest)
+        this.state.addNewJoinRequest(joinRequest)
+        const cycleInfo = this.getCycleMarkerInfo()
+        const nodeId = this.state.computeNodeId(joinRequest.nodeInfo.publicKey, cycleInfo.marker)
+        this._setNodeId(nodeId)
         return true
       }
-      const joined = await this._join()
-      if (!joined) {
+      const nodeId = await this._join()
+      if (!nodeId) {
         this.mainLogger.info('Unable to join network. Shutting down...')
         return false
       }
       this.mainLogger.info('Successfully joined the network!')
-      await this.network.tell([{ internalIp: '127.0.0.1', internalPort: 9005 }], 'test')
-      const testResponse = await this.network.ask({ internalIp: '127.0.0.1', internalPort: 9005 }, 'test2')
-      console.log(JSON.stringify(testResponse))
+      this._setNodeId(nodeId)
+      // const testResponse = await this.network.ask({ internalIp: '127.0.0.1', internalPort: 9005 }, 'test2')
+      // console.log(JSON.stringify(testResponse))
       return true
     }
     // If we made it this far, we need to sync to the network

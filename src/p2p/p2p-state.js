@@ -62,17 +62,26 @@ class P2PState {
   async clear () {
     this.mainLogger.info('Clearing P2P state in memory and in database...')
     await this.storage.clearP2pState()
+    await this.storage.deleteProperty('id')
     this.mainLogger.info('P2P data cleared from database.')
     this._resetState()
   }
 
-  addJoinRequest (joinRequest) {
-    if (!this.acceptJoinReq) return false
-    const bestJoinRequests = this._getBestJoinRequests()
-    bestJoinRequests.push(joinRequest)
+  _addJoinRequest (joinRequest) {
+    if (!this._addToBestJoinRequests(joinRequest)) {
+      return false
+    }
     this._addPendingNode(joinRequest.nodeInfo)
-    // TODO: return if actually added to best join requests
     return true
+  }
+
+  addNewJoinRequest (joinRequest) {
+    if (!this.acceptJoinReq) return false
+    return this._addJoinRequest(joinRequest)
+  }
+
+  addGossipedJoinRequest (joinRequest) {
+    return this._addJoinRequest(joinRequest)
   }
 
   _addPendingNode (node) {
@@ -85,12 +94,11 @@ class P2PState {
     }
   }
 
-  _computeNodeId (publicKey, cycleMarker) {
+  computeNodeId (publicKey, cycleMarker) {
     // TODO: Implement actual node ID process
     return publicKey
   }
 
-  // TODO: Check if we are the node being added so we can add our ID to the properties table
   async _acceptNode (publicKey, cycleMarker) {
     let node
     try {
@@ -98,7 +106,7 @@ class P2PState {
     } catch (e) {
       throw new Error('Node not found in pending.')
     }
-    let nodeId = this._computeNodeId(publicKey, cycleMarker)
+    let nodeId = this.computeNodeId(publicKey, cycleMarker)
     node.id = nodeId
     delete node.publicKey
     this.nodes.ordered.push(node)
@@ -201,6 +209,16 @@ class P2PState {
     return this.currentCycle.bestJoinRequests
   }
 
+  _addToBestJoinRequests (joinRequest) {
+    // TODO: implement full logic for filtering join request
+    const bestRequests = this._getBestJoinRequests()
+    for (const best of bestRequests) {
+      if (best.publicKey === joinRequest.publicKey) return false
+    }
+    bestRequests.push(joinRequest)
+    return true
+  }
+
   // TODO: implement this to get best nodes based on POW, selection number,
   // ---   and number of desired nodes
   _getBestNodes () {
@@ -254,7 +272,7 @@ class P2PState {
     cycleInfo.marker = this.getCurrentCertificate().marker
 
     this.cycles.push(cycleInfo)
-    const accepted = this._acceptNodes(cycleInfo.joined)
+    const accepted = this._acceptNodes(cycleInfo.joined, cycleInfo.marker)
     const cycleAdded = this.storage.addCycles(cycleInfo)
     const promises = [accepted, cycleAdded]
     try {
@@ -410,6 +428,24 @@ class P2PState {
     const lastCycle = this.getLastCycle()
     if (!lastCycle) return []
     return lastCycle.joined
+  }
+
+  _areEquivalentNodes (node1, node2) {
+    const properties = ['externalIp', 'internalIp', 'externalPort', 'internalPort']
+    for (const property of properties) {
+      if (!node1[property] || !node2[property]) return false
+      if (node1[property] !== node2[property]) return false
+    }
+  }
+
+  getAllNodes (self = null) {
+    const nodes = this.nodes.current
+    if (!self) return Object.values(nodes)
+    // Check if self in node list
+    if (!nodes[self]) throw new Error('Fatal: Invalid node ID in `self` field.')
+    const nodesCopy = utils.deepCopy(nodes)
+    delete nodesCopy[self]
+    return Object.values(nodesCopy)
   }
 }
 
