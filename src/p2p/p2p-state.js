@@ -144,7 +144,7 @@ class P2PState {
     if (oldStatus && this.nodes[oldStatus][id]) delete this.nodes[oldStatus][id]
     this.nodes[status][id] = node
     if (!updateDb) return true
-    // await this.storage.updateNodes(node, { status })
+    await this.storage.updateNodes({ id }, { status })
     return true
   }
 

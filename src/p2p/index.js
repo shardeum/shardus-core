@@ -347,6 +347,10 @@ class P2P {
       await this.storage.setProperty('externalPort', this.getIpInfo().externalPort)
       if (isFirstSeed) {
         this.mainLogger.debug('Rejoining network...')
+
+        // This is for testing purposes
+        console.log('Doing initial setup for server...')
+
         const joinRequest = await this._createJoinRequest()
         this.state.startCycles()
         this.state.addNewJoinRequest(joinRequest)
@@ -358,8 +362,9 @@ class P2P {
         await utils.sleep(this.state.getCurrentCycleDuration() * 1000)
         await this.state.setNodeStatus(this.id, 'active')
 
-        // This is for testing purposes
+        // This is also for testing purposes
         console.log('Server ready!')
+
         return true
       }
       const nodeId = await this._join()
