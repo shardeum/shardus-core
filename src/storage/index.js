@@ -5,14 +5,13 @@ const models = require('./models')
 
 class Storage {
   constructor (logger, baseDir, config) {
-    let absBaseDir = path.join(path.parse(require.main.filename).dir, baseDir)
     // Get storage config
-    let storageConfig = require(path.join(absBaseDir, config.confFile))
+    let storageConfig = require(path.resolve(path.join(baseDir, config.confFile)))
     // Setup logger
     this.mainLogger = logger.getLogger('main')
     // Create dbDir if it doesn't exist
-    let { dir: dbDir, base: dbFile } = path.parse(path.join(absBaseDir, storageConfig.options.storage))
-    storageConfig.options.storage = path.join(dbDir, dbFile)
+    storageConfig.options.storage = path.join(baseDir, storageConfig.options.storage)
+    let dbDir = path.parse(storageConfig.options.storage).dir
     _ensureExists(dbDir)
     this.mainLogger.info('Created Database directory.')
     // Start Sequelize and load models
