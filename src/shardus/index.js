@@ -27,6 +27,9 @@ class Shardus {
     this.exitHandler.registerSync('shardus', () => {
       this.stopHeartbeat()
     })
+    this.exitHandler.registerSync('crypto', () => {
+      this.crypto.stopAllGenerators()
+    })
     this.exitHandler.registerAsync('shardus', () => {
       this.mainLogger.info('Writing heartbeat to database before exiting...')
       return this.writeHeartbeat()

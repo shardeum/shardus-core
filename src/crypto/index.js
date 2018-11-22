@@ -19,7 +19,6 @@ class Crypto {
     }
     this.mainLogger.info('Keypair loaded successfully from database.')
     this.keypair = keypair
-    this.powGenerator = null
   }
 
   _generateKeypair () {
@@ -54,6 +53,13 @@ class Crypto {
 
   getComputeProofOfWork (seed, difficulty) {
     return this._runProofOfWorkGenerator('./computePowGenerator.js', seed, difficulty)
+  }
+
+  stopAllGenerators () {
+    for (const generator in this.powGenerators) {
+      this.powGenerators[generator].kill()
+    }
+    this.powGenerators = {}
   }
 
   _runProofOfWorkGenerator (generator, seed, difficulty) {
