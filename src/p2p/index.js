@@ -345,6 +345,8 @@ class P2P {
       await this.state.clear()
       await this.storage.setProperty('externalIp', this.getIpInfo().externalIp)
       await this.storage.setProperty('externalPort', this.getIpInfo().externalPort)
+      await this.storage.setProperty('internalIp', this.getIpInfo().internalIp)
+      await this.storage.setProperty('internalPort', this.getIpInfo().internalPort)
       if (isFirstSeed) {
         this.mainLogger.debug('Rejoining network...')
 
