@@ -4,6 +4,8 @@ module.exports = [
   'nodes',
   {
     id: { type: Sequelize.TEXT, allowNull: false, primaryKey: true },
+    publicKey: { type: Sequelize.TEXT, allowNull: false },
+    cycleJoined: { type: Sequelize.TEXT, allowNull: false },
     internalIp: { type: Sequelize.STRING, allowNull: false },
     externalIp: { type: Sequelize.STRING, allowNull: false },
     internalPort: { type: Sequelize.SMALLINT, allowNull: false },

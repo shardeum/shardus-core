@@ -356,12 +356,12 @@ class P2P {
         const joinRequest = await this._createJoinRequest()
         this.state.startCycles()
         this.state.addNewJoinRequest(joinRequest)
-        const { marker } = this.getCycleMarkerInfo()
-        const nodeId = this.state.computeNodeId(joinRequest.nodeInfo.publicKey, marker)
-        this._setNodeId(nodeId)
         // Sleep for cycle duration before updating status
         // TODO: Make this more deterministic
         await utils.sleep(this.state.getCurrentCycleDuration() * 1000)
+        const { currentCycleMarker } = this.getCycleMarkerInfo()
+        const nodeId = this.state.computeNodeId(joinRequest.nodeInfo.publicKey, currentCycleMarker)
+        this._setNodeId(nodeId)
         await this.state.setNodeStatus(this.id, 'active')
 
         // This is also for testing purposes

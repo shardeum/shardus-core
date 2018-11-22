@@ -104,8 +104,9 @@ class P2PState {
   }
 
   computeNodeId (publicKey, cycleMarker) {
-    // TODO: Implement actual node ID process
-    return publicKey
+    const nodeId = this.crypto.hash({ publicKey, cycleMarker })
+    this.mainLogger.debug(`Node ID is: ${nodeId}`)
+    return nodeId
   }
 
   getNodeStatus (nodeId) {
@@ -157,9 +158,9 @@ class P2PState {
     }
     let nodeId = this.computeNodeId(publicKey, cycleMarker)
     node.id = nodeId
-    delete node.publicKey
+    node.cycleJoined = cycleMarker
     this.nodes.ordered.push(node)
-    delete this.nodes.pending[node.id]
+    delete this.nodes.pending[node.publicKey]
     await this._updateNodeStatus(node, 'syncing', false)
     await this.addNode(node)
     this.mainLogger.debug(`Nodelist after adding this node: ${JSON.stringify(this.nodes.current)}`)
