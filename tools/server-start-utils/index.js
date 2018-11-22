@@ -13,9 +13,9 @@ class ServerStartUtils {
     this.baseDirPath = baseDirPath
     this.instDirPath = instDirPath
     this.serverPath = path.join(baseDirPath, 'server.js')
-    this.servers = []
+    this.servers = {}
     // Save default configs
-    this.configs = _readJsonFiles(path.join(baseDirPath, 'config'))
+    this.defaultConfigs = _readJsonFiles(path.join(baseDirPath, 'config'))
     // Create instance dir
     _ensureExists(instDirPath)
   }
@@ -24,47 +24,77 @@ class ServerStartUtils {
     this.name = name
   }
 
-  setConfig (changes) {
-    this.configs = merge(this.configs, changes)
+  setDefaultConfig (changes) {
+    this.defaultConfigs = merge(this.defaultConfigs, changes)
+  }
+
+  async setServerConfig (port, changes) {
+    const server = this.servers[port]
+    if (!server) return console.log('Could not find server on port', port)
+    await this.stopServer(server.port)
+    let serverConfigs = _readJsonFiles(path.join(server.baseDir, 'config'))
+    let changedConfigs = merge(serverConfigs, changes)
+    _writeJsonFiles(path.join(server.baseDir, 'config'), changedConfigs)
   }
 
   async startServer (port) {
-    // Copy configs and set port
-    let configs = JSON.parse(JSON.stringify(this.configs))
-    configs.server.externalPort = port
-    // Create new baseDir for server
-    let newBaseDirPath = path.join(this.instDirPath, `${this.name}-${port}`)
-    configs.server.baseDir = newBaseDirPath
-    await _createBaseDir(newBaseDirPath, configs)
-    // Fork server
-    let server = fork(this.serverPath, [newBaseDirPath])
-    const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${port}/cyclemarker`)
-    if (!success) throw new Error(`Server at ${port} failed to start.`)
-    server.port = port
-    server.baseDir = newBaseDirPath
-    // Save and return it
-    this.servers.push(server)
-    console.log('Successfully started server on port', port)
-    return server
+    let server = this.servers[port]
+    switch (true) {
+      // If no server existed on this port...
+      case (!server): {
+        // Copy defaultConfigs and set port
+        let configs = JSON.parse(JSON.stringify(this.defaultConfigs))
+        configs.server.externalPort = port
+        // Create new baseDir for server and write configs
+        let newBaseDirPath = path.join(this.instDirPath, `${this.name}-${port}`)
+        configs.server.baseDir = newBaseDirPath
+        await _createBaseDir(newBaseDirPath, configs)
+        // Fork a server process
+        let serverProc = fork(this.serverPath, [newBaseDirPath])
+        const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${port}/cyclemarker`)
+        if (!success) throw new Error(`Server at ${port} failed to start.`)
+        // Save it
+        server = {
+          process: serverProc,
+          baseDir: newBaseDirPath,
+          port: port
+        }
+        this.servers[port] = server
+        console.log('Successfully started server on port', port)
+        break
+      }
+      // If a server once existed on this port...
+      case (server && server.baseDir && !server.process): {
+        // Fork a server process from the existing baseDir
+        let serverProc = fork(this.serverPath, [server.baseDir])
+        const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${port}/cyclemarker`)
+        if (!success) throw new Error(`Server at ${port} failed to start.`)
+        // Save the process
+        server.process = serverProc
+        console.log('Successfully restarted server on port', port)
+        break
+      }
+    }
+    return server.process
   }
 
   async stopServer (port) {
-    const serverIndex = this.servers.findIndex(server => server.port === port)
-    if (serverIndex === -1) return console.log('Could not find server on port', port)
-    const server = this.servers[serverIndex]
-    server.kill()
+    const server = this.servers[port]
+    if (!server) return console.log('Could not find server on port', port)
+    if (server.process === null) return console.log('Server is already stopped on port', port)
+    server.process.kill()
     const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${port}/cyclemarker`, false)
     if (!success) throw new Error('Failed to stop server on port ' + port)
+    server.process = null
     console.log('Stopped server on port', port)
   }
 
   async deleteServer (port) {
-    const serverIndex = this.servers.findIndex(server => server.port === port)
-    if (serverIndex === -1) return console.log('Could not find server on port', port)
-    const server = this.servers[serverIndex]
-    await this.stopServer(port)
+    const server = this.servers[port]
+    if (!server) return console.log('Could not find server on port', port)
+    await this.stopServer(server.port)
     _rimraf(server.baseDir)
-    this.servers.splice(serverIndex, 1)
+    delete this.servers[port]
     console.log('Deleted server that was on port', port)
   }
 
@@ -88,15 +118,25 @@ class ServerStartUtils {
     return this.servers
   }
 
+  async startAllStoppedServers () {
+    let promises = []
+    for (const port in this.servers) {
+      const server = this.servers[port]
+      if (server.process === null) {
+        promises.push(this.startServer(port))
+      }
+    }
+    await Promise.all(promises)
+  }
+
   async stopAllServers () {
-    const ports = this.servers.map(server => server.port)
-    const promises = ports.map(port => this.stopServer(port))
+    const promises = Object.keys(this.servers).map(port => this.stopServer(port))
     await Promise.all(promises)
   }
 
   async deleteAllServers () {
-    const ports = this.servers.map(server => server.port)
-    for (const port of ports) await this.deleteServer(port)
+    const promises = Object.keys(this.servers).map(port => this.deleteServer(port))
+    await Promise.all(promises)
   }
 }
 
