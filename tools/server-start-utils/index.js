@@ -2,6 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const { fork } = require('child_process')
 const axios = require('axios')
+const merge = require('deepmerge')
 
 const LOCAL_ADDRESS = '127.0.0.1'
 const NODE_UP_TIMEOUT = process.env.NODE_UP_TIMEOUT || 5000
@@ -24,7 +25,7 @@ class ServerStartUtils {
   }
 
   setConfig (changes) {
-    Object.assign(this.configs, changes)
+    this.configs = merge(this.configs, changes)
   }
 
   async startServer (port) {
