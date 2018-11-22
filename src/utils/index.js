@@ -29,7 +29,6 @@ const deepCopy = (obj) => {
 const readJson = (filename) => {
   const file = readFileSync(filename)
   const config = JSON.parse(file)
-  console.log(config)
   return config
 }
 
