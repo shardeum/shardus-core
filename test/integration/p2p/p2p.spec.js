@@ -21,7 +21,7 @@ async function init (loggerConf = null, externalPort = null) {
   // newConfStorage = instances.newConfStorage
 }
 
-test('Testing P2P integrated methods with a seedNode up', { timeout: 50000 }, async t => {
+test('Testing P2P integrated methods with a seedNode up', { timeout: 100000, skip: false }, async t => {
   let server = spawn('node', [path.join(__dirname, 'shardus-child-process.js')])
   let config = module.require(path.join(__dirname, '../../../config/server.json'))
   server.stdout.on('data', (data) => console.log(`[stdout] ==> ${data.toString()}`))
@@ -29,9 +29,8 @@ test('Testing P2P integrated methods with a seedNode up', { timeout: 50000 }, as
   await sleep(5000)
   await init(null, 9002)
   await p2p.discoverNetwork()
-  let res = await p2p._createJoinRequest()
-  console.log('res', res)
-  t.match(res, {
+  let joinRequest = await p2p._createJoinRequest()
+  t.match(joinRequest, {
     cycleMarker: /[0-9a-fA-F]+/,
     nodeInfo: {
       address: /[0-9a-fA-F]+/,

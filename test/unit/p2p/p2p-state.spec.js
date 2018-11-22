@@ -20,7 +20,7 @@ createTestDb(confStorage)
 
 storage = new Storage(
   logger,
-  '../../../',
+  '.',
   { confFile: './config/storage.json' }
 )
 let crypto = new Crypto(logger, storage)

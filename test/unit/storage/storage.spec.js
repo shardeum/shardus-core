@@ -21,7 +21,7 @@ let logger = new Logger(path.resolve('./'), config.log)
 test('testing initialization property', async t => {
   const failStorage = new Storage(
     logger,
-    '../../../',
+    '.',
     { confFile: './config/storage.json' }
   )
 
@@ -45,7 +45,7 @@ test('testing init fn', async t => {
     resetLogFile()
     storage = new Storage(
       logger,
-      '../../../',
+      '.',
       { confFile: './config/storage.json' }
     )
     await storage.init()

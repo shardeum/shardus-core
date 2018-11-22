@@ -33,7 +33,7 @@ async function getInstances (loggerConf = null, externalPort = null) {
   let logger = new Logger(path.resolve('./'), loggerConf || loggerConfig)
   let storage = new Storage(
     logger,
-    '../../../',
+    '.',
     { confFile: './config/storage.json' }
   )
   config.externalPort = externalPort || config.externalPort

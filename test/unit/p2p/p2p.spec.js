@@ -37,7 +37,7 @@ let logger = new Logger(path.resolve('./'), loggerConfig)
 createTestDb(confStorage)
 let storage = new Storage(
   logger,
-  '../../../',
+  '.',
   { confFile: './config/storage.json' }
 )
 let crypto

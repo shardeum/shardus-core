@@ -15,7 +15,7 @@ let config = require(path.join(__dirname, '../../../config/server.json'))
 let confStorage = module.require(`../../../config/storage.json`)
 config.baseDir = '.'
 config.log.confFile = 'config/logs.json'
-config.storage.confFile = '../../../config/storage.json'
+config.storage.confFile = './config/storage.json'
 // increase the timeSync limit to avoid issues in the test
 config.syncLimit = 100000
 
@@ -32,11 +32,12 @@ test('testing Shardus class', async t => {
 
 test('testing methods isolated', { timeout: 20000 }, async t => {
   let server = spawn('node', [path.join(__dirname, 'child-process.js')])
-  // server.stdout.on('data', (data) => console.log(`[stdout] ==> ${data.toString()}`))
-  // server.stderr.on('data', (data) => console.log(`[stderr] ==> ${data.toString()}`))
+  server.stdout.on('data', (data) => console.log(`[stdout] ==> ${data.toString()}`))
+  server.stderr.on('data', (data) => console.log(`[stderr] ==> ${data.toString()}`))
   await sleep(6000)
   const res = await axios.post(`http://${config.externalIp}:${config.externalPort}/exit`)
   await sleep(6000)
+  console.log(server.exitCode)
   t.equal(res.data.success, true, 'should return success: true from /exit endpoint')
   t.equal(server.exitCode, 0, 'the server should be killed correctly')
   await server.kill()
@@ -45,10 +46,10 @@ test('testing methods isolated', { timeout: 20000 }, async t => {
 
 test('testing the shutdown method', { timeout: 10000 }, async t => {
   resetLogFile('main')
-  spawn('node', [path.join(__dirname, 'child-process-shutdown.js')])
-  // server.stdout.on('data', (data) => console.log(`[stdout] ==> ${data.toString()}`))
-  // server.stderr.on('data', (data) => console.log(`[stderr] ==> ${data.toString()}`))
-  await sleep(6000)
+  let server = spawn('node', [path.join(__dirname, 'child-process-shutdown.js')])
+  server.stdout.on('data', (data) => console.log(`[stdout] ==> ${data.toString()}`))
+  server.stderr.on('data', (data) => console.log(`[stderr] ==> ${data.toString()}`))
+  await sleep(8000)
   const log = readLogFile('main')
   if (confStorage) {
     confStorage.options.storage = 'db/db.sqlite'

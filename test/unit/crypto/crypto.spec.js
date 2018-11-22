@@ -25,7 +25,7 @@ let confStorage = module.require(`../../../config/storage.json`)
 // let newConfStorage = createTestDb(confStorage)
 let storage = new Storage(
   logger,
-  '../../../',
+  '.',
   { confFile: './config/storage.json' }
 )
 let crypto = new Crypto(logger, storage)
