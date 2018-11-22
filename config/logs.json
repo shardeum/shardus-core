@@ -3,19 +3,16 @@
     "out": { "type": "console" },
     "main": {
       "type": "file",
-      "filename": "logs/main.log",
       "maxLogSize": 1000000, 
       "backups": 3
     },
     "fatal": {
       "type": "file",
-      "filename": "logs/fatal.log",
       "maxLogSize": 1000000, 
       "backups": 3
     },
     "net": {
       "type": "file",
-      "filename": "logs/net.log",
       "maxLogSize": 1000000, 
       "backups": 3
     }

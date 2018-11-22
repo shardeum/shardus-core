@@ -1,3 +1,5 @@
+const { readFileSync } = require('fs')
+
 const sleep = (ms) => {
   return new Promise(resolve => {
     setTimeout(resolve, ms)
@@ -24,6 +26,14 @@ const deepCopy = (obj) => {
   return JSON.parse(JSON.stringify(obj))
 }
 
+const readJson = (filename) => {
+  const file = readFileSync(filename)
+  const config = JSON.parse(file)
+  console.log(config)
+  return config
+}
+
 exports.sleep = sleep
 exports.getTime = getTime
 exports.deepCopy = deepCopy
+exports.readJson = readJson
