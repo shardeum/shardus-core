@@ -2,12 +2,13 @@ const test = require('tap').test
 const fs = require('fs')
 const path = require('path')
 const axios = require('axios')
-const { spawn } = require('child_process')
+const { spawn, fork } = require('child_process')
 
 const Shardus = require('../../../src/shardus')
 const { sleep } = require('../../../src/utils')
 const { readLogFile, resetLogFile } = require('../../includes/utils-log')
 const { clearTestDb, createTestDb } = require('../../includes/utils-storage')
+const { isValidHex } = require('../../includes/utils')
 
 // let newConfStorage, shardus
 let shardus
@@ -19,8 +20,19 @@ config.storage.confFile = './config/storage.json'
 // increase the timeSync limit to avoid issues in the test
 config.syncLimit = 100000
 
+async function requestFromChild (msg) {
+  return new Promise(function (resolve, reject) {
+    const forked = fork('./test/unit/shardus/child-process-shardus.js')
+    forked.send(msg)
+    forked.on('message', (data) => {
+      forked.send('shutdown')
+      resolve(data)
+    })
+  })
+}
+
 // Testing constructor
-test('testing Shardus class', async t => {
+test('testing Shardus class', { timeout: 20000 }, async t => {
   // Testing constructor
   // newConfStorage = createTestDb(confStorage, '../../../db/db.test.sqlite')
   createTestDb(confStorage, '../../../db/db.test.sqlite')
@@ -37,7 +49,6 @@ test('testing methods isolated', { timeout: 20000 }, async t => {
   await sleep(6000)
   const res = await axios.post(`http://${config.externalIp}:${config.externalPort}/exit`)
   await sleep(6000)
-  console.log(server.exitCode)
   t.equal(res.data.success, true, 'should return success: true from /exit endpoint')
   t.equal(server.exitCode, 0, 'the server should be killed correctly')
   await server.kill()
@@ -57,5 +68,24 @@ test('testing the shutdown method', { timeout: 10000 }, async t => {
     clearTestDb()
   }
   t.notEqual(log.indexOf('Logger shutting down cleanly...'), -1, 'Should terminate the logger within shardus correctly and insert the log entry')
+  t.end()
+})
+
+test('Testing getCycleMarkerInfo', { timeout: 50000 }, async t => {
+  createTestDb(confStorage, '../../../db/db.test.sqlite')
+  let { cycleMarkerInfo, nodeAddress } = await requestFromChild('getCycleMarkerInfo')
+  const diff = Date.now() - (cycleMarkerInfo.currentTime * 1000)
+  t.equal(isValidHex(cycleMarkerInfo.currentCycleMarker), true, 'cycleMarker should be a valid hex')
+  t.equal(Array.isArray(cycleMarkerInfo.nodesJoined), true, 'joined should be an array')
+  t.equal(cycleMarkerInfo.nodesJoined.length, 1, 'should have at least one joined node')
+  t.equal(isValidHex(cycleMarkerInfo.nodesJoined[0]), true, 'the element 0 of the joined array should be a hex value')
+  t.equal(cycleMarkerInfo.nodesJoined[0], nodeAddress, 'the joined node address should be equals to the address of the inserted node')
+  t.equal(isNaN(Number(cycleMarkerInfo.currentTime * 1000)), false, 'the currentTime should be a valid time value')
+  t.equal(diff > 10000, false, 'the difference of times should not be greater than 10s')
+  if (confStorage) {
+    confStorage.options.storage = 'db/db.sqlite'
+    fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
+    clearTestDb()
+  }
   t.end()
 })
