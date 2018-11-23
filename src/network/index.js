@@ -38,7 +38,7 @@ class Network {
       if (!this.internalRoutes[route]) throw new Error('Unable to handle request, invalid route.')
       const handler = this.internalRoutes[route]
       if (!data.payload) {
-        await handler(respond)
+        await handler(null, respond)
         return
       }
       await handler(payload, respond)

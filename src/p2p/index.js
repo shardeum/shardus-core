@@ -22,6 +22,7 @@ class P2P {
     this.queryDelay = config.queryDelay
     this.netadmin = config.netadmin || 'default'
     this.state = new P2PState(config, this.logger, this.storage, this.crypto)
+    this.seedNodes = null
   }
 
   async init () {
@@ -34,6 +35,9 @@ class P2P {
     // Load ID from database
     const id = await this.storage.getProperty('id')
     if (id) this._setNodeId(id, false)
+
+    // Retrieve seed nodes
+    this.seedNodes = this._getSeedNodes()
 
     // Set up the network after we are sure we have our current IP info
     await this.network.setup(this.getIpInfo())
@@ -122,8 +126,31 @@ class P2P {
   }
 
   getLatestCycles (amount) {
-    const cycles = this.state.getCycles(amount)
+    const cycles = this.state.getLastCycles(amount)
     return cycles
+  }
+
+  getCycleChain (start, end) {
+    let cycles
+    try {
+      cycles = this.state.getCycles(start, end)
+    } catch (e) {
+      this.mainLogger.debug(e)
+      cycles = null
+    }
+    return cycles
+  }
+
+  getCycleChainHash (start, end) {
+    let cycleChain
+    try {
+      cycleChain = this.getCycleChain(start, end)
+    } catch (e) {
+      return null
+    }
+    const hash = this.crypto.hash({ cycleChain })
+    this.mainLogger.debug(`Hash of requested cycle chain: ${hash}`)
+    return hash
   }
 
   _getThisNodeInfo () {
@@ -175,6 +202,25 @@ class P2P {
     }
     // TODO: Check if we are in nodeslist (requires ID)
     return false
+  }
+
+  _getNonSeedNodes (seedNodes = []) {
+    // Get all nodes minus ourself
+    const nodes = this.state.getAllNodes(this.id)
+    // Make a copy of the nodeslist
+    const nodesCopy = utils.deepCopy(nodes)
+    if (!seedNodes.length) throw new Error('Fatal: No seed nodes provided!')
+    for (const seedNode of seedNodes) {
+      delete nodesCopy[seedNode]
+    }
+    return nodesCopy
+  }
+
+  getNodelistHash () {
+    const nodelist = this.state.getAllNodes()
+    const nodelistHash = this.crypto.hash({ nodelist })
+    this.mainLogger.debug(`Hash of current nodelist: ${nodelistHash}`)
+    return nodelistHash
   }
 
   async _submitJoin (nodes, joinRequest) {
@@ -233,7 +279,7 @@ class P2P {
   }
 
   async _join () {
-    const seedNodes = await this._getSeedNodes()
+    const seedNodes = this.seedNodes
     const localTime = utils.getTime('s')
     const { currentTime } = await this._fetchCycleMarker(seedNodes)
     if (!this._checkWithinSyncLimit(localTime, currentTime)) throw Error('Local time out of sync with network.')
@@ -359,28 +405,28 @@ class P2P {
     throw new Error(`Could not get a response from ${nodes.length} nodes. Encountered ${errors} query errors.`)
   }
 
-  _verifyNodeList (nodeList, nodeListHash) {
-    return this.cypto.hash({ nodeList }) === nodeListHash
+  _verifyNodelist (nodelist, nodelistHash) {
+    return this.cypto.hash({ nodelist }) === nodelistHash
   }
 
   _verifyCycleChain (cycleChain, chainHash) {
     return this.cypto.hash({ cycleChain }) === chainHash
   }
 
-  _fetchNodeListHash (nodes) {
+  _fetchNodelistHash (nodes) {
     let queryFn = (node) => {
-      // TODO: [AS] Use the apporpriate endpoint to get a nodeList hash
-      return { nodeListHash: '' }
+      // TODO: [AS] Use the apporpriate endpoint to get a nodelist hash
+      return { nodelistHash: '' }
     }
     return this._robustQuery(nodes, queryFn)
   }
 
-  _fetchVerifiedNodeList (nodes, nodeListHash) {
+  _fetchVerifiedNodelist (nodes, nodelistHash) {
     let queryFn = node => {
-      // TODO: [AS] Use the appropriate endpoint to get a nodeList
-      return { nodeList: [] }
+      // TODO: [AS] Use the appropriate endpoint to get a nodelist
+      return { nodelist: [] }
     }
-    let verifyFn = ({ nodeList }) => this._verifyNodeList(nodeList, nodeListHash)
+    let verifyFn = ({ nodelist }) => this._verifyNodelist(nodelist, nodelistHash)
     return this._sequentialQuery(nodes, queryFn, verifyFn)
   }
 
@@ -412,7 +458,7 @@ class P2P {
     // Get current cycle counter
     let cycleCounter
     try {
-      ({ cycleCounter } = await this._fetchCycleMarker(nodes))
+      ;({ cycleCounter } = await this._fetchCycleMarker(nodes))
     } catch (e) {
       this.mainLogger.info('Could not get cycleMarker from nodes. Querying seedNodes for it...')
       this.mainLogger.debug(e)
@@ -436,7 +482,7 @@ class P2P {
     // Get verified cycle chain
     let cycleChain
     try {
-      ({ cycleChain } = await this._fetchVerifiedCycleChain(nodes, chainHash, chainStart, chainEnd))
+      ;({ cycleChain } = await this._fetchVerifiedCycleChain(nodes, chainHash, chainStart, chainEnd))
     } catch (e) {
       this.mainLogger.info('Could not get verified cycleChain from nodes. Querying seedNodes for it...')
       this.mainLogger.debug(e)
@@ -466,7 +512,7 @@ class P2P {
     return true
   }
 
-  async discoverNetwork () {
+  async _discoverNetwork () {
     // Check if our time is synced to network time server
     let timeSynced = await this._checkTimeSynced(this.timeServer)
     if (!timeSynced) throw new Error('Local time out of sync with time server.')
@@ -474,57 +520,60 @@ class P2P {
     // Check if we are first seed node
     const seedNodes = await this._getSeedNodes()
     const isFirstSeed = this._checkIfFirstSeedNode(seedNodes)
-    if (isFirstSeed) {
-      this.mainLogger.info('You are the first seed node!')
-    } else {
+    if (!isFirstSeed) {
       this.mainLogger.info('You are not the first seed node...')
+      return false
     }
+    this.mainLogger.info('You are the first seed node!')
+    return true
+  }
 
-    // Check if we need to rejoin
-    const rejoin = await this._checkRejoin()
-    if (rejoin) {
-      this.mainLogger.info('Server needs to rejoin...')
-      this.mainLogger.debug('Clearing P2P state...')
-      await this.state.clear()
-      await this.storage.setProperty('externalIp', this.getIpInfo().externalIp)
-      await this.storage.setProperty('externalPort', this.getIpInfo().externalPort)
-      await this.storage.setProperty('internalIp', this.getIpInfo().internalIp)
-      await this.storage.setProperty('internalPort', this.getIpInfo().internalPort)
-      if (isFirstSeed) {
-        this.mainLogger.debug('Rejoining network...')
+  async _rejoinNetwork (isFirstSeed) {
+    this.mainLogger.debug('Clearing P2P state...')
+    await this.state.clear()
 
-        // This is for testing purposes
-        console.log('Doing initial setup for server...')
+    // Sets our IPs and ports for internal and external network in the database
+    await this.storage.setProperty('externalIp', this.getIpInfo().externalIp)
+    await this.storage.setProperty('externalPort', this.getIpInfo().externalPort)
+    await this.storage.setProperty('internalIp', this.getIpInfo().internalIp)
+    await this.storage.setProperty('internalPort', this.getIpInfo().internalPort)
 
-        const joinRequest = await this._createJoinRequest()
-        this.state.startCycles()
-        this.state.addNewJoinRequest(joinRequest)
-        // Sleep for cycle duration before updating status
-        // TODO: Make this more deterministic
-        await utils.sleep(this.state.getCurrentCycleDuration() * 1000)
-        const { currentCycleMarker } = this.getCycleMarkerInfo()
-        const nodeId = this.state.computeNodeId(joinRequest.nodeInfo.publicKey, currentCycleMarker)
-        this._setNodeId(nodeId)
-        await this.state.setNodeStatus(this.id, 'active')
+    if (isFirstSeed) {
+      this.mainLogger.debug('Rejoining network...')
 
-        // This is also for testing purposes
-        console.log('Server ready!')
+      // This is for testing purposes
+      console.log('Doing initial setup for server...')
 
-        return true
-      }
-      const nodeId = await this._join()
-      if (!nodeId) {
-        this.mainLogger.info('Unable to join network. Shutting down...')
-        return false
-      }
-      this.mainLogger.info('Successfully joined the network!')
+      const joinRequest = await this._createJoinRequest()
+      this.state.startCycles()
+      this.state.addNewJoinRequest(joinRequest)
+      // Sleep for cycle duration before updating status
+      // TODO: Make this more deterministic
+      await utils.sleep(this.state.getCurrentCycleDuration() * 1000)
+      const { currentCycleMarker } = this.getCycleMarkerInfo()
+      const nodeId = this.state.computeNodeId(joinRequest.nodeInfo.publicKey, currentCycleMarker)
       this._setNodeId(nodeId)
-      // const testResponse = await this.network.ask({ internalIp: '127.0.0.1', internalPort: 9005 }, 'test2')
-      // console.log(JSON.stringify(testResponse))
+      await this.state.setNodeStatus(this.id, 'active')
+
+      // This is also for testing purposes
+      console.log('Server ready!')
+
       return true
     }
-    // If we made it this far, we need to sync to the network
 
+    const nodeId = await this._join()
+    if (!nodeId) {
+      this.mainLogger.info('Unable to join network. Shutting down...')
+      return false
+    }
+    this.mainLogger.info('Successfully joined the network!')
+    this._setNodeId(nodeId)
+    // const testResponse = await this.network.ask({ internalIp: '127.0.0.1', internalPort: 9005 }, 'test2')
+    // console.log(JSON.stringify(testResponse))
+    return true
+  }
+
+  async _resyncToNetwork (isFirstSeed) {
     // TODO: need to make it robust when resync implemented,
     // ---   currently system would never resync if we were only
     // ---   seed node in the network
@@ -541,6 +590,15 @@ class P2P {
     // TODO: add resyncing
     this.mainLogger.debug('Unable to resync... TODO: implement resyncing.')
     return false
+  }
+
+  async startup () {
+    const isFirstSeed = await this._discoverNetwork()
+    const rejoin = await this._checkRejoin()
+    let joined
+    if (rejoin) joined = await this._rejoinNetwork(isFirstSeed)
+    else joined = await this._resyncToNetwork(isFirstSeed)
+    return joined
   }
 }
 

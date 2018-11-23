@@ -384,6 +384,12 @@ class P2PState {
     */
   }
 
+  getCycles (start = 0, end = (this.cycles.length - 1)) {
+    if (start < 0) throw new Error('Invalid start cycle counter.')
+    if (end > this.cycles.length - 1) throw new Error('Invalid end cycle counter.')
+    return this.cycles.slice(start, end + 1)
+  }
+
   getCurrentCertificate () {
     // TODO: implement certificate propagation
     const cert = this.currentCycle.certificate
@@ -402,7 +408,7 @@ class P2PState {
     return 100
   }
 
-  getCycles (amount) {
+  getLastCycles (amount) {
     if (this.cycles.length < amount) {
       return this.cycles
     }

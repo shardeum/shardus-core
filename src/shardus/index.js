@@ -93,13 +93,13 @@ class Shardus {
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network)
     await this.p2p.init()
     this._registerRoutes()
-    let joinedNetwork
+    let started
     try {
-      joinedNetwork = await this.p2p.discoverNetwork()
+      started = await this.p2p.startup()
     } catch (e) {
       throw new Error(e)
     }
-    if (!joinedNetwork) await this.shutdown()
+    if (!started) await this.shutdown()
   }
 
   async shutdown () {
