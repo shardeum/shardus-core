@@ -28,83 +28,87 @@ class ServerStartUtils {
     this.defaultConfigs = merge(this.defaultConfigs, changes)
   }
 
-  async setServerConfig (port, changes) {
-    const server = this.servers[port]
-    if (!server) return console.log('Could not find server on port', port)
-    await this.stopServer(server.port)
+  async setServerConfig (extPort, changes) {
+    const server = this.servers[extPort]
+    if (!server) return console.log('Could not find server on port', extPort)
+    await this.stopServer(server.extPort)
     let serverConfigs = _readJsonFiles(path.join(server.baseDir, 'config'))
     let changedConfigs = merge(serverConfigs, changes)
     _writeJsonFiles(path.join(server.baseDir, 'config'), changedConfigs)
   }
 
-  async startServer (port) {
-    let server = this.servers[port]
+  async startServer (extPort = null, intPort = null) {
+    let server = this.servers[extPort]
     switch (true) {
       // If no server existed on this port...
       case (!server): {
         // Copy defaultConfigs and set port
         let configs = JSON.parse(JSON.stringify(this.defaultConfigs))
-        configs.server.externalPort = port
+        if (extPort) configs.server.ip.externalPort = extPort
+        if (intPort) configs.server.ip.internalPort = intPort
         // Create new baseDir for server and write configs
-        let newBaseDirPath = path.join(this.instDirPath, `${this.name}-${port}`)
+        let newBaseDirPath = path.join(this.instDirPath, `${this.name}-${extPort}`)
         configs.server.baseDir = newBaseDirPath
         await _createBaseDir(newBaseDirPath, configs)
         // Fork a server process
         let serverProc = fork(this.serverPath, [newBaseDirPath])
-        const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${port}/cyclemarker`)
-        if (!success) throw new Error(`Server at ${port} failed to start.`)
+        const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${extPort}/cyclemarker`)
+        if (!success) throw new Error(`Server at ${extPort} failed to start.`)
         // Save it
         server = {
           process: serverProc,
           baseDir: newBaseDirPath,
-          port: port
+          extPort: extPort,
+          intPort: intPort
         }
-        this.servers[port] = server
-        console.log('Successfully started server on port', port)
+        this.servers[extPort] = server
+        console.log('Successfully started server on port', extPort)
         break
       }
       // If a server once existed on this port...
       case (server && server.baseDir && !server.process): {
         // Fork a server process from the existing baseDir
         let serverProc = fork(this.serverPath, [server.baseDir])
-        const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${port}/cyclemarker`)
-        if (!success) throw new Error(`Server at ${port} failed to start.`)
+        const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${extPort}/cyclemarker`)
+        if (!success) throw new Error(`Server at ${extPort} failed to start.`)
         // Save the process
         server.process = serverProc
-        console.log('Successfully restarted server on port', port)
+        console.log('Successfully restarted server on port', extPort)
         break
       }
     }
     return server.process
   }
 
-  async stopServer (port) {
-    const server = this.servers[port]
-    if (!server) return console.log('Could not find server on port', port)
-    if (server.process === null) return console.log('Server is already stopped on port', port)
+  async stopServer (extPort) {
+    const server = this.servers[extPort]
+    if (!server) return console.log('Could not find server on port', extPort)
+    if (server.process === null) return console.log('Server is already stopped on port', extPort)
     server.process.kill()
-    const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${port}/cyclemarker`, false)
-    if (!success) throw new Error('Failed to stop server on port ' + port)
+    const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${extPort}/cyclemarker`, false)
+    if (!success) throw new Error('Failed to stop server on port ' + extPort)
     server.process = null
-    console.log('Stopped server on port', port)
+    console.log('Stopped server on port', extPort)
   }
 
-  async deleteServer (port) {
-    const server = this.servers[port]
-    if (!server) return console.log('Could not find server on port', port)
-    await this.stopServer(server.port)
+  async deleteServer (extPort) {
+    const server = this.servers[extPort]
+    if (!server) return console.log('Could not find server on port', extPort)
+    await this.stopServer(server.extPort)
     _rimraf(server.baseDir)
-    delete this.servers[port]
-    console.log('Deleted server that was on port', port)
+    delete this.servers[extPort]
+    console.log('Deleted server that was on port', extPort)
   }
 
-  async startServers (port, num, wait = 3500) {
-    console.log(`Starting ${num} nodes from port ${port}...`)
-    await this.startServer(port)
+  async startServers (num, extPort = null, intPort = null, wait = 3500) {
+    if (!extPort) extPort = this.defaultConfigs.server.ip.externalPort
+    if (!intPort) intPort = this.defaultConfigs.server.ip.internalPort
+    console.log(`Starting ${num} nodes from port ${extPort}...`)
+    await this.startServer(extPort, intPort)
 
     let promises = []
     for (let i = 1; i < num; i++) {
-      promises.push(this.startServer(port + i))
+      promises.push(this.startServer(extPort + i, intPort + i))
     }
 
     try {
@@ -120,22 +124,22 @@ class ServerStartUtils {
 
   async startAllStoppedServers () {
     let promises = []
-    for (const port in this.servers) {
-      const server = this.servers[port]
+    for (const extPort in this.servers) {
+      const server = this.servers[extPort]
       if (server.process === null) {
-        promises.push(this.startServer(port))
+        promises.push(this.startServer(server.extPort, server.intPort))
       }
     }
     await Promise.all(promises)
   }
 
   async stopAllServers () {
-    const promises = Object.keys(this.servers).map(port => this.stopServer(port))
+    const promises = Object.keys(this.servers).map(extPort => this.stopServer(extPort))
     await Promise.all(promises)
   }
 
   async deleteAllServers () {
-    const promises = Object.keys(this.servers).map(port => this.deleteServer(port))
+    const promises = Object.keys(this.servers).map(extPort => this.deleteServer(extPort))
     await Promise.all(promises)
   }
 }
