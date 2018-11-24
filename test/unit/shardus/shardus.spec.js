@@ -32,7 +32,7 @@ async function requestFromChild (msg) {
 }
 
 // Testing constructor
-test('testing Shardus class', { timeout: 20000 }, async t => {
+test('testing Shardus class', { skip: false, timeout: 20000 }, async t => {
   // Testing constructor
   // newConfStorage = createTestDb(confStorage, '../../../db/db.test.sqlite')
   createTestDb(confStorage, '../../../db/db.test.sqlite')
@@ -42,7 +42,7 @@ test('testing Shardus class', { timeout: 20000 }, async t => {
   t.end()
 })
 
-test('testing methods isolated', { timeout: 20000 }, async t => {
+test('testing methods isolated', { skip: false, timeout: 20000 }, async t => {
   let server = spawn('node', [path.join(__dirname, 'child-process.js')])
   server.stdout.on('data', (data) => console.log(`[stdout] ==> ${data.toString()}`))
   server.stderr.on('data', (data) => console.log(`[stderr] ==> ${data.toString()}`))
@@ -55,7 +55,7 @@ test('testing methods isolated', { timeout: 20000 }, async t => {
   t.end()
 })
 
-test('testing the shutdown method', { timeout: 10000 }, async t => {
+test('testing the shutdown method', { skip: false, timeout: 10000 }, async t => {
   resetLogFile('main')
   let server = spawn('node', [path.join(__dirname, 'child-process-shutdown.js')])
   server.stdout.on('data', (data) => console.log(`[stdout] ==> ${data.toString()}`))
@@ -71,7 +71,7 @@ test('testing the shutdown method', { timeout: 10000 }, async t => {
   t.end()
 })
 
-test('Testing getCycleMarkerInfo', { timeout: 50000 }, async t => {
+test('Testing getCycleMarkerInfo', { skip: false, timeout: 50000 }, async t => {
   createTestDb(confStorage, '../../../db/db.test.sqlite')
   let { cycleMarkerInfo, nodeAddress } = await requestFromChild('getCycleMarkerInfo')
   const diff = Date.now() - (cycleMarkerInfo.currentTime * 1000)
@@ -82,6 +82,49 @@ test('Testing getCycleMarkerInfo', { timeout: 50000 }, async t => {
   t.equal(cycleMarkerInfo.nodesJoined[0], nodeAddress, 'the joined node address should be equals to the address of the inserted node')
   t.equal(isNaN(Number(cycleMarkerInfo.currentTime * 1000)), false, 'the currentTime should be a valid time value')
   t.equal(diff > 10000, false, 'the difference of times should not be greater than 10s')
+  if (confStorage) {
+    confStorage.options.storage = 'db/db.sqlite'
+    fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
+    clearTestDb()
+  }
+  t.end()
+})
+
+test('Testing getLatestCycles method', { skip: false, timeout: 50000 }, async t => {
+  createTestDb(confStorage, '../../../db/db.test.sqlite')
+  let { latestCycles } = await requestFromChild('getLatestCycles')
+  console.log(latestCycles)
+  t.equal(Array.isArray(latestCycles), true, 'latestCycles should be an array')
+  t.equal(latestCycles.length, 2, 'should have last 2 latest cycles')
+  t.equal(isValidHex(latestCycles[0].previous), true, 'Cycle 1 cycleMarker should be a valid hex')
+  t.equal(isValidHex(latestCycles[1].previous), true, 'Cycle 2 cycleMarker should be a valid hex')
+  t.equal(latestCycles[0].counter + 1, latestCycles[1].counter, 'Cycle 2 counter should be larger than Cycle 1 counter by 1')
+  t.equal(latestCycles[1].previous, latestCycles[0].marker, 'Previous of Cycle 2 should be equal to cycle marker of Cycle 1')
+  if (confStorage) {
+    confStorage.options.storage = 'db/db.sqlite'
+    fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
+    clearTestDb()
+  }
+  t.end()
+})
+
+test('Testing _join method', { skip: false, timeout: 50000 }, async t => {
+  createTestDb(confStorage, '../../../db/db.test.sqlite')
+  let { joined } = await requestFromChild('_join')
+  t.equal(joined, true, '_join method should return true if join is successful')
+  if (confStorage) {
+    confStorage.options.storage = 'db/db.sqlite'
+    fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
+    clearTestDb()
+  }
+  t.end()
+})
+
+test('Testing _waitUntilJoinPhase method', { skip: false, timeout: 50000 }, async t => {
+  createTestDb(confStorage, '../../../db/db.test.sqlite')
+  await requestFromChild('_waitUntilJoinPhase')
+  const log = readLogFile('main')
+  t.notEqual(log.indexOf('Waiting for 8000 ms before next join phase...'), -1, 'Should terminate the logger within shardus correctly and insert the log entry')
   if (confStorage) {
     confStorage.options.storage = 'db/db.sqlite'
     fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
