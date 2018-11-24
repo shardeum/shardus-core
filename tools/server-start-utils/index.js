@@ -37,47 +37,50 @@ class ServerStartUtils {
     _writeJsonFiles(path.join(server.baseDir, 'config'), changedConfigs)
   }
 
-  async startServer (extPort = null, intPort = null) {
+  async startServer (extPort = null, intPort = null, outputToFile = true) {
+    if (!extPort) extPort = this.defaultConfigs.server.ip.externalPort
+    if (!intPort) intPort = this.defaultConfigs.server.ip.internalPort
     let server = this.servers[extPort]
     switch (true) {
       // If no server existed on this port...
-      case (!server): {
-        // Copy defaultConfigs and set port
+      case (!_exists(server)): {
+        // Copy defaultConfigs and edit ports and baseDir
         let configs = JSON.parse(JSON.stringify(this.defaultConfigs))
-        if (extPort) configs.server.ip.externalPort = extPort
-        if (intPort) configs.server.ip.internalPort = intPort
+        configs.server.baseDir = path.join(this.instDirPath, `${this.name}-${extPort}`)
+        configs.server.ip.externalPort = extPort
+        configs.server.ip.internalPort = intPort
         // Create new baseDir for server and write configs
-        let newBaseDirPath = path.join(this.instDirPath, `${this.name}-${extPort}`)
-        configs.server.baseDir = newBaseDirPath
-        await _createBaseDir(newBaseDirPath, configs)
+        await _createBaseDir(configs.server.baseDir, configs)
         // Fork a server process
-        let serverProc = fork(this.serverPath, [newBaseDirPath])
-        const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${extPort}/cyclemarker`)
-        if (!success) throw new Error(`Server at ${extPort} failed to start.`)
+        let serverProc = await _forkServer(this.serverPath, configs.server.ip.externalPort, configs.server.baseDir, outputToFile)
         // Save it
         server = {
           process: serverProc,
-          baseDir: newBaseDirPath,
-          extPort: extPort,
-          intPort: intPort
+          baseDir: configs.server.baseDir,
+          extPort: configs.server.ip.externalPort,
+          intPort: configs.server.ip.internalPort
         }
-        this.servers[extPort] = server
-        console.log('Successfully started server on port', extPort)
+        this.servers[server.extPort] = server
+        console.log(`Successfully started server on ext:int ports ${server.extPort}:${server.intPort}`)
         break
       }
       // If a server once existed on this port...
-      case (server && server.baseDir && !server.process): {
+      case (_exists(server) && _exists(server.baseDir) && !_exists(server.process)): {
         // Fork a server process from the existing baseDir
-        let serverProc = fork(this.serverPath, [server.baseDir])
-        const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${extPort}/cyclemarker`)
-        if (!success) throw new Error(`Server at ${extPort} failed to start.`)
+        let serverProc = await _forkServer(this.serverPath, extPort, server.baseDir, outputToFile)
         // Save the process
         server.process = serverProc
-        console.log('Successfully restarted server on port', extPort)
+        console.log(`Successfully restarted server on ext:int ports ${server.extPort}:${server.intPort}`)
+        break
+      }
+      // If a server is running on this port...
+      case (_exists(server) && _exists(server.baseDir) && _exists(server.process)): {
+        console.log(`Server already running on ext:int ports ${server.extPort}:${server.intPort}`)
+        server = null
         break
       }
     }
-    return server.process
+    return server
   }
 
   async stopServer (extPort) {
@@ -88,22 +91,23 @@ class ServerStartUtils {
     const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${extPort}/cyclemarker`, false)
     if (!success) throw new Error('Failed to stop server on port ' + extPort)
     server.process = null
-    console.log('Stopped server on port', extPort)
+    console.log('Stopped server on ext port', extPort)
+    return server
   }
 
   async deleteServer (extPort) {
     const server = this.servers[extPort]
-    if (!server) return console.log('Could not find server on port', extPort)
+    if (!server) return console.log('Could not find server on ext port', extPort)
     await this.stopServer(server.extPort)
     _rimraf(server.baseDir)
     delete this.servers[extPort]
-    console.log('Deleted server that was on port', extPort)
+    console.log('Deleted server that was on ext port', extPort)
   }
 
   async startServers (num, extPort = null, intPort = null, wait = 3500) {
     if (!extPort) extPort = this.defaultConfigs.server.ip.externalPort
     if (!intPort) intPort = this.defaultConfigs.server.ip.internalPort
-    console.log(`Starting ${num} nodes from port ${extPort}...`)
+    console.log(`Starting ${num} nodes from ext:int port ${extPort}:${intPort}...`)
     await this.startServer(extPort, intPort)
 
     let promises = []
@@ -122,12 +126,12 @@ class ServerStartUtils {
     return this.servers
   }
 
-  async startAllStoppedServers () {
+  async startAllStoppedServers (outputToFile = true) {
     let promises = []
     for (const extPort in this.servers) {
       const server = this.servers[extPort]
       if (server.process === null) {
-        promises.push(this.startServer(server.extPort, server.intPort))
+        promises.push(this.startServer(server.extPort, server.intPort, outputToFile))
       }
     }
     await Promise.all(promises)
@@ -150,6 +154,20 @@ module.exports = function (relBaseDirPath, relInstDirPath) {
   let absBaseDirPath = path.resolve(path.join(parentModuleDirname, relBaseDirPath))
   let absInstDirPath = path.resolve(path.join(parentModuleDirname, relInstDirPath))
   return new ServerStartUtils(absBaseDirPath, absInstDirPath)
+}
+
+async function _forkServer (serverPath, extPort, baseDir, outputToFile = true) {
+  let serverProc
+  if (outputToFile) {
+    let timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    let output = fs.openSync(path.join(baseDir, `output-${timestamp}.txt`), 'w')
+    serverProc = fork(serverPath, [baseDir], { stdio: ['inherit', output, output, 'ipc'] })
+  } else {
+    serverProc = fork(serverPath, [baseDir])
+  }
+  const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${extPort}/cyclemarker`)
+  if (!success) throw new Error(`Server at ${extPort} failed to start.`)
+  return serverProc
 }
 
 async function _sleep (ms = 0) {
@@ -244,4 +262,8 @@ function _rimraf (dir) {
     })
     fs.rmdirSync(dir)
   }
+}
+
+function _exists (thing) {
+  return (typeof thing !== 'undefined' && thing !== null)
 }
