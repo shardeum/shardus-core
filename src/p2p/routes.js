@@ -3,6 +3,8 @@ exports.register = function (context) {
 }
 
 function setupRoutes () {
+  // ==== External Routes ====
+
   this.network.registerExternalGet('cyclemarker', (req, res) => {
     const cycleMarkerInfo = this.getCycleMarkerInfo()
     res.json(cycleMarkerInfo)
@@ -29,10 +31,22 @@ function setupRoutes () {
     this.mainLogger.debug('Join request accepted!')
   })
 
+  this.network.registerExternalGet('nodeinfo', (req, res) => {
+    const nodeInfo = this.getPublicNodeInfo()
+    res.json({ nodeInfo })
+  })
+
+  // ==== Internal Routes ====
+
   this.network.registerInternal('join', async (payload) => {
     const accepted = await this.addJoinRequest(payload, false)
     if (!accepted) return this.mainLogger.debug('Join request not accepted.')
     this.mainLogger.debug('Join request accepted!')
+  })
+
+  this.network.registerInternal('cyclemarker', async (payload, respond) => {
+    const cycleMarkerInfo = this.getCycleMarkerInfo()
+    await respond(cycleMarkerInfo)
   })
 
   this.network.registerInternal('nodelisthash', async (payload, respond) => {
@@ -51,12 +65,14 @@ function setupRoutes () {
       await respond({ cycleChainHash: null, error: 'no payload; start and end cycle required' })
       return
     }
-    if (!payload.start || !payload.end) {
+    this.mainLogger.debug(`Payload of request on 'cyclechainhash': ${JSON.stringify(payload)}`)
+    if (payload.start === undefined || payload.end === undefined) {
       this.mainLogger.debug('Start and end for the `cyclechainhash` request were not both provided.')
       await respond({ cycleChainHash: null, error: 'start and end required' })
       return
     }
     const cycleChainHash = this.getCycleChainHash(payload.start, payload.end)
+    this.mainLogger.debug(`Cycle chain hash to be sent: ${JSON.stringify(cycleChainHash)}`)
     if (!cycleChainHash) {
       await respond({ cycleChainHash, error: 'invalid indexes for cycle chain hash' })
       return
@@ -70,7 +86,7 @@ function setupRoutes () {
       await respond({ cycleChain: null, error: 'no payload; start and end cycle required' })
       return
     }
-    if (!payload.start || !payload.end) {
+    if (payload.start === undefined || payload.end === undefined) {
       this.mainLogger.debug('Start and end for the `cyclechain` request were not both provided.')
       await respond({ cycleChain: null, error: 'start and end required' })
       return

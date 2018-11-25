@@ -315,14 +315,26 @@ class P2PState {
     this.addCertificate(certificate)
   }
 
+  async addCycle (cycle) {
+    this.cycles.push(cycle)
+    await this.storage.addCycles(cycle)
+  }
+
+  async addCycles (cycles) {
+    for (const cycle of cycles) {
+      this.cycles.push(cycle)
+    }
+    await this.storage.addCycles(cycles)
+    this.mainLogger.debug(`All cycles after adding given cycles: ${JSON.stringify(this.cycles)}`)
+  }
+
   async _createCycle () {
     this.mainLogger.info('Creating new cycle chain entry...')
     const cycleInfo = this.getCycleInfo()
     cycleInfo.marker = this.getCurrentCertificate().marker
 
-    this.cycles.push(cycleInfo)
     const accepted = this._acceptNodes(cycleInfo.joined, cycleInfo.marker)
-    const cycleAdded = this.storage.addCycles(cycleInfo)
+    const cycleAdded = this.addCycle(cycleInfo)
     const promises = [accepted, cycleAdded]
     try {
       await Promise.all(promises)
@@ -384,9 +396,9 @@ class P2PState {
     */
   }
 
-  getCycles (start = 0, end = (this.cycles.length - 1)) {
+  getCycles (start = 0, end = this.cycles.length) {
     if (start < 0) throw new Error('Invalid start cycle counter.')
-    if (end > this.cycles.length - 1) throw new Error('Invalid end cycle counter.')
+    if (end > this.cycles.length) throw new Error('Invalid end cycle counter.')
     return this.cycles.slice(start, end + 1)
   }
 
