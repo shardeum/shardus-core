@@ -648,7 +648,8 @@ class P2P {
 
     // If not first seed, we need to sync to network
     this.mainLogger.info('Syncing to network...')
-    // TODO: add resyncing
+
+    // Get full node info for seed nodes
     this.seedNodes = await this._fetchSeedNodesInfo(seedNodes)
 
     // Get hash of nodelist
