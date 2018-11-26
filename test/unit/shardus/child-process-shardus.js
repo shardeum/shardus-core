@@ -14,10 +14,15 @@ process.on('message', async (msg) => {
   switch (msg) {
     case ('getCycleMarkerInfo'):
       await shardus.setup(config)
-      await sleep(Math.ceil(config.cycleDuration * 1.2) * 1000) // wait until second cycle
-      let cycleMarkerInfo = shardus.p2p.getCycleMarkerInfo()
-      let nodeAddress = shardus.p2p._getThisNodeInfo().address
-      process.send({ cycleMarkerInfo, nodeAddress })
+      let cycleMarkerInfo
+      let checkInterval = setInterval(() => {
+        cycleMarkerInfo = shardus.p2p.getCycleMarkerInfo()
+        if (cycleMarkerInfo.cycleCounter === 1) { // wait until second cycle
+          let nodeAddress = shardus.p2p._getThisNodeInfo().address
+          clearInterval(checkInterval)
+          process.send({ cycleMarkerInfo, nodeAddress })
+        }
+      }, 1000)
       break
     case ('getLatestCycles'):
       await shardus.setup(config)

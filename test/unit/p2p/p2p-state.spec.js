@@ -97,8 +97,9 @@ test('Testing addJoinRequest, getCycleInfo and clear methods', { timeout: 100000
   t.end()
 })
 
-test('Testing addNodes', async t => {
-  let address = '50e686d4e7bf82abe86df4b5de8cc27cae0d28f2fa5a9afbddf0a700758b252b'
+test('Testing addNodes method', async t => {
+  let key = p2pState.crypto._generateKeypair()
+  let address = key.publicKey
   let validNode = {
     internalIp: '127.0.0.1',
     internalPort: 9001,
@@ -124,6 +125,34 @@ test('Testing addNodes', async t => {
   } catch (e) {
     t.pass('Should throw an error when invalid node is provided')
   }
+  t.end()
+})
+
+test('Testing _addPendingNode, _addJoiningNodes and _acceptNodes methods', async t => {
+  let key = p2pState.crypto._generateKeypair()
+  let node = {
+    publicKey: key.publicKey,
+    internalIp: '127.0.0.1',
+    internalPort: 10000,
+    externalIp: '127.0.0.1',
+    externalPort: 10000,
+    joinRequestTimestamp: Date.now(),
+    address: key.publicKey
+  }
+  // testing _addPendingNode
+  p2pState._addPendingNode(node)
+  t.deepEqual(p2pState.nodes.pending[key.publicKey], node, 'should add node to pending list')
+  // testing _addJoiningNodes
+  p2pState._addJoiningNodes([node])
+  t.notEqual(p2pState.currentCycle.joined.indexOf(key.publicKey), -1, 'should add node to currently joined list')
+  // testing _acceptNode
+  const cycleMarker = p2pState.getCurrentCycleMarker()
+  const cycleInfo = p2pState.getCycleInfo()
+  p2pState._acceptNodes(cycleInfo.joined, cycleMarker)
+  t.deepEqual(p2pState.nodes.current[key.publicKey], node, 'should accept node and add to current list')
+  t.deepEqual(p2pState.nodes.syncing[key.publicKey], node, 'should accept node and add to syncing list')
+  // clean up after tests
+  await p2pState.clear()
   if (confStorage) {
     confStorage.options.storage = 'db/db.sqlite'
     fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
