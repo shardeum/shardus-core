@@ -26,7 +26,9 @@ async function requestFromChild (msg) {
     forked.send(msg)
     forked.on('message', (data) => {
       forked.send('shutdown')
-      resolve(data)
+      setTimeout(() => { // wait until child_process is shutdowned
+        resolve(data)
+      }, 4000)
     })
   })
 }
