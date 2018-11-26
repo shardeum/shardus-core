@@ -93,7 +93,6 @@ test('Testing getCycleMarkerInfo', { skip: false, timeout: 50000 }, async t => {
 test('Testing getLatestCycles method', { skip: false, timeout: 50000 }, async t => {
   createTestDb(confStorage, '../../../db/db.test.sqlite')
   let { latestCycles } = await requestFromChild('getLatestCycles')
-  console.log(latestCycles)
   t.equal(Array.isArray(latestCycles), true, 'latestCycles should be an array')
   t.equal(latestCycles.length, 2, 'should have last 2 latest cycles')
   t.equal(isValidHex(latestCycles[0].previous), true, 'Cycle 1 cycleMarker should be a valid hex')
@@ -112,19 +111,6 @@ test('Testing _join method', { skip: false, timeout: 50000 }, async t => {
   createTestDb(confStorage, '../../../db/db.test.sqlite')
   let { joined } = await requestFromChild('_join')
   t.equal(joined, true, '_join method should return true if join is successful')
-  if (confStorage) {
-    confStorage.options.storage = 'db/db.sqlite'
-    fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
-    clearTestDb()
-  }
-  t.end()
-})
-
-test('Testing _waitUntilJoinPhase method', { skip: false, timeout: 50000 }, async t => {
-  createTestDb(confStorage, '../../../db/db.test.sqlite')
-  await requestFromChild('_waitUntilJoinPhase')
-  const log = readLogFile('main')
-  t.notEqual(log.indexOf('Waiting for 8000 ms before next join phase...'), -1, 'Should terminate the logger within shardus correctly and insert the log entry')
   if (confStorage) {
     confStorage.options.storage = 'db/db.sqlite'
     fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))

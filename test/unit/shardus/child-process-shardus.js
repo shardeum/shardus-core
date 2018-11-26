@@ -1,6 +1,6 @@
 const path = require('path')
 const Shardus = require('../../../src/shardus')
-const { sleep, getTime } = require('../../../src/utils')
+const { sleep } = require('../../../src/utils')
 
 let config = module.require(path.join(__dirname, '../../../config/server.json'))
 config.baseDir = '.'
@@ -30,14 +30,6 @@ process.on('message', async (msg) => {
       await sleep(Math.ceil(config.cycleDuration * 0.1) * 1000)
       let joined = await shardus.p2p._join()
       process.send({ joined })
-      break
-    case ('_waitUntilJoinPhase'):
-      await shardus.setup(config)
-      let currentTime = getTime('s')
-      let cycleStart = currentTime - 3
-      let duration = config.cycleDuration
-      await shardus.p2p._waitUntilJoinPhase(currentTime, cycleStart, duration)
-      process.send({ message: 'done' })
       break
     case ('shutdown'):
       await shardus.shutdown()

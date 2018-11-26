@@ -9,10 +9,11 @@ const Logger = require('../../../src/logger')
 const Storage = require('../../../src/storage')
 const Crypto = require('../../../src/crypto/index')
 
-// const { readLogFile, resetLogFile } = require('../../includes/utils-log')
+const { readLogFile } = require('../../includes/utils-log')
 const { clearTestDb, createTestDb } = require('../../includes/utils-storage')
 // const { sleep } = require('../../../src/utils')
 const { isValidHex } = require('../../includes/utils')
+const { getTime } = require('../../../src/utils')
 
 let p2p
 let confStorage = module.require(`../../../config/storage.json`)
@@ -134,6 +135,38 @@ test('Testing _getThisNodeInfo', t => {
   t.notEqual(isIP(res.internalIp), 0, 'internalIp should be a valid ip')
   t.equal(typeof res.internalPort, 'number', 'internalPort should be a number')
   t.equal(diff > 10000, false, 'the difference of times should not be greater than 10s')
+  if (confStorage) {
+    confStorage.options.storage = 'db/db.sqlite'
+    fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
+    clearTestDb()
+  }
+  t.end()
+})
+
+test('Testing _waitUntilJoinPhase', async t => {
+  createTestDb(confStorage, '../../../db/db.test.sqlite')
+  let currentTime = getTime('s')
+  let cycleStart = currentTime - 3
+  let duration = config.cycleDuration
+  await p2p._waitUntilJoinPhase(currentTime, cycleStart, duration)
+  const log = readLogFile('main')
+  t.notEqual(log.indexOf('Waiting for 8000 ms before next join phase...'), -1, 'Should have waiting message before joinphase in the log file')
+  if (confStorage) {
+    confStorage.options.storage = 'db/db.sqlite'
+    fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
+    clearTestDb()
+  }
+  t.end()
+})
+
+test('Testing _waitUntilCycleMarker', async t => {
+  createTestDb(confStorage, '../../../db/db.test.sqlite')
+  let currentTime = getTime('s')
+  let cycleStart = currentTime - 3
+  let duration = config.cycleDuration
+  await p2p._waitUntilCycleMarker(currentTime, cycleStart, duration)
+  const log = readLogFile('main')
+  t.notEqual(log.indexOf('Waiting for 14000 ms before next cycle marker creation...'), -1, 'Should terminate the logger within shardus correctly and insert the log entry')
   if (confStorage) {
     confStorage.options.storage = 'db/db.sqlite'
     fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
