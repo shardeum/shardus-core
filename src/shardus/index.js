@@ -8,6 +8,7 @@ const utils = require('../utils')
 
 class Shardus {
   constructor (config) {
+    this.config = config
     this.logger = new Logger(config.baseDir, config.log)
     this.mainLogger = this.logger.getLogger('main')
     this.fatalLogger = this.logger.getLogger('fatal')
@@ -74,13 +75,13 @@ class Shardus {
     clearInterval(this.heartbeatTimer)
   }
 
-  async setup (config) {
+  async setup (app = null) {
     await this.storage.init()
     this._setupHeartbeat()
     this.crypto = new Crypto(this.logger, this.storage)
     await this.crypto.init()
-    const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay } = config
-    const ipInfo = config.ip
+    const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay } = this.config
+    const ipInfo = this.config.ip
     const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay }
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network)
     await this.p2p.init()
