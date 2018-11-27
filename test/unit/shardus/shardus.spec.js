@@ -120,3 +120,17 @@ test('Testing _join method', { skip: false, timeout: 50000 }, async t => {
   }
   t.end()
 })
+
+test('Testing _submitJoin method', { skip: false, timeout: 50000 }, async t => {
+  createTestDb(confStorage, '../../../db/db.test.sqlite')
+  let { joinRequest } = await requestFromChild('_submitJoin')
+  const log = readLogFile('main')
+  const submitJoinMessage = `Join request received: ${JSON.stringify(joinRequest)}`
+  t.notEqual(log.indexOf(submitJoinMessage), -1, 'Should recieve submitted join request and insert the log entry')
+  if (confStorage) {
+    confStorage.options.storage = 'db/db.sqlite'
+    fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
+    clearTestDb()
+  }
+  t.end()
+})

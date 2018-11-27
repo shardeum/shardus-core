@@ -17,10 +17,12 @@ process.on('message', async (msg) => {
       let cycleMarkerInfo
       let checkInterval = setInterval(async () => {
         cycleMarkerInfo = shardus.p2p.getCycleMarkerInfo()
-        console.log(cycleMarkerInfo)
+        // console.log(cycleMarkerInfo)
         if (cycleMarkerInfo.cycleCounter === 1 || cycleMarkerInfo.cycleCounter > 1) { // wait until second cycle
           clearInterval(checkInterval)
           await sleep(5000)
+          console.log('last cycle is...')
+          console.log(shardus.p2p.state.getLastCycle())
           cycleMarkerInfo = shardus.p2p.getCycleMarkerInfo()
           let nodeAddress = shardus.p2p._getThisNodeInfo().address
           console.log(cycleMarkerInfo)
@@ -40,6 +42,14 @@ process.on('message', async (msg) => {
       await sleep(Math.ceil(config.cycleDuration * 0.1) * 1000)
       let joined = await shardus.p2p._join()
       process.send({ joined })
+      break
+    case ('_submitJoin'):
+      await shardus.setup(config)
+      const seedNodes = await shardus.p2p._getSeedNodes()
+      const { currentCycleMarker } = await shardus.p2p._getNetworkCycleMarker(seedNodes)
+      const joinRequest = await shardus.p2p._createJoinRequest(currentCycleMarker)
+      await shardus.p2p._submitJoin(seedNodes, joinRequest)
+      process.send({ joinRequest })
       break
     case ('shutdown'):
       await shardus.shutdown()
