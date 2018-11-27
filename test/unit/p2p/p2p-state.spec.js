@@ -151,6 +151,37 @@ test('Testing _addPendingNode, _addJoiningNodes and _acceptNodes methods', async
   p2pState._acceptNodes(cycleInfo.joined, cycleMarker)
   t.deepEqual(p2pState.nodes.current[key.publicKey], node, 'should accept node and add to current list')
   t.deepEqual(p2pState.nodes.syncing[key.publicKey], node, 'should accept node and add to syncing list')
+  t.end()
+})
+
+test('Testing _addNodesToNodelist and _addNodeToNodelist methods', async t => {
+  let nodes = []
+  let keys = []
+  for (let i = 0; i < 3; i++) {
+    keys.push(p2pState.crypto._generateKeypair())
+    nodes.push({
+      publicKey: keys[i].publicKey,
+      internalIp: '127.0.0.1',
+      internalPort: 10000 + i,
+      externalIp: '127.0.0.1',
+      externalPort: 10000 + i,
+      joinRequestTimestamp: Date.now(),
+      address: keys[i].publicKey,
+      id: keys[i].publicKey
+    })
+  }
+  try {
+    p2pState._addNodesToNodelist(nodes)
+    t.fail('Should throw an error when node status is not provided')
+  } catch (e) {
+    t.pass('Should throw an error when node status is not provided')
+  }
+  nodes.forEach(function (node) { node.status = 'syncing' })
+  p2pState._addNodesToNodelist(nodes)
+  for (let i = 0; i < 3; i++) {
+    t.deepEqual(p2pState.nodes.current[keys[i].publicKey], nodes[i], 'should add each nodes to current list')
+    t.deepEqual(p2pState.nodes.syncing[keys[i].publicKey], nodes[i], 'should add each nodes to syncing list')
+  }
   // clean up after tests
   await p2pState.clear()
   if (confStorage) {
