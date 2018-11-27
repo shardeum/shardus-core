@@ -29,6 +29,9 @@ test('Testing constructor P2PState', async t => {
   p2pState = new P2PState(config, logger, storage, crypto)
   await storage.init()
   await p2pState.init()
+
+  await p2pState.storage.init()
+  await p2pState.crypto.init()
   t.equal(p2pState instanceof P2PState, true, 'should instanciate the object correctly')
 })
 
@@ -36,8 +39,6 @@ test('Testing addJoinRequest, getCycleInfo and clear methods', { timeout: 100000
   let keys = []
   let joinArray = []
   let numberOfJoinRequest = 10
-  await p2pState.storage.init()
-  await p2pState.crypto.init()
   // Testing addJoinRequest and getLastJoined
   // {
   p2pState.startCycles()
@@ -182,8 +183,24 @@ test('Testing _addNodesToNodelist and _addNodeToNodelist methods', async t => {
     t.deepEqual(p2pState.nodes.current[keys[i].publicKey], nodes[i], 'should add each nodes to current list')
     t.deepEqual(p2pState.nodes.syncing[keys[i].publicKey], nodes[i], 'should add each nodes to syncing list')
   }
-  // clean up after tests
   await p2pState.clear()
+  if (confStorage) {
+    confStorage.options.storage = 'db/db.sqlite'
+    fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
+    clearTestDb()
+  }
+  t.end()
+})
+
+test('Testing getLastCycleStart, currentCycleStart methods', { timeout: 100000 }, async t => {
+  p2pState.startCycles()
+  await sleep((Math.ceil(config.cycleDuration * 1.1) * 1000)) // wait at least one cycle
+  const lastCycleStart = p2pState.getLastCycleStart()
+  const currentCycleStart = p2pState.getCurrentCycleStart()
+  t.equal(isNaN(Number(lastCycleStart * 1000)), false, 'the last cycle start should be a valid time value')
+  t.equal(isNaN(Number(currentCycleStart * 1000)), false, 'the current cycle start should be a valid time value')
+  p2pState.stopCycles()
+  await sleep((Math.ceil(config.cycleDuration) * 1000))
   if (confStorage) {
     confStorage.options.storage = 'db/db.sqlite'
     fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
