@@ -18,34 +18,10 @@ function _checkHttps (url) {
   return true
 }
 
-function _getHttp (url) {
+function _get(url, isHttps) {
+  const module = isHttps ? https : http
   return new Promise((resolve, reject) => {
-    let req = http.get(url, (res) => {
-      let data = ''
-      res.setEncoding('utf8')
-      res.on('data', (chunk) => {
-        data += chunk
-      })
-      res.on('end', () => {
-        let parsed
-        try {
-          // console.log(data)
-          parsed = JSON.parse(data)
-        } catch (e) {
-          reject(e)
-        }
-        resolve(parsed)
-      })
-    })
-    req.on('error', (e) => {
-      reject(e)
-    })
-  })
-}
-
-function _getHttps (url) {
-  return new Promise((resolve, reject) => {
-    let req = https.get(url, (res) => {
+    let req = module.get(url, (res) => {
       let data = ''
       res.setEncoding('utf8')
       res.on('data', (chunk) => {
@@ -72,54 +48,18 @@ function _getHttps (url) {
   Queries the given host for a JSON payload
   Returns a promise, resolves parsed JSON response
 */
-async function get (url) {
+async function get(url) {
   let normalized = _normalizeUrl(url)
   let host = parseUrl(normalized, true)
-  let res
-  if (!_checkHttps(normalized)) {
-    res = await _getHttp(host)
-    return res
-  }
-  res = await _getHttps(host)
+  let isHttps = _checkHttps(normalized)
+  let res = await _get(host, isHttps)
   return res
 }
 
-function _postHttp (options, payload) {
+function _post(options, payload) {
+  const module = isHttps ? https : http
   return new Promise((resolve, reject) => {
-    let req = http.request(options, (res) => {
-      let data = ''
-      res.setEncoding('utf8')
-      res.on('data', (chunk) => {
-        data += chunk
-      })
-      res.on('end', () => {
-        let parsed
-        try {
-          // console.log(data)
-          parsed = JSON.parse(data)
-        } catch (e) {
-          reject(e)
-        }
-        resolve(parsed)
-      })
-    })
-    req.on('error', (e) => {
-      reject(e)
-    })
-    if (payload) {
-      try {
-        req.write(payload)
-      } catch (e) {
-        console.error(e.message)
-      }
-    }
-    req.end()
-  })
-}
-
-function _postHttps (options, payload) {
-  return new Promise((resolve, reject) => {
-    let req = https.request(options, (res) => {
+    let req = module.request(options, (res) => {
       let data = ''
       res.setEncoding('utf8')
       res.on('data', (chunk) => {
@@ -154,7 +94,7 @@ function _postHttps (options, payload) {
   Posts a JSON payload to a given host
   Returns a promise, resolves parsed JSON response if successful, rejects on error
 */
-async function post (givenHost, body) {
+async function post(givenHost, body) {
   let normalized = _normalizeUrl(givenHost)
   let host = parseUrl(normalized, true)
   let payload = body ? JSON.stringify(body) : null
@@ -168,13 +108,8 @@ async function post (givenHost, body) {
       'Content-Length': payload ? Buffer.byteLength(payload) : '0'
     }
   }
-
-  let res
-  if (!_checkHttps(normalized)) {
-    res = await _postHttp(options, payload)
-    return res
-  }
-  res = await _postHttps(options, payload)
+  let isHttps = _checkHttps(normalized)
+  let res = await _post(options, payload, isHttps)
   return res
 }
 
