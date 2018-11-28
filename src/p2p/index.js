@@ -688,6 +688,7 @@ class P2P {
     await this.network.tell(allNodes, 'active', { nodeId: this.id })
     // Wait until end of cycle
     // Check if we are set to active
+    // Update our own status in database
     // END LOOP
   }
 
