@@ -36,6 +36,12 @@ class Shardus {
     this.exitHandler.registerAsync('storage', () => {
       return this.storage.close()
     })
+    this.exitHandler.registerAsync('application', () => {
+      this.mainLogger.log('Closing the application')
+      if (this.app.close) {
+        return this.app.close()
+      }
+    })
     this.exitHandler.registerAsync('logger', () => {
       return this.logger.shutdown()
     })
@@ -77,7 +83,7 @@ class Shardus {
   }
 
   setup (app = null) {
-    this.app = app
+    this.app = this.getApplicationInterface(app)
     return this
   }
 
@@ -187,6 +193,66 @@ class Shardus {
     }
     this.mainLogger.debug(`End of onReceipt`)
     return true
+  }
+
+  /**
+ * getApplicaitonInterface() method acts as an interface between Shardus core and Application
+ * It validates the implementation of Shardus Application Interface
+ * @param {Application} Application running on Shardus network
+ * @returns {applicationInterfaceImpl} Shardus application interface implementation
+ * @throws {Exception} If the interface is not appropriately implemented
+ */
+  getApplicationInterface (application) {
+    this.mainLogger.debug('Start of getApplicationInterfaces()')
+    let applicationInterfaceImpl = {}
+    try {
+      if (application == null) {
+        // throw new Error('Invalid Application Instance')
+        return null
+      }
+
+      // Required Methods:
+      if (typeof (application.validateTransaction) === 'function') {
+        applicationInterfaceImpl.validateTransaction = async (inTx) => application.validateTransaction(inTx)
+      } else {
+        throw new Error('Missing requried interface function. validateTransaction()')
+      }
+
+      if (typeof (application.apply) === 'function') {
+        applicationInterfaceImpl.apply = async (inTx, receipt) => application.apply(inTx, receipt)
+      } else {
+        throw new Error('Missing requried interface function. apply()')
+      }
+
+      if (typeof (application.getKeyFromTransaction) === 'function') {
+        applicationInterfaceImpl.getKeyFromTransaction = application.getKeyFromTransaction
+      } else {
+        throw new Error('Missing requried interface function. getKeysFromTransaction()')
+      }
+
+      if (typeof (application.getStateId) === 'function') {
+        applicationInterfaceImpl.getStateId = async (accountAddress) => application.getStateId(accountAddress)
+      } else {
+        throw new Error('Missing requried interface function. getStateId()')
+      }
+
+      // opitonal methods
+      if (typeof (application.close) === 'function') {
+        applicationInterfaceImpl.close = async () => application.close()
+      } else {
+        // throw new Error('Missing requried interface function. apply()')
+      }
+      if (typeof (application.handleHttpRequest) === 'function') {
+        applicationInterfaceImpl.handleHttpRequest = async (httpMethod, uri, req, res) => application.handleHttpRequest(httpMethod, uri, req, res)
+      } else {
+        // throw new Error('Missing requried interface function. apply()')
+      }
+    } catch (ex) {
+      this.fatalLogger.log(`Required application interface not implemented. Exception: ${ex}`)
+      throw new Error(ex)
+    }
+    this.mainLogger.debug('End of getApplicationInterfaces()')
+    return applicationInterfaceImpl
   }
 
   async start () {
