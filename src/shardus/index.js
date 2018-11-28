@@ -5,6 +5,7 @@ const Crypto = require('../crypto')
 const Storage = require('../storage')
 const Network = require('../network')
 const utils = require('../utils')
+const Consensus = require('../consensus')
 
 class Shardus {
   constructor (config) {
@@ -80,6 +81,114 @@ class Shardus {
     return this
   }
 
+  /**
+   * Temp external API
+   * ToDo:- Will need to be moved accordingly after the network refactor
+   */
+
+  _tempRegisterAPI () {
+    this.mainLogger.debug('Registring External API. Temporary...')
+
+    this.network.registerExternalPost('/inject', async (req, res) => {
+      console.log(`Request=${JSON.stringify(req.body)}`)
+      // await this.injectTransaction(req, res)
+      await this.app.handleHttpRequest('post', '/inject', req, res) // method?
+    })
+
+    // super hack!
+    this.network.registerExternalGet('/nodes', async (req, res) => {
+      res.json({ nodes: [{ id: 1, ip: '127.0.0.1', port: '9001' }], success: true })
+    })
+
+    this.network.registerExternalGet('/accounts', async (req, res) => {
+      await this.app.onAccounts(req, res)
+    })
+    this.network.registerExternalGet('/account/:id', async (req, res) => {
+      await this.app.onGetAccount(req, res)
+    })
+    this.mainLogger.debug('Done Registring External API. Temporary...')
+  }
+
+  /**
+   * Handle incoming tranaction requests
+   */
+
+  async put (req, res) {
+    this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(req.body)}`)
+    // retrieve incoming transaction from HTTP request
+    let inTransaction = req.body
+    let shardusTransaction = {}
+    try {
+      if (typeof inTransaction !== 'object') {
+        return res.status(500).send({ success: false, reason: `Invalid Transaction! ${inTransaction}` })
+      }
+
+      /**
+       * {txnReceivedTimestamp, sign, inTxn:{srcAct, tgtAct, tnxAmt, txnType, seqNum, txnTimestamp, signs}}
+       * Timestamping the transaction of when the transaction was received. Sign the complete transaction
+       * with the node SK
+       * ToDo: Check with Omar if validateTransaction () methods needs receivedTimestamp and Node Signature
+       */
+      shardusTransaction.receivedTimestamp = Date.now()
+      shardusTransaction.inTransaction = inTransaction
+      this.crypto.sign(shardusTransaction)
+      this.mainLogger.debug(`ShardusTransaction: ${shardusTransaction}`)
+
+      // Validate transaction through the application. Shardus can see inside the transaction
+      let transactionValidateResult = await this.application.validateTransaction(inTransaction)
+      if (transactionValidateResult.result !== 'pass') {
+        this.mainLogger.error(`Failed to validate transaction. Reason: ${transactionValidateResult.reason}`)
+        return res.status(500).send({ success: false, reason: transactionValidateResult.reason })
+      }
+      this.mainLogger.debug('Transaction Valided')
+      // Perform Consensus -- Currently no algorithm is being used
+      // let nodeList = await this.storage.getNodes()
+      let consensus = new Consensus(this.config, this.logger, this.crypto, this.p2p, this.storage, null, this.applicationInterfaceImpl)
+      // let transactionReceipt = await consensus.inject(inTransaction)
+      let transactionReceipt = await consensus.inject(shardusTransaction)
+      this.mainLogger.debug(`Received Consensus. Receipt: ${JSON.stringify(transactionReceipt)}`)
+      // Apply the transaction
+      await this.application.apply(inTransaction, transactionReceipt)
+
+      // TODO///////////////////////
+      // //////Broadcast reciept to other nodes in the list?  (possibly do that in consensus.inject() instead )
+      // //////////////////////////
+    } catch (ex) {
+      this.fatalLogger.fatal(`Failed to process transaction. Exception: ${ex}`)
+      res.status(500).send({ success: false, reason: `Failed to process trasnaction: ${JSON.parse(inTransaction)} ${ex}` })
+    }
+    this.mainLogger.debug(`End of injectTransaction ${inTransaction}`)
+    return res.status(200).send({ success: true, reason: 'Transaction successfully processed' })
+  }
+
+  // TODO , register and an internal endpoint so that something can call this
+  async onReceipt (receipt, shardusTransaction) {
+    this.mainLogger.debug(`Start of onReciept`)
+    let transaction = shardusTransaction.inTransaction
+    // retrieve incoming transaction from HTTP request
+    try {
+      if (typeof transaction !== 'object') {
+        return false
+      }
+      // TODO! validate that reciept is sign by a valid node in the network
+      if (this.crypto.verify(receipt.sign.owner) === false) {
+        return false
+      }
+
+      // check that the tx hash matches the receipt
+      let txhash = this.crypto.hash(transaction) // todo use this instead: cryptoRaw.hashObj(transaction)
+      if (txhash !== receipt.txHash) {
+        return false
+      }
+
+      await this.application.apply(transaction, receipt)
+    } catch (ex) {
+      this.fatalLogger.fatal(`Failed to process receipt. Exception: ${ex}`)
+    }
+    this.mainLogger.debug(`End of onReceipt`)
+    return true
+  }
+
   async start () {
     await this.storage.init()
     this._setupHeartbeat()
@@ -91,6 +200,7 @@ class Shardus {
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network)
     await this.p2p.init()
     this._registerRoutes()
+    this._tempRegisterAPI()
     let started
     try {
       started = await this.p2p.startup()
