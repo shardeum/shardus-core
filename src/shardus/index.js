@@ -75,7 +75,12 @@ class Shardus {
     clearInterval(this.heartbeatTimer)
   }
 
-  async setup (app = null) {
+  setup (app = null) {
+    this.app = app
+    return this
+  }
+
+  async start () {
     await this.storage.init()
     this._setupHeartbeat()
     this.crypto = new Crypto(this.logger, this.storage)
