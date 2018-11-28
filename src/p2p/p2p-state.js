@@ -12,9 +12,13 @@ class P2PState {
     // Variables for regulating different phases cycles
     this.acceptJoinReq = false
     this.shouldStop = false
+    this.canUpdateStatus = 'none'
 
     // Specifies valid statuses
     this.validStatuses = ['active', 'syncing', 'pending']
+    this.statusUpdateType = {
+      'active': 'activated'
+    }
 
     // Defines a clean nodelist that we will use for restoring the nodeslist to a clean state
     this.cleanNodelist = {
@@ -22,6 +26,7 @@ class P2PState {
       current: {},
       byIp: {}
     }
+
     // Populates the clean nodelist with our valid statuses
     for (const status of this.validStatuses) {
       this.cleanNodelist[status] = {}
@@ -43,6 +48,7 @@ class P2PState {
     // Sets nodelist and current cycle to a copy of the clean nodelist and cycle objects
     this.nodes = utils.deepCopy(this.cleanNodelist)
     this.currentCycle = utils.deepCopy(this.cleanCycle)
+    this.nextCycle = utils.deepCopy(this.cleanCycle)
   }
 
   async init () {
@@ -64,6 +70,7 @@ class P2PState {
 
   _resetState () {
     this._resetCurrentCycle()
+    this._resetNextCycle()
     this._resetNodelist()
     this._resetCycles()
   }
@@ -115,7 +122,43 @@ class P2PState {
     return current[nodeId].status
   }
 
-  async setNodeStatus (nodeId, status) {
+  addStatusUpdate (nodeId, status) {
+    const whichCycle = this.canUpdateStatus
+    if (whichCycle === 'none') {
+      this.mainLogger.debug('Cannot add status update to queue, request made during non-accepting phase.')
+      return false
+    }
+    // Check if we actually know about this node
+    if (!this.getNode(nodeId)) {
+      this.mainLogger.debug('Cannot update status of unknown node.')
+      return false
+    }
+    const invalidStatusMsg = `Invalid status: ${status}. Unable to add status update to queue.`
+    if (!this.validStatuses.includes(status)) {
+      this.mainLogger.debug(invalidStatusMsg)
+      return false
+    }
+    let type
+    try {
+      type = this.statusUpdateType[status]
+    } catch (e) {
+      this.mainLogger.debug(invalidStatusMsg)
+      return false
+    }
+    this.mainLogger.debug(`Type of status update: ${type}`)
+    if (whichCycle === 'current') {
+      this.currentCycle[type].push(nodeId)
+      return true
+    }
+    if (whichCycle === 'next') {
+      this.nextCycle[type].push(nodeId)
+      return true
+    }
+    this.mainLogger.debug(`this.canUpdateStatus/ whichCycle is an invalid value... ${whichCycle}`)
+  }
+
+  async _setNodeStatus (nodeId, status) {
+    // Get node by ID
     let node
     try {
       node = this.getNode(nodeId)
@@ -123,6 +166,7 @@ class P2PState {
       this.mainLogger.debug(`${nodeId} is not a valid or known node ID.`)
       return false
     }
+    // Try to update status for given node
     let updated
     try {
       updated = await this._updateNodeStatus(node, status)
@@ -131,6 +175,16 @@ class P2PState {
       return false
     }
     return updated
+  }
+
+  // Sets a group of nodes to a particular status
+  async _setNodesToStatus (nodeIds, status) {
+    this.mainLogger.debug(`Node IDs to be updated to ${status} status: ${JSON.stringify(nodeIds)}`)
+    const promises = []
+    for (const nodeId of nodeIds) {
+      promises.push(this._setNodeStatus(nodeId, status))
+    }
+    await Promise.all(promises)
   }
 
   async _updateNodeStatus (node, status, updateDb = true) {
@@ -214,6 +268,10 @@ class P2PState {
     this.currentCycle = utils.deepCopy(this.cleanCycle)
   }
 
+  _resetNextCycle () {
+    this.nextCycle = utils.deepCopy(this.cleanCycle)
+  }
+
   // Kicks off the whole cycle and cycle marker creation system
   startCycles () {
     this.shouldStop = false
@@ -225,8 +283,14 @@ class P2PState {
     this.shouldStop = true
   }
 
+  _makeNextCycleCurrent () {
+    this.currentCycle = this.nextCycle
+  }
+
   _startNewCycle () {
-    this._resetCurrentCycle()
+    // this._resetCurrentCycle()
+    this._makeNextCycleCurrent()
+    this._resetNextCycle()
     const lastCycleDuration = this.getLastCycleDuration()
     const lastCycleStart = this.getLastCycleStart()
     const currentTime = utils.getTime('s')
@@ -243,6 +307,7 @@ class P2PState {
   _startJoinPhase (phaseLen) {
     this.mainLogger.debug('Starting join phase...')
     this.acceptJoinReq = true
+    this.canUpdateStatus = 'current'
     setTimeout(() => {
       this._endJoinPhase(phaseLen)
     }, phaseLen)
@@ -282,6 +347,7 @@ class P2PState {
   _endJoinPhase (phaseLen) {
     this.mainLogger.debug('Ending join phase...')
     this.acceptJoinReq = false
+    this.canUpdateStatus = 'none'
     const bestNodes = this._getBestNodes()
     this._addJoiningNodes(bestNodes)
     // TODO: implement clearing out the unaccepted nodes from byIp when clearing pending requests
@@ -292,6 +358,7 @@ class P2PState {
 
   _startCycleSync (phaseLen) {
     this.mainLogger.debug('Starting cycle sync phase...')
+    this.canUpdateStatus = 'next'
     this._createCycleMarker()
     setTimeout(() => {
       this._finalizeCycle(phaseLen)
@@ -331,11 +398,14 @@ class P2PState {
   async _createCycle () {
     this.mainLogger.info('Creating new cycle chain entry...')
     const cycleInfo = this.getCycleInfo()
+    this.mainLogger.debug(`Cycle info for new cycle: ${JSON.stringify(cycleInfo)}`)
     cycleInfo.marker = this.getCurrentCertificate().marker
 
     const accepted = this._acceptNodes(cycleInfo.joined, cycleInfo.marker)
+    this.mainLogger.debug(`Nodes to be activated this cycle: ${JSON.stringify(cycleInfo.activated)}`)
+    const activated = this._setNodesToStatus(cycleInfo.activated, 'active')
     const cycleAdded = this.addCycle(cycleInfo)
-    const promises = [accepted, cycleAdded]
+    const promises = [accepted, activated, cycleAdded]
     try {
       await Promise.all(promises)
       this.mainLogger.info('Added cycle chain entry to database successfully!')
@@ -444,7 +514,9 @@ class P2PState {
   }
 
   getActivated () {
-    return this.currentCycle.activated
+    const activated = this.currentCycle.activated
+    this.mainLogger.debug(`Result of getActivated: ${JSON.stringify(activated)}`)
+    return activated
   }
 
   getLastCycle () {

@@ -609,16 +609,13 @@ class P2P {
       const joinRequest = await this._createJoinRequest()
       this.state.startCycles()
       this.state.addNewJoinRequest(joinRequest)
+
       // Sleep for cycle duration before updating status
       // TODO: Make this more deterministic
       await utils.sleep(this.state.getCurrentCycleDuration() * 1000)
       const { currentCycleMarker } = this.getCycleMarkerInfo()
       const nodeId = this.state.computeNodeId(joinRequest.nodeInfo.publicKey, currentCycleMarker)
       this._setNodeId(nodeId)
-      await this.state.setNodeStatus(this.id, 'active')
-
-      // This is also for testing purposes
-      console.log('Server ready!')
 
       return true
     }
@@ -643,6 +640,14 @@ class P2P {
     // If you are first node, there is nothing to sync to
     if (isFirstSeed) {
       this.mainLogger.info('No syncing required...')
+
+      // Set node to activated status
+      const active = this.state.addStatusUpdate(this.id, 'active')
+      console.log(active)
+
+      // This is also for testing purposes
+      console.log('Server ready!')
+
       return true
     }
 
@@ -654,7 +659,7 @@ class P2P {
 
     // Get hash of nodelist
     const nodelistHash = await this._fetchNodelistHash(this.seedNodes)
-    this.mainLogger.debug(`Node list hash is: ${nodelistHash}.`)
+    this.mainLogger.debug(`Nodelist hash is: ${nodelistHash}.`)
 
     // Get and verify nodelist aganist hash
     const nodelist = await this._fetchVerifiedNodelist(this.seedNodes, nodelistHash)

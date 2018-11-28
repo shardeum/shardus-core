@@ -98,4 +98,21 @@ function setupRoutes () {
     }
     await respond({ cycleChain })
   })
+
+  this.network.registerInternal('active', async (payload) => {
+    // TODO: Add required signature to this route
+    if (!payload) {
+      this.mainLogger.debug('No payload provided with `active` request.')
+      return
+    }
+    this.mainLogger.debug(`Payload for 'active' request: ${payload}`)
+    const { nodeId } = payload
+    if (!payload.nodeId) {
+      this.mainLogger.debug('Node ID of node was not provided with `active` request.')
+      return
+    }
+
+    // Add status update of given node to queue
+    await this.state.addStatusUpdate(nodeId, 'active')
+  })
 }
