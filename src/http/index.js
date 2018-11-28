@@ -18,7 +18,7 @@ function _checkHttps (url) {
   return true
 }
 
-function _get(url, isHttps) {
+function _get (url, isHttps) {
   const module = isHttps ? https : http
   return new Promise((resolve, reject) => {
     let req = module.get(url, (res) => {
@@ -48,7 +48,7 @@ function _get(url, isHttps) {
   Queries the given host for a JSON payload
   Returns a promise, resolves parsed JSON response
 */
-async function get(url) {
+async function get (url) {
   let normalized = _normalizeUrl(url)
   let host = parseUrl(normalized, true)
   let isHttps = _checkHttps(normalized)
@@ -56,7 +56,7 @@ async function get(url) {
   return res
 }
 
-function _post(options, payload) {
+function _post (options, payload, isHttps) {
   const module = isHttps ? https : http
   return new Promise((resolve, reject) => {
     let req = module.request(options, (res) => {
@@ -94,7 +94,7 @@ function _post(options, payload) {
   Posts a JSON payload to a given host
   Returns a promise, resolves parsed JSON response if successful, rejects on error
 */
-async function post(givenHost, body) {
+async function post (givenHost, body) {
   let normalized = _normalizeUrl(givenHost)
   let host = parseUrl(normalized, true)
   let payload = body ? JSON.stringify(body) : null
