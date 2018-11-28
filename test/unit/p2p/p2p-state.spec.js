@@ -9,6 +9,8 @@ const P2PState = require('../../../src/p2p/p2p-state')
 
 const { clearTestDb, createTestDb } = require('../../includes/utils-storage')
 const { sleep } = require('../../../src/utils')
+const { isValidHex } = require('../../includes/utils')
+const { readLogFile } = require('../../includes/utils-log')
 
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../config/server.json')))
 config.cycleDuration = 10
@@ -184,11 +186,6 @@ test('Testing _addNodesToNodelist and _addNodeToNodelist methods', async t => {
     t.deepEqual(p2pState.nodes.syncing[keys[i].publicKey], nodes[i], 'should add each nodes to syncing list')
   }
   await p2pState.clear()
-  if (confStorage) {
-    confStorage.options.storage = 'db/db.sqlite'
-    fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
-    clearTestDb()
-  }
   t.end()
 })
 
@@ -201,6 +198,36 @@ test('Testing getLastCycleStart, currentCycleStart methods', { timeout: 100000 }
   t.equal(isNaN(Number(currentCycleStart * 1000)), false, 'the current cycle start should be a valid time value')
   p2pState.stopCycles()
   await sleep((Math.ceil(config.cycleDuration) * 1000))
+  t.end()
+})
+
+test('Testing _computeCycleMarker, _createCertificate methods', { timeout: 100000 }, async t => {
+  p2pState.startCycles()
+  await sleep((Math.ceil(config.cycleDuration * 0.4) * 1000)) // wait at least one cycle
+  const cycleInfo = p2pState.getCycleInfo(false)
+  const cycleMarker = p2pState._computeCycleMarker(cycleInfo)
+  const cycleCertificate = p2pState._createCertificate(cycleMarker)
+  p2pState.stopCycles()
+  await sleep((Math.ceil(config.cycleDuration) * 1000))
+  const log = readLogFile('main')
+
+  t.equal(isValidHex(cycleMarker), true, 'Cycle Marker should be a valid hex value')
+  t.notEqual(log.indexOf(`Created cycle marker: ${cycleMarker}`), -1, 'Should enter created cycle marker into logs')
+  t.equal(cycleCertificate.marker, cycleMarker, 'Should have correct marker field in certificate')
+  t.equal(p2pState.crypto.verify(cycleCertificate), true, 'Should have valid signature in certificate')
+  t.end()
+})
+
+test('Testing _createCycleMarker method', { timeout: 100000 }, async t => {
+  p2pState.startCycles()
+  p2pState._createCycleMarker()
+  let certificate = p2pState.currentCycle.certificate
+  p2pState.stopCycles()
+  await sleep((Math.ceil(config.cycleDuration) * 1000))
+
+  t.equal(isValidHex(certificate.marker), true, 'Cycle Marker in certificate should be a valid hex value')
+  t.equal(p2pState.crypto.verify(certificate), true, 'Should have valid signature in certificate')
+
   if (confStorage) {
     confStorage.options.storage = 'db/db.sqlite'
     fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
