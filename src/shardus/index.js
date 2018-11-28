@@ -120,7 +120,7 @@ class Shardus {
     let shardusTransaction = {}
     try {
       if (typeof inTransaction !== 'object') {
-        return res.status(500).send({ success: false, reason: `Invalid Transaction! ${inTransaction}` })
+        return { success: false, reason: `Invalid Transaction! ${inTransaction}` }
       }
 
       /**
@@ -138,7 +138,7 @@ class Shardus {
       let transactionValidateResult = await this.application.validateTransaction(inTransaction)
       if (transactionValidateResult.result !== 'pass') {
         this.mainLogger.error(`Failed to validate transaction. Reason: ${transactionValidateResult.reason}`)
-        return res.status(500).send({ success: false, reason: transactionValidateResult.reason })
+        return { success: false, reason: transactionValidateResult.reason }
       }
       this.mainLogger.debug('Transaction Valided')
       // Perform Consensus -- Currently no algorithm is being used
@@ -155,10 +155,10 @@ class Shardus {
       // //////////////////////////
     } catch (ex) {
       this.fatalLogger.fatal(`Failed to process transaction. Exception: ${ex}`)
-      res.status(500).send({ success: false, reason: `Failed to process trasnaction: ${JSON.parse(inTransaction)} ${ex}` })
+      return { success: false, reason: `Failed to process trasnaction: ${JSON.parse(inTransaction)} ${ex}` }
     }
     this.mainLogger.debug(`End of injectTransaction ${inTransaction}`)
-    return res.status(200).send({ success: true, reason: 'Transaction successfully processed' })
+    return { success: true, reason: 'Transaction successfully processed' }
   }
 
   // TODO , register and an internal endpoint so that something can call this
