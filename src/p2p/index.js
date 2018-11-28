@@ -640,14 +640,6 @@ class P2P {
     // If you are first node, there is nothing to sync to
     if (isFirstSeed) {
       this.mainLogger.info('No syncing required...')
-
-      // Set node to activated status
-      const active = this.state.addStatusUpdate(this.id, 'active')
-      console.log(active)
-
-      // This is also for testing purposes
-      console.log('Server ready!')
-
       return true
     }
 
@@ -684,6 +676,21 @@ class P2P {
     return true
   }
 
+  async _goActive (isFirstSeed) {
+    if (isFirstSeed) {
+      this.state.addStatusUpdate(this.id, 'active')
+      return true
+    }
+    // TO-DO: Implement robust system for getting set to active
+    // LOOP
+    // Wait until good time to send active request
+    const allNodes = this.state.getAllNodes(this.id)
+    await this.network.tell(allNodes, 'active', { nodeId: this.id })
+    // Wait until end of cycle
+    // Check if we are set to active
+    // END LOOP
+  }
+
   async startup () {
     const seedNodes = await this._getSeedNodes()
     const isFirstSeed = await this._discoverNetwork(seedNodes)
@@ -691,8 +698,16 @@ class P2P {
     let joined = true
     if (needJoin) joined = await this._joinNetwork(seedNodes, isFirstSeed)
     if (!joined) return false
-    const synced = await this._syncToNetwork(seedNodes, isFirstSeed)
-    return synced
+    await this._syncToNetwork(seedNodes, isFirstSeed)
+
+    await this._goActive(isFirstSeed)
+    this.mainLogger.info('Node is now active!')
+
+    // if (!isFirstSeed) this.state.startCycles()
+
+    // This is also for testing purposes
+    console.log('Server ready!')
+    return true
   }
 }
 
