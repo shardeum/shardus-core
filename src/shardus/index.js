@@ -247,6 +247,19 @@ class Shardus {
       } else {
         // throw new Error('Missing requried interface function. apply()')
       }
+
+      // TEMP endpoints for workaround. delete this later.
+      if (typeof (application.onAccounts) === 'function') {
+        applicationInterfaceImpl.onAccounts = async (req, res) => application.onAccounts(req, res)
+      } else {
+        // throw new Error('Missing requried interface function. apply()')
+      }
+
+      if (typeof (application.onGetAccount) === 'function') {
+        applicationInterfaceImpl.onGetAccount = async (req, res) => application.onGetAccount(req, res)
+      } else {
+        // throw new Error('Missing requried interface function. apply()')
+      }
     } catch (ex) {
       this.fatalLogger.log(`Required application interface not implemented. Exception: ${ex}`)
       throw new Error(ex)
