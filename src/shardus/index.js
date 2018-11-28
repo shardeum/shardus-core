@@ -95,21 +95,21 @@ class Shardus {
   _tempRegisterAPI () {
     this.mainLogger.debug('Registring External API. Temporary...')
 
-    this.network.registerExternalPost('/inject', async (req, res) => {
+    this.network.registerExternalPost('inject', async (req, res) => {
       console.log(`Request=${JSON.stringify(req.body)}`)
       // await this.injectTransaction(req, res)
       await this.app.handleHttpRequest('post', '/inject', req, res) // method?
     })
 
     // super hack!
-    this.network.registerExternalGet('/nodes', async (req, res) => {
+    this.network.registerExternalGet('nodes', async (req, res) => {
       res.json({ nodes: [{ id: 1, ip: '127.0.0.1', port: '9001' }], success: true })
     })
 
-    this.network.registerExternalGet('/accounts', async (req, res) => {
+    this.network.registerExternalGet('accounts', async (req, res) => {
       await this.app.onAccounts(req, res)
     })
-    this.network.registerExternalGet('/account/:id', async (req, res) => {
+    this.network.registerExternalGet('account/:id', async (req, res) => {
       await this.app.onGetAccount(req, res)
     })
     this.mainLogger.debug('Done Registring External API. Temporary...')
