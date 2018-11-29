@@ -18,6 +18,8 @@ class Shardus {
     this.crypto = {}
     this.network = new Network(config.network, this.logger)
     this.p2p = {}
+    this.app = {}
+    this.consensus = {}
 
     this.heartbeatInterval = config.heartbeatInterval
     this.heartbeatTimer = null
@@ -25,6 +27,9 @@ class Shardus {
     // alias the network register calls so that an app can get to them
     this.registerExternalGet = (route, handler) => this.network.registerExternalGet(route, handler)
     this.registerExternalPost = (route, handler) => this.network.registerExternalPost(route, handler)
+    this.registerExternalPut = (route, handler) => this.network.registerExternalPut(route, handler)
+    this.registerExternalDelete = (route, handler) => this.network.registerExternalDelete(route, handler)
+    this.registerExternalPatch = (route, handler) => this.network.registerExternalPatch(route, handler)
 
     this.exitHandler.addSigListeners()
     this.exitHandler.registerSync('shardus', () => {
@@ -42,7 +47,7 @@ class Shardus {
     })
     this.exitHandler.registerAsync('application', () => {
       this.mainLogger.log('Closing the application')
-      if (this.app.close) {
+      if (this.app && this.app.close) {
         return this.app.close()
       }
     })
@@ -88,6 +93,8 @@ class Shardus {
 
   setup (app = null) {
     this.app = this.getApplicationInterface(app)
+
+    this.consensus = new Consensus(this.config, this.logger, this.crypto, this.p2p, this.storage, null, this.app)
     return this
   }
 
@@ -141,7 +148,7 @@ class Shardus {
        */
       shardusTransaction.receivedTimestamp = Date.now()
       shardusTransaction.inTransaction = inTransaction
-      this.crypto.sign(shardusTransaction)
+
       this.mainLogger.debug(`ShardusTransaction: ${shardusTransaction}`)
 
       // Validate transaction through the application. Shardus can see inside the transaction
@@ -150,53 +157,25 @@ class Shardus {
         this.mainLogger.error(`Failed to validate transaction. Reason: ${transactionValidateResult.reason}`)
         return { success: false, reason: transactionValidateResult.reason }
       }
+      this.crypto.sign(shardusTransaction)
+
+      // /////////////////////////////////////
+      // TODO Gossip transaction to other nodes
+      // /////////////////////////////////////////
+
       this.mainLogger.debug('Transaction Valided')
       // Perform Consensus -- Currently no algorithm is being used
       // let nodeList = await this.storage.getNodes()
-      let consensus = new Consensus(this.config, this.logger, this.crypto, this.p2p, this.storage, null, this.app)
-      // let transactionReceipt = await consensus.inject(inTransaction)
-      let transactionReceipt = await consensus.inject(shardusTransaction)
+      let transactionReceipt = await this.consensus.inject(shardusTransaction)
       this.mainLogger.debug(`Received Consensus. Receipt: ${JSON.stringify(transactionReceipt)}`)
       // Apply the transaction
       await this.app.apply(inTransaction, transactionReceipt)
-
-      // TODO///////////////////////
-      // //////Broadcast reciept to other nodes in the list?  (possibly do that in consensus.inject() instead )
-      // //////////////////////////
     } catch (ex) {
       this.fatalLogger.fatal(`Failed to process transaction. Exception: ${ex}`)
       return { success: false, reason: `Failed to process trasnaction: ${JSON.parse(inTransaction)} ${ex}` }
     }
     this.mainLogger.debug(`End of injectTransaction ${inTransaction}`)
     return { success: true, reason: 'Transaction successfully processed' }
-  }
-
-  // TODO , register and an internal endpoint so that something can call this
-  async onReceipt (receipt, shardusTransaction) {
-    this.mainLogger.debug(`Start of onReciept`)
-    let transaction = shardusTransaction.inTransaction
-    // retrieve incoming transaction from HTTP request
-    try {
-      if (typeof transaction !== 'object') {
-        return false
-      }
-      // TODO! validate that reciept is sign by a valid node in the network
-      if (this.crypto.verify(receipt.sign.owner) === false) {
-        return false
-      }
-
-      // check that the tx hash matches the receipt
-      let txhash = this.crypto.hash(transaction) // todo use this instead: cryptoRaw.hashObj(transaction)
-      if (txhash !== receipt.txHash) {
-        return false
-      }
-
-      await this.app.apply(transaction, receipt)
-    } catch (ex) {
-      this.fatalLogger.fatal(`Failed to process receipt. Exception: ${ex}`)
-    }
-    this.mainLogger.debug(`End of onReceipt`)
-    return true
   }
 
   /**
@@ -274,8 +253,8 @@ class Shardus {
 
   async catchAllHandler (method, path, req, res) {
     // console.log('shardus catch all: ' + method + ' ' + path)
-    if (this.applicationInterfaceImpl.handleHttpRequest) {
-      this.applicationInterfaceImpl.handleHttpRequest(method, path, req, res)
+    if (this.app.handleHttpRequest) {
+      this.app.handleHttpRequest(method, path, req, res)
     }
   }
 

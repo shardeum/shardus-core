@@ -11,7 +11,14 @@ class Consensus {
     this.storage = storage
     this.nodeList = nodeList
     this.applicationInterfaceImpl = applicationInterfaceImpl
+
+    this.pendingTransactions = []
   }
+
+  // ///////////////////////////////////////////////////////////////
+  // TODO register an endpoint to recieve a pending transaction via gossip
+  // TODO register an endpoint to recieve gossip of reciepts  (calls onReceipt)
+  // ///////////////////////////////////////////////////////////////
 
   async inject (shardusTransaction) {
     this.mainLogger.debug(`Start of inject(${shardusTransaction})`)
@@ -44,6 +51,11 @@ class Consensus {
       throw new Error(ex)
     }
     this.mainLogger.debug(`End of inject(${inTransaction})`)
+
+    // ///////////////////////
+    // TODO Broadcast reciept to other nodes in the list?  (possibly do that in consensus.inject() instead )
+    // //////////////////////////
+
     return transactionReceipt
   }
 
@@ -56,6 +68,33 @@ class Consensus {
     this.crypto.sign(reciept) // sign with this node's key
     // cryptoRaw.signObj(reciept, validator.secretKey, validator.publicKey)
     return reciept
+  }
+
+  async onReceipt (receipt, shardusTransaction) {
+    this.mainLogger.debug(`Start of onReciept`)
+    let transaction = shardusTransaction.inTransaction
+    // retrieve incoming transaction from HTTP request
+    try {
+      if (typeof transaction !== 'object') {
+        return false
+      }
+      // TODO! validate that reciept is sign by a valid node in the network
+      if (this.crypto.verify(receipt.sign.owner) === false) {
+        return false
+      }
+
+      // check that the tx hash matches the receipt
+      let txhash = this.crypto.hash(transaction) // todo use this instead: cryptoRaw.hashObj(transaction)
+      if (txhash !== receipt.txHash) {
+        return false
+      }
+
+      await this.app.apply(transaction, receipt)
+    } catch (ex) {
+      this.fatalLogger.fatal(`Failed to process receipt. Exception: ${ex}`)
+    }
+    this.mainLogger.debug(`End of onReceipt`)
+    return true
   }
 }
 

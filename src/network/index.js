@@ -133,6 +133,18 @@ class Network {
     this._registerExternal('POST', route, handler)
   }
 
+  registerExternalPut (route, handler) {
+    this._registerExternal('PUT', route, handler)
+  }
+
+  registerExternalDelete (route, handler) {
+    this._registerExternal('DELETE', route, handler)
+  }
+
+  registerExternalPatch (route, handler) {
+    this._registerExternal('PATCH', route, handler)
+  }
+
   registerInternal (route, handler) {
     this.internalRoutes[route] = handler
   }
