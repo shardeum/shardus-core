@@ -23,8 +23,8 @@ class Shardus {
     this.heartbeatTimer = null
 
     // alias the network register calls so that an app can get to them
-    this.registerExternalGet = this.network.registerExternalGet
-    this.registerExternalPost = this.network.registerExternalPost
+    this.registerExternalGet = (route, handler) => this.network.registerExternalGet(route, handler)
+    this.registerExternalPost = (route, handler) => this.network.registerExternalPost(route, handler)
 
     this.exitHandler.addSigListeners()
     this.exitHandler.registerSync('shardus', () => {
