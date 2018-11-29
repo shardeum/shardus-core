@@ -141,7 +141,7 @@ class Shardus {
       this.mainLogger.debug(`ShardusTransaction: ${shardusTransaction}`)
 
       // Validate transaction through the application. Shardus can see inside the transaction
-      let transactionValidateResult = await this.application.validateTransaction(inTransaction)
+      let transactionValidateResult = await this.app.validateTransaction(inTransaction)
       if (transactionValidateResult.result !== 'pass') {
         this.mainLogger.error(`Failed to validate transaction. Reason: ${transactionValidateResult.reason}`)
         return { success: false, reason: transactionValidateResult.reason }
@@ -154,7 +154,7 @@ class Shardus {
       let transactionReceipt = await consensus.inject(shardusTransaction)
       this.mainLogger.debug(`Received Consensus. Receipt: ${JSON.stringify(transactionReceipt)}`)
       // Apply the transaction
-      await this.application.apply(inTransaction, transactionReceipt)
+      await this.app.apply(inTransaction, transactionReceipt)
 
       // TODO///////////////////////
       // //////Broadcast reciept to other nodes in the list?  (possibly do that in consensus.inject() instead )
@@ -187,7 +187,7 @@ class Shardus {
         return false
       }
 
-      await this.application.apply(transaction, receipt)
+      await this.app.apply(transaction, receipt)
     } catch (ex) {
       this.fatalLogger.fatal(`Failed to process receipt. Exception: ${ex}`)
     }
