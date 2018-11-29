@@ -96,6 +96,35 @@ class Network {
     }
   }
 
+  async _catchAllHandler (method, path, req, res) {
+    // console.log('catch all: ' + method + ' ' + path)
+    if (this.externalCatchAll) {
+      await this.externalCatchAll(method, path, req, res)
+    }
+  }
+
+  // must register this last!
+  _registerCatchAll () {
+    let network = this
+    this.app.get('/', async function (req, res) {
+      await network._catchAllHandler(req.method, req.path, req, res)
+    })
+    this.app.get('*', async function (req, res) {
+      await network._catchAllHandler(req.method, req.path, req, res)
+    })
+    this.app.post('/', async function (req, res) {
+      await network._catchAllHandler(req.method, req.path, req, res)
+    })
+    this.app.post('*', async function (req, res) {
+      await network._catchAllHandler(req.method, req.path, req, res)
+    })
+    // could use express 'any' if we want to catch more than just get or post
+  }
+
+  setExternalCatchAll (handler) {
+    this.externalCatchAll = handler
+  }
+
   registerExternalGet (route, handler) {
     this._registerExternal('GET', route, handler)
   }

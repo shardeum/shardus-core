@@ -22,6 +22,10 @@ class Shardus {
     this.heartbeatInterval = config.heartbeatInterval
     this.heartbeatTimer = null
 
+    // alias the network register calls so that an app can get to them
+    this.registerExternalGet = this.network.registerExternalGet
+    this.registerExternalPost = this.network.registerExternalPost
+
     this.exitHandler.addSigListeners()
     this.exitHandler.registerSync('shardus', () => {
       this.stopHeartbeat()
@@ -268,6 +272,13 @@ class Shardus {
     return applicationInterfaceImpl
   }
 
+  async catchAllHandler (method, path, req, res) {
+    // console.log('shardus catch all: ' + method + ' ' + path)
+    if (this.applicationInterfaceImpl.handleHttpRequest) {
+      this.applicationInterfaceImpl.handleHttpRequest(method, path, req, res)
+    }
+  }
+
   async start () {
     await this.storage.init()
     this._setupHeartbeat()
@@ -279,7 +290,10 @@ class Shardus {
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network)
     await this.p2p.init()
     this._registerRoutes()
-    this._tempRegisterAPI()
+    // this._tempRegisterAPI()
+    this.network._registerCatchAll()
+    this.network.setExternalCatchAll(async (method, path, req, res) => this.catchAllHandler(method, path, req, res))
+
     let started
     try {
       started = await this.p2p.startup()
