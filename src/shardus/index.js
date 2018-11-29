@@ -149,7 +149,7 @@ class Shardus {
       this.mainLogger.debug('Transaction Valided')
       // Perform Consensus -- Currently no algorithm is being used
       // let nodeList = await this.storage.getNodes()
-      let consensus = new Consensus(this.config, this.logger, this.crypto, this.p2p, this.storage, null, this.applicationInterfaceImpl)
+      let consensus = new Consensus(this.config, this.logger, this.crypto, this.p2p, this.storage, null, this.app)
       // let transactionReceipt = await consensus.inject(inTransaction)
       let transactionReceipt = await consensus.inject(shardusTransaction)
       this.mainLogger.debug(`Received Consensus. Receipt: ${JSON.stringify(transactionReceipt)}`)
