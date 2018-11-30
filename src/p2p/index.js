@@ -23,6 +23,7 @@ class P2P {
     this.netadmin = config.netadmin || 'default'
     this.state = new P2PState(config, this.logger, this.storage, this.crypto)
     this.seedNodes = null
+    this.gossipHandlers = {}
   }
 
   async init () {
@@ -712,6 +713,46 @@ class P2P {
     // -----  to be gossiped to it before marking itself active
     await this.state.directStatusUpdate(this.id, 'active', true)
     return true
+  }
+
+  /**
+   * Send Gossip to all nodes
+   */
+  async sendGossip (type, payload) {
+    this.mainLogger.debug(`Start of sendGossip(${JSON.stringify(payload)})`)
+    const gossipPayload = { type: type, data: payload }
+    try {
+      const allNodes = this.state.getAllNodes(this.id)
+      this.mainLogger.debug(`Gossiping join request to these nodes: ${JSON.stringify(allNodes)}`)
+      await this.network.tell(allNodes, 'gossip', gossipPayload)
+    } catch (ex) {
+      this.mainLogger.error(`Failed to sendGossip(${JSON.stringify(payload)}) Exception => ex`)
+    }
+    this.mainLogger.debug(`End of sendGossip(${JSON.stringify(payload)})`)
+  }
+
+  /**
+ * Handle Goosip Transactions
+ * Payload: {type: ['receipt', 'trustedTransaction'], data: {}}
+ */
+  async handleGossip (payload) {
+    this.mainLogger.debug(`Start of handleGossip(${JSON.stringify(payload)})`)
+    const type = payload.type
+    const data = payload.data
+
+    const gossipHandler = this.gossipHandlers[type]
+    if (!gossipHandler) {
+      this.mainLogger.debug('Gossip Handler not found')
+    }
+    await gossipHandler(data)
+    this.mainLogger.debug(`End of handleGossip(${JSON.stringify(payload)})`)
+  }
+  /**
+ * @param {route} example:- 'receipt', 'transaction'
+ * @param {handler} example:- function
+ */
+  registerGossipHandler (route, handler) {
+    this.gossipHandlers[route] = handler
   }
 
   async startup () {

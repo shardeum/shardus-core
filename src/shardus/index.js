@@ -129,10 +129,6 @@ class Shardus {
       }
       this.crypto.sign(shardusTransaction)
 
-      // /////////////////////////////////////
-      // TODO Gossip transaction to other nodes
-      // /////////////////////////////////////////
-
       this.mainLogger.debug('Transaction Valided')
       // Perform Consensus -- Currently no algorithm is being used
       // let nodeList = await this.storage.getNodes()

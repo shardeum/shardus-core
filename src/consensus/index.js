@@ -2,17 +2,36 @@
 const cryptoRaw = require('shardus-crypto-utils')
 cryptoRaw('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
 class Consensus {
-  constructor (config, logger, crypto, network, storage, nodeList, applicationInterfaceImpl) {
+  constructor (config, logger, crypto, p2p, storage, nodeList, applicationInterfaceImpl) {
     this.config = config
     this.logger = logger
     this.mainLogger = this.logger.getLogger('main')
     this.crypto = crypto
-    this.network = network
+    // this.network = network
+    this.p2p = p2p
     this.storage = storage
     this.nodeList = nodeList
     this.applicationInterfaceImpl = applicationInterfaceImpl
 
-    this.pendingTransactions = []
+    this.pendingTransactions = {}
+    // Register Gossip Handlers with P2P
+    this.p2p.registerGossipHandlers('receipt', async (data) => {
+      await this.onReceipt(data)
+    })
+
+    this.p2p.registerGossipHandlers('transaction', async (data) => {
+      await this.onTransaction(data)
+    })
+  }
+
+  /**
+   * Register GossipHandlers with P2P class
+   */
+  async onTransaction (shardusTransaction) {
+    this.mainLogger.debug(`Start of onTransaction(${shardusTransaction})`)
+    const transHash = cryptoRaw.hashObj(shardusTransaction.inTransaction)
+    this.pendingTransactions[transHash] = shardusTransaction
+    this.mainLogger.debug(`End of onTransaction(${shardusTransaction})`)
   }
 
   // ///////////////////////////////////////////////////////////////
@@ -27,6 +46,9 @@ class Consensus {
     try {
       // let keysRequest = { type: 'keyFromTransaction', txn: inTransaction }
       // let keysResponse = await this.application.get(keysRequest)
+      this.mainLogger.debug(`Gossiping Validated Transaction ${JSON.stringify(shardusTransaction)}`)      
+      this.p2p.sendGossip('transaction', shardusTransaction)
+      this.mainLogger.debug(`Done Gossiping Validated Transaction ${JSON.stringify(shardusTransaction)}`)      
       let keysResponse = this.applicationInterfaceImpl.getKeyFromTransaction(inTransaction)
       let { sourceKeys, targetKeys } = keysResponse
       let sourceAddress, targetAddress, stateId
@@ -50,11 +72,11 @@ class Consensus {
       this.logger.getLogger('main').error(`Failed to process Transaction. Exception: ${ex}`)
       throw new Error(ex)
     }
-    this.mainLogger.debug(`End of inject(${inTransaction})`)
 
-    // ///////////////////////
-    // TODO Broadcast reciept to other nodes in the list?  (possibly do that in consensus.inject() instead )
-    // //////////////////////////
+    this.mainLogger.debug(`Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)      
+    this.p2p.sendGossip('receipt', transactionReceipt)
+    this.mainLogger.debug(`Done Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)     
+    this.mainLogger.debug(`End of inject(${inTransaction})`)
 
     return transactionReceipt
   }
@@ -70,8 +92,9 @@ class Consensus {
     return reciept
   }
 
-  async onReceipt (receipt, shardusTransaction) {
+  async onReceipt (receipt) {
     this.mainLogger.debug(`Start of onReciept`)
+    const shardusTransaction = this.pendingTransactions[receipt.txHash]
     let transaction = shardusTransaction.inTransaction
     // retrieve incoming transaction from HTTP request
     try {

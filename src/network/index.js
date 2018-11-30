@@ -91,6 +91,15 @@ class Network {
       case 'POST':
         this.app.post(formattedRoute, handler)
         break
+      case 'PUT':
+        this.app.put(formattedRoute, handler)
+        break
+      case 'DELETE':
+        this.app.delete(formattedRoute, handler)
+        break
+      case 'PATCH':
+        this.app.patch(formattedRoute, handler)
+        break
       default:
         throw new Error('Fatal: Invalid HTTP method for handler.')
     }

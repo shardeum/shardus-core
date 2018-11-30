@@ -44,6 +44,13 @@ function setupRoutes () {
     this.mainLogger.debug('Join request accepted!')
   })
 
+  // Temp Gossip Endpoint
+  this.network.registerInternal('gossip', async (payload) => {
+    const accepted = await this.handleGossip(payload, false)
+    if (!accepted) return this.mainLogger.debug('Gossip Not Accepted.')
+    this.mainLogger.debug('Gossip request accepted!')
+  })
+
   this.network.registerInternal('cyclemarker', async (payload, respond) => {
     const cycleMarkerInfo = this.getCycleMarkerInfo()
     await respond(cycleMarkerInfo)
