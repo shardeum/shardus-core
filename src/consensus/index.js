@@ -15,11 +15,11 @@ class Consensus {
 
     this.pendingTransactions = {}
     // Register Gossip Handlers with P2P
-    this.p2p.registerGossipHandlers('receipt', async (data) => {
+    this.p2p.registerGossipHandler('receipt', async (data) => {
       await this.onReceipt(data)
     })
 
-    this.p2p.registerGossipHandlers('transaction', async (data) => {
+    this.p2p.registerGossipHandler('transaction', async (data) => {
       await this.onTransaction(data)
     })
   }
