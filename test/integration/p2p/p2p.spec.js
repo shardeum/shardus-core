@@ -82,7 +82,7 @@ test('Testing discoverNetwork method with a seednode up', { timeout: 100000, ski
   t.end()
 })
 
-test('Testing join procedure with 1 seed node and 3 normal ndoes', { timeout: 100000, skip: false }, async t => {
+test('Testing join procedure with 1 seed node and 3 normal nodes', { timeout: 100000, skip: false }, async t => {
   startUtils.startServer(9001)
   await sleep(500)
   startUtils.startServers(9002, 3)
