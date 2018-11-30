@@ -127,7 +127,7 @@ class Shardus {
         this.mainLogger.error(`Failed to validate transaction. Reason: ${transactionValidateResult.reason}`)
         return { success: false, reason: transactionValidateResult.reason }
       }
-      this.crypto.sign(shardusTransaction)
+      shardusTransaction = this.crypto.sign(shardusTransaction)
 
       this.mainLogger.debug('Transaction Valided')
       // Perform Consensus -- Currently no algorithm is being used

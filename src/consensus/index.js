@@ -46,9 +46,9 @@ class Consensus {
     try {
       // let keysRequest = { type: 'keyFromTransaction', txn: inTransaction }
       // let keysResponse = await this.application.get(keysRequest)
-      this.mainLogger.debug(`Gossiping Validated Transaction ${JSON.stringify(shardusTransaction)}`)      
+      this.mainLogger.debug(`Gossiping Validated Transaction ${JSON.stringify(shardusTransaction)}`)
       this.p2p.sendGossip('transaction', shardusTransaction)
-      this.mainLogger.debug(`Done Gossiping Validated Transaction ${JSON.stringify(shardusTransaction)}`)      
+      this.mainLogger.debug(`Done Gossiping Validated Transaction ${JSON.stringify(shardusTransaction)}`)
       let keysResponse = this.applicationInterfaceImpl.getKeyFromTransaction(inTransaction)
       let { sourceKeys, targetKeys } = keysResponse
       let sourceAddress, targetAddress, stateId
@@ -73,23 +73,23 @@ class Consensus {
       throw new Error(ex)
     }
 
-    this.mainLogger.debug(`Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)      
+    this.mainLogger.debug(`Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
     this.p2p.sendGossip('receipt', transactionReceipt)
-    this.mainLogger.debug(`Done Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)     
+    this.mainLogger.debug(`Done Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
     this.mainLogger.debug(`End of inject(${inTransaction})`)
 
     return transactionReceipt
   }
 
-  createReciept (tx, validator, state) {
-    let reciept = {
+  createReciept (tx, state) {
+    let receipt = {
       stateId: state,
       txHash: cryptoRaw.hashObj(tx),
       time: Date.now()
     }
-    this.crypto.sign(reciept) // sign with this node's key
+    receipt = this.crypto.sign(receipt) // sign with this node's key
     // cryptoRaw.signObj(reciept, validator.secretKey, validator.publicKey)
-    return reciept
+    return receipt
   }
 
   async onReceipt (receipt) {
@@ -106,13 +106,14 @@ class Consensus {
         return false
       }
 
+      // ToDo: Revisit this check
       // check that the tx hash matches the receipt
-      let txhash = this.crypto.hash(transaction) // todo use this instead: cryptoRaw.hashObj(transaction)
-      if (txhash !== receipt.txHash) {
-        return false
-      }
+      // let txhash = this.crypto.hash(transaction) // todo use this instead: cryptoRaw.hashObj(transaction)
+      // if (txhash !== receipt.txHash) {
+      //   return false
+      // }
 
-      await this.app.apply(transaction, receipt)
+      await this.applicationInterfaceImpl.apply(transaction, receipt)
     } catch (ex) {
       this.fatalLogger.fatal(`Failed to process receipt. Exception: ${ex}`)
     }
