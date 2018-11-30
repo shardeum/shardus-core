@@ -1,14 +1,14 @@
 const path = require('path')
 const fs = require('fs')
 
-function readLogFile (targetLog) {
-  let logPath = path.join(__dirname, '../../logs/', `${targetLog}.log`)
+function readLogFile (targetLog, relativePath = '../../logs/') {
+  let logPath = path.join(__dirname, relativePath, `${targetLog}.log`)
   if (!fs.existsSync(logPath)) return false
   return fs.readFileSync(logPath).toString()
 }
 
-function resetLogFile (targetLog) {
-  let logPath = path.join(__dirname, '../../logs/', `${targetLog}.log`)
+function resetLogFile (targetLog, relativePath = '../../logs/') {
+  let logPath = path.join(__dirname, relativePath, `${targetLog}.log`)
   if (!fs.existsSync(logPath)) return false
   fs.writeFileSync(logPath, '')
   return true
