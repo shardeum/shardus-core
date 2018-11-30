@@ -20,15 +20,16 @@ async function init (loggerConf = null, externalPort = null) {
 }
 
 test('Testing /join API endpoint in shardus class', { timeout: 100000, skip: false }, async t => {
-  await startUtils.startServer(9001)
+  let server = await startUtils.startServer(9001)
   await init(null, 9002)
 
-  let response = await axios.post(`http://${config.externalIp}:${config.externalPort - 1}/join`, {})
+  // let response = await axios.post(`http://${config.externalIp}:${config.externalPort - 1}/join`, {})
   //  t.equal(response.data.success, false, 'Should return success: false for an empty join request')
   //  t.equal(response.data.error, 'invalid join request', 'Should return error message for empty join request')
 
   let joinRequest = await p2p._createJoinRequest()
-  response = await axios.post(`http://${config.externalIp}:${config.externalPort - 1}/join`, joinRequest)
+  console.log(joinRequest)
+  let response = await axios.post(`http://${config.externalIp}:${config.externalPort - 1}/join`, joinRequest)
   const log = readLogFile('main', '../integration/shardus/instances/shardus-server-9001/logs')
   await startUtils.deleteAllServers()
   t.equal(response.data.success, true, 'Should return success: true for a valid join request')
