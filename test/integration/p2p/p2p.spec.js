@@ -87,13 +87,21 @@ test('Testing join procedure with 1 seed node and 3 normal nodes', { timeout: 10
   await sleep(500)
   startUtils.startServers(9002, 3)
   await sleep(config.cycleDuration * 2.9 * 1000) // waiting unitl third cycle to check join result
+  // await sleep(config.cycleDuration * 1.9 * 1000) // waiting unitl third cycle to check join result
   let response = await axios.get(`http://127.0.0.1:9001/cyclemarker`)
-  if (response.data.nodesJoined.length < 3) {
+  let joined = response.data.nodesJoined.map(n => n)
+  if (joined.length < 3) {
+    console.log(joined)
+    console.log('waiting for another cycle...')
     await sleep(config.cycleDuration * 1 * 1000) // waiting for one more cycle if all 3 nodes haven't been accepted yet
     response = await axios.get(`http://127.0.0.1:9001/cyclemarker`)
+    response.data.nodesJoined.forEach(n => {
+      if (joined.indexOf(n) === -1) joined.push(n)
+    })
   }
+  console.log(joined)
   await startUtils.deleteAllServers()
-  t.equal(response.data.nodesJoined.length, 3, 'Should have 3 nodes joined in second cycle')
+  t.equal(joined.length, 3, 'Should have 3 nodes joined in second cycle')
   if (confStorage) {
     confStorage.options.storage = 'db/db.sqlite'
     fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
