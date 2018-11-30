@@ -21,11 +21,8 @@ process.on('message', async (msg) => {
         if (cycleMarkerInfo.cycleCounter === 1 || cycleMarkerInfo.cycleCounter > 1) { // wait until second cycle
           clearInterval(checkInterval)
           await sleep(5000)
-          console.log('last cycle is...')
-          console.log(shardus.p2p.state.getLastCycle())
           cycleMarkerInfo = shardus.p2p.getCycleMarkerInfo()
           let nodeAddress = shardus.p2p._getThisNodeInfo().address
-          console.log(cycleMarkerInfo)
           clearInterval(checkInterval)
           process.send({ cycleMarkerInfo, nodeAddress })
         }
