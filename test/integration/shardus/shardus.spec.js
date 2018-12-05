@@ -19,16 +19,28 @@ async function init (loggerConf = null, externalPort = null) {
   p2p = instances.p2p
 }
 
+test('Testing milestone-5 join procedure', { timeout: 100000, skip: false }, async t => {
+  await startUtils.startServer(9001) // start seed Node
+  await startUtils.startServer(9002) // start second Node
+  await sleep(config.cycleDuration * 2.0 * 1000)
+
+  let receivedRequests = await startUtils.getRequests(9001)
+  let joinRequest = receivedRequests.find(r => r.url === '/join' && r.method === 'POST')
+  let secondNodeId = joinRequest.body.nodeInfo.address
+
+  await sleep(config.cycleDuration * 1.0 * 1000)
+  let stateOfSeedNode = await startUtils.getState(9001)
+
+  t.equal(joinRequest.body.nodeInfo.externalPort, 9002, 'Should seedNode receive join request made by second node')
+  t.notEqual(stateOfSeedNode.nodes.current[secondNodeId], undefined, 'Should have second node Id in the current node list of seedNode')
+  await startUtils.deleteAllServers()
+  t.end()
+})
+
 test('Testing /join API endpoint in shardus class', { timeout: 100000, skip: false }, async t => {
   await startUtils.startServer(9001)
   await init(null, 9002)
-
-  // let response = await axios.post(`http://${config.externalIp}:${config.externalPort - 1}/join`, {})
-  //  t.equal(response.data.success, false, 'Should return success: false for an empty join request')
-  //  t.equal(response.data.error, 'invalid join request', 'Should return error message for empty join request')
-
   let joinRequest = await p2p._createJoinRequest()
-  console.log(joinRequest)
   let response = await axios.post(`http://127.0.0.1:9001/join`, joinRequest)
   const log = readLogFile('main', '../integration/shardus/instances/shardus-server-9001/logs')
   await startUtils.deleteAllServers()

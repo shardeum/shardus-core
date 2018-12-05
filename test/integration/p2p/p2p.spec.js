@@ -85,7 +85,7 @@ test('Testing discoverNetwork method with a seednode up', { timeout: 100000, ski
 test('Testing join procedure with 1 seed node and 3 normal nodes', { timeout: 100000, skip: false }, async t => {
   startUtils.startServer(9001)
   await sleep(500)
-  startUtils.startServers(9002, 3)
+  startUtils.startServers(3, 9002)
   await sleep(config.cycleDuration * 2.9 * 1000) // waiting unitl third cycle to check join result
   // await sleep(config.cycleDuration * 1.9 * 1000) // waiting unitl third cycle to check join result
   let response = await axios.get(`http://127.0.0.1:9001/cyclemarker`)
