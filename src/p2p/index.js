@@ -681,15 +681,10 @@ class P2P {
       this.state.addStatusUpdate(this.id, 'active')
       return true
     }
-    // TO-DO: Implement robust system for getting set to active
-    // LOOP
-    // Wait until good time to send active request
-    const allNodes = this.state.getAllNodes(this.id)
-    await this.network.tell(allNodes, 'active', { nodeId: this.id })
-    // Wait until end of cycle
-    // Check if we are set to active
-    // Update our own status in database
-    // END LOOP
+    // TO-DO: After gossip is implemented, node will wait for messages
+    // -----  to be gossiped to it before marking itself active
+    this.state.addStatusUpdate(this.id, 'active')
+    return true
   }
 
   async startup () {

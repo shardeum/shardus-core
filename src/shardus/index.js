@@ -44,14 +44,6 @@ class Shardus {
       res.json({ success: true })
       await this.shutdown()
     })
-
-    this.network.registerInternal('test', async () => {
-      console.log('It works!')
-    })
-
-    this.network.registerInternal('test2', async (respond) => {
-      await respond({ success: true })
-    })
   }
 
   registerExceptionHandler () {
