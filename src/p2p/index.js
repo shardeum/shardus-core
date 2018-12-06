@@ -293,6 +293,27 @@ class P2P {
     await utils.sleep(timeToWait)
   }
 
+  _isIn2ndQuarter (currentTime, cycleStart, cycleDuration) {
+    this.mainLogger.debug(`Current time is: ${currentTime}`)
+    this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
+    this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
+    const startOf2ndQuarter = cycleStart + Math.ceil(0.5 * cycleDuration)
+    const endOf2ndQuarter = cycleStart + Math.ceil(0.75 * cycleDuration)
+    if (currentTime < startOf2ndQuarter || currentTime > endOf2ndQuarter) {
+      return false
+    }
+    return true
+  }
+
+  async _submitWhenNot2nd (nodes, route, message) {
+    this.mainLogger.debug(`Submitting message: ${JSON.stringify(message)} on route: ${route} whenever it's not the second cycle...`)
+    const { currentTime, cycleStart, cycleDuration } = await this._fetchCycleMarkerInternal(this.seedNodes)
+    if (this._isIn2ndQuarter(currentTime, cycleStart, cycleDuration)) {
+      await utils.sleep(0.25 * cycleDuration * 1000)
+    }
+    await this.network.tell(nodes, route, message)
+  }
+
   async _attemptJoin (seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration) {
     // TODO: check if we missed join phase
     const currTime1 = utils.getTime('s') + timeOffset
@@ -556,7 +577,7 @@ class P2P {
   }
 
   _validateJoinRequest (joinRequest) {
-    // TODO: implement actual validation
+    // TODO: implement actual validation (call to application side?)
     return true
   }
 
@@ -676,13 +697,17 @@ class P2P {
     return true
   }
 
+  async _submitActiveRequest () {
+    const allNodes = this.state.getAllNodes(this.id)
+    await this._submitWhenNot2nd(allNodes, 'active', { nodeId: this.id })
+  }
+
   async _goActive (isFirstSeed) {
     if (isFirstSeed) {
       this.state.addStatusUpdate(this.id, 'active')
       return true
     }
-    const allNodes = this.state.getAllNodes(this.id)
-    await this.network.tell(allNodes, 'active', { nodeId: this.id })
+    await this._submitActiveRequest()
     // TO-DO: After gossip is implemented, node will wait for messages
     // -----  to be gossiped to it before marking itself active
     await this.state.directStatusUpdate(this.id, 'active', true)
