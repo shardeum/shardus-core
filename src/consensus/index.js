@@ -6,6 +6,7 @@ class Consensus {
     this.config = config
     this.logger = logger
     this.mainLogger = this.logger.getLogger('main')
+    this.fatalLogger = this.logger.getLogger('fatal')
     this.crypto = crypto
     // this.network = network
     this.p2p = p2p
