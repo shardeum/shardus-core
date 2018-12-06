@@ -187,6 +187,23 @@ class P2PState {
     await Promise.all(promises)
   }
 
+  // For use for internal updates to status for this node
+  async directStatusUpdate (nodeId, status, updateDb) {
+    // Check if we actually know about this node
+    const node = this.getNode(nodeId)
+    if (!node) {
+      this.mainLogger.debug('Cannot update status of unknown node.')
+      return false
+    }
+    const invalidStatusMsg = `Invalid status: ${status}. Unable to update status.`
+    if (!this.validStatuses.includes(status)) {
+      this.mainLogger.debug(invalidStatusMsg)
+      return false
+    }
+    await this._updateNodeStatus(node, status, updateDb)
+    return true
+  }
+
   async _updateNodeStatus (node, status, updateDb = true) {
     if (!this.validStatuses.includes(status)) throw new Error('Invalid node status.')
     if (node.status === status) return true

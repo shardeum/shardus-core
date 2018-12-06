@@ -685,7 +685,7 @@ class P2P {
     await this.network.tell(allNodes, 'active', { nodeId: this.id })
     // TO-DO: After gossip is implemented, node will wait for messages
     // -----  to be gossiped to it before marking itself active
-    this.state.addStatusUpdate(this.id, 'active')
+    await this.state.directStatusUpdate(this.id, 'active', true)
     return true
   }
 
