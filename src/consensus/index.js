@@ -67,7 +67,7 @@ class Consensus {
         stateId = await this.applicationInterfaceImpl.getStateId(sourceAddress)
         this.mainLogger.debug(`StateID: ${stateId}`)
       }
-      transactionReceipt = this.createReciept(inTransaction, null, stateId)
+      transactionReceipt = this.createReciept(inTransaction, stateId)
     } catch (ex) {
       this.logger.getLogger('main').error(`Failed to process Transaction. Exception: ${ex}`)
       throw new Error(ex)
@@ -102,7 +102,7 @@ class Consensus {
         return false
       }
       // TODO! validate that reciept is sign by a valid node in the network
-      if (this.crypto.verify(receipt.sign.owner) === false) {
+      if (this.crypto.verify(receipt, receipt.sign.owner) === false) {
         return false
       }
 
