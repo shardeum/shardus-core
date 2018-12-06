@@ -11,8 +11,8 @@ config.syncLimit = 100000
 let shardus = new Shardus(config)
 
 async function init () {
-  await shardus.start()
+  await shardus.setup(config)
+  shardus.registerExceptionHandler()
   await shardus.shutdown()
 }
-
 init()

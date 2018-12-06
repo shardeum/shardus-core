@@ -37,10 +37,7 @@ test('testing initialization property', async t => {
 
 // Drop the database if exists and then test the init fn
 test('testing init fn', async t => {
-  // Don't need an additional defined scope
-  // {
   try {
-    // newConfStorage = createTestDb(confStorage)
     createTestDb(confStorage)
     resetLogFile()
     storage = new Storage(
@@ -54,7 +51,6 @@ test('testing init fn', async t => {
   } catch (e) {
     t.threw(e)
   }
-  // }
   t.end()
 })
 
@@ -150,7 +146,9 @@ test('testing set and add methods for nodes model', async t => {
       externalPort: 443,
       joinRequestTimestamp: Date.now(),
       status: 'ok',
-      address: 'a1b2c3e4f5'
+      address: 'a1b2c3e4f5',
+      publicKey: 'a1b2c3e4f5',
+      cycleJoined: 'a1b2c3e4f5'
     }
     await storage.addNodes(node)
     const res = await storage.getNodes(node)
@@ -233,7 +231,9 @@ test('testing clearP2pState method', async t => {
     externalPort: 443,
     joinRequestTimestamp: Date.now(),
     status: 'ok',
-    address: 'a1b2c3e4f5'
+    address: 'a1b2c3e4f5',
+    publicKey: 'a1b2c3e4f5',
+    cycleJoined: 'a1b2c3e4f5'
   }
   let cycle = {
     certificate: [ 'keyNode1', 'keyNode2' ],

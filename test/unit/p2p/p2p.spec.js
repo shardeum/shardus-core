@@ -8,15 +8,15 @@ const P2P = require('../../../src/p2p')
 const Logger = require('../../../src/logger')
 const Storage = require('../../../src/storage')
 const Crypto = require('../../../src/crypto/index')
+const Network = require('../../../src/network/index')
 
 const { readLogFile } = require('../../includes/utils-log')
 const { clearTestDb, createTestDb } = require('../../includes/utils-storage')
 // const { sleep } = require('../../../src/utils')
-const { isValidHex } = require('../../includes/utils')
-const { getTime } = require('../../../src/utils')
+// const { isValidHex } = require('../../includes/utils')
 
 let p2p
-let confStorage = module.require(`../../../config/storage.json`)
+let confStorage = module.require('../../../config/storage.json')
 let config = require(path.join(__dirname, '../../../config/server.json'))
 // increase the timeSync limit to avoid issues in the test
 config.syncLimit = 100000
@@ -34,7 +34,6 @@ let loggerConfig = {
 }
 
 let logger = new Logger(path.resolve('./'), loggerConfig)
-// let newConfStorage = createTestDb(confStorage)
 createTestDb(confStorage)
 let storage = new Storage(
   logger,
@@ -42,131 +41,55 @@ let storage = new Storage(
   { confFile: './config/storage.json' }
 )
 let crypto
+let network
 
 test('Testing p2p constructor', async t => {
   await storage.init()
   crypto = new Crypto(logger, storage)
   await crypto.init()
-  p2p = new P2P(config, logger, storage, crypto)
+  network = new Network(config.network, logger)
+  const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay } = config
+  const ipInfo = config.ip
+  const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay }
+  p2p = new P2P(p2pConf, logger, storage, crypto, network)
   t.equal(p2p instanceof P2P, true, 'p2p should be instatiated correctly')
   t.end()
 })
 
-test('Testing _verifyIpInfo', async t => {
-  // {
+test('Testing _verifyExternalInfo', async t => {
   try {
-    p2p._verifyIpInfo()
+    p2p._verifyExternalInfo()
     t.fail('this call without args should not be allowed')
   } catch (e) {
     t.pass('should throw an error with no args passed')
   }
-  // }
 
-  // {
   try {
-    p2p._verifyIpInfo({ externalIp: '127.0.0.1' })
+    p2p._verifyExternalInfo({ externalIp: '127.0.0.1' })
     t.fail('this call without port should not be allowed')
   } catch (e) {
     t.pass('should throw an error with no property port passed')
   }
-  // }
 
   {
-    const res = p2p._verifyIpInfo({ externalIp: '127.0.0.1', externalPort: 9001 })
+    const res = p2p._verifyExternalInfo({ externalIp: '127.0.0.1', externalPort: 9001 })
     t.equal(res, true, 'should return true for a valid ip and port passed as parameter')
   }
-
   t.end()
 })
 
-test('Testing _retrieveIp method', async t => {
-  // {
+test('Testing _discoverIp method', async t => {
   try {
-    // const res = await p2p._retrieveIp('http://google.com')
-    await p2p._retrieveIp('http://google.com')
+    await p2p._discoverIp('http://google.com')
     t.fail('should not get an IP from google')
   } catch (e) {
     t.pass('should throw an error for an invalid ip server')
   }
-  // }
 
   {
-    const res = await p2p._retrieveIp(config.ipServer)
+    const res = await p2p._discoverIp(config.ipServer)
     t.notEqual(isIP(res), 0, 'should return a valid ip from ipServer')
   }
-  t.end()
-})
-
-test('Testing _checkTimeSynced method', async t => {
-  // {
-  t.equal(await p2p._checkTimeSynced(config.timeServer), true, 'should validate the timeSync verification with arimaa time server')
-  // }
-  t.end()
-})
-
-test('Testing _getSeedListSigned method', async t => {
-  const localNode = { ip: '127.0.0.1', port: 9001 }
-  const res = await p2p._getSeedListSigned()
-  t.equal(Array.isArray(res.seedNodes), true, '_getSeedNodes should return an array type')
-  t.notEqual(res.seedNodes.length, 0, 'the array should have at least one node in its list')
-  t.deepEqual(res.seedNodes[0], localNode, 'should have a local node as the first element of the array list')
-  t.equal(typeof res.sign, 'object', 'the sign property should be an object')
-  t.equal(isValidHex(res.sign.owner), true, 'owner pk should be a valid hex')
-  t.equal(isValidHex(res.sign.sig), true, 'signature should be a valid hex')
-  t.end()
-})
-
-test('Testing getIpInfo method', async t => {
-  t.deepEqual(p2p.getIpInfo(), config.ipInfo, 'should return the identical object from ipInfo')
-  t.end()
-})
-
-// discorverNetwork is already tested in shardus module unit tests
-
-// let nodeAddress
-test('Testing _getThisNodeInfo', t => {
-  const res = p2p._getThisNodeInfo()
-  // nodeAddress = res.address
-  const diff = (Math.floor(Date.now() / 1000)) - res.joinRequestTimestamp
-  t.equal(typeof res.externalIp, 'string', 'externalIp should be a string')
-  t.notEqual(isIP(res.externalIp), 0, 'externalIp should be a valid ip')
-  t.equal(typeof res.externalPort, 'number', 'externalPort should be a number')
-  t.equal(typeof res.internalIp, 'string', 'internalIp should be a string')
-  t.notEqual(isIP(res.internalIp), 0, 'internalIp should be a valid ip')
-  t.equal(typeof res.internalPort, 'number', 'internalPort should be a number')
-  t.equal(diff > 10000, false, 'the difference of times should not be greater than 10s')
-  if (confStorage) {
-    confStorage.options.storage = 'db/db.sqlite'
-    fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
-    clearTestDb()
-  }
-  t.end()
-})
-
-test('Testing _waitUntilJoinPhase', async t => {
-  createTestDb(confStorage, '../../../db/db.test.sqlite')
-  let currentTime = getTime('s')
-  let cycleStart = currentTime - 3
-  let duration = config.cycleDuration
-  await p2p._waitUntilJoinPhase(currentTime, cycleStart, duration)
-  const log = readLogFile('main')
-  t.notEqual(log.indexOf('Waiting for 8000 ms before next join phase...'), -1, 'Should have waiting message before joinphase in the log file')
-  if (confStorage) {
-    confStorage.options.storage = 'db/db.sqlite'
-    fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
-    clearTestDb()
-  }
-  t.end()
-})
-
-test('Testing _waitUntilCycleMarker', async t => {
-  createTestDb(confStorage, '../../../db/db.test.sqlite')
-  let currentTime = getTime('s')
-  let cycleStart = currentTime - 3
-  let duration = config.cycleDuration
-  await p2p._waitUntilCycleMarker(currentTime, cycleStart, duration)
-  const log = readLogFile('main')
-  t.notEqual(log.indexOf('Waiting for 14000 ms before next cycle marker creation...'), -1, 'Should terminate the logger within shardus correctly and insert the log entry')
   if (confStorage) {
     confStorage.options.storage = 'db/db.sqlite'
     fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))

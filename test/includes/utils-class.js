@@ -5,6 +5,7 @@ const P2P = require('../../src/p2p')
 const Logger = require('../../src/logger')
 const Storage = require('../../src/storage')
 const Crypto = require('../../src/crypto/index')
+const Network = require('../../src/network')
 
 // keeping legacy code that does not pass standard: unused var
 const { clearTestDb, createTestDb } = require('../includes/utils-storage')// eslint-disable-line
@@ -31,6 +32,7 @@ let newConfStorage = createTestDb(confStorage)
 
 async function getInstances (loggerConf = null, externalPort = null) {
   let logger = new Logger(path.resolve('./'), loggerConf || loggerConfig)
+  let network = new Network(config.network, logger)
   let storage = new Storage(
     logger,
     '.',
@@ -42,7 +44,11 @@ async function getInstances (loggerConf = null, externalPort = null) {
   await storage.init()
   let crypto = new Crypto(logger, storage)
   await crypto.init()
-  p2p = new P2P(config, logger, storage, crypto)
+
+  const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay } = config
+  ipInfo = config.ip
+  const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay }
+  p2p = new P2P(p2pConf, logger, storage, crypto, network)
   return {
     storage,
     logger,

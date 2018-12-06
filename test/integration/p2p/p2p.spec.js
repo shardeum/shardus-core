@@ -10,23 +10,18 @@ const { sleep } = require('../../../src/utils')
 const startUtils = require('../../../tools/server-start-utils/index')('../../../', './instances')
 // let storage, logger, crypto, newConfStorage
 let p2p
-let config = module.require(path.join(__dirname, '../../../config/server.json'))
+// let config = module.require(path.join(__dirname, '../../../config/server.json'))
 
 async function init (loggerConf = null, externalPort = null) {
-  // standard cleanup, commenting out unused variables, can add them back in as needed
   const instances = await getInstances(loggerConf, externalPort)
-  // storage = instances.storage
-  // logger = instances.logger
-  // crypto = instances.Crypto
   p2p = instances.p2p
-  // newConfStorage = instances.newConfStorage
 }
 
 test('Testing P2P integrated methods with a seedNode up', { timeout: 100000, skip: false }, async t => {
   await startUtils.startServer(9001)
   await init(null, 9002)
-  await p2p.discoverNetwork()
-  let joinRequest = await p2p._createJoinRequest()
+  // await p2p.discoverNetwork()
+  let joinRequest = await p2p._createJoinRequest('abc123')
   t.match(joinRequest, {
     cycleMarker: /[0-9a-fA-F]+/,
     nodeInfo: {
@@ -51,15 +46,15 @@ test('Testing P2P integrated methods with a seedNode up', { timeout: 100000, ski
     }
   }, 'joinRequest should have all expected properties')
   await sleep(2000)
-  const shutdown = await axios.post(`http://${config.externalIp}:${config.externalPort - 1}/exit`, {})
-  await sleep(2000)
-  await startUtils.deleteAllServers()
+  const shutdown = await axios.post(`http://127.0.0.1:9001/exit`, {})
+  await sleep(4000)
   if (confStorage) {
     confStorage.options.storage = 'db/db.sqlite'
     fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
     clearTestDb()
   }
   t.equal(shutdown.data.success, true, 'should shutdown the server correctly')
+  await startUtils.deleteAllServers()
   t.end()
 })
 

@@ -1,19 +1,19 @@
 const test = require('tap').test
-const fs = require('fs')
+// const fs = require('fs')
 const path = require('path')
 const axios = require('axios')
-const { spawn, fork } = require('child_process')
+// const { spawn } = require('child_process')
 
 const Shardus = require('../../../src/shardus')
 const { sleep } = require('../../../src/utils')
-const { readLogFile, resetLogFile } = require('../../includes/utils-log')
-const { clearTestDb, createTestDb } = require('../../includes/utils-storage')
-const { isValidHex } = require('../../includes/utils')
+// const { readLogFile, resetLogFile } = require('../../includes/utils-log')
+// const { clearTestDb } = require('../../includes/utils-storage')
+const startUtils = require('../../../tools/server-start-utils/index')('../../../', './instances')
 
 // let newConfStorage, shardus
 let shardus
 let config = require(path.join(__dirname, '../../../config/server.json'))
-let confStorage = module.require(`../../../config/storage.json`)
+// let confStorage = module.require(`../../../config/storage.json`)
 config.baseDir = '.'
 config.log.confFile = 'config/logs.json'
 config.storage.confFile = './config/storage.json'
@@ -34,42 +34,20 @@ async function requestFromChild (msg) {
 }
 
 // Testing constructor
-test('testing Shardus class', { skip: false, timeout: 20000 }, async t => {
-  // Testing constructor
-  // newConfStorage = createTestDb(confStorage, '../../../db/db.test.sqlite')
-  createTestDb(confStorage, '../../../db/db.test.sqlite')
+test('testing Shardus class', async t => {
   shardus = new Shardus(config)
   t.equal(shardus instanceof Shardus, true, 'the object should be an instance of Shardus')
   await shardus.storage.init()
   t.end()
 })
 
-test('testing methods isolated', { skip: false, timeout: 20000 }, async t => {
-  let server = spawn('node', [path.join(__dirname, 'child-process.js')])
-  server.stdout.on('data', (data) => console.log(`[stdout] ==> ${data.toString()}`))
-  server.stderr.on('data', (data) => console.log(`[stderr] ==> ${data.toString()}`))
-  await sleep(6000)
-  const res = await axios.post(`http://${config.externalIp}:${config.externalPort}/exit`)
-  await sleep(6000)
+test('testing /exit endpoint', { timeout: 20000 }, async t => {
+  let server = await startUtils.startServer(9001)
+  const res = await axios.post(`http://127.0.0.1:9001/exit`)
+  await sleep(4000)
   t.equal(res.data.success, true, 'should return success: true from /exit endpoint')
-  t.equal(server.exitCode, 0, 'the server should be killed correctly')
-  await server.kill()
-  t.end()
-})
-
-test('testing the shutdown method', { skip: false, timeout: 10000 }, async t => {
-  resetLogFile('main')
-  let server = spawn('node', [path.join(__dirname, 'child-process-shutdown.js')])
-  server.stdout.on('data', (data) => console.log(`[stdout] ==> ${data.toString()}`))
-  server.stderr.on('data', (data) => console.log(`[stderr] ==> ${data.toString()}`))
-  await sleep(8000)
-  const log = readLogFile('main')
-  if (confStorage) {
-    confStorage.options.storage = 'db/db.sqlite'
-    fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
-    clearTestDb()
-  }
-  t.notEqual(log.indexOf('Logger shutting down cleanly...'), -1, 'Should terminate the logger within shardus correctly and insert the log entry')
+  t.equal(server.process.exitCode, 0, 'the server should be killed correctly')
+  await startUtils.deleteAllServers()
   t.end()
 })
 
