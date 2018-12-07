@@ -89,7 +89,7 @@ test('Testing getNode and getAllNodes method', async t => {
   t.end()
 })
 
-test('Testing setNodeState, getNodeStatus and _updateNodeStatus methods', async t => {
+test('Testing _setNodeStatus, getNodeStatus and _updateNodeStatus methods', async t => {
   await p2pState.clear()
   let key = p2pState.crypto._generateKeypair()
   let node = {
@@ -105,8 +105,8 @@ test('Testing setNodeState, getNodeStatus and _updateNodeStatus methods', async 
     status: 'pending'
   }
   p2pState.addNode(node)
-  t.equal(await p2pState.setNodeStatus('0'.repeat(64), 'syncing'), false, 'Should return false if node ID is not found')
-  t.equal(await p2pState.setNodeStatus(node.id, 'syncing'), true, 'Should successfully set the node status to syncing')
+  t.equal(await p2pState._setNodeStatus('0'.repeat(64), 'syncing'), false, 'Should return false if node ID is not found')
+  t.equal(await p2pState._setNodeStatus(node.id, 'syncing'), true, 'Should successfully set the node status to syncing')
   t.equal(p2pState.getNodeStatus(node.id), 'syncing', 'Should set the node status to syncing and retrieve the status')
   t.equal(await p2pState._updateNodeStatus(node, 'active'), true, 'Should successfully set the node status to active')
   t.equal(p2pState.getNodeStatus(node.id), 'active', 'Should set the node status to active and retrieve the status')

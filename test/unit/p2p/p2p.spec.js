@@ -10,7 +10,7 @@ const Storage = require('../../../src/storage')
 const Crypto = require('../../../src/crypto/index')
 const Network = require('../../../src/network/index')
 
-const { readLogFile } = require('../../includes/utils-log')
+// const { readLogFile } = require('../../includes/utils-log')
 const { clearTestDb, createTestDb } = require('../../includes/utils-storage')
 // const { sleep } = require('../../../src/utils')
 // const { isValidHex } = require('../../includes/utils')

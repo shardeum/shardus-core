@@ -1,19 +1,20 @@
 const test = require('tap').test
-// const fs = require('fs')
+const fs = require('fs')
 const path = require('path')
 const axios = require('axios')
-// const { spawn } = require('child_process')
+const { fork } = require('child_process')
 
 const Shardus = require('../../../src/shardus')
 const { sleep } = require('../../../src/utils')
-// const { readLogFile, resetLogFile } = require('../../includes/utils-log')
-// const { clearTestDb } = require('../../includes/utils-storage')
+const { readLogFile } = require('../../includes/utils-log')
+const { createTestDb, clearTestDb } = require('../../includes/utils-storage')
 const startUtils = require('../../../tools/server-start-utils/index')('../../../', './instances')
+const { isValidHex } = require('../../includes/utils')
 
 // let newConfStorage, shardus
 let shardus
 let config = require(path.join(__dirname, '../../../config/server.json'))
-// let confStorage = module.require(`../../../config/storage.json`)
+let confStorage = module.require(`../../../config/storage.json`)
 config.baseDir = '.'
 config.log.confFile = 'config/logs.json'
 config.storage.confFile = './config/storage.json'
@@ -51,7 +52,8 @@ test('testing /exit endpoint', { timeout: 20000 }, async t => {
   t.end()
 })
 
-test('Testing getCycleMarkerInfo', { skip: false, timeout: 50000 }, async t => {
+// TODO: use shardus instance from sever-start-util for this test
+test('Testing getCycleMarkerInfo', { skip: true, timeout: 50000 }, async t => {
   createTestDb(confStorage, '../../../db/db.test.sqlite')
   let { cycleMarkerInfo, nodeAddress } = await requestFromChild('getCycleMarkerInfo')
   const diff = Date.now() - (cycleMarkerInfo.currentTime * 1000)
@@ -70,7 +72,8 @@ test('Testing getCycleMarkerInfo', { skip: false, timeout: 50000 }, async t => {
   t.end()
 })
 
-test('Testing getLatestCycles method', { skip: false, timeout: 50000 }, async t => {
+// TODO: use shardus instance from sever-start-util for this test
+test('Testing getLatestCycles method', { skip: true, timeout: 50000 }, async t => {
   createTestDb(confStorage, '../../../db/db.test.sqlite')
   let { latestCycles } = await requestFromChild('getLatestCycles')
   t.equal(Array.isArray(latestCycles), true, 'latestCycles should be an array')
@@ -87,7 +90,8 @@ test('Testing getLatestCycles method', { skip: false, timeout: 50000 }, async t 
   t.end()
 })
 
-test('Testing _join method', { skip: false, timeout: 50000 }, async t => {
+// TODO: use shardus instance from sever-start-util for this test
+test('Testing _join method', { skip: true, timeout: 50000 }, async t => {
   createTestDb(confStorage, '../../../db/db.test.sqlite')
   let { joined } = await requestFromChild('_join')
   t.equal(joined, true, '_join method should return true if join is successful')
@@ -99,7 +103,8 @@ test('Testing _join method', { skip: false, timeout: 50000 }, async t => {
   t.end()
 })
 
-test('Testing _submitJoin method', { skip: false, timeout: 50000 }, async t => {
+// TODO: use shardus instance from sever-start-util for this test
+test('Testing _submitJoin method', { skip: true, timeout: 50000 }, async t => {
   createTestDb(confStorage, '../../../db/db.test.sqlite')
   let { joinRequest } = await requestFromChild('_submitJoin')
   const log = readLogFile('main')

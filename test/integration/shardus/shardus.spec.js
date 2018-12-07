@@ -19,26 +19,8 @@ async function init (loggerConf = null, externalPort = null) {
   p2p = instances.p2p
 }
 
-test('Testing milestone-5 join procedure', { timeout: 100000, skip: false }, async t => {
-  await startUtils.startServer(9001) // start seed Node
-  await startUtils.startServer(9002) // start second Node
-  await sleep(config.cycleDuration * 2.0 * 1000)
-
-  let receivedRequests = await startUtils.getRequests(9001)
-  let joinRequest = receivedRequests.find(r => r.url === '/join' && r.method === 'POST')
-  let secondNodeId = joinRequest.body.nodeInfo.address
-
-  await sleep(config.cycleDuration * 1.0 * 1000)
-  let stateOfSeedNode = await startUtils.getState(9001)
-
-  t.equal(joinRequest.body.nodeInfo.externalPort, 9002, 'Should seedNode receive join request made by second node')
-  t.notEqual(stateOfSeedNode.nodes.current[secondNodeId], undefined, 'Should have second node Id in the current node list of seedNode')
-  await startUtils.deleteAllServers()
-  t.end()
-})
-
 test('Testing /join API endpoint in shardus class', { timeout: 100000, skip: false }, async t => {
-  await startUtils.startServer(9001)
+  await startUtils.startServer(9001, 9005)
   await init(null, 9002)
   let joinRequest = await p2p._createJoinRequest()
   let response = await axios.post(`http://127.0.0.1:9001/join`, joinRequest)
@@ -55,7 +37,7 @@ test('Testing /join API endpoint in shardus class', { timeout: 100000, skip: fal
 })
 
 test('Testing /cyclemarker API endpoint', { timeout: 100000, skip: false }, async t => {
-  await startUtils.startServer(9001)
+  await startUtils.startServer(9001, 9005)
   await sleep(config.cycleDuration * 2.5 * 1000)
   const response = await axios.get(`http://127.0.0.1:9001/cyclemarker`)
   const cyclemarker = response.data

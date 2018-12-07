@@ -8,7 +8,6 @@ const { getInstances } = module.require('../../includes/utils-class')
 const { clearTestDb } = module.require('../../includes/utils-storage')
 const { sleep } = require('../../../src/utils')
 const startUtils = require('../../../tools/server-start-utils/index')('../../../', './instances')
-// let storage, logger, crypto, newConfStorage
 let p2p
 // let config = module.require(path.join(__dirname, '../../../config/server.json'))
 
@@ -18,9 +17,8 @@ async function init (loggerConf = null, externalPort = null) {
 }
 
 test('Testing P2P integrated methods with a seedNode up', { timeout: 100000, skip: false }, async t => {
-  await startUtils.startServer(9001)
+  await startUtils.startServer(9001, 9005)
   await init(null, 9002)
-  // await p2p.discoverNetwork()
   let joinRequest = await p2p._createJoinRequest('abc123')
   t.match(joinRequest, {
     cycleMarker: /[0-9a-fA-F]+/,
@@ -55,52 +53,18 @@ test('Testing P2P integrated methods with a seedNode up', { timeout: 100000, ski
   }
   t.equal(shutdown.data.success, true, 'should shutdown the server correctly')
   await startUtils.deleteAllServers()
-  t.end()
 })
 
-test('Testing discoverNetwork method with a seednode up', { timeout: 100000, skip: false }, async t => {
-  await startUtils.startServer(9001)
-  await sleep(1000)
+// TODO: use shardus instance from sever-start-util for this test
+test('Testing startup method with a seednode up', { timeout: 100000, skip: true }, async t => {
+  await startUtils.startServer(9001, 9005, true)
   await init(null, 9002)
-  await p2p.discoverNetwork()
-  const response = await axios.get(`http://127.0.0.1:9001/cyclemarker`)
-  let thisNodeInfo = p2p._getThisNodeInfo()
-  await sleep(2000)
-  await startUtils.deleteAllServers()
-  await sleep(3000)
-  t.notEqual(response.data.nodesJoined.indexOf(thisNodeInfo.publicKey), -1, 'Should included this node in joined list')
+  let startup = await p2p.startup()
+  t.equal(startup, true, 'Should return true if startup is successful')
   if (confStorage) {
     confStorage.options.storage = 'db/db.sqlite'
     fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
     clearTestDb()
   }
-  t.end()
-})
-
-test('Testing join procedure with 1 seed node and 3 normal nodes', { timeout: 100000, skip: false }, async t => {
-  startUtils.startServer(9001)
-  await sleep(500)
-  startUtils.startServers(3, 9002)
-  await sleep(config.cycleDuration * 2.9 * 1000) // waiting unitl third cycle to check join result
-  // await sleep(config.cycleDuration * 1.9 * 1000) // waiting unitl third cycle to check join result
-  let response = await axios.get(`http://127.0.0.1:9001/cyclemarker`)
-  let joined = response.data.nodesJoined.map(n => n)
-  if (joined.length < 3) {
-    console.log(joined)
-    console.log('waiting for another cycle...')
-    await sleep(config.cycleDuration * 1 * 1000) // waiting for one more cycle if all 3 nodes haven't been accepted yet
-    response = await axios.get(`http://127.0.0.1:9001/cyclemarker`)
-    response.data.nodesJoined.forEach(n => {
-      if (joined.indexOf(n) === -1) joined.push(n)
-    })
-  }
-  console.log(joined)
   await startUtils.deleteAllServers()
-  t.equal(joined.length, 3, 'Should have 3 nodes joined in second cycle')
-  if (confStorage) {
-    confStorage.options.storage = 'db/db.sqlite'
-    fs.writeFileSync(path.join(__dirname, `../../../config/storage.json`), JSON.stringify(confStorage, null, 2))
-    clearTestDb()
-  }
-  t.end()
 })

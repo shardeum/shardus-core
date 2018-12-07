@@ -17,7 +17,6 @@ process.on('message', async (msg) => {
       let cycleMarkerInfo
       let checkInterval = setInterval(async () => {
         cycleMarkerInfo = shardus.p2p.getCycleMarkerInfo()
-        // console.log(cycleMarkerInfo)
         if (cycleMarkerInfo.cycleCounter === 1 || cycleMarkerInfo.cycleCounter > 1) { // wait until second cycle
           clearInterval(checkInterval)
           await sleep(5000)
