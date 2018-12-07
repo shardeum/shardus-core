@@ -1,6 +1,4 @@
 
-const cryptoRaw = require('shardus-crypto-utils')
-cryptoRaw('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
 class Consensus {
   constructor (config, logger, crypto, p2p, storage, nodeList, applicationInterfaceImpl) {
     this.config = config
@@ -30,7 +28,7 @@ class Consensus {
    */
   async onTransaction (shardusTransaction) {
     this.mainLogger.debug(`Start of onTransaction(${shardusTransaction})`)
-    const transHash = cryptoRaw.hashObj(shardusTransaction.inTransaction)
+    const transHash = this.crypto.hash(shardusTransaction.inTransaction)
     this.pendingTransactions[transHash] = shardusTransaction
     this.mainLogger.debug(`End of onTransaction(${shardusTransaction})`)
   }
@@ -85,11 +83,10 @@ class Consensus {
   createReciept (tx, state) {
     let receipt = {
       stateId: state,
-      txHash: cryptoRaw.hashObj(tx),
+      txHash: this.crypto.hash(tx),
       time: Date.now()
     }
     receipt = this.crypto.sign(receipt) // sign with this node's key
-    // cryptoRaw.signObj(reciept, validator.secretKey, validator.publicKey)
     return receipt
   }
 
@@ -109,7 +106,7 @@ class Consensus {
 
       // ToDo: Revisit this check
       // check that the tx hash matches the receipt
-      // let txhash = this.crypto.hash(transaction) // todo use this instead: cryptoRaw.hashObj(transaction)
+      // let txhash = this.crypto.hash(transaction)
       // if (txhash !== receipt.txHash) {
       //   return false
       // }
