@@ -369,7 +369,7 @@ class P2PState {
 
       // Check if we are better than the lowest best
       if (!this._isBetterThanLowestBest(joinRequest, lowest)) {
-        this.mainLogger.debug(`${joinRequest.selectionNum} is not better than ${lowest.selectionNum}. Node ${joinRequest.nodeInfo.privateKey} not added to this cycle.`)
+        this.mainLogger.debug(`${joinRequest.selectionNum} is not better than ${lowest.selectionNum}. Node ${joinRequest.nodeInfo.publicKey} not added to this cycle.`)
         return false
       }
     }
@@ -625,6 +625,7 @@ class P2PState {
       if (!node1[property] || !node2[property]) return false
       if (node1[property] !== node2[property]) return false
     }
+    return true
   }
 
   getNode (id) {

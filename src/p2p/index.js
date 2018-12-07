@@ -310,7 +310,7 @@ class P2P {
   }
 
   async _submitWhenNot2nd (nodes, route, message) {
-    this.mainLogger.debug(`Submitting message: ${JSON.stringify(message)} on route: ${route} whenever it's not the second cycle...`)
+    this.mainLogger.debug(`Submitting message: ${JSON.stringify(message)} on route: ${route} whenever it's not the second quarter of cycle...`)
     const { currentTime, cycleStart, cycleDuration } = await this._fetchCycleMarkerInternal(this.seedNodes)
     if (this._isIn2ndQuarter(currentTime, cycleStart, cycleDuration)) {
       await utils.sleep(0.25 * cycleDuration * 1000)
