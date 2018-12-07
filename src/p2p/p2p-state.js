@@ -340,12 +340,45 @@ class P2PState {
     return true
   }
 
+  _isBetterThanLowestBest (request, lowest) {
+    if (!this.crypto.isGreaterHash(request.selectionNum, lowest.selectionNum)) {
+      return false
+    }
+    return true
+  }
+
+  // Check if better than lowest best, if not, return false: check that we're not propagating
+  // Insert sorted
+  // If length of array is bigger than our max nodes per cycle, drop lowest
+
   _addToBestJoinRequests (joinRequest) {
-    // TODO: implement full logic for filtering join request
     const bestRequests = this._getBestJoinRequests()
     const { nodeInfo } = joinRequest
+
+    // Return if we already know about this node
     if (this._isKnownNode(nodeInfo)) return false
-    bestRequests.push(joinRequest)
+
+    // TODO: calculate how many nodes to accept this cycle
+    const toAccept = 1
+
+    // If length of array is bigger, do this precheck
+    const competing = bestRequests.length >= toAccept
+    if (competing) {
+      const lastIndex = bestRequests.length - 1
+      const lowest = bestRequests[lastIndex]
+
+      // Check if we are better than the lowest best
+      if (!this._isBetterThanLowestBest(joinRequest, lowest)) {
+        this.mainLogger.debug(`${joinRequest.selectionNum} is not better than ${lowest.selectionNum}. Node ${joinRequest.nodeInfo.privateKey} not added to this cycle.`)
+        return false
+      }
+    }
+
+    // Insert sorted into best list if we made it this far
+    utils.insertSorted(bestRequests, joinRequest, (a, b) => (a.selectionNum < b.selectionNum ? 1 : (a.selectionNum > b.selectionNum ? -1 : 0)))
+
+    // If we were competing for a spot, we have to get rid of the weakest link
+    if (competing) bestRequests.pop()
     return true
   }
 

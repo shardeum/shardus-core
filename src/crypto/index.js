@@ -51,6 +51,10 @@ class Crypto {
     return crypto.hashObj(obj, true)
   }
 
+  isGreaterHash (hash1, hash2) {
+    return hash1 > hash2
+  }
+
   getComputeProofOfWork (seed, difficulty) {
     return this._runProofOfWorkGenerator('./computePowGenerator.js', seed, difficulty)
   }
