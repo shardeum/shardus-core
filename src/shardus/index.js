@@ -174,6 +174,12 @@ class Shardus {
         throw new Error('Missing requried interface function. validateTransaction()')
       }
 
+      if (typeof (application.validateTxnFields) === 'function') {
+        applicationInterfaceImpl.validateTxnFields = async (inTx) => application.validateTxnFields(inTx)
+      } else {
+        throw new Error('Missing requried interface function. validateTxnFields()')
+      }
+
       if (typeof (application.apply) === 'function') {
         applicationInterfaceImpl.apply = async (inTx, receipt) => application.apply(inTx, receipt)
       } else {
