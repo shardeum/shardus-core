@@ -663,7 +663,9 @@ class P2P {
     // Add retrieved nodelist to the state
     await this.state.addNodes(nodelist)
 
-    const nodes = this.state.getAllNodes(this.id)
+    // TODO: When active nodes are synced, change nodes to allActiveNodes
+    // const nodes = this.state.getActiveNodes(this.id)
+    const nodes = this.seedNodes
     const cycleChain = await this._fetchLatestCycleChain(this.seedNodes, nodes)
     this.mainLogger.debug(`Retrieved cycle chain: ${JSON.stringify(cycleChain)}`)
     try {
