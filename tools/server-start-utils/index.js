@@ -3,56 +3,77 @@ const path = require('path')
 const { fork } = require('child_process')
 const axios = require('axios')
 const merge = require('deepmerge')
+const Shardus = require('../../src/shardus')
 
 const LOCAL_ADDRESS = '127.0.0.1'
-const NODE_UP_TIMEOUT = process.env.NODE_UP_TIMEOUT || 5000
+const NODE_UP_TIMEOUT = process.env.NODE_UP_TIMEOUT || 60000
 
 class ServerStartUtils {
-  constructor (baseDirPath, instDirPath) {
-    this.name = 'shardus-server'
-    this.baseDirPath = baseDirPath
-    this.instDirPath = instDirPath
-    this.serverPath = path.join(baseDirPath, 'server.js')
+  constructor (config = {}) {
+    Object.assign(this, merge(this, config))
+    if (!this.baseDir) this.baseDir = '.'
+    if (!this.instanceDir) this.instanceDir = path.join(this.baseDir, 'instances')
+    if (!this.instanceNames) this.instanceNames = 'shardus-server'
+    if (!this.serverPath) this.serverPath = path.join(this.baseDir, 'server.js')
+    if (!this.verbose) this.verbose = false
+    // Save default server configs
+    this.defaultConfigs = _readJsonFiles(path.join(this.baseDir, 'config'))
+    // Ensure instance dir exists
+    _ensureExists(this.instanceDir)
+    // Create an obj to hold the servers we're gonna start
     this.servers = {}
-    // Save default configs
-    this.defaultConfigs = _readJsonFiles(path.join(baseDirPath, 'config'))
-    // Create instance dir
-    _ensureExists(instDirPath)
   }
 
   setInstanceNames (name) {
-    this.name = name
+    this.instanceNames = name
   }
 
-  setDefaultConfig (changes) {
-    this.defaultConfigs = merge(this.defaultConfigs, changes)
+  setDefaultConfig (changes = {}) {
+    if (Object.keys(changes).length !== 0) {
+      this.defaultConfigs = merge(this.defaultConfigs, changes)
+    }
   }
 
-  async setServerConfig (extPort, changes) {
-    const server = this.servers[extPort]
-    if (!server) return console.log('Could not find server on port', extPort)
-    await this.stopServer(server.extPort)
+  async setServerConfig (port, changes = {}) {
+    if (Object.keys(changes).length === 0) return
+    const server = this.servers[port]
+    if (!server) return this._log('Could not find server on port', port)
+    try {
+      await this.stopServer(port)
+    } catch (e) {
+      throw e
+    }
     let serverConfigs = _readJsonFiles(path.join(server.baseDir, 'config'))
     let changedConfigs = merge(serverConfigs, changes)
     _writeJsonFiles(path.join(server.baseDir, 'config'), changedConfigs)
   }
 
-  async startServer (extPort = null, intPort = null, outputToFile = true) {
-    if (!extPort) extPort = this.defaultConfigs.server.ip.externalPort
-    if (!intPort) intPort = this.defaultConfigs.server.ip.internalPort
-    let server = this.servers[extPort]
+  async startServer (extPort = null, intPort = null, changes = null, outputToFile = true, instance = false) {
+    extPort = extPort || _get(changes, 'server.ip.externalPort') || this.defaultConfigs.server.ip.externalPort
+    intPort = intPort || _get(changes, 'server.ip.internalPort') || this.defaultConfigs.server.ip.internalPort
+    let server = this.servers[extPort] || this.servers[intPort]
     switch (true) {
       // If no server existed on this port...
       case (!_exists(server)): {
+        this._log(`Attempting to start server on ports ${extPort}:${intPort}...`)
         // Copy defaultConfigs and edit ports and baseDir
-        let configs = JSON.parse(JSON.stringify(this.defaultConfigs))
-        configs.server.baseDir = path.join(this.instDirPath, `${this.name}-${extPort}`)
+        const configs = changes ? merge(this.defaultConfigs, changes) : this.defaultConfigs
+        configs.server.baseDir = path.join(this.instanceDir, `${this.instanceNames}-${extPort}`)
         configs.server.ip.externalPort = extPort
         configs.server.ip.internalPort = intPort
         // Create new baseDir for server and write configs
         await _createBaseDir(configs.server.baseDir, configs)
-        // Fork a server process
-        let serverProc = await _forkServer(this.serverPath, configs.server.ip.externalPort, configs.server.baseDir, outputToFile)
+        // Fork a server process or instance
+        let serverProc
+        try {
+          if (instance) {
+            serverProc = await _startInstance(configs)
+          } else {
+            serverProc = await _forkServer(this.serverPath, configs.server.ip.externalPort, configs.server.baseDir, outputToFile)
+          }
+        } catch (e) {
+          throw e
+        }
         // Save it
         server = {
           process: serverProc,
@@ -61,21 +82,36 @@ class ServerStartUtils {
           intPort: configs.server.ip.internalPort
         }
         this.servers[server.extPort] = server
-        console.log(`Successfully started server on ext:int ports ${server.extPort}:${server.intPort}`)
+        this.servers[server.intPort] = server
+        this._log(`Successfully started server on ports ${server.extPort}:${server.intPort}`)
         break
       }
       // If a server once existed on this port...
       case (_exists(server) && _exists(server.baseDir) && !_exists(server.process)): {
+        this._log(`Attempting to restart server on ports ${server.extPort}:${server.intPort}...`)
+        // If changes given, update the servers config
+        if (changes) {
+          try {
+            await this.setServerConfig(server.extPort, changes)
+          } catch (e) {
+            throw e
+          }
+        }
         // Fork a server process from the existing baseDir
-        let serverProc = await _forkServer(this.serverPath, extPort, server.baseDir, outputToFile)
+        let serverProc
+        try {
+          serverProc = await _forkServer(this.serverPath, server.extPort, server.baseDir, outputToFile)
+        } catch (e) {
+          throw e
+        }
         // Save the process
         server.process = serverProc
-        console.log(`Successfully restarted server on ext:int ports ${server.extPort}:${server.intPort}`)
+        this._log(`Successfully restarted server on ports ${server.extPort}:${server.intPort}`)
         break
       }
       // If a server is running on this port...
       case (_exists(server) && _exists(server.baseDir) && _exists(server.process)): {
-        console.log(`Server already running on ext:int ports ${server.extPort}:${server.intPort}`)
+        this._log(`Did not start server on ports ${extPort}:${intPort}; Server already running on ports ${server.extPort}:${server.intPort}`)
         server = null
         break
       }
@@ -83,77 +119,118 @@ class ServerStartUtils {
     return server
   }
 
-  async stopServer (extPort) {
-    const server = this.servers[extPort]
-    if (!server) return console.log('Could not find server on port', extPort)
-    if (server.process === null) return console.log('Server is already stopped on port', extPort)
-    server.process.kill()
-    const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${extPort}/cyclemarker`, false)
-    if (!success) throw new Error('Failed to stop server on port ' + extPort)
-    server.process = null
-    console.log('Stopped server on ext port', extPort)
+  async startServerInstance (extPort = null, intPort = null, changes = null, outputToFile = true) {
+    let server = await this.startServer(extPort, intPort, changes, outputToFile, true)
+    return server.process
+  }
+
+  async stopServer (port) {
+    const server = this.servers[port]
+    if (!server) return this._log('Could not find server on port', port)
+    if (server.process === null) return this._log('Server is already stopped on port', port)
+    if (server.process instanceof Shardus) {
+      server.process.exitHandler._cleanupSync()
+      await server.process.exitHandler._cleanupAsync()
+      server.process = null
+    } else {
+      server.process.kill()
+      const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${port}/cyclemarker`, false)
+      if (!success) throw new Error('Failed to stop server on port ' + port)
+      server.process = null
+    }
+    this._log('Stopped server on port', port)
     return server
   }
 
-  async deleteServer (extPort) {
-    const server = this.servers[extPort]
-    if (!server) return console.log('Could not find server on ext port', extPort)
-    await this.stopServer(server.extPort)
+  async deleteServer (port) {
+    const server = this.servers[port]
+    if (!server) return this._log('Could not find server on port', port)
+    try {
+      await this.stopServer(port)
+    } catch (e) {
+      throw e
+    }
     _rimraf(server.baseDir)
-    delete this.servers[extPort]
-    console.log('Deleted server that was on ext port', extPort)
+    delete this.servers[server.extPort]
+    delete this.servers[server.intPort]
+    this._log('Deleted server that was on port', port)
   }
 
-  async startServers (num, extPort = null, intPort = null, wait = 3500) {
+  async startServers (num, extPort = null, intPort = null, changes = null, outputToFile = true, instance = false, wait = 0) {
     if (!extPort) extPort = this.defaultConfigs.server.ip.externalPort
     if (!intPort) intPort = this.defaultConfigs.server.ip.internalPort
-    console.log(`Starting ${num} nodes from ext:int port ${extPort}:${intPort}...`)
-    await this.startServer(extPort, intPort)
+    this._log(`Starting ${num} nodes from port ${extPort}:${intPort}...`)
+    await this.startServer(extPort, intPort, changes, outputToFile, instance)
+
+    await _sleep(wait)
 
     let promises = []
     for (let i = 1; i < num; i++) {
-      promises.push(this.startServer(extPort + i, intPort + i))
+      promises.push(this.startServer(extPort + i, intPort + i, changes, outputToFile, instance))
     }
 
     try {
       await Promise.all(promises)
     } catch (e) {
-      console.log(e)
+      this._log(e)
     }
-
-    await _sleep(wait)
 
     return this.servers
   }
 
-  async startAllStoppedServers (outputToFile = true) {
+  async startAllStoppedServers (changes = null, outputToFile = true, instance = false) {
     let promises = []
-    for (const extPort in this.servers) {
-      const server = this.servers[extPort]
+    for (const port in this.servers) {
+      const server = this.servers[port]
       if (server.process === null) {
-        promises.push(this.startServer(server.extPort, server.intPort, outputToFile))
+        server.process = 'starting...'
+        let promise = this.startServer(server.extPort, server.intPort, changes, outputToFile, instance).catch(err => {
+          server.process = null
+          throw err
+        })
+        promises.push(promise)
       }
     }
     await Promise.all(promises)
   }
 
   async stopAllServers () {
-    const promises = Object.keys(this.servers).map(extPort => this.stopServer(extPort))
-    await Promise.all(promises)
+    const promises = Object.keys(this.servers).map(port => this.stopServer(port))
+    try {
+      await Promise.all(promises)
+    } catch (e) {
+      throw new Error('Failed to stop all servers', e)
+    }
   }
 
   async deleteAllServers () {
     const promises = Object.keys(this.servers).map(extPort => this.deleteServer(extPort))
-    await Promise.all(promises)
+    try {
+      await Promise.all(promises)
+    } catch (e) {
+      throw new Error('Failed to delete all servers', e)
+    }
   }
-}
 
-module.exports = function (relBaseDirPath, relInstDirPath) {
-  if (!relInstDirPath) relInstDirPath = path.join(relBaseDirPath, 'instances')
-  let parentModuleDirname = path.parse(module.parent.filename).dir
-  let absBaseDirPath = path.resolve(path.join(parentModuleDirname, relBaseDirPath))
-  let absInstDirPath = path.resolve(path.join(parentModuleDirname, relInstDirPath))
-  return new ServerStartUtils(absBaseDirPath, absInstDirPath)
+  async getRequests (port) {
+    const server = this.servers[port]
+    if (!server) return this._log('Could not find server on port', port)
+    const response = await axios.get(`http://${LOCAL_ADDRESS}:${port}/test`)
+    if (!response) throw new Error('Failed to get requests from server on port ' + port)
+    return response.data.requests
+  }
+
+  async getState (port) {
+    const server = this.servers[port]
+    if (!server) return this._log('Could not find server on port', port)
+    const response = await axios.get(`http://${LOCAL_ADDRESS}:${port}/test`)
+    if (!response) throw new Error('Failed to get requests from server on port ' + port)
+    return response.data.state
+  }
+
+  _log (...params) {
+    if (this.verbose) console.log(...params)
+  }
 }
 
 async function _forkServer (serverPath, extPort, baseDir, outputToFile = true) {
@@ -165,16 +242,27 @@ async function _forkServer (serverPath, extPort, baseDir, outputToFile = true) {
   } else {
     serverProc = fork(serverPath, [baseDir])
   }
-  const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${extPort}/cyclemarker`)
+  serverProc.on('error', err => { throw new Error(`Server at ${extPort} failed to start: error ${err}`) })
+  serverProc.on('exit', code => { throw new Error(`Server at ${extPort} failed to start: exit code ${code}`) })
+  const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${extPort}/nodeinfo`, data => _exists(data.nodeInfo.id))
   if (!success) throw new Error(`Server at ${extPort} failed to start.`)
+  serverProc.removeAllListeners()
   return serverProc
+}
+
+async function _startInstance (configs) {
+  const instance = new Shardus(configs.server)
+  instance.start()
+  const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${configs.server.ip.externalPort}/nodeinfo`, data => _exists(data.nodeInfo.id))
+  if (!success) throw new Error(`Server at ${configs.server.ip.externalPort} failed to start.`)
+  return instance
 }
 
 async function _sleep (ms = 0) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-async function _awaitCondition (host, available = true) {
+async function _awaitCondition (host, successFn, available = true) {
   const startTime = new Date().valueOf()
 
   let success = true
@@ -188,8 +276,10 @@ async function _awaitCondition (host, available = true) {
 
     // try the condition
     try {
-      await axios(host)
-      if (available) break
+      const resp = await axios(host)
+      let successful
+      try { successful = successFn(resp.data) } catch (e) { throw e }
+      if (available && successful) break
     } catch (e) {
       if (!available) break
     }
@@ -266,4 +356,24 @@ function _rimraf (dir) {
 
 function _exists (thing) {
   return (typeof thing !== 'undefined' && thing !== null)
+}
+
+function _get (obj, nestedProp) {
+  const props = nestedProp.split('.')
+  for (const prop of props) {
+    if (!obj || !obj.hasOwnProperty(prop)) {
+      return undefined
+    }
+    obj = obj[prop]
+  }
+  return obj
+}
+
+module.exports = function (config = {}) {
+  const relBaseDir = config.baseDir || '.'
+  const relInstanceDir = config.instanceDir || path.join(relBaseDir, 'instances')
+  const parentModuleDirname = path.parse(module.parent.filename).dir
+  config.baseDir = path.resolve(path.join(parentModuleDirname, relBaseDir))
+  config.instanceDir = path.resolve(path.join(parentModuleDirname, relInstanceDir))
+  return new ServerStartUtils(config)
 }
