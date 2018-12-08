@@ -103,6 +103,24 @@ class Shardus {
     return this
   }
 
+  validateTransactionTimestamp (txnTimestamp) {
+    this.mainLogger.debug(`Start of validateTransactionTimestamp(${txnTimestamp})`)
+    let transactionExpired = false
+    const txnExprationTime = this.config.transactionExpireTime
+    const currNodeTimestamp = Date.now()
+
+    this.mainLogger(`Transaction Timestamp: ${txnTimestamp} CurrNodeTimestamp: ${currNodeTimestamp} 
+    txnExprationTime: ${txnExprationTime}`)
+    const txnAge = currNodeTimestamp - txnTimestamp
+    this.mainLogger(`TransactionAge: ${txnAge}`)
+    if (txnAge <= txnExprationTime) {
+      this.mainLogger.error(`Transaction Timestamp is accepted`)
+      transactionExpired = true
+    }
+    this.mainLogger.debug(`End of validateTransactionTimestamp(${txnTimestamp})`)
+    return transactionExpired
+  }
+
   /**
    * Handle incoming tranaction requests
    */
@@ -115,6 +133,19 @@ class Shardus {
     try {
       if (typeof inTransaction !== 'object') {
         return { success: false, reason: `Invalid Transaction! ${inTransaction}` }
+      }
+
+      /**
+       * Perform basic validation of the transaction fields. Also, validate the transaction timestamp
+       */
+      this.mainLogger.debug(`Performing initial validation of the transaction`)
+      const initValidationResp = this.app.validateTxnFields(inTransaction)
+      this.mainLogger.debug(`InitialValidationResponse: ${JSON.stringify(initValidationResp)}`)
+
+      const txnTimestamp = initValidationResp.txnTimestamp
+      if (!this.validateTransactionTimestamp(txnTimestamp)) {
+        this.fatalLogger.fatal(`Transaction Expired: ${inTransaction}`)
+        return { success: false, reason: 'Transaction Expired' }
       }
 
       /**
