@@ -205,7 +205,7 @@ class Shardus {
       }
 
       if (typeof (application.validateTxnFields) === 'function') {
-        applicationInterfaceImpl.validateTxnFields = async (inTx) => application.validateTxnFields(inTx)
+        applicationInterfaceImpl.validateTxnFields = (inTx) => application.validateTxnFields(inTx)
       } else {
         throw new Error('Missing requried interface function. validateTxnFields()')
       }
