@@ -10,6 +10,7 @@
   "difficulty": 2,
   "queryDelay": 1,
   "netadmin": "758b1c119412298802cd28dbfa394cdfeecc4074492d60844cc192d632d84de3",
+  "transactionExpireTime": 5,
   "ip": {
     "externalIp": "127.0.0.1",
     "externalPort": 9001,
