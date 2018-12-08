@@ -103,21 +103,21 @@ class Shardus {
     return this
   }
 
-  validateTransactionTimestamp (txnTimestamp) {
-    this.mainLogger.debug(`Start of validateTransactionTimestamp(${txnTimestamp})`)
+  isTransactionTimestampExpired (txnTimestamp) {
+    this.mainLogger.debug(`Start of isTransactionTimestampExpired(${txnTimestamp})`)
     let transactionExpired = false
     const txnExprationTime = this.config.transactionExpireTime
     const currNodeTimestamp = Date.now()
 
-    this.mainLogger(`Transaction Timestamp: ${txnTimestamp} CurrNodeTimestamp: ${currNodeTimestamp} 
+    this.mainLogger.debug(`Transaction Timestamp: ${txnTimestamp} CurrNodeTimestamp: ${currNodeTimestamp} 
     txnExprationTime: ${txnExprationTime}`)
     const txnAge = currNodeTimestamp - txnTimestamp
-    this.mainLogger(`TransactionAge: ${txnAge}`)
-    if (txnAge <= txnExprationTime) {
-      this.mainLogger.error(`Transaction Timestamp is accepted`)
+    this.mainLogger.debug(`TransactionAge: ${txnAge}`)
+    if (txnAge >= (txnExprationTime * 1000)) {
+      this.fatalLogger.error(`Transaction Expired`)
       transactionExpired = true
     }
-    this.mainLogger.debug(`End of validateTransactionTimestamp(${txnTimestamp})`)
+    this.mainLogger.debug(`End of isTransactionTimestampExpired(${txnTimestamp})`)
     return transactionExpired
   }
 
@@ -134,7 +134,6 @@ class Shardus {
       if (typeof inTransaction !== 'object') {
         return { success: false, reason: `Invalid Transaction! ${inTransaction}` }
       }
-
       /**
        * Perform basic validation of the transaction fields. Also, validate the transaction timestamp
        */
@@ -143,7 +142,7 @@ class Shardus {
       this.mainLogger.debug(`InitialValidationResponse: ${JSON.stringify(initValidationResp)}`)
 
       const txnTimestamp = initValidationResp.txnTimestamp
-      if (!this.validateTransactionTimestamp(txnTimestamp)) {
+      if (this.isTransactionTimestampExpired(txnTimestamp)) {
         this.fatalLogger.fatal(`Transaction Expired: ${inTransaction}`)
         return { success: false, reason: 'Transaction Expired' }
       }
