@@ -21,11 +21,11 @@ class P2P {
     this.difficulty = config.difficulty
     this.queryDelay = config.queryDelay
     this.netadmin = config.netadmin || 'default'
-
-    this.state = new P2PState(config, this.logger, this.storage, this, this.crypto)
-
     this.seedNodes = null
     this.gossipHandlers = {}
+    this.gossipRecipients = config.gossipRecipients
+
+    this.state = new P2PState(config, this.logger, this.storage, this, this.crypto)
   }
 
   async init () {
@@ -830,9 +830,9 @@ class P2P {
     this.mainLogger.debug(`Start of sendGossip(${JSON.stringify(payload)})`)
     const gossipPayload = { type: type, data: payload }
     try {
-      const allNodes = this.state.getAllNodes(this.id)
-      this.mainLogger.debug(`Gossiping join request to these nodes: ${JSON.stringify(allNodes)}`)
-      await this.tell(allNodes, 'gossip', gossipPayload)
+      const recipients = getRandom(this.state.getAllNodes(this.id), this.gossipRecipients)
+      this.mainLogger.debug(`Gossiping join request to these nodes: ${JSON.stringify(recipients)}`)
+      await this.network.tell(recipients, 'gossip', gossipPayload)
     } catch (ex) {
       this.mainLogger.error(`Failed to sendGossip(${JSON.stringify(payload)}) Exception => ex`)
     }
@@ -857,11 +857,11 @@ class P2P {
   }
 
   /**
- * @param {route} example:- 'receipt', 'transaction'
+ * @param {type} example:- 'receipt', 'transaction'
  * @param {handler} example:- function
  */
-  registerGossipHandler (route, handler) {
-    this.gossipHandlers[route] = handler
+  registerGossipHandler (type, handler) {
+    this.gossipHandlers[type] = handler
   }
 
   async startup () {
@@ -890,6 +890,22 @@ function shuffleArray (array) {
     const j = Math.floor(Math.random() * (i + 1));
     [array[i], array[j]] = [array[j], array[i]]
   }
+}
+
+// From: https://stackoverflow.com/a/19270021
+function getRandom (arr, n) {
+  const result = new Array(n)
+  let len = arr.length
+  const taken = new Array(len)
+  if (n > len) {
+    throw new RangeError('getRandom: more elements taken than available')
+  }
+  while (n--) {
+    var x = Math.floor(Math.random() * len)
+    result[n] = arr[x in taken ? taken[x] : x]
+    taken[x] = --len in taken ? taken[len] : len
+  }
+  return result
 }
 
 module.exports = P2P

@@ -109,7 +109,7 @@ class Shardus {
     const txnExprationTime = this.config.transactionExpireTime
     const currNodeTimestamp = Date.now()
 
-    this.mainLogger.debug(`Transaction Timestamp: ${txnTimestamp} CurrNodeTimestamp: ${currNodeTimestamp} 
+    this.mainLogger.debug(`Transaction Timestamp: ${txnTimestamp} CurrNodeTimestamp: ${currNodeTimestamp}
     txnExprationTime: ${txnExprationTime}`)
     const txnAge = currNodeTimestamp - txnTimestamp
     this.mainLogger.debug(`TransactionAge: ${txnAge}`)
@@ -272,9 +272,9 @@ class Shardus {
     this._setupHeartbeat()
     this.crypto = new Crypto(this.logger, this.storage)
     await this.crypto.init()
-    const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay } = this.config
+    const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients } = this.config
     const ipInfo = this.config.ip
-    const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay }
+    const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients }
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network)
     await this.p2p.init()
 
