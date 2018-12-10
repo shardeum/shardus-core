@@ -107,7 +107,6 @@ function setupRoutes () {
   })
 
   this.registerInternal('active', async (payload) => {
-    // TODO: Add required signature to this route
     if (!payload) {
       this.mainLogger.debug('No payload provided with `active` request.')
       return
