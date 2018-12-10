@@ -3,7 +3,7 @@ exports.register = function (context) {
 }
 
 function setupRoutes () {
-  // ==== External Routes ====
+  // -------- EXTERNAL Routes ----------
 
   this.network.registerExternalGet('cyclemarker', (req, res) => {
     const cycleMarkerInfo = this.getCycleMarkerInfo()
@@ -36,37 +36,37 @@ function setupRoutes () {
     res.json({ nodeInfo })
   })
 
-  // ==== Internal Routes ====
+  // -------- INTERNAL Routes ----------
 
-  this.network.registerInternal('join', async (payload) => {
+  this.registerInternal('join', async (payload) => {
     const accepted = await this.addJoinRequest(payload, false)
     if (!accepted) return this.mainLogger.debug('Join request not accepted.')
     this.mainLogger.debug('Join request accepted!')
   })
 
   // Temp Gossip Endpoint
-  this.network.registerInternal('gossip', async (payload) => {
+  this.registerInternal('gossip', async (payload) => {
     const accepted = await this.handleGossip(payload, false)
     if (!accepted) return this.mainLogger.debug('Gossip Not Accepted.')
     this.mainLogger.debug('Gossip request accepted!')
   })
 
-  this.network.registerInternal('cyclemarker', async (payload, respond) => {
+  this.registerInternal('cyclemarker', async (payload, respond) => {
     const cycleMarkerInfo = this.getCycleMarkerInfo()
     await respond(cycleMarkerInfo)
   })
 
-  this.network.registerInternal('nodelisthash', async (payload, respond) => {
+  this.registerInternal('nodelisthash', async (payload, respond) => {
     const nodelistHash = this.getNodelistHash()
     await respond({ nodelistHash })
   })
 
-  this.network.registerInternal('nodelist', async (payload, respond) => {
+  this.registerInternal('nodelist', async (payload, respond) => {
     const nodelist = this.state.getAllNodes()
     await respond({ nodelist })
   })
 
-  this.network.registerInternal('cyclechainhash', async (payload, respond) => {
+  this.registerInternal('cyclechainhash', async (payload, respond) => {
     if (!payload) {
       this.mainLogger.debug('No payload provided with `cyclechainhash` request.')
       await respond({ cycleChainHash: null, error: 'no payload; start and end cycle required' })
@@ -87,7 +87,7 @@ function setupRoutes () {
     await respond({ cycleChainHash })
   })
 
-  this.network.registerInternal('cyclechain', async (payload, respond) => {
+  this.registerInternal('cyclechain', async (payload, respond) => {
     if (!payload) {
       this.mainLogger.debug('No payload provided with `cyclechain` request.')
       await respond({ cycleChain: null, error: 'no payload; start and end cycle required' })
@@ -106,7 +106,7 @@ function setupRoutes () {
     await respond({ cycleChain })
   })
 
-  this.network.registerInternal('active', async (payload) => {
+  this.registerInternal('active', async (payload) => {
     // TODO: Add required signature to this route
     if (!payload) {
       this.mainLogger.debug('No payload provided with `active` request.')
@@ -121,5 +121,26 @@ function setupRoutes () {
 
     // Add status update of given node to queue
     await this.state.addStatusUpdate(nodeId, 'active')
+  })
+
+  // -------- DEBUG Routes ----------
+
+  // Test route for the P2P.tell function
+  this.registerInternal('test1', async (payload) => {
+    if (!payload) {
+      console.log('no payload')
+      return
+    }
+    console.log(payload)
+  })
+
+  // Test route for the P2P.ask function
+  this.registerInternal('test2', async (payload, respond) => {
+    if (!payload) {
+      console.log('no payload')
+      return
+    }
+    console.log(payload)
+    await respond(payload)
   })
 }

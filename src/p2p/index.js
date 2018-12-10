@@ -127,9 +127,10 @@ class P2P {
 
   getPublicNodeInfo () {
     const id = this.id
+    const publicKey = this.crypto.getPublicKey()
     const ipInfo = this.getIpInfo()
     const status = { status: this.state.getNodeStatus(this.id) }
-    const nodeInfo = Object.assign({ id }, ipInfo, status)
+    const nodeInfo = Object.assign({ id, publicKey }, ipInfo, status)
     return nodeInfo
   }
 
@@ -315,7 +316,7 @@ class P2P {
     if (this._isIn2ndQuarter(currentTime, cycleStart, cycleDuration)) {
       await utils.sleep(0.25 * cycleDuration * 1000)
     }
-    await this.network.tell(nodes, route, message)
+    await this.tell(nodes, route, message)
   }
 
   async _attemptJoin (seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration) {
@@ -428,6 +429,7 @@ class P2P {
         let result = responses.add(query)
         if (result) return result
       } catch (e) {
+        this.mainLogger.debug(e)
         errors++
       }
     }
@@ -484,7 +486,7 @@ class P2P {
 
   async _fetchNodelistHash (nodes) {
     let queryFn = async (node) => {
-      const { nodelistHash } = await this.network.ask(node, 'nodelisthash')
+      const { nodelistHash } = await this.ask(node, 'nodelisthash')
       return { nodelistHash }
     }
     const { nodelistHash } = await this._robustQuery(nodes, queryFn)
@@ -493,7 +495,7 @@ class P2P {
 
   async _fetchVerifiedNodelist (nodes, nodelistHash) {
     let queryFn = async (node) => {
-      const { nodelist } = await this.network.ask(node, 'nodelist')
+      const { nodelist } = await this.ask(node, 'nodelist')
       return { nodelist }
     }
     let verifyFn = (nodelist) => this._verifyNodelist(nodelist, nodelistHash)
@@ -508,7 +510,7 @@ class P2P {
 
   async _fetchCycleMarkerInternal (nodes) {
     let queryFn = async (node) => {
-      const cycleMarkerInfo = await this.network.ask(node, 'cyclemarker')
+      const cycleMarkerInfo = await this.ask(node, 'cyclemarker')
       return cycleMarkerInfo
     }
     const cycleMarkerInfo = await this._robustQuery(nodes, queryFn)
@@ -517,7 +519,7 @@ class P2P {
 
   async _fetchCycleChainHash (nodes, start, end) {
     let queryFn = async (node) => {
-      const { cycleChainHash } = await this.network.ask(node, 'cyclechainhash', { start, end })
+      const { cycleChainHash } = await this.ask(node, 'cyclechainhash', { start, end })
       return { cycleChainHash }
     }
     const { cycleChainHash } = await this._robustQuery(nodes, queryFn)
@@ -527,7 +529,7 @@ class P2P {
 
   async _fetchVerifiedCycleChain (nodes, cycleChainHash, start, end) {
     let queryFn = async (node) => {
-      const { cycleChain } = await this.network.ask(node, 'cyclechain', { start, end })
+      const { cycleChain } = await this.ask(node, 'cyclechain', { start, end })
       return { cycleChain }
     }
     let verifyFn = (cycleChain) => this._verifyCycleChain(cycleChain, cycleChainHash)
@@ -596,7 +598,7 @@ class P2P {
     if (!active) return true
     const allNodes = this.state.getAllNodes(this.id)
     this.mainLogger.debug(`Gossiping join request to these nodes: ${JSON.stringify(allNodes)}`)
-    await this.network.tell(allNodes, 'join', joinRequest)
+    await this.tell(allNodes, 'join', joinRequest)
     return true
   }
 
@@ -652,7 +654,7 @@ class P2P {
     }
     this.mainLogger.info('Successfully joined the network!')
     this._setNodeId(nodeId)
-    // const testResponse = await this.network.ask({ internalIp: '127.0.0.1', internalPort: 9005 }, 'test2')
+    // const testResponse = await this.ask({ internalIp: '127.0.0.1', internalPort: 9005 }, 'test2')
     // console.log(JSON.stringify(testResponse))
     return true
   }
@@ -672,13 +674,21 @@ class P2P {
     this.mainLogger.info('Syncing to network...')
 
     // Get full node info for seed nodes
+    this.mainLogger.debug('Fetching seed node info...')
     this.seedNodes = await this._fetchSeedNodesInfo(seedNodes)
 
+    if (!isFirstSeed) {
+      await this.tell(this.seedNodes, 'test1', { test: 'test' })
+      await this.ask(this.seedNodes[0], 'test2', { test: 'test' }, true)
+    }
+
     // Get hash of nodelist
+    this.mainLogger.debug('Fetching nodelist hash...')
     const nodelistHash = await this._fetchNodelistHash(this.seedNodes)
     this.mainLogger.debug(`Nodelist hash is: ${nodelistHash}.`)
 
     // Get and verify nodelist aganist hash
+    this.mainLogger.debug('Fetching verified nodelist...')
     const nodelist = await this._fetchVerifiedNodelist(this.seedNodes, nodelistHash)
     this.mainLogger.debug(`Nodelist is: ${JSON.stringify(nodelist)}.`)
 
@@ -687,6 +697,7 @@ class P2P {
 
     // TODO: When active nodes are synced, change nodes to allActiveNodes
     // const nodes = this.state.getActiveNodes(this.id)
+    this.mainLogger.debug('Fetching latest cycle chain...')
     const nodes = this.seedNodes
     const cycleChain = await this._fetchLatestCycleChain(this.seedNodes, nodes)
     this.mainLogger.debug(`Retrieved cycle chain: ${JSON.stringify(cycleChain)}`)
@@ -718,6 +729,94 @@ class P2P {
     return true
   }
 
+  // Finds a node either in nodelist or in seedNodes listhis.mainLogger.debug(`Node ID to look up: ${nodeId}`)t if told to
+  _findNodeInGroup (nodeId, group) {
+    if (!group) {
+      const errMsg = 'No group given for _findNodeInGroup()'
+      this.mainLogger.debug(errMsg)
+      throw new Error(errMsg)
+    }
+    this.mainLogger.debug(`Node ID to find in group: ${nodeId}`)
+    for (const node of group) {
+      if (node.id === nodeId) return node
+    }
+    return false
+  }
+
+  // Verifies that the received internal message was signed by the stated node
+  _verifySignedByNode (message, node) {
+    let result
+    try {
+      if (!node.publicKey) {
+        this.mainLogger.debug('Node object did not contain public key for verifySignedByNode()!')
+        return false
+      }
+      this.mainLogger.debug(`Expected publicKey: ${node.publicKey}, actual publicKey: ${message.sign.owner}`)
+      result = this.crypto.verify(message, node.publicKey)
+    } catch (e) {
+      this.mainLogger.debug(`Invalid or missing signature on message: ${JSON.stringify(message)}`)
+      return false
+    }
+    return result
+  }
+
+  _verifyInternalPayload (payload, nodeGroup) {
+    // Check to see if node is in expected node group
+    const node = this._findNodeInGroup(payload.sender, nodeGroup)
+    if (!node) {
+      this.mainLogger.debug(`Invalid sender on internal payload: ${JSON.stringify(payload)}`)
+      return false
+    }
+    const signedByNode = this._verifySignedByNode(payload, node)
+    // Check if actually signed by that node
+    if (!signedByNode) {
+      this.mainLogger.debug('Internal payload not signed by an expected node.')
+      return false
+    }
+    this.mainLogger.debug('Internal payload successfully verified.')
+    return true
+  }
+
+  // Our own P2P version of the network tell, with a sign added
+  async tell (nodes, route, message) {
+    message.sender = this.id
+    const payload = this.crypto.sign(message)
+    await this.network.tell(nodes, route, payload)
+  }
+
+  // Our own P2P version of the network ask, with a sign added, and sign verified on other side
+  async ask (node, route, message = {}) {
+    message.sender = this.id
+    const payload = this.crypto.sign(message)
+    const res = await this.network.ask(node, route, payload)
+    this.mainLogger.debug(`Result of network-level ask: ${JSON.stringify(res)}`)
+    const verified = this._verifyInternalPayload(res, [node])
+    if (!verified) throw new Error(`Unable to verify response to ask request: ${route} -- ${JSON.stringify(message)} from node: ${node.id}`)
+    return res
+  }
+
+  registerInternal (route, handler) {
+    // Create function that wraps handler function
+    const wrappedHandler = async (payload, respond) => {
+      // Create wrapped respond function for sending back signed data
+      const respondWrapped = async (response) => {
+        response.sender = this.id
+        if (response.sign) delete response.sign
+        const wrappedResponse = this.crypto.sign(response)
+        this.mainLogger.debug(`The wrapped response to send back: ${wrappedResponse}`)
+        await respond(wrappedResponse)
+      }
+      // Checks for valid signature
+      if (!this._verifyInternalPayload(payload, this.state.getAllNodes(this.id))) {
+        await respondWrapped({ success: false, error: 'invalid or missing signature' })
+        return
+      }
+      await handler(payload, respondWrapped)
+    }
+    // Include that in the handler function that is passed
+    this.network.registerInternal(route, wrappedHandler)
+  }
+
   /**
    * Send Gossip to all nodes
    */
@@ -727,7 +826,7 @@ class P2P {
     try {
       const allNodes = this.state.getAllNodes(this.id)
       this.mainLogger.debug(`Gossiping join request to these nodes: ${JSON.stringify(allNodes)}`)
-      await this.network.tell(allNodes, 'gossip', gossipPayload)
+      await this.tell(allNodes, 'gossip', gossipPayload)
     } catch (ex) {
       this.mainLogger.error(`Failed to sendGossip(${JSON.stringify(payload)}) Exception => ex`)
     }
@@ -750,6 +849,7 @@ class P2P {
     await gossipHandler(data)
     this.mainLogger.debug(`End of handleGossip(${JSON.stringify(payload)})`)
   }
+
   /**
  * @param {route} example:- 'receipt', 'transaction'
  * @param {handler} example:- function
