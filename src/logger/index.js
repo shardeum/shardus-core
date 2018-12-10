@@ -1,6 +1,7 @@
 const log4js = require('log4js')
 const { existsSync, mkdirSync } = require('fs')
 const { readJson } = require('../utils')
+const log4jsExtend = require('log4js-extend')
 
 class Logger {
   constructor (baseDir, config) {
@@ -61,7 +62,7 @@ class Logger {
 
     // Read the log config from log config file
     this.log4Conf = this._readLogConfig()
-
+    log4jsExtend(log4js)
     this._addFileNamesToAppenders()
     this._configureLogs()
     this.getLogger('main').info('Logger initialized.')
