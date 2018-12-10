@@ -826,15 +826,15 @@ class P2P {
   /**
    * Send Gossip to all nodes
    */
-  async sendGossip (type, payload) {
+  async sendGossip (type, payload, nodes) {
     this.mainLogger.debug(`Start of sendGossip(${JSON.stringify(payload)})`)
     const gossipPayload = { type: type, data: payload }
+    const recipients = getRandom(nodes, this.gossipRecipients)
     try {
-      const recipients = getRandom(this.state.getAllNodes(this.id), this.gossipRecipients)
       this.mainLogger.debug(`Gossiping join request to these nodes: ${JSON.stringify(recipients)}`)
       await this.network.tell(recipients, 'gossip', gossipPayload)
     } catch (ex) {
-      this.mainLogger.error(`Failed to sendGossip(${JSON.stringify(payload)}) Exception => ex`)
+      this.mainLogger.error(`Failed to sendGossip(${JSON.stringify(payload)}) Exception => ${ex}`)
     }
     this.mainLogger.debug(`End of sendGossip(${JSON.stringify(payload)})`)
   }
