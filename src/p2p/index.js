@@ -677,11 +677,6 @@ class P2P {
     this.mainLogger.debug('Fetching seed node info...')
     this.seedNodes = await this._fetchSeedNodesInfo(seedNodes)
 
-    if (!isFirstSeed) {
-      await this.tell(this.seedNodes, 'test1', { test: 'test' })
-      await this.ask(this.seedNodes[0], 'test2', { test: 'test' }, true)
-    }
-
     // Get hash of nodelist
     this.mainLogger.debug('Fetching nodelist hash...')
     const nodelistHash = await this._fetchNodelistHash(this.seedNodes)
