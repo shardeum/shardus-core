@@ -24,6 +24,7 @@ class P2P {
     this.seedNodes = null
     this.gossipHandlers = {}
     this.gossipRecipients = config.gossipRecipients
+    this.gossipedHashes = new Map()
 
     this.state = new P2PState(config, this.logger, this.storage, this, this.crypto)
   }
@@ -601,7 +602,7 @@ class P2P {
     if (!active) return true
     const allNodes = this.state.getAllNodes(this.id)
     this.mainLogger.debug(`Gossiping join request to these nodes: ${JSON.stringify(allNodes)}`)
-    await this.tell(allNodes, 'join', joinRequest)
+    await this.sendGossip('join', joinRequest, allNodes)
     return true
   }
 
@@ -827,8 +828,16 @@ class P2P {
    * Send Gossip to all nodes
    */
   async sendGossip (type, payload, nodes) {
+    if (nodes.length === 0) return
     this.mainLogger.debug(`Start of sendGossip(${JSON.stringify(payload)})`)
     const gossipPayload = { type: type, data: payload }
+
+    const gossipHash = this.crypto.hash(gossipPayload)
+    if (this.gossipedHashes.has(gossipHash)) {
+      this.mainLogger.debug(`Gossip already sent: ${gossipHash.substring(0, 5)}`)
+      return
+    }
+
     const recipients = getRandom(nodes, this.gossipRecipients)
     try {
       this.mainLogger.debug(`Gossiping join request to these nodes: ${JSON.stringify(recipients)}`)
@@ -836,6 +845,7 @@ class P2P {
     } catch (ex) {
       this.mainLogger.error(`Failed to sendGossip(${JSON.stringify(payload)}) Exception => ${ex}`)
     }
+    this.gossipedHashes.set(gossipHash, false)
     this.mainLogger.debug(`End of sendGossip(${JSON.stringify(payload)})`)
   }
 
@@ -851,7 +861,21 @@ class P2P {
     const gossipHandler = this.gossipHandlers[type]
     if (!gossipHandler) {
       this.mainLogger.debug('Gossip Handler not found')
+      return
     }
+
+    const gossipHash = this.crypto.hash(payload)
+    if (this.gossipedHashes.has(gossipHash)) {
+      this.mainLogger.debug(`Got old gossip: ${gossipHash.substring(0, 5)}`)
+      if (!this.gossipedHashes.get(gossipHash)) {
+        setTimeout(() => this.gossipedHashes.delete(gossipHash), this.syncLimit)
+        this.gossipedHashes.set(gossipHash, true)
+        this.mainLogger.debug(`Marked old gossip for deletion: ${gossipHash.substring(0, 5)} in ${this.syncLimit} ms`)
+      }
+      return
+    }
+    this.gossipedHashes.set(gossipHash, false)
+
     await gossipHandler(data)
     this.mainLogger.debug(`End of handleGossip(${JSON.stringify(payload)})`)
   }
@@ -898,7 +922,7 @@ function getRandom (arr, n) {
   let len = arr.length
   const taken = new Array(len)
   if (n > len) {
-    throw new RangeError('getRandom: more elements taken than available')
+    n = len
   }
   while (n--) {
     var x = Math.floor(Math.random() * len)

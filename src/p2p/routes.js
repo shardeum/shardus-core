@@ -38,13 +38,6 @@ function setupRoutes () {
 
   // -------- INTERNAL Routes ----------
 
-  this.registerInternal('join', async (payload) => {
-    const accepted = await this.addJoinRequest(payload, false)
-    if (!accepted) return this.mainLogger.debug('Join request not accepted.')
-    this.mainLogger.debug('Join request accepted!')
-  })
-
-  // Temp Gossip Endpoint
   this.registerInternal('gossip', async (payload) => {
     const accepted = await this.handleGossip(payload, false)
     if (!accepted) return this.mainLogger.debug('Gossip Not Accepted.')
@@ -132,6 +125,14 @@ function setupRoutes () {
     console.log(certificate)
     const added = this.state.addCertificate(certificate)
     if (added) this.tell(this.state.getAllNodes(this.id), 'certificate', certificate)
+  })
+
+  // -------- GOSSIP Routes ----------
+
+  this.registerGossipHandler('join', async (payload) => {
+    const accepted = await this.addJoinRequest(payload, false)
+    if (!accepted) return this.mainLogger.debug('Join request not accepted.')
+    this.mainLogger.debug('Join request accepted!')
   })
 
   // -------- DEBUG Routes ----------

@@ -15,11 +15,14 @@ class Consensus {
     this.pendingTransactions = {}
     // Register Gossip Handlers with P2P
     this.p2p.registerGossipHandler('receipt', async (data) => {
-      await this.onReceipt(data)
+      if (await this.onReceipt(data)) {
+        this.p2p.sendGossip('receipt', data, this.p2p.state.getAllNodes(this.p2p.id))
+      }
     })
 
     this.p2p.registerGossipHandler('transaction', async (data) => {
       await this.onTransaction(data)
+      this.p2p.sendGossip('transaction', data, this.p2p.state.getAllNodes(this.p2p.id))
     })
   }
 
@@ -46,7 +49,8 @@ class Consensus {
       // let keysRequest = { type: 'keyFromTransaction', txn: inTransaction }
       // let keysResponse = await this.application.get(keysRequest)
       this.mainLogger.debug(`Gossiping Validated Transaction ${JSON.stringify(shardusTransaction)}`)
-      this.p2p.sendGossip('transaction', shardusTransaction)
+      // TODO: Change this to use just the nodes in the conesensus group
+      this.p2p.sendGossip('transaction', shardusTransaction, this.p2p.state.getAllNodes(this.p2p.id))
       this.mainLogger.debug(`Done Gossiping Validated Transaction ${JSON.stringify(shardusTransaction)}`)
       let keysResponse = this.applicationInterfaceImpl.getKeyFromTransaction(inTransaction)
       let { sourceKeys, targetKeys } = keysResponse
@@ -73,7 +77,7 @@ class Consensus {
     }
 
     this.mainLogger.debug(`Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
-    this.p2p.sendGossip('receipt', transactionReceipt)
+    this.p2p.sendGossip('receipt', transactionReceipt, this.p2p.state.getAllNodes(this.p2p.id))
     this.mainLogger.debug(`Done Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
     this.mainLogger.debug(`End of inject(${inTransaction})`)
 
