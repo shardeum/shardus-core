@@ -59,6 +59,10 @@ class Network {
         return
       }
       await handler(payload, respond)
+      self.requests.push({
+        url: route,
+        body: payload
+      })
     })
     console.log(`Internal server running on port ${this.ipInfo.internalPort}...`)
   }
