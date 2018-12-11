@@ -122,6 +122,18 @@ function setupRoutes () {
     await this.state.addStatusUpdate(nodeId, 'active')
   })
 
+  this.registerInternal('certificate', async (payload) => {
+    if (!payload) {
+      this.mainLogger.debug('No payload provided for the `certificate` request.')
+      return
+    }
+    const certificate = payload
+    this.mainLogger.debug(`Propagated cycle certificate: ${JSON.stringify(certificate)}`)
+    console.log(certificate)
+    const added = this.state.addCertificate(certificate)
+    if (added) this.tell(this.state.getAllNodes(this.id), 'certificate', certificate)
+  })
+
   // -------- DEBUG Routes ----------
 
   // Test route for the P2P.tell function

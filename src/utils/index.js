@@ -58,8 +58,15 @@ const insertSorted = (arr, item, comparator) => {
   arr.splice(index, 0, item)
 }
 
+const XOR = (hexString1, hexString2) => {
+  const num1 = parseInt(hexString1.substring(0, 8), 16)
+  const num2 = parseInt(hexString2.substring(0, 8), 16)
+  return (num1 ^ num2) >>> 0
+}
+
 exports.sleep = sleep
 exports.getTime = getTime
 exports.deepCopy = deepCopy
 exports.readJson = readJson
 exports.insertSorted = insertSorted
+exports.XOR = XOR

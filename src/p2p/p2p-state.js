@@ -1,8 +1,9 @@
 const utils = require('../utils')
 
 class P2PState {
-  constructor (config, logger, storage, crypto) {
+  constructor (config, logger, storage, p2p, crypto) {
     this.mainLogger = logger.getLogger('main')
+    this.p2p = p2p
     this.crypto = crypto
     this.storage = storage
     this.defaultCycleDuration = config.cycleDuration
@@ -42,7 +43,8 @@ class P2PState {
       lost: [],
       returned: [],
       activated: [],
-      certificate: {}
+      certificate: {},
+      bestCertDist: null
     }
 
     // Sets nodelist and current cycle to a copy of the clean nodelist and cycle objects
@@ -246,7 +248,6 @@ class P2PState {
   }
 
   // TODO: Insert ordered into order subobject
-  // TODO: Pull insertOrdered fn from old codebase
   _addNodeToNodelist (node) {
     const status = node.status
     if (!this.validStatuses.includes(status)) throw new Error('Invalid node status.')
@@ -429,7 +430,9 @@ class P2PState {
     const cycleInfo = this.getCycleInfo(false)
     const cycleMarker = this._computeCycleMarker(cycleInfo)
     const certificate = this._createCertificate(cycleMarker)
-    this.addCertificate(certificate)
+    if (!this.cycles.length) return this.addCertificate({ marker: cycleMarker, signer: '0'.repeat(64) })
+    const added = this.addCertificate(certificate)
+    if (added) this.p2p.tell(this.getAllNodes(this.p2p.id), 'certificate', certificate)
   }
 
   async addCycle (cycle) {
@@ -499,21 +502,40 @@ class P2PState {
 
   _createCertificate (cycleMarker) {
     this.mainLogger.info(`Creating certificate for cycle marker ${cycleMarker}...`)
-    const cert = this.crypto.sign({ marker: cycleMarker })
+    const signer = this.p2p.id
+    const cert = this.crypto.sign({ marker: cycleMarker, signer })
     return cert
   }
 
   addCertificate (certificate) {
-    this.mainLogger.debug('Adding certificate...')
-    // TODO: Should check whether certificate is better or not than current cert
-    this.currentCycle.certificate = certificate
-    this.mainLogger.debug('Certificate added!')
+    const addCert = (cert, dist) => {
+      this.currentCycle.certificate = cert
+      this.currentCycle.bestCertDist = dist
+      this.mainLogger.debug('Certificate added!')
+    }
+    this.mainLogger.debug('Attempting to add certificate...')
+    this.mainLogger.debug(`Certificate to be added: ${JSON.stringify(certificate)}`)
+
+    // Calculate XOR distance between cycle marker and the signer of the certificate's node ID
+    const certDist = utils.XOR(certificate.marker, certificate.signer)
+
+    // If we don't have a best cert for this cycle yet, just add this cert
+    if (!this.currentCycle.bestCertDist) {
+      addCert(certificate, certDist)
+      return true
+    }
+
+    // If the cert distance for this cert is less than the current best, return false
+    if (certDist <= this.currentCycle.bestCertDist) {
+      this.mainLogger.debug('Certificate not added. Current certificate is better.')
+      this.mainLogger.debug(`Current certificate distance from cycle marker: ${this.currentCycle.bestCertDist}`)
+      this.mainLogger.debug(`This certficate distance from cycle marker: ${certDist}`)
+      return false
+    }
+
+    // Otherwise, we have the new best, add it and return true
+    addCert(certificate, certDist)
     return true
-    /*
-      TODO:
-        Should return true or false of whether the cert was added,
-        will be used when deciding whether to propagate cert or not
-    */
   }
 
   getCycles (start = 0, end = this.cycles.length) {
@@ -523,7 +545,6 @@ class P2PState {
   }
 
   getCurrentCertificate () {
-    // TODO: implement certificate propagation
     const cert = this.currentCycle.certificate
     if (!Object.keys(cert).length) return null
     return cert

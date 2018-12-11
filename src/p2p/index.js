@@ -21,7 +21,9 @@ class P2P {
     this.difficulty = config.difficulty
     this.queryDelay = config.queryDelay
     this.netadmin = config.netadmin || 'default'
-    this.state = new P2PState(config, this.logger, this.storage, this.crypto)
+
+    this.state = new P2PState(config, this.logger, this.storage, this, this.crypto)
+
     this.seedNodes = null
     this.gossipHandlers = {}
   }
@@ -372,6 +374,7 @@ class P2P {
     // Build and return a join request
     let nodeInfo = this._getThisNodeInfo()
     let selectionNum = this.crypto.hash({ cycleMarker, address: nodeInfo.address })
+    // TO-DO: Think about if the selection number still needs to be signed
     // let signedSelectionNum = this.crypto.sign({ selectionNum })
     let proofOfWork = {
       compute: await this.crypto.getComputeProofOfWork(cycleMarker, this.difficulty)
@@ -755,54 +758,62 @@ class P2P {
     return result
   }
 
-  _verifyInternalPayload (payload, nodeGroup) {
+  _extractPayload (wrappedPayload, nodeGroup) {
     // Check to see if node is in expected node group
-    const node = this._findNodeInGroup(payload.sender, nodeGroup)
+    const node = this._findNodeInGroup(wrappedPayload.sender, nodeGroup)
     if (!node) {
-      this.mainLogger.debug(`Invalid sender on internal payload: ${JSON.stringify(payload)}`)
-      return false
+      this.mainLogger.debug(`Invalid sender on internal payload: ${JSON.stringify(wrappedPayload)}`)
+      return null
     }
-    const signedByNode = this._verifySignedByNode(payload, node)
+    const signedByNode = this._verifySignedByNode(wrappedPayload, node)
     // Check if actually signed by that node
     if (!signedByNode) {
       this.mainLogger.debug('Internal payload not signed by an expected node.')
-      return false
+      return null
     }
+    const payload = wrappedPayload.payload
     this.mainLogger.debug('Internal payload successfully verified.')
-    return true
+    return payload
+  }
+
+  _wrapAndSignMessage (msg) {
+    if (!msg) throw new Error('No message given to wrap and sign!')
+    const wrapped = {
+      payload: msg,
+      sender: this.id
+    }
+    const signed = this.crypto.sign(wrapped)
+    return signed
   }
 
   // Our own P2P version of the network tell, with a sign added
   async tell (nodes, route, message) {
-    message.sender = this.id
-    const payload = this.crypto.sign(message)
-    await this.network.tell(nodes, route, payload)
+    const signedMessage = this._wrapAndSignMessage(message)
+    await this.network.tell(nodes, route, signedMessage)
   }
 
   // Our own P2P version of the network ask, with a sign added, and sign verified on other side
   async ask (node, route, message = {}) {
-    message.sender = this.id
-    const payload = this.crypto.sign(message)
-    const res = await this.network.ask(node, route, payload)
-    this.mainLogger.debug(`Result of network-level ask: ${JSON.stringify(res)}`)
-    const verified = this._verifyInternalPayload(res, [node])
-    if (!verified) throw new Error(`Unable to verify response to ask request: ${route} -- ${JSON.stringify(message)} from node: ${node.id}`)
-    return res
+    const signedMessage = this._wrapAndSignMessage(message)
+    const signedResponse = await this.network.ask(node, route, signedMessage)
+    this.mainLogger.debug(`Result of network-level ask: ${JSON.stringify(signedResponse)}`)
+    const response = this._extractPayload(signedResponse, [node])
+    if (!response) throw new Error(`Unable to verify response to ask request: ${route} -- ${JSON.stringify(message)} from node: ${node.id}`)
+    return response
   }
 
   registerInternal (route, handler) {
     // Create function that wraps handler function
-    const wrappedHandler = async (payload, respond) => {
+    const wrappedHandler = async (wrappedPayload, respond) => {
       // Create wrapped respond function for sending back signed data
       const respondWrapped = async (response) => {
-        response.sender = this.id
-        if (response.sign) delete response.sign
-        const wrappedResponse = this.crypto.sign(response)
-        this.mainLogger.debug(`The wrapped response to send back: ${wrappedResponse}`)
-        await respond(wrappedResponse)
+        const signedResponse = this._wrapAndSignMessage(response)
+        this.mainLogger.debug(`The signed wrapped response to send back: ${signedResponse}`)
+        await respond(signedResponse)
       }
-      // Checks for valid signature
-      if (!this._verifyInternalPayload(payload, this.state.getAllNodes(this.id))) {
+      // Checks to see if we can extract the actual payload from the wrapped message
+      const payload = this._extractPayload(wrappedPayload, this.state.getAllNodes(this.id))
+      if (!payload) {
         await respondWrapped({ success: false, error: 'invalid or missing signature' })
         return
       }
