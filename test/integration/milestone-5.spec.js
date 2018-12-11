@@ -1,11 +1,7 @@
 const { test, afterEach } = require('tap')
 const { sleep } = require('../../src/utils')
-const Shardus = require('../../src/shardus')
-const startUtils = require('../../tools/server-start-utils')('../..')
+const startUtils = require('../../tools/server-start-utils')({ baseDir: '../..' })
 const axios = require('axios')
-const path = require('path')
-const fs = require('fs')
-const { clearTestDb, createTestDb } = require('../includes/utils-storage')
 
 const seedNodePort = 9001
 const secondNodePort = 9002
@@ -44,27 +40,15 @@ test('second node should poll the seed nodes `/cyclemarker` endpoint to check if
   await sleep(3.0 * cycleDuration * 1000)
   let { data } = await axios.get('http://127.0.0.1:9001/test')
   let { requests } = data
+  console.log(requests)
   let cycleMarkerRequests = requests.filter(r => r.url === '/cyclemarker')
   t.equal(cycleMarkerRequests.length > 1, true, 'Should seed node receive more than one cyclemarker requests from second node')
 })
 
-// TODO: use shardus instance from sever-start-util for this test
-test('second node should make join requests every cycle marker if it is not accepted', { skip: true, timeout: 200000 }, async t => {
-  let shardus
+test('second node should make join requests every cycle marker if it is not accepted', { timeout: 200000 }, async t => {
+  let server = await startUtils.startServer(9001, 9005, null, true, true)
+  let shardus = server.process
   let success = true
-  let config = require(path.join(__dirname, '../../config/server.json'))
-  let confStorage = module.require(`../../config/storage.json`)
-
-  config.baseDir = '.'
-  config.log.confFile = 'config/logs.json'
-  config.storage.confFile = './config/storage.json'
-  config.syncLimit = 100000
-  config.cycleDuration = 10
-  createTestDb(confStorage, '../../db/db.test.sqlite')
-
-  // start seed node
-  shardus = new Shardus(config)
-  await shardus.setup(config)
 
   // set seed node acceptJoinReq = false to reject join requests from second node
   setInterval(() => {
@@ -95,11 +79,5 @@ test('second node should make join requests every cycle marker if it is not acce
   }
   // cleaning up
   clearInterval(checkInterval)
-  shardus.shutdown()
-  if (confStorage) {
-    confStorage.options.storage = 'db/db.sqlite'
-    fs.writeFileSync(path.join(__dirname, `../../config/storage.json`), JSON.stringify(confStorage, null, 2))
-    clearTestDb()
-  }
   t.equal(success, true, 'Number of join requests from second node should be increasing in each cycle')
 })
