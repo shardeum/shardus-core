@@ -38,6 +38,10 @@ class Shardus {
     this.exitHandler.registerSync('crypto', () => {
       this.crypto.stopAllGenerators()
     })
+    this.exitHandler.registerAsync('network', () => {
+      this.mainLogger.info('Shutting down networking...')
+      return this.network.shutdown()
+    })
     this.exitHandler.registerAsync('shardus', () => {
       this.mainLogger.info('Writing heartbeat to database before exiting...')
       return this.writeHeartbeat()

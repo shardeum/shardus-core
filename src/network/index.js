@@ -5,18 +5,21 @@ const bodyParser = require('body-parser')
 class Network {
   constructor (config, logger) {
     this.app = express()
+    this.qn = null
     this.mainLogger = logger.getLogger('main')
     this.netLogger = logger.getLogger('net')
     this.ipInfo = {}
     this.timeout = config.timeout * 1000
     this.internalRoutes = {}
+    this.extServer = null
+    this.intServers = null
   }
 
   // TODO: Allow for binding to a specified network interface
   _setupExternal () {
     return new Promise((resolve, reject) => {
       this.app.use(bodyParser.json())
-      this.app.listen(this.ipInfo.externalPort, () => {
+      this.extServer = this.app.listen(this.ipInfo.externalPort, () => {
         const msg = `External server running on port ${this.ipInfo.externalPort}...`
         console.log(msg)
         this.mainLogger.info(msg)
@@ -30,8 +33,7 @@ class Network {
     this.qn = Qn({
       port: this.ipInfo.internalPort
     })
-
-    await this.qn.listen(async (data, remote, protocol, respond) => {
+    this.intServers = await this.qn.listen(async (data, remote, protocol, respond) => {
       if (!data) throw new Error('No data provided in request...')
       const { route, payload } = data
       if (!route) throw new Error('Unable to read request, no route specified.')
@@ -80,6 +82,17 @@ class Network {
     this.ipInfo = ipInfo
     await this._setupExternal()
     this._setupInternal()
+  }
+
+  async shutdown () {
+    try {
+      await Promise.all([
+        closeServer(this.extServer),
+        this.qn.stopListening(this.intServers)
+      ])
+    } catch (e) {
+      throw e
+    }
   }
 
   _registerExternal (method, route, handler) {
@@ -132,6 +145,12 @@ class Network {
   registerInternal (route, handler) {
     this.internalRoutes[route] = handler
   }
+}
+
+function closeServer (server) {
+  return new Promise((resolve, reject) => {
+    server.close(err => err ? reject(err) : resolve())
+  })
 }
 
 module.exports = Network
