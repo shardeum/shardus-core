@@ -92,7 +92,7 @@ class Shardus {
 
   stopHeartbeat () {
     this.mainLogger.info('Stopping heartbeat...')
-    clearInterval(this.heartbeatTimer)
+    clearInterval(this._heartbeatTimer)
   }
 
   setup (app = null) {
