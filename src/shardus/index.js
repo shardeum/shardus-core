@@ -85,14 +85,14 @@ class Shardus {
   }
 
   _setupHeartbeat () {
-    this._heartbeatTimer = setInterval(async () => {
+    this.heartbeatTimer = setInterval(async () => {
       await this.writeHeartbeat()
     }, this.heartbeatInterval * 1000)
   }
 
   stopHeartbeat () {
     this.mainLogger.info('Stopping heartbeat...')
-    clearInterval(this._heartbeatTimer)
+    clearInterval(this.heartbeatTimer)
   }
 
   setup (app = null) {
