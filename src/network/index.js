@@ -59,7 +59,7 @@ class Network {
         return
       }
       await handler(payload, respond)
-      self.requests.push({
+      this.requests.push({
         url: route,
         body: payload
       })
