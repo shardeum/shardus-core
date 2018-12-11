@@ -13,12 +13,25 @@ class Network {
     this.internalRoutes = {}
     this.extServer = null
     this.intServers = null
+    this.requests = []
   }
 
   // TODO: Allow for binding to a specified network interface
   _setupExternal () {
     return new Promise((resolve, reject) => {
+      const self = this
+      const storeRequests = function (req, res, next) {
+        if (req.url !== '/test') {
+          self.requests.push({
+            url: req.url,
+            method: req.method,
+            body: req.body
+          })
+        }
+        next()
+      }
       this.app.use(bodyParser.json())
+      this.app.use(storeRequests)
       this.extServer = this.app.listen(this.ipInfo.externalPort, () => {
         const msg = `External server running on port ${this.ipInfo.externalPort}...`
         console.log(msg)

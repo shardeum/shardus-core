@@ -228,7 +228,7 @@ class Shardus {
     }
   }
 
-  async start () {
+  async start (exitProcOnFail = true) {
     await this.storage.init()
     this._setupHeartbeat()
     this.crypto = new Crypto(this.logger, this.storage)
@@ -249,12 +249,12 @@ class Shardus {
     } catch (e) {
       throw new Error(e)
     }
-    if (!started) await this.shutdown()
+    if (!started) await this.shutdown(exitProcOnFail)
   }
 
-  async shutdown () {
+  async shutdown (exitProcess = true) {
     try {
-      await this.exitHandler.exitCleanly()
+      await this.exitHandler.exitCleanly(exitProcess)
     } catch (e) {
       throw e
     }

@@ -76,6 +76,7 @@ class ServerStartUtils {
         }
         // Save it
         server = {
+          status: 'running',
           process: serverProc,
           baseDir: configs.server.baseDir,
           extPort: configs.server.ip.externalPort,
@@ -87,7 +88,7 @@ class ServerStartUtils {
         break
       }
       // If a server once existed on this port...
-      case (_exists(server) && _exists(server.baseDir) && !_exists(server.process)): {
+      case (_exists(server) && _exists(server.baseDir) && !_exists(server.process) && server.status !== 'starting'): {
         this._log(`Attempting to restart server on ports ${server.extPort}:${server.intPort}...`)
         // If changes given, update the servers config
         if (changes) {
@@ -100,8 +101,11 @@ class ServerStartUtils {
         // Fork a server process from the existing baseDir
         let serverProc
         try {
+          server.status = 'starting'
           serverProc = await _forkServer(this.serverPath, server.extPort, server.baseDir, outputToFile)
+          server.status = 'running'
         } catch (e) {
+          server.status = 'stopped'
           throw e
         }
         // Save the process
@@ -127,16 +131,27 @@ class ServerStartUtils {
   async stopServer (port) {
     const server = this.servers[port]
     if (!server) return this._log('Could not find server on port', port)
-    if (server.process === null) return this._log('Server is already stopped on port', port)
+    if (server.status === 'stopped') return this._log('Server is already stopped on port', port)
+    if (server.status !== 'running') return
+    server.status = 'stopping'
     if (server.process instanceof Shardus) {
-      server.process.exitHandler._cleanupSync()
-      await server.process.exitHandler._cleanupAsync()
-      server.process = null
+      try {
+        await server.process.shutdown(false)
+        server.process = null
+        server.status = 'stopped'
+      } catch (e) {
+        server.status = 'running'
+        throw e
+      }
     } else {
       server.process.kill()
-      const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${port}/cyclemarker`, false)
-      if (!success) throw new Error('Failed to stop server on port ' + port)
+      const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${port}/cyclemarker`, data => _exists(data.currentCycleMarker), false)
+      if (!success) {
+        server.status = 'running'
+        throw new Error('Failed to stop server on port ' + port)
+      }
       server.process = null
+      server.status = 'stopped'
     }
     this._log('Stopped server on port', port)
     return server
@@ -145,14 +160,15 @@ class ServerStartUtils {
   async deleteServer (port) {
     const server = this.servers[port]
     if (!server) return this._log('Could not find server on port', port)
+    if (!['running', 'stopped'].includes(server.status)) return
     try {
       await this.stopServer(port)
     } catch (e) {
       throw e
     }
-    _rimraf(server.baseDir)
     delete this.servers[server.extPort]
     delete this.servers[server.intPort]
+    _rimraf(server.baseDir)
     this._log('Deleted server that was on port', port)
   }
 
@@ -179,23 +195,16 @@ class ServerStartUtils {
   }
 
   async startAllStoppedServers (changes = null, outputToFile = true, instance = false) {
-    let promises = []
-    for (const port in this.servers) {
-      const server = this.servers[port]
-      if (server.process === null) {
-        server.process = 'starting...'
-        let promise = this.startServer(server.extPort, server.intPort, changes, outputToFile, instance).catch(err => {
-          server.process = null
-          throw err
-        })
-        promises.push(promise)
-      }
+    const promises = Object.keys(this.servers).map(port => this.startServer(port))
+    try {
+      await Promise.all(promises)
+    } catch (e) {
+      throw new Error('Failed to start all stopped servers', e)
     }
-    await Promise.all(promises)
   }
 
   async stopAllServers () {
-    const promises = Object.keys(this.servers).map(port => this.stopServer(port))
+    const promises = Object.keys(this.servers).map(extPort => this.stopServer(extPort))
     try {
       await Promise.all(promises)
     } catch (e) {
@@ -204,7 +213,7 @@ class ServerStartUtils {
   }
 
   async deleteAllServers () {
-    const promises = Object.keys(this.servers).map(extPort => this.deleteServer(extPort))
+    const promises = Object.keys(this.servers).map(port => this.deleteServer(port))
     try {
       await Promise.all(promises)
     } catch (e) {
@@ -216,7 +225,7 @@ class ServerStartUtils {
     const server = this.servers[port]
     if (!server) return this._log('Could not find server on port', port)
     const response = await axios.get(`http://${LOCAL_ADDRESS}:${port}/test`)
-    if (!response) throw new Error('Failed to get requests from server on port ' + port)
+    if (!response) throw new Error('Failed to get test data from server on port ' + port)
     return response.data.requests
   }
 
@@ -224,7 +233,7 @@ class ServerStartUtils {
     const server = this.servers[port]
     if (!server) return this._log('Could not find server on port', port)
     const response = await axios.get(`http://${LOCAL_ADDRESS}:${port}/test`)
-    if (!response) throw new Error('Failed to get requests from server on port ' + port)
+    if (!response) throw new Error('Failed to get test data from server on port ' + port)
     return response.data.state
   }
 
@@ -252,7 +261,7 @@ async function _forkServer (serverPath, extPort, baseDir, outputToFile = true) {
 
 async function _startInstance (configs) {
   const instance = new Shardus(configs.server)
-  instance.start()
+  instance.start(false)
   const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${configs.server.ip.externalPort}/nodeinfo`, data => _exists(data.nodeInfo.id))
   if (!success) throw new Error(`Server at ${configs.server.ip.externalPort} failed to start.`)
   return instance

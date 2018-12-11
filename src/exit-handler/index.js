@@ -29,14 +29,14 @@ class ExitHandler {
   }
 
   // Exits after cleaning up with all registered functions
-  async exitCleanly () {
+  async exitCleanly (exitProcess = true) {
     this._cleanupSync()
     try {
       await this._cleanupAsync()
     } catch (e) {
       console.error(e)
     }
-    process.exit()
+    if (exitProcess) process.exit()
   }
 
   // Used for adding event listeners for the SIGINT and SIGTERM signals
