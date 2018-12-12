@@ -24,6 +24,7 @@ class P2P {
     this.seedNodes = null
     this.gossipHandlers = {}
     this.gossipRecipients = config.gossipRecipients
+    this.gossipTimeout = config.gossipTimeout * 1000
 
     this.gossipedHashes = new Map()
 
@@ -867,9 +868,9 @@ class P2P {
     if (this.gossipedHashes.has(gossipHash)) {
       this.mainLogger.debug(`Got old gossip: ${gossipHash.substring(0, 5)}`)
       if (!this.gossipedHashes.get(gossipHash)) {
-        setTimeout(() => this.gossipedHashes.delete(gossipHash), this.syncLimit)
+        setTimeout(() => this.gossipedHashes.delete(gossipHash), this.gossipTimeout)
         this.gossipedHashes.set(gossipHash, true)
-        this.mainLogger.debug(`Marked old gossip for deletion: ${gossipHash.substring(0, 5)} in ${this.syncLimit} ms`)
+        this.mainLogger.debug(`Marked old gossip for deletion: ${gossipHash.substring(0, 5)} in ${this.gossipTimeout} ms`)
       }
       return
     }
