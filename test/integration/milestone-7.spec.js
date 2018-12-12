@@ -1,8 +1,7 @@
 const { test, afterEach } = require('tap')
-const { sleep } = require('../../src/utils')
 const { isValidHex } = require('../includes/utils')
 const startUtils = require('../../tools/server-start-utils')({ baseDir: '../..' })
-// const axios = require('axios')
+
 const seedNodePort = 9001
 const secondNodePort = 9002
 const cycleDuration = 5
@@ -10,16 +9,14 @@ const cycleDuration = 5
 startUtils.setDefaultConfig({ server: { cycleDuration } })
 
 afterEach(async (t) => {
-  await startUtils.deleteAllServers()
+  // await startUtils.deleteAllServers()
 })
 
-test('Second node should compute and save its node_id and activate its internal API', async t => {
+test('Second node should compute and save its node_id and activate its internal API', { skip: true }, async t => {
   await startUtils.startServer(seedNodePort, 9015)
   const shardusSecond = await startUtils.startServerInstance(secondNodePort, 9016)
-  await sleep(2.0 * cycleDuration * 1000)
   const secondNodeId = await shardusSecond.storage.getProperty('id')
 
-  await sleep(5000)
   let requests = await startUtils.getRequests(seedNodePort)
   requests = requests.map(r => r.url)
 
@@ -29,14 +26,19 @@ test('Second node should compute and save its node_id and activate its internal 
 
 test('Second node should use its internal API to sync its node list and cycle chain with the network ', async t => {
   await startUtils.startServer(seedNodePort, 9015)
-  await sleep(cycleDuration * 1000)
   await startUtils.startServer(secondNodePort, 9016)
-
-  await sleep(2.0 * cycleDuration * 1000)
 
   let seedState = await startUtils.getState(seedNodePort)
   let secondState = await startUtils.getState(secondNodePort)
 
-  // TODO: to compare cyclechain from seed node and second node
-  t.deepEqual(seedState.nodes, secondState.nodes, 'Should have same nodelist as seed node')
+  t.deepEqual(seedState.nodes, secondState.nodes, 'Should have same node list as seed node')
+
+  // Check only the cycles that have been synced by the second node
+  const seedCycles = {}
+  const secondCycles = {}
+  for (const cycle in secondState.cycles) {
+    secondCycles[cycle] = secondState.cycles[cycle]
+    seedCycles[cycle] = seedState.cycles[cycle]
+  }
+  t.deepEqual(seedCycles, secondCycles, 'Should have same cycles as seed node')
 })
