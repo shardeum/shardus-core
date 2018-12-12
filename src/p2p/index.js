@@ -128,7 +128,8 @@ class P2P {
   getPublicNodeInfo () {
     const id = this.id
     const ipInfo = this.getIpInfo()
-    const nodeInfo = Object.assign({ id }, ipInfo)
+    const status = { status: this.state.getNodeStatus(this.id) }
+    const nodeInfo = Object.assign({ id }, ipInfo, status)
     return nodeInfo
   }
 
