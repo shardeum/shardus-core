@@ -529,7 +529,7 @@ class P2PState {
     if (certDist <= this.currentCycle.bestCertDist) {
       this.mainLogger.debug('Certificate not added. Current certificate is better.')
       this.mainLogger.debug(`Current certificate distance from cycle marker: ${this.currentCycle.bestCertDist}`)
-      this.mainLogger.debug(`This certficate distance from cycle marker: ${certDist}`)
+      this.mainLogger.debug(`This certificate distance from cycle marker: ${certDist}`)
       return false
     }
 

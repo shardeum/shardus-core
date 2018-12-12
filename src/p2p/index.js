@@ -24,6 +24,7 @@ class P2P {
     this.seedNodes = null
     this.gossipHandlers = {}
     this.gossipRecipients = config.gossipRecipients
+
     this.gossipedHashes = new Map()
 
     this.state = new P2PState(config, this.logger, this.storage, this, this.crypto)
@@ -313,13 +314,14 @@ class P2P {
     return true
   }
 
-  async _submitWhenNot2nd (nodes, route, message) {
+  async _submitWhenNot2nd (route, message) {
     this.mainLogger.debug(`Submitting message: ${JSON.stringify(message)} on route: ${route} whenever it's not the second quarter of cycle...`)
     const { currentTime, cycleStart, cycleDuration } = await this._fetchCycleMarkerInternal(this.seedNodes)
     if (this._isIn2ndQuarter(currentTime, cycleStart, cycleDuration)) {
       await utils.sleep(0.25 * cycleDuration * 1000)
     }
-    await this.tell(nodes, route, message)
+    this.mainLogger.debug(`Gossiping message: ${JSON.stringify(message)} on '${route}'.`)
+    await this.sendGossip(route, message)
   }
 
   async _attemptJoin (seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration) {
@@ -600,9 +602,7 @@ class P2P {
     if (!added) return false
     const active = this._isActive()
     if (!active) return true
-    const allNodes = this.state.getAllNodes(this.id)
-    this.mainLogger.debug(`Gossiping join request to these nodes: ${JSON.stringify(allNodes)}`)
-    await this.sendGossip('join', joinRequest, allNodes)
+    await this.sendGossip('join', joinRequest)
     return true
   }
 
@@ -712,8 +712,8 @@ class P2P {
   }
 
   async _submitActiveRequest () {
-    const allNodes = this.state.getAllNodes(this.id)
-    await this._submitWhenNot2nd(allNodes, 'active', { nodeId: this.id })
+    const signedRequest = this.crypto.sign({ nodeId: this.id })
+    await this._submitWhenNot2nd('active', signedRequest)
   }
 
   async _goActive (isFirstSeed) {
@@ -722,8 +722,7 @@ class P2P {
       return true
     }
     await this._submitActiveRequest()
-    // TO-DO: After gossip is implemented, node will wait for messages
-    // -----  to be gossiped to it before marking itself active
+    // TO-DO: Delete this line once we are starting cycles as non-seed node
     await this.state.directStatusUpdate(this.id, 'active', true)
     return true
   }
@@ -809,7 +808,7 @@ class P2P {
       // Create wrapped respond function for sending back signed data
       const respondWrapped = async (response) => {
         const signedResponse = this._wrapAndSignMessage(response)
-        this.mainLogger.debug(`The signed wrapped response to send back: ${signedResponse}`)
+        this.mainLogger.debug(`The signed wrapped response to send back: ${JSON.stringify(signedResponse)}`)
         await respond(signedResponse)
       }
       // Checks to see if we can extract the actual payload from the wrapped message
@@ -827,7 +826,7 @@ class P2P {
   /**
    * Send Gossip to all nodes
    */
-  async sendGossip (type, payload, nodes) {
+  async sendGossip (type, payload, nodes = this.state.getAllNodes(this.id)) {
     if (nodes.length === 0) return
     this.mainLogger.debug(`Start of sendGossip(${JSON.stringify(payload)})`)
     const gossipPayload = { type: type, data: payload }
@@ -840,8 +839,8 @@ class P2P {
 
     const recipients = getRandom(nodes, this.gossipRecipients)
     try {
-      this.mainLogger.debug(`Gossiping join request to these nodes: ${JSON.stringify(recipients)}`)
-      await this.network.tell(recipients, 'gossip', gossipPayload)
+      this.mainLogger.debug(`Gossiping ${type} request to these nodes: ${JSON.stringify(recipients)}`)
+      await this.tell(recipients, 'gossip', gossipPayload)
     } catch (ex) {
       this.mainLogger.error(`Failed to sendGossip(${JSON.stringify(payload)}) Exception => ${ex}`)
     }
@@ -918,12 +917,12 @@ function shuffleArray (array) {
 
 // From: https://stackoverflow.com/a/19270021
 function getRandom (arr, n) {
-  const result = new Array(n)
   let len = arr.length
   const taken = new Array(len)
   if (n > len) {
     n = len
   }
+  const result = new Array(n)
   while (n--) {
     var x = Math.floor(Math.random() * len)
     result[n] = arr[x in taken ? taken[x] : x]

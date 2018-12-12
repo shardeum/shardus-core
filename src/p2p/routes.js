@@ -99,22 +99,6 @@ function setupRoutes () {
     await respond({ cycleChain })
   })
 
-  this.registerInternal('active', async (payload) => {
-    if (!payload) {
-      this.mainLogger.debug('No payload provided with `active` request.')
-      return
-    }
-    this.mainLogger.debug(`Payload for 'active' request: ${payload}`)
-    const { nodeId } = payload
-    if (!payload.nodeId) {
-      this.mainLogger.debug('Node ID of node was not provided with `active` request.')
-      return
-    }
-
-    // Add status update of given node to queue
-    await this.state.addStatusUpdate(nodeId, 'active')
-  })
-
   this.registerInternal('certificate', async (payload) => {
     if (!payload) {
       this.mainLogger.debug('No payload provided for the `certificate` request.')
@@ -122,7 +106,6 @@ function setupRoutes () {
     }
     const certificate = payload
     this.mainLogger.debug(`Propagated cycle certificate: ${JSON.stringify(certificate)}`)
-    console.log(certificate)
     const added = this.state.addCertificate(certificate)
     if (added) this.tell(this.state.getAllNodes(this.id), 'certificate', certificate)
   })
@@ -133,6 +116,44 @@ function setupRoutes () {
     const accepted = await this.addJoinRequest(payload, false)
     if (!accepted) return this.mainLogger.debug('Join request not accepted.')
     this.mainLogger.debug('Join request accepted!')
+  })
+
+  this.registerGossipHandler('active', async (payload) => {
+    if (!payload) {
+      this.mainLogger.debug('No payload provided with `active` request.')
+      return
+    }
+    this.mainLogger.debug(`Payload for 'active' request: ${payload}`)
+    const { nodeId, sign } = payload
+    if (!nodeId) {
+      this.mainLogger.debug('Node ID of node was not provided with `active` request.')
+      return
+    }
+    if (!sign) {
+      this.mainLogger.debug('Active message was not signed.')
+      return
+    }
+    let publicKey
+    try {
+      ;({ publicKey } = this.state.getNode(nodeId))
+    } catch (e) {
+      this.mainLogger.debug(e)
+      ;({ publicKey } = null)
+    }
+    if (!publicKey) {
+      this.mainLogger.debug('Unknown node ID in request.')
+      return
+    }
+    const isSignedByNode = this.crypto.verify(payload, publicKey)
+    if (!isSignedByNode) {
+      this.mainLogger.debug('Active request was not signed by the expected node.')
+      return
+    }
+    // Add status update of given node to queue
+    const added = await this.state.addStatusUpdate(nodeId, 'active')
+    if (!added) return this.mainLogger.debug(`Status update to active for ${nodeId} not added.`)
+    this.mainLogger.debug(`Status update to active for ${nodeId} was added!`)
+    await this.sendGossip('active', payload)
   })
 
   // -------- DEBUG Routes ----------
