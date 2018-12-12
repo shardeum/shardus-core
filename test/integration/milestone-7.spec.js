@@ -1,4 +1,5 @@
 const { test, afterEach } = require('tap')
+const { sleep } = require('../../src/utils')
 const { isValidHex } = require('../includes/utils')
 const startUtils = require('../../tools/server-start-utils')({ baseDir: '../..' })
 
@@ -9,10 +10,10 @@ const cycleDuration = 5
 startUtils.setDefaultConfig({ server: { cycleDuration } })
 
 afterEach(async (t) => {
-  // await startUtils.deleteAllServers()
+  await startUtils.deleteAllServers()
 })
 
-test('Second node should compute and save its node_id and activate its internal API', { skip: true }, async t => {
+test('Second node should compute and save its node_id and activate its internal API', async t => {
   await startUtils.startServer(seedNodePort, 9015)
   const shardusSecond = await startUtils.startServerInstance(secondNodePort, 9016)
   const secondNodeId = await shardusSecond.storage.getProperty('id')
@@ -28,9 +29,10 @@ test('Second node should use its internal API to sync its node list and cycle ch
   await startUtils.startServer(seedNodePort, 9015)
   await startUtils.startServer(secondNodePort, 9016)
 
+  await sleep(1.5 * cycleDuration * 1000)
+
   let seedState = await startUtils.getState(seedNodePort)
   let secondState = await startUtils.getState(secondNodePort)
-
   t.deepEqual(seedState.nodes, secondState.nodes, 'Should have same node list as seed node')
 
   // Check only the cycles that have been synced by the second node
