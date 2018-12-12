@@ -6,7 +6,7 @@ const merge = require('deepmerge')
 const Shardus = require('../../src/shardus')
 
 const LOCAL_ADDRESS = '127.0.0.1'
-const NODE_UP_TIMEOUT = process.env.NODE_UP_TIMEOUT || 60000
+const NODE_UP_TIMEOUT = process.env.NODE_UP_TIMEOUT || 300000
 
 class ServerStartUtils {
   constructor (config = {}) {
@@ -48,16 +48,26 @@ class ServerStartUtils {
     _writeJsonFiles(path.join(server.baseDir, 'config'), changedConfigs)
   }
 
-  async startServer (extPort = null, intPort = null, changes = null, outputToFile = true, instance = false) {
+  async startServer (extPort = null, intPort = null, successFn = 'active', changes = null, outputToFile = true, instance = false) {
     extPort = extPort || _get(changes, 'server.ip.externalPort') || this.defaultConfigs.server.ip.externalPort
     intPort = intPort || _get(changes, 'server.ip.internalPort') || this.defaultConfigs.server.ip.internalPort
+    changes = changes || {}
+    if (typeof successFn !== 'function') {
+      switch (successFn) {
+        case 'id':
+          successFn = data => _exists(data.nodeInfo.id)
+          break
+        case 'active':
+          successFn = data => data.nodeInfo.status === 'active'
+      }
+    }
     let server = this.servers[extPort] || this.servers[intPort]
     switch (true) {
       // If no server existed on this port...
       case (!_exists(server)): {
         this._log(`Attempting to start server on ports ${extPort}:${intPort}...`)
         // Copy defaultConfigs and edit ports and baseDir
-        const configs = changes ? merge(this.defaultConfigs, changes) : this.defaultConfigs
+        const configs = merge(this.defaultConfigs, changes)
         configs.server.baseDir = path.join(this.instanceDir, `${this.instanceNames}-${extPort}`)
         configs.server.ip.externalPort = extPort
         configs.server.ip.internalPort = intPort
@@ -67,9 +77,9 @@ class ServerStartUtils {
         let serverProc
         try {
           if (instance) {
-            serverProc = await _startInstance(configs)
+            serverProc = await _startInstance(configs, successFn)
           } else {
-            serverProc = await _forkServer(this.serverPath, configs.server.ip.externalPort, configs.server.baseDir, outputToFile)
+            serverProc = await _forkServer(this.serverPath, configs.server.ip.externalPort, configs.server.baseDir, outputToFile, successFn)
           }
         } catch (e) {
           throw e
@@ -102,7 +112,7 @@ class ServerStartUtils {
         let serverProc
         try {
           server.status = 'starting'
-          serverProc = await _forkServer(this.serverPath, server.extPort, server.baseDir, outputToFile)
+          serverProc = await _forkServer(this.serverPath, server.extPort, server.baseDir, outputToFile, successFn)
           server.status = 'running'
         } catch (e) {
           server.status = 'stopped'
@@ -123,8 +133,8 @@ class ServerStartUtils {
     return server
   }
 
-  async startServerInstance (extPort = null, intPort = null, changes = null, outputToFile = true) {
-    let server = await this.startServer(extPort, intPort, changes, outputToFile, true)
+  async startServerInstance (extPort = null, intPort = null, successFn = 'active', changes = null, outputToFile = true) {
+    let server = await this.startServer(extPort, intPort, successFn, changes, outputToFile, true)
     return server.process
   }
 
@@ -172,17 +182,17 @@ class ServerStartUtils {
     this._log('Deleted server that was on port', port)
   }
 
-  async startServers (num, extPort = null, intPort = null, changes = null, outputToFile = true, instance = false, wait = 0) {
+  async startServers (num, extPort = null, intPort = null, successFn = 'active', changes = null, outputToFile = true, instance = false, wait = 0) {
     if (!extPort) extPort = this.defaultConfigs.server.ip.externalPort
     if (!intPort) intPort = this.defaultConfigs.server.ip.internalPort
     this._log(`Starting ${num} nodes from port ${extPort}:${intPort}...`)
-    await this.startServer(extPort, intPort, changes, outputToFile, instance)
+    await this.startServer(extPort, intPort, successFn, changes, outputToFile, instance)
 
     await _sleep(wait)
 
     let promises = []
     for (let i = 1; i < num; i++) {
-      promises.push(this.startServer(extPort + i, intPort + i, changes, outputToFile, instance))
+      promises.push(this.startServer(extPort + i, intPort + i, successFn, changes, outputToFile, instance))
     }
 
     try {
@@ -194,7 +204,7 @@ class ServerStartUtils {
     return this.servers
   }
 
-  async startAllStoppedServers (changes = null, outputToFile = true, instance = false) {
+  async startAllStoppedServers (successStatus = 'active', changes = null, outputToFile = true, instance = false) {
     const promises = Object.keys(this.servers).map(port => this.startServer(port))
     try {
       await Promise.all(promises)
@@ -242,7 +252,7 @@ class ServerStartUtils {
   }
 }
 
-async function _forkServer (serverPath, extPort, baseDir, outputToFile = true) {
+async function _forkServer (serverPath, extPort, baseDir, outputToFile = true, successFn) {
   let serverProc
   if (outputToFile) {
     let timestamp = new Date().toISOString().replace(/[:.]/g, '-')
@@ -253,16 +263,16 @@ async function _forkServer (serverPath, extPort, baseDir, outputToFile = true) {
   }
   serverProc.on('error', err => { throw new Error(`Server at ${extPort} failed to start: error ${err}`) })
   serverProc.on('exit', code => { throw new Error(`Server at ${extPort} failed to start: exit code ${code}`) })
-  const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${extPort}/nodeinfo`, data => _exists(data.nodeInfo.id))
+  const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${extPort}/nodeinfo`, successFn)
   if (!success) throw new Error(`Server at ${extPort} failed to start.`)
   serverProc.removeAllListeners()
   return serverProc
 }
 
-async function _startInstance (configs) {
+async function _startInstance (configs, successFn) {
   const instance = new Shardus(configs.server)
   instance.start(false)
-  const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${configs.server.ip.externalPort}/nodeinfo`, data => _exists(data.nodeInfo.id))
+  const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${configs.server.ip.externalPort}/nodeinfo`, successFn)
   if (!success) throw new Error(`Server at ${configs.server.ip.externalPort} failed to start.`)
   return instance
 }
