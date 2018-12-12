@@ -1,6 +1,6 @@
 const { test, afterEach } = require('tap')
 const { sleep } = require('../../src/utils')
-const startUtils = require('../../tools/server-start-utils')({ baseDir: '../..', verbose: true })
+const startUtils = require('../../tools/server-start-utils')({ baseDir: '../..' })
 const axios = require('axios')
 const seedNodePort = 9001
 const secondNodePort = 9002
@@ -9,7 +9,7 @@ const cycleDuration = 5
 startUtils.setDefaultConfig({ server: { cycleDuration } })
 
 afterEach(async (t) => {
-  // await startUtils.deleteAllServers()
+  await startUtils.deleteAllServers()
 })
 
 test('The seed node allows 1 new node to join per cycle: ', async t => {
@@ -18,7 +18,6 @@ test('The seed node allows 1 new node to join per cycle: ', async t => {
   const { nodes } = await startUtils.getState(seedNodePort)
   let joinedNodes = nodes.filter(n => n.externalPort !== seedNodePort).map(n => n.externalPort)
   t.notEqual(joinedNodes.indexOf(secondNodePort), -1, 'Should have second node Id in the joined node list')
-  await startUtils.deleteAllServers()
 })
 
 test('seed node should send join tx to all known nodes', async t => {
@@ -34,7 +33,6 @@ test('seed node should send join tx to all known nodes', async t => {
   const request = await startUtils.getRequests(9002)
   const joinRequests = request.filter(r => r.url === 'join').map(r => r.body.nodeInfo.externalPort)
   t.notEqual(joinRequests.indexOf(9005), -1, 'Should have join request from node on port 9005')
-  await startUtils.deleteAllServers()
 })
 
 test('seed node should select one new node per cycle based on highest selection number', async t => {
@@ -51,12 +49,10 @@ test('seed node should select one new node per cycle based on highest selection 
   const nodeWithHighSelectionNum = joinRequests[0].body.nodeInfo
   const response = await axios(`http://127.0.0.1:${seedNodePort}/cyclechain`)
   const cycleChain = response.data.cycleChain
-  const latestCycle = cycleChain[cycleChain.length - 1]
   const { nodes } = await startUtils.getState(seedNodePort)
   const joinedNodeAddresses = nodes.map(n => n.address)
 
   t.equal(cycleChain.length > 0, true, 'Cycle chain should have more than one cycle')
-  t.equal(latestCycle.active, 3, 'Seed node should create cycle chain with joined nodes')
   t.equal(joinedNodeAddresses.includes(nodeWithHighSelectionNum.address), true, 'Seed node should add selected nodes to its node list ')
 
   // TODO: to test seedNode accept join request with highest selection number first
@@ -65,5 +61,4 @@ test('seed node should select one new node per cycle based on highest selection 
   // .map(c => c.joined[0])
   // const firstAcceptedNode = joinedNodes[0]
   // t.equal(firstAcceptedNode, nodeWithHighSelectionNum.address, 'Should accept node with highest selection number first')
-  await startUtils.deleteAllServers()
 })
