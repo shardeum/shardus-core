@@ -32,6 +32,9 @@ class Shardus {
     this.registerExternalPatch = (route, handler) => this.network.registerExternalPatch(route, handler)
 
     this.exitHandler.addSigListeners()
+    this.exitHandler.registerSync('p2p', () => {
+      this.p2p.state.stopCycles()
+    })
     this.exitHandler.registerSync('shardus', () => {
       this.stopHeartbeat()
     })
