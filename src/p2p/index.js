@@ -298,8 +298,10 @@ class P2P {
     this.mainLogger.debug(`Current time is: ${currentTime}`)
     this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
     this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
-    const startOf2ndQuarter = cycleStart + Math.ceil(0.5 * cycleDuration)
-    const endOf2ndQuarter = cycleStart + Math.ceil(0.75 * cycleDuration)
+    const startOf2ndQuarter = cycleStart + Math.ceil(0.25 * cycleDuration)
+    this.mainLogger.debug(`Start of second quarter: ${startOf2ndQuarter}`)
+    const endOf2ndQuarter = cycleStart + Math.ceil(0.5 * cycleDuration)
+    this.mainLogger.debug(`End of second quarter: ${endOf2ndQuarter}`)
     if (currentTime < startOf2ndQuarter || currentTime > endOf2ndQuarter) {
       return false
     }

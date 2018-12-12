@@ -50,7 +50,7 @@ class Shardus {
       return this.storage.close()
     })
     this.exitHandler.registerAsync('application', () => {
-      this.mainLogger.log('Closing the application')
+      this.mainLogger.info('Closing the application...')
       if (this.app && this.app.close) {
         return this.app.close()
       }
