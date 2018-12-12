@@ -1,16 +1,16 @@
 const { test, afterEach } = require('tap')
 const { sleep } = require('../../src/utils')
-const startUtils = require('../../tools/server-start-utils')({ baseDir: '../..' })
+const startUtils = require('../../tools/server-start-utils')({ baseDir: '../..', verbose: true })
 const axios = require('axios')
 
 const seedNodePort = 9001
 const secondNodePort = 9002
-const cycleDuration = 10
+const cycleDuration = 5
 
 startUtils.setDefaultConfig({ server: { cycleDuration } })
 
 afterEach(async (t) => {
-  await startUtils.deleteAllServers()
+  // await startUtils.deleteAllServers()
 })
 
 test('seed node should have a `/join` endpoint on its external API', async t => {
@@ -21,46 +21,48 @@ test('seed node should have a `/join` endpoint on its external API', async t => 
     throw new Error(e)
   }
   t.pass('Seed node should have a `/join` endpoint')
+  await startUtils.deleteAllServers()
 })
 
-test('second node should send a join request to the seed nodes `/join` endpoint', async t => {
-  await startUtils.startServers(2, 9001, 9005)
+test('second node should send a join request to the seed node `/join` endpoint', async t => {
+  await startUtils.startServers(2, seedNodePort, 9015)
   await sleep(2.5 * cycleDuration * 1000)
-  try {
-    var { data } = await axios.get(`http://127.0.0.1:${seedNodePort}/test`)
-  } catch (e) {
-    throw new Error(e)
-  }
-  const joinRequest = data.requests.find(r => r.url === '/join' && r.method === 'POST')
+  const requests = await startUtils.getRequests(seedNodePort)
+  const joinRequest = requests.find(r => r.url === '/join' && r.method === 'POST')
   t.equal(joinRequest.body.nodeInfo.externalPort, secondNodePort, 'Seed node recieves join request from second node')
+  await startUtils.deleteAllServers()
 })
 
 test('second node should poll the seed nodes `/cyclemarker` endpoint to check if it was accepted', async t => {
-  await startUtils.startServers(2, 9001, 9005)
+  await startUtils.startServers(2, seedNodePort, 9015)
   await sleep(3.0 * cycleDuration * 1000)
-  let { data } = await axios.get('http://127.0.0.1:9001/test')
-  let { requests } = data
-  console.log(requests)
+  const requests = await startUtils.getRequests(seedNodePort)
   let cycleMarkerRequests = requests.filter(r => r.url === '/cyclemarker')
   t.equal(cycleMarkerRequests.length > 1, true, 'Should seed node receive more than one cyclemarker requests from second node')
+  await startUtils.deleteAllServers()
 })
 
-test('second node should make join requests every cycle marker if it is not accepted', { timeout: 200000 }, async t => {
-  let server = await startUtils.startServer(9001, 9005, null, true, true)
+test('second node should make join requests every cycle marker if it is not accepted', { timeout: 200000, skip: false }, async t => {
+  let server = await startUtils.startServer(seedNodePort, 9015, null, true, true)
   let shardus = server.process
   let success = true
 
   // set seed node acceptJoinReq = false to reject join requests from second node
-  setInterval(() => {
+  const rejectInterval = setInterval(() => {
     if (shardus.p2p.state.acceptJoinReq === true) {
       shardus.p2p.state.acceptJoinReq = false
     }
   }, 100)
 
   // start second node
-  await startUtils.startServer(9002, 9006) // start second node
-  let record = {}
+  // TODO: start second seed node while seed node is not accepting requests
+  try {
+    await startUtils.startServer(secondNodePort, 9016) // start second node
+  } catch (e) {
+    console.log('some error while trying to start second node')
+  }
 
+  let record = {}
   const checkEachCycle = async function () {
     let { data } = await axios.get('http://127.0.0.1:9001/test')
     let { requests, state } = data
@@ -79,5 +81,7 @@ test('second node should make join requests every cycle marker if it is not acce
   }
   // cleaning up
   clearInterval(checkInterval)
+  clearInterval(rejectInterval)
   t.equal(success, true, 'Number of join requests from second node should be increasing in each cycle')
+  await startUtils.deleteAllServers()
 })
