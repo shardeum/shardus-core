@@ -14,7 +14,6 @@ class Network {
     this.internalRoutes = {}
     this.extServer = null
     this.intServers = null
-    this.requests = []
   }
 
   // TODO: Allow for binding to a specified network interface
@@ -23,11 +22,11 @@ class Network {
       const self = this
       const storeRequests = function (req, res, next) {
         if (req.url !== '/test') {
-          self.requests.push({
+          self.netLogger.debug(JSON.stringify({
             url: req.url,
             method: req.method,
             body: req.body
-          })
+          }))
         }
         next()
       }
@@ -59,10 +58,10 @@ class Network {
         return
       }
       await handler(payload, respond)
-      this.requests.push({
+      this.netLogger.debug(JSON.stringify({
         url: route,
         body: payload
-      })
+      }))
     })
     console.log(`Internal server running on port ${this.ipInfo.internalPort}...`)
   }

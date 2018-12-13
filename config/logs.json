@@ -3,17 +3,17 @@
     "out": { "type": "console" },
     "main": {
       "type": "file",
-      "maxLogSize": 1000000, 
+      "maxLogSize": 1000000,
       "backups": 3
     },
     "fatal": {
       "type": "file",
-      "maxLogSize": 1000000, 
+      "maxLogSize": 1000000,
       "backups": 3
     },
     "net": {
       "type": "file",
-      "maxLogSize": 1000000, 
+      "maxLogSize": 1000000,
       "backups": 3
     }
   },
@@ -21,6 +21,6 @@
     "default": { "appenders": [ "out" ], "level": "trace" },
     "main": { "appenders": [ "main" ], "level": "trace" },
     "fatal": { "appenders": [ "fatal" ], "level": "fatal" },
-    "net": { "appenders": [ "net" ], "level": "info" }
+    "net": { "appenders": [ "net" ], "level": "trace" }
   }
 }
