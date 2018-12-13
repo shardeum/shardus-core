@@ -432,7 +432,8 @@ class P2PState {
     const certificate = this._createCertificate(cycleMarker)
     if (!this.cycles.length) return this.addCertificate({ marker: cycleMarker, signer: '0'.repeat(64) })
     const added = this.addCertificate(certificate)
-    if (added) this.p2p.tell(this.getAllNodes(this.p2p.id), 'certificate', certificate)
+    if (!added) return
+    this.p2p.sendGossip('certificate', certificate)
   }
 
   async addCycle (cycle) {

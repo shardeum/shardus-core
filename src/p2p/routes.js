@@ -99,17 +99,6 @@ function setupRoutes () {
     await respond({ cycleChain })
   })
 
-  this.registerInternal('certificate', async (payload) => {
-    if (!payload) {
-      this.mainLogger.debug('No payload provided for the `certificate` request.')
-      return
-    }
-    const certificate = payload
-    this.mainLogger.debug(`Propagated cycle certificate: ${JSON.stringify(certificate)}`)
-    const added = this.state.addCertificate(certificate)
-    if (added) this.tell(this.state.getAllNodes(this.id), 'certificate', certificate)
-  })
-
   // -------- GOSSIP Routes ----------
 
   this.registerGossipHandler('join', async (payload) => {
@@ -154,6 +143,18 @@ function setupRoutes () {
     if (!added) return this.mainLogger.debug(`Status update to active for ${nodeId} not added.`)
     this.mainLogger.debug(`Status update to active for ${nodeId} was added!`)
     await this.sendGossip('active', payload)
+  })
+
+  this.registerGossipHandler('certificate', async (payload) => {
+    if (!payload) {
+      this.mainLogger.debug('No payload provided for the `certificate` request.')
+      return
+    }
+    const certificate = payload
+    this.mainLogger.debug(`Propagated cycle certificate: ${JSON.stringify(certificate)}`)
+    const added = this.state.addCertificate(certificate)
+    if (!added) return
+    this.sendGossip('certificate', certificate)
   })
 
   // -------- DEBUG Routes ----------
