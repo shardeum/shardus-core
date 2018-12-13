@@ -26,10 +26,10 @@ test('seed node should send join tx to all known nodes', async t => {
   // establish a network with a seed node and 3 other nodes
   await startUtils.startServer(seedNodePort, 9016)
   await startUtils.startServer(secondNodePort, 9017)
-  await startUtils.startServer(9003, 9018, 'id')
+  await startUtils.startServer(9003, 9018)
 
   // start a 4th node on port 9004
-  await startUtils.startServer(9004, 8004, 'id')
+  await startUtils.startServer(9004, 8004)
   await sleep(cycleDuration * 1000)
 
   const requests = await startUtils.getRequests(9002)
@@ -40,7 +40,7 @@ test('seed node should send join tx to all known nodes', async t => {
 test('seed node should select one new node per cycle based on highest selection number', async t => {
   await startUtils.startServer(seedNodePort, 9016)
   await startUtils.startServer(secondNodePort, 9017)
-  await startUtils.startServer(9003, 9018, 'id')
+  await startUtils.startServer(9003, 9018)
   await sleep(cycleDuration * 1000)
   const requests = await startUtils.getRequests(seedNodePort)
   const joinRequests = requests
