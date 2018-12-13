@@ -7,8 +7,6 @@ const { fork } = require('child_process')
 const axios = require('axios')
 const merge = require('deepmerge')
 const sqlite = require('sqlite')
-const Shardus = require('../../src/shardus')
-const models = require('../../src/storage/models')
 
 const LOCAL_ADDRESS = '127.0.0.1'
 const NODE_UP_TIMEOUT = process.env.NODE_UP_TIMEOUT || 60000
@@ -20,6 +18,8 @@ class ServerStartUtils {
     if (!this.instanceDir) this.instanceDir = path.join(this.baseDir, 'instances')
     if (!this.instanceNames) this.instanceNames = 'shardus-server'
     if (!this.serverPath) this.serverPath = path.join(this.baseDir, 'server.js')
+    if (!this.Shardus) this.Shardus = require(path.join(this.baseDir, 'src', 'shardus'))
+    if (!this.models) this.models = require(path.join(this.baseDir, 'src', 'storage', 'models'))
     if (!this.verbose) this.verbose = false
     // Save default server configs
     this.defaultConfigs = _readJsonFiles(path.join(this.baseDir, 'config'))
@@ -149,7 +149,7 @@ class ServerStartUtils {
     if (server.status === 'stopped') return this._log('Server is already stopped on port', port)
     if (server.status !== 'running') return
     server.status = 'stopping'
-    if (server.process instanceof Shardus) {
+    if (server.process instanceof this.Shardus) {
       try {
         await server.process.shutdown(false)
         server.process = null
@@ -260,7 +260,7 @@ class ServerStartUtils {
     if (!server) return this._log('Could not find server on port', port)
     const db = await sqlite.open(path.join(server.baseDir, 'db', 'db.sqlite'))
     const state = {}
-    for (const [ tableName, fieldObj ] of models) {
+    for (const [ tableName, fieldObj ] of this.models) {
       const fieldNames = Object.keys(fieldObj).join(', ')
       state[tableName] = await db.all(`SELECT ${fieldNames} from ${tableName}`)
     }
@@ -290,7 +290,7 @@ async function _forkServer (serverPath, extPort, baseDir, outputToFile = true, s
 }
 
 async function _startInstance (configs, successFn) {
-  const instance = new Shardus(configs.server)
+  const instance = new this.Shardus(configs.server)
   instance.start(false)
   const success = await _awaitCondition(`http://${LOCAL_ADDRESS}:${configs.server.ip.externalPort}/nodeinfo`, successFn)
   if (!success) throw new Error(`Server at ${configs.server.ip.externalPort} failed to start.`)
