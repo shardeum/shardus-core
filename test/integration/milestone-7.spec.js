@@ -16,7 +16,7 @@ afterEach(async (t) => {
 test('Second node should compute and save its node_id and activate its internal API', async t => {
   await startUtils.startServer(seedNodePort, 9015)
   const shardusSecond = await startUtils.startServerInstance(secondNodePort, 9016)
-  sleep(cycleDuration)
+  await sleep(cycleDuration * 1000)
 
   const secondNodeId = await shardusSecond.storage.getProperty('id')
 

@@ -16,7 +16,7 @@ afterEach(async (t) => {
 test('The seed node allows 1 new node to join per cycle: ', async t => {
   await startUtils.startServer(seedNodePort, 9005, 'id')
   await startUtils.startServer(secondNodePort, 9006, 'id')
-  sleep(cycleDuration)
+  await sleep(cycleDuration * 1000)
   const { nodes } = await startUtils.getState(seedNodePort)
   let joinedNodes = nodes.filter(n => n.externalPort !== seedNodePort).map(n => n.externalPort)
   t.notEqual(joinedNodes.indexOf(secondNodePort), -1, 'Should have second node Id in the joined node list')
@@ -30,7 +30,7 @@ test('seed node should send join tx to all known nodes', async t => {
 
   // start a 4th node on port 9004
   await startUtils.startServer(9004, 8004, 'id')
-  sleep(cycleDuration)
+  await sleep(cycleDuration * 1000)
 
   const requests = await startUtils.getRequests(9002)
   const joinRequests = requests.filter(r => r.url === 'join').map(r => r.body.nodeInfo.externalPort)
@@ -41,7 +41,7 @@ test('seed node should select one new node per cycle based on highest selection 
   await startUtils.startServer(seedNodePort, 9016, 'id')
   await startUtils.startServer(secondNodePort, 9017, 'id')
   await startUtils.startServer(9003, 9018, 'id')
-  sleep(cycleDuration)
+  await sleep(cycleDuration * 1000)
   const requests = await startUtils.getRequests(seedNodePort)
   const joinRequests = requests
     .filter(r => r.url === '/join')
