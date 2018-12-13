@@ -48,7 +48,7 @@ class ServerStartUtils {
     _writeJsonFiles(path.join(server.baseDir, 'config'), changedConfigs)
   }
 
-  async startServer (extPort = null, intPort = null, successFn = 'active', changes = null, outputToFile = true, instance = false) {
+  async startServer (extPort = null, intPort = null, successFn = 'id', changes = null, outputToFile = true, instance = false) {
     extPort = extPort || _get(changes, 'server.ip.externalPort') || this.defaultConfigs.server.ip.externalPort
     intPort = intPort || _get(changes, 'server.ip.internalPort') || this.defaultConfigs.server.ip.internalPort
     changes = changes || {}
@@ -133,7 +133,7 @@ class ServerStartUtils {
     return server
   }
 
-  async startServerInstance (extPort = null, intPort = null, successFn = 'active', changes = null, outputToFile = true) {
+  async startServerInstance (extPort = null, intPort = null, successFn = 'id', changes = null, outputToFile = true) {
     let server = await this.startServer(extPort, intPort, successFn, changes, outputToFile, true)
     return server.process
   }
@@ -182,7 +182,7 @@ class ServerStartUtils {
     this._log('Deleted server that was on port', port)
   }
 
-  async startServers (num, extPort = null, intPort = null, successFn = 'active', changes = null, outputToFile = true, instance = false, wait = 0) {
+  async startServers (num, extPort = null, intPort = null, successFn = 'id', changes = null, outputToFile = true, instance = false, wait = 0) {
     if (!extPort) extPort = this.defaultConfigs.server.ip.externalPort
     if (!intPort) intPort = this.defaultConfigs.server.ip.internalPort
     this._log(`Starting ${num} nodes from port ${extPort}:${intPort}...`)
@@ -204,7 +204,7 @@ class ServerStartUtils {
     return this.servers
   }
 
-  async startAllStoppedServers (successStatus = 'active', changes = null, outputToFile = true, instance = false) {
+  async startAllStoppedServers (changes = null, outputToFile = true, instance = false) {
     const promises = Object.keys(this.servers).map(port => this.startServer(port))
     try {
       await Promise.all(promises)

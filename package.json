@@ -6,11 +6,11 @@
   "scripts": {
     "test": "standard && tap --timeout=0 \"test/**/*.spec.js\"",
     "test:watch": "nodemon -x npm run test",
-    "test:unit": "tap \"test/unit/**/*.spec.js\"",
+    "test:unit": "tap --timeout=0 \"test/unit/**/*.spec.js\"",
     "test:unit:watch": "nodemon -x npm run test:unit",
-    "test:integration": "tap \"test/integration/**/*.spec.js\"",
+    "test:integration": "tap --timeout=0 \"test/integration/**/*.spec.js\"",
     "test:integration:watch": "nodemon -x npm run test:integration",
-    "cover": "nyc tap \"test/**/*.spec.js\" --coverage-report=html && codecov"
+    "cover": "nyc tap --timeout=0 \"test/**/*.spec.js\" --coverage-report=html && codecov"
   },
   "repository": {
     "type": "git",

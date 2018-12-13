@@ -1,4 +1,4 @@
-const { test, afterEach } = require('tap')
+const { test, afterEach, tearDown } = require('tap')
 const { sleep } = require('../../src/utils')
 const { isValidHex } = require('../includes/utils')
 const startUtils = require('../../tools/server-start-utils')({ baseDir: '../..' })
@@ -16,6 +16,8 @@ afterEach(async (t) => {
 test('Second node should compute and save its node_id and activate its internal API', async t => {
   await startUtils.startServer(seedNodePort, 9015)
   const shardusSecond = await startUtils.startServerInstance(secondNodePort, 9016)
+  sleep(cycleDuration)
+
   const secondNodeId = await shardusSecond.storage.getProperty('id')
 
   let requests = await startUtils.getRequests(seedNodePort)
@@ -43,4 +45,8 @@ test('Second node should use its internal API to sync its node list and cycle ch
     seedCycles[cycle] = seedState.cycles[cycle]
   }
   t.deepEqual(seedCycles, secondCycles, 'Should have same cycles as seed node')
+})
+
+tearDown(async () => {
+  startUtils.deleteAllServers()
 })
