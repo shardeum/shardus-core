@@ -22,6 +22,7 @@ class P2P {
     this.queryDelay = config.queryDelay
     this.netadmin = config.netadmin || 'default'
     this.seedNodes = null
+    this.acceptInternal = false
     this.gossipHandlers = {}
     this.gossipRecipients = config.gossipRecipients
     this.gossipTimeout = config.gossipTimeout * 1000
@@ -672,6 +673,7 @@ class P2P {
     // If you are first node, there is nothing to sync to
     if (isFirstSeed) {
       this.mainLogger.info('No syncing required...')
+      this.acceptInternal = true
       return true
     }
 
@@ -694,6 +696,9 @@ class P2P {
 
     // Add retrieved nodelist to the state
     await this.state.addNodes(nodelist)
+
+    // After we have the ndoe list, we can turn on internal routes
+    this.acceptInternal = true
 
     // TODO: When active nodes are synced, change nodes to allActiveNodes
     // const nodes = this.state.getActiveNodes(this.id)
@@ -806,6 +811,11 @@ class P2P {
   registerInternal (route, handler) {
     // Create function that wraps handler function
     const wrappedHandler = async (wrappedPayload, respond) => {
+      // We have internal requests turned off until we have the node list
+      if (!this.acceptInternal) {
+        this.mainLogger.debug('We are not currently accepting internal requests...')
+        return
+      }
       // Create wrapped respond function for sending back signed data
       const respondWrapped = async (response) => {
         const signedResponse = this._wrapAndSignMessage(response)
