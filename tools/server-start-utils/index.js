@@ -6,7 +6,7 @@ const merge = require('deepmerge')
 const Shardus = require('../../src/shardus')
 
 const LOCAL_ADDRESS = '127.0.0.1'
-const NODE_UP_TIMEOUT = process.env.NODE_UP_TIMEOUT || 300000
+const NODE_UP_TIMEOUT = process.env.NODE_UP_TIMEOUT || 60000
 
 class ServerStartUtils {
   constructor (config = {}) {
