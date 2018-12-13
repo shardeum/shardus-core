@@ -42,5 +42,5 @@ test('Network should add nodes active state to the cycle chain', async t => {
 })
 
 tearDown(async () => {
-  await startUtils.deleteAllServers()
+  await startUtils.stopAllServers()
 })

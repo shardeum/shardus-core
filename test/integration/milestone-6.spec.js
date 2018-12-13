@@ -65,5 +65,5 @@ test('seed node should select one new node per cycle based on highest selection 
 })
 
 tearDown(async () => {
-  await startUtils.deleteAllServers()
+  await startUtils.stopAllServers()
 })

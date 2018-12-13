@@ -42,5 +42,5 @@ test('second node should poll the seed nodes `/cyclemarker` endpoint to check if
 })
 
 tearDown(async () => {
-  await startUtils.deleteAllServers()
+  await startUtils.stopAllServers()
 })
