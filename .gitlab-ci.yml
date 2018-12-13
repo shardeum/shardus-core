@@ -3,6 +3,7 @@ image: node:10.13.0
 stages:
   - init
   - tests
+  - output
 
 cache:
   paths:
@@ -20,3 +21,8 @@ tests:
     # when stdout is not a terminal, which it apparently isn't in the gitlab
     # test runner output.
     - npm test
+
+output:
+  stage: output
+  script:
+    - tail -n 1000 instances/*/logs/*
