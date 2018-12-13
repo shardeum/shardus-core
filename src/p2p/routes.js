@@ -112,7 +112,7 @@ function setupRoutes () {
       this.mainLogger.debug('No payload provided with `active` request.')
       return
     }
-    this.mainLogger.debug(`Payload for 'active' request: ${payload}`)
+    this.mainLogger.debug(`Payload for 'active' request: ${JSON.stringify(payload)}`)
     const { nodeId, sign } = payload
     if (!nodeId) {
       this.mainLogger.debug('Node ID of node was not provided with `active` request.')
