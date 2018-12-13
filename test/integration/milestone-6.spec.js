@@ -1,5 +1,4 @@
 const { test, afterEach } = require('tap')
-const { sleep } = require('../../src/utils')
 const startUtils = require('../../tools/server-start-utils')({ baseDir: '../..', verbose: true })
 const axios = require('axios')
 const seedNodePort = 9001
