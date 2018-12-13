@@ -1,9 +1,14 @@
 const fs = require('fs')
+const util = require('util')
+const readdir = util.promisify(fs.readdir)
+const readFile = util.promisify(fs.readFile)
 const path = require('path')
 const { fork } = require('child_process')
 const axios = require('axios')
 const merge = require('deepmerge')
+const sqlite = require('sqlite')
 const Shardus = require('../../src/shardus')
+const models = require('../../src/storage/models')
 
 const LOCAL_ADDRESS = '127.0.0.1'
 const NODE_UP_TIMEOUT = process.env.NODE_UP_TIMEOUT || 60000
@@ -234,17 +239,32 @@ class ServerStartUtils {
   async getRequests (port) {
     const server = this.servers[port]
     if (!server) return this._log('Could not find server on port', port)
-    const response = await axios.get(`http://${LOCAL_ADDRESS}:${port}/test`)
-    if (!response) throw new Error('Failed to get test data from server on port ' + port)
-    return response.data.requests
+    const logDir = path.join(server.baseDir, 'logs')
+    const files = await readdir(logDir)
+    const requests = []
+    for (const file of files) {
+      if (file.split('.')[0] === 'net') {
+        const txt = await readFile(path.join(logDir, file), 'utf8')
+        for (const line of txt.split('\n')) {
+          if (line.trim() !== '') {
+            requests.push(JSON.parse(line.split(' net - ')[1]))
+          }
+        }
+      }
+    }
+    return requests
   }
 
   async getState (port) {
     const server = this.servers[port]
     if (!server) return this._log('Could not find server on port', port)
-    const response = await axios.get(`http://${LOCAL_ADDRESS}:${port}/test`)
-    if (!response) throw new Error('Failed to get test data from server on port ' + port)
-    return response.data.state
+    const db = await sqlite.open(path.join(server.baseDir, 'db', 'db.sqlite'))
+    const state = {}
+    for (const [ tableName, fieldObj ] of models) {
+      const fieldNames = Object.keys(fieldObj).join(', ')
+      state[tableName] = await db.all(`SELECT ${fieldNames} from ${tableName}`)
+    }
+    return state
   }
 
   _log (...params) {
