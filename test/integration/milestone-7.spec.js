@@ -48,5 +48,5 @@ test('Second node should use its internal API to sync its node list and cycle ch
 })
 
 tearDown(async () => {
-  startUtils.deleteAllServers()
+  await startUtils.deleteAllServers()
 })
