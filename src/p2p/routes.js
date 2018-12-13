@@ -36,16 +36,6 @@ function setupRoutes () {
     res.json({ nodeInfo })
   })
 
-  this.network.registerExternalGet('test', async (req, res) => {
-    const cycles = await this.storage.listCycles()
-    const nodes = await this.storage.listNodes()
-    let state = {
-      cycles: cycles,
-      nodes: nodes
-    }
-    res.json({ state, requests: this.network.requests })
-  })
-
   // ==== Internal Routes ====
 
   this.network.registerInternal('join', async (payload) => {
