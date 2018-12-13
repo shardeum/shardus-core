@@ -1,7 +1,7 @@
 const { test, afterEach, tearDown } = require('tap')
 const axios = require('axios')
 const { sleep } = require('../../src/utils')
-const startUtils = require('../../tools/server-start-utils')({ baseDir: '../..', verbose: true })
+const startUtils = require('../../tools/server-start-utils')({ baseDir: '../..' })
 
 const seedNodePort = 9001
 const secondNodePort = 9002
