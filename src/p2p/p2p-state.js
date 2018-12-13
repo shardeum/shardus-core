@@ -659,7 +659,9 @@ class P2PState {
   _getSubsetOfNodelist (nodes, self = null) {
     if (!self) return Object.values(nodes)
     // Check if self in node list
-    if (!nodes[self]) throw new Error('Fatal: Invalid node ID in `self` field.')
+    if (!nodes[self]) {
+      throw new Error(`Fatal: Invalid node ID in 'self' field. Given ID: ${self}`)
+    }
     const nodesCopy = utils.deepCopy(nodes)
     delete nodesCopy[self]
     return Object.values(nodesCopy)

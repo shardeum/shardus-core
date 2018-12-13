@@ -50,10 +50,13 @@ class Network {
     this.intServers = await this.qn.listen(async (data, remote, protocol, respond) => {
       if (!data) throw new Error('No data provided in request...')
       const { route, payload } = data
-      if (!route) throw new Error('Unable to read request, no route specified.')
+      if (!route) {
+        this.mainLogger.debug(`Payload of received message: ${JSON.stringify(data)}`)
+        throw new Error('Unable to read request, no route specified.')
+      }
       if (!this.internalRoutes[route]) throw new Error('Unable to handle request, invalid route.')
       const handler = this.internalRoutes[route]
-      if (!data.payload) {
+      if (!payload) {
         await handler(null, respond)
         return
       }
