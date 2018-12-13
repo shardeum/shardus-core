@@ -1,6 +1,7 @@
 const Qn = require('shardus-quic-net')
 const express = require('express')
 const bodyParser = require('body-parser')
+const cors = require('cors')
 
 class Network {
   constructor (config, logger) {
@@ -31,6 +32,7 @@ class Network {
         next()
       }
       this.app.use(bodyParser.json())
+      this.app.use(cors())
       this.app.use(storeRequests)
       this.extServer = this.app.listen(this.ipInfo.externalPort, () => {
         const msg = `External server running on port ${this.ipInfo.externalPort}...`
