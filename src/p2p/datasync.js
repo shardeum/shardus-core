@@ -19,6 +19,9 @@ class DataSync {
     this.mainStartingTs = Date.now()
 
     this.clearPartitionData()
+
+    this.acceptedTXQueue = []
+    this.registerEndpoints()
   }
 
   // this clears state data related to the current partion we are processing.
@@ -432,6 +435,23 @@ class DataSync {
         await utils.sleep(1)
       }
     }
+  }
+
+  registerEndpoints () {
+    // alternatively we would need to query for accepted tx.
+
+    // This endpoint will likely be a one off thing so that we can test before milesone 15.  after milesone 15 the accepted TX may flow from the consensus coordinator
+
+    // After joining the network
+    //   Record Joined timestamp
+    //   Even a syncing node will receive accepted transactions
+    //   Starts receiving accepted transaction and saving them to Accepted Tx Table
+    this.p2p.registerGossipHandler('acceptedTx', async (data) => {
+      // what to do with this data?
+      // need to insert into state table and accepted tx table for any nodes in our shard that are involved
+      this.acceptedTXQueue.push(data)
+      // TODO a timestamp sorted insert
+    })
   }
 }
 

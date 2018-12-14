@@ -25,7 +25,6 @@ class Shardus {
 
     this.heartbeatInterval = config.heartbeatInterval
     this.heartbeatTimer = null
-    this.acceptedTXQueue = []
 
     // alias the network register calls so that an app can get to them
     this.registerExternalGet = (route, handler) => this.network.registerExternalGet(route, handler)
@@ -458,21 +457,6 @@ class Shardus {
       let accountData = this.app.getAccountDataByList(payload.accountIds)
       result.accountData = accountData
       await respond(result)
-    })
-
-    // alternatively we would need to query for accepted tx.
-
-    // This endpoint will likely be a one off thing so that we can test before milesone 15.  after milesone 15 the accepted TX may flow from the consensus coordinator
-
-    // After joining the network
-    //   Record Joined timestamp
-    //   Even a syncing node will receive accepted transactions
-    //   Starts receiving accepted transaction and saving them to Accepted Tx Table
-    this.p2p.registerGossipHandler('acceptedTx', async (data) => {
-      // what to do with this data?
-      // need to insert into state table and accepted tx table for any nodes in our shard that are involved
-      this.acceptedTXQueue.push(data)
-      // TODO a timestamp sorted insert
     })
   }
 }
