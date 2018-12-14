@@ -270,7 +270,7 @@ class Shardus {
   async start (exitProcOnFail = true) {
     await this.storage.init()
     this._setupHeartbeat()
-    this.crypto = new Crypto(this.logger, this.storage)
+    this.crypto = new Crypto(this.config.crypto, this.logger, this.storage)
     await this.crypto.init()
     const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout } = this.config
     const ipInfo = this.config.ip

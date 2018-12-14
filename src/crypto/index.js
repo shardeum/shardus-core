@@ -2,7 +2,8 @@ const crypto = require('shardus-crypto-utils')
 const { fork } = require('child_process')
 
 class Crypto {
-  constructor (logger, storage) {
+  constructor (config, logger, storage) {
+    this.config = config
     this.mainLogger = logger.getLogger('main')
     this.storage = storage
     this.keypair = {}
@@ -10,7 +11,7 @@ class Crypto {
   }
 
   async init () {
-    crypto('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
+    crypto(this.config.hashKey)
     let keypair = await this.storage.getProperty('keypair')
     if (!keypair) {
       this.keypair = this._generateKeypair()
