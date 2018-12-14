@@ -197,14 +197,22 @@ class Storage {
     throw new Error('not implmented')
   }
 
-  async addAcceptedTransactions (acceptedTransaction) {
+  async addAcceptedTransactions (acceptedTransactions) {
     this._checkInit()
-    throw new Error('not implmented')
+    try {
+      await this._create(this.models.acceptedTx, acceptedTransactions)
+    } catch (e) {
+      throw new Error(e)
+    }
   }
 
-  async addAccountStates (accountStart, accountEnd, tsStart, tsEnd, limit) {
+  async addAccountStates (accountStates) {
     this._checkInit()
-    throw new Error('not implmented')
+    try {
+      await this._create(this.models.accountState, accountStates)
+    } catch (e) {
+      throw new Error(e)
+    }
   }
 
   async queryAcceptedTransactions (tsStart, tsEnd, limit) {
@@ -258,8 +266,8 @@ class Storage {
     }
     return table.destroy({ where, ...opts })
   }
-  _rawQuery (query, tableModel) {
-    return this.sequelize.query(query, { model: tableModel })
+  _rawQuery (table, query) {
+    return this.sequelize.query(query, { model: table })
   }
 }
 

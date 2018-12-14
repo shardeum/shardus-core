@@ -1,7 +1,7 @@
 const Sequelize = require('sequelize')
 
 module.exports = [
-  'account-state',
+  'accountStates',
   {
     accountId: { type: Sequelize.STRING, allowNull: false, primaryKey: true },
     txId: { type: Sequelize.STRING, allowNull: false },
