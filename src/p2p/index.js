@@ -6,7 +6,7 @@ const routes = require('./routes')
 const DataSync = require('./datasync.js')
 
 class P2P {
-  constructor (config, logger, storage, crypto, network) {
+  constructor (config, logger, storage, crypto, network, accountUtility) {
     this.logger = logger
     this.mainLogger = logger.getLogger('main')
     this.storage = storage
@@ -32,7 +32,7 @@ class P2P {
 
     this.state = new P2PState(config, this.logger, this.storage, this, this.crypto)
 
-    this.dataSync = new DataSync(this.config, this.logger, this.storage, this.p2p, this.crypto)
+    this.dataSync = new DataSync(this.config, this.logger, this.storage, this.p2p, this.crypto, accountUtility)
   }
 
   async init () {

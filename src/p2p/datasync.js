@@ -7,11 +7,12 @@ const utils = require('../utils')
 // todo need error handling on all the p2p requests.
 
 class DataSync {
-  constructor (config, logger, storage, p2p, crypto) {
+  constructor (config, logger, storage, p2p, crypto, accountUtility) {
     this.mainLogger = logger.getLogger('main')
     this.p2p = p2p
     this.crypto = crypto
     this.storage = storage
+    this.accountUtility = accountUtility
 
     this.completedPartitions = []
     this.syncSettleTime = 3 * 10 // an estimate of max transaction settle time. todo make it a config or function of consensus later
@@ -362,7 +363,7 @@ class DataSync {
     }
 
     // failedHashes is a list of accounts that failed to match the hash reported by the server
-    let failedHashes = await this.app.set_account_data(this.goodAccounts) // repeatable form may need to call this in batches
+    let failedHashes = await this.accountUtility.setAccountData(this.goodAccounts) // repeatable form may need to call this in batches
 
     if (failedHashes.length > 1000) {
       // state -> try another node. TODO record/eval/report blame?
@@ -421,6 +422,8 @@ class DataSync {
     let counter = 0
     while (this.acceptedTXQueue.length > 0) {
       // apply the tx
+
+      // this.accountUtility.acceptTransaction(tx, receipt)
 
       // every x messages need to yeild
       counter++

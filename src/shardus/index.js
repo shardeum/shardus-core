@@ -104,6 +104,7 @@ class Shardus {
   }
 
   setup (app = null) {
+    this.accountUtility = this.getAccountUtilityInterface(app)
     this.app = this.getApplicationInterface(app)
     return this
   }
@@ -202,7 +203,7 @@ class Shardus {
 
   async acceptTransaction (tx, receipt) {
     // app applies data
-    let { stateTableResults, txId, txTimestamp } = await this.app.apply(tx, receipt) // TODO! implement this on the app side.
+    let { stateTableResults, txId, txTimestamp } = await this.app.apply(tx) // TODO! implement this on the app side.
     // TODO post enterprise:  the stateTableResults may need to be a map with keys so we can choose which one to actually insert in our accountStateTable
 
     let txStatus = 1 // HARDCODED!!! pre m15
@@ -318,11 +319,35 @@ class Shardus {
     return applicationInterfaceImpl
   }
 
-  async catchAllHandler (method, path, req, res) {
-    // console.log('shardus catch all: ' + method + ' ' + path)
-    if (this.app.handleHttpRequest) {
-      this.app.handleHttpRequest(method, path, req, res)
+  getAccountUtilityInterface (application) {
+    this.mainLogger.debug('Start of getApplicationInterfaces()')
+    let accountUtilityInterface = {}
+    try {
+      if (application == null) {
+        // throw new Error('Invalid Application Instance')
+        return null
+      }
+
+      // App.set_account_data (Acc_records)
+      // Acc_records - as provided by App.get_accounts
+      // Stores the records into the Accounts table if the hash of the Acc_data matches State_id
+      // Returns a list of failed Acc_id
+      if (typeof (application.onGetAccount) === 'function') {
+        accountUtilityInterface.setAccountData = async (accountRecords) => application.setAccountData(accountRecords)
+      } else {
+        // throw new Error('Missing requried interface function. apply()')
+      }
+      if (typeof (this.acceptTransaction) === 'function') {
+        accountUtilityInterface.acceptTransaction = async (tx, receipt) => this.acceptTransaction(tx, receipt)
+      } else {
+        // throw new Error('Missing requried interface function. apply()')
+      }
+    } catch (ex) {
+      this.fatalLogger.log(`Required application interface not implemented. Exception: ${ex}`)
+      throw new Error(ex)
     }
+    this.mainLogger.debug('End of getApplicationInterfaces()')
+    return accountUtilityInterface
   }
 
   async start (exitProcOnFail = true) {
@@ -333,7 +358,7 @@ class Shardus {
     const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout } = this.config
     const ipInfo = this.config.ip
     const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout }
-    this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network)
+    this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network, this.accountUtility)
     await this.p2p.init()
 
     this.consensus = new Consensus(this.config, this.logger, this.crypto, this.p2p, this.storage, null, this.app)
