@@ -11,9 +11,8 @@ class P2PState {
     this.cycles = []
 
     // Variables for regulating different phases cycles
-    this.acceptJoinReq = false
+    this.acceptChainUpdates = false
     this.shouldStop = false
-    this.canUpdateStatus = 'none'
 
     // Specifies valid statuses
     this.validStatuses = ['active', 'syncing', 'pending']
@@ -50,7 +49,6 @@ class P2PState {
     // Sets nodelist and current cycle to a copy of the clean nodelist and cycle objects
     this.nodes = utils.deepCopy(this.cleanNodelist)
     this.currentCycle = utils.deepCopy(this.cleanCycle)
-    this.nextCycle = utils.deepCopy(this.cleanCycle)
   }
 
   async init () {
@@ -72,7 +70,6 @@ class P2PState {
 
   _resetState () {
     this._resetCurrentCycle()
-    this._resetNextCycle()
     this._resetNodelist()
     this._resetCycles()
   }
@@ -94,7 +91,7 @@ class P2PState {
   }
 
   addNewJoinRequest (joinRequest) {
-    if (!this.acceptJoinReq) return false
+    if (!this.acceptChainUpdates) return false
     return this._addJoinRequest(joinRequest)
   }
 
@@ -125,11 +122,6 @@ class P2PState {
   }
 
   addStatusUpdate (nodeId, status) {
-    const whichCycle = this.canUpdateStatus
-    if (whichCycle === 'none') {
-      this.mainLogger.debug('Cannot add status update to queue, request made during non-accepting phase.')
-      return false
-    }
     // Check if we actually know about this node
     if (!this.getNode(nodeId)) {
       this.mainLogger.debug('Cannot update status of unknown node.')
@@ -148,15 +140,8 @@ class P2PState {
       return false
     }
     this.mainLogger.debug(`Type of status update: ${type}`)
-    if (whichCycle === 'current') {
-      this.currentCycle[type].push(nodeId)
-      return true
-    }
-    if (whichCycle === 'next') {
-      this.nextCycle[type].push(nodeId)
-      return true
-    }
-    this.mainLogger.debug(`this.canUpdateStatus/ whichCycle is an invalid value... ${whichCycle}`)
+    this.currentCycle[type].push(nodeId)
+    this.mainLogger.debug(`Node ${nodeId} added to ${type} list for this cycle.`)
   }
 
   async _setNodeStatus (nodeId, status) {
@@ -286,10 +271,6 @@ class P2PState {
     this.currentCycle = utils.deepCopy(this.cleanCycle)
   }
 
-  _resetNextCycle () {
-    this.nextCycle = utils.deepCopy(this.cleanCycle)
-  }
-
   // Kicks off the whole cycle and cycle marker creation system
   startCycles () {
     this.shouldStop = false
@@ -301,14 +282,8 @@ class P2PState {
     this.shouldStop = true
   }
 
-  _makeNextCycleCurrent () {
-    this.currentCycle = this.nextCycle
-  }
-
   _startNewCycle () {
-    // this._resetCurrentCycle()
-    this._makeNextCycleCurrent()
-    this._resetNextCycle()
+    this._resetCurrentCycle()
     const lastCycleDuration = this.getLastCycleDuration()
     const lastCycleStart = this.getLastCycleStart()
     const currentTime = utils.getTime('s')
@@ -319,15 +294,14 @@ class P2PState {
     this.mainLogger.debug(`Last cycle duration: ${lastCycleDuration}`)
     this.mainLogger.debug(`Current time: ${currentTime}`)
     const quarterCycle = Math.ceil(this.getCurrentCycleDuration() * 1000 / 4)
-    this._startJoinPhase(quarterCycle)
+    this._startUpdatePhase(quarterCycle)
   }
 
-  _startJoinPhase (phaseLen) {
+  _startUpdatePhase (phaseLen) {
     this.mainLogger.debug('Starting join phase...')
-    this.acceptJoinReq = true
-    this.canUpdateStatus = 'current'
+    this.acceptChainUpdates = true
     setTimeout(() => {
-      this._endJoinPhase(phaseLen)
+      this._endUpdatePhase(phaseLen)
     }, phaseLen)
   }
 
@@ -395,10 +369,9 @@ class P2PState {
     return bestNodes
   }
 
-  _endJoinPhase (phaseLen) {
+  _endUpdatePhase (phaseLen) {
     this.mainLogger.debug('Ending join phase...')
-    this.acceptJoinReq = false
-    this.canUpdateStatus = 'none'
+    this.acceptChainUpdates = false
     const bestNodes = this._getBestNodes()
     this._addJoiningNodes(bestNodes)
     // TODO: implement clearing out the unaccepted nodes from byIp when clearing pending requests
@@ -409,7 +382,6 @@ class P2PState {
 
   _startCycleSync (phaseLen) {
     this.mainLogger.debug('Starting cycle sync phase...')
-    this.canUpdateStatus = 'next'
     this._createCycleMarker()
     setTimeout(() => {
       this._finalizeCycle(phaseLen)

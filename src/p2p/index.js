@@ -275,7 +275,23 @@ class P2P {
     return null
   }
 
-  async _waitUntilJoinPhase (currentTime, cycleStart, cycleDuration) {
+  // Check if we are in the update phase
+  _isInUpdatePhase (currentTime, cycleStart, cycleDuration) {
+    this.mainLogger.debug(`Current time is: ${currentTime}`)
+    this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
+    this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
+    const startOfUpdatePhase = cycleStart
+    this.mainLogger.debug(`Start of second quarter: ${startOfUpdatePhase}`)
+    const endOfUpdatePhase = cycleStart + Math.ceil(0.25 * cycleDuration)
+    this.mainLogger.debug(`End of second quarter: ${endOfUpdatePhase}`)
+    if (currentTime < startOfUpdatePhase || currentTime > endOfUpdatePhase) {
+      return false
+    }
+    return true
+  }
+
+  // Wait until the chain update phase
+  async _waitUntilUpdatePhase (currentTime, cycleStart, cycleDuration) {
     this.mainLogger.debug(`Current time is: ${currentTime}`)
     this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
     this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
@@ -286,6 +302,7 @@ class P2P {
     await utils.sleep(timeToWait)
   }
 
+  // Wait until the end of the cycle
   async _waitUntilEndOfCycle (currentTime, cycleStart, cycleDuration) {
     this.mainLogger.debug(`Current time is: ${currentTime}`)
     this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
@@ -302,25 +319,14 @@ class P2P {
     await utils.sleep(timeToWait)
   }
 
-  _isIn2ndQuarter (currentTime, cycleStart, cycleDuration) {
-    this.mainLogger.debug(`Current time is: ${currentTime}`)
-    this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
-    this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
-    const startOf2ndQuarter = cycleStart + Math.ceil(0.25 * cycleDuration)
-    this.mainLogger.debug(`Start of second quarter: ${startOf2ndQuarter}`)
-    const endOf2ndQuarter = cycleStart + Math.ceil(0.5 * cycleDuration)
-    this.mainLogger.debug(`End of second quarter: ${endOf2ndQuarter}`)
-    if (currentTime < startOf2ndQuarter || currentTime > endOf2ndQuarter) {
-      return false
-    }
-    return true
-  }
-
-  async _submitWhenNot2nd (route, message) {
+  async _submitWhenUpdatePhase (route, message) {
     this.mainLogger.debug(`Submitting message: ${JSON.stringify(message)} on route: ${route} whenever it's not the second quarter of cycle...`)
+    // TO-DO: potentially make this not just the seed nodes that are queried for cycle marker
     const { currentTime, cycleStart, cycleDuration } = await this._fetchCycleMarkerInternal(this.seedNodes)
-    if (this._isIn2ndQuarter(currentTime, cycleStart, cycleDuration)) {
-      await utils.sleep(0.25 * cycleDuration * 1000)
+
+    // If we are nto in the update phase, then wait until it starts to submit this message
+    if (!this._isInUpdatePhase(currentTime, cycleStart, cycleDuration)) {
+      await this._waitUntilUpdatePhase(currentTime, cycleStart, cycleDuration)
     }
     this.mainLogger.debug(`Gossiping message: ${JSON.stringify(message)} on '${route}'.`)
     await this.sendGossip(route, message)
@@ -329,7 +335,7 @@ class P2P {
   async _attemptJoin (seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration) {
     // TODO: check if we missed join phase
     const currTime1 = utils.getTime('s') + timeOffset
-    await this._waitUntilJoinPhase(currTime1, cycleStart, cycleDuration)
+    await this._waitUntilUpdatePhase(currTime1, cycleStart, cycleDuration)
     await this._submitJoin(seedNodes, joinRequest)
     const currTime2 = utils.getTime('s') + timeOffset
     await this._waitUntilEndOfCycle(currTime2, cycleStart, cycleDuration)
@@ -700,9 +706,9 @@ class P2P {
     // After we have the ndoe list, we can turn on internal routes
     this.acceptInternal = true
 
+    this.mainLogger.debug('Fetching latest cycle chain...')
     // TODO: When active nodes are synced, change nodes to allActiveNodes
     // const nodes = this.state.getActiveNodes(this.id)
-    this.mainLogger.debug('Fetching latest cycle chain...')
     const nodes = this.seedNodes
     const cycleChain = await this._fetchLatestCycleChain(this.seedNodes, nodes)
     this.mainLogger.debug(`Retrieved cycle chain: ${JSON.stringify(cycleChain)}`)
@@ -719,11 +725,15 @@ class P2P {
 
   async _submitActiveRequest () {
     const signedRequest = this.crypto.sign({ nodeId: this.id })
-    await this._submitWhenNot2nd('active', signedRequest)
+    await this._submitWhenUpdatePhase('active', signedRequest)
   }
 
   async _goActive (isFirstSeed) {
     if (isFirstSeed) {
+      const { currentTime, cycleStart, cycleDuration } = this.getCycleMarkerInfo()
+      if (!this._isInUpdatePhase(currentTime, cycleStart, cycleDuration)) {
+        await this._waitUntilUpdatePhase(currentTime, cycleStart, cycleDuration)
+      }
       this.state.addStatusUpdate(this.id, 'active')
       return true
     }
