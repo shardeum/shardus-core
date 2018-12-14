@@ -990,7 +990,9 @@ class P2P {
     if (!joined) return false
     await this._syncToNetwork(seedNodes, isFirstSeed)
 
-    await this.dataSync.syncStateData(3)
+    if (isFirstSeed === false) {
+      await this.dataSync.syncStateData(3)
+    }
 
     await this._goActive(isFirstSeed)
 
