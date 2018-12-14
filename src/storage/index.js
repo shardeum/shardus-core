@@ -200,7 +200,7 @@ class Storage {
   async addAcceptedTransactions (acceptedTransactions) {
     this._checkInit()
     try {
-      await this._create(this.models.acceptedTx, acceptedTransactions)
+      await this._create(this.models.acceptedTxs, acceptedTransactions)
     } catch (e) {
       throw new Error(e)
     }
@@ -209,7 +209,7 @@ class Storage {
   async addAccountStates (accountStates) {
     this._checkInit()
     try {
-      await this._create(this.models.accountState, accountStates)
+      await this._create(this.models.accountStates, accountStates)
     } catch (e) {
       throw new Error(e)
     }
