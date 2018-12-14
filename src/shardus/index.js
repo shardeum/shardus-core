@@ -6,6 +6,7 @@ const Storage = require('../storage')
 const Network = require('../network')
 const utils = require('../utils')
 const Consensus = require('../consensus')
+// const DataSync = require('./datasync.js')
 
 class Shardus {
   constructor (config) {
@@ -20,9 +21,11 @@ class Shardus {
     this.p2p = {}
     this.app = {}
     this.consensus = {}
+    // this.dataSync = new DataSync(this.config, this.logger, this.storage, this.p2p, this.crypto)
 
     this.heartbeatInterval = config.heartbeatInterval
     this.heartbeatTimer = null
+    this.acceptedTXQueue = []
 
     // alias the network register calls so that an app can get to them
     this.registerExternalGet = (route, handler) => this.network.registerExternalGet(route, handler)
@@ -68,6 +71,8 @@ class Shardus {
       res.json({ success: true })
       await this.shutdown()
     })
+
+    this._registerSyncEndpoints()
   }
 
   registerExceptionHandler () {
@@ -172,13 +177,42 @@ class Shardus {
       let transactionReceipt = await this.consensus.inject(shardusTransaction)
       this.mainLogger.debug(`Received Consensus. Receipt: ${JSON.stringify(transactionReceipt)}`)
       // Apply the transaction
-      await this.app.apply(inTransaction, transactionReceipt)
+      await this.acceptTransaction(inTransaction, transactionReceipt)
     } catch (ex) {
       this.fatalLogger.fatal(`Failed to process transaction. Exception: ${ex}`)
       return { success: false, reason: `Failed to process trasnaction: ${JSON.parse(inTransaction)} ${ex}` }
     }
     this.mainLogger.debug(`End of injectTransaction ${inTransaction}`)
     return { success: true, reason: 'Transaction successfully processed' }
+  }
+
+  // accepted-tx :
+  // txId: { type: Sequelize.STRING, allowNull: false, primaryKey: true },
+  // txTimestamp: { type: Sequelize.BIGINT, allowNull: false },
+  // txData: { type: Sequelize.TEXT, allowNull: false },
+  // txStatus: { type: Sequelize.STRING, allowNull: false },
+  // txReceipt: { type: Sequelize.STRING, allowNull: false }
+
+  // account-state:
+  // accountId: { type: Sequelize.STRING, allowNull: false, primaryKey: true },
+  // txId: { type: Sequelize.STRING, allowNull: false },
+  // txTimestamp: { type: Sequelize.BIGINT, allowNull: false },
+  // stateBefore: { type: Sequelize.STRING, allowNull: false },
+  // stateAfter: { type: Sequelize.STRING, allowNull: false }
+
+  async acceptTransaction (tx, receipt) {
+    // app applies data
+    let { stateTableResults, txId, txTimestamp } = await this.app.apply(tx, receipt) // TODO! implement this on the app side.
+    // TODO post enterprise:  the stateTableResults may need to be a map with keys so we can choose which one to actually insert in our accountStateTable
+
+    let txStatus = 1 // HARDCODED!!! pre m15
+    // store transaction in accepted table
+    let acceptedTX = { txId: txId, txTimestamp: txTimestamp, txData: tx, txStatus: txStatus, txReceipt: receipt } // TODO init this data so we can save it
+    this.storage.addAcceptedTransactions([acceptedTX])
+
+    // query app for account state (or return it from apply)
+    // write entry into account state table (for each source or dest account in our shard)
+    this.storage.addAccountStates(stateTableResults)
   }
 
   /**
@@ -252,6 +286,30 @@ class Shardus {
       } else {
         // throw new Error('Missing requried interface function. apply()')
       }
+
+      // App.get_account_data (Acc_start, Acc_end, Max_records)
+      // Provides the functionality defined for /get_accounts API
+      // Max_records - limits the number of records returned
+      if (typeof (application.onGetAccount) === 'function') {
+        applicationInterfaceImpl.getAccountData = async (accountStart, accountEnd, maxRecords) => application.getAccountData(accountStart, accountEnd, maxRecords)
+      } else {
+        // throw new Error('Missing requried interface function. apply()')
+      }
+      // App.set_account_data (Acc_records)
+      // Acc_records - as provided by App.get_accounts
+      // Stores the records into the Accounts table if the hash of the Acc_data matches State_id
+      // Returns a list of failed Acc_id
+      if (typeof (application.onGetAccount) === 'function') {
+        applicationInterfaceImpl.setAccountData = async (accountRecords) => application.setAccountData(accountRecords)
+      } else {
+        // throw new Error('Missing requried interface function. apply()')
+      }
+
+      if (typeof (application.onGetAccount) === 'function') {
+        applicationInterfaceImpl.getAccountDataByList = async (addressList) => application.getAccountDataByList(addressList)
+      } else {
+        // throw new Error('Missing requried interface function. apply()')
+      }
     } catch (ex) {
       this.fatalLogger.log(`Required application interface not implemented. Exception: ${ex}`)
       throw new Error(ex)
@@ -285,6 +343,11 @@ class Shardus {
     let started
     try {
       started = await this.p2p.startup()
+
+      // if (started) {
+      //   // if not seed node.   todo determine where this gets kicked off.
+      //   await this.p2p.dataSync.syncStateData(3)
+      // }
     } catch (e) {
       throw new Error(e)
     }
@@ -297,6 +360,95 @@ class Shardus {
     } catch (e) {
       throw e
     }
+  }
+
+  // ---------------------App sync code-----------------------
+  _registerSyncEndpoints () {
+    //    /get_account_state_hash (Acc_start, Acc_end, Ts_start, Ts_end)
+    // Acc_start - get data for accounts starting with this account id; inclusive
+    // Acc_end - get data for accounts up to this account id; inclusive
+    // Ts_start - get data newer than this timestamp
+    // Ts_end - get data older than this timestamp
+    // Returns a single hash of the data from the Account State Table determined by the input parameters; sort by Tx_ts  then Tx_id before taking the hash
+    // Updated names:  accountStart , accountEnd, tsStart, tsEnd
+    this.p2p.registerInternal('get_account_state_hash', async (payload, respond) => {
+      let result = {}
+
+      let accountStates = await this.storage.queryAccountStateTable(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, 300)
+      let stateHash = this.crypto.hash(accountStates)
+      result.stateHash = stateHash
+      await respond(result)
+    })
+
+    //    /get_account_state (Acc_start, Acc_end, Ts_start, Ts_end)
+    // Acc_start - get data for accounts starting with this account id; inclusive
+    // Acc_end - get data for accounts up to this account id; inclusive
+    // Ts_start - get data newer than this timestamp
+    // Ts_end - get data older than this timestamp
+    // Returns data from the Account State Table determined by the input parameters; limits result to 1000 records (as configured)
+    // Updated names:  accountStart , accountEnd, tsStart, tsEnd
+    this.p2p.registerInternal('get_account_state', async (payload, respond) => {
+      let result = {}
+      let accountStates = await this.storage.queryAccountStateTable(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, 300)
+      result.stateHash = accountStates
+      await respond(result)
+    })
+
+    // /get_accpeted_transactions (Ts_start, Ts_end)
+    // Ts_start - get data newer than this timestamp
+    // Ts_end - get data older than this timestamp
+    // Returns data from the Accepted Tx Table starting with Ts_start; limits result to 500 records (as configured)
+    // Updated names: tsStart, tsEnd
+    this.p2p.registerInternal('get_accpeted_transactions', async (payload, respond) => {
+      let result = {}
+
+      let transactions = await this.storage.queryAcceptedTransactions(payload.tsStart, payload.tsEnd, 300)
+      result.transactions = transactions
+      await respond(result)
+    })
+
+    //     /get_account_data (Acc_start, Acc_end)
+    // Acc_start - get data for accounts starting with this account id; inclusive
+    // Acc_end - get data for accounts up to this account id; inclusive
+    // Returns data from the application Account Table; limits result to 300 records (as configured);
+    // For applications with multiple “Account” tables the returned data is grouped by table name.
+    // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
+    // Updated names:  accountStart , accountEnd
+    this.p2p.registerInternal('get_account_data', async (payload, respond) => {
+      let result = {}
+
+      let accountData = this.app.getAccountData(payload.accountStart, payload.accountEnd, payload.maxRecords)
+      result.accountData = accountData
+      await respond(result)
+    })
+
+    // /get_account_data_by_list (Acc_ids)
+    // Acc_ids - array of accounts to get
+    // Returns data from the application Account Table for just the given account ids;
+    // For applications with multiple “Account” tables the returned data is grouped by table name.
+    // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
+    // Updated names:  accountIds, max records
+    this.p2p.registerInternal('get_account_data_by_list', async (payload, respond) => {
+      let result = {}
+      let accountData = this.app.getAccountDataByList(payload.accountIds)
+      result.accountData = accountData
+      await respond(result)
+    })
+
+    // alternatively we would need to query for accepted tx.
+
+    // This endpoint will likely be a one off thing so that we can test before milesone 15.  after milesone 15 the accepted TX may flow from the consensus coordinator
+
+    // After joining the network
+    //   Record Joined timestamp
+    //   Even a syncing node will receive accepted transactions
+    //   Starts receiving accepted transaction and saving them to Accepted Tx Table
+    this.p2p.registerGossipHandler('acceptedTx', async (data) => {
+      // what to do with this data?
+      // need to insert into state table and accepted tx table for any nodes in our shard that are involved
+      this.acceptedTXQueue.push(data)
+      // TODO a timestamp sorted insert
+    })
   }
 }
 

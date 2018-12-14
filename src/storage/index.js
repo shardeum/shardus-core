@@ -192,6 +192,51 @@ class Storage {
     }
   }
 
+  async updateStateTable (accountStateData) {
+    this._checkInit()
+    throw new Error('not implmented')
+  }
+
+  async addAcceptedTransactions (acceptedTransaction) {
+    this._checkInit()
+    throw new Error('not implmented')
+  }
+
+  async addAccountStates (accountStart, accountEnd, tsStart, tsEnd, limit) {
+    this._checkInit()
+    throw new Error('not implmented')
+  }
+
+  async queryAcceptedTransactions (tsStart, tsEnd, limit) {
+    this._checkInit()
+    throw new Error('not implmented')
+  }
+
+  async queryAccountStateTable (accountStart, accountEnd, tsStart, tsEnd, limit) {
+    this._checkInit()
+    throw new Error('not implmented')
+  }
+
+  // example of a raw query with some similarities to what we want:
+
+  // async getAllLatestAccounts () {
+  //   let accounts
+  //   this._checkInit()
+  //   try {
+  //     // accounts = await this._read(this.models.accounts, null, { attributes: { exclude: ['createdAt', 'updatedAt'] }, raw: true })
+  //     const query = `select * from accounts acct1 inner join
+  //     (select address, max(timestamp) ts from accounts group by address) acct2
+  //     on acct1.address = acct2.address and acct1.timestamp = acct2.ts`
+  //     accounts = await this._query(query, this.models.accounts)
+  //     this.mainLogger.debug(`Accounts: ${accounts}`)
+  //   } catch (e) {
+  //     let errMsg = `Failed to retrieve getLatestAllAccounts() ==> Exception: ${e}`
+  //     this.mainLogger.error(errMsg)
+  //     throw new Error(errMsg)
+  //   }
+  //   return accounts
+  // }
+
   _checkInit () {
     if (!this.initialized) throw new Error('Storage not initialized.')
   }
@@ -212,6 +257,9 @@ class Storage {
       return table.destroy({ ...opts })
     }
     return table.destroy({ where, ...opts })
+  }
+  _rawQuery (query, tableModel) {
+    return this.sequelize.query(query, { model: tableModel })
   }
 }
 

@@ -3,6 +3,7 @@ const utils = require('../utils')
 const http = require('../http')
 const P2PState = require('./p2p-state')
 const routes = require('./routes')
+const DataSync = require('./datasync.js')
 
 class P2P {
   constructor (config, logger, storage, crypto, network) {
@@ -30,6 +31,8 @@ class P2P {
     this.gossipedHashes = new Map()
 
     this.state = new P2PState(config, this.logger, this.storage, this, this.crypto)
+
+    this.dataSync = new DataSync(this.config, this.logger, this.storage, this.p2p, this.crypto)
   }
 
   async init () {
@@ -986,6 +989,9 @@ class P2P {
     if (needJoin) joined = await this._joinNetwork(seedNodes, isFirstSeed)
     if (!joined) return false
     await this._syncToNetwork(seedNodes, isFirstSeed)
+
+    await this.p2p.dataSync.syncStateData(3)
+
     await this._goActive(isFirstSeed)
 
     // This is also for testing purposes

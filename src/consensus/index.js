@@ -1,6 +1,7 @@
 
 class Consensus {
-  constructor (config, logger, crypto, p2p, storage, nodeList, applicationInterfaceImpl) {
+  constructor (shardus, config, logger, crypto, p2p, storage, nodeList, applicationInterfaceImpl) {
+    this.shardus = shardus
     this.config = config
     this.logger = logger
     this.mainLogger = this.logger.getLogger('main')
@@ -115,7 +116,7 @@ class Consensus {
       //   return false
       // }
 
-      await this.applicationInterfaceImpl.apply(transaction, receipt)
+      this.shardus.acceptTransaction(transaction, receipt)
     } catch (ex) {
       this.fatalLogger.fatal(`Failed to process receipt. Exception: ${ex}`)
     }
