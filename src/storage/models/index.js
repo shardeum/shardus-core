@@ -2,6 +2,6 @@ module.exports = [
   require('./cycles'),
   require('./nodes'),
   require('./properties'),
-  require('./accepted-tx'),
-  require('./account-state')
+  require('./acceptedTxs'),
+  require('./accountStates')
 ]
