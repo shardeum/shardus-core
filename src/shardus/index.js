@@ -186,20 +186,6 @@ class Shardus {
     return { success: true, reason: 'Transaction successfully processed' }
   }
 
-  // accepted-tx :
-  // txId: { type: Sequelize.STRING, allowNull: false, primaryKey: true },
-  // txTimestamp: { type: Sequelize.BIGINT, allowNull: false },
-  // txData: { type: Sequelize.TEXT, allowNull: false },
-  // txStatus: { type: Sequelize.STRING, allowNull: false },
-  // txReceipt: { type: Sequelize.STRING, allowNull: false }
-
-  // account-state:
-  // accountId: { type: Sequelize.STRING, allowNull: false, primaryKey: true },
-  // txId: { type: Sequelize.STRING, allowNull: false },
-  // txTimestamp: { type: Sequelize.BIGINT, allowNull: false },
-  // stateBefore: { type: Sequelize.STRING, allowNull: false },
-  // stateAfter: { type: Sequelize.STRING, allowNull: false }
-
   async acceptTransaction (tx, receipt, gossipTx = false) {
     // app applies data
     let { stateTableResults, txId, txTimestamp } = await this.app.apply(tx) // TODO! implement this on the app side.
@@ -207,7 +193,7 @@ class Shardus {
 
     let txStatus = 1 // HARDCODED!!! pre m15
     // store transaction in accepted table
-    let acceptedTX = { txId: txId, txTimestamp: txTimestamp, txData: tx, txStatus: txStatus, txReceipt: receipt } // TODO init this data so we can save it
+    let acceptedTX = { id: txId, timestamp: txTimestamp, data: tx, status: txStatus, receipt: receipt } // TODO init this data so we can save it
     this.storage.addAcceptedTransactions([acceptedTX])
 
     // query app for account state (or return it from apply)
