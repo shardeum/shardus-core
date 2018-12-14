@@ -32,7 +32,7 @@ class P2P {
 
     this.state = new P2PState(config, this.logger, this.storage, this, this.crypto)
 
-    this.dataSync = new DataSync(this.config, this.logger, this.storage, this.p2p, this.crypto, accountUtility)
+    this.dataSync = new DataSync(this.config, this.logger, this.storage, this, this.crypto, accountUtility)
   }
 
   async init () {
@@ -990,7 +990,7 @@ class P2P {
     if (!joined) return false
     await this._syncToNetwork(seedNodes, isFirstSeed)
 
-    await this.p2p.dataSync.syncStateData(3)
+    await this.dataSync.syncStateData(3)
 
     await this._goActive(isFirstSeed)
 

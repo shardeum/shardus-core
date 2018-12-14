@@ -6,7 +6,6 @@ const Storage = require('../storage')
 const Network = require('../network')
 const utils = require('../utils')
 const Consensus = require('../consensus')
-// const DataSync = require('./datasync.js')
 
 class Shardus {
   constructor (config) {
@@ -21,7 +20,6 @@ class Shardus {
     this.p2p = {}
     this.app = {}
     this.consensus = {}
-    // this.dataSync = new DataSync(this.config, this.logger, this.storage, this.p2p, this.crypto)
 
     this.heartbeatInterval = config.heartbeatInterval
     this.heartbeatTimer = null
@@ -35,7 +33,9 @@ class Shardus {
 
     this.exitHandler.addSigListeners()
     this.exitHandler.registerSync('p2p', () => {
-      this.p2p.state.stopCycles()
+      if (this.p2p.state) {
+        this.p2p.state.stopCycles()
+      }
     })
     this.exitHandler.registerSync('shardus', () => {
       this.stopHeartbeat()
@@ -177,7 +177,7 @@ class Shardus {
       let transactionReceipt = await this.consensus.inject(shardusTransaction)
       this.mainLogger.debug(`Received Consensus. Receipt: ${JSON.stringify(transactionReceipt)}`)
       // Apply the transaction
-      await this.acceptTransaction(inTransaction, transactionReceipt)
+      await this.acceptTransaction(inTransaction, transactionReceipt, true)
     } catch (ex) {
       this.fatalLogger.fatal(`Failed to process transaction. Exception: ${ex}`)
       return { success: false, reason: `Failed to process trasnaction: ${JSON.parse(inTransaction)} ${ex}` }
@@ -200,7 +200,7 @@ class Shardus {
   // stateBefore: { type: Sequelize.STRING, allowNull: false },
   // stateAfter: { type: Sequelize.STRING, allowNull: false }
 
-  async acceptTransaction (tx, receipt) {
+  async acceptTransaction (tx, receipt, gossipTx = false) {
     // app applies data
     let { stateTableResults, txId, txTimestamp } = await this.app.apply(tx) // TODO! implement this on the app side.
     // TODO post enterprise:  the stateTableResults may need to be a map with keys so we can choose which one to actually insert in our accountStateTable
@@ -213,6 +213,11 @@ class Shardus {
     // query app for account state (or return it from apply)
     // write entry into account state table (for each source or dest account in our shard)
     this.storage.addAccountStates(stateTableResults)
+
+    if (gossipTx) {
+      // temporary implementaiton to share transactions
+      this.p2p.sendGossip('acceptedTx', acceptedTX)
+    }
   }
 
   /**
@@ -360,18 +365,13 @@ class Shardus {
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network, this.accountUtility)
     await this.p2p.init()
 
-    this.consensus = new Consensus(this.config, this.logger, this.crypto, this.p2p, this.storage, null, this.app)
+    this.consensus = new Consensus(this.accountUtility, this.config, this.logger, this.crypto, this.p2p, this.storage, null, this.app)
 
     this._registerRoutes()
 
     let started
     try {
       started = await this.p2p.startup()
-
-      // if (started) {
-      //   // if not seed node.   todo determine where this gets kicked off.
-      //   await this.p2p.dataSync.syncStateData(3)
-      // }
     } catch (e) {
       throw new Error(e)
     }
