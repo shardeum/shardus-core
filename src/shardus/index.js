@@ -459,6 +459,15 @@ class Shardus {
       await respond(result)
     })
   }
+
+  createApplyResponse (txId, txTimestamp) {
+    let replyObject = { stateTableResults: [], txId, txTimestamp }
+    return replyObject
+  }
+
+  applyResponseAddState (resultObject, accountId, txId, txTimestamp, stateBefore, stateAfter) {
+    resultObject.stateTableResults.push({ accountId, txId, txTimestamp, stateBefore, stateAfter })
+  }
 }
 
 module.exports = Shardus
