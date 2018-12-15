@@ -3,8 +3,8 @@ const Sequelize = require('sequelize')
 module.exports = [
   'accountStates',
   {
-    accountId: { type: Sequelize.STRING, allowNull: false, validate: { isLowercase: true }, unique: 'compositeIndex' },
-    txId: { type: Sequelize.STRING, allowNull: false, validate: { isLowercase: true } },
+    accountId: { type: Sequelize.STRING, allowNull: false, unique: 'compositeIndex' },
+    txId: { type: Sequelize.STRING, allowNull: false },
     txTimestamp: { type: Sequelize.BIGINT, allowNull: false, unique: 'compositeIndex' },
     stateBefore: { type: Sequelize.STRING, allowNull: false },
     stateAfter: { type: Sequelize.STRING, allowNull: false }

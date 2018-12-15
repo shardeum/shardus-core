@@ -3,7 +3,7 @@ const Sequelize = require('sequelize')
 module.exports = [
   'acceptedTxs',
   {
-    id: { type: Sequelize.STRING, allowNull: false, primaryKey: true, validate: { isLowercase: true } },
+    id: { type: Sequelize.STRING, allowNull: false, primaryKey: true },
     timestamp: { type: Sequelize.BIGINT, allowNull: false },
     data: { type: Sequelize.TEXT, allowNull: false },
     status: { type: Sequelize.STRING, allowNull: false },
