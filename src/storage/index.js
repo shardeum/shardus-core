@@ -210,26 +210,36 @@ class Storage {
     }
   }
   async queryAcceptedTransactions (tsStart, tsEnd, limit) {
-    this._read(
-      this.models.acceptedTxs,
-      { timestamp: { [Op.between]: [tsStart, tsEnd] } },
-      {
-        order: [ ['timestamp', 'ASC'] ],
-        attributes: { exclude: ['createdAt', 'updatedAt'] },
-        raw: true
-      }
-    )
+    this._checkInit()
+    try {
+      await this._read(
+        this.models.acceptedTxs,
+        { timestamp: { [Op.between]: [tsStart, tsEnd] } },
+        {
+          order: [ ['timestamp', 'ASC'] ],
+          attributes: { exclude: ['createdAt', 'updatedAt'] },
+          raw: true
+        }
+      )
+    } catch (e) {
+      throw new Error(e)
+    }
   }
   async queryAccountStateTable (accountStart, accountEnd, tsStart, tsEnd, limit) {
-    this._read(
-      this.models.accountStates,
-      { accountId: { [Op.between]: [accountStart, accountEnd] } },
-      {
-        order: [ ['accountId', 'ASC'] ],
-        attributes: { exclude: ['createdAt', 'updatedAt'] },
-        raw: true
-      }
-    )
+    this._checkInit()
+    try {
+      await this._read(
+        this.models.accountStates,
+        { accountId: { [Op.between]: [accountStart, accountEnd] } },
+        {
+          order: [ ['accountId', 'ASC'] ],
+          attributes: { exclude: ['createdAt', 'updatedAt'] },
+          raw: true
+        }
+      )
+    } catch (e) {
+      throw new Error(e)
+    }
   }
 
   // example of a raw query with some similarities to what we want:
