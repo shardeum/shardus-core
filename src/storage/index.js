@@ -1,6 +1,7 @@
 const fs = require('fs')
 const path = require('path')
 const Sequelize = require('sequelize')
+const Op = Sequelize.Op
 const models = require('./models')
 
 class Storage {
@@ -192,11 +193,6 @@ class Storage {
     }
   }
 
-  async updateStateTable (accountStateData) {
-    this._checkInit()
-    throw new Error('not implmented')
-  }
-
   async addAcceptedTransactions (acceptedTransactions) {
     this._checkInit()
     try {
@@ -205,7 +201,6 @@ class Storage {
       throw new Error(e)
     }
   }
-
   async addAccountStates (accountStates) {
     this._checkInit()
     try {
@@ -214,15 +209,27 @@ class Storage {
       throw new Error(e)
     }
   }
-
   async queryAcceptedTransactions (tsStart, tsEnd, limit) {
-    this._checkInit()
-    throw new Error('not implmented')
+    this._read(
+      this.models.acceptedTxs,
+      { timestamp: { [Op.between]: [tsStart, tsEnd] } },
+      {
+        order: [ ['timestamp', 'ASC'] ],
+        attributes: { exclude: ['createdAt', 'updatedAt'] },
+        raw: true
+      }
+    )
   }
-
   async queryAccountStateTable (accountStart, accountEnd, tsStart, tsEnd, limit) {
-    this._checkInit()
-    throw new Error('not implmented')
+    this._read(
+      this.models.accountStates,
+      { accountId: { [Op.between]: [accountStart, accountEnd] } },
+      {
+        order: [ ['accountId', 'ASC'] ],
+        attributes: { exclude: ['createdAt', 'updatedAt'] },
+        raw: true
+      }
+    )
   }
 
   // example of a raw query with some similarities to what we want:
