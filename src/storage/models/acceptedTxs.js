@@ -5,9 +5,9 @@ module.exports = [
   {
     id: { type: Sequelize.STRING, allowNull: false, primaryKey: true },
     timestamp: { type: Sequelize.BIGINT, allowNull: false },
-    data: { type: Sequelize.TEXT, allowNull: false },
+    data: { type: Sequelize.JSON, allowNull: false },
     status: { type: Sequelize.STRING, allowNull: false },
-    receipt: { type: Sequelize.STRING, allowNull: false }
+    receipt: { type: Sequelize.JSON, allowNull: false }
   }
 ]
 
