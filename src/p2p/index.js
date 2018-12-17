@@ -997,6 +997,12 @@ class P2P {
 
     await this._goActive(isFirstSeed)
 
+    if (isFirstSeed === false){
+      //TODO potentially not ready to share state data with other nodes yet, may need a state for this so we dont get flagged as dishonest
+      await this.dataSync.patchRemainingStateData()
+    }
+    // if (!isFirstSeed) this.state.startCycles()
+
     // This is also for testing purposes
     console.log('Server ready!')
     return true

@@ -212,15 +212,17 @@ class Storage {
   async queryAcceptedTransactions (tsStart, tsEnd, limit) {
     this._checkInit()
     try {
-      await this._read(
+      let result = await this._read(
         this.models.acceptedTxs,
         { timestamp: { [Op.between]: [tsStart, tsEnd] } },
         {
+          limit: limit,
           order: [ ['timestamp', 'ASC'] ],
-          attributes: { exclude: ['createdAt', 'updatedAt'] },
+          attributes: { exclude: ['createdAt', 'updatedAt', 'id'] },
           raw: true
         }
       )
+      return result
     } catch (e) {
       throw new Error(e)
     }
@@ -228,15 +230,17 @@ class Storage {
   async queryAccountStateTable (accountStart, accountEnd, tsStart, tsEnd, limit) {
     this._checkInit()
     try {
-      await this._read(
+      let result = await this._read(
         this.models.accountStates,
-        { accountId: { [Op.between]: [accountStart, accountEnd] } },
+        { accountId: { [Op.between]: [accountStart, accountEnd] },  txTimestamp: { [Op.between]: [tsStart, tsEnd] } },
         {
-          order: [ ['accountId', 'ASC'] ],
-          attributes: { exclude: ['createdAt', 'updatedAt'] },
+          limit: limit,
+          order: [ ['txTimestamp', 'ASC'] ],
+          attributes: { exclude: ['createdAt', 'updatedAt', 'id'] },
           raw: true
         }
       )
+      return result
     } catch (e) {
       throw new Error(e)
     }

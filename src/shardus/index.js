@@ -194,16 +194,55 @@ class Shardus {
     let txStatus = 1 // HARDCODED!!! pre m15
     // store transaction in accepted table
     let acceptedTX = { id: txId, timestamp: txTimestamp, data: tx, status: txStatus, receipt: receipt } // TODO init this data so we can save it
-    this.storage.addAcceptedTransactions([acceptedTX])
+    await this.storage.addAcceptedTransactions([acceptedTX])
 
     // query app for account state (or return it from apply)
     // write entry into account state table (for each source or dest account in our shard)
-    this.storage.addAccountStates(stateTableResults)
+    await this.storage.addAccountStates(stateTableResults)
 
     if (gossipTx) {
       // temporary implementaiton to share transactions
       this.p2p.sendGossip('acceptedTx', acceptedTX)
     }
+  }
+
+  // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
+  async tryApplyTransaction(tx) {
+    // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
+    let keysResponse = this.app.getKeyFromTransaction(inTransaction)
+    let { sourceKeys, targetKeys } = keysResponse
+    let sourceAddress, targetAddress, sourceState, targetState
+
+    let timestamp = inTransaction.txnTimestmp //TODO!!! need to push this to application method thta cracks the transaction
+
+    if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
+      sourceAddress = sourceKeys[0]
+      sourceState = await this.app.getStateId(sourceAddress)
+
+      let accountStates = await this.storage.queryAccountStateTable(sourceState, sourceState, timestamp, timestamp, 1)
+      if(accountStates.length === 0 || accountStates[0].stateBefore !== stateBefore) {
+        return
+      }
+    }
+    if (Array.isArray(targetKeys) && targetKeys.length > 0) {
+      targetAddress = targetKeys[0]
+      targetState = await this.app.getStateId(targetAddress)
+      // todo post enterprise, only check this if it is in our address range
+      let accountStates = await this.storage.queryAccountStateTable(targetState, targetState, timestamp, timestamp, 1)
+      if(accountStates.length === 0 || accountStates[0].stateBefore !== stateBefore) {
+        return
+      }
+    }
+
+    this.app.apply(tx)
+    
+    //we don't have enough information to write this to the accepted transaction table but we could 
+
+    // let { stateTableResults, txId, txTimestamp } = await this.app.apply(tx)
+    // let txStatus = 1 // HARDCODED!!! pre m15
+    // // store transaction in accepted table ... alternatively we could have queried for accepted TX... tbd on the correct answer here
+    // let acceptedTX = { id: txId, timestamp: txTimestamp, data: tx, status: txStatus, receipt: receipt } 
+    // this.storage.addAcceptedTransactions([acceptedTX])
   }
 
   /**
@@ -359,6 +398,9 @@ class Shardus {
     try {
       started = await this.p2p.startup()
     } catch (e) {
+      console.log(e.message + " at " + e.stack)
+      this.mainLogger.debug(e.message + " at " + e.stack)
+      this.fatalLogger.log(e.message + " at " + e.stack)
       throw new Error(e)
     }
     if (!started) await this.shutdown(exitProcOnFail)
@@ -384,7 +426,8 @@ class Shardus {
     this.p2p.registerInternal('get_account_state_hash', async (payload, respond) => {
       let result = {}
 
-      let accountStates = await this.storage.queryAccountStateTable(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, 300)
+      // yikes need to potentially hash only N records at a time and return an array of hashes
+      let accountStates = await this.storage.queryAccountStateTable(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, 100000000)
       let stateHash = this.crypto.hash(accountStates)
       result.stateHash = stateHash
       await respond(result)
@@ -399,8 +442,9 @@ class Shardus {
     // Updated names:  accountStart , accountEnd, tsStart, tsEnd
     this.p2p.registerInternal('get_account_state', async (payload, respond) => {
       let result = {}
-      let accountStates = await this.storage.queryAccountStateTable(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, 300)
-      result.stateHash = accountStates
+      // max records set artificially low for better test coverage, todo make config
+      let accountStates = await this.storage.queryAccountStateTable(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, 10)
+      result.accountStates = accountStates
       await respond(result)
     })
 
@@ -412,7 +456,7 @@ class Shardus {
     this.p2p.registerInternal('get_accpeted_transactions', async (payload, respond) => {
       let result = {}
 
-      let transactions = await this.storage.queryAcceptedTransactions(payload.tsStart, payload.tsEnd, 300)
+      let transactions = await this.storage.queryAcceptedTransactions(payload.tsStart, payload.tsEnd, 10)
       result.transactions = transactions
       await respond(result)
     })
@@ -427,7 +471,7 @@ class Shardus {
     this.p2p.registerInternal('get_account_data', async (payload, respond) => {
       let result = {}
 
-      let accountData = this.app.getAccountData(payload.accountStart, payload.accountEnd, payload.maxRecords)
+      let accountData = await this.app.getAccountData(payload.accountStart, payload.accountEnd, payload.maxRecords)
       result.accountData = accountData
       await respond(result)
     })
@@ -440,7 +484,7 @@ class Shardus {
     // Updated names:  accountIds, max records
     this.p2p.registerInternal('get_account_data_by_list', async (payload, respond) => {
       let result = {}
-      let accountData = this.app.getAccountDataByList(payload.accountIds)
+      let accountData = await this.app.getAccountDataByList(payload.accountIds)
       result.accountData = accountData
       await respond(result)
     })
