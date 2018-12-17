@@ -651,10 +651,13 @@ class P2P {
 
       // Sleep for cycle duration before updating status
       // TODO: Make this more deterministic
-      await utils.sleep(this.state.getCurrentCycleDuration() * 1000)
-      const { currentCycleMarker } = this.getCycleMarkerInfo()
-      const nodeId = this.state.computeNodeId(joinRequest.nodeInfo.publicKey, currentCycleMarker)
-      this._setNodeId(nodeId)
+      await utils.sleep(Math.ceil(this.state.getCurrentCycleDuration() / 2) * 1000)
+      const { nextCycleMarker } = this.getCycleMarkerInfo()
+      this.mainLogger.debug(`Public key: ${joinRequest.nodeInfo.publicKey}`)
+      this.mainLogger.debug(`Next cycle marker: ${nextCycleMarker}`)
+      const nodeId = this.state.computeNodeId(joinRequest.nodeInfo.publicKey, nextCycleMarker)
+      this.mainLogger.debug(`Computed node ID to be set for this node: ${nodeId}`)
+      await this._setNodeId(nodeId)
 
       return true
     }
@@ -665,7 +668,7 @@ class P2P {
       return false
     }
     this.mainLogger.info('Successfully joined the network!')
-    this._setNodeId(nodeId)
+    await this._setNodeId(nodeId)
     // const testResponse = await this.ask({ internalIp: '127.0.0.1', internalPort: 9005 }, 'test2')
     // console.log(JSON.stringify(testResponse))
     return true

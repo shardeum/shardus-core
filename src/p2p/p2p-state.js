@@ -380,9 +380,9 @@ class P2PState {
     }, phaseLen)
   }
 
-  _startCycleSync (phaseLen) {
+  async _startCycleSync (phaseLen) {
     this.mainLogger.debug('Starting cycle sync phase...')
-    this._createCycleMarker()
+    await this._createCycleMarker()
     setTimeout(() => {
       this._finalizeCycle(phaseLen)
     }, phaseLen)
@@ -390,14 +390,14 @@ class P2PState {
 
   async _finalizeCycle (phaseLen) {
     this.mainLogger.debug('Starting cycle finalization phase...')
-    this._createCycle()
-    setTimeout(() => {
+    setTimeout(async () => {
+      await this._createCycle()
       if (this.shouldStop) return
       this._startNewCycle()
     }, phaseLen)
   }
 
-  _createCycleMarker () {
+  async _createCycleMarker () {
     this.mainLogger.info('Creating new cycle marker...')
     const cycleInfo = this.getCycleInfo(false)
     const cycleMarker = this._computeCycleMarker(cycleInfo)
@@ -405,7 +405,7 @@ class P2PState {
     if (!this.cycles.length) return this.addCertificate({ marker: cycleMarker, signer: '0'.repeat(64) })
     const added = this.addCertificate(certificate)
     if (!added) return
-    this.p2p.sendGossip('certificate', certificate)
+    await this.p2p.sendGossip('certificate', certificate)
   }
 
   async addCycle (cycle) {
@@ -632,7 +632,8 @@ class P2PState {
     if (!self) return Object.values(nodes)
     // Check if self in node list
     if (!nodes[self]) {
-      throw new Error(`Fatal: Invalid node ID in 'self' field. Given ID: ${self}`)
+      this.mainLogger.error(`Invalid node ID in 'self' field. Given ID: ${self}`)
+      return Object.values(nodes)
     }
     const nodesCopy = utils.deepCopy(nodes)
     delete nodesCopy[self]
