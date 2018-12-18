@@ -1,6 +1,5 @@
 const log4js = require('log4js')
 const { existsSync, mkdirSync } = require('fs')
-const { readJson } = require('../utils')
 const log4jsExtend = require('log4js-extend')
 
 class Logger {
@@ -17,15 +16,7 @@ class Logger {
   _checkValidConfig () {
     const config = this.config
     if (!config.dir) throw Error('Fatal Error: Log directory not defined.')
-    if (!config.confFile || typeof config.confFile !== 'string') throw Error('Fatal Error: Valid log configuration filename not provided.')
     if (!config.files || typeof config.files !== 'object') throw Error('Fatal Error: Valid log file locations not provided.')
-  }
-
-  // Read the log configuration file specified within the provided configuration and configure log4js with it
-  _readLogConfig () {
-    const confFile = `${this.baseDir}/${this.config.confFile}`
-    if (!existsSync(confFile)) throw Error('Fatal Error: Provided log configuration file does not exist.')
-    return readJson(confFile)
   }
 
   // Add filenames to each appender of type 'file'
@@ -61,7 +52,7 @@ class Logger {
     if (!existsSync(this.logDir)) mkdirSync(this.logDir)
 
     // Read the log config from log config file
-    this.log4Conf = this._readLogConfig()
+    this.log4Conf = config.options
     log4jsExtend(log4js)
     this._addFileNamesToAppenders()
     this._configureLogs()

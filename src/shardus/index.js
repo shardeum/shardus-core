@@ -8,13 +8,13 @@ const utils = require('../utils')
 const Consensus = require('../consensus')
 
 class Shardus {
-  constructor (config) {
+  constructor ({ server: config, logs: logsConfig, storage: storageConfig }) {
     this.config = config
-    this.logger = new Logger(config.baseDir, config.log)
+    this.logger = new Logger(config.baseDir, logsConfig)
     this.mainLogger = this.logger.getLogger('main')
     this.fatalLogger = this.logger.getLogger('fatal')
     this.exitHandler = new ExitHandler()
-    this.storage = new Storage(this.logger, config.baseDir, config.storage)
+    this.storage = new Storage(config.baseDir, storageConfig, this.logger)
     this.crypto = {}
     this.network = new Network(config.network, this.logger)
     this.p2p = {}

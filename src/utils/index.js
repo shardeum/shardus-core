@@ -1,4 +1,5 @@
-const { readFileSync } = require('fs')
+const { readFileSync, readdirSync } = require('fs')
+const { join } = require('path')
 
 const sleep = (ms) => {
   return new Promise(resolve => {
@@ -30,6 +31,15 @@ const readJson = (filename) => {
   const file = readFileSync(filename)
   const config = JSON.parse(file)
   return config
+}
+
+const readJsonDir = (dir) => { // => filesObj
+  let filesObj = {}
+  readdirSync(dir).forEach(fileName => {
+    let name = fileName.split('.')[0]
+    filesObj[name] = require(join(dir, fileName))
+  })
+  return filesObj
 }
 
 const insertSorted = (arr, item, comparator) => {
@@ -68,5 +78,6 @@ exports.sleep = sleep
 exports.getTime = getTime
 exports.deepCopy = deepCopy
 exports.readJson = readJson
+exports.readJsonDir = readJsonDir
 exports.insertSorted = insertSorted
 exports.XOR = XOR

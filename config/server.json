@@ -24,13 +24,5 @@
   },
   "network": {
     "timeout": 10
-  },
-  "log": {
-    "dir": "logs",
-    "confFile": "./config/logs.json",
-    "files": {"main": "", "fatal": "", "net": ""}
-  },
-  "storage": {
-    "confFile": "./config/storage.json"
   }
 }

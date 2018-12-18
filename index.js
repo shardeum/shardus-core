@@ -1,8 +1,11 @@
-const path = require('path')
+const { join } = require('path')
 const merge = require('deepmerge')
+const { readJsonDir } = require('./src/utils')
 const Shardus = require('./src/shardus')
-const defaultConfig = require('./config/server.json')
+const defaultConfigs = readJsonDir(join(__dirname, 'config'))
 
-defaultConfig.baseDir = path.join(__dirname, defaultConfig.baseDir)
+function shardusFactory (configs = {}) {
+  return new Shardus(merge(defaultConfigs, configs))
+}
 
-module.exports = (config = {}) => new Shardus(merge(defaultConfig, config))
+module.exports = shardusFactory
