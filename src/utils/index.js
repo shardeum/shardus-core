@@ -37,7 +37,7 @@ const readJsonDir = (dir) => { // => filesObj
   let filesObj = {}
   readdirSync(dir).forEach(fileName => {
     let name = fileName.split('.')[0]
-    filesObj[name] = require(join(dir, fileName))
+    filesObj[name] = readJson(join(dir, fileName))
   })
   return filesObj
 }
