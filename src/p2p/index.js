@@ -831,35 +831,34 @@ class P2P {
 
   // Verifies that the received internal message was signed by the stated node
   _verifySignedByNode (message, node) {
-    // let result
-    // try {
-    //   if (!node.publicKey) {
-    //     this.mainLogger.debug('Node object did not contain public key for verifySignedByNode()!')
-    //     return false
-    //   }
-    //   this.mainLogger.debug(`Expected publicKey: ${node.publicKey}, actual publicKey: ${message.sign.owner}`)
-    //   result = this.crypto.verify(message, node.publicKey)
-    // } catch (e) {
-    //   this.mainLogger.debug(`Invalid or missing signature on message: ${JSON.stringify(message)}`)
-    //   return false
-    // }
-    // return result
-    return true
+    let result
+    try {
+      if (!node.publicKey) {
+        this.mainLogger.debug('Node object did not contain public key for verifySignedByNode()!')
+        return false
+      }
+      this.mainLogger.debug(`Expected publicKey: ${node.publicKey}, actual publicKey: ${message.sign.owner}`)
+      result = this.crypto.verify(message, node.publicKey)
+    } catch (e) {
+      this.mainLogger.debug(`Invalid or missing signature on message: ${JSON.stringify(message)}`)
+      return false
+    }
+    return result
   }
 
   _extractPayload (wrappedPayload, nodeGroup) {
-    // // Check to see if node is in expected node group
-    // const node = this._findNodeInGroup(wrappedPayload.sender, nodeGroup)
-    // if (!node) {
-    //   this.mainLogger.debug(`Invalid sender on internal payload: ${JSON.stringify(wrappedPayload)}`)
-    //   return null
-    // }
-    // const signedByNode = this._verifySignedByNode(wrappedPayload, node)
-    // // Check if actually signed by that node
-    // if (!signedByNode) {
-    //   this.mainLogger.debug('Internal payload not signed by an expected node.')
-    //   return null
-    // }
+    // Check to see if node is in expected node group
+    const node = this._findNodeInGroup(wrappedPayload.sender, nodeGroup)
+    if (!node) {
+      this.mainLogger.debug(`Invalid sender on internal payload: ${JSON.stringify(wrappedPayload)}`)
+      return null
+    }
+    const signedByNode = this._verifySignedByNode(wrappedPayload, node)
+    // Check if actually signed by that node
+    if (!signedByNode) {
+      this.mainLogger.debug('Internal payload not signed by an expected node.')
+      return null
+    }
     const payload = wrappedPayload.payload
     this.mainLogger.debug('Internal payload successfully verified.')
     return payload
@@ -997,8 +996,8 @@ class P2P {
 
     await this._goActive(isFirstSeed)
 
-    if (isFirstSeed === false){
-      //TODO potentially not ready to share state data with other nodes yet, may need a state for this so we dont get flagged as dishonest
+    if (isFirstSeed === false) {
+      // TODO: potentially not ready to share state data with other nodes yet, may need a state for this so we dont get flagged as dishonest
       await this.dataSync.patchRemainingStateData()
     }
     // if (!isFirstSeed) this.state.startCycles()
