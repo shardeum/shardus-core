@@ -100,7 +100,6 @@ function setupRoutes () {
   })
 
   this.registerInternal('unfinalized', async (payload, respond) => {
-    console.log(this.state.unfinalizedReady)
     if (!this.state.unfinalizedReady) {
       this.mainLogger.debug('Unfinalized cycle not ready to be provided.')
       await respond({ unfinalizedCycle: null })

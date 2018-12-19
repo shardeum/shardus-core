@@ -696,7 +696,6 @@ class P2P {
     }
 
     const nodeId = await this._join(seedNodes)
-    console.log(nodeId)
     if (!nodeId) {
       this.mainLogger.info('Unable to join network. Shutting down...')
       return false
@@ -984,8 +983,6 @@ class P2P {
     await this._syncToNetwork(seedNodes, isFirstSeed)
     await this._goActive(isFirstSeed)
     this.mainLogger.info('Node is now active!')
-
-    // if (!isFirstSeed) this.state.startCycles()
 
     // This is also for testing purposes
     console.log('Server ready!')
