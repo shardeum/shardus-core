@@ -8,6 +8,7 @@ const config = require(configPath)
 const shardus = new Shardus(config)
 
 async function init () {
+  shardus.setup(null)
   await shardus.start()
   shardus.registerExceptionHandler()
 }

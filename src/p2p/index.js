@@ -32,7 +32,7 @@ class P2P {
 
     this.state = new P2PState(config, this.logger, this.storage, this, this.crypto)
 
-    this.dataSync = new DataSync(this.config, this.logger, this.storage, this, this.crypto, accountUtility)
+    this.dataSync = accountUtility ? new DataSync(this.config, this.logger, this.storage, this, this.crypto, accountUtility) : null
   }
 
   async init () {
@@ -990,14 +990,14 @@ class P2P {
     if (!joined) return false
     await this._syncToNetwork(seedNodes, isFirstSeed)
 
-    if (isFirstSeed === false) {
+    if (this.dataSync && isFirstSeed === false) {
       await this.dataSync.syncStateData(3)
     }
 
     await this._goActive(isFirstSeed)
 
-    if (isFirstSeed === false) {
-      // TODO: potentially not ready to share state data with other nodes yet, may need a state for this so we dont get flagged as dishonest
+    if (this.dataSync && isFirstSeed === false) {
+      // TODO potentially not ready to share state data with other nodes yet, may need a state for this so we dont get flagged as dishonest
       await this.dataSync.patchRemainingStateData()
     }
     // if (!isFirstSeed) this.state.startCycles()

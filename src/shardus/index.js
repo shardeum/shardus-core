@@ -18,8 +18,10 @@ class Shardus {
     this.crypto = {}
     this.network = new Network(config.network, this.logger)
     this.p2p = {}
-    this.app = {}
     this.consensus = {}
+    this.appProvided = null
+    this.app = null
+    this.accountUtility = null
 
     this.heartbeatInterval = config.heartbeatInterval
     this.heartbeatTimer = null
@@ -70,8 +72,7 @@ class Shardus {
       res.json({ success: true })
       await this.shutdown()
     })
-
-    this._registerSyncEndpoints()
+    if (this.appProvided) this._registerSyncEndpoints()
   }
 
   registerExceptionHandler () {
@@ -102,9 +103,16 @@ class Shardus {
     clearInterval(this.heartbeatTimer)
   }
 
-  setup (app = null) {
-    this.accountUtility = this.getAccountUtilityInterface(app)
-    this.app = this.getApplicationInterface(app)
+  setup (app) {
+    if (app === null) {
+      this.appProvided = false
+    } else if (app === Object(app)) {
+      this.accountUtility = this.getAccountUtilityInterface(app)
+      this.app = this.getApplicationInterface(app)
+      this.appProvided = true
+    } else {
+      throw new Error('Please provide an App object or null to Shardus.setup.')
+    }
     return this
   }
 
@@ -131,6 +139,7 @@ class Shardus {
    */
 
   async put (req, res) {
+    if (!this.appProvided) throw new Error('Please provide an App object to Shardus.setup before calling Shardus.put')
     this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(req.body)}`)
     // retrieve incoming transaction from HTTP request
     let inTransaction = req.body
@@ -385,6 +394,7 @@ class Shardus {
   }
 
   async start (exitProcOnFail = true) {
+    if (this.appProvided === null) throw new Error('Please call Shardus.setup with an App object or null before calling Shardus.start.')
     await this.storage.init()
     this._setupHeartbeat()
     this.crypto = new Crypto(this.config.crypto, this.logger, this.storage)
