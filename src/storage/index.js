@@ -31,6 +31,10 @@ class Storage {
     await this.sequelize.close()
   }
 
+  async dropAndCreateModel (model) {
+    await model.sync({ force: true })
+  }
+
   async addCycles (cycles) {
     this._checkInit()
     try {
@@ -242,6 +246,14 @@ class Storage {
     } catch (e) {
       throw new Error(e)
     }
+  }
+
+  async dropAndCreateAcceptedTransactions () {
+    await this.dropAndCreateModel(this.models.acceptedTxs)
+  }
+
+  async dropAndCreatAccountStateTable () {
+    await this.dropAndCreateModel(this.models.accountStates)
   }
 
   // example of a raw query with some similarities to what we want:

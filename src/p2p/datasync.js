@@ -75,6 +75,12 @@ class DataSync {
   // The last step catch up on the acceptedTx queue
   async syncStateData (requiredNodeCount) {
     await utils.sleep(5000) // Temporary delay to make it easier to attach a debugger
+
+    // delete and re-create some tables before we sync:
+    await this.storage.dropAndCreatAccountStateTable()
+    await this.storage.dropAndCreateAcceptedTransactions()
+    await this.accountUtility.deleteLocalAccountData()
+
     this.mainLogger.debug(`DATASYNC: starting syncStateData`)
 
     this.requiredNodeCount = requiredNodeCount
@@ -101,8 +107,6 @@ class DataSync {
 
   async syncStateDataForPartition (partition) {
     try {
-      this.accountUtility.deleteLocalAccountData()
-
       this.currentPartition = partition
       this.addressRange = this.partitionToAddressRange(partition)
 
@@ -492,7 +496,7 @@ class DataSync {
     }
     let addressList = []
     for (let account of this.accountsWithStateConflict) {
-      addressList.push(account)
+      addressList.push(account.address)
     }
 
     // should we pick different nodes to ask? (at the very least need to change the data source node!!!!!!)
