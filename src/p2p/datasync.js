@@ -50,13 +50,12 @@ class DataSync {
   // This is the main outer loop that will loop over the different partitions
   // The last step catch up on the acceptedTx queue
   async syncStateData (requiredNodeCount) {
-
     await utils.sleep(5000) // Temporary delay to make it easier to attach a debugger
     this.mainLogger.debug(`DATASYNC: starting syncStateData`)
 
     this.requiredNodeCount = requiredNodeCount
     // in the future, loop through and call this for each partition
-    //todo after enterprise: use only the address range that our node needs
+    // todo after enterprise: use only the address range that our node needs
     for (let i = 0; i < this.getNumPartitions(); i++) {
       await this.syncStateDataForPartition(i)
       this.completedPartitions.push(i)
@@ -66,18 +65,17 @@ class DataSync {
 
     // one we have all of the initial data the last thing to do is get caught up on transactions
     await this.applyAcceptedTx()
-    
+
     // TODO !!! once we are on the network we still need to patch our state data so that it is a perfect match of other nodes for our supported address range
     //  Only need to requery the range that overlaps when we joined and when we started receiving our own state updates on the network.
     //  The trick is this query will get some duplicate data, but maybe the way the keys are in the db are setup we can just attemp to save what we get.  will need testing
     //  also this should be not invoked here but some time after we have joined the network... like syncSettleTime after we went active
-    //  see patchRemainingStateData() 
+    //  see patchRemainingStateData()
 
     // all complete!
   }
 
   async syncStateDataForPartition (partition) {
-    
     try {
       this.currentPartition = partition
       this.addressRange = this.partitionToAddressRange(partition)
@@ -207,7 +205,7 @@ class DataSync {
       let safeTime = currentTs - this.syncSettleTime
       if (endTime <= safeTime) {
         // need to idle for bit
-        await utils.sleep( safeTime - endTime )
+        await utils.sleep(safeTime - endTime)
       }
       this.lastStateSyncEndtime = endTime
 
@@ -233,7 +231,7 @@ class DataSync {
         this.mainLogger.debug(`DATASYNC: syncStateTableData hashes do not match `)
         // failed restart with new nodes.  TODO record/eval/report blame?
         this.recordPotentialBadnode()
-        throw new Error('FailAndRestartPartition') //TODO we need to ask other nodes for a hash one at a time untill we can feel better about a hash consensus
+        throw new Error('FailAndRestartPartition') // TODO we need to ask other nodes for a hash one at a time untill we can feel better about a hash consensus
       }
 
       //  Simple one shot way to get account state data, loop form below
@@ -253,35 +251,37 @@ class DataSync {
         let result = await this.p2p.ask(this.dataSourceNode, 'get_account_state', message)
 
         let accountStateData = result.accountStates
-        let lastLowQuery = lowTimeQuery
+        // let lastLowQuery = lowTimeQuery
         if (accountStateData.length > 0) {
           let lastAccount = accountStateData[accountStateData.length - 1]
           if (lastAccount.txTimestamp > lowTimeQuery) {
             moreDataRemaining = true
             lowTimeQuery = lastAccount.txTimestamp
           }
-        } 
+        }
 
         // if this is a repeated query, clear out any dupes from the new list we just got
         // there could be many rows that use the stame timestamp so we will search for them
         let dataDuplicated = true
-        while (loopCount > 0 && accountStateData.length > 0 && dataDuplicated) {
-          let stateData = accountStateData[0]
-          dataDuplicated = false
-          for(let i = this.combinedAccountStateData.length-1; i>=0; i--){
-            let existingStateData = this.combinedAccountStateData[i]
-            if((existingStateData.txTimestamp === stateData.txTimestamp) && (existingStateData.accountId === stateData.accountId)){
-              dataDuplicated = true
-              break
+        if (loopCount > 0) {
+          while (accountStateData.length > 0 && dataDuplicated) {
+            let stateData = accountStateData[0]
+            dataDuplicated = false
+            for (let i = this.combinedAccountStateData.length - 1; i >= 0; i--) {
+              let existingStateData = this.combinedAccountStateData[i]
+              if ((existingStateData.txTimestamp === stateData.txTimestamp) && (existingStateData.accountId === stateData.accountId)) {
+                dataDuplicated = true
+                break
+              }
+              // once we get to an older timestamp we can stop looking, the outer loop will be done also
+              if (existingStateData.txTimestamp < stateData.txTimestamp) {
+                break
+              }
             }
-            // once we get to an older timestamp we can stop looking, the outer loop will be done also
-            if(existingStateData.txTimestamp < stateData.txTimestamp) {
-              break
+            if (dataDuplicated) {
+              accountStateData.shift()
             }
           }
-          if (dataDuplicated){
-            accountStateData.shift()
-          } 
         }
 
         if (accountStateData.length === 0) {
@@ -289,7 +289,7 @@ class DataSync {
         } else {
           this.mainLogger.debug(`DATASYNC: syncStateTableData got ${accountStateData.length} more records`)
           this.combinedAccountStateData = this.combinedAccountStateData.concat(accountStateData)
-          loopCount++          
+          loopCount++
         }
       }
 
@@ -324,7 +324,7 @@ class DataSync {
     let loopCount = 0
     // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
     while (moreDataRemaining) {
-      //max records artificially low to make testing coverage better.  todo make it a config or calculate based on data size
+      // max records artificially low to make testing coverage better.  todo make it a config or calculate based on data size
       let message = { accountStart: queryLow, accountEnd: queryHigh, maxRecords: 3 }
       let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
       // accountData is in the form [{accountId, stateId, data}] for n accounts.
@@ -339,7 +339,7 @@ class DataSync {
           moreDataRemaining = true
           queryLow = lastAccount.accountId
         }
-      } 
+      }
 
       // if this is a repeated query, clear out any dupes from the new list we just got
       // there should be only one dupe in since account ids are unique
@@ -354,7 +354,7 @@ class DataSync {
       } else {
         this.mainLogger.debug(`DATASYNC: syncAccountData got ${accountData.length} more records`)
         this.combinedAccountData = this.combinedAccountData.concat(accountData)
-        loopCount++        
+        loopCount++
       }
     }
   }
@@ -498,7 +498,7 @@ class DataSync {
 
     while (this.acceptedTXQueue.length > 0) {
       // apply the tx
-      let nextTX = acceptedTXQueue.slice()
+      let nextTX = this.acceptedTXQueue.slice()
 
       // we no longer have state table data in memory so there is not much more the datasync can do
       // shardus / the app code can take it from here
@@ -513,12 +513,12 @@ class DataSync {
     }
   }
 
-  async patchRemainingStateData() {
+  async patchRemainingStateData () {
     this.mainLogger.debug(`DATASYNC: patchRemainingStateData`)
 
     this.clearPartitionData()
 
-    //todo after enterprise: use only the address range that our node needs
+    // todo after enterprise: use only the address range that our node needs
     this.addressRange = this.partitionToAddressRange(1)
     let lowAddress = this.addressRange.low
     let highAddress = this.addressRange.high
