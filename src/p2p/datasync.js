@@ -46,6 +46,30 @@ class DataSync {
     this.mapAccountData = {}
   }
 
+  // TODO: Milestone 14-15? this will take a short list of account IDs and get us resynced on them
+  async resyncIndividualAccounts (accountsList) {
+    // make sure we are patched up to date on state data
+    // get fresh copies of account data
+    // catch up to tx queue
+  }
+
+  // TODO: Milestone 13.  this is the resync procedure that keeps existing app data and attempts to update it
+  async resyncStateData (requiredNodeCount) {
+    // 1. Determine the time window that needs to be covered (when were we last active)
+
+    // 2. query accepted transactions for the given range
+
+    // 3. query state table data to cover the range
+
+    // 4. re-processAccountData .  similar to process data but should handle working with only accounts that had new transactions in the given time.
+
+    // 5. any error handling / loops etc.
+
+    // 6a. catch up to tx queue
+
+    // 6. optionally?  validate hashes on our data range? over a givn time..
+  }
+
   // syncs transactions and application state data
   // This is the main outer loop that will loop over the different partitions
   // The last step catch up on the acceptedTx queue
@@ -77,6 +101,8 @@ class DataSync {
 
   async syncStateDataForPartition (partition) {
     try {
+      this.accountUtility.deleteLocalAccountData()
+
       this.currentPartition = partition
       this.addressRange = this.partitionToAddressRange(partition)
 

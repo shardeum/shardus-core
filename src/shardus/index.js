@@ -207,20 +207,20 @@ class Shardus {
   }
 
   // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
-  async tryApplyTransaction(tx) {
+  async tryApplyTransaction (tx) {
     // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
-    let keysResponse = this.app.getKeyFromTransaction(inTransaction)
+    let keysResponse = this.app.getKeyFromTransaction(tx)
     let { sourceKeys, targetKeys } = keysResponse
     let sourceAddress, targetAddress, sourceState, targetState
 
-    let timestamp = inTransaction.txnTimestmp //TODO!!! need to push this to application method thta cracks the transaction
+    let timestamp = tx.txnTimestmp // TODO!!! need to push this to application method thta cracks the transaction
 
     if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
       sourceAddress = sourceKeys[0]
       sourceState = await this.app.getStateId(sourceAddress)
 
       let accountStates = await this.storage.queryAccountStateTable(sourceState, sourceState, timestamp, timestamp, 1)
-      if(accountStates.length === 0 || accountStates[0].stateBefore !== stateBefore) {
+      if (accountStates.length === 0 || accountStates[0].stateBefore !== sourceState) {
         return
       }
     }
@@ -229,19 +229,19 @@ class Shardus {
       targetState = await this.app.getStateId(targetAddress)
       // todo post enterprise, only check this if it is in our address range
       let accountStates = await this.storage.queryAccountStateTable(targetState, targetState, timestamp, timestamp, 1)
-      if(accountStates.length === 0 || accountStates[0].stateBefore !== stateBefore) {
+      if (accountStates.length === 0 || accountStates[0].stateBefore !== targetState) {
         return
       }
     }
 
     this.app.apply(tx)
-    
-    //we don't have enough information to write this to the accepted transaction table but we could 
+
+    // we don't have enough information to write this to the accepted transaction table but we could
 
     // let { stateTableResults, txId, txTimestamp } = await this.app.apply(tx)
     // let txStatus = 1 // HARDCODED!!! pre m15
     // // store transaction in accepted table ... alternatively we could have queried for accepted TX... tbd on the correct answer here
-    // let acceptedTX = { id: txId, timestamp: txTimestamp, data: tx, status: txStatus, receipt: receipt } 
+    // let acceptedTX = { id: txId, timestamp: txTimestamp, data: tx, status: txStatus, receipt: receipt }
     // this.storage.addAcceptedTransactions([acceptedTX])
   }
 
@@ -371,6 +371,11 @@ class Shardus {
       } else {
         // throw new Error('Missing requried interface function. apply()')
       }
+      if (typeof (this.acceptTransaction) === 'function') {
+        accountUtilityInterface.deleteLocalAccountData = async () => application.deleteLocalAccountData()
+      } else {
+        // throw new Error('Missing requried interface function. apply()')
+      }
     } catch (ex) {
       this.fatalLogger.log(`Required application interface not implemented. Exception: ${ex}`)
       throw new Error(ex)
@@ -398,9 +403,9 @@ class Shardus {
     try {
       started = await this.p2p.startup()
     } catch (e) {
-      console.log(e.message + " at " + e.stack)
-      this.mainLogger.debug(e.message + " at " + e.stack)
-      this.fatalLogger.log(e.message + " at " + e.stack)
+      console.log(e.message + ' at ' + e.stack)
+      this.mainLogger.debug(e.message + ' at ' + e.stack)
+      this.fatalLogger.log(e.message + ' at ' + e.stack)
       throw new Error(e)
     }
     if (!started) await this.shutdown(exitProcOnFail)
