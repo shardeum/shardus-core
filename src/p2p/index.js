@@ -302,12 +302,29 @@ class P2P {
     await utils.sleep(timeToWait)
   }
 
+  // Wait until last phase of cycle
+  async _waitUntilLastPhase (currentTime, cycleStart, cycleDuration) {
+    this.mainLogger.debug(`Current time is: ${currentTime}`)
+    this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
+    this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
+    const beginningOfLast = cycleStart + Math.ceil(0.75 * cycleDuration)
+    this.mainLogger.debug(`Beginning of last phase at: ${beginningOfLast}`)
+    let timeToWait
+    if (currentTime < beginningOfLast) {
+      timeToWait = (beginningOfLast - currentTime + this.queryDelay) * 1000
+    } else {
+      timeToWait = 0
+    }
+    this.mainLogger.debug(`Waiting for ${timeToWait} ms before the last phase...`)
+    await utils.sleep(timeToWait)
+  }
+
   // Wait until the end of the cycle
   async _waitUntilEndOfCycle (currentTime, cycleStart, cycleDuration) {
     this.mainLogger.debug(`Current time is: ${currentTime}`)
     this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
     this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
-    const endOfCycle = cycleStart + (2 * cycleDuration)
+    const endOfCycle = cycleStart + cycleDuration
     this.mainLogger.debug(`End of cycle at: ${endOfCycle}`)
     let timeToWait
     if (currentTime < endOfCycle) {
@@ -338,7 +355,8 @@ class P2P {
     await this._waitUntilUpdatePhase(currTime1, cycleStart, cycleDuration)
     await this._submitJoin(seedNodes, joinRequest)
     const currTime2 = utils.getTime('s') + timeOffset
-    await this._waitUntilEndOfCycle(currTime2, cycleStart, cycleDuration)
+    // This time we use cycleStart + cycleDuration because we are in the next cycle
+    await this._waitUntilEndOfCycle(currTime2, cycleStart + cycleDuration, cycleDuration)
     const nodeId = await this._fetchNodeId(seedNodes)
     return nodeId
   }
@@ -596,6 +614,21 @@ class P2P {
     return cycleChain
   }
 
+  async _fetchUnfinalizedCycle (nodes) {
+    let queryFn = async (node) => {
+      const { unfinalizedCycle } = await this.ask(node, 'unfinalized')
+      return { unfinalizedCycle }
+    }
+    let unfinalizedCycle
+    try {
+      ;({ unfinalizedCycle } = await this._robustQuery(nodes, queryFn))
+    } catch (e) {
+      this.mainLogger.debug('Unable to get unfinalized cycle. Need to resync cycle chain and try again.')
+      ;({ unfinalizedCycle } = null)
+    }
+    return unfinalizedCycle
+  }
+
   _validateJoinRequest (joinRequest) {
     // TODO: implement actual validation (call to application side?)
     return true
@@ -663,6 +696,7 @@ class P2P {
     }
 
     const nodeId = await this._join(seedNodes)
+    console.log(nodeId)
     if (!nodeId) {
       this.mainLogger.info('Unable to join network. Shutting down...')
       return false
@@ -706,7 +740,7 @@ class P2P {
     // Add retrieved nodelist to the state
     await this.state.addNodes(nodelist)
 
-    // After we have the ndoe list, we can turn on internal routes
+    // After we have the node list, we can turn on internal routes
     this.acceptInternal = true
 
     this.mainLogger.debug('Fetching latest cycle chain...')
@@ -722,6 +756,23 @@ class P2P {
       this.mainLogger.info('Unable to add cycles. Sync failed...')
       return false
     }
+
+    // Get in cadence, then start cycles
+    // TODO: get this from all active nodes
+    const { cycleStart, cycleDuration } = await this._fetchCycleMarkerInternal(this.seedNodes)
+    const currentTime = utils.getTime('s')
+
+    // First we wait until the beginning of the final quarter
+    await this._waitUntilLastPhase(currentTime, cycleStart, cycleDuration)
+
+    // Then we get the unfinalized cycle data
+    const unfinalized = await this._fetchUnfinalizedCycle(this.seedNodes)
+
+    // TO-DO: check if the unfinalized cycle was null and try again
+
+    // We add the unfinalized cycle data and start cycles
+    await this.state.addUnfinalizedAndStart(unfinalized)
+
     this.mainLogger.info('Successfully synced to the network!')
     return true
   }
@@ -740,9 +791,20 @@ class P2P {
       this.state.addStatusUpdate(this.id, 'active')
       return true
     }
-    await this._submitActiveRequest()
-    // TO-DO: Delete this line once we are starting cycles as non-seed node
-    await this.state.directStatusUpdate(this.id, 'active', true)
+    const ensureActive = async () => {
+      if (!this._isActive()) {
+        const { currentTime, cycleStart, cycleDuration } = this.getCycleMarkerInfo()
+        await this._waitUntilUpdatePhase(currentTime, cycleStart, cycleDuration)
+        this.mainLogger.debug('Not active yet, submitting an active request.')
+        await this._submitActiveRequest()
+        const toWait = cycleDuration * 1000
+        this.mainLogger.debug(`Waiting before checking if active, waiting ${toWait} ms...`)
+        setTimeout(async () => {
+          await ensureActive()
+        }, toWait)
+      }
+    }
+    await ensureActive()
     return true
   }
 
@@ -797,6 +859,7 @@ class P2P {
 
   _wrapAndSignMessage (msg) {
     if (!msg) throw new Error('No message given to wrap and sign!')
+    this.mainLogger.debug(`Attaching sender ${this.id} to the message: ${JSON.stringify(msg)}`)
     const wrapped = {
       payload: msg,
       sender: this.id
@@ -919,7 +982,6 @@ class P2P {
     if (needJoin) joined = await this._joinNetwork(seedNodes, isFirstSeed)
     if (!joined) return false
     await this._syncToNetwork(seedNodes, isFirstSeed)
-
     await this._goActive(isFirstSeed)
     this.mainLogger.info('Node is now active!')
 

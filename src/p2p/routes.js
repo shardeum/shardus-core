@@ -99,6 +99,17 @@ function setupRoutes () {
     await respond({ cycleChain })
   })
 
+  this.registerInternal('unfinalized', async (payload, respond) => {
+    console.log(this.state.unfinalizedReady)
+    if (!this.state.unfinalizedReady) {
+      this.mainLogger.debug('Unfinalized cycle not ready to be provided.')
+      await respond({ unfinalizedCycle: null })
+      return
+    }
+    const unfinalizedCycle = this.state.currentCycle
+    await respond({ unfinalizedCycle })
+  })
+
   // -------- GOSSIP Routes ----------
 
   this.registerGossipHandler('join', async (payload) => {

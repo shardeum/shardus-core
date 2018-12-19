@@ -13,6 +13,7 @@ class P2PState {
     // Variables for regulating different phases cycles
     this.acceptChainUpdates = false
     this.shouldStop = false
+    this.unfinalizedReady = false
 
     // Specifies valid statuses
     this.validStatuses = ['active', 'syncing', 'pending']
@@ -390,8 +391,10 @@ class P2PState {
 
   async _finalizeCycle (phaseLen) {
     this.mainLogger.debug('Starting cycle finalization phase...')
+    this.unfinalizedReady = true
     setTimeout(async () => {
       await this._createCycle()
+      this.unfinalizedReady = false
       if (this.shouldStop) return
       this._startNewCycle()
     }, phaseLen)
@@ -406,6 +409,23 @@ class P2PState {
     const added = this.addCertificate(certificate)
     if (!added) return
     await this.p2p.sendGossip('certificate', certificate)
+  }
+
+  async addUnfinalizedAndStart (cycle) {
+    if (!cycle) {
+      this.mainLogger.info('Unable to add unfinalized cycle. Cycle not given.')
+      return false
+    }
+    const { start, duration } = cycle
+    const currTime = utils.getTime('s')
+    const toWait = (start + duration) - currTime
+    this.currentCycle = cycle
+    await this._createCycle()
+    this.mainLogger.debug(`Waiting ${toWait} ms before starting cycles...`)
+    setTimeout(() => {
+      this.mainLogger.debug('Starting up cycles...')
+      this.startCycles()
+    }, toWait)
   }
 
   async addCycle (cycle) {
