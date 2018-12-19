@@ -232,7 +232,7 @@ class Storage {
     try {
       let result = await this._read(
         this.models.accountStates,
-        { accountId: { [Op.between]: [accountStart, accountEnd] },  txTimestamp: { [Op.between]: [tsStart, tsEnd] } },
+        { accountId: { [Op.between]: [accountStart, accountEnd] }, txTimestamp: { [Op.between]: [tsStart, tsEnd] } },
         {
           limit: limit,
           order: [ ['txTimestamp', 'ASC'] ],
