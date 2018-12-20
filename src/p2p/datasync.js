@@ -518,7 +518,7 @@ class DataSync {
       // TODO ? record/eval/report blame?
       this.recordPotentialBadnode()
       this.failedAccounts = this.failedAccounts.concat(failedHashes)
-      for (let accountId of this.failedHashes) {
+      for (let accountId of failedHashes) {
         account = this.mapAccountData[accountId]
         this.accountsWithStateConflict.push(account)
       }
