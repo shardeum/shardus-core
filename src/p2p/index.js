@@ -298,7 +298,7 @@ class P2P {
     const nextJoinStart = cycleStart + cycleDuration
     this.mainLogger.debug(`Next join cycle starts at: ${nextJoinStart}`)
     const timeToWait = (nextJoinStart - currentTime + this.queryDelay) * 1000
-    this.mainLogger.debug(`Waiting for ${timeToWait} ms before next join phase...`)
+    this.mainLogger.debug(`Waiting for ${timeToWait} ms before next update phase...`)
     await utils.sleep(timeToWait)
   }
 
@@ -779,6 +779,7 @@ class P2P {
   async _submitActiveRequest () {
     const signedRequest = this.crypto.sign({ nodeId: this.id })
     await this._submitWhenUpdatePhase('active', signedRequest)
+    this.state.addStatusUpdate(this.id, 'active')
   }
 
   async _goActive (isFirstSeed) {
@@ -792,15 +793,16 @@ class P2P {
     }
     const ensureActive = async () => {
       if (!this._isActive()) {
-        const { currentTime, cycleStart, cycleDuration } = this.getCycleMarkerInfo()
-        await this._waitUntilUpdatePhase(currentTime, cycleStart, cycleDuration)
+        const { cycleDuration } = this.getCycleMarkerInfo()
         this.mainLogger.debug('Not active yet, submitting an active request.')
         await this._submitActiveRequest()
-        const toWait = cycleDuration * 1000
+        const toWait = (cycleDuration * 1000) * 0.75
         this.mainLogger.debug(`Waiting before checking if active, waiting ${toWait} ms...`)
         setTimeout(async () => {
           await ensureActive()
         }, toWait)
+      } else {
+        this.mainLogger.info('Node is now active!')
       }
     }
     await ensureActive()
@@ -982,7 +984,6 @@ class P2P {
     if (!joined) return false
     await this._syncToNetwork(seedNodes, isFirstSeed)
     await this._goActive(isFirstSeed)
-    this.mainLogger.info('Node is now active!')
 
     // This is also for testing purposes
     console.log('Server ready!')

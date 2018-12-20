@@ -299,7 +299,7 @@ class P2PState {
   }
 
   _startUpdatePhase (phaseLen) {
-    this.mainLogger.debug('Starting join phase...')
+    this.mainLogger.debug('Starting update phase...')
     this.acceptChainUpdates = true
     setTimeout(() => {
       this._endUpdatePhase(phaseLen)
@@ -322,10 +322,6 @@ class P2PState {
     }
     return true
   }
-
-  // Check if better than lowest best, if not, return false: check that we're not propagating
-  // Insert sorted
-  // If length of array is bigger than our max nodes per cycle, drop lowest
 
   _addToBestJoinRequests (joinRequest) {
     const bestRequests = this._getBestJoinRequests()
@@ -371,7 +367,7 @@ class P2PState {
   }
 
   _endUpdatePhase (phaseLen) {
-    this.mainLogger.debug('Ending join phase...')
+    this.mainLogger.debug('Ending update phase...')
     this.acceptChainUpdates = false
     const bestNodes = this._getBestNodes()
     this._addJoiningNodes(bestNodes)
@@ -500,6 +496,8 @@ class P2PState {
     return cert
   }
 
+  // TODO: make sure cycle marker is what we think it should be
+  // ----- whenever it is different, we shouldn't go with it naively
   addCertificate (certificate) {
     const addCert = (cert, dist) => {
       this.currentCycle.certificate = cert
