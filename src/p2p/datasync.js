@@ -190,6 +190,7 @@ class DataSync {
 
       // await utils.sleep(10000)
       // throw new Error('FailAndRestartPartition')
+      this.mainLogger.debug(`DATASYNC: below minimum number of nodes required to sync data, but going to try anyway  required: ${this.requiredNodeCount}  available: ${this.dataSourceNodes.length}`)
     }
     this.dataSourceNode = this.dataSourceNodes[0]
 
@@ -258,29 +259,26 @@ class DataSync {
       for (let node of this.dataSourceNodes) {
         let result = await this.p2p.ask(node, 'get_account_state_hash', message) // todo mem performance after enterprise: upgrade this to allow an array of N hashes if there is too much data to query in one shot
         // todo m11: handle error cases?
-        stateHashResults.push(result.stateHash)
+        stateHashResults.push({ hash: result.stateHash, node: node })
       }
 
       let hashesMatch = true
-      let firstHash = stateHashResults[0]
+      let firstHash = stateHashResults[0].hash
       // Test that results match.
-      for (let i = 1; i < stateHashResults; i++) {
-        if (stateHashResults[i] !== firstHash) {
+      for (let i = 1; i < stateHashResults.length; i++) {
+        if (stateHashResults[i].hash !== firstHash) {
           hashesMatch = false
         }
       }
       if (hashesMatch === false) {
         this.mainLogger.debug(`DATASYNC: syncStateTableData hashes do not match `)
+        for (let hashResp of stateHashResults) {
+          this.mainLogger.debug(`DATASYNC: node:  ${hashResp.node.externalIp}:${hashResp.node.externalPort}  hash: ${hashResp.hash}`)
+        }
         // failed restart with new nodes.  TODO ?: record/eval/report blame?
         this.recordPotentialBadnode()
-        throw new Error('FailAndRestartPartition') // TODO m11: we need to ask other nodes for a hash one at a time untill we can feel better about a hash consensus
+        throw new Error('FailAndRestartPartition') // TODO m11: we need to ask other nodes for a hash one at a time until we can feel better about a hash consensus
       }
-
-      //  Simple one shot way to get account state data, loop form below
-      // message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, tsEnd: endTime }
-      // let accountStateData = await this.p2p.ask(this.dataSourceNode, 'get_account_state', message)
-      // let recievedStateDataHash = this.crypto.hash(accountStateData)
-      // this.combinedAccountStateData.concat(accountStateData)
 
       let moreDataRemaining = true
       this.combinedAccountStateData = []
@@ -293,17 +291,16 @@ class DataSync {
         let result = await this.p2p.ask(this.dataSourceNode, 'get_account_state', message)
 
         let accountStateData = result.accountStates
-        // let lastLowQuery = lowTimeQuery
+        // get the timestamp of the last account state received so we can use it as the low timestamp for our next query
         if (accountStateData.length > 0) {
           let lastAccount = accountStateData[accountStateData.length - 1]
           if (lastAccount.txTimestamp > lowTimeQuery) {
-            moreDataRemaining = true
             lowTimeQuery = lastAccount.txTimestamp
           }
         }
 
-        // if this is a repeated query, clear out any dupes from the new list we just got
-        // there could be many rows that use the stame timestamp so we will search for them
+        // If this is a repeated query, clear out any dupes from the new list we just got.
+        // There could be many rows that use the stame timestamp so we will search and remove them
         let dataDuplicated = true
         if (loopCount > 0) {
           while (accountStateData.length > 0 && dataDuplicated) {
@@ -374,11 +371,11 @@ class DataSync {
 
       let lastAccount
       let firstAccount
+      // get the address of the last account received so we can use it as the low address for our next query
       if (accountData.length > 0) {
         lastAccount = accountData[accountData.length - 1]
         firstAccount = accountData[0]
         if (lastAccount.accountId > queryLow) {
-          moreDataRemaining = true
           queryLow = lastAccount.accountId
         }
       }
@@ -455,6 +452,10 @@ class DataSync {
         //
         account.syncData.uptodate = false
       }
+    }
+
+    if (this.missingAccountData.length > 0) {
+      this.mainLogger.debug(`DATASYNC: processAccountData hashes missing from data, but in the state table: ${this.missingAccountData.length}`)
     }
 
     //   For each account in the Account State Table make sure the entry in Account data has the same State_after value; if not save the account id to be looked up later
@@ -556,6 +557,8 @@ class DataSync {
         await utils.sleep(1)
       }
     }
+
+    this.mainLogger.debug(`DATASYNC: applyAcceptedTx finished`)
   }
 
   // we get any transactions we need through the acceptedTx gossip
@@ -591,22 +594,22 @@ class DataSync {
     //   Record Joined timestamp
     //   Even a syncing node will receive accepted transactions
     //   Starts receiving accepted transaction and saving them to Accepted Tx Table
-    this.p2p.registerGossipHandler('acceptedTx', async (tx) => {
+    this.p2p.registerGossipHandler('acceptedTx', async (acceptedTX) => {
       // docs mention putting this in a table but it seems so far that an in memory queue should be ok
       // should we filter, or instead rely on gossip in to only give us TXs that matter to us?
 
       // Lets insert this tx into a sorted list where index 0 == oldest and length-1 == newest
       if (this.isSyncingAcceptedTxs) {
         if (this.acceptedTXQueue.length === 0) {
-          this.acceptedTXQueue.push(tx)
+          this.acceptedTXQueue.push(acceptedTX)
         } else {
           let index = this.acceptedTXQueue.length - 1
           let lastTx = this.acceptedTXQueue[index]
-          while (tx.timestamp < lastTx.timestamp && index > 0) {
+          while (acceptedTX.timestamp < lastTx.timestamp && index > 0) {
             index--
             lastTx = this.acceptedTXQueue[index]
           }
-          this.acceptedTXQueue.splice(index, 0, tx)
+          this.acceptedTXQueue.splice(index, 0, acceptedTX)
         }
       }
     })
