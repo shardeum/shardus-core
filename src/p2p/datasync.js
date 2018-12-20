@@ -199,6 +199,17 @@ class DataSync {
     }
   }
 
+  async getMoreNodes (lowAddress, highAddress, count, excludeList = []) {
+    let moreNodes = this.getRandomNodesInRange(count, lowAddress, highAddress, excludeList) // todo after enterprise: should probably expand the range used to look for node to include +- N partitions
+    if (moreNodes.length <= count) {
+
+    }
+    for (let node of moreNodes) {
+      excludeList[node.id] = true
+    }
+    return moreNodes
+  }
+
   // todo refactor: this into a util, grabbed it from p2p
   // From: https://stackoverflow.com/a/12646864
   shuffleArray (array) {
@@ -252,32 +263,49 @@ class DataSync {
       }
       this.lastStateSyncEndtime = endTime
 
-      let queryLow = lowAddress
-      let queryHigh = highAddress
-      let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, tsEnd: endTime }
-      let stateHashResults = []
-      for (let node of this.dataSourceNodes) {
-        let result = await this.p2p.ask(node, 'get_account_state_hash', message) // todo mem performance after enterprise: upgrade this to allow an array of N hashes if there is too much data to query in one shot
-        // todo m11: handle error cases?
-        stateHashResults.push({ hash: result.stateHash, node: node })
-      }
+      let searchingForGoodHash = true
 
-      let hashesMatch = true
-      let firstHash = stateHashResults[0].hash
-      // Test that results match.
-      for (let i = 1; i < stateHashResults.length; i++) {
-        if (stateHashResults[i].hash !== firstHash) {
-          hashesMatch = false
+      let queryLow
+      let queryHigh
+      let nodesToAsk = []
+      let firstHash
+      nodesToAsk = nodesToAsk.concat(this.dataSourceNodes)
+      while (searchingForGoodHash) {
+        queryLow = lowAddress
+        queryHigh = highAddress
+        let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, tsEnd: endTime }
+        let stateHashResults = []
+        for (let node of nodesToAsk) {
+          let result = await this.p2p.ask(node, 'get_account_state_hash', message) // todo mem performance after enterprise: upgrade this to allow an array of N hashes if there is too much data to query in one shot
+          // todo m11: handle error cases?
+          stateHashResults.push({ hash: result.stateHash, node: node })
         }
-      }
-      if (hashesMatch === false) {
-        this.mainLogger.debug(`DATASYNC: syncStateTableData hashes do not match `)
-        for (let hashResp of stateHashResults) {
-          this.mainLogger.debug(`DATASYNC: node:  ${hashResp.node.externalIp}:${hashResp.node.externalPort}  hash: ${hashResp.hash}`)
+
+        let hashesMatch = true
+        firstHash = stateHashResults[0].hash
+        // Test that results match.
+        for (let i = 1; i < stateHashResults.length; i++) {
+          if (stateHashResults[i].hash !== firstHash) {
+            hashesMatch = false
+          }
         }
-        // failed restart with new nodes.  TODO ?: record/eval/report blame?
-        this.recordPotentialBadnode()
-        throw new Error('FailAndRestartPartition') // TODO m11: we need to ask other nodes for a hash one at a time until we can feel better about a hash consensus
+        if (hashesMatch === false) {
+          this.mainLogger.debug(`DATASYNC: syncStateTableData hashes do not match `)
+          for (let hashResp of stateHashResults) {
+            this.mainLogger.debug(`DATASYNC: node:  ${hashResp.node.externalIp}:${hashResp.node.externalPort}  hash: ${hashResp.hash}`)
+          }
+          // // failed restart with new nodes.  TODO ?: record/eval/report blame?
+          this.recordPotentialBadnode()
+          throw new Error('FailAndRestartPartition') // TODO m11: we need to ask other nodes for a hash one at a time until we can feel better about a hash consensus
+
+          // TODO after enterprise? code to handle getting bad hash data where we ask for one more node at a time until we have consensus on what hashes are good vs. bad
+          // let moreNodes = this.getMoreNodes(1, lowAddress, highAddress, this.visitedNodes)
+          // if (moreNodes.length > 0) {
+          //   nodesToAsk = nodesToAsk.concat(moreNodes)
+          // }
+        } else {
+          searchingForGoodHash = false
+        }
       }
 
       let moreDataRemaining = true
@@ -287,7 +315,7 @@ class DataSync {
       let lowTimeQuery = startTime
       // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
       while (moreDataRemaining) {
-        message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: lowTimeQuery, tsEnd: endTime }
+        let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: lowTimeQuery, tsEnd: endTime }
         let result = await this.p2p.ask(this.dataSourceNode, 'get_account_state', message)
 
         let accountStateData = result.accountStates
