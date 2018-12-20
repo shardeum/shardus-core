@@ -4,7 +4,7 @@ const utils = require('../utils')
 
 // general notes / questions
 // should we wipe our local DB before sync?
-// todo need error handling on all the p2p requests.
+// todo m12: need error handling on all the p2p requests.
 
 class DataSync {
   constructor (config, logger, storage, p2p, crypto, accountUtility) {
@@ -22,6 +22,8 @@ class DataSync {
 
     this.acceptedTXQueue = []
     this.registerEndpoints()
+
+    this.isSyncingAcceptedTxs = true // default is true so we will start adding to our tx queue asap
   }
 
   // this clears state data related to the current partion we are processing.
@@ -42,19 +44,23 @@ class DataSync {
     this.visitedNodes = {} // map of node we have visited
 
     this.accountsWithStateConflict = []
-    this.failedAccounts = []
+    this.failedAccounts = [] // todo m11: determine how/when we will pull something out of this list!
     this.mapAccountData = {}
   }
 
   // TODO: Milestone 14-15? this will take a short list of account IDs and get us resynced on them
   async resyncIndividualAccounts (accountsList) {
+    this.isSyncingAcceptedTxs = true
     // make sure we are patched up to date on state data
     // get fresh copies of account data
     // catch up to tx queue
+
+    this.isSyncingAcceptedTxs = false
   }
 
   // TODO: Milestone 13.  this is the resync procedure that keeps existing app data and attempts to update it
   async resyncStateData (requiredNodeCount) {
+    this.isSyncingAcceptedTxs = true
     // 1. Determine the time window that needs to be covered (when were we last active)
 
     // 2. query accepted transactions for the given range
@@ -68,12 +74,14 @@ class DataSync {
     // 6a. catch up to tx queue
 
     // 6. optionally?  validate hashes on our data range? over a givn time..
+    this.isSyncingAcceptedTxs = false
   }
 
   // syncs transactions and application state data
   // This is the main outer loop that will loop over the different partitions
   // The last step catch up on the acceptedTx queue
   async syncStateData (requiredNodeCount) {
+    this.isSyncingAcceptedTxs = true
     await utils.sleep(5000) // Temporary delay to make it easier to attach a debugger
 
     // delete and re-create some tables before we sync:
@@ -89,20 +97,22 @@ class DataSync {
     for (let i = 0; i < this.getNumPartitions(); i++) {
       await this.syncStateDataForPartition(i)
       this.completedPartitions.push(i)
-      // todo reset any state we need here.
       this.clearPartitionData()
     }
 
     // one we have all of the initial data the last thing to do is get caught up on transactions
     await this.applyAcceptedTx()
 
-    // TODO !!! once we are on the network we still need to patch our state data so that it is a perfect match of other nodes for our supported address range
+    // TODO after enterprise: once we are on the network we still need to patch our state data so that it is a perfect match of other nodes for our supported address range
     //  Only need to requery the range that overlaps when we joined and when we started receiving our own state updates on the network.
     //  The trick is this query will get some duplicate data, but maybe the way the keys are in the db are setup we can just attemp to save what we get.  will need testing
     //  also this should be not invoked here but some time after we have joined the network... like syncSettleTime after we went active
     //  see patchRemainingStateData()
+    //  update.. not going to worry about this until after enterprise.  possibly ok to do this right before apply acceptedTX() !!
 
     // all complete!
+
+    this.isSyncingAcceptedTxs = false
   }
 
   async syncStateDataForPartition (partition) {
@@ -154,7 +164,7 @@ class DataSync {
   partitionToAddressRange (partition) {
     // let numPartitions = getNumPartitions()
     // let partitionFraction = partition / numPartitions
-    // todo implement partition->address range math.  possibly store it in a lookup table
+    // todo after enterprise: implement partition->address range math.  possibly store it in a lookup table
     let result = {}
     result.partition = partition
     result.low = '0'.repeat(64)
@@ -170,12 +180,12 @@ class DataSync {
   async getSyncNodes (lowAddress, highAddress) {
     // The following is repeated for each range of addresses or partitions
     //   Nodes to get data from should be selected based on the range of addresses or partitions
-    this.dataSourceNodes = this.getRandomNodesInRange(3, lowAddress, highAddress, this.visitedNodes) // todo should probably expand the range used to look for node to include +- N partitions
+    this.dataSourceNodes = this.getRandomNodesInRange(3, lowAddress, highAddress, this.visitedNodes) // todo after enterprise: should probably expand the range used to look for node to include +- N partitions
     if (this.dataSourceNodes.length <= 0) {
       throw new Error('found no nodes to sync app data from')
     }
     if (this.dataSourceNodes.length < this.requiredNodeCount) {
-      // TODO fail if not in development mode.
+      // TODO m11: fail if not in development mode.  use a development flag?
       // edge case would be restarting an entire network that has data..
 
       // await utils.sleep(10000)
@@ -188,7 +198,7 @@ class DataSync {
     }
   }
 
-  // todo refactor this into a util, grabbed it from p2p
+  // todo refactor: this into a util, grabbed it from p2p
   // From: https://stackoverflow.com/a/12646864
   shuffleArray (array) {
     for (let i = array.length - 1; i > 0; i--) {
@@ -197,7 +207,7 @@ class DataSync {
     }
   }
 
-  // todo move to p2p?  todo need to ask nodes that
+  // todo refactor: move to p2p?
   getRandomNodesInRange (count, lowAddress, highAddress, exclude) {
     let allNodes = this.p2p.state.getAllNodes(this.p2p.id)
     this.shuffleArray(allNodes)
@@ -209,20 +219,22 @@ class DataSync {
       if (node.id >= lowAddress && node.id <= highAddress) {
         if ((node.id in exclude) === false) {
           results.push(node)
+          if (results.length >= count) {
+            return results
+          }
         }
       }
     }
     return results
   }
 
-  // TODO !!  need to upgrade this to the form that can re-request data if the limit has been hit.  see syncAccountData
   async syncStateTableData (lowAddress, highAddress, startTime, endTime) {
     let searchingForGoodData = true
 
     this.mainLogger.debug(`DATASYNC: syncStateTableData startTime: ${startTime} endTime: ${endTime} low: ${lowAddress} high: ${highAddress} `)
-    // todo this loop will try three more random nodes, this is slightly different than described how to handle failure in the doc. this should be corrected but will take more code
+    // todo m11: this loop will try three more random nodes, this is slightly different than described how to handle failure in the doc. this should be corrected but will take more code
     // should prossible break this into a state machine in  its own class.
-    while (searchingForGoodData) { // todo this needs to be replaced
+    while (searchingForGoodData) { // todo m11: this needs to be replaced
       // Sync the Account State Table First Pass
       //   Use the /get_account_state_hash API to get the hash from 3 or more nodes until there is a match between 3 nodes. Ts_start should be 0, or beginning of time.  The Ts_end value should be current time minus 10T (as configured)
       //   Use the /get_account_state API to get the data from one of the 3 nodes
@@ -244,8 +256,8 @@ class DataSync {
       let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, tsEnd: endTime }
       let stateHashResults = []
       for (let node of this.dataSourceNodes) {
-        let result = await this.p2p.ask(node, 'get_account_state_hash', message) // todo wrap and call this in the repeatable form.
-        // todo handle error cases?
+        let result = await this.p2p.ask(node, 'get_account_state_hash', message) // todo mem performance after enterprise: upgrade this to allow an array of N hashes if there is too much data to query in one shot
+        // todo m11: handle error cases?
         stateHashResults.push(result.stateHash)
       }
 
@@ -259,9 +271,9 @@ class DataSync {
       }
       if (hashesMatch === false) {
         this.mainLogger.debug(`DATASYNC: syncStateTableData hashes do not match `)
-        // failed restart with new nodes.  TODO record/eval/report blame?
+        // failed restart with new nodes.  TODO ?: record/eval/report blame?
         this.recordPotentialBadnode()
-        throw new Error('FailAndRestartPartition') // TODO we need to ask other nodes for a hash one at a time untill we can feel better about a hash consensus
+        throw new Error('FailAndRestartPartition') // TODO m11: we need to ask other nodes for a hash one at a time untill we can feel better about a hash consensus
       }
 
       //  Simple one shot way to get account state data, loop form below
@@ -329,7 +341,7 @@ class DataSync {
         searchingForGoodData = false
       } else {
         this.mainLogger.debug(`DATASYNC: syncStateTableData finished downloading the requested data but the hash does not match`)
-        // Failed again back through loop! TODO record/eval/report blame?
+        // Failed again back through loop! TODO ? record/eval/report blame?
         this.recordPotentialBadnode()
         throw new Error('FailAndRestartPartition')
       }
@@ -354,7 +366,7 @@ class DataSync {
     let loopCount = 0
     // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
     while (moreDataRemaining) {
-      // max records artificially low to make testing coverage better.  todo make it a config or calculate based on data size
+      // max records artificially low to make testing coverage better.  todo refactor: make it a config or calculate based on data size
       let message = { accountStart: queryLow, accountEnd: queryHigh, maxRecords: 3 }
       let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
       // accountData is in the form [{accountId, stateId, data}] for n accounts.
@@ -391,7 +403,6 @@ class DataSync {
 
   async failandRestart () {
     this.mainLogger.debug(`failandRestart`)
-    // TODO log failure
     this.clearPartitionData()
 
     // using set timeout before we resume to prevent infinite stack depth.
@@ -415,8 +426,7 @@ class DataSync {
   // State data = {accountId, txId, txTimestamp, stateBefore, stateAfter}
   // accountData is in the form [{accountId, stateId, data}] for n accounts.
   async processAccountData () {
-    // let accountData =
-
+    this.missingAccountData = []
     this.mapAccountData = {}
     // create a fast lookup map for the accounts we have.  Perf.  will need to review if this fits into memory.  May need a novel structure.
     let account
@@ -425,10 +435,13 @@ class DataSync {
       this.mapAccountData[account.accountId] = account
     }
 
-    //   For each account in the Account data make sure the entry in the Account State Table has the same State_after value; if not remove the record from the Account data
+    // For each account in the Account data make sure the entry in the Account State Table has the same State_after value; if not remove the record from the Account data
     for (let stateData of this.inMemoryStateTableData) {
       account = this.mapAccountData[stateData.accountId]
-      // todo check if state table has an account we dont have
+      // does the state data table have a node and we don't have data for it?
+      if (account == null) {
+        this.missingAccountData.push(stateData.accountId)
+      }
 
       if (!account.syncData) {
         account.syncData = {}
@@ -472,7 +485,7 @@ class DataSync {
     }
     if (failedHashes.length > 0) {
       this.mainLogger.debug(`DATASYNC: processAccountData failed hashes:  ${failedHashes.length} will have to download them again`)
-      // TODO record/eval/report blame?
+      // TODO ? record/eval/report blame?
       this.recordPotentialBadnode()
       this.failedAccounts = this.failedAccounts.concat(failedHashes)
       for (let accountId of this.failedHashes) {
@@ -498,8 +511,11 @@ class DataSync {
     for (let account of this.accountsWithStateConflict) {
       addressList.push(account.address)
     }
+    // add the addresses of accounts that we got state table data for but not data for
+    addressList = addressList.concat(this.missingAccountData)
+    this.missingAccountData = []
 
-    // should we pick different nodes to ask? (at the very least need to change the data source node!!!!!!)
+    // TODO m11:  should we pick different nodes to ask? (at the very least need to change the data source node!!!!!!)
 
     let message = { accountIds: addressList }
     let accountData = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
@@ -507,7 +523,6 @@ class DataSync {
     this.mainLogger.debug(`DATASYNC: syncFailedAcccounts requesting data for failed hashes`)
     this.combinedAccountData.combine(accountData)
 
-    // todo need queury state table data, then reprocess our data.
     await this.syncStateTableData(lowAddress, highAddress, this.lastStateSyncEndtime, Date.now())
 
     // process the new accounts.
@@ -543,6 +558,13 @@ class DataSync {
     }
   }
 
+  // we get any transactions we need through the acceptedTx gossip
+  async syncAcceptedTX () {
+
+  }
+
+  // this won't actually do much until after Shardus Enterprise
+  // potentially we could do a better job of tracking exactly which state table we did not get and be able to get this with half the bandwith
   async patchRemainingStateData () {
     this.mainLogger.debug(`DATASYNC: patchRemainingStateData`)
 
@@ -569,11 +591,24 @@ class DataSync {
     //   Record Joined timestamp
     //   Even a syncing node will receive accepted transactions
     //   Starts receiving accepted transaction and saving them to Accepted Tx Table
-    this.p2p.registerGossipHandler('acceptedTx', async (data) => {
-      // what to do with this data?
-      // need to insert into state table and accepted tx table for any nodes in our shard that are involved
-      this.acceptedTXQueue.push(data)
-      // TODO a timestamp sorted insert
+    this.p2p.registerGossipHandler('acceptedTx', async (tx) => {
+      // docs mention putting this in a table but it seems so far that an in memory queue should be ok
+      // should we filter, or instead rely on gossip in to only give us TXs that matter to us?
+
+      // Lets insert this tx into a sorted list where index 0 == oldest and length-1 == newest
+      if (this.isSyncingAcceptedTxs) {
+        if (this.acceptedTXQueue.length === 0) {
+          this.acceptedTXQueue.push(tx)
+        } else {
+          let index = this.acceptedTXQueue.length - 1
+          let lastTx = this.acceptedTXQueue[index]
+          while (tx.timestamp < lastTx.timestamp && index > 0) {
+            index--
+            lastTx = this.acceptedTXQueue[index]
+          }
+          this.acceptedTXQueue.splice(index, 0, tx)
+        }
+      }
     })
   }
 }

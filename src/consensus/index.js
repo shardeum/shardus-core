@@ -37,11 +37,6 @@ class Consensus {
     this.mainLogger.debug(`End of onTransaction(${shardusTransaction})`)
   }
 
-  // ///////////////////////////////////////////////////////////////
-  // TODO register an endpoint to recieve a pending transaction via gossip
-  // TODO register an endpoint to recieve gossip of reciepts  (calls onReceipt)
-  // ///////////////////////////////////////////////////////////////
-
   async inject (shardusTransaction) {
     this.mainLogger.debug(`Start of inject(${shardusTransaction})`)
     let transactionReceipt

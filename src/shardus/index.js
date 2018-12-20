@@ -197,12 +197,12 @@ class Shardus {
 
   async acceptTransaction (tx, receipt, gossipTx = false) {
     // app applies data
-    let { stateTableResults, txId, txTimestamp } = await this.app.apply(tx) // TODO! implement this on the app side.
+    let { stateTableResults, txId, txTimestamp } = await this.app.apply(tx)
     // TODO post enterprise:  the stateTableResults may need to be a map with keys so we can choose which one to actually insert in our accountStateTable
 
-    let txStatus = 1 // HARDCODED!!! pre m15
+    let txStatus = 1 // TODO m15: unhardcode this
     // store transaction in accepted table
-    let acceptedTX = { id: txId, timestamp: txTimestamp, data: tx, status: txStatus, receipt: receipt } // TODO init this data so we can save it
+    let acceptedTX = { id: txId, timestamp: txTimestamp, data: tx, status: txStatus, receipt: receipt }
     await this.storage.addAcceptedTransactions([acceptedTX])
 
     // query app for account state (or return it from apply)
@@ -216,13 +216,14 @@ class Shardus {
   }
 
   // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
-  async tryApplyTransaction (tx) {
+  async tryApplyTransaction (acceptedTX) {
+    let tx = acceptedTX.data
     // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
     let keysResponse = this.app.getKeyFromTransaction(tx)
     let { sourceKeys, targetKeys } = keysResponse
     let sourceAddress, targetAddress, sourceState, targetState
 
-    let timestamp = tx.txnTimestmp // TODO!!! need to push this to application method thta cracks the transaction
+    let timestamp = tx.txnTimestmp // TODO m11: need to push this to application method thta cracks the transaction
 
     if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
       sourceAddress = sourceKeys[0]
@@ -244,14 +245,8 @@ class Shardus {
     }
 
     this.app.apply(tx)
-
-    // we don't have enough information to write this to the accepted transaction table but we could
-
-    // let { stateTableResults, txId, txTimestamp } = await this.app.apply(tx)
-    // let txStatus = 1 // HARDCODED!!! pre m15
-    // // store transaction in accepted table ... alternatively we could have queried for accepted TX... tbd on the correct answer here
-    // let acceptedTX = { id: txId, timestamp: txTimestamp, data: tx, status: txStatus, receipt: receipt }
-    // this.storage.addAcceptedTransactions([acceptedTX])
+    // write the accepted TX to storage
+    this.storage.addAcceptedTransactions([acceptedTX])
   }
 
   /**
@@ -457,7 +452,8 @@ class Shardus {
     // Updated names:  accountStart , accountEnd, tsStart, tsEnd
     this.p2p.registerInternal('get_account_state', async (payload, respond) => {
       let result = {}
-      // max records set artificially low for better test coverage, todo make config
+      // max records set artificially low for better test coverage
+      // todo m11: make configs for how many records to query
       let accountStates = await this.storage.queryAccountStateTable(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, 10)
       result.accountStates = accountStates
       await respond(result)
