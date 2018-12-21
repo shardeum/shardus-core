@@ -93,6 +93,12 @@ class Consensus {
   async onReceipt (receipt) {
     this.mainLogger.debug(`Start of onReciept`)
     const shardusTransaction = this.pendingTransactions[receipt.txHash]
+
+    if (shardusTransaction == null) {
+      console.log('no tx found.  todo: better handling while we are syncing')
+      return // todo error
+    }
+
     let transaction = shardusTransaction.inTransaction
     // retrieve incoming transaction from HTTP request
     try {

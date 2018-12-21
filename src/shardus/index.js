@@ -370,13 +370,19 @@ class Shardus {
       } else {
         // throw new Error('Missing requried interface function. apply()')
       }
+      if (typeof (application.deleteLocalAccountData) === 'function') {
+        accountUtilityInterface.deleteLocalAccountData = async () => application.deleteLocalAccountData()
+      } else {
+        // throw new Error('Missing requried interface function. apply()')
+      }
+
       if (typeof (this.acceptTransaction) === 'function') {
         accountUtilityInterface.acceptTransaction = async (tx, receipt) => this.acceptTransaction(tx, receipt)
       } else {
         // throw new Error('Missing requried interface function. apply()')
       }
-      if (typeof (this.acceptTransaction) === 'function') {
-        accountUtilityInterface.deleteLocalAccountData = async () => application.deleteLocalAccountData()
+      if (typeof (this.tryApplyTransaction) === 'function') {
+        accountUtilityInterface.tryApplyTransaction = async (acceptedTX) => this.tryApplyTransaction(acceptedTX)
       } else {
         // throw new Error('Missing requried interface function. apply()')
       }

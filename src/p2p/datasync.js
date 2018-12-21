@@ -83,7 +83,7 @@ class DataSync {
   async syncStateData (requiredNodeCount) {
     this.isSyncingAcceptedTxs = true
     await utils.sleep(5000) // Temporary delay to make it easier to attach a debugger
-
+    console.log('syncStateData start')
     // delete and re-create some tables before we sync:
     await this.storage.dropAndCreatAccountStateTable()
     await this.storage.dropAndCreateAcceptedTransactions()
@@ -103,6 +103,7 @@ class DataSync {
     // one we have all of the initial data the last thing to do is get caught up on transactions
     await this.applyAcceptedTx()
 
+    console.log('syncStateData end')
     // TODO after enterprise: once we are on the network we still need to patch our state data so that it is a perfect match of other nodes for our supported address range
     //  Only need to requery the range that overlaps when we joined and when we started receiving our own state updates on the network.
     //  The trick is this query will get some duplicate data, but maybe the way the keys are in the db are setup we can just attemp to save what we get.  will need testing
@@ -570,9 +571,10 @@ class DataSync {
 
     this.mainLogger.debug(`DATASYNC: applyAcceptedTx for up to ${this.acceptedTXQueue.length} transactions`)
 
+    console.log(`applyAcceptedTx   queue: ${this.acceptedTXQueue.length}`)
     while (this.acceptedTXQueue.length > 0) {
       // apply the tx
-      let nextTX = this.acceptedTXQueue.slice()
+      let nextTX = this.acceptedTXQueue.shift()
 
       // we no longer have state table data in memory so there is not much more the datasync can do
       // shardus / the app code can take it from here
@@ -626,6 +628,7 @@ class DataSync {
       // docs mention putting this in a table but it seems so far that an in memory queue should be ok
       // should we filter, or instead rely on gossip in to only give us TXs that matter to us?
 
+      console.log('got accepted tx: ' + acceptedTX.timestamp)
       // Lets insert this tx into a sorted list where index 0 == oldest and length-1 == newest
       if (this.isSyncingAcceptedTxs) {
         if (this.acceptedTXQueue.length === 0) {
