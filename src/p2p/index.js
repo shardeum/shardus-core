@@ -620,8 +620,8 @@ class P2P {
       return { unfinalizedCycle }
     }
     let equalFn = (payload1, payload2) => {
-      const hash1 = this.hash(payload1)
-      const hash2 = this.hash(payload2)
+      const hash1 = this.crypto.hash(payload1)
+      const hash2 = this.crypto.hash(payload2)
       return hash1 === hash2
     }
     let unfinalizedCycle
