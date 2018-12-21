@@ -121,7 +121,7 @@ class DataSync {
       this.currentPartition = partition
       this.addressRange = this.partitionToAddressRange(partition)
 
-      this.partitionStartTimeStame = Date.now()
+      this.partitionStartTimeStamp = Date.now()
 
       let lowAddress = this.addressRange.low
       let highAddress = this.addressRange.high
