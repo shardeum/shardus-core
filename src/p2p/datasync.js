@@ -551,7 +551,7 @@ class DataSync {
     let accountData = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
 
     this.mainLogger.debug(`DATASYNC: syncFailedAcccounts requesting data for failed hashes`)
-    this.combinedAccountData.combine(accountData)
+    this.combinedAccountData.concat(accountData)
 
     await this.syncStateTableData(lowAddress, highAddress, this.lastStateSyncEndtime, Date.now())
 
