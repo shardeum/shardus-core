@@ -46,7 +46,7 @@ class Consensus {
       // let keysResponse = await this.application.get(keysRequest)
       this.mainLogger.debug(`Gossiping Validated Transaction ${JSON.stringify(shardusTransaction)}`)
       // TODO: Change this to use just the nodes in the conesensus group
-      this.p2p.sendGossip('transaction', shardusTransaction, this.p2p.state.getAllNodes(this.p2p.id))
+      // await this.p2p.sendGossip('transaction', shardusTransaction, this.p2p.state.getAllNodes(this.p2p.id))
       this.mainLogger.debug(`Done Gossiping Validated Transaction ${JSON.stringify(shardusTransaction)}`)
       let keysResponse = this.applicationInterfaceImpl.getKeyFromTransaction(inTransaction)
       let { sourceKeys, targetKeys } = keysResponse
@@ -73,7 +73,7 @@ class Consensus {
     }
 
     this.mainLogger.debug(`Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
-    this.p2p.sendGossip('receipt', transactionReceipt, this.p2p.state.getAllNodes(this.p2p.id))
+    await this.p2p.sendGossip('receipt', { shardusTransaction, transactionReceipt }, this.p2p.state.getAllNodes(this.p2p.id))
     this.mainLogger.debug(`Done Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
     this.mainLogger.debug(`End of inject(${inTransaction})`)
 
@@ -90,12 +90,15 @@ class Consensus {
     return receipt
   }
 
-  async onReceipt (receipt) {
+  // changed to {shardusTransaction, transactionReceipt} to fix out of order messaging.  real consensus will need to have a queue to apply changes
+  async onReceipt (data) {
     this.mainLogger.debug(`Start of onReciept`)
-    const shardusTransaction = this.pendingTransactions[receipt.txHash]
-
+    // const shardusTransaction = this.pendingTransactions[receipt.txHash]
+    const shardusTransaction = data.shardusTransaction
+    let receipt = data.transactionReceipt
     if (shardusTransaction == null) {
-      console.log('no tx found.  todo: better handling while we are syncing')
+      console.log(`onReceipt failed. No transaction found for: ${receipt.txHash}`)
+      this.mainLogger.debug(`onReceipt failed. No transaction found for: ${receipt.txHash}`)
       return // todo error
     }
 
