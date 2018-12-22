@@ -39,8 +39,7 @@ function setupRoutes () {
   // -------- INTERNAL Routes ----------
 
   this.registerInternal('gossip', async (payload) => {
-    const accepted = await this.handleGossip(payload, false)
-    if (!accepted) return this.mainLogger.debug('Gossip Not Accepted.')
+    await this.handleGossip(payload)
     this.mainLogger.debug('Gossip request accepted!')
   })
 
