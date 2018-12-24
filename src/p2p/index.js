@@ -32,7 +32,7 @@ class P2P {
 
     this.state = new P2PState(config, this.logger, this.storage, this, this.crypto)
 
-    this.dataSync = accountUtility ? new DataSync(this.config, this.logger, this.storage, this, this.crypto, accountUtility) : null
+    this.dataSync = accountUtility ? new DataSync(config, this.logger, this.storage, this, this.crypto, accountUtility) : null
   }
 
   async init () {
