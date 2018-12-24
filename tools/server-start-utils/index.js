@@ -9,7 +9,7 @@ const merge = require('deepmerge')
 const sqlite = require('sqlite')
 
 const LOCAL_ADDRESS = '127.0.0.1'
-const NODE_UP_TIMEOUT = process.env.NODE_UP_TIMEOUT || 60000
+let NODE_UP_TIMEOUT = process.env.NODE_UP_TIMEOUT || 60000
 
 class ServerStartUtils {
   constructor (config = {}) {
@@ -21,6 +21,8 @@ class ServerStartUtils {
     if (!this.Shardus) this.Shardus = require(path.join(this.baseDir, 'src', 'shardus'))
     if (!this.models) this.models = require(path.join(this.baseDir, 'src', 'storage', 'models'))
     if (!this.verbose) this.verbose = false
+    // Set NODE_UP_TIMEOUT if passed
+    if (this.nodeUpTimeout) NODE_UP_TIMEOUT = this.nodeUpTimeout
     // Save default server configs
     this.defaultConfigs = _readJsonFiles(path.join(this.baseDir, 'config'))
     // Ensure instance dir exists
