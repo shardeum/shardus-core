@@ -414,7 +414,7 @@ class P2PState {
     }
     const { start, duration } = cycle
     const currTime = utils.getTime('s')
-    const toWait = (start + duration) - currTime
+    const toWait = ((start + duration) - currTime) * 1000
     this.currentCycle = cycle
     await this._createCycle()
     this.mainLogger.debug(`Waiting ${toWait} ms before starting cycles...`)

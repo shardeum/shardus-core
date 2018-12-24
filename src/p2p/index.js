@@ -281,9 +281,9 @@ class P2P {
     this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
     this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
     const startOfUpdatePhase = cycleStart
-    this.mainLogger.debug(`Start of second quarter: ${startOfUpdatePhase}`)
+    this.mainLogger.debug(`Start of first quarter: ${startOfUpdatePhase}`)
     const endOfUpdatePhase = cycleStart + Math.ceil(0.25 * cycleDuration)
-    this.mainLogger.debug(`End of second quarter: ${endOfUpdatePhase}`)
+    this.mainLogger.debug(`End of first quarter: ${endOfUpdatePhase}`)
     if (currentTime < startOfUpdatePhase || currentTime > endOfUpdatePhase) {
       return false
     }
@@ -799,7 +799,7 @@ class P2P {
         const { cycleDuration } = this.getCycleMarkerInfo()
         this.mainLogger.debug('Not active yet, submitting an active request.')
         await this._submitActiveRequest()
-        const toWait = (cycleDuration * 1000) * 0.75
+        const toWait = cycleDuration * 1000
         this.mainLogger.debug(`Waiting before checking if active, waiting ${toWait} ms...`)
         setTimeout(async () => {
           await ensureActive()
