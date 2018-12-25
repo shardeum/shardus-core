@@ -24,5 +24,10 @@
   },
   "network": {
     "timeout": 10
+  },
+  "reporting": {
+    "report": true,
+    "recipient": "localhost:12000/heartbeat",
+    "interval": 2
   }
 }

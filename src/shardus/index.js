@@ -35,8 +35,8 @@ class Shardus {
 
     this.exitHandler.addSigListeners()
     this.exitHandler.registerSync('p2p', () => {
-      if (this.p2p.state) {
-        this.p2p.state.stopCycles()
+      if (this.p2p) {
+        this.p2p.cleanupSync()
       }
     })
     this.exitHandler.registerSync('shardus', () => {
@@ -400,9 +400,9 @@ class Shardus {
     this._setupHeartbeat()
     this.crypto = new Crypto(this.config.crypto, this.logger, this.storage)
     await this.crypto.init()
-    const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout } = this.config
+    const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout, reporting } = this.config
     const ipInfo = this.config.ip
-    const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout }
+    const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout, reporting }
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network, this.accountUtility)
     await this.p2p.init()
 

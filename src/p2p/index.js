@@ -4,9 +4,11 @@ const http = require('../http')
 const P2PState = require('./p2p-state')
 const routes = require('./routes')
 const DataSync = require('./datasync.js')
+const Reporter = require('./reporter.js')
 
 class P2P {
   constructor (config, logger, storage, crypto, network, accountUtility) {
+    this.reporting = config.reporting
     this.logger = logger
     this.mainLogger = logger.getLogger('main')
     this.storage = storage
@@ -33,6 +35,7 @@ class P2P {
     this.state = new P2PState(config, this.logger, this.storage, this, this.crypto)
 
     this.dataSync = accountUtility ? new DataSync(config, this.logger, this.storage, this, this.crypto, accountUtility) : null
+    this.reporter = this.reporting.report ? new Reporter(this.reporting, logger, this) : null
   }
 
   async init () {
@@ -128,6 +131,29 @@ class P2P {
     this.mainLogger.info(`Your node's ID is ${this.id}`)
     if (!updateDb) return
     await this.storage.setProperty('id', id)
+  }
+
+  getNodeId () {
+    return this.id
+  }
+
+  // TODO: implement getting hash of app state
+  getAppState () {
+    return null
+  }
+
+  getCycleMarker () {
+    return this.state.getCurrentCycleMarker()
+  }
+
+  // TODO: Implement getting injected tps by counting on /injected route and clearing counter at the end of every call
+  getTpsInjected () {
+    return 0
+  }
+
+  // Same for applied TPS, except on calls to application.apply
+  getTpsApplied () {
+    return 0
   }
 
   getIpInfo () {
@@ -996,6 +1022,15 @@ class P2P {
 
     await this._goActive(isFirstSeed)
 
+    if (this.reporter) {
+      try {
+        this.reporter.startReporting()
+      } catch (e) {
+        this.mainLogger.error(e)
+        console.error(e)
+      }
+    }
+
     // turning this off until after enterprise, should figure out a way to work it in before we go active
     // if (this.dataSync && isFirstSeed === false) {
     //   // TODO potentially not ready to share state data with other nodes yet, may need a state for this so we dont get flagged as dishonest
@@ -1007,6 +1042,19 @@ class P2P {
     // This is also for testing purposes
     console.log('Server ready!')
     return true
+  }
+
+  cleanupSync () {
+    if (this.state) {
+      this.state.stopCycles()
+    }
+    if (this.reporter) {
+      try {
+        this.reporter.stopReporting()
+      } catch (e) {
+        this.mainLogger.error(e)
+      }
+    }
   }
 }
 
