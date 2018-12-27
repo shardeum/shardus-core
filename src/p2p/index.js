@@ -4,11 +4,9 @@ const http = require('../http')
 const P2PState = require('./p2p-state')
 const routes = require('./routes')
 const DataSync = require('./datasync.js')
-const Reporter = require('./reporter.js')
 
 class P2P {
   constructor (config, logger, storage, crypto, network, accountUtility) {
-    this.reporting = config.reporting
     this.logger = logger
     this.mainLogger = logger.getLogger('main')
     this.storage = storage
@@ -26,16 +24,20 @@ class P2P {
     this.netadmin = config.netadmin || 'default'
     this.seedNodes = null
     this.acceptInternal = false
+
     this.gossipHandlers = {}
     this.gossipRecipients = config.gossipRecipients
     this.gossipTimeout = config.gossipTimeout * 1000
-
     this.gossipedHashes = new Map()
 
     this.state = new P2PState(config, this.logger, this.storage, this, this.crypto)
-
     this.dataSync = accountUtility ? new DataSync(config, this.logger, this.storage, this, this.crypto, accountUtility) : null
-    this.reporter = this.reporting.report ? new Reporter(this.reporting, logger, this) : null
+
+    this.reportCallbacks = {
+      joining: null,
+      joined: null,
+      active: null
+    }
   }
 
   async init () {
@@ -56,6 +58,18 @@ class P2P {
 
   _registerRoutes () {
     routes.register(this)
+  }
+
+  registerOnJoining (cb) {
+    this.reportCallbacks.joining = cb
+  }
+
+  registerOnJoined (cb) {
+    this.reportCallbacks.joined = cb
+  }
+
+  registerOnActive (cb) {
+    this.reportCallbacks.active = cb
   }
 
   _verifyExternalInfo (ipInfo) {
@@ -1012,8 +1026,20 @@ class P2P {
     const isFirstSeed = await this._discoverNetwork(seedNodes)
     const needJoin = await this._checkIfNeedJoin(isFirstSeed)
     let joined = true
+    // Check if we need to call back to reporter on attempting to join
+    if (this.reportCallbacks.joining) {
+      this.mainLogger.debug('Calling back reporter `joining` callback.')
+      const publicKey = this.crypto.getPublicKey()
+      await this.reportCallbacks.joining(publicKey)
+    }
     if (needJoin) joined = await this._joinNetwork(seedNodes, isFirstSeed)
     if (!joined) return false
+    // Check if we need to call back to reporter after joining
+    if (this.reportCallbacks.joined) {
+      this.mainLogger.debug('Calling back reporter `joined` callback.')
+      const publicKey = this.crypto.getPublicKey()
+      await this.reportCallbacks.joined(this.id, publicKey)
+    }
     await this._syncToNetwork(seedNodes, isFirstSeed)
 
     if (this.dataSync && isFirstSeed === false) {
@@ -1022,13 +1048,10 @@ class P2P {
 
     await this._goActive(isFirstSeed)
 
-    if (this.reporter) {
-      try {
-        this.reporter.startReporting()
-      } catch (e) {
-        this.mainLogger.error(e)
-        console.error(e)
-      }
+    // Check if we need to call back to reporter after we have synced up and are now active
+    if (this.reportCallbacks.active) {
+      this.mainLogger.debug('Calling back reporter `active` callback.')
+      await this.reportCallbacks.active(this.id)
     }
 
     // turning this off until after enterprise, should figure out a way to work it in before we go active
@@ -1047,13 +1070,6 @@ class P2P {
   cleanupSync () {
     if (this.state) {
       this.state.stopCycles()
-    }
-    if (this.reporter) {
-      try {
-        this.reporter.stopReporting()
-      } catch (e) {
-        this.mainLogger.error(e)
-      }
     }
   }
 }

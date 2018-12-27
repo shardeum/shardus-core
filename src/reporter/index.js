@@ -4,10 +4,48 @@ class Reporter {
   constructor (config, logger, p2p) {
     this.config = config
     this.mainLogger = logger.getLogger('main')
-
     this.p2p = p2p
 
     this.reportTimer = null
+
+    this.p2p.registerOnJoining((publicKey) => {
+      return this.reportJoining(publicKey)
+    })
+
+    this.p2p.registerOnJoined((nodeId, publicKey) => {
+      return this.reportJoined(nodeId, publicKey)
+    })
+
+    this.p2p.registerOnActive((nodeId) => {
+      return this.reportActive(nodeId)
+    })
+  }
+
+  async reportJoining (publicKey) {
+    try {
+      await http.post(`${this.config.recipient}/joining`, { publicKey })
+    } catch (e) {
+      this.mainLogger.error(e)
+      console.error(e)
+    }
+  }
+
+  async reportJoined (nodeId, publicKey) {
+    try {
+      await http.post(`${this.config.recipient}/joined`, { publicKey, nodeId })
+    } catch (e) {
+      this.mainLogger.error(e)
+      console.error(e)
+    }
+  }
+
+  async reportActive (nodeId) {
+    try {
+      await http.post(`${this.config.recipient}/active`, { nodeId })
+    } catch (e) {
+      this.mainLogger.error(e)
+      console.error(e)
+    }
   }
 
   // Sends a report
@@ -19,7 +57,7 @@ class Reporter {
       data
     }
     try {
-      await http.post(this.config.recipient, report)
+      await http.post(`${this.config.recipient}/heartbeat`, report)
     } catch (e) {
       this.mainLogger.error(e)
       console.error(e)

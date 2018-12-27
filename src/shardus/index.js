@@ -6,6 +6,7 @@ const Storage = require('../storage')
 const Network = require('../network')
 const utils = require('../utils')
 const Consensus = require('../consensus')
+const Reporter = require('../reporter')
 
 class Shardus {
   constructor ({ server: config, logs: logsConfig, storage: storageConfig }) {
@@ -22,6 +23,7 @@ class Shardus {
     this.appProvided = null
     this.app = null
     this.accountUtility = null
+    this.reporter = null
 
     this.heartbeatInterval = config.heartbeatInterval
     this.heartbeatTimer = null
@@ -34,6 +36,11 @@ class Shardus {
     this.registerExternalPatch = (route, handler) => this.network.registerExternalPatch(route, handler)
 
     this.exitHandler.addSigListeners()
+    this.exitHandler.registerSync('reporter', () => {
+      if (this.reporter) {
+        this.reporter.stopReporting()
+      }
+    })
     this.exitHandler.registerSync('p2p', () => {
       if (this.p2p) {
         this.p2p.cleanupSync()
@@ -400,13 +407,14 @@ class Shardus {
     this._setupHeartbeat()
     this.crypto = new Crypto(this.config.crypto, this.logger, this.storage)
     await this.crypto.init()
-    const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout, reporting } = this.config
+    const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout } = this.config
     const ipInfo = this.config.ip
-    const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout, reporting }
+    const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout }
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network, this.accountUtility)
     await this.p2p.init()
 
     this.consensus = new Consensus(this.accountUtility, this.config, this.logger, this.crypto, this.p2p, this.storage, null, this.app)
+    this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p) : null
 
     this._registerRoutes()
 
@@ -420,6 +428,7 @@ class Shardus {
       throw new Error(e)
     }
     if (!started) await this.shutdown(exitProcOnFail)
+    if (this.reporter) this.reporter.startReporting()
   }
 
   async shutdown (exitProcess = true) {
