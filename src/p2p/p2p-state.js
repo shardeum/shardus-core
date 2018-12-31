@@ -85,6 +85,7 @@ class P2PState {
 
   _addJoinRequest (joinRequest) {
     if (!this._addToBestJoinRequests(joinRequest)) {
+      this.mainLogger.debug('Join request not added: Was not best request for this cycle.')
       return false
     }
     this._addPendingNode(joinRequest.nodeInfo)
@@ -92,7 +93,10 @@ class P2PState {
   }
 
   addNewJoinRequest (joinRequest) {
-    if (!this.acceptChainUpdates) return false
+    if (!this.acceptChainUpdates) {
+      this.mainLogger.debug('Join request not added: Not accepting chain updates right now.')
+      return false
+    }
     return this._addJoinRequest(joinRequest)
   }
 
