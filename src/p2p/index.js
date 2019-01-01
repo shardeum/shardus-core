@@ -656,8 +656,8 @@ class P2P {
     try {
       ;({ unfinalizedCycle } = await this._robustQuery(nodes, queryFn, equalFn))
     } catch (e) {
-      this.mainLogger.debug('Unable to get unfinalized cycle. Need to resync cycle chain and try again.')
-      ;({ unfinalizedCycle } = null)
+      this.mainLogger.debug(`Unable to get unfinalized cycle: ${e}. Need to resync cycle chain and try again.`)
+      unfinalizedCycle = null
     }
     return unfinalizedCycle
   }
