@@ -27,7 +27,7 @@
   },
   "reporting": {
     "report": true,
-    "recipient": "localhost:3000/api",
+    "recipient": "https://tn1.shardus.com:3000/api",
     "interval": 2
   }
 }
