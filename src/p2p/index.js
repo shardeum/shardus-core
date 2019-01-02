@@ -500,7 +500,7 @@ class P2P {
       }
     }
 
-    throw new Error(`Could not get ${redundancy} redundant responses from ${nodes.length} nodes. Encountered ${errors} query errors.`)
+    throw new Error(`Could not get ${redundancy} ${redundancy > 1 ? 'redundant responses' : 'response'} from ${nodes.length} ${nodes.length > 1 ? 'nodes' : 'node'}. Encountered ${errors} query errors.`)
   }
 
   async _sequentialQuery (nodes, queryFn, verifyFn) {
