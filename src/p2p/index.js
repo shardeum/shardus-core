@@ -367,7 +367,13 @@ class P2P {
   async _submitWhenUpdatePhase (route, message) {
     this.mainLogger.debug(`Submitting message: ${JSON.stringify(message)} on route: ${route} whenever it's not the second quarter of cycle...`)
     // TO-DO: potentially make this not just the seed nodes that are queried for cycle marker
-    const { currentTime, cycleStart, cycleDuration } = await this._fetchCycleMarkerInternal(this.state.getActiveNodes())
+    let cycleMarker
+    try {
+      cycleMarker = await this._fetchCycleMarkerInternal(this.state.getActiveNodes())
+    } catch (e) {
+      cycleMarker = await this._fetchCycleMarkerInternal(this.seedNodes)
+    }
+    const { currentTime, cycleStart, cycleDuration } = cycleMarker
 
     // If we are nto in the update phase, then wait until it starts to submit this message
     if (!this._isInUpdatePhase(currentTime, cycleStart, cycleDuration)) {
@@ -795,14 +801,25 @@ class P2P {
     }
 
     // Get in cadence, then start cycles
-    const { cycleStart, cycleDuration } = await this._fetchCycleMarkerInternal(this.state.getActiveNodes())
+    let cycleMarker
+    try {
+      cycleMarker = await this._fetchCycleMarkerInternal(this.state.getActiveNodes())
+    } catch (e) {
+      cycleMarker = await this._fetchCycleMarkerInternal(this.seedNodes)
+    }
+    const { cycleStart, cycleDuration } = cycleMarker
     const currentTime = utils.getTime('s')
 
     // First we wait until the beginning of the final quarter
     await this._waitUntilLastPhase(currentTime, cycleStart, cycleDuration)
 
     // Then we get the unfinalized cycle data
-    const unfinalized = await this._fetchUnfinalizedCycle(this.state.getActiveNodes())
+    let unfinalized
+    try {
+      unfinalized = await this._fetchUnfinalizedCycle(this.state.getActiveNodes())
+    } catch (e) {
+      unfinalized = await this._fetchUnfinalizedCycle(this.seedNodes)
+    }
 
     // TO-DO: check if the unfinalized cycle was null and try again
 
