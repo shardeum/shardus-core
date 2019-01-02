@@ -460,12 +460,12 @@ class P2P {
     return true
   }
 
-  async _robustQuery (nodes, queryFn, equalityFn, redundancy) {
-    if (typeof equalityFn !== 'function') {
-      equalityFn = util.isDeepStrictEqual
-    }
-    if (!redundancy || redundancy < 1) redundancy = 3
-    redundancy = nodes.length < redundancy ? nodes.length : redundancy
+  async _robustQuery (nodes = [], queryFn, equalityFn, redundancy = 3) {
+    if (nodes.length === 0) throw new Error('No nodes given.')
+    if (typeof queryFn !== 'function') throw new Error(`Provided queryFn ${queryFn} is not a valid function.`)
+    if (typeof equalityFn !== 'function') equalityFn = util.isDeepStrictEqual
+    if (redundancy < 1) redundancy = 3
+    if (redundancy > nodes.length) redundancy = nodes.length
 
     class Tally {
       constructor (winCount, equalFn) {
