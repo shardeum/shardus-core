@@ -131,8 +131,10 @@ class DataSync {
       await this.getSyncNodes(lowAddress, highAddress)
 
       await this.syncStateTableData(lowAddress, highAddress, 0, Date.now() - this.syncSettleTime)
+      this.mainLogger.debug(`DATASYNC: partition: ${partition}, syncStateTableData 1st pass done.`)
 
       await this.syncAccountData(lowAddress, highAddress)
+      this.mainLogger.debug(`DATASYNC: partition: ${partition}, syncAccountData done.`)
 
       // potentially do the next 2 blocks periodically in the account data retreval so we can flush data to disk!  generalize the account state table update so it can be called 'n' times
 
@@ -141,12 +143,14 @@ class DataSync {
       //   Same as the procedure for First Pass except:
       //   Ts_start should be the Ts_end value from last time and Ts_end value should be current time minus 10T
       await this.syncStateTableData(lowAddress, highAddress, this.lastStateSyncEndtime, Date.now())
+      this.mainLogger.debug(`DATASYNC: partition: ${partition}, syncStateTableData 2nd pass done.`)
 
       // Process the Account data
       //   For each account in the Account data make sure the entry in the Account State Table has the same State_after value; if not remove the record from the Account data
       //   For each account in the Account State Table make sure the entry in Account data has the same State_after value; if not save the account id to be looked up later
       //   Use the App.set_account_data function with the Account data to save the data to the application Accounts Table; if any failed accounts are returned save the account id to be looked up later
-      this.processAccountData()
+      await this.processAccountData()
+      this.mainLogger.debug(`DATASYNC: partition: ${partition}, processAccountData done.`)
 
       // Sync the failed accounts
       //   Log that some account failed
