@@ -226,13 +226,13 @@ class DataSync {
 
   // todo refactor: move to p2p?
   getRandomNodesInRange (count, lowAddress, highAddress, exclude) {
-    let allNodes = this.p2p.state.getAllNodes(this.p2p.id)
+    let allNodes = this.p2p.state.getActiveNodes(this.p2p.id)
     this.shuffleArray(allNodes)
     let results = []
     if (allNodes.length <= count) {
       count = allNodes.length
     }
-    for (let node of allNodes) {
+    for (const node of allNodes) {
       if (node.id >= lowAddress && node.id <= highAddress) {
         if ((node.id in exclude) === false) {
           results.push(node)
