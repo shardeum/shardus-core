@@ -413,8 +413,8 @@ class Shardus {
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network, this.accountUtility)
     await this.p2p.init()
 
-    this.consensus = new Consensus(this.accountUtility, this.config, this.logger, this.crypto, this.p2p, this.storage, null, this.app)
     this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p) : null
+    this.consensus = new Consensus(this.accountUtility, this.config, this.logger, this.crypto, this.p2p, this.storage, null, this.app, this.reporter)
 
     this._registerRoutes()
 

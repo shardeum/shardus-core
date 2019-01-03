@@ -1,6 +1,6 @@
 
 class Consensus {
-  constructor (accountUtility, config, logger, crypto, p2p, storage, nodeList, applicationInterfaceImpl) {
+  constructor (accountUtility, config, logger, crypto, p2p, storage, nodeList, applicationInterfaceImpl, reporter) {
     this.accountUtility = accountUtility
     this.config = config
     this.logger = logger
@@ -12,6 +12,7 @@ class Consensus {
     this.storage = storage
     this.nodeList = nodeList
     this.applicationInterfaceImpl = applicationInterfaceImpl
+    this.reporter = reporter
 
     this.pendingTransactions = {}
     // Register Gossip Handlers with P2P
@@ -38,6 +39,8 @@ class Consensus {
   }
 
   async inject (shardusTransaction) {
+    // TODO: Make this report more robust, actually make sure that we are getting all injected txs from app
+    this.reporter.incrementTxInjected()
     this.mainLogger.debug(`Start of inject(${shardusTransaction})`)
     let transactionReceipt
     let inTransaction = shardusTransaction.inTransaction
@@ -121,6 +124,8 @@ class Consensus {
       // }
 
       this.accountUtility.acceptTransaction(transaction, receipt)
+      // TODO: Make this more robust, actually make sure the application has applied tx
+      this.reporter.incrementTxApplied()
     } catch (ex) {
       this.fatalLogger.fatal(`Failed to process receipt. Exception: ${ex}`)
     }

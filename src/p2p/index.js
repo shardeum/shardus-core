@@ -160,16 +160,6 @@ class P2P {
     return this.state.getCurrentCycleMarker()
   }
 
-  // TODO: Implement getting injected tps by counting on /injected route and clearing counter at the end of every call
-  getTpsInjected () {
-    return 0
-  }
-
-  // Same for applied TPS, except on calls to application.apply
-  getTpsApplied () {
-    return 0
-  }
-
   getIpInfo () {
     return this.ipInfo
   }

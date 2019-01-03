@@ -7,6 +7,8 @@ class Reporter {
     this.p2p = p2p
 
     this.reportTimer = null
+    this._txInjected = 0
+    this._txApplied = 0
 
     this.p2p.registerOnJoining((publicKey) => {
       return this.reportJoining(publicKey)
@@ -19,6 +21,23 @@ class Reporter {
     this.p2p.registerOnActive((nodeId) => {
       return this.reportActive(nodeId)
     })
+  }
+
+  incrementTxInjected () {
+    this._txInjected += 1
+  }
+
+  incrementTxApplied () {
+    this._txApplied += 1
+  }
+
+  _resetTxsSeen () {
+    this._txInjected = 0
+    this._txApplied = 0
+  }
+
+  _calculateAverageTps (txs) {
+    return Math.round(txs / this.config.interval)
   }
 
   async reportJoining (publicKey) {
@@ -70,8 +89,8 @@ class Reporter {
       const appState = this.p2p.getAppState()
       const cycleMarker = this.p2p.getCycleMarker()
       const nodelistHash = this.p2p.getNodelistHash()
-      const tpsInjected = this.p2p.getTpsInjected()
-      const tpsApplied = this.p2p.getTpsApplied()
+      const tpsInjected = this._calculateAverageTps(this._txInjected)
+      const tpsApplied = this._calculateAverageTps(this._txApplied)
 
       try {
         await this._sendReport({ appState, cycleMarker, nodelistHash, tpsInjected, tpsApplied })
@@ -79,6 +98,8 @@ class Reporter {
         this.mainLogger.error(e)
         console.error(e)
       }
+
+      this._resetTxsSeen()
     }, this.config.interval * 1000)
   }
 
