@@ -1,10 +1,11 @@
 const http = require('../http')
 
 class Reporter {
-  constructor (config, logger, p2p) {
+  constructor (config, logger, p2p, shardus) {
     this.config = config
     this.mainLogger = logger.getLogger('main')
     this.p2p = p2p
+    this.shardus = shardus
 
     this.reportTimer = null
     this._txInjected = 0
@@ -86,14 +87,15 @@ class Reporter {
   startReporting () {
     // Creates and sends a report every `interval` seconds
     this.reportTimer = setInterval(async () => {
-      const appState = this.p2p.getAppState()
+      const appState = await this.shardus.getAccountsStateHash()
       const cycleMarker = this.p2p.getCycleMarker()
       const nodelistHash = this.p2p.getNodelistHash()
-      const tpsInjected = this._calculateAverageTps(this._txInjected)
-      const tpsApplied = this._calculateAverageTps(this._txApplied)
+      const txInjected = this._txInjected
+      const txApplied = this._txApplied
+      const reportInterval = this.config.interval
 
       try {
-        await this._sendReport({ appState, cycleMarker, nodelistHash, tpsInjected, tpsApplied })
+        await this._sendReport({ appState, cycleMarker, nodelistHash, txInjected, txApplied, reportInterval })
       } catch (e) {
         this.mainLogger.error(e)
         console.error(e)

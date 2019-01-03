@@ -413,7 +413,7 @@ class Shardus {
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network, this.accountUtility)
     await this.p2p.init()
 
-    this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p) : null
+    this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this) : null
     this.consensus = new Consensus(this.accountUtility, this.config, this.logger, this.crypto, this.p2p, this.storage, null, this.app, this.reporter)
 
     this._registerRoutes()
@@ -439,6 +439,12 @@ class Shardus {
     }
   }
 
+  async getAccountsStateHash (accountStart = '0'.repeat(64), accountEnd = 'f'.repeat(64), tsStart = 0, tsEnd = Date.now()) {
+    const accountStates = await this.storage.queryAccountStateTable(accountStart, accountEnd, tsStart, tsEnd, 100000000)
+    const stateHash = this.crypto.hash(accountStates)
+    return stateHash
+  }
+
   // ---------------------App sync code-----------------------
   _registerSyncEndpoints () {
     //    /get_account_state_hash (Acc_start, Acc_end, Ts_start, Ts_end)
@@ -452,8 +458,7 @@ class Shardus {
       let result = {}
 
       // yikes need to potentially hash only N records at a time and return an array of hashes
-      let accountStates = await this.storage.queryAccountStateTable(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, 100000000)
-      let stateHash = this.crypto.hash(accountStates)
+      let stateHash = await this.getAccountsStateHash(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd)
       result.stateHash = stateHash
       await respond(result)
     })

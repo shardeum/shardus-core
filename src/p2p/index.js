@@ -151,11 +151,6 @@ class P2P {
     return this.id
   }
 
-  // TODO: implement getting hash of app state
-  getAppState () {
-    return null
-  }
-
   getCycleMarker () {
     return this.state.getCurrentCycleMarker()
   }
