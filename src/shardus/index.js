@@ -421,6 +421,7 @@ class Shardus {
     let started
     try {
       started = await this.p2p.startup()
+      this.consensus.consensusActive = true
     } catch (e) {
       console.log(e.message + ' at ' + e.stack)
       this.mainLogger.debug(e.message + ' at ' + e.stack)

@@ -15,14 +15,22 @@ class Consensus {
     this.reporter = reporter
 
     this.pendingTransactions = {}
+
+    this.consensusActive = false
     // Register Gossip Handlers with P2P
     this.p2p.registerGossipHandler('receipt', async (data) => {
+      if (!this.consensusActive) {
+        return
+      }
       if (await this.onReceipt(data)) {
         this.p2p.sendGossip('receipt', data, this.p2p.state.getAllNodes(this.p2p.id))
       }
     })
 
     this.p2p.registerGossipHandler('transaction', async (data) => {
+      if (!this.consensusActive) {
+        return
+      }
       await this.onTransaction(data)
       this.p2p.sendGossip('transaction', data, this.p2p.state.getAllNodes(this.p2p.id))
     })
