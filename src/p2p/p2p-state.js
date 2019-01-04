@@ -295,15 +295,16 @@ class P2PState {
     this.mainLogger.debug(`Last cycle duration: ${lastCycleDuration}`)
     this.mainLogger.debug(`Current time: ${currentTime}`)
     const quarterCycle = Math.ceil(this.getCurrentCycleDuration() * 1000 / 4)
-    this._startUpdatePhase(quarterCycle)
+    this._startUpdatePhase(this.currentCycle.start * 1000, quarterCycle)
   }
 
-  _startUpdatePhase (phaseLen) {
+  _startUpdatePhase (startTime, phaseLen) {
     this.mainLogger.debug('Starting update phase...')
     this.acceptChainUpdates = true
-    setTimeout(() => {
-      this._endUpdatePhase(phaseLen)
-    }, phaseLen)
+    const endTime = startTime + phaseLen
+    utils.setAlarm(() => {
+      this._endUpdatePhase(endTime, phaseLen)
+    }, endTime)
   }
 
   _getBestJoinRequests () {
@@ -366,34 +367,37 @@ class P2PState {
     return bestNodes
   }
 
-  _endUpdatePhase (phaseLen) {
+  _endUpdatePhase (startTime, phaseLen) {
     this.mainLogger.debug('Ending update phase...')
     this.acceptChainUpdates = false
     const bestNodes = this._getBestNodes()
     this._addJoiningNodes(bestNodes)
     // TODO: implement clearing out the unaccepted nodes from byIp when clearing pending requests
-    setTimeout(() => {
-      this._startCycleSync(phaseLen)
-    }, phaseLen)
+    const endTime = startTime + phaseLen
+    utils.setAlarm(() => {
+      this._startCycleSync(endTime, phaseLen)
+    }, endTime)
   }
 
-  async _startCycleSync (phaseLen) {
+  async _startCycleSync (startTime, phaseLen) {
     this.mainLogger.debug('Starting cycle sync phase...')
     await this._createCycleMarker()
-    setTimeout(() => {
-      this._finalizeCycle(phaseLen)
-    }, phaseLen)
+    const endTime = startTime + phaseLen
+    utils.setAlarm(() => {
+      this._finalizeCycle(endTime, phaseLen)
+    }, endTime)
   }
 
-  async _finalizeCycle (phaseLen) {
+  async _finalizeCycle (startTime, phaseLen) {
     this.mainLogger.debug('Starting cycle finalization phase...')
     this.unfinalizedReady = true
-    setTimeout(async () => {
+    const endTime = startTime + phaseLen
+    utils.setAlarm(async () => {
       await this._createCycle()
       this.unfinalizedReady = false
       if (this.shouldStop) return
       this._startNewCycle()
-    }, phaseLen)
+    }, endTime)
   }
 
   async _createCycleMarker () {

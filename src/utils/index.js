@@ -74,6 +74,16 @@ const XOR = (hexString1, hexString2) => {
   return (num1 ^ num2) >>> 0
 }
 
+const setAlarm = (callback, timestamp) => {
+  const now = Date.now()
+  if (timestamp <= now) {
+    callback()
+    return
+  }
+  const toWait = timestamp - now
+  setTimeout(callback, toWait)
+}
+
 exports.sleep = sleep
 exports.getTime = getTime
 exports.deepCopy = deepCopy
@@ -81,3 +91,4 @@ exports.readJson = readJson
 exports.readJsonDir = readJsonDir
 exports.insertSorted = insertSorted
 exports.XOR = XOR
+exports.setAlarm = setAlarm
