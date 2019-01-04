@@ -23,6 +23,7 @@ class Consensus {
         return
       }
       if (await this.onReceipt(data)) {
+        console.log('onReceipt: ' + data.shardusTransaction.inTransaction.txnTimestmp) // todo remove
         this.p2p.sendGossip('receipt', data, this.p2p.state.getAllNodes(this.p2p.id))
       }
     })

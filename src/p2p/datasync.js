@@ -6,6 +6,8 @@ const utils = require('../utils')
 // should we wipe our local DB before sync?
 // todo m12: need error handling on all the p2p requests.
 
+const allZeroes64 = '0'.repeat(64)
+
 class DataSync {
   constructor (config, logger, storage, p2p, crypto, accountUtility) {
     this.mainLogger = logger.getLogger('main')
@@ -15,12 +17,13 @@ class DataSync {
     this.accountUtility = accountUtility
 
     this.completedPartitions = []
-    this.syncSettleTime = 3 * 10 // an estimate of max transaction settle time. todo make it a config or function of consensus later
+    this.syncSettleTime = 5000 // 3 * 10 // an estimate of max transaction settle time. todo make it a config or function of consensus later
     this.mainStartingTs = Date.now()
 
     this.clearPartitionData()
 
     this.acceptedTXQueue = []
+    this.acceptedTXByHash = {}
     this.registerEndpoints()
 
     this.isSyncingAcceptedTxs = true // default is true so we will start adding to our tx queue asap
@@ -103,7 +106,7 @@ class DataSync {
     // one we have all of the initial data the last thing to do is get caught up on transactions
     await this.applyAcceptedTx()
 
-    console.log('syncStateData end')
+    console.log('syncStateData end' + '   time:' + Date.now())
     // TODO after enterprise: once we are on the network we still need to patch our state data so that it is a perfect match of other nodes for our supported address range
     //  Only need to requery the range that overlaps when we joined and when we started receiving our own state updates on the network.
     //  The trick is this query will get some duplicate data, but maybe the way the keys are in the db are setup we can just attemp to save what we get.  will need testing
@@ -112,9 +115,19 @@ class DataSync {
     //  update.. not going to worry about this until after enterprise.  possibly ok to do this right before apply acceptedTX() !!
 
     // all complete!
-
-    this.isSyncingAcceptedTxs = false
   }
+
+  async finalTXCatchup (diableQueue) {
+    console.log('finalTXCatchup ' + '   time:' + Date.now())
+
+    // await utils.sleep(2000) // can add a sleep in to excercise this functionality
+
+    await this.applyAcceptedTx()
+    if (diableQueue){
+      this.isSyncingAcceptedTxs = false
+    }
+  }
+
 
   async syncStateDataForPartition (partition) {
     try {
@@ -248,6 +261,7 @@ class DataSync {
   async syncStateTableData (lowAddress, highAddress, startTime, endTime) {
     let searchingForGoodData = true
 
+    console.log(`syncStateTableData startTime: ${startTime} endTime: ${endTime}` + '   time:' + Date.now())
     this.mainLogger.debug(`DATASYNC: syncStateTableData startTime: ${startTime} endTime: ${endTime} low: ${lowAddress} high: ${highAddress} `)
     // todo m11: this loop will try three more random nodes, this is slightly different than described how to handle failure in the doc. this should be corrected but will take more code
     // should prossible break this into a state machine in  its own class.
@@ -262,9 +276,9 @@ class DataSync {
       let currentTs = Date.now()
 
       let safeTime = currentTs - this.syncSettleTime
-      if (endTime <= safeTime) {
+      if (endTime >= safeTime) {
         // need to idle for bit
-        await utils.sleep(safeTime - endTime)
+        await utils.sleep(endTime - safeTime)
       }
       this.lastStateSyncEndtime = endTime
 
@@ -386,6 +400,7 @@ class DataSync {
   async syncAccountData (lowAddress, highAddress) {
     // Sync the Account data
     //   Use the /get_account_data API to get the data from the Account Table using any of the nodes that had a matching hash
+    console.log(`syncAccountData` + '   time:' + Date.now())
 
     let queryLow = lowAddress
     let queryHigh = highAddress
@@ -465,12 +480,34 @@ class DataSync {
       this.mapAccountData[account.accountId] = account
     }
 
+    let missingButOkAccounts = 0
+    let missingTXs = 0
+    let handledButOk = 0
+    let missingButOkAccountIDs = {}
     // For each account in the Account data make sure the entry in the Account State Table has the same State_after value; if not remove the record from the Account data
     for (let stateData of this.inMemoryStateTableData) {
       account = this.mapAccountData[stateData.accountId]
       // does the state data table have a node and we don't have data for it?
       if (account == null) {
-        this.missingAccountData.push(stateData.accountId)
+        // make sure we have a transaction that matches this in our queue
+        // the state table data we are working with is sufficiently old, so that we should have seen a transaction in our queue by the time we could get here
+        let txRef = this.acceptedTXByHash[stateData.txId]
+        if (txRef == null) {
+          missingTXs++
+          this.missingAccountData.push(stateData.accountId)
+        } else if (stateData.stateBefore === allZeroes64) {
+          // this means we are at the start of a valid state table chain that starts with creating an account
+          missingButOkAccountIDs[stateData.accountId] = true
+          missingButOkAccounts++
+        } else if (missingButOkAccountIDs[stateData.accountId] === true) {
+          // no action. we dont have account, but we know a different transaction will create it.
+          handledButOk++
+        } else {
+          // unhandled case. not expected.  this would happen if the state table chain does not start with this account being created
+          // this could be caused by a node trying to withold account data when syncing
+          this.missingAccountData.push(stateData.accountId)
+        }
+        // should we check timestamp for the state table data?
       }
 
       if (!account.syncData) {
@@ -487,8 +524,13 @@ class DataSync {
       }
     }
 
+    if (missingButOkAccounts > 0) {
+      // it is valid / normal flow to get to this point:
+      this.mainLogger.debug(`DATASYNC: processAccountData accouts missing from accountData, but are ok, because we have transactions for them: ${missingButOkAccounts}, ${handledButOk}`)
+    }
     if (this.missingAccountData.length > 0) {
-      this.mainLogger.debug(`DATASYNC: processAccountData hashes missing from data, but in the state table: ${this.missingAccountData.length}`)
+      // getting this indicates a non-typical problem that needs correcting
+      this.mainLogger.debug(`DATASYNC: processAccountData accounts missing from accountData, but in the state table.  This is an unexpected error and we will need to handle them as failed accounts: ${this.missingAccountData.length}, ${missingTXs}`)
     }
 
     //   For each account in the Account State Table make sure the entry in Account data has the same State_after value; if not save the account id to be looked up later
@@ -575,7 +617,7 @@ class DataSync {
 
     this.mainLogger.debug(`DATASYNC: applyAcceptedTx for up to ${this.acceptedTXQueue.length} transactions`)
 
-    console.log(`applyAcceptedTx   queue: ${this.acceptedTXQueue.length}`)
+    console.log(`applyAcceptedTx   queue: ${this.acceptedTXQueue.length}` + '   time:' + Date.now())
     while (this.acceptedTXQueue.length > 0) {
       // apply the tx
       let nextTX = this.acceptedTXQueue.shift()
@@ -632,19 +674,27 @@ class DataSync {
       // docs mention putting this in a table but it seems so far that an in memory queue should be ok
       // should we filter, or instead rely on gossip in to only give us TXs that matter to us?
 
-      console.log('got accepted tx: ' + acceptedTX.timestamp)
+      if (!this.isSyncingAcceptedTxs) {
+        console.log('got accepted tx after sync complete: ' + acceptedTX.timestamp + '   time:' + Date.now())
+        return
+      }
+
+      console.log('got accepted tx: ' + acceptedTX.timestamp + '   time:' + Date.now())
       // Lets insert this tx into a sorted list where index 0 == oldest and length-1 == newest
       if (this.isSyncingAcceptedTxs) {
+        let txId = this.crypto.hash(acceptedTX)
+        this.acceptedTXByHash[txId] = acceptedTX
+
         if (this.acceptedTXQueue.length === 0) {
           this.acceptedTXQueue.push(acceptedTX)
         } else {
           let index = this.acceptedTXQueue.length - 1
           let lastTx = this.acceptedTXQueue[index]
-          while (acceptedTX.timestamp < lastTx.timestamp && index > 0) {
+          while (acceptedTX.timestamp < lastTx.timestamp && index >= 0) {
             index--
             lastTx = this.acceptedTXQueue[index]
           }
-          this.acceptedTXQueue.splice(index, 0, acceptedTX)
+          this.acceptedTXQueue.splice(index+1, 0, acceptedTX)
         }
       }
     })

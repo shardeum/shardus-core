@@ -7,6 +7,7 @@ const Network = require('../network')
 const utils = require('../utils')
 const Consensus = require('../consensus')
 const Reporter = require('../reporter')
+const allZeroes64 = '0'.repeat(64)
 
 class Shardus {
   constructor ({ server: config, logs: logsConfig, storage: storageConfig }) {
@@ -225,6 +226,9 @@ class Shardus {
   // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
   async tryApplyTransaction (acceptedTX) {
     let tx = acceptedTX.data
+
+    // was trying too hard to validate everything.  what we actually need to do is rely on consensus for accepted TXs
+
     // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
     let keysResponse = this.app.getKeyFromTransaction(tx)
     let { sourceKeys, targetKeys } = keysResponse
@@ -232,26 +236,66 @@ class Shardus {
 
     let timestamp = tx.txnTimestmp // TODO m11: need to push this to application method thta cracks the transaction
 
+    console.log('tryApplyTransaction ' + timestamp)
+
+    let hasStateTableData = false
     if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
       sourceAddress = sourceKeys[0]
       sourceState = await this.app.getStateId(sourceAddress)
 
-      let accountStates = await this.storage.queryAccountStateTable(sourceState, sourceState, timestamp, timestamp, 1)
-      if (accountStates.length === 0 || accountStates[0].stateBefore !== sourceState) {
-        return
+      // let accountStates = await this.storage.queryAccountStateTable(sourceState, sourceState, timestamp, timestamp, 1)
+      let accountStates = await this.storage.searchAccountStateTable(sourceAddress, timestamp)
+
+      if (accountStates.length !== 0) {
+        hasStateTableData = true
+        if (accountStates.length === 0) {
+          console.log('tryApplyTransaction ' + timestamp + ' missing source account state 1')
+          return
+        }
+
+        if (accountStates.length === 0 || accountStates[0].stateBefore !== sourceState) {
+          console.log('tryApplyTransaction ' + timestamp + ' cant apply state 1')
+          return
+        }
       }
     }
     if (Array.isArray(targetKeys) && targetKeys.length > 0) {
       targetAddress = targetKeys[0]
-      targetState = await this.app.getStateId(targetAddress)
-      // todo post enterprise, only check this if it is in our address range
-      let accountStates = await this.storage.queryAccountStateTable(targetState, targetState, timestamp, timestamp, 1)
-      if (accountStates.length === 0 || accountStates[0].stateBefore !== targetState) {
-        return
+      // let accountStates = await this.storage.queryAccountStateTable(targetState, targetState, timestamp, timestamp, 1)
+      let accountStates = await this.storage.searchAccountStateTable(targetAddress, timestamp)
+
+      if (accountStates.length !== 0) {
+        hasStateTableData = true
+        if (accountStates.length === 0) {
+          console.log('tryApplyTransaction ' + timestamp + ' missing target account state 2')
+          return
+        }
+        if (accountStates.length !== 0 && accountStates[0].stateBefore !== allZeroes64) {
+          targetState = await this.app.getStateId(targetAddress, false)
+          if (targetState == null) {
+            console.log('tryApplyTransaction ' + timestamp + ' target state does not exist, thats ok')
+          } else if (accountStates[0].stateBefore !== targetState) {
+            console.log('tryApplyTransaction ' + timestamp + ' cant apply state 2')
+            return
+          }
+        }
       }
+      // todo post enterprise, only check this if it is in our address range
     }
 
-    this.app.apply(tx)
+    console.log('tryApplyTransaction ' + timestamp + ' Applying!')
+    let { stateTableResults } = await this.app.apply(tx)
+    // only write our state table data if we dont already have it in the db
+    if (hasStateTableData === false) {
+      await this.storage.addAccountStates(stateTableResults)
+      for (let stateT of stateTableResults) {
+        console.log('writeStateTable ' + stateT.accountId)
+      }      
+    }
+
+
+    // post validate that state ended up correctly?
+
     // write the accepted TX to storage
     this.storage.addAcceptedTransactions([acceptedTX])
   }
@@ -298,7 +342,7 @@ class Shardus {
       }
 
       if (typeof (application.getStateId) === 'function') {
-        applicationInterfaceImpl.getStateId = async (accountAddress) => application.getStateId(accountAddress)
+        applicationInterfaceImpl.getStateId = async (accountAddress, mustExist) => application.getStateId(accountAddress, mustExist)
       } else {
         throw new Error('Missing requried interface function. getStateId()')
       }
@@ -422,6 +466,8 @@ class Shardus {
     try {
       started = await this.p2p.startup()
       this.consensus.consensusActive = true
+      await utils.sleep(1000)
+      await this.p2p.dataSync.finalTXCatchup(true)
     } catch (e) {
       console.log(e.message + ' at ' + e.stack)
       this.mainLogger.debug(e.message + ' at ' + e.stack)
@@ -527,8 +573,12 @@ class Shardus {
     return replyObject
   }
 
-  applyResponseAddState (resultObject, accountId, txId, txTimestamp, stateBefore, stateAfter) {
-    resultObject.stateTableResults.push({ accountId, txId, txTimestamp, stateBefore, stateAfter })
+  applyResponseAddState (resultObject, accountId, txId, txTimestamp, stateBefore, stateAfter, accountCreated) {
+    let state = { accountId, txId, txTimestamp, stateBefore, stateAfter }
+    if (accountCreated) {
+      state.stateBefore = allZeroes64
+    }
+    resultObject.stateTableResults.push(state)
   }
 }
 

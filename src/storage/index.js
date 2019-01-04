@@ -237,7 +237,24 @@ class Storage {
         { accountId: { [Op.between]: [accountStart, accountEnd] }, txTimestamp: { [Op.between]: [tsStart, tsEnd] } },
         {
           limit: limit,
-          order: [ ['txTimestamp', 'ASC'] ],
+          order: [ ['txTimestamp', 'ASC'], ['accountId', 'ASC'] ],
+          attributes: { exclude: ['createdAt', 'updatedAt', 'id'] },
+          raw: true
+        }
+      )
+      return result
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
+  async searchAccountStateTable (accountId, txTimestamp) {
+    this._checkInit()
+    try {
+      let result = await this._read(
+        this.models.accountStates,
+        { accountId, txTimestamp },
+        {
           attributes: { exclude: ['createdAt', 'updatedAt', 'id'] },
           raw: true
         }

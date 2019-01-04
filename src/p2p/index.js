@@ -1072,6 +1072,9 @@ class P2P {
 
     // This is also for testing purposes
     console.log('Server ready!')
+
+    await this.dataSync.finalTXCatchup(false)
+
     return true
   }
 
