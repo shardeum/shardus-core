@@ -290,9 +290,8 @@ class Shardus {
       await this.storage.addAccountStates(stateTableResults)
       for (let stateT of stateTableResults) {
         console.log('writeStateTable ' + stateT.accountId)
-      }      
+      }
     }
-
 
     // post validate that state ended up correctly?
 
@@ -466,8 +465,10 @@ class Shardus {
     try {
       started = await this.p2p.startup()
       this.consensus.consensusActive = true
-      await utils.sleep(1000)
-      await this.p2p.dataSync.finalTXCatchup(true)
+      if (this.p2p.dataSync != null) {
+        await utils.sleep(1000)
+        await this.p2p.dataSync.finalTXCatchup(true)
+      }
     } catch (e) {
       console.log(e.message + ' at ' + e.stack)
       this.mainLogger.debug(e.message + ' at ' + e.stack)
