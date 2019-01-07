@@ -106,6 +106,7 @@ class Reporter {
   }
 
   stopReporting () {
+    this.mainLogger.info('Stopping statistics reporting...')
     clearInterval(this.reportTimer)
   }
 }
