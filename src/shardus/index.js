@@ -152,6 +152,7 @@ class Shardus {
     // retrieve incoming transaction from HTTP request
     let inTransaction = req.body
     let shardusTransaction = {}
+    let ourLock = -1
     try {
       if (typeof inTransaction !== 'object') {
         return { success: false, reason: `Invalid Transaction! ${inTransaction}` }
@@ -178,6 +179,10 @@ class Shardus {
       shardusTransaction.receivedTimestamp = Date.now()
       shardusTransaction.inTransaction = inTransaction
 
+      let txId = this.crypto.hash(inTransaction)
+      // QUEUE delay system...
+      ourLock = await this.consensus.queueAndDelay(txnTimestamp, txId)
+
       this.mainLogger.debug(`ShardusTransaction: ${shardusTransaction}`)
 
       // Validate transaction through the application. Shardus can see inside the transaction
@@ -198,12 +203,22 @@ class Shardus {
     } catch (ex) {
       this.fatalLogger.fatal(`Failed to process transaction. Exception: ${ex}`)
       return { success: false, reason: `Failed to process trasnaction: ${JSON.parse(inTransaction)} ${ex}` }
+    } finally {
+      this.consensus.unlockQueue(ourLock)
     }
     this.mainLogger.debug(`End of injectTransaction ${inTransaction}`)
     return { success: true, reason: 'Transaction successfully processed' }
   }
 
   async acceptTransaction (tx, receipt, gossipTx = false) {
+    let { success, hasStateTableData } = await this.testAccountStateTable(tx)
+    let timestamp = tx.txnTimestmp
+    if (!success) {
+      let errorMsg = 'acceptTransaction ' + timestamp + ' failed. has state table data: ' + hasStateTableData
+      console.log(errorMsg)
+      throw new Error(errorMsg)
+    }
+
     // app applies data
     let { stateTableResults, txId, txTimestamp } = await this.app.apply(tx)
     // TODO post enterprise:  the stateTableResults may need to be a map with keys so we can choose which one to actually insert in our accountStateTable
@@ -223,20 +238,12 @@ class Shardus {
     }
   }
 
-  // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
-  async tryApplyTransaction (acceptedTX) {
-    let tx = acceptedTX.data
-
-    // was trying too hard to validate everything.  what we actually need to do is rely on consensus for accepted TXs
-
-    // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
+  async testAccountStateTable (tx) {
     let keysResponse = this.app.getKeyFromTransaction(tx)
     let { sourceKeys, targetKeys } = keysResponse
     let sourceAddress, targetAddress, sourceState, targetState
 
-    let timestamp = tx.txnTimestmp // TODO m11: need to push this to application method thta cracks the transaction
-
-    console.log('tryApplyTransaction ' + timestamp)
+    let timestamp = tx.txnTimestmp
 
     let hasStateTableData = false
     if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
@@ -249,13 +256,15 @@ class Shardus {
       if (accountStates.length !== 0) {
         hasStateTableData = true
         if (accountStates.length === 0) {
-          console.log('tryApplyTransaction ' + timestamp + ' missing source account state 1')
-          return
+          console.log('testAccountStateTable ' + timestamp + ' missing source account state 1')
+          this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' missing source account state 1')
+          return { success: false, hasStateTableData }
         }
 
         if (accountStates.length === 0 || accountStates[0].stateBefore !== sourceState) {
-          console.log('tryApplyTransaction ' + timestamp + ' cant apply state 1')
-          return
+          console.log('testAccountStateTable ' + timestamp + ' cant apply state 1')
+          this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' cant apply state 1')
+          return { success: false, hasStateTableData }
         }
       }
     }
@@ -267,29 +276,74 @@ class Shardus {
       if (accountStates.length !== 0) {
         hasStateTableData = true
         if (accountStates.length === 0) {
-          console.log('tryApplyTransaction ' + timestamp + ' missing target account state 2')
-          return
+          console.log('testAccountStateTable ' + timestamp + ' missing target account state 2')
+          this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' missing target account state 2')
+          return { success: false, hasStateTableData }
         }
         if (accountStates.length !== 0 && accountStates[0].stateBefore !== allZeroes64) {
           targetState = await this.app.getStateId(targetAddress, false)
           if (targetState == null) {
-            console.log('tryApplyTransaction ' + timestamp + ' target state does not exist, thats ok')
+            console.log('testAccountStateTable ' + timestamp + ' target state does not exist, thats ok')
+            this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' target state does not exist, thats ok')
           } else if (accountStates[0].stateBefore !== targetState) {
-            console.log('tryApplyTransaction ' + timestamp + ' cant apply state 2')
-            return
+            console.log('testAccountStateTable ' + timestamp + ' cant apply state 2')
+            this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' cant apply state 2')
+            return { success: false, hasStateTableData }
           }
         }
       }
       // todo post enterprise, only check this if it is in our address range
     }
 
+    return { success: true, hasStateTableData }
+  }
+
+  // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
+  async tryApplyTransaction (acceptedTX) {
+    let tx = acceptedTX.data
+    let receipt = acceptedTX.receipt
+    let timestamp = tx.txnTimestmp // TODO m11: need to push this to application method thta cracks the transaction
+    console.log('tryApplyTransaction ' + timestamp)
+    this.mainLogger.debug('DATASYNC: tryApplyTransaction ' + timestamp)
+
+    let { success, hasStateTableData } = await this.testAccountStateTable(tx)
+
+    if (!success) {
+      return // we failed
+    }
+
+    // test reciept state ids. some redundant queries that could be optimized!
+    let keysResponse = this.app.getKeyFromTransaction(tx)
+    let { sourceKeys, targetKeys } = keysResponse
+    let sourceAddress, targetAddress, sourceState, targetState
+    if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
+      sourceAddress = sourceKeys[0]
+      sourceState = await this.app.getStateId(sourceAddress)
+      if (sourceState !== receipt.stateId) {
+        console.log('tryApplyTransaction source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + sourceState + ' reciept: ' + receipt.stateId)
+        this.mainLogger.debug('DATASYNC: tryApplyTransaction source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + sourceState + ' reciept: ' + receipt.stateId)
+        return
+      }
+    }
+    if (Array.isArray(targetKeys) && targetKeys.length > 0) {
+      targetAddress = targetKeys[0]
+      targetState = await this.app.getStateId(targetAddress, false)
+      if (targetState !== receipt.targetStateId) {
+        console.log('tryApplyTransaction target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetState + ' reciept: ' + receipt.targetStateId)
+        this.mainLogger.debug('DATASYNC: tryApplyTransaction target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetState + ' reciept: ' + receipt.targetStateId)
+        return
+      }
+    }
+
     console.log('tryApplyTransaction ' + timestamp + ' Applying!')
+    this.mainLogger.debug('DATASYNC: tryApplyTransaction ' + timestamp + ' Applying!')
     let { stateTableResults } = await this.app.apply(tx)
     // only write our state table data if we dont already have it in the db
     if (hasStateTableData === false) {
       await this.storage.addAccountStates(stateTableResults)
       for (let stateT of stateTableResults) {
         console.log('writeStateTable ' + stateT.accountId)
+        this.mainLogger.debug('DATASYNC: writeStateTable ' + stateT.accountId)
       }
     }
 
@@ -466,8 +520,10 @@ class Shardus {
       started = await this.p2p.startup()
       this.consensus.consensusActive = true
       if (this.p2p.dataSync != null) {
-        await utils.sleep(1000)
+        // await this.p2p.dataSync.finalTXCatchup(false)
+        await utils.sleep(3000)
         await this.p2p.dataSync.finalTXCatchup(true)
+        // should we keep trying to catch up untill it returns false? ... i think so since we will reject and lose TXs for now.
       }
     } catch (e) {
       console.log(e.message + ' at ' + e.stack)

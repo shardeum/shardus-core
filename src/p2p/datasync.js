@@ -20,6 +20,8 @@ class DataSync {
     this.syncSettleTime = 5000 // 3 * 10 // an estimate of max transaction settle time. todo make it a config or function of consensus later
     this.mainStartingTs = Date.now()
 
+    this.queueSitTime = 3000 // todo make this a setting. and tie in with the value in consensus
+
     this.clearPartitionData()
 
     this.acceptedTXQueue = []
@@ -123,11 +125,10 @@ class DataSync {
     // await utils.sleep(2000) // can add a sleep in to excercise this functionality
 
     await this.applyAcceptedTx()
-    if (diableQueue){
+    if (diableQueue) {
       this.isSyncingAcceptedTxs = false
     }
   }
-
 
   async syncStateDataForPartition (partition) {
     try {
@@ -619,6 +620,14 @@ class DataSync {
 
     console.log(`applyAcceptedTx   queue: ${this.acceptedTXQueue.length}` + '   time:' + Date.now())
     while (this.acceptedTXQueue.length > 0) {
+      let currentTime = Date.now()
+      let txAge = currentTime - this.acceptedTXQueue[0].timestamp
+      if (txAge < this.queueSitTime) {
+        console.log(`applyAcceptedTx tx too young, exiting.  remaining queue: ${this.acceptedTXQueue.length}` + '   time:' + Date.now())
+        this.mainLogger.debug(`DATASYNC: applyAcceptedTx tx too young, exiting.  remaining queue: ${this.acceptedTXQueue.length}` + '   time:' + Date.now())
+        return this.acceptedTXQueue.length
+      }
+
       // apply the tx
       let nextTX = this.acceptedTXQueue.shift()
 
@@ -633,8 +642,8 @@ class DataSync {
         await utils.sleep(1)
       }
     }
-
     this.mainLogger.debug(`DATASYNC: applyAcceptedTx finished`)
+    return this.acceptedTXQueue.length
   }
 
   // we get any transactions we need through the acceptedTx gossip
@@ -682,19 +691,19 @@ class DataSync {
       console.log('got accepted tx: ' + acceptedTX.timestamp + '   time:' + Date.now())
       // Lets insert this tx into a sorted list where index 0 == oldest and length-1 == newest
       if (this.isSyncingAcceptedTxs) {
-        let txId = this.crypto.hash(acceptedTX)
-        this.acceptedTXByHash[txId] = acceptedTX
-
+        let txId = acceptedTX.id
+        this.acceptedTXByHash[txId] = acceptedTX // we already have .id.. do we really need to hash this also?
+        let timestamp = acceptedTX.timestamp
         if (this.acceptedTXQueue.length === 0) {
           this.acceptedTXQueue.push(acceptedTX)
         } else {
           let index = this.acceptedTXQueue.length - 1
           let lastTx = this.acceptedTXQueue[index]
-          while (acceptedTX.timestamp < lastTx.timestamp && index >= 0) {
+          while (index >= 0 && ((timestamp < lastTx.timestamp) || (timestamp === lastTx.timestamp && txId < lastTx.id))) {
             index--
             lastTx = this.acceptedTXQueue[index]
           }
-          this.acceptedTXQueue.splice(index+1, 0, acceptedTX)
+          this.acceptedTXQueue.splice(index + 1, 0, acceptedTX)
         }
       }
     })
