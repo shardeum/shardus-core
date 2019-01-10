@@ -70,7 +70,7 @@ function setupRoutes () {
       await respond({ cycleChainHash: null, error: 'start and end required' })
       return
     }
-    const cycleChainHash = this.getCycleChainHash(payload.start, payload.end)
+    const cycleChainHash = this.getCycleChainHash(payload.start, payload.end, true)
     this.mainLogger.debug(`Cycle chain hash to be sent: ${JSON.stringify(cycleChainHash)}`)
     if (!cycleChainHash) {
       await respond({ cycleChainHash, error: 'invalid indexes for cycle chain hash' })
@@ -90,7 +90,7 @@ function setupRoutes () {
       await respond({ cycleChain: null, error: 'start and end required' })
       return
     }
-    const cycleChain = this.getCycleChain(payload.start, payload.end)
+    const cycleChain = this.getCycleChain(payload.start, payload.end, true)
     if (!cycleChain) {
       await respond({ cycleChain, error: 'invalid indexes for cycle chain' })
       return

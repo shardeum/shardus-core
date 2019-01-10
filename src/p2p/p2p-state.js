@@ -247,12 +247,17 @@ class P2PState {
     }
 
     this.mainLogger.debug(`Type of status update: ${type}`)
+<<<<<<< HEAD
 
     // Finally add the update after all validation has passed
     this.currentCycle.updates[status].push(update)
     utils.insertSorted(this.currentCycle.data[type], nodeId)
     // Mark node as seen for this cycle
     this._markNodeAsSeen(nodeId)
+=======
+    // TODO: Insert sorted
+    this.currentCycle[type].push(nodeId)
+>>>>>>> Remove cycle cert from cycle hash, add comment describing process of app specific join request validation
     this.mainLogger.debug(`Node ${nodeId} added to ${type} list for this cycle.`)
     return true
   }
@@ -478,6 +483,12 @@ class P2PState {
       const lastIndex = bestRequests.length - 1
       const lowest = bestRequests[lastIndex]
 
+      // TODO: call into application
+      // ----- application should decide the ranking order of the join requests
+      // ----- if hook doesn't exist, then we go with default order based on selection number
+      // ----- hook signature = (currentList, newJoinRequest, numDesired) returns [newOrder, added]
+      // ----- should create preconfigured hooks for adding POW, allowing join based on netadmin sig, etc.
+
       // Check if we are better than the lowest best
       if (!this._isBetterThanLowestBest(joinRequest, lowest)) {
         this.mainLogger.debug(`${joinRequest.selectionNum} is not better than ${lowest.selectionNum}. Node ${joinRequest.nodeInfo.publicKey} not added to this cycle.`)
@@ -644,7 +655,14 @@ class P2PState {
     return cert
   }
 
+<<<<<<< HEAD
   addCertificate (certificate, fromNetwork = false) {
+=======
+  // TODO: make sure cycle marker is what we think it should be
+  // ----- whenever it is different, we shouldn't go with it naively
+  // ----- whenever it is different, we should get cycle data from the node that reported it as different
+  addCertificate (certificate) {
+>>>>>>> Remove cycle cert from cycle hash, add comment describing process of app specific join request validation
     const addCert = (cert, dist) => {
       this.currentCycle.data.certificate = cert
       this.currentCycle.metadata.bestCertDist = dist

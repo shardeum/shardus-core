@@ -192,11 +192,17 @@ class P2P {
     return cycles
   }
 
-  getCycleChain (start, end) {
+  getCycleChain (start, end, excludeCerts = false) {
     this.mainLogger.debug(`Requested cycle chain from cycle ${start} to ${end}...`)
     let cycles
     try {
       cycles = this.state.getCycles(start, end)
+      if (excludeCerts) {
+        cycles = utils.deepCopy(cycles)
+        for (const cycle of cycles) {
+          delete cycle.certificate
+        }
+      }
     } catch (e) {
       this.mainLogger.debug(e)
       cycles = null
@@ -205,11 +211,11 @@ class P2P {
     return cycles
   }
 
-  getCycleChainHash (start, end) {
+  getCycleChainHash (start, end, excludeCerts = false) {
     this.mainLogger.debug(`Requested hash of cycle chain from cycle ${start} to ${end}...`)
     let cycleChain
     try {
-      cycleChain = this.getCycleChain(start, end)
+      cycleChain = this.getCycleChain(start, end, excludeCerts)
     } catch (e) {
       return null
     }
