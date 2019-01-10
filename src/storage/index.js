@@ -268,6 +268,15 @@ class Storage {
       throw new Error(e)
     }
   }
+  async clearAppRelatedState () {
+    this._checkInit()
+    try {
+      await this._delete(this.models.accountStates, null, { truncate: true })
+      await this._delete(this.models.acceptedTxs, null, { truncate: true })
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
 
   async addAcceptedTransactions (acceptedTransactions) {
     this._checkInit()

@@ -238,6 +238,10 @@ class Shardus {
     return { success: true, reason: 'Transaction successfully processed' }
   }
 
+  async resetAppRelatedState () {
+    await this.storage.clearAppRelatedState()
+  }
+
   async acceptTransaction (tx, receipt, gossipTx = false) {
     this.profiler.profileSectionStart('acceptTx-teststate')
     let { success, hasStateTableData } = await this.testAccountStateTable(tx)
