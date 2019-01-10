@@ -229,7 +229,7 @@ class Consensus {
   unlockQueue (id) {
     if (this.lockOwner === id) {
       this.queueLocked = false
-    } else {
+    } else if (id !== -1) {
       // this should never happen as long as we are careful to use try/finally blocks
       this.fatalLogger.fatal(`Failed to unlock the queue: ${id}`)
     }
