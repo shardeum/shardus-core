@@ -225,11 +225,7 @@ class P2PState {
       this.mainLogger.debug('Status update was not signed by the expected node.')
       return false
     }
-    // Check if we actually know about this node
-    if (!this.getNode(nodeId)) {
-      this.mainLogger.debug('Cannot update status of unknown node.')
-      return false
-    }
+
     this.mainLogger.debug(`Type of status update: ${type}`)
 
     // Finally add the update after all validation has passed
