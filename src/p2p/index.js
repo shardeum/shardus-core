@@ -457,6 +457,7 @@ class P2P {
   }
 
   _isActive () {
+    this.mainLogger.debug('Checking if active...')
     const active = this.state.getNodeStatus(this.id) === 'active'
     if (!active) {
       this.mainLogger.debug('This node is not currently active...')

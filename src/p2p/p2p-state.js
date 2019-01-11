@@ -145,7 +145,7 @@ class P2PState {
       return false
     }
     this.mainLogger.debug(`Type of status update: ${type}`)
-    this.currentCycle[type].push(nodeId)
+    utils.insertSorted(this.currentCycle[type], nodeId)
     this.mainLogger.debug(`Node ${nodeId} added to ${type} list for this cycle.`)
   }
 
