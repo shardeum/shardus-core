@@ -36,7 +36,8 @@ class P2PState {
     // Defines a clean cycle that we will for restoring the current cycle to a clean state
     this.cleanCycle = {
       metadata: {
-        bestCertDist: null
+        bestCertDist: null,
+        updateSeen: {}
       },
       updates: {
         bestJoinRequests: [],
@@ -121,6 +122,14 @@ class P2PState {
     }
   }
 
+  // Checks if a given timestamp is during the current cycle
+  isDuringThisCycle (timestamp) {
+    // const start = this.getCurrentCycleStart()
+    // const duration = this.getCurrentCycleDuration()
+    // TODO: make this actually evaluate if the timestamp is in the current cycle
+    return true
+  }
+
   computeNodeId (publicKey, cycleMarker) {
     const nodeId = this.crypto.hash({ publicKey, cycleMarker })
     this.mainLogger.debug(`Node ID is: ${nodeId}`)
@@ -133,20 +142,63 @@ class P2PState {
     return current[nodeId].status
   }
 
-  // addStatusUpdate (update) {
-  addStatusUpdate (nodeId, status) {
-    // const { nodeId, status, timestamp } = update
-
-    // Check if we actually know about this node
-    if (!this.getNode(nodeId)) {
-      this.mainLogger.debug('Cannot update status of unknown node.')
+  // Can check if a node ID or public key has been seen for an update already this cycle
+  _wasSeenThisCycle (key) {
+    if (!this.currentCycle.metadata.updateSeen[key]) {
       return false
     }
+    return true
+  }
+
+  // Marks a node as seen for an update this cycle
+  _markNodeAsSeen (key) {
+    this.currentCycle.metadata.updateSeen[key] = true
+  }
+
+  addStatusUpdate (update) {
+    const { nodeId, status, timestamp, sign } = update
+
+    // Validate that all required fields exist
+    if (!nodeId) {
+      this.mainLogger.debug('Node ID of node was not provided with status update.')
+      return false
+    }
+    if (!sign) {
+      this.mainLogger.debug('Status update was not signed.')
+      return false
+    }
+    if (!status) {
+      this.mainLogger.debug('No status given with update.')
+      return false
+    }
+    if (!timestamp) {
+      this.mainLogger.debug('No timestamp given with update.')
+      return false
+    }
+
+    // Check if node has already been seen for an update for this cycle
+    if (this._wasSeenThisCycle(nodeId)) {
+      this.mainLogger.debug(`Node ID ${nodeId} has already been seen this cycle.`)
+      return false
+    }
+    // Check if node status already matches update status
+    const currentStatus = this.getNodeStatus(nodeId)
+    if (currentStatus === status) {
+      this.mainLogger.debug(`Node status ${currentStatus} already matches requested status of ${status}. Unable to add status update.`)
+      return false
+    }
+    // Check if the timestamp is valid
+    if (!this.isDuringThisCycle(timestamp)) {
+      this.mainLogger.debug(`The timestamp ${timestamp} is not a time during the current cycle. Unable to add status update.`)
+      return false
+    }
+    // Check if the status update is of a valid type
     const invalidStatusMsg = `Invalid status: ${status}. Unable to add status update to queue.`
     if (!this.validStatuses.includes(status)) {
       this.mainLogger.debug(invalidStatusMsg)
       return false
     }
+    // Get status type
     let type
     try {
       type = this.statusUpdateType[status]
@@ -154,11 +206,39 @@ class P2PState {
       this.mainLogger.debug(invalidStatusMsg)
       return false
     }
+
+    // Try to get the public key associated with given node ID
+    let publicKey
+    try {
+      ;({ publicKey } = this.getNode(nodeId))
+    } catch (e) {
+      this.mainLogger.debug(e)
+      ;({ publicKey } = null)
+    }
+    if (!publicKey) {
+      this.mainLogger.debug('Unknown node ID in status update.')
+      return false
+    }
+    // Check if the status update was signed by the node
+    const isSignedByNode = this.crypto.verify(update, publicKey)
+    if (!isSignedByNode) {
+      this.mainLogger.debug('Status update was not signed by the expected node.')
+      return false
+    }
+    // Check if we actually know about this node
+    if (!this.getNode(nodeId)) {
+      this.mainLogger.debug('Cannot update status of unknown node.')
+      return false
+    }
     this.mainLogger.debug(`Type of status update: ${type}`)
-    // TODO: evaluate if we should insert sorted into these arrays
-    // this.currentCycle.updates[status].push(update)
+
+    // Finally add the update after all validation has passed
+    this.currentCycle.updates[status].push(update)
     utils.insertSorted(this.currentCycle.data[type], nodeId)
+    // Mark node as seen for this cycle
+    this._markNodeAsSeen(nodeId)
     this.mainLogger.debug(`Node ${nodeId} added to ${type} list for this cycle.`)
+    return true
   }
 
   async _setNodeStatus (nodeId, status) {

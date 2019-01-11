@@ -122,35 +122,9 @@ function setupRoutes () {
       return
     }
     this.mainLogger.debug(`Payload for 'active' request: ${JSON.stringify(payload)}`)
-    const { nodeId, sign } = payload
-    if (!nodeId) {
-      this.mainLogger.debug('Node ID of node was not provided with `active` request.')
-      return
-    }
-    if (!sign) {
-      this.mainLogger.debug('Active message was not signed.')
-      return
-    }
-    let publicKey
-    try {
-      ;({ publicKey } = this.state.getNode(nodeId))
-    } catch (e) {
-      this.mainLogger.debug(e)
-      ;({ publicKey } = null)
-    }
-    if (!publicKey) {
-      this.mainLogger.debug('Unknown node ID in request.')
-      return
-    }
-    const isSignedByNode = this.crypto.verify(payload, publicKey)
-    if (!isSignedByNode) {
-      this.mainLogger.debug('Active request was not signed by the expected node.')
-      return
-    }
     // Add status update of given node to queue
-    const added = await this.state.addStatusUpdate(nodeId, 'active')
-    if (!added) return this.mainLogger.debug(`Status update to active for ${nodeId} not added.`)
-    this.mainLogger.debug(`Status update to active for ${nodeId} was added!`)
+    const added = await this.state.addStatusUpdate(payload)
+    if (!added) return this.mainLogger.debug(`Status update to active for ${payload.nodeId} not added.`)
     await this.sendGossip('active', payload)
   })
 

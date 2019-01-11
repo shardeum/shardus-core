@@ -837,10 +837,20 @@ class P2P {
     return true
   }
 
-  async _submitActiveRequest () {
-    const signedRequest = this.crypto.sign({ nodeId: this.id })
-    await this._submitWhenUpdatePhase('active', signedRequest)
-    this.state.addStatusUpdate(this.id, 'active')
+  _createStatusUpdate (type) {
+    const update = {
+      nodeId: this.id,
+      status: type,
+      timestamp: utils.getTime()
+    }
+    const signedUpdate = this.crypto.sign(update)
+    return signedUpdate
+  }
+
+  async _submitStatusUpdate (type) {
+    const update = this._createStatusUpdate(type)
+    await this._submitWhenUpdatePhase(type, update)
+    this.state.addStatusUpdate(update)
   }
 
   async _goActive (isFirstSeed) {
@@ -849,14 +859,15 @@ class P2P {
       if (!this._isInUpdatePhase(currentTime, cycleStart, cycleDuration)) {
         await this._waitUntilUpdatePhase(currentTime, cycleStart, cycleDuration)
       }
-      this.state.addStatusUpdate(this.id, 'active')
+      const update = this._createStatusUpdate('active')
+      this.state.addStatusUpdate(update)
       return true
     }
     const ensureActive = async () => {
       if (!this._isActive()) {
         const { cycleDuration } = this.getCycleMarkerInfo()
         this.mainLogger.debug('Not active yet, submitting an active request.')
-        await this._submitActiveRequest()
+        await this._submitStatusUpdate('active')
         const toWait = cycleDuration * 1000
         this.mainLogger.debug(`Waiting before checking if active, waiting ${toWait} ms...`)
         setTimeout(async () => {
