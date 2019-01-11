@@ -192,17 +192,11 @@ class P2P {
     return cycles
   }
 
-  getCycleChain (start, end, excludeCerts = false) {
+  getCycleChain (start, end) {
     this.mainLogger.debug(`Requested cycle chain from cycle ${start} to ${end}...`)
     let cycles
     try {
       cycles = this.state.getCycles(start, end)
-      if (excludeCerts) {
-        cycles = utils.deepCopy(cycles)
-        for (const cycle of cycles) {
-          delete cycle.certificate
-        }
-      }
     } catch (e) {
       this.mainLogger.debug(e)
       cycles = null
@@ -211,11 +205,24 @@ class P2P {
     return cycles
   }
 
-  getCycleChainHash (start, end, excludeCerts = false) {
+  getCycleMarkerCerts (start, end) {
+    this.mainLogger.debug(`Requested cycle marker certificates from cycle ${start} to ${end}...`)
+    let certs
+    try {
+      certs = this.state.getCertificates(start, end)
+    } catch (e) {
+      this.mainLogger.debug(e)
+      certs = null
+    }
+    this.mainLogger.debug(`Result of requested cycleChain: ${certs}`)
+    return certs
+  }
+
+  getCycleChainHash (start, end) {
     this.mainLogger.debug(`Requested hash of cycle chain from cycle ${start} to ${end}...`)
     let cycleChain
     try {
-      cycleChain = this.getCycleChain(start, end, excludeCerts)
+      cycleChain = this.getCycleChain(start, end)
     } catch (e) {
       return null
     }
@@ -464,9 +471,10 @@ class P2P {
 
   _isActive () {
     this.mainLogger.debug('Checking if active...')
-    const active = this.state.getNodeStatus(this.id) === 'active'
+    const status = this.state.getNodeStatus(this.id)
+    const active = status === 'active'
     if (!active) {
-      this.mainLogger.debug('This node is not currently active...')
+      this.mainLogger.debug(`This node is not currently active... Current status: ${status}`)
       return false
     }
     this.mainLogger.debug('This node is active!')

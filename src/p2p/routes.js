@@ -70,7 +70,8 @@ function setupRoutes () {
       await respond({ cycleChainHash: null, error: 'start and end required' })
       return
     }
-    const cycleChainHash = this.getCycleChainHash(payload.start, payload.end, true)
+    const cycleChainHash = this.getCycleChainHash(payload.start, payload.end)
+    console.log(cycleChainHash)
     this.mainLogger.debug(`Cycle chain hash to be sent: ${JSON.stringify(cycleChainHash)}`)
     if (!cycleChainHash) {
       await respond({ cycleChainHash, error: 'invalid indexes for cycle chain hash' })
@@ -90,12 +91,18 @@ function setupRoutes () {
       await respond({ cycleChain: null, error: 'start and end required' })
       return
     }
-    const cycleChain = this.getCycleChain(payload.start, payload.end, true)
+    const cycleChain = this.getCycleChain(payload.start, payload.end)
+    const cycleMarkerCerts = this.getCycleMarkerCerts(payload.start, payload.end)
+    console.log(cycleChain)
     if (!cycleChain) {
       await respond({ cycleChain, error: 'invalid indexes for cycle chain' })
       return
     }
-    await respond({ cycleChain })
+    if (!cycleMarkerCerts) {
+      await respond({ cycleChain, cycleMarkerCerts, error: 'invalid indexes for cycle marker certificates' })
+      return
+    }
+    await respond({ cycleChain, cycleMarkerCerts })
   })
 
   this.registerInternal('unfinalized', async (payload, respond) => {

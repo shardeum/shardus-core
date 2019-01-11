@@ -9,6 +9,7 @@ class P2PState {
     this.defaultCycleDuration = config.cycleDuration
 
     this.cycles = []
+    this.certificates = []
 
     // Variables for regulating different phases cycles
     this.acceptChainUpdates = false
@@ -583,14 +584,27 @@ class P2PState {
     }, toWait)
   }
 
-  async addCycle (cycle) {
+  async addCycle (cycle, certificate = null) {
     this.cycles.push(cycle)
+    if (certificate) {
+      this.certificates.push(certificate)
+      cycle = utils.deepCopy(cycle)
+      cycle.certificate = certificate
+    }
     await this.storage.addCycles(cycle)
   }
 
-  async addCycles (cycles) {
+  async addCycles (cycles, certificates = null) {
     for (const cycle of cycles) {
       this.cycles.push(cycle)
+    }
+    if (certificates.length) {
+      cycles = utils.deepCopy(cycles)
+      for (let i = 0; i < cycles.length; i++) {
+        const certificate = certificates[i]
+        this.certificates.push(certificate)
+        cycle.certificate = certificate
+      }
     }
     await this.storage.addCycles(cycles)
     this.mainLogger.debug(`All cycles after adding given cycles: ${JSON.stringify(this.cycles)}`)
@@ -719,6 +733,12 @@ class P2PState {
     if (start < 0) throw new Error('Invalid start cycle counter.')
     if (end > this.cycles.length) throw new Error('Invalid end cycle counter.')
     return this.cycles.slice(start, end + 1)
+  }
+
+  getCertificates (start = 0, end = this.certificates.length) {
+    if (start < 0) throw new Error('Invalid start cycle counter.')
+    if (end > this.cycles.length) throw new Error('Invalid end cycle counter.')
+    return this.certificates.slice(start, end + 1)
   }
 
   getCurrentCertificate () {
