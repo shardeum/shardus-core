@@ -31,6 +31,9 @@ class DataSync {
     this.isSyncingAcceptedTxs = true // default is true so we will start adding to our tx queue asap
 
     this.verboseLogs = false
+    if (this.mainLogger && ['TRACE'].includes(this.mainLogger.level.levelStr)) {
+      this.verboseLogs = true
+    }
   }
 
   // this clears state data related to the current partion we are processing.
