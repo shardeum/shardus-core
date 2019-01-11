@@ -124,9 +124,17 @@ class P2PState {
 
   // Checks if a given timestamp is during the current cycle
   isDuringThisCycle (timestamp) {
-    // const start = this.getCurrentCycleStart()
-    // const duration = this.getCurrentCycleDuration()
-    // TODO: make this actually evaluate if the timestamp is in the current cycle
+    const start = this.getCurrentCycleStart() * 1000
+    const duration = this.getCurrentCycleDuration() * 1000
+    const end = start + duration
+    if (timestamp < start) {
+      this.mainLogger.debug('Status update timestamp is too old for this cycle.')
+      return false
+    }
+    if (timestamp > end) {
+      this.mainLogger.debug('Status update timestamp is too far in the future for this cycle.')
+      return false
+    }
     return true
   }
 
