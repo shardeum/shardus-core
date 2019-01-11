@@ -35,16 +35,23 @@ class P2PState {
 
     // Defines a clean cycle that we will for restoring the current cycle to a clean state
     this.cleanCycle = {
-      bestJoinRequests: [],
-      start: null,
-      duration: null,
-      joined: [],
-      removed: [],
-      lost: [],
-      returned: [],
-      activated: [],
-      certificate: {},
-      bestCertDist: null
+      metadata: {
+        bestCertDist: null
+      },
+      updates: {
+        bestJoinRequests: [],
+        active: []
+      },
+      data: {
+        start: null,
+        duration: null,
+        joined: [],
+        removed: [],
+        lost: [],
+        returned: [],
+        activated: [],
+        certificate: {}
+      }
     }
 
     // Sets nodelist and current cycle to a copy of the clean nodelist and cycle objects
@@ -110,7 +117,7 @@ class P2PState {
 
   _addJoiningNodes (nodes) {
     for (const node of nodes) {
-      this.currentCycle.joined.push(node.publicKey)
+      this.currentCycle.data.joined.push(node.publicKey)
     }
   }
 
@@ -126,7 +133,10 @@ class P2PState {
     return current[nodeId].status
   }
 
+  // addStatusUpdate (update) {
   addStatusUpdate (nodeId, status) {
+    // const { nodeId, status, timestamp } = update
+
     // Check if we actually know about this node
     if (!this.getNode(nodeId)) {
       this.mainLogger.debug('Cannot update status of unknown node.')
@@ -145,7 +155,9 @@ class P2PState {
       return false
     }
     this.mainLogger.debug(`Type of status update: ${type}`)
-    utils.insertSorted(this.currentCycle[type], nodeId)
+    // TODO: evaluate if we should insert sorted into these arrays
+    // this.currentCycle.updates[status].push(update)
+    utils.insertSorted(this.currentCycle.data[type], nodeId)
     this.mainLogger.debug(`Node ${nodeId} added to ${type} list for this cycle.`)
   }
 
@@ -292,14 +304,14 @@ class P2PState {
     const lastCycleDuration = this.getLastCycleDuration()
     const lastCycleStart = this.getLastCycleStart()
     const currentTime = utils.getTime('s')
-    this.currentCycle.duration = lastCycleDuration
-    this.currentCycle.start = lastCycleStart ? lastCycleStart + lastCycleDuration : utils.getTime('s')
+    this.currentCycle.data.duration = lastCycleDuration
+    this.currentCycle.data.start = lastCycleStart ? lastCycleStart + lastCycleDuration : utils.getTime('s')
     this.mainLogger.info(`Starting new cycle of duration ${this.getCurrentCycleDuration()}...`)
     this.mainLogger.debug(`Last cycle start time: ${lastCycleStart}`)
     this.mainLogger.debug(`Last cycle duration: ${lastCycleDuration}`)
     this.mainLogger.debug(`Current time: ${currentTime}`)
     const quarterCycle = Math.ceil(this.getCurrentCycleDuration() * 1000 / 4)
-    this._startUpdatePhase(this.currentCycle.start * 1000, quarterCycle)
+    this._startUpdatePhase(this.currentCycle.data.start * 1000, quarterCycle)
   }
 
   _startUpdatePhase (startTime, phaseLen) {
@@ -312,7 +324,7 @@ class P2PState {
   }
 
   _getBestJoinRequests () {
-    return this.currentCycle.bestJoinRequests
+    return this.currentCycle.updates.bestJoinRequests
   }
 
   _isKnownNode (node) {
@@ -508,8 +520,8 @@ class P2PState {
   // ----- whenever it is different, we shouldn't go with it naively
   addCertificate (certificate) {
     const addCert = (cert, dist) => {
-      this.currentCycle.certificate = cert
-      this.currentCycle.bestCertDist = dist
+      this.currentCycle.data.certificate = cert
+      this.currentCycle.metadata.bestCertDist = dist
       this.mainLogger.debug('Certificate added!')
     }
     this.mainLogger.debug('Attempting to add certificate...')
@@ -519,15 +531,15 @@ class P2PState {
     const certDist = utils.XOR(certificate.marker, certificate.signer)
 
     // If we don't have a best cert for this cycle yet, just add this cert
-    if (!this.currentCycle.bestCertDist) {
+    if (!this.currentCycle.metadata.bestCertDist) {
       addCert(certificate, certDist)
       return true
     }
 
     // If the cert distance for this cert is less than the current best, return false
-    if (certDist <= this.currentCycle.bestCertDist) {
+    if (certDist <= this.currentCycle.metadata.bestCertDist) {
       this.mainLogger.debug('Certificate not added. Current certificate is better.')
-      this.mainLogger.debug(`Current certificate distance from cycle marker: ${this.currentCycle.bestCertDist}`)
+      this.mainLogger.debug(`Current certificate distance from cycle marker: ${this.currentCycle.metadata.bestCertDist}`)
       this.mainLogger.debug(`This certificate distance from cycle marker: ${certDist}`)
       return false
     }
@@ -544,7 +556,7 @@ class P2PState {
   }
 
   getCurrentCertificate () {
-    const cert = this.currentCycle.certificate
+    const cert = this.currentCycle.data.certificate
     if (!Object.keys(cert).length) return null
     return cert
   }
@@ -568,23 +580,23 @@ class P2PState {
   }
 
   getJoined () {
-    return this.currentCycle.joined
+    return this.currentCycle.data.joined
   }
 
   getRemoved () {
-    return this.currentCycle.removed
+    return this.currentCycle.data.removed
   }
 
   getLost () {
-    return this.currentCycle.lost
+    return this.currentCycle.data.lost
   }
 
   getReturned () {
-    return this.currentCycle.returned
+    return this.currentCycle.data.returned
   }
 
   getActivated () {
-    const activated = this.currentCycle.activated
+    const activated = this.currentCycle.data.activated
     this.mainLogger.debug(`Result of getActivated: ${JSON.stringify(activated)}`)
     return activated
   }
@@ -607,7 +619,7 @@ class P2PState {
   }
 
   getCurrentCycleStart () {
-    return this.currentCycle.start || null
+    return this.currentCycle.data.start || null
   }
 
   getLastCycleDuration () {
@@ -617,7 +629,7 @@ class P2PState {
   }
 
   getCurrentCycleDuration () {
-    return this.currentCycle.duration
+    return this.currentCycle.data.duration
   }
 
   getCurrentCycleMarker () {
