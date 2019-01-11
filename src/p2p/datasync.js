@@ -29,6 +29,8 @@ class DataSync {
     this.registerEndpoints()
 
     this.isSyncingAcceptedTxs = true // default is true so we will start adding to our tx queue asap
+
+    this.verboseLogs = false
   }
 
   // this clears state data related to the current partion we are processing.
@@ -684,11 +686,11 @@ class DataSync {
       // should we filter, or instead rely on gossip in to only give us TXs that matter to us?
 
       if (!this.isSyncingAcceptedTxs) {
-        console.log('got accepted tx after sync complete: ' + acceptedTX.timestamp + '   time:' + Date.now())
+        if (this.verboseLogs) console.log('got accepted tx after sync complete: ' + acceptedTX.timestamp + '   time:' + Date.now())
         return
       }
 
-      console.log('got accepted tx: ' + acceptedTX.timestamp + '   time:' + Date.now())
+      if (this.verboseLogs) console.log('got accepted tx: ' + acceptedTX.timestamp + '   time:' + Date.now())
       // Lets insert this tx into a sorted list where index 0 == oldest and length-1 == newest
       if (this.isSyncingAcceptedTxs) {
         let txId = acceptedTX.id

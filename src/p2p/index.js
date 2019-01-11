@@ -31,6 +31,11 @@ class P2P {
     this.gossipedHashes = new Map()
     this.gossipedHashesSent = new Map() // TODO Perf: both of these lists need some eventual cleaning.  Perferably keep a sorted list also and periodically remove expired messages from the map and list
 
+    this.verboseLogs = false
+    if (this.mainLogger && ['TRACE'].includes(this.mainLogger.level.levelStr)) {
+      this.verboseLogs = true
+    }
+
     this.state = new P2PState(config, this.logger, this.storage, this, this.crypto)
     this.dataSync = accountUtility ? new DataSync(config, this.logger, this.storage, this, this.crypto, accountUtility) : null
 
@@ -380,7 +385,7 @@ class P2P {
     if (!this._isInUpdatePhase(currentTime, cycleStart, cycleDuration)) {
       await this._waitUntilUpdatePhase(currentTime, cycleStart, cycleDuration)
     }
-    this.mainLogger.debug(`Gossiping message: ${JSON.stringify(message)} on '${route}'.`)
+    if (this.verboseLogs) this.mainLogger.debug(`Gossiping message: ${JSON.stringify(message)} on '${route}'.`)
     await this.sendGossip(route, message)
   }
 
@@ -971,24 +976,24 @@ class P2P {
    */
   async sendGossip (type, payload, nodes = this.state.getAllNodes(this.id)) {
     if (nodes.length === 0) return
-    this.mainLogger.debug(`Start of sendGossip(${JSON.stringify(payload)})`)
+    if (this.verboseLogs) this.mainLogger.debug(`Start of sendGossip(${JSON.stringify(payload)})`)
     const gossipPayload = { type: type, data: payload }
 
     const gossipHash = this.crypto.hash(gossipPayload)
     if (this.gossipedHashesSent.has(gossipHash)) {
-      this.mainLogger.debug(`Gossip already sent: ${gossipHash.substring(0, 5)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`Gossip already sent: ${gossipHash.substring(0, 5)}`)
       return
     }
 
     const recipients = getRandom(nodes, this.gossipRecipients)
     try {
-      this.mainLogger.debug(`Gossiping ${type} request to these nodes: ${JSON.stringify(recipients)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`Gossiping ${type} request to these nodes: ${JSON.stringify(recipients)}`)
       await this.tell(recipients, 'gossip', gossipPayload)
     } catch (ex) {
-      this.mainLogger.error(`Failed to sendGossip(${JSON.stringify(payload)}) Exception => ${ex}`)
+      if (this.verboseLogs) this.mainLogger.error(`Failed to sendGossip(${JSON.stringify(payload)}) Exception => ${ex}`)
     }
     this.gossipedHashesSent.set(gossipHash, false)
-    this.mainLogger.debug(`End of sendGossip(${JSON.stringify(payload)})`)
+    if (this.verboseLogs) this.mainLogger.debug(`End of sendGossip(${JSON.stringify(payload)})`)
   }
 
   /**
@@ -996,7 +1001,7 @@ class P2P {
  * Payload: {type: ['receipt', 'trustedTransaction'], data: {}}
  */
   async handleGossip (payload) {
-    this.mainLogger.debug(`Start of handleGossip(${JSON.stringify(payload)})`)
+    if (this.verboseLogs) this.mainLogger.debug(`Start of handleGossip(${JSON.stringify(payload)})`)
     const type = payload.type
     const data = payload.data
 
@@ -1012,18 +1017,18 @@ class P2P {
     }
 
     if (this.gossipedHashes.has(gossipHash)) {
-      this.mainLogger.debug(`Got old gossip: ${gossipHash.substring(0, 5)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`Got old gossip: ${gossipHash.substring(0, 5)}`)
       if (!this.gossipedHashes.get(gossipHash)) {
         setTimeout(() => this.gossipedHashes.delete(gossipHash), this.gossipTimeout)
         this.gossipedHashes.set(gossipHash, true)
-        this.mainLogger.debug(`Marked old gossip for deletion: ${gossipHash.substring(0, 5)} in ${this.gossipTimeout} ms`)
+        if (this.verboseLogs) this.mainLogger.debug(`Marked old gossip for deletion: ${gossipHash.substring(0, 5)} in ${this.gossipTimeout} ms`)
       }
       return
     }
     this.gossipedHashes.set(gossipHash, false)
 
     await gossipHandler(data)
-    this.mainLogger.debug(`End of handleGossip(${JSON.stringify(payload)})`)
+    if (this.verboseLogs) this.mainLogger.debug(`End of handleGossip(${JSON.stringify(payload)})`)
   }
 
   /**

@@ -12,6 +12,7 @@ const allZeroes64 = '0'.repeat(64)
 class Shardus {
   constructor ({ server: config, logs: logsConfig, storage: storageConfig }) {
     this.config = config
+    this.verboseLogs = false
     this.logger = new Logger(config.baseDir, logsConfig)
     this.mainLogger = this.logger.getLogger('main')
     this.fatalLogger = this.logger.getLogger('fatal')
@@ -28,6 +29,10 @@ class Shardus {
 
     this.heartbeatInterval = config.heartbeatInterval
     this.heartbeatTimer = null
+
+    if (this.mainLogger && ['TRACE'].includes(this.mainLogger.level.levelStr)) {
+      this.verboseLogs = true
+    }
 
     // alias the network register calls so that an app can get to them
     this.registerExternalGet = (route, handler) => this.network.registerExternalGet(route, handler)
@@ -148,7 +153,7 @@ class Shardus {
 
   async put (req, res) {
     if (!this.appProvided) throw new Error('Please provide an App object to Shardus.setup before calling Shardus.put')
-    this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(req.body)}`)
+    if (this.verboseLogs) this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(req.body)}`)
     // retrieve incoming transaction from HTTP request
     let inTransaction = req.body
     let shardusTransaction = {}
@@ -160,9 +165,9 @@ class Shardus {
       /**
        * Perform basic validation of the transaction fields. Also, validate the transaction timestamp
        */
-      this.mainLogger.debug(`Performing initial validation of the transaction`)
+      if (this.verboseLogs) this.mainLogger.debug(`Performing initial validation of the transaction`)
       const initValidationResp = this.app.validateTxnFields(inTransaction)
-      this.mainLogger.debug(`InitialValidationResponse: ${JSON.stringify(initValidationResp)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`InitialValidationResponse: ${JSON.stringify(initValidationResp)}`)
 
       const txnTimestamp = initValidationResp.txnTimestamp
       if (this.isTransactionTimestampExpired(txnTimestamp)) {
@@ -183,7 +188,7 @@ class Shardus {
       // QUEUE delay system...
       ourLock = await this.consensus.queueAndDelay(txnTimestamp, txId)
 
-      this.mainLogger.debug(`ShardusTransaction: ${shardusTransaction}`)
+      if (this.verboseLogs) this.mainLogger.debug(`ShardusTransaction: ${shardusTransaction}`)
 
       // Validate transaction through the application. Shardus can see inside the transaction
       let transactionValidateResult = await this.app.validateTransaction(inTransaction)
@@ -193,11 +198,11 @@ class Shardus {
       }
       shardusTransaction = this.crypto.sign(shardusTransaction)
 
-      this.mainLogger.debug('Transaction Valided')
+      if (this.verboseLogs) this.mainLogger.debug('Transaction Valided')
       // Perform Consensus -- Currently no algorithm is being used
       // let nodeList = await this.storage.getNodes()
       let transactionReceipt = await this.consensus.inject(shardusTransaction)
-      this.mainLogger.debug(`Received Consensus. Receipt: ${JSON.stringify(transactionReceipt)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`Received Consensus. Receipt: ${JSON.stringify(transactionReceipt)}`)
       // Apply the transaction
       await this.acceptTransaction(inTransaction, transactionReceipt, true)
     } catch (ex) {
@@ -206,7 +211,7 @@ class Shardus {
     } finally {
       this.consensus.unlockQueue(ourLock)
     }
-    this.mainLogger.debug(`End of injectTransaction ${inTransaction}`)
+    if (this.verboseLogs) this.mainLogger.debug(`End of injectTransaction ${inTransaction}`)
     return { success: true, reason: 'Transaction successfully processed' }
   }
 
@@ -256,14 +261,14 @@ class Shardus {
       if (accountStates.length !== 0) {
         hasStateTableData = true
         if (accountStates.length === 0) {
-          console.log('testAccountStateTable ' + timestamp + ' missing source account state 1')
-          this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' missing source account state 1')
+          if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' missing source account state 1')
+          if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' missing source account state 1')
           return { success: false, hasStateTableData }
         }
 
         if (accountStates.length === 0 || accountStates[0].stateBefore !== sourceState) {
-          console.log('testAccountStateTable ' + timestamp + ' cant apply state 1')
-          this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' cant apply state 1')
+          if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' cant apply state 1')
+          if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' cant apply state 1')
           return { success: false, hasStateTableData }
         }
       }
@@ -276,18 +281,18 @@ class Shardus {
       if (accountStates.length !== 0) {
         hasStateTableData = true
         if (accountStates.length === 0) {
-          console.log('testAccountStateTable ' + timestamp + ' missing target account state 2')
-          this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' missing target account state 2')
+          if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' missing target account state 2')
+          if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' missing target account state 2')
           return { success: false, hasStateTableData }
         }
         if (accountStates.length !== 0 && accountStates[0].stateBefore !== allZeroes64) {
           targetState = await this.app.getStateId(targetAddress, false)
           if (targetState == null) {
-            console.log('testAccountStateTable ' + timestamp + ' target state does not exist, thats ok')
-            this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' target state does not exist, thats ok')
+            if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' target state does not exist, thats ok')
+            if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' target state does not exist, thats ok')
           } else if (accountStates[0].stateBefore !== targetState) {
-            console.log('testAccountStateTable ' + timestamp + ' cant apply state 2')
-            this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' cant apply state 2')
+            if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' cant apply state 2')
+            if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' cant apply state 2')
             return { success: false, hasStateTableData }
           }
         }
@@ -303,8 +308,8 @@ class Shardus {
     let tx = acceptedTX.data
     let receipt = acceptedTX.receipt
     let timestamp = tx.txnTimestmp // TODO m11: need to push this to application method thta cracks the transaction
-    console.log('tryApplyTransaction ' + timestamp)
-    this.mainLogger.debug('DATASYNC: tryApplyTransaction ' + timestamp)
+    if (this.verboseLogs) console.log('tryApplyTransaction ' + timestamp)
+    if (this.verboseLogs) this.mainLogger.debug('DATASYNC: tryApplyTransaction ' + timestamp)
 
     let { success, hasStateTableData } = await this.testAccountStateTable(tx)
 
@@ -320,8 +325,8 @@ class Shardus {
       sourceAddress = sourceKeys[0]
       sourceState = await this.app.getStateId(sourceAddress)
       if (sourceState !== receipt.stateId) {
-        console.log('tryApplyTransaction source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + sourceState + ' reciept: ' + receipt.stateId)
-        this.mainLogger.debug('DATASYNC: tryApplyTransaction source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + sourceState + ' reciept: ' + receipt.stateId)
+        if (this.verboseLogs) console.log('tryApplyTransaction source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + sourceState + ' reciept: ' + receipt.stateId)
+        if (this.verboseLogs) this.mainLogger.debug('DATASYNC: tryApplyTransaction source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + sourceState + ' reciept: ' + receipt.stateId)
         return
       }
     }
@@ -329,21 +334,21 @@ class Shardus {
       targetAddress = targetKeys[0]
       targetState = await this.app.getStateId(targetAddress, false)
       if (targetState !== receipt.targetStateId) {
-        console.log('tryApplyTransaction target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetState + ' reciept: ' + receipt.targetStateId)
-        this.mainLogger.debug('DATASYNC: tryApplyTransaction target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetState + ' reciept: ' + receipt.targetStateId)
+        if (this.verboseLogs) console.log('tryApplyTransaction target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetState + ' reciept: ' + receipt.targetStateId)
+        if (this.verboseLogs) this.mainLogger.debug('DATASYNC: tryApplyTransaction target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetState + ' reciept: ' + receipt.targetStateId)
         return
       }
     }
 
-    console.log('tryApplyTransaction ' + timestamp + ' Applying!')
-    this.mainLogger.debug('DATASYNC: tryApplyTransaction ' + timestamp + ' Applying!')
+    if (this.verboseLogs) console.log('tryApplyTransaction ' + timestamp + ' Applying!')
+    if (this.verboseLogs) this.mainLogger.debug('DATASYNC: tryApplyTransaction ' + timestamp + ' Applying!')
     let { stateTableResults } = await this.app.apply(tx)
     // only write our state table data if we dont already have it in the db
     if (hasStateTableData === false) {
       await this.storage.addAccountStates(stateTableResults)
       for (let stateT of stateTableResults) {
-        console.log('writeStateTable ' + stateT.accountId)
-        this.mainLogger.debug('DATASYNC: writeStateTable ' + stateT.accountId)
+        if (this.verboseLogs) console.log('writeStateTable ' + stateT.accountId)
+        if (this.verboseLogs) this.mainLogger.debug('DATASYNC: writeStateTable ' + stateT.accountId)
       }
     }
 

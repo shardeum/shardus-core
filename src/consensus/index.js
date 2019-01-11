@@ -17,6 +17,11 @@ class Consensus {
 
     this.pendingTransactions = {}
 
+    this.mainLogs = false
+    if (this.mainLogger && ['TRACE', 'debug'].includes(this.mainLogger.level.levelStr)) {
+      this.mainLogs = true
+    }
+
     this.consensusActive = false
     this.queueAndDelayList = []
     this.queueCounter = 0
@@ -46,25 +51,25 @@ class Consensus {
    * Register GossipHandlers with P2P class
    */
   async onTransaction (shardusTransaction) {
-    this.mainLogger.debug(`Start of onTransaction(${shardusTransaction})`)
+    if (this.mainLogs) this.mainLogger.debug(`Start of onTransaction(${shardusTransaction})`)
     const transHash = this.crypto.hash(shardusTransaction.inTransaction)
     this.pendingTransactions[transHash] = shardusTransaction
-    this.mainLogger.debug(`End of onTransaction(${shardusTransaction})`)
+    if (this.mainLogs) this.mainLogger.debug(`End of onTransaction(${shardusTransaction})`)
   }
 
   async inject (shardusTransaction) {
     // TODO: Make this report more robust, actually make sure that we are getting all injected txs from app
-    this.reporter.incrementTxInjected()
-    this.mainLogger.debug(`Start of inject(${shardusTransaction})`)
+    if (this.reporter) this.reporter.incrementTxInjected()
+    if (this.mainLogs) this.mainLogger.debug(`Start of inject(${shardusTransaction})`)
     let transactionReceipt
     let inTransaction = shardusTransaction.inTransaction
     try {
       // let keysRequest = { type: 'keyFromTransaction', txn: inTransaction }
       // let keysResponse = await this.application.get(keysRequest)
-      this.mainLogger.debug(`Gossiping Validated Transaction ${JSON.stringify(shardusTransaction)}`)
+      if (this.mainLogs) this.mainLogger.debug(`Gossiping Validated Transaction ${JSON.stringify(shardusTransaction)}`)
       // TODO: Change this to use just the nodes in the conesensus group
       // await this.p2p.sendGossip('transaction', shardusTransaction, this.p2p.state.getAllNodes(this.p2p.id))
-      this.mainLogger.debug(`Done Gossiping Validated Transaction ${JSON.stringify(shardusTransaction)}`)
+      if (this.mainLogs) this.mainLogger.debug(`Done Gossiping Validated Transaction ${JSON.stringify(shardusTransaction)}`)
       let keysResponse = this.applicationInterfaceImpl.getKeyFromTransaction(inTransaction)
       let { sourceKeys, targetKeys } = keysResponse
       let sourceAddress, targetAddress, stateId, targetStateId
@@ -75,13 +80,13 @@ class Consensus {
       if (Array.isArray(targetKeys) && targetKeys.length > 0) {
         targetAddress = targetKeys[0]
       }
-      this.mainLogger.debug(`sourceAddress: ${JSON.stringify(sourceAddress)} targetAddress: ${JSON.stringify(targetAddress)}`)
+      if (this.mainLogs) this.mainLogger.debug(`sourceAddress: ${JSON.stringify(sourceAddress)} targetAddress: ${JSON.stringify(targetAddress)}`)
 
       if (sourceAddress) {
         // keysRequest = { type: 'stateID', address: sourceAddress }
         // stateID = await this.application.get(keysRequest)
         stateId = await this.applicationInterfaceImpl.getStateId(sourceAddress)
-        this.mainLogger.debug(`StateID: ${stateId}`)
+        if (this.mainLogs) this.mainLogger.debug(`StateID: ${stateId}`)
       }
 
       if (targetAddress) {
@@ -94,10 +99,10 @@ class Consensus {
       throw new Error(ex)
     }
 
-    this.mainLogger.debug(`Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
+    if (this.mainLogs) this.mainLogger.debug(`Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
     await this.p2p.sendGossip('receipt', { shardusTransaction, transactionReceipt }, this.p2p.state.getAllNodes(this.p2p.id))
-    this.mainLogger.debug(`Done Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
-    this.mainLogger.debug(`End of inject(${inTransaction})`)
+    if (this.mainLogs) this.mainLogger.debug(`Done Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
+    if (this.mainLogs) this.mainLogger.debug(`End of inject(${inTransaction})`)
 
     return transactionReceipt
   }
@@ -115,13 +120,13 @@ class Consensus {
 
   // changed to {shardusTransaction, transactionReceipt} to fix out of order messaging.  real consensus will need to have a queue to apply changes
   async onReceipt (data) {
-    this.mainLogger.debug(`Start of onReciept`)
+    if (this.mainLogs) this.mainLogger.debug(`Start of onReciept`)
     // const shardusTransaction = this.pendingTransactions[receipt.txHash]
     const shardusTransaction = data.shardusTransaction
     let receipt = data.transactionReceipt
     if (shardusTransaction == null) {
-      console.log(`onReceipt failed. No transaction found for: ${receipt.txHash}`)
-      this.mainLogger.debug(`onReceipt failed. No transaction found for: ${receipt.txHash}`)
+      if (this.mainLogs) console.log(`onReceipt failed. No transaction found for: ${receipt.txHash}`)
+      if (this.mainLogs) this.mainLogger.debug(`onReceipt failed. No transaction found for: ${receipt.txHash}`)
       return // todo error
     }
     let transaction = shardusTransaction.inTransaction
@@ -175,13 +180,13 @@ class Consensus {
 
       this.accountUtility.acceptTransaction(transaction, receipt)
       // TODO: Make this more robust, actually make sure the application has applied tx
-      this.reporter.incrementTxApplied()
+      if (this.reporter) this.reporter.incrementTxApplied()
     } catch (ex) {
       this.fatalLogger.fatal(`Failed to process receipt. Exception: ${ex}`)
     } finally {
       this.unlockQueue(ourLock)
     }
-    this.mainLogger.debug(`End of onReceipt`)
+    if (this.mainLogs) this.mainLogger.debug(`End of onReceipt`)
     return true
   }
 
@@ -189,6 +194,7 @@ class Consensus {
   // many funcitions at a time can be stuck on this call.  This code will cause the calling functions to
   // exectue in timestamp order and one at a time.
   async queueAndDelay (timestamp, tieBreaker) {
+    // return -1
     this.queueCounter++
     let currentTime = Date.now()
     let delta = currentTime - timestamp
