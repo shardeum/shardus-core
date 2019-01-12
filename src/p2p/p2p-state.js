@@ -114,6 +114,14 @@ class P2PState {
 
   _addPendingNode (node) {
     this.nodes.pending[node.publicKey] = node
+    const internalHost = `${node.internalIp}:${node.internalPort}`
+    this.nodes.byIp[internalHost] = node
+  }
+
+  _removeJoiningNode (node) {
+    delete this.nodes.pending[node.publicKey]
+    const internalHost = `${node.internalIp}:${node.internalPort}`
+    delete this.nodes.byIp[internalHost]
   }
 
   _addJoiningNodes (nodes) {
@@ -339,7 +347,6 @@ class P2PState {
     if (!this.validStatuses.includes(status)) throw new Error('Invalid node status.')
     this.nodes[status][node.id] = node
     this.nodes.current[node.id] = node
-    this.nodes.byIp[`${node.internalIp}:${node.internalPort}`] = node
   }
 
   _addNodesToNodelist (nodes) {
@@ -425,11 +432,25 @@ class P2PState {
   }
 
   _addToBestJoinRequests (joinRequest) {
-    const bestRequests = this._getBestJoinRequests()
     const { nodeInfo } = joinRequest
 
+    // Check if this node has already been seen this cycle
+    if (this._wasSeenThisCycle(nodeInfo.publicKey)) {
+      this.mainLogger.debug('Node has already been seen this cycle. Unable to add join request.')
+      return false
+    }
+
+    // Mark node as seen for this cycle
+    this._markNodeAsSeen(nodeInfo.publicKey)
+
     // Return if we already know about this node
-    if (this._isKnownNode(nodeInfo)) return false
+    if (this._isKnownNode(nodeInfo)) {
+      this.mainLogger.info('Cannot add join request for this node, already a known node.')
+      return false
+    }
+
+    // Get the list of best requests
+    const bestRequests = this._getBestJoinRequests()
 
     // TODO: calculate how many nodes to accept this cycle
     const toAccept = 1
@@ -451,7 +472,12 @@ class P2PState {
     utils.insertSorted(bestRequests, joinRequest, (a, b) => (a.selectionNum < b.selectionNum ? 1 : (a.selectionNum > b.selectionNum ? -1 : 0)))
 
     // If we were competing for a spot, we have to get rid of the weakest link
-    if (competing) bestRequests.pop()
+    if (competing) {
+      const removedRequest = bestRequests.pop()
+      const removedNode = removedRequest.nodeInfo
+      this.mainLogger.debug(`Removing the following node from this cycle's join requests: ${removedNode}`)
+      this._removeJoiningNode(removedNode)
+    }
     return true
   }
 
@@ -472,7 +498,6 @@ class P2PState {
     this.acceptChainUpdates = false
     const bestNodes = this._getBestNodes()
     this._addJoiningNodes(bestNodes)
-    // TODO: implement clearing out the unaccepted nodes from byIp when clearing pending requests
     const endTime = startTime + phaseLen
     utils.setAlarm(() => {
       this._startCycleSync(endTime, phaseLen)
