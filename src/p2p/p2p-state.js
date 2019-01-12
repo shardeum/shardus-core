@@ -267,7 +267,11 @@ class P2PState {
     for (const activeRequest of active) {
       this.addStatusUpdate(activeRequest)
     }
-    await this._createCycleMarker()
+    const cMarkerBefore = this.getCurrentCertificate().marker
+    await this._createCycleMarker(false)
+    const cMarkerAfter = this.getCurrentCertificate().marker
+    if (cMarkerBefore === cMarkerAfter) return false
+    return true
   }
 
   async _setNodeStatus (nodeId, status) {
@@ -551,7 +555,7 @@ class P2PState {
     this.unfinalizedReady = true
   }
 
-  async _createCycleMarker () {
+  async _createCycleMarker (gossip = true) {
     this.mainLogger.info('Creating new cycle marker...')
     const cycleInfo = this.getCycleInfo(false)
     const cycleMarker = this._computeCycleMarker(cycleInfo)
@@ -559,6 +563,7 @@ class P2PState {
     if (!this.cycles.length) return this.addCertificate({ marker: cycleMarker, signer: '0'.repeat(64) })
     const [added] = this.addCertificate(certificate)
     if (!added) return
+    if (!gossip) return
     await this.p2p.sendGossip('certificate', certificate)
   }
 

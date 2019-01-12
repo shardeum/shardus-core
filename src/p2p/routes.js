@@ -154,8 +154,16 @@ function setupRoutes () {
           return
         case 'diff_cm':
           const cycleUpdates = await this._requestCycleUpdates(sender)
-          await this.state.addCycleUpdates(cycleUpdates)
-          return
+          const cycleUpdated = await this.state.addCycleUpdates(cycleUpdates)
+          if (!cycleUpdated) return
+          // Try to see if they had the same cycle marker, and if they did, check if their cert is better
+          const [added] = this.state.addCertificate(certificate, true)
+          if (!added) {
+            const ourCert = this.state.getCurrentCertificate()
+            this.sendGossip('certificate', ourCert)
+            return
+          }
+          break
       }
     }
     await this.sendGossip('certificate', certificate)
