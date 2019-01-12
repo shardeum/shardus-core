@@ -1007,6 +1007,10 @@ class P2P {
     }
 
     const gossipHash = this.crypto.hash(payload)
+    if (this.gossipedHashesSent.has(gossipHash)) {
+      return
+    }
+
     if (this.gossipedHashes.has(gossipHash)) {
       this.mainLogger.debug(`Got old gossip: ${gossipHash.substring(0, 5)}`)
       if (!this.gossipedHashes.get(gossipHash)) {
