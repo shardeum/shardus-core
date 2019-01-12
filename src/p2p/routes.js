@@ -38,8 +38,8 @@ function setupRoutes () {
 
   // -------- INTERNAL Routes ----------
 
-  this.registerInternal('gossip', async (payload) => {
-    await this.handleGossip(payload)
+  this.registerInternal('gossip', async (payload, respond, sender) => {
+    await this.handleGossip(payload, sender)
     this.mainLogger.debug('Gossip request accepted!')
   })
 
@@ -133,7 +133,7 @@ function setupRoutes () {
     await this.sendGossip('active', payload)
   })
 
-  this.registerGossipHandler('certificate', async (payload) => {
+  this.registerGossipHandler('certificate', async (payload, sender) => {
     if (!payload) {
       this.mainLogger.debug('No payload provided for the `certificate` request.')
       return
@@ -146,9 +146,7 @@ function setupRoutes () {
         case 'not_better':
           return
         case 'diff_cm':
-          // TODO: make it possible to get sender and request data from them instead
-          // ----- so original signer doesn't get spammed
-          const cycleUpdates = await this._requestCycleUpdates(certificate.signer)
+          const cycleUpdates = await this._requestCycleUpdates(sender)
           await this.state.addCycleUpdates(cycleUpdates)
           return
       }

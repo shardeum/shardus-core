@@ -943,8 +943,9 @@ class P2P {
       return null
     }
     const payload = wrappedPayload.payload
+    const sender = wrappedPayload.sender
     this.mainLogger.debug('Internal payload successfully verified.')
-    return payload
+    return [payload, sender]
   }
 
   _wrapAndSignMessage (msg) {
@@ -969,7 +970,7 @@ class P2P {
     const signedMessage = this._wrapAndSignMessage(message)
     const signedResponse = await this.network.ask(node, route, signedMessage)
     this.mainLogger.debug(`Result of network-level ask: ${JSON.stringify(signedResponse)}`)
-    const response = this._extractPayload(signedResponse, [node])
+    const [response] = this._extractPayload(signedResponse, [node])
     if (!response) throw new Error(`Unable to verify response to ask request: ${route} -- ${JSON.stringify(message)} from node: ${node.id}`)
     return response
   }
@@ -989,12 +990,12 @@ class P2P {
         await respond(signedResponse)
       }
       // Checks to see if we can extract the actual payload from the wrapped message
-      const payload = this._extractPayload(wrappedPayload, this.state.getAllNodes(this.id))
+      const [payload, sender] = this._extractPayload(wrappedPayload, this.state.getAllNodes(this.id))
       if (!payload) {
         await respondWrapped({ success: false, error: 'invalid or missing signature' })
         return
       }
-      await handler(payload, respondWrapped)
+      await handler(payload, respondWrapped, sender)
     }
     // Include that in the handler function that is passed
     this.network.registerInternal(route, wrappedHandler)
@@ -1029,7 +1030,7 @@ class P2P {
  * Handle Goosip Transactions
  * Payload: {type: ['receipt', 'trustedTransaction'], data: {}}
  */
-  async handleGossip (payload) {
+  async handleGossip (payload, sender) {
     if (this.verboseLogs) this.mainLogger.debug(`Start of handleGossip(${JSON.stringify(payload)})`)
     const type = payload.type
     const data = payload.data
@@ -1056,7 +1057,7 @@ class P2P {
     }
     this.gossipedHashes.set(gossipHash, false)
 
-    await gossipHandler(data)
+    await gossipHandler(data, sender)
     if (this.verboseLogs) this.mainLogger.debug(`End of handleGossip(${JSON.stringify(payload)})`)
   }
 
