@@ -108,6 +108,11 @@ function setupRoutes () {
     await respond({ unfinalizedCycle })
   })
 
+  this.registerInternal('cycleupdates', async (payload, respond) => {
+    const cycleUpdates = this.state.currentCycle.updates
+    await respond({ cycleUpdates })
+  })
+
   // -------- GOSSIP Routes ----------
 
   this.registerGossipHandler('join', async (payload) => {
@@ -135,9 +140,20 @@ function setupRoutes () {
     }
     const certificate = payload
     this.mainLogger.debug(`Propagated cycle certificate: ${JSON.stringify(certificate)}`)
-    const added = this.state.addCertificate(certificate)
-    if (!added) return
-    this.sendGossip('certificate', certificate)
+    const [added, reason] = this.state.addCertificate(certificate, true)
+    if (!added) {
+      switch (reason) {
+        case 'not_better':
+          return
+        case 'diff_cm':
+          // TODO: make it possible to get sender and request data from them instead
+          // ----- so original signer doesn't get spammed
+          const cycleUpdates = await this._requestCycleUpdates(certificate.signer)
+          await this.state.addCycleUpdates(cycleUpdates)
+          return
+      }
+    }
+    await this.sendGossip('certificate', certificate)
   })
 
   // -------- DEBUG Routes ----------

@@ -675,6 +675,23 @@ class P2P {
     return unfinalizedCycle
   }
 
+  async _requestCycleUpdates (nodeId) {
+    const node = this.state.getNode(nodeId)
+    const { cycleUpdates } = await this.ask(node, 'cycleupdates')
+    return cycleUpdates
+  }
+
+  async _requestUpdatesAndAdd (nodeId) {
+    const updates = await this._requestCycleUpdates(nodeId)
+    await this.state.addCycleUpdates(updates)
+  }
+
+  async requestUpdatesFromRandom () {
+    const randomNode = getRandom(this.state.getAllNodes(this.id), 1)
+    const randNodeId = randomNode.id
+    await this._requestUpdatesAndAdd(randNodeId)
+  }
+
   _validateJoinRequest (joinRequest) {
     // TODO: implement actual validation (call to application side?)
     return true

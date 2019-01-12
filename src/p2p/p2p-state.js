@@ -14,6 +14,7 @@ class P2PState {
     this.acceptChainUpdates = false
     this.shouldStop = false
     this.unfinalizedReady = false
+    this.cyclesStarted = false
 
     // Specifies valid statuses
     this.validStatuses = ['active', 'syncing', 'pending']
@@ -37,7 +38,8 @@ class P2PState {
     this.cleanCycle = {
       metadata: {
         bestCertDist: null,
-        updateSeen: {}
+        updateSeen: {},
+        receivedCerts: false
       },
       updates: {
         bestJoinRequests: [],
@@ -92,6 +94,7 @@ class P2PState {
   }
 
   _addJoinRequest (joinRequest) {
+    if (!this.cyclesStarted) return false
     if (!this._addToBestJoinRequests(joinRequest)) {
       this.mainLogger.debug('Join request not added: Was not best request for this cycle.')
       return false
@@ -172,6 +175,7 @@ class P2PState {
   }
 
   addStatusUpdate (update) {
+    if (!this.cyclesStarted) return false
     const { nodeId, status, timestamp, sign } = update
 
     // Validate that all required fields exist
@@ -251,6 +255,18 @@ class P2PState {
     this._markNodeAsSeen(nodeId)
     this.mainLogger.debug(`Node ${nodeId} added to ${type} list for this cycle.`)
     return true
+  }
+
+  // TODO: Update this to go through entire update types
+  async addCycleUpdates (updates) {
+    const { bestJoinRequests, active } = updates
+    for (const joinRequest of bestJoinRequests) {
+      this._addJoinRequest(joinRequest)
+    }
+    for (const activeRequest of active) {
+      this.addStatusUpdate(activeRequest)
+    }
+    await this._createCycleMarker()
   }
 
   async _setNodeStatus (nodeId, status) {
@@ -381,6 +397,7 @@ class P2PState {
 
   // Kicks off the whole cycle and cycle marker creation system
   startCycles () {
+    this.cyclesStarted = true
     this.shouldStop = false
     this.mainLogger.info('Starting first cycle...')
     this._startNewCycle()
@@ -515,7 +532,6 @@ class P2PState {
 
   async _finalizeCycle (startTime, phaseLen) {
     this.mainLogger.debug('Starting cycle finalization phase...')
-    this.unfinalizedReady = true
     const endTime = startTime + phaseLen
     utils.setAlarm(async () => {
       await this._createCycle()
@@ -523,6 +539,9 @@ class P2PState {
       if (this.shouldStop) return
       this._startNewCycle()
     }, endTime)
+    // TODO: Make it so seed node doesn't need to call this when alone
+    // if (!this.currentCycle.metadata.receivedCerts) await this.p2p.requestUpdatesFromRandom()
+    this.unfinalizedReady = true
   }
 
   async _createCycleMarker () {
@@ -531,7 +550,7 @@ class P2PState {
     const cycleMarker = this._computeCycleMarker(cycleInfo)
     const certificate = this._createCertificate(cycleMarker)
     if (!this.cycles.length) return this.addCertificate({ marker: cycleMarker, signer: '0'.repeat(64) })
-    const added = this.addCertificate(certificate)
+    const [added] = this.addCertificate(certificate)
     if (!added) return
     await this.p2p.sendGossip('certificate', certificate)
   }
@@ -625,9 +644,7 @@ class P2PState {
     return cert
   }
 
-  // TODO: make sure cycle marker is what we think it should be
-  // ----- whenever it is different, we shouldn't go with it naively
-  addCertificate (certificate) {
+  addCertificate (certificate, fromNetwork = false) {
     const addCert = (cert, dist) => {
       this.currentCycle.data.certificate = cert
       this.currentCycle.metadata.bestCertDist = dist
@@ -636,13 +653,37 @@ class P2PState {
     this.mainLogger.debug('Attempting to add certificate...')
     this.mainLogger.debug(`Certificate to be added: ${JSON.stringify(certificate)}`)
 
+    // TODO: verify signer of the certificate and return false plus 'invalid_signer' reason
+
+    // If we received this cert from the network, change our receivedCerts flag to true
+    if (fromNetwork) {
+      // TODO: Make this return the proper reason
+      if (!this.cyclesStarted) return [false, 'not_better']
+      this.currentCycle.metadata.receivedCerts = true
+    }
+
+    // If we don't have a best cert for this cycle yet, just add this cert
+    if (!this.currentCycle.metadata.bestCertDist) {
+      const certDist = utils.XOR(certificate.marker, certificate.signer)
+      addCert(certificate, certDist)
+      return [true]
+    }
+
+    // If the cycle marker is different than what we have, don't add it
+    if (certificate.marker !== this.getCurrentCertificate().marker) {
+      console.log(certificate.marker)
+      console.log(this.getCurrentCertificate().marker)
+      this.mainLogger.debug('The cycle marker from this certificate is different than the one we currently have...')
+      return [false, 'diff_cm']
+    }
+
     // Calculate XOR distance between cycle marker and the signer of the certificate's node ID
     const certDist = utils.XOR(certificate.marker, certificate.signer)
 
     // If we don't have a best cert for this cycle yet, just add this cert
     if (!this.currentCycle.metadata.bestCertDist) {
       addCert(certificate, certDist)
-      return true
+      return [true]
     }
 
     // If the cert distance for this cert is less than the current best, return false
@@ -650,12 +691,12 @@ class P2PState {
       this.mainLogger.debug('Certificate not added. Current certificate is better.')
       this.mainLogger.debug(`Current certificate distance from cycle marker: ${this.currentCycle.metadata.bestCertDist}`)
       this.mainLogger.debug(`This certificate distance from cycle marker: ${certDist}`)
-      return false
+      return [false, 'not_better']
     }
 
     // Otherwise, we have the new best, add it and return true
     addCert(certificate, certDist)
-    return true
+    return [true]
   }
 
   getCycles (start = 0, end = this.cycles.length) {
