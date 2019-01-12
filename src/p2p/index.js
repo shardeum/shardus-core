@@ -29,6 +29,7 @@ class P2P {
     this.gossipRecipients = config.gossipRecipients
     this.gossipTimeout = config.gossipTimeout * 1000
     this.gossipedHashes = new Map()
+    this.gossipedHashesSent = new Map() // TODO Perf: both of these lists need some eventual cleaning.  Perferably keep a sorted list also and periodically remove expired messages from the map and list
 
     this.state = new P2PState(config, this.logger, this.storage, this, this.crypto)
     this.dataSync = accountUtility ? new DataSync(config, this.logger, this.storage, this, this.crypto, accountUtility) : null
@@ -974,7 +975,7 @@ class P2P {
     const gossipPayload = { type: type, data: payload }
 
     const gossipHash = this.crypto.hash(gossipPayload)
-    if (this.gossipedHashes.has(gossipHash)) {
+    if (this.gossipedHashesSent.has(gossipHash)) {
       this.mainLogger.debug(`Gossip already sent: ${gossipHash.substring(0, 5)}`)
       return
     }
@@ -986,7 +987,7 @@ class P2P {
     } catch (ex) {
       this.mainLogger.error(`Failed to sendGossip(${JSON.stringify(payload)}) Exception => ${ex}`)
     }
-    this.gossipedHashes.set(gossipHash, false)
+    this.gossipedHashesSent.set(gossipHash, false)
     this.mainLogger.debug(`End of sendGossip(${JSON.stringify(payload)})`)
   }
 
