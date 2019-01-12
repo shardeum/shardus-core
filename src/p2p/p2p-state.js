@@ -248,17 +248,12 @@ class P2PState {
     }
 
     this.mainLogger.debug(`Type of status update: ${type}`)
-<<<<<<< HEAD
 
     // Finally add the update after all validation has passed
     this.currentCycle.updates[status].push(update)
     utils.insertSorted(this.currentCycle.data[type], nodeId)
     // Mark node as seen for this cycle
     this._markNodeAsSeen(nodeId)
-=======
-    // TODO: Insert sorted
-    this.currentCycle[type].push(nodeId)
->>>>>>> Remove cycle cert from cycle hash, add comment describing process of app specific join request validation
     this.mainLogger.debug(`Node ${nodeId} added to ${type} list for this cycle.`)
     return true
   }
