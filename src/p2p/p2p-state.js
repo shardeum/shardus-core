@@ -598,7 +598,7 @@ class P2PState {
       for (let i = 0; i < cycles.length; i++) {
         const certificate = certificates[i]
         this.certificates.push(certificate)
-        cycle.certificate = certificate
+        cycles[i].certificate = certificate
       }
     }
     await this.storage.addCycles(cycles)
