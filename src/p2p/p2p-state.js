@@ -664,14 +664,10 @@ class P2PState {
     return cert
   }
 
-<<<<<<< HEAD
   addCertificate (certificate, fromNetwork = false) {
-=======
   // TODO: make sure cycle marker is what we think it should be
   // ----- whenever it is different, we shouldn't go with it naively
   // ----- whenever it is different, we should get cycle data from the node that reported it as different
-  addCertificate (certificate) {
->>>>>>> Remove cycle cert from cycle hash, add comment describing process of app specific join request validation
     const addCert = (cert, dist) => {
       this.currentCycle.data.certificate = cert
       this.currentCycle.metadata.bestCertDist = dist
