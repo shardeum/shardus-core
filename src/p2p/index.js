@@ -565,7 +565,7 @@ class P2P {
 
   _verifyCycleChain (cycleChain, cycleChainHash) {
     this.mainLogger.debug(`Given cycle chain: ${JSON.stringify(cycleChain)}`)
-    const ourHash = this.crypto.hash(cycleChain)
+    const ourHash = this.crypto.hash({ cycleChain })
     this.mainLogger.debug(`Our cycle chain hash: ${ourHash}`)
     this.mainLogger.debug(`Given cycle chain hash: ${cycleChainHash}`)
     return ourHash === cycleChainHash
@@ -616,12 +616,12 @@ class P2P {
 
   async _fetchVerifiedCycleChain (nodes, cycleChainHash, start, end) {
     let queryFn = async (node) => {
-      const { cycleChain } = await this.ask(node, 'cyclechain', { start, end })
-      return { cycleChain }
+      const chainAndCerts = await this.ask(node, 'cyclechain', { start, end })
+      return chainAndCerts
     }
-    let verifyFn = (cycleChain) => this._verifyCycleChain(cycleChain, cycleChainHash)
-    const { cycleChain } = await this._sequentialQuery(nodes, queryFn, verifyFn)
-    return cycleChain
+    let verifyFn = ({ cycleChain }) => this._verifyCycleChain(cycleChain, cycleChainHash)
+    const chainAndCerts = await this._sequentialQuery(nodes, queryFn, verifyFn)
+    return chainAndCerts
   }
 
   async _fetchLatestCycleChain (seedNodes, nodes) {
@@ -657,16 +657,16 @@ class P2P {
     this.mainLogger.debug(`Fetched cycle chain hash: ${cycleChainHash}`)
 
     // Get verified cycle chain
-    let cycleChain
+    let chainAndCerts
     try {
-      cycleChain = await this._fetchVerifiedCycleChain(nodes, cycleChainHash, chainStart, chainEnd)
+      chainAndCerts = await this._fetchVerifiedCycleChain(nodes, cycleChainHash, chainStart, chainEnd)
     } catch (e) {
       this.mainLogger.info('Could not get verified cycleChain from nodes. Querying seedNodes for it...')
       this.mainLogger.debug(e)
-      cycleChain = await this._fetchVerifiedCycleChain(seedNodes, cycleChainHash, chainStart, chainEnd)
+      chainAndCerts = await this._fetchVerifiedCycleChain(seedNodes, cycleChainHash, chainStart, chainEnd)
     }
 
-    return cycleChain
+    return chainAndCerts
   }
 
   async _fetchUnfinalizedCycle (nodes) {
@@ -828,10 +828,10 @@ class P2P {
     this.mainLogger.debug('Fetching latest cycle chain...')
     const nodes = this.state.getActiveNodes()
     // const nodes = this.seedNodes
-    const cycleChain = await this._fetchLatestCycleChain(this.seedNodes, nodes)
+    const { cycleChain, cycleMarkerCerts } = await this._fetchLatestCycleChain(this.seedNodes, nodes)
     this.mainLogger.debug(`Retrieved cycle chain: ${JSON.stringify(cycleChain)}`)
     try {
-      await this.state.addCycles(cycleChain)
+      await this.state.addCycles(cycleChain, cycleMarkerCerts)
     } catch (e) {
       this.mainLogger.error(e)
       this.mainLogger.info('Unable to add cycles. Sync failed...')
