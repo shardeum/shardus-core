@@ -572,7 +572,7 @@ class P2PState {
       this.mainLogger.info('Unable to add unfinalized cycle. Cycle not given.')
       return false
     }
-    const { start, duration } = cycle
+    const { data: { start, duration } } = cycle
     const currTime = utils.getTime('s')
     const toWait = ((start + duration) - currTime) * 1000
     this.currentCycle = cycle
