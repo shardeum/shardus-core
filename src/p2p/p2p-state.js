@@ -234,7 +234,7 @@ class P2PState {
       ;({ publicKey } = this.getNode(nodeId))
     } catch (e) {
       this.mainLogger.debug(e)
-      ;({ publicKey } = null)
+      publicKey = null
     }
     if (!publicKey) {
       this.mainLogger.debug('Unknown node ID in status update.')

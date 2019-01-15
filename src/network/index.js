@@ -51,7 +51,7 @@ class Network {
       if (!data) throw new Error('No data provided in request...')
       const { route, payload } = data
       if (!route) {
-        this.mainLogger.debug(`Payload of received message: ${JSON.stringify(data)}`)
+        this.mainLogger.debug(`Unable to read request, payload of received message: ${JSON.stringify(data)}`)
         throw new Error('Unable to read request, no route specified.')
       }
       if (!this.internalRoutes[route]) throw new Error('Unable to handle request, invalid route.')

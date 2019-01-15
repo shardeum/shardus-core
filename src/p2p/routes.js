@@ -153,7 +153,9 @@ function setupRoutes () {
         case 'not_better':
           return
         case 'diff_cm':
+          console.log(sender)
           const cycleUpdates = await this._requestCycleUpdates(sender)
+          console.log(cycleUpdates)
           const cycleUpdated = await this.state.addCycleUpdates(cycleUpdates)
           if (!cycleUpdated) return
           // Try to see if they had the same cycle marker, and if they did, check if their cert is better

@@ -944,17 +944,22 @@ class P2P {
   }
 
   _extractPayload (wrappedPayload, nodeGroup) {
+    if (wrappedPayload.error) {
+      const error = wrappedPayload.error
+      this.mainLogger.debug(`Failed to extract payload. Error: ${error}`)
+      return [null]
+    }
     // Check to see if node is in expected node group
     const node = this._findNodeInGroup(wrappedPayload.sender, nodeGroup)
     if (!node) {
       this.mainLogger.debug(`Invalid sender on internal payload: ${JSON.stringify(wrappedPayload)}`)
-      return null
+      return [null]
     }
     const signedByNode = this._verifySignedByNode(wrappedPayload, node)
     // Check if actually signed by that node
     if (!signedByNode) {
       this.mainLogger.debug('Internal payload not signed by an expected node.')
-      return null
+      return [null]
     }
     const payload = wrappedPayload.payload
     const sender = wrappedPayload.sender
@@ -985,7 +990,9 @@ class P2P {
     const signedResponse = await this.network.ask(node, route, signedMessage)
     this.mainLogger.debug(`Result of network-level ask: ${JSON.stringify(signedResponse)}`)
     const [response] = this._extractPayload(signedResponse, [node])
-    if (!response) throw new Error(`Unable to verify response to ask request: ${route} -- ${JSON.stringify(message)} from node: ${node.id}`)
+    if (!response) {
+      throw new Error(`Unable to verify response to ask request: ${route} -- ${JSON.stringify(message)} from node: ${node.id}`)
+    }
     return response
   }
 
@@ -995,6 +1002,7 @@ class P2P {
       // We have internal requests turned off until we have the node list
       if (!this.acceptInternal) {
         this.mainLogger.debug('We are not currently accepting internal requests...')
+        await respond({ success: false, error: 'not_accepting' })
         return
       }
       // Create wrapped respond function for sending back signed data
@@ -1006,7 +1014,8 @@ class P2P {
       // Checks to see if we can extract the actual payload from the wrapped message
       const [payload, sender] = this._extractPayload(wrappedPayload, this.state.getAllNodes(this.id))
       if (!payload) {
-        await respondWrapped({ success: false, error: 'invalid or missing signature' })
+        console.log(respondWrapped.toString())
+        await respondWrapped({ success: false, error: 'missing_sig' })
         return
       }
       await handler(payload, respondWrapped, sender)
