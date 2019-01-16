@@ -93,9 +93,10 @@ class Reporter {
       const txInjected = this._txInjected
       const txApplied = this._txApplied
       const reportInterval = this.config.interval
+      const nodeIpInfo = this.p2p.getIpInfo()
 
       try {
-        await this._sendReport({ appState, cycleMarker, nodelistHash, txInjected, txApplied, reportInterval })
+        await this._sendReport({ appState, cycleMarker, nodelistHash, txInjected, txApplied, reportInterval, nodeIpInfo })
       } catch (e) {
         this.mainLogger.error(e)
         console.error(e)
