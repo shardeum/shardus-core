@@ -118,6 +118,20 @@ function setupRoutes () {
   this.registerInternal('cycleupdates', async (payload, respond) => {
     const cycleUpdates = this.state.currentCycle.updates
     await respond({ cycleUpdates })
+    // Correct yourself if the askers cycleUpdates are better
+    const hisCycleUpdates = payload.myCycleUpdates
+    const hisCertificate = payload.myCertificate
+    console.log(hisCycleUpdates)
+    const cycleUpdated = await this.state.addCycleUpdates(hisCycleUpdates)
+    if (!cycleUpdated) return
+    // Try to see if they had the same cycle marker, and if they did, check if their cert is better
+    this.state.addcertificate(hisCertificate, true)
+    // const [added] = this.state.addcertificate(hiscertificate, true)
+    // if (!added) {
+    //   const ourcert = this.state.getcurrentcertificate()
+    //   this.sendgossip('certificate', ourcert)
+    //   return
+    // }
   })
 
   // -------- GOSSIP Routes ----------

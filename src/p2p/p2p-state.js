@@ -550,8 +550,9 @@ class P2PState {
       if (this.shouldStop) return
       this._startNewCycle()
     }, endTime)
-    // TODO: Make it so seed node doesn't need to call this when alone
-    // if (!this.currentCycle.metadata.receivedCerts) await this.p2p.requestUpdatesFromRandom()
+    if (this.getActiveNodes(this.p2p.id).length > 0) {
+      if (!this.currentCycle.metadata.receivedCerts) await this.p2p.requestUpdatesFromRandom()
+    }
     this.unfinalizedReady = true
   }
 

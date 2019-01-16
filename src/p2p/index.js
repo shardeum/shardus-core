@@ -691,7 +691,9 @@ class P2P {
 
   async _requestCycleUpdates (nodeId) {
     const node = this.state.getNode(nodeId)
-    const { cycleUpdates } = await this.ask(node, 'cycleupdates')
+    const myCycleUpdates = this.state.currentCycle.updates
+    const myCertificate = this.state.getCurrentCertificate()
+    const { cycleUpdates } = await this.ask(node, 'cycleupdates', { myCycleUpdates, myCertificate })
     return cycleUpdates
   }
 
