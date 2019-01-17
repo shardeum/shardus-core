@@ -27,6 +27,8 @@ class Consensus {
     this.queueCounter = 0
     this.queueLocked = false
     this.queueSitTime = 3000 // todo make this a setting. and tie in with the value in datasync
+    this.lastServed = 0
+
     // Register Gossip Handlers with P2P
     this.p2p.registerGossipHandler('receipt', async (data) => {
       if (!this.consensusActive) {
@@ -58,8 +60,6 @@ class Consensus {
   }
 
   async inject (shardusTransaction) {
-    // TODO: Make this report more robust, actually make sure that we are getting all injected txs from app
-    if (this.reporter) this.reporter.incrementTxInjected()
     if (this.mainLogs) this.mainLogger.debug(`Start of inject(${shardusTransaction})`)
     let transactionReceipt
     let inTransaction = shardusTransaction.inTransaction
@@ -120,6 +120,7 @@ class Consensus {
 
   // changed to {shardusTransaction, transactionReceipt} to fix out of order messaging.  real consensus will need to have a queue to apply changes
   async onReceipt (data) {
+    this.profiler.profileSectionStart('onReceipt')
     if (this.mainLogs) this.mainLogger.debug(`Start of onReciept`)
     // const shardusTransaction = this.pendingTransactions[receipt.txHash]
     const shardusTransaction = data.shardusTransaction
@@ -180,10 +181,11 @@ class Consensus {
 
       this.accountUtility.acceptTransaction(transaction, receipt)
       // TODO: Make this more robust, actually make sure the application has applied tx
-      if (this.reporter) this.reporter.incrementTxApplied()
+      // if (this.reporter) this.reporter.incrementTxApplied()
     } catch (ex) {
       this.fatalLogger.fatal(`Failed to process receipt. Exception: ${ex}`)
     } finally {
+      this.profiler.profileSectionEnd('onReceipt')
       this.unlockQueue(ourLock)
     }
     if (this.mainLogs) this.mainLogger.debug(`End of onReceipt`)
@@ -219,16 +221,35 @@ class Consensus {
       this.queueAndDelayList.splice(index + 1, 0, entry)
     }
 
+    // utils.insertSorted(this.queueAndDelayList, entry, (a, b) => (a.timestamp > b.timestamp || (a.timestamp === b.timestamp && a.tieBreaker > b.tieBreaker)) ? 1 : -1)
+
+    // this.mainLogger.debug(`list results: start`)
+    // for (let i = 0; i < this.queueAndDelayList.length; i++) {
+    //   this.mainLogger.debug(`list results: ${JSON.stringify(this.queueAndDelayList[i])}`)
+    // }
+
     // Sleep until it is a valid time for us to do work
     await utils.sleep(soonestExecute)
 
     // wait till we are at the front of the queue, and the queue is not locked
-    while (this.queueAndDelayList[0].id !== ourID && this.queueLocked) {
-      await utils.sleep(2)
+    while (this.queueAndDelayList[0].id !== ourID || this.queueLocked) {
+      // perf optimization to reduce the amount of times we have to sleep (attempt to come out of sleep at close to the right time)
+      let sleepEstimate = ourID - this.lastServed
+      if (sleepEstimate < 1) {
+        sleepEstimate = 1
+      }
+      await utils.sleep(5 * sleepEstimate)
+      // await utils.sleep(2)
     }
+
+    // remove our entry from the array
+    this.queueAndDelayList.shift()
+
+    // this.mainLogger.debug(`queueAndDelay next TS ${timestamp}`)
     // lock things so that only our calling function can do work
     this.queueLocked = true
     this.lockOwner = ourID
+    this.lastServed = ourID
     return ourID
   }
 

@@ -1,11 +1,12 @@
 const http = require('../http')
 
 class Reporter {
-  constructor (config, logger, p2p, shardus) {
+  constructor (config, logger, p2p, shardus, profiler) {
     this.config = config
     this.mainLogger = logger.getLogger('main')
     this.p2p = p2p
     this.shardus = shardus
+    this.profiler = profiler
 
     this.reportTimer = null
     this._txInjected = 0
@@ -22,6 +23,14 @@ class Reporter {
     this.p2p.registerOnActive((nodeId) => {
       return this.reportActive(nodeId)
     })
+
+    this.lastTime = Date.now
+
+    this.doConsoleReport = false
+    if (this.config.console === true) {
+      this.doConsoleReport = true
+    }
+    this.hasRecipient = this.config.recipient != null
   }
 
   incrementTxInjected () {
@@ -42,6 +51,9 @@ class Reporter {
   }
 
   async reportJoining (publicKey) {
+    if (!this.hasRecipient) {
+      return
+    }
     try {
       await http.post(`${this.config.recipient}/joining`, { publicKey })
     } catch (e) {
@@ -51,6 +63,9 @@ class Reporter {
   }
 
   async reportJoined (nodeId, publicKey) {
+    if (!this.hasRecipient) {
+      return
+    }
     try {
       await http.post(`${this.config.recipient}/joined`, { publicKey, nodeId })
     } catch (e) {
@@ -60,6 +75,9 @@ class Reporter {
   }
 
   async reportActive (nodeId) {
+    if (!this.hasRecipient) {
+      return
+    }
     try {
       await http.post(`${this.config.recipient}/active`, { nodeId })
     } catch (e) {
@@ -70,6 +88,9 @@ class Reporter {
 
   // Sends a report
   async _sendReport (data) {
+    if (!this.hasRecipient) {
+      return
+    }
     const nodeId = this.p2p.getNodeId()
     if (!nodeId) throw new Error('No node ID available to the Reporter module.')
     const report = {
@@ -102,8 +123,26 @@ class Reporter {
         console.error(e)
       }
 
+      if (this.doConsoleReport) {
+        this.consoleReport()
+      }
+
       this._resetTxsSeen()
     }, this.config.interval * 1000)
+  }
+
+  consoleReport () {
+    let time = Date.now()
+    let delta = time - this.lastTime
+    delta = delta * 0.001
+    let report = `Perf inteval ${delta}    ${this._txInjected} Injected @${this._txInjected / delta} per second.    ${this._txApplied} Applied @${this._txApplied / delta} per second`
+    this.lastTime = time
+
+    console.log(report)
+
+    if (this.profiler) {
+      this.profiler.printAndClearReport(delta)
+    }
   }
 
   stopReporting () {

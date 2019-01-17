@@ -490,6 +490,8 @@ class DataSync {
     let missingTXs = 0
     let handledButOk = 0
     let missingButOkAccountIDs = {}
+
+    this.mainLogger.debug(`DATASYNC: processAccountData stateTableCount: ${this.inMemoryStateTableData.length}`)
     // For each account in the Account data make sure the entry in the Account State Table has the same State_after value; if not remove the record from the Account data
     for (let stateData of this.inMemoryStateTableData) {
       account = this.mapAccountData[stateData.accountId]
@@ -542,20 +544,24 @@ class DataSync {
     //   For each account in the Account State Table make sure the entry in Account data has the same State_after value; if not save the account id to be looked up later
     this.accountsWithStateConflict = []
     this.goodAccounts = []
+    let noSyncData = 0
+    let noMatches = 0
     for (let account of this.combinedAccountData) {
       if (!account.syncData) {
         // this account was not found in state data
         this.accountsWithStateConflict.push(account)
+        noSyncData++
       } else if (!account.syncData.anyMatch) {
         // this account was in state data but none of the state table stateAfter matched our state
         this.accountsWithStateConflict.push(account)
+        noMatches++
       } else {
         delete account.syncData
         this.goodAccounts.push(account)
       }
     }
 
-    this.mainLogger.debug(`DATASYNC: processAccountData saving ${this.goodAccounts.length} of ${this.combinedAccountData.length} records to db`)
+    this.mainLogger.debug(`DATASYNC: processAccountData saving ${this.goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk}`)
     // failedHashes is a list of accounts that failed to match the hash reported by the server
     let failedHashes = await this.accountUtility.setAccountData(this.goodAccounts) // repeatable form may need to call this in batches
 

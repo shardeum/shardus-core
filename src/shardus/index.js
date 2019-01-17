@@ -7,17 +7,19 @@ const Network = require('../network')
 const utils = require('../utils')
 const Consensus = require('../consensus')
 const Reporter = require('../reporter')
+const Profiler = require('../utils/profiler.js')
 const allZeroes64 = '0'.repeat(64)
 
 class Shardus {
   constructor ({ server: config, logs: logsConfig, storage: storageConfig }) {
+    this.profiler = new Profiler()
     this.config = config
     this.verboseLogs = false
     this.logger = new Logger(config.baseDir, logsConfig)
     this.mainLogger = this.logger.getLogger('main')
     this.fatalLogger = this.logger.getLogger('fatal')
     this.exitHandler = new ExitHandler()
-    this.storage = new Storage(config.baseDir, storageConfig, this.logger)
+    this.storage = new Storage(config.baseDir, storageConfig, this.logger, this.profiler)
     this.crypto = {}
     this.network = new Network(config.network, this.logger)
     this.p2p = {}
@@ -130,20 +132,21 @@ class Shardus {
   }
 
   isTransactionTimestampExpired (txnTimestamp) {
-    this.mainLogger.debug(`Start of isTransactionTimestampExpired(${txnTimestamp})`)
+    // this.mainLogger.debug(`Start of isTransactionTimestampExpired(${txnTimestamp})`)
     let transactionExpired = false
     const txnExprationTime = this.config.transactionExpireTime
     const currNodeTimestamp = Date.now()
 
-    this.mainLogger.debug(`Transaction Timestamp: ${txnTimestamp} CurrNodeTimestamp: ${currNodeTimestamp}
-    txnExprationTime: ${txnExprationTime}`)
     const txnAge = currNodeTimestamp - txnTimestamp
-    this.mainLogger.debug(`TransactionAge: ${txnAge}`)
+    this.mainLogger.debug(`Transaction Timestamp: ${txnTimestamp} CurrNodeTimestamp: ${currNodeTimestamp}
+    txnExprationTime: ${txnExprationTime}   TransactionAge: ${txnAge}`)
+
+    // this.mainLogger.debug(`TransactionAge: ${txnAge}`)
     if (txnAge >= (txnExprationTime * 1000)) {
       this.fatalLogger.error(`Transaction Expired`)
       transactionExpired = true
     }
-    this.mainLogger.debug(`End of isTransactionTimestampExpired(${txnTimestamp})`)
+    // this.mainLogger.debug(`End of isTransactionTimestampExpired(${txnTimestamp})`)
     return transactionExpired
   }
 
@@ -152,6 +155,9 @@ class Shardus {
    */
 
   async put (req, res) {
+    let transactionOk = false
+    if (this.reporter) this.reporter.incrementTxInjected()
+
     if (!this.appProvided) throw new Error('Please provide an App object to Shardus.setup before calling Shardus.put')
     if (this.verboseLogs) this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(req.body)}`)
     // retrieve incoming transaction from HTTP request
@@ -188,10 +194,14 @@ class Shardus {
       // QUEUE delay system...
       ourLock = await this.consensus.queueAndDelay(txnTimestamp, txId)
 
+      this.profiler.profileSectionStart('put')
+
       if (this.verboseLogs) this.mainLogger.debug(`ShardusTransaction: ${shardusTransaction}`)
 
       // Validate transaction through the application. Shardus can see inside the transaction
+      this.profiler.profileSectionStart('validateTx')
       let transactionValidateResult = await this.app.validateTransaction(inTransaction)
+      this.profiler.profileSectionEnd('validateTx')
       if (transactionValidateResult.result !== 'pass') {
         this.mainLogger.error(`Failed to validate transaction. Reason: ${transactionValidateResult.reason}`)
         return { success: false, reason: transactionValidateResult.reason }
@@ -201,21 +211,35 @@ class Shardus {
       if (this.verboseLogs) this.mainLogger.debug('Transaction Valided')
       // Perform Consensus -- Currently no algorithm is being used
       // let nodeList = await this.storage.getNodes()
+      this.profiler.profileSectionStart('consensusInject')
       let transactionReceipt = await this.consensus.inject(shardusTransaction)
+      this.profiler.profileSectionEnd('consensusInject')
       if (this.verboseLogs) this.mainLogger.debug(`Received Consensus. Receipt: ${JSON.stringify(transactionReceipt)}`)
       // Apply the transaction
-      await this.acceptTransaction(inTransaction, transactionReceipt, true)
+      this.profiler.profileSectionStart('acceptTx')
+      transactionOk = await this.acceptTransaction(inTransaction, transactionReceipt, true)
+      this.profiler.profileSectionEnd('acceptTx')
     } catch (ex) {
       this.fatalLogger.fatal(`Failed to process transaction. Exception: ${ex}`)
-      return { success: false, reason: `Failed to process trasnaction: ${JSON.parse(inTransaction)} ${ex}` }
+      return { success: false, reason: `Failed to process trasnaction: ${JSON.stringify(inTransaction)} ${ex}` }
     } finally {
+      // this.profiler.profileSectionEnd('acceptTx')
+      // this.profiler.profileSectionEnd('validateTx')
+      this.profiler.profileSectionEnd('put')
       this.consensus.unlockQueue(ourLock)
+      if (!transactionOk) {
+        this.mainLogger.debug('Transaction result failed: ' + JSON.stringify(inTransaction))
+      }
     }
-    if (this.verboseLogs) this.mainLogger.debug(`End of injectTransaction ${inTransaction}`)
+    if (transactionOk) {
+      this.mainLogger.debug('Transaction result ok: ' + JSON.stringify(inTransaction))
+    }
+    if (this.verboseLogs) this.mainLogger.debug(`End of injectTransaction ${JSON.stringify(inTransaction)}`)
     return { success: true, reason: 'Transaction successfully processed' }
   }
 
   async acceptTransaction (tx, receipt, gossipTx = false) {
+    this.profiler.profileSectionStart('acceptTx-teststate')
     let { success, hasStateTableData } = await this.testAccountStateTable(tx)
     let timestamp = tx.txnTimestmp
     if (!success) {
@@ -223,24 +247,41 @@ class Shardus {
       console.log(errorMsg)
       throw new Error(errorMsg)
     }
+    this.profiler.profileSectionEnd('acceptTx-teststate')
 
+    this.profiler.profileSectionStart('acceptTx-apply')
     // app applies data
     let { stateTableResults, txId, txTimestamp } = await this.app.apply(tx)
     // TODO post enterprise:  the stateTableResults may need to be a map with keys so we can choose which one to actually insert in our accountStateTable
+    this.profiler.profileSectionEnd('acceptTx-apply')
 
+    if (this.reporter) this.reporter.incrementTxApplied()
+
+    this.profiler.profileSectionStart('acceptTx-addAccepted')
     let txStatus = 1 // TODO m15: unhardcode this
     // store transaction in accepted table
     let acceptedTX = { id: txId, timestamp: txTimestamp, data: tx, status: txStatus, receipt: receipt }
     await this.storage.addAcceptedTransactions([acceptedTX])
+    this.profiler.profileSectionEnd('acceptTx-addAccepted')
 
+    // this.profiler.profileSectionStart('acceptTx-addAccepted2')
+    // await this.storage.addAcceptedTransactions2(acceptedTX)
+    // this.profiler.profileSectionEnd('acceptTx-addAccepted2')
+
+    this.profiler.profileSectionStart('acceptTx-addState')
     // query app for account state (or return it from apply)
     // write entry into account state table (for each source or dest account in our shard)
     await this.storage.addAccountStates(stateTableResults)
+    this.profiler.profileSectionEnd('acceptTx-addState')
 
+    this.profiler.profileSectionStart('acceptTx-gossip')
     if (gossipTx) {
       // temporary implementaiton to share transactions
       this.p2p.sendGossip('acceptedTx', acceptedTX)
     }
+    this.profiler.profileSectionEnd('acceptTx-gossip')
+
+    return true
   }
 
   async testAccountStateTable (tx) {
@@ -515,7 +556,7 @@ class Shardus {
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network, this.accountUtility)
     await this.p2p.init()
 
-    this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this) : null
+    this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this, this.profiler) : null
     this.consensus = new Consensus(this.accountUtility, this.config, this.logger, this.crypto, this.p2p, this.storage, null, this.app, this.reporter)
 
     this._registerRoutes()

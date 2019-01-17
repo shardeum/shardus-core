@@ -3,9 +3,12 @@ const path = require('path')
 const Sequelize = require('sequelize')
 const Op = Sequelize.Op
 const models = require('./models')
+var sqlite3 = require('sqlite3').verbose()
+const stringify = require('fast-stable-stringify')
 
 class Storage {
-  constructor (baseDir, config, logger) {
+  constructor (baseDir, config, logger, profiler) {
+    this.profiler = profiler
     // Setup logger
     this.mainLogger = logger.getLogger('main')
     // Create dbDir if it doesn't exist
@@ -18,13 +21,37 @@ class Storage {
     for (let [modelName, modelAttributes] of models) this.sequelize.define(modelName, modelAttributes)
     this.models = this.sequelize.models
     this.initialized = false
+
+    this.db = new sqlite3.Database(path.join(dbDir, 'db2.sqlite')) // ':memory:'
+    // this.db = new sqlite3.Database(':memory:')
+
+    // sqlite3_exec(db, "PRAGMA synchronous = OFF", NULL, NULL, &sErrMsg);
+    // sqlite3_exec(db, "PRAGMA journal_mode = MEMORY", NULL, NULL, &sErrMsg);
+    this.run('PRAGMA synchronous = OFF')
+    this.run('PRAGMA journal_mode = MEMORY')
+
+    this.run('PRAGMA synchronous = OFF')
+    this.run('PRAGMA journal_mode = MEMORY')
+
+    this._rawQuery(this.models.acceptedTxs, 'PRAGMA synchronous = OFF')
+    this._rawQuery(this.models.acceptedTxs, 'PRAGMA journal_mode = MEMORY')
   }
 
   async init () {
     // Create tables for models in DB if they don't exist
-    for (let model of Object.values(this.models)) await model.sync()
+    for (let model of Object.values(this.models)) {
+      await model.sync()
+
+      this._rawQuery(model, 'PRAGMA synchronous = OFF')
+      this._rawQuery(model, 'PRAGMA journal_mode = MEMORY')
+    }
+
     this.initialized = true
     this.mainLogger.info('Database initialized.')
+
+    this.db.run('CREATE TABLE `acceptedTxs` (`id` VARCHAR(255) NOT NULL PRIMARY KEY, `timestamp` BIGINT NOT NULL, `data` JSON NOT NULL, `status` VARCHAR(255) NOT NULL, `receipt` JSON NOT NULL, `createdAt` DATETIME NOT NULL, `updatedAt` DATETIME NOT NULL)')
+    this.db.run('CREATE TABLE `accountStates` (`id` INTEGER PRIMARY KEY AUTOINCREMENT, `accountId` VARCHAR(255) NOT NULL, `txId` VARCHAR(255) NOT NULL, `txTimestamp` BIGINT NOT NULL, `stateBefore` VARCHAR(255) NOT NULL, `stateAfter` VARCHAR(255) NOT NULL, `createdAt` DATETIME NOT NULL, `updatedAt` DATETIME NOT NULL, UNIQUE (`accountId`, `txTimestamp`))')
+    // this.db.close()
   }
   async close () {
     this.mainLogger.info('Closing Database connections.')
@@ -198,7 +225,24 @@ class Storage {
   async addAcceptedTransactions (acceptedTransactions) {
     this._checkInit()
     try {
-      await this._create(this.models.acceptedTxs, acceptedTransactions)
+      // await this._create(this.models.acceptedTxs, acceptedTransactions)
+      acceptedTransactions = acceptedTransactions[0] // hack
+      if (acceptedTransactions == null) {
+        console.log('fail no atx')
+        return
+      }
+      let ts = Date.now()
+      let query = `INSERT INTO acceptedTxs (id,timestamp,data,status,receipt,createdAt,updatedAt) VALUES ('${acceptedTransactions.id}', '${acceptedTransactions.timestamp}', '${stringify(acceptedTransactions.data)}', '${acceptedTransactions.status}', '${stringify(acceptedTransactions.receipt)}', '${ts}', '${ts}' )`
+      // console.log('find:' + this.sequelize.QueryTypes.INSERT)
+      // console.log('b' + this.sequelize.QueryType.INSERT)
+      // await this._rawQuery(this.models.acceptedTxs, query)
+      // await this.sequelize.query({ query, values: [] }, { model: this.models.acceptedTxs, type: this.sequelize.QueryType.INSERT })
+      await this.sequelize.query(query, { model: this.models.acceptedTxs, type: this.sequelize.QueryTypes.INSERT })
+
+      // await this._rawQuery(this.models.acceptedTxs, `INSERT INTO acceptedTxs (id,timestamp,data,status,receipt,createdAt,updatedAt) VALUES ("${acceptedTransactions.id}", "${acceptedTransactions.timestamp}", "${stringify(acceptedTransactions.data)}", "${acceptedTransactions.status}", "${stringify(acceptedTransactions.receipt)}", "${ts}", "${ts}" )`)
+      // await this._rawQuery(this.models.acceptedTxs, `INSERT INTO acceptedTxs (id,timestamp,data,status,receipt) VALUES (${acceptedTransactions.id}, ${acceptedTransactions.timestamp}, ${stringify(acceptedTransactions.data)}, ${acceptedTransactions.status}, ${stringify(acceptedTransactions.receipt)} )`)
+      // await this.sequelize.query(`INSERT INTO acceptedTxs (id,timestamp,data,status,receipt,createdAt,updatedAt) VALUES ('${acceptedTransactions.id}', '${acceptedTransactions.timestamp}', '${stringify(acceptedTransactions.data)}', '${acceptedTransactions.status}', '${stringify(acceptedTransactions.receipt)}', '${ts}', '${ts}')`,
+      //   { model: this.models.acceptedTxs, type: this.sequelize.QueryType.INSERT })
     } catch (e) {
       throw new Error(e)
     }
@@ -211,6 +255,52 @@ class Storage {
       throw new Error(e)
     }
   }
+
+  // async function _sleep (ms = 0) {
+  //   return new Promise(resolve => setTimeout(resolve, ms))
+  // }
+
+  run (sql, params = []) {
+    return new Promise((resolve, reject) => {
+      this.db.run(sql, params, function (err) {
+        if (err) {
+          console.log('Error running sql ' + sql)
+          console.log(err)
+          reject(err)
+        } else {
+          resolve({ id: this.lastID })
+        }
+      })
+    })
+  }
+
+  async addAcceptedTransactions2 (acceptedTransactions) {
+    this._checkInit()
+    try {
+      // await this._create(this.models.acceptedTxs, acceptedTransactions) //, Date.now(), Date.now(),
+      // await new Promise(resolve => this.db.run("INSERT INTO acceptedTxs ('id','timestamp','data','status','receipt','createdAt','updatedAt') VALUES (?, ?2, ?3, ?3, ?4, ?5, ?6, ?7)",
+      //   [acceptedTransactions.id, acceptedTransactions.timestamp, acceptedTransactions.data, acceptedTransactions.status, acceptedTransactions.receipt, Date.now(), Date.now()],
+      //   resolve))
+
+      // console.log(' data: ' + JSON.stringify(acceptedTransactions.data))
+      await this.run(`INSERT INTO acceptedTxs (id,timestamp,data,status,receipt,createdAt,updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [acceptedTransactions.id, acceptedTransactions.timestamp, stringify(acceptedTransactions.data), acceptedTransactions.status, stringify(acceptedTransactions.receipt), Date.now(), Date.now()])
+
+      // INSERT INTO `acceptedTxs`(`id`,`timestamp`,`data`,`status`,`receipt`,`createdAt`,`updatedAt`) VALUES (770270327989,0,'','','','','');
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+  async addAccountStates2 (accountStates) {
+    this._checkInit()
+    try {
+      // await this._create(this.models.accountStates, accountStates)
+
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
   async queryAcceptedTransactions (tsStart, tsEnd, limit) {
     this._checkInit()
     try {
@@ -296,6 +386,7 @@ class Storage {
   _checkInit () {
     if (!this.initialized) throw new Error('Storage not initialized.')
   }
+
   _create (table, values, opts) {
     if (Array.isArray(values)) {
       return table.bulkCreate(values, opts)
@@ -317,6 +408,63 @@ class Storage {
   _rawQuery (table, query) {
     return this.sequelize.query(query, { model: table })
   }
+
+  // async _create (table, values, opts) {
+  //   let res = null
+  //   try {
+  //     this.profiler.profileSectionStart('db')
+  //     if (Array.isArray(values)) {
+  //       res = await table.bulkCreate(values, opts)
+  //     }
+  //     res = await table.create(values, opts)
+  //   } finally {
+  //     this.profiler.profileSectionEnd('db')
+  //   }
+  //   return res
+  // }
+  // async _read (table, where, opts) {
+  //   let res = null
+  //   try {
+  //     this.profiler.profileSectionStart('db')
+  //     res = await table.findAll({ where, ...opts })
+  //   } finally {
+  //     this.profiler.profileSectionEnd('db')
+  //   }
+  //   return res
+  // }
+  // async _update (table, values, where, opts) {
+  //   let res = null
+  //   try {
+  //     this.profiler.profileSectionStart('db')
+  //     res = await table.update(values, { where, ...opts })
+  //   } finally {
+  //     this.profiler.profileSectionEnd('db')
+  //   }
+  //   return res
+  // }
+  // async _delete (table, where, opts) {
+  //   let res = null
+  //   try {
+  //     this.profiler.profileSectionStart('db')
+  //     if (!where) {
+  //       res = await table.destroy({ ...opts })
+  //     }
+  //     res = await table.destroy({ where, ...opts })
+  //   } finally {
+  //     this.profiler.profileSectionEnd('db')
+  //   }
+  //   return res
+  // }
+  // async _rawQuery (table, query) {
+  //   let res = null
+  //   try {
+  //     this.profiler.profileSectionStart('db')
+  //     res = await this.sequelize.query(query, { model: table })
+  //   } finally {
+  //     this.profiler.profileSectionEnd('db')
+  //   }
+  //   return res
+  // }
 }
 
 // From: https://stackoverflow.com/a/21196961
