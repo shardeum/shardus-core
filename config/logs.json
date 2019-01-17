@@ -6,18 +6,18 @@
       "out": { "type": "console" },
       "main": {
         "type": "file",
-        "maxLogSize": 1000000,
-        "backups": 3
+        "maxLogSize": 10000000,
+        "backups": 10
       },
       "fatal": {
         "type": "file",
-        "maxLogSize": 1000000,
-        "backups": 3
+        "maxLogSize": 10000000,
+        "backups": 10
       },
       "net": {
         "type": "file",
-        "maxLogSize": 1000000,
-        "backups": 3
+        "maxLogSize": 10000000,
+        "backups": 10
       }
     },
     "categories": {
