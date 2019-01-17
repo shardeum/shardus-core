@@ -1,7 +1,8 @@
 const utils = require('../utils')
 
 class Consensus {
-  constructor (accountUtility, config, logger, crypto, p2p, storage, nodeList, applicationInterfaceImpl, reporter) {
+  constructor (accountUtility, config, logger, crypto, p2p, storage, nodeList, applicationInterfaceImpl, reporter, profiler) {
+    this.profiler = profiler
     this.accountUtility = accountUtility
     this.config = config
     this.logger = logger
