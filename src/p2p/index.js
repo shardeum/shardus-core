@@ -1016,7 +1016,6 @@ class P2P {
       // Checks to see if we can extract the actual payload from the wrapped message
       const [payload, sender] = this._extractPayload(wrappedPayload, this.state.getAllNodes(this.id))
       if (!payload) {
-        console.log(respondWrapped.toString())
         await respondWrapped({ success: false, error: 'missing_sig' })
         return
       }
