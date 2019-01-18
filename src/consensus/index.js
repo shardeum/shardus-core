@@ -239,7 +239,7 @@ class Consensus {
       if (sleepEstimate < 1) {
         sleepEstimate = 1
       }
-      await utils.sleep(5 * sleepEstimate)
+      await utils.sleep(2 * sleepEstimate)
       // await utils.sleep(2)
     }
 

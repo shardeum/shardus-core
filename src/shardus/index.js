@@ -264,15 +264,17 @@ class Shardus {
     await this.storage.addAcceptedTransactions([acceptedTX])
     this.profiler.profileSectionEnd('acceptTx-addAccepted')
 
-    // this.profiler.profileSectionStart('acceptTx-addAccepted2')
-    // await this.storage.addAcceptedTransactions2(acceptedTX)
-    // this.profiler.profileSectionEnd('acceptTx-addAccepted2')
+    // this.profiler.profileSectionStart('acceptTx-addAccepted3')
+    // await this.storage.addAcceptedTransactions3(acceptedTX)
+    // this.profiler.profileSectionEnd('acceptTx-addAccepted3')
 
     this.profiler.profileSectionStart('acceptTx-addState')
     // query app for account state (or return it from apply)
     // write entry into account state table (for each source or dest account in our shard)
     await this.storage.addAccountStates(stateTableResults)
     this.profiler.profileSectionEnd('acceptTx-addState')
+
+    // await this.storage.addAccountStates2(stateTableResults)
 
     this.profiler.profileSectionStart('acceptTx-gossip')
     if (gossipTx) {
@@ -560,6 +562,8 @@ class Shardus {
     this.consensus = new Consensus(this.accountUtility, this.config, this.logger, this.crypto, this.p2p, this.storage, null, this.app, this.reporter, this.profiler)
 
     this._registerRoutes()
+
+    // this.storage.queryAccountStateTable2('0'.repeat(64), 'f'.repeat(64), 0, Date.now())
 
     let started
     try {

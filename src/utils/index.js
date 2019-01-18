@@ -84,6 +84,13 @@ const setAlarm = (callback, timestamp) => {
   setTimeout(callback, toWait)
 }
 
+const isObject = (val) => {
+  if (val === null) {
+    return false
+  }
+  return ((typeof val === 'function') || (typeof val === 'object'))
+}
+
 exports.sleep = sleep
 exports.getTime = getTime
 exports.deepCopy = deepCopy
@@ -92,3 +99,4 @@ exports.readJsonDir = readJsonDir
 exports.insertSorted = insertSorted
 exports.XOR = XOR
 exports.setAlarm = setAlarm
+exports.isObject = isObject
