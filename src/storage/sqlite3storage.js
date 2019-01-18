@@ -310,6 +310,7 @@ class Sqlite3Storage {
     return optionsString
   }
 
+  // run/get/all promise wraps from this tutorial: https://stackabuse.com/a-sqlite-tutorial-with-node-js/
   run (sql, params = []) {
     return new Promise((resolve, reject) => {
       this.db.run(sql, params, function (err) {
