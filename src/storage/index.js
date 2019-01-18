@@ -7,7 +7,8 @@ const stringify = require('fast-stable-stringify')
 // const utils = require('../utils')
 
 // const SequelizeStorage = require('./sequelizeStorage')
-const Sqlite3Storage = require('./sqlite3storage')
+// const Sqlite3Storage = require('./sqlite3storage')
+const BetterSqlite3Storage = require('./betterSqlite3storage')
 
 class Storage {
   constructor (baseDir, config, logger, profiler) {
@@ -16,7 +17,7 @@ class Storage {
     this.mainLogger = logger.getLogger('main')
     // this.storage = new SequelizeStorage(models, config, logger, baseDir, this.profiler)
 
-    this.storage = new Sqlite3Storage(models, config, logger, baseDir, this.profiler)
+    this.storage = new BetterSqlite3Storage(models, config, logger, baseDir, this.profiler)
   }
 
   async init () {

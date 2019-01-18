@@ -17,6 +17,7 @@
     "url": "git@gitlab.com:shardus/enterprise/shardus-enterprise-server.git"
   },
   "dependencies": {
+    "better-sqlite3": "5.3.0",
     "body-parser": "1.18.3",
     "cors": "2.8.5",
     "deepmerge": "2.2.1",
