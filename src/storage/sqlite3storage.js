@@ -28,9 +28,11 @@ class Sqlite3Storage {
       this.sqlite3Define(modelName, modelAttributes)
     }
 
-    this.db = new sqlite3.Database(':memory:')
-    // this.db = new sqlite3.Database(storageConfig.options.storage)
-    // this.db = new sqlite3.Database(path.join(dbDir, 'db2.sqlite')) // ':memory:'
+    if (storageConfig.options.memoryFile) {
+      this.db = new sqlite3.Database(':memory:')
+    } else {
+      this.db = new sqlite3.Database(storageConfig.options.storage)
+    }
   }
 
   sqlite3Define (modelName, modelAttributes) {
