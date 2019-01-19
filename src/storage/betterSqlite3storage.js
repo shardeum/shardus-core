@@ -6,7 +6,7 @@ var sqlite3 = require('better-sqlite3')
 const stringify = require('fast-stable-stringify')
 const utils = require('../utils')
 
-class Sqlite3Storage {
+class BetterSqlite3Storage {
   // note that old storage passed in logger, now we pass in the specific log for it to use.  This works for application use, but may need to rethink if we apply this to shardus core
   constructor (models, storageConfig, logger, baseDir, profiler) {
     this.profiler = profiler
