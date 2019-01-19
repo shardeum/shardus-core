@@ -119,13 +119,22 @@ function setupRoutes () {
     const cycleUpdates = this.state.currentCycle.updates
     await respond({ cycleUpdates })
     // Update your cycle and remake a cert if the askers cycleUpdates are better
-    this.mainLogger.debug('Got asked for updates; will update our cycle if we are out of sync...')
-    const { myCycleUpdates: hisCycleUpdates, myCertificate: hisCertificate }= payload.myCycleUpdates
+    if (!payload) {
+      this.mainLogger.debug('No payload provided with cycleupdate request.')
+      return
+    }
+    const hisCycleUpdates = payload.myCycleUpdates
+    const hisCertificate = payload.myCertificate
+    if (!hisCycleUpdates || !hisCertificate) {
+      this.mainLogger.debug('Invalid payload provided with cycleupdates request.')
+      return
+    }
     const cycleUpdated = await this.state.addCycleUpdates(hisCycleUpdates)
-    if (!cycleUpdated) return
-    this.mainLogger.debug('Our cycle was bad, it has been corrected.')
-    // Use the askers cert if its better than the one you made
-    this.state.addCertificate(hisCertificate, true)
+    if (cycleUpdated) {
+      this.mainLogger.debug('Updated our cycle data after getting a cycleupdates request.')
+      // Use the askers cert if its better than the one you made
+      this.state.addCertificate(hisCertificate, true)
+    }
   })
 
   // -------- GOSSIP Routes ----------
