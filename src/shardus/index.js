@@ -245,7 +245,7 @@ class Shardus {
   async acceptTransaction (tx, receipt, gossipTx = false) {
     this.profiler.profileSectionStart('acceptTx-teststate')
     let { success, hasStateTableData } = await this.testAccountStateTable(tx)
-    let timestamp = tx.txnTimestmp
+    let timestamp = tx.txnTimestamp
     if (!success) {
       let errorMsg = 'acceptTransaction ' + timestamp + ' failed. has state table data: ' + hasStateTableData
       console.log(errorMsg)
@@ -295,7 +295,7 @@ class Shardus {
     let { sourceKeys, targetKeys } = keysResponse
     let sourceAddress, targetAddress, sourceState, targetState
 
-    let timestamp = tx.txnTimestmp
+    let timestamp = tx.txnTimestamp
 
     let hasStateTableData = false
     if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
@@ -354,7 +354,7 @@ class Shardus {
   async tryApplyTransaction (acceptedTX) {
     let tx = acceptedTX.data
     let receipt = acceptedTX.receipt
-    let timestamp = tx.txnTimestmp // TODO m11: need to push this to application method thta cracks the transaction
+    let timestamp = tx.txnTimestamp // TODO m11: need to push this to application method thta cracks the transaction
     if (this.verboseLogs) console.log('tryApplyTransaction ' + timestamp)
     if (this.verboseLogs) this.mainLogger.debug('DATASYNC: tryApplyTransaction ' + timestamp)
 

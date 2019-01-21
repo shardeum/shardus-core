@@ -36,7 +36,7 @@ class Consensus {
         return
       }
       if (await this.onReceipt(data)) {
-        console.log('onReceipt: ' + data.shardusTransaction.inTransaction.txnTimestmp) // todo remove
+        console.log('onReceipt: ' + data.shardusTransaction.inTransaction.txnTimestamp) // todo remove
         this.p2p.sendGossip('receipt', data, this.p2p.state.getAllNodes(this.p2p.id))
       }
     })
@@ -143,7 +143,7 @@ class Consensus {
         return false
       }
 
-      let timestamp = transaction.txnTimestmp
+      let timestamp = transaction.txnTimestamp
       // QUEUE delay system...
       ourLock = await this.queueAndDelay(transaction, receipt.txHash)
 
