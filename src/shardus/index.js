@@ -80,6 +80,8 @@ class Shardus {
     this.exitHandler.registerAsync('logger', () => {
       return this.logger.shutdown()
     })
+
+    this.logger.playbackLogState('constructed', '', '')
   }
 
   _registerRoutes () {
@@ -125,6 +127,7 @@ class Shardus {
       this.accountUtility = this.getAccountUtilityInterface(app)
       this.app = this.getApplicationInterface(app)
       this.appProvided = true
+      this.logger.playbackLogState('appProvided', '', '')
     } else {
       throw new Error('Please provide an App object or null to Shardus.setup.')
     }

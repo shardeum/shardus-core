@@ -7,6 +7,7 @@ class Network {
   constructor (config, logger) {
     this.app = express()
     this.qn = null
+    this.logger = logger
     this.mainLogger = logger.getLogger('main')
     this.netLogger = logger.getLogger('net')
     this.ipInfo = {}
@@ -14,6 +15,12 @@ class Network {
     this.internalRoutes = {}
     this.extServer = null
     this.intServers = null
+
+    this.verboseLogsNet = false
+    if (this.netLogger && ['TRACE'].includes(this.netLogger.level.levelStr)) {
+      this.verboseLogsNet = true
+    }
+    // console.log('NETWORK LOGGING ' + this.verboseLogsNet + '  ' + this.netLogger.level.levelStr)
   }
 
   // TODO: Allow for binding to a specified network interface
@@ -22,11 +29,13 @@ class Network {
       const self = this
       const storeRequests = function (req, res, next) {
         if (req.url !== '/test') {
-          self.netLogger.debug(JSON.stringify({
-            url: req.url,
-            method: req.method,
-            body: req.body
-          }))
+          if (self.verboseLogsNet) {
+            self.netLogger.debug(JSON.stringify({
+              url: req.url,
+              method: req.method,
+              body: req.body
+            }))
+          }
         }
         next()
       }
@@ -61,28 +70,32 @@ class Network {
         return
       }
       await handler(payload, respond)
-      this.netLogger.debug(JSON.stringify({
-        url: route,
-        body: payload
-      }))
+      if (this.verboseLogsNet) {
+        this.netLogger.debug(JSON.stringify({
+          url: route,
+          body: payload
+        }))
+      }
     })
     console.log(`Internal server running on port ${this.ipInfo.internalPort}...`)
   }
 
-  async tell (nodes, route, message) {
+  async tell (nodes, route, message, logged = false) {
     const data = { route, payload: message }
     const promises = []
     for (const node of nodes) {
+      if (!logged) this.logger.playbackLog('self', node, 'InternalTell', route, '', message)
       const promise = this.qn.send(node.internalPort, node.internalIp, data)
       promises.push(promise)
     }
     await Promise.all(promises)
   }
 
-  ask (node, route, message) {
+  ask (node, route, message, logged = false) {
     return new Promise(async (resolve, reject) => {
       const data = { route, payload: message }
       const onRes = (res) => {
+        if (!logged) this.logger.playbackLog('self', node, 'InternalAskResp', route, '', res)
         resolve(res)
       }
       const onTimeout = () => {
@@ -90,6 +103,7 @@ class Network {
         this.mainLogger.error(err)
         reject(err)
       }
+      if (!logged) this.logger.playbackLog('self', node, 'InternalAsk', route, '', message)
       await this.qn.send(node.internalPort, node.internalIp, data, this.timeout, onRes, onTimeout)
     })
   }
@@ -101,6 +115,9 @@ class Network {
     if (!ipInfo.internalPort) throw new Error('Fatal: network module requires internalPort')
 
     this.ipInfo = ipInfo
+
+    this.logger.setPlaybackIPInfo(ipInfo)
+
     await this._setupExternal()
     this._setupInternal()
   }
@@ -118,21 +135,32 @@ class Network {
 
   _registerExternal (method, route, handler) {
     const formattedRoute = `/${route}`
+
+    let self = this
+    let wrappedHandler = handler
+    if (this.logger.playbackLogEnabled) {
+      wrappedHandler = function (req, res) {
+        self.logger.playbackLog(req.hostname, 'self', 'ExternalRecv', route, '', { params: req.params, body: req.body })
+        return handler(req, res)
+      }
+      // handler = wrappedHandler
+    }
+
     switch (method) {
       case 'GET':
-        this.app.get(formattedRoute, handler)
+        this.app.get(formattedRoute, wrappedHandler)
         break
       case 'POST':
-        this.app.post(formattedRoute, handler)
+        this.app.post(formattedRoute, wrappedHandler)
         break
       case 'PUT':
-        this.app.put(formattedRoute, handler)
+        this.app.put(formattedRoute, wrappedHandler)
         break
       case 'DELETE':
-        this.app.delete(formattedRoute, handler)
+        this.app.delete(formattedRoute, wrappedHandler)
         break
       case 'PATCH':
-        this.app.patch(formattedRoute, handler)
+        this.app.patch(formattedRoute, wrappedHandler)
         break
       default:
         throw new Error('Fatal: Invalid HTTP method for handler.')

@@ -981,15 +981,15 @@ class P2P {
   }
 
   // Our own P2P version of the network tell, with a sign added
-  async tell (nodes, route, message) {
+  async tell (nodes, route, message, logged = false) {
     const signedMessage = this._wrapAndSignMessage(message)
-    await this.network.tell(nodes, route, signedMessage)
+    await this.network.tell(nodes, route, signedMessage, logged)
   }
 
   // Our own P2P version of the network ask, with a sign added, and sign verified on other side
-  async ask (node, route, message = {}) {
+  async ask (node, route, message = {}, logged = false) {
     const signedMessage = this._wrapAndSignMessage(message)
-    const signedResponse = await this.network.ask(node, route, signedMessage)
+    const signedResponse = await this.network.ask(node, route, signedMessage, logged)
     this.mainLogger.debug(`Result of network-level ask: ${JSON.stringify(signedResponse)}`)
     const [response] = this._extractPayload(signedResponse, [node])
     if (!response) {
@@ -1011,6 +1011,9 @@ class P2P {
       const respondWrapped = async (response) => {
         const signedResponse = this._wrapAndSignMessage(response)
         this.mainLogger.debug(`The signed wrapped response to send back: ${JSON.stringify(signedResponse)}`)
+        if (route !== 'gossip') {
+          this.logger.playbackLog(sender, 'self', 'InternalRecvResp', route, '', payload)
+        }
         await respond(signedResponse)
       }
       // Checks to see if we can extract the actual payload from the wrapped message
@@ -1018,6 +1021,9 @@ class P2P {
       if (!payload) {
         await respondWrapped({ success: false, error: 'missing_sig' })
         return
+      }
+      if (route !== 'gossip') {
+        this.logger.playbackLog(sender, 'self', 'InternalRecv', route, '', payload)
       }
       await handler(payload, respondWrapped, sender)
     }
@@ -1042,7 +1048,10 @@ class P2P {
     const recipients = getRandom(nodes, this.gossipRecipients)
     try {
       if (this.verboseLogs) this.mainLogger.debug(`Gossiping ${type} request to these nodes: ${JSON.stringify(recipients)}`)
-      await this.tell(recipients, 'gossip', gossipPayload)
+      for (const node of recipients) {
+        this.logger.playbackLog('self', node, 'GossipSend', type, '', gossipPayload)
+      }
+      await this.tell(recipients, 'gossip', gossipPayload, true)
     } catch (ex) {
       if (this.verboseLogs) this.mainLogger.error(`Failed to sendGossip(${JSON.stringify(payload)}) Exception => ${ex}`)
     }
@@ -1081,6 +1090,7 @@ class P2P {
     }
     this.gossipedHashes.set(gossipHash, false)
 
+    this.logger.playbackLog(sender, 'self', 'GossipRcv', type, '', data)
     await gossipHandler(data, sender)
     if (this.verboseLogs) this.mainLogger.debug(`End of handleGossip(${JSON.stringify(payload)})`)
   }

@@ -7,20 +7,25 @@ class Reporter {
     this.p2p = p2p
     this.shardus = shardus
     this.profiler = profiler
+    this.logger = logger
 
     this.reportTimer = null
     this._txInjected = 0
     this._txApplied = 0
 
     this.p2p.registerOnJoining((publicKey) => {
+      this.logger.playbackLogState('joining', '', publicKey)
       return this.reportJoining(publicKey)
     })
 
     this.p2p.registerOnJoined((nodeId, publicKey) => {
+      this.logger.playbackLogState('joined', nodeId, publicKey)
+      this.logger.setPlaybackID(nodeId)
       return this.reportJoined(nodeId, publicKey)
     })
 
     this.p2p.registerOnActive((nodeId) => {
+      this.logger.playbackLogState('active', nodeId, '')
       return this.reportActive(nodeId)
     })
 

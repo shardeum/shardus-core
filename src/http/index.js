@@ -2,6 +2,8 @@ const parseUrl = require('url').parse
 const http = require('http')
 const https = require('https')
 
+let _logger = null
+
 function _containsProtocol (url) {
   if (!url.match('https?://*')) return false
   return true
@@ -52,7 +54,17 @@ async function get (url) {
   let normalized = _normalizeUrl(url)
   let host = parseUrl(normalized, true)
   let isHttps = _checkHttps(normalized)
+
+  if (_logger) {
+    _logger.playbackLog('self', host.hostname + ':' + host.port, 'HttpRequest', host.pathname, '', '')
+  }
+
   let res = await _get(host, isHttps)
+
+  if (_logger) {
+    _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponse', host.pathname, '', res)
+  }
+
   return res
 }
 
@@ -108,10 +120,24 @@ async function post (givenHost, body) {
       'Content-Length': payload ? Buffer.byteLength(payload) : '0'
     }
   }
+
+  if (_logger) {
+    _logger.playbackLog('self', host.hostname + ':' + host.port, 'HttpRequest', host.pathname, '', body)
+  }
+
   let isHttps = _checkHttps(normalized)
   let res = await _post(options, payload, isHttps)
+
+  if (_logger) {
+    _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResp', host.pathname, '', res)
+  }
   return res
+}
+
+function setLogger (logger) {
+  _logger = logger
 }
 
 exports.get = get
 exports.post = post
+exports.setLogger = setLogger
