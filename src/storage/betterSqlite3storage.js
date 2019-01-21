@@ -2,7 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const Sequelize = require('sequelize')
 const Op = Sequelize.Op
-var sqlite3 = require('better-sqlite3')
+var Sqlite3 = require('better-sqlite3')
 const stringify = require('fast-stable-stringify')
 const utils = require('../utils')
 
@@ -29,9 +29,9 @@ class BetterSqlite3Storage {
     }
 
     if (storageConfig.options.memoryFile) {
-      this.db = new sqlite3(':memory:')
+      this.db = new Sqlite3(':memory:')
     } else {
-      this.db = new sqlite3(storageConfig.options.storage)
+      this.db = new Sqlite3(storageConfig.options.storage)
     }
   }
 
@@ -367,4 +367,4 @@ async function _ensureExists (dir) {
   })
 }
 
-module.exports = Sqlite3Storage
+module.exports = BetterSqlite3Storage
