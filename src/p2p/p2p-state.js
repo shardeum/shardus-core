@@ -700,12 +700,15 @@ class P2PState {
       return [true]
     }
 
-    // If the cycle marker is different than what we have, don't add it, if we recieved it from the network
-    if (fromNetwork) {
-      if (certificate.marker !== this.getCurrentCertificate().marker) {
-        this.mainLogger.debug('The cycle marker from this certificate is different than the one we currently have...')
-        return [false, 'diff_cm']
-      }
+    // If the cycle marker is different than what we have
+    if (certificate.marker !== this.getCurrentCertificate().marker) {
+      this.mainLogger.debug('The cycle marker from this certificate is different than the one we currently have...')
+      // If its from the network, don't add it
+      if (fromNetwork) return [false, 'diff_cm']
+      // Otherwise, its ours and we should add it
+      const certDist = utils.XOR(certificate.marker, certificate.signer)
+      addCert(certificate, certDist)
+      return [true]
     }
 
     // Calculate XOR distance between cycle marker and the signer of the certificate's node ID
