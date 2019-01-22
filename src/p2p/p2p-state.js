@@ -709,7 +709,6 @@ class P2PState {
     }
 
     // If the cycle marker is different than what we have
-    console.log(`${certificate.marker} : ${this.getCurrentCertificate().marker}`)
     if (certificate.marker !== this.getCurrentCertificate().marker) {
       this.mainLogger.debug('The cycle marker from this certificate is different than the one we currently have...')
       // If its from the network, don't add it

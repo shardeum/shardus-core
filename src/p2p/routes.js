@@ -38,7 +38,6 @@ function setupRoutes () {
 
   this.network.registerExternalGet('joined/:publicKey', (req, res) => {
     const publicKey = req.params.publicKey
-    console.log(publicKey)
     const node = this.state.getNodeByPubKey(publicKey)
     if (!node) {
       this.mainLogger.debug(`Unable to find node with given public key ${publicKey} for 'joined' route request.`)
@@ -83,7 +82,6 @@ function setupRoutes () {
       return
     }
     const cycleChainHash = this.getCycleChainHash(payload.start, payload.end)
-    console.log(cycleChainHash)
     this.mainLogger.debug(`Cycle chain hash to be sent: ${JSON.stringify(cycleChainHash)}`)
     if (!cycleChainHash) {
       await respond({ cycleChainHash, error: 'invalid indexes for cycle chain hash' })
@@ -105,7 +103,6 @@ function setupRoutes () {
     }
     const cycleChain = this.getCycleChain(payload.start, payload.end)
     const cycleMarkerCerts = this.getCycleMarkerCerts(payload.start, payload.end)
-    console.log(cycleChain)
     if (!cycleChain) {
       await respond({ cycleChain, error: 'invalid indexes for cycle chain' })
       return
