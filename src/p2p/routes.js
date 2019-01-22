@@ -36,6 +36,18 @@ function setupRoutes () {
     res.json({ nodeInfo })
   })
 
+  this.network.registerExternalGet('joined/:publicKey', (req, res) => {
+    const publicKey = req.params.publicKey
+    console.log(publicKey)
+    const node = this.state.getNodeByPubKey(publicKey)
+    if (!node) {
+      this.mainLogger.debug(`Unable to find node with given public key ${publicKey} for 'joined' route request.`)
+      return res.json({ joined: false })
+    }
+    const { cycleJoined } = node
+    return res.json({ joined: true, cycleJoined })
+  })
+
   // -------- INTERNAL Routes ----------
 
   this.registerInternal('gossip', async (payload, respond, sender) => {

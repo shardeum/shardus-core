@@ -311,17 +311,6 @@ class P2P {
     await http.post(`${node.ip}:${node.port}/join`, joinRequest)
   }
 
-  async _fetchNodeId (seedNodes) {
-    // TODO: implement a more robust way to choose a node
-    const { nodesJoined, currentCycleMarker } = await this._fetchCycleMarker(seedNodes)
-    this.mainLogger.debug(`Nodes joined in this cycle: ${JSON.stringify(nodesJoined)}`)
-    const { publicKey } = this._getThisNodeInfo()
-    for (const key of nodesJoined) {
-      if (key === publicKey) return this.state.computeNodeId(publicKey, currentCycleMarker)
-    }
-    return null
-  }
-
   // Check if we are in the update phase
   _isInUpdatePhase (currentTime, cycleStart, cycleDuration) {
     this.mainLogger.debug(`Current time is: ${currentTime}`)
@@ -593,6 +582,21 @@ class P2P {
   async _fetchCycleMarker (nodes) {
     const cycleMarkerInfo = await this._robustQuery(nodes, (node) => http.get(`${node.ip}:${node.port}/cyclemarker`))
     return cycleMarkerInfo
+  }
+
+  async _fetchNodeId (seedNodes) {
+    const { publicKey } = this._getThisNodeInfo()
+    const queryFn = async (node) => {
+      const { cycleJoined } = await http.get(`${node.ip}:${node.port}/joined/${publicKey}`)
+      return { cycleJoined }
+    }
+    const { cycleJoined } = await this._robustQuery(seedNodes, queryFn)
+    if (!cycleJoined) {
+      this.mainLogger.info('Unable to get cycle marker, likely this node\'s join request was not excepted.')
+      return null
+    }
+    const nodeId = this.state.computeNodeId(publicKey, cycleJoined)
+    return nodeId
   }
 
   async _fetchCycleMarkerInternal (nodes) {

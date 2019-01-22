@@ -27,7 +27,8 @@ class P2PState {
     this.cleanNodelist = {
       ordered: [],
       current: {},
-      byIp: {}
+      byIp: {},
+      byPubKey: {}
     }
 
     // Populates the clean nodelist with our valid statuses
@@ -368,6 +369,7 @@ class P2PState {
     if (!this.validStatuses.includes(status)) throw new Error('Invalid node status.')
     this.nodes[status][node.id] = node
     this.nodes.current[node.id] = node
+    this.nodes.byPubKey[node.publicKey] = node
   }
 
   _addNodesToNodelist (nodes) {
@@ -503,7 +505,7 @@ class P2PState {
     if (competing) {
       const removedRequest = bestRequests.pop()
       const removedNode = removedRequest.nodeInfo
-      this.mainLogger.debug(`Removing the following node from this cycle's join requests: ${removedNode}`)
+      this.mainLogger.debug(`Removing the following node from this cycle's join requests: ${JSON.stringify(removedNode)}`)
       this._removeJoiningNode(removedNode)
     }
     return true
@@ -849,6 +851,16 @@ class P2PState {
     const current = this.nodes.current
     if (!current[id]) throw new Error('Invalid node ID.')
     return current[id]
+  }
+
+  getNodeByPubKey (publicKey) {
+    const byPubKey = this.nodes.byPubKey
+    const node = byPubKey[publicKey]
+    if (!node) {
+      this.mainLogger.debug(`Node not found for given public key: ${publicKey}...`)
+      return null
+    }
+    return node
   }
 
   _getSubsetOfNodelist (nodes, self = null) {
