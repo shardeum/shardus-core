@@ -129,10 +129,16 @@ class P2PState {
     delete this.nodes.byIp[internalHost]
   }
 
-  _addJoiningNodes (nodes) {
-    for (const node of nodes) {
-      this.currentCycle.data.joined.push(node.publicKey)
+  _addJoiningNodes () {
+    const joining = this._getBestNodes()
+    this.mainLogger.debug(`Joining nodes: ${JSON.stringify(joining)}`)
+    const joined = this.currentCycle.data.joined
+    this.mainLogger.debug(`Current joined: ${JSON.stringify(joined)}`)
+    joined.length = 0
+    for (const node of joining) {
+      joined.push(node.publicKey)
     }
+    this.mainLogger.debug(`Joined after update: ${JSON.stringify(joined)}`)
   }
 
   // Checks if a given timestamp is during the current cycle
@@ -526,8 +532,6 @@ class P2PState {
   _endUpdatePhase (startTime, phaseLen) {
     this.mainLogger.debug('Ending update phase...')
     this.acceptChainUpdates = false
-    const bestNodes = this._getBestNodes()
-    this._addJoiningNodes(bestNodes)
     const endTime = startTime + phaseLen
     utils.setAlarm(() => {
       this._startCycleSync(endTime, phaseLen)
@@ -560,8 +564,12 @@ class P2PState {
 
   async _createCycleMarker (gossip = true) {
     this.mainLogger.info('Creating new cycle marker...')
+    this._addJoiningNodes()
+    this.mainLogger.debug('Getting cycle info to create cycle marker...')
     const cycleInfo = this.getCycleInfo(false)
+    this.mainLogger.debug('Computing cycle marker before creating certificate...')
     const cycleMarker = this._computeCycleMarker(cycleInfo)
+    this.mainLogger.debug('Creating new certificate based on the new computed cycle marker...')
     const certificate = this._createCertificate(cycleMarker)
     if (!this.cycles.length) return this.addCertificate({ marker: cycleMarker, signer: '0'.repeat(64) })
     const [added] = this.addCertificate(certificate)
@@ -701,6 +709,7 @@ class P2PState {
     }
 
     // If the cycle marker is different than what we have
+    console.log(`${certificate.marker} : ${this.getCurrentCertificate().marker}`)
     if (certificate.marker !== this.getCurrentCertificate().marker) {
       this.mainLogger.debug('The cycle marker from this certificate is different than the one we currently have...')
       // If its from the network, don't add it
