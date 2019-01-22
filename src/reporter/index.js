@@ -62,7 +62,7 @@ class Reporter {
     try {
       await http.post(`${this.config.recipient}/joining`, { publicKey })
     } catch (e) {
-      this.mainLogger.error(e)
+      this.mainLogger.error('reportJoining: ' + e.name + ': ' + e.message + ' at ' + e.stack)
       console.error(e)
     }
   }
@@ -74,7 +74,7 @@ class Reporter {
     try {
       await http.post(`${this.config.recipient}/joined`, { publicKey, nodeId })
     } catch (e) {
-      this.mainLogger.error(e)
+      this.mainLogger.error('reportJoined: ' + e.name + ': ' + e.message + ' at ' + e.stack)
       console.error(e)
     }
   }
@@ -86,7 +86,7 @@ class Reporter {
     try {
       await http.post(`${this.config.recipient}/active`, { nodeId })
     } catch (e) {
-      this.mainLogger.error(e)
+      this.mainLogger.error('reportActive: ' + e.name + ': ' + e.message + ' at ' + e.stack)
       console.error(e)
     }
   }
@@ -105,7 +105,7 @@ class Reporter {
     try {
       await http.post(`${this.config.recipient}/heartbeat`, report)
     } catch (e) {
-      this.mainLogger.error(e)
+      this.mainLogger.error('_sendReport: ' + e.name + ': ' + e.message + ' at ' + e.stack)
       console.error(e)
     }
   }
@@ -124,7 +124,7 @@ class Reporter {
       try {
         await this._sendReport({ appState, cycleMarker, nodelistHash, txInjected, txApplied, reportInterval, nodeIpInfo })
       } catch (e) {
-        this.mainLogger.error(e)
+        this.mainLogger.error('startReporting: ' + e.name + ': ' + e.message + ' at ' + e.stack)
         console.error(e)
       }
 

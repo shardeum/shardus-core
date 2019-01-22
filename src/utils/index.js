@@ -96,6 +96,9 @@ const isString = (x) => {
 }
 
 const makeShortHash = (x, n = 4) => {
+  if (!x) {
+    return x
+  }
   if (x.length > 63) {
     if (x.length === 64) {
       return x.slice(0, n) + 'x' + x.slice(63 - n)

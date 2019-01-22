@@ -94,11 +94,11 @@ class Shardus {
 
   registerExceptionHandler () {
     process.on('uncaughtException', async (err) => {
-      this.fatalLogger.fatal(err)
+      this.fatalLogger.fatal('uncaughtException: ' + err.name + ': ' + err.message + ' at ' + err.stack)
       try {
         await this.exitHandler.exitCleanly()
       } catch (e) {
-        console.error(e)
+        console.error('uncaughtException: ' + e.name + ': ' + e.message + ' at ' + e.stack)
         process.exit(1)
       }
     })
@@ -162,25 +162,25 @@ class Shardus {
     if (this.reporter) this.reporter.incrementTxInjected()
 
     if (!this.appProvided) throw new Error('Please provide an App object to Shardus.setup before calling Shardus.put')
-    if (this.verboseLogs) this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(req.body)}`)
+    if (this.verboseLogs) this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(req.body)}`) // not reducing tx here so we can get the long hashes
     // retrieve incoming transaction from HTTP request
     let inTransaction = req.body
     let shardusTransaction = {}
     let ourLock = -1
     try {
       if (typeof inTransaction !== 'object') {
-        return { success: false, reason: `Invalid Transaction! ${inTransaction}` }
+        return { success: false, reason: `Invalid Transaction! ${utils.stringifyReduce(inTransaction)}` }
       }
       /**
        * Perform basic validation of the transaction fields. Also, validate the transaction timestamp
        */
       if (this.verboseLogs) this.mainLogger.debug(`Performing initial validation of the transaction`)
       const initValidationResp = this.app.validateTxnFields(inTransaction)
-      if (this.verboseLogs) this.mainLogger.debug(`InitialValidationResponse: ${JSON.stringify(initValidationResp)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`InitialValidationResponse: ${utils.stringifyReduce(initValidationResp)}`)
 
       const txnTimestamp = initValidationResp.txnTimestamp
       if (this.isTransactionTimestampExpired(txnTimestamp)) {
-        this.fatalLogger.fatal(`Transaction Expired: ${inTransaction}`)
+        this.fatalLogger.fatal(`Transaction Expired: ${utils.stringifyReduce(inTransaction)}`)
         return { success: false, reason: 'Transaction Expired' }
       }
 
@@ -199,7 +199,7 @@ class Shardus {
 
       this.profiler.profileSectionStart('put')
 
-      if (this.verboseLogs) this.mainLogger.debug(`ShardusTransaction: ${shardusTransaction}`)
+      if (this.verboseLogs) this.mainLogger.debug(`ShardusTransaction. shortTxID: ${txId} txID: ${utils.makeShortHash(txId)} TX data: ${utils.stringifyReduce(shardusTransaction)}`)
 
       // Validate transaction through the application. Shardus can see inside the transaction
       this.profiler.profileSectionStart('validateTx')
@@ -217,27 +217,28 @@ class Shardus {
       this.profiler.profileSectionStart('consensusInject')
       let transactionReceipt = await this.consensus.inject(shardusTransaction)
       this.profiler.profileSectionEnd('consensusInject')
-      if (this.verboseLogs) this.mainLogger.debug(`Received Consensus. Receipt: ${JSON.stringify(transactionReceipt)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`Received Consensus. Receipt: ${utils.stringifyReduce(transactionReceipt)}`)
       // Apply the transaction
       this.profiler.profileSectionStart('acceptTx')
       transactionOk = await this.acceptTransaction(inTransaction, transactionReceipt, true)
       this.profiler.profileSectionEnd('acceptTx')
     } catch (ex) {
-      this.fatalLogger.fatal(`Failed to process transaction. Exception: ${ex}`)
-      return { success: false, reason: `Failed to process trasnaction: ${JSON.stringify(inTransaction)} ${ex}` }
+      this.fatalLogger.fatal(`Put: Failed to process transaction. Exception: ${ex}`)
+      this.fatalLogger.fatal('put: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      return { success: false, reason: `Failed to process trasnaction: ${utils.stringifyReduce(inTransaction)} ${ex}` }
     } finally {
       // this.profiler.profileSectionEnd('acceptTx')
       // this.profiler.profileSectionEnd('validateTx')
       this.profiler.profileSectionEnd('put')
       this.consensus.unlockQueue(ourLock)
       if (!transactionOk) {
-        this.mainLogger.debug('Transaction result failed: ' + JSON.stringify(inTransaction))
+        this.mainLogger.debug('Transaction result failed: ' + utils.stringifyReduce(inTransaction))
       }
     }
     if (transactionOk) {
-      this.mainLogger.debug('Transaction result ok: ' + JSON.stringify(inTransaction))
+      this.mainLogger.debug('Transaction result ok: ' + utils.stringifyReduce(inTransaction))
     }
-    if (this.verboseLogs) this.mainLogger.debug(`End of injectTransaction ${JSON.stringify(inTransaction)}`)
+    if (this.verboseLogs) this.mainLogger.debug(`End of injectTransaction ${utils.stringifyReduce(inTransaction)}`)
     return { success: true, reason: 'Transaction successfully processed' }
   }
 
@@ -504,7 +505,8 @@ class Shardus {
         // throw new Error('Missing requried interface function. apply()')
       }
     } catch (ex) {
-      this.fatalLogger.log(`Required application interface not implemented. Exception: ${ex}`)
+      this.fatalLogger.fatal(`Required application interface not implemented. Exception: ${ex}`)
+      this.fatalLogger.fatal('getApplicationInterface: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       throw new Error(ex)
     }
     this.mainLogger.debug('End of getApplicationInterfaces()')
@@ -546,7 +548,8 @@ class Shardus {
         // throw new Error('Missing requried interface function. apply()')
       }
     } catch (ex) {
-      this.fatalLogger.log(`Required application interface not implemented. Exception: ${ex}`)
+      this.fatalLogger.fatal(`Required application interface not implemented. Exception: ${ex}`)
+      this.fatalLogger.fatal('getAccountUtilityInterface: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       throw new Error(ex)
     }
     this.mainLogger.debug('End of getApplicationInterfaces()')
@@ -584,8 +587,8 @@ class Shardus {
       }
     } catch (e) {
       console.log(e.message + ' at ' + e.stack)
-      this.mainLogger.debug(e.message + ' at ' + e.stack)
-      this.fatalLogger.log(e.message + ' at ' + e.stack)
+      this.mainLogger.debug('sharuds.start() ' + e.message + ' at ' + e.stack)
+      this.fatalLogger.fatal('sharuds.start() ' + e.message + ' at ' + e.stack)
       throw new Error(e)
     }
     if (!started) await this.shutdown(exitProcOnFail)

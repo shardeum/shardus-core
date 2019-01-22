@@ -839,7 +839,7 @@ class P2P {
     try {
       await this.state.addCycles(cycleChain, cycleMarkerCerts)
     } catch (e) {
-      this.mainLogger.error(e)
+      this.mainLogger.error('_syncToNetwork: ' + e.name + ': ' + e.message + ' at ' + e.stack)
       this.mainLogger.info('Unable to add cycles. Sync failed...')
       return false
     }
@@ -1040,7 +1040,7 @@ class P2P {
    */
   async sendGossip (type, payload, nodes = this.state.getAllNodes(this.id)) {
     if (nodes.length === 0) return
-    if (this.verboseLogs) this.mainLogger.debug(`Start of sendGossip(${JSON.stringify(payload)})`)
+    if (this.verboseLogs) this.mainLogger.debug(`Start of sendGossip(${utils.stringifyReduce(payload)})`)
     const gossipPayload = { type: type, data: payload }
 
     const gossipHash = this.crypto.hash(gossipPayload)
@@ -1051,16 +1051,17 @@ class P2P {
 
     const recipients = getRandom(nodes, this.gossipRecipients)
     try {
-      if (this.verboseLogs) this.mainLogger.debug(`Gossiping ${type} request to these nodes: ${JSON.stringify(recipients)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`Gossiping ${type} request to these nodes: ${utils.stringifyReduce(recipients)}`)
       for (const node of recipients) {
         this.logger.playbackLog('self', node, 'GossipSend', type, '', gossipPayload)
       }
       await this.tell(recipients, 'gossip', gossipPayload, true)
     } catch (ex) {
-      if (this.verboseLogs) this.mainLogger.error(`Failed to sendGossip(${JSON.stringify(payload)}) Exception => ${ex}`)
+      if (this.verboseLogs) this.mainLogger.error(`Failed to sendGossip(${utils.stringifyReduce(payload)}) Exception => ${ex}`)
+      this.fatalLogger.fatal('sendGossip: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
     }
     this.gossipedHashesSent.set(gossipHash, false)
-    if (this.verboseLogs) this.mainLogger.debug(`End of sendGossip(${JSON.stringify(payload)})`)
+    if (this.verboseLogs) this.mainLogger.debug(`End of sendGossip(${utils.stringifyReduce(payload)})`)
   }
 
   /**
@@ -1068,7 +1069,7 @@ class P2P {
  * Payload: {type: ['receipt', 'trustedTransaction'], data: {}}
  */
   async handleGossip (payload, sender) {
-    if (this.verboseLogs) this.mainLogger.debug(`Start of handleGossip(${JSON.stringify(payload)})`)
+    if (this.verboseLogs) this.mainLogger.debug(`Start of handleGossip(${utils.stringifyReduce(payload)})`)
     const type = payload.type
     const data = payload.data
 
@@ -1096,7 +1097,7 @@ class P2P {
 
     this.logger.playbackLog(sender, 'self', 'GossipRcv', type, '', data)
     await gossipHandler(data, sender)
-    if (this.verboseLogs) this.mainLogger.debug(`End of handleGossip(${JSON.stringify(payload)})`)
+    if (this.verboseLogs) this.mainLogger.debug(`End of handleGossip(${utils.stringifyReduce(payload)})`)
   }
 
   /**

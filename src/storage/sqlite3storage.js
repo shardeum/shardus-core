@@ -24,12 +24,6 @@ class Sqlite3Storage {
     for (let [modelName, modelAttributes] of models) {
       this.sqlite3Define(modelName, modelAttributes)
     }
-
-    if (storageConfig.options.memoryFile) {
-      this.db = new sqlite3.Database(':memory:')
-    } else {
-      this.db = new sqlite3.Database(storageConfig.options.storage)
-    }
   }
 
   sqlite3Define (modelName, modelAttributes) {
@@ -87,6 +81,13 @@ class Sqlite3Storage {
     let dbDir = path.parse(this.storageConfig.options.storage).dir
     await _ensureExists(dbDir)
     this.mainLogger.info('Created Database directory.')
+
+    if (this.storageConfig.options.memoryFile) {
+      this.db = new sqlite3.Database(':memory:')
+    } else {
+      this.db = new sqlite3.Database(this.storageConfig.options.storage)
+    }
+
     // Create tables for models in DB if they don't exist
     // for (let model of Object.values(this.models)) {
     //   await model.sync()

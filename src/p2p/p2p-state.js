@@ -289,7 +289,7 @@ class P2PState {
     try {
       updated = await this._updateNodeStatus(node, status)
     } catch (e) {
-      this.mainLogger.error(e)
+      this.mainLogger.error('_setNodeStatus: ' + e.name + ': ' + e.message + ' at ' + e.stack)
       return false
     }
     return updated
@@ -628,7 +628,7 @@ class P2PState {
       await Promise.all(promises)
       this.mainLogger.info('Added cycle chain entry to database successfully!')
     } catch (e) {
-      this.mainLogger.error(e)
+      this.mainLogger.error('_createCycle: ' + e.name + ': ' + e.message + ' at ' + e.stack)
     }
   }
 

@@ -81,13 +81,13 @@ class Consensus {
       if (Array.isArray(targetKeys) && targetKeys.length > 0) {
         targetAddress = targetKeys[0]
       }
-      if (this.mainLogs) this.mainLogger.debug(`sourceAddress: ${JSON.stringify(sourceAddress)} targetAddress: ${JSON.stringify(targetAddress)}`)
+      if (this.mainLogs) this.mainLogger.debug(`sourceAddress: ${utils.makeShortHash(sourceAddress)} targetAddress: ${utils.makeShortHash(targetAddress)}`)
 
       if (sourceAddress) {
         // keysRequest = { type: 'stateID', address: sourceAddress }
         // stateID = await this.application.get(keysRequest)
         stateId = await this.applicationInterfaceImpl.getStateId(sourceAddress)
-        if (this.mainLogs) this.mainLogger.debug(`StateID: ${stateId}`)
+        if (this.mainLogs) this.mainLogger.debug(`StateID: ${stateId} short stateID: ${utils.makeShortHash(stateId)} `)
       }
 
       if (targetAddress) {
@@ -96,7 +96,8 @@ class Consensus {
 
       transactionReceipt = this.createReciept(inTransaction, stateId, targetStateId)
     } catch (ex) {
-      this.logger.getLogger('main').error(`Failed to process Transaction. Exception: ${ex}`)
+      this.logger.getLogger('main').error(`Inject: Failed to process Transaction. Exception: ${ex}`)
+      this.fatalLogger.fatal('inject: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       throw new Error(ex)
     }
 
@@ -170,13 +171,13 @@ class Consensus {
       if (receipt.stateId) {
         stateId = await this.applicationInterfaceImpl.getStateId(sourceAddress)
         if (stateId !== receipt.stateId) {
-          throw new Error('onReceipt source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + stateId + ' reciept: ' + receipt.stateId)
+          throw new Error('onReceipt source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + stateId + ' reciept: ' + receipt.stateId + ' account: ' + utils.makeShortHash(sourceAddress))
         }
       }
       if (receipt.targetStateId) {
         targetStateId = await this.applicationInterfaceImpl.getStateId(targetAddress, false)
         if (targetStateId !== receipt.targetStateId) {
-          throw new Error('onReceipt target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetStateId + ' reciept: ' + receipt.targetStateId)
+          throw new Error('onReceipt target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetStateId + ' reciept: ' + receipt.targetStateId + ' account: ' + utils.makeShortHash(targetAddress))
         }
       }
 
@@ -185,6 +186,7 @@ class Consensus {
       // if (this.reporter) this.reporter.incrementTxApplied()
     } catch (ex) {
       this.fatalLogger.fatal(`Failed to process receipt. Exception: ${ex}`)
+      this.fatalLogger.fatal(ex.message + ' at ' + ex.stack)
     } finally {
       this.profiler.profileSectionEnd('onReceipt')
       this.unlockQueue(ourLock)
