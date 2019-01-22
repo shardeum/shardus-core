@@ -83,7 +83,6 @@ class BetterSqlite3Storage {
     if (this.storageConfig.options.memoryFile) {
       this.db = new Sqlite3(':memory:')
     } else {
-      console.log('===DEBUG===', this.storageConfig.options.storage)
       this.db = new Sqlite3(this.storageConfig.options.storage)
     }
     // Create tables for models in DB if they don't exist
