@@ -5,22 +5,25 @@ const Sequelize = require('sequelize')
 class SequelizeStorage {
   // note that old storage passed in logger, now we pass in the specific log for it to use.  This works for application use, but may need to rethink if we apply this to shardus core
   constructor (models, storageConfig, logger, baseDir, profiler) {
+    this.models = models
+    this.storageConfig = storageConfig
+    this.baseDir = baseDir
     this.profiler = profiler
     // Setup logger
     this.mainLogger = logger.getLogger('default')
-    // Create dbDir if it doesn't exist
-    storageConfig.options.storage = path.join(baseDir, storageConfig.options.storage)
-    let dbDir = path.parse(storageConfig.options.storage).dir
-    _ensureExists(dbDir)
-    this.mainLogger.info('Created Database directory.')
-    // Start Sequelize and load models
-    this.sequelize = new Sequelize(...Object.values(storageConfig))
-    for (let [modelName, modelAttributes] of models) this.sequelize.define(modelName, modelAttributes)
-    this.storageModels = this.sequelize.models
-    this.initialized = false
   }
 
   async init () {
+    // Create dbDir if it doesn't exist
+    this.storageConfig.options.storage = path.join(this.baseDir, this.storageConfig.options.storage)
+    let dbDir = path.parse(this.storageConfig.options.storage).dir
+    await _ensureExists(dbDir)
+    this.mainLogger.info('Created Database directory.')
+    // Start Sequelize and load models
+    this.sequelize = new Sequelize(...Object.values(this.storageConfig))
+    for (let [modelName, modelAttributes] of this.models) this.sequelize.define(modelName, modelAttributes)
+    this.storageModels = this.sequelize.models
+    this.initialized = false
     // Create tables for models in DB if they don't exist
     for (let model of Object.values(this.storageModels)) {
       await model.sync()
