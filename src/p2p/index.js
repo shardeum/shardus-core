@@ -694,7 +694,14 @@ class P2P {
   }
 
   async _requestCycleUpdates (nodeId) {
-    const node = this.state.getNode(nodeId)
+    let node
+    try {
+      node = this.state.getNode(nodeId)
+    } catch (e) {
+      this.mainLogger.error(e)
+      this.mainLogger.error(`Received certificate from unknown node: ${nodeId}`)
+      return false
+    }
     const myCycleUpdates = this.state.currentCycle.updates
     const myCertificate = this.state.getCurrentCertificate()
     const { cycleUpdates } = await this.ask(node, 'cycleupdates', { myCycleUpdates, myCertificate })
@@ -703,6 +710,10 @@ class P2P {
 
   async _requestUpdatesAndAdd (nodeId) {
     const updates = await this._requestCycleUpdates(nodeId)
+    if (!updates) {
+      this.mainLogger.error('Unable to add updates, no updates were able to be retrieved.')
+      return
+    }
     await this.state.addCycleUpdates(updates)
   }
 
