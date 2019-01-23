@@ -18,7 +18,7 @@ class P2PState {
     this.cyclesStarted = false
 
     // Specifies valid statuses
-    this.validStatuses = ['active', 'syncing', 'pending']
+    this.validStatuses = ['active', 'syncing']
     this.statusUpdateType = {
       'active': 'activated'
     }
@@ -101,7 +101,6 @@ class P2PState {
       this.mainLogger.debug('Join request not added: Was not best request for this cycle.')
       return false
     }
-    this._addPendingNode(joinRequest.nodeInfo)
     return true
   }
 
@@ -115,18 +114,6 @@ class P2PState {
 
   addGossipedJoinRequest (joinRequest) {
     return this._addJoinRequest(joinRequest)
-  }
-
-  _addPendingNode (node) {
-    this.nodes.pending[node.publicKey] = node
-    const internalHost = `${node.internalIp}:${node.internalPort}`
-    this.nodes.byIp[internalHost] = node
-  }
-
-  _removeJoiningNode (node) {
-    delete this.nodes.pending[node.publicKey]
-    const internalHost = `${node.internalIp}:${node.internalPort}`
-    delete this.nodes.byIp[internalHost]
   }
 
   _addJoiningNodes () {
@@ -344,27 +331,20 @@ class P2PState {
     return true
   }
 
-  async _acceptNode (publicKey, cycleMarker) {
-    let node
-    try {
-      node = this.nodes.pending[publicKey]
-    } catch (e) {
-      throw new Error('Node not found in pending.')
-    }
-    let nodeId = this.computeNodeId(publicKey, cycleMarker)
+  async _acceptNode (node, cycleMarker) {
+    let nodeId = this.computeNodeId(node.publicKey, cycleMarker)
     node.id = nodeId
     node.cycleJoined = cycleMarker
     this.nodes.ordered.push(node)
-    delete this.nodes.pending[node.publicKey]
     await this._updateNodeStatus(node, 'syncing', false)
     await this.addNode(node)
     this.mainLogger.debug(`Nodelist after adding this node: ${JSON.stringify(this.nodes.current)}`)
   }
 
-  async _acceptNodes (publicKeys, cycleMarker) {
+  async _acceptNodes (nodes, cycleMarker) {
     const promises = []
-    for (const publicKey of publicKeys) {
-      promises.push(this._acceptNode(publicKey, cycleMarker))
+    for (const node of nodes) {
+      promises.push(this._acceptNode(node, cycleMarker))
     }
     await Promise.all(promises)
   }
@@ -376,6 +356,9 @@ class P2PState {
     this.nodes[status][node.id] = node
     this.nodes.current[node.id] = node
     this.nodes.byPubKey[node.publicKey] = node
+    // Get internalHost by concatenating the internal IP and port
+    const internalHost = `${node.internalIp}:${node.internalPort}`
+    this.nodes.byIp[internalHost] = node
   }
 
   _addNodesToNodelist (nodes) {
@@ -512,7 +495,6 @@ class P2PState {
       const removedRequest = bestRequests.pop()
       const removedNode = removedRequest.nodeInfo
       this.mainLogger.debug(`Removing the following node from this cycle's join requests: ${JSON.stringify(removedNode)}`)
-      this._removeJoiningNode(removedNode)
     }
     return true
   }
@@ -627,7 +609,9 @@ class P2PState {
     this.mainLogger.debug(`Cycle info for new cycle: ${JSON.stringify(cycleInfo)}`)
     cycleInfo.marker = this.getCurrentCertificate().marker
 
-    const accepted = this._acceptNodes(cycleInfo.joined, cycleInfo.marker)
+    const bestNodes = this._getBestNodes()
+    const accepted = this._acceptNodes(bestNodes, cycleInfo.marker)
+
     this.mainLogger.debug(`Nodes to be activated this cycle: ${JSON.stringify(cycleInfo.activated)}`)
     const activated = this._setNodesToStatus(cycleInfo.activated, 'active')
     const cycleAdded = this.addCycle(cycleInfo)

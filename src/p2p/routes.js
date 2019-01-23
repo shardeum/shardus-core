@@ -215,4 +215,9 @@ function setupRoutes () {
     console.log(payload)
     await respond(payload)
   })
+
+  // -------- DEMO Routes ----------
+/*   this.network.regisiterExternalGet('nodelist', async (payload, respond) => {
+    res.json({ })
+  }) */
 }

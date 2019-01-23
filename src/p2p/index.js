@@ -720,14 +720,14 @@ class P2P {
   async addJoinRequest (joinRequest, fromExternal = true) {
     const valid = this._validateJoinRequest(joinRequest)
     if (!valid) {
-      this.mainLogger.debug(`Join request rejected: Failed validation ${JSON.stringify(valid)}.`)
+      this.mainLogger.debug(`Join request rejected: Failed validation.`)
       return false
     }
     let added
     if (!fromExternal) added = this.state.addGossipedJoinRequest(joinRequest)
     else added = this.state.addNewJoinRequest(joinRequest)
     if (!added) {
-      this.mainLogger.debug(`Join request rejected: Was not added ${JSON.stringify(added)}.`)
+      this.mainLogger.debug(`Join request rejected: Was not added. TODO: Have this fn return reason.`)
       return false
     }
     const active = this._isActive()
