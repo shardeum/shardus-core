@@ -217,7 +217,7 @@ function setupRoutes () {
   })
 
   // -------- DEMO Routes ----------
-/*   this.network.regisiterExternalGet('nodelist', async (payload, respond) => {
-    res.json({ })
-  }) */
+  this.network.registerExternalGet('nodelist', async (req, res) => {
+    return res.json({ nodelist: this.state.getAllNodes() })
+  })
 }
