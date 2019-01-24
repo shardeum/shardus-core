@@ -9,6 +9,7 @@ class P2P {
   constructor (config, logger, storage, crypto, network, accountUtility) {
     this.logger = logger
     this.mainLogger = logger.getLogger('main')
+    this.fatalLogger = this.logger.getLogger('fatal')
     this.storage = storage
     this.crypto = crypto
     this.network = network

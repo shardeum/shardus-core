@@ -185,8 +185,7 @@ class Consensus {
       // TODO: Make this more robust, actually make sure the application has applied tx
       // if (this.reporter) this.reporter.incrementTxApplied()
     } catch (ex) {
-      this.fatalLogger.fatal(`Failed to process receipt. Exception: ${ex}`)
-      this.fatalLogger.fatal(ex.message + ' at ' + ex.stack)
+      this.fatalLogger.fatal('Failed to process receipt: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
     } finally {
       this.profiler.profileSectionEnd('onReceipt')
       this.unlockQueue(ourLock)
