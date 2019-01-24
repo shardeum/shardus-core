@@ -56,6 +56,7 @@ class Network {
     this.qn = Qn({
       port: this.ipInfo.internalPort
     })
+    this.qn.MAX_QUIC_DATA_SIZE = 0 // This forces TCP only comms
     this.intServers = await this.qn.listen(async (data, remote, protocol, respond) => {
       if (!data) throw new Error('No data provided in request...')
       const { route, payload } = data
