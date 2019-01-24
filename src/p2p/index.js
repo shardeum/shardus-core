@@ -1263,6 +1263,14 @@ function getRandomGossipIn (nodeIdxs, fanOut, seed, myIdx) {
     // If I was someone who they would ask, remember them
     if (myIdx in theirRecipients.slice(0, fanOut)) results.push(i)
   }
+  // Ensure that we return exactly fanOut number of results
+  if (results.length > fanOut) return results.slice(0, fanOut)
+  if (results.length < fanOut) {
+    // Get random idxs from nodeIdxs, and add em to results until it is fanOut length
+    const nodeIdxsNotMe = nodeIdxs.filter(idx => idx !== myIdx)
+    const randomIdxs = shuffleArraySeeded(nodeIdxsNotMe, seed + myIdx)
+    return results.concat(randomIdxs.slice(0, fanOut - results.length))
+  }
   return results
 }
 
