@@ -1083,7 +1083,7 @@ class P2P {
    */
   async sendGossipIn (type, payload, nodes = this.state.getAllNodes()) {
     if (nodes.length === 0) return
-    if (this.verboseLogs) this.mainLogger.debug(`Start of sendGossip(${utils.stringifyReduce(payload)})`)
+    if (this.verboseLogs) this.mainLogger.debug(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
     const gossipPayload = { type: type, data: payload }
 
     const gossipHash = this.crypto.hash(gossipPayload)
@@ -1107,10 +1107,10 @@ class P2P {
       await this.tell(recipients, 'gossip', gossipPayload, true)
     } catch (ex) {
       if (this.verboseLogs) this.mainLogger.error(`Failed to sendGossip(${utils.stringifyReduce(payload)}) Exception => ${ex}`)
-      this.fatalLogger.fatal('sendGossip: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.fatalLogger.fatal('sendGossipIn: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
     }
     this.gossipedHashesSent.set(gossipHash, false)
-    if (this.verboseLogs) this.mainLogger.debug(`End of sendGossip(${utils.stringifyReduce(payload)})`)
+    if (this.verboseLogs) this.mainLogger.debug(`End of sendGossipIn(${utils.stringifyReduce(payload)})`)
   }
 
   /**
@@ -1259,9 +1259,10 @@ function getRandomGossipIn (nodeIdxs, fanOut, seed, myIdx) {
     // Find out who each node would ask
     const theirSeed = seed + i
     const nodeIdxsOfOthers = nodeIdxs.filter(idx => idx !== i)
-    const theirRecipients = shuffleArraySeeded(nodeIdxsOfOthers, theirSeed)
+    shuffleArraySeeded(nodeIdxsOfOthers, theirSeed)
+    const theirRecipients = nodeIdxsOfOthers.slice(0, fanOut)
     // If I was someone who they would ask, remember them
-    if (myIdx in theirRecipients.slice(0, fanOut)) results.push(i)
+    if (myIdx in theirRecipients) results.push(i)
   }
   // Ensure that we return exactly fanOut number of results
   if (results.length > fanOut) return results.slice(0, fanOut)

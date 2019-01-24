@@ -28,7 +28,7 @@
   },
   "reporting": {
     "report": true,
-    "recipient": "https://tn1.shardus.com:3000/api",
+    "recipient": "http://127.0.0.1:3000/api",
     "interval": 2,
     "console": false
   }
