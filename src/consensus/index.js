@@ -102,7 +102,9 @@ class Consensus {
     }
 
     if (this.mainLogs) this.mainLogger.debug(`Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
-    await this.p2p.sendGossip('receipt', { shardusTransaction, transactionReceipt }, this.p2p.state.getAllNodes(this.p2p.id))
+    // USING GOSSIP IN NOW
+    // await this.p2p.sendGossip('receipt', { shardusTransaction, transactionReceipt }, this.p2p.state.getAllNodes(this.p2p.id))
+    await this.p2p.sendGossipIn('receipt', { shardusTransaction, transactionReceipt })
     if (this.mainLogs) this.mainLogger.debug(`Done Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
     if (this.mainLogs) this.mainLogger.debug(`End of inject(${inTransaction})`)
 

@@ -4,6 +4,7 @@ const http = require('../http')
 const P2PState = require('./p2p-state')
 const routes = require('./routes')
 const DataSync = require('./datasync.js')
+const seedrandom = require('seedrandom')
 
 class P2P {
   constructor (config, logger, storage, crypto, network, accountUtility) {
@@ -1061,7 +1062,43 @@ class P2P {
       return
     }
 
+    // [TODO] pass getRandomGossipIn hash of payload
     const recipients = getRandom(nodes, this.gossipRecipients)
+    try {
+      if (this.verboseLogs) this.mainLogger.debug(`Gossiping ${type} request to these nodes: ${utils.stringifyReduce(recipients)}`)
+      for (const node of recipients) {
+        this.logger.playbackLog('self', node, 'GossipSend', type, '', gossipPayload)
+      }
+      await this.tell(recipients, 'gossip', gossipPayload, true)
+    } catch (ex) {
+      if (this.verboseLogs) this.mainLogger.error(`Failed to sendGossip(${utils.stringifyReduce(payload)}) Exception => ${ex}`)
+      this.fatalLogger.fatal('sendGossip: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+    }
+    this.gossipedHashesSent.set(gossipHash, false)
+    if (this.verboseLogs) this.mainLogger.debug(`End of sendGossip(${utils.stringifyReduce(payload)})`)
+  }
+
+  /**
+   * Send Gossip to all nodes, using gossip in
+   */
+  async sendGossipIn (type, payload, nodes = this.state.getAllNodes()) {
+    if (nodes.length === 0) return
+    if (this.verboseLogs) this.mainLogger.debug(`Start of sendGossip(${utils.stringifyReduce(payload)})`)
+    const gossipPayload = { type: type, data: payload }
+
+    const gossipHash = this.crypto.hash(gossipPayload)
+    if (this.gossipedHashesSent.has(gossipHash)) {
+      if (this.verboseLogs) this.mainLogger.debug(`Gossip already sent: ${gossipHash.substring(0, 5)}`)
+      return
+    }
+
+    const nodeIdxs = new Array(nodes.length).fill().map((curr, idx) => idx)
+    // Find out your own index in the nodes array
+    const myIdx = nodes.findIndex(node => node.id === this.id)
+    if (myIdx < 0) throw new Error('Could not find self in nodes array')
+    // Map back recipient idxs to node objects
+    const recipientIdxs = getRandomGossipIn(nodeIdxs, this.gossipRecipients, gossipHash, myIdx)
+    const recipients = recipientIdxs.map(idx => nodes[idx])
     try {
       if (this.verboseLogs) this.mainLogger.debug(`Gossiping ${type} request to these nodes: ${utils.stringifyReduce(recipients)}`)
       for (const node of recipients) {
@@ -1200,6 +1237,33 @@ function getRandom (arr, n) {
     taken[x] = --len in taken ? taken[len] : len
   }
   return result
+}
+
+// From: https://stackoverflow.com/a/12646864
+function shuffleArraySeeded (array, seed) {
+  const rng = seedrandom(seed)
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]]
+  }
+}
+
+function getRandomGossipIn (nodeIdxs, fanOut, seed, myIdx) {
+  if (nodeIdxs.length < 2) return []
+  if (nodeIdxs.length - 1 < fanOut) fanOut = nodeIdxs.length - 1
+  // Loop all nodes
+  const results = []
+  for (let i = 0; i < nodeIdxs.length; i++) {
+    // Ignore self
+    if (i === myIdx) continue
+    // Find out who each node would ask
+    const theirSeed = seed + i
+    const nodeIdxsOfOthers = nodeIdxs.filter(idx => idx !== i)
+    const theirRecipients = shuffleArraySeeded(nodeIdxsOfOthers, theirSeed)
+    // If I was someone who they would ask, remember them
+    if (myIdx in theirRecipients.slice(0, fanOut)) results.push(i)
+  }
+  return results
 }
 
 module.exports = P2P
