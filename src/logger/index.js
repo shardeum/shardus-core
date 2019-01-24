@@ -74,7 +74,7 @@ class Logger {
     this._playbackOwner = os.hostname()
     this._playbackOwner_host = this._playbackOwner
     this._playbackIPInfo = null
-
+    this._nodeInfos = {}
     http.setLogger(this)
   }
 
@@ -105,6 +105,10 @@ class Logger {
   identifyNode (input) {
     if (utils.isString(input)) {
       if (input.length === 64) {
+        let seenNode = this._nodeInfos[input]
+        if (seenNode) {
+          return seenNode.out
+        }
         return utils.makeShortHash(input)
       } else {
         return input
@@ -113,9 +117,14 @@ class Logger {
 
     if (utils.isObject(input)) {
       if (input.id) {
-        return utils.makeShortHash(input.id)
+        let seenNode = this._nodeInfos[input.id]
+        if (seenNode) {
+          return seenNode.out
+        }
+        let shorthash = utils.makeShortHash(input.id)
+        let out = shorthash + ':' + input.externalPort
+        this._nodeInfos[input.id] = { node: input, out, shorthash }
       }
-
       return stringify(input)
     }
   }
