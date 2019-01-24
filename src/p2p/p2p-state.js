@@ -7,6 +7,7 @@ class P2PState {
     this.crypto = crypto
     this.storage = storage
     this.defaultCycleDuration = config.cycleDuration
+    this.maxNodesPerCycle = config.maxNodesPerCycle
 
     this.cycles = []
     this.certificates = []
@@ -466,7 +467,7 @@ class P2PState {
     const bestRequests = this._getBestJoinRequests()
 
     // TODO: calculate how many nodes to accept this cycle
-    const toAccept = 1
+    const toAccept = this.maxNodesPerCycle
 
     // If length of array is bigger, do this precheck
     const competing = bestRequests.length >= toAccept
