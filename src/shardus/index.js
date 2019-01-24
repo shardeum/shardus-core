@@ -287,7 +287,7 @@ class Shardus {
     this.profiler.profileSectionStart('acceptTx-gossip')
     if (gossipTx) {
       // temporary implementaiton to share transactions
-      this.p2p.sendGossip('acceptedTx', acceptedTX)
+      this.p2p.sendGossipIn('acceptedTx', acceptedTX)
     }
     this.profiler.profileSectionEnd('acceptTx-gossip')
 
