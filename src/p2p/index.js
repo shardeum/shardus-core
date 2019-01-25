@@ -4,7 +4,6 @@ const http = require('../http')
 const P2PState = require('./p2p-state')
 const routes = require('./routes')
 const DataSync = require('./datasync.js')
-const seedrandom = require('seedrandom')
 
 class P2P {
   constructor (config, logger, storage, crypto, network, accountUtility) {
@@ -1261,20 +1260,20 @@ function getRandom (arr, n) {
 
 function getRandomGossipIn (nodeIdxs, fanOut, myIdx) {
   let nn = nodeIdxs.length
-  if (fanOut>=nn){ fanOut = nn - 1 }
-  if (fanOut<1){ return [] }
-  let results = [(myIdx+1)%nn]
-  if (fanOut<2){ return results }
-  results.push((myIdx+nn-1)%nn)
-  if (fanOut<3){ return results }
-  while(results.length < fanOut){
-    let r = Math.floor(Math.random()*nn)
-    if (r === myIdx){ continue }
+  if (fanOut >= nn) { fanOut = nn - 1 }
+  if (fanOut < 1) { return [] }
+  let results = [(myIdx + 1) % nn]
+  if (fanOut < 2) { return results }
+  results.push((myIdx + nn - 1) % nn)
+  if (fanOut < 3) { return results }
+  while (results.length < fanOut) {
+    let r = Math.floor(Math.random() * nn)
+    if (r === myIdx) { continue }
     let k = 0
-    for(;k<results.length;k++){
-      if (r === results[k]){ break }
+    for (; k < results.length; k++) {
+      if (r === results[k]) { break }
     }
-    if (k === results.length){ results.push(r) }
+    if (k === results.length) { results.push(r) }
   }
   return results
 }
