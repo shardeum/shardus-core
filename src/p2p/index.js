@@ -1081,7 +1081,7 @@ class P2P {
   /**
    * Send Gossip to all nodes, using gossip in
    */
-  async sendGossipIn (type, payload, seed, nodes = this.state.getAllNodes()) {
+  async sendGossipIn (type, payload, nodes = this.state.getAllNodes()) {
     if (nodes.length === 0) return
     if (this.verboseLogs) this.mainLogger.debug(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
     const gossipPayload = { type: type, data: payload }
@@ -1098,7 +1098,7 @@ class P2P {
     const myIdx = nodes.findIndex(node => node.id === this.id)
     if (myIdx < 0) throw new Error('Could not find self in nodes array')
     // Map back recipient idxs to node objects
-    const recipientIdxs = getRandomGossipIn(nodeIdxs, this.gossipRecipients, 'abc', myIdx)
+    const recipientIdxs = getRandomGossipIn(nodeIdxs, this.gossipRecipients, myIdx)
     const recipients = recipientIdxs.map(idx => nodes[idx])
     try {
       if (this.verboseLogs) this.mainLogger.debug(`GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(recipients)}`)
@@ -1240,40 +1240,22 @@ function getRandom (arr, n) {
   return result
 }
 
-// From: https://stackoverflow.com/a/12646864
-/*
-function shuffleArraySeeded (array, seed) {
-  const rng = seedrandom(seed)
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]]
-  }
-}
-*/
-
-function getRandomGossipIn (nodeIdxs, fanOut, seed, myIdx) {
-  if (nodeIdxs.length < 2) return []
-  if (nodeIdxs.length - 1 < fanOut) fanOut = nodeIdxs.length - 1
-  // Loop all nodes
-  const randInRange = (range, rng = Math.random) => Math.floor(rng() * range)
-  const results = []
-  for (let i = 0; i < nodeIdxs.length; i++) {
-    // Ignore self
-    if (i === myIdx) continue
-    // Find out who each node would ask
-    const theirSeed = seed + i
-    const theirRng = seedrandom(theirSeed)
-    const theirRecipients = new Array(fanOut).fill().map(() => nodeIdxs[randInRange(nodeIdxs.length, theirRng)])
-    // If I was someone who they would ask, remember them
-    if (myIdx in theirRecipients) results.push(i)
-  }
-  // Ensure that we return exactly fanOut number of results
-  if (results.length > fanOut) return results.slice(0, fanOut)
-  if (results.length < fanOut) {
-    // Get random idxs from nodeIdxs, and add em to results until it is fanOut length
-    const nodeIdxsNotMe = nodeIdxs.filter(idx => idx !== myIdx)
-    const randomIdxs = new Array(fanOut - results.length).fill().map(() => nodeIdxsNotMe[randInRange(nodeIdxsNotMe.length)])
-    return results.concat(randomIdxs)
+function getRandomGossipIn (nodeIdxs, fanOut, myIdx) {
+  let nn = nodeIdxs.length
+  if (fanOut>=nn){ fanOut = nn - 1 }
+  if (fanOut<1){ return [] }
+  let results = [(myIdx+1)%nn]
+  if (fanOut<2){ return results }
+  results.push((myIdx+nn-1)%nn)
+  if (fanOut<3){ return results }
+  while(results.length < fanOut){
+    let r = Math.floor(Math.random()*nn)
+    if (r === myIdx){ continue }
+    let k = 0
+    for(;k<results.length;k++){
+      if (r === results[k]){ break }
+    }
+    if (k === results.length){ results.push(r) }
   }
   return results
 }
