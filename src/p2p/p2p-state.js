@@ -586,6 +586,10 @@ class P2PState {
       cycle.certificate = certificate
     }
     await this.storage.addCycles(cycle)
+
+    if (this.p2p.onNewCycle) {
+      this.p2p.onNewCycle(this.cycles)
+    }
   }
 
   async addCycles (cycles, certificates = null) {

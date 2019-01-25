@@ -547,6 +547,11 @@ class Shardus {
       } else {
         // throw new Error('Missing requried interface function. apply()')
       }
+      if (typeof (this.getAccountsStateHash) === 'function') {
+        accountUtilityInterface.getAccountsStateHash = async (accountStart, accountEnd, tsStart, tsEnd) => this.getAccountsStateHash(accountStart, accountEnd, tsStart, tsEnd)
+      } else {
+        // throw new Error('Missing requried interface function. apply()')
+      }
     } catch (ex) {
       this.fatalLogger.fatal(`Required application interface not implemented. Exception: ${ex}`)
       this.fatalLogger.fatal('getAccountUtilityInterface: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -584,6 +589,8 @@ class Shardus {
         await utils.sleep(3000)
         await this.p2p.dataSync.finalTXCatchup(true)
         // should we keep trying to catch up untill it returns false? ... i think so since we will reject and lose TXs for now.
+        await utils.sleep(3000)
+        await this.p2p.dataSync.enableSyncCheck()
       }
     } catch (e) {
       console.log(e.message + ' at ' + e.stack)
@@ -651,7 +658,10 @@ class Shardus {
     this.p2p.registerInternal('get_accpeted_transactions', async (payload, respond) => {
       let result = {}
 
-      let transactions = await this.storage.queryAcceptedTransactions(payload.tsStart, payload.tsEnd, 10)
+      if (!payload.limit) {
+        payload.limit = 10
+      }
+      let transactions = await this.storage.queryAcceptedTransactions(payload.tsStart, payload.tsEnd, payload.limit)
       result.transactions = transactions
       await respond(result)
     })

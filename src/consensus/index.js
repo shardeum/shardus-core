@@ -35,8 +35,16 @@ class Consensus {
       if (!this.consensusActive) {
         return
       }
+
+      if (this.config.debug && this.config.debug.loseReceiptChance) {
+        if (Math.random() < this.config.debug.loseReceiptChance) {
+          this.logger.playbackLogNote('FakeLoseReceipt', '', data)
+          return
+        }
+      }
+
       if (await this.onReceipt(data)) {
-        console.log('onReceipt: ' + data.shardusTransaction.inTransaction.txnTimestamp) // todo remove
+        console.log('onReceipt: ' + data.shardusTransaction.inTransaction.txnTimestamp)
         this.p2p.sendGossip('receipt', data, this.p2p.state.getAllNodes(this.p2p.id))
       }
     })

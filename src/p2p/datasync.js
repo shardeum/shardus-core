@@ -15,6 +15,7 @@ class DataSync {
     this.crypto = crypto
     this.storage = storage
     this.accountUtility = accountUtility
+    this.logger = logger
 
     this.completedPartitions = []
     this.syncSettleTime = 5000 // 3 * 10 // an estimate of max transaction settle time. todo make it a config or function of consensus later
@@ -718,6 +719,140 @@ class DataSync {
         }
       }
     })
+  }
+
+  enableSyncCheck () {
+    this.p2p.registerOnNewCycle(async (cycles) => {
+      if (cycles.length < 2) {
+        return
+      }
+      let thisCycle = cycles[cycles.length - 1]
+      let lastCycle = cycles[cycles.length - 2]
+      let endTime = thisCycle.start * 1000
+      let startTime = lastCycle.start * 1000
+
+      let accountStart = '0'.repeat(64)
+      let accountEnd = 'f'.repeat(64)
+      let message = { accountStart, accountEnd, tsStart: startTime, tsEnd: endTime }
+
+      await utils.sleep(5000) // wait a few seconds for things to settle
+
+      let equalFn = (a, b) => {
+        return a.stateHash === b.stateHash
+      }
+      let queryFn = async (node) => {
+        let result = await this.p2p.ask(node, 'get_account_state_hash', message)
+        return result
+      }
+      let winners = []
+      let result = await this.p2p._robustQuery(this.p2p.state.getAllNodes(this.p2p.id), queryFn, equalFn, 3, winners)
+      if (result && result.stateHash) {
+        let stateHash = await this.accountUtility.getAccountsStateHash(accountStart, accountEnd, startTime, endTime)
+        if (stateHash === result.stateHash) {
+          this.logger.playbackLogNote('appStateCheck', '', `Hashes Match = ${utils.makeShortHash(stateHash)} num cycles:${cycles.length} start: ${startTime}  end:${endTime}`)
+        } else {
+          this.logger.playbackLogNote('appStateCheck', '', `Hashes Dont Match ourState: ${utils.makeShortHash(stateHash)} otherState: ${utils.makeShortHash(result.stateHash)} window: ${startTime} to ${endTime}`)
+          // winners[0]
+          await this.restoreAccountDataByTx(winners, accountStart, accountEnd, startTime, endTime)
+        }
+      }
+    })
+  }
+
+  async restoreAccountDataByTx (nodes, accountStart, accountEnd, timeStart, timeEnd) {
+    this.logger.playbackLogNote('restoreByTx', '', `start`)
+
+    let helper = nodes[0]
+
+    let message = { tsStart: timeStart, tsEnd: timeEnd, limit: 10000 }
+    let result = await this.p2p.ask(helper, 'get_accpeted_transactions', message) // todo perf, could await these in parallel
+    let acceptedTXs = result.transactions
+
+    let toParse = ''
+    try {
+      for (let i = 0; i < acceptedTXs.length; i++) {
+        toParse = acceptedTXs[i]
+        if (utils.isObject(toParse) === false) {
+          acceptedTXs[i] = JSON.parse(toParse)
+          // this.logger.playbackLogNote('restoreByTx', '', `parsed: ${acceptedTXs[i]}`)
+        } else {
+          // this.logger.playbackLogNote('restoreByTx', '', acceptedTXs[i])
+
+          toParse.data = JSON.parse(toParse.data)
+          toParse.receipt = JSON.parse(toParse.receipt)
+        }
+      }
+    } catch (ex) {
+      this.fatalLogger.fatal('restoreByTx error: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack + ' while parsing: ' + toParse)
+    }
+    this.acceptedTXQueue = this.acceptedTXQueue.concat(acceptedTXs)
+
+    this.logger.playbackLogNote('restoreByTx', '', `tx count: ${this.acceptedTXQueue.length} queue: `) // ${utils.stringifyReduce(this.acceptedTXQueue)}
+
+    await this.applyAcceptedTx()
+
+    this.logger.playbackLogNote('restoreByTx', '', `end`)
+  }
+
+  sortedArrayDifference (a, b, compareFn) {
+    let results = []
+    // let aIdx = 0
+    let bIdx = 0
+
+    for (let i = 0; i < a.length; ++i) {
+      let aEntry = a[i]
+      let bEntry = b[bIdx]
+      let cmp = compareFn(aEntry, bEntry)
+      if (cmp === 0) {
+        bIdx++
+      } else if (cmp < 1) {
+        results.push(aEntry)
+      } else {
+        // nothing
+      }
+    }
+    return results
+  }
+
+  async restoreAccountData (nodes, accountStart, accountEnd, timeStart, timeEnd) {
+    let helper = nodes[0]
+
+    let message = { accountStart: accountStart, accountEnd: accountEnd, tsStart: timeStart, tsEnd: timeEnd }
+    let remoteAccountStates = await this.p2p.ask(helper, 'get_account_state', message) // todo perf, could await these in parallel
+    let accountStates = await this.storage.queryAccountStateTable(accountStart, accountEnd, timeStart, timeEnd, 100000000)
+
+    let compareFn = (a, b) => {
+      if (a.txTimestamp !== b.txTimestamp) {
+        return (a.txTimestamp > b.txTimestamp) ? 1 : -1
+      } else if (a.accountId !== b.accountId) {
+        return (a.accountId > b.accountId) ? 1 : -1
+      } else {
+        return 0
+      }
+    }
+    let diff = this.sortedArrayDifference(remoteAccountStates, accountStates, compareFn)
+    if (diff.length <= 0) {
+      return // give up
+    }
+    let accountsToPatch = []
+    // patch account states
+    await this.storage.addAccountStates(diff)
+    for (let state in diff) {
+      if (state.accountId) {
+        accountsToPatch.push(state.accountId)
+      }
+    }
+
+    let message2 = { accountIds: accountsToPatch }
+    let accountData = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message2)
+
+    if (accountData) {
+      // for(let account in accountData) {
+      //   //if exists update.
+      //   //else create
+      // }
+      // todo  this.accountUtility.patchUpdateAccounts(accountData)
+    }
   }
 }
 

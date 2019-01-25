@@ -79,6 +79,10 @@ class P2P {
     this.reportCallbacks.active = cb
   }
 
+  registerOnNewCycle (cb) {
+    this.onNewCycle = cb
+  }
+
   _verifyExternalInfo (ipInfo) {
     if (!ipInfo.externalIp) {
       return false
@@ -471,7 +475,7 @@ class P2P {
     return true
   }
 
-  async _robustQuery (nodes = [], queryFn, equalityFn, redundancy = 3) {
+  async _robustQuery (nodes = [], queryFn, equalityFn, redundancy = 3, winners = null) {
     if (nodes.length === 0) throw new Error('No nodes given.')
     if (typeof queryFn !== 'function') throw new Error(`Provided queryFn ${queryFn} is not a valid function.`)
     if (typeof equalityFn !== 'function') equalityFn = util.isDeepStrictEqual
@@ -484,13 +488,23 @@ class P2P {
         this.equalFn = equalFn
         this.items = []
       }
-      add (newItem) {
+      add (newItem, node) {
         for (let item of this.items) {
           if (this.equalFn(newItem, item.value)) item.count++
-          if (item.count >= this.winCount) return item.value
+          if (item.count >= this.winCount) {
+            this.items.push({ value: newItem, count: 1, node })
+            return item.value
+          }
         }
-        this.items.push({ value: newItem, count: 1 })
+        this.items.push({ value: newItem, count: 1, node })
         if (this.winCount === 1) return newItem
+      }
+      fillWinnersList (result, winners) {
+        for (let item of this.items) {
+          if (this.equalFn(result, item.value)) {
+            winners.push(item.node)
+          }
+        }
       }
     }
     let responses = new Tally(redundancy, equalityFn)
@@ -503,8 +517,13 @@ class P2P {
       try {
         let query = await queryFn(node)
         this.mainLogger.debug(`Result of query: ${JSON.stringify(query)}`)
-        let result = responses.add(query)
-        if (result) return result
+        let result = responses.add(query, node)
+        if (result) {
+          if (winners) {
+            responses.fillWinnersList(result, winners)
+          }
+          return result
+        }
       } catch (e) {
         this.mainLogger.debug(e)
         errors++
