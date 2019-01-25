@@ -1100,7 +1100,7 @@ class P2P {
   /**
    * Send Gossip to all nodes, using gossip in
    */
-  async sendGossipIn (type, payload, nodes = this.state.getAllNodes()) {
+  async sendGossipIn (type, payload, seed, nodes = this.state.getAllNodes()) {
     if (nodes.length === 0) return
     if (this.verboseLogs) this.mainLogger.debug(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
     const gossipPayload = { type: type, data: payload }
@@ -1111,17 +1111,18 @@ class P2P {
       return
     }
 
+    nodes.sort((first, second) => first.id.localeCompare(second.id, 'en', { sensitivity: 'variant' }))
     const nodeIdxs = new Array(nodes.length).fill().map((curr, idx) => idx)
     // Find out your own index in the nodes array
     const myIdx = nodes.findIndex(node => node.id === this.id)
     if (myIdx < 0) throw new Error('Could not find self in nodes array')
     // Map back recipient idxs to node objects
-    const recipientIdxs = getRandomGossipIn(nodeIdxs, this.gossipRecipients, gossipHash, myIdx)
+    const recipientIdxs = getRandomGossipIn(nodeIdxs, this.gossipRecipients, 'abc', myIdx)
     const recipients = recipientIdxs.map(idx => nodes[idx])
     try {
-      if (this.verboseLogs) this.mainLogger.debug(`Gossiping ${type} request to these nodes: ${utils.stringifyReduce(recipients)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(recipients)}`)
       for (const node of recipients) {
-        this.logger.playbackLog('self', node, 'GossipSend', type, '', gossipPayload)
+        this.logger.playbackLog('self', node, 'GossipInSend', type, '', gossipPayload)
       }
       await this.tell(recipients, 'gossip', gossipPayload, true)
     } catch (ex) {
@@ -1259,6 +1260,7 @@ function getRandom (arr, n) {
 }
 
 // From: https://stackoverflow.com/a/12646864
+/*
 function shuffleArraySeeded (array, seed) {
   const rng = seedrandom(seed)
   for (let i = array.length - 1; i > 0; i--) {
@@ -1266,20 +1268,21 @@ function shuffleArraySeeded (array, seed) {
     [array[i], array[j]] = [array[j], array[i]]
   }
 }
+*/
 
 function getRandomGossipIn (nodeIdxs, fanOut, seed, myIdx) {
   if (nodeIdxs.length < 2) return []
   if (nodeIdxs.length - 1 < fanOut) fanOut = nodeIdxs.length - 1
   // Loop all nodes
+  const randInRange = (range, rng = Math.random) => Math.floor(rng() * range)
   const results = []
   for (let i = 0; i < nodeIdxs.length; i++) {
     // Ignore self
     if (i === myIdx) continue
     // Find out who each node would ask
     const theirSeed = seed + i
-    const nodeIdxsOfOthers = nodeIdxs.filter(idx => idx !== i)
-    shuffleArraySeeded(nodeIdxsOfOthers, theirSeed)
-    const theirRecipients = nodeIdxsOfOthers.slice(0, fanOut)
+    const theirRng = seedrandom(theirSeed)
+    const theirRecipients = new Array(fanOut).fill().map(() => nodeIdxs[randInRange(nodeIdxs.length, theirRng)])
     // If I was someone who they would ask, remember them
     if (myIdx in theirRecipients) results.push(i)
   }
@@ -1288,8 +1291,8 @@ function getRandomGossipIn (nodeIdxs, fanOut, seed, myIdx) {
   if (results.length < fanOut) {
     // Get random idxs from nodeIdxs, and add em to results until it is fanOut length
     const nodeIdxsNotMe = nodeIdxs.filter(idx => idx !== myIdx)
-    const randomIdxs = shuffleArraySeeded(nodeIdxsNotMe, seed + myIdx)
-    return results.concat(randomIdxs.slice(0, fanOut - results.length))
+    const randomIdxs = new Array(fanOut - results.length).fill().map(() => nodeIdxsNotMe[randInRange(nodeIdxsNotMe.length)])
+    return results.concat(randomIdxs)
   }
   return results
 }
