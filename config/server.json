@@ -10,10 +10,10 @@
   "difficulty": 2,
   "queryDelay": 1,
   "netadmin": "758b1c119412298802cd28dbfa394cdfeecc4074492d60844cc192d632d84de3",
-  "gossipRecipients": 5,
+  "gossipRecipients": 4,
   "gossipTimeout": 180,
   "transactionExpireTime": 5,
-  "maxNodesPerCycle": 1,
+  "maxNodesPerCycle": 5,
   "crypto": {
     "hashKey": "69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc"
   },
