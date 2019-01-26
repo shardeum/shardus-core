@@ -133,7 +133,7 @@ class Consensus {
   // changed to {shardusTransaction, transactionReceipt} to fix out of order messaging.  real consensus will need to have a queue to apply changes
   async onReceipt (data) {
     this.profiler.profileSectionStart('onReceipt')
-    if (this.mainLogs) this.mainLogger.debug(`Start of onReciept`)
+
     // const shardusTransaction = this.pendingTransactions[receipt.txHash]
     const shardusTransaction = data.shardusTransaction
     let receipt = data.transactionReceipt
@@ -143,20 +143,24 @@ class Consensus {
       return // todo error
     }
     let transaction = shardusTransaction.inTransaction
+    if (typeof transaction !== 'object') {
+      return false
+    }
+
+    let timestamp = transaction.txnTimestamp
+    if (this.mainLogs) this.mainLogger.debug(`Queue onReceipt ${timestamp}`)
+
     // retrieve incoming transaction from HTTP request
     let ourLock = -1
     try {
-      if (typeof transaction !== 'object') {
-        return false
-      }
       // TODO! validate that reciept is sign by a valid node in the network
       if (this.crypto.verify(receipt, receipt.sign.owner) === false) {
         return false
       }
 
-      let timestamp = transaction.txnTimestamp
       // QUEUE delay system...
       ourLock = await this.queueAndDelay(transaction, receipt.txHash)
+      if (this.mainLogs) this.mainLogger.debug(`Start of onReceipt ${timestamp}`)
 
       // ToDo: Revisit this check
       // check that the tx hash matches the receipt
@@ -191,7 +195,7 @@ class Consensus {
         }
       }
 
-      this.accountUtility.acceptTransaction(transaction, receipt)
+      await this.accountUtility.acceptTransaction(transaction, receipt)
       // TODO: Make this more robust, actually make sure the application has applied tx
       // if (this.reporter) this.reporter.incrementTxApplied()
     } catch (ex) {
@@ -200,7 +204,7 @@ class Consensus {
       this.profiler.profileSectionEnd('onReceipt')
       this.unlockQueue(ourLock)
     }
-    if (this.mainLogs) this.mainLogger.debug(`End of onReceipt`)
+    if (this.mainLogs) this.mainLogger.debug(`End of onReceipt ${timestamp}`)
     return true
   }
 

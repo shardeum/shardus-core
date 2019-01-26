@@ -247,6 +247,7 @@ class Shardus {
   }
 
   async acceptTransaction (tx, receipt, gossipTx = false) {
+    if (this.verboseLogs) this.mainLogger.debug(`acceptTransaction start ${tx.timestamp}`)
     this.profiler.profileSectionStart('acceptTx-teststate')
     let { success, hasStateTableData } = await this.testAccountStateTable(tx)
     let timestamp = tx.txnTimestamp
@@ -255,6 +256,7 @@ class Shardus {
       console.log(errorMsg)
       throw new Error(errorMsg)
     }
+
     this.profiler.profileSectionEnd('acceptTx-teststate')
 
     this.profiler.profileSectionStart('acceptTx-apply')
@@ -291,6 +293,7 @@ class Shardus {
     }
     this.profiler.profileSectionEnd('acceptTx-gossip')
 
+    if (this.verboseLogs) this.mainLogger.debug(`acceptTransaction end ${tx.timestamp}`)
     return true
   }
 
