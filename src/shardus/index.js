@@ -246,7 +246,7 @@ class Shardus {
     await this.storage.clearAppRelatedState()
   }
 
-  async acceptTransaction (tx, receipt, gossipTx = false) {
+  async acceptTransaction (tx, receipt, gossipTx = false, dontAllowStateTableData = false) {
     if (this.verboseLogs) this.mainLogger.debug(`acceptTransaction start ${tx.timestamp}`)
     this.profiler.profileSectionStart('acceptTx-teststate')
     let { success, hasStateTableData } = await this.testAccountStateTable(tx)
@@ -255,6 +255,11 @@ class Shardus {
       let errorMsg = 'acceptTransaction ' + timestamp + ' failed. has state table data: ' + hasStateTableData
       console.log(errorMsg)
       throw new Error(errorMsg)
+    }
+
+    if (dontAllowStateTableData && hasStateTableData) {
+      if (this.verboseLogs) this.mainLogger.debug(`acceptTransaction exit because we have state table data ${tx.timestamp}`)
+      return
     }
 
     this.profiler.profileSectionEnd('acceptTx-teststate')

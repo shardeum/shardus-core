@@ -195,7 +195,7 @@ class Consensus {
         }
       }
 
-      await this.accountUtility.acceptTransaction(transaction, receipt)
+      await this.accountUtility.acceptTransaction(transaction, receipt, false, true)
       // TODO: Make this more robust, actually make sure the application has applied tx
       // if (this.reporter) this.reporter.incrementTxApplied()
     } catch (ex) {
