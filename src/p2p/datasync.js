@@ -718,6 +718,8 @@ class DataSync {
           this.acceptedTXQueue.splice(index + 1, 0, acceptedTX)
         }
       }
+
+      this.p2p.sendGossipIn('acceptedTx', acceptedTX, tracker)
     })
   }
 
