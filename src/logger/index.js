@@ -71,8 +71,8 @@ class Logger {
     }
     this._seenAddresses = {}
     this._shortStrings = {}
-    this._playbackOwner = os.hostname()
-    this._playbackOwner_host = this._playbackOwner
+    this._playbackOwner_host = os.hostname()
+    this._playbackOwner = 'temp_' + this._playbackOwner_host
     this._playbackIPInfo = null
     this._nodeInfos = {}
     http.setLogger(this)
@@ -90,7 +90,7 @@ class Logger {
 
   setPlaybackIPInfo (ipInfo) {
     this._playbackIPInfo = ipInfo
-    let newName = this._playbackOwner_host + ':' + this._playbackIPInfo.externalPort
+    let newName = 'temp_' + this._playbackOwner_host + ':' + this._playbackIPInfo.externalPort
     this.playbackLogNote('logHostNameUpdate', '', { newName })
     this._playbackOwner = newName
   }

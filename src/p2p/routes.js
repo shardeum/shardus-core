@@ -49,8 +49,8 @@ function setupRoutes () {
 
   // -------- INTERNAL Routes ----------
 
-  this.registerInternal('gossip', async (payload, respond, sender) => {
-    await this.handleGossip(payload, sender)
+  this.registerInternal('gossip', async (payload, respond, sender, tracker = '') => {
+    await this.handleGossip(payload, sender, tracker)
     this.mainLogger.debug('Gossip request accepted!')
   })
 
@@ -148,13 +148,13 @@ function setupRoutes () {
 
   // -------- GOSSIP Routes ----------
 
-  this.registerGossipHandler('join', async (payload) => {
-    const accepted = await this.addJoinRequest(payload, false)
+  this.registerGossipHandler('join', async (payload, sender, tracker) => {
+    const accepted = await this.addJoinRequest(payload, tracker, false)
     if (!accepted) return this.mainLogger.debug('Join request not accepted.')
     this.mainLogger.debug('Join request accepted!')
   })
 
-  this.registerGossipHandler('active', async (payload) => {
+  this.registerGossipHandler('active', async (payload, sender, tracker) => {
     if (!payload) {
       this.mainLogger.debug('No payload provided with `active` request.')
       return
@@ -163,10 +163,10 @@ function setupRoutes () {
     // Add status update of given node to queue
     const added = await this.state.addStatusUpdate(payload)
     if (!added) return this.mainLogger.debug(`Status update to active for ${payload.nodeId} not added.`)
-    await this.sendGossip('active', payload)
+    await this.sendGossip('active', payload, tracker)
   })
 
-  this.registerGossipHandler('certificate', async (payload, sender) => {
+  this.registerGossipHandler('certificate', async (payload, sender, tracker) => {
     if (!payload) {
       this.mainLogger.debug('No payload provided for the `certificate` request.')
       return
@@ -186,13 +186,13 @@ function setupRoutes () {
           const [added] = this.state.addCertificate(certificate, true)
           if (!added) {
             const ourCert = this.state.getCurrentCertificate()
-            this.sendGossip('certificate', ourCert)
+            this.sendGossip('certificate', ourCert, tracker)
             return
           }
           break
       }
     }
-    await this.sendGossip('certificate', certificate)
+    await this.sendGossip('certificate', certificate, tracker)
   })
 
   // -------- DEBUG Routes ----------

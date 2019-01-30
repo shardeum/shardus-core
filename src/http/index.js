@@ -3,6 +3,8 @@ const http = require('http')
 const https = require('https')
 
 let _logger = null
+let getIndex = 1
+let postIndex = -1
 
 function _containsProtocol (url) {
   if (!url.match('https?://*')) return false
@@ -56,15 +58,16 @@ async function get (url) {
   let isHttps = _checkHttps(normalized)
 
   if (_logger) {
-    _logger.playbackLog('self', host.hostname + ':' + host.port, 'HttpRequest', host.pathname, '', '')
+    _logger.playbackLog('self', host.hostname + ':' + host.port, 'HttpRequest', host.pathname, getIndex, '')
   }
 
   let res = await _get(host, isHttps)
 
   if (_logger) {
-    _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponse', host.pathname, '', res)
+    _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv', host.pathname, getIndex, res)
   }
 
+  getIndex++
   return res
 }
 
@@ -122,15 +125,17 @@ async function post (givenHost, body) {
   }
 
   if (_logger) {
-    _logger.playbackLog('self', host.hostname + ':' + host.port, 'HttpRequest', host.pathname, '', body)
+    _logger.playbackLog('self', host.hostname + ':' + host.port, 'HttpRequest', host.pathname, postIndex, body)
   }
 
   let isHttps = _checkHttps(normalized)
   let res = await _post(options, payload, isHttps)
 
   if (_logger) {
-    _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResp', host.pathname, '', res)
+    _logger.playbackLog(host.hostname + ':' + host.port, 'self', 'HttpResponseRecv', host.pathname, postIndex, res)
   }
+
+  postIndex--
   return res
 }
 

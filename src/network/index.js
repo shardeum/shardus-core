@@ -21,6 +21,9 @@ class Network {
       this.verboseLogsNet = true
     }
     // console.log('NETWORK LOGGING ' + this.verboseLogsNet + '  ' + this.netLogger.level.levelStr)
+
+    this.InternalTellCounter = 1
+    this.InternalAskCounter = 1
   }
 
   // TODO: Allow for binding to a specified network interface
@@ -84,8 +87,13 @@ class Network {
   async tell (nodes, route, message, logged = false) {
     const data = { route, payload: message }
     const promises = []
+    let id = ''
+    if (message.tracker) {
+      id = message.tracker
+    }
     for (const node of nodes) {
-      if (!logged) this.logger.playbackLog('self', node, 'InternalTell', route, '', message)
+      if (!logged) this.logger.playbackLog('self', node, 'InternalTell', route, id, message)
+      this.InternalTellCounter++
       const promise = this.qn.send(node.internalPort, node.internalIp, data)
       promises.push(promise)
     }
@@ -94,9 +102,16 @@ class Network {
 
   ask (node, route, message, logged = false) {
     return new Promise(async (resolve, reject) => {
+      let counter = this.InternalAskCounter
+      this.InternalAskCounter++
+      let id = ''
+      if (message.tracker) {
+        id = message.tracker
+      }
+
       const data = { route, payload: message }
       const onRes = (res) => {
-        if (!logged) this.logger.playbackLog('self', node, 'InternalAskResp', route, '', res)
+        if (!logged) this.logger.playbackLog('self', node, 'InternalAskResp', route, id, res)
         resolve(res)
       }
       const onTimeout = () => {
@@ -104,7 +119,7 @@ class Network {
         this.mainLogger.error(err)
         reject(err)
       }
-      if (!logged) this.logger.playbackLog('self', node, 'InternalAsk', route, '', message)
+      if (!logged) this.logger.playbackLog('self', node, 'InternalAsk', route, id, message)
       await this.qn.send(node.internalPort, node.internalIp, data, this.timeout, onRes, onTimeout)
     })
   }
@@ -141,7 +156,7 @@ class Network {
     let wrappedHandler = handler
     if (this.logger.playbackLogEnabled) {
       wrappedHandler = function (req, res) {
-        self.logger.playbackLog(req.hostname, 'self', 'ExternalRecv', route, '', { params: req.params, body: req.body })
+        self.logger.playbackLog(req.hostname, 'self', 'ExternalHttpReq', formattedRoute, '', { params: req.params, body: req.body })
         return handler(req, res)
       }
       // handler = wrappedHandler

@@ -691,7 +691,7 @@ class DataSync {
     //   Record Joined timestamp
     //   Even a syncing node will receive accepted transactions
     //   Starts receiving accepted transaction and saving them to Accepted Tx Table
-    this.p2p.registerGossipHandler('acceptedTx', async (acceptedTX) => {
+    this.p2p.registerGossipHandler('acceptedTx', async (acceptedTX, sender, tracker) => {
       // docs mention putting this in a table but it seems so far that an in memory queue should be ok
       // should we filter, or instead rely on gossip in to only give us TXs that matter to us?
 

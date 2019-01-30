@@ -31,7 +31,7 @@ class Consensus {
     this.lastServed = 0
 
     // Register Gossip Handlers with P2P
-    this.p2p.registerGossipHandler('receipt', async (data) => {
+    this.p2p.registerGossipHandler('receipt', async (data, sender, tracker) => {
       if (!this.consensusActive) {
         return
       }
@@ -45,16 +45,16 @@ class Consensus {
 
       if (await this.onReceipt(data)) {
         console.log('onReceipt: ' + data.shardusTransaction.inTransaction.txnTimestamp) // todo remove
-        this.p2p.sendGossipIn('receipt', data)
+        this.p2p.sendGossipIn('receipt', data, tracker)
       }
     })
 
-    this.p2p.registerGossipHandler('transaction', async (data) => {
+    this.p2p.registerGossipHandler('transaction', async (data, sender, tracker) => {
       if (!this.consensusActive) {
         return
       }
       await this.onTransaction(data)
-      this.p2p.sendGossipIn('transaction', data)
+      this.p2p.sendGossipIn('transaction', data, tracker)
     })
   }
 

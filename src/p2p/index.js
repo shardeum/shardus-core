@@ -45,6 +45,9 @@ class P2P {
       joined: null,
       active: null
     }
+
+    this.InternalRecvCounter = 0
+    this.keyCounter = 0
   }
 
   async init () {
@@ -748,7 +751,7 @@ class P2P {
     return true
   }
 
-  async addJoinRequest (joinRequest, fromExternal = true) {
+  async addJoinRequest (joinRequest, tracker, fromExternal = true) {
     const valid = this._validateJoinRequest(joinRequest)
     if (!valid) {
       this.mainLogger.debug(`Join request rejected: Failed validation.`)
@@ -763,7 +766,7 @@ class P2P {
     }
     const active = this._isActive()
     if (!active) return true
-    await this.sendGossip('join', joinRequest)
+    await this.sendGossip('join', joinRequest, tracker)
     return true
   }
 
@@ -1000,30 +1003,47 @@ class P2P {
     }
     const payload = wrappedPayload.payload
     const sender = wrappedPayload.sender
+    const tracker = wrappedPayload.tracker
     this.mainLogger.debug('Internal payload successfully verified.')
-    return [payload, sender]
+    return [payload, sender, tracker]
   }
 
-  _wrapAndSignMessage (msg) {
+  _wrapAndSignMessage (msg, tracker = '') {
     if (!msg) throw new Error('No message given to wrap and sign!')
     this.mainLogger.debug(`Attaching sender ${this.id} to the message: ${JSON.stringify(msg)}`)
     const wrapped = {
       payload: msg,
-      sender: this.id
+      sender: this.id,
+      tracker: tracker
     }
     const signed = this.crypto.sign(wrapped)
     return signed
   }
 
+  createMsgTracker () {
+    // return 'key_' + utils.makeShortHash(this.crypto.getPublicKey()) + '_' + Date.now() + '_' + this.keyCounter++
+    return 'key_' + utils.makeShortHash(this.id) + '_' + Date.now() + '_' + this.keyCounter++
+  }
+  createGossipTracker () {
+    // 'gkey_' + utils.makeShortHash(this.crypto.getPublicKey()) + '_' + Date.now() + '_' + this.keyCounter++
+    return 'gkey_' + utils.makeShortHash(this.id) + '_' + Date.now() + '_' + this.keyCounter++
+  }
+
   // Our own P2P version of the network tell, with a sign added
-  async tell (nodes, route, message, logged = false) {
-    const signedMessage = this._wrapAndSignMessage(message)
+  async tell (nodes, route, message, logged = false, tracker = '') {
+    if (tracker === '') {
+      tracker = this.createMsgTracker()
+    }
+    const signedMessage = this._wrapAndSignMessage(message, tracker)
     await this.network.tell(nodes, route, signedMessage, logged)
   }
 
   // Our own P2P version of the network ask, with a sign added, and sign verified on other side
-  async ask (node, route, message = {}, logged = false) {
-    const signedMessage = this._wrapAndSignMessage(message)
+  async ask (node, route, message = {}, logged = false, tracker = '') {
+    if (tracker === '') {
+      tracker = this.createMsgTracker()
+    }
+    const signedMessage = this._wrapAndSignMessage(message, tracker)
     const signedResponse = await this.network.ask(node, route, signedMessage, logged)
     this.mainLogger.debug(`Result of network-level ask: ${JSON.stringify(signedResponse)}`)
     const [response] = this._extractPayload(signedResponse, [node])
@@ -1036,31 +1056,36 @@ class P2P {
   registerInternal (route, handler) {
     // Create function that wraps handler function
     const wrappedHandler = async (wrappedPayload, respond) => {
+      this.InternalRecvCounter++
+      let counter = this.InternalRecvCounter
       // We have internal requests turned off until we have the node list
       if (!this.acceptInternal) {
         this.mainLogger.debug('We are not currently accepting internal requests...')
         await respond({ success: false, error: 'not_accepting' })
         return
       }
+      let tracker = ''
       // Create wrapped respond function for sending back signed data
       const respondWrapped = async (response) => {
-        const signedResponse = this._wrapAndSignMessage(response)
+        const signedResponse = this._wrapAndSignMessage(response, tracker)
         this.mainLogger.debug(`The signed wrapped response to send back: ${JSON.stringify(signedResponse)}`)
         if (route !== 'gossip') {
-          this.logger.playbackLog(sender, 'self', 'InternalRecvResp', route, '', payload)
+          this.logger.playbackLog(sender, 'self', 'InternalRecvResp', route, tracker, response)
         }
         await respond(signedResponse)
       }
       // Checks to see if we can extract the actual payload from the wrapped message
-      const [payload, sender] = this._extractPayload(wrappedPayload, this.state.getAllNodes(this.id))
+      let payloadArray = this._extractPayload(wrappedPayload, this.state.getAllNodes(this.id))
+      const [payload, sender] = payloadArray
+      tracker = payloadArray[2] || ''
       if (!payload) {
         await respondWrapped({ success: false, error: 'missing_sig' })
         return
       }
       if (route !== 'gossip') {
-        this.logger.playbackLog(sender, 'self', 'InternalRecv', route, '', payload)
+        this.logger.playbackLog(sender, 'self', 'InternalRecv', route, tracker, payload)
       }
-      await handler(payload, respondWrapped, sender)
+      await handler(payload, respondWrapped, sender, tracker)
     }
     // Include that in the handler function that is passed
     this.network.registerInternal(route, wrappedHandler)
@@ -1069,8 +1094,13 @@ class P2P {
   /**
    * Send Gossip to all nodes
    */
-  async sendGossip (type, payload, nodes = this.state.getAllNodes(this.id)) {
+  async sendGossip (type, payload, tracker = '', nodes = this.state.getAllNodes(this.id)) {
     if (nodes.length === 0) return
+
+    if (tracker === '') {
+      tracker = this.createGossipTracker()
+    }
+
     if (this.verboseLogs) this.mainLogger.debug(`Start of sendGossip(${utils.stringifyReduce(payload)})`)
     const gossipPayload = { type: type, data: payload }
 
@@ -1085,9 +1115,9 @@ class P2P {
     try {
       if (this.verboseLogs) this.mainLogger.debug(`Gossiping ${type} request to these nodes: ${utils.stringifyReduce(recipients)}`)
       for (const node of recipients) {
-        this.logger.playbackLog('self', node, 'GossipSend', type, '', gossipPayload)
+        this.logger.playbackLog('self', node, 'GossipSend', type, tracker, gossipPayload)
       }
-      await this.tell(recipients, 'gossip', gossipPayload, true)
+      await this.tell(recipients, 'gossip', gossipPayload, true, tracker)
     } catch (ex) {
       if (this.verboseLogs) this.mainLogger.error(`Failed to sendGossip(${utils.stringifyReduce(payload)}) Exception => ${ex}`)
       this.fatalLogger.fatal('sendGossip: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -1099,8 +1129,13 @@ class P2P {
   /**
    * Send Gossip to all nodes, using gossip in
    */
-  async sendGossipIn (type, payload, nodes = this.state.getAllNodes()) {
+  async sendGossipIn (type, payload, tracker = '', nodes = this.state.getAllNodes()) {
     if (nodes.length === 0) return
+
+    if (tracker === '') {
+      tracker = thisl.createGossipTracker()
+    }
+
     if (this.verboseLogs) this.mainLogger.debug(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
     const gossipPayload = { type: type, data: payload }
 
@@ -1109,7 +1144,6 @@ class P2P {
       if (this.verboseLogs) this.mainLogger.debug(`Gossip already sent: ${gossipHash.substring(0, 5)}`)
       return
     }
-
     nodes.sort((first, second) => first.id.localeCompare(second.id, 'en', { sensitivity: 'variant' }))
     const nodeIdxs = new Array(nodes.length).fill().map((curr, idx) => idx)
     // Find out your own index in the nodes array
@@ -1121,9 +1155,9 @@ class P2P {
     try {
       if (this.verboseLogs) this.mainLogger.debug(`GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(recipients)}`)
       for (const node of recipients) {
-        this.logger.playbackLog('self', node, 'GossipInSend', type, '', gossipPayload)
+        this.logger.playbackLog('self', node, 'GossipInSend', type, tracker, gossipPayload)
       }
-      await this.tell(recipients, 'gossip', gossipPayload, true)
+      await this.tell(recipients, 'gossip', gossipPayload, true, tracker)
     } catch (ex) {
       if (this.verboseLogs) this.mainLogger.error(`Failed to sendGossip(${utils.stringifyReduce(payload)}) Exception => ${ex}`)
       this.fatalLogger.fatal('sendGossipIn: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -1136,7 +1170,7 @@ class P2P {
  * Handle Goosip Transactions
  * Payload: {type: ['receipt', 'trustedTransaction'], data: {}}
  */
-  async handleGossip (payload, sender) {
+  async handleGossip (payload, sender, tracker = '') {
     if (this.verboseLogs) this.mainLogger.debug(`Start of handleGossip(${utils.stringifyReduce(payload)})`)
     const type = payload.type
     const data = payload.data
@@ -1162,9 +1196,8 @@ class P2P {
       return
     }
     this.gossipedHashes.set(gossipHash, false)
-
-    this.logger.playbackLog(sender, 'self', 'GossipRcv', type, '', data)
-    await gossipHandler(data, sender)
+    this.logger.playbackLog(sender, 'self', 'GossipRcv', type, tracker, data)
+    await gossipHandler(data, sender, tracker)
     if (this.verboseLogs) this.mainLogger.debug(`End of handleGossip(${utils.stringifyReduce(payload)})`)
   }
 
