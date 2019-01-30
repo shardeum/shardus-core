@@ -1021,11 +1021,9 @@ class P2P {
   }
 
   createMsgTracker () {
-    // return 'key_' + utils.makeShortHash(this.crypto.getPublicKey()) + '_' + Date.now() + '_' + this.keyCounter++
     return 'key_' + utils.makeShortHash(this.id) + '_' + Date.now() + '_' + this.keyCounter++
   }
   createGossipTracker () {
-    // 'gkey_' + utils.makeShortHash(this.crypto.getPublicKey()) + '_' + Date.now() + '_' + this.keyCounter++
     return 'gkey_' + utils.makeShortHash(this.id) + '_' + Date.now() + '_' + this.keyCounter++
   }
 
@@ -1057,7 +1055,6 @@ class P2P {
     // Create function that wraps handler function
     const wrappedHandler = async (wrappedPayload, respond) => {
       this.InternalRecvCounter++
-      let counter = this.InternalRecvCounter
       // We have internal requests turned off until we have the node list
       if (!this.acceptInternal) {
         this.mainLogger.debug('We are not currently accepting internal requests...')
@@ -1133,7 +1130,7 @@ class P2P {
     if (nodes.length === 0) return
 
     if (tracker === '') {
-      tracker = thisl.createGossipTracker()
+      tracker = this.createGossipTracker()
     }
 
     if (this.verboseLogs) this.mainLogger.debug(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)

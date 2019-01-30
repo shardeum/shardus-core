@@ -102,7 +102,6 @@ class Network {
 
   ask (node, route, message, logged = false) {
     return new Promise(async (resolve, reject) => {
-      let counter = this.InternalAskCounter
       this.InternalAskCounter++
       let id = ''
       if (message.tracker) {
