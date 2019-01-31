@@ -1,4 +1,4 @@
-const Qn = require('shardus-quic-net')
+const Sn = require('shardus-net')
 const express = require('express')
 const bodyParser = require('body-parser')
 const cors = require('cors')
@@ -6,7 +6,7 @@ const cors = require('cors')
 class Network {
   constructor (config, logger) {
     this.app = express()
-    this.qn = null
+    this.sn = null
     this.logger = logger
     this.mainLogger = logger.getLogger('main')
     this.netLogger = logger.getLogger('net')
@@ -14,7 +14,7 @@ class Network {
     this.timeout = config.timeout * 1000
     this.internalRoutes = {}
     this.extServer = null
-    this.intServers = null
+    this.intServer = null
 
     this.verboseLogsNet = false
     if (this.netLogger && ['TRACE'].includes(this.netLogger.level.levelStr)) {
@@ -56,11 +56,10 @@ class Network {
 
   // TODO: Allow for binding to a specified network interface
   async _setupInternal () {
-    this.qn = Qn({
+    this.sn = Sn({
       port: this.ipInfo.internalPort
     })
-    // this.qn.MAX_QUIC_DATA_SIZE = 0 // This forces TCP only comms
-    this.intServers = await this.qn.listen(async (data, remote, protocol, respond) => {
+    this.intServer = await this.sn.listen(async (data, remote, respond) => {
       if (!data) throw new Error('No data provided in request...')
       const { route, payload } = data
       if (!route) {
@@ -94,7 +93,7 @@ class Network {
     for (const node of nodes) {
       if (!logged) this.logger.playbackLog('self', node, 'InternalTell', route, id, message)
       this.InternalTellCounter++
-      const promise = this.qn.send(node.internalPort, node.internalIp, data)
+      const promise = this.sn.send(node.internalPort, node.internalIp, data)
       promises.push(promise)
     }
     await Promise.all(promises)
@@ -119,7 +118,7 @@ class Network {
         reject(err)
       }
       if (!logged) this.logger.playbackLog('self', node, 'InternalAsk', route, id, message)
-      await this.qn.send(node.internalPort, node.internalIp, data, this.timeout, onRes, onTimeout)
+      await this.sn.send(node.internalPort, node.internalIp, data, this.timeout, onRes, onTimeout)
     })
   }
 
@@ -141,7 +140,7 @@ class Network {
     try {
       await Promise.all([
         closeServer(this.extServer),
-        this.qn.stopListening(this.intServers)
+        this.sn.stopListening(this.intServer)
       ])
     } catch (e) {
       throw e

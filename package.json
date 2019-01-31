@@ -26,7 +26,7 @@
     "log4js-extend": "0.2.1",
     "sequelize": "4.41.0",
     "shardus-crypto-utils": "gitlab:shardus/shardus-crypto-utils",
-    "shardus-quic-net": "gitlab:shardus/shardus-quic-net",
+    "shardus-net": "gitlab:shardus/shardus-net",
     "sqlite": "3.0.0"
   },
   "devDependencies": {
