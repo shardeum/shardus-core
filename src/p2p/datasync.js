@@ -747,6 +747,10 @@ class DataSync {
         return result
       }
       let winners = []
+      let nodes = this.p2p.state.getAllNodes(this.p2p.id)
+      if (nodes.length === 0) {
+        return // nothing to do
+      }
       let result = await this.p2p._robustQuery(this.p2p.state.getAllNodes(this.p2p.id), queryFn, equalFn, 3, winners)
       if (result && result.stateHash) {
         let stateHash = await this.accountUtility.getAccountsStateHash(accountStart, accountEnd, startTime, endTime)
