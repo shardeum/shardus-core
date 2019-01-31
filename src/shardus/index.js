@@ -7,6 +7,7 @@ const Network = require('../network')
 const utils = require('../utils')
 const Consensus = require('../consensus')
 const Reporter = require('../reporter')
+const Debug = require('../debug')
 const Profiler = require('../utils/profiler.js')
 const allZeroes64 = '0'.repeat(64)
 
@@ -24,6 +25,7 @@ class Shardus {
     this.network = new Network(config.network, this.logger)
     this.p2p = {}
     this.consensus = {}
+    this.debug = {}
     this.appProvided = null
     this.app = null
     this.accountUtility = null
@@ -601,6 +603,8 @@ class Shardus {
     const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout, maxNodesPerCycle }
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network, this.accountUtility)
     await this.p2p.init()
+    this.debug = new Debug(this.config.baseDir, this.logger, this.storage, this.network)
+    await this.debug.init()
 
     this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this, this.profiler) : null
     this.consensus = new Consensus(this.accountUtility, this.config, this.logger, this.crypto, this.p2p, this.storage, null, this.app, this.reporter, this.profiler)

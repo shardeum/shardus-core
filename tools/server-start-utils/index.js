@@ -55,7 +55,7 @@ class ServerStartUtils {
     _writeJsonFiles(path.join(server.baseDir, 'config'), changedConfigs)
   }
 
-  async startServer (extPort = null, intPort = null, successFn = 'id', changes = null, outputToFile = true, instance = false) {
+  async startServer (extPort = null, intPort = null, successFn = null, changes = null, outputToFile = true, instance = false) {
     extPort = extPort || _get(changes, 'server.ip.externalPort') || this.defaultConfigs.server.ip.externalPort
     intPort = intPort || _get(changes, 'server.ip.internalPort') || this.defaultConfigs.server.ip.internalPort
     changes = changes || {}
@@ -65,6 +65,9 @@ class ServerStartUtils {
           successFn = data => _exists(data.nodeInfo.id)
           break
         case 'active':
+          successFn = data => data.nodeInfo.status === 'active'
+          break
+        default:
           successFn = data => data.nodeInfo.status === 'active'
       }
     }
