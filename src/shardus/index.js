@@ -602,8 +602,8 @@ class Shardus {
       }
     } catch (e) {
       console.log(e.message + ' at ' + e.stack)
-      this.mainLogger.debug('sharuds.start() ' + e.message + ' at ' + e.stack)
-      this.fatalLogger.fatal('sharuds.start() ' + e.message + ' at ' + e.stack)
+      this.mainLogger.debug('shardus.start() ' + e.message + ' at ' + e.stack)
+      this.fatalLogger.fatal('shardus.start() ' + e.message + ' at ' + e.stack)
       throw new Error(e)
     }
     if (!started) await this.shutdown(exitProcOnFail)
