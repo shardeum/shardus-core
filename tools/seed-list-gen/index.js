@@ -3,6 +3,8 @@ const config = require('./config.json')
 const fs = require('fs')
 const path = require('path')
 
+crypto('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
+
 let seedList
 const outputFile = config.outFile
 const keyFile = config.keypair
@@ -25,7 +27,6 @@ try {
   if (!keys.publicKey || !keys.secretKey) throw new Error('Missing pk/sk in the keypair file')
 } catch (e) {
   // If no valid keypair, create one and write it to the specified inFile,
-  crypto('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
   keys = crypto.generateKeypair()
   fs.writeFileSync(path.join(__dirname, keyFile), JSON.stringify(keys, null, 2))
   console.log(`New keypair has been generated and stored in ${keyFile} `)
