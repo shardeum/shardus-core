@@ -14,8 +14,10 @@ class Crypto {
     crypto(this.config.hashKey)
     let keypair = await this.storage.getProperty('keypair')
     if (!keypair) {
+      this.mainLogger.info('Keypair unable to be loaded from database. Generating new keypair...')
       this.keypair = this._generateKeypair()
       await this.storage.setProperty('keypair', this.keypair)
+      this.mainLogger.info('New keypair successfully generated and saved to database.')
       return
     }
     this.mainLogger.info('Keypair loaded successfully from database.')

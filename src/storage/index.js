@@ -217,12 +217,12 @@ class Storage {
       if (!prop) {
         await this._create(this.storageModels.properties, {
           key,
-          value: JSON.stringify(value)
+          value
         })
       } else {
         await this._update(this.storageModels.properties, {
           key,
-          value: JSON.stringify(value)
+          value
         }, { key })
       }
     } catch (e) {
