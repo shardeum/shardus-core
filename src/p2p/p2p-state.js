@@ -340,10 +340,10 @@ class P2PState extends EventEmitter {
     let nodeId = this.computeNodeId(node.publicKey, cycleMarker)
     node.id = nodeId
     node.cycleJoined = cycleMarker
-    this.nodes.ordered.push(node)
     await this._updateNodeStatus(node, 'syncing', false)
     await this.addNode(node)
     this.mainLogger.debug(`Nodelist after adding this node: ${JSON.stringify(this.nodes.current)}`)
+    this.mainLogger.debug(`Ordered nodelist after adding this node: ${JSON.stringify(this.nodes.ordered)}`)
   }
 
   async _acceptNodes (nodes, cycleMarker) {
@@ -354,7 +354,6 @@ class P2PState extends EventEmitter {
     await Promise.all(promises)
   }
 
-  // TODO: Insert ordered into order subobject
   _addNodeToNodelist (node) {
     const status = node.status
     if (!this.validStatuses.includes(status)) throw new Error('Invalid node status.')
@@ -364,6 +363,13 @@ class P2PState extends EventEmitter {
     // Get internalHost by concatenating the internal IP and port
     const internalHost = `${node.internalIp}:${node.internalPort}`
     this.nodes.byIp[internalHost] = node
+    // Insert sorted into ordered list
+    utils.insertSorted(this.nodes.ordered, node, (a, b) => {
+      if (a.joinRequestTimestamp === b.joinRequestTimestamp) {
+        return this.crypto.isGreaterHash(a.id, b.id) ? 1 : -1
+      }
+      return a.joinRequestTimestamp > b.joinRequestTimestamp ? 1 : -1
+    })
   }
 
   _addNodesToNodelist (nodes) {
