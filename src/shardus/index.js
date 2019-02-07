@@ -113,9 +113,9 @@ class Shardus {
     this._setupHeartbeat()
     this.crypto = new Crypto(this.config.crypto, this.logger, this.storage)
     await this.crypto.init()
-    const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout, maxNodesPerCycle, maxSeedNodes } = this.config
+
     const ipInfo = this.config.ip
-    const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout, maxNodesPerCycle, maxSeedNodes }
+    const p2pConf = Object.assign({ ipInfo }, this.config.p2p)
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto)
     await this.p2p.init(this.network)
     this.debug = new Debug(this.config.baseDir, this.network)

@@ -1,22 +1,24 @@
 {
-  "ipServer": "api.ipify.org/?format=json",
-  "timeServer": "http://arimaa.com/timestamp/",
-  "syncLimit": 180,
-  "cycleDuration": 15,
-  "maxRejoinTime": 20,
   "heartbeatInterval": 5,
-  "seedList": "https://gitlab.com/shardus/seed-node-lists/raw/master/public/seed-list-local.json",
   "baseDir": ".",
-  "difficulty": 2,
-  "queryDelay": 1,
-  "netadmin": "758b1c119412298802cd28dbfa394cdfeecc4074492d60844cc192d632d84de3",
-  "gossipRecipients": 4,
-  "gossipTimeout": 180,
-  "transactionExpireTime": 10,
-  "maxNodesPerCycle": 5,
-  "maxSeedNodes": 10,
+  "transactionExpireTime": 5,
   "crypto": {
     "hashKey": "69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc"
+  },
+  "p2p": {
+    "ipServer": "api.ipify.org/?format=json",
+    "timeServer": "http://arimaa.com/timestamp/",
+    "syncLimit": 180,
+    "cycleDuration": 15,
+    "maxRejoinTime": 20,
+    "seedList": "https://gitlab.com/shardus/seed-node-lists/raw/master/public/seed-list-local.json",
+    "difficulty": 2,
+    "queryDelay": 1,
+    "netadmin": "758b1c119412298802cd28dbfa394cdfeecc4074492d60844cc192d632d84de3",
+    "gossipRecipients": 4,
+    "gossipTimeout": 180,
+    "maxNodesPerCycle": 5,
+    "maxSeedNodes": 10
   },
   "ip": {
     "externalIp": "127.0.0.1",
