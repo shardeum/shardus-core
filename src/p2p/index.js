@@ -1058,7 +1058,6 @@ class P2P {
       // We have internal requests turned off until we have the node list
       if (!this.acceptInternal) {
         this.mainLogger.debug('We are not currently accepting internal requests...')
-        await respond({ success: false, error: 'not_accepting' })
         return
       }
       let tracker = ''
@@ -1076,7 +1075,7 @@ class P2P {
       const [payload, sender] = payloadArray
       tracker = payloadArray[2] || ''
       if (!payload) {
-        await respondWrapped({ success: false, error: 'missing_sig' })
+        this.mainLogger.debug('Payload unable to be extracted, possible missing signature...')
         return
       }
       if (route !== 'gossip') {
