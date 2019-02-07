@@ -23,7 +23,7 @@ const getTime = (format = 'ms') => {
 }
 
 const deepCopy = (obj) => {
-  if (typeof obj !== 'object') throw Error('Object not of type object.')
+  if (typeof obj !== 'object') throw Error('Given element is not of type object.')
   return JSON.parse(JSON.stringify(obj))
 }
 

@@ -5,6 +5,11 @@ try {
   console.log('Crypto support is disabled!')
 }
 
+const generateSeed = () => {
+  const bytes = crypto.randomBytes(16)
+  return bytes.toString('hex')
+}
+
 const parseSeed = (seed) => {
   if (typeof seed !== 'string' || seed.length !== 32) {
     return false
@@ -37,11 +42,6 @@ const sfc32 = (a, b, c, d) => {
 }
 
 const generateContext = (seed) => {
-  const generateSeed = () => {
-    const bytes = crypto.randomBytes(16)
-    return bytes.toString('hex')
-  }
-
   if (!seed) {
     seed = generateSeed()
   }
@@ -55,7 +55,8 @@ const generateContext = (seed) => {
     return Math.floor(rand() * (max - min + 1)) + min
   }
 
-  return { generateSeed, rand, randomInt }
+  return { rand, randomInt }
 }
 
-module.exports = generateContext
+exports = module.exports = generateContext
+exports.generateSeed = generateSeed

@@ -1,5 +1,6 @@
 const EventEmitter = require('events')
 const utils = require('../utils')
+const Random = require('../random')
 
 class P2PState extends EventEmitter {
   constructor (config, logger, storage, p2p, crypto) {
@@ -10,6 +11,7 @@ class P2PState extends EventEmitter {
     this.storage = storage
     this.defaultCycleDuration = config.cycleDuration
     this.maxNodesPerCycle = config.maxNodesPerCycle
+    this.maxSeedNodes = config.maxSeedNodes
 
     this.cycles = []
     this.certificates = []
@@ -889,6 +891,41 @@ class P2PState extends EventEmitter {
 
   getActiveNodes (self) {
     return this._getSubsetOfNodelist(this.nodes.active, self)
+  }
+
+  getNodesOrdered () {
+    return this.nodes.ordered
+  }
+
+  getRandomSeedNodes (seed) {
+    if (!seed) {
+      return [null, 'no_seed']
+    }
+
+    const orderedNodes = utils.deepCopy(this.getNodesOrdered())
+    for (let i = 0; i < orderedNodes.length; i++) {
+      const node = orderedNodes[i]
+      if (node.status !== 'active') {
+        orderedNodes.splice(i, 1)
+      }
+    }
+    let chosenNodes
+    // If the number of active nodes is less than or equal to the max seeds nodes we want, just return the entire list
+    if (orderedNodes.length <= this.maxSeedNodes) {
+      chosenNodes = orderedNodes
+    } else { // Otherwise we seed RNG and generate numbers to select random nodes until we have 10
+      chosenNodes = []
+      const random = Random(seed)
+      while (chosenNodes.length < 10) {
+        const randIndex = random.randomInt(0, orderedNodes.length - 1)
+        const randomNode = orderedNodes[randIndex]
+        chosenNodes.push(randomNode)
+        orderedNodes.splice(randIndex, 1)
+      }
+    }
+    // Remove all properties from nodes besides external IP and port
+    const seedNodes = chosenNodes.map((node) => { return { ip: node.externalIp, port: node.externalPort } })
+    return [seedNodes]
   }
 }
 

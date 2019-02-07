@@ -47,6 +47,23 @@ function setupRoutes () {
     return res.json({ joined: true, cycleJoined })
   })
 
+  // TODO: Change this to post request
+  this.network.registerExternalGet('seednodes/:seed', (req, res) => {
+    // TODO: Get seed from body
+    // const seed = req.body.seed
+    const seed = req.params.seed
+    if (!seed || typeof seed !== 'string' || seed.length !== 32) {
+      this.mainLogger.debug('Invalid seed was given for \'seednodes\' route.')
+      return res.json({ seedNodes: [], error: 'invalid_seed' })
+    }
+    // TODO: Validate signature
+    const [seedNodes, error] = this.state.getRandomSeedNodes(seed)
+    if (error) {
+      return res.json({ seedNodes, error })
+    }
+    return res.json({ seedNodes })
+  })
+
   // -------- INTERNAL Routes ----------
 
   this.registerInternal('gossip', async (payload, respond, sender, tracker = '') => {
