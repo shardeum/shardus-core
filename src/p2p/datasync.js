@@ -181,7 +181,7 @@ class DataSync {
     } catch (error) {
       if (error.message === 'FailAndRestartPartition') {
         this.mainLogger.debug(`DATASYNC: Error Failed at: ${error.stack}`)
-        this.failandRestart()
+        await this.failandRestart()
       }
     }
   }
@@ -289,13 +289,12 @@ class DataSync {
       }
       this.lastStateSyncEndtime = endTime
 
-      let searchingForGoodHash = true
-
       let queryLow
       let queryHigh
       let nodesToAsk = []
       let firstHash
       nodesToAsk = nodesToAsk.concat(this.dataSourceNodes)
+      let searchingForGoodHash = true
       while (searchingForGoodHash) {
         queryLow = lowAddress
         queryHigh = highAddress
@@ -316,7 +315,7 @@ class DataSync {
           }
         }
         if (hashesMatch === false) {
-          this.mainLogger.debug(`DATASYNC: syncStateTableData hashes do not match `)
+          this.mainLogger.debug(`DATASYNC: hash: syncStateTableData hashes do not match `)
           for (let hashResp of stateHashResults) {
             this.mainLogger.debug(`DATASYNC: node:  ${hashResp.node.externalIp}:${hashResp.node.externalPort}  hash: ${hashResp.hash}`)
           }
@@ -330,15 +329,55 @@ class DataSync {
           //   nodesToAsk = nodesToAsk.concat(moreNodes)
           // }
         } else {
+          this.mainLogger.debug(`DATASYNC: hash: got good hash ${firstHash}`)
           searchingForGoodHash = false
         }
       }
+
+      if (nodesToAsk.length === 0) {
+        this.mainLogger.debug(`DATASYNC: hash: no nodes availabe to ask for hash`)
+      }
+
+      // queryLow = lowAddress
+      // queryHigh = highAddress
+      // let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, tsEnd: endTime }
+
+      // let equalFn = (a, b) => {
+      //   return a.stateHash === b.stateHash
+      // }
+      // let queryFn = async (node) => {
+      //   let result = await this.p2p.ask(node, 'get_account_state_hash', message)
+      //   return result
+      // }
+      // let winners = []
+      // let nodes = this.getRandomNodesInRange(100, lowAddress, highAddress)
+      // // let nodes = this.p2p.state.getAllNodes(this.p2p.id)
+      // if (nodes.length === 0) {
+      //   this.mainLogger.debug(`no nodes available`)
+      //   return // nothing to do
+      // }
+      // this.mainLogger.debug(`DATASYNC: _robustQuery get_account_state_hash from ${utils.stringifyReduce(nodes.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+      // let result = await this.p2p._robustQuery(nodes, queryFn, equalFn, 3, winners)
+      // if (result && result.stateHash) {
+      //   this.mainLogger.debug(`DATASYNC: _robustQuery returned result: ${result.stateHash}`)
+      //   if (winners.length === 0) {
+      //     throw new Error('FailAndRestartPartition1')
+      //   }
+      //   this.dataSourceNode = winners[0]
+      //   this.mainLogger.debug(`DATASYNC: got hash ${result.stateHash} from ${utils.stringifyReduce(winners.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+      //   firstHash = result.stateHash
+      // } else {
+      //   this.mainLogger.debug(`DATASYNC: _robustQuery get_account_state_hash failed`)
+      //   throw new Error('FailAndRestartPartition2')
+      // }
 
       let moreDataRemaining = true
       this.combinedAccountStateData = []
       let loopCount = 0
 
       let lowTimeQuery = startTime
+      this.mainLogger.debug(`DATASYNC: hash: getting state table data from: ${utils.makeShortHash(this.dataSourceNode.id) + ':' + this.dataSourceNode.externalPort}`)
+
       // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
       while (moreDataRemaining) {
         let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: lowTimeQuery, tsEnd: endTime }
@@ -458,9 +497,11 @@ class DataSync {
     this.clearPartitionData()
 
     // using set timeout before we resume to prevent infinite stack depth.
-    setTimeout(async () => {
-      await this.syncStateDataForPartition(this.currentPartition)
-    }, 1000)
+    // setTimeout(async () => {
+    //   await this.syncStateDataForPartition(this.currentPartition)
+    // }, 1000)
+    utils.sleep(1000)
+    await this.syncStateDataForPartition(this.currentPartition)
   }
 
   // just a placeholder for later
@@ -490,6 +531,7 @@ class DataSync {
     let missingButOkAccounts = 0
     let missingTXs = 0
     let handledButOk = 0
+    let otherMissingCase = 0
     let missingButOkAccountIDs = {}
 
     this.mainLogger.debug(`DATASYNC: processAccountData stateTableCount: ${this.inMemoryStateTableData.length}`)
@@ -503,7 +545,9 @@ class DataSync {
         let txRef = this.acceptedTXByHash[stateData.txId]
         if (txRef == null) {
           missingTXs++
-          this.missingAccountData.push(stateData.accountId)
+          if (stateData.accountId != null) {
+            this.missingAccountData.push(stateData.accountId)
+          }
         } else if (stateData.stateBefore === allZeroes64) {
           // this means we are at the start of a valid state table chain that starts with creating an account
           missingButOkAccountIDs[stateData.accountId] = true
@@ -514,7 +558,10 @@ class DataSync {
         } else {
           // unhandled case. not expected.  this would happen if the state table chain does not start with this account being created
           // this could be caused by a node trying to withold account data when syncing
-          this.missingAccountData.push(stateData.accountId)
+          if (stateData.accountId != null) {
+            this.missingAccountData.push(stateData.accountId)
+          }
+          otherMissingCase++
         }
         // should we check timestamp for the state table data?
       }
@@ -562,7 +609,7 @@ class DataSync {
       }
     }
 
-    this.mainLogger.debug(`DATASYNC: processAccountData saving ${this.goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk}`)
+    this.mainLogger.debug(`DATASYNC: processAccountData saving ${this.goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase}`)
     // failedHashes is a list of accounts that failed to match the hash reported by the server
     let failedHashes = await this.accountUtility.setAccountData(this.goodAccounts) // repeatable form may need to call this in batches
 
@@ -579,7 +626,18 @@ class DataSync {
       this.failedAccounts = this.failedAccounts.concat(failedHashes)
       for (let accountId of failedHashes) {
         account = this.mapAccountData[accountId]
-        this.accountsWithStateConflict.push(account)
+
+        if (this.verboseLogs) this.mainLogger.debug(`DATASYNC: processAccountData ${accountId}  data: ${utils.stringifyReduce(account)}`)
+
+        if (account != null) {
+          if (this.verboseLogs) this.mainLogger.debug(`DATASYNC: processAccountData adding account to list`)
+          this.accountsWithStateConflict.push(account)
+        } else {
+          if (this.verboseLogs) this.mainLogger.debug(`DATASYNC: processAccountData cant find data: ${accountId}`)
+          if (accountId) {
+            this.accountsWithStateConflict.push({ address: accountId })
+          }
+        }
       }
     }
 
@@ -592,24 +650,27 @@ class DataSync {
   //   Repeat the “Sync the Account State Table Second Pass” step
   //   Repeat the “Process the Account data” step
   async syncFailedAcccounts (lowAddress, highAddress) {
-    if (this.accountsWithStateConflict.length === 0) {
-      this.mainLogger.debug(`DATASYNC: syncFailedAcccounts not failed hashes to sync`)
+    if (this.accountsWithStateConflict.length === 0 && this.missingAccountData.length === 0) {
+      this.mainLogger.debug(`DATASYNC: syncFailedAcccounts no failed hashes to sync`)
       return
     }
+    if (this.verboseLogs) this.mainLogger.debug(`DATASYNC: syncFailedAcccounts start`)
     let addressList = []
     for (let account of this.accountsWithStateConflict) {
-      addressList.push(account.address)
+      if (account.address != null) {
+        addressList.push(account.address)
+      }
     }
     // add the addresses of accounts that we got state table data for but not data for
     addressList = addressList.concat(this.missingAccountData)
     this.missingAccountData = []
 
     // TODO m11:  should we pick different nodes to ask? (at the very least need to change the data source node!!!!!!)
+    this.mainLogger.debug(`DATASYNC: syncFailedAcccounts requesting data for failed hashes ${utils.stringifyReduce(addressList)}`)
 
     let message = { accountIds: addressList }
     let accountData = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
 
-    this.mainLogger.debug(`DATASYNC: syncFailedAcccounts requesting data for failed hashes`)
     this.combinedAccountData.concat(accountData)
 
     await this.syncStateTableData(lowAddress, highAddress, this.lastStateSyncEndtime, Date.now())
@@ -631,6 +692,9 @@ class DataSync {
     this.mainLogger.debug(`DATASYNC: applyAcceptedTx for up to ${this.acceptedTXQueue.length} transactions`)
 
     console.log(`applyAcceptedTx   queue: ${this.acceptedTXQueue.length}` + '   time:' + Date.now())
+
+    let anyAcceptedTx = false
+
     while (this.acceptedTXQueue.length > 0) {
       let currentTime = Date.now()
       let txAge = currentTime - this.acceptedTXQueue[0].timestamp
@@ -645,7 +709,18 @@ class DataSync {
 
       // we no longer have state table data in memory so there is not much more the datasync can do
       // shardus / the app code can take it from here
-      await this.accountUtility.tryApplyTransaction(nextTX)
+      let result = await this.accountUtility.tryApplyTransaction(nextTX)
+      if (result === false && anyAcceptedTx === false) {
+        // hit a trailing edge. we must have mismatche sync of account data, need to requery and restart this
+        // uery account data for the next N transactions?
+
+        // push this back in
+        // this.acceptedTXQueue.unshift(nextTX)
+        // break // we will need more state table data for coverage.
+      }
+      if (result === true) {
+        anyAcceptedTx = true
+      }
 
       // every x messages need to yeild
       counter++
@@ -695,8 +770,10 @@ class DataSync {
       // docs mention putting this in a table but it seems so far that an in memory queue should be ok
       // should we filter, or instead rely on gossip in to only give us TXs that matter to us?
 
+      this.p2p.sendGossipIn('acceptedTx', acceptedTX, tracker)
+
       if (!this.isSyncingAcceptedTxs) {
-        if (this.verboseLogs) console.log('got accepted tx after sync complete: ' + acceptedTX.timestamp + '   time:' + Date.now())
+        // if (this.verboseLogs) console.log('got accepted tx after sync complete: ' + acceptedTX.timestamp + '   time:' + Date.now())
         return
       }
 
@@ -718,8 +795,6 @@ class DataSync {
           this.acceptedTXQueue.splice(index + 1, 0, acceptedTX)
         }
       }
-
-      this.p2p.sendGossipIn('acceptedTx', acceptedTX, tracker)
     })
   }
 
@@ -747,11 +822,12 @@ class DataSync {
         return result
       }
       let winners = []
-      let nodes = this.p2p.state.getAllNodes(this.p2p.id)
+      // let nodes = this.p2p.state.getAllNodes(this.p2p.id)
+      let nodes = this.getRandomNodesInRange(100, accountStart, accountEnd)
       if (nodes.length === 0) {
         return // nothing to do
       }
-      let result = await this.p2p._robustQuery(this.p2p.state.getAllNodes(this.p2p.id), queryFn, equalFn, 3, winners)
+      let result = await this.p2p._robustQuery(nodes, queryFn, equalFn, 3, winners)
       if (result && result.stateHash) {
         let stateHash = await this.accountUtility.getAccountsStateHash(accountStart, accountEnd, startTime, endTime)
         if (stateHash === result.stateHash) {

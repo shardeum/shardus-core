@@ -33,7 +33,7 @@ class Network {
       const storeRequests = function (req, res, next) {
         if (req.url !== '/test') {
           if (self.verboseLogsNet) {
-            self.netLogger.debug(JSON.stringify({
+            self.netLogger.debug('External\t' + JSON.stringify({
               url: req.url,
               method: req.method,
               body: req.body
@@ -74,7 +74,7 @@ class Network {
       }
       await handler(payload, respond)
       if (this.verboseLogsNet) {
-        this.netLogger.debug(JSON.stringify({
+        this.netLogger.debug('Internal\t' + JSON.stringify({
           url: route,
           body: payload
         }))

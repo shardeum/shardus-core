@@ -32,6 +32,8 @@ class Consensus {
 
     // Register Gossip Handlers with P2P
     this.p2p.registerGossipHandler('receipt', async (data, sender, tracker) => {
+      this.p2p.sendGossipIn('receipt', data, tracker)
+
       if (!this.consensusActive) {
         return
       }
@@ -45,7 +47,9 @@ class Consensus {
 
       if (await this.onReceipt(data)) {
         console.log('onReceipt: ' + data.shardusTransaction.inTransaction.txnTimestamp) // todo remove
-        this.p2p.sendGossipIn('receipt', data, tracker)
+      } else {
+        // something failed and that is causing us to not gossip the receipt
+        this.playbackLogNote('receiptFailure', tracker, data)
       }
     })
 
@@ -140,10 +144,11 @@ class Consensus {
     if (shardusTransaction == null) {
       if (this.mainLogs) console.log(`onReceipt failed. No transaction found for: ${receipt.txHash}`)
       if (this.mainLogs) this.mainLogger.debug(`onReceipt failed. No transaction found for: ${receipt.txHash}`)
-      return // todo error
+      return false
     }
     let transaction = shardusTransaction.inTransaction
     if (typeof transaction !== 'object') {
+      if (this.mainLogs) console.log(`onReceipt failed. transaction is not an object: ${receipt.txHash}`)
       return false
     }
 
@@ -155,6 +160,7 @@ class Consensus {
     try {
       // TODO! validate that reciept is sign by a valid node in the network
       if (this.crypto.verify(receipt, receipt.sign.owner) === false) {
+        if (this.mainLogs) console.log(`onReceipt failed. transaction has invalid signing: ${receipt.txHash}`)
         return false
       }
 

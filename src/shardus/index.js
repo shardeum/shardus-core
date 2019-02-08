@@ -247,7 +247,7 @@ class Shardus {
   }
 
   async acceptTransaction (tx, receipt, gossipTx = false, dontAllowStateTableData = false) {
-    if (this.verboseLogs) this.mainLogger.debug(`acceptTransaction start ${tx.timestamp}`)
+    if (this.verboseLogs) this.mainLogger.debug(`acceptTransaction start ${tx.txnTimestamp}`)
     this.profiler.profileSectionStart('acceptTx-teststate')
     let { success, hasStateTableData } = await this.testAccountStateTable(tx)
     let timestamp = tx.txnTimestamp
@@ -286,6 +286,12 @@ class Shardus {
     this.profiler.profileSectionStart('acceptTx-addState')
     // query app for account state (or return it from apply)
     // write entry into account state table (for each source or dest account in our shard)
+    if (this.verboseLogs) {
+      for (let stateT of stateTableResults) {
+        this.mainLogger.debug('acceptTransaction: writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter))
+      }
+    }
+
     await this.storage.addAccountStates(stateTableResults)
     this.profiler.profileSectionEnd('acceptTx-addState')
 
@@ -298,65 +304,67 @@ class Shardus {
     }
     this.profiler.profileSectionEnd('acceptTx-gossip')
 
-    if (this.verboseLogs) this.mainLogger.debug(`acceptTransaction end ${tx.timestamp}`)
+    if (this.verboseLogs) this.mainLogger.debug(`acceptTransaction end ${tx.txnTimestamp}`)
     return true
   }
 
   async testAccountStateTable (tx) {
-    let keysResponse = this.app.getKeyFromTransaction(tx)
-    let { sourceKeys, targetKeys } = keysResponse
-    let sourceAddress, targetAddress, sourceState, targetState
-
-    let timestamp = tx.txnTimestamp
-
     let hasStateTableData = false
-    if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
-      sourceAddress = sourceKeys[0]
-      sourceState = await this.app.getStateId(sourceAddress)
+    try {
+      let keysResponse = this.app.getKeyFromTransaction(tx)
+      let { sourceKeys, targetKeys } = keysResponse
+      let sourceAddress, targetAddress, sourceState, targetState
 
-      // let accountStates = await this.storage.queryAccountStateTable(sourceState, sourceState, timestamp, timestamp, 1)
-      let accountStates = await this.storage.searchAccountStateTable(sourceAddress, timestamp)
+      let timestamp = tx.txnTimestamp
 
-      if (accountStates.length !== 0) {
-        hasStateTableData = true
-        if (accountStates.length === 0) {
-          if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' missing source account state 1')
-          if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' missing source account state 1')
-          return { success: false, hasStateTableData }
-        }
+      if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
+        sourceAddress = sourceKeys[0]
+        // let accountStates = await this.storage.queryAccountStateTable(sourceState, sourceState, timestamp, timestamp, 1)
+        let accountStates = await this.storage.searchAccountStateTable(sourceAddress, timestamp)
+        if (accountStates.length !== 0) {
+          sourceState = await this.app.getStateId(sourceAddress)
+          hasStateTableData = true
+          // if (accountStates.length === 0) {
+          //   if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' missing source account state 1')
+          //   if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' missing source account state 1')
+          //   return { success: false, hasStateTableData }
+          // }
 
-        if (accountStates.length === 0 || accountStates[0].stateBefore !== sourceState) {
-          if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' cant apply state 1')
-          if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' cant apply state 1')
-          return { success: false, hasStateTableData }
-        }
-      }
-    }
-    if (Array.isArray(targetKeys) && targetKeys.length > 0) {
-      targetAddress = targetKeys[0]
-      // let accountStates = await this.storage.queryAccountStateTable(targetState, targetState, timestamp, timestamp, 1)
-      let accountStates = await this.storage.searchAccountStateTable(targetAddress, timestamp)
-
-      if (accountStates.length !== 0) {
-        hasStateTableData = true
-        if (accountStates.length === 0) {
-          if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' missing target account state 2')
-          if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' missing target account state 2')
-          return { success: false, hasStateTableData }
-        }
-        if (accountStates.length !== 0 && accountStates[0].stateBefore !== allZeroes64) {
-          targetState = await this.app.getStateId(targetAddress, false)
-          if (targetState == null) {
-            if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' target state does not exist, thats ok')
-            if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' target state does not exist, thats ok')
-          } else if (accountStates[0].stateBefore !== targetState) {
-            if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' cant apply state 2')
-            if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' cant apply state 2')
+          if (accountStates.length === 0 || accountStates[0].stateBefore !== sourceState) {
+            if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' cant apply state 1')
+            if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' cant apply state 1 stateId: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
             return { success: false, hasStateTableData }
           }
         }
       }
+      if (Array.isArray(targetKeys) && targetKeys.length > 0) {
+        targetAddress = targetKeys[0]
+        // let accountStates = await this.storage.queryAccountStateTable(targetState, targetState, timestamp, timestamp, 1)
+        let accountStates = await this.storage.searchAccountStateTable(targetAddress, timestamp)
+
+        if (accountStates.length !== 0) {
+          hasStateTableData = true
+          // if (accountStates.length === 0) {
+          //   if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' missing target account state 2')
+          //   if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' missing target account state 2')
+          //   return { success: false, hasStateTableData }
+          // }
+          if (accountStates.length !== 0 && accountStates[0].stateBefore !== allZeroes64) {
+            targetState = await this.app.getStateId(targetAddress, false)
+            if (targetState == null) {
+              if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' target state does not exist, thats ok')
+              if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' target state does not exist, thats ok')
+            } else if (accountStates[0].stateBefore !== targetState) {
+              if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' cant apply state 2')
+              if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' cant apply state 2 stateId: ' + utils.makeShortHash(targetState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(targetAddress))
+              return { success: false, hasStateTableData }
+            }
+          }
+        }
       // todo post enterprise, only check this if it is in our address range
+      }
+    } catch (ex) {
+      this.fatalLogger.fatal('testAccountStateTable failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
     }
 
     return { success: true, hasStateTableData }
@@ -364,57 +372,70 @@ class Shardus {
 
   // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
   async tryApplyTransaction (acceptedTX) {
-    let tx = acceptedTX.data
-    let receipt = acceptedTX.receipt
-    let timestamp = tx.txnTimestamp // TODO m11: need to push this to application method thta cracks the transaction
-    if (this.verboseLogs) console.log('tryApplyTransaction ' + timestamp)
-    if (this.verboseLogs) this.mainLogger.debug('DATASYNC: tryApplyTransaction ' + timestamp)
+    let ourLock = -1
+    try {
+      let tx = acceptedTX.data
+      let receipt = acceptedTX.receipt
+      let timestamp = tx.txnTimestamp // TODO m11: need to push this to application method thta cracks the transaction
 
-    let { success, hasStateTableData } = await this.testAccountStateTable(tx)
+      // QUEUE delay system...
+      ourLock = await this.consensus.queueAndDelay(timestamp, receipt.txHash)
 
-    if (!success) {
-      return // we failed
-    }
+      if (this.verboseLogs) console.log('tryApplyTransaction ' + timestamp)
+      if (this.verboseLogs) this.mainLogger.debug('DATASYNC: tryApplyTransaction ' + timestamp)
 
-    // test reciept state ids. some redundant queries that could be optimized!
-    let keysResponse = this.app.getKeyFromTransaction(tx)
-    let { sourceKeys, targetKeys } = keysResponse
-    let sourceAddress, targetAddress, sourceState, targetState
-    if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
-      sourceAddress = sourceKeys[0]
-      sourceState = await this.app.getStateId(sourceAddress)
-      if (sourceState !== receipt.stateId) {
-        if (this.verboseLogs) console.log('tryApplyTransaction source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + sourceState + ' reciept: ' + receipt.stateId)
-        if (this.verboseLogs) this.mainLogger.debug('DATASYNC: tryApplyTransaction source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + sourceState + ' reciept: ' + receipt.stateId)
-        return
+      let { success, hasStateTableData } = await this.testAccountStateTable(tx)
+
+      if (!success) {
+        return false// we failed
       }
-    }
-    if (Array.isArray(targetKeys) && targetKeys.length > 0) {
-      targetAddress = targetKeys[0]
-      targetState = await this.app.getStateId(targetAddress, false)
-      if (targetState !== receipt.targetStateId) {
-        if (this.verboseLogs) console.log('tryApplyTransaction target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetState + ' reciept: ' + receipt.targetStateId)
-        if (this.verboseLogs) this.mainLogger.debug('DATASYNC: tryApplyTransaction target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetState + ' reciept: ' + receipt.targetStateId)
-        return
+
+      // test reciept state ids. some redundant queries that could be optimized!
+      let keysResponse = this.app.getKeyFromTransaction(tx)
+      let { sourceKeys, targetKeys } = keysResponse
+      let sourceAddress, targetAddress, sourceState, targetState
+      if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
+        sourceAddress = sourceKeys[0]
+        sourceState = await this.app.getStateId(sourceAddress)
+        if (sourceState !== receipt.stateId) {
+          if (this.verboseLogs) console.log('tryApplyTransaction source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + sourceState + ' receipt: ' + receipt.stateId + ' address: ' + sourceAddress)
+          if (this.verboseLogs) this.mainLogger.debug('DATASYNC: tryApplyTransaction source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + sourceState + ' receipt: ' + receipt.stateId + ' address: ' + sourceAddress)
+          return false
+        }
       }
-    }
-
-    if (this.verboseLogs) console.log('tryApplyTransaction ' + timestamp + ' Applying!')
-    if (this.verboseLogs) this.mainLogger.debug('DATASYNC: tryApplyTransaction ' + timestamp + ' Applying!')
-    let { stateTableResults } = await this.app.apply(tx)
-    // only write our state table data if we dont already have it in the db
-    if (hasStateTableData === false) {
-      await this.storage.addAccountStates(stateTableResults)
-      for (let stateT of stateTableResults) {
-        if (this.verboseLogs) console.log('writeStateTable ' + stateT.accountId)
-        if (this.verboseLogs) this.mainLogger.debug('DATASYNC: writeStateTable ' + stateT.accountId)
+      if (Array.isArray(targetKeys) && targetKeys.length > 0) {
+        targetAddress = targetKeys[0]
+        targetState = await this.app.getStateId(targetAddress, false)
+        if (targetState !== receipt.targetStateId) {
+          if (this.verboseLogs) console.log('tryApplyTransaction target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetState + ' receipt: ' + receipt.targetStateId + ' address: ' + targetAddress)
+          if (this.verboseLogs) this.mainLogger.debug('DATASYNC: tryApplyTransaction target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetState + ' receipt: ' + receipt.targetStateId + ' address: ' + targetAddress)
+          return false
+        }
       }
+
+      if (this.verboseLogs) console.log('tryApplyTransaction ' + timestamp + ' Applying!')
+      if (this.verboseLogs) this.mainLogger.debug('DATASYNC: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
+      let { stateTableResults } = await this.app.apply(tx)
+      // only write our state table data if we dont already have it in the db
+      if (hasStateTableData === false) {
+        for (let stateT of stateTableResults) {
+          if (this.verboseLogs) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId))
+          if (this.verboseLogs) this.mainLogger.debug('DATASYNC: writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter))
+        }
+        await this.storage.addAccountStates(stateTableResults)
+      }
+
+      // post validate that state ended up correctly?
+
+      // write the accepted TX to storage
+      this.storage.addAcceptedTransactions([acceptedTX])
+    } catch (ex) {
+      this.fatalLogger.fatal('tryApplyTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      return false
+    } finally {
+      this.consensus.unlockQueue(ourLock)
     }
-
-    // post validate that state ended up correctly?
-
-    // write the accepted TX to storage
-    this.storage.addAcceptedTransactions([acceptedTX])
+    return true
   }
 
   /**
@@ -598,7 +619,7 @@ class Shardus {
         await this.p2p.dataSync.finalTXCatchup(true)
         // should we keep trying to catch up untill it returns false? ... i think so since we will reject and lose TXs for now.
         await utils.sleep(3000)
-        await this.p2p.dataSync.enableSyncCheck()
+        // await this.p2p.dataSync.enableSyncCheck()
       }
     } catch (e) {
       console.log(e.message + ' at ' + e.stack)

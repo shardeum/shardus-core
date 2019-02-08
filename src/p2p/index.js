@@ -1109,7 +1109,7 @@ class P2P {
     // [TODO] pass getRandomGossipIn hash of payload
     const recipients = getRandom(nodes, this.gossipRecipients)
     try {
-      if (this.verboseLogs) this.mainLogger.debug(`Gossiping ${type} request to these nodes: ${utils.stringifyReduce(recipients)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`Gossiping ${type} request to these nodes: ${utils.stringifyReduce(recipients.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
       for (const node of recipients) {
         this.logger.playbackLog('self', node, 'GossipSend', type, tracker, gossipPayload)
       }
@@ -1149,7 +1149,7 @@ class P2P {
     const recipientIdxs = getRandomGossipIn(nodeIdxs, this.gossipRecipients, myIdx)
     const recipients = recipientIdxs.map(idx => nodes[idx])
     try {
-      if (this.verboseLogs) this.mainLogger.debug(`GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(recipients)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(recipients.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
       for (const node of recipients) {
         this.logger.playbackLog('self', node, 'GossipInSend', type, tracker, gossipPayload)
       }
