@@ -619,7 +619,7 @@ class Shardus {
         await this.p2p.dataSync.finalTXCatchup(true)
         // should we keep trying to catch up untill it returns false? ... i think so since we will reject and lose TXs for now.
         await utils.sleep(3000)
-        // await this.p2p.dataSync.enableSyncCheck()
+        await this.p2p.dataSync.enableSyncCheck()
       }
     } catch (e) {
       console.log(e.message + ' at ' + e.stack)
