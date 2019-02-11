@@ -613,26 +613,18 @@ class Shardus {
 
     // this.storage.queryAccountStateTable2('0'.repeat(64), 'f'.repeat(64), 0, Date.now())
 
-    let started
-    try {
-      started = await this.p2p.startup()
-      this.consensus.consensusActive = true
-      if (this.p2p.dataSync != null) {
-        // await this.p2p.dataSync.finalTXCatchup(false)
-        await utils.sleep(3000)
-        await this.p2p.dataSync.finalTXCatchup(true)
-        // should we keep trying to catch up untill it returns false? ... i think so since we will reject and lose TXs for now.
-        await utils.sleep(3000)
-        await this.p2p.dataSync.enableSyncCheck()
-      }
-    } catch (e) {
+    this.p2p.on('failed', () => {
+      this.shutdown(exitProcOnFail)
+    })
+
+    this.p2p.on('error', (e) => {
       console.log(e.message + ' at ' + e.stack)
       this.mainLogger.debug('shardus.start() ' + e.message + ' at ' + e.stack)
       this.fatalLogger.fatal('shardus.start() ' + e.message + ' at ' + e.stack)
       throw new Error(e)
-    }
-    if (!started) await this.shutdown(exitProcOnFail)
-    if (this.reporter) this.reporter.startReporting()
+    })
+
+    this.p2p.startup()
   }
 
   async shutdown (exitProcess = true) {

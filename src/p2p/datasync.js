@@ -35,6 +35,15 @@ class DataSync {
     if (this.mainLogger && ['TRACE'].includes(this.mainLogger.level.levelStr)) {
       this.verboseLogs = true
     }
+
+    this.p2p.on('active', () => process.nextTick(async () => {
+      // await this.p2p.dataSync.finalTXCatchup(false)
+      await utils.sleep(3000)
+      await this.finalTXCatchup(true)
+      // should we keep trying to catch up untill it returns false? ... i think so since we will reject and lose TXs for now.
+      await utils.sleep(3000)
+      this.enableSyncCheck()
+    }))
   }
 
   // this clears state data related to the current partion we are processing.
@@ -799,7 +808,7 @@ class DataSync {
   }
 
   enableSyncCheck () {
-    this.p2p.registerOnNewCycle(async (cycles) => {
+    this.p2p.state.on('newCycle', (cycles) => process.nextTick(async () => {
       if (cycles.length < 2) {
         return
       }
@@ -838,7 +847,7 @@ class DataSync {
           await this.restoreAccountDataByTx(winners, accountStart, accountEnd, startTime, endTime)
         }
       }
-    })
+    }))
   }
 
   async restoreAccountDataByTx (nodes, accountStart, accountEnd, timeStart, timeEnd) {

@@ -1,7 +1,9 @@
+const EventEmitter = require('events')
 const utils = require('../utils')
 
-class P2PState {
+class P2PState extends EventEmitter {
   constructor (config, logger, storage, p2p, crypto) {
+    super()
     this.mainLogger = logger.getLogger('main')
     this.p2p = p2p
     this.crypto = crypto
@@ -587,9 +589,7 @@ class P2PState {
     }
     await this.storage.addCycles(cycle)
 
-    if (this.p2p.onNewCycle) {
-      this.p2p.onNewCycle(this.cycles)
-    }
+    this.emit('newCycle', this.cycles)
   }
 
   async addCycles (cycles, certificates = null) {

@@ -13,20 +13,21 @@ class Reporter {
     this._txInjected = 0
     this._txApplied = 0
 
-    this.p2p.registerOnJoining((publicKey) => {
+    this.p2p.on('joining', (publicKey) => {
       this.logger.playbackLogState('joining', '', publicKey)
-      return this.reportJoining(publicKey)
+      this.reportJoining(publicKey)
     })
 
-    this.p2p.registerOnJoined((nodeId, publicKey) => {
+    this.p2p.on('joined', (nodeId, publicKey) => {
       this.logger.playbackLogState('joined', nodeId, publicKey)
       this.logger.setPlaybackID(nodeId)
-      return this.reportJoined(nodeId, publicKey)
+      this.reportJoined(nodeId, publicKey)
     })
 
-    this.p2p.registerOnActive((nodeId) => {
+    this.p2p.on('active', (nodeId) => {
       this.logger.playbackLogState('active', nodeId, '')
-      return this.reportActive(nodeId)
+      this.reportActive(nodeId)
+      this.startReporting()
     })
 
     this.lastTime = Date.now

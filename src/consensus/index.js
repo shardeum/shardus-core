@@ -24,6 +24,8 @@ class Consensus {
     }
 
     this.consensusActive = false
+    this.p2p.on('active', () => { this.consensusActive = true })
+
     this.queueAndDelayList = []
     this.queueCounter = 0
     this.queueLocked = false
