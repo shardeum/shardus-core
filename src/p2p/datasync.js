@@ -823,7 +823,7 @@ class DataSync {
       }
       let winners = []
       // let nodes = this.p2p.state.getAllNodes(this.p2p.id)
-      let nodes = this.getRandomNodesInRange(100, accountStart, accountEnd)
+      let nodes = this.getRandomNodesInRange(100, accountStart, accountEnd, [])
       if (nodes.length === 0) {
         return // nothing to do
       }
