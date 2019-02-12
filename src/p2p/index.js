@@ -364,11 +364,11 @@ class P2P extends EventEmitter {
 
   async _submitWhenUpdatePhase (route, message) {
     this.mainLogger.debug(`Submitting message: ${JSON.stringify(message)} on route: ${route} whenever it's not the second quarter of cycle...`)
-    // TO-DO: potentially make this not just the seed nodes that are queried for cycle marker
     let cycleMarker
     try {
       cycleMarker = await this._fetchCycleMarkerInternal(this.state.getActiveNodes())
     } catch (e) {
+      this.mainLogger.warn('Could not get cycleMarker from nodes. Querying seedNodes for it...')
       cycleMarker = await this._fetchCycleMarkerInternal(this.seedNodes)
     }
     const { currentTime, cycleStart, cycleDuration } = cycleMarker
@@ -640,7 +640,7 @@ class P2P extends EventEmitter {
     try {
       ;({ cycleCounter } = await this._fetchCycleMarkerInternal(nodes))
     } catch (e) {
-      this.mainLogger.info('Could not get cycleMarker from nodes. Querying seedNodes for it...')
+      this.mainLogger.warn('Could not get cycleMarker from nodes. Querying seedNodes for it...')
       this.mainLogger.debug(e)
       ;({ cycleCounter } = await this._fetchCycleMarkerInternal(seedNodes))
     }
@@ -656,7 +656,7 @@ class P2P extends EventEmitter {
     try {
       cycleChainHash = await this._fetchCycleChainHash(nodes, chainStart, chainEnd)
     } catch (e) {
-      this.mainLogger.info('Could not get cycleChainHash from nodes. Querying seedNodes for it...')
+      this.mainLogger.warn('Could not get cycleChainHash from nodes. Querying seedNodes for it...')
       this.mainLogger.debug(e)
       cycleChainHash = await this._fetchCycleChainHash(seedNodes, chainStart, chainEnd)
     }
@@ -668,7 +668,7 @@ class P2P extends EventEmitter {
     try {
       chainAndCerts = await this._fetchVerifiedCycleChain(nodes, cycleChainHash, chainStart, chainEnd)
     } catch (e) {
-      this.mainLogger.info('Could not get verified cycleChain from nodes. Querying seedNodes for it...')
+      this.mainLogger.warn('Could not get verified cycleChain from nodes. Querying seedNodes for it...')
       this.mainLogger.debug(e)
       chainAndCerts = await this._fetchVerifiedCycleChain(seedNodes, cycleChainHash, chainStart, chainEnd)
     }
@@ -861,6 +861,7 @@ class P2P extends EventEmitter {
     try {
       cycleMarker = await this._fetchCycleMarkerInternal(this.state.getActiveNodes())
     } catch (e) {
+      this.mainLogger.warn('Unable to get cycle marker internally from active nodes. Falling back to seed nodes...')
       cycleMarker = await this._fetchCycleMarkerInternal(this.seedNodes)
     }
     const { cycleStart, cycleDuration } = cycleMarker
@@ -874,6 +875,7 @@ class P2P extends EventEmitter {
     try {
       unfinalized = await this._fetchUnfinalizedCycle(this.state.getActiveNodes())
     } catch (e) {
+      this.mainLogger.warn('Unable to get cycle marker internally from active nodes. Falling back to seed nodes...')
       unfinalized = await this._fetchUnfinalizedCycle(this.seedNodes)
     }
 
