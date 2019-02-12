@@ -804,8 +804,6 @@ class P2P extends EventEmitter {
     }
     this.mainLogger.info('Successfully joined the network!')
     await this._setNodeId(nodeId)
-    // const testResponse = await this.ask({ internalIp: '127.0.0.1', internalPort: 9005 }, 'test2')
-    // console.log(JSON.stringify(testResponse))
     return true
   }
 
