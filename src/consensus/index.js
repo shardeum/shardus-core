@@ -1,19 +1,18 @@
 const utils = require('../utils')
 
 class Consensus {
-  constructor (accountUtility, config, logger, crypto, p2p, storage, nodeList, applicationInterfaceImpl, reporter, profiler) {
+  constructor (app, shardus, config, logger, crypto, p2p, storage, reporter, profiler) {
     this.profiler = profiler
-    this.accountUtility = accountUtility
+    this.app = app
+    this.shardus = shardus
     this.config = config
     this.logger = logger
     this.mainLogger = this.logger.getLogger('main')
     this.fatalLogger = this.logger.getLogger('fatal')
     this.crypto = crypto
-    // this.network = network
     this.p2p = p2p
     this.storage = storage
-    this.nodeList = nodeList
-    this.applicationInterfaceImpl = applicationInterfaceImpl
+    this.app = app
     this.reporter = reporter
 
     this.pendingTransactions = {}
@@ -85,7 +84,7 @@ class Consensus {
       // TODO: Change this to use just the nodes in the conesensus group
       // await this.p2p.sendGossip('transaction', shardusTransaction, this.p2p.state.getAllNodes(this.p2p.id))
       if (this.mainLogs) this.mainLogger.debug(`Done Gossiping Validated Transaction ${JSON.stringify(shardusTransaction)}`)
-      let keysResponse = this.applicationInterfaceImpl.getKeyFromTransaction(inTransaction)
+      let keysResponse = this.app.getKeyFromTransaction(inTransaction)
       let { sourceKeys, targetKeys } = keysResponse
       let sourceAddress, targetAddress, stateId, targetStateId
 
@@ -100,12 +99,12 @@ class Consensus {
       if (sourceAddress) {
         // keysRequest = { type: 'stateID', address: sourceAddress }
         // stateID = await this.application.get(keysRequest)
-        stateId = await this.applicationInterfaceImpl.getStateId(sourceAddress)
+        stateId = await this.app.getStateId(sourceAddress)
         if (this.mainLogs) this.mainLogger.debug(`StateID: ${stateId} short stateID: ${utils.makeShortHash(stateId)} `)
       }
 
       if (targetAddress) {
-        targetStateId = await this.applicationInterfaceImpl.getStateId(targetAddress, false) // we don't require this to exist
+        targetStateId = await this.app.getStateId(targetAddress, false) // we don't require this to exist
       }
 
       transactionReceipt = this.createReciept(inTransaction, stateId, targetStateId)
@@ -180,7 +179,7 @@ class Consensus {
       // Validate any target or source hashes if they are available
       // todo perf: we could pass the expected state values into the app and ask the app to bail/error if they dont match. this puts more burden on the app dev though
 
-      let keysResponse = this.applicationInterfaceImpl.getKeyFromTransaction(transaction)
+      let keysResponse = this.app.getKeyFromTransaction(transaction)
       let { sourceKeys, targetKeys } = keysResponse
       let sourceAddress, targetAddress, stateId, targetStateId
 
@@ -191,19 +190,19 @@ class Consensus {
         targetAddress = targetKeys[0]
       }
       if (receipt.stateId) {
-        stateId = await this.applicationInterfaceImpl.getStateId(sourceAddress)
+        stateId = await this.app.getStateId(sourceAddress)
         if (stateId !== receipt.stateId) {
           throw new Error('onReceipt source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + stateId + ' reciept: ' + receipt.stateId + ' account: ' + utils.makeShortHash(sourceAddress))
         }
       }
       if (receipt.targetStateId) {
-        targetStateId = await this.applicationInterfaceImpl.getStateId(targetAddress, false)
+        targetStateId = await this.app.getStateId(targetAddress, false)
         if (targetStateId !== receipt.targetStateId) {
           throw new Error('onReceipt target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetStateId + ' reciept: ' + receipt.targetStateId + ' account: ' + utils.makeShortHash(targetAddress))
         }
       }
 
-      await this.accountUtility.acceptTransaction(transaction, receipt, false, true)
+      await this.shardus.acceptTransaction(transaction, receipt, false, true)
       // TODO: Make this more robust, actually make sure the application has applied tx
       // if (this.reporter) this.reporter.incrementTxApplied()
     } catch (ex) {

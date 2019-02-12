@@ -28,7 +28,6 @@ class Shardus {
     this.debug = {}
     this.appProvided = null
     this.app = null
-    this.accountUtility = null
     this.reporter = null
 
     this.heartbeatInterval = config.heartbeatInterval
@@ -91,7 +90,6 @@ class Shardus {
       res.json({ success: true })
       await this.shutdown()
     })
-    if (this.appProvided) this._registerSyncEndpoints()
   }
 
   registerExceptionHandler () {
@@ -126,7 +124,6 @@ class Shardus {
     if (app === null) {
       this.appProvided = false
     } else if (app === Object(app)) {
-      this.accountUtility = this.getAccountUtilityInterface(app)
       this.app = this.getApplicationInterface(app)
       this.appProvided = true
       this.logger.playbackLogState('appProvided', '', '')
@@ -535,6 +532,11 @@ class Shardus {
       } else {
         // throw new Error('Missing requried interface function. apply()')
       }
+      if (typeof (application.deleteLocalAccountData) === 'function') {
+        applicationInterfaceImpl.deleteLocalAccountData = async () => application.deleteLocalAccountData()
+      } else {
+        // throw new Error('Missing requried interface function. apply()')
+      }
     } catch (ex) {
       this.fatalLogger.fatal(`Required application interface not implemented. Exception: ${ex}`)
       this.fatalLogger.fatal('getApplicationInterface: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -542,54 +544,6 @@ class Shardus {
     }
     this.mainLogger.debug('End of getApplicationInterfaces()')
     return applicationInterfaceImpl
-  }
-
-  getAccountUtilityInterface (application) {
-    this.mainLogger.debug('Start of getApplicationInterfaces()')
-    let accountUtilityInterface = {}
-    try {
-      if (application == null) {
-        // throw new Error('Invalid Application Instance')
-        return null
-      }
-
-      // App.set_account_data (Acc_records)
-      // Acc_records - as provided by App.get_accounts
-      // Stores the records into the Accounts table if the hash of the Acc_data matches State_id
-      // Returns a list of failed Acc_id
-      if (typeof (application.onGetAccount) === 'function') {
-        accountUtilityInterface.setAccountData = async (accountRecords) => application.setAccountData(accountRecords)
-      } else {
-        // throw new Error('Missing requried interface function. apply()')
-      }
-      if (typeof (application.deleteLocalAccountData) === 'function') {
-        accountUtilityInterface.deleteLocalAccountData = async () => application.deleteLocalAccountData()
-      } else {
-        // throw new Error('Missing requried interface function. apply()')
-      }
-
-      if (typeof (this.acceptTransaction) === 'function') {
-        accountUtilityInterface.acceptTransaction = async (tx, receipt) => this.acceptTransaction(tx, receipt)
-      } else {
-        // throw new Error('Missing requried interface function. apply()')
-      }
-      if (typeof (this.tryApplyTransaction) === 'function') {
-        accountUtilityInterface.tryApplyTransaction = async (acceptedTX) => this.tryApplyTransaction(acceptedTX)
-      } else {
-        // throw new Error('Missing requried interface function. apply()')
-      }
-      if (typeof (this.getAccountsStateHash) === 'function') {
-        accountUtilityInterface.getAccountsStateHash = async (accountStart, accountEnd, tsStart, tsEnd) => this.getAccountsStateHash(accountStart, accountEnd, tsStart, tsEnd)
-      } else {
-        // throw new Error('Missing requried interface function. apply()')
-      }
-    } catch (ex) {
-      this.fatalLogger.fatal(`Required application interface not implemented. Exception: ${ex}`)
-      this.fatalLogger.fatal('getAccountUtilityInterface: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      throw new Error(ex)
-    }
-    this.mainLogger.debug('End of getApplicationInterfaces()')
-    return accountUtilityInterface
   }
 
   async start (exitProcOnFail = true) {
@@ -601,17 +555,15 @@ class Shardus {
     const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout, maxNodesPerCycle } = this.config
     const ipInfo = this.config.ip
     const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout, maxNodesPerCycle }
-    this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network, this.accountUtility)
+    this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network, this.app, this)
     await this.p2p.init()
     this.debug = new Debug(this.config.baseDir, this.logger, this.storage, this.network)
     await this.debug.init()
 
     this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this, this.profiler) : null
-    this.consensus = new Consensus(this.accountUtility, this.config, this.logger, this.crypto, this.p2p, this.storage, null, this.app, this.reporter, this.profiler)
+    this.consensus = new Consensus(this.app, this, this.config, this.logger, this.crypto, this.p2p, this.storage, this.reporter, this.profiler)
 
     this._registerRoutes()
-
-    // this.storage.queryAccountStateTable2('0'.repeat(64), 'f'.repeat(64), 0, Date.now())
 
     this.p2p.on('failed', () => {
       this.shutdown(exitProcOnFail)
@@ -639,85 +591,6 @@ class Shardus {
     const accountStates = await this.storage.queryAccountStateTable(accountStart, accountEnd, tsStart, tsEnd, 100000000)
     const stateHash = this.crypto.hash(accountStates)
     return stateHash
-  }
-
-  // ---------------------App sync code-----------------------
-  _registerSyncEndpoints () {
-    //    /get_account_state_hash (Acc_start, Acc_end, Ts_start, Ts_end)
-    // Acc_start - get data for accounts starting with this account id; inclusive
-    // Acc_end - get data for accounts up to this account id; inclusive
-    // Ts_start - get data newer than this timestamp
-    // Ts_end - get data older than this timestamp
-    // Returns a single hash of the data from the Account State Table determined by the input parameters; sort by Tx_ts  then Tx_id before taking the hash
-    // Updated names:  accountStart , accountEnd, tsStart, tsEnd
-    this.p2p.registerInternal('get_account_state_hash', async (payload, respond) => {
-      let result = {}
-
-      // yikes need to potentially hash only N records at a time and return an array of hashes
-      let stateHash = await this.getAccountsStateHash(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd)
-      result.stateHash = stateHash
-      await respond(result)
-    })
-
-    //    /get_account_state (Acc_start, Acc_end, Ts_start, Ts_end)
-    // Acc_start - get data for accounts starting with this account id; inclusive
-    // Acc_end - get data for accounts up to this account id; inclusive
-    // Ts_start - get data newer than this timestamp
-    // Ts_end - get data older than this timestamp
-    // Returns data from the Account State Table determined by the input parameters; limits result to 1000 records (as configured)
-    // Updated names:  accountStart , accountEnd, tsStart, tsEnd
-    this.p2p.registerInternal('get_account_state', async (payload, respond) => {
-      let result = {}
-      // max records set artificially low for better test coverage
-      // todo m11: make configs for how many records to query
-      let accountStates = await this.storage.queryAccountStateTable(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, 10)
-      result.accountStates = accountStates
-      await respond(result)
-    })
-
-    // /get_accpeted_transactions (Ts_start, Ts_end)
-    // Ts_start - get data newer than this timestamp
-    // Ts_end - get data older than this timestamp
-    // Returns data from the Accepted Tx Table starting with Ts_start; limits result to 500 records (as configured)
-    // Updated names: tsStart, tsEnd
-    this.p2p.registerInternal('get_accpeted_transactions', async (payload, respond) => {
-      let result = {}
-
-      if (!payload.limit) {
-        payload.limit = 10
-      }
-      let transactions = await this.storage.queryAcceptedTransactions(payload.tsStart, payload.tsEnd, payload.limit)
-      result.transactions = transactions
-      await respond(result)
-    })
-
-    //     /get_account_data (Acc_start, Acc_end)
-    // Acc_start - get data for accounts starting with this account id; inclusive
-    // Acc_end - get data for accounts up to this account id; inclusive
-    // Returns data from the application Account Table; limits result to 300 records (as configured);
-    // For applications with multiple “Account” tables the returned data is grouped by table name.
-    // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
-    // Updated names:  accountStart , accountEnd
-    this.p2p.registerInternal('get_account_data', async (payload, respond) => {
-      let result = {}
-
-      let accountData = await this.app.getAccountData(payload.accountStart, payload.accountEnd, payload.maxRecords)
-      result.accountData = accountData
-      await respond(result)
-    })
-
-    // /get_account_data_by_list (Acc_ids)
-    // Acc_ids - array of accounts to get
-    // Returns data from the application Account Table for just the given account ids;
-    // For applications with multiple “Account” tables the returned data is grouped by table name.
-    // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
-    // Updated names:  accountIds, max records
-    this.p2p.registerInternal('get_account_data_by_list', async (payload, respond) => {
-      let result = {}
-      let accountData = await this.app.getAccountDataByList(payload.accountIds)
-      result.accountData = accountData
-      await respond(result)
-    })
   }
 
   createApplyResponse (txId, txTimestamp) {

@@ -1,21 +1,19 @@
 const utils = require('../utils')
 
-// const EnumSyncState = { NotStarted: 1, InitialStateData: 2, GettingAppData: 3, SecondaryStateData: 4, Failed: 5 }
-
-// general notes / questions
-// should we wipe our local DB before sync?
 // todo m12: need error handling on all the p2p requests.
 
 const allZeroes64 = '0'.repeat(64)
 
 class DataSync {
-  constructor (config, logger, storage, p2p, crypto, accountUtility) {
+  constructor (app, shardus, config, logger, storage, p2p, crypto) {
     this.mainLogger = logger.getLogger('main')
     this.p2p = p2p
     this.crypto = crypto
     this.storage = storage
-    this.accountUtility = accountUtility
+    this.app = app
+    this.shardus = shardus
     this.logger = logger
+    this.config = config
 
     this.completedPartitions = []
     this.syncSettleTime = 5000 // 3 * 10 // an estimate of max transaction settle time. todo make it a config or function of consensus later
@@ -44,6 +42,8 @@ class DataSync {
       await utils.sleep(3000)
       this.enableSyncCheck()
     }))
+
+    this.endpointsRegistered = false
   }
 
   // this clears state data related to the current partion we are processing.
@@ -101,13 +101,15 @@ class DataSync {
   // This is the main outer loop that will loop over the different partitions
   // The last step catch up on the acceptedTx queue
   async syncStateData (requiredNodeCount) {
+    this.registerSyncEndpoints()
+
     this.isSyncingAcceptedTxs = true
     await utils.sleep(5000) // Temporary delay to make it easier to attach a debugger
     console.log('syncStateData start')
     // delete and re-create some tables before we sync:
     await this.storage.dropAndCreatAccountStateTable()
     await this.storage.dropAndCreateAcceptedTransactions()
-    await this.accountUtility.deleteLocalAccountData()
+    await this.app.deleteLocalAccountData()
 
     this.mainLogger.debug(`DATASYNC: starting syncStateData`)
 
@@ -301,51 +303,6 @@ class DataSync {
       let firstHash
       let queryLow
       let queryHigh
-      // let nodesToAsk = []
-      // nodesToAsk = nodesToAsk.concat(this.dataSourceNodes)
-      // let searchingForGoodHash = true
-      // while (searchingForGoodHash) {
-      //   queryLow = lowAddress
-      //   queryHigh = highAddress
-      //   let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, tsEnd: endTime }
-      //   let stateHashResults = []
-      //   for (let node of nodesToAsk) {
-      //     let result = await this.p2p.ask(node, 'get_account_state_hash', message) // todo mem performance after enterprise: upgrade this to allow an array of N hashes if there is too much data to query in one shot
-      //     // todo m11: handle error cases?
-      //     stateHashResults.push({ hash: result.stateHash, node: node })
-      //   }
-
-      //   let hashesMatch = true
-      //   firstHash = stateHashResults[0].hash
-      //   // Test that results match.
-      //   for (let i = 1; i < stateHashResults.length; i++) {
-      //     if (stateHashResults[i].hash !== firstHash) {
-      //       hashesMatch = false
-      //     }
-      //   }
-      //   if (hashesMatch === false) {
-      //     this.mainLogger.debug(`DATASYNC: hash: syncStateTableData hashes do not match `)
-      //     for (let hashResp of stateHashResults) {
-      //       this.mainLogger.debug(`DATASYNC: node:  ${hashResp.node.externalIp}:${hashResp.node.externalPort}  hash: ${hashResp.hash}`)
-      //     }
-      //     // // failed restart with new nodes.  TODO ?: record/eval/report blame?
-      //     this.recordPotentialBadnode()
-      //     throw new Error('FailAndRestartPartition') // TODO m11: we need to ask other nodes for a hash one at a time until we can feel better about a hash consensus
-
-      //     // TODO after enterprise? code to handle getting bad hash data where we ask for one more node at a time until we have consensus on what hashes are good vs. bad
-      //     // let moreNodes = this.getMoreNodes(1, lowAddress, highAddress, this.visitedNodes)
-      //     // if (moreNodes.length > 0) {
-      //     //   nodesToAsk = nodesToAsk.concat(moreNodes)
-      //     // }
-      //   } else {
-      //     this.mainLogger.debug(`DATASYNC: hash: got good hash ${firstHash}`)
-      //     searchingForGoodHash = false
-      //   }
-      // }
-
-      // if (nodesToAsk.length === 0) {
-      //   this.mainLogger.debug(`DATASYNC: hash: no nodes availabe to ask for hash`)
-      // }
 
       queryLow = lowAddress
       queryHigh = highAddress
@@ -359,8 +316,6 @@ class DataSync {
         return result
       }
       let winners = []
-      // let nodes = this.getRandomNodesInRange(100, lowAddress, highAddress, [])
-      // let nodes = this.p2p.state.getAllNodes(this.p2p.id)
       let nodes = this.p2p.state.getActiveNodes(this.p2p.id)
       if (nodes.length === 0) {
         this.mainLogger.debug(`no nodes available`)
@@ -621,7 +576,7 @@ class DataSync {
 
     this.mainLogger.debug(`DATASYNC: processAccountData saving ${this.goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase}`)
     // failedHashes is a list of accounts that failed to match the hash reported by the server
-    let failedHashes = await this.accountUtility.setAccountData(this.goodAccounts) // repeatable form may need to call this in batches
+    let failedHashes = await this.app.setAccountData(this.goodAccounts) // repeatable form may need to call this in batches
 
     if (failedHashes.length > 1000) {
       this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
@@ -721,7 +676,7 @@ class DataSync {
 
       // we no longer have state table data in memory so there is not much more the datasync can do
       // shardus / the app code can take it from here
-      let result = await this.accountUtility.tryApplyTransaction(nextTX)
+      let result = await this.shardus.tryApplyTransaction(nextTX)
       if (result === false && anyAcceptedTx === false) {
         // hit a trailing edge. we must have mismatche sync of account data, need to requery and restart this
         // uery account data for the next N transactions?
@@ -841,7 +796,7 @@ class DataSync {
       }
       let result = await this.p2p._robustQuery(nodes, queryFn, equalFn, 3, winners)
       if (result && result.stateHash) {
-        let stateHash = await this.accountUtility.getAccountsStateHash(accountStart, accountEnd, startTime, endTime)
+        let stateHash = await this.shardus.getAccountsStateHash(accountStart, accountEnd, startTime, endTime)
         if (stateHash === result.stateHash) {
           this.logger.playbackLogNote('appStateCheck', '', `Hashes Match = ${utils.makeShortHash(stateHash)} num cycles:${cycles.length} start: ${startTime}  end:${endTime}`)
         } else {
@@ -945,8 +900,91 @@ class DataSync {
       //   //if exists update.
       //   //else create
       // }
-      // todo  this.accountUtility.patchUpdateAccounts(accountData)
+      // todo  this.todo.patchUpdateAccounts(accountData)
     }
+  }
+
+  // ---------------------App sync code-----------------------
+  registerSyncEndpoints () {
+    if (this.endpointsRegistered) {
+      return
+    }
+    this.endpointsRegistered = true
+    //    /get_account_state_hash (Acc_start, Acc_end, Ts_start, Ts_end)
+    // Acc_start - get data for accounts starting with this account id; inclusive
+    // Acc_end - get data for accounts up to this account id; inclusive
+    // Ts_start - get data newer than this timestamp
+    // Ts_end - get data older than this timestamp
+    // Returns a single hash of the data from the Account State Table determined by the input parameters; sort by Tx_ts  then Tx_id before taking the hash
+    // Updated names:  accountStart , accountEnd, tsStart, tsEnd
+    this.p2p.registerInternal('get_account_state_hash', async (payload, respond) => {
+      let result = {}
+
+      // yikes need to potentially hash only N records at a time and return an array of hashes
+      let stateHash = await this.shardus.getAccountsStateHash(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd)
+      result.stateHash = stateHash
+      await respond(result)
+    })
+
+    //    /get_account_state (Acc_start, Acc_end, Ts_start, Ts_end)
+    // Acc_start - get data for accounts starting with this account id; inclusive
+    // Acc_end - get data for accounts up to this account id; inclusive
+    // Ts_start - get data newer than this timestamp
+    // Ts_end - get data older than this timestamp
+    // Returns data from the Account State Table determined by the input parameters; limits result to 1000 records (as configured)
+    // Updated names:  accountStart , accountEnd, tsStart, tsEnd
+    this.p2p.registerInternal('get_account_state', async (payload, respond) => {
+      let result = {}
+      // max records set artificially low for better test coverage
+      // todo m11: make configs for how many records to query
+      let accountStates = await this.storage.queryAccountStateTable(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, 10)
+      result.accountStates = accountStates
+      await respond(result)
+    })
+
+    // /get_accpeted_transactions (Ts_start, Ts_end)
+    // Ts_start - get data newer than this timestamp
+    // Ts_end - get data older than this timestamp
+    // Returns data from the Accepted Tx Table starting with Ts_start; limits result to 500 records (as configured)
+    // Updated names: tsStart, tsEnd
+    this.p2p.registerInternal('get_accpeted_transactions', async (payload, respond) => {
+      let result = {}
+
+      if (!payload.limit) {
+        payload.limit = 10
+      }
+      let transactions = await this.storage.queryAcceptedTransactions(payload.tsStart, payload.tsEnd, payload.limit)
+      result.transactions = transactions
+      await respond(result)
+    })
+
+    //     /get_account_data (Acc_start, Acc_end)
+    // Acc_start - get data for accounts starting with this account id; inclusive
+    // Acc_end - get data for accounts up to this account id; inclusive
+    // Returns data from the application Account Table; limits result to 300 records (as configured);
+    // For applications with multiple “Account” tables the returned data is grouped by table name.
+    // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
+    // Updated names:  accountStart , accountEnd
+    this.p2p.registerInternal('get_account_data', async (payload, respond) => {
+      let result = {}
+
+      let accountData = await this.app.getAccountData(payload.accountStart, payload.accountEnd, payload.maxRecords)
+      result.accountData = accountData
+      await respond(result)
+    })
+
+    // /get_account_data_by_list (Acc_ids)
+    // Acc_ids - array of accounts to get
+    // Returns data from the application Account Table for just the given account ids;
+    // For applications with multiple “Account” tables the returned data is grouped by table name.
+    // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
+    // Updated names:  accountIds, max records
+    this.p2p.registerInternal('get_account_data_by_list', async (payload, respond) => {
+      let result = {}
+      let accountData = await this.app.getAccountDataByList(payload.accountIds)
+      result.accountData = accountData
+      await respond(result)
+    })
   }
 }
 

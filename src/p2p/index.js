@@ -7,7 +7,7 @@ const routes = require('./routes')
 const DataSync = require('./datasync.js')
 
 class P2P extends EventEmitter {
-  constructor (config, logger, storage, crypto, network, accountUtility) {
+  constructor (config, logger, storage, crypto, network, app, shardus) {
     super()
     this.logger = logger
     this.mainLogger = logger.getLogger('main')
@@ -40,7 +40,7 @@ class P2P extends EventEmitter {
     }
 
     this.state = new P2PState(config, this.logger, this.storage, this, this.crypto)
-    this.dataSync = accountUtility ? new DataSync(config, this.logger, this.storage, this, this.crypto, accountUtility) : null
+    this.dataSync = app ? new DataSync(app, shardus, config, this.logger, this.storage, this, this.crypto) : null
 
     this.InternalRecvCounter = 0
     this.keyCounter = 0
@@ -1206,8 +1206,12 @@ class P2P extends EventEmitter {
 
     await this._syncToNetwork(seedNodes, isFirstSeed)
 
-    if (this.dataSync && isFirstSeed === false) {
-      await this.dataSync.syncStateData(3)
+    if (this.dataSync) {
+      if (isFirstSeed) {
+        this.dataSync.registerSyncEndpoints()
+      } else {
+        await this.dataSync.syncStateData(3)
+      }
     }
 
     await this._goActive(isFirstSeed)
