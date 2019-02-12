@@ -22,9 +22,6 @@ class Consensus {
       this.mainLogs = true
     }
 
-    this.consensusActive = false
-    this.p2p.on('active', () => { this.consensusActive = true })
-
     this.queueAndDelayList = []
     this.queueCounter = 0
     this.queueLocked = false
@@ -35,7 +32,7 @@ class Consensus {
     this.p2p.registerGossipHandler('receipt', async (data, sender, tracker) => {
       this.p2p.sendGossipIn('receipt', data, tracker)
 
-      if (!this.consensusActive) {
+      if (!this.p2p.isActive()) {
         return
       }
 
@@ -55,7 +52,7 @@ class Consensus {
     })
 
     this.p2p.registerGossipHandler('transaction', async (data, sender, tracker) => {
-      if (!this.consensusActive) {
+      if (!this.p2p.isActive()) {
         return
       }
       await this.onTransaction(data)

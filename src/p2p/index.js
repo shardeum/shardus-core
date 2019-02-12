@@ -26,6 +26,7 @@ class P2P extends EventEmitter {
     this.queryDelay = config.queryDelay
     this.netadmin = config.netadmin || 'default'
     this.seedNodes = null
+    this.isFirstSeed = false
     this.acceptInternal = false
 
     this.gossipHandlers = {}
@@ -251,7 +252,7 @@ class P2P extends EventEmitter {
     }
   }
 
-  async _checkIfNeedJoin (isFirstSeed) {
+  async _checkIfNeedJoin () {
     const currExternIp = this.getIpInfo().externalIp
     const currExternPort = this.getIpInfo().externalPort
     const dbExternIp = await this.storage.getProperty('externalIp')
@@ -262,7 +263,7 @@ class P2P extends EventEmitter {
 
     // TODO: Remove this and replace with robust way of seeing if no nodes
     // ----- are currently active before returning true
-    if (isFirstSeed) return true
+    if (this.isFirstSeed) return true
 
     const currentTime = utils.getTime('s')
     const lastHeartbeat = await this.storage.getProperty('heartbeat') || 0
@@ -445,7 +446,7 @@ class P2P extends EventEmitter {
     return signedJoinReq
   }
 
-  _isActive () {
+  isActive () {
     this.mainLogger.debug('Checking if active...')
     const status = this.state.getNodeStatus(this.id)
     const active = status === 'active'
@@ -743,7 +744,7 @@ class P2P extends EventEmitter {
       this.mainLogger.debug(`Join request rejected: Was not added. TODO: Have this fn return reason.`)
       return false
     }
-    const active = this._isActive()
+    const active = this.isActive()
     if (!active) return true
     await this.sendGossip('join', joinRequest, tracker)
     return true
@@ -764,7 +765,7 @@ class P2P extends EventEmitter {
     return true
   }
 
-  async _joinNetwork (seedNodes, isFirstSeed) {
+  async _joinNetwork (seedNodes) {
     this.mainLogger.debug('Clearing P2P state...')
     await this.state.clear()
 
@@ -774,7 +775,7 @@ class P2P extends EventEmitter {
     await this.storage.setProperty('internalIp', this.getIpInfo().internalIp)
     await this.storage.setProperty('internalPort', this.getIpInfo().internalPort)
 
-    if (isFirstSeed) {
+    if (this.isFirstSeed) {
       this.mainLogger.debug('Joining network...')
 
       // This is for testing purposes
@@ -807,13 +808,13 @@ class P2P extends EventEmitter {
     return true
   }
 
-  async _syncToNetwork (seedNodes, isFirstSeed) {
+  async _syncToNetwork (seedNodes) {
     // TODO: need to make it robust when resync implemented,
     // ---   currently system would never resync if we were only
     // ---   seed node in the network
 
     // If you are first node, there is nothing to sync to
-    if (isFirstSeed) {
+    if (this.isFirstSeed) {
       this.mainLogger.info('No syncing required...')
       this.acceptInternal = true
       return true
@@ -901,8 +902,8 @@ class P2P extends EventEmitter {
     this.state.addStatusUpdate(update)
   }
 
-  async _goActive (isFirstSeed) {
-    if (isFirstSeed) {
+  async goActive () {
+    if (this.isFirstSeed) {
       const { currentTime, cycleStart, cycleDuration } = this.getCycleMarkerInfo()
       if (!this._isInUpdatePhase(currentTime, cycleStart, cycleDuration)) {
         await this._waitUntilUpdatePhase(currentTime, cycleStart, cycleDuration)
@@ -912,7 +913,7 @@ class P2P extends EventEmitter {
       return true
     }
     const ensureActive = async () => {
-      if (!this._isActive()) {
+      if (!this.isActive()) {
         const { cycleDuration } = this.getCycleMarkerInfo()
         this.mainLogger.debug('Not active yet, submitting an active request.')
         await this._submitStatusUpdate('active')
@@ -926,6 +927,9 @@ class P2P extends EventEmitter {
       }
     }
     await ensureActive()
+    // Emit the 'active' event after becoming active
+    this.mainLogger.debug('Emitting `active` event.')
+    this.emit('active', this.id)
     return true
   }
 
@@ -1184,8 +1188,8 @@ class P2P extends EventEmitter {
 
   async startup () {
     const seedNodes = await this._getSeedNodes()
-    const isFirstSeed = await this._discoverNetwork(seedNodes)
-    const needJoin = await this._checkIfNeedJoin(isFirstSeed)
+    this.isFirstSeed = await this._discoverNetwork(seedNodes)
+    const needJoin = await this._checkIfNeedJoin()
 
     // Emit the 'joining' event before attempting to join
     const publicKey = this.crypto.getPublicKey()
@@ -1194,7 +1198,7 @@ class P2P extends EventEmitter {
 
     // If joining was unsuccessful, emit the 'failed' event
     let joined = true
-    if (needJoin) joined = await this._joinNetwork(seedNodes, isFirstSeed)
+    if (needJoin) joined = await this._joinNetwork(seedNodes)
     if (!joined) {
       this.emit('failed')
       return false
@@ -1204,21 +1208,17 @@ class P2P extends EventEmitter {
     this.mainLogger.debug('Emitting `joined` event.')
     this.emit('joined', this.id, publicKey)
 
-    await this._syncToNetwork(seedNodes, isFirstSeed)
+    await this._syncToNetwork(seedNodes)
 
     if (this.dataSync) {
-      if (isFirstSeed) {
+      if (this.isFirstSeed) {
         this.dataSync.registerSyncEndpoints()
       } else {
         await this.dataSync.syncStateData(3)
       }
     }
 
-    await this._goActive(isFirstSeed)
-
-    // Emit the 'active' event after becoming active
-    this.mainLogger.debug('Emitting `active` event.')
-    this.emit('active', this.id)
+    await this.goActive()
 
     // turning this off until after enterprise, should figure out a way to work it in before we go active
     // if (this.dataSync && isFirstSeed === false) {
@@ -1226,12 +1226,10 @@ class P2P extends EventEmitter {
     //   await this.dataSync.patchRemainingStateData()
     // }
 
-    // if (!isFirstSeed) this.state.startCycles()
-
     // This is also for testing purposes
     console.log('Server ready!')
 
-    if (this.dataSync && isFirstSeed === false) {
+    if (this.dataSync && this.isFirstSeed === false) {
       await this.dataSync.finalTXCatchup(false)
     }
 
