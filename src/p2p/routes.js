@@ -195,28 +195,8 @@ function setupRoutes () {
     await this.sendGossip('certificate', certificate, tracker)
   })
 
-  // -------- DEBUG Routes ----------
-
-  // Test route for the P2P.tell function
-  this.registerInternal('test1', async (payload) => {
-    if (!payload) {
-      console.log('no payload')
-      return
-    }
-    console.log(payload)
-  })
-
-  // Test route for the P2P.ask function
-  this.registerInternal('test2', async (payload, respond) => {
-    if (!payload) {
-      console.log('no payload')
-      return
-    }
-    console.log(payload)
-    await respond(payload)
-  })
-
   // -------- DEMO Routes ----------
+
   this.network.registerExternalGet('nodelist', async (req, res) => {
     return res.json({ nodelist: this.state.getAllNodes() })
   })
