@@ -867,7 +867,7 @@ class P2PState extends EventEmitter {
     if (!self) return Object.values(nodes)
     // Check if self in node list
     if (!nodes[self]) {
-      this.mainLogger.error(`Invalid node ID in 'self' field. Given ID: ${self}`)
+      this.mainLogger.warn(`Invalid node ID in 'self' field. Given ID: ${self}`)
       return Object.values(nodes)
     }
     const nodesCopy = utils.deepCopy(nodes)
