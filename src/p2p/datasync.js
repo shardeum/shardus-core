@@ -298,87 +298,88 @@ class DataSync {
       }
       this.lastStateSyncEndtime = endTime
 
+      let firstHash
       let queryLow
       let queryHigh
-      let nodesToAsk = []
-      let firstHash
-      nodesToAsk = nodesToAsk.concat(this.dataSourceNodes)
-      let searchingForGoodHash = true
-      while (searchingForGoodHash) {
-        queryLow = lowAddress
-        queryHigh = highAddress
-        let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, tsEnd: endTime }
-        let stateHashResults = []
-        for (let node of nodesToAsk) {
-          let result = await this.p2p.ask(node, 'get_account_state_hash', message) // todo mem performance after enterprise: upgrade this to allow an array of N hashes if there is too much data to query in one shot
-          // todo m11: handle error cases?
-          stateHashResults.push({ hash: result.stateHash, node: node })
-        }
-
-        let hashesMatch = true
-        firstHash = stateHashResults[0].hash
-        // Test that results match.
-        for (let i = 1; i < stateHashResults.length; i++) {
-          if (stateHashResults[i].hash !== firstHash) {
-            hashesMatch = false
-          }
-        }
-        if (hashesMatch === false) {
-          this.mainLogger.debug(`DATASYNC: hash: syncStateTableData hashes do not match `)
-          for (let hashResp of stateHashResults) {
-            this.mainLogger.debug(`DATASYNC: node:  ${hashResp.node.externalIp}:${hashResp.node.externalPort}  hash: ${hashResp.hash}`)
-          }
-          // // failed restart with new nodes.  TODO ?: record/eval/report blame?
-          this.recordPotentialBadnode()
-          throw new Error('FailAndRestartPartition') // TODO m11: we need to ask other nodes for a hash one at a time until we can feel better about a hash consensus
-
-          // TODO after enterprise? code to handle getting bad hash data where we ask for one more node at a time until we have consensus on what hashes are good vs. bad
-          // let moreNodes = this.getMoreNodes(1, lowAddress, highAddress, this.visitedNodes)
-          // if (moreNodes.length > 0) {
-          //   nodesToAsk = nodesToAsk.concat(moreNodes)
-          // }
-        } else {
-          this.mainLogger.debug(`DATASYNC: hash: got good hash ${firstHash}`)
-          searchingForGoodHash = false
-        }
-      }
-
-      if (nodesToAsk.length === 0) {
-        this.mainLogger.debug(`DATASYNC: hash: no nodes availabe to ask for hash`)
-      }
-
-      // queryLow = lowAddress
-      // queryHigh = highAddress
-      // let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, tsEnd: endTime }
-
-      // let equalFn = (a, b) => {
-      //   return a.stateHash === b.stateHash
-      // }
-      // let queryFn = async (node) => {
-      //   let result = await this.p2p.ask(node, 'get_account_state_hash', message)
-      //   return result
-      // }
-      // let winners = []
-      // let nodes = this.getRandomNodesInRange(100, lowAddress, highAddress)
-      // // let nodes = this.p2p.state.getAllNodes(this.p2p.id)
-      // if (nodes.length === 0) {
-      //   this.mainLogger.debug(`no nodes available`)
-      //   return // nothing to do
-      // }
-      // this.mainLogger.debug(`DATASYNC: _robustQuery get_account_state_hash from ${utils.stringifyReduce(nodes.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
-      // let result = await this.p2p._robustQuery(nodes, queryFn, equalFn, 3, winners)
-      // if (result && result.stateHash) {
-      //   this.mainLogger.debug(`DATASYNC: _robustQuery returned result: ${result.stateHash}`)
-      //   if (winners.length === 0) {
-      //     throw new Error('FailAndRestartPartition1')
+      // let nodesToAsk = []
+      // nodesToAsk = nodesToAsk.concat(this.dataSourceNodes)
+      // let searchingForGoodHash = true
+      // while (searchingForGoodHash) {
+      //   queryLow = lowAddress
+      //   queryHigh = highAddress
+      //   let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, tsEnd: endTime }
+      //   let stateHashResults = []
+      //   for (let node of nodesToAsk) {
+      //     let result = await this.p2p.ask(node, 'get_account_state_hash', message) // todo mem performance after enterprise: upgrade this to allow an array of N hashes if there is too much data to query in one shot
+      //     // todo m11: handle error cases?
+      //     stateHashResults.push({ hash: result.stateHash, node: node })
       //   }
-      //   this.dataSourceNode = winners[0]
-      //   this.mainLogger.debug(`DATASYNC: got hash ${result.stateHash} from ${utils.stringifyReduce(winners.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
-      //   firstHash = result.stateHash
-      // } else {
-      //   this.mainLogger.debug(`DATASYNC: _robustQuery get_account_state_hash failed`)
-      //   throw new Error('FailAndRestartPartition2')
+
+      //   let hashesMatch = true
+      //   firstHash = stateHashResults[0].hash
+      //   // Test that results match.
+      //   for (let i = 1; i < stateHashResults.length; i++) {
+      //     if (stateHashResults[i].hash !== firstHash) {
+      //       hashesMatch = false
+      //     }
+      //   }
+      //   if (hashesMatch === false) {
+      //     this.mainLogger.debug(`DATASYNC: hash: syncStateTableData hashes do not match `)
+      //     for (let hashResp of stateHashResults) {
+      //       this.mainLogger.debug(`DATASYNC: node:  ${hashResp.node.externalIp}:${hashResp.node.externalPort}  hash: ${hashResp.hash}`)
+      //     }
+      //     // // failed restart with new nodes.  TODO ?: record/eval/report blame?
+      //     this.recordPotentialBadnode()
+      //     throw new Error('FailAndRestartPartition') // TODO m11: we need to ask other nodes for a hash one at a time until we can feel better about a hash consensus
+
+      //     // TODO after enterprise? code to handle getting bad hash data where we ask for one more node at a time until we have consensus on what hashes are good vs. bad
+      //     // let moreNodes = this.getMoreNodes(1, lowAddress, highAddress, this.visitedNodes)
+      //     // if (moreNodes.length > 0) {
+      //     //   nodesToAsk = nodesToAsk.concat(moreNodes)
+      //     // }
+      //   } else {
+      //     this.mainLogger.debug(`DATASYNC: hash: got good hash ${firstHash}`)
+      //     searchingForGoodHash = false
+      //   }
       // }
+
+      // if (nodesToAsk.length === 0) {
+      //   this.mainLogger.debug(`DATASYNC: hash: no nodes availabe to ask for hash`)
+      // }
+
+      queryLow = lowAddress
+      queryHigh = highAddress
+      let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, tsEnd: endTime }
+
+      let equalFn = (a, b) => {
+        return a.stateHash === b.stateHash
+      }
+      let queryFn = async (node) => {
+        let result = await this.p2p.ask(node, 'get_account_state_hash', message)
+        return result
+      }
+      let winners = []
+      // let nodes = this.getRandomNodesInRange(100, lowAddress, highAddress, [])
+      // let nodes = this.p2p.state.getAllNodes(this.p2p.id)
+      let nodes = this.p2p.state.getActiveNodes(this.p2p.id)
+      if (nodes.length === 0) {
+        this.mainLogger.debug(`no nodes available`)
+        return // nothing to do
+      }
+      this.mainLogger.debug(`DATASYNC: _robustQuery get_account_state_hash from ${utils.stringifyReduce(nodes.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+      let result = await this.p2p._robustQuery(nodes, queryFn, equalFn, 3, winners)
+      if (result && result.stateHash) {
+        this.mainLogger.debug(`DATASYNC: _robustQuery returned result: ${result.stateHash}`)
+        if (winners.length === 0) {
+          throw new Error('FailAndRestartPartition1')
+        }
+        this.dataSourceNode = winners[0] // Todo random index
+        this.mainLogger.debug(`DATASYNC: got hash ${result.stateHash} from ${utils.stringifyReduce(winners.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+        firstHash = result.stateHash
+      } else {
+        this.mainLogger.debug(`DATASYNC: _robustQuery get_account_state_hash failed`)
+        throw new Error('FailAndRestartPartition2')
+      }
 
       let moreDataRemaining = true
       this.combinedAccountStateData = []
@@ -665,9 +666,11 @@ class DataSync {
     }
     if (this.verboseLogs) this.mainLogger.debug(`DATASYNC: syncFailedAcccounts start`)
     let addressList = []
-    for (let account of this.accountsWithStateConflict) {
-      if (account.address != null) {
-        addressList.push(account.address)
+    for (let accountEntry of this.accountsWithStateConflict) {
+      if (accountEntry.data && accountEntry.data.address) {
+        addressList.push(accountEntry.data.address)
+      } else {
+        if (this.verboseLogs) this.mainLogger.debug(`DATASYNC: syncFailedAcccounts failed to add account ${accountEntry}`)
       }
     }
     // add the addresses of accounts that we got state table data for but not data for
