@@ -294,9 +294,10 @@ class P2P extends EventEmitter {
   }
 
   async _submitJoin (nodes, joinRequest) {
-    const node = nodes[0]
-    this.mainLogger.debug(`Sending join request to ${node.ip}:${node.port}`)
-    await http.post(`${node.ip}:${node.port}/join`, joinRequest)
+    for (const node of nodes) {
+      this.mainLogger.debug(`Sending join request to ${node.ip}:${node.port}`)
+      await http.post(`${node.ip}:${node.port}/join`, joinRequest)
+    }
   }
 
   // Check if we are in the update phase
@@ -416,11 +417,9 @@ class P2P extends EventEmitter {
     return nodeId
   }
 
-  // TODO: Think about exception when there is more than
-  // ----- one seed node in seed list, but you are still a seednode
   _checkIfFirstSeedNode (seedNodes) {
     if (!seedNodes.length) throw new Error('Fatal: No seed nodes in seed list!')
-    if (seedNodes.length > 1) return false
+    // if (seedNodes.length > 1) return false
     const seed = seedNodes[0]
     const { externalIp, externalPort } = this.getIpInfo()
     if (externalIp === seed.ip && externalPort === seed.port) {
