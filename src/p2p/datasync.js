@@ -814,7 +814,7 @@ class DataSync {
     let helper = nodes[0]
 
     let message = { tsStart: timeStart, tsEnd: timeEnd, limit: 10000 }
-    let result = await this.p2p.ask(helper, 'get_accpeted_transactions', message) // todo perf, could await these in parallel
+    let result = await this.p2p.ask(helper, 'get_accepted_transactions', message) // todo perf, could await these in parallel
     let acceptedTXs = result.transactions
 
     let toParse = ''
@@ -942,12 +942,12 @@ class DataSync {
       await respond(result)
     })
 
-    // /get_accpeted_transactions (Ts_start, Ts_end)
+    // /get_accepted_transactions (Ts_start, Ts_end)
     // Ts_start - get data newer than this timestamp
     // Ts_end - get data older than this timestamp
     // Returns data from the Accepted Tx Table starting with Ts_start; limits result to 500 records (as configured)
     // Updated names: tsStart, tsEnd
-    this.p2p.registerInternal('get_accpeted_transactions', async (payload, respond) => {
+    this.p2p.registerInternal('get_accepted_transactions', async (payload, respond) => {
       let result = {}
 
       if (!payload.limit) {
@@ -958,7 +958,7 @@ class DataSync {
       await respond(result)
     })
 
-    //     /get_account_data (Acc_start, Acc_end)
+    // /get_account_data (Acc_start, Acc_end)
     // Acc_start - get data for accounts starting with this account id; inclusive
     // Acc_end - get data for accounts up to this account id; inclusive
     // Returns data from the application Account Table; limits result to 300 records (as configured);
