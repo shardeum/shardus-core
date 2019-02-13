@@ -41,7 +41,7 @@ class P2P extends EventEmitter {
     }
 
     this.state = new P2PState(config, this.logger, this.storage, this, this.crypto)
-    this.dataSync = app ? new DataSync(app, shardus, config, this.logger, this.storage, this, this.crypto) : null
+    // this.dataSync = app ? new DataSync(app, shardus, config, this.logger, this.storage, this, this.crypto) : null
 
     this.InternalRecvCounter = 0
     this.keyCounter = 0
@@ -1212,6 +1212,7 @@ class P2P extends EventEmitter {
 
     await this._syncToNetwork(seedNodes)
 
+    /*
     if (this.dataSync) {
       if (this.isFirstSeed) {
         this.dataSync.registerSyncEndpoints()
@@ -1221,6 +1222,7 @@ class P2P extends EventEmitter {
     }
 
     await this.goActive()
+    */
 
     // turning this off until after enterprise, should figure out a way to work it in before we go active
     // if (this.dataSync && isFirstSeed === false) {
@@ -1229,11 +1231,13 @@ class P2P extends EventEmitter {
     // }
 
     // This is also for testing purposes
-    console.log('Server ready!')
+    // console.log('Server ready!')
 
+    /*
     if (this.dataSync && this.isFirstSeed === false) {
       await this.dataSync.finalTXCatchup(false)
     }
+    */
 
     return true
   }
