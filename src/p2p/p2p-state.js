@@ -670,9 +670,6 @@ class P2PState extends EventEmitter {
   }
 
   addCertificate (certificate, fromNetwork = false) {
-  // TODO: make sure cycle marker is what we think it should be
-  // ----- whenever it is different, we shouldn't go with it naively
-  // ----- whenever it is different, we should get cycle data from the node that reported it as different
     const addCert = (cert, dist) => {
       this.currentCycle.data.certificate = cert
       this.currentCycle.metadata.bestCertDist = dist
