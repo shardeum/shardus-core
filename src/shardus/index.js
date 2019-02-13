@@ -8,7 +8,7 @@ const utils = require('../utils')
 const Consensus = require('../consensus')
 const Reporter = require('../reporter')
 const Debug = require('../debug')
-const DataSync = require('../data-sync')
+const StateManager = require('../state-manager')
 const Profiler = require('../utils/profiler.js')
 const allZeroes64 = '0'.repeat(64)
 
@@ -30,7 +30,7 @@ class Shardus {
     this.appProvided = null
     this.app = null
     this.reporter = null
-    this.dataSync = null
+    this.stateManager = null
 
     this.heartbeatInterval = config.heartbeatInterval
     this.heartbeatTimer = null
@@ -562,7 +562,7 @@ class Shardus {
     this.debug = new Debug(this.config.baseDir, this.logger, this.storage, this.network)
     await this.debug.init()
 
-    this.dataSync = this.app ? new DataSync(this.app, this, this.logger, this.storage, this.p2p, this.crypto) : null
+    this.stateManager = this.app ? new StateManager(this.app, this, this.logger, this.storage, this.p2p, this.crypto) : null
     this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this, this.profiler) : null
     this.consensus = new Consensus(this.app, this, this.config, this.logger, this.crypto, this.p2p, this.storage, this.reporter, this.profiler)
 
@@ -580,15 +580,15 @@ class Shardus {
     })
 
     await this.p2p.startup()
-    if (this.dataSync) await this.dataSync.syncStateData(3)
+    if (this.stateManager) await this.stateManager.syncStateData(3)
     await this.p2p.goActive()
     console.log('Server ready!')
-    if (this.dataSync) {
-      await this.dataSync.finalTXCatchup(false)
+    if (this.stateManager) {
+      await this.stateManager.finalTXCatchup(false)
       await utils.sleep(3000)
-      await this.dataSync.finalTXCatchup(true)
+      await this.stateManager.finalTXCatchup(true)
       await utils.sleep(3000)
-      this.dataSync.enableSyncCheck()
+      this.stateManager.enableSyncCheck()
     }
   }
 

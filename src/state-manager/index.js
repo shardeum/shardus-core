@@ -4,7 +4,7 @@ const utils = require('../utils')
 
 const allZeroes64 = '0'.repeat(64)
 
-class DataSync {
+class StateManager {
   constructor (app, shardus, logger, storage, p2p, crypto) {
     this.mainLogger = logger.getLogger('main')
     this.p2p = p2p
@@ -970,4 +970,4 @@ class DataSync {
   }
 }
 
-module.exports = DataSync
+module.exports = StateManager
