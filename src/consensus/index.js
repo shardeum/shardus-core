@@ -104,7 +104,7 @@ class Consensus {
         targetStateId = await this.app.getStateId(targetAddress, false) // we don't require this to exist
       }
 
-      transactionReceipt = this.createReciept(inTransaction, stateId, targetStateId)
+      transactionReceipt = this.createReceipt(inTransaction, stateId, targetStateId)
     } catch (ex) {
       this.logger.getLogger('main').error(`Inject: Failed to process Transaction. Exception: ${ex}`)
       this.fatalLogger.fatal('inject: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -121,7 +121,7 @@ class Consensus {
     return transactionReceipt
   }
 
-  createReciept (tx, state, targetStateId) {
+  createReceipt (tx, state, targetStateId) {
     let receipt = {
       stateId: state,
       targetStateId: targetStateId,
