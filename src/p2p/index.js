@@ -4,10 +4,9 @@ const utils = require('../utils')
 const http = require('../http')
 const P2PState = require('./p2p-state')
 const routes = require('./routes')
-const DataSync = require('./datasync.js')
 
 class P2P extends EventEmitter {
-  constructor (config, logger, storage, crypto, network, app, shardus) {
+  constructor (config, logger, storage, crypto, network, app) {
     super()
     this.logger = logger
     this.mainLogger = logger.getLogger('main')
@@ -41,7 +40,6 @@ class P2P extends EventEmitter {
     }
 
     this.state = new P2PState(config, this.logger, this.storage, this, this.crypto)
-    // this.dataSync = app ? new DataSync(app, shardus, config, this.logger, this.storage, this, this.crypto) : null
 
     this.InternalRecvCounter = 0
     this.keyCounter = 0

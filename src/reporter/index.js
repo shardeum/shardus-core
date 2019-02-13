@@ -1,34 +1,17 @@
 const http = require('../http')
 
 class Reporter {
-  constructor (config, logger, p2p, shardus, profiler) {
+  constructor (config, logger, p2p, stateManager, profiler) {
     this.config = config
     this.mainLogger = logger.getLogger('main')
     this.p2p = p2p
-    this.shardus = shardus
+    this.stateManager = stateManager
     this.profiler = profiler
     this.logger = logger
 
     this.reportTimer = null
     this._txInjected = 0
     this._txApplied = 0
-
-    this.p2p.on('joining', (publicKey) => {
-      this.logger.playbackLogState('joining', '', publicKey)
-      this.reportJoining(publicKey)
-    })
-
-    this.p2p.on('joined', (nodeId, publicKey) => {
-      this.logger.playbackLogState('joined', nodeId, publicKey)
-      this.logger.setPlaybackID(nodeId)
-      this.reportJoined(nodeId, publicKey)
-    })
-
-    this.p2p.on('active', (nodeId) => {
-      this.logger.playbackLogState('active', nodeId, '')
-      this.reportActive(nodeId)
-      this.startReporting()
-    })
 
     this.lastTime = Date.now
 
@@ -114,7 +97,7 @@ class Reporter {
   startReporting () {
     // Creates and sends a report every `interval` seconds
     this.reportTimer = setInterval(async () => {
-      const appState = await this.shardus.getAccountsStateHash()
+      const appState = await this.stateManager.getAccountsStateHash()
       const cycleMarker = this.p2p.getCycleMarker()
       const nodelistHash = this.p2p.getNodelistHash()
       const txInjected = this._txInjected

@@ -9,9 +9,6 @@ class Debug {
     this.archiveFilePath = path.join(baseDir, this.archiveName)
     this.logsDirPath = logger.logDir
     this.dbDirPath = path.parse(storage.storage.storageConfig.options.storage).dir
-  }
-
-  async init () {
     this._registerRoutes()
   }
 

@@ -24,6 +24,7 @@ class Shardus {
     this.storage = new Storage(config.baseDir, storageConfig, this.logger, this.profiler)
     this.crypto = {}
     this.network = new Network(config.network, this.logger)
+    this.debug = new Debug(config.baseDir, this.logger, this.storage, this.network)
     this.p2p = {}
     this.consensus = {}
     this.debug = {}
@@ -58,7 +59,7 @@ class Shardus {
       }
     })
     this.exitHandler.registerSync('shardus', () => {
-      this.stopHeartbeat()
+      this._stopHeartbeat()
     })
     this.exitHandler.registerSync('crypto', () => {
       this.crypto.stopAllGenerators()
@@ -69,7 +70,7 @@ class Shardus {
     })
     this.exitHandler.registerAsync('shardus', () => {
       this.mainLogger.info('Writing heartbeat to database before exiting...')
-      return this.writeHeartbeat()
+      return this._writeHeartbeat()
     })
     this.exitHandler.registerAsync('storage', () => {
       return this.storage.close()
@@ -87,46 +88,11 @@ class Shardus {
     this.logger.playbackLogState('constructed', '', '')
   }
 
-  _registerRoutes () {
-    this.network.registerExternalPost('exit', async (req, res) => {
-      res.json({ success: true })
-      await this.shutdown()
-    })
-  }
-
-  registerExceptionHandler () {
-    process.on('uncaughtException', async (err) => {
-      this.fatalLogger.fatal('uncaughtException: ' + err.name + ': ' + err.message + ' at ' + err.stack)
-      try {
-        await this.exitHandler.exitCleanly()
-      } catch (e) {
-        console.error('uncaughtException: ' + e.name + ': ' + e.message + ' at ' + e.stack)
-        process.exit(1)
-      }
-    })
-  }
-
-  async writeHeartbeat () {
-    const timestamp = utils.getTime('s')
-    await this.storage.setProperty('heartbeat', timestamp)
-  }
-
-  _setupHeartbeat () {
-    this.heartbeatTimer = setInterval(async () => {
-      await this.writeHeartbeat()
-    }, this.heartbeatInterval * 1000)
-  }
-
-  stopHeartbeat () {
-    this.mainLogger.info('Stopping heartbeat...')
-    clearInterval(this.heartbeatTimer)
-  }
-
   setup (app) {
     if (app === null) {
       this.appProvided = false
     } else if (app === Object(app)) {
-      this.app = this.getApplicationInterface(app)
+      this.app = this._getApplicationInterface(app)
       this.appProvided = true
       this.logger.playbackLogState('appProvided', '', '')
     } else {
@@ -135,29 +101,66 @@ class Shardus {
     return this
   }
 
-  isTransactionTimestampExpired (txnTimestamp) {
-    // this.mainLogger.debug(`Start of isTransactionTimestampExpired(${txnTimestamp})`)
-    let transactionExpired = false
-    const txnExprationTime = this.config.transactionExpireTime
-    const currNodeTimestamp = Date.now()
+  async start (exitProcOnFail = true) {
+    if (this.appProvided === null) throw new Error('Please call Shardus.setup with an App object or null before calling Shardus.start.')
+    await this.storage.init()
+    this._setupHeartbeat()
+    this.crypto = new Crypto(this.config.crypto, this.logger, this.storage)
+    await this.crypto.init()
+    const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout, maxNodesPerCycle } = this.config
+    const ipInfo = this.config.ip
+    const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout, maxNodesPerCycle }
+    this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network, this.app)
+    await this.p2p.init()
 
-    const txnAge = currNodeTimestamp - txnTimestamp
-    this.mainLogger.debug(`Transaction Timestamp: ${txnTimestamp} CurrNodeTimestamp: ${currNodeTimestamp}
-    txnExprationTime: ${txnExprationTime}   TransactionAge: ${txnAge}`)
+    this.stateManager = this.app ? new StateManager(this.verboseLogs, this.profiler, this.reporter, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto) : null
+    this.consensus = new Consensus(this.app, this.stateManager, this.config, this.logger, this.crypto, this.p2p, this.storage, this.reporter, this.profiler)
+    this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this.stateManager, this.profiler) : null
 
-    // this.mainLogger.debug(`TransactionAge: ${txnAge}`)
-    if (txnAge >= (txnExprationTime * 1000)) {
-      this.fatalLogger.error(`Transaction Expired`)
-      transactionExpired = true
+    this._registerRoutes()
+
+    this.p2p.on('joining', (publicKey) => {
+      this.logger.playbackLogState('joining', '', publicKey)
+      this.reporter.reportJoining(publicKey)
+    })
+    this.p2p.on('joined', (nodeId, publicKey) => {
+      this.logger.playbackLogState('joined', nodeId, publicKey)
+      this.logger.setPlaybackID(nodeId)
+      this.reporter.reportJoined(nodeId, publicKey)
+    })
+    this.p2p.on('active', (nodeId) => {
+      this.logger.playbackLogState('active', nodeId, '')
+      this.reporter.reportActive(nodeId)
+      this.reporter.startReporting()
+    })
+    this.p2p.on('failed', () => {
+      this.shutdown(exitProcOnFail)
+    })
+    this.p2p.on('error', (e) => {
+      console.log(e.message + ' at ' + e.stack)
+      this.mainLogger.debug('shardus.start() ' + e.message + ' at ' + e.stack)
+      this.fatalLogger.fatal('shardus.start() ' + e.message + ' at ' + e.stack)
+      throw new Error(e)
+    })
+    await this.p2p.startup()
+
+    if (this.stateManager) await this.stateManager.syncStateData(3)
+
+    await this.p2p.goActive()
+    console.log('Server ready!')
+
+    if (this.stateManager) {
+      await this.stateManager.finalTXCatchup(false)
+      await utils.sleep(3000)
+      await this.stateManager.finalTXCatchup(true)
+      await utils.sleep(3000)
+      this.stateManager.enableSyncCheck()
     }
-    // this.mainLogger.debug(`End of isTransactionTimestampExpired(${txnTimestamp})`)
-    return transactionExpired
   }
 
   /**
    * Handle incoming tranaction requests
    */
-
   async put (req, res) {
     let transactionOk = false
     if (this.reporter) this.reporter.incrementTxInjected()
@@ -180,7 +183,7 @@ class Shardus {
       if (this.verboseLogs) this.mainLogger.debug(`InitialValidationResponse: ${utils.stringifyReduce(initValidationResp)}`)
 
       const txnTimestamp = initValidationResp.txnTimestamp
-      if (this.isTransactionTimestampExpired(txnTimestamp)) {
+      if (this._isTransactionTimestampExpired(txnTimestamp)) {
         this.fatalLogger.fatal(`Transaction Expired: ${utils.stringifyReduce(inTransaction)}`)
         return { success: false, reason: 'Transaction Expired' }
       }
@@ -221,7 +224,7 @@ class Shardus {
       if (this.verboseLogs) this.mainLogger.debug(`Received Consensus. Receipt: ${utils.stringifyReduce(transactionReceipt)}`)
       // Apply the transaction
       this.profiler.profileSectionStart('acceptTx')
-      transactionOk = await this.acceptTransaction(inTransaction, transactionReceipt, true)
+      transactionOk = await this.stateManager.acceptTransaction(inTransaction, transactionReceipt, true)
       this.profiler.profileSectionEnd('acceptTx')
     } catch (ex) {
       this.fatalLogger.fatal(`Put: Failed to process transaction. Exception: ${ex}`)
@@ -243,200 +246,32 @@ class Shardus {
     return { success: true, reason: 'Transaction successfully processed' }
   }
 
+  // USED BY SIMPLECOINAPP
+  createApplyResponse (txId, txTimestamp) {
+    let replyObject = { stateTableResults: [], txId, txTimestamp }
+    return replyObject
+  }
+
+  // USED BY SIMPLECOINAPP
+  applyResponseAddState (resultObject, accountId, txId, txTimestamp, stateBefore, stateAfter, accountCreated) {
+    let state = { accountId, txId, txTimestamp, stateBefore, stateAfter }
+    if (accountCreated) {
+      state.stateBefore = allZeroes64
+    }
+    resultObject.stateTableResults.push(state)
+  }
+
+  // USED BY SIMPLECOINAPP
   async resetAppRelatedState () {
     await this.storage.clearAppRelatedState()
   }
 
-  async acceptTransaction (tx, receipt, gossipTx = false, dontAllowStateTableData = false) {
-    if (this.verboseLogs) this.mainLogger.debug(`acceptTransaction start ${tx.txnTimestamp}`)
-    this.profiler.profileSectionStart('acceptTx-teststate')
-    let { success, hasStateTableData } = await this.testAccountStateTable(tx)
-    let timestamp = tx.txnTimestamp
-    if (!success) {
-      let errorMsg = 'acceptTransaction ' + timestamp + ' failed. has state table data: ' + hasStateTableData
-      console.log(errorMsg)
-      throw new Error(errorMsg)
-    }
-
-    if (dontAllowStateTableData && hasStateTableData) {
-      if (this.verboseLogs) this.mainLogger.debug(`acceptTransaction exit because we have state table data ${tx.timestamp}`)
-      return
-    }
-
-    this.profiler.profileSectionEnd('acceptTx-teststate')
-
-    this.profiler.profileSectionStart('acceptTx-apply')
-    // app applies data
-    let { stateTableResults, txId, txTimestamp } = await this.app.apply(tx)
-    // TODO post enterprise:  the stateTableResults may need to be a map with keys so we can choose which one to actually insert in our accountStateTable
-    this.profiler.profileSectionEnd('acceptTx-apply')
-
-    if (this.reporter) this.reporter.incrementTxApplied()
-
-    this.profiler.profileSectionStart('acceptTx-addAccepted')
-    let txStatus = 1 // TODO m15: unhardcode this
-    // store transaction in accepted table
-    let acceptedTX = { id: txId, timestamp: txTimestamp, data: tx, status: txStatus, receipt: receipt }
-    await this.storage.addAcceptedTransactions([acceptedTX])
-    this.profiler.profileSectionEnd('acceptTx-addAccepted')
-
-    // this.profiler.profileSectionStart('acceptTx-addAccepted3')
-    // await this.storage.addAcceptedTransactions3(acceptedTX)
-    // this.profiler.profileSectionEnd('acceptTx-addAccepted3')
-
-    this.profiler.profileSectionStart('acceptTx-addState')
-    // query app for account state (or return it from apply)
-    // write entry into account state table (for each source or dest account in our shard)
-    if (this.verboseLogs) {
-      for (let stateT of stateTableResults) {
-        this.mainLogger.debug('acceptTransaction: writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter))
-      }
-    }
-
-    await this.storage.addAccountStates(stateTableResults)
-    this.profiler.profileSectionEnd('acceptTx-addState')
-
-    // await this.storage.addAccountStates2(stateTableResults)
-
-    this.profiler.profileSectionStart('acceptTx-gossip')
-    if (gossipTx) {
-      // temporary implementaiton to share transactions
-      this.p2p.sendGossipIn('acceptedTx', acceptedTX)
-    }
-    this.profiler.profileSectionEnd('acceptTx-gossip')
-
-    if (this.verboseLogs) this.mainLogger.debug(`acceptTransaction end ${tx.txnTimestamp}`)
-    return true
-  }
-
-  async testAccountStateTable (tx) {
-    let hasStateTableData = false
+  async shutdown (exitProcess = true) {
     try {
-      let keysResponse = this.app.getKeyFromTransaction(tx)
-      let { sourceKeys, targetKeys } = keysResponse
-      let sourceAddress, targetAddress, sourceState, targetState
-
-      let timestamp = tx.txnTimestamp
-
-      if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
-        sourceAddress = sourceKeys[0]
-        // let accountStates = await this.storage.queryAccountStateTable(sourceState, sourceState, timestamp, timestamp, 1)
-        let accountStates = await this.storage.searchAccountStateTable(sourceAddress, timestamp)
-        if (accountStates.length !== 0) {
-          sourceState = await this.app.getStateId(sourceAddress)
-          hasStateTableData = true
-          // if (accountStates.length === 0) {
-          //   if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' missing source account state 1')
-          //   if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' missing source account state 1')
-          //   return { success: false, hasStateTableData }
-          // }
-
-          if (accountStates.length === 0 || accountStates[0].stateBefore !== sourceState) {
-            if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' cant apply state 1')
-            if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' cant apply state 1 stateId: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
-            return { success: false, hasStateTableData }
-          }
-        }
-      }
-      if (Array.isArray(targetKeys) && targetKeys.length > 0) {
-        targetAddress = targetKeys[0]
-        // let accountStates = await this.storage.queryAccountStateTable(targetState, targetState, timestamp, timestamp, 1)
-        let accountStates = await this.storage.searchAccountStateTable(targetAddress, timestamp)
-
-        if (accountStates.length !== 0) {
-          hasStateTableData = true
-          // if (accountStates.length === 0) {
-          //   if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' missing target account state 2')
-          //   if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' missing target account state 2')
-          //   return { success: false, hasStateTableData }
-          // }
-          if (accountStates.length !== 0 && accountStates[0].stateBefore !== allZeroes64) {
-            targetState = await this.app.getStateId(targetAddress, false)
-            if (targetState == null) {
-              if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' target state does not exist, thats ok')
-              if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' target state does not exist, thats ok')
-            } else if (accountStates[0].stateBefore !== targetState) {
-              if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' cant apply state 2')
-              if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' cant apply state 2 stateId: ' + utils.makeShortHash(targetState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(targetAddress))
-              return { success: false, hasStateTableData }
-            }
-          }
-        }
-      // todo post enterprise, only check this if it is in our address range
-      }
-    } catch (ex) {
-      this.fatalLogger.fatal('testAccountStateTable failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      await this.exitHandler.exitCleanly(exitProcess)
+    } catch (e) {
+      throw e
     }
-
-    return { success: true, hasStateTableData }
-  }
-
-  // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
-  async tryApplyTransaction (acceptedTX) {
-    let ourLock = -1
-    try {
-      let tx = acceptedTX.data
-      let receipt = acceptedTX.receipt
-      let timestamp = tx.txnTimestamp // TODO m11: need to push this to application method thta cracks the transaction
-
-      // QUEUE delay system...
-      ourLock = await this.consensus.queueAndDelay(timestamp, receipt.txHash)
-
-      if (this.verboseLogs) console.log('tryApplyTransaction ' + timestamp)
-      if (this.verboseLogs) this.mainLogger.debug('DATASYNC: tryApplyTransaction ' + timestamp)
-
-      let { success, hasStateTableData } = await this.testAccountStateTable(tx)
-
-      if (!success) {
-        return false// we failed
-      }
-
-      // test reciept state ids. some redundant queries that could be optimized!
-      let keysResponse = this.app.getKeyFromTransaction(tx)
-      let { sourceKeys, targetKeys } = keysResponse
-      let sourceAddress, targetAddress, sourceState, targetState
-      if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
-        sourceAddress = sourceKeys[0]
-        sourceState = await this.app.getStateId(sourceAddress)
-        if (sourceState !== receipt.stateId) {
-          if (this.verboseLogs) console.log('tryApplyTransaction source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + sourceState + ' receipt: ' + receipt.stateId + ' address: ' + sourceAddress)
-          if (this.verboseLogs) this.mainLogger.debug('DATASYNC: tryApplyTransaction source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + sourceState + ' receipt: ' + receipt.stateId + ' address: ' + sourceAddress)
-          return false
-        }
-      }
-      if (Array.isArray(targetKeys) && targetKeys.length > 0) {
-        targetAddress = targetKeys[0]
-        targetState = await this.app.getStateId(targetAddress, false)
-        if (targetState !== receipt.targetStateId) {
-          if (this.verboseLogs) console.log('tryApplyTransaction target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetState + ' receipt: ' + receipt.targetStateId + ' address: ' + targetAddress)
-          if (this.verboseLogs) this.mainLogger.debug('DATASYNC: tryApplyTransaction target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetState + ' receipt: ' + receipt.targetStateId + ' address: ' + targetAddress)
-          return false
-        }
-      }
-
-      if (this.verboseLogs) console.log('tryApplyTransaction ' + timestamp + ' Applying!')
-      if (this.verboseLogs) this.mainLogger.debug('DATASYNC: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
-      let { stateTableResults } = await this.app.apply(tx)
-      // only write our state table data if we dont already have it in the db
-      if (hasStateTableData === false) {
-        for (let stateT of stateTableResults) {
-          if (this.verboseLogs) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId))
-          if (this.verboseLogs) this.mainLogger.debug('DATASYNC: writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter))
-        }
-        await this.storage.addAccountStates(stateTableResults)
-      }
-
-      // post validate that state ended up correctly?
-
-      // write the accepted TX to storage
-      this.storage.addAcceptedTransactions([acceptedTX])
-    } catch (ex) {
-      this.fatalLogger.fatal('tryApplyTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      return false
-    } finally {
-      this.consensus.unlockQueue(ourLock)
-    }
-    return true
   }
 
   /**
@@ -446,8 +281,8 @@ class Shardus {
  * @returns {applicationInterfaceImpl} Shardus application interface implementation
  * @throws {Exception} If the interface is not appropriately implemented
  */
-  getApplicationInterface (application) {
-    this.mainLogger.debug('Start of getApplicationInterfaces()')
+  _getApplicationInterface (application) {
+    this.mainLogger.debug('Start of _getApplicationInterfaces()')
     let applicationInterfaceImpl = {}
     try {
       if (application == null) {
@@ -541,82 +376,65 @@ class Shardus {
       }
     } catch (ex) {
       this.fatalLogger.fatal(`Required application interface not implemented. Exception: ${ex}`)
-      this.fatalLogger.fatal('getApplicationInterface: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.fatalLogger.fatal('_getApplicationInterface: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       throw new Error(ex)
     }
-    this.mainLogger.debug('End of getApplicationInterfaces()')
+    this.mainLogger.debug('End of _getApplicationInterfaces()')
     return applicationInterfaceImpl
   }
 
-  async start (exitProcOnFail = true) {
-    if (this.appProvided === null) throw new Error('Please call Shardus.setup with an App object or null before calling Shardus.start.')
-    await this.storage.init()
-    this._setupHeartbeat()
-    this.crypto = new Crypto(this.config.crypto, this.logger, this.storage)
-    await this.crypto.init()
-    const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout, maxNodesPerCycle } = this.config
-    const ipInfo = this.config.ip
-    const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout, maxNodesPerCycle }
-    this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network, this.app, this)
-    await this.p2p.init()
-    this.debug = new Debug(this.config.baseDir, this.logger, this.storage, this.network)
-    await this.debug.init()
-
-    this.stateManager = this.app ? new StateManager(this.app, this, this.logger, this.storage, this.p2p, this.crypto) : null
-    this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this, this.profiler) : null
-    this.consensus = new Consensus(this.app, this, this.config, this.logger, this.crypto, this.p2p, this.storage, this.reporter, this.profiler)
-
-    this._registerRoutes()
-
-    this.p2p.on('failed', () => {
-      this.shutdown(exitProcOnFail)
+  _registerRoutes () {
+    this.network.registerExternalPost('exit', async (req, res) => {
+      res.json({ success: true })
+      await this.shutdown()
     })
+  }
 
-    this.p2p.on('error', (e) => {
-      console.log(e.message + ' at ' + e.stack)
-      this.mainLogger.debug('shardus.start() ' + e.message + ' at ' + e.stack)
-      this.fatalLogger.fatal('shardus.start() ' + e.message + ' at ' + e.stack)
-      throw new Error(e)
+  registerExceptionHandler () {
+    process.on('uncaughtException', async (err) => {
+      this.fatalLogger.fatal('uncaughtException: ' + err.name + ': ' + err.message + ' at ' + err.stack)
+      try {
+        await this.exitHandler.exitCleanly()
+      } catch (e) {
+        console.error('uncaughtException: ' + e.name + ': ' + e.message + ' at ' + e.stack)
+        process.exit(1)
+      }
     })
+  }
 
-    await this.p2p.startup()
-    if (this.stateManager) await this.stateManager.syncStateData(3)
-    await this.p2p.goActive()
-    console.log('Server ready!')
-    if (this.stateManager) {
-      await this.stateManager.finalTXCatchup(false)
-      await utils.sleep(3000)
-      await this.stateManager.finalTXCatchup(true)
-      await utils.sleep(3000)
-      this.stateManager.enableSyncCheck()
+  async _writeHeartbeat () {
+    const timestamp = utils.getTime('s')
+    await this.storage.setProperty('heartbeat', timestamp)
+  }
+
+  _setupHeartbeat () {
+    this.heartbeatTimer = setInterval(async () => {
+      await this._writeHeartbeat()
+    }, this.heartbeatInterval * 1000)
+  }
+
+  _stopHeartbeat () {
+    this.mainLogger.info('Stopping heartbeat...')
+    clearInterval(this.heartbeatTimer)
+  }
+
+  _isTransactionTimestampExpired (txnTimestamp) {
+    // this.mainLogger.debug(`Start of _isTransactionTimestampExpired(${txnTimestamp})`)
+    let transactionExpired = false
+    const txnExprationTime = this.config.transactionExpireTime
+    const currNodeTimestamp = Date.now()
+
+    const txnAge = currNodeTimestamp - txnTimestamp
+    this.mainLogger.debug(`Transaction Timestamp: ${txnTimestamp} CurrNodeTimestamp: ${currNodeTimestamp}
+    txnExprationTime: ${txnExprationTime}   TransactionAge: ${txnAge}`)
+
+    // this.mainLogger.debug(`TransactionAge: ${txnAge}`)
+    if (txnAge >= (txnExprationTime * 1000)) {
+      this.fatalLogger.error(`Transaction Expired`)
+      transactionExpired = true
     }
-  }
-
-  async shutdown (exitProcess = true) {
-    try {
-      await this.exitHandler.exitCleanly(exitProcess)
-    } catch (e) {
-      throw e
-    }
-  }
-
-  async getAccountsStateHash (accountStart = '0'.repeat(64), accountEnd = 'f'.repeat(64), tsStart = 0, tsEnd = Date.now()) {
-    const accountStates = await this.storage.queryAccountStateTable(accountStart, accountEnd, tsStart, tsEnd, 100000000)
-    const stateHash = this.crypto.hash(accountStates)
-    return stateHash
-  }
-
-  createApplyResponse (txId, txTimestamp) {
-    let replyObject = { stateTableResults: [], txId, txTimestamp }
-    return replyObject
-  }
-
-  applyResponseAddState (resultObject, accountId, txId, txTimestamp, stateBefore, stateAfter, accountCreated) {
-    let state = { accountId, txId, txTimestamp, stateBefore, stateAfter }
-    if (accountCreated) {
-      state.stateBefore = allZeroes64
-    }
-    resultObject.stateTableResults.push(state)
+    // this.mainLogger.debug(`End of _isTransactionTimestampExpired(${txnTimestamp})`)
+    return transactionExpired
   }
 }
 

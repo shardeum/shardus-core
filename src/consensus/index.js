@@ -1,10 +1,10 @@
 const utils = require('../utils')
 
 class Consensus {
-  constructor (app, shardus, config, logger, crypto, p2p, storage, reporter, profiler) {
+  constructor (app, stateManager, config, logger, crypto, p2p, storage, reporter, profiler) {
     this.profiler = profiler
     this.app = app
-    this.shardus = shardus
+    this.stateManager = stateManager
     this.config = config
     this.logger = logger
     this.mainLogger = this.logger.getLogger('main')
@@ -199,7 +199,7 @@ class Consensus {
         }
       }
 
-      await this.shardus.acceptTransaction(transaction, receipt, false, true)
+      await this.stateManager.acceptTransaction(transaction, receipt, false, true)
       // TODO: Make this more robust, actually make sure the application has applied tx
       // if (this.reporter) this.reporter.incrementTxApplied()
     } catch (ex) {
