@@ -495,21 +495,31 @@ class P2P extends EventEmitter {
     nodes = [...nodes]
     shuffleArray(nodes)
 
+    const queries = []
+    // Wrap the query so that we know which node it's coming from
+    const wrappedQuery = async (node) => {
+      let response = queryFn(node)
+      return { response, node }
+    }
+    // We create a promise for each node in the list
     for (let node of nodes) {
-      try {
-        let query = await queryFn(node)
-        this.mainLogger.debug(`Result of query: ${JSON.stringify(query)}`)
-        let result = responses.add(query, node)
-        if (result) {
-          if (winners) {
-            responses.fillWinnersList(result, winners)
-          }
-          return result
+      queries.push(wrappedQuery(node))
+    }
+    const [results, errs] = await utils.robustPromiseAll(queries)
+    for (const result of results) {
+      const { response, node } = result
+      let finalResult = responses.add(response, node)
+      if (finalResult) {
+        if (winners) {
+          responses.fillWinnersList(finalResult, winners)
         }
-      } catch (e) {
-        this.mainLogger.debug(e)
-        errors++
+        return finalResult
       }
+    }
+
+    for (const err of errs) {
+      this.mainLogger.debug(err)
+      errors += 1
     }
 
     throw new Error(`Could not get ${redundancy} ${redundancy > 1 ? 'redundant responses' : 'response'} from ${nodes.length} ${nodes.length > 1 ? 'nodes' : 'node'}. Encountered ${errors} query errors.`)
