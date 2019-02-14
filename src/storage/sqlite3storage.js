@@ -9,8 +9,9 @@ const utils = require('../utils')
 class Sqlite3Storage {
   // note that old storage passed in logger, now we pass in the specific log for it to use.  This works for application use, but may need to rethink if we apply this to shardus core
   constructor (models, storageConfig, logger, baseDir, profiler) {
-    this.storageConfig = storageConfig
     this.baseDir = baseDir
+    this.storageConfig = storageConfig
+    this.storageConfig.options.storage = path.join(this.baseDir, this.storageConfig.options.storage)
     this.profiler = profiler
     // Setup logger
     this.mainLogger = logger.getLogger('default')
@@ -77,7 +78,6 @@ class Sqlite3Storage {
 
   async init () {
     // Create dbDir if it doesn't exist
-    this.storageConfig.options.storage = path.join(this.baseDir, this.storageConfig.options.storage)
     let dbDir = path.parse(this.storageConfig.options.storage).dir
     await _ensureExists(dbDir)
     this.mainLogger.info('Created Database directory.')

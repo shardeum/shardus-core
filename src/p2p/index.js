@@ -6,14 +6,14 @@ const P2PState = require('./p2p-state')
 const routes = require('./routes')
 
 class P2P extends EventEmitter {
-  constructor (config, logger, storage, crypto, network, app) {
+  constructor (config, logger, storage, crypto) {
     super()
     this.logger = logger
     this.mainLogger = logger.getLogger('main')
     this.fatalLogger = this.logger.getLogger('fatal')
     this.storage = storage
     this.crypto = crypto
-    this.network = network
+    this.network = null
     this.ipInfo = config.ipInfo
     this.id = null
     this.ipServer = config.ipServer
@@ -45,7 +45,7 @@ class P2P extends EventEmitter {
     this.keyCounter = 0
   }
 
-  async init () {
+  async init (network) {
     // Initialize our p2p state
     await this.state.init()
 
@@ -57,6 +57,7 @@ class P2P extends EventEmitter {
     if (id) this._setNodeId(id, false)
 
     // Set up the network after we are sure we have our current IP info
+    this.network = network
     await this.network.setup(this.getIpInfo())
     this._registerRoutes()
   }

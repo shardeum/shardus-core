@@ -11,6 +11,7 @@ class BetterSqlite3Storage {
   constructor (models, storageConfig, logger, baseDir, profiler) {
     this.baseDir = baseDir
     this.storageConfig = storageConfig
+    this.storageConfig.options.storage = path.join(this.baseDir, this.storageConfig.options.storage)
     this.profiler = profiler
     // Setup logger
     this.mainLogger = logger.getLogger('default')
@@ -76,7 +77,6 @@ class BetterSqlite3Storage {
 
   async init () {
     // Create dbDir if it doesn't exist
-    this.storageConfig.options.storage = path.join(this.baseDir, this.storageConfig.options.storage)
     let dbDir = path.parse(this.storageConfig.options.storage).dir
     await _ensureExists(dbDir)
     this.mainLogger.info('Created Database directory.')

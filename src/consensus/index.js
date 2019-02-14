@@ -2,7 +2,7 @@ const EventEmitter = require('events')
 const utils = require('../utils')
 
 class Consensus extends EventEmitter {
-  constructor (app, config, logger, crypto, p2p, storage, reporter, profiler) {
+  constructor (app, config, logger, crypto, p2p, storage, profiler) {
     super()
     this.profiler = profiler
     this.app = app
@@ -14,7 +14,6 @@ class Consensus extends EventEmitter {
     this.p2p = p2p
     this.storage = storage
     this.app = app
-    this.reporter = reporter
 
     this.pendingTransactions = {}
 
@@ -156,7 +155,6 @@ class Consensus extends EventEmitter {
       }
 
       this.emit('accepted', transaction, receipt, false, true)
-      // if (this.reporter) this.reporter.incrementTxApplied()
     } catch (ex) {
       this.fatalLogger.fatal('Failed to process receipt: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
     } finally {

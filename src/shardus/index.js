@@ -24,10 +24,9 @@ class Shardus {
     this.storage = new Storage(config.baseDir, storageConfig, this.logger, this.profiler)
     this.crypto = {}
     this.network = new Network(config.network, this.logger)
-    this.debug = new Debug(config.baseDir, this.logger, this.storage, this.network)
     this.p2p = {}
-    this.consensus = {}
     this.debug = {}
+    this.consensus = {}
     this.appProvided = null
     this.app = null
     this.reporter = null
@@ -110,16 +109,17 @@ class Shardus {
     const { ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout, maxNodesPerCycle } = this.config
     const ipInfo = this.config.ip
     const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout, maxNodesPerCycle }
-    this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network, this.app)
-    await this.p2p.init()
-
+    this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto)
+    await this.p2p.init(this.network)
+    this.debug = new Debug(this.config.baseDir, this.logger, this.storage, this.network)
     if (this.app) {
-      this.stateManager = this.app ? new StateManager(this.verboseLogs, this.profiler, this.reporter, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto) : null
-      this.consensus = new Consensus(this.app, this.config, this.logger, this.crypto, this.p2p, this.storage, this.reporter, this.profiler)
+      this.stateManager = new StateManager(this.verboseLogs, this.profiler, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto)
+      this.consensus = new Consensus(this.app, this.config, this.logger, this.crypto, this.p2p, this.storage, this.profiler)
       this.consensus.on('accepted', (...txArgs) => this.stateManager.acceptTransaction(...txArgs))
     }
 
     this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this.stateManager, this.profiler) : null
+    if (this.reporter && this.stateManager) this.stateManager.on('applied', () => this.reporter.incrementTxApplied())
 
     this._registerRoutes()
 

@@ -1,14 +1,15 @@
+const EventEmitter = require('events')
 const utils = require('../utils')
 
 // todo m12: need error handling on all the p2p requests.
 
 const allZeroes64 = '0'.repeat(64)
 
-class StateManager {
-  constructor (verboseLogs, profiler, reporter, app, consensus, logger, storage, p2p, crypto) {
+class StateManager extends EventEmitter {
+  constructor (verboseLogs, profiler, app, consensus, logger, storage, p2p, crypto) {
+    super()
     this.verboseLogs = verboseLogs
     this.profiler = profiler
-    this.reporter = reporter
     this.mainLogger = logger.getLogger('main')
     this.fatalLogger = logger.getLogger('fatal')
     this.p2p = p2p
@@ -1069,7 +1070,7 @@ class StateManager {
     // TODO post enterprise:  the stateTableResults may need to be a map with keys so we can choose which one to actually insert in our accountStateTable
     this.profiler.profileSectionEnd('acceptTx-apply')
 
-    if (this.reporter) this.reporter.incrementTxApplied()
+    this.emit('applied')
 
     this.profiler.profileSectionStart('acceptTx-addAccepted')
     let txStatus = 1 // TODO m15: unhardcode this
