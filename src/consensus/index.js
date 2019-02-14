@@ -1,7 +1,9 @@
+const EventEmitter = require('events')
 const utils = require('../utils')
 
-class Consensus {
+class Consensus extends EventEmitter {
   constructor (app, stateManager, config, logger, crypto, p2p, storage, reporter, profiler) {
+    super()
     this.profiler = profiler
     this.app = app
     this.stateManager = stateManager
@@ -27,47 +29,6 @@ class Consensus {
     this.queueLocked = false
     this.queueSitTime = 3000 // todo make this a setting. and tie in with the value in datasync
     this.lastServed = 0
-
-    // Register Gossip Handlers with P2P
-    this.p2p.registerGossipHandler('receipt', async (data, sender, tracker) => {
-      this.p2p.sendGossipIn('receipt', data, tracker)
-
-      if (!this.p2p.isActive()) {
-        return
-      }
-
-      if (this.config.debug && this.config.debug.loseReceiptChance) {
-        if (Math.random() < this.config.debug.loseReceiptChance) {
-          this.logger.playbackLogNote('FakeLoseReceipt', '', data)
-          return
-        }
-      }
-
-      if (await this.onReceipt(data)) {
-        console.log('onReceipt: ' + data.shardusTransaction.inTransaction.txnTimestamp) // todo remove
-      } else {
-        // something failed and that is causing us to not gossip the receipt
-        this.playbackLogNote('receiptFailure', tracker, data)
-      }
-    })
-
-    this.p2p.registerGossipHandler('transaction', async (data, sender, tracker) => {
-      if (!this.p2p.isActive()) {
-        return
-      }
-      await this.onTransaction(data)
-      this.p2p.sendGossipIn('transaction', data, tracker)
-    })
-  }
-
-  /**
-   * Register GossipHandlers with P2P class
-   */
-  async onTransaction (shardusTransaction) {
-    if (this.mainLogs) this.mainLogger.debug(`Start of onTransaction(${shardusTransaction})`)
-    const transHash = this.crypto.hash(shardusTransaction.inTransaction)
-    this.pendingTransactions[transHash] = shardusTransaction
-    if (this.mainLogs) this.mainLogger.debug(`End of onTransaction(${shardusTransaction})`)
   }
 
   async inject (shardusTransaction) {
@@ -78,8 +39,6 @@ class Consensus {
       // let keysRequest = { type: 'keyFromTransaction', txn: inTransaction }
       // let keysResponse = await this.application.get(keysRequest)
       if (this.mainLogs) this.mainLogger.debug(`Gossiping Validated Transaction ${JSON.stringify(shardusTransaction)}`)
-      // TODO: Change this to use just the nodes in the conesensus group
-      // await this.p2p.sendGossip('transaction', shardusTransaction, this.p2p.state.getAllNodes(this.p2p.id))
       if (this.mainLogs) this.mainLogger.debug(`Done Gossiping Validated Transaction ${JSON.stringify(shardusTransaction)}`)
       let keysResponse = this.app.getKeyFromTransaction(inTransaction)
       let { sourceKeys, targetKeys } = keysResponse
@@ -112,9 +71,7 @@ class Consensus {
     }
 
     if (this.mainLogs) this.mainLogger.debug(`Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
-    // USING GOSSIP IN NOW
-    // await this.p2p.sendGossip('receipt', { shardusTransaction, transactionReceipt }, this.p2p.state.getAllNodes(this.p2p.id))
-    await this.p2p.sendGossipIn('receipt', { shardusTransaction, transactionReceipt })
+    await this.onReceipt({ shardusTransaction, transactionReceipt })
     if (this.mainLogs) this.mainLogger.debug(`Done Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
     if (this.mainLogs) this.mainLogger.debug(`End of inject(${inTransaction})`)
 
@@ -199,8 +156,7 @@ class Consensus {
         }
       }
 
-      await this.stateManager.acceptTransaction(transaction, receipt, false, true)
-      // TODO: Make this more robust, actually make sure the application has applied tx
+      this.emit('accepted', transaction, receipt, false, true)
       // if (this.reporter) this.reporter.incrementTxApplied()
     } catch (ex) {
       this.fatalLogger.fatal('Failed to process receipt: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)

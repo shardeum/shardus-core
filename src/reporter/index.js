@@ -1,4 +1,5 @@
 const http = require('../http')
+const allZeroes64 = '0'.repeat(64)
 
 class Reporter {
   constructor (config, logger, p2p, stateManager, profiler) {
@@ -97,7 +98,7 @@ class Reporter {
   startReporting () {
     // Creates and sends a report every `interval` seconds
     this.reportTimer = setInterval(async () => {
-      const appState = await this.stateManager.getAccountsStateHash()
+      const appState = this.stateManager ? await this.stateManager.getAccountsStateHash() : allZeroes64
       const cycleMarker = this.p2p.getCycleMarker()
       const nodelistHash = this.p2p.getNodelistHash()
       const txInjected = this._txInjected

@@ -113,8 +113,12 @@ class Shardus {
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto, this.network, this.app)
     await this.p2p.init()
 
-    this.stateManager = this.app ? new StateManager(this.verboseLogs, this.profiler, this.reporter, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto) : null
-    this.consensus = new Consensus(this.app, this.stateManager, this.config, this.logger, this.crypto, this.p2p, this.storage, this.reporter, this.profiler)
+    if (this.app) {
+      this.stateManager = this.app ? new StateManager(this.verboseLogs, this.profiler, this.reporter, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto) : null
+      this.consensus = new Consensus(this.app, this.stateManager, this.config, this.logger, this.crypto, this.p2p, this.storage, this.reporter, this.profiler)
+      this.consensus.on('accepted', (...txArgs) => this.stateManager.acceptTransaction(...txArgs))
+    }
+
     this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this.stateManager, this.profiler) : null
 
     this._registerRoutes()
