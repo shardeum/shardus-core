@@ -115,7 +115,7 @@ class Shardus {
 
     if (this.app) {
       this.stateManager = this.app ? new StateManager(this.verboseLogs, this.profiler, this.reporter, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto) : null
-      this.consensus = new Consensus(this.app, this.stateManager, this.config, this.logger, this.crypto, this.p2p, this.storage, this.reporter, this.profiler)
+      this.consensus = new Consensus(this.app, this.config, this.logger, this.crypto, this.p2p, this.storage, this.reporter, this.profiler)
       this.consensus.on('accepted', (...txArgs) => this.stateManager.acceptTransaction(...txArgs))
     }
 

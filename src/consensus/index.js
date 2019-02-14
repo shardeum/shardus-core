@@ -2,11 +2,10 @@ const EventEmitter = require('events')
 const utils = require('../utils')
 
 class Consensus extends EventEmitter {
-  constructor (app, stateManager, config, logger, crypto, p2p, storage, reporter, profiler) {
+  constructor (app, config, logger, crypto, p2p, storage, reporter, profiler) {
     super()
     this.profiler = profiler
     this.app = app
-    this.stateManager = stateManager
     this.config = config
     this.logger = logger
     this.mainLogger = this.logger.getLogger('main')
