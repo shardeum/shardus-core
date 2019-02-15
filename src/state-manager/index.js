@@ -128,7 +128,7 @@ class StateManager extends EventEmitter {
     this.dataSyncMainPhaseComplete = true
     // one we have all of the initial data the last thing to do is get caught up on transactions
     // await this.applyAcceptedTx()
-    this.TryStartAcceptedQueue()
+    this.tryStartAcceptedQueue()
 
     console.log('syncStateData end' + '   time:' + Date.now())
     // TODO after enterprise: once we are on the network we still need to patch our state data so that it is a perfect match of other nodes for our supported address range
@@ -147,7 +147,7 @@ class StateManager extends EventEmitter {
     // await utils.sleep(2000) // can add a sleep in to excercise this functionality
 
     // await this.applyAcceptedTx()
-    this.TryStartAcceptedQueue()
+    this.tryStartAcceptedQueue()
     if (diableQueue) {
       this.isSyncingAcceptedTxs = false
     }
@@ -652,60 +652,6 @@ class StateManager extends EventEmitter {
     await this.processAccountData()
   }
 
-  // Apply the Accepted Tx
-  //   This should be done after we have synced the Account data across all the partitions or address ranges
-  //   Starting with the oldest accepted transactions we have in the Accepted Tx Table apply the transactions using the App.apply function
-  //   If the transaction was applied the App.apply function will return the State_before and State_after and we need to create an entry in the Account State Table with the Tx_id and the before and after states for this account
-  //   Some of the early transactions will not be applied since the account data is more recent
-  //   Note that the state in the receipt associated with the transaction may not be the same as State_before at the time of applying the transaction
-  //   Once all the accepted transactions have been applied, gossip the “Active” message
-  // async applyAcceptedTx () {
-  //   let counter = 0
-
-  //   this.mainLogger.debug(`DATASYNC: applyAcceptedTx for up to ${this.acceptedTXQueue.length} transactions`)
-
-  //   console.log(`applyAcceptedTx   queue: ${this.acceptedTXQueue.length}` + '   time:' + Date.now())
-
-  //   let anyAcceptedTx = false
-
-  //   while (this.acceptedTXQueue.length > 0) {
-  //     let currentTime = Date.now()
-  //     let txAge = currentTime - this.acceptedTXQueue[0].timestamp
-  //     if (txAge < this.queueSitTime) {
-  //       console.log(`applyAcceptedTx tx too young, exiting.  remaining queue: ${this.acceptedTXQueue.length}` + '   time:' + Date.now())
-  //       this.mainLogger.debug(`DATASYNC: applyAcceptedTx tx too young, exiting.  remaining queue: ${this.acceptedTXQueue.length}` + '   time:' + Date.now())
-  //       return this.acceptedTXQueue.length
-  //     }
-
-  //     // apply the tx
-  //     let nextTX = this.acceptedTXQueue.shift()
-
-  //     // we no longer have state table data in memory so there is not much more the datasync can do
-  //     // shardus / the app code can take it from here
-  //     let result = await this.tryApplyTransaction(nextTX)
-  //     if (result === false && anyAcceptedTx === false) {
-  //       // hit a trailing edge. we must have mismatche sync of account data, need to requery and restart this
-  //       // uery account data for the next N transactions?
-
-  //       // push this back in
-  //       // this.acceptedTXQueue.unshift(nextTX)
-  //       // break // we will need more state table data for coverage.
-  //     }
-  //     if (result === true) {
-  //       anyAcceptedTx = true
-  //     }
-
-  //     // every x messages need to yeild
-  //     counter++
-  //     if (counter > 10) {
-  //       counter = 0
-  //       await utils.sleep(1)
-  //     }
-  //   }
-  //   this.mainLogger.debug(`DATASYNC: applyAcceptedTx finished`)
-  //   return this.acceptedTXQueue.length
-  // }
-
   // we get any transactions we need through the acceptedTx gossip
   async syncAcceptedTX () {
 
@@ -746,30 +692,6 @@ class StateManager extends EventEmitter {
       this.p2p.sendGossipIn('acceptedTx', acceptedTX, tracker)
 
       await this.queueAcceptedTransaction(acceptedTX, false)
-
-      // if (!this.isSyncingAcceptedTxs) {
-      //   // if (this.verboseLogs) console.log('got accepted tx after sync complete: ' + acceptedTX.timestamp + '   time:' + Date.now())
-      //   return
-      // }
-
-      // if (this.verboseLogs) console.log('got accepted tx: ' + acceptedTX.timestamp + '   time:' + Date.now())
-      // // Lets insert this tx into a sorted list where index 0 == oldest and length-1 == newest
-      // if (this.isSyncingAcceptedTxs) {
-      //   let txId = acceptedTX.id
-      //   this.acceptedTXByHash[txId] = acceptedTX // we already have .id.. do we really need to hash this also?
-      //   let timestamp = acceptedTX.timestamp
-      //   if (this.acceptedTXQueue.length === 0) {
-      //     this.acceptedTXQueue.push(acceptedTX)
-      //   } else {
-      //     let index = this.acceptedTXQueue.length - 1
-      //     let lastTx = this.acceptedTXQueue[index]
-      //     while (index >= 0 && ((timestamp < lastTx.timestamp) || (timestamp === lastTx.timestamp && txId < lastTx.id))) {
-      //       index--
-      //       lastTx = this.acceptedTXQueue[index]
-      //     }
-      //     this.acceptedTXQueue.splice(index + 1, 0, acceptedTX)
-      //   }
-      // }
     })
 
     // /get_account_state_hash (Acc_start, Acc_end, Ts_start, Ts_end)
@@ -1063,68 +985,6 @@ class StateManager extends EventEmitter {
     return { success: true, hasStateTableData }
   }
 
-  // async acceptTransaction (tx, receipt, gossipTx = false, dontAllowStateTableData = false) {
-  //   if (this.verboseLogs) this.mainLogger.debug(`acceptTransaction start ${tx.txnTimestamp}`)
-  //   this.profiler.profileSectionStart('acceptTx-teststate')
-  //   let { success, hasStateTableData } = await this.testAccountStateTable(tx)
-  //   let timestamp = tx.txnTimestamp
-  //   if (!success) {
-  //     let errorMsg = 'acceptTransaction ' + timestamp + ' failed. has state table data: ' + hasStateTableData
-  //     console.log(errorMsg)
-  //     throw new Error(errorMsg)
-  //   }
-
-  //   if (dontAllowStateTableData && hasStateTableData) {
-  //     if (this.verboseLogs) this.mainLogger.debug(`acceptTransaction exit because we have state table data ${tx.timestamp}`)
-  //     return
-  //   }
-
-  //   this.profiler.profileSectionEnd('acceptTx-teststate')
-
-  //   this.profiler.profileSectionStart('acceptTx-apply')
-  //   // app applies data
-  //   let { stateTableResults, txId, txTimestamp } = await this.app.apply(tx)
-  //   // TODO post enterprise:  the stateTableResults may need to be a map with keys so we can choose which one to actually insert in our accountStateTable
-  //   this.profiler.profileSectionEnd('acceptTx-apply')
-
-  //   if (this.reporter) this.reporter.incrementTxApplied()
-
-  //   this.profiler.profileSectionStart('acceptTx-addAccepted')
-  //   let txStatus = 1 // TODO m15: unhardcode this
-  //   // store transaction in accepted table
-  //   let acceptedTX = { id: txId, timestamp: txTimestamp, data: tx, status: txStatus, receipt: receipt }
-  //   await this.storage.addAcceptedTransactions([acceptedTX])
-  //   this.profiler.profileSectionEnd('acceptTx-addAccepted')
-
-  //   // this.profiler.profileSectionStart('acceptTx-addAccepted3')
-  //   // await this.storage.addAcceptedTransactions3(acceptedTX)
-  //   // this.profiler.profileSectionEnd('acceptTx-addAccepted3')
-
-  //   this.profiler.profileSectionStart('acceptTx-addState')
-  //   // query app for account state (or return it from apply)
-  //   // write entry into account state table (for each source or dest account in our shard)
-  //   if (this.verboseLogs) {
-  //     for (let stateT of stateTableResults) {
-  //       this.mainLogger.debug('acceptTransaction: writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter))
-  //     }
-  //   }
-
-  //   await this.storage.addAccountStates(stateTableResults)
-  //   this.profiler.profileSectionEnd('acceptTx-addState')
-
-  //   // await this.storage.addAccountStates2(stateTableResults)
-
-  //   this.profiler.profileSectionStart('acceptTx-gossip')
-  //   if (gossipTx) {
-  //     // temporary implementaiton to share transactions
-  //     this.p2p.sendGossipIn('acceptedTx', acceptedTX)
-  //   }
-  //   this.profiler.profileSectionEnd('acceptTx-gossip')
-
-  //   if (this.verboseLogs) this.mainLogger.debug(`acceptTransaction end ${tx.txnTimestamp}`)
-  //   return true
-  // }
-
   // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
   async tryApplyTransaction (acceptedTX) {
     // let ourLock = -1
@@ -1220,15 +1080,15 @@ class StateManager extends EventEmitter {
     this.newAcceptedTXQueue.splice(index + 1, 0, acceptedTX)
 
     // start the queue if needed
-    this.TryStartAcceptedQueue()
+    this.tryStartAcceptedQueue()
   }
 
-  TryStartAcceptedQueue () {
+  tryStartAcceptedQueue () {
     if (!this.dataSyncMainPhaseComplete) {
       return
     }
     if (!this.newAcceptedTXQueueRunning) {
-      this.ProcessAcceptedTXQueue()
+      this.processAcceptedTXQueue()
     } else if (this.newAcceptedTXQueue.length > 0) {
       this.interruptSleepIfNeeded(this.newAcceptedTXQueue[0].timestamp)
     }
@@ -1265,7 +1125,7 @@ class StateManager extends EventEmitter {
     }
   }
 
-  async ProcessAcceptedTXQueue () {
+  async processAcceptedTXQueue () {
     try {
       // wait untill next apply time available
       // run as many apply tx as needed.

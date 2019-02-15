@@ -221,10 +221,6 @@ class Shardus {
       let transactionReceipt = await this.consensus.inject(shardusTransaction)
       this.profiler.profileSectionEnd('consensusInject')
       if (this.verboseLogs) this.mainLogger.debug(`Received Consensus. Receipt: ${utils.stringifyReduce(transactionReceipt)}`)
-      // Apply the transaction
-      // this.profiler.profileSectionStart('acceptTx')
-      // transactionOk = await this.stateManager.acceptTransaction(inTransaction, transactionReceipt, true)
-      // this.profiler.profileSectionEnd('acceptTx')
     } catch (ex) {
       this.fatalLogger.fatal(`Put: Failed to process transaction. Exception: ${ex}`)
       this.fatalLogger.fatal('put: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
