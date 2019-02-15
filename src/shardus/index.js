@@ -112,6 +112,7 @@ class Shardus {
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto)
     await this.p2p.init(this.network)
     this.debug = new Debug(this.config.baseDir, this.logger, this.storage, this.network)
+
     if (this.app) {
       this.stateManager = new StateManager(this.verboseLogs, this.profiler, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto)
       this.consensus = new Consensus(this.app, this.config, this.logger, this.crypto, this.p2p, this.storage, this.profiler)
@@ -125,17 +126,19 @@ class Shardus {
 
     this.p2p.on('joining', (publicKey) => {
       this.logger.playbackLogState('joining', '', publicKey)
-      this.reporter.reportJoining(publicKey)
+      if (this.reporter) this.reporter.reportJoining(publicKey)
     })
     this.p2p.on('joined', (nodeId, publicKey) => {
       this.logger.playbackLogState('joined', nodeId, publicKey)
       this.logger.setPlaybackID(nodeId)
-      this.reporter.reportJoined(nodeId, publicKey)
+      if (this.reporter) this.reporter.reportJoined(nodeId, publicKey)
     })
     this.p2p.on('active', (nodeId) => {
       this.logger.playbackLogState('active', nodeId, '')
-      this.reporter.reportActive(nodeId)
-      this.reporter.startReporting()
+      if (this.reporter) {
+        this.reporter.reportActive(nodeId)
+        this.reporter.startReporting()
+      }
     })
     this.p2p.on('failed', () => {
       this.shutdown(exitProcOnFail)
