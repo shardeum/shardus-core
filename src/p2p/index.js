@@ -593,7 +593,7 @@ class P2P extends EventEmitter {
     }
     const { cycleJoined } = await this._robustQuery(seedNodes, queryFn)
     if (!cycleJoined) {
-      this.mainLogger.info('Unable to get cycle marker, likely this node\'s join request was not excepted.')
+      this.mainLogger.info('Unable to get cycle marker, likely this node\'s join request was not accepted.')
       return null
     }
     const nodeId = this.state.computeNodeId(publicKey, cycleJoined)
