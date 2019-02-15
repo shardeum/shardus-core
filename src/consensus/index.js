@@ -68,9 +68,17 @@ class Consensus extends EventEmitter {
       throw new Error(ex)
     }
 
-    if (this.mainLogs) this.mainLogger.debug(`Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
-    await this.onReceipt({ shardusTransaction, transactionReceipt })
-    if (this.mainLogs) this.mainLogger.debug(`Done Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
+    // if (this.mainLogs) this.mainLogger.debug(`Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
+    // await this.onReceipt({ shardusTransaction, transactionReceipt })
+    // if (this.mainLogs) this.mainLogger.debug(`Done Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
+
+    let timestamp = inTransaction.txnTimestamp // todo not great that we are cracking this, should wrap in a helper
+    let txStatus = 1 // todo real values for tx status. this is just a stand in
+    let txId = transactionReceipt.txHash
+    let acceptedTX = { id: txId, timestamp, data: inTransaction, status: txStatus, receipt: transactionReceipt }
+
+    this.emit('accepted', acceptedTX, true)
+
     if (this.mainLogs) this.mainLogger.debug(`End of inject(${inTransaction})`)
 
     return transactionReceipt
@@ -87,153 +95,154 @@ class Consensus extends EventEmitter {
     return receipt
   }
 
-  // changed to {shardusTransaction, transactionReceipt} to fix out of order messaging.  real consensus will need to have a queue to apply changes
-  async onReceipt (data) {
-    this.profiler.profileSectionStart('onReceipt')
+  // // changed to {shardusTransaction, transactionReceipt} to fix out of order messaging.  real consensus will need to have a queue to apply changes
+  // async onReceipt (data) {
+  //   this.profiler.profileSectionStart('onReceipt')
 
-    // const shardusTransaction = this.pendingTransactions[receipt.txHash]
-    const shardusTransaction = data.shardusTransaction
-    let receipt = data.transactionReceipt
-    if (shardusTransaction == null) {
-      if (this.mainLogs) console.log(`onReceipt failed. No transaction found for: ${receipt.txHash}`)
-      if (this.mainLogs) this.mainLogger.debug(`onReceipt failed. No transaction found for: ${receipt.txHash}`)
-      return false
-    }
-    let transaction = shardusTransaction.inTransaction
-    if (typeof transaction !== 'object') {
-      if (this.mainLogs) console.log(`onReceipt failed. transaction is not an object: ${receipt.txHash}`)
-      return false
-    }
+  //   // const shardusTransaction = this.pendingTransactions[receipt.txHash]
+  //   const shardusTransaction = data.shardusTransaction
+  //   let receipt = data.transactionReceipt
+  //   if (shardusTransaction == null) {
+  //     if (this.mainLogs) console.log(`onReceipt failed. No transaction found for: ${receipt.txHash}`)
+  //     if (this.mainLogs) this.mainLogger.debug(`onReceipt failed. No transaction found for: ${receipt.txHash}`)
+  //     return false
+  //   }
+  //   let transaction = shardusTransaction.inTransaction
+  //   if (typeof transaction !== 'object') {
+  //     if (this.mainLogs) console.log(`onReceipt failed. transaction is not an object: ${receipt.txHash}`)
+  //     return false
+  //   }
 
-    let timestamp = transaction.txnTimestamp
-    if (this.mainLogs) this.mainLogger.debug(`Queue onReceipt ${timestamp}`)
+  //   let timestamp = transaction.txnTimestamp
+  //   if (this.mainLogs) this.mainLogger.debug(`Queue onReceipt ${timestamp}`)
 
-    // retrieve incoming transaction from HTTP request
-    let ourLock = -1
-    try {
-      // TODO! validate that reciept is sign by a valid node in the network
-      if (this.crypto.verify(receipt, receipt.sign.owner) === false) {
-        if (this.mainLogs) console.log(`onReceipt failed. transaction has invalid signing: ${receipt.txHash}`)
-        return false
-      }
+  //   // retrieve incoming transaction from HTTP request
+  //   // let ourLock = -1
+  //   try {
+  //     // TODO! validate that reciept is sign by a valid node in the network
+  //     if (this.crypto.verify(receipt, receipt.sign.owner) === false) {
+  //       if (this.mainLogs) console.log(`onReceipt failed. transaction has invalid signing: ${receipt.txHash}`)
+  //       return false
+  //     }
 
-      // QUEUE delay system...
-      ourLock = await this.queueAndDelay(transaction, receipt.txHash)
-      if (this.mainLogs) this.mainLogger.debug(`Start of onReceipt ${timestamp}`)
+  //     // QUEUE delay system...
+  //     // ourLock = await this.queueAndDelay(transaction, receipt.txHash)
+  //     if (this.mainLogs) this.mainLogger.debug(`Start of onReceipt ${timestamp}`)
 
-      // ToDo: Revisit this check
-      // check that the tx hash matches the receipt
-      // let txhash = this.crypto.hash(transaction)
-      // if (txhash !== receipt.txHash) {
-      //   return false
-      // }
+  //     // ToDo: Revisit this check
+  //     // check that the tx hash matches the receipt
+  //     // let txhash = this.crypto.hash(transaction)
+  //     // if (txhash !== receipt.txHash) {
+  //     //   return false
+  //     // }
 
-      // Validate any target or source hashes if they are available
-      // todo perf: we could pass the expected state values into the app and ask the app to bail/error if they dont match. this puts more burden on the app dev though
+  //     // Validate any target or source hashes if they are available
+  //     // todo perf: we could pass the expected state values into the app and ask the app to bail/error if they dont match. this puts more burden on the app dev though
 
-      let keysResponse = this.app.getKeyFromTransaction(transaction)
-      let { sourceKeys, targetKeys } = keysResponse
-      let sourceAddress, targetAddress, stateId, targetStateId
+  //     let keysResponse = this.app.getKeyFromTransaction(transaction)
+  //     let { sourceKeys, targetKeys } = keysResponse
+  //     let sourceAddress, targetAddress, stateId, targetStateId
 
-      if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
-        sourceAddress = sourceKeys[0]
-      }
-      if (Array.isArray(targetKeys) && targetKeys.length > 0) {
-        targetAddress = targetKeys[0]
-      }
-      if (receipt.stateId) {
-        stateId = await this.app.getStateId(sourceAddress)
-        if (stateId !== receipt.stateId) {
-          throw new Error('onReceipt source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + stateId + ' reciept: ' + receipt.stateId + ' account: ' + utils.makeShortHash(sourceAddress))
-        }
-      }
-      if (receipt.targetStateId) {
-        targetStateId = await this.app.getStateId(targetAddress, false)
-        if (targetStateId !== receipt.targetStateId) {
-          throw new Error('onReceipt target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetStateId + ' reciept: ' + receipt.targetStateId + ' account: ' + utils.makeShortHash(targetAddress))
-        }
-      }
+  //     if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
+  //       sourceAddress = sourceKeys[0]
+  //     }
+  //     if (Array.isArray(targetKeys) && targetKeys.length > 0) {
+  //       targetAddress = targetKeys[0]
+  //     }
+  //     if (receipt.stateId) {
+  //       stateId = await this.app.getStateId(sourceAddress)
+  //       if (stateId !== receipt.stateId) {
+  //         throw new Error('onReceipt source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + stateId + ' reciept: ' + receipt.stateId + ' account: ' + utils.makeShortHash(sourceAddress))
+  //       }
+  //     }
+  //     if (receipt.targetStateId) {
+  //       targetStateId = await this.app.getStateId(targetAddress, false)
+  //       if (targetStateId !== receipt.targetStateId) {
+  //         throw new Error('onReceipt target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetStateId + ' reciept: ' + receipt.targetStateId + ' account: ' + utils.makeShortHash(targetAddress))
+  //       }
+  //     }
 
-      this.emit('accepted', transaction, receipt, false, true)
-    } catch (ex) {
-      this.fatalLogger.fatal('Failed to process receipt: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-    } finally {
-      this.profiler.profileSectionEnd('onReceipt')
-      this.unlockQueue(ourLock)
-    }
-    if (this.mainLogs) this.mainLogger.debug(`End of onReceipt ${timestamp}`)
-    return true
-  }
+  //     this.emit('accepted', transaction, receipt, false, true)
+  //     // if (this.reporter) this.reporter.incrementTxApplied()
+  //   } catch (ex) {
+  //     this.fatalLogger.fatal('Failed to process receipt: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+  //   } finally {
+  //     this.profiler.profileSectionEnd('onReceipt')
+  //     // this.unlockQueue(ourLock)
+  //   }
+  //   if (this.mainLogs) this.mainLogger.debug(`End of onReceipt ${timestamp}`)
+  //   return true
+  // }
 
   // special delay that cuases the calling function to wait.
   // many funcitions at a time can be stuck on this call.  This code will cause the calling functions to
   // exectue in timestamp order and one at a time.
-  async queueAndDelay (timestamp, tieBreaker) {
-    // return -1
-    this.queueCounter++
-    let currentTime = Date.now()
-    let delta = currentTime - timestamp
-    let soonestExecute = this.queueSitTime - delta
-    if (soonestExecute < 0) {
-      soonestExecute = 0
-    }
+  // async queueAndDelay (timestamp, tieBreaker) {
+  //   // return -1
+  //   this.queueCounter++
+  //   let currentTime = Date.now()
+  //   let delta = currentTime - timestamp
+  //   let soonestExecute = this.queueSitTime - delta
+  //   if (soonestExecute < 0) {
+  //     soonestExecute = 0
+  //   }
 
-    let ourID = this.queueCounter
-    let entry = { id: ourID, timestamp, tieBreaker }
+  //   let ourID = this.queueCounter
+  //   let entry = { id: ourID, timestamp, tieBreaker }
 
-    // sorted insert into queue
-    if (this.queueAndDelayList.length === 0) {
-      this.queueAndDelayList.push(entry)
-    } else {
-      let index = this.queueAndDelayList.length - 1
-      let lastTx = this.queueAndDelayList[index]
-      while (index >= 0 && (timestamp < lastTx.timestamp || (timestamp === lastTx.timestamp && tieBreaker < lastTx.tieBreaker))) {
-        index--
-        lastTx = this.queueAndDelayList[index]
-      }
-      this.queueAndDelayList.splice(index + 1, 0, entry)
-    }
+  //   // sorted insert into queue
+  //   if (this.queueAndDelayList.length === 0) {
+  //     this.queueAndDelayList.push(entry)
+  //   } else {
+  //     let index = this.queueAndDelayList.length - 1
+  //     let lastTx = this.queueAndDelayList[index]
+  //     while (index >= 0 && (timestamp < lastTx.timestamp || (timestamp === lastTx.timestamp && tieBreaker < lastTx.tieBreaker))) {
+  //       index--
+  //       lastTx = this.queueAndDelayList[index]
+  //     }
+  //     this.queueAndDelayList.splice(index + 1, 0, entry)
+  //   }
 
-    // utils.insertSorted(this.queueAndDelayList, entry, (a, b) => (a.timestamp > b.timestamp || (a.timestamp === b.timestamp && a.tieBreaker > b.tieBreaker)) ? 1 : -1)
+  //   // utils.insertSorted(this.queueAndDelayList, entry, (a, b) => (a.timestamp > b.timestamp || (a.timestamp === b.timestamp && a.tieBreaker > b.tieBreaker)) ? 1 : -1)
 
-    // this.mainLogger.debug(`list results: start`)
-    // for (let i = 0; i < this.queueAndDelayList.length; i++) {
-    //   this.mainLogger.debug(`list results: ${JSON.stringify(this.queueAndDelayList[i])}`)
-    // }
+  //   // this.mainLogger.debug(`list results: start`)
+  //   // for (let i = 0; i < this.queueAndDelayList.length; i++) {
+  //   //   this.mainLogger.debug(`list results: ${JSON.stringify(this.queueAndDelayList[i])}`)
+  //   // }
 
-    // Sleep until it is a valid time for us to do work
-    await utils.sleep(soonestExecute)
+  //   // Sleep until it is a valid time for us to do work
+  //   await utils.sleep(soonestExecute)
 
-    // wait till we are at the front of the queue, and the queue is not locked
-    while (this.queueAndDelayList[0].id !== ourID || this.queueLocked) {
-      // perf optimization to reduce the amount of times we have to sleep (attempt to come out of sleep at close to the right time)
-      let sleepEstimate = ourID - this.lastServed
-      if (sleepEstimate < 1) {
-        sleepEstimate = 1
-      }
-      await utils.sleep(2 * sleepEstimate)
-      // await utils.sleep(2)
-    }
+  //   // wait till we are at the front of the queue, and the queue is not locked
+  //   while (this.queueAndDelayList[0].id !== ourID || this.queueLocked) {
+  //     // perf optimization to reduce the amount of times we have to sleep (attempt to come out of sleep at close to the right time)
+  //     let sleepEstimate = ourID - this.lastServed
+  //     if (sleepEstimate < 1) {
+  //       sleepEstimate = 1
+  //     }
+  //     await utils.sleep(2 * sleepEstimate)
+  //     // await utils.sleep(2)
+  //   }
 
-    // remove our entry from the array
-    this.queueAndDelayList.shift()
+  //   // remove our entry from the array
+  //   this.queueAndDelayList.shift()
 
-    // this.mainLogger.debug(`queueAndDelay next TS ${timestamp}`)
-    // lock things so that only our calling function can do work
-    this.queueLocked = true
-    this.lockOwner = ourID
-    this.lastServed = ourID
-    return ourID
-  }
+  //   // this.mainLogger.debug(`queueAndDelay next TS ${timestamp}`)
+  //   // lock things so that only our calling function can do work
+  //   this.queueLocked = true
+  //   this.lockOwner = ourID
+  //   this.lastServed = ourID
+  //   return ourID
+  // }
 
-  unlockQueue (id) {
-    if (this.lockOwner === id) {
-      this.queueLocked = false
-    } else if (id !== -1) {
-      // this should never happen as long as we are careful to use try/finally blocks
-      this.fatalLogger.fatal(`Failed to unlock the queue: ${id}`)
-    }
-  }
+  // unlockQueue (id) {
+  //   if (this.lockOwner === id) {
+  //     this.queueLocked = false
+  //   } else if (id !== -1) {
+  //     // this should never happen as long as we are careful to use try/finally blocks
+  //     this.fatalLogger.fatal(`Failed to unlock the queue: ${id}`)
+  //   }
+  // }
 }
 
 module.exports = Consensus

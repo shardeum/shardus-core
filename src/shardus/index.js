@@ -116,7 +116,7 @@ class Shardus {
     if (this.app) {
       this.stateManager = new StateManager(this.verboseLogs, this.profiler, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto)
       this.consensus = new Consensus(this.app, this.config, this.logger, this.crypto, this.p2p, this.storage, this.profiler)
-      this.consensus.on('accepted', (...txArgs) => this.stateManager.acceptTransaction(...txArgs))
+      this.consensus.on('accepted', (...txArgs) => this.stateManager.queueAcceptedTransaction(...txArgs))
     }
 
     this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this.stateManager, this.profiler) : null
@@ -177,7 +177,7 @@ class Shardus {
     // retrieve incoming transaction from HTTP request
     let inTransaction = req.body
     let shardusTransaction = {}
-    let ourLock = -1
+    // let ourLock = -1
     try {
       if (typeof inTransaction !== 'object') {
         return { success: false, reason: `Invalid Transaction! ${utils.stringifyReduce(inTransaction)}` }
@@ -206,20 +206,12 @@ class Shardus {
 
       let txId = this.crypto.hash(inTransaction)
       // QUEUE delay system...
-      ourLock = await this.consensus.queueAndDelay(txnTimestamp, txId)
+      // ourLock = await this.consensus.queueAndDelay(txnTimestamp, txId)
 
       this.profiler.profileSectionStart('put')
 
       if (this.verboseLogs) this.mainLogger.debug(`ShardusTransaction. shortTxID: ${txId} txID: ${utils.makeShortHash(txId)} TX data: ${utils.stringifyReduce(shardusTransaction)}`)
 
-      // Validate transaction through the application. Shardus can see inside the transaction
-      this.profiler.profileSectionStart('validateTx')
-      let transactionValidateResult = await this.app.validateTransaction(inTransaction)
-      this.profiler.profileSectionEnd('validateTx')
-      if (transactionValidateResult.result !== 'pass') {
-        this.mainLogger.error(`Failed to validate transaction. Reason: ${transactionValidateResult.reason}`)
-        return { success: false, reason: transactionValidateResult.reason }
-      }
       shardusTransaction = this.crypto.sign(shardusTransaction)
 
       if (this.verboseLogs) this.mainLogger.debug('Transaction Valided')
@@ -230,9 +222,9 @@ class Shardus {
       this.profiler.profileSectionEnd('consensusInject')
       if (this.verboseLogs) this.mainLogger.debug(`Received Consensus. Receipt: ${utils.stringifyReduce(transactionReceipt)}`)
       // Apply the transaction
-      this.profiler.profileSectionStart('acceptTx')
-      transactionOk = await this.stateManager.acceptTransaction(inTransaction, transactionReceipt, true)
-      this.profiler.profileSectionEnd('acceptTx')
+      // this.profiler.profileSectionStart('acceptTx')
+      // transactionOk = await this.stateManager.acceptTransaction(inTransaction, transactionReceipt, true)
+      // this.profiler.profileSectionEnd('acceptTx')
     } catch (ex) {
       this.fatalLogger.fatal(`Put: Failed to process transaction. Exception: ${ex}`)
       this.fatalLogger.fatal('put: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -241,7 +233,7 @@ class Shardus {
       // this.profiler.profileSectionEnd('acceptTx')
       // this.profiler.profileSectionEnd('validateTx')
       this.profiler.profileSectionEnd('put')
-      this.consensus.unlockQueue(ourLock)
+      // this.consensus.unlockQueue(ourLock)
       if (!transactionOk) {
         this.mainLogger.debug('Transaction result failed: ' + utils.stringifyReduce(inTransaction))
       }
