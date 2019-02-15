@@ -141,18 +141,6 @@ class StateManager extends EventEmitter {
     // all complete!
   }
 
-  async finalTXCatchup (diableQueue) {
-    console.log('finalTXCatchup ' + '   time:' + Date.now())
-
-    // await utils.sleep(2000) // can add a sleep in to excercise this functionality
-
-    // await this.applyAcceptedTx()
-    this.tryStartAcceptedQueue()
-    if (diableQueue) {
-      this.isSyncingAcceptedTxs = false
-    }
-  }
-
   async syncStateDataForPartition (partition) {
     try {
       this.currentPartition = partition

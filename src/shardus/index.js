@@ -157,9 +157,6 @@ class Shardus {
     console.log('Server ready!')
 
     if (this.stateManager) {
-      await this.stateManager.finalTXCatchup(false)
-      await utils.sleep(3000)
-      await this.stateManager.finalTXCatchup(true)
       await utils.sleep(3000)
       this.stateManager.enableSyncCheck()
     }
