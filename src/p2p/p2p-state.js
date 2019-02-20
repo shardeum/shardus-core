@@ -581,14 +581,14 @@ class P2PState extends EventEmitter {
   }
 
   async addCycle (cycle, certificate = null) {
-    this.cycles.push(cycle)
     if (certificate) {
       this.certificates.push(certificate)
       cycle = utils.deepCopy(cycle)
       cycle.certificate = certificate
     }
     await this.storage.addCycles(cycle)
-
+    delete cycle.certificate
+    this.cycles.push(cycle)
     this.emit('newCycle', this.cycles)
   }
 
