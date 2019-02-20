@@ -129,20 +129,51 @@ function setupRoutes () {
     await respond({ cycleUpdates })
     // Update your cycle and remake a cert if the askers cycleUpdates are better
     if (!payload) {
-      this.mainLogger.debug('No payload provided with cycleupdate request.')
+      this.mainLogger.debug('No payload provided with `cycleupdates` request.')
       return
     }
     const hisCycleUpdates = payload.myCycleUpdates
     const hisCertificate = payload.myCertificate
     if (!hisCycleUpdates || !hisCertificate) {
-      this.mainLogger.debug('Invalid payload provided with cycleupdates request.')
+      this.mainLogger.debug('Invalid payload provided with `cycleupdates` request.')
       return
     }
     const cycleUpdated = await this.state.addCycleUpdates(hisCycleUpdates)
+    // TODO: Verify the logic here
     if (cycleUpdated) {
-      this.mainLogger.debug('Updated our cycle data after getting a cycleupdates request.')
+      this.mainLogger.debug('Updated our cycle data after getting a `cycleupdates` request.')
       // Use the askers cert if its better than the one you made
       this.state.addCertificate(hisCertificate, true)
+    }
+  })
+
+  this.registerInternal('node', async (payload, respond) => {
+    if (!payload) {
+      this.mainLogger.debug('No payload provided with `node` request.')
+      await respond({ node: null })
+      return
+    }
+    const getBy = payload.getBy
+    if (!getBy) {
+      this.mainLogger.debug('No query method provided with `node` request.')
+      await respond({ node: null })
+      return
+    }
+
+    switch (getBy) {
+      case 'publicKey':
+        const publicKey = payload.publicKey
+        if (!publicKey) {
+          this.mainLogger.debug('No public key provided with `node` request to get by public key.')
+          await respond({ node: null })
+          return
+        }
+        const node = this.state.getNodeByPubKey(publicKey)
+        await respond({ node })
+        break
+      default:
+        this.mainLogger.debug('Invalid query method provided with `node` request.')
+        await respond({ node: null })
     }
   })
 
