@@ -2,17 +2,16 @@ const http = require('../http')
 const allZeroes64 = '0'.repeat(64)
 
 class Reporter {
-  constructor (config, logger, p2p, stateManager, profiler) {
+  constructor (config, logger, p2p, stats, stateManager, profiler) {
     this.config = config
     this.mainLogger = logger.getLogger('main')
     this.p2p = p2p
+    this.stats = stats
     this.stateManager = stateManager
     this.profiler = profiler
     this.logger = logger
 
     this.reportTimer = null
-    this._txInjected = 0
-    this._txApplied = 0
 
     this.lastTime = Date.now
 
@@ -21,19 +20,6 @@ class Reporter {
       this.doConsoleReport = true
     }
     this.hasRecipient = this.config.recipient != null
-  }
-
-  incrementTxInjected () {
-    this._txInjected += 1
-  }
-
-  incrementTxApplied () {
-    this._txApplied += 1
-  }
-
-  _resetTxsSeen () {
-    this._txInjected = 0
-    this._txApplied = 0
   }
 
   _calculateAverageTps (txs) {
@@ -97,14 +83,18 @@ class Reporter {
 
   startReporting () {
     // Creates and sends a report every `interval` seconds
+    let lastReportTime = null
+
     this.reportTimer = setInterval(async () => {
       const appState = this.stateManager ? await this.stateManager.getAccountsStateHash() : allZeroes64
       const cycleMarker = this.p2p.getCycleMarker()
       const nodelistHash = this.p2p.getNodelistHash()
-      const txInjected = this._txInjected
-      const txApplied = this._txApplied
+      const txInjected = this.stats.getTxInjected(lastReportTime)
+      const txApplied = this.stats.getTxApplied(lastReportTime)
       const reportInterval = this.config.interval
       const nodeIpInfo = this.p2p.getIpInfo()
+
+      lastReportTime = Date.now()
 
       try {
         await this._sendReport({ appState, cycleMarker, nodelistHash, txInjected, txApplied, reportInterval, nodeIpInfo })
@@ -116,8 +106,6 @@ class Reporter {
       if (this.doConsoleReport) {
         this.consoleReport()
       }
-
-      this._resetTxsSeen()
     }, this.config.interval * 1000)
   }
 
@@ -125,7 +113,9 @@ class Reporter {
     let time = Date.now()
     let delta = time - this.lastTime
     delta = delta * 0.001
-    let report = `Perf inteval ${delta}    ${this._txInjected} Injected @${this._txInjected / delta} per second.    ${this._txApplied} Applied @${this._txApplied / delta} per second`
+    const txInjected = this.stats.getTxInjected()
+    const txApplied = this.stats.getTxApplied()
+    let report = `Perf inteval ${delta}    ${txInjected} Injected @${txInjected / delta} per second.    ${txApplied} Applied @${txApplied / delta} per second`
     this.lastTime = time
 
     console.log(report)

@@ -9,6 +9,7 @@ const Consensus = require('../consensus')
 const Reporter = require('../reporter')
 const Debug = require('../debug')
 const StateManager = require('../state-manager')
+const Stats = require('../stats')
 const Profiler = require('../utils/profiler.js')
 const allZeroes64 = '0'.repeat(64)
 
@@ -20,6 +21,7 @@ class Shardus {
     this.logger = new Logger(config.baseDir, logsConfig)
     this.mainLogger = this.logger.getLogger('main')
     this.fatalLogger = this.logger.getLogger('fatal')
+    this.stats = new Stats()
     this.exitHandler = new ExitHandler()
     this.storage = new Storage(config.baseDir, storageConfig, this.logger, this.profiler)
     this.crypto = {}
@@ -119,7 +121,7 @@ class Shardus {
       this.consensus.on('accepted', (...txArgs) => this.stateManager.queueAcceptedTransaction(...txArgs))
     }
 
-    this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this.stateManager, this.profiler) : null
+    this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this.stats, this.stateManager, this.profiler) : null
     if (this.reporter && this.stateManager) this.stateManager.on('applied', () => this.reporter.incrementTxApplied())
 
     this._registerRoutes()
