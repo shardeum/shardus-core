@@ -130,8 +130,11 @@ class P2P extends EventEmitter {
       const node = seedNodes[i]
       promises[i] = this._fetchSeedNodeInfo(node)
     }
-    const seedNodesInfo = await Promise.all(promises)
-    return seedNodesInfo
+    const [results, errors] = await utils.robustPromiseAll(promises)
+    for (const error of errors) {
+      this.mainLogger.warn(error)
+    }
+    return results
   }
 
   async _setNodeId (id, updateDb = true) {
@@ -488,41 +491,69 @@ class P2P extends EventEmitter {
           }
         }
       }
+      getHighestCount () {
+        if (!this.items.length) return 0
+        let highestCount = 0
+        for (let item of this.items) {
+          if (item.count > highestCount) {
+            highestCount = item.count
+          }
+        }
+        return highestCount
+      }
     }
     let responses = new Tally(redundancy, equalityFn)
     let errors = 0
 
     nodes = [...nodes]
     shuffleArray(nodes)
+    const nodeCount = nodes.length
 
-    const queries = []
-    // Wrap the query so that we know which node it's coming from
-    const wrappedQuery = async (node) => {
-      let response = queryFn(node)
-      return { response, node }
-    }
-    // We create a promise for each node in the list
-    for (let node of nodes) {
-      queries.push(wrappedQuery(node))
-    }
-    const [results, errs] = await utils.robustPromiseAll(queries)
-    for (const result of results) {
-      const { response, node } = result
-      let finalResult = responses.add(response, node)
-      if (finalResult) {
-        if (winners) {
-          responses.fillWinnersList(finalResult, winners)
-        }
-        return finalResult
+    const queryNodes = async (nodes) => {
+      // Wrap the query so that we know which node it's coming from
+      const wrappedQuery = async (node) => {
+        let response = queryFn(node)
+        return { response, node }
       }
+
+      // We create a promise for each of the first `redundancy` nodes in the shuffled array
+      const queries = []
+      for (var i = 0; i < nodes.length; i++) {
+        let node = nodes[i]
+        queries.push(wrappedQuery(node))
+      }
+      const [results, errs] = await utils.robustPromiseAll(queries)
+
+      let finalResult
+      for (const result of results) {
+        const { response, node } = result
+        finalResult = responses.add(response, node)
+        if (finalResult) break
+      }
+
+      for (const err of errs) {
+        this.mainLogger.debug(err)
+        errors += 1
+      }
+
+      if (!finalResult) return null
+      return finalResult
     }
 
-    for (const err of errs) {
-      this.mainLogger.debug(err)
-      errors += 1
+    let finalResult = null
+    while (!finalResult) {
+      let toQuery = redundancy - responses.getHighestCount()
+      if (nodes.length < toQuery) break
+      let nodesToQuery = nodes.splice(0, toQuery)
+      finalResult = await queryNodes(nodesToQuery)
+    }
+    if (finalResult) {
+      responses.fillWinnersList(finalResult, winners)
+      return finalResult
     }
 
-    throw new Error(`Could not get ${redundancy} ${redundancy > 1 ? 'redundant responses' : 'response'} from ${nodes.length} ${nodes.length > 1 ? 'nodes' : 'node'}. Encountered ${errors} query errors.`)
+    // TODO: Don't throw an error, should just return what had the most
+    throw new Error(`Could not get ${redundancy} ${redundancy > 1 ? 'redundant responses' : 'response'} from ${nodeCount} ${nodeCount !== 1 ? 'nodes' : 'node'}. Encountered ${errors} query errors.`)
   }
 
   async _sequentialQuery (nodes, queryFn, verifyFn) {
