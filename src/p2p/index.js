@@ -945,9 +945,6 @@ class P2P extends EventEmitter {
   }
 
   async goActive () {
-    // Emit the 'active' event after becoming active
-    this.mainLogger.debug('Emitting `active` event.')
-    this.emit('active', this.id)
     if (this.isFirstSeed) {
       const { currentTime, cycleStart, cycleDuration } = this.getCycleMarkerInfo()
       if (!this._isInUpdatePhase(currentTime, cycleStart, cycleDuration)) {
@@ -955,6 +952,9 @@ class P2P extends EventEmitter {
       }
       const update = this._createStatusUpdate('active')
       this.state.addStatusUpdate(update)
+      // Emit the 'active' event after becoming active
+      this.mainLogger.debug('Emitting `active` event.')
+      this.emit('active', this.id)
       return true
     }
     const ensureActive = async () => {
@@ -968,6 +968,9 @@ class P2P extends EventEmitter {
           await ensureActive()
         }, toWait)
       } else {
+        // Emit the 'active' event after becoming active
+        this.mainLogger.debug('Emitting `active` event.')
+        this.emit('active', this.id)
         this.mainLogger.info('Node is now active!')
       }
     }
