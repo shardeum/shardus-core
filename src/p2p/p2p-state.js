@@ -580,31 +580,30 @@ class P2PState extends EventEmitter {
     }, toWait)
   }
 
-  async addCycle (cycle, certificate = null) {
+  async addCycle (cycle, certificate = null, updateDb = true) {
     if (certificate) {
       this.certificates.push(certificate)
-      cycle = utils.deepCopy(cycle)
       cycle.certificate = certificate
     }
-    await this.storage.addCycles(cycle)
+    if (updateDb) await this.storage.addCycles(cycle)
     delete cycle.certificate
     this.cycles.push(cycle)
     this.emit('newCycle', this.cycles)
   }
 
-  async addCycles (cycles, certificates = null) {
-    for (const cycle of cycles) {
-      this.cycles.push(cycle)
-    }
+  async addCycles (cycles, certificates = null, updateDb = true) {
     if (certificates.length) {
-      cycles = utils.deepCopy(cycles)
       for (let i = 0; i < cycles.length; i++) {
         const certificate = certificates[i]
         this.certificates.push(certificate)
         cycles[i].certificate = certificate
       }
     }
-    await this.storage.addCycles(cycles)
+    if (updateDb) await this.storage.addCycles(cycles)
+    for (let i = 0; i < cycles.length; i++) {
+      delete cycles[i].certificate
+      this.cycles.push(cycles[i])
+    }
     this.mainLogger.debug(`All cycles after adding given cycles: ${JSON.stringify(this.cycles)}`)
   }
 
@@ -619,7 +618,11 @@ class P2PState extends EventEmitter {
 
     this.mainLogger.debug(`Nodes to be activated this cycle: ${JSON.stringify(cycleInfo.activated)}`)
     const activated = this._setNodesToStatus(cycleInfo.activated, 'active')
-    const cycleAdded = this.addCycle(cycleInfo)
+
+    // Get certificate from cycleInfo and then remove it from the object
+    const certificate = cycleInfo.certificate
+    delete cycleInfo.certificate
+    const cycleAdded = this.addCycle(cycleInfo, certificate)
     const promises = [accepted, activated, cycleAdded]
     try {
       await Promise.all(promises)
