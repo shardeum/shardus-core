@@ -9,7 +9,8 @@ const Consensus = require('../consensus')
 const Reporter = require('../reporter')
 const Debug = require('../debug')
 const StateManager = require('../state-manager')
-const Stats = require('../stats')
+const Statistics = require('../statistics')
+const LoadDetection = require('../load-detection')
 const Profiler = require('../utils/profiler.js')
 const allZeroes64 = '0'.repeat(64)
 
@@ -21,7 +22,8 @@ class Shardus {
     this.logger = new Logger(config.baseDir, logsConfig)
     this.mainLogger = this.logger.getLogger('main')
     this.fatalLogger = this.logger.getLogger('fatal')
-    this.stats = new Stats()
+    this.statistics = new Statistics(config.statistics)
+    this.loadDetection = new LoadDetection(config.loadDetection, this.statistics)
     this.exitHandler = new ExitHandler()
     this.storage = new Storage(config.baseDir, storageConfig, this.logger, this.profiler)
     this.crypto = {}
@@ -117,12 +119,12 @@ class Shardus {
 
     if (this.app) {
       this.stateManager = new StateManager(this.verboseLogs, this.profiler, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto)
+      this.stateManager.on('applied', () => this.statistics.incrementTxApplied())
       this.consensus = new Consensus(this.app, this.config, this.logger, this.crypto, this.p2p, this.storage, this.profiler)
       this.consensus.on('accepted', (...txArgs) => this.stateManager.queueAcceptedTransaction(...txArgs))
     }
 
-    this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this.stats, this.stateManager, this.profiler) : null
-    if (this.reporter && this.stateManager) this.stateManager.on('applied', () => this.reporter.incrementTxApplied())
+    this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this.statistics, this.stateManager, this.profiler) : null
 
     this._registerRoutes()
 
@@ -167,16 +169,21 @@ class Shardus {
   /**
    * Handle incoming tranaction requests
    */
-  async put (req, res) {
-    let transactionOk = false
-    if (this.reporter) this.reporter.incrementTxInjected()
-
+  put (req, res) {
     if (!this.appProvided) throw new Error('Please provide an App object to Shardus.setup before calling Shardus.put')
+
     if (this.verboseLogs) this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(req.body)}`) // not reducing tx here so we can get the long hashes
+
+    if (this.loadDetection.isOverloaded()) {
+      return res.status(200).send({ success: false, reason: 'Maximum load exceeded.' })
+    } else {
+      res.status(200).send({ success: true, reason: 'Transaction queued, poll for results.' })
+    }
+
     // retrieve incoming transaction from HTTP request
     let inTransaction = req.body
     let shardusTransaction = {}
-    // let ourLock = -1
+
     try {
       if (typeof inTransaction !== 'object') {
         return { success: false, reason: `Invalid Transaction! ${utils.stringifyReduce(inTransaction)}` }
@@ -204,8 +211,6 @@ class Shardus {
       shardusTransaction.inTransaction = inTransaction
 
       let txId = this.crypto.hash(inTransaction)
-      // QUEUE delay system...
-      // ourLock = await this.consensus.queueAndDelay(timestamp, txId)
 
       this.profiler.profileSectionStart('put')
 
@@ -217,26 +222,18 @@ class Shardus {
       // Perform Consensus -- Currently no algorithm is being used
       // At this point the transaction is injected. Add a playback log
       this.logger.playbackLogNote('tx_injected', `${txId}`, `Transaction: ${utils.stringifyReduce(inTransaction)}`)
+      this.statistics.incrementTxInjected()
       this.profiler.profileSectionStart('consensusInject')
-      let transactionReceipt = await this.consensus.inject(shardusTransaction)
-      this.profiler.profileSectionEnd('consensusInject')
-      if (this.verboseLogs) this.mainLogger.debug(`Received Consensus. Receipt: ${utils.stringifyReduce(transactionReceipt)}`)
-      transactionOk = true
+      this.consensus.inject(shardusTransaction).then(transactionReceipt => {
+        this.profiler.profileSectionEnd('consensusInject')
+        if (this.verboseLogs) this.mainLogger.debug(`Received Consensus. Receipt: ${utils.stringifyReduce(transactionReceipt)}`)
+      })
     } catch (ex) {
       this.fatalLogger.fatal(`Put: Failed to process transaction. Exception: ${ex}`)
       this.fatalLogger.fatal('put: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       return { success: false, reason: `Failed to process trasnaction: ${utils.stringifyReduce(inTransaction)} ${ex}` }
     } finally {
-      // this.profiler.profileSectionEnd('acceptTx')
-      // this.profiler.profileSectionEnd('validateTx')
       this.profiler.profileSectionEnd('put')
-      // this.consensus.unlockQueue(ourLock)
-      if (!transactionOk) {
-        this.mainLogger.debug('Transaction result failed: ' + utils.stringifyReduce(inTransaction))
-      }
-    }
-    if (transactionOk) {
-      this.mainLogger.debug('Transaction result ok: ' + utils.stringifyReduce(inTransaction))
     }
     if (this.verboseLogs) this.mainLogger.debug(`End of injectTransaction ${utils.stringifyReduce(inTransaction)}`)
     return { success: true, reason: 'Transaction successfully processed' }

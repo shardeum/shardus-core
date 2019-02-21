@@ -2,18 +2,18 @@ const http = require('../http')
 const allZeroes64 = '0'.repeat(64)
 
 class Reporter {
-  constructor (config, logger, p2p, stats, stateManager, profiler) {
+  constructor (config, logger, p2p, statistics, stateManager, profiler) {
     this.config = config
     this.mainLogger = logger.getLogger('main')
     this.p2p = p2p
-    this.stats = stats
+    this.statistics = statistics
     this.stateManager = stateManager
     this.profiler = profiler
     this.logger = logger
 
     this.reportTimer = null
 
-    this.lastTime = Date.now
+    this.lastTime = Date.now()
 
     this.doConsoleReport = false
     if (this.config.console === true) {
@@ -89,15 +89,14 @@ class Reporter {
       const appState = this.stateManager ? await this.stateManager.getAccountsStateHash() : allZeroes64
       const cycleMarker = this.p2p.getCycleMarker()
       const nodelistHash = this.p2p.getNodelistHash()
-      const txInjected = this.stats.getTxInjected(lastReportTime)
-      const txApplied = this.stats.getTxApplied(lastReportTime)
+      const txInjected = this.statistics.getTxInjectedCount(lastReportTime)
+      const txApplied = this.statistics.getTxAppliedCount(lastReportTime)
       const reportInterval = this.config.interval
       const nodeIpInfo = this.p2p.getIpInfo()
 
-      lastReportTime = Date.now()
-
       try {
         await this._sendReport({ appState, cycleMarker, nodelistHash, txInjected, txApplied, reportInterval, nodeIpInfo })
+        lastReportTime = process.hrtime.bigint()
       } catch (e) {
         this.mainLogger.error('startReporting: ' + e.name + ': ' + e.message + ' at ' + e.stack)
         console.error(e)
@@ -113,8 +112,8 @@ class Reporter {
     let time = Date.now()
     let delta = time - this.lastTime
     delta = delta * 0.001
-    const txInjected = this.stats.getTxInjected()
-    const txApplied = this.stats.getTxApplied()
+    const txInjected = this.statistics.getTxInjectedCount()
+    const txApplied = this.statistics.getTxAppliedCount()
     let report = `Perf inteval ${delta}    ${txInjected} Injected @${txInjected / delta} per second.    ${txApplied} Applied @${txApplied / delta} per second`
     this.lastTime = time
 
