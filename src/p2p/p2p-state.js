@@ -53,6 +53,7 @@ class P2PState extends EventEmitter {
       data: {
         start: null,
         duration: null,
+        counter: null,
         joined: [],
         removed: [],
         lost: [],
@@ -302,7 +303,7 @@ class P2PState extends EventEmitter {
   }
 
   // For use for internal updates to status for this node
-  async directStatusUpdate (nodeId, status, updateDb) {
+  async directStatusUpdate (nodeId, status, updateDb = true) {
     // Check if we actually know about this node
     const node = this.getNode(nodeId)
     if (!node) {

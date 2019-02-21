@@ -548,7 +548,9 @@ class P2P extends EventEmitter {
       finalResult = await queryNodes(nodesToQuery)
     }
     if (finalResult) {
-      responses.fillWinnersList(finalResult, winners)
+      if (winners) {
+        responses.fillWinnersList(finalResult, winners)
+      }
       return finalResult
     }
 
@@ -736,6 +738,143 @@ class P2P extends EventEmitter {
     return unfinalizedCycle
   }
 
+  async _fetchNodeByPublicKey (nodes, publicKey) {
+    let queryFn = async (target) => {
+      const payload = {
+        getBy: 'publicKey',
+        publicKey
+      }
+      const { node } = await this.ask(target, 'node', payload)
+      return node
+    }
+    let equalFn = (payload1, payload2) => {
+      const hash1 = this.crypto.hash(payload1)
+      const hash2 = this.crypto.hash(payload2)
+      return hash1 === hash2
+    }
+    let node
+    try {
+      node = await this._robustQuery(nodes, queryFn, equalFn)
+    } catch (e) {
+      this.mainLogger.debug(`Unable to get node: $(e.message). Unable to get consistent response from nodes.`)
+      node = null
+    }
+    return node
+  }
+
+  async _fetchFinalizedChain (seedNodes, nodes, chainStart, chainEnd) {
+    nodes = nodes.filter(n => !(seedNodes.map(s => s.id).includes(n.id)))
+
+    // Get cycle chain hash
+    let cycleChainHash
+    try {
+      cycleChainHash = await this._fetchCycleChainHash(nodes, chainStart, chainEnd)
+    } catch (e) {
+      this.mainLogger.warn('Could not get cycleChainHash from nodes. Querying seedNodes for it...')
+      this.mainLogger.debug(e)
+      cycleChainHash = await this._fetchCycleChainHash(seedNodes, chainStart, chainEnd)
+    }
+
+    this.mainLogger.debug(`Fetched cycle chain hash: ${cycleChainHash}`)
+
+    // Get verified cycle chain
+    let chainAndCerts
+    try {
+      chainAndCerts = await this._fetchVerifiedCycleChain(nodes, cycleChainHash, chainStart, chainEnd)
+    } catch (e) {
+      this.mainLogger.warn('Could not get verified cycleChain from nodes. Querying seedNodes for it...')
+      this.mainLogger.debug(e)
+      chainAndCerts = await this._fetchVerifiedCycleChain(seedNodes, cycleChainHash, chainStart, chainEnd)
+    }
+    return chainAndCerts
+  }
+
+  async _syncUpChainAndNodelist () {
+    const nodes = this.state.getActiveNodes(this.isActive() ? this.id : null)
+    const seedNodes = this.seedNodes
+
+    this.mainLogger.info('Syncing up cycle chain and nodelist...')
+
+    // Get current cycle counter
+    let cycleCounter
+    try {
+      ;({ cycleCounter } = await this._fetchCycleMarkerInternal(nodes))
+    } catch (e) {
+      this.mainLogger.warn('Could not get cycleMarker from nodes. Querying seedNodes for it...')
+      this.mainLogger.debug(e)
+      ;({ cycleCounter } = await this._fetchCycleMarkerInternal(seedNodes))
+    }
+    this.mainLogger.debug(`Fetched cycle counter: ${cycleCounter}`)
+
+    let chainStart = this.state.getCycleCounter()
+    let chainEnd = cycleCounter
+
+    if (chainStart === chainEnd) return true
+
+    const { cycleChain, cycleMarkerCerts } = await this._fetchFinalizedChain(seedNodes, nodes, chainStart, chainEnd)
+    this.mainLogger.debug(`Retrieved cycle chain: ${JSON.stringify(cycleChain)}`)
+    try {
+      await this.state.addCycles(cycleChain, cycleMarkerCerts)
+    } catch (e) {
+      this.mainLogger.error('_syncUpChainAndNodelist: ' + e.name + ': ' + e.message + ' at ' + e.stack)
+      this.mainLogger.info('Unable to add cycles. Sync up failed...')
+      throw new Error('Unable to sync chain. Sync up failed...')
+    }
+
+    // DEBUG: to trigger _fetchNodeByPublicKey()
+    // const publicKey = this.seedNodes[0].publicKey
+    // console.log(publicKey)
+    // console.log(nodes)
+    // const node = await this._fetchNodeByPublicKey(nodes, publicKey)
+
+    // Check through cycles we resynced, gather all nodes we need nodeinfo on (by pubKey)
+    // Also keep track of which nodes went active
+    // Robust query for all the nodes' node info, and add nodes
+    // Then go back through and mark all nodes that you saw as active if they aren't
+
+    const toAdd = []
+    const toSetActive = []
+    for (let cycle of cycleChain) {
+      // If nodes joined in this cycle, add them to toAdd list
+      if (cycle.joined.length) {
+        for (const publicKey of cycle.joined) {
+          toAdd.push(publicKey)
+        }
+      }
+
+      // If nodes went active in this cycle, add them to toSetActive list
+      if (cycle.activated.length) {
+        for (const id of cycle.activated) {
+          toSetActive.push(id)
+        }
+      }
+    }
+
+    // We populate an array with all the queries we need to make for missing nodes
+    this.mainLogger.debug(`Missed the following nodes joining: ${JSON.stringify(toAdd)}. Fetching their info to add to nodelist.`)
+    const queries = []
+    for (const pubKey of toAdd) {
+      queries.push(this._fetchNodeByPublicKey(nodes, pubKey))
+    }
+    // We try to get all the nodes that we missed in the given cycles
+    const [results, errors] = await utils.robustPromiseAll(queries)
+    // Then we add them one by one to our state
+    for (const node of results) {
+      await this.state.addNode(node)
+    }
+    // TODO: add proper error handling
+    if (errors.length) {
+      this.mainLogger.warn('Errors from _syncUpChainAndNodelist()!')
+    }
+
+    // After we finish adding our missing nodes, we try to add any active status updates we missed
+    this.mainLogger.debug(`Missed active updates for the following nodes: ${JSON.stringify(toSetActive)}. Attempting to update the status for each one.`)
+    for (const id of toSetActive) {
+      await this.state.directStatusUpdate(id, 'active')
+    }
+    return true
+  }
+
   async _requestCycleUpdates (nodeId) {
     let node
     try {
@@ -849,10 +988,6 @@ class P2P extends EventEmitter {
   }
 
   async _syncToNetwork (seedNodes) {
-    // TODO: need to make it robust when resync implemented,
-    // ---   currently system would never resync if we were only
-    // ---   seed node in the network
-
     // If you are first node, there is nothing to sync to
     if (this.isFirstSeed) {
       this.mainLogger.info('No syncing required...')
@@ -885,7 +1020,6 @@ class P2P extends EventEmitter {
 
     this.mainLogger.debug('Fetching latest cycle chain...')
     const nodes = this.state.getActiveNodes()
-    // const nodes = this.seedNodes
     const { cycleChain, cycleMarkerCerts } = await this._fetchLatestCycleChain(this.seedNodes, nodes)
     this.mainLogger.debug(`Retrieved cycle chain: ${JSON.stringify(cycleChain)}`)
     try {
@@ -897,29 +1031,64 @@ class P2P extends EventEmitter {
     }
 
     // Get in cadence, then start cycles
-    let cycleMarker
-    try {
-      cycleMarker = await this._fetchCycleMarkerInternal(this.state.getActiveNodes())
-    } catch (e) {
-      this.mainLogger.warn('Unable to get cycle marker internally from active nodes. Falling back to seed nodes...')
-      cycleMarker = await this._fetchCycleMarkerInternal(this.seedNodes)
+
+    let firstTime = true
+
+    const getUnfinalized = async () => {
+      this.mainLogger.debug('Getting unfinalized cycle data...')
+      let cycleMarker
+      try {
+        cycleMarker = await this._fetchCycleMarkerInternal(this.state.getActiveNodes())
+      } catch (e) {
+        this.mainLogger.warn('Unable to get cycle marker internally from active nodes. Falling back to seed nodes...')
+        cycleMarker = await this._fetchCycleMarkerInternal(this.seedNodes)
+      }
+      const { cycleStart, cycleDuration } = cycleMarker
+      const currentTime = utils.getTime('s')
+
+      // First we wait until the beginning of the final quarter
+      await this._waitUntilLastPhase(currentTime, cycleStart, cycleDuration)
+
+      // DEBUG: to trigger _syncUpChainAndNodelist()
+      if (firstTime) {
+        const toSleep = Math.ceil(Math.random() * 10) * Math.ceil(Math.random() * 10) * 1000
+        this.mainLogger.debug(`First unfinalized attempt... Sleeping for ${toSleep} ms in order to prompt again.`)
+        await utils.sleep(toSleep)
+        firstTime = false
+        let cycleMarker
+        try {
+          cycleMarker = await this._fetchCycleMarkerInternal(this.state.getActiveNodes())
+        } catch (e) {
+          this.mainLogger.warn('Unable to get cycle marker internally from active nodes. Falling back to seed nodes...')
+          cycleMarker = await this._fetchCycleMarkerInternal(this.seedNodes)
+        }
+        const { cycleStart, cycleDuration } = cycleMarker
+        const currentTime = utils.getTime('s')
+
+        // First we wait until the beginning of the final quarter
+        await this._waitUntilUpdatePhase(currentTime, cycleStart, cycleDuration)
+      }
+
+      // Then we get the unfinalized cycle data
+      let unfinalized
+      try {
+        unfinalized = await this._fetchUnfinalizedCycle(this.state.getActiveNodes())
+      } catch (e) {
+        this.mainLogger.warn('Unable to get cycle marker internally from active nodes. Falling back to seed nodes...')
+        unfinalized = await this._fetchUnfinalizedCycle(this.seedNodes)
+      }
+      return unfinalized
     }
-    const { cycleStart, cycleDuration } = cycleMarker
-    const currentTime = utils.getTime('s')
 
-    // First we wait until the beginning of the final quarter
-    await this._waitUntilLastPhase(currentTime, cycleStart, cycleDuration)
+    let unfinalized = null
+    let firstTry = true
 
-    // Then we get the unfinalized cycle data
-    let unfinalized
-    try {
-      unfinalized = await this._fetchUnfinalizedCycle(this.state.getActiveNodes())
-    } catch (e) {
-      this.mainLogger.warn('Unable to get cycle marker internally from active nodes. Falling back to seed nodes...')
-      unfinalized = await this._fetchUnfinalizedCycle(this.seedNodes)
+    // We keep trying to keep our chain and sync and try to get unfinalized cycle data until we are able to get the unfinalized data in time
+    while (!unfinalized) {
+      if (!firstTry) await this._syncUpChainAndNodelist()
+      unfinalized = await getUnfinalized()
+      firstTry = false
     }
-
-    // TO-DO: check if the unfinalized cycle was null and try again
 
     // We add the unfinalized cycle data and start cycles
     await this.state.addUnfinalizedAndStart(unfinalized)
