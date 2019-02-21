@@ -1032,7 +1032,7 @@ class P2P extends EventEmitter {
 
     // Get in cadence, then start cycles
 
-    let firstTime = true
+    // let firstTime = true
 
     const getUnfinalized = async () => {
       this.mainLogger.debug('Getting unfinalized cycle data...')
@@ -1050,24 +1050,24 @@ class P2P extends EventEmitter {
       await this._waitUntilLastPhase(currentTime, cycleStart, cycleDuration)
 
       // DEBUG: to trigger _syncUpChainAndNodelist()
-      if (firstTime) {
-        const toSleep = Math.ceil(Math.random() * 10) * Math.ceil(Math.random() * 10) * 1000
-        this.mainLogger.debug(`First unfinalized attempt... Sleeping for ${toSleep} ms in order to prompt again.`)
-        await utils.sleep(toSleep)
-        firstTime = false
-        let cycleMarker
-        try {
-          cycleMarker = await this._fetchCycleMarkerInternal(this.state.getActiveNodes())
-        } catch (e) {
-          this.mainLogger.warn('Unable to get cycle marker internally from active nodes. Falling back to seed nodes...')
-          cycleMarker = await this._fetchCycleMarkerInternal(this.seedNodes)
-        }
-        const { cycleStart, cycleDuration } = cycleMarker
-        const currentTime = utils.getTime('s')
+      // if (firstTime) {
+      //   const toSleep = Math.ceil(Math.random() * 10) * Math.ceil(Math.random() * 10) * 1000
+      //   this.mainLogger.debug(`First unfinalized attempt... Sleeping for ${toSleep} ms in order to prompt again.`)
+      //   await utils.sleep(toSleep)
+      //   firstTime = false
+      //   let cycleMarker
+      //   try {
+      //     cycleMarker = await this._fetchCycleMarkerInternal(this.state.getActiveNodes())
+      //   } catch (e) {
+      //     this.mainLogger.warn('Unable to get cycle marker internally from active nodes. Falling back to seed nodes...')
+      //     cycleMarker = await this._fetchCycleMarkerInternal(this.seedNodes)
+      //   }
+      //   const { cycleStart, cycleDuration } = cycleMarker
+      //   const currentTime = utils.getTime('s')
 
-        // First we wait until the beginning of the final quarter
-        await this._waitUntilUpdatePhase(currentTime, cycleStart, cycleDuration)
-      }
+      //   // First we wait until the beginning of the final quarter
+      //   await this._waitUntilUpdatePhase(currentTime, cycleStart, cycleDuration)
+      // }
 
       // Then we get the unfinalized cycle data
       let unfinalized
