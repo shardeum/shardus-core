@@ -460,7 +460,7 @@ class P2P extends EventEmitter {
     return true
   }
 
-  async _robustQuery (nodes = [], queryFn, equalityFn, redundancy = 3, winners = null) {
+  async robustQuery (nodes = [], queryFn, equalityFn, redundancy = 3, winners = null) {
     if (nodes.length === 0) throw new Error('No nodes given.')
     if (typeof queryFn !== 'function') throw new Error(`Provided queryFn ${queryFn} is not a valid function.`)
     if (typeof equalityFn !== 'function') equalityFn = util.isDeepStrictEqual
@@ -610,7 +610,7 @@ class P2P extends EventEmitter {
       const { nodelistHash } = await this.ask(node, 'nodelisthash')
       return { nodelistHash }
     }
-    const { nodelistHash } = await this._robustQuery(nodes, queryFn)
+    const { nodelistHash } = await this.robustQuery(nodes, queryFn)
     return nodelistHash
   }
 
@@ -625,7 +625,7 @@ class P2P extends EventEmitter {
   }
 
   async _fetchCycleMarker (nodes) {
-    const cycleMarkerInfo = await this._robustQuery(nodes, (node) => http.get(`${node.ip}:${node.port}/cyclemarker`))
+    const cycleMarkerInfo = await this.robustQuery(nodes, (node) => http.get(`${node.ip}:${node.port}/cyclemarker`))
     return cycleMarkerInfo
   }
 
@@ -635,7 +635,7 @@ class P2P extends EventEmitter {
       const { cycleJoined } = await http.get(`${node.ip}:${node.port}/joined/${publicKey}`)
       return { cycleJoined }
     }
-    const { cycleJoined } = await this._robustQuery(seedNodes, queryFn)
+    const { cycleJoined } = await this.robustQuery(seedNodes, queryFn)
     if (!cycleJoined) {
       this.mainLogger.info('Unable to get cycle marker, likely this node\'s join request was not accepted.')
       return null
@@ -649,7 +649,7 @@ class P2P extends EventEmitter {
       const cycleMarkerInfo = await this.ask(node, 'cyclemarker')
       return cycleMarkerInfo
     }
-    const cycleMarkerInfo = await this._robustQuery(nodes, queryFn)
+    const cycleMarkerInfo = await this.robustQuery(nodes, queryFn)
     return cycleMarkerInfo
   }
 
@@ -658,7 +658,7 @@ class P2P extends EventEmitter {
       const { cycleChainHash } = await this.ask(node, 'cyclechainhash', { start, end })
       return { cycleChainHash }
     }
-    const { cycleChainHash } = await this._robustQuery(nodes, queryFn)
+    const { cycleChainHash } = await this.robustQuery(nodes, queryFn)
     this.mainLogger.debug(`Result of robust query to fetch cycle chain hash: ${cycleChainHash}`)
     return cycleChainHash
   }
@@ -730,7 +730,7 @@ class P2P extends EventEmitter {
     }
     let unfinalizedCycle
     try {
-      ;({ unfinalizedCycle } = await this._robustQuery(nodes, queryFn, equalFn))
+      ;({ unfinalizedCycle } = await this.robustQuery(nodes, queryFn, equalFn))
     } catch (e) {
       this.mainLogger.debug(`Unable to get unfinalized cycle: ${e}. Need to resync cycle chain and try again.`)
       unfinalizedCycle = null
@@ -754,7 +754,7 @@ class P2P extends EventEmitter {
     }
     let node
     try {
-      node = await this._robustQuery(nodes, queryFn, equalFn)
+      node = await this.robustQuery(nodes, queryFn, equalFn)
     } catch (e) {
       this.mainLogger.debug(`Unable to get node: $(e.message). Unable to get consistent response from nodes.`)
       node = null

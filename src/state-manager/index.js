@@ -326,18 +326,18 @@ class StateManager extends EventEmitter {
         this.mainLogger.debug(`no nodes available`)
         return // nothing to do
       }
-      this.mainLogger.debug(`DATASYNC: _robustQuery get_account_state_hash from ${utils.stringifyReduce(nodes.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+      this.mainLogger.debug(`DATASYNC: robustQuery get_account_state_hash from ${utils.stringifyReduce(nodes.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
       let result
       try {
-        result = await this.p2p._robustQuery(nodes, queryFn, equalFn, 3, winners)
+        result = await this.p2p.robustQuery(nodes, queryFn, equalFn, 3, winners)
       } catch (ex) {
-        this.mainLogger.debug('syncStateTableData: _robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-        this.fatalLogger.fatal('syncStateTableData: _robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        this.mainLogger.debug('syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        this.fatalLogger.fatal('syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         throw new Error('FailAndRestartPartition0')
       }
 
       if (result && result.stateHash) {
-        this.mainLogger.debug(`DATASYNC: _robustQuery returned result: ${result.stateHash}`)
+        this.mainLogger.debug(`DATASYNC: robustQuery returned result: ${result.stateHash}`)
         if (!winners || winners.length === 0) {
           this.mainLogger.debug(`DATASYNC: no winners, going to throw fail and restart`)
           this.fatalLogger.fatal(`DATASYNC: no winners, going to throw fail and restart`) // todo: consider if this is just an error
@@ -347,7 +347,7 @@ class StateManager extends EventEmitter {
         this.mainLogger.debug(`DATASYNC: got hash ${result.stateHash} from ${utils.stringifyReduce(winners.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
         firstHash = result.stateHash
       } else {
-        this.mainLogger.debug(`DATASYNC: _robustQuery get_account_state_hash failed`)
+        this.mainLogger.debug(`DATASYNC: robustQuery get_account_state_hash failed`)
         throw new Error('FailAndRestartPartition2')
       }
 
@@ -1043,7 +1043,7 @@ class StateManager extends EventEmitter {
       if (nodes.length === 0) {
         return // nothing to do
       }
-      let result = await this.p2p._robustQuery(nodes, queryFn, equalFn, 3, winners)
+      let result = await this.p2p.robustQuery(nodes, queryFn, equalFn, 3, winners)
       if (result && result.stateHash) {
         let stateHash = await this.getAccountsStateHash(accountStart, accountEnd, startTime, endTime)
         if (stateHash === result.stateHash) {
