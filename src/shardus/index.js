@@ -22,8 +22,6 @@ class Shardus {
     this.logger = new Logger(config.baseDir, logsConfig)
     this.mainLogger = this.logger.getLogger('main')
     this.fatalLogger = this.logger.getLogger('fatal')
-    this.statistics = new Statistics(config.statistics)
-    this.loadDetection = new LoadDetection(config.loadDetection, this.statistics)
     this.exitHandler = new ExitHandler()
     this.storage = new Storage(config.baseDir, storageConfig, this.logger, this.profiler)
     this.crypto = {}
@@ -35,6 +33,8 @@ class Shardus {
     this.app = null
     this.reporter = null
     this.stateManager = null
+    this.statistics = null
+    this.loadDetection = null
 
     this.heartbeatInterval = config.heartbeatInterval
     this.heartbeatTimer = null
@@ -119,7 +119,12 @@ class Shardus {
 
     if (this.app) {
       this.stateManager = new StateManager(this.verboseLogs, this.profiler, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto)
-      this.stateManager.on('applied', () => this.statistics.incrementTxApplied())
+      this.statistics = new Statistics(this.config.statistics, this.stateManager.newAcceptedTXQueue, { counterNames: ['txInjected', 'txApplied', 'txRejected'] })
+      this.stateManager.on('txApplied', () => this.statistics.increment('txApplied'))
+
+      this.loadDetection = new LoadDetection(this.statistics)
+      this.statistics.startSnapshots()
+
       this.consensus = new Consensus(this.app, this.config, this.logger, this.crypto, this.p2p, this.storage, this.profiler)
       this.consensus.on('accepted', (...txArgs) => this.stateManager.queueAcceptedTransaction(...txArgs))
     }
@@ -175,6 +180,7 @@ class Shardus {
     if (this.verboseLogs) this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(req.body)}`) // not reducing tx here so we can get the long hashes
 
     if (this.loadDetection.isOverloaded()) {
+      this.statistics.increment('txRejected')
       return res.status(200).send({ success: false, reason: 'Maximum load exceeded.' })
     } else {
       res.status(200).send({ success: true, reason: 'Transaction queued, poll for results.' })
@@ -222,7 +228,7 @@ class Shardus {
       // Perform Consensus -- Currently no algorithm is being used
       // At this point the transaction is injected. Add a playback log
       this.logger.playbackLogNote('tx_injected', `${txId}`, `Transaction: ${utils.stringifyReduce(inTransaction)}`)
-      this.statistics.incrementTxInjected()
+      this.statistics.increment('txInjected')
       this.profiler.profileSectionStart('consensusInject')
       this.consensus.inject(shardusTransaction).then(transactionReceipt => {
         this.profiler.profileSectionEnd('consensusInject')

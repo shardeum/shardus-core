@@ -1225,7 +1225,7 @@ class StateManager extends EventEmitter {
     } finally {
       this.fifoUnlock('accountModification', ourLockID)
     }
-    this.emit('applied')
+    this.emit('txApplied', acceptedTX)
     return true
   }
 

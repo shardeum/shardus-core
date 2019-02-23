@@ -1,43 +1,80 @@
 class Statistics {
-  constructor (config) {
-    this.unitsPerSec = BigInt(1000000000)
-    this.txInjected = []
-    this.txApplied = []
-    this.windowLength = this.unitsPerSec * BigInt(config.windowLength)
+  constructor (config, acceptedTxQueue, { counterNames = [] }) {
+    this.interval = config.interval * 1000
+    this.timer = null
+    this.acceptedTxQueue = acceptedTxQueue
+    this.counters = {}
+    for (const name of counterNames) {
+      this.counters[name] = new CounterRing(60)
+    }
+    this.queueLengthRing = new Ring(60)
   }
 
-  incrementTxInjected () {
-    const now = process.hrtime.bigint()
-    this.txInjected.push(now)
-    const expired = now - this.windowLength
-    this.txInjected = this.txInjected.filter(time => time > expired)
+  startSnapshots () {
+    this.timer = setInterval(this._takeSnapshot.bind(this), this.interval)
   }
 
-  incrementTxApplied () {
-    const now = process.hrtime.bigint()
-    this.txApplied.push(now)
-    const expired = now - this.windowLength
-    this.txApplied = this.txApplied.filter(time => time > expired)
+  stopSnapshots () {
+    clearInterval(this.timer)
   }
 
-  getTxInjectedCount (since = 0) {
-    if (since === 0) return this.txInjected.length
-    return this.txInjected.filter(time => time > since).length
+  increment (name) {
+    this.counters[name].increment()
   }
 
-  getTxAppliedCount (since = 0) {
-    if (since === 0) return this.txApplied.length
-    return this.txApplied.filter(time => time > since).length
+  count (name) {
+    return this.counters[name].count
   }
 
-  getLastTxInjectedTime () {
-    if (this.txInjected.length < 1) return BigInt(0)
-    return this.txInjected[this.txInjected.length - 1]
+  average (name) {
+    return this.counters[name].ring.average()
   }
 
-  getLastTxAppliedTime () {
-    if (this.txApplied.length < 1) return BigInt(0)
-    return this.txApplied[this.txApplied.length - 1]
+  averageQueueLength () {
+    return this.queueLengthRing.average()
+  }
+
+  _takeSnapshot () {
+    for (const name in this.counters) {
+      this.counters[name].snapshot()
+    }
+    this.queueLengthRing.save(this.acceptedTxQueue.length)
+  }
+}
+
+class Ring {
+  constructor (length) {
+    this.elements = new Array(length)
+    this.index = 0
+  }
+  save (value) {
+    this.elements[this.index] = value
+    this.index = ++this.index % this.elements.length
+  }
+  average () {
+    let sum = 0
+    let total = 0
+    for (const element of this.elements) {
+      if (element) {
+        sum += element
+        total++
+      }
+    }
+    return total > 0 ? sum / total : 0
+  }
+}
+
+class CounterRing {
+  constructor (length) {
+    this.count = 0
+    this.ring = new Ring(length)
+  }
+  increment () {
+    ++this.count
+  }
+  snapshot () {
+    this.ring.save(this.count)
+    this.count = 0
   }
 }
 

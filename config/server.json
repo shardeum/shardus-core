@@ -36,10 +36,6 @@
     "loseReceiptChance": 0.000
   },
   "statistics": {
-    "windowLength": 5
-  },
-  "loadDetection": {
-    "maxAppliedTps": 0,
-    "maxInjectedTps": 0
+    "interval": 1
   }
 }
