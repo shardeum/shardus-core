@@ -42,6 +42,34 @@ const readJsonDir = (dir) => { // => filesObj
   return filesObj
 }
 
+const binarySearch = (arr, item, comparator) => {
+  if (comparator == null) {
+    // Emulate the default Array.sort() comparator
+    comparator = (a, b) => {
+      if (typeof a !== 'string') a = String(a)
+      if (typeof b !== 'string') b = String(b)
+      return (a > b ? 1 : (a < b ? -1 : 0))
+    }
+  }
+
+  // Get the index of the item
+  let min = 0
+  let max = arr.length
+  let index = Math.floor((min + max) / 2)
+  while (max > min) {
+    const result = comparator(item, arr[index])
+    if (result === 0) {
+      return index
+    } else if (result < 0) {
+      max = index
+    } else {
+      min = index + 1
+    }
+    index = Math.floor((min + max) / 2)
+  }
+  return false
+}
+
 const insertSorted = (arr, item, comparator) => {
   if (comparator == null) {
     // Emulate the default Array.sort() comparator
@@ -245,6 +273,7 @@ exports.getTime = getTime
 exports.deepCopy = deepCopy
 exports.readJson = readJson
 exports.readJsonDir = readJsonDir
+exports.binarySearch = binarySearch
 exports.insertSorted = insertSorted
 exports.computeMedian = computeMedian
 exports.XOR = XOR

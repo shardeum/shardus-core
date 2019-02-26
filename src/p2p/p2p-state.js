@@ -12,6 +12,7 @@ class P2PState extends EventEmitter {
     this.defaultCycleDuration = config.cycleDuration
     this.maxNodesPerCycle = config.maxNodesPerCycle
     this.maxSeedNodes = config.maxSeedNodes
+    this.desiredNodes = config.desiredNodes
 
     this.cycles = []
     this.certificates = []
@@ -356,6 +357,66 @@ class P2PState extends EventEmitter {
     await Promise.all(promises)
   }
 
+  _getNodeOrderedIndex (node) {
+    const ordered = this.nodes.ordered
+    // First check the first index of the ordered list, as this is most likely when removing nodes
+    if (ordered[0].id === node.id) return 0
+    // Then perform a b-search for the rest of the search
+    const comparator = (a, b) => {
+      if (a.joinRequestTimestamp === b.joinRequestTimestamp) {
+        if (a.id === b.id) return 0
+        return this.crypto.isGreaterHash(a.id, b.id) ? 1 : -1
+      }
+      return a.joinRequestTimestamp > b.joinRequestTimestamp ? 1 : -1
+    }
+    return utils.binarySearch(ordered, node, comparator)
+  }
+
+  _markNodesForRemoval (n) {
+    const nodes = this.nodes.ordered.slice(0, n)
+    const removed = this.currentCycle.data.removed
+    removed.length = 0
+    for (const node of nodes) {
+      removed.push(node.id)
+    }
+  }
+
+  _removeExcessNodes () {
+    const desired = this.getDesiredCount()
+    // TODO: Consider changing this to active nodes only and think about implications
+    const current = this.getAllNodes().length
+    const diff = current - desired
+    if (diff <= 0) return
+    this._markNodesForRemoval(diff)
+  }
+
+  _removeNodeFromNodelist (node) {
+    delete this.nodes[node.status][node.id]
+    delete this.nodes.current[node.id]
+    delete this.nodes.byPubKey[node.publicKey]
+    // Get internalHost by concatenating the internal IP and port
+    const internalHost = `${node.internalIp}:${node.internalPort}`
+    delete this.nodes.byIp[internalHost]
+    const index = this._getNodeOrderedIndex(node)
+    this.nodes.ordered.splice(index, 1)
+  }
+
+  _removeNodesFromNodelist (nodes) {
+    for (const node of nodes) {
+      this._removeNodeFromNodelist(node)
+    }
+  }
+
+  async _removeNode (node) {
+    this._removeNodeFromNodelist(node)
+    await this.storage.deleteNodes(node)
+  }
+
+  async _removeNodes (nodes) {
+    this._removeNodesFromNodelist(nodes)
+    await this.storage.deleteNodes(nodes)
+  }
+
   _addNodeToNodelist (node) {
     const status = node.status
     if (!this.validStatuses.includes(status)) throw new Error('Invalid node status.')
@@ -560,6 +621,7 @@ class P2PState extends EventEmitter {
   async _createCycleMarker (gossip = true) {
     this.mainLogger.info('Creating new cycle marker...')
     this._addJoiningNodes()
+    this._removeExcessNodes()
     this.mainLogger.debug('Getting cycle info to create cycle marker...')
     const cycleInfo = this.getCycleInfo(false)
     this.mainLogger.debug('Computing cycle marker before creating certificate...')
@@ -633,7 +695,11 @@ class P2PState extends EventEmitter {
     const certificate = cycleInfo.certificate
     delete cycleInfo.certificate
     const cycleAdded = this.addCycle(cycleInfo, certificate)
-    const promises = [accepted, activated, cycleAdded]
+
+    const removedNodes = this._getRemovedNodes()
+    const removed = this._removeNodes(removedNodes)
+
+    const promises = [accepted, activated, removed, cycleAdded]
     try {
       await Promise.all(promises)
       this.mainLogger.info('Added cycle chain entry to database successfully!')
@@ -766,7 +832,7 @@ class P2PState extends EventEmitter {
 
   getDesiredCount () {
     // TODO: Implement an actual calculation
-    return 100
+    return this.desiredNodes
   }
 
   getLastCycles (amount) {
@@ -895,6 +961,16 @@ class P2PState extends EventEmitter {
 
   getNodesOrdered () {
     return this.nodes.ordered
+  }
+
+  _getRemovedNodes () {
+    const nodes = []
+    const removedIds = this.getRemoved()
+    for (const id of removedIds) {
+      const node = this.getNode(id)
+      nodes.push(node)
+    }
+    return nodes
   }
 
   getRandomSeedNodes (seed) {
