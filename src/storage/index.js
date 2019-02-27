@@ -399,6 +399,25 @@ class Storage {
     }
   }
 
+  // todo also sync accepted tx? idk.
+  async queryAccountStateTableByList (addressList, tsStart, tsEnd) {
+    this._checkInit()
+    try {
+      let result = await this._read(
+        this.storageModels.accountStates,
+        { txTimestamp: { [Op.between]: [tsStart, tsEnd] }, accountId: { [Op.in]: addressList } },
+        {
+          order: [ ['address', 'ASC'] ],
+          attributes: { exclude: ['createdAt', 'updatedAt', 'id'] },
+          raw: true
+        }
+      )
+      return result
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
   // async queryAccountStateTable2 (accountStart, accountEnd, tsStart, tsEnd, limit) {
   //   this._checkInit()
   //   try {

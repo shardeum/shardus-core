@@ -22,24 +22,21 @@ class Consensus extends EventEmitter {
       this.mainLogs = true
     }
 
-    this.queueAndDelayList = []
-    this.queueCounter = 0
-    this.queueLocked = false
-    this.queueSitTime = 3000 // todo make this a setting. and tie in with the value in datasync
     this.lastServed = 0
   }
 
   async inject (shardusTransaction) {
-    if (this.mainLogs) this.mainLogger.debug(`Start of inject(${shardusTransaction})`)
     let transactionReceipt
     let inTransaction = shardusTransaction.inTransaction
+    let timestamp = 0
+    let debugInfo = ''
     try {
-      // let keysRequest = { type: 'keyFromTransaction', txn: inTransaction }
-      // let keysResponse = await this.application.get(keysRequest)
-      if (this.mainLogs) this.mainLogger.debug(`Gossiping Validated Transaction ${JSON.stringify(shardusTransaction)}`)
-      if (this.mainLogs) this.mainLogger.debug(`Done Gossiping Validated Transaction ${JSON.stringify(shardusTransaction)}`)
       let keysResponse = this.app.getKeyFromTransaction(inTransaction)
       let { sourceKeys, targetKeys } = keysResponse
+      timestamp = keysResponse.timestamp
+      debugInfo = keysResponse.debugInfo
+
+      if (this.mainLogs) this.mainLogger.debug(`Start of inject(${timestamp}  ${debugInfo}  tx: ${utils.stringifyReduce(shardusTransaction)})`)
       let sourceAddress, targetAddress, stateId, targetStateId
 
       if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
@@ -51,14 +48,15 @@ class Consensus extends EventEmitter {
       if (this.mainLogs) this.mainLogger.debug(`sourceAddress: ${utils.makeShortHash(sourceAddress)} targetAddress: ${utils.makeShortHash(targetAddress)}`)
 
       if (sourceAddress) {
-        // keysRequest = { type: 'stateID', address: sourceAddress }
-        // stateID = await this.application.get(keysRequest)
-        stateId = await this.app.getStateId(sourceAddress)
+        if (this.mainLogs) this.mainLogger.debug(`get source state id for ${sourceAddress}`)
+        stateId = null // await this.app.getStateId(sourceAddress)
         if (this.mainLogs) this.mainLogger.debug(`StateID: ${stateId} short stateID: ${utils.makeShortHash(stateId)} `)
       }
 
       if (targetAddress) {
-        targetStateId = await this.app.getStateId(targetAddress, false) // we don't require this to exist
+        if (this.mainLogs) this.mainLogger.debug(`get target state id for ${targetAddress}`)
+        targetStateId = null // await this.app.getStateId(targetAddress, false) // we don't require this to exist
+        if (this.mainLogs) this.mainLogger.debug(`targetStateId ${targetStateId}`)
       }
 
       transactionReceipt = this.createReceipt(inTransaction, stateId, targetStateId)
@@ -68,18 +66,13 @@ class Consensus extends EventEmitter {
       throw new Error(ex)
     }
 
-    // if (this.mainLogs) this.mainLogger.debug(`Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
-    // await this.onReceipt({ shardusTransaction, transactionReceipt })
-    // if (this.mainLogs) this.mainLogger.debug(`Done Gossiping Receipt Transaction ${JSON.stringify(transactionReceipt)}`)
-
-    let timestamp = inTransaction.txnTimestamp // todo not great that we are cracking this, should wrap in a helper
     let txStatus = 1 // todo real values for tx status. this is just a stand in
     let txId = transactionReceipt.txHash
     let acceptedTX = { id: txId, timestamp, data: inTransaction, status: txStatus, receipt: transactionReceipt }
 
     this.emit('accepted', acceptedTX, true)
 
-    if (this.mainLogs) this.mainLogger.debug(`End of inject(${inTransaction})`)
+    if (this.mainLogs) this.mainLogger.debug(`End of inject(${timestamp}  ${debugInfo})`)
 
     return transactionReceipt
   }

@@ -186,14 +186,14 @@ class Shardus {
       const initValidationResp = this.app.validateTxnFields(inTransaction)
       if (this.verboseLogs) this.mainLogger.debug(`InitialValidationResponse: ${utils.stringifyReduce(initValidationResp)}`)
 
-      const txnTimestamp = initValidationResp.txnTimestamp
-      if (this._isTransactionTimestampExpired(txnTimestamp)) {
+      const timestamp = initValidationResp.txnTimestamp
+      if (this._isTransactionTimestampExpired(timestamp)) {
         this.fatalLogger.fatal(`Transaction Expired: ${utils.stringifyReduce(inTransaction)}`)
         return { success: false, reason: 'Transaction Expired' }
       }
 
       /**
-       * {txnReceivedTimestamp, sign, inTxn:{srcAct, tgtAct, tnxAmt, txnType, seqNum, txnTimestamp, signs}}
+       * {txnReceivedTimestamp, sign, inTxn:{srcAct, tgtAct, tnxAmt, txnType, seqNum, timestamp, signs}}
        * Timestamping the transaction of when the transaction was received. Sign the complete transaction
        * with the node SK
        * ToDo: Check with Omar if validateTransaction () methods needs receivedTimestamp and Node Signature
@@ -203,7 +203,7 @@ class Shardus {
 
       let txId = this.crypto.hash(inTransaction)
       // QUEUE delay system...
-      // ourLock = await this.consensus.queueAndDelay(txnTimestamp, txId)
+      // ourLock = await this.consensus.queueAndDelay(timestamp, txId)
 
       this.profiler.profileSectionStart('put')
 
@@ -213,11 +213,12 @@ class Shardus {
 
       if (this.verboseLogs) this.mainLogger.debug('Transaction Valided')
       // Perform Consensus -- Currently no algorithm is being used
-      // let nodeList = await this.storage.getNodes()
       this.profiler.profileSectionStart('consensusInject')
       let transactionReceipt = await this.consensus.inject(shardusTransaction)
       this.profiler.profileSectionEnd('consensusInject')
       if (this.verboseLogs) this.mainLogger.debug(`Received Consensus. Receipt: ${utils.stringifyReduce(transactionReceipt)}`)
+
+      transactionOk = true
     } catch (ex) {
       this.fatalLogger.fatal(`Put: Failed to process transaction. Exception: ${ex}`)
       this.fatalLogger.fatal('put: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -341,22 +342,35 @@ class Shardus {
       // App.get_account_data (Acc_start, Acc_end, Max_records)
       // Provides the functionality defined for /get_accounts API
       // Max_records - limits the number of records returned
-      if (typeof (application.onGetAccount) === 'function') {
+      if (typeof (application.getAccountData) === 'function') {
         applicationInterfaceImpl.getAccountData = async (accountStart, accountEnd, maxRecords) => application.getAccountData(accountStart, accountEnd, maxRecords)
       } else {
         // throw new Error('Missing requried interface function. apply()')
       }
+
+      if (typeof (application.getAccountData2) === 'function') {
+        applicationInterfaceImpl.getAccountData2 = async (accountStart, accountEnd, tsStart, tsEnd, maxRecords) => application.getAccountData2(accountStart, accountEnd, tsStart, tsEnd, maxRecords)
+      } else {
+        // throw new Error('Missing requried interface function. apply()')
+      }
+
+      if (typeof (application.getAccountData3) === 'function') {
+        applicationInterfaceImpl.getAccountData3 = async (accountStart, accountEnd, tsStart, maxRecords) => application.getAccountData3(accountStart, accountEnd, tsStart, maxRecords)
+      } else {
+        // throw new Error('Missing requried interface function. apply()')
+      }
+
       // App.set_account_data (Acc_records)
       // Acc_records - as provided by App.get_accounts
       // Stores the records into the Accounts table if the hash of the Acc_data matches State_id
       // Returns a list of failed Acc_id
-      if (typeof (application.onGetAccount) === 'function') {
+      if (typeof (application.setAccountData) === 'function') {
         applicationInterfaceImpl.setAccountData = async (accountRecords) => application.setAccountData(accountRecords)
       } else {
         // throw new Error('Missing requried interface function. apply()')
       }
 
-      if (typeof (application.onGetAccount) === 'function') {
+      if (typeof (application.getAccountDataByList) === 'function') {
         applicationInterfaceImpl.getAccountDataByList = async (addressList) => application.getAccountDataByList(addressList)
       } else {
         // throw new Error('Missing requried interface function. apply()')
@@ -410,14 +424,14 @@ class Shardus {
     clearInterval(this.heartbeatTimer)
   }
 
-  _isTransactionTimestampExpired (txnTimestamp) {
-    // this.mainLogger.debug(`Start of _isTransactionTimestampExpired(${txnTimestamp})`)
+  _isTransactionTimestampExpired (timestamp) {
+    // this.mainLogger.debug(`Start of _isTransactionTimestampExpired(${timestamp})`)
     let transactionExpired = false
     const txnExprationTime = this.config.transactionExpireTime
     const currNodeTimestamp = Date.now()
 
-    const txnAge = currNodeTimestamp - txnTimestamp
-    this.mainLogger.debug(`Transaction Timestamp: ${txnTimestamp} CurrNodeTimestamp: ${currNodeTimestamp}
+    const txnAge = currNodeTimestamp - timestamp
+    this.mainLogger.debug(`Transaction Timestamp: ${timestamp} CurrNodeTimestamp: ${currNodeTimestamp}
     txnExprationTime: ${txnExprationTime}   TransactionAge: ${txnAge}`)
 
     // this.mainLogger.debug(`TransactionAge: ${txnAge}`)
@@ -425,7 +439,7 @@ class Shardus {
       this.fatalLogger.error(`Transaction Expired`)
       transactionExpired = true
     }
-    // this.mainLogger.debug(`End of _isTransactionTimestampExpired(${txnTimestamp})`)
+    // this.mainLogger.debug(`End of _isTransactionTimestampExpired(${timestamp})`)
     return transactionExpired
   }
 }

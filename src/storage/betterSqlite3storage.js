@@ -99,7 +99,7 @@ class BetterSqlite3Storage {
 
     // , `createdAt` DATETIME NOT NULL, `updatedAt` DATETIME NOT NULL
     // `id` INTEGER PRIMARY KEY AUTOINCREMENT,
-    await this.run('CREATE TABLE if not exists `accounts` (`address` VARCHAR(255) NOT NULL, `modified` BIGINT NOT NULL, `sequence` BIGINT NOT NULL, `owners` JSON NOT NULL, `signs` SMALLINT NOT NULL, `balance` DOUBLE PRECISION NOT NULL, `type` VARCHAR(255) NOT NULL, `data` JSON NOT NULL, `hash` VARCHAR(255) NOT NULL, `txs` VARCHAR(255) NOT NULL)')
+    await this.run('CREATE TABLE if not exists `accounts` (`address` VARCHAR(255) NOT NULL, `modified` BIGINT NOT NULL, `sequence` BIGINT NOT NULL, `owners` JSON NOT NULL, `signs` SMALLINT NOT NULL, `balance` DOUBLE PRECISION NOT NULL, `type` VARCHAR(255) NOT NULL, `data` JSON NOT NULL, `hash` VARCHAR(255) NOT NULL, `txs` VARCHAR(255) NOT NULL, `timestamp` BIGINT NOT NULL)')
 
     await this.run('PRAGMA synchronous = OFF')
     await this.run('PRAGMA journal_mode = MEMORY')
@@ -232,6 +232,7 @@ class BetterSqlite3Storage {
 
         let value = paramsObj[key]
         if (utils.isObject(value)) {
+          // WHERE column_name BETWEEN value1 AND value2;
           if (value[Op.between]) {
             let between = value[Op.between]
             paramEntry.type = 'BETWEEN'
@@ -239,6 +240,23 @@ class BetterSqlite3Storage {
             paramEntry.v2 = between[1]
             paramEntry.sql = `${paramEntry.name} ${paramEntry.type} ? AND ? `
             paramEntry.vals = [paramEntry.v1, paramEntry.v2]
+          }
+          // WHERE column_name IN (value1, value2, ...)
+          if (value[Op.in]) {
+            let inValues = value[Op.in]
+            paramEntry.type = 'IN'
+            // paramEntry.v1 = between[0]
+            // paramEntry.v2 = between[1]
+            let questionMarks = ''
+            for (let i = 0; i < inValues.length; i++) {
+              questionMarks += '?'
+              if (i < inValues.length - 1) {
+                questionMarks += ' , '
+              }
+            }
+            paramEntry.sql = `${paramEntry.name} ${paramEntry.type} (${questionMarks})`
+            paramEntry.vals = []
+            paramEntry.vals = paramEntry.vals.concat(inValues)
           }
         } else {
           paramEntry.type = '='

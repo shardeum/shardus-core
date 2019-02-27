@@ -20,10 +20,10 @@ class StateManager extends EventEmitter {
     this.logger = logger
 
     this.completedPartitions = []
-    this.syncSettleTime = 5000 // 3 * 10 // an estimate of max transaction settle time. todo make it a config or function of consensus later
+    this.syncSettleTime = 8000 // 3 * 10 // an estimate of max transaction settle time. todo make it a config or function of consensus later
     this.mainStartingTs = Date.now()
 
-    this.queueSitTime = 3000 // todo make this a setting. and tie in with the value in consensus
+    this.queueSitTime = 6000 // todo make this a setting. and tie in with the value in consensus
 
     this.clearPartitionData()
 
@@ -41,6 +41,10 @@ class StateManager extends EventEmitter {
     this.newAcceptedTXQueue = []
     this.newAcceptedTXQueueRunning = false
     this.dataSyncMainPhaseComplete = false
+
+    this.dataPhaseTag = 'DATASYNC: '
+    // this.accountRepair
+    this.applySoftLock = false
   }
 
   /* -------- DATASYNC Functions ---------- */
@@ -65,6 +69,8 @@ class StateManager extends EventEmitter {
     this.accountsWithStateConflict = []
     this.failedAccounts = [] // todo m11: determine how/when we will pull something out of this list!
     this.mapAccountData = {}
+
+    this.fifoLocks = {}
   }
 
   // TODO: Milestone 14-15? this will take a short list of account IDs and get us resynced on them
@@ -125,20 +131,20 @@ class StateManager extends EventEmitter {
       this.clearPartitionData()
     }
 
-    this.dataSyncMainPhaseComplete = true
     // one we have all of the initial data the last thing to do is get caught up on transactions
-    // await this.applyAcceptedTx()
-    this.tryStartAcceptedQueue()
+    // This will await the queue processing up to Date.now()
+    await this._firstTimeQueueAwait()
 
     console.log('syncStateData end' + '   time:' + Date.now())
-    // TODO after enterprise: once we are on the network we still need to patch our state data so that it is a perfect match of other nodes for our supported address range
-    //  Only need to requery the range that overlaps when we joined and when we started receiving our own state updates on the network.
-    //  The trick is this query will get some duplicate data, but maybe the way the keys are in the db are setup we can just attemp to save what we get.  will need testing
-    //  also this should be not invoked here but some time after we have joined the network... like syncSettleTime after we went active
-    //  see patchRemainingStateData()
-    //  update.. not going to worry about this until after enterprise.  possibly ok to do this right before apply acceptedTX() !!
 
     // all complete!
+    this.mainLogger.debug(`DATASYNC: complete`)
+    this.logger.playbackLogState('datasyncComplete', '', '')
+
+    // update the debug tag and restart the queue
+    this.dataPhaseTag = 'STATESYNC: '
+    this.dataSyncMainPhaseComplete = true
+    this.tryStartAcceptedQueue()
   }
 
   async syncStateDataForPartition (partition) {
@@ -184,8 +190,13 @@ class StateManager extends EventEmitter {
       //   Repeat the “Process the Account data” step
       await this.syncFailedAcccounts(lowAddress, highAddress)
     } catch (error) {
-      if (error.message === 'FailAndRestartPartition') {
+      if (error.message.includes('FailAndRestartPartition')) {
         this.mainLogger.debug(`DATASYNC: Error Failed at: ${error.stack}`)
+        this.fatalLogger.fatal('DATASYNC: FailAndRestartPartition: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+        await this.failandRestart()
+      } else {
+        this.fatalLogger.fatal('syncStateDataForPartition failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+        this.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + error.name + ': ' + error.message + ' at ' + error.stack)
         await this.failandRestart()
       }
     }
@@ -316,10 +327,20 @@ class StateManager extends EventEmitter {
         return // nothing to do
       }
       this.mainLogger.debug(`DATASYNC: _robustQuery get_account_state_hash from ${utils.stringifyReduce(nodes.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
-      let result = await this.p2p._robustQuery(nodes, queryFn, equalFn, 3, winners)
+      let result
+      try {
+        result = await this.p2p._robustQuery(nodes, queryFn, equalFn, 3, winners)
+      } catch (ex) {
+        this.mainLogger.debug('syncStateTableData: _robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        this.fatalLogger.fatal('syncStateTableData: _robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        throw new Error('FailAndRestartPartition0')
+      }
+
       if (result && result.stateHash) {
         this.mainLogger.debug(`DATASYNC: _robustQuery returned result: ${result.stateHash}`)
-        if (winners.length === 0) {
+        if (!winners || winners.length === 0) {
+          this.mainLogger.debug(`DATASYNC: no winners, going to throw fail and restart`)
+          this.fatalLogger.fatal(`DATASYNC: no winners, going to throw fail and restart`) // todo: consider if this is just an error
           throw new Error('FailAndRestartPartition1')
         }
         this.dataSourceNode = winners[0] // Todo random index
@@ -402,7 +423,8 @@ class StateManager extends EventEmitter {
     }
   }
 
-  async syncAccountData (lowAddress, highAddress) {
+  // sync account data by address range
+  async syncAccountDataOld (lowAddress, highAddress) {
     // Sync the Account data
     //   Use the /get_account_data API to get the data from the Account Table using any of the nodes that had a matching hash
     console.log(`syncAccountData` + '   time:' + Date.now())
@@ -451,15 +473,187 @@ class StateManager extends EventEmitter {
     }
   }
 
+  // syncs account data up to a certain time by making time based queries
+  async syncAccountDataOld2 (lowAddress, highAddress) {
+    // Sync the Account data
+    //   Use the /get_account_data API to get the data from the Account Table using any of the nodes that had a matching hash
+    console.log(`syncAccountData2` + '   time:' + Date.now())
+
+    let queryLow = lowAddress
+    let queryHigh = highAddress
+
+    let moreDataRemaining = true
+
+    this.combinedAccountData = []
+    let loopCount = 0
+
+    let startTime = 0
+    let endTime = this.mainStartingTs + 50000 // todo get better end time
+    let lowTimeQuery = startTime
+    // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
+    while (moreDataRemaining) {
+      // max records artificially low to make testing coverage better.  todo refactor: make it a config or calculate based on data size
+      let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, tsEnd: endTime, maxRecords: 3 }
+      let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data2', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
+      // accountData is in the form [{accountId, stateId, data}] for n accounts.
+      let accountData = result.accountData
+
+      // get the timestamp of the last account data received so we can use it as the low timestamp for our next query
+      if (accountData.length > 0) {
+        let lastAccount = accountData[accountData.length - 1]
+        if (lastAccount.timestamp > lowTimeQuery) {
+          lowTimeQuery = lastAccount.timestamp
+          startTime = lowTimeQuery
+        }
+      }
+
+      // If this is a repeated query, clear out any dupes from the new list we just got.
+      // There could be many rows that use the stame timestamp so we will search and remove them
+      let dataDuplicated = true
+      if (loopCount > 0) {
+        while (accountData.length > 0 && dataDuplicated) {
+          let stateData = accountData[0]
+          dataDuplicated = false
+          for (let i = this.combinedAccountData.length - 1; i >= 0; i--) {
+            let existingStateData = this.combinedAccountData[i]
+            if ((existingStateData.timestamp === stateData.timestamp) && (existingStateData.accountId === stateData.accountId)) {
+              dataDuplicated = true
+              break
+            }
+            // once we get to an older timestamp we can stop looking, the outer loop will be done also
+            if (existingStateData.timestamp < stateData.timestamp) {
+              break
+            }
+          }
+          if (dataDuplicated) {
+            accountData.shift()
+          }
+        }
+      }
+
+      if (accountData.length === 0) {
+        moreDataRemaining = false
+      } else {
+        this.mainLogger.debug(`DATASYNC: syncAccountData2 got ${accountData.length} more records`)
+        this.combinedAccountData = this.combinedAccountData.concat(accountData)
+        loopCount++
+        // await utils.sleep(500)
+      }
+    }
+  }
+
+  async syncAccountData (lowAddress, highAddress) {
+    // Sync the Account data
+    //   Use the /get_account_data API to get the data from the Account Table using any of the nodes that had a matching hash
+    console.log(`syncAccountData3` + '   time:' + Date.now())
+
+    let queryLow = lowAddress
+    let queryHigh = highAddress
+
+    let moreDataRemaining = true
+
+    this.combinedAccountData = []
+    let loopCount = 0
+
+    let startTime = 0
+    let lowTimeQuery = startTime
+    // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
+    while (moreDataRemaining) {
+      // max records artificially low to make testing coverage better.  todo refactor: make it a config or calculate based on data size
+      let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, maxRecords: 5 }
+      let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data3', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
+      // accountData is in the form [{accountId, stateId, data}] for n accounts.
+      let accountData = result.data.wrappedAccounts
+
+      let lastUpdateNeeded = result.data.lastUpdateNeeded
+
+      // get the timestamp of the last account data received so we can use it as the low timestamp for our next query
+      if (accountData.length > 0) {
+        let lastAccount = accountData[accountData.length - 1]
+        if (lastAccount.timestamp > lowTimeQuery) {
+          lowTimeQuery = lastAccount.timestamp
+          startTime = lowTimeQuery
+        }
+      }
+
+      // If this is a repeated query, clear out any dupes from the new list we just got.
+      // There could be many rows that use the stame timestamp so we will search and remove them
+      let dataDuplicated = true
+      if (loopCount > 0) {
+        while (accountData.length > 0 && dataDuplicated) {
+          let stateData = accountData[0]
+          dataDuplicated = false
+          for (let i = this.combinedAccountData.length - 1; i >= 0; i--) {
+            let existingStateData = this.combinedAccountData[i]
+            if ((existingStateData.timestamp === stateData.timestamp) && (existingStateData.accountId === stateData.accountId)) {
+              dataDuplicated = true
+              break
+            }
+            // once we get to an older timestamp we can stop looking, the outer loop will be done also
+            if (existingStateData.timestamp < stateData.timestamp) {
+              break
+            }
+          }
+          if (dataDuplicated) {
+            accountData.shift()
+          }
+        }
+      }
+
+      // if we have any accounts in wrappedAccounts2
+      let accountData2 = result.data.wrappedAccounts2
+      if (accountData2.length > 0) {
+        while (accountData.length > 0 && dataDuplicated) {
+          let stateData = accountData2[0]
+          dataDuplicated = false
+          for (let i = this.combinedAccountData.length - 1; i >= 0; i--) {
+            let existingStateData = this.combinedAccountData[i]
+            if ((existingStateData.timestamp === stateData.timestamp) && (existingStateData.accountId === stateData.accountId)) {
+              dataDuplicated = true
+              break
+            }
+            // once we get to an older timestamp we can stop looking, the outer loop will be done also
+            if (existingStateData.timestamp < stateData.timestamp) {
+              break
+            }
+          }
+          if (dataDuplicated) {
+            accountData2.shift()
+          }
+        }
+      }
+
+      if (lastUpdateNeeded || (accountData2.length === 0 && accountData.length === 0)) {
+        moreDataRemaining = false
+        this.mainLogger.debug(`DATASYNC: syncAccountData3 got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lowTimeQuery} highestTS1: ${result.data.highestTs}`)
+        if (accountData.length > 0) {
+          this.combinedAccountData = this.combinedAccountData.concat(accountData)
+        }
+        if (accountData2.length > 0) {
+          this.combinedAccountData = this.combinedAccountData.concat(accountData2)
+        }
+      } else {
+        this.mainLogger.debug(`DATASYNC: syncAccountData3 got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lowTimeQuery} highestTS1: ${result.data.highestTs}`)
+        this.combinedAccountData = this.combinedAccountData.concat(accountData)
+        loopCount++
+        // await utils.sleep(500)
+      }
+      await utils.sleep(200)
+    }
+  }
+
+  // this.p2p.registerInternal('get_account_data2', async (payload, respond) => {
+
   async failandRestart () {
-    this.mainLogger.debug(`failandRestart`)
+    this.mainLogger.debug(`DATASYNC: failandRestart`)
+    this.logger.playbackLogState('datasyncFail', '', '')
     this.clearPartitionData()
 
     // using set timeout before we resume to prevent infinite stack depth.
     // setTimeout(async () => {
     //   await this.syncStateDataForPartition(this.currentPartition)
     // }, 1000)
-    utils.sleep(1000)
+    await utils.sleep(1000)
     await this.syncStateDataForPartition(this.currentPartition)
   }
 
@@ -487,13 +681,27 @@ class StateManager extends EventEmitter {
       this.mapAccountData[account.accountId] = account
     }
 
+    let accountKeys = Object.keys(this.mapAccountData)
+    let uniqueAccounts = accountKeys.length
+    let initialCombinedAccountLength = this.combinedAccountData.length
+    if (uniqueAccounts < initialCombinedAccountLength) {
+      // keep only the newest copies of each account:
+      // we need this if using a time based datasync
+      this.combinedAccountData = []
+      for (let accountID of accountKeys) {
+        this.combinedAccountData.push(this.mapAccountData[accountID])
+      }
+    }
+
     let missingButOkAccounts = 0
     let missingTXs = 0
     let handledButOk = 0
     let otherMissingCase = 0
     let missingButOkAccountIDs = {}
 
-    this.mainLogger.debug(`DATASYNC: processAccountData stateTableCount: ${this.inMemoryStateTableData.length}`)
+    let missingAccountIDs = {}
+
+    this.mainLogger.debug(`DATASYNC: processAccountData stateTableCount: ${this.inMemoryStateTableData.length} unique accounts: ${uniqueAccounts}  initial combined len: ${initialCombinedAccountLength}`)
     // For each account in the Account data make sure the entry in the Account State Table has the same State_after value; if not remove the record from the Account data
     for (let stateData of this.inMemoryStateTableData) {
       account = this.mapAccountData[stateData.accountId]
@@ -506,6 +714,7 @@ class StateManager extends EventEmitter {
           missingTXs++
           if (stateData.accountId != null) {
             this.missingAccountData.push(stateData.accountId)
+            missingAccountIDs[stateData.accountId] = true
           }
         } else if (stateData.stateBefore === allZeroes64) {
           // this means we are at the start of a valid state table chain that starts with creating an account
@@ -519,10 +728,12 @@ class StateManager extends EventEmitter {
           // this could be caused by a node trying to withold account data when syncing
           if (stateData.accountId != null) {
             this.missingAccountData.push(stateData.accountId)
+            missingAccountIDs[stateData.accountId] = true
           }
           otherMissingCase++
         }
         // should we check timestamp for the state table data?
+        continue
       }
 
       if (!account.syncData) {
@@ -541,11 +752,11 @@ class StateManager extends EventEmitter {
 
     if (missingButOkAccounts > 0) {
       // it is valid / normal flow to get to this point:
-      this.mainLogger.debug(`DATASYNC: processAccountData accouts missing from accountData, but are ok, because we have transactions for them: ${missingButOkAccounts}, ${handledButOk}`)
+      this.mainLogger.debug(`DATASYNC: processAccountData accouts missing from accountData, but are ok, because we have transactions for them: missingButOKList: ${missingButOkAccounts}, handledbutOK: ${handledButOk}`)
     }
     if (this.missingAccountData.length > 0) {
       // getting this indicates a non-typical problem that needs correcting
-      this.mainLogger.debug(`DATASYNC: processAccountData accounts missing from accountData, but in the state table.  This is an unexpected error and we will need to handle them as failed accounts: ${this.missingAccountData.length}, ${missingTXs}`)
+      this.mainLogger.debug(`DATASYNC: processAccountData accounts missing from accountData, but in the state table.  This is an unexpected error and we will need to handle them as failed accounts: missingList: ${this.missingAccountData.length}, missingTX count: ${missingTXs} missingUnique: ${Object.keys(missingAccountIDs).length}`)
     }
 
     //   For each account in the Account State Table make sure the entry in Account data has the same State_after value; if not save the account id to be looked up later
@@ -630,9 +841,11 @@ class StateManager extends EventEmitter {
     this.mainLogger.debug(`DATASYNC: syncFailedAcccounts requesting data for failed hashes ${utils.stringifyReduce(addressList)}`)
 
     let message = { accountIds: addressList }
-    let accountData = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
+    let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
 
-    this.combinedAccountData.concat(accountData)
+    this.combinedAccountData = this.combinedAccountData.concat(result.accountData)
+
+    this.mainLogger.debug(`DATASYNC: syncFailedAcccounts combinedAccountData: ${this.combinedAccountData.length} accountData: ${result.accountData.length}`)
 
     await this.syncStateTableData(lowAddress, highAddress, this.lastStateSyncEndtime, Date.now())
 
@@ -739,9 +952,43 @@ class StateManager extends EventEmitter {
     // Updated names:  accountStart , accountEnd
     this.p2p.registerInternal('get_account_data', async (payload, respond) => {
       let result = {}
-
-      let accountData = await this.app.getAccountData(payload.accountStart, payload.accountEnd, payload.maxRecords)
+      let accountData = null
+      let ourLockID = -1
+      try {
+        ourLockID = await this.fifoLock('accountModification')
+        accountData = await this.app.getAccountData(payload.accountStart, payload.accountEnd, payload.maxRecords)
+      } finally {
+        this.fifoUnlock('accountModification', ourLockID)
+      }
       result.accountData = accountData
+      await respond(result)
+    })
+
+    this.p2p.registerInternal('get_account_data2', async (payload, respond) => {
+      let result = {}
+      let accountData = null
+      let ourLockID = -1
+      try {
+        ourLockID = await this.fifoLock('accountModification')
+        accountData = await this.app.getAccountData2(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, payload.maxRecords)
+      } finally {
+        this.fifoUnlock('accountModification', ourLockID)
+      }
+      result.accountData = accountData
+      await respond(result)
+    })
+
+    this.p2p.registerInternal('get_account_data3', async (payload, respond) => {
+      let result = {}
+      let accountData = null
+      let ourLockID = -1
+      try {
+        ourLockID = await this.fifoLock('accountModification')
+        accountData = await this.app.getAccountData3(payload.accountStart, payload.accountEnd, payload.tsStart, payload.maxRecords)
+      } finally {
+        this.fifoUnlock('accountModification', ourLockID)
+      }
+      result.data = accountData
       await respond(result)
     })
 
@@ -753,13 +1000,21 @@ class StateManager extends EventEmitter {
     // Updated names:  accountIds, max records
     this.p2p.registerInternal('get_account_data_by_list', async (payload, respond) => {
       let result = {}
-      let accountData = await this.app.getAccountDataByList(payload.accountIds)
+      let accountData = null
+      let ourLockID = -1
+      try {
+        ourLockID = await this.fifoLock('accountModification')
+        accountData = await this.app.getAccountDataByList(payload.accountIds)
+      } finally {
+        this.fifoUnlock('accountModification', ourLockID)
+      }
       result.accountData = accountData
       await respond(result)
     })
   }
 
   enableSyncCheck () {
+    return // hack no sync check , dont check in!!!!!
     this.p2p.state.on('newCycle', (cycles) => process.nextTick(async () => {
       if (cycles.length < 2) {
         return
@@ -911,119 +1166,199 @@ class StateManager extends EventEmitter {
     return stateHash
   }
 
-  async testAccountStateTable (tx) {
+  // async testAccountStateTableOld (tx) {
+  //   let hasStateTableData = false
+  //   try {
+  //     let keysResponse = this.app.getKeyFromTransaction(tx)
+  //     let { sourceKeys, targetKeys, timestamp } = keysResponse
+  //     let sourceAddress, targetAddress, sourceState, targetState
+
+  //     if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
+  //       sourceAddress = sourceKeys[0]
+  //       // let accountStates = await this.storage.queryAccountStateTable(sourceState, sourceState, timestamp, timestamp, 1)
+  //       let accountStates = await this.storage.searchAccountStateTable(sourceAddress, timestamp)
+  //       if (accountStates.length !== 0) {
+  //         sourceState = await this.app.getStateId(sourceAddress)
+  //         hasStateTableData = true
+  //         // if (accountStates.length === 0) {
+  //         //   if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' missing source account state 1')
+  //         //   if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' missing source account state 1')
+  //         //   return { success: false, hasStateTableData }
+  //         // }
+
+  //         if (accountStates.length === 0 || accountStates[0].stateBefore !== sourceState) {
+  //           if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' cant apply state 1')
+  //           if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' cant apply state 1 stateId: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
+  //           return { success: false, hasStateTableData }
+  //         }
+  //       }
+  //     }
+  //     if (Array.isArray(targetKeys) && targetKeys.length > 0) {
+  //       targetAddress = targetKeys[0]
+  //       // let accountStates = await this.storage.queryAccountStateTable(targetState, targetState, timestamp, timestamp, 1)
+  //       let accountStates = await this.storage.searchAccountStateTable(targetAddress, timestamp)
+
+  //       if (accountStates.length !== 0) {
+  //         hasStateTableData = true
+  //         // if (accountStates.length === 0) {
+  //         //   if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' missing target account state 2')
+  //         //   if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' missing target account state 2')
+  //         //   return { success: false, hasStateTableData }
+  //         // }
+  //         if (accountStates.length !== 0 && accountStates[0].stateBefore !== allZeroes64) {
+  //           targetState = await this.app.getStateId(targetAddress, false)
+  //           if (targetState == null) {
+  //             if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' target state does not exist, thats ok')
+  //             if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' target state does not exist, thats ok')
+  //           } else if (accountStates[0].stateBefore !== targetState) {
+  //             if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' cant apply state 2')
+  //             if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' cant apply state 2 stateId: ' + utils.makeShortHash(targetState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(targetAddress))
+  //             return { success: false, hasStateTableData }
+  //           }
+  //         }
+  //       }
+  //     // todo post enterprise, only check this if it is in our address range
+  //     }
+  //   } catch (ex) {
+  //     this.fatalLogger.fatal('testAccountStateTable failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+  //   }
+
+  //   return { success: true, hasStateTableData }
+  // }
+
+  async testAccountTimesAndStateTable (tx, accountData) {
     let hasStateTableData = false
+
+    function tryGetAccountData (accountID) {
+      for (let accountEntry of accountData) {
+        if (accountEntry.accountId === accountID) {
+          return accountEntry
+        }
+      }
+      return null
+    }
+
     try {
       let keysResponse = this.app.getKeyFromTransaction(tx)
-      let { sourceKeys, targetKeys } = keysResponse
+      let { sourceKeys, targetKeys, timestamp } = keysResponse
       let sourceAddress, targetAddress, sourceState, targetState
 
-      let timestamp = tx.txnTimestamp
+      // check account age to make sure it is older than the tx
+      let failedAgeCheck = false
+      for (let accountEntry of accountData) {
+        if (accountEntry.timestamp > timestamp) {
+          failedAgeCheck = true
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
+        }
+      }
+      if (failedAgeCheck) {
+        // if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountTimesAndStateTable accounts have future state ' + timestamp)
+        return { success: false, hasStateTableData }
+      }
 
+      // check state table
       if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
         sourceAddress = sourceKeys[0]
-        // let accountStates = await this.storage.queryAccountStateTable(sourceState, sourceState, timestamp, timestamp, 1)
         let accountStates = await this.storage.searchAccountStateTable(sourceAddress, timestamp)
         if (accountStates.length !== 0) {
-          sourceState = await this.app.getStateId(sourceAddress)
+          let accountEntry = tryGetAccountData(sourceAddress)
+          if (accountEntry == null) {
+            return { success: false, hasStateTableData }
+          }
+          sourceState = accountEntry.stateId
           hasStateTableData = true
-          // if (accountStates.length === 0) {
-          //   if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' missing source account state 1')
-          //   if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' missing source account state 1')
-          //   return { success: false, hasStateTableData }
-          // }
-
           if (accountStates.length === 0 || accountStates[0].stateBefore !== sourceState) {
-            if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' cant apply state 1')
-            if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' cant apply state 1 stateId: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
+            if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1')
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1 stateId: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
             return { success: false, hasStateTableData }
           }
         }
       }
       if (Array.isArray(targetKeys) && targetKeys.length > 0) {
         targetAddress = targetKeys[0]
-        // let accountStates = await this.storage.queryAccountStateTable(targetState, targetState, timestamp, timestamp, 1)
         let accountStates = await this.storage.searchAccountStateTable(targetAddress, timestamp)
 
         if (accountStates.length !== 0) {
           hasStateTableData = true
-          // if (accountStates.length === 0) {
-          //   if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' missing target account state 2')
-          //   if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' missing target account state 2')
-          //   return { success: false, hasStateTableData }
-          // }
           if (accountStates.length !== 0 && accountStates[0].stateBefore !== allZeroes64) {
-            targetState = await this.app.getStateId(targetAddress, false)
-            if (targetState == null) {
-              if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' target state does not exist, thats ok')
-              if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' target state does not exist, thats ok')
-            } else if (accountStates[0].stateBefore !== targetState) {
-              if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' cant apply state 2')
-              if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' cant apply state 2 stateId: ' + utils.makeShortHash(targetState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(targetAddress))
+            let accountEntry = tryGetAccountData(targetAddress)
+
+            if (accountEntry == null) {
+              if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress))
+              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ' + utils.stringifyReduce(accountData))
+              this.fatalLogger.fatal(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ' + utils.stringifyReduce(accountData)) // todo: consider if this is just an error
+              // fail this because we already check if the before state was all zeroes
               return { success: false, hasStateTableData }
+            } else {
+              targetState = accountEntry.stateId
+              if (accountStates[0].stateBefore !== targetState) {
+                if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2')
+                if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2 stateId: ' + utils.makeShortHash(targetState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(targetAddress))
+                return { success: false, hasStateTableData }
+              }
             }
           }
         }
-      // todo post enterprise, only check this if it is in our address range
       }
     } catch (ex) {
-      this.fatalLogger.fatal('testAccountStateTable failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.fatalLogger.fatal('testAccountTimesAndStateTable failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
     }
-
     return { success: true, hasStateTableData }
   }
 
   // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
-  async tryApplyTransaction (acceptedTX) {
-    // let ourLock = -1
+  async tryApplyTransaction (acceptedTX, hasStateTableData) {
+    let ourLockID = -1
     try {
       let tx = acceptedTX.data
-      let receipt = acceptedTX.receipt
-      let timestamp = tx.txnTimestamp // TODO m11: need to push this to application method thta cracks the transaction
+      // let receipt = acceptedTX.receipt
+      let keysResponse = this.app.getKeyFromTransaction(tx)
+      let { timestamp, debugInfo } = keysResponse
 
-      // QUEUE delay system...
-      // ourLock = await this.consensus.queueAndDelay(timestamp, receipt.txHash)
+      // if (this.verboseLogs) console.log('tryApplyTransaction ' + timestamp + ' ' + debugInfo)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'tryApplyTransaction ' + timestamp + ' ' + debugInfo)
 
-      if (this.verboseLogs) console.log('tryApplyTransaction ' + timestamp)
-      if (this.verboseLogs) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp)
+      // let { success, hasStateTableData } = await this.testAccountStateTable(tx)
 
-      let { success, hasStateTableData } = await this.testAccountStateTable(tx)
-
-      if (!success) {
-        return false// we failed
-      }
+      // if (!success) {
+      //   // this.fatalLogger.fatal('tryApplyTransaction failed: ' + timestamp)
+      //   if (this.verboseLogs) this.mainLogger.debug('DATASYNC: tryApplyTransaction failed: ' + timestamp)
+      //   return false// we failed
+      // }
 
       // test reciept state ids. some redundant queries that could be optimized!
-      let keysResponse = this.app.getKeyFromTransaction(tx)
-      let { sourceKeys, targetKeys } = keysResponse
-      let sourceAddress, targetAddress, sourceState, targetState
-      if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
-        sourceAddress = sourceKeys[0]
-        sourceState = await this.app.getStateId(sourceAddress)
-        if (sourceState !== receipt.stateId) {
-          if (this.verboseLogs) console.log('tryApplyTransaction source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + sourceState + ' receipt: ' + receipt.stateId + ' address: ' + sourceAddress)
-          if (this.verboseLogs) this.mainLogger.debug('APPSTATE: tryApplyTransaction source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + sourceState + ' receipt: ' + receipt.stateId + ' address: ' + sourceAddress)
-          return false
-        }
-      }
-      if (Array.isArray(targetKeys) && targetKeys.length > 0) {
-        targetAddress = targetKeys[0]
-        targetState = await this.app.getStateId(targetAddress, false)
-        if (targetState !== receipt.targetStateId) {
-          if (this.verboseLogs) console.log('tryApplyTransaction target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetState + ' receipt: ' + receipt.targetStateId + ' address: ' + targetAddress)
-          if (this.verboseLogs) this.mainLogger.debug('APPSTATE: tryApplyTransaction target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetState + ' receipt: ' + receipt.targetStateId + ' address: ' + targetAddress)
-          return false
-        }
-      }
+      // let sourceAddress, targetAddress, sourceState, targetState
+      // if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
+      //   sourceAddress = sourceKeys[0]
+      //   sourceState = await this.app.getStateId(sourceAddress)
+      //   // if (sourceState !== receipt.stateId) {
+      //   //   if (this.verboseLogs) console.log('tryApplyTransaction source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + sourceState + ' receipt: ' + receipt.stateId + ' address: ' + sourceAddress)
+      //   //   if (this.verboseLogs) this.mainLogger.debug('APPSTATE: tryApplyTransaction source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + sourceState + ' receipt: ' + receipt.stateId + ' address: ' + sourceAddress)
+      //   //   return false
+      //   // }
+      // }
+      // if (Array.isArray(targetKeys) && targetKeys.length > 0) {
+      //   targetAddress = targetKeys[0]
+      //   targetState = await this.app.getStateId(targetAddress, false)
+      //   // if (targetState !== receipt.targetStateId) {
+      //   //   if (this.verboseLogs) console.log('tryApplyTransaction target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetState + ' receipt: ' + receipt.targetStateId + ' address: ' + targetAddress)
+      //   //   if (this.verboseLogs) this.mainLogger.debug('APPSTATE: tryApplyTransaction target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetState + ' receipt: ' + receipt.targetStateId + ' address: ' + targetAddress)
+      //   //   return false
+      //   // }
+      // }
+
+      ourLockID = await this.fifoLock('accountModification')
 
       if (this.verboseLogs) console.log('tryApplyTransaction ' + timestamp + ' Applying!')
-      if (this.verboseLogs) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
+      // if (this.verboseLogs) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
+      this.applySoftLock = true
       let { stateTableResults } = await this.app.apply(tx)
+      this.applySoftLock = false
       // only write our state table data if we dont already have it in the db
       if (hasStateTableData === false) {
         for (let stateT of stateTableResults) {
           if (this.verboseLogs) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId))
-          if (this.verboseLogs) this.mainLogger.debug('APPSTATE: writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter))
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter))
         }
         await this.storage.addAccountStates(stateTableResults)
       }
@@ -1036,27 +1371,34 @@ class StateManager extends EventEmitter {
       this.fatalLogger.fatal('tryApplyTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       return false
     } finally {
-      // this.consensus.unlockQueue(ourLock)
+      this.fifoUnlock('accountModification', ourLockID)
     }
     this.emit('applied')
     return true
   }
 
-  wrapAcceptedTx (tx, receipt) {
-    let timestamp = tx.txnTimestamp // todo not great that we are cracking this, should wrap in a helper
-    let txStatus = 1 // todo real values for tx status. this is just a stand in
-    let txId = receipt.txHash
-    let acceptedTX = { id: txId, timestamp, data: tx, status: txStatus, receipt: receipt }
-    return acceptedTX
-  }
+  // wrapAcceptedTx (tx, receipt) {
+  //   let timestamp = tx.txnTimestamp // todo not great that we are cracking this, should wrap in a helper
+  //   let txStatus = 1 // todo real values for tx status. this is just a stand in
+  //   let txId = receipt.txHash
+  //   let acceptedTX = { id: txId, timestamp, data: tx, status: txStatus, receipt: receipt }
+  //   return acceptedTX
+  // }
 
   queueAcceptedTransaction (acceptedTX, sendGossip = true) {
+    let keysResponse = this.app.getKeyFromTransaction(acceptedTX.data)
+    let timestamp = keysResponse.timestamp
+    let txId = acceptedTX.receipt.txHash
+
+    let age = Date.now() - timestamp
+    if (age > this.queueSitTime * 0.9) {
+      this.fatalLogger.fatal('queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
+      // TODO consider throwing this out.  right now it is just a warning
+    }
+
     if (sendGossip) {
       this.p2p.sendGossipIn('acceptedTx', acceptedTX)
     }
-
-    let timestamp = acceptedTX.data.txnTimestamp
-    let txId = acceptedTX.receipt.txHash
 
     // sorted insert
     let index = this.newAcceptedTXQueue.length - 1
@@ -1081,19 +1423,52 @@ class StateManager extends EventEmitter {
       this.interruptSleepIfNeeded(this.newAcceptedTXQueue[0].timestamp)
     }
   }
+  async _firstTimeQueueAwait () {
+    if (this.newAcceptedTXQueueRunning) {
+      this.fatalLogger.fatal('DATASYNC: newAcceptedTXQueueRunning')
+      return
+    }
+    await this.processAcceptedTXQueue(Date.now())
+  }
 
   async applyAcceptedTransaction (acceptedTX) {
+    let tx = acceptedTX.data
+    let keysResponse = this.app.getKeyFromTransaction(tx)
+    let { sourceKeys, targetKeys, timestamp, debugInfo } = keysResponse
+
+    if (this.verboseLogs) console.log('applyAcceptedTransaction ' + timestamp + ' ' + debugInfo)
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction ' + timestamp + ' ' + debugInfo)
+
+    let allkeys = []
+    allkeys = allkeys.concat(sourceKeys)
+    allkeys = allkeys.concat(targetKeys)
+    let accountData = await this.app.getAccountDataByList(allkeys)
+
+    let { success, hasStateTableData } = await this.testAccountTimesAndStateTable(tx, accountData)
+
+    if (!success) {
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction pretest failed: ' + timestamp)
+      return false
+    }
+
     // Validate transaction through the application. Shardus can see inside the transaction
     this.profiler.profileSectionStart('validateTx')
     // todo add data fetch to the result and pass it into app apply(), include previous hashes
     let transactionValidateResult = await this.app.validateTransaction(acceptedTX.data)
     this.profiler.profileSectionEnd('validateTx')
     if (transactionValidateResult.result !== 'pass') {
-      this.mainLogger.error(`Failed to validate transaction. Reason: ${transactionValidateResult.reason}`)
+      let keysResponse = this.app.getKeyFromTransaction(acceptedTX.data)
+      let timestamp = keysResponse.timestamp
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction validate failed: ' + timestamp)
+      this.mainLogger.error(`Failed to validate transaction. Reason: ${transactionValidateResult.reason} ts:${timestamp}`)
       return { success: false, reason: transactionValidateResult.reason }
     }
     // todo2 refactor the state table data checks out of try apply and calculate them with less effort using results from validate
-    await this.tryApplyTransaction(acceptedTX)
+    let applyResult = await this.tryApplyTransaction(acceptedTX, hasStateTableData)
+    if (applyResult) {
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction SUCCEDED ' + timestamp)
+    }
+    return { success: applyResult, reason: 'apply result' }
   }
 
   interruptibleSleep (ms, targetTime) {
@@ -1113,28 +1488,95 @@ class StateManager extends EventEmitter {
     }
   }
 
-  async processAcceptedTXQueue () {
+  async processAcceptedTXQueue (maxTimestamp = -1) {
     try {
       // wait untill next apply time available
       // run as many apply tx as needed.
       this.newAcceptedTXQueueRunning = true
 
+      let acceptedTXCount = 0
+      let edgeFailDetected = false
+
       while (this.newAcceptedTXQueue.length > 0) {
         let currentTime = Date.now()
-        let txAge = currentTime - this.newAcceptedTXQueue[0].timestamp
+        let txTime = this.newAcceptedTXQueue[0].timestamp
+        let txAge = currentTime - txTime
         if (txAge < this.queueSitTime) {
           let waitTime = this.queueSitTime - txAge
-          this.sleepInterrupt = this.interruptibleSleep(waitTime, this.newAcceptedTXQueue[0].timestamp)
+          this.sleepInterrupt = this.interruptibleSleep(waitTime, txTime)
           await this.sleepInterrupt.promise
           continue
         }
 
         // apply the tx
         let acceptedTX = this.newAcceptedTXQueue.shift()
-        await this.applyAcceptedTransaction(acceptedTX)
+        let txResult = await this.applyAcceptedTransaction(acceptedTX)
+
+        if (txResult) {
+          acceptedTXCount++
+        } else {
+          if (!edgeFailDetected && acceptedTXCount > 0) {
+            edgeFailDetected = true
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `processAcceptedTXQueue edgeFail ${utils.stringifyReduce(acceptedTX)}`)
+            this.fatalLogger.fatal(this.dataPhaseTag + `processAcceptedTXQueue edgeFail ${utils.stringifyReduce(acceptedTX)}`) // todo: consider if this is just an error
+          }
+        }
+
+        // await utils.sleep(0)
+        if (maxTimestamp > 0 && txTime > maxTimestamp) {
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `processAcceptedTXQueue reached max timestamp. ${maxTimestamp} Exiting with ${this.newAcceptedTXQueue.length} items remaining`)
+          this.newAcceptedTXQueueRunning = false
+          return
+        }
       }
     } finally {
       this.newAcceptedTXQueueRunning = false
+    }
+  }
+
+  async fifoLock (fifoName) {
+    let thisFifo = this.fifoLocks[fifoName]
+    if (thisFifo == null) {
+      thisFifo = { fifoName, queueCounter: 0, waitingList: [], lastServed: 0, queueLocked: false, lockOwner: null }
+      this.fifoLocks[fifoName] = thisFifo
+    }
+    thisFifo.queueCounter++
+    let ourID = thisFifo.queueCounter
+    let entry = { id: ourID }
+
+    if (thisFifo.waitingList.length > 0 || thisFifo.queueLocked) {
+      thisFifo.waitingList.push(entry)
+      // wait till we are at the front of the queue, and the queue is not locked
+      while (thisFifo.waitingList[0].id !== ourID || thisFifo.queueLocked) {
+      // perf optimization to reduce the amount of times we have to sleep (attempt to come out of sleep at close to the right time)
+        let sleepEstimate = ourID - thisFifo.lastServed
+        if (sleepEstimate < 1) {
+          sleepEstimate = 1
+        }
+        await utils.sleep(1 * sleepEstimate)
+      // await utils.sleep(2)
+      }
+      // remove our entry from the array
+      thisFifo.waitingList.shift()
+    }
+
+    // lock things so that only our calling function can do work
+    thisFifo.queueLocked = true
+    thisFifo.lockOwner = ourID
+    thisFifo.lastServed = ourID
+    return ourID
+  }
+
+  fifoUnlock (fifoName, id) {
+    let thisFifo = this.fifoLocks[fifoName]
+    if (id === -1 || !thisFifo) {
+      return // nothing to do
+    }
+    if (thisFifo.lockOwner === id) {
+      thisFifo.queueLocked = false
+    } else if (id !== -1) {
+      // this should never happen as long as we are careful to use try/finally blocks
+      this.fatalLogger.fatal(`Failed to unlock the fifo ${thisFifo.fifoName}: ${id}`)
     }
   }
 }
