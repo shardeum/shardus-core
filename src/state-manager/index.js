@@ -1014,7 +1014,7 @@ class StateManager extends EventEmitter {
   }
 
   enableSyncCheck () {
-    return // hack no sync check , dont check in!!!!!
+    // return // hack no sync check , dont check in!!!!!
     this.p2p.state.on('newCycle', (cycles) => process.nextTick(async () => {
       if (cycles.length < 2) {
         return
@@ -1166,66 +1166,6 @@ class StateManager extends EventEmitter {
     return stateHash
   }
 
-  // async testAccountStateTableOld (tx) {
-  //   let hasStateTableData = false
-  //   try {
-  //     let keysResponse = this.app.getKeyFromTransaction(tx)
-  //     let { sourceKeys, targetKeys, timestamp } = keysResponse
-  //     let sourceAddress, targetAddress, sourceState, targetState
-
-  //     if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
-  //       sourceAddress = sourceKeys[0]
-  //       // let accountStates = await this.storage.queryAccountStateTable(sourceState, sourceState, timestamp, timestamp, 1)
-  //       let accountStates = await this.storage.searchAccountStateTable(sourceAddress, timestamp)
-  //       if (accountStates.length !== 0) {
-  //         sourceState = await this.app.getStateId(sourceAddress)
-  //         hasStateTableData = true
-  //         // if (accountStates.length === 0) {
-  //         //   if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' missing source account state 1')
-  //         //   if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' missing source account state 1')
-  //         //   return { success: false, hasStateTableData }
-  //         // }
-
-  //         if (accountStates.length === 0 || accountStates[0].stateBefore !== sourceState) {
-  //           if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' cant apply state 1')
-  //           if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' cant apply state 1 stateId: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
-  //           return { success: false, hasStateTableData }
-  //         }
-  //       }
-  //     }
-  //     if (Array.isArray(targetKeys) && targetKeys.length > 0) {
-  //       targetAddress = targetKeys[0]
-  //       // let accountStates = await this.storage.queryAccountStateTable(targetState, targetState, timestamp, timestamp, 1)
-  //       let accountStates = await this.storage.searchAccountStateTable(targetAddress, timestamp)
-
-  //       if (accountStates.length !== 0) {
-  //         hasStateTableData = true
-  //         // if (accountStates.length === 0) {
-  //         //   if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' missing target account state 2')
-  //         //   if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' missing target account state 2')
-  //         //   return { success: false, hasStateTableData }
-  //         // }
-  //         if (accountStates.length !== 0 && accountStates[0].stateBefore !== allZeroes64) {
-  //           targetState = await this.app.getStateId(targetAddress, false)
-  //           if (targetState == null) {
-  //             if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' target state does not exist, thats ok')
-  //             if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' target state does not exist, thats ok')
-  //           } else if (accountStates[0].stateBefore !== targetState) {
-  //             if (this.verboseLogs) console.log('testAccountStateTable ' + timestamp + ' cant apply state 2')
-  //             if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountStateTable ' + timestamp + ' cant apply state 2 stateId: ' + utils.makeShortHash(targetState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(targetAddress))
-  //             return { success: false, hasStateTableData }
-  //           }
-  //         }
-  //       }
-  //     // todo post enterprise, only check this if it is in our address range
-  //     }
-  //   } catch (ex) {
-  //     this.fatalLogger.fatal('testAccountStateTable failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-  //   }
-
-  //   return { success: true, hasStateTableData }
-  // }
-
   async testAccountTimesAndStateTable (tx, accountData) {
     let hasStateTableData = false
 
@@ -1315,37 +1255,7 @@ class StateManager extends EventEmitter {
       let keysResponse = this.app.getKeyFromTransaction(tx)
       let { timestamp, debugInfo } = keysResponse
 
-      // if (this.verboseLogs) console.log('tryApplyTransaction ' + timestamp + ' ' + debugInfo)
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'tryApplyTransaction ' + timestamp + ' ' + debugInfo)
-
-      // let { success, hasStateTableData } = await this.testAccountStateTable(tx)
-
-      // if (!success) {
-      //   // this.fatalLogger.fatal('tryApplyTransaction failed: ' + timestamp)
-      //   if (this.verboseLogs) this.mainLogger.debug('DATASYNC: tryApplyTransaction failed: ' + timestamp)
-      //   return false// we failed
-      // }
-
-      // test reciept state ids. some redundant queries that could be optimized!
-      // let sourceAddress, targetAddress, sourceState, targetState
-      // if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
-      //   sourceAddress = sourceKeys[0]
-      //   sourceState = await this.app.getStateId(sourceAddress)
-      //   // if (sourceState !== receipt.stateId) {
-      //   //   if (this.verboseLogs) console.log('tryApplyTransaction source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + sourceState + ' receipt: ' + receipt.stateId + ' address: ' + sourceAddress)
-      //   //   if (this.verboseLogs) this.mainLogger.debug('APPSTATE: tryApplyTransaction source stateid does not match reciept. ts:' + timestamp + ' stateId: ' + sourceState + ' receipt: ' + receipt.stateId + ' address: ' + sourceAddress)
-      //   //   return false
-      //   // }
-      // }
-      // if (Array.isArray(targetKeys) && targetKeys.length > 0) {
-      //   targetAddress = targetKeys[0]
-      //   targetState = await this.app.getStateId(targetAddress, false)
-      //   // if (targetState !== receipt.targetStateId) {
-      //   //   if (this.verboseLogs) console.log('tryApplyTransaction target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetState + ' receipt: ' + receipt.targetStateId + ' address: ' + targetAddress)
-      //   //   if (this.verboseLogs) this.mainLogger.debug('APPSTATE: tryApplyTransaction target stateid does not match reciept. ts:' + timestamp + ' stateId: ' + targetState + ' receipt: ' + receipt.targetStateId + ' address: ' + targetAddress)
-      //   //   return false
-      //   // }
-      // }
 
       ourLockID = await this.fifoLock('accountModification')
 
@@ -1376,14 +1286,6 @@ class StateManager extends EventEmitter {
     this.emit('applied')
     return true
   }
-
-  // wrapAcceptedTx (tx, receipt) {
-  //   let timestamp = tx.txnTimestamp // todo not great that we are cracking this, should wrap in a helper
-  //   let txStatus = 1 // todo real values for tx status. this is just a stand in
-  //   let txId = receipt.txHash
-  //   let acceptedTX = { id: txId, timestamp, data: tx, status: txStatus, receipt: receipt }
-  //   return acceptedTX
-  // }
 
   queueAcceptedTransaction (acceptedTX, sendGossip = true) {
     let keysResponse = this.app.getKeyFromTransaction(acceptedTX.data)
