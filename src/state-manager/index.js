@@ -1186,7 +1186,7 @@ class StateManager extends EventEmitter {
       // check account age to make sure it is older than the tx
       let failedAgeCheck = false
       for (let accountEntry of accountData) {
-        if (accountEntry.timestamp > timestamp) {
+        if (accountEntry.timestamp >= timestamp) {
           failedAgeCheck = true
           if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
         }
