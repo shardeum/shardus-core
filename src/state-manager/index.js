@@ -1028,7 +1028,7 @@ class StateManager extends EventEmitter {
       let accountEnd = 'f'.repeat(64)
       let message = { accountStart, accountEnd, tsStart: startTime, tsEnd: endTime }
 
-      await utils.sleep(5000) // wait a few seconds for things to settle
+      await utils.sleep(this.syncSettleTime) // wait a few seconds for things to settle
 
       let equalFn = (a, b) => {
         return a.stateHash === b.stateHash
