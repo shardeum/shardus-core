@@ -1296,6 +1296,7 @@ class StateManager extends EventEmitter {
     if (age > this.queueSitTime * 0.9) {
       this.fatalLogger.fatal('queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
       // TODO consider throwing this out.  right now it is just a warning
+      this.logger.playbackLogNote('oldQueueInsertion', '', 'queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
     }
 
     if (sendGossip) {
