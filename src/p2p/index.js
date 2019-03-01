@@ -460,7 +460,7 @@ class P2P extends EventEmitter {
     return true
   }
 
-  async robustQuery (nodes = [], queryFn, equalityFn, redundancy = 3, winners = null) {
+  async robustQuery (nodes = [], queryFn, equalityFn, redundancy = 3) {
     if (nodes.length === 0) throw new Error('No nodes given.')
     if (typeof queryFn !== 'function') throw new Error(`Provided queryFn ${queryFn} is not a valid function.`)
     if (typeof equalityFn !== 'function') equalityFn = util.isDeepStrictEqual
@@ -474,22 +474,30 @@ class P2P extends EventEmitter {
         this.items = []
       }
       add (newItem, node) {
+        // We search to see if we've already seen this item before
         for (let item of this.items) {
-          if (this.equalFn(newItem, item.value)) item.count++
+          // If the value of the new item is not equal to the current item, we continue searching
+          if (!this.equalFn(newItem, item.value)) continue
+          // If the new item is equal to the current item in the list,
+          // we increment the current item's counter and add the current node to the list
+          item.count++
+          item.nodes.push(node)
+          // Here we check our win condition if the current item's counter was incremented
+          // If we meet the win requirement, we return an array with the value of the item,
+          // and the list of nodes who voted for that item
           if (item.count >= this.winCount) {
-            this.items.push({ value: newItem, count: 1, node })
-            return item.value
+            return [item.value, item.nodes]
           }
+          // Otherwise, if the win condition hasn't been met,
+          // We return null to indicate no winner yet
+          return null
         }
-        this.items.push({ value: newItem, count: 1, node })
-        if (this.winCount === 1) return newItem
-      }
-      fillWinnersList (result, winners) {
-        for (let item of this.items) {
-          if (this.equalFn(result, item.value)) {
-            winners.push(item.node)
-          }
-        }
+        // If we made it through the entire items list without finding a match,
+        // We create a new item and set the count to 1
+        this.items.push({ value: newItem, count: 1, nodes: [node] })
+        // Finally, we check to see if the winCount is 1,
+        // and return the item we just created if that is the case
+        if (this.winCount === 1) return [newItem, [node]]
       }
       getHighestCount () {
         if (!this.items.length) return 0
@@ -512,7 +520,7 @@ class P2P extends EventEmitter {
     const queryNodes = async (nodes) => {
       // Wrap the query so that we know which node it's coming from
       const wrappedQuery = async (node) => {
-        let response = queryFn(node)
+        let response = await queryFn(node)
         return { response, node }
       }
 
@@ -548,9 +556,6 @@ class P2P extends EventEmitter {
       finalResult = await queryNodes(nodesToQuery)
     }
     if (finalResult) {
-      if (winners) {
-        responses.fillWinnersList(finalResult, winners)
-      }
       return finalResult
     }
 
@@ -610,7 +615,8 @@ class P2P extends EventEmitter {
       const { nodelistHash } = await this.ask(node, 'nodelisthash')
       return { nodelistHash }
     }
-    const { nodelistHash } = await this.robustQuery(nodes, queryFn)
+    const [response] = await this.robustQuery(nodes, queryFn)
+    const { nodelistHash } = response
     return nodelistHash
   }
 
@@ -625,7 +631,7 @@ class P2P extends EventEmitter {
   }
 
   async _fetchCycleMarker (nodes) {
-    const cycleMarkerInfo = await this.robustQuery(nodes, (node) => http.get(`${node.ip}:${node.port}/cyclemarker`))
+    const [cycleMarkerInfo] = await this.robustQuery(nodes, (node) => http.get(`${node.ip}:${node.port}/cyclemarker`))
     return cycleMarkerInfo
   }
 
@@ -635,7 +641,8 @@ class P2P extends EventEmitter {
       const { cycleJoined } = await http.get(`${node.ip}:${node.port}/joined/${publicKey}`)
       return { cycleJoined }
     }
-    const { cycleJoined } = await this.robustQuery(seedNodes, queryFn)
+    const [response] = await this.robustQuery(seedNodes, queryFn)
+    const { cycleJoined } = response
     if (!cycleJoined) {
       this.mainLogger.info('Unable to get cycle marker, likely this node\'s join request was not accepted.')
       return null
@@ -649,7 +656,7 @@ class P2P extends EventEmitter {
       const cycleMarkerInfo = await this.ask(node, 'cyclemarker')
       return cycleMarkerInfo
     }
-    const cycleMarkerInfo = await this.robustQuery(nodes, queryFn)
+    const [cycleMarkerInfo] = await this.robustQuery(nodes, queryFn)
     return cycleMarkerInfo
   }
 
@@ -658,7 +665,8 @@ class P2P extends EventEmitter {
       const { cycleChainHash } = await this.ask(node, 'cyclechainhash', { start, end })
       return { cycleChainHash }
     }
-    const { cycleChainHash } = await this.robustQuery(nodes, queryFn)
+    const [response] = await this.robustQuery(nodes, queryFn)
+    const { cycleChainHash } = response
     this.mainLogger.debug(`Result of robust query to fetch cycle chain hash: ${cycleChainHash}`)
     return cycleChainHash
   }
@@ -730,7 +738,8 @@ class P2P extends EventEmitter {
     }
     let unfinalizedCycle
     try {
-      ;({ unfinalizedCycle } = await this.robustQuery(nodes, queryFn, equalFn))
+      const [response] = await this.robustQuery(nodes, queryFn, equalFn)
+      ;({ unfinalizedCycle } = response)
     } catch (e) {
       this.mainLogger.debug(`Unable to get unfinalized cycle: ${e}. Need to resync cycle chain and try again.`)
       unfinalizedCycle = null
@@ -754,7 +763,7 @@ class P2P extends EventEmitter {
     }
     let node
     try {
-      node = await this.robustQuery(nodes, queryFn, equalFn)
+      [node] = await this.robustQuery(nodes, queryFn, equalFn)
     } catch (e) {
       this.mainLogger.debug(`Unable to get node: $(e.message). Unable to get consistent response from nodes.`)
       node = null

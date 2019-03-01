@@ -320,7 +320,6 @@ class StateManager extends EventEmitter {
         let result = await this.p2p.ask(node, 'get_account_state_hash', message)
         return result
       }
-      let winners = []
       let nodes = this.p2p.state.getActiveNodes(this.p2p.id)
       if (nodes.length === 0) {
         this.mainLogger.debug(`no nodes available`)
@@ -328,8 +327,9 @@ class StateManager extends EventEmitter {
       }
       this.mainLogger.debug(`DATASYNC: robustQuery get_account_state_hash from ${utils.stringifyReduce(nodes.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
       let result
+      let winners
       try {
-        result = await this.p2p.robustQuery(nodes, queryFn, equalFn, 3, winners)
+        [result, winners] = await this.p2p.robustQuery(nodes, queryFn, equalFn, 3)
       } catch (ex) {
         this.mainLogger.debug('syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         this.fatalLogger.fatal('syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -1037,13 +1037,12 @@ class StateManager extends EventEmitter {
         let result = await this.p2p.ask(node, 'get_account_state_hash', message)
         return result
       }
-      let winners = []
       // let nodes = this.p2p.state.getAllNodes(this.p2p.id)
       let nodes = this.getRandomNodesInRange(100, accountStart, accountEnd, [])
       if (nodes.length === 0) {
         return // nothing to do
       }
-      let result = await this.p2p.robustQuery(nodes, queryFn, equalFn, 3, winners)
+      let [result, winners] = await this.p2p.robustQuery(nodes, queryFn, equalFn, 3)
       if (result && result.stateHash) {
         let stateHash = await this.getAccountsStateHash(accountStart, accountEnd, startTime, endTime)
         if (stateHash === result.stateHash) {
