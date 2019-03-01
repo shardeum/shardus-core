@@ -36,6 +36,7 @@
     "loseReceiptChance": 0.000
   },
   "statistics": {
+    "save": true,
     "interval": 1
   }
 }

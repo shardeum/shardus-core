@@ -18,7 +18,6 @@ class LoadDetection {
 
   isOverloaded () {
     // return this.getCurrentLoad() > 0.8
-    this.getCurrentLoad()
     return false
   }
 }

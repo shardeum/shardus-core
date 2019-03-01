@@ -119,11 +119,10 @@ class Shardus {
 
     if (this.app) {
       this.stateManager = new StateManager(this.verboseLogs, this.profiler, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto)
-      this.statistics = new Statistics(this.config.statistics, this.stateManager.newAcceptedTXQueue, { counterNames: ['txInjected', 'txApplied', 'txRejected'] })
+      this.statistics = new Statistics(this.config.baseDir, this.config.statistics, this.stateManager.newAcceptedTXQueue, { counterNames: ['txInjected', 'txApplied', 'txRejected'] })
       this.stateManager.on('txApplied', () => this.statistics.increment('txApplied'))
 
       this.loadDetection = new LoadDetection(this.statistics)
-      this.statistics.startSnapshots()
 
       this.consensus = new Consensus(this.app, this.config, this.logger, this.crypto, this.p2p, this.storage, this.profiler)
       this.consensus.on('accepted', (...txArgs) => this.stateManager.queueAcceptedTransaction(...txArgs))
@@ -148,6 +147,7 @@ class Shardus {
         this.reporter.reportActive(nodeId)
         this.reporter.startReporting()
       }
+      if (this.statistics) this.statistics.startSnapshots()
     })
     this.p2p.on('failed', () => {
       this.shutdown(exitProcOnFail)
