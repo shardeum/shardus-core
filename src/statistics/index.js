@@ -61,7 +61,7 @@ class Statistics {
   }
 
   _takeSnapshot () {
-    const time = Date.now()
+    const time = new Date().toISOString()
     let tabSeperatedValues = ''
 
     for (const name in this.counters) {
