@@ -303,7 +303,7 @@ class StateManager extends EventEmitter {
         // need to idle for bit
         await utils.sleep(endTime - safeTime)
       }
-      this.lastStateSyncEndtime = endTime
+      this.lastStateSyncEndtime = endTime + 1 // Adding +1 so that the next query will not overlap the time bounds. this saves us from a bunch of data tracking and filtering to remove duplicates when this function is called later
 
       let firstHash
       let queryLow
