@@ -53,7 +53,6 @@ class StateManager extends EventEmitter {
   clearPartitionData () {
     // These are all for the given partition
     this.addressRange = null
-    this.dataSourceNodes = []
     this.dataSourceNode = null
     this.removedNodes = []
 
@@ -159,8 +158,6 @@ class StateManager extends EventEmitter {
 
       this.mainLogger.debug(`DATASYNC: syncStateDataForPartition partition: ${partition} low: ${lowAddress} high: ${highAddress} `)
 
-      await this.getSyncNodes(lowAddress, highAddress)
-
       await this.syncStateTableData(lowAddress, highAddress, 0, Date.now() - this.syncSettleTime)
       this.mainLogger.debug(`DATASYNC: partition: ${partition}, syncStateTableData 1st pass done.`)
 
@@ -216,39 +213,6 @@ class StateManager extends EventEmitter {
   getNumPartitions () {
     // hardcoded to one in enterprise
     return 1
-  }
-
-  async getSyncNodes (lowAddress, highAddress) {
-    // The following is repeated for each range of addresses or partitions
-    //   Nodes to get data from should be selected based on the range of addresses or partitions
-    this.dataSourceNodes = this.getRandomNodesInRange(3, lowAddress, highAddress, this.visitedNodes) // todo after enterprise: should probably expand the range used to look for node to include +- N partitions
-    if (this.dataSourceNodes.length <= 0) {
-      throw new Error('found no nodes to sync app data from')
-    }
-    if (this.dataSourceNodes.length < this.requiredNodeCount) {
-      // TODO m11: fail if not in development mode.  use a development flag?
-      // edge case would be restarting an entire network that has data..
-
-      // await utils.sleep(10000)
-      // throw new Error('FailAndRestartPartition')
-      this.mainLogger.debug(`DATASYNC: below minimum number of nodes required to sync data, but going to try anyway  required: ${this.requiredNodeCount}  available: ${this.dataSourceNodes.length}`)
-    }
-    this.dataSourceNode = this.dataSourceNodes[0]
-
-    for (let node of this.dataSourceNodes) {
-      this.visitedNodes[node.id] = true
-    }
-  }
-
-  async getMoreNodes (lowAddress, highAddress, count, excludeList = []) {
-    let moreNodes = this.getRandomNodesInRange(count, lowAddress, highAddress, excludeList) // todo after enterprise: should probably expand the range used to look for node to include +- N partitions
-    if (moreNodes.length <= count) {
-
-    }
-    for (let node of moreNodes) {
-      excludeList[node.id] = true
-    }
-    return moreNodes
   }
 
   // todo refactor: this into a util, grabbed it from p2p
@@ -853,30 +817,6 @@ class StateManager extends EventEmitter {
     await this.processAccountData()
   }
 
-  // we get any transactions we need through the acceptedTx gossip
-  async syncAcceptedTX () {
-
-  }
-
-  // this won't actually do much until after Shardus Enterprise
-  // potentially we could do a better job of tracking exactly which state table we did not get and be able to get this with half the bandwith
-  async patchRemainingStateData () {
-    this.mainLogger.debug(`DATASYNC: patchRemainingStateData`)
-
-    this.clearPartitionData()
-
-    // todo after enterprise: use only the address range that our node needs
-    this.addressRange = this.partitionToAddressRange(1)
-    let lowAddress = this.addressRange.low
-    let highAddress = this.addressRange.high
-    await this.getSyncNodes(lowAddress, highAddress)
-
-    // pick new nodes? / handle errors?
-    let startTime = this.mainStartingTs - this.syncSettleTime
-    let endTime = Date.now()
-    await this.syncStateTableData(lowAddress, highAddress, startTime, endTime)
-  }
-
   registerEndpoints () {
     // alternatively we would need to query for accepted tx.
 
@@ -1096,6 +1036,7 @@ class StateManager extends EventEmitter {
     this.logger.playbackLogNote('restoreByTx', '', `end`)
   }
 
+  // Code Not in use, but could be used as a reference for future code
   sortedArrayDifference (a, b, compareFn) {
     let results = []
     // let aIdx = 0
@@ -1116,6 +1057,7 @@ class StateManager extends EventEmitter {
     return results
   }
 
+  // Code Not in use/finished, but could be used as a reference for future code
   async restoreAccountData (nodes, accountStart, accountEnd, timeStart, timeEnd) {
     let helper = nodes[0]
 
