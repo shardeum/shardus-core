@@ -732,6 +732,12 @@ class P2P extends EventEmitter {
       return { unfinalizedCycle }
     }
     let equalFn = (payload1, payload2) => {
+      // Make a copy of the cycle payload and delete the metadata for the hash comparison,
+      // so that we get more consistent results
+      const copyPayload1 = utils.deepCopy(payload1)
+      const copyPayload2 = utils.deepCopy(payload2)
+      delete copyPayload1.metadata
+      delete copyPayload2.metadata
       const hash1 = this.crypto.hash(payload1)
       const hash2 = this.crypto.hash(payload2)
       return hash1 === hash2
@@ -818,7 +824,8 @@ class P2P extends EventEmitter {
     let chainStart = this.state.getCycleCounter()
     let chainEnd = cycleCounter
 
-    if (chainStart === chainEnd) return true
+    // We check to make sure that the last cycle we are trying to sync is not the latest one we already have
+    if (chainEnd === chainStart - 1) return true
 
     const { cycleChain, cycleMarkerCerts } = await this._fetchFinalizedChain(seedNodes, nodes, chainStart, chainEnd)
     this.mainLogger.debug(`Retrieved cycle chain: ${JSON.stringify(cycleChain)}`)

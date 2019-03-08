@@ -733,13 +733,13 @@ class P2PState extends EventEmitter {
 
   getCycles (start = 0, end = this.cycles.length) {
     if (start < 0) throw new Error('Invalid start cycle counter.')
-    if (end > this.cycles.length) throw new Error('Invalid end cycle counter.')
+    if (end > this.cycles.length + 1) this.mainLogger.error('Invalid end cycle counter.')
     return this.cycles.slice(start, end + 1)
   }
 
   getCertificates (start = 0, end = this.certificates.length) {
     if (start < 0) throw new Error('Invalid start cycle counter.')
-    if (end > this.cycles.length) throw new Error('Invalid end cycle counter.')
+    if (end > this.cycles.length + 1) this.mainLogger.error('Invalid end cycle counter.')
     return this.certificates.slice(start, end + 1)
   }
 
