@@ -734,12 +734,12 @@ class P2P extends EventEmitter {
     let equalFn = (payload1, payload2) => {
       // Make a copy of the cycle payload and delete the metadata for the hash comparison,
       // so that we get more consistent results
-      const copyPayload1 = utils.deepCopy(payload1)
-      const copyPayload2 = utils.deepCopy(payload2)
-      delete copyPayload1.metadata
-      delete copyPayload2.metadata
-      const hash1 = this.crypto.hash(payload1)
-      const hash2 = this.crypto.hash(payload2)
+      const cycle1 = utils.deepCopy(payload1.unfinalizedCycle)
+      const cycle2 = utils.deepCopy(payload2.unfinalizedCycle)
+      delete cycle1.metadata
+      delete cycle2.metadata
+      const hash1 = this.crypto.hash(cycle1)
+      const hash2 = this.crypto.hash(cycle2)
       return hash1 === hash2
     }
     let unfinalizedCycle
