@@ -14,6 +14,16 @@
         "maxLogSize": 10000000,
         "backups": 10
       },
+      "errorFile": {
+        "type": "file",
+        "maxLogSize": 10000000,
+        "backups": 10
+      },      
+      "errors": {
+        "type": "logLevelFilter",
+        "level": "ERROR",
+        "appender": "errorFile"
+      },
       "net": {
         "type": "file",
         "maxLogSize": 10000000,
@@ -23,11 +33,11 @@
         "type": "file",
         "maxLogSize": 10000000,
         "backups": 10
-      }     
+      }
     },
     "categories": {
       "default": { "appenders": [ "out" ], "level": "trace" },
-      "main": { "appenders": [ "main" ], "level": "trace" },
+      "main": { "appenders": [ "main", "errors"  ], "level": "trace" },
       "fatal": { "appenders": [ "fatal" ], "level": "fatal" },
       "net": { "appenders": [ "net" ], "level": "trace" },
       "playback": { "appenders": [ "playback" ], "level": "trace" }
