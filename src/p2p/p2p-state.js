@@ -13,12 +13,15 @@ class P2PState extends EventEmitter {
     this.maxNodesPerCycle = config.maxNodesPerCycle
     this.maxSeedNodes = config.maxSeedNodes
     this.desiredNodes = config.desiredNodes
+    this.nodeExpiryAge = config.nodeExpiryAge
+    this.maxNodesToRotate = config.maxNodesToRotate
 
     this.cycles = []
     this.certificates = []
 
     // Variables for regulating different phases cycles
     this.acceptChainUpdates = false
+    this.acceptJoinRequests = true
     this.shouldStop = false
     this.unfinalizedReady = false
     this.cyclesStarted = false
@@ -47,7 +50,8 @@ class P2PState extends EventEmitter {
       metadata: {
         bestCertDist: null,
         updateSeen: {},
-        receivedCerts: false
+        receivedCerts: false,
+        toAccept: 0
       },
       updates: {
         bestJoinRequests: [],
@@ -62,7 +66,8 @@ class P2PState extends EventEmitter {
         lost: [],
         returned: [],
         activated: [],
-        certificate: {}
+        certificate: {},
+        expired: 0
       }
     }
 
@@ -372,6 +377,73 @@ class P2PState extends EventEmitter {
     return utils.binarySearch(ordered, node, comparator)
   }
 
+  _getExpiredCountInternal () {
+    // This line allows for a configuration in which nodes never expire
+    if (this.nodeExpiryAge === 0) return 0
+    const nodes = this.nodes.ordered
+    const expiredTime = utils.getTime('s') - this.nodeExpiryAge
+    const isExpired = (node) => {
+      if (node.joinRequestTimestamp > expiredTime) {
+        return false
+      }
+      return true
+    }
+    let count = 0
+    for (const node of nodes) {
+      if (!isExpired(node)) {
+        break
+      }
+      count += 1
+    }
+    return count
+  }
+
+  // Checks if we are at max nodes already
+  getNodesNeeded () {
+    const desired = this.getDesiredCount()
+    const active = this.getActiveCount()
+    return desired - active
+  }
+
+  _setJoinAcceptance () {
+    const needed = this.getNodesNeeded()
+    if (needed < 0) {
+      this.acceptJoinRequests = false
+      return
+    }
+    const expired = this.getExpiredCount()
+    if (needed === 0 && expired === 0) {
+      this.acceptJoinRequests = false
+      return
+    }
+    this.acceptJoinRequests = true
+  }
+
+  _determineOpenSlots () {
+    let toAccept = 0
+    const needed = this.getNodesNeeded()
+    // If we're over max nodes, we don't want to open any slots
+    if (needed < 0) {
+      this.currentCycle.metadata.toAccept = toAccept
+      return
+    }
+    // If we're at max nodes but not over, we want to check if there are any expired nodes to rotate out
+    if (needed === 0) {
+      const expired = this.getExpiredCount()
+      if (expired > 0) toAccept = expired
+      if (toAccept > this.maxNodesToRotate) toAccept = this.maxNodesToRotate
+    } else {
+      // Otherwise we open up as many slots as we can, th lesser between
+      // the difference between desired and active, or the max nodes we can allow per cycle
+      const desired = this.getDesiredCount()
+      const active = this.getActiveCount()
+      const currentOpen = desired - active
+      toAccept = currentOpen
+      if (toAccept > this.maxNodesPerCycle) toAccept = this.maxNodesPerCycle
+    }
+    this.currentCycle.metadata.toAccept = toAccept
+  }
+
   _markNodesForRemoval (n) {
     const nodes = this.nodes.ordered.slice(0, n)
     const removed = this.currentCycle.data.removed
@@ -382,12 +454,16 @@ class P2PState extends EventEmitter {
   }
 
   _removeExcessNodes () {
+    const expired = this.getExpiredCount()
+    if (expired === 0) return
     const desired = this.getDesiredCount()
-    // TODO: Consider changing this to active nodes only and think about implications
-    const current = this.getAllNodes().length
-    const diff = current - desired
+    const active = this.getActiveCount()
+    const diff = active - desired
     if (diff <= 0) return
-    this._markNodesForRemoval(diff)
+    let toRemove = diff
+    if (toRemove > this.maxNodesToRotate) toRemove = this.maxNodesToRotate
+    if (toRemove > expired) toRemove = expired
+    this._markNodesForRemoval(toRemove)
   }
 
   _removeNodeFromNodelist (node) {
@@ -408,13 +484,13 @@ class P2PState extends EventEmitter {
   }
 
   async _removeNode (node) {
+    // await this.storage.deleteNodes(node)
     this._removeNodeFromNodelist(node)
-    await this.storage.deleteNodes(node)
   }
 
   async _removeNodes (nodes) {
+    // await this.storage.deleteNodes(nodes)
     this._removeNodesFromNodelist(nodes)
-    await this.storage.deleteNodes(nodes)
   }
 
   _addNodeToNodelist (node) {
@@ -484,6 +560,9 @@ class P2PState extends EventEmitter {
     const currentTime = utils.getTime('s')
     this.currentCycle.data.duration = lastCycleDuration
     this.currentCycle.data.start = lastCycleStart ? lastCycleStart + lastCycleDuration : utils.getTime('s')
+    this.currentCycle.data.expired = this._getExpiredCountInternal()
+    this._setJoinAcceptance()
+    this._determineOpenSlots()
     this.mainLogger.info(`Starting new cycle of duration ${this.getCurrentCycleDuration()}...`)
     this.mainLogger.debug(`Last cycle start time: ${lastCycleStart}`)
     this.mainLogger.debug(`Last cycle duration: ${lastCycleDuration}`)
@@ -539,8 +618,8 @@ class P2PState extends EventEmitter {
     // Get the list of best requests
     const bestRequests = this._getBestJoinRequests()
 
-    // TODO: calculate how many nodes to accept this cycle
-    const toAccept = this.maxNodesPerCycle
+    const toAccept = this.currentCycle.metadata.toAccept
+    console.log(toAccept)
 
     // If length of array is bigger, do this precheck
     const competing = bestRequests.length >= toAccept
@@ -720,6 +799,7 @@ class P2PState extends EventEmitter {
     const lost = this.getLost()
     const returned = this.getReturned()
     const activated = this.getActivated()
+    const expired = this.getExpiredCount()
 
     const cycleInfo = {
       previous,
@@ -732,7 +812,8 @@ class P2PState extends EventEmitter {
       removed,
       lost,
       returned,
-      activated
+      activated,
+      expired
     }
     if (withCert) {
       cycleInfo.certificate = this.getCurrentCertificate()
@@ -833,6 +914,10 @@ class P2PState extends EventEmitter {
   getDesiredCount () {
     // TODO: Implement an actual calculation
     return this.desiredNodes
+  }
+
+  getExpiredCount () {
+    return this.currentCycle.data.expired
   }
 
   getLastCycles (amount) {

@@ -12,6 +12,7 @@ module.exports = [
     duration: { type: Sequelize.BIGINT, allowNull: false },
     active: { type: Sequelize.BIGINT, allowNull: false },
     desired: { type: Sequelize.BIGINT, allowNull: false },
+    expired: { type: Sequelize.BIGINT, allowNull: false },
     joined: { type: Sequelize.JSON, allowNull: false },
     activated: { type: Sequelize.JSON, allowNull: false },
     removed: { type: Sequelize.JSON, allowNull: false },

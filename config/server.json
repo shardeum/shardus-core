@@ -19,7 +19,9 @@
     "gossipTimeout": 180,
     "maxNodesPerCycle": 5,
     "maxSeedNodes": 10,
-    "desiredNodes": 15
+    "desiredNodes": 15,
+    "nodeExpiryAge": 180,
+    "maxNodesToRotate": 1
   },
   "ip": {
     "externalIp": "127.0.0.1",

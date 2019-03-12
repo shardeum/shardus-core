@@ -16,6 +16,9 @@ function setupRoutes () {
   })
 
   this.network.registerExternalPost('join', async (req, res) => {
+    if (!this.state.acceptJoinRequests) {
+      return res.json({ success: false, error: 'not accepting join requests' })
+    }
     const invalidJoinReqErr = 'invalid join request'
     if (!req.body) {
       this.mainLogger.error('Invalid join request received.')
@@ -204,6 +207,7 @@ function setupRoutes () {
   // -------- GOSSIP Routes ----------
 
   this.registerGossipHandler('join', async (payload, sender, tracker) => {
+    if (!this.state.acceptJoinRequests) return this.mainLogger.debug('Join request not accepted. Not accepting join requests currently.')
     const accepted = await this.addJoinRequest(payload, tracker, false)
     if (!accepted) return this.mainLogger.debug('Join request not accepted.')
     this.mainLogger.debug('Join request accepted!')
