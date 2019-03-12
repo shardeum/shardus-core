@@ -3,17 +3,21 @@ const fs = require('fs')
 const { Readable } = require('stream')
 
 class Statistics {
-  constructor (baseDir, config, { counters = [], watchers = {} }) {
-    this.interval = config.interval * 1000
-    this.timer = null
-    this.watchers = {}
-    for (const name in watchers) {
-      const watchFn = watchers[name]
-      this.watchers[name] = new WatcherRing(60, watchFn)
-    }
+  constructor (baseDir, config, { counters = [], watchers = {}, timers = [] }, context) {
+    this.intervalDuration = config.interval * 1000
+    this.interval = null
     this.counters = {}
     for (const name of counters) {
       this.counters[name] = new CounterRing(60)
+    }
+    this.watchers = {}
+    for (const name in watchers) {
+      const watchFn = watchers[name]
+      this.watchers[name] = new WatcherRing(60, watchFn, context)
+    }
+    this.timers = {}
+    for (const name of timers) {
+      this.timers[name] = new TimerRing(60)
     }
     this.stream = null
     this.streamIsPushable = false
@@ -35,12 +39,12 @@ class Statistics {
   startSnapshots () {
     const tabSeperatedHeaders = 'Name\tValue\tTime\n'
     this._pushToStream(tabSeperatedHeaders)
-    if (!this.timer) this.timer = setInterval(this._takeSnapshot.bind(this), this.interval)
+    if (!this.interval) this.interval = setInterval(this._takeSnapshot.bind(this), this.intervalDuration)
   }
 
   stopSnapshots () {
-    clearInterval(this.timer)
-    this.timer = null
+    clearInterval(this.interval)
+    this.interval = null
   }
 
   // Increments the given CounterRing's count
@@ -71,16 +75,30 @@ class Statistics {
     return watcher.watchFn()
   }
 
+  // Starts an entry for the given id in the given TimerRing
+  startTimer (timerName, id) {
+    const timer = this.timers[timerName]
+    if (!timer) throw new Error(`Timer '${timerName}' is undefined.`)
+    timer.start(id)
+  }
+
+  // Stops an entry for the given id in the given TimerRing
+  stopTimer (timerName, id) {
+    const timer = this.timers[timerName]
+    if (!timer) throw new Error(`Timer '${timerName}' is undefined.`)
+    timer.stop(id)
+  }
+
   // Returns the current average of all elements in the given WatcherRing or CounterRing
   getAverage (name) {
-    const ringHolder = this.counters[name] || this.watchers[name]
+    const ringHolder = this.counters[name] || this.watchers[name] || this.timers[name]
     if (!ringHolder.ring) throw new Error(`Ring holder '${name}' is undefined.`)
     return ringHolder.ring.average()
   }
 
   // Returns the value of the last element of the given WatcherRing or CounterRing
   getPreviousElement (name) {
-    const ringHolder = this.counters[name] || this.watchers[name]
+    const ringHolder = this.counters[name] || this.watchers[name] || this.timers[name]
     if (!ringHolder.ring) throw new Error(`Ring holder '${name}' is undefined.`)
     return ringHolder.ring.previous()
   }
@@ -91,15 +109,15 @@ class Statistics {
 
     for (const counter in this.counters) {
       this.counters[counter].snapshot()
-      tabSeperatedValues += `${counter}-total\t${this.getCounterTotal(counter)}\t${time}\n`
       tabSeperatedValues += `${counter}-average\t${this.getAverage(counter)}\t${time}\n`
-      tabSeperatedValues += `${counter}-previous\t${this.getPreviousElement(counter)}\t${time}\n`
     }
     for (const watcher in this.watchers) {
       this.watchers[watcher].snapshot()
-      tabSeperatedValues += `${watcher}-value\t${this.getWatcherValue(watcher)}\t${time}\n`
       tabSeperatedValues += `${watcher}-average\t${this.getAverage(watcher)}\t${time}\n`
-      tabSeperatedValues += `${watcher}-previous\t${this.getPreviousElement(watcher)}\t${time}\n`
+    }
+    for (const timer in this.timers) {
+      this.timers[timer].snapshot()
+      tabSeperatedValues += `${timer}-average\t${this.getAverage(timer) / 1000}\t${time}\n`
     }
 
     this._pushToStream(tabSeperatedValues)
@@ -155,12 +173,37 @@ class CounterRing {
 }
 
 class WatcherRing {
-  constructor (length, watchFn) {
-    this.watchFn = watchFn
+  constructor (length, watchFn, context) {
+    this.watchFn = watchFn.bind(context)
     this.ring = new Ring(length)
   }
   snapshot () {
-    this.ring.save(this.watchFn())
+    const value = this.watchFn()
+    this.ring.save(value)
+  }
+}
+
+class TimerRing {
+  constructor (length) {
+    this.ids = {}
+    this.avgTimePerItem = new Ring(10)
+    this.ring = new Ring(length)
+  }
+  start (id) {
+    if (!this.ids[id]) {
+      this.ids[id] = Date.now()
+    }
+  }
+  stop (id) {
+    const entry = this.ids[id]
+    if (entry) {
+      const duration = Date.now() - entry
+      this.avgTimePerItem.save(duration)
+      delete this.ids[id]
+    }
+  }
+  snapshot () {
+    this.ring.save(this.avgTimePerItem.average())
   }
 }
 

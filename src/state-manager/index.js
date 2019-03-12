@@ -1255,6 +1255,7 @@ class StateManager extends EventEmitter {
       }
       this.newAcceptedTXQueue.splice(index + 1, 0, acceptedTX)
       this.logger.playbackLogNote('tx_addToQueue', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
+      this.emit('txQueued', acceptedTX.receipt.txHash)
 
       // start the queue if needed
       this.tryStartAcceptedQueue()
@@ -1368,6 +1369,7 @@ class StateManager extends EventEmitter {
         // apply the tx
         let acceptedTX = this.newAcceptedTXQueue.shift()
         this.logger.playbackLogNote('tx_workingOnTx', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
+        this.emit('txPopped', acceptedTX.receipt.txHash)
         let txResult = await this.applyAcceptedTransaction(acceptedTX)
 
         if (txResult.success) {

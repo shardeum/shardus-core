@@ -122,11 +122,14 @@ class Shardus {
       this.statistics = new Statistics(this.config.baseDir, this.config.statistics, {
         // counters: ['txInjected', 'txApplied', 'txRejected'],
         counters: ['txInjected', 'txApplied'],
-        watchers: { queueLength: () => this.stateManager.newAcceptedTXQueue.length }
-      })
+        watchers: { queueLength: () => this.stateManager.newAcceptedTXQueue.length },
+        timers: ['txTimeInQueue']
+      }, this)
+      this.stateManager.on('txQueued', txId => this.statistics.startTimer('txTimeInQueue', txId))
+      this.stateManager.on('txPopped', txId => this.statistics.stopTimer('txTimeInQueue', txId))
       this.stateManager.on('txApplied', () => this.statistics.incrementCounter('txApplied'))
 
-      this.loadDetection = new LoadDetection(this.statistics)
+      this.loadDetection = new LoadDetection(this.config.loadDetection, this.statistics)
 
       this.consensus = new Consensus(this.app, this.config, this.logger, this.crypto, this.p2p, this.storage, this.profiler)
       this.consensus.on('accepted', (...txArgs) => this.stateManager.queueAcceptedTransaction(...txArgs))

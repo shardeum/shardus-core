@@ -38,5 +38,9 @@
   "statistics": {
     "save": true,
     "interval": 1
+  },
+  "loadDetection" : {
+    "desiredTxTime": 15,
+    "loadLimit": 0.8
   }
 }

@@ -1,24 +1,23 @@
 class LoadDetection {
-  constructor (statistics) {
+  constructor (config, statistics) {
     this.statistics = statistics
+    this.desiredTxTime = config.desiredTxTime
+    this.loadLimit = config.loadLimit
   }
 
   /**
    * Returns a number between 0 and 1 indicating the current load.
    */
   getCurrentLoad () {
-    /*
-    console.log('DBG', 'avg txInjected', this.statistics.getAverage('txInjected'))
-    console.log('DBG', 'avg txApplied', this.statistics.getAverage('txApplied'))
-    console.log('DBG', 'avg txRejected', this.statistics.getAverage('txRejected'))
-    console.log('DBG', 'avg queueLength', this.statistics.getAverage('queueLength'))
-    console.log('DBG', '======')
-    */
+    const txTimeInQueue = this.statistics.getAverage('txTimeInQueue')
+    const queueLength = this.statistics.getAverage('queueLength')
+    if (queueLength < 10) return 0
+    const load = txTimeInQueue / this.desiredTxTime
+    return load > 1 ? 1 : load
   }
 
   isOverloaded () {
-    // return this.getCurrentLoad() > 0.8
-    return false
+    return this.getCurrentLoad() > this.loadLimit
   }
 }
 
