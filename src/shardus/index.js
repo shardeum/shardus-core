@@ -119,8 +119,12 @@ class Shardus {
 
     if (this.app) {
       this.stateManager = new StateManager(this.verboseLogs, this.profiler, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto)
-      this.statistics = new Statistics(this.config.baseDir, this.config.statistics, this.stateManager.newAcceptedTXQueue, { counterNames: ['txInjected', 'txApplied', 'txRejected'] })
-      this.stateManager.on('txApplied', () => this.statistics.increment('txApplied'))
+      this.statistics = new Statistics(this.config.baseDir, this.config.statistics, {
+        // counters: ['txInjected', 'txApplied', 'txRejected'],
+        counters: ['txInjected', 'txApplied'],
+        watchers: { queueLength: () => this.stateManager.newAcceptedTXQueue.length }
+      })
+      this.stateManager.on('txApplied', () => this.statistics.incrementCounter('txApplied'))
 
       this.loadDetection = new LoadDetection(this.statistics)
 
@@ -180,7 +184,7 @@ class Shardus {
     if (this.verboseLogs) this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(req.body)}`) // not reducing tx here so we can get the long hashes
 
     if (this.loadDetection.isOverloaded()) {
-      this.statistics.increment('txRejected')
+      // this.statistics.incrementCounter('txRejected')
       return res.status(200).send({ success: false, reason: 'Maximum load exceeded.' })
     } else {
       res.status(200).send({ success: true, reason: 'Transaction queued, poll for results.' })
@@ -228,7 +232,7 @@ class Shardus {
       // Perform Consensus -- Currently no algorithm is being used
       // At this point the transaction is injected. Add a playback log
       this.logger.playbackLogNote('tx_injected', `${txId}`, `Transaction: ${utils.stringifyReduce(inTransaction)}`)
-      this.statistics.increment('txInjected')
+      this.statistics.incrementCounter('txInjected')
       this.profiler.profileSectionStart('consensusInject')
       this.consensus.inject(shardusTransaction).then(transactionReceipt => {
         this.profiler.profileSectionEnd('consensusInject')

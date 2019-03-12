@@ -87,8 +87,8 @@ class Reporter {
       const appState = this.stateManager ? await this.stateManager.getAccountsStateHash() : allZeroes64
       const cycleMarker = this.p2p.getCycleMarker()
       const nodelistHash = this.p2p.getNodelistHash()
-      const txInjected = this.statistics ? this.statistics.previous('txInjected') : 0
-      const txApplied = this.statistics ? this.statistics.previous('txApplied') : 0
+      const txInjected = this.statistics ? this.statistics.getPreviousElement('txInjected') : 0
+      const txApplied = this.statistics ? this.statistics.getPreviousElement('txApplied') : 0
       const reportInterval = this.config.interval
       const nodeIpInfo = this.p2p.getIpInfo()
 
@@ -109,8 +109,8 @@ class Reporter {
     let time = Date.now()
     let delta = time - this.lastTime
     delta = delta * 0.001
-    const txInjected = this.statistics ? this.statistics.previous('txInjected') : 0
-    const txApplied = this.statistics ? this.statistics.previous('txApplied') : 0
+    const txInjected = this.statistics ? this.statistics.getPreviousElement('txInjected') : 0
+    const txApplied = this.statistics ? this.statistics.getPreviousElement('txApplied') : 0
     let report = `Perf inteval ${delta}    ${txInjected} Injected @${txInjected / delta} per second.    ${txApplied} Applied @${txApplied / delta} per second`
     this.lastTime = time
 

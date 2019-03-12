@@ -3,15 +3,18 @@ const fs = require('fs')
 const { Readable } = require('stream')
 
 class Statistics {
-  constructor (baseDir, config, acceptedTxQueue, { counterNames = [] }) {
+  constructor (baseDir, config, { counters = [], watchers = {} }) {
     this.interval = config.interval * 1000
     this.timer = null
-    this.acceptedTxQueue = acceptedTxQueue
+    this.watchers = {}
+    for (const name in watchers) {
+      const watchFn = watchers[name]
+      this.watchers[name] = new WatcherRing(60, watchFn)
+    }
     this.counters = {}
-    for (const name of counterNames) {
+    for (const name of counters) {
       this.counters[name] = new CounterRing(60)
     }
-    this.queueLengthRing = new Ring(60)
     this.stream = null
     this.streamIsPushable = false
     if (config.save) {
@@ -40,39 +43,64 @@ class Statistics {
     this.timer = null
   }
 
-  increment (name) {
-    this.counters[name].increment()
+  // Increments the given CounterRing's count
+  incrementCounter (counterName) {
+    const counter = this.counters[counterName]
+    if (!counter) throw new Error(`Counter '${counterName}' is undefined.`)
+    counter.increment()
   }
 
-  count (name) {
-    return this.counters[name].count
+  // Returns the current count of the given CounterRing
+  getCurrentCount (counterName) {
+    const counter = this.counters[counterName]
+    if (!counter) throw new Error(`Counter '${counterName}' is undefined.`)
+    return counter.count
   }
 
-  average (name) {
-    return this.counters[name].ring.average()
+  // Returns the current total of the given CounterRing
+  getCounterTotal (counterName) {
+    const counter = this.counters[counterName]
+    if (!counter) throw new Error(`Counter '${counterName}' is undefined.`)
+    return counter.total
   }
 
-  previous (name) {
-    return this.counters[name].ring.previous()
+  // Returns the result of the given WatcherRings watchFn
+  getWatcherValue (watcherName) {
+    const watcher = this.watchers[watcherName]
+    if (!watcher) throw new Error(`Watcher '${watcherName}' is undefined.`)
+    return watcher.watchFn()
   }
 
-  averageQueueLength () {
-    return this.queueLengthRing.average()
+  // Returns the current average of all elements in the given WatcherRing or CounterRing
+  getAverage (name) {
+    const ringHolder = this.counters[name] || this.watchers[name]
+    if (!ringHolder.ring) throw new Error(`Ring holder '${name}' is undefined.`)
+    return ringHolder.ring.average()
+  }
+
+  // Returns the value of the last element of the given WatcherRing or CounterRing
+  getPreviousElement (name) {
+    const ringHolder = this.counters[name] || this.watchers[name]
+    if (!ringHolder.ring) throw new Error(`Ring holder '${name}' is undefined.`)
+    return ringHolder.ring.previous()
   }
 
   _takeSnapshot () {
     const time = new Date().toISOString()
     let tabSeperatedValues = ''
 
-    for (const name in this.counters) {
-      this.counters[name].snapshot()
-      tabSeperatedValues += `${name}-count\t${this.count(name)}\t${time}\n`
-      tabSeperatedValues += `${name}-average\t${this.average(name)}\t${time}\n`
-      tabSeperatedValues += `${name}-previous\t${this.previous(name)}\t${time}\n`
+    for (const counter in this.counters) {
+      this.counters[counter].snapshot()
+      tabSeperatedValues += `${counter}-total\t${this.getCounterTotal(counter)}\t${time}\n`
+      tabSeperatedValues += `${counter}-average\t${this.getAverage(counter)}\t${time}\n`
+      tabSeperatedValues += `${counter}-previous\t${this.getPreviousElement(counter)}\t${time}\n`
     }
-    this.queueLengthRing.save(this.acceptedTxQueue.length)
-    tabSeperatedValues += `queueLength-average\t${this.averageQueueLength()}\t${time}\n`
-    tabSeperatedValues += `queueLength-previous\t${this.averageQueueLength()}\t${time}\n`
+    for (const watcher in this.watchers) {
+      this.watchers[watcher].snapshot()
+      tabSeperatedValues += `${watcher}-value\t${this.getWatcherValue(watcher)}\t${time}\n`
+      tabSeperatedValues += `${watcher}-average\t${this.getAverage(watcher)}\t${time}\n`
+      tabSeperatedValues += `${watcher}-previous\t${this.getPreviousElement(watcher)}\t${time}\n`
+    }
 
     this._pushToStream(tabSeperatedValues)
   }
@@ -113,14 +141,26 @@ class Ring {
 class CounterRing {
   constructor (length) {
     this.count = 0
+    this.total = 0
     this.ring = new Ring(length)
   }
   increment () {
     ++this.count
+    ++this.total
   }
   snapshot () {
     this.ring.save(this.count)
     this.count = 0
+  }
+}
+
+class WatcherRing {
+  constructor (length, watchFn) {
+    this.watchFn = watchFn
+    this.ring = new Ring(length)
+  }
+  snapshot () {
+    this.ring.save(this.watchFn())
   }
 }
 
