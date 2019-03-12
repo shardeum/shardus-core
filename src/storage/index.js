@@ -192,10 +192,26 @@ class Storage {
       throw new Error(e)
     }
   }
-  async deleteNodes (node) {
+  async deleteNodes (nodes) {
     this._checkInit()
+    const nodeIds = []
+    // Attempt to add node to the nodeIds list
+    const addNodeToList = (node) => {
+      if (!node.id) {
+        this.mainLogger.error(`Node attempted to be deleted without ID: ${JSON.stringify(node)}`)
+        return
+      }
+      nodeIds.push(node.id)
+    }
+    if (nodes.length) {
+      for (const node of nodes) {
+        addNodeToList(node)
+      }
+    } else {
+      addNodeToList(nodes)
+    }
     try {
-      await this._delete(this.storageModels.nodes, node)
+      await this._delete(this.storageModels.nodes, { id: { [Op.in]: nodeIds } })
     } catch (e) {
       throw new Error(e)
     }

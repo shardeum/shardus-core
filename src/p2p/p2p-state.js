@@ -484,12 +484,12 @@ class P2PState extends EventEmitter {
   }
 
   async _removeNode (node) {
-    // await this.storage.deleteNodes(node)
+    await this.storage.deleteNodes(node)
     this._removeNodeFromNodelist(node)
   }
 
   async _removeNodes (nodes) {
-    // await this.storage.deleteNodes(nodes)
+    await this.storage.deleteNodes(nodes)
     this._removeNodesFromNodelist(nodes)
   }
 
@@ -619,7 +619,6 @@ class P2PState extends EventEmitter {
     const bestRequests = this._getBestJoinRequests()
 
     const toAccept = this.currentCycle.metadata.toAccept
-    console.log(toAccept)
 
     // If length of array is bigger, do this precheck
     const competing = bestRequests.length >= toAccept
