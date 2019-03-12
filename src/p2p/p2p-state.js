@@ -15,6 +15,7 @@ class P2PState extends EventEmitter {
     this.desiredNodes = config.desiredNodes
     this.nodeExpiryAge = config.nodeExpiryAge
     this.maxNodesToRotate = config.maxNodesToRotate
+    this.maxPercentOfDelta = config.maxPercentOfDelta
 
     this.cycles = []
     this.certificates = []
@@ -419,13 +420,12 @@ class P2PState extends EventEmitter {
     this.acceptJoinRequests = true
   }
 
-  _determineOpenSlots () {
+  _getOpenSlots () {
     let toAccept = 0
     const needed = this.getNodesNeeded()
     // If we're over max nodes, we don't want to open any slots
     if (needed < 0) {
-      this.currentCycle.metadata.toAccept = toAccept
-      return
+      return toAccept
     }
     // If we're at max nodes but not over, we want to check if there are any expired nodes to rotate out
     if (needed === 0) {
@@ -440,8 +440,12 @@ class P2PState extends EventEmitter {
       const currentOpen = desired - active
       toAccept = currentOpen
       if (toAccept > this.maxNodesPerCycle) toAccept = this.maxNodesPerCycle
+      // Check if the percentage of nodes to add per cycle are smaller than the current toAccept value
+      const calculatedPercent = Math.floor((this.maxPercentOfDelta / 100) * currentOpen)
+      const percentOfNodes = calculatedPercent > 0 ? calculatedPercent : 1
+      if (toAccept > percentOfNodes) toAccept = percentOfNodes
     }
-    this.currentCycle.metadata.toAccept = toAccept
+    return toAccept
   }
 
   _markNodesForRemoval (n) {
@@ -562,7 +566,7 @@ class P2PState extends EventEmitter {
     this.currentCycle.data.start = lastCycleStart ? lastCycleStart + lastCycleDuration : utils.getTime('s')
     this.currentCycle.data.expired = this._getExpiredCountInternal()
     this._setJoinAcceptance()
-    this._determineOpenSlots()
+    this.currentCycle.metadata.toAccept = this._getOpenSlots()
     this.mainLogger.info(`Starting new cycle of duration ${this.getCurrentCycleDuration()}...`)
     this.mainLogger.debug(`Last cycle start time: ${lastCycleStart}`)
     this.mainLogger.debug(`Last cycle duration: ${lastCycleDuration}`)

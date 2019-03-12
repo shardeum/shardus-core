@@ -17,11 +17,12 @@
     "netadmin": "758b1c119412298802cd28dbfa394cdfeecc4074492d60844cc192d632d84de3",
     "gossipRecipients": 4,
     "gossipTimeout": 180,
-    "maxNodesPerCycle": 5,
     "maxSeedNodes": 10,
     "desiredNodes": 15,
     "nodeExpiryAge": 180,
-    "maxNodesToRotate": 1
+    "maxNodesToRotate": 1,
+    "maxNodesPerCycle": 5,
+    "maxPercentOfDelta": 40
   },
   "ip": {
     "externalIp": "127.0.0.1",
