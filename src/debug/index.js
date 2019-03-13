@@ -3,18 +3,49 @@ const path = require('path')
 const tar = require('tar')
 
 class Debug {
-  constructor (baseDir, logger, storage, network) {
+  constructor (baseDir, network) {
+    this.baseDir = baseDir
     this.network = network
     this.archiveName = `debug-${network.ipInfo.externalIp}-${network.ipInfo.externalPort}.tar.gz`
     this.archiveFilePath = path.join(baseDir, this.archiveName)
-    this.logsDirPath = logger.logDir
-    this.dbDirPath = path.parse(storage.storage.storageConfig.options.storage).dir
+    this.folders = []
+    this.files = []
     this._registerRoutes()
+  }
+
+  addFolder (src, dest) {
+    if (path.isAbsolute(dest)) throw new Error('"dest" must be a relative path.')
+    src = path.isAbsolute(src) ? src : path.resolve(path.join(this.baseDir, src))
+    this.folders.push([src, dest])
+  }
+
+  addFile (src, dest) {
+    if (path.isAbsolute(dest)) throw new Error('"dest" must be a relative path.')
+    src = path.isAbsolute(src) ? src : path.resolve(path.join(this.baseDir, src))
+    this.files.push([src, dest])
+  }
+
+  async createArchive (output) {
+    output = path.resolve(output)
+    const tmpDir = output.replace(/\.tar\.gz/, '')
+    const outputDir = tmpDir.split(path.sep).slice(0, -1).join(path.sep)
+
+    for (const [src, dest] of this.folders) {
+      const absoluteDest = path.resolve(path.join(tmpDir, dest))
+      copyDirSync(src, absoluteDest)
+    }
+    for (const [src, dest] of this.files) {
+      const absoluteDest = path.resolve(path.join(tmpDir, dest))
+      fs.copyFileSync(src, absoluteDest)
+    }
+
+    await tar.create({ gzip: true, file: output, cwd: outputDir }, [path.relative(outputDir, tmpDir)])
+    rimraf(tmpDir)
   }
 
   _registerRoutes () {
     this.network.registerExternalGet('debug', async (req, res) => {
-      await createArchive({ output: this.archiveFilePath, logs: this.logsDirPath, db: this.dbDirPath })
+      await this.createArchive(this.archiveFilePath)
       res.download(this.archiveFilePath, this.archiveName)
     })
   }
@@ -22,45 +53,25 @@ class Debug {
 
 module.exports = Debug
 
-async function createArchive ({ output, logs, db }) {
-  output = path.resolve(output)
-  logs = path.resolve(logs)
-  db = path.resolve(db)
-
-  const tmpDir = output.replace(/\.tar\.gz/, '')
-  const outputDir = tmpDir.split(path.sep).slice(0, -1).join(path.sep)
-
-  await copyDirSync(logs, path.join(tmpDir, 'logs'))
-  await copyDirSync(db, path.join(tmpDir, 'db'))
-
-  await tar.create({ gzip: true, file: output, cwd: outputDir }, [path.relative(outputDir, tmpDir)])
-
-  rimraf(tmpDir)
+function ensureExists (dir) {
+  try {
+    fs.mkdirSync(dir, { recursive: true })
+  } catch (err) {
+    // Ignore err if folder exists
+    if (err.code !== 'EEXIST') {
+      // Something else went wrong
+      throw err
+    }
+  }
 }
 
-async function ensureExists (dir) {
-  return new Promise((resolve, reject) => {
-    fs.mkdir(dir, { recursive: true }, (err) => {
-      if (err) {
-        // Ignore err if folder exists
-        if (err.code === 'EEXIST') resolve()
-        // Something else went wrong
-        else reject(err)
-      } else {
-        // Successfully created folder
-        resolve()
-      }
-    })
-  })
-}
-
-async function copyDirSync (src, tgt) {
-  await ensureExists(tgt)
+function copyDirSync (src, tgt) {
+  ensureExists(tgt)
   const files = fs.readdirSync(src)
   for (const file of files) {
     const srcFilePath = path.join(src, file)
     const tgtFilePath = path.join(tgt, file)
-    fs.lstatSync(srcFilePath).isDirectory() ? await copyDirSync(srcFilePath, tgt) : fs.copyFileSync(srcFilePath, tgtFilePath)
+    fs.lstatSync(srcFilePath).isDirectory() ? copyDirSync(srcFilePath, tgt) : fs.copyFileSync(srcFilePath, tgtFilePath)
   }
 }
 

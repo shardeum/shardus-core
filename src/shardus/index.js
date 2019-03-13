@@ -13,6 +13,7 @@ const Statistics = require('../statistics')
 const LoadDetection = require('../load-detection')
 const Profiler = require('../utils/profiler.js')
 const allZeroes64 = '0'.repeat(64)
+const path = require('path')
 
 class Shardus {
   constructor ({ server: config, logs: logsConfig, storage: storageConfig }) {
@@ -115,7 +116,9 @@ class Shardus {
     const p2pConf = { ipInfo, ipServer, timeServer, seedList, syncLimit, netadmin, cycleDuration, maxRejoinTime, difficulty, queryDelay, gossipRecipients, gossipTimeout, maxNodesPerCycle }
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto)
     await this.p2p.init(this.network)
-    this.debug = new Debug(this.config.baseDir, this.logger, this.storage, this.network)
+    this.debug = new Debug(this.config.baseDir, this.network)
+    this.debug.addFolder(this.logger.logDir, './logs')
+    this.debug.addFolder(path.parse(this.storage.storage.storageConfig.options.storage).dir, './db')
 
     if (this.app) {
       this.stateManager = new StateManager(this.verboseLogs, this.profiler, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto)
@@ -124,6 +127,7 @@ class Shardus {
         watchers: { queueLength: () => this.stateManager.newAcceptedTXQueue.length },
         timers: ['txTimeInQueue']
       }, this)
+      this.debug.addFile('./statistics.tsv', './statistics.tsv')
       this.stateManager.on('txQueued', txId => this.statistics.startTimer('txTimeInQueue', txId))
       this.stateManager.on('txPopped', txId => this.statistics.stopTimer('txTimeInQueue', txId))
       this.stateManager.on('txApplied', () => this.statistics.incrementCounter('txApplied'))
