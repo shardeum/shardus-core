@@ -19,6 +19,7 @@ class Statistics {
     for (const name of timers) {
       this.timers[name] = new TimerRing(60)
     }
+    this.snapshotWriteFns = []
     this.stream = null
     this.streamIsPushable = false
     if (config.save) {
@@ -34,6 +35,10 @@ class Statistics {
     this.stream = new Readable()
     this.stream._read = () => { this.streamIsPushable = true }
     return this.stream
+  }
+
+  writeOnSnapshot (writeFn, context) {
+    this.snapshotWriteFns.push(writeFn.bind(context))
   }
 
   startSnapshots () {
@@ -89,14 +94,21 @@ class Statistics {
     timer.stop(id)
   }
 
-  // Returns the current average of all elements in the given WatcherRing or CounterRing
+  // Returns the average timePerItem of the given TimerRing
+  getAvgTimePerItem (timerName) {
+    const timer = this.timers[timerName]
+    if (!timer) throw new Error(`Timer '${timerName}' is undefined.`)
+    return timer.timePerItem.average()
+  }
+
+  // Returns the current average of all elements in the given WatcherRing, CounterRing, or TimerRing
   getAverage (name) {
     const ringHolder = this.counters[name] || this.watchers[name] || this.timers[name]
     if (!ringHolder.ring) throw new Error(`Ring holder '${name}' is undefined.`)
     return ringHolder.ring.average()
   }
 
-  // Returns the value of the last element of the given WatcherRing or CounterRing
+  // Returns the value of the last element of the given WatcherRing, CounterRing, or TimerRing
   getPreviousElement (name) {
     const ringHolder = this.counters[name] || this.watchers[name] || this.timers[name]
     if (!ringHolder.ring) throw new Error(`Ring holder '${name}' is undefined.`)
@@ -110,6 +122,7 @@ class Statistics {
     for (const counter in this.counters) {
       this.counters[counter].snapshot()
       tabSeperatedValues += `${counter}-average\t${this.getAverage(counter)}\t${time}\n`
+      tabSeperatedValues += `${counter}-total\t${this.getCounterTotal(counter)}\t${time}\n`
     }
     for (const watcher in this.watchers) {
       this.watchers[watcher].snapshot()
@@ -118,6 +131,11 @@ class Statistics {
     for (const timer in this.timers) {
       this.timers[timer].snapshot()
       tabSeperatedValues += `${timer}-average\t${this.getAverage(timer) / 1000}\t${time}\n`
+      tabSeperatedValues += `${timer}-timePerItem\t${this.getAvgTimePerItem(timer) / 1000}\t${time}\n`
+    }
+
+    for (const writeFn of this.snapshotWriteFns) {
+      tabSeperatedValues += writeFn()
     }
 
     this._pushToStream(tabSeperatedValues)
@@ -186,7 +204,7 @@ class WatcherRing {
 class TimerRing {
   constructor (length) {
     this.ids = {}
-    this.avgTimePerItem = new Ring(10)
+    this.timePerItem = new Ring(10)
     this.ring = new Ring(length)
   }
   start (id) {
@@ -198,12 +216,12 @@ class TimerRing {
     const entry = this.ids[id]
     if (entry) {
       const duration = Date.now() - entry
-      this.avgTimePerItem.save(duration)
+      this.timePerItem.save(duration)
       delete this.ids[id]
     }
   }
   snapshot () {
-    this.ring.save(this.avgTimePerItem.average())
+    this.ring.save(this.timePerItem.average())
   }
 }
 

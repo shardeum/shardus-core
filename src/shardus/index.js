@@ -120,8 +120,7 @@ class Shardus {
     if (this.app) {
       this.stateManager = new StateManager(this.verboseLogs, this.profiler, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto)
       this.statistics = new Statistics(this.config.baseDir, this.config.statistics, {
-        // counters: ['txInjected', 'txApplied', 'txRejected'],
-        counters: ['txInjected', 'txApplied'],
+        counters: ['txInjected', 'txApplied', 'txRejected'],
         watchers: { queueLength: () => this.stateManager.newAcceptedTXQueue.length },
         timers: ['txTimeInQueue']
       }, this)
@@ -130,6 +129,11 @@ class Shardus {
       this.stateManager.on('txApplied', () => this.statistics.incrementCounter('txApplied'))
 
       this.loadDetection = new LoadDetection(this.config.loadDetection, this.statistics)
+      this.statistics.writeOnSnapshot(() => {
+        const time = new Date().toISOString()
+        const load = this.loadDetection.getCurrentLoad()
+        return `serverLoad\t${load}\t${time}\n`
+      }, this)
 
       this.consensus = new Consensus(this.app, this.config, this.logger, this.crypto, this.p2p, this.storage, this.profiler)
       this.consensus.on('accepted', (...txArgs) => this.stateManager.queueAcceptedTransaction(...txArgs))
@@ -187,7 +191,7 @@ class Shardus {
     if (this.verboseLogs) this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(req.body)}`) // not reducing tx here so we can get the long hashes
 
     if (this.loadDetection.isOverloaded()) {
-      // this.statistics.incrementCounter('txRejected')
+      this.statistics.incrementCounter('txRejected')
       return res.status(200).send({ success: false, reason: 'Maximum load exceeded.' })
     } else {
       res.status(200).send({ success: true, reason: 'Transaction queued, poll for results.' })
