@@ -380,7 +380,7 @@ class P2P extends EventEmitter {
       await this._waitUntilUpdatePhase(currentTime, cycleStart, cycleDuration)
     }
     if (this.verboseLogs) this.mainLogger.debug(`Gossiping message: ${JSON.stringify(message)} on '${route}'.`)
-    await this.sendGossip(route, message)
+    await this.sendGossipIn(route, message)
   }
 
   async _attemptJoin (seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration) {
@@ -941,7 +941,7 @@ class P2P extends EventEmitter {
     }
     const active = this.isActive()
     if (!active) return true
-    await this.sendGossip('join', joinRequest, tracker)
+    await this.sendGossipIn('join', joinRequest, tracker)
     return true
   }
 

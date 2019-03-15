@@ -146,10 +146,10 @@ function setupRoutes () {
       const [added] = this.state.addCertificate(hisCertificate, true)
       if (!added) {
         const myCertificate = this.state.getCurrentCertificate()
-        await this.sendGossip('certificate', myCertificate)
+        await this.sendGossipIn('certificate', myCertificate)
         return
       }
-      await this.sendGossip('certificate', hisCertificate)
+      await this.sendGossipIn('certificate', hisCertificate)
     }
   })
 
@@ -200,7 +200,7 @@ function setupRoutes () {
     // Add status update of given node to queue
     const added = await this.state.addStatusUpdate(payload)
     if (!added) return this.mainLogger.debug(`Status update to active for ${payload.nodeId} not added.`)
-    await this.sendGossip('active', payload, tracker)
+    await this.sendGossipIn('active', payload, tracker)
   })
 
   this.registerGossipHandler('certificate', async (payload, sender, tracker) => {
@@ -223,13 +223,13 @@ function setupRoutes () {
           const [added] = this.state.addCertificate(certificate, true)
           if (!added) {
             const ourCert = this.state.getCurrentCertificate()
-            await this.sendGossip('certificate', ourCert, tracker)
+            await this.sendGossipIn('certificate', ourCert, tracker)
             return
           }
           break
       }
     }
-    await this.sendGossip('certificate', certificate, tracker)
+    await this.sendGossipIn('certificate', certificate, tracker)
   })
 
   // -------- DEMO Routes ----------

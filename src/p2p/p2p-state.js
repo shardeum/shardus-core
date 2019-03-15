@@ -561,7 +561,7 @@ class P2PState extends EventEmitter {
     const [added] = this.addCertificate(certificate)
     if (!added) return
     if (!gossip) return
-    await this.p2p.sendGossip('certificate', certificate)
+    await this.p2p.sendGossipIn('certificate', certificate)
   }
 
   async addUnfinalizedAndStart (cycle) {
