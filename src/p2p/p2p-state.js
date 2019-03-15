@@ -543,7 +543,7 @@ class P2PState extends EventEmitter {
       this._startNewCycle()
     }, endTime)
     if (this.getActiveNodes(this.p2p.id).length > 0) {
-      if (!this.currentCycle.metadata.receivedCerts) await this.p2p.requestUpdatesFromRandom()
+      await this.p2p.requestUpdatesFromRandom()
     }
     this.unfinalizedReady = true
   }
