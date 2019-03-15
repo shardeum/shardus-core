@@ -143,7 +143,13 @@ function setupRoutes () {
     if (cycleUpdated) {
       this.mainLogger.debug('Updated our cycle data after getting a `cycleupdates` request.')
       // Use the askers cert if its better than the one you made
-      this.state.addCertificate(hisCertificate, true)
+      const [added] = this.state.addCertificate(hisCertificate, true)
+      if (!added) {
+        const myCertificate = this.state.getCurrentCertificate()
+        await this.sendGossip('certificate', myCertificate)
+        return
+      }
+      await this.sendGossip('certificate', hisCertificate)
     }
   })
 
@@ -217,7 +223,7 @@ function setupRoutes () {
           const [added] = this.state.addCertificate(certificate, true)
           if (!added) {
             const ourCert = this.state.getCurrentCertificate()
-            this.sendGossip('certificate', ourCert, tracker)
+            await this.sendGossip('certificate', ourCert, tracker)
             return
           }
           break
