@@ -916,7 +916,7 @@ class P2P extends EventEmitter {
   }
 
   async requestUpdatesFromRandom () {
-    const randomNode = getRandom(this.state.getAllNodes(this.id), 1)
+    const [randomNode] = getRandom(this.state.getAllNodes(this.id), 1)
     const randNodeId = randomNode.id
     await this._requestUpdatesAndAdd(randNodeId)
   }
