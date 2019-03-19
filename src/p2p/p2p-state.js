@@ -487,12 +487,12 @@ class P2PState extends EventEmitter {
     }
   }
 
-  async _removeNode (node) {
+  async removeNode (node) {
     await this.storage.deleteNodes(node)
     this._removeNodeFromNodelist(node)
   }
 
-  async _removeNodes (nodes) {
+  async removeNodes (nodes) {
     await this.storage.deleteNodes(nodes)
     this._removeNodesFromNodelist(nodes)
   }
@@ -779,7 +779,7 @@ class P2PState extends EventEmitter {
     const cycleAdded = this.addCycle(cycleInfo, certificate)
 
     const removedNodes = this._getRemovedNodes()
-    const removed = this._removeNodes(removedNodes)
+    const removed = this.removeNodes(removedNodes)
 
     const promises = [accepted, activated, removed, cycleAdded]
     try {

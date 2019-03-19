@@ -856,8 +856,11 @@ class P2P extends EventEmitter {
     // Robust query for all the nodes' node info, and add nodes
     // Then go back through and mark all nodes that you saw as active if they aren't
 
+
+    // TODO: Refactor: Consider if this needs to be done cycle by cycle or if it can just be done all at once
     const toAdd = []
     const toSetActive = []
+    const toRemove = []
     for (let cycle of cycleChain) {
       // If nodes joined in this cycle, add them to toAdd list
       if (cycle.joined.length) {
@@ -870,6 +873,13 @@ class P2P extends EventEmitter {
       if (cycle.activated.length) {
         for (const id of cycle.activated) {
           toSetActive.push(id)
+        }
+      }
+
+      // If nodes were removed in this cycle, make sure to remove them
+      if (cycle.removed.length) {
+        for (const id of cycle.removed) {
+          toRemove.push(id)
         }
       }
     }
@@ -895,6 +905,12 @@ class P2P extends EventEmitter {
     this.mainLogger.debug(`Missed active updates for the following nodes: ${JSON.stringify(toSetActive)}. Attempting to update the status for each one.`)
     for (const id of toSetActive) {
       await this.state.directStatusUpdate(id, 'active')
+    }
+
+    this.mainLogger.debug(`Missed removing the following nodes: ${JSON.stringify(toRemove)}. Attempting to remove each node.`)
+    for (const id of toRemove) {
+      const node = this.state.getNode(id)
+      await this.state.removeNode(id)
     }
     return true
   }
