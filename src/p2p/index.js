@@ -856,7 +856,6 @@ class P2P extends EventEmitter {
     // Robust query for all the nodes' node info, and add nodes
     // Then go back through and mark all nodes that you saw as active if they aren't
 
-
     // TODO: Refactor: Consider if this needs to be done cycle by cycle or if it can just be done all at once
     const toAdd = []
     const toSetActive = []
@@ -910,7 +909,7 @@ class P2P extends EventEmitter {
     this.mainLogger.debug(`Missed removing the following nodes: ${JSON.stringify(toRemove)}. Attempting to remove each node.`)
     for (const id of toRemove) {
       const node = this.state.getNode(id)
-      await this.state.removeNode(id)
+      await this.state.removeNode(node)
     }
     return true
   }
