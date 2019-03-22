@@ -62,6 +62,18 @@ class Reporter {
     }
   }
 
+  async reportRemoved (nodeId) {
+    if (!this.hasRecipient) {
+      return
+    }
+    try {
+      await http.post(`${this.config.recipient}/removed`, { nodeId })
+    } catch (e) {
+      this.mainLogger.error('reportRemoved: ' + e.name + ': ' + e.message + ' at ' + e.stack)
+      console.error(e)
+    }
+  }
+
   // Sends a report
   async _sendReport (data) {
     if (!this.hasRecipient) {

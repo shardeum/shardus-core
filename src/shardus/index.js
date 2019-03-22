@@ -181,7 +181,7 @@ class Shardus {
     this.p2p.on('removed', async () => {
       if (this.reporter) {
         this.reporter.stopReporting()
-        // TODO: 2) report 'removed' to reporter
+        await this.reporter.reportRemoved(this.p2p.id)
       }
       if (this.app) {
         await this.app.deleteLocalAccountData()
