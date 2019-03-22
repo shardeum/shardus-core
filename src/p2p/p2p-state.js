@@ -336,6 +336,7 @@ class P2PState extends EventEmitter {
   }
 
   async _acceptNode (node, cycleMarker) {
+    node.curvePublicKey = this.crypto.convertPublicKeyToCurve(node.publicKey)
     let nodeId = this.computeNodeId(node.publicKey, cycleMarker)
     node.id = nodeId
     node.cycleJoined = cycleMarker

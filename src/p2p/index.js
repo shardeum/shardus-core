@@ -159,9 +159,10 @@ class P2P extends EventEmitter {
   getPublicNodeInfo () {
     const id = this.id
     const publicKey = this.crypto.getPublicKey()
+    const curvePublicKey = this.crypto.convertPublicKeyToCurve(publicKey)
     const ipInfo = this.getIpInfo()
     const status = { status: this.state.getNodeStatus(this.id) }
-    const nodeInfo = Object.assign({ id, publicKey }, ipInfo, status)
+    const nodeInfo = Object.assign({ id, publicKey, curvePublicKey }, ipInfo, status)
     return nodeInfo
   }
 

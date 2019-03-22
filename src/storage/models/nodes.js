@@ -5,6 +5,7 @@ module.exports = [
   {
     id: { type: Sequelize.TEXT, allowNull: false, primaryKey: true },
     publicKey: { type: Sequelize.TEXT, allowNull: false },
+    curvePublicKey: { type: Sequelize.TEXT, allowNull: false },
     cycleJoined: { type: Sequelize.TEXT, allowNull: false },
     internalIp: { type: Sequelize.STRING, allowNull: false },
     externalIp: { type: Sequelize.STRING, allowNull: false },

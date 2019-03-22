@@ -7,6 +7,7 @@ class Crypto {
     this.mainLogger = logger.getLogger('main')
     this.storage = storage
     this.keypair = {}
+    this.curveKeypair = {}
     this.powGenerators = {}
   }
 
@@ -18,10 +19,14 @@ class Crypto {
       this.keypair = this._generateKeypair()
       await this.storage.setProperty('keypair', this.keypair)
       this.mainLogger.info('New keypair successfully generated and saved to database.')
-      return
+    } else {
+      this.mainLogger.info('Keypair loaded successfully from database.')
+      this.keypair = keypair
     }
-    this.mainLogger.info('Keypair loaded successfully from database.')
-    this.keypair = keypair
+    this.curveKeypair = {
+      secretKey: crypto.convertSkToCurve(this.keypair.secretKey),
+      publicKey: crypto.convertPkToCurve(this.keypair.publicKey)
+    }
   }
 
   _generateKeypair () {
@@ -30,8 +35,24 @@ class Crypto {
     return keypair
   }
 
+  convertPublicKeyToCurve (pk) {
+    return crypto.convertPkToCurve(pk)
+  }
+
   getPublicKey () {
     return this.keypair.publicKey
+  }
+
+  getCurvePublicKey () {
+    return this.curveKeypair.publicKey
+  }
+
+  tag (obj, recipientCurvePk) {
+    crypto.tagObj(obj, this.curveKeypair.secretKey, recipientCurvePk)
+  }
+
+  authenticate (obj, senderCurvePk) {
+    crypto.authenticateObj(obj, this.curveKeypair.secretKey, senderCurvePk)
   }
 
   sign (obj) {
