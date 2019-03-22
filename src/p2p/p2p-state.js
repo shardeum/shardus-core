@@ -23,9 +23,10 @@ class P2PState extends EventEmitter {
     // Variables for regulating different phases cycles
     this.acceptChainUpdates = false
     this.acceptJoinRequests = true
-    this.shouldStop = false
     this.unfinalizedReady = false
     this.cyclesStarted = false
+
+    this.shouldStop = false
 
     // Specifies valid statuses
     this.validStatuses = ['active', 'syncing']
@@ -92,12 +93,22 @@ class P2PState extends EventEmitter {
 
   _resetCycles () {
     this.cycles.length = 0
+    this.certificates.length = 0
+  }
+
+  // We leave out shouldStop in case we have recently stopped the cycles
+  _resetControlVars () {
+    this.acceptChainUpdates = false
+    this.acceptJoinRequests = true
+    this.unfinalizedReady = false
+    this.cyclesStarted = false
   }
 
   _resetState () {
     this._resetCurrentCycle()
     this._resetNodelist()
     this._resetCycles()
+    this._resetControlVars()
   }
 
   async clear () {
@@ -267,6 +278,7 @@ class P2PState extends EventEmitter {
 
   // TODO: Update this to go through entire update types
   async addCycleUpdates (updates) {
+    if (!this.cyclesStarted) return false
     const { bestJoinRequests, active } = updates
     for (const joinRequest of bestJoinRequests) {
       this._addJoinRequest(joinRequest)
@@ -471,6 +483,10 @@ class P2PState extends EventEmitter {
   }
 
   _removeNodeFromNodelist (node) {
+    if (node.id === this.p2p.id) {
+      this.mainLogger.info(`We have been marked for removal from the network. Commencing restart process. Current cycle marker: ${this.getCurrentCycleMarker()}`)
+      this.emit('removed')
+    }
     delete this.nodes[node.status][node.id]
     delete this.nodes.current[node.id]
     delete this.nodes.byPubKey[node.publicKey]
@@ -493,6 +509,7 @@ class P2PState extends EventEmitter {
   }
 
   async removeNodes (nodes) {
+    if (!nodes.length) return
     await this.storage.deleteNodes(nodes)
     this._removeNodesFromNodelist(nodes)
   }
@@ -555,9 +572,11 @@ class P2PState extends EventEmitter {
 
   stopCycles () {
     this.shouldStop = true
+    this.cyclesStarted = false
   }
 
   _startNewCycle () {
+    if (this.shouldStop) return
     this._resetCurrentCycle()
     const lastCycleDuration = this.getLastCycleDuration()
     const lastCycleStart = this.getLastCycleStart()
@@ -576,6 +595,7 @@ class P2PState extends EventEmitter {
   }
 
   _startUpdatePhase (startTime, phaseLen) {
+    if (this.shouldStop) return
     this.mainLogger.debug('Starting update phase...')
     this.acceptChainUpdates = true
     const endTime = startTime + phaseLen
@@ -668,6 +688,7 @@ class P2PState extends EventEmitter {
   }
 
   _endUpdatePhase (startTime, phaseLen) {
+    if (this.shouldStop) return
     this.mainLogger.debug('Ending update phase...')
     this.acceptChainUpdates = false
     const endTime = startTime + phaseLen
@@ -677,6 +698,7 @@ class P2PState extends EventEmitter {
   }
 
   async _startCycleSync (startTime, phaseLen) {
+    if (this.shouldStop) return
     this.mainLogger.debug('Starting cycle sync phase...')
     await this._createCycleMarker()
     const endTime = startTime + phaseLen
@@ -686,12 +708,13 @@ class P2PState extends EventEmitter {
   }
 
   async _finalizeCycle (startTime, phaseLen) {
+    if (this.shouldStop) return
     this.mainLogger.debug('Starting cycle finalization phase...')
     const endTime = startTime + phaseLen
     utils.setAlarm(async () => {
+      if (this.shouldStop) return
       await this._createCycle()
       this.unfinalizedReady = false
-      if (this.shouldStop) return
       this._startNewCycle()
     }, endTime)
     if (this.getActiveNodes(this.p2p.id).length > 0) {

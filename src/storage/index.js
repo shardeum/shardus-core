@@ -43,10 +43,6 @@ class Storage {
     if (!this.initialized) throw new Error('Storage not initialized.')
   }
 
-  async deleteAndRecreateAccountData () {
-    await this.storage.dropAndCreateModel(this.storageModels.accounts)
-  }
-
   // constructor (baseDir, config, logger, profiler) {
   //   this.profiler = profiler
   //   // Setup logger
@@ -468,14 +464,6 @@ class Storage {
     } catch (e) {
       throw new Error(e)
     }
-  }
-
-  async dropAndCreateAcceptedTransactions () {
-    await this.storage.dropAndCreateModel(this.storageModels.acceptedTxs)
-  }
-
-  async dropAndCreatAccountStateTable () {
-    await this.storage.dropAndCreateModel(this.storageModels.accountStates)
   }
 
   // example of a raw query with some similarities to what we want:

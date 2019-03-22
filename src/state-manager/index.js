@@ -19,6 +19,8 @@ class StateManager extends EventEmitter {
     this.consensus = consensus
     this.logger = logger
 
+    this._listeners = {}
+
     this.completedPartitions = []
     this.mainStartingTs = Date.now()
 
@@ -46,6 +48,7 @@ class StateManager extends EventEmitter {
     this.dataPhaseTag = 'DATASYNC: '
     // this.accountRepair
     this.applySoftLock = false
+    this.queueStopped = false
   }
 
   /* -------- DATASYNC Functions ---------- */
@@ -116,8 +119,7 @@ class StateManager extends EventEmitter {
     await utils.sleep(5000) // Temporary delay to make it easier to attach a debugger
     console.log('syncStateData start')
     // delete and re-create some tables before we sync:
-    await this.storage.dropAndCreatAccountStateTable()
-    await this.storage.dropAndCreateAcceptedTransactions()
+    await this.storage.clearAppRelatedState()
     await this.app.deleteLocalAccountData()
 
     this.mainLogger.debug(`DATASYNC: starting syncStateData`)
@@ -954,9 +956,20 @@ class StateManager extends EventEmitter {
     })
   }
 
+  _unregisterEndpoints () {
+    this.p2p.unregisterGossipHandler('acceptedTx')
+    this.p2p.unregisterInternal('get_account_state_hash')
+    this.p2p.unregisterInternal('get_account_state')
+    this.p2p.unregisterInternal('get_accepted_transactions')
+    this.p2p.unregisterInternal('get_account_data')
+    this.p2p.unregisterInternal('get_account_data2')
+    this.p2p.unregisterInternal('get_account_data3')
+    this.p2p.unregisterInternal('get_account_data_by_list')
+  }
+
   enableSyncCheck () {
     // return // hack no sync check , dont check in!!!!!
-    this.p2p.state.on('newCycle', (cycles) => process.nextTick(async () => {
+    this._registerListener(this.p2p.state, 'newCycle', (cycles) => process.nextTick(async () => {
       if (cycles.length < 2) {
         return
       }
@@ -1285,6 +1298,7 @@ class StateManager extends EventEmitter {
   }
 
   async applyAcceptedTransaction (acceptedTX) {
+    if (this.queueStopped) return
     let tx = acceptedTX.data
     let keysResponse = this.app.getKeyFromTransaction(tx)
     let { sourceKeys, targetKeys, timestamp, debugInfo } = keysResponse
@@ -1438,6 +1452,52 @@ class StateManager extends EventEmitter {
       // this should never happen as long as we are careful to use try/finally blocks
       this.fatalLogger.fatal(`Failed to unlock the fifo ${thisFifo.fifoName}: ${id}`)
     }
+  }
+
+  async _clearState () {
+    await this.storage.clearAppRelatedState()
+  }
+
+  _stopQueue () {
+    this.queueStopped = true
+  }
+
+  _clearQueue () {
+    this.newAcceptedTXQueue = []
+  }
+
+  _registerListener (emitter, event, callback) {
+    if (this._listeners[event]) {
+      this.mainLogger.fatal('State Manager can only register one listener per event!')
+      return
+    }
+    emitter.on(event, callback)
+    this._listeners[event] = [emitter, callback]
+  }
+
+  _unregisterListener (event) {
+    if (!this._listeners[event]) {
+      this.mainLogger.warn(`This event listener doesn't exist! Event: \`${event}\` in StateManager`)
+      return
+    }
+    const entry = this._listeners[event]
+    const [emitter, callback] = entry
+    emitter.removeListener(event, callback)
+    delete this._listeners[event]
+  }
+
+  _cleanupListeners () {
+    for (const event of Object.keys(this._listeners)) {
+      this._unregisterListener(event)
+    }
+  }
+
+  async cleanup () {
+    this._stopQueue()
+    this._unregisterEndpoints()
+    this._clearQueue()
+    this._cleanupListeners()
+    await this._clearState()
   }
 }
 

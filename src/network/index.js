@@ -206,7 +206,14 @@ class Network {
   }
 
   registerInternal (route, handler) {
+    if (this.internalRoutes[route]) throw Error('Handler already exists for specified internal route.')
     this.internalRoutes[route] = handler
+  }
+
+  unregisterInternal (route) {
+    if (this.internalRoutes[route]) {
+      delete this.internalRoutes[route]
+    }
   }
 }
 

@@ -41,6 +41,10 @@ class P2P extends EventEmitter {
 
     this.state = new P2PState(config, this.logger, this.storage, this, this.crypto)
 
+    this.state.on('removed', () => {
+      this.emit('removed')
+    })
+
     this.InternalRecvCounter = 0
     this.keyCounter = 0
   }
@@ -256,6 +260,12 @@ class P2P extends EventEmitter {
   }
 
   async _checkIfNeedJoin () {
+    const id = await this.storage.getProperty('id')
+    if (!id) {
+      this.mainLogger.debug('Node needs to join, no node ID found in database.')
+      return true
+    }
+
     const currExternIp = this.getIpInfo().externalIp
     const currExternPort = this.getIpInfo().externalPort
     const dbExternIp = await this.storage.getProperty('externalIp')
@@ -939,7 +949,7 @@ class P2P extends EventEmitter {
   }
 
   async requestUpdatesFromRandom () {
-    const [randomNode] = getRandom(this.state.getAllNodes(this.id), 1)
+    const [randomNode] = getRandom(this.state.getActiveNodes(this.id), 1)
     const randNodeId = randomNode.id
     await this._requestUpdatesAndAdd(randNodeId)
   }
@@ -1326,6 +1336,10 @@ class P2P extends EventEmitter {
     this.network.registerInternal(route, wrappedHandler)
   }
 
+  unregisterInternal (route) {
+    this.network.unregisterInternal(route)
+  }
+
   /**
    * Send Gossip to all nodes
    */
@@ -1450,6 +1464,12 @@ class P2P extends EventEmitter {
     this.gossipHandlers[type] = handler
   }
 
+  unregisterGossipHandler (type) {
+    if (this.gossipHandlers[type]) {
+      delete this.gossipHandlers[type]
+    }
+  }
+
   async startup () {
     const seedNodes = await this._getSeedNodes()
     this.isFirstSeed = await this._discoverNetwork(seedNodes)
@@ -1473,7 +1493,6 @@ class P2P extends EventEmitter {
     this.emit('joined', this.id, publicKey)
 
     await this._syncToNetwork(seedNodes)
-
     /*
     if (this.dataSync) {
       if (this.isFirstSeed) {
@@ -1500,7 +1519,7 @@ class P2P extends EventEmitter {
       await this.dataSync.finalTXCatchup(false)
     }
     */
-
+    this.emit('initialized')
     return true
   }
 
@@ -1508,6 +1527,14 @@ class P2P extends EventEmitter {
     if (this.state) {
       this.state.stopCycles()
     }
+  }
+
+  async restart () {
+    this.acceptInternal = false
+    this.state.stopCycles()
+    await this.state.clear()
+    console.log('Restarting, then rejoining network...')
+    await this.startup()
   }
 }
 

@@ -39,6 +39,8 @@ class Shardus {
     this.loadDetection = null
     this.rateLimiting = null
 
+    this._listeners = {}
+
     this.heartbeatInterval = config.heartbeatInterval
     this.heartbeatTimer = null
 
@@ -123,7 +125,6 @@ class Shardus {
     this.debug.addFolder(path.parse(this.storage.storage.storageConfig.options.storage).dir, './db')
 
     if (this.app) {
-      this.stateManager = new StateManager(this.verboseLogs, this.profiler, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto)
       this.statistics = new Statistics(this.config.baseDir, this.config.statistics, {
         counters: ['txInjected', 'txApplied', 'txRejected'],
         watchers: {
@@ -133,9 +134,6 @@ class Shardus {
         timers: ['txTimeInQueue']
       }, this)
       this.debug.addFile('./statistics.tsv', './statistics.tsv')
-      this.stateManager.on('txQueued', txId => this.statistics.startTimer('txTimeInQueue', txId))
-      this.stateManager.on('txPopped', txId => this.statistics.stopTimer('txTimeInQueue', txId))
-      this.stateManager.on('txApplied', () => this.statistics.incrementCounter('txApplied'))
 
       this.loadDetection = new LoadDetection(this.config.loadDetection, this.statistics)
       this.statistics.on('snapshot', () => this.loadDetection.updateLoad())
@@ -143,10 +141,11 @@ class Shardus {
       this.rateLimiting = new RateLimiting(this.config.rateLimiting, this.loadDetection)
 
       this.consensus = new Consensus(this.app, this.config, this.logger, this.crypto, this.p2p, this.storage, this.profiler)
-      this.consensus.on('accepted', (...txArgs) => this.stateManager.queueAcceptedTransaction(...txArgs))
+      this._createAndLinkStateManager()
     }
 
     this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this.statistics, this.stateManager, this.profiler) : null
+    this._attemptCreateAppliedListener()
 
     this._registerRoutes()
 
@@ -176,8 +175,78 @@ class Shardus {
       this.fatalLogger.fatal('shardus.start() ' + e.message + ' at ' + e.stack)
       throw new Error(e)
     })
-    await this.p2p.startup()
+    this.p2p.on('initialized', async () => {
+      await this.syncAppData()
+    })
+    this.p2p.on('removed', async () => {
+      if (this.reporter) {
+        this.reporter.stopReporting()
+        // TODO: 2) report 'removed' to reporter
+      }
+      if (this.app) {
+        await this.app.deleteLocalAccountData()
+        this._attemptRemoveAppliedListener()
+        this._unlinkStateManager()
+        await this.stateManager.cleanup()
+        this._createAndLinkStateManager()
+        this._attemptCreateAppliedListener()
+      }
+      await this.p2p.restart()
+    })
 
+    await this.p2p.startup()
+  }
+
+  _registerListener (emitter, event, callback) {
+    if (this._listeners[event]) {
+      this.mainLogger.fatal('Shardus can only register one listener per event!')
+      return
+    }
+    emitter.on(event, callback)
+    this._listeners[event] = [emitter, callback]
+  }
+
+  _unregisterListener (event) {
+    if (!this._listeners[event]) {
+      this.mainLogger.warn(`This event listener doesn't exist! Event: \`${event}\` in Shardus`)
+      return
+    }
+    const entry = this._listeners[event]
+    const [emitter, callback] = entry
+    emitter.removeListener(event, callback)
+    delete this._listeners[event]
+  }
+
+  _cleanupListeners () {
+    for (const event of Object.keys(this._listeners)) {
+      this._unregisterListener(event)
+    }
+  }
+
+  _attemptCreateAppliedListener () {
+    if (!this.statistics || !this.stateManager) return
+    this._registerListener(this.stateManager, 'txQueued', txId => this.statistics.startTimer('txTimeInQueue', txId))
+    this._registerListener(this.stateManager, 'txPopped', txId => this.statistics.stopTimer('txTimeInQueue', txId))
+    this._registerListener(this.stateManager, 'txApplied', () => this.statistics.incrementCounter('txApplied'))
+  }
+
+  _attemptRemoveAppliedListener () {
+    if (!this.statistics || !this.stateManager) return
+    this._unregisterListener('txQueued')
+    this._unregisterListener('txPopped')
+    this._unregisterListener('txApplied')
+  }
+
+  _unlinkStateManager () {
+    this._unregisterListener('accepted')
+  }
+
+  _createAndLinkStateManager () {
+    this.stateManager = new StateManager(this.verboseLogs, this.profiler, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto)
+    this._registerListener(this.consensus, 'accepted', (...txArgs) => this.stateManager.queueAcceptedTransaction(...txArgs))
+  }
+
+  async syncAppData () {
     if (this.stateManager) await this.stateManager.syncStateData(3)
 
     await this.p2p.goActive()
