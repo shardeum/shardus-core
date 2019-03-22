@@ -1179,17 +1179,17 @@ class P2P extends EventEmitter {
   }
 
   // Verifies that the received internal message was signed by the stated node
-  _verifySignedByNode (message, node) {
+  _authenticateByNode (message, node) {
     let result
     try {
-      if (!node.publicKey) {
-        this.mainLogger.debug('Node object did not contain public key for verifySignedByNode()!')
+      if (!node.curvePublicKey) {
+        this.mainLogger.debug('Node object did not contain curve public key for authenticateByNode()!')
         return false
       }
-      this.mainLogger.debug(`Expected publicKey: ${node.publicKey}, actual publicKey: ${message.sign.owner}`)
-      result = this.crypto.verify(message, node.publicKey)
+      this.mainLogger.debug(`Expected publicKey: ${node.curvePublicKey}`)
+      result = this.crypto.authenticate(message, node.curvePublicKey)
     } catch (e) {
-      this.mainLogger.debug(`Invalid or missing signature on message: ${JSON.stringify(message)}`)
+      this.mainLogger.debug(`Invalid or missing authentication tag on message: ${JSON.stringify(message)}`)
       return false
     }
     return result
@@ -1207,29 +1207,29 @@ class P2P extends EventEmitter {
       this.mainLogger.debug(`Invalid sender on internal payload: ${JSON.stringify(wrappedPayload)}`)
       return [null]
     }
-    const signedByNode = this._verifySignedByNode(wrappedPayload, node)
+    const authenticatedByNode = this._authenticateByNode(wrappedPayload, node)
     // Check if actually signed by that node
-    if (!signedByNode) {
-      this.mainLogger.debug('Internal payload not signed by an expected node.')
+    if (!authenticatedByNode) {
+      this.mainLogger.debug('Internal payload not authenticated by an expected node.')
       return [null]
     }
     const payload = wrappedPayload.payload
     const sender = wrappedPayload.sender
     const tracker = wrappedPayload.tracker
-    this.mainLogger.debug('Internal payload successfully verified.')
+    this.mainLogger.debug('Internal payload successfully authenticated.')
     return [payload, sender, tracker]
   }
 
-  _wrapAndSignMessage (msg, tracker = '') {
-    if (!msg) throw new Error('No message given to wrap and sign!')
+  _wrapAndTagMessage (msg, tracker = '', recipientNode) {
+    if (!msg) throw new Error('No message given to wrap and tag!')
     this.mainLogger.debug(`Attaching sender ${this.id} to the message: ${JSON.stringify(msg)}`)
     const wrapped = {
       payload: msg,
       sender: this.id,
       tracker: tracker
     }
-    const signed = this.crypto.sign(wrapped)
-    return signed
+    const tagged = this.crypto.tag(wrapped, recipientNode.curvePublicKey)
+    return tagged
   }
 
   createMsgTracker () {
@@ -1244,8 +1244,12 @@ class P2P extends EventEmitter {
     if (tracker === '') {
       tracker = this.createMsgTracker()
     }
-    const signedMessage = this._wrapAndSignMessage(message, tracker)
-    await this.network.tell(nodes, route, signedMessage, logged)
+    const promises = []
+    for (const node of nodes) {
+      const signedMessage = this._wrapAndTagMessage(message, tracker, node)
+      promises.push(this.network.tell([node], route, signedMessage, logged))
+    }
+    await Promise.all(promises)
   }
 
   // Our own P2P version of the network ask, with a sign added, and sign verified on other side
@@ -1253,7 +1257,7 @@ class P2P extends EventEmitter {
     if (tracker === '') {
       tracker = this.createMsgTracker()
     }
-    const signedMessage = this._wrapAndSignMessage(message, tracker)
+    const signedMessage = this._wrapAndTagMessage(message, tracker, node)
     const signedResponse = await this.network.ask(node, route, signedMessage, logged)
     this.mainLogger.debug(`Result of network-level ask: ${JSON.stringify(signedResponse)}`)
     const [response] = this._extractPayload(signedResponse, [node])
@@ -1275,7 +1279,8 @@ class P2P extends EventEmitter {
       let tracker = ''
       // Create wrapped respond function for sending back signed data
       const respondWrapped = async (response) => {
-        const signedResponse = this._wrapAndSignMessage(response, tracker)
+        const node = this.state.getNode(sender)
+        const signedResponse = this._wrapAndTagMessage(response, tracker, node)
         this.mainLogger.debug(`The signed wrapped response to send back: ${JSON.stringify(signedResponse)}`)
         if (route !== 'gossip') {
           this.logger.playbackLog(sender, 'self', 'InternalRecvResp', route, tracker, response)

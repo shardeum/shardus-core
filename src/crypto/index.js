@@ -48,11 +48,13 @@ class Crypto {
   }
 
   tag (obj, recipientCurvePk) {
-    crypto.tagObj(obj, this.curveKeypair.secretKey, recipientCurvePk)
+    const objCopy = JSON.parse(crypto.stringify(obj))
+    crypto.tagObj(objCopy, this.curveKeypair.secretKey, recipientCurvePk)
+    return objCopy
   }
 
   authenticate (obj, senderCurvePk) {
-    crypto.authenticateObj(obj, this.curveKeypair.secretKey, senderCurvePk)
+    return crypto.authenticateObj(obj, this.curveKeypair.secretKey, senderCurvePk)
   }
 
   sign (obj) {
