@@ -11,6 +11,7 @@ const Debug = require('../debug')
 const StateManager = require('../state-manager')
 const Statistics = require('../statistics')
 const LoadDetection = require('../load-detection')
+const RateLimiting = require('../rate-limiting')
 const Profiler = require('../utils/profiler.js')
 const allZeroes64 = '0'.repeat(64)
 const path = require('path')
@@ -36,6 +37,7 @@ class Shardus {
     this.stateManager = null
     this.statistics = null
     this.loadDetection = null
+    this.rateLimiting = null
 
     this.heartbeatInterval = config.heartbeatInterval
     this.heartbeatTimer = null
@@ -139,6 +141,8 @@ class Shardus {
         return `serverLoad\t${load}\t${time}\n`
       }, this)
 
+      this.rateLimiting = new RateLimiting(this.config.rateLimiting, this.loadDetection)
+
       this.consensus = new Consensus(this.app, this.config, this.logger, this.crypto, this.p2p, this.storage, this.profiler)
       this.consensus.on('accepted', (...txArgs) => this.stateManager.queueAcceptedTransaction(...txArgs))
     }
@@ -194,7 +198,7 @@ class Shardus {
 
     if (this.verboseLogs) this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(req.body)}`) // not reducing tx here so we can get the long hashes
 
-    if (this.loadDetection.isOverloaded()) {
+    if (this.rateLimiting.isOverloaded()) {
       this.statistics.incrementCounter('txRejected')
       return res.status(200).send({ success: false, reason: 'Maximum load exceeded.' })
     } else {

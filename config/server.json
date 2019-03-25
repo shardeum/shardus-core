@@ -39,10 +39,12 @@
     "save": true,
     "interval": 1
   },
-  "loadDetection" : {
+  "loadDetection": {
+    "queueLimit": 1000
+  },
+  "rateLimiting": {
     "limitRate": true,
     "desiredTxTime": 15,
-    "loadLimit": 0.8,
-    "queueLimit": 1000
+    "loadLimit": 0.8
   }
 }
