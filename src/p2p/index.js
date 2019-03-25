@@ -642,8 +642,15 @@ class P2P extends EventEmitter {
       const { cycleJoined } = await http.get(`${node.ip}:${node.port}/joined/${publicKey}`)
       return { cycleJoined }
     }
-    const [response] = await this.robustQuery(seedNodes, queryFn)
-    const { cycleJoined } = response
+    let query
+    while (!query) {
+      try {
+        query = await this.robustQuery(seedNodes, queryFn)
+      } catch (e) {
+        this.mainLogger.error(e)
+      }
+    }
+    const { cycleJoined } = query[0]
     if (!cycleJoined) {
       this.mainLogger.info('Unable to get cycle marker, likely this node\'s join request was not accepted.')
       return null
