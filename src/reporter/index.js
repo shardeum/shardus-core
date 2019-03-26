@@ -94,8 +94,6 @@ class Reporter {
   }
 
   startReporting () {
-    // Resets any previous tx state before reporting starts
-    this._resetTxsSeen()
     // Creates and sends a report every `interval` seconds
     this.reportTimer = setInterval(async () => {
       const appState = this.stateManager ? await this.stateManager.getAccountsStateHash() : allZeroes64
