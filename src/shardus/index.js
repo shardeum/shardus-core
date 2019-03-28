@@ -126,7 +126,10 @@ class Shardus {
       this.stateManager = new StateManager(this.verboseLogs, this.profiler, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto)
       this.statistics = new Statistics(this.config.baseDir, this.config.statistics, {
         counters: ['txInjected', 'txApplied', 'txRejected'],
-        watchers: { queueLength: () => this.stateManager.newAcceptedTXQueue.length },
+        watchers: {
+          queueLength: () => this.stateManager.newAcceptedTXQueue.length,
+          serverLoad: () => this.loadDetection.getCurrentLoad()
+        },
         timers: ['txTimeInQueue']
       }, this)
       this.debug.addFile('./statistics.tsv', './statistics.tsv')
@@ -135,11 +138,7 @@ class Shardus {
       this.stateManager.on('txApplied', () => this.statistics.incrementCounter('txApplied'))
 
       this.loadDetection = new LoadDetection(this.config.loadDetection, this.statistics)
-      this.statistics.writeOnSnapshot(() => {
-        const time = new Date().toISOString()
-        const load = this.loadDetection.getCurrentLoad()
-        return `serverLoad\t${load}\t${time}\n`
-      }, this)
+      this.statistics.on('snapshot', () => this.loadDetection.updateLoad())
 
       this.rateLimiting = new RateLimiting(this.config.rateLimiting, this.loadDetection)
 

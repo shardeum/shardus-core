@@ -123,6 +123,7 @@ class Statistics extends EventEmitter {
     for (const watcher in this.watchers) {
       this.watchers[watcher].snapshot()
       tabSeperatedValues += `${watcher}-average\t${this.getAverage(watcher)}\t${time}\n`
+      tabSeperatedValues += `${watcher}-value\t${this.getWatcherValue(watcher)}\t${time}\n`
     }
     for (const timer in this.timers) {
       this.timers[timer].snapshot()
@@ -158,7 +159,7 @@ class Ring {
     let total = 0
     for (const element of this.elements) {
       if (_exists(element)) {
-        sum += element
+        sum += Number(element)
         total++
       }
     }

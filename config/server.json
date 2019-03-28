@@ -40,11 +40,11 @@
     "interval": 1
   },
   "loadDetection": {
-    "queueLimit": 1000
+    "queueLimit": 1000,
+    "desiredTxTime": 15
   },
   "rateLimiting": {
     "limitRate": true,
-    "desiredTxTime": 15,
     "loadLimit": 0.8
   }
 }

@@ -3,18 +3,25 @@ class LoadDetection {
     this.desiredTxTime = config.desiredTxTime
     this.queueLimit = config.queueLimit
     this.statistics = statistics
+    this.load = 0
   }
 
   /**
    * Returns a number between 0 and 1 indicating the current load.
    */
-  getCurrentLoad () {
+  updateLoad () {
     const txTimeInQueue = this.statistics.getAverage('txTimeInQueue') / 1000
+    const scaledTxTimeInQueue = txTimeInQueue >= this.desiredTxTime ? 1 : txTimeInQueue / this.desiredTxTime
+
     const queueLength = this.statistics.getWatcherValue('queueLength')
-    if (queueLength < 10) return 0
-    if (queueLength > this.queueLimit) return 1
-    const load = txTimeInQueue / this.desiredTxTime
-    return load > 1 ? 1 : load
+    const scaledQueueLength = queueLength >= this.queueLimit ? 1 : queueLength / this.queueLimit
+
+    const load = scaledTxTimeInQueue + scaledQueueLength
+    this.load = load >= 1 ? 1 : load
+  }
+
+  getCurrentLoad () {
+    return this.load
   }
 }
 
