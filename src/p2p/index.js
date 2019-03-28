@@ -1314,7 +1314,7 @@ class P2P extends EventEmitter {
   /**
    * Send Gossip to all nodes
    */
-  async sendGossip (type, payload, tracker = '', nodes = this.state.getAllNodes(this.id)) {
+  async sendGossip (type, payload, tracker = '', sender = null, nodes = this.state.getAllNodes(this.id)) {
     if (nodes.length === 0) return
 
     if (tracker === '') {
@@ -1331,7 +1331,10 @@ class P2P extends EventEmitter {
     }
 
     // [TODO] pass getRandomGossipIn hash of payload
-    const recipients = getRandom(nodes, this.gossipRecipients)
+    let recipients = getRandom(nodes, this.gossipRecipients)
+    if (sender != null) {
+      recipients = removeNodesByID(recipients, [sender])
+    }
     try {
       if (this.verboseLogs) this.mainLogger.debug(`Gossiping ${type} request to these nodes: ${utils.stringifyReduce(recipients.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
       for (const node of recipients) {
@@ -1349,7 +1352,7 @@ class P2P extends EventEmitter {
   /**
    * Send Gossip to all nodes, using gossip in
    */
-  async sendGossipIn (type, payload, tracker = '', nodes = this.state.getAllNodes()) {
+  async sendGossipIn (type, payload, tracker = '', sender = null, nodes = this.state.getAllNodes()) {
     if (nodes.length === 0) return
 
     if (tracker === '') {
@@ -1371,7 +1374,10 @@ class P2P extends EventEmitter {
     if (myIdx < 0) throw new Error('Could not find self in nodes array')
     // Map back recipient idxs to node objects
     const recipientIdxs = getRandomGossipIn(nodeIdxs, this.gossipRecipients, myIdx)
-    const recipients = recipientIdxs.map(idx => nodes[idx])
+    let recipients = recipientIdxs.map(idx => nodes[idx])
+    if (sender != null) {
+      recipients = removeNodesByID(recipients, [sender])
+    }
     try {
       if (this.verboseLogs) this.mainLogger.debug(`GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(recipients.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
       for (const node of recipients) {
@@ -1498,6 +1504,12 @@ function shuffleArray (array) {
   }
 }
 
+function removeNodesByID (nodes, ids) {
+  if (!Array.isArray(ids)) {
+    return nodes
+  }
+  return nodes.filter(node => ids.indexOf(node.id) === -1)
+}
 // From: https://stackoverflow.com/a/19270021
 function getRandom (arr, n) {
   let len = arr.length

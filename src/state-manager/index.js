@@ -831,9 +831,9 @@ class StateManager extends EventEmitter {
       // docs mention putting this in a table but it seems so far that an in memory queue should be ok
       // should we filter, or instead rely on gossip in to only give us TXs that matter to us?
 
-      this.p2p.sendGossipIn('acceptedTx', acceptedTX, tracker)
+      this.p2p.sendGossipIn('acceptedTx', acceptedTX, tracker, sender)
 
-      await this.queueAcceptedTransaction(acceptedTX, false)
+      await this.queueAcceptedTransaction(acceptedTX, false, sender)
     })
 
     // /get_account_state_hash (Acc_start, Acc_end, Ts_start, Ts_end)
@@ -1229,7 +1229,7 @@ class StateManager extends EventEmitter {
     return true
   }
 
-  queueAcceptedTransaction (acceptedTX, sendGossip = true) {
+  queueAcceptedTransaction (acceptedTX, sendGossip = true, sender) {
     let keysResponse = this.app.getKeyFromTransaction(acceptedTX.data)
     let timestamp = keysResponse.timestamp
     let txId = acceptedTX.receipt.txHash
@@ -1243,7 +1243,7 @@ class StateManager extends EventEmitter {
       }
 
       if (sendGossip) {
-        this.p2p.sendGossipIn('acceptedTx', acceptedTX)
+        this.p2p.sendGossipIn('acceptedTx', acceptedTX, '', sender)
         this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
       }
       // sorted insert
