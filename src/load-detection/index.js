@@ -9,7 +9,7 @@ class LoadDetection {
    * Returns a number between 0 and 1 indicating the current load.
    */
   getCurrentLoad () {
-    const txTimeInQueue = this.statistics.getAvgTimePerItem('txTimeInQueue') / 1000
+    const txTimeInQueue = this.statistics.getAverage('txTimeInQueue') / 1000
     const queueLength = this.statistics.getWatcherValue('queueLength')
     if (queueLength < 10) return 0
     if (queueLength > this.queueLimit) return 1

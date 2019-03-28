@@ -1,9 +1,12 @@
 const path = require('path')
 const fs = require('fs')
 const { Readable } = require('stream')
+const EventEmitter = require('events')
+const utils = require('../utils')
 
-class Statistics {
+class Statistics extends EventEmitter {
   constructor (baseDir, config, { counters = [], watchers = {}, timers = [] }, context) {
+    super()
     this.intervalDuration = config.interval * 1000
     this.interval = null
     this.counters = {}
@@ -94,13 +97,6 @@ class Statistics {
     timer.stop(id)
   }
 
-  // Returns the average timePerItem of the given TimerRing
-  getAvgTimePerItem (timerName) {
-    const timer = this.timers[timerName]
-    if (!timer) throw new Error(`Timer '${timerName}' is undefined.`)
-    return timer.timePerItem.average()
-  }
-
   // Returns the current average of all elements in the given WatcherRing, CounterRing, or TimerRing
   getAverage (name) {
     const ringHolder = this.counters[name] || this.watchers[name] || this.timers[name]
@@ -131,7 +127,6 @@ class Statistics {
     for (const timer in this.timers) {
       this.timers[timer].snapshot()
       tabSeperatedValues += `${timer}-average\t${this.getAverage(timer) / 1000}\t${time}\n`
-      tabSeperatedValues += `${timer}-timePerItem\t${this.getAvgTimePerItem(timer) / 1000}\t${time}\n`
     }
 
     for (const writeFn of this.snapshotWriteFns) {
@@ -139,6 +134,7 @@ class Statistics {
     }
 
     this._pushToStream(tabSeperatedValues)
+    this.emit('snapshot')
   }
 
   _pushToStream (data) {
@@ -161,7 +157,7 @@ class Ring {
     let sum = 0
     let total = 0
     for (const element of this.elements) {
-      if (element) {
+      if (_exists(element)) {
         sum += element
         total++
       }
@@ -204,7 +200,6 @@ class WatcherRing {
 class TimerRing {
   constructor (length) {
     this.ids = {}
-    this.timePerItem = new Ring(10)
     this.ring = new Ring(length)
   }
   start (id) {
@@ -215,14 +210,26 @@ class TimerRing {
   stop (id) {
     const entry = this.ids[id]
     if (entry) {
-      const duration = Date.now() - entry
-      this.timePerItem.save(duration)
       delete this.ids[id]
     }
   }
   snapshot () {
-    this.ring.save(this.timePerItem.average())
+    // Calc median duration of all entries in ids
+    const durations = []
+    const numCompare = (a, b) => a > b ? 1 : (a < b ? -1 : 0)
+    for (const id in this.ids) {
+      const startTime = this.ids[id]
+      const duration = Date.now() - startTime
+      utils.insertSorted(durations, duration, numCompare)
+    }
+    const median = utils.computeMedian(durations, false)
+    // Save median
+    this.ring.save(median)
   }
+}
+
+function _exists (thing) {
+  return (typeof thing !== 'undefined' && thing !== null)
 }
 
 module.exports = Statistics

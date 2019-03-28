@@ -68,6 +68,29 @@ const insertSorted = (arr, item, comparator) => {
   arr.splice(index, 0, item)
 }
 
+const computeMedian = (arr, sort = true, comparator) => {
+  if (sort) {
+    arr.sort(comparator)
+  }
+  const len = arr.length
+  switch (len) {
+    case 0: {
+      return 0
+    }
+    case 1: {
+      return arr[0]
+    }
+    default: {
+      const mid = len / 2
+      if (len % 2 === 0) {
+        return arr[mid]
+      } else {
+        return (arr[Math.floor(mid)] + arr[Math.ceil(mid)]) / 2
+      }
+    }
+  }
+}
+
 const XOR = (hexString1, hexString2) => {
   const num1 = parseInt(hexString1.substring(0, 8), 16)
   const num2 = parseInt(hexString2.substring(0, 8), 16)
@@ -223,6 +246,7 @@ exports.deepCopy = deepCopy
 exports.readJson = readJson
 exports.readJsonDir = readJsonDir
 exports.insertSorted = insertSorted
+exports.computeMedian = computeMedian
 exports.XOR = XOR
 exports.setAlarm = setAlarm
 exports.isObject = isObject
