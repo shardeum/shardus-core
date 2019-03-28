@@ -68,9 +68,9 @@ const insertSorted = (arr, item, comparator) => {
   arr.splice(index, 0, item)
 }
 
-const computeMedian = (arr, sort = true, comparator) => {
+const computeMedian = (arr = [], sort = true) => {
   if (sort) {
-    arr.sort(comparator)
+    arr.sort((a, b) => a - b)
   }
   const len = arr.length
   switch (len) {

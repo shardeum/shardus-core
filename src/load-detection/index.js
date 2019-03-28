@@ -16,8 +16,8 @@ class LoadDetection {
     const queueLength = this.statistics.getWatcherValue('queueLength')
     const scaledQueueLength = queueLength >= this.queueLimit ? 1 : queueLength / this.queueLimit
 
-    const load = scaledTxTimeInQueue + scaledQueueLength
-    this.load = load >= 1 ? 1 : load
+    const load = Math.max(scaledTxTimeInQueue, scaledQueueLength)
+    this.load = load
   }
 
   getCurrentLoad () {

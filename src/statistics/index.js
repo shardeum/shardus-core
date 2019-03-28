@@ -217,11 +217,10 @@ class TimerRing {
   snapshot () {
     // Calc median duration of all entries in ids
     const durations = []
-    const numCompare = (a, b) => a > b ? 1 : (a < b ? -1 : 0)
     for (const id in this.ids) {
       const startTime = this.ids[id]
       const duration = Date.now() - startTime
-      utils.insertSorted(durations, duration, numCompare)
+      utils.insertSorted(durations, duration, (a, b) => a - b)
     }
     const median = utils.computeMedian(durations, false)
     // Save median
