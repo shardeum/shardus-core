@@ -63,6 +63,7 @@ class P2PState extends EventEmitter {
         start: null,
         duration: null,
         counter: null,
+        previous: null,
         joined: [],
         removed: [],
         lost: [],
@@ -581,6 +582,8 @@ class P2PState extends EventEmitter {
     const lastCycleDuration = this.getLastCycleDuration()
     const lastCycleStart = this.getLastCycleStart()
     const currentTime = utils.getTime('s')
+    this.currentCycle.data.counter = this.getLastCycleCounter() + 1
+    this.currentCycle.data.previous = this.getCurrentCycleMarker()
     this.currentCycle.data.duration = lastCycleDuration
     this.currentCycle.data.start = lastCycleStart ? lastCycleStart + lastCycleDuration : utils.getTime('s')
     this.currentCycle.data.expired = this._getExpiredCountInternal()
@@ -814,7 +817,7 @@ class P2PState extends EventEmitter {
   }
 
   getCycleInfo (withCert = true) {
-    const previous = this.getCurrentCycleMarker()
+    const previous = this.getPreviousCycleMarker()
     const counter = this.getCycleCounter()
     const start = this.getCurrentCycleStart()
     const duration = this.getCurrentCycleDuration()
@@ -981,15 +984,21 @@ class P2PState extends EventEmitter {
   }
 
   getCycleCounter () {
-    const lastCycle = this.getLastCycle()
-    if (!lastCycle) return 0
-    return lastCycle.counter + 1
+    const counter = this.currentCycle.data.counter
+    if (counter === undefined || counter === null) return null
+    return this.currentCycle.data.counter
   }
 
   getLastCycleStart () {
     const lastCycle = this.getLastCycle()
     if (!lastCycle) return null
     return lastCycle.start
+  }
+
+  getLastCycleCounter () {
+    const lastCycle = this.getLastCycle()
+    if (!lastCycle) return -1
+    return lastCycle.counter
   }
 
   getCurrentCycleStart () {
@@ -1010,6 +1019,10 @@ class P2PState extends EventEmitter {
     const lastCycle = this.getLastCycle()
     if (!lastCycle) return '0'.repeat(64)
     return lastCycle.marker
+  }
+
+  getPreviousCycleMarker () {
+    return this.currentCycle.data.previous || '0'.repeat(64)
   }
 
   getNextCycleMarker () {
