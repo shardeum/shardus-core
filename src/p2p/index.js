@@ -839,11 +839,11 @@ class P2P extends EventEmitter {
     }
     this.mainLogger.debug(`Fetched cycle counter: ${cycleCounter}`)
 
-    let chainStart = this.state.getCycleCounter()
+    let chainStart = this.state.getLastCycle().counter
     let chainEnd = cycleCounter
 
     // We check to make sure that the last cycle we are trying to sync is not the latest one we already have
-    if (chainEnd === chainStart - 1) return true
+    if (chainEnd === chainStart) return true
 
     const { cycleChain, cycleMarkerCerts } = await this._fetchFinalizedChain(seedNodes, nodes, chainStart, chainEnd)
     this.mainLogger.debug(`Retrieved cycle chain: ${JSON.stringify(cycleChain)}`)
