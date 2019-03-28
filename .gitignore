@@ -78,3 +78,6 @@ db
 
 # Don't add test instances to repo
 instances/
+
+# Statistics
+statistics.tsv
