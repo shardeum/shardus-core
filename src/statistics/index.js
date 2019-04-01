@@ -7,21 +7,15 @@ const utils = require('../utils')
 class Statistics extends EventEmitter {
   constructor (baseDir, config, { counters = [], watchers = {}, timers = [] }, context) {
     super()
-    this.intervalDuration = config.interval * 1000
+    this.intervalDuration = config.interval || 1
+    this.intervalDuration = this.intervalDuration * 1000
+    this.context = context
+    this.counterDefs = counters
+    this.watcherDefs = watchers
+    this.timerDefs = timers
+    this.initialize()
+
     this.interval = null
-    this.counters = {}
-    for (const name of counters) {
-      this.counters[name] = new CounterRing(60)
-    }
-    this.watchers = {}
-    for (const name in watchers) {
-      const watchFn = watchers[name]
-      this.watchers[name] = new WatcherRing(60, watchFn, context)
-    }
-    this.timers = {}
-    for (const name of timers) {
-      this.timers[name] = new TimerRing(60)
-    }
     this.snapshotWriteFns = []
     this.stream = null
     this.streamIsPushable = false
@@ -32,6 +26,12 @@ class Statistics extends EventEmitter {
       const statsReadStream = this.getStream()
       statsReadStream.pipe(fileWriteStream)
     }
+  }
+
+  initialize () {
+    this.counters = this._initializeCounters(this.counterDefs)
+    this.watchers = this._initializeWatchers(this.watcherDefs, this.context)
+    this.timers = this._initializeTimers(this.timerDefs)
   }
 
   getStream () {
@@ -109,6 +109,31 @@ class Statistics extends EventEmitter {
     const ringHolder = this.counters[name] || this.watchers[name] || this.timers[name]
     if (!ringHolder.ring) throw new Error(`Ring holder '${name}' is undefined.`)
     return ringHolder.ring.previous()
+  }
+
+  _initializeCounters (counterDefs = []) {
+    const counters = {}
+    for (const name of counterDefs) {
+      counters[name] = new CounterRing(60)
+    }
+    return counters
+  }
+
+  _initializeWatchers (watcherDefs = {}, context) {
+    const watchers = {}
+    for (const name in watcherDefs) {
+      const watchFn = watcherDefs[name]
+      watchers[name] = new WatcherRing(60, watchFn, context)
+    }
+    return watchers
+  }
+
+  _initializeTimers (timerDefs = []) {
+    const timers = {}
+    for (const name of timerDefs) {
+      timers[name] = new TimerRing(60)
+    }
+    return timers
   }
 
   _takeSnapshot () {

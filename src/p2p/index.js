@@ -28,6 +28,9 @@ class P2P extends EventEmitter {
     this.isFirstSeed = false
     this.acceptInternal = false
 
+    this.scalingCollector = {}
+    this.scalingRequested = false
+
     this.gossipHandlers = {}
     this.gossipRecipients = config.gossipRecipients
     this.gossipTimeout = config.gossipTimeout * 1000
@@ -1231,6 +1234,22 @@ class P2P extends EventEmitter {
     return true
   }
 
+  requestNetworkUpsize () {
+    console.log('DBG', 'UPSIZE!')
+  }
+
+  requestNetworkDownsize () {
+    console.log('DBG', 'DOWNSIZE!')
+  }
+
+  async handleScaling (payload, sender) {
+    // If `desired` <= `minNodes` OR `desired` >= `maxNodes`, return
+    const desired = this.state.getDesiredCount()
+    if (desired <= this.state.minNodes || desired >= this.state.maxNodes) return
+    if (exists(this.scalingCollector[sender])) return // Save only 1 message per node per cycle
+    // Extract requested change from payload
+  }
+
   // Finds a node either in nodelist or in seedNodes listhis.mainLogger.debug(`Node ID to look up: ${nodeId}`)t if told to
   _findNodeInGroup (nodeId, group) {
     if (!group) {
@@ -1621,6 +1640,10 @@ function getRandomGossipIn (nodeIdxs, fanOut, myIdx) {
     if (k === results.length) { results.push(r) }
   }
   return results
+}
+
+function exists (thing) {
+  return (typeof thing !== 'undefined' && thing !== null)
 }
 
 module.exports = P2P

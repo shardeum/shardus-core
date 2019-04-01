@@ -128,8 +128,8 @@ class Shardus {
       this.statistics = new Statistics(this.config.baseDir, this.config.statistics, {
         counters: ['txInjected', 'txApplied', 'txRejected'],
         watchers: {
-          queueLength: () => this.stateManager.newAcceptedTXQueue.length,
-          serverLoad: () => this.loadDetection.getCurrentLoad()
+          queueLength: () => this.stateManager ? this.stateManager.newAcceptedTXQueue.length : 0,
+          serverLoad: () => this.loadDetection ? this.loadDetection.getCurrentLoad() : 0
         },
         timers: ['txTimeInQueue']
       }, this)
@@ -137,15 +137,17 @@ class Shardus {
 
       this.loadDetection = new LoadDetection(this.config.loadDetection, this.statistics)
       this.statistics.on('snapshot', () => this.loadDetection.updateLoad())
+      this.loadDetection.on('highLoad', this.p2p.requestNetworkUpsize)
+      this.loadDetection.on('lowLoad', this.p2p.requestNetworkDownsize)
 
       this.rateLimiting = new RateLimiting(this.config.rateLimiting, this.loadDetection)
 
       this.consensus = new Consensus(this.app, this.config, this.logger, this.crypto, this.p2p, this.storage, this.profiler)
       this._createAndLinkStateManager()
+      this._attemptCreateAppliedListener()
     }
 
     this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this.statistics, this.stateManager, this.profiler) : null
-    this._attemptCreateAppliedListener()
 
     this._registerRoutes()
 
@@ -179,6 +181,10 @@ class Shardus {
       await this.syncAppData()
     })
     this.p2p.on('removed', async () => {
+      if (this.statistics) {
+        this.statistics.stopSnapshots()
+        this.statistics.initialize()
+      }
       if (this.reporter) {
         this.reporter.stopReporting()
         await this.reporter.reportRemoved(this.p2p.id)

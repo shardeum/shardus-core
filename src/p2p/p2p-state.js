@@ -12,7 +12,7 @@ class P2PState extends EventEmitter {
     this.defaultCycleDuration = config.cycleDuration
     this.maxNodesPerCycle = config.maxNodesPerCycle
     this.maxSeedNodes = config.maxSeedNodes
-    this.desiredNodes = config.desiredNodes
+    this.desiredNodes = config.minNodes
     this.nodeExpiryAge = config.nodeExpiryAge
     this.maxNodesToRotate = config.maxNodesToRotate
     this.maxPercentOfDelta = config.maxPercentOfDelta

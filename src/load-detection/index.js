@@ -1,5 +1,10 @@
-class LoadDetection {
+const EventEmitter = require('events')
+
+class LoadDetection extends EventEmitter {
   constructor (config, statistics) {
+    super()
+    this.highThreshold = config.highThreshold
+    this.lowThreshold = config.lowThreshold
     this.desiredTxTime = config.desiredTxTime
     this.queueLimit = config.queueLimit
     this.statistics = statistics
@@ -17,6 +22,8 @@ class LoadDetection {
     const scaledQueueLength = queueLength >= this.queueLimit ? 1 : queueLength / this.queueLimit
 
     const load = Math.max(scaledTxTimeInQueue, scaledQueueLength)
+    if (load > this.highThreshold) this.emit('highLoad')
+    if (load < this.lowThreshold) this.emit('lowLoad')
     this.load = load
   }
 

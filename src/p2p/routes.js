@@ -254,6 +254,14 @@ function setupRoutes () {
     await this.sendGossipIn('certificate', certificate, tracker, sender)
   })
 
+  this.registerGossipHandler('scaling', async (payload, sender, tracker) => {
+    if (!payload) {
+      this.mainLogger.debug('No payload provided for the `scaling` request.')
+      return
+    }
+    await this.handleScaling(payload, sender)
+  })
+
   // -------- DEMO Routes ----------
 
   this.network.registerExternalGet('nodelist', async (req, res) => {
