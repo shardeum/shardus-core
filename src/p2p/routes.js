@@ -259,7 +259,12 @@ function setupRoutes () {
       this.mainLogger.debug('No payload provided for the `scaling` request.')
       return
     }
-    await this.handleScaling(payload, sender)
+    const desired = this.state.getDesiredCount()
+    if (desired <= this.state.minNodes || desired >= this.state.maxNodes) return
+    console.log('We\'re trying to scale.')
+    // Attempt to add scaling message to cycle
+    // Based on if it gets added or not, regossip
+    // this.sendGossipIn('scaling', payload, tracker)
   })
 
   // -------- DEMO Routes ----------

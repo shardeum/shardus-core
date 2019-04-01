@@ -70,7 +70,8 @@ class P2PState extends EventEmitter {
         returned: [],
         activated: [],
         certificate: {},
-        expired: 0
+        expired: 0,
+        desired: 0
       }
     }
 
@@ -587,6 +588,7 @@ class P2PState extends EventEmitter {
     this.currentCycle.data.duration = lastCycleDuration
     this.currentCycle.data.start = lastCycleStart ? lastCycleStart + lastCycleDuration : utils.getTime('s')
     this.currentCycle.data.expired = this._getExpiredCountInternal()
+    this.currentCycle.data.desired = this.desiredNodes
     this._setJoinAcceptance()
     this.currentCycle.metadata.toAccept = this._getOpenSlots()
     this.mainLogger.info(`Starting new cycle of duration ${this.getCurrentCycleDuration()}...`)
@@ -814,6 +816,7 @@ class P2PState extends EventEmitter {
     } catch (e) {
       this.mainLogger.error('_createCycle: ' + e.name + ': ' + e.message + ' at ' + e.stack)
     }
+    this.desiredNodes = this.currentCycle.desired
   }
 
   getCycleInfo (withCert = true) {
@@ -941,8 +944,11 @@ class P2PState extends EventEmitter {
   }
 
   getDesiredCount () {
-    // TODO: Implement an actual calculation
     return this.desiredNodes
+  }
+
+  getNextDesiredCount () {
+    return this.currentCycle.desired
   }
 
   getExpiredCount () {

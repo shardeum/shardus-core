@@ -28,7 +28,6 @@ class P2P extends EventEmitter {
     this.isFirstSeed = false
     this.acceptInternal = false
 
-    this.scalingCollector = {}
     this.scalingRequested = false
 
     this.gossipHandlers = {}
@@ -46,6 +45,10 @@ class P2P extends EventEmitter {
 
     this.state.on('removed', () => {
       this.emit('removed')
+    })
+
+    this.state.on('newCycle', () => {
+      this.scalingRequested = false
     })
 
     this.InternalRecvCounter = 0
@@ -1235,19 +1238,15 @@ class P2P extends EventEmitter {
   }
 
   requestNetworkUpsize () {
+    if (this.scalingRequested) return
     console.log('DBG', 'UPSIZE!')
+    this.scalingRequested = true
   }
 
   requestNetworkDownsize () {
+    if (this.scalingRequested) return
     console.log('DBG', 'DOWNSIZE!')
-  }
-
-  async handleScaling (payload, sender) {
-    // If `desired` <= `minNodes` OR `desired` >= `maxNodes`, return
-    const desired = this.state.getDesiredCount()
-    if (desired <= this.state.minNodes || desired >= this.state.maxNodes) return
-    if (exists(this.scalingCollector[sender])) return // Save only 1 message per node per cycle
-    // Extract requested change from payload
+    this.scalingRequested = true
   }
 
   // Finds a node either in nodelist or in seedNodes listhis.mainLogger.debug(`Node ID to look up: ${nodeId}`)t if told to
@@ -1640,10 +1639,6 @@ function getRandomGossipIn (nodeIdxs, fanOut, myIdx) {
     if (k === results.length) { results.push(r) }
   }
   return results
-}
-
-function exists (thing) {
-  return (typeof thing !== 'undefined' && thing !== null)
 }
 
 module.exports = P2P
