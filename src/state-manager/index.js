@@ -1321,7 +1321,7 @@ class StateManager extends EventEmitter {
     let applyResult = await this.tryApplyTransaction(acceptedTX, hasStateTableData)
     if (applyResult) {
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction SUCCEDED ' + timestamp)
-      this.logger.playbackLogNote('tx_accepted', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
+      this.logger.playbackLogNote('tx_applied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
     } else {
       this.logger.playbackLogNote('tx_apply_rejected 3', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)      
     }
