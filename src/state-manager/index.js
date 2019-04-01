@@ -20,10 +20,11 @@ class StateManager extends EventEmitter {
     this.logger = logger
 
     this.completedPartitions = []
-    this.syncSettleTime = 8000 // 3 * 10 // an estimate of max transaction settle time. todo make it a config or function of consensus later
     this.mainStartingTs = Date.now()
 
     this.queueSitTime = 6000 // todo make this a setting. and tie in with the value in consensus
+    // this.syncSettleTime = 8000 // 3 * 10 // an estimate of max transaction settle time. todo make it a config or function of consensus later
+    this.syncSettleTime = this.queueSitTime + 2000 // 3 * 10 // an estimate of max transaction settle time. todo make it a config or function of consensus later
 
     this.clearPartitionData()
 
@@ -1233,28 +1234,35 @@ class StateManager extends EventEmitter {
     let timestamp = keysResponse.timestamp
     let txId = acceptedTX.receipt.txHash
 
-    let age = Date.now() - timestamp
-    if (age > this.queueSitTime * 0.9) {
-      this.fatalLogger.fatal('queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
-      // TODO consider throwing this out.  right now it is just a warning
-      this.logger.playbackLogNote('oldQueueInsertion', '', 'queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
-    }
+    try {
+      let age = Date.now() - timestamp
+      if (age > this.queueSitTime * 0.9) {
+        this.fatalLogger.fatal('queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
+        // TODO consider throwing this out.  right now it is just a warning
+        this.logger.playbackLogNote('oldQueueInsertion', '', 'queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
+      }
 
-    if (sendGossip) {
-      this.p2p.sendGossipIn('acceptedTx', acceptedTX)
-    }
+      if (sendGossip) {
+        this.p2p.sendGossipIn('acceptedTx', acceptedTX)
+        this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
+      }
+      // sorted insert
+      let index = this.newAcceptedTXQueue.length - 1
+      let lastTx = this.newAcceptedTXQueue[index]
+      while (index >= 0 && ((timestamp < lastTx.timestamp) || (timestamp === lastTx.timestamp && txId < lastTx.id))) {
+        index--
+        lastTx = this.newAcceptedTXQueue[index]
+      }
+      this.newAcceptedTXQueue.splice(index + 1, 0, acceptedTX)
+      this.logger.playbackLogNote('tx_addToQueue', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
 
-    // sorted insert
-    let index = this.newAcceptedTXQueue.length - 1
-    let lastTx = this.newAcceptedTXQueue[index]
-    while (index >= 0 && ((timestamp < lastTx.timestamp) || (timestamp === lastTx.timestamp && txId < lastTx.id))) {
-      index--
-      lastTx = this.newAcceptedTXQueue[index]
+      // start the queue if needed
+      this.tryStartAcceptedQueue()
+    } catch (error) {
+      this.logger.playbackLogNote('tx_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
+      this.fatalLogger.fatal('queueAcceptedTransaction failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+      throw new Error(error)
     }
-    this.newAcceptedTXQueue.splice(index + 1, 0, acceptedTX)
-
-    // start the queue if needed
-    this.tryStartAcceptedQueue()
   }
 
   tryStartAcceptedQueue () {
@@ -1292,7 +1300,8 @@ class StateManager extends EventEmitter {
 
     if (!success) {
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction pretest failed: ' + timestamp)
-      return false
+      this.logger.playbackLogNote('tx_apply_rejected 1', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)      
+      return { success: false, reason: 'applyAcceptedTransaction pretest failed' }
     }
 
     // Validate transaction through the application. Shardus can see inside the transaction
@@ -1305,12 +1314,16 @@ class StateManager extends EventEmitter {
       let timestamp = keysResponse.timestamp
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction validate failed: ' + timestamp)
       this.mainLogger.error(`Failed to validate transaction. Reason: ${transactionValidateResult.reason} ts:${timestamp}`)
+      this.logger.playbackLogNote('tx_apply_rejected 2', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)            
       return { success: false, reason: transactionValidateResult.reason }
     }
     // todo2 refactor the state table data checks out of try apply and calculate them with less effort using results from validate
     let applyResult = await this.tryApplyTransaction(acceptedTX, hasStateTableData)
     if (applyResult) {
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction SUCCEDED ' + timestamp)
+      this.logger.playbackLogNote('tx_accepted', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
+    } else {
+      this.logger.playbackLogNote('tx_apply_rejected 3', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)      
     }
     return { success: applyResult, reason: 'apply result' }
   }
@@ -1354,9 +1367,10 @@ class StateManager extends EventEmitter {
 
         // apply the tx
         let acceptedTX = this.newAcceptedTXQueue.shift()
+        this.logger.playbackLogNote('tx_workingOnTx', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
         let txResult = await this.applyAcceptedTransaction(acceptedTX)
 
-        if (txResult) {
+        if (txResult.success) {
           acceptedTXCount++
         } else {
           if (!edgeFailDetected && acceptedTXCount > 0) {

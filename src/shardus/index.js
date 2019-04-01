@@ -213,11 +213,12 @@ class Shardus {
 
       if (this.verboseLogs) this.mainLogger.debug('Transaction Valided')
       // Perform Consensus -- Currently no algorithm is being used
+      // At this point the transaction is injected. Add a playback log
+      this.logger.playbackLogNote('tx_injected', `${txId}`, `Transaction: ${utils.stringifyReduce(inTransaction)}`)
       this.profiler.profileSectionStart('consensusInject')
       let transactionReceipt = await this.consensus.inject(shardusTransaction)
       this.profiler.profileSectionEnd('consensusInject')
       if (this.verboseLogs) this.mainLogger.debug(`Received Consensus. Receipt: ${utils.stringifyReduce(transactionReceipt)}`)
-
       transactionOk = true
     } catch (ex) {
       this.fatalLogger.fatal(`Put: Failed to process transaction. Exception: ${ex}`)
