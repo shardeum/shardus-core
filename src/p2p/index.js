@@ -643,7 +643,7 @@ class P2P extends EventEmitter {
       return { cycleJoined }
     }
     let query
-    while (!query[0]) {
+    while (!query || !query[0]) {
       try {
         query = await this.robustQuery(seedNodes, queryFn)
       } catch (e) {
