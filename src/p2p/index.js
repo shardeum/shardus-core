@@ -321,7 +321,7 @@ class P2P extends EventEmitter {
   }
 
   // Check if we are in the update phase
-  _isInUpdatePhase (currentTime, cycleStart, cycleDuration) {
+  _isInUpdatePhase (currentTime = utils.getTime('s'), cycleStart = this.getCurrentCycleStart(), cycleDuration = this.state.getCurrentCycleDuration()) {
     this.mainLogger.debug(`Current time is: ${currentTime}`)
     this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
     this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
@@ -350,7 +350,9 @@ class P2P extends EventEmitter {
   }
 
   // Wait until the chain update phase
-  async _waitUntilUpdatePhase (currentTime, cycleStart, cycleDuration) {
+  async _waitUntilUpdatePhase (currentTime = utils.getTime('s'), cycleStart = this.getCurrentCycleStart(), cycleDuration = this.state.getCurrentCycleDuration()) {
+    // If we are already in the update phase, return
+    if (this._isInUpdatePhase(currentTime, cycleStart, cycleDuration)) return
     this.mainLogger.debug(`Current time is: ${currentTime}`)
     this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
     this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
@@ -1237,16 +1239,49 @@ class P2P extends EventEmitter {
     return true
   }
 
-  requestNetworkUpsize () {
+  _constructScalingRequest (upOrDown) {
+    // TODO: Check if this is all we need for the scaling request
+    // Node
+    // Timestamp
+    // Scale up or down
+    // Signature
+    const request = {
+      node: this.id,
+      timestamp: utils.getTime()
+    }
+    switch (upOrDown) {
+      case 'up':
+        request.scale = 'up'
+        break
+      case 'down':
+        request.scale = 'down'
+        break
+      default:
+        const err = new Error(`Invalid scaling request type: ${upOrDown}`)
+        this.mainLogger.fatal(err)
+        throw err
+    }
+    const signedReq = this.crypto.sign(request)
+    return signedReq
+  }
+
+  async _requestNetworkScaling (upOrDown) {
     if (this.scalingRequested) return
-    console.log('DBG', 'UPSIZE!')
+    await this._waitUntilUpdatePhase()
+    const request = this._constructScalingRequest(upOrDown)
+    await this.sendGossipIn('scaling', request)
+    // this.state.addExtScalingRequest(request)
     this.scalingRequested = true
   }
 
-  requestNetworkDownsize () {
-    if (this.scalingRequested) return
+  async requestNetworkUpsize () {
+    console.log('DBG', 'UPSIZE!')
+    await this._requestNetworkScaling('up')
+  }
+
+  async requestNetworkDownsize () {
     console.log('DBG', 'DOWNSIZE!')
-    this.scalingRequested = true
+    await this._requestNetworkScaling('down')
   }
 
   // Finds a node either in nodelist or in seedNodes listhis.mainLogger.debug(`Node ID to look up: ${nodeId}`)t if told to

@@ -262,9 +262,9 @@ function setupRoutes () {
     const desired = this.state.getDesiredCount()
     if (desired <= this.state.minNodes || desired >= this.state.maxNodes) return
     console.log('We\'re trying to scale.')
-    // Attempt to add scaling message to cycle
-    // Based on if it gets added or not, regossip
-    // this.sendGossipIn('scaling', payload, tracker)
+    // const added = this.addExtScalingRequest(payload)
+    // if (!added) return
+    this.sendGossipIn('scaling', payload, tracker)
   })
 
   // -------- DEMO Routes ----------

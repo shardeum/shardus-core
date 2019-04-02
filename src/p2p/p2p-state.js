@@ -138,6 +138,30 @@ class P2PState extends EventEmitter {
     return this._addJoinRequest(joinRequest)
   }
 
+  addExtScalingRequest (scalingRequest) {
+    if (!this.acceptChainUpdates) {
+      this.mainLogger.debug('Join request not added: Not accepting chain updates right now.')
+      return false
+    }
+    return this._addScalingRequest(scalingRequest)
+  }
+
+  _addScalingRequest (scalingRequest) {
+    // Return false if we already have more than maxScaleProp requests
+
+    // Validation
+    // Return false if timestamp is too old (for a previous cycle maybe?)
+    // Return false if we have seen a request for this node already for this cycle
+    // Return false if fails validation for signature
+
+    // If passes, add to current cycle
+    // Check tally
+    // If minScaleAccept up, increase currentCycle.desired
+    // else minScaleAccept down, and not minScale, decrease currentCycle.desired
+    // TODO: remove this
+    return true
+  }
+
   addGossipedJoinRequest (joinRequest) {
     return this._addJoinRequest(joinRequest)
   }
