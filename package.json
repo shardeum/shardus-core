@@ -22,6 +22,7 @@
     "cors": "2.8.5",
     "deepmerge": "2.2.1",
     "express": "4.16.4",
+    "fast-stable-stringify": "1.0.0",
     "log4js": "3.0.6",
     "log4js-extend": "0.2.1",
     "sequelize": "4.41.0",
