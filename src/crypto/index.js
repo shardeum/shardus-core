@@ -9,6 +9,7 @@ class Crypto {
     this.keypair = {}
     this.curveKeypair = {}
     this.powGenerators = {}
+    this.sharedKeys = {}
   }
 
   async init () {
@@ -47,14 +48,25 @@ class Crypto {
     return this.curveKeypair.publicKey
   }
 
+  getSharedKey (curvePk) {
+    let sharedKey = this.sharedKeys[curvePk]
+    if (!sharedKey) {
+      sharedKey = crypto.generateSharedKey(this.curveKeypair.secretKey, curvePk)
+      this.sharedKeys[curvePk] = sharedKey
+    }
+    return sharedKey
+  }
+
   tag (obj, recipientCurvePk) {
     const objCopy = JSON.parse(crypto.stringify(obj))
-    crypto.tagObj(objCopy, this.curveKeypair.secretKey, recipientCurvePk)
+    const sharedKey = this.getSharedKey(recipientCurvePk)
+    crypto.tagObj(objCopy, sharedKey)
     return objCopy
   }
 
   authenticate (obj, senderCurvePk) {
-    return crypto.authenticateObj(obj, this.curveKeypair.secretKey, senderCurvePk)
+    const sharedKey = this.getSharedKey(senderCurvePk)
+    return crypto.authenticateObj(obj, sharedKey)
   }
 
   sign (obj) {
