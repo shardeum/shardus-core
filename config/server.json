@@ -24,7 +24,10 @@
     "nodeExpiryAge": 180,
     "maxNodesToRotate": 1,
     "maxNodesPerCycle": 5,
-    "maxPercentOfDelta": 40
+    "maxPercentOfDelta": 40,
+    "scaleReqsNeeded": 5,
+    "maxScaleReqs": 10,
+    "amountToScale": 1
   },
   "ip": {
     "externalIp": "127.0.0.1",

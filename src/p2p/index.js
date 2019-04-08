@@ -774,10 +774,8 @@ class P2P extends EventEmitter {
     let equalFn = (payload1, payload2) => {
       // Make a copy of the cycle payload and delete the metadata for the hash comparison,
       // so that we get more consistent results
-      const cycle1 = utils.deepCopy(payload1.unfinalizedCycle)
-      const cycle2 = utils.deepCopy(payload2.unfinalizedCycle)
-      delete cycle1.metadata
-      delete cycle2.metadata
+      const cycle1 = payload1.data
+      const cycle2 = payload2.data
       const hash1 = this.crypto.hash(cycle1)
       const hash2 = this.crypto.hash(cycle2)
       return hash1 === hash2
@@ -1240,14 +1238,16 @@ class P2P extends EventEmitter {
   }
 
   _constructScalingRequest (upOrDown) {
-    // TODO: Check if this is all we need for the scaling request
+    // Scaling request structure:
     // Node
     // Timestamp
+    // Cycle counter
     // Scale up or down
     // Signature
     const request = {
       node: this.id,
-      timestamp: utils.getTime()
+      timestamp: utils.getTime(),
+      cycleCounter: this.state.getCycleCounter()
     }
     switch (upOrDown) {
       case 'up':
@@ -1270,7 +1270,7 @@ class P2P extends EventEmitter {
     await this._waitUntilUpdatePhase()
     const request = this._constructScalingRequest(upOrDown)
     await this.sendGossipIn('scaling', request)
-    // this.state.addExtScalingRequest(request)
+    await this.state.addExtScalingRequest(request)
     this.scalingRequested = true
   }
 

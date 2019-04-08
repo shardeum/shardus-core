@@ -261,9 +261,8 @@ function setupRoutes () {
     }
     const desired = this.state.getDesiredCount()
     if (desired <= this.state.minNodes || desired >= this.state.maxNodes) return
-    console.log('We\'re trying to scale.')
-    // const added = this.addExtScalingRequest(payload)
-    // if (!added) return
+    const added = await this.addExtScalingRequest(payload)
+    if (!added) return
     this.sendGossipIn('scaling', payload, tracker)
   })
 

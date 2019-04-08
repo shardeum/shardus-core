@@ -16,6 +16,11 @@ class P2PState extends EventEmitter {
     this.nodeExpiryAge = config.nodeExpiryAge
     this.maxNodesToRotate = config.maxNodesToRotate
     this.maxPercentOfDelta = config.maxPercentOfDelta
+    this.scaleReqsNeeded = config.scaleReqsNeeded
+    this.maxScaleReqs = config.maxScaleReqs
+    this.amountToScale = config.amountToScale
+    this.minNodes = config.minNodes
+    this.maxNodes = config.maxNodes
 
     this.cycles = []
     this.certificates = []
@@ -53,11 +58,18 @@ class P2PState extends EventEmitter {
         bestCertDist: null,
         updateSeen: {},
         receivedCerts: false,
-        toAccept: 0
+        toAccept: 0,
+        scalingSeen: {},
+        startingDesired: 0,
+        scaling: false
       },
       updates: {
         bestJoinRequests: [],
-        active: []
+        active: [],
+        scaling: {
+          up: [],
+          down: []
+        }
       },
       data: {
         start: null,
@@ -138,28 +150,143 @@ class P2PState extends EventEmitter {
     return this._addJoinRequest(joinRequest)
   }
 
-  addExtScalingRequest (scalingRequest) {
+  async addExtScalingRequest (scalingRequest) {
     if (!this.acceptChainUpdates) {
       this.mainLogger.debug('Join request not added: Not accepting chain updates right now.')
       return false
     }
-    return this._addScalingRequest(scalingRequest)
+    const added = await this._addScalingRequest(scalingRequest)
+    return added
   }
 
-  _addScalingRequest (scalingRequest) {
-    // Return false if we already have more than maxScaleProp requests
-
-    // Validation
-    // Return false if timestamp is too old (for a previous cycle maybe?)
-    // Return false if we have seen a request for this node already for this cycle
+  validateScalingRequest (scalingRequest) {
+    // Check existence of fields
+    if (!scalingRequest.node || !scalingRequest.timestamp || !scalingRequest.cycleCounter || !scalingRequest.scale || !scalingRequest.sign) {
+      this.mainLogger.debug(`Invalid scaling request, missing fields. Request: ${JSON.stringify(scalingRequest)}`)
+      return false
+    }
+    // Check if cycle counter matches
+    if (scalingRequest.cycleCounter !== this.getCycleCounter()) {
+      this.mainLogger.debug(`Invalid scaling request, not for this cycle. Request: ${JSON.stringify(scalingRequest)}`)
+      return false
+    }
+    // Check if we are trying to scale either up or down
+    if (scalingRequest.scale !== 'up' && scalingRequest.scale !== 'down') {
+      this.mainLogger.debug(`Invalid scaling request, not a valid scaling type. Request: ${JSON.stringify(scalingRequest)}`)
+      return false
+    }
+    // Try to get the node who supposedly signed this request
+    let node
+    try {
+      node = this.getNode(scalingRequest.node)
+    } catch (e) {
+      this.mainLogger.debug(e)
+      this.mainLogger.debug(`Invalid scaling request, not a known node. Request: ${JSON.stringify(scalingRequest)}`)
+      return false
+    }
     // Return false if fails validation for signature
-
-    // If passes, add to current cycle
-    // Check tally
-    // If minScaleAccept up, increase currentCycle.desired
-    // else minScaleAccept down, and not minScale, decrease currentCycle.desired
-    // TODO: remove this
+    if (!this.crypto.verify(scalingRequest, node.publicKey)) {
+      this.mainLogger.debug(`Invalid scaling request, signature is not valid. Request: ${JSON.stringify(scalingRequest)}`)
+      return false
+    }
     return true
+  }
+
+  async _checkScaling () {
+    const metadata = this.currentCycle.metadata
+    const scalingUpdates = this.currentCycle.updates.scaling
+
+    // Keep a flag if we have changed our metadata.scaling at all
+    let changed = false
+
+    if (metadata.scaling === 'up') {
+      this.mainLogger.debug('Already set to scale up this cycle. No need to scale.')
+      return
+    }
+
+    // Check up first
+    if (scalingUpdates.up.length >= this.scaleReqsNeeded) {
+      metadata.scaling = 'up'
+      changed = true
+    }
+
+    // If we haven't changed, check down
+    if (!changed) {
+      if (scalingUpdates.down.length >= this.scaleReqsNeeded) {
+        metadata.scaling = 'down'
+        changed = true
+      } else {
+        return
+      }
+    }
+    // At this point, we have changed our scaling flag
+    let newDesired
+    switch (metadata.scaling) {
+      case 'up':
+        newDesired = metadata.startingDesired + this.amountToScale
+        // If newDesired more than maxNodes, set newDesired to maxNodes
+        if (newDesired > this.maxNodes) newDesired = this.maxNodes
+        break
+      case 'down':
+        newDesired = metadata.startingDesired - this.amountToScale
+        // If newDesired less than minNodes, set newDesired to minNodes
+        if (newDesired < this.minNodes) newDesired = this.minNodes
+        break
+      default:
+        this.mainLogger.error(new Error(`Invalid scaling flag after changing flag. Flag: ${metadata.scaling}`))
+        return
+    }
+    // If scaling flag changed, trigger computeCycleMarker
+    await this._createCycleMarker()
+  }
+
+  async _addToScalingRequests (scalingRequest) {
+    const scalingUpdates = this.currentCycle.updates.scaling
+    switch (scalingRequest.scale) {
+      case 'up':
+        // Check if we have exceeded the limit of scaling requests
+        if (scalingUpdates.up.length >= this.maxScaleReqs) {
+          this.mainLogger.debug('Max scale up requests already exceeded. Cannot add request.')
+          return false
+        }
+        scalingUpdates.up.push(scalingRequest)
+        await this._checkScaling()
+        return true
+      case 'down':
+        // Check if we are already voting scale up, don't add in that case
+        if (this.currentCycle.metadata.scaling === 'up') {
+          this.mainLogger.debug('Already scaling up this cycle. Cannot add scaling down request.')
+          return false
+        }
+        // Check if we have exceeded the limit of scaling requests
+        if (scalingUpdates.down.length >= this.maxScaleReqs) {
+          this.mainLogger.debug('Max scale down requests already exceeded. Cannot add request.')
+          return false
+        }
+        scalingUpdates.down.push(scalingRequest)
+        await this._checkScaling()
+        return true
+      default:
+        this.mainLogger.debug(`Invalid scaling type in _addToScalingRequests(). Request: ${JSON.stringify(scalingRequest)}`)
+        return false
+    }
+  }
+
+  async _addScalingRequest (scalingRequest) {
+    // Check existence of node
+    if (!scalingRequest.node) return
+    // Check scaling seen for this node
+    if (this.currentCycle.metadata.scalingSeen[scalingRequest.node]) return
+
+    // Set scaling seen for this node
+    this.currentCycle.metadata.scalingSeen[scalingRequest.node] = true
+
+    const valid = this.validateScalingRequest(scalingRequest)
+    if (!valid) return false
+
+    // If we pass validation, add to current cycle
+    const added = await this._addToScalingRequests(scalingRequest)
+    return added
   }
 
   addGossipedJoinRequest (joinRequest) {
@@ -305,12 +432,18 @@ class P2PState extends EventEmitter {
   // TODO: Update this to go through entire update types
   async addCycleUpdates (updates) {
     if (!this.cyclesStarted) return false
-    const { bestJoinRequests, active } = updates
+    const { bestJoinRequests, active, scaling } = updates
     for (const joinRequest of bestJoinRequests) {
       this._addJoinRequest(joinRequest)
     }
     for (const activeRequest of active) {
       this.addStatusUpdate(activeRequest)
+    }
+    for (const scaleReq of scaling.up) {
+      await this._addScalingRequest(scaleReq)
+    }
+    for (const scaleReq of scaling.down) {
+      await this._addScalingRequest(scaleReq)
     }
     const cMarkerBefore = this.getCurrentCertificate().marker
     await this._createCycleMarker(false)
@@ -613,6 +746,7 @@ class P2PState extends EventEmitter {
     this.currentCycle.data.start = lastCycleStart ? lastCycleStart + lastCycleDuration : utils.getTime('s')
     this.currentCycle.data.expired = this._getExpiredCountInternal()
     this.currentCycle.data.desired = this.desiredNodes
+    this.currentCycle.metadata.startingDesired = this.desiredNodes
     this._setJoinAcceptance()
     this.currentCycle.metadata.toAccept = this._getOpenSlots()
     this.mainLogger.info(`Starting new cycle of duration ${this.getCurrentCycleDuration()}...`)
@@ -849,7 +983,7 @@ class P2PState extends EventEmitter {
     const start = this.getCurrentCycleStart()
     const duration = this.getCurrentCycleDuration()
     const active = this.getActiveCount()
-    const desired = this.getDesiredCount()
+    const desired = this.getNextDesiredCount()
     const joined = this.getJoined()
     const removed = this.getRemoved()
     const lost = this.getLost()
