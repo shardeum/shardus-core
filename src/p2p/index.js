@@ -329,6 +329,20 @@ class P2P extends EventEmitter {
     return true
   }
 
+  _isInLastPhase (currentTime, cycleStart, cycleDuration) {
+    this.mainLogger.debug(`Current time is: ${currentTime}`)
+    this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
+    this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
+    const startOfLastPhase = cycleStart + Math.ceil(0.75 * cycleDuration)
+    this.mainLogger.debug(`Start of last quarter: ${startOfLastPhase}`)
+    const endOfLastPhase = cycleStart + cycleDuration
+    this.mainLogger.debug(`End of last quarter: ${endOfLastPhase}`)
+    if (currentTime < startOfLastPhase || currentTime > endOfLastPhase) {
+      return false
+    }
+    return true
+  }
+
   // Wait until the chain update phase
   async _waitUntilUpdatePhase (currentTime, cycleStart, cycleDuration) {
     this.mainLogger.debug(`Current time is: ${currentTime}`)
@@ -828,19 +842,33 @@ class P2P extends EventEmitter {
 
     this.mainLogger.info('Syncing up cycle chain and nodelist...')
 
-    // Get current cycle counter
-    let cycleCounter
-    try {
-      ;({ cycleCounter } = await this._fetchCycleMarkerInternal(nodes))
-    } catch (e) {
-      this.mainLogger.warn('Could not get cycleMarker from nodes. Querying seedNodes for it...')
-      this.mainLogger.debug(e)
-      ;({ cycleCounter } = await this._fetchCycleMarkerInternal(seedNodes))
+    const getCycleMarker = async () => {
+      // Get current cycle counter
+      let cycleMarker
+      try {
+        cycleMarker = await this._fetchCycleMarkerInternal(nodes)
+      } catch (e) {
+        this.mainLogger.warn('Could not get cycleMarker from nodes. Querying seedNodes for it...')
+        this.mainLogger.debug(e)
+        cycleMarker = await this._fetchCycleMarkerInternal(seedNodes)
+      }
+      this.mainLogger.debug(`Fetched cycle marker: ${JSON.stringify(cycleMarker)}`)
+      return cycleMarker
     }
-    this.mainLogger.debug(`Fetched cycle counter: ${cycleCounter}`)
+
+    let cycleMarker
+    let isInLastPhase = false
+
+    // We want to make sure we are not in the last phase, so we don't accidentally miss a cycle
+    do {
+      cycleMarker = await getCycleMarker()
+      isInLastPhase = this._isInLastPhase(utils.getTime('s'), cycleMarker.cycleStart, cycleMarker.cycleDuration)
+      if (!isInLastPhase) break
+      await this._waitUntilEndOfCycle(utils.getTime('s'), cycleMarker.cycleStart, cycleMarker.cycleDuration)
+    } while (isInLastPhase)
 
     let chainStart = this.state.getLastCycle().counter
-    let chainEnd = cycleCounter
+    let chainEnd = cycleMarker.cycleCounter
 
     // We check to make sure that the last cycle we are trying to sync is not the latest one we already have
     if (chainEnd === chainStart) return true
@@ -1130,13 +1158,11 @@ class P2P extends EventEmitter {
     }
 
     let unfinalized = null
-    let firstTry = true
 
     // We keep trying to keep our chain and sync and try to get unfinalized cycle data until we are able to get the unfinalized data in time
     while (!unfinalized) {
-      if (!firstTry) await this._syncUpChainAndNodelist()
+      await this._syncUpChainAndNodelist()
       unfinalized = await getUnfinalized()
-      firstTry = false
     }
 
     // We add the unfinalized cycle data and start cycles
