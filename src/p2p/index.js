@@ -321,7 +321,7 @@ class P2P extends EventEmitter {
   }
 
   // Check if we are in the update phase
-  _isInUpdatePhase (currentTime = utils.getTime('s'), cycleStart = this.getCurrentCycleStart(), cycleDuration = this.state.getCurrentCycleDuration()) {
+  _isInUpdatePhase (currentTime = utils.getTime('s'), cycleStart = this.state.getCurrentCycleStart(), cycleDuration = this.state.getCurrentCycleDuration()) {
     this.mainLogger.debug(`Current time is: ${currentTime}`)
     this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
     this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
@@ -350,7 +350,7 @@ class P2P extends EventEmitter {
   }
 
   // Wait until the chain update phase
-  async _waitUntilUpdatePhase (currentTime = utils.getTime('s'), cycleStart = this.getCurrentCycleStart(), cycleDuration = this.state.getCurrentCycleDuration()) {
+  async _waitUntilUpdatePhase (currentTime = utils.getTime('s'), cycleStart = this.state.getCurrentCycleStart(), cycleDuration = this.state.getCurrentCycleDuration()) {
     // If we are already in the update phase, return
     if (this._isInUpdatePhase(currentTime, cycleStart, cycleDuration)) return
     this.mainLogger.debug(`Current time is: ${currentTime}`)
