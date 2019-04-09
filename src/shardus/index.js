@@ -137,8 +137,12 @@ class Shardus {
 
       this.loadDetection = new LoadDetection(this.config.loadDetection, this.statistics)
       this.statistics.on('snapshot', () => this.loadDetection.updateLoad())
-      this.loadDetection.on('highLoad', this.p2p.requestNetworkUpsize)
-      this.loadDetection.on('lowLoad', this.p2p.requestNetworkDownsize)
+      this.loadDetection.on('highLoad', async () => {
+        await this.p2p.requestNetworkUpsize()
+      })
+      this.loadDetection.on('lowLoad', async () => {
+        await this.p2p.requestNetworkDownsize()
+      })
 
       this.rateLimiting = new RateLimiting(this.config.rateLimiting, this.loadDetection)
 
