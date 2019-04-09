@@ -974,7 +974,7 @@ class P2PState extends EventEmitter {
     } catch (e) {
       this.mainLogger.error('_createCycle: ' + e.name + ': ' + e.message + ' at ' + e.stack)
     }
-    this.desiredNodes = this.currentCycle.desired
+    this.desiredNodes = this.currentCycle.data.desired
   }
 
   getCycleInfo (withCert = true) {
@@ -984,6 +984,7 @@ class P2PState extends EventEmitter {
     const duration = this.getCurrentCycleDuration()
     const active = this.getActiveCount()
     const desired = this.getNextDesiredCount()
+    console.log(desired)
     const joined = this.getJoined()
     const removed = this.getRemoved()
     const lost = this.getLost()
@@ -1106,7 +1107,7 @@ class P2PState extends EventEmitter {
   }
 
   getNextDesiredCount () {
-    return this.currentCycle.desired
+    return this.currentCycle.data.desired
   }
 
   getExpiredCount () {
