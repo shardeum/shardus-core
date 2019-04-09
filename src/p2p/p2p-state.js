@@ -984,7 +984,6 @@ class P2PState extends EventEmitter {
     const duration = this.getCurrentCycleDuration()
     const active = this.getActiveCount()
     const desired = this.getNextDesiredCount()
-    console.log(desired)
     const joined = this.getJoined()
     const removed = this.getRemoved()
     const lost = this.getLost()
