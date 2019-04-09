@@ -856,22 +856,30 @@ class P2P extends EventEmitter {
       return cycleMarker
     }
 
-    let cycleMarker
-    let isInLastPhase = false
+    // Gets cycle marker and ensures that we are not at the boundary of a cycle
+    const getCycleMarkerSafely = async () => {
+      let cycleMarker
+      let isInLastPhase = false
 
-    // We want to make sure we are not in the last phase, so we don't accidentally miss a cycle
-    do {
-      cycleMarker = await getCycleMarker()
-      isInLastPhase = this._isInLastPhase(utils.getTime('s'), cycleMarker.cycleStart, cycleMarker.cycleDuration)
-      if (!isInLastPhase) break
-      await this._waitUntilEndOfCycle(utils.getTime('s'), cycleMarker.cycleStart, cycleMarker.cycleDuration)
-    } while (isInLastPhase)
+      // We want to make sure we are not in the last phase, so we don't accidentally miss a cycle
+      do {
+        cycleMarker = await getCycleMarker()
+        isInLastPhase = this._isInLastPhase(utils.getTime('s'), cycleMarker.cycleStart, cycleMarker.cycleDuration)
+        if (!isInLastPhase) break
+        await this._waitUntilEndOfCycle(utils.getTime('s'), cycleMarker.cycleStart, cycleMarker.cycleDuration)
+      } while (isInLastPhase)
+      return cycleMarker
+    }
 
-    let chainStart = this.state.getLastCycle().counter
-    let chainEnd = cycleMarker.cycleCounter
+    const { cycleCounter } = await getCycleMarkerSafely()
 
-    // We check to make sure that the last cycle we are trying to sync is not the latest one we already have
-    if (chainEnd === chainStart) return true
+    const lastCycleCounter = this.state.getLastCycleCounter()
+    // If our last recorded cycle counter is one less than we currently see, we are synced up
+    if (lastCycleCounter === cycleCounter - 1) return true
+
+    // We want to sync from the cycle directly after our current cycle, until the latest cycle
+    let chainStart = lastCycleCounter + 1
+    let chainEnd = cycleCounter
 
     const { cycleChain, cycleMarkerCerts } = await this._fetchFinalizedChain(seedNodes, nodes, chainStart, chainEnd)
     this.mainLogger.debug(`Retrieved cycle chain: ${JSON.stringify(cycleChain)}`)
@@ -949,7 +957,8 @@ class P2P extends EventEmitter {
       const node = this.state.getNode(id)
       await this.state.removeNode(node)
     }
-    return true
+    const synced = await this._syncUpChainAndNodelist()
+    return synced
   }
 
   async _requestCycleUpdates (nodeId) {
