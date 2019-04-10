@@ -50,21 +50,8 @@ function setupRoutes () {
     return res.json({ joined: true, cycleJoined })
   })
 
-  this.network.registerExternalPost('seednodes', (req, res) => {
-    const seed = req.body.seed
-    // const seed = req.params.seed
-    if (!seed || typeof seed !== 'string' || seed.length !== 32) {
-      this.mainLogger.debug('Invalid seed was given for \'seednodes\' route.')
-      return res.json({ seedNodes: null, error: 'invalid_seed' })
-    }
-    if (!this.crypto.verify(req.body, this.netadmin)) {
-      this.mainLogger.debug('Invalid netadmin signature on the given seed.')
-      return res.json({ seedNodes: null, error: 'invalid_sig' })
-    }
-    const [seedNodes, error] = this.state.getRandomSeedNodes(seed)
-    if (error) {
-      return res.json({ seedNodes, error })
-    }
+  this.network.registerExternalGet('seednodes', (req, res) => {
+    const seedNodes = this.state.getSeedNodes()
     return res.json({ seedNodes })
   })
 

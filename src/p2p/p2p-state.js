@@ -1,6 +1,6 @@
 const EventEmitter = require('events')
 const utils = require('../utils')
-const Random = require('../random')
+// const Random = require('../random')
 
 class P2PState extends EventEmitter {
   constructor (config, logger, storage, p2p, crypto) {
@@ -21,6 +21,7 @@ class P2PState extends EventEmitter {
     this.amountToScale = config.amountToScale
     this.minNodes = config.minNodes
     this.maxNodes = config.maxNodes
+    this.seedNodeOffset = config.seedNodeOffset
 
     this.cycles = []
     this.certificates = []
@@ -1269,36 +1270,66 @@ class P2PState extends EventEmitter {
     return nodes
   }
 
-  getRandomSeedNodes (seed) {
-    if (!seed) {
-      return [null, 'no_seed']
+  getSeedNodes () {
+    // A helper function we use to produce a seed node list of the expected format
+    const produceSeedList = (nodes) => {
+      const seedNodes = nodes.map((node) => { return { ip: node.externalIp, port: node.externalPort } })
+      return seedNodes
     }
-
+    // Make a deep copy of the nodelist ordered by join timestamp
     const orderedNodes = utils.deepCopy(this.getNodesOrdered())
+    // Remove nodes that are not active from our list
     for (let i = 0; i < orderedNodes.length; i++) {
       const node = orderedNodes[i]
       if (node.status !== 'active') {
         orderedNodes.splice(i, 1)
       }
     }
-    let chosenNodes
-    // If the number of active nodes is less than or equal to the max seeds nodes we want, just return the entire list
-    if (orderedNodes.length <= this.maxSeedNodes) {
-      chosenNodes = orderedNodes
-    } else { // Otherwise we seed RNG and generate numbers to select random nodes until we have 10
-      chosenNodes = []
-      const random = Random(seed)
-      while (chosenNodes.length < 10) {
-        const randIndex = random.randomInt(0, orderedNodes.length - 1)
-        const randomNode = orderedNodes[randIndex]
-        chosenNodes.push(randomNode)
-        orderedNodes.splice(randIndex, 1)
-      }
-    }
-    // Remove all properties from nodes besides external IP and port
-    const seedNodes = chosenNodes.map((node) => { return { ip: node.externalIp, port: node.externalPort } })
-    return [seedNodes]
+    // Reverse array
+    orderedNodes.reverse()
+    // If less than minNodes - seedNodeOffset, just return the whole list
+    if (orderedNodes.length < this.minNodes - this.seedNodeOffset) return produceSeedList(orderedNodes)
+    // If we make it here, we more than minNodes - seedNodeOffset, remove the last 4 nodes
+    orderedNodes.splice(orderedNodes.length - this.seedNodeOffset, this.seedNodeOffset)
+    // If nodes left over are less than or = maxSeedNodes, return all nodes
+    if (orderedNodes.length <= this.maxSeedNodes) return produceSeedList(orderedNodes)
+    // Remove excess nodes
+    const toRemove = orderedNodes.length - this.maxSeedNodes
+    orderedNodes.splice(orderedNodes.length - toRemove, toRemove)
+    // Return reverse-ordered nodes
+    return produceSeedList(orderedNodes)
   }
+
+  // getRandomSeedNodes (seed) {
+  //   if (!seed) {
+  //     return [null, 'no_seed']
+  //   }
+
+  //   const orderedNodes = utils.deepCopy(this.getNodesOrdered())
+  //   for (let i = 0; i < orderedNodes.length; i++) {
+  //     const node = orderedNodes[i]
+  //     if (node.status !== 'active') {
+  //       orderedNodes.splice(i, 1)
+  //     }
+  //   }
+  //   let chosenNodes
+  //   // If the number of active nodes is less than or equal to the max seeds nodes we want, just return the entire list
+  //   if (orderedNodes.length <= this.maxSeedNodes) {
+  //     chosenNodes = orderedNodes
+  //   } else { // Otherwise we seed RNG and generate numbers to select random nodes until we have 10
+  //     chosenNodes = []
+  //     const random = Random(seed)
+  //     while (chosenNodes.length < 10) {
+  //       const randIndex = random.randomInt(0, orderedNodes.length - 1)
+  //       const randomNode = orderedNodes[randIndex]
+  //       chosenNodes.push(randomNode)
+  //       orderedNodes.splice(randIndex, 1)
+  //     }
+  //   }
+  //   // Remove all properties from nodes besides external IP and port
+  //   const seedNodes = chosenNodes.map((node) => { return { ip: node.externalIp, port: node.externalPort } })
+  //   return [seedNodes]
+  // }
 }
 
 module.exports = P2PState

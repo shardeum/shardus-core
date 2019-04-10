@@ -20,6 +20,7 @@
     "maxSeedNodes": 10,
     "minNodes": 15,
     "maxNodes": 20,
+    "seedNodeOffset": 4,
     "nodeExpiryAge": 180,
     "maxNodesToRotate": 1,
     "maxNodesPerCycle": 5,
