@@ -216,6 +216,7 @@ class P2PState extends EventEmitter {
         metadata.scaling = 'down'
         changed = true
       } else {
+        // Return if we don't change anything
         return
       }
     }
@@ -236,6 +237,9 @@ class P2PState extends EventEmitter {
         this.mainLogger.error(new Error(`Invalid scaling flag after changing flag. Flag: ${metadata.scaling}`))
         return
     }
+    // Set our current cycle's desired to the new desired count
+    this.currentCycle.data.desired = newDesired
+
     // If scaling flag changed, trigger computeCycleMarker
     await this._createCycleMarker()
   }

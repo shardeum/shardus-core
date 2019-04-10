@@ -18,7 +18,6 @@
     "gossipRecipients": 4,
     "gossipTimeout": 180,
     "maxSeedNodes": 10,
-    "desiredNodes": 15,
     "minNodes": 15,
     "maxNodes": 20,
     "nodeExpiryAge": 180,

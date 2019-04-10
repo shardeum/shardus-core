@@ -364,7 +364,7 @@ class P2P extends EventEmitter {
   }
 
   // Wait until last phase of cycle
-  async _waitUntilLastPhase (currentTime, cycleStart, cycleDuration) {
+  async _waitUntilLastPhase (currentTime = utils.getTime('s'), cycleStart = this.state.getCurrentCycleStart(), cycleDuration = this.state.getCurrentCycleDuration()) {
     this.mainLogger.debug(`Current time is: ${currentTime}`)
     this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
     this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
@@ -381,7 +381,7 @@ class P2P extends EventEmitter {
   }
 
   // Wait until the end of the cycle
-  async _waitUntilEndOfCycle (currentTime, cycleStart, cycleDuration) {
+  async _waitUntilEndOfCycle (currentTime = utils.getTime('s'), cycleStart = this.state.getCurrentCycleStart(), cycleDuration = this.state.getCurrentCycleDuration()) {
     this.mainLogger.debug(`Current time is: ${currentTime}`)
     this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
     this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
@@ -774,8 +774,8 @@ class P2P extends EventEmitter {
     let equalFn = (payload1, payload2) => {
       // Make a copy of the cycle payload and delete the metadata for the hash comparison,
       // so that we get more consistent results
-      const cycle1 = payload1.data
-      const cycle2 = payload2.data
+      const cycle1 = payload1.unfinalizedCycle.data
+      const cycle2 = payload2.unfinalizedCycle.data
       const hash1 = this.crypto.hash(cycle1)
       const hash2 = this.crypto.hash(cycle2)
       return hash1 === hash2
@@ -1247,7 +1247,7 @@ class P2P extends EventEmitter {
     const request = {
       node: this.id,
       timestamp: utils.getTime(),
-      cycleCounter: this.state.getCycleCounter()
+      cycleCounter: this.state.getCycleCounter() + 1
     }
     switch (upOrDown) {
       case 'up':
@@ -1266,20 +1266,26 @@ class P2P extends EventEmitter {
   }
 
   async _requestNetworkScaling (upOrDown) {
-    if (this.scalingRequested) return
-    await this._waitUntilUpdatePhase()
+    if (!this.isActive() || this.scalingRequested) return
     const request = this._constructScalingRequest(upOrDown)
-    await this.sendGossipIn('scaling', request)
+    await this._waitUntilEndOfCycle()
     await this.state.addExtScalingRequest(request)
+    await this.sendGossipIn('scaling', request)
     this.scalingRequested = true
   }
 
   async requestNetworkUpsize () {
+    if (this.state.getDesiredCount() >= this.state.maxNodes) {
+      return
+    }
     console.log('DBG', 'UPSIZE!')
     await this._requestNetworkScaling('up')
   }
 
   async requestNetworkDownsize () {
+    if (this.state.getDesiredCount() <= this.state.minNodes) {
+      return
+    }
     console.log('DBG', 'DOWNSIZE!')
     await this._requestNetworkScaling('down')
   }
