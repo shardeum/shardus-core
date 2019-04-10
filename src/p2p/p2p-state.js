@@ -212,6 +212,10 @@ class P2PState extends EventEmitter {
 
     // If we haven't changed, check down
     if (!changed) {
+      if (metadata.scaling === 'down') {
+        this.mainLogger.debug('Already set to scale down for this cycle. No need to scale.')
+        return
+      }
       if (scalingUpdates.down.length >= this.scaleReqsNeeded) {
         metadata.scaling = 'down'
         changed = true

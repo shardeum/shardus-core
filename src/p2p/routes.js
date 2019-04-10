@@ -259,9 +259,7 @@ function setupRoutes () {
       this.mainLogger.debug('No payload provided for the `scaling` request.')
       return
     }
-    const desired = this.state.getDesiredCount()
-    if (desired <= this.state.minNodes || desired >= this.state.maxNodes) return
-    const added = await this.addExtScalingRequest(payload)
+    const added = await this.state.addExtScalingRequest(payload)
     if (!added) return
     this.sendGossipIn('scaling', payload, tracker)
   })
