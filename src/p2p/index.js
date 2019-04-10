@@ -663,8 +663,22 @@ class P2P extends EventEmitter {
     return nodelist
   }
 
+  _isSameCycleMarkerInfo (info1, info2) {
+    const cm1 = utils.deepCopy(info1)
+    const cm2 = utils.deepCopy(info2)
+    delete cm1.currentTime
+    delete cm2.currentTime
+    const equivalent = util.isDeepStrictEqual(cm1, cm2)
+    this.mainLogger.debug(`Equivalence of the two compared cycle marker infos: ${equivalent}`)
+    return equivalent
+  }
+
   async _fetchCycleMarker (nodes) {
-    const [cycleMarkerInfo] = await this.robustQuery(nodes, (node) => http.get(`${node.ip}:${node.port}/cyclemarker`))
+    const queryFn = async (node) => {
+      const cycleMarkerInfo = await http.get(`${node.ip}:${node.port}/cyclemarker`)
+      return cycleMarkerInfo
+    }
+    const [cycleMarkerInfo] = await this.robustQuery(nodes, queryFn, () => this._isSameCycleMarkerInfo)
     return cycleMarkerInfo
   }
 
@@ -696,7 +710,7 @@ class P2P extends EventEmitter {
       const cycleMarkerInfo = await this.ask(node, 'cyclemarker')
       return cycleMarkerInfo
     }
-    const [cycleMarkerInfo] = await this.robustQuery(nodes, queryFn)
+    const [cycleMarkerInfo] = await this.robustQuery(nodes, queryFn, (query1, query2) => this._isSameCycleMarkerInfo)
     return cycleMarkerInfo
   }
 
