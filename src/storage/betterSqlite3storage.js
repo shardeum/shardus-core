@@ -99,7 +99,7 @@ class BetterSqlite3Storage {
 
     // , `createdAt` DATETIME NOT NULL, `updatedAt` DATETIME NOT NULL
     // `id` INTEGER PRIMARY KEY AUTOINCREMENT,
-    await this.run('CREATE TABLE if not exists `accounts` (`address` VARCHAR(255) NOT NULL, `modified` BIGINT NOT NULL, `sequence` BIGINT NOT NULL, `owners` JSON NOT NULL, `signs` SMALLINT NOT NULL, `balance` DOUBLE PRECISION NOT NULL, `type` VARCHAR(255) NOT NULL, `data` JSON NOT NULL, `hash` VARCHAR(255) NOT NULL, `txs` VARCHAR(255) NOT NULL, `timestamp` BIGINT NOT NULL)')
+    await this.run('CREATE TABLE if not exists `accounts` (`address` VARCHAR(255) NOT NULL PRIMARY KEY, `modified` BIGINT NOT NULL, `sequence` BIGINT NOT NULL, `owners` JSON NOT NULL, `signs` SMALLINT NOT NULL, `balance` DOUBLE PRECISION NOT NULL, `type` VARCHAR(255) NOT NULL, `data` JSON NOT NULL, `hash` VARCHAR(255) NOT NULL, `txs` VARCHAR(255) NOT NULL, `timestamp` BIGINT NOT NULL)')
 
     await this.run('PRAGMA synchronous = OFF')
     await this.run('PRAGMA journal_mode = MEMORY')
