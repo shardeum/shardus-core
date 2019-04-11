@@ -36,11 +36,11 @@
       }
     },
     "categories": {
-      "default": { "appenders": [ "out" ], "level": "trace" },
-      "main": { "appenders": [ "main", "errors"  ], "level": "trace" },
-      "fatal": { "appenders": [ "fatal" ], "level": "fatal" },
-      "net": { "appenders": [ "net" ], "level": "trace" },
-      "playback": { "appenders": [ "playback" ], "level": "trace" }
+      "default": { "appenders": [ "out" ], "level": "FATAL" },
+      "main": { "appenders": [ "main", "errors"  ], "level": "FATAL" },
+      "fatal": { "appenders": [ "fatal" ], "level": "FATAL" },
+      "net": { "appenders": [ "net" ], "level": "FATAL" },
+      "playback": { "appenders": [ "playback" ], "level": "FATAL" }
     }
   }
 }
