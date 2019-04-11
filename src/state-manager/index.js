@@ -6,7 +6,7 @@ const utils = require('../utils')
 const allZeroes64 = '0'.repeat(64)
 
 class StateManager extends EventEmitter {
-  constructor (verboseLogs, profiler, app, consensus, logger, storage, p2p, crypto) {
+  constructor (verboseLogs, profiler, app, consensus, logger, storage, p2p, crypto, config) {
     super()
     this.verboseLogs = verboseLogs
     this.profiler = profiler
@@ -18,6 +18,7 @@ class StateManager extends EventEmitter {
     this.app = app
     this.consensus = consensus
     this.logger = logger
+    this.config = config
 
     this._listeners = {}
 
@@ -527,7 +528,7 @@ class StateManager extends EventEmitter {
     // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
     while (moreDataRemaining) {
       // max records artificially low to make testing coverage better.  todo refactor: make it a config or calculate based on data size
-      let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, maxRecords: 50 }
+      let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, maxRecords: this.config.stateManager.accountBucketSize }
       let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data3', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
       // accountData is in the form [{accountId, stateId, data}] for n accounts.
       let accountData = result.data.wrappedAccounts
@@ -865,7 +866,7 @@ class StateManager extends EventEmitter {
       let result = {}
       // max records set artificially low for better test coverage
       // todo m11: make configs for how many records to query
-      let accountStates = await this.storage.queryAccountStateTable(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, 200)
+      let accountStates = await this.storage.queryAccountStateTable(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, this.config.stateManager.stateTableBucketSize)
       result.accountStates = accountStates
       await respond(result)
     })

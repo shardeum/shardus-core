@@ -60,5 +60,9 @@
   "rateLimiting": {
     "limitRate": true,
     "loadLimit": 0.8
+  },
+  "stateManager": {
+    "stateTableBucketSize": 200,
+    "accountBucketSize": 50
   }
 }
