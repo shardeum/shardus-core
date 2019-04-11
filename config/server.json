@@ -54,12 +54,12 @@
   "loadDetection": {
     "queueLimit": 1000,
     "desiredTxTime": 15,
-    "highThreshold": 0.8,
+    "highThreshold": 0.5,
     "lowThreshold": 0.2
   },
   "rateLimiting": {
     "limitRate": true,
-    "loadLimit": 0.8
+    "loadLimit": 0.5
   },
   "stateManager": {
     "stateTableBucketSize": 200,
