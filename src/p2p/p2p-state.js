@@ -1279,25 +1279,26 @@ class P2PState extends EventEmitter {
     // Make a deep copy of the nodelist ordered by join timestamp
     const orderedNodes = utils.deepCopy(this.getNodesOrdered())
     // Remove nodes that are not active from our list
+    const filteredNodes = []
     for (let i = 0; i < orderedNodes.length; i++) {
       const node = orderedNodes[i]
-      if (node.status !== 'active') {
-        orderedNodes.splice(i, 1)
+      if (node.status === 'active') {
+        filteredNodes.push(node)
       }
     }
     // Reverse array
-    orderedNodes.reverse()
+    filteredNodes.reverse()
     // If less than minNodes - seedNodeOffset, just return the whole list
-    if (orderedNodes.length < this.minNodes - this.seedNodeOffset) return produceSeedList(orderedNodes)
+    if (filteredNodes.length < this.minNodes - this.seedNodeOffset) return produceSeedList(filteredNodes)
     // If we make it here, we more than minNodes - seedNodeOffset, remove the last 4 nodes
-    orderedNodes.splice(orderedNodes.length - this.seedNodeOffset, this.seedNodeOffset)
+    filteredNodes.splice(filteredNodes.length - this.seedNodeOffset, this.seedNodeOffset)
     // If nodes left over are less than or = maxSeedNodes, return all nodes
-    if (orderedNodes.length <= this.maxSeedNodes) return produceSeedList(orderedNodes)
+    if (filteredNodes.length <= this.maxSeedNodes) return produceSeedList(filteredNodes)
     // Remove excess nodes
-    const toRemove = orderedNodes.length - this.maxSeedNodes
-    orderedNodes.splice(orderedNodes.length - toRemove, toRemove)
+    const toRemove = filteredNodes.length - this.maxSeedNodes
+    filteredNodes.splice(filteredNodes.length - toRemove, toRemove)
     // Return reverse-ordered nodes
-    return produceSeedList(orderedNodes)
+    return produceSeedList(filteredNodes)
   }
 
   // getRandomSeedNodes (seed) {
