@@ -501,9 +501,15 @@ class Shardus {
   }
 
   _registerRoutes () {
+    // DEBUG routes
+    // TODO: Remove eventually, or at least route guard these
     this.network.registerExternalPost('exit', async (req, res) => {
       res.json({ success: true })
       await this.shutdown()
+    })
+
+    this.network.registerExternalGet('config', async (req, res) => {
+      res.json({ config: this.config })
     })
   }
 
