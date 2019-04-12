@@ -126,7 +126,7 @@ class Shardus {
 
     if (this.app) {
       this.statistics = new Statistics(this.config.baseDir, this.config.statistics, {
-        counters: ['txInjected', 'txApplied', 'txRejected'],
+        counters: ['txInjected', 'txApplied', 'txRejected', 'txExpired'],
         watchers: {
           queueLength: () => this.stateManager ? this.stateManager.newAcceptedTXQueue.length : 0,
           serverLoad: () => this.loadDetection ? this.loadDetection.getCurrentLoad() : 0
@@ -301,6 +301,7 @@ class Shardus {
       const timestamp = initValidationResp.txnTimestamp
       if (this._isTransactionTimestampExpired(timestamp)) {
         this.fatalLogger.fatal(`Transaction Expired: ${utils.stringifyReduce(inTransaction)}`)
+        this.statistics.incrementCounter('txExpired')
         return { success: false, reason: 'Transaction Expired' }
       }
 

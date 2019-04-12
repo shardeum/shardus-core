@@ -102,11 +102,13 @@ class Reporter {
       const desiredNodes = this.p2p.state.getDesiredCount()
       const txInjected = this.statistics ? this.statistics.getPreviousElement('txInjected') : 0
       const txApplied = this.statistics ? this.statistics.getPreviousElement('txApplied') : 0
+      const txRejected = this.statistics ? this.statistics.getPreviousElement('txRejected') : 0
+      const txExpired = this.statistics ? this.statistics.getPreviousElement('txExpired') : 0
       const reportInterval = this.config.interval
       const nodeIpInfo = this.p2p.getIpInfo()
 
       try {
-        await this._sendReport({ appState, cycleMarker, nodelistHash, desiredNodes, txInjected, txApplied, reportInterval, nodeIpInfo })
+        await this._sendReport({ appState, cycleMarker, nodelistHash, desiredNodes, txInjected, txApplied, txRejected, txExpired, reportInterval, nodeIpInfo })
       } catch (e) {
         this.mainLogger.error('startReporting: ' + e.name + ': ' + e.message + ' at ' + e.stack)
         console.error(e)
