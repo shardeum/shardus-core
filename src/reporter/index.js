@@ -98,6 +98,7 @@ class Reporter {
     this.reportTimer = setInterval(async () => {
       const appState = this.stateManager ? await this.stateManager.getAccountsStateHash() : allZeroes64
       const cycleMarker = this.p2p.getCycleMarker()
+      const cycleCounter = this.p2p.state.getCycleCounter()
       const nodelistHash = this.p2p.getNodelistHash()
       const desiredNodes = this.p2p.state.getDesiredCount()
       const txInjected = this.statistics ? this.statistics.getPreviousElement('txInjected') : 0
@@ -108,7 +109,7 @@ class Reporter {
       const nodeIpInfo = this.p2p.getIpInfo()
 
       try {
-        await this._sendReport({ appState, cycleMarker, nodelistHash, desiredNodes, txInjected, txApplied, txRejected, txExpired, reportInterval, nodeIpInfo })
+        await this._sendReport({ appState, cycleMarker, cycleCounter, nodelistHash, desiredNodes, txInjected, txApplied, txRejected, txExpired, reportInterval, nodeIpInfo })
       } catch (e) {
         this.mainLogger.error('startReporting: ' + e.name + ': ' + e.message + ' at ' + e.stack)
         console.error(e)
