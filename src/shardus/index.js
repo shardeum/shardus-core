@@ -274,6 +274,10 @@ class Shardus {
   put (req, res) {
     if (!this.appProvided) throw new Error('Please provide an App object to Shardus.setup before calling Shardus.put')
 
+    if (!this.stateManager.dataSyncMainPhaseComplete) {
+      return res.status(200).send({ success: false, reason: 'Node is still syncing.' })
+    }
+
     if (this.verboseLogs) this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(req.body)}`) // not reducing tx here so we can get the long hashes
 
     if (this.rateLimiting.isOverloaded()) {
