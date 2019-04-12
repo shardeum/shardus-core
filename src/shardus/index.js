@@ -39,6 +39,9 @@ class Shardus {
     this.loadDetection = null
     this.rateLimiting = null
 
+    this.mainLogger.fatal(`===== Server config: =====`)
+    this.mainLogger.fatal(JSON.stringify(config, null, 2))
+
     this._listeners = {}
 
     this.heartbeatInterval = config.heartbeatInterval
