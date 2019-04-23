@@ -125,6 +125,21 @@ const XOR = (hexString1, hexString2) => {
   return (num1 ^ num2) >>> 0
 }
 
+const getClosestHash = (targetHash, hashes) => {
+  let closest = null
+  let closestDist = 0
+  for (const hash of hashes) {
+    const dist = XOR(targetHash, hash)
+    if (dist === closestDist) {
+      console.error(new Error(`Two hashes came out to the same distance from target hash!\n 1st hash: ${closest}\n 2nd hash: ${hash}\n Target hash: ${targetHash}`))
+      return null
+    }
+    if (dist > closestDist) closest = hash
+    closestDist = dist
+  }
+  return closest
+}
+
 const setAlarm = (callback, timestamp) => {
   const now = Date.now()
   if (timestamp <= now) {
@@ -277,6 +292,7 @@ exports.binarySearch = binarySearch
 exports.insertSorted = insertSorted
 exports.computeMedian = computeMedian
 exports.XOR = XOR
+exports.getClosestHash = getClosestHash
 exports.setAlarm = setAlarm
 exports.isObject = isObject
 exports.isString = isString

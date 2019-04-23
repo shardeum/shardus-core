@@ -1,6 +1,6 @@
 const EventEmitter = require('events')
 const utils = require('../utils')
-// const Random = require('../random')
+const Random = require('../random')
 
 class P2PState extends EventEmitter {
   constructor (config, logger, storage, p2p, crypto) {
@@ -1420,9 +1420,11 @@ class P2PState extends EventEmitter {
     return nodes
   }
 
-  getSeedNodes () {
+  getSeedNodes (forSeedList = true) {
     // A helper function we use to produce a seed node list of the expected format
     const produceSeedList = (nodes) => {
+      // We use this flag to get back the raw nodes instead of the node objects for the seed list format
+      if (!forSeedList) return nodes
       const seedNodes = nodes.map((node) => { return { ip: node.externalIp, port: node.externalPort } })
       return seedNodes
     }
@@ -1449,6 +1451,13 @@ class P2PState extends EventEmitter {
     filteredNodes.splice(filteredNodes.length - toRemove, toRemove)
     // Return reverse-ordered nodes
     return produceSeedList(filteredNodes)
+  }
+
+  getRandomActiveNode () {
+    const nodes = this.getActiveNodes(this.id)
+    const random = Random()
+    const randIndex = random.randomInt(0, nodes.length - 1)
+    return nodes[randIndex]
   }
 
   // getRandomSeedNodes (seed) {

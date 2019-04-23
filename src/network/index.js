@@ -1,10 +1,12 @@
+const EventEmitter = require('events')
 const Sn = require('shardus-net')
 const express = require('express')
 const bodyParser = require('body-parser')
 const cors = require('cors')
 
-class Network {
+class Network extends EventEmitter {
   constructor (config, logger) {
+    super()
     this.app = express()
     this.sn = null
     this.logger = logger
@@ -117,6 +119,7 @@ class Network {
       const onTimeout = () => {
         const err = new Error('Request timed out.')
         this.mainLogger.error(err)
+        this.emit('timeout', node)
         reject(err)
       }
       if (!logged) this.logger.playbackLog('self', node, 'InternalAsk', route, id, message)
