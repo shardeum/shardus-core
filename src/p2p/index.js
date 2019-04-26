@@ -1070,7 +1070,8 @@ class P2P extends EventEmitter {
       // This is for testing purposes
       console.log('Doing initial setup for server...')
 
-      const joinRequest = await this._createJoinRequest()
+      const cycleMarker = this.state.getCurrentCycleMarker()
+      const joinRequest = await this._createJoinRequest(cycleMarker)
       this.state.startCycles()
       this.state.addNewJoinRequest(joinRequest)
 
