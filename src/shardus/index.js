@@ -299,6 +299,11 @@ class Shardus {
       return { success: false, reason: 'Node is still syncing.' }
     }
 
+    if (!this.p2p.allowTransactions()) {
+      this.statistics.incrementCounter('txRejected')
+      return { success: false, reason: 'Network conditions to allow transactions are not met.' }
+    }
+
     if (this.rateLimiting.isOverloaded()) {
       this.statistics.incrementCounter('txRejected')
       return { success: false, reason: 'Maximum load exceeded.' }

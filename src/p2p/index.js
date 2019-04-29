@@ -1406,6 +1406,10 @@ class P2P extends EventEmitter {
     await this._requestNetworkScaling('down')
   }
 
+  allowTransactions () {
+    return this.state.getActiveCount() >= this.state.minNodes
+  }
+
   // Finds a node either in nodelist or in seedNodes listhis.mainLogger.debug(`Node ID to look up: ${nodeId}`)t if told to
   _findNodeInGroup (nodeId, group) {
     if (!group) {
