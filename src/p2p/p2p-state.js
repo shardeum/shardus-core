@@ -136,6 +136,7 @@ class P2PState extends EventEmitter {
 
   _addJoinRequest (joinRequest) {
     if (!this.cyclesStarted) return false
+    if (!this.p2p.isActive()) return false
     if (!this._addToBestJoinRequests(joinRequest)) {
       this.mainLogger.debug('Join request not added: Was not best request for this cycle.')
       return false
