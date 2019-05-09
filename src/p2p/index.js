@@ -118,7 +118,8 @@ class P2P extends EventEmitter {
   }
 
   async _getSeedListSigned () {
-    let seedListSigned = await http.get(this.seedList)
+    const nodeInfo = this.getPublicNodeInfo()
+    const seedListSigned = await http.post(this.seedList, { nodeInfo })
     this.mainLogger.debug(`Got signed seed list: ${JSON.stringify(seedListSigned)}`)
     return seedListSigned
   }
