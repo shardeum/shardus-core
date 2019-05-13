@@ -114,7 +114,9 @@ class Crypto {
       })
     })
     // Tell child to compute PoW
-    this.powGenerators[generator].send({ seed, difficulty })
+    if (!this.powGenerators[generator].killed) {
+      this.powGenerators[generator].send({ seed, difficulty })
+    }
     // Return a promise the resolves to a valid { nonce, hash }
     return promise
   }
@@ -127,7 +129,9 @@ class Crypto {
         resolve(signal)
       })
     })
-    this.powGenerators[generator].kill()
+    if (!this.powGenerators[generator].killed) {
+      this.powGenerators[generator].kill()
+    }
     return promise
   }
 }
