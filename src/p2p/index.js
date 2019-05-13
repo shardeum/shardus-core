@@ -1024,13 +1024,16 @@ class P2P extends EventEmitter {
       return false
     }
     let added
+    const active = this.isActive()
     if (!fromExternal) added = this.state.addGossipedJoinRequest(joinRequest)
-    else added = this.state.addNewJoinRequest(joinRequest)
+    else {
+      if (!active) return false
+      added = this.state.addNewJoinRequest(joinRequest)
+    }
     if (!added) {
       this.mainLogger.debug(`Join request rejected: Was not added. TODO: Have this fn return reason.`)
       return false
     }
-    const active = this.isActive()
     if (!active) return true
     await this.sendGossipIn('join', joinRequest, tracker)
     return true
