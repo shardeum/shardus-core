@@ -3,5 +3,6 @@ module.exports = [
   require('./nodes'),
   require('./properties'),
   require('./acceptedTxs'),
-  require('./accountStates')
+  require('./accountStates'),
+  require('./accountsCopy')
 ]

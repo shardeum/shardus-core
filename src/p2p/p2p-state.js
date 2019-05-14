@@ -766,11 +766,18 @@ class P2PState extends EventEmitter {
     this._startUpdatePhase(this.currentCycle.data.start * 1000, quarterCycle)
   }
 
+  // Q1
   _startUpdatePhase (startTime, phaseLen) {
     if (this.shouldStop) return
     this.mainLogger.debug('Starting update phase...')
     this.acceptChainUpdates = true
     const endTime = startTime + phaseLen
+
+    const lastCycle = this.getLastCycle()
+    let time = utils.getTime('s')
+    console.log('Q1 ' + time)
+    this.emit('cycle_q1_start', lastCycle, time)
+
     utils.setAlarm(() => {
       this._endUpdatePhase(endTime, phaseLen)
     }, endTime)
@@ -859,30 +866,51 @@ class P2PState extends EventEmitter {
     return bestNodes
   }
 
+  // Q2
   _endUpdatePhase (startTime, phaseLen) {
     if (this.shouldStop) return
     this.mainLogger.debug('Ending update phase...')
     this.acceptChainUpdates = false
     const endTime = startTime + phaseLen
+
+    const lastCycle = this.getLastCycle()
+    let time = utils.getTime('s')
+    console.log('Q2 ' + time)
+    this.emit('cycle_q2_start', lastCycle, time)
+
     utils.setAlarm(() => {
       this._startCycleSync(endTime, phaseLen)
     }, endTime)
   }
 
+  // Q3
   async _startCycleSync (startTime, phaseLen) {
     if (this.shouldStop) return
     this.mainLogger.debug('Starting cycle sync phase...')
     await this._createCycleMarker()
     const endTime = startTime + phaseLen
+
+    const lastCycle = this.getLastCycle()
+    let time = utils.getTime('s')
+    console.log('Q3 ' + time)
+    this.emit('cycle_q3_start', lastCycle, time)
+
     utils.setAlarm(() => {
       this._finalizeCycle(endTime, phaseLen)
     }, endTime)
   }
 
+  // Q4
   async _finalizeCycle (startTime, phaseLen) {
     if (this.shouldStop) return
     this.mainLogger.debug('Starting cycle finalization phase...')
     const endTime = startTime + phaseLen
+
+    const lastCycle = this.getLastCycle()
+    let time = utils.getTime('s')
+    console.log('Q4 ' + time)
+    this.emit('cycle_q4_start', lastCycle, time)
+
     utils.setAlarm(async () => {
       if (this.shouldStop) return
       await this._createCycle()
@@ -1154,6 +1182,28 @@ class P2PState extends EventEmitter {
   getLastCycle () {
     if (!this.cycles.length) return null
     return this.cycles[this.cycles.length - 1]
+  }
+
+  getCycleByTimestamp (timestamp) {
+    let secondsTs = Math.floor(timestamp * 0.001)
+    // search from end, to improve normal case perf
+    for (let i = this.cycles.length - 1; i >= 0; i--) {
+      let cycle = this.cycles[i]
+      if (cycle.start <= secondsTs && cycle.start + cycle.duration > secondsTs) {
+        return cycle
+      }
+    }
+    return null
+  }
+
+  getCycleByCounter (counter) {
+    for (let i = this.cycles.length - 1; i >= 0; i--) {
+      let cycle = this.cycles[i]
+      if (cycle.counter === counter) {
+        return cycle
+      }
+    }
+    return null
   }
 
   getCycleCounter () {

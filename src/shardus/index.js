@@ -267,7 +267,11 @@ class Shardus {
 
     if (this.stateManager) {
       await utils.sleep(3000)
-      this.stateManager.enableSyncCheck()
+      // Original sync check
+      // this.stateManager.enableSyncCheck()
+
+      // Partition check and data repair (new)
+      this.stateManager.startSyncPartitions()
     }
   }
 
@@ -352,17 +356,18 @@ class Shardus {
 
   // USED BY SIMPLECOINAPP
   createApplyResponse (txId, txTimestamp) {
-    let replyObject = { stateTableResults: [], txId, txTimestamp }
+    let replyObject = { stateTableResults: [], txId, txTimestamp, accountData: [] }
     return replyObject
   }
 
   // USED BY SIMPLECOINAPP
-  applyResponseAddState (resultObject, accountId, txId, txTimestamp, stateBefore, stateAfter, accountCreated) {
+  applyResponseAddState (resultObject, accountData, accountId, txId, txTimestamp, stateBefore, stateAfter, accountCreated) {
     let state = { accountId, txId, txTimestamp, stateBefore, stateAfter }
     if (accountCreated) {
       state.stateBefore = allZeroes64
     }
     resultObject.stateTableResults.push(state)
+    resultObject.accountData.push({ accountId, data: accountData, txId, timestamp: txTimestamp, hash: stateAfter })
   }
 
   // USED BY SIMPLECOINAPP
@@ -477,6 +482,20 @@ class Shardus {
       // Returns a list of failed Acc_id
       if (typeof (application.setAccountData) === 'function') {
         applicationInterfaceImpl.setAccountData = async (accountRecords) => application.setAccountData(accountRecords)
+      } else {
+        // throw new Error('Missing requried interface function. apply()')
+      }
+
+      // pass array of account copies to this (only looks at the data field) and it will reset the account state
+      if (typeof (application.resetAccountData) === 'function') {
+        applicationInterfaceImpl.resetAccountData = async (accountRecords) => application.resetAccountData(accountRecords)
+      } else {
+        // throw new Error('Missing requried interface function. apply()')
+      }
+
+      // pass array of account ids to this and it will delete the accounts
+      if (typeof (application.deleteAccountData) === 'function') {
+        applicationInterfaceImpl.deleteAccountData = async (addressList) => application.deleteAccountData(addressList)
       } else {
         // throw new Error('Missing requried interface function. apply()')
       }

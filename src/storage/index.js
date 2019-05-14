@@ -30,7 +30,7 @@ class Storage {
     this._read = async (table, where, opts) => this.storage._read(table, where, opts)
     this._update = async (table, values, where, opts) => this.storage._update(table, values, where, opts)
     this._delete = async (table, where, opts) => this.storage._delete(table, where, opts)
-    this._query = async (query, tableModel) => this.storage._rawQuery(query, tableModel)
+    this._query = async (query, tableModel) => this.storage._rawQuery(query, tableModel) // or queryString, valueArray for non-sequelize
 
     this.initialized = true
   }
@@ -293,7 +293,7 @@ class Storage {
   async addAcceptedTransactions (acceptedTransactions) {
     this._checkInit()
     try {
-      await this._create(this.storageModels.acceptedTxs, acceptedTransactions)
+      await this._create(this.storageModels.acceptedTxs, acceptedTransactions, { createOrReplace: true })
     } catch (e) {
       throw new Error(e)
     }
@@ -392,6 +392,26 @@ class Storage {
       throw new Error(e)
     }
   }
+
+  async queryAcceptedTransactionsByIds (ids) {
+    this._checkInit()
+    try {
+      let result = await this._read(
+        this.storageModels.acceptedTxs,
+        { id: { [Op.in]: ids } },
+        {
+          // limit: limit,
+          order: [ ['timestamp', 'ASC'] ],
+          attributes: { exclude: ['createdAt', 'updatedAt', 'id'] },
+          raw: true
+        }
+      )
+      return result
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
   async queryAccountStateTable (accountStart, accountEnd, tsStart, tsEnd, limit) {
     this._checkInit()
     try {
@@ -425,6 +445,22 @@ class Storage {
         }
       )
       return result
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
+  async clearAccountStateTableByList (addressList, tsStart, tsEnd) {
+    this._checkInit()
+    try {
+      await this._delete(
+        this.storageModels.accountStates,
+        { txTimestamp: { [Op.between]: [tsStart, tsEnd] }, accountId: { [Op.in]: addressList } },
+        {
+          attributes: { exclude: ['createdAt', 'updatedAt', 'id'] },
+          raw: true
+        }
+      )
     } catch (e) {
       throw new Error(e)
     }
@@ -466,6 +502,89 @@ class Storage {
     }
   }
 
+
+
+  async createAccountCopies (accountCopies) {
+    this._checkInit()
+    try {
+      // console.log('createAccountCopies write: ' + JSON.stringify(accountCopies))
+      await this._create(this.storageModels.accountsCopy, accountCopies)
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
+  async createOrReplaceAccountCopy (accountCopy) {
+    this._checkInit()
+    try {
+      // console.log('createOrReplaceAccountCopy write: ' + JSON.stringify(accountCopy))
+      await this._create(this.storageModels.accountsCopy, accountCopy, { createOrReplace: true })
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
+  // accountId: { type: Sequelize.STRING, allowNull: false, unique: 'compositeIndex' },
+  // cycleNumber: { type: Sequelize.STRING, allowNull: false, unique: 'compositeIndex' },
+  // data: { type: Sequelize.STRING, allowNull: false },
+  // timestamp: { type: Sequelize.BIGINT, allowNull: false },
+  // hash: { type: Sequelize.STRING, allowNull: false }
+
+  async getAccountReplacmentCopies1 (accountIDs, cycleNumber) {
+    this._checkInit()
+    try {
+      let result = await this._read(
+        this.storageModels.accountsCopy,
+        { cycleNumber: { [Op.lte]: cycleNumber }, accountId: { [Op.in]: accountIDs } },
+        {
+          // limit: limit,
+          // order: [ ['timestamp', 'ASC'] ],
+          attributes: { exclude: ['createdAt', 'updatedAt'] },
+          raw: true
+        }
+      )
+      return result
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
+  async getAccountReplacmentCopies (accountIDs, cycleNumber) {
+    this._checkInit()
+    try {
+      let expandQ = ''
+      for (let i = 0; i < accountIDs.length; i++) {
+        expandQ += '?'
+        if (i < accountIDs.length - 1) {
+          expandQ += ', '
+        }
+      }
+      // cycleNumber const query = `select accountId, max(cycleNumber), data, timestamp, hash from accountsCopy WHERE cycleNumber <= ? and accountId IN (${expandQ}) group by accountId `
+      const query = `select accountId, max(cycleNumber) cycleNumber, data, timestamp, hash from accountsCopy WHERE cycleNumber <= ? and accountId IN (${expandQ}) group by accountId `
+      let result = await this._query(query, [cycleNumber, ...accountIDs])
+      return result
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
+  async clearAccountReplacmentCopies (accountIDs, cycleNumber) {
+    this._checkInit()
+    try {
+      await this._delete(
+        this.storageModels.accountsCopy,
+        { cycleNumber: { [Op.gte]: cycleNumber }, accountId: { [Op.in]: accountIDs } },
+        {
+          // limit: limit,
+          // order: [ ['timestamp', 'ASC'] ],
+          attributes: { exclude: ['createdAt', 'updatedAt'] },
+          raw: true
+        }
+      )
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
   // example of a raw query with some similarities to what we want:
 
   // async getAllLatestAccounts () {

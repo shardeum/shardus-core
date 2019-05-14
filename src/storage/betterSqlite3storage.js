@@ -63,6 +63,7 @@ class BetterSqlite3Storage {
         modelData.substitutionString += ', '
       }
     }
+    modelData.insertOrReplaceString = `INSERT OR REPLACE INTO ${modelData.tableName} (${modelData.columnsString} ) VALUES (${modelData.substitutionString})`
     modelData.insertString = `INSERT INTO ${modelData.tableName} (${modelData.columnsString} ) VALUES (${modelData.substitutionString})`
     modelData.selectString = `SELECT * FROM ${modelData.tableName} `
     modelData.updateString = `UPDATE ${modelData.tableName} SET `
@@ -96,10 +97,11 @@ class BetterSqlite3Storage {
     await this.run('CREATE TABLE if not exists `cycles` (`counter` BIGINT NOT NULL UNIQUE PRIMARY KEY, `certificate` JSON NOT NULL, `previous` TEXT NOT NULL, `marker` TEXT NOT NULL, `start` BIGINT NOT NULL, `duration` BIGINT NOT NULL, `active` BIGINT NOT NULL, `desired` BIGINT NOT NULL, `expired` BIGINT NOT NULL, `joined` JSON NOT NULL, `activated` JSON NOT NULL, `removed` JSON NOT NULL, `returned` JSON NOT NULL, `lost` JSON NOT NULL)')
     await this.run('CREATE TABLE if not exists `nodes` (`id` TEXT NOT NULL PRIMARY KEY, `publicKey` TEXT NOT NULL, `curvePublicKey` TEXT NOT NULL, `cycleJoined` TEXT NOT NULL, `internalIp` VARCHAR(255) NOT NULL, `externalIp` VARCHAR(255) NOT NULL, `internalPort` SMALLINT NOT NULL, `externalPort` SMALLINT NOT NULL, `joinRequestTimestamp` BIGINT NOT NULL, `address` VARCHAR(255) NOT NULL, `status` VARCHAR(255) NOT NULL)')
     await this.run('CREATE TABLE if not exists `properties` (`key` VARCHAR(255) NOT NULL PRIMARY KEY, `value` JSON)')
+    await this.run('CREATE TABLE if not exists `accountsCopy` (`accountId` VARCHAR(255) NOT NULL, `cycleNumber` BIGINT NOT NULL, `data` JSON NOT NULL, `timestamp` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, PRIMARY KEY (`accountId`, `cycleNumber`))')
 
     // , `createdAt` DATETIME NOT NULL, `updatedAt` DATETIME NOT NULL
     // `id` INTEGER PRIMARY KEY AUTOINCREMENT,
-    await this.run('CREATE TABLE if not exists `accounts` (`address` VARCHAR(255) NOT NULL PRIMARY KEY, `modified` BIGINT NOT NULL, `sequence` BIGINT NOT NULL, `owners` JSON NOT NULL, `signs` SMALLINT NOT NULL, `balance` DOUBLE PRECISION NOT NULL, `type` VARCHAR(255) NOT NULL, `data` JSON NOT NULL, `hash` VARCHAR(255) NOT NULL, `txs` VARCHAR(255) NOT NULL, `timestamp` BIGINT NOT NULL)')
+    await this.run('CREATE TABLE if not exists `accounts` (`address` VARCHAR(255) NOT NULL PRIMARY KEY, `modified` BIGINT NOT NULL, `sequence` BIGINT NOT NULL, `owners` JSON NOT NULL, `signs` SMALLINT NOT NULL, `balance` DOUBLE PRECISION NOT NULL, `type` VARCHAR(255) NOT NULL, `data` JSON NOT NULL, `hash` VARCHAR(255) NOT NULL, `txs` TEXT NOT NULL, `timestamp` BIGINT NOT NULL)')
 
     await this.run('PRAGMA synchronous = OFF')
     await this.run('PRAGMA journal_mode = MEMORY')
@@ -133,6 +135,9 @@ class BetterSqlite3Storage {
       return
     }
     let queryString = table.insertString
+    if (opts && opts.createOrReplace) {
+      queryString = table.insertOrReplaceString
+    }
     let inputs = []
     // console.log('columns: ' + stringify(table.columns))
     for (let column of table.columns) {
@@ -217,8 +222,10 @@ class BetterSqlite3Storage {
     return this.run(queryString, valueArray)
   }
 
-  _rawQuery (table, query) {
-    return this.sequelize.query(query, { model: table })
+  _rawQuery (queryString, valueArray) {
+    // return this.sequelize.query(query, { model: table })
+
+    return this.all(queryString, valueArray)
   }
 
   params2Array (paramsObj, table) {
@@ -257,6 +264,22 @@ class BetterSqlite3Storage {
             paramEntry.sql = `${paramEntry.name} ${paramEntry.type} (${questionMarks})`
             paramEntry.vals = []
             paramEntry.vals = paramEntry.vals.concat(inValues)
+          }
+          if (value[Op.lte]) {
+            let rightHandValue = value[Op.lte]
+            paramEntry.type = 'LTE'
+            paramEntry.v1 = rightHandValue
+            // paramEntry.v2 = between[1]
+            paramEntry.sql = `${paramEntry.name} <= ?`
+            paramEntry.vals = [paramEntry.v1]
+          }
+          if (value[Op.gte]) {
+            let rightHandValue = value[Op.gte]
+            paramEntry.type = 'GTE'
+            paramEntry.v1 = rightHandValue
+            // paramEntry.v2 = between[1]
+            paramEntry.sql = `${paramEntry.name} >= ?`
+            paramEntry.vals = [paramEntry.v1]
           }
         } else {
           paramEntry.type = '='

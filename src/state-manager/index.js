@@ -1,5 +1,6 @@
 const EventEmitter = require('events')
 const utils = require('../utils')
+const stringify = require('fast-stable-stringify')
 
 // todo m12: need error handling on all the p2p requests.
 
@@ -18,6 +19,7 @@ class StateManager extends EventEmitter {
     this.app = app
     this.consensus = consensus
     this.logger = logger
+
     this.config = config
 
     this._listeners = {}
@@ -49,6 +51,12 @@ class StateManager extends EventEmitter {
     this.dataPhaseTag = 'DATASYNC: '
     // this.accountRepair
     this.applySoftLock = false
+
+    this.initStateSyncData() // to early?
+
+    this.useHashSets = true
+    this.lastActiveNodeCount = 0
+
     this.queueStopped = false
   }
 
@@ -231,6 +239,7 @@ class StateManager extends EventEmitter {
   // todo refactor: move to p2p?
   getRandomNodesInRange (count, lowAddress, highAddress, exclude) {
     let allNodes = this.p2p.state.getActiveNodes(this.p2p.id)
+    this.lastActiveNodeCount = allNodes.length
     this.shuffleArray(allNodes)
     let results = []
     if (allNodes.length <= count) {
@@ -779,7 +788,31 @@ class StateManager extends EventEmitter {
       }
     }
 
+    await this.writeCombinedAccountDataToBackups(failedHashes)
+
     this.combinedAccountData = [] // we can clear this now.
+  }
+
+  async writeCombinedAccountDataToBackups (failedHashes) {
+    let failedAccountsById = {}
+    for (let hash of failedHashes) {
+      failedAccountsById[hash] = true
+    }
+
+    const lastCycle = this.p2p.state.getLastCycle()
+    let cycleNumber = lastCycle.counter
+    let accountCopies = []
+    for (let accountEntry of this.goodAccounts) {
+      // check failed hashes
+      if (failedAccountsById[accountEntry.stateId]) {
+        continue
+      }
+      // wrappedAccounts.push({ accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp })
+      let accountCopy = { accountId: accountEntry.accountId, data: accountEntry.data, timestamp: accountEntry.timestamp, hash: accountEntry.stateId, cycleNumber }
+      accountCopies.push(accountCopy)
+    }
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'writeCombinedAccountDataToBackups ' + accountCopies.length + ' ' + JSON.stringify(accountCopies[0]))
+    await this.storage.createAccountCopies(accountCopies)
   }
 
   // Sync the failed accounts
@@ -955,6 +988,263 @@ class StateManager extends EventEmitter {
       result.accountData = accountData
       await respond(result)
     })
+
+    // /post_partition_results (Partition_results)
+    //   Partition_results - array of objects with the fields {Partition_id, Cycle_number, Partition_hash, Node_id, Node_sign}
+    //   Returns nothing
+    this.p2p.registerInternal('post_partition_results', async (payload, respond) => {
+      // let result = {}
+      // let ourLockID = -1
+      try {
+        // ourLockID = await this.fifoLock('accountModification')
+        // accountData = await this.app.getAccountDataByList(payload.accountIds)
+
+        // Nodes collect the partition result from peers.
+        // Nodes may receive partition results for partitions they are not covering and will ignore those messages.
+        // Once a node has collected 50% or more peers giving the same partition result it can combine them to create a partition receipt. The node tries to create a partition receipt for all partitions it covers.
+        // If the partition receipt has a different partition hash than the node, the node needs to ask one of the peers with the majority partition hash for the partition object and determine the transactions it has missed.
+        // If the node is not able to create a partition receipt for a partition, the node needs to ask all peers which have a different partition hash for the partition object and determine the transactions it has missed. Only one peer for each different partition hash needs to be queried. Uses the /get_partition_txids API.
+        // If the node has missed some transactions for a partition, the node needs to get these transactions from peers and apply these transactions to affected accounts starting with a known good copy of the account from the end of the last cycle. Uses the /get_transactions_by_list API.
+        // If the node applied missed transactions to a partition, then it creates a new partition object, partition hash and partition result.
+        // After generating new partition results as needed, the node broadcasts the set of partition results to N adjacent peers on each side; where N is the number of  partitions covered by the node.
+        // After receiving new partition results from peers, the node should be able to collect 50% or more peers giving the same partition result and build a partition receipt.
+        // Any partition for which the node could not generate a partition receipt, should be logged as a fatal error.
+        // Nodes save the partition receipt as proof that the transactions they have applied are correct and were also applied by peers.
+
+        // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results`)
+
+        if (!payload) {
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results: abort no payload`)
+          return
+        }
+
+        let partitionResults = payload.partitionResults
+        let key = 'c' + payload.Cycle_number
+
+        let responsesById = this.partitionResponsesByCycleById[key]
+        if (!responsesById) {
+          responsesById = {}
+          this.partitionResponsesByCycleById[key] = responsesById
+        }
+
+        if (!payload.partitionResults) {
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results: abort, partitionResults == null`)
+          return
+        }
+
+        if (payload.partitionResults.length === 0) {
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results: abort, partitionResults.length == 0`)
+          return
+        }
+
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results ${utils.stringifyReduce(payload)}`)
+
+        if (!payload.partitionResults[0].sign) {
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results: abort, no sign object on partition`)
+          return
+        }
+
+        let owner = payload.partitionResults[0].sign.owner
+        // merge these responses in
+        let ourPartitionValues = this.partitionResultsByCycle[key]
+        for (let partitionResult of partitionResults) {
+          let key2 = 'p' + partitionResult.Partition_id
+          let responses = responsesById[key2]
+          if (!responses) {
+            responses = []
+            responsesById[key2] = responses
+          }
+          // clean out an older response from same node if on exists
+          responses = responses.filter(item => (item.sign == null) || item.sign.owner !== owner)
+          responsesById[key2] = responses // have to re-assign this since it is a new ref to the array
+
+          // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_resultsB responses.length ${responses.length} `)
+          // add the result ot the list of responses
+          if (partitionResult) {
+            responses.push(partitionResult)
+          } else {
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results partitionResult missing`)
+          }
+
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results partition: ${partitionResult.Partition_id} responses.length ${responses.length}  cycle:${payload.Cycle_number}`)
+
+          // // if enough data, and our response is prepped.
+          // if (responses.length > 3) {
+          //   let ourResult = null
+          //   for (let obj of ourPartitionValues) {
+          //     if (obj.Partition_id === partitionResult.Partition_id) {
+          //       ourResult = obj
+          //       break
+          //     }
+          //   }
+          //   // payload.Cycle_number
+          //   let [partitionReceipt, topResult, success] = await this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
+
+          //   if (!success) {
+          //     let cycle = this.p2p.state.getCycleByCounter(payload.Cycle_number)
+          //     await this.startRepairProcess(cycle, topResult)
+          //   } else if (partitionReceipt) {
+          //     // do we ever send partition receipt yet?
+          //     this.storePartitionReceipt(payload.Cycle_number, partitionReceipt)
+          //   }
+          // }
+        }
+
+        // Try to create receipts if we can
+        var partitionKeys = Object.keys(responsesById)
+
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results partitionKeys: ${partitionKeys}`)
+
+        // not sure we need full loop here, maybe just the one realated to this response?... except we could get lots of partitions in the response
+        for (let partitionKey of partitionKeys) {
+          let responses = responsesById[partitionKey]
+          // if enough data, and our response is prepped.
+          let repairTracker
+          let partitionId = null
+          if (responses.length > 0) {
+            partitionId = responses[0].Partition_id
+            repairTracker = this._getRepairTrackerForCycle(payload.Cycle_number, partitionId)
+            if (repairTracker.busy && repairTracker.awaitWinningHash === false) {
+              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results tracker busy. ${partitionKey} responses: ${responses.length}.  ${utils.stringifyReduce(repairTracker)}`)
+              continue
+            }
+            if (repairTracker.repairsFullyComplete) {
+              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results repairsFullyComplete = true  cycle:${payload.Cycle_number}`)
+              continue
+            }
+          } else {
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results no responses. ${partitionKey} responses: ${responses.length}. repairTracker: ${utils.stringifyReduce(repairTracker)} responsesById: ${utils.stringifyReduce(responsesById)}`)
+            continue
+          }
+
+          let responsesRequired = 3
+          if (this.useHashSets) {
+            responsesRequired = 1 + Math.ceil(repairTracker.numNodes * 0.9) // get responses from 90% of the node we have sent to
+          }
+          // are there enough responses to try generating a receipt
+          if (responses.length >= responsesRequired && (repairTracker.evaluationStarted === false || repairTracker.awaitWinningHash)) {
+            repairTracker.evaluationStarted = true
+
+            // let partitionId = responses[0].Partition_id
+            let ourResult = null
+            for (let obj of ourPartitionValues) {
+              if (obj.Partition_id === partitionId) {
+                ourResult = obj
+                break
+              }
+            }
+            if (ourResult == null) {
+              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results our result is not computed yet `)
+              // Todo repair : may need to sleep or restart this computation later..
+              return
+            }
+
+            // payload.Cycle_number
+            let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
+
+            let [partitionReceipt, topResult, success] = receiptResults
+            // return [null, topResult, false, hashSetList, output, ourSolution]
+            if (!success) {
+              if (repairTracker.awaitWinningHash) {
+                if (topResult == null) {
+                  // if we are awaitWinningHash then wait for a top result before we start repair process again
+                  if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair awaitWinningHash:true but topResult == null so keep waiting `)
+                  continue
+                } else {
+                  if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair awaitWinningHash:true and we have a top result so start reparing! `)
+                }
+              }
+
+              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results: tryGeneratePartitionReciept failed start repair process ${receiptResults.length}`)
+              let cycle = this.p2p.state.getCycleByCounter(payload.Cycle_number)
+              await this.startRepairProcess(cycle, topResult, partitionId, ourResult.Partition_hash)
+            } else if (partitionReceipt) {
+              // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results: success store partition receipt`)
+              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results 3 allFinished, final cycle: ${payload.Cycle_number} hash:${utils.stringifyReduce({ topResult })}`)
+              // do we ever send partition receipt yet?
+              this.storePartitionReceipt(payload.Cycle_number, partitionReceipt)
+
+              this.repairTrackerMarkFinished(repairTracker)
+            }
+          } else {
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results not enough responses awaitWinningHash: ${repairTracker.awaitWinningHash} resp: ${responses.length}. required:${responsesRequired} repairTracker: ${utils.stringifyReduce(repairTracker)}`)
+          }
+        }
+
+        // partitionResults
+      } finally {
+        // this.fifoUnlock('accountModification', ourLockID)
+      }
+      // result.accountData = accountData
+      // await respond(result)
+    })
+
+    // /get_transactions_by_list (Tx_ids)
+    //   Tx_ids - array of transaction ids
+    //   Returns data from the Transactions Table for just the given transaction ids
+    this.p2p.registerInternal('get_transactions_by_list', async (payload, respond) => {
+      let result = {}
+      try {
+        result = await this.storage.queryAcceptedTransactionsByIds(payload.Tx_ids)
+      } finally {
+      }
+      await respond(result)
+    })
+
+    this.p2p.registerInternal('get_transactions_by_partition_index', async (payload, respond) => {
+      let result = {}
+
+      let passFailList = []
+      try {
+        // let partitionId = payload.partitionId
+        let cycle = payload.cycle
+        let indicies = payload.tx_indicies
+        let hash = payload.hash
+
+        let key = 'c' + cycle
+        let partitionObjectsByHash = this.recentPartitionObjectsByCycleByHash[key]
+        if (!partitionObjectsByHash) {
+          await respond({ success: false })
+        }
+        let partitionObject = partitionObjectsByHash[hash]
+        if (!partitionObject) {
+          await respond({ success: false })
+        }
+        let txIDList = []
+        for (let index of indicies) {
+          let txid = partitionObject.Txids[index]
+          txIDList.push(txid)
+          let passFail = partitionObject.Status[index]
+          passFailList.push(passFail)
+        }
+
+        result = await this.storage.queryAcceptedTransactionsByIds(txIDList)
+      } finally {
+      }
+      // TODO fix pass fail sorting.. it is probably all wrong and out of sync, but currently nothing fails.
+      await respond({ success: true, acceptedTX: result, passFail: passFailList })
+    })
+
+    // /get_partition_txids (Partition_id, Cycle_number)
+    //   Partition_id
+    //   Cycle_number
+    //   Returns the partition object which contains the txids along with the status
+    this.p2p.registerInternal('get_partition_txids', async (payload, respond) => {
+      let result = {}
+      try {
+        let id = payload.Partition_id
+        let key = 'c' + payload.Cycle_number
+        let partitionObjects = this.partitionObjectsByCycle[key]
+        for (let obj of partitionObjects) {
+          if (obj.Partition_id === id) {
+            result = obj
+          }
+        }
+      } finally {
+
+      }
+      await respond(result)
+    })
   }
 
   _unregisterEndpoints () {
@@ -968,6 +1258,9 @@ class StateManager extends EventEmitter {
     this.p2p.unregisterInternal('get_account_data_by_list')
   }
 
+  // //////////////////////////////////////////////////////////////////////////
+  // //////////////////////////   Old sync check     //////////////////////////
+  // //////////////////////////////////////////////////////////////////////////
   enableSyncCheck () {
     // return // hack no sync check , dont check in!!!!!
     this._registerListener(this.p2p.state, 'newCycle', (cycles) => process.nextTick(async () => {
@@ -1096,7 +1389,7 @@ class StateManager extends EventEmitter {
     let accountsToPatch = []
     // patch account states
     await this.storage.addAccountStates(diff)
-    for (let state in diff) {
+    for (let state of diff) {
       if (state.accountId) {
         accountsToPatch.push(state.accountId)
       }
@@ -1203,28 +1496,31 @@ class StateManager extends EventEmitter {
   }
 
   // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
-  async tryApplyTransaction (acceptedTX, hasStateTableData) {
+  async tryApplyTransaction (acceptedTX, hasStateTableData, repairing, filter) {
     let ourLockID = -1
+    let accountDataList
+    let txTs = 0
     try {
       let tx = acceptedTX.data
       // let receipt = acceptedTX.receipt
       let keysResponse = this.app.getKeyFromTransaction(tx)
       let { timestamp, debugInfo } = keysResponse
-
+      txTs = timestamp
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'tryApplyTransaction ' + timestamp + ' ' + debugInfo)
 
       ourLockID = await this.fifoLock('accountModification')
 
-      if (this.verboseLogs) console.log('tryApplyTransaction ' + timestamp + ' Applying!')
+      if (this.verboseLogs) console.log(`tryApplyTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
       // if (this.verboseLogs) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
       this.applySoftLock = true
-      let { stateTableResults } = await this.app.apply(tx)
+      let { stateTableResults, accountData: _accountdata } = await this.app.apply(tx, filter)
+      accountDataList = _accountdata
       this.applySoftLock = false
       // only write our state table data if we dont already have it in the db
       if (hasStateTableData === false) {
         for (let stateT of stateTableResults) {
           if (this.verboseLogs) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId))
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter))
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
         }
         await this.storage.addAccountStates(stateTableResults)
       }
@@ -1235,11 +1531,24 @@ class StateManager extends EventEmitter {
       this.storage.addAcceptedTransactions([acceptedTX])
     } catch (ex) {
       this.fatalLogger.fatal('tryApplyTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+
+      if (!repairing) this.tempRecordTXByCycle(txTs, acceptedTX, false)
+
       return false
     } finally {
       this.fifoUnlock('accountModification', ourLockID)
     }
-    this.emit('txApplied', acceptedTX)
+
+    await this.updateAccountsCopyTable(accountDataList, repairing, txTs)
+
+    if (!repairing) {
+      // await this.updateAccountsCopyTable(accountDataList)
+
+      this.tempRecordTXByCycle(txTs, acceptedTX, true)
+
+      this.emit('txApplied', acceptedTX)
+    }
+
     return true
   }
 
@@ -1247,6 +1556,14 @@ class StateManager extends EventEmitter {
     let keysResponse = this.app.getKeyFromTransaction(acceptedTX.data)
     let timestamp = keysResponse.timestamp
     let txId = acceptedTX.receipt.txHash
+
+    if (this.config.debug.loseTxChance > 0) {
+      let rand = Math.random()
+      if (this.config.debug.loseTxChance > rand) {
+        this.logger.playbackLogNote('tx_dropForTest', txId, 'dropping tx ' + timestamp)
+        return
+      }
+    }
 
     try {
       let age = Date.now() - timestamp
@@ -1499,6 +1816,1715 @@ class StateManager extends EventEmitter {
     this._clearQueue()
     this._cleanupListeners()
     await this._clearState()
+  }
+
+  //  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  //  //////////////////////////////////////////////////          Data Repair                    ///////////////////////////////////////////////////////////
+  //  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  // by what index? partition?
+  // trigger this in the q2 phase
+  generatePartitionObjects (lastCycle) {
+    // TODO sharding.  when we add state sharding need to loop over partitions.
+    let partitionObject = this.generatePartitionObject(lastCycle, 1)
+
+    // Nodes sign the partition hash along with the Partition_id, Cycle_number and timestamp to produce a partition result.
+    let partitionResult = this.generatePartitionResult(partitionObject)
+
+    // byId?
+    let key = 'c' + lastCycle.counter
+
+    let partitionObjects = [partitionObject]
+    let partitionResults = [partitionResult]
+
+    this.partitionObjectsByCycle[key] = partitionObjects
+    this.partitionResultsByCycle[key] = partitionResults // todo in the future there could be many results (one per covered partition)
+
+    let partitionResultsByHash = this.recentPartitionObjectsByCycleByHash[key]
+    if (partitionResultsByHash == null) {
+      partitionResultsByHash = {}
+      this.recentPartitionObjectsByCycleByHash[key] = partitionResultsByHash
+    }
+    // todo sharding :   need to loop and put all results in this list
+    // todo perf, need to clean out data from older cycles..
+    partitionResultsByHash[partitionResult.Partition_hash] = partitionObject
+
+    // add our result to the list of all other results
+    let responsesById = this.partitionResponsesByCycleById[key]
+    if (!responsesById) {
+      responsesById = {}
+      this.partitionResponsesByCycleById[key] = responsesById
+    }
+    // this part should be good to go for sharding.
+    for (let pResult of partitionResults) {
+      let key2 = 'p' + pResult.Partition_id
+      let responses = responsesById[key2]
+      if (!responses) {
+        responses = []
+        responsesById[key2] = responses
+      }
+      let ourID = this.crypto.getPublicKey()
+      // clean out an older response from same node if on exists
+      responses = responses.filter(item => item.sign && item.sign.owner !== ourID) // if the item is not signed clear it!
+      responsesById[key2] = responses // have to re-assign this since it is a new ref to the array
+      responses.push(pResult)
+    }
+
+    // return [partitionObject, partitionResult]
+  }
+
+  generatePartitionResult (partitionObject) {
+    let partitionHash = this.crypto.hash(partitionObject)
+    let partitionResult = { Partition_hash: partitionHash, Partition_id: partitionObject.Partition_id, Cycle_number: partitionObject.Cycle_number }
+
+    if (this.useHashSets) {
+      let hashSet = ''
+      for (let hash of partitionObject.Txids) {
+        hashSet += hash.slice(0, 2)
+      }
+      partitionResult.hashSet = hashSet
+    }
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair partitionObject: ${utils.stringifyReduce(partitionObject)}`)
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair generatePartitionResult: ${utils.stringifyReduce(partitionResult)}`)
+
+    if (partitionObject.Txids && partitionObject.Txids.length > 0) {
+      this.logger.playbackLogNote('partitionObject', 'c' + partitionObject.Cycle_number, partitionObject)
+    }
+    // nodeid in form of the signer!
+    return partitionResult
+  }
+  // {
+  //   Partition_id: 342,
+  //   Partitions: 500, - total number of partitions during this cycle
+  //   Cycle_number: 5329,
+  //   Cycle_marker: 0x123abc… ,
+  //   Txids: [txid1, txid2, …],  - ordered from oldest to recent
+  //   Status: [1,0, …],      - ordered corresponding to Txids; 1 for applied; 0 for failed
+  //   Chain: [partition_hash_341, partition_hash_342, partition_hash_343, …]
+  // }
+  generatePartitionObject (lastCycle, partitionId) {
+    let txList = this.getTXList(lastCycle.counter, partitionId)
+
+    let txSourceData = txList
+    if (txList.newTxList) {
+      txSourceData = txList.newTxList
+    }
+
+    let partitionObject = {
+      Partition_id: partitionId,
+      Partitions: 1,
+      Cycle_number: lastCycle.counter,
+      Cycle_marker: lastCycle.marker,
+      Txids: txSourceData.hashes, // txid1, txid2, …],  - ordered from oldest to recent
+      Status: txSourceData.passed, // [1,0, …],      - ordered corresponding to Txids; 1 for applied; 0 for failed
+      Chain: [] // [partition_hash_341, partition_hash_342, partition_hash_343, …]
+    }
+    return partitionObject
+  }
+
+  partitionObjectToTxMaps (partitionObject) {
+    let statusMap = {}
+    for (let i = 0; i < partitionObject.Txids.length; i++) {
+      let tx = partitionObject.Txids[i]
+      let status = partitionObject.Status[i]
+      statusMap[tx] = status
+    }
+    return statusMap
+  }
+
+  tryGeneratePartitionReciept (allResults, ourResult, repairPassHack = false) {
+    // let hashCounting = {}
+    // let topHash
+    // let topCount = 0
+    // let topResult = null
+    // for (let partitionResult of allResults) {
+    //   let hash = partitionResult.Partition_hash
+    //   let count = hashCounting[hash] || 0
+    //   count++
+    //   hashCounting[hash] = count
+    //   if (count > topCount) {
+    //     topCount = count
+    //     topHash = hash
+    //     topResult = partitionResult
+    //   }
+    // }
+    let partitionId = ourResult.Partition_id
+    let cycleCounter = ourResult.Cycle_number
+
+    let repairTracker = this._getRepairTrackerForCycle(cycleCounter, partitionId)
+    repairTracker.busy = true // mark busy so we won't try to start this task again while in the middle of it
+
+    let [topHash, topCount, topResult] = this.findMostCommonResponse(cycleCounter, partitionId, repairTracker.triedHashes)
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryGeneratePartitoinReciept repairTracker: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
+
+    let requiredHalf = Math.max(1, allResults.length / 2)
+    if (this.useHashSets && repairPassHack) {
+      // hack force our node to win:
+      topCount = requiredHalf
+      topHash = ourResult.Partition_hash
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryGeneratePartitoinReciept hack force win: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
+    }
+
+    let resultsList = []
+    if (topCount >= requiredHalf) {
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair tryGeneratePartitoinReciept: top hash wins: ' + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
+      for (let partitionResult of allResults) {
+        if (partitionResult.Partition_hash === topHash) {
+          resultsList.push(partitionResult)
+        }
+      }
+    } else {
+      if (this.useHashSets) {
+        // bail in a way that will cause us to use the hashset strings
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair tryGeneratePartitoinReciept: did not win, useHashSets: ' + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
+        return [null, null, false]
+      }
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair tryGeneratePartitoinReciept: top hash failed: ' + utils.makeShortHash(topHash) + ` ${topCount} / ${requiredHalf}`)
+      return [null, topResult, false]
+    }
+
+    if (ourResult.Partition_hash !== topHash) {
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair tryGeneratePartitoinReciept: our hash does not match: ' + utils.makeShortHash(topHash) + ` our hash: ${ourResult.Partition_hash}`)
+      return [null, topResult, false]
+    }
+
+    let partitionReceipt = {
+      resultsList
+    }
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryGeneratePartitoinReciept OK! ${utils.stringifyReduce({ partitionReceipt, topResult })}`)
+
+    return [partitionReceipt, topResult, true]
+  }
+
+  async startRepairProcess (cycle, topResult, partitionId, ourLastResultHash) {
+    let repairTracker = this._getRepairTrackerForCycle(cycle.counter, partitionId)
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess begin.  repairTracker: ${utils.stringifyReduce(repairTracker)}`)
+
+    repairTracker.repairing = true
+
+    this.repairTrackerClearForNextRepair(repairTracker)
+    // let partitionID
+    let cycleNumber
+    let key
+    let key2
+
+    let usedSyncTXsFromHashSetStrings = false
+    try {
+      // partitionId = partitionId // topResult.Partition_id
+      cycleNumber = cycle.counter // topResult.Cycle_number
+      key = 'c' + cycleNumber
+      key2 = 'p' + partitionId
+
+      if (topResult) {
+        repairTracker.triedHashes.push(topResult)
+        await this.syncTXsFromWinningHash(topResult)
+      } else {
+        if (this.useHashSets) {
+          let retCode = await this.syncTXsFromHashSetStrings(cycleNumber, partitionId, repairTracker, ourLastResultHash)
+
+          if (retCode === 100) {
+            // syncTXsFromHashSetStrings has failed
+            repairTracker.awaitWinningHash = true
+            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` syncTXsFromHashSetStrings failed so we will set awaitWinningHash=true and hope a hash code wins  `)
+            return
+          }
+
+          // return // bail since code is not complete
+          usedSyncTXsFromHashSetStrings = true
+        } else {
+          // this probably fails with out hashsets.. or keeps tring forever
+        }
+      }
+
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess syncTXs finished.  `)
+
+      this.generatePartitionObjects(cycle) // this will stomp our old results TODO PERF: (a bit inefficient since it works on all partitions)
+
+      // get responses
+      let responsesById = this.partitionResponsesByCycleById[key]
+      let responses = responsesById[key2]
+
+      // find our result
+      let ourPartitionValues = this.partitionResultsByCycle[key]
+      let ourResult = null
+      for (let obj of ourPartitionValues) {
+        if (obj.Partition_id === partitionId) {
+          ourResult = obj
+          break
+        }
+      }
+
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess our result: ${utils.stringifyReduce(ourResult)} obj: ${utils.stringifyReduce(this.partitionObjectsByCycle[key])} `)
+
+      // check if our hash now matches the majority one, maybe even re check the majority hash..?
+      let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult, true)
+      let [partitionReceipt, topResult2, success] = receiptResults
+
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess tryGeneratePartitionReciept: ${utils.stringifyReduce({ partitionReceipt, topResult2, success })}  `)
+
+      if (!success) {
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess success==false starting repair again in 3 seconds!`)
+
+        let cycle = this.p2p.state.getCycleByCounter(cycleNumber)
+
+        await utils.sleep(3000) // wait a second.. also when to give up
+        await this.startRepairProcess(cycle, topResult2, partitionId, ourResult.Partition_hash)
+        return
+      } else if (partitionReceipt) {
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess success==ok`)
+
+        if (usedSyncTXsFromHashSetStrings === false) {
+          // do we ever send partition receipt yet?
+          this.storePartitionReceipt(cycleNumber, partitionReceipt)
+          repairTracker.txRepairComplete = true
+        } else {
+          repairTracker.awaitWinningHash = true
+        }
+
+        // are all repairs complete. if so apply them to accounts.
+        // look at the repair tracker for every partition.
+
+        let cycleKey = 'c' + cycle.counter
+
+        let allFinished = true
+        let repairsByPartition = this.repairTrackingByCycleById[key]
+
+        if (!repairsByPartition) {
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess repairsByPartition==null ${key} ck: ${cycleKey} `)
+        }
+
+        // check that all the repair keys are good
+        let repairKeys = Object.keys(repairsByPartition)
+        for (let partitionKey of repairKeys) {
+          let repairTracker1 = repairsByPartition[partitionKey]
+          if ((repairTracker1.txRepairComplete === false && repairTracker1.evaluationStarted) || repairTracker1.evaluationStarted === false) {
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess repairTracker1 ${utils.stringifyReduce(repairTracker1)} `)
+            // allFinished = false // TODO sharding!   need to fix this logic so that we make sure all partitions are good before we proceed to merge and apply things
+            // perhaps check that awaitWinningHash == true for all of them now? idk..
+          }
+        }
+        if (allFinished) {
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess allFinished, start merge and apply cycle: ${cycleNumber}`)
+          await this.mergeAndApplyTXRepairs(cycleNumber)
+
+          // only declare victory after we matched hashes
+          if (usedSyncTXsFromHashSetStrings === false) {
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess 1 allFinished, final cycle: ${cycleNumber} hash:${utils.stringifyReduce({ topResult2 })}`)
+            return
+          } else {
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess set evaluationStarted=false so we can tally up hashes again ${cycleNumber}`)
+            repairTracker.evaluationStarted = false
+            repairTracker.awaitWinningHash = true
+
+            // TODO SHARDING... need to refactor this so it happens per partition before we are all done
+            // now that we are done see if we can form a receipt with what we have on the off change that all other nodes have sent us their corrected receipts already
+            let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
+            let [partitionReceipt3, topResult3, success3] = receiptResults
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess immediate receipt check. cycle: ${cycleNumber} success:${success3} topResult:${utils.stringifyReduce(topResult3)}  partitionReceipt: ${utils.stringifyReduce({ partitionReceipt3 })}`)
+
+            // see if we already have a winning hash to correct to
+            if (!success3) {
+              if (repairTracker.awaitWinningHash) {
+                if (topResult3 == null) {
+                  // if we are awaitWinningHash then wait for a top result before we start repair process again
+                  if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess awaitWinningHash:true but topResult == null so keep waiting `)
+                } else {
+                  if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess awaitWinningHash:true and we have a top result so start reparing! `)
+                  if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess: tryGeneratePartitionReciept failed start repair process ${receiptResults.length}`)
+                  let cycle = this.p2p.state.getCycleByCounter(cycleNumber)
+                  await utils.sleep(1000)
+                  await this.startRepairProcess(cycle, topResult3, partitionId, ourResult.Partition_hash)
+                  return // we are correcting to another hash.  don't bother sending our hash out
+                }
+              }
+            } else {
+              this.storePartitionReceipt(cycleNumber, partitionReceipt3)
+              this.repairTrackerMarkFinished(repairTracker)
+              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess 2 allFinished, final cycle: ${cycleNumber} hash:${utils.stringifyReduce({ topResult2 })}`)
+            }
+          }
+        }
+      }
+
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess we repaired stuff so re-broadcast our results`)
+      // broadcast our upgraded result again
+      // how about for just this partition?
+      // TODO repair.  how to make this converge towards order and heal the network problems. is this the right time/place to broadcaast it?  I think it does converge now since merge does a strait copy of the winner
+      await this.broadcastPartitionResults(cycleNumber)
+
+      // if not look for other missing txids from hashes we have not investigated yet and repeat process.
+    } catch (ex) {
+      this.mainLogger.debug('_repair: startRepairProcess ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.fatalLogger.fatal('_repair: startRepairProcess ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      // throw new Error('FailAndRestartPartition0')
+    } finally {
+      repairTracker.repairing = false // ? really
+    }
+  }
+
+  async syncTXsFromWinningHash (topResult) {
+    // get node ID from signing.
+    // obj.sign = { owner: pk, sig }
+    let signingNode = topResult.sign.owner
+    let allNodes = this.p2p.state.getActiveNodes(this.p2p.id)
+    let nodeToContact
+
+    if (!allNodes) {
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: allNodes: undefined ')
+      throw new Error('allNodes undefined')
+    }
+
+    for (const node of allNodes) {
+      if (node.address === signingNode) {
+        nodeToContact = node
+        break
+      }
+    }
+    if (nodeToContact) {
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: node to ask for TXs: ' + utils.stringifyReduce(topResult))
+    } else {
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: cant find node: ' + utils.stringifyReduce(topResult))
+      throw new Error(`nodeToContact undefined ${utils.stringifyReduce(allNodes)}  ${utils.makeShortHash(signingNode)}`)
+    }
+
+    // get the list of tx ids for a partition?..
+    let payload = { Cycle_number: topResult.Cycle_number, Partition_id: topResult.Partition_id }
+    let partitionObject = await this.p2p.ask(nodeToContact, 'get_partition_txids', payload)
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: partitionObject: ' + utils.stringifyReduce(partitionObject))
+
+    let statusMap = this.partitionObjectToTxMaps(partitionObject)
+    let ourPartitionObj = this.getPartitionObject(topResult.Cycle_number, topResult.Partition_id)
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: ourPartitionObj: ' + utils.stringifyReduce(ourPartitionObj))
+
+    let ourStatusMap = this.partitionObjectToTxMaps(ourPartitionObj)
+    // need to match up on all data, but only sync what we need and remove what we dont.
+
+    // filter to only get accepted txs
+
+    // for (let i = 0; i < partitionObject.Txids.length; i++) {
+    //   if (partitionObject.Status[i] === 1) {
+    //     // partitionObject.Txids
+    //     acceptedTXIDs.push(partitionObject.Txids[i])
+    //   }
+    // }
+
+    let repairTracker = this._getRepairTrackerForCycle(topResult.Cycle_number, topResult.Partition_id)
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: _getRepairTrackerForCycle: ' + utils.stringifyReduce(repairTracker))
+
+    let missingAcceptedTXIDs = []
+    let missingFailedTXs = []
+    let allMissingTXs = []
+    for (let i = 0; i < partitionObject.Txids.length; i++) {
+      let status = partitionObject.Status[i]
+      let tx = partitionObject.Txids[i]
+      if (ourStatusMap.hasOwnProperty(tx) === false) {
+        if (status === 1) {
+          missingAcceptedTXIDs.push(tx)
+        } else {
+          missingFailedTXs.push(tx)
+        }
+        repairTracker.missingTXIds.push(tx)
+        allMissingTXs.push(tx)
+      }
+    }
+    let invalidAcceptedTXIDs = []
+    for (let i = 0; i < ourPartitionObj.Txids.length; i++) {
+      // let status = ourPartitionObj.Status[i]
+      let tx = ourPartitionObj.Txids[i]
+      if (statusMap.hasOwnProperty(tx) === false) {
+        invalidAcceptedTXIDs.push(tx)
+        repairTracker.extraTXIds.push(tx)
+      }
+    }
+
+    // ask for missing txs of other node
+    payload = { Tx_ids: missingAcceptedTXIDs }
+    let txs = await this.p2p.ask(nodeToContact, 'get_transactions_by_list', payload)
+    repairTracker.newPendingTXs = txs // ?
+
+    // get failed txs that we are missing
+    payload = { Tx_ids: missingFailedTXs }
+    txs = await this.p2p.ask(nodeToContact, 'get_transactions_by_list', payload)
+    repairTracker.newFailedTXs = txs
+    // this.storage.addAcceptedTransactions(txs) // commit the failed TXs to our db. not sure if this is strictly necessary
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: repairTracker updates: ' + utils.stringifyReduce(repairTracker))
+
+    this._mergeRepairDataIntoLocalState(repairTracker, ourPartitionObj, statusMap, partitionObject)
+  }
+
+  _mergeRepairDataIntoLocalState (repairTracker, ourPartitionObj, otherStatusMap, otherPartitionObject) {
+    // just simple assignment.  if we changed things to merge the best N results this would need to change.
+    ourPartitionObj.Txids = [...otherPartitionObject.Txids]
+    ourPartitionObj.Status = [...otherPartitionObject.Status]
+
+    // add/remove them somewhere else?  to the structure used to generate the lists
+    // let look at where a partition object is generated.
+    let key = repairTracker.key
+    let txList = this.getTXListByKey(key, repairTracker.partitionId)
+
+    txList.hashes = ourPartitionObj.Txids
+    txList.passed = ourPartitionObj.Status
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _mergeRepairDataIntoLocalState:  key: ${key} txlist: ${utils.stringifyReduce({ hashes: txList.hashes, passed: txList.passed })} `)
+  }
+
+  //  this works with syncTXsFromHashSetStrings to correct our partition object data. unlike the other version of this function this just creates entries on a
+  //  temp member newTxList that will be used for the next partition object calculation
+  _mergeRepairDataIntoLocalState2 (repairTracker, ourPartitionObj, ourLastResultHash, ourHashSet) {
+    let key = repairTracker.key
+    let txList = this.getTXListByKey(key, repairTracker.partitionId)
+
+    let txSourceList = txList
+    if (txList.newTxList) {
+      txSourceList = txList.newTxList
+    }
+    // let newTxList = { hashes: [...txList.hashes], passed: [...txList.passed], txs: [...txList.txs] }
+    let newTxList = { hashes: [], passed: [], txs: [], thashes: [], tpassed: [], ttxs: [] }
+    txList.newTxList = newTxList // append it to tx list for now.
+    repairTracker.solutionDeltas.sort(function (a, b) { return a.i - b.i }) // why did b - a help us once??
+
+    // let extraIndex = 0
+    // for (let i = 0; i < txList.hashes.length; i++) {
+    //   let extra = -1
+    //   if (extraIndex < ourHashSet.extraMap.length) {
+    //     extra = ourHashSet.extraMap[extraIndex]
+    //   }
+    //   if (extra === i) {
+    //     extraIndex++
+    //     continue
+    //   }
+    //   newTxList.thashes.push(txList.hashes[i])
+    //   newTxList.tpassed.push(txList.passed[i])
+    //   newTxList.ttxs.push(txList.txs[i])
+    // }
+
+    let debugSol = []
+    for (let solution of repairTracker.solutionDeltas) {
+      debugSol.push({ i: solution.i, tx: solution.tx.id.slice(0, 4) })
+    }
+
+    ourHashSet.extraMap.sort(function (a, b) { return a - b })
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 z ourHashSet.extraMap: ${utils.stringifyReduce(ourHashSet.extraMap)} debugSol: ${utils.stringifyReduce(debugSol)}`)
+
+    let extraIndex = 0
+    for (let i = 0; i < txSourceList.hashes.length; i++) {
+      let extra = -1
+      if (extraIndex < ourHashSet.extraMap.length) {
+        extra = ourHashSet.extraMap[extraIndex]
+      }
+      if (extra === i) {
+        extraIndex++
+        continue
+      }
+      newTxList.thashes.push(txSourceList.hashes[i])
+      newTxList.tpassed.push(txSourceList.passed[i])
+      newTxList.ttxs.push(txSourceList.txs[i])
+    }
+
+    let hashSet = ''
+    for (let hash of newTxList.thashes) {
+      hashSet += hash.slice(0, 2)
+    }
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a  len: ${ourHashSet.indexMap.length}  extraIndex: ${extraIndex} ourPreHashSet: ${hashSet}`)
+
+    // Txids: txSourceData.hashes, // txid1, txid2, …],  - ordered from oldest to recent
+    // Status: txSourceData.passed, // [1,0, …],      - ordered corresponding to Txids; 1 for applied; 0 for failed
+    // build our data while skipping extras.
+
+    // insert corrections in order for each -1 in our local list (or write from our temp lists above)
+    let ourCounter = 0
+    let solutionIndex = 0
+    for (let i = 0; i < ourHashSet.indexMap.length; i++) {
+      let currentIndex = ourHashSet.indexMap[i]
+      if (currentIndex >= 0) {
+        // pull from our list? but we have already removed stuff?
+        newTxList.hashes[i] = newTxList.thashes[ourCounter]
+        newTxList.passed[i] = newTxList.tpassed[ourCounter]
+        newTxList.txs[i] = newTxList.ttxs[ourCounter]
+        ourCounter++
+        if (newTxList.hashes[i] == null) {
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+        }
+      } else {
+        // repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j] })
+        let solutionDelta = repairTracker.solutionDeltas[solutionIndex]
+
+        if (!solutionDelta) {
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error solutionDelta=null  solutionIndex: ${solutionIndex} i:${i} of ${ourHashSet.indexMap.length} deltas: ${utils.stringifyReduce(repairTracker.solutionDeltas)}`)
+        }
+        // insert the next one
+        newTxList.hashes[i] = solutionDelta.tx.id
+        newTxList.passed[i] = solutionDelta.pf
+        newTxList.txs[i] = solutionDelta.tx
+        solutionIndex++
+        if (newTxList.hashes[i] == null) {
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 b error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+        }
+      }
+    }
+
+    hashSet = ''
+    for (let hash of newTxList.hashes) {
+      if (!hash) {
+        hashSet += 'xx'
+        continue
+      }
+      hashSet += hash.slice(0, 2)
+    }
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 c  len: ${ourHashSet.indexMap.length}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter} ourHashSet: ${hashSet}`)
+
+    if (repairTracker.outputHashSet !== hashSet) {
+      this.mainLogger.error(`Failed to match our hashset to the solution hashSet: ${hashSet}  solution: ${repairTracker.outputHashSet}  `)
+
+      let hashSetList = []
+      hashSetList.push({ hash: 'a1', votePower: 1, hashSet: hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0 })
+      hashSetList.push({ hash: 'b1', votePower: 10, hashSet: repairTracker.outputHashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0 })
+      let output = StateManager.solveHashSets(hashSetList)
+      for (let hashSetEntry of hashSetList) {
+        this.mainLogger.error(JSON.stringify(hashSetEntry))
+      }
+      this.mainLogger.error(JSON.stringify(output))
+      StateManager.expandIndexMapping(hashSetList[0], output)
+      this.mainLogger.error(JSON.stringify(hashSetList[0].indexMap))
+      this.mainLogger.error(JSON.stringify(hashSetList[0].extraMap))
+
+      return false
+    }
+
+    return true
+  }
+
+  async syncTXsFromHashSetStrings (cycleNumber, partitionId, repairTracker, ourLastResultHash) {
+    let cycleCounter = cycleNumber
+    if (!this.useHashSets) {
+      return
+    }
+
+    let hashSetList = this.solveHashSetsPrep(cycleCounter, partitionId, this.crypto.getPublicKey())
+    hashSetList.sort(function (a, b) { return a.hash > b.hash }) // sort so that solution will be deterministic
+    let output = StateManager.solveHashSets(hashSetList)
+
+    let outputHashSet = ''
+    for (let hash of output) {
+      outputHashSet += hash
+    }
+    repairTracker.outputHashSet = outputHashSet
+
+    // REFLOW HACK.  when we randomize host selection should make sure not to pick this forced solution as an answer
+    // TODO perf:  if we fixed the algorith we could probably do this in one pass instead
+    let hashSetList2 = this.solveHashSetsPrep(cycleCounter, partitionId, this.crypto.getPublicKey())
+    hashSetList2.sort(function (a, b) { return a.hash > b.hash }) // sort so that solution will be deterministic
+    let hashSet = { hash: 'FORCED', votePower: 1000, hashSet: outputHashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [], ourRow: false }
+    hashSetList2.push(hashSet)
+    output = StateManager.solveHashSets(hashSetList2, 10, 0.625, output)
+    hashSetList = hashSetList2
+
+    for (let hashSetEntry of hashSetList) {
+      StateManager.expandIndexMapping(hashSetEntry, output) // expand them all for debug.  TODO perf: remove this line
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + JSON.stringify(hashSetEntry))
+    }
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + JSON.stringify(output))
+    // find our solution
+    let ourSolution = hashSetList.find((a) => a.ourRow === true) // owner
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'ourSolution: ' + JSON.stringify({ ourSolution, len: ourSolution.length }))
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'solved outputHashSet: ' + outputHashSet)
+    // lets generate the indexMap and extraMap index tables for out hashlist solution
+    StateManager.expandIndexMapping(ourSolution, output)
+
+    // hashListEntry.indexMap = []
+    // hashListEntry.extraMap = []
+    // flag extras
+    let requestsByHost = new Array(hashSetList.length).fill(null)
+    for (let correction of ourSolution.corrections) {
+      let index = correction.i
+      if (correction.t === 'insert') {
+        let greedyAsk = -1 // todo perf: could try non greedy
+        let voters = correction.tv.vote.voters
+        for (let i = 0; i < voters.length; i++) {
+          if (requestsByHost[voters[i]]) {
+            greedyAsk = voters[i]
+          }
+        }
+        // no entries found so init one
+        if (greedyAsk < 0) {
+          greedyAsk = voters[0]
+          requestsByHost[greedyAsk] = { requests: [], hostIndex: [] }
+        }
+        // generate the index map for the server we will ask as needed
+        if (hashSetList[greedyAsk].indexMap == null) {
+          StateManager.expandIndexMapping(hashSetList[greedyAsk], output)
+        }
+        // use the remote hosts index map to determine for the exact index.
+        requestsByHost[greedyAsk].hostIndex.push(hashSetList[greedyAsk].indexMap[index]) // todo calc this on host side, requires some cache mgmt!
+
+        // just ask for the correction and let the remote host do the translation!
+        requestsByHost[greedyAsk].requests.push(index)
+
+        // send the hash we are asking for so we will have a ref for the index
+        requestsByHost[greedyAsk].hash = hashSetList[greedyAsk].hash
+      }
+    }
+
+    // stomp or create a repair deltas array parallel to the other changes
+    repairTracker.solutionDeltas = []
+
+    for (let i = 0; i < requestsByHost.length; i++) {
+      if (requestsByHost[i] != null) {
+        requestsByHost[i].requests.sort(function (a, b) { return a - b }) // sort these since the reponse for the host will also sort by timestamp
+        let payload = { partitionId: partitionId, cycle: cycleNumber, tx_indicies: requestsByHost[i].hostIndex, hash: requestsByHost[i].hash }
+        console.log(`host group: ${i}  requests: ${utils.stringifyReduce(payload)}  hosts: ${utils.stringifyReduce(hashSetList[i].owners)} `)
+        if (hashSetList[i].owners.length > 0) {
+          let nodeToContact = this.p2p.state.getNodeByPubKey(hashSetList[i].owners[0])
+
+          let result = await this.p2p.ask(nodeToContact, 'get_transactions_by_partition_index', payload)
+          // { success: true, acceptedTX: result, passFail: passFailList }
+          if (result.success === true) {
+            console.log(`get_transactions_by_partition_index ok!  payload: ${utils.stringifyReduce(payload)}`)
+            for (let j = 0; j < result.acceptedTX.length; j++) {
+              let acceptedTX = result.acceptedTX[j]
+              if (result.passFail[j] === 1) {
+                repairTracker.newPendingTXs.push(acceptedTX)
+                repairTracker.missingTXIds.push(acceptedTX.id)
+              } else {
+                repairTracker.newFailedTXs.push(acceptedTX) // todo perf:  could make the response more complex so that it does not return the full tx for falied ones!.   this could take a fair amount of work.
+              }
+              // update our solution deltas.. hopefully that is enough info to patch up our state.
+              repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j] })
+            }
+          } else {
+            // todo datasync:  assert/fail/or retry
+            console.log(`get_transactions_by_partition_index faied!  payload: ${utils.stringifyReduce(payload)}`)
+          }
+
+          // add these TXs to newPendingTXs or newFailedTXs  and the IDs to missingTXIds
+          // host needs to give us pass/fail info
+        }
+      }
+    }
+
+    // calculate extraTXIds
+    // first find the partition object that matches the hash we used in this solution
+    let key = 'c' + cycleNumber
+    let partitionObjectsByHash = this.recentPartitionObjectsByCycleByHash[key]
+    if (!partitionObjectsByHash) {
+      return
+    }
+    let partitionObject = partitionObjectsByHash[ourSolution.hash]
+    if (!partitionObject) {
+      return
+    }
+    // next use our extraMap indicies to grab the actual transactions we need for the list
+    for (let i = 0; i < ourSolution.extraMap.length; i++) {
+      // these indexes will be relative to the object map we had the first time.
+      let index = ourSolution.extraMap[i]
+      repairTracker.extraTXIds.push(partitionObject.Txids[index])
+      // repairTracker.extraTXs.push(partitionObject.txs[index])
+    }
+
+    let mergeOk = this._mergeRepairDataIntoLocalState2(repairTracker, partitionObject, ourLastResultHash, ourSolution)
+
+    if (mergeOk === false) {
+      return 100 // ugh super hack ret value
+    }
+    // todo print hash set here.
+  }
+
+  // async applyHashSetSolution (solution) {
+  //   // solution.corrections
+  //   // end goal is to fill up the repair entry for the partition with newPendingTXs, newFailedTXs, missingTXIds, and extraTXIds
+  //   //
+  // }
+
+  _getRepairTrackerForCycle (counter, partition) {
+    let key = 'c' + counter
+    let key2 = 'p' + partition
+    let repairsByPartition = this.repairTrackingByCycleById[key]
+    if (!repairsByPartition) {
+      repairsByPartition = {}
+      this.repairTrackingByCycleById[key] = repairsByPartition
+    }
+    let repairTracker = repairsByPartition[key2]
+    if (!repairTracker) {
+      // triedHashes: Hashes for partition objects that we have tried to reconcile with already
+      // removedTXIds: a list of TXIds that we have removed
+      // repairedTXs: a list of TXIds that we have added in
+      // newPendingTXs: a list of TXs we fetched that are ready to process
+      // newFailedTXs: a list of TXs that we fetched, they had failed so we save them but do not apply them
+      // extraTXIds: a list of TXIds that our partition has that the leading partition does not.  This is what we need to remove
+      // missingTXIds: a list of TXIds that our partition has that the leading partition has that we don't.  We will need to add these in using the list newPendingTXs
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_getRepairTrackerForCycle: creating for cycle:${counter} partition:${partition}`)
+      repairTracker = { triedHashes: [],
+        numNodes: this.lastActiveNodeCount, // num nodes that we send partition results to
+        counter: counter,
+        partitionId: partition,
+        key: key,
+        key2: key2,
+        removedTXIds: [],
+        repairedTXs: [],
+        newPendingTXs: [],
+        newFailedTXs: [],
+        extraTXIds: [],
+        // extraTXs: [],
+        missingTXIds: [],
+        repairing: false,
+        repairsNeeded: false,
+        busy: false,
+        txRepairComplete: false,
+        evaluationStarted: false,
+        awaitWinningHash: false,
+        repairsFullyComplete: false }
+      repairsByPartition[key2] = repairTracker
+    }
+    return repairTracker
+  }
+
+  repairTrackerMarkFinished (repairTracker) {
+    repairTracker.repairsFullyComplete = true
+  }
+
+  repairTrackerClearForNextRepair (repairTracker) {
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` repairTrackerClearForNextRepair cycleNumber: ${repairTracker.counter} parition: ${repairTracker.partitionId} `)
+    repairTracker.removedTXIds = []
+    repairTracker.repairedTXs = []
+    repairTracker.newPendingTXs = []
+    repairTracker.newFailedTXs = []
+    repairTracker.extraTXIds = []
+    repairTracker.missingTXIds = []
+  }
+
+  async mergeAndApplyTXRepairs (cycleNumber) {
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs cycleNumber ${cycleNumber}`)
+    // this will call into some of the funtions at the bottom of this file
+
+    let allTXsToApply = {}
+    let allExtraTXids = {}
+    let allAccountsToResetById = {}
+    let txIDToAcc = {}
+    let allNewTXsById = {}
+    // get all txs and sort them
+    let repairsByPartition = this.repairTrackingByCycleById['c' + cycleNumber]
+    let partitionKeys = Object.keys(repairsByPartition)
+    for (let key of partitionKeys) {
+      let repairEntry = repairsByPartition[key]
+      for (let tx of repairEntry.newPendingTXs) {
+        if (utils.isString(tx.data)) {
+          tx.data = JSON.parse(tx.data) // JIT parse.. is that ok?
+        }
+        let keysResponse = this.app.getKeyFromTransaction(tx.data)
+
+        if (!keysResponse) {
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
+        }
+
+        let { sourceKeys, targetKeys } = keysResponse
+
+        for (let accountID of sourceKeys) {
+          allAccountsToResetById[accountID] = 1
+        }
+        for (let accountID of targetKeys) {
+          allAccountsToResetById[accountID] = 1
+        }
+        allNewTXsById[tx.id] = tx
+        txIDToAcc[tx.id] = { sourceKeys, targetKeys }
+      }
+      for (let tx of repairEntry.missingTXIds) {
+        allTXsToApply[tx] = 1
+      }
+      for (let tx of repairEntry.extraTXIds) {
+        allExtraTXids[tx] = 1
+        // TODO Repair. ugh have to query our data and figure out which accounts need to be reset.
+      }
+      // allTXsToApply[]
+      // todo repair: hmmm also reset accounts have a tx we need to remove.
+    }
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs: extra: ${utils.stringifyReduce(allExtraTXids)}  txIDToAcc: ${utils.stringifyReduce(txIDToAcc)}`)
+
+    // let accountStateEntries = {}
+    // walk through all txs for this cycle.
+    // get or create entries for accounts.
+    // track when they have missing txs or wrong txs
+
+    let txList = this.getTXList(cycleNumber, -1) // todo sharding: pass partition ID
+
+    let txIDToAccCount = 0
+    let txIDResetExtraCount = 0
+    // build a list with our existing txs, but dont include the bad ones
+    if (txList) {
+      for (let i = 0; i < txList.txs.length; i++) {
+        let tx = txList.txs[i]
+        if (allExtraTXids[tx.id]) {
+        // this was a bad tx dont include it.   we have to look up the account associated with this tx and make sure they get reset
+          let keysResponse = this.app.getKeyFromTransaction(tx.data)
+          if (!keysResponse) {
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs problem with keysResp2  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
+          }
+          let { sourceKeys, targetKeys } = keysResponse
+          for (let accountID of sourceKeys) {
+            allAccountsToResetById[accountID] = 1
+            txIDResetExtraCount++
+          }
+          for (let accountID of targetKeys) {
+            allAccountsToResetById[accountID] = 1
+            txIDResetExtraCount++
+          }
+        } else {
+          // a good tx that we had earlier
+          let keysResponse = this.app.getKeyFromTransaction(tx.data)
+          let { sourceKeys, targetKeys } = keysResponse
+          allNewTXsById[tx.id] = tx
+          txIDToAcc[tx.id] = { sourceKeys, targetKeys }
+          txIDToAccCount++
+          // we will only play back the txs on accounts that point to allAccountsToResetById
+        }
+      }
+    } else {
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs txList not found for: cycle: ${cycleNumber} in ${utils.stringifyReduce(this.txByCycle)}`)
+    }
+
+    // build and sort a list of TXs that we need to apply
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs txIDResetExtraCount: ${txIDResetExtraCount} allAccountsToResetById ${utils.stringifyReduce(allAccountsToResetById)}`)
+    // reset accounts
+    let accountKeys = Object.keys(allAccountsToResetById)
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs revert accountKeys ${utils.stringifyReduce(accountKeys)}`)
+
+    await this._revertAccounts(accountKeys, cycleNumber)
+
+    // convert allNewTXsById map to newTXList list
+    let newTXList = []
+    let txKeys = Object.keys(allNewTXsById)
+    for (let txKey of txKeys) {
+      let tx = allNewTXsById[txKey]
+      newTXList.push(tx)
+    }
+
+    // sort the list by ascending timestamp
+    newTXList.sort(function (a, b) { return a.timestamp - b.timestamp })
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs txList.length: ${txList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
+
+    let applyCount = 0
+    let applyFailCount = 0
+    let hasEffect = false
+    for (let tx of newTXList) {
+      let keysFilter = txIDToAcc[tx.id]
+      // need a transform to map all txs that would matter.
+      try {
+        if (keysFilter) {
+          let acountsFilter = {} // this is a filter of accounts that we want to write to
+          // find which accounts need txs applied.
+          hasEffect = false
+          for (let accountID of keysFilter.sourceKeys) {
+            if (allAccountsToResetById[accountID]) {
+              acountsFilter[accountID] = 1
+              hasEffect = true
+            }
+          }
+          for (let accountID of keysFilter.targetKeys) {
+            if (allAccountsToResetById[accountID]) {
+              acountsFilter[accountID] = 1
+              hasEffect = true
+            }
+          }
+          if (!hasEffect) {
+            // no need to apply this tx because it would do nothing
+            continue
+          }
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs apply tx ${utils.makeShortHash(tx.id)} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
+          let hasStateTableData = false // may or may not have it but not tracking yet
+
+          // HACK!!  receipts sent across the net to us may need to get re parsed
+          if (utils.isString(tx.data.receipt)) {
+            tx.data.receipt = JSON.parse(tx.data.receipt)
+          }
+
+          let applied = await this.tryApplyTransaction(tx, hasStateTableData, true, acountsFilter)
+          if (!applied) {
+            applyFailCount++
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs apply failed`)
+          } else {
+            applyCount++
+          }
+        } else {
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs no for ${tx.id} in ${utils.stringifyReduce(txIDToAcc)}`)
+        }
+      } catch (ex) {
+        this.mainLogger.debug('_repair: startRepairProcess mergeAndApplyTXRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        this.fatalLogger.fatal('_repair: startRepairProcess mergeAndApplyTXRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      }
+
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
+    }
+
+    // run the list but only for nodes that had a problem!!!
+    // run for allAccountsToResetById
+
+    // apply all TXs to accounts for cycle. (are those new pending TXs already worked into our local dataset or doe we do that now)
+    // node apply tx to just the accounts that have been reset! (save perf and complexity where there is overlap)
+    // update the repair entry stats?... idk.
+    // crap do we need to register a suspend lock on accounts that we cant work on yet... we will fail at updating them
+    // pre scan this?
+  }
+
+  async _revertAccounts (accountIDs, cycleNumber) {
+    let cycle = this.p2p.state.getCycleByCounter(cycleNumber)
+    let cycleEnd = (cycle.start + cycle.duration) * 1000
+    let cycleStart = cycle.start * 1000
+    cycleEnd -= this.syncSettleTime // adjust by sync settle time
+    cycleStart -= this.syncSettleTime // adjust by sync settle time
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts start  numAccounts: ${accountIDs.length} repairing cycle:${cycleNumber}`)
+
+    try {
+      // query our account copies that are less than or equal to this cycle!
+      let prevCycle = cycleNumber - 1
+      let replacmentAccounts = await this.storage.getAccountReplacmentCopies(accountIDs, prevCycle)
+
+      if (replacmentAccounts.length > 0) {
+        for (let accountData of replacmentAccounts) {
+          if (utils.isString(accountData.data)) {
+            accountData.data = JSON.parse(accountData.data)
+            // hack, mode the owner so we can see the rewrite taking place
+            // accountData.data.data.data = { rewrite: cycleNumber }
+          }
+
+          // if (accountData.data.owners && utils.isString(accountData.data.owners)) {
+          //   accountData.data.owners = JSON.parse(accountData.data.owners)
+          // }
+
+          // if (accountData.data.data && utils.isString(accountData.data.data)) {
+          //   accountData.data.data = JSON.parse(accountData.data.data)
+          // }
+          // if (accountData.data.txs && utils.isString(accountData.data.txs) === false) {
+          //   accountData.data.txs = stringify(accountData.data.txs)
+          // }
+
+          if (accountData == null || accountData.data == null || accountData.data.data.address == null) {
+            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair _revertAccounts null account data found: ${accountData.data.address} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
+          } else {
+            // todo overkill
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts reset: ${utils.makeShortHash(accountData.data.data.address)} ts: ${utils.makeShortHash(accountData.data.data.timestamp)} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
+          }
+        }
+        // tell the app to replace the account data
+        await this.app.resetAccountData(replacmentAccounts)
+        // update local state.
+      } else {
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts No replacment accounts found!!! cycle <= :${prevCycle}`)
+      }
+
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts: ${accountIDs.length} replacmentAccounts ${replacmentAccounts.length} repairing cycle:${cycleNumber}`)
+
+      // TODO prodution. consider if we need a better set of checks before we delete an account!
+      // If we don't have a replacement copy for an account we should try to delete it
+
+      // Find any accountIDs not in resetAccountData
+      let accountsReverted = {}
+      let accountsToDelete = []
+      let debug = []
+      for (let accountData of replacmentAccounts) {
+        accountsReverted[accountData.accountId] = 1
+        // if (accountData.data.timestamp >= requiredOlderThanAge) {
+        //   accountsToDelete.push(accountData.id)
+        // }
+        if (accountData.cycleNumber > prevCycle) {
+          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair _revertAccounts cycle too new for backup restore: ${accountData.cycleNumber}  cycleNumber:${cycleNumber} timestamp:${accountData.timestamp}`)
+        }
+
+        debug.push({ id: accountData.accountId, cycleNumber: accountData.cycleNumber, timestamp: accountData.timestamp, hash: accountData.hash, accHash: accountData.data.hash, accTs: accountData.data.timestamp })
+      }
+
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts: ${utils.stringifyReduce(debug)}`)
+
+      for (let accountID of accountIDs) {
+        if (accountsReverted[accountID] == null) {
+          accountsToDelete.push(accountID)
+        }
+      }
+      if (accountsToDelete.length > 0) {
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts delete some accounts ${utils.stringifyReduce(accountsToDelete)}`)
+        await this.app.deleteAccountData(accountsToDelete)
+      }
+
+      // mark for kill future txlist stuff for any accounts we nuked
+
+      // make a map to find impacted accounts
+      let accMap = {}
+      for (let accid of accountIDs) {
+        accMap[accid] = 1
+      }
+      // check for this.tempTXRecords that involve accounts we are going to clear
+      for (let txRecord of this.tempTXRecords) {
+        // if (txRecord.txTS < cycleEnd) {
+        let keysResponse = this.app.getKeyFromTransaction(txRecord.acceptedTx.data)
+        if (!keysResponse) {
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
+        }
+        let { sourceKeys, targetKeys } = keysResponse
+        for (let accountID of sourceKeys) {
+          if (accMap[accountID]) {
+            txRecord.redacted = cycleNumber
+          }
+        }
+        for (let accountID of targetKeys) {
+          if (accMap[accountID]) {
+            txRecord.redacted = cycleNumber
+          }
+        }
+        // }
+      }
+
+      // clear out bad state table data!!
+      // add number to clear future state table data too
+      await this.storage.clearAccountStateTableByList(accountIDs, cycleStart, cycleEnd + 1000000)
+
+      // clear replacement copies for this cycle for these accounts!
+
+      // todo clear based on GTE!!!
+      await this.storage.clearAccountReplacmentCopies(accountIDs, cycleNumber)
+    } catch (ex) {
+      this.mainLogger.debug('_repair: _revertAccounts mergeAndApplyTXRepairs ' + ` ${utils.stringifyReduce({ cycleNumber, cycleEnd, cycleStart, accountIDs })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.fatalLogger.fatal('_repair: _revertAccounts mergeAndApplyTXRepairs ' + ` ${utils.stringifyReduce({ cycleNumber, cycleEnd, cycleStart, accountIDs })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+    }
+  }
+
+  // async createInitialAccountBackups () {
+  //   // After data syncing the node saves a copy of the account data in the Accounts Copy Table
+  // }
+
+  async periodicCycleDataCleanup () {
+    // On a periodic bases older copies of the account data where we have more than 2 copies for the same account can be deleted.
+  }
+
+  async broadcastPartitionResults (cycleNumber) {
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair broadcastPartitionResults for cycle: ${cycleNumber}`)
+
+    let accountStart = '0'.repeat(64) // TODO worldwide. use partition ranges and only send to in range nodes
+    let accountEnd = 'f'.repeat(64)
+
+    let broadcastTargets = 6
+    if (this.useHashSets) {
+      broadcastTargets = 100
+    }
+
+    let nodes = this.getRandomNodesInRange(broadcastTargets, accountStart, accountEnd, [])
+    if (nodes.length === 0) {
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair broadcastPartitionResults: abort no nodes to send partition to`)
+      return // nothing to do
+    }
+
+    console.log(`numnodes: ${nodes.length}`)
+
+    let partitionResults = this.partitionResultsByCycle['c' + cycleNumber]
+
+    // sign results as needed
+    for (let i = 0; i < partitionResults.length; i++) {
+      if (!partitionResults[i].sign) {
+        partitionResults[i] = this.crypto.sign(partitionResults[i])
+      }
+
+      let repairTracker = this._getRepairTrackerForCycle(cycleNumber, partitionResults[i].Partition_id) // was Cycle_number
+      repairTracker.numNodes = this.lastActiveNodeCount // nodes.length
+    }
+
+    let payload = { Cycle_number: cycleNumber, partitionResults: partitionResults }
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair broadcastPartitionResults ${utils.stringifyReduce(payload)}`)
+    // send the array of partition results for this current cycle.
+    await this.p2p.tell(nodes, 'post_partition_results', payload)
+  }
+
+  initStateSyncData () {
+    if (!this.partitionObjectsByCycle) {
+      this.partitionObjectsByCycle = {} // our partition objects by cycle.  index by cycle counter key to get an array
+    }
+    if (!this.partitionResultsByCycle) {
+      this.partitionResultsByCycle = {} // our partition results by cycle.  index by cycle counter key to get an array
+    }
+
+    if (!this.repairTrackingByCycleById) {
+      this.repairTrackingByCycleById = {} // tracks state for repairing partitions. index by cycle counter key to get the repair object, index by parition
+    }
+
+    if (!this.recentPartitionObjectsByCycleByHash) {
+      this.recentPartitionObjectsByCycleByHash = {} // our partition objects by cycle.  index by cycle counter key to get an array
+    }
+
+    if (!this.tempTXRecords) {
+      this.tempTXRecords = [] // temporary store for TXs that we put in a partition object after a cycle is complete. an array that holds any TXs (i.e. from different cycles), code will filter out what it needs
+    }
+
+    if (!this.txByCycle) {
+      this.txByCycle = {}
+    }
+
+    if (!this.txByCycleByPartition) {
+      this.txByCycleByPartition = {}
+    }
+
+    if (!this.partitionResponsesByCycleById) {
+      this.partitionResponsesByCycleById = {} // Stores the partition responses that other nodes push to us.  Index by cycle key, then index by partition id
+    }
+  }
+
+  async startSyncPartitions () {
+    // await this.createInitialAccountBackups() // nm this is now part of regular data sync
+    // register our handlers
+    this.p2p.state.on('cycle_q2_start', async (lastCycle, time) => {
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startSyncPartitions:cycle_q2_start cycle: ${lastCycle.counter}`)
+
+      // this will take temp TXs and make sure they are stored in the correct place for us to generate partitions
+      this.processTempTXs(lastCycle)
+
+      // During the Q2 phase of a cycle, nodes compute the partition hash of the previous cycle for all the partitions covered by the node.
+      // Q2 was chosen so that any transactions submitted with a time stamp that falls in the previous quarter will have been processed and finalized. This could be changed to Q3 if we find that more time is needed.
+      this.generatePartitionObjects(lastCycle)
+
+      // pre-allocate the next cycle data to be safe!
+      let prekey = 'c' + (lastCycle.counter + 1)
+      this.partitionObjectsByCycle[prekey] = []
+      this.partitionResultsByCycle[prekey] = []
+
+      // Nodes generate the partition result for all partitions they cover.
+      // Nodes broadcast the set of partition results to N adjacent peers on each side; where N is
+      // the number of partitions covered by the node. Uses the /post_partition_results API.
+
+      await this.broadcastPartitionResults(lastCycle.counter) // Cycle_number
+    })
+
+    this.p2p.state.on('cycle_q2_start', async (lastCycle, time) => {
+
+    })
+
+    this.p2p.state.on('cycle_q4_start', async (lastCycle, time) => {
+      // Also we would like the repair process to finish by the end of Q3 and definitely before the start of a new cycle. Otherwise the cycle duration may need to be increased.
+    })
+
+    // // could just use a direct function call for this
+    // this.p2p.stateManager.on('applied', async (acceptedTX) => {
+    //   // Whenever a transaction is applied a copy of the account data is also also
+    //   // saved to the Accounts Copy Table. Within the same cycle the copy will overwrite
+    //   // the previous copy. A copy will be created for each cycle where the account was modified.
+    //   this.storage.updateOrReplaceAccountCopy()
+    // })
+  }
+
+  // originally this only recorder results if we were not repairing but it turns out we need to update our copies any time we apply state.
+  // with the update we will calculate the cycle based on timestamp rather than using the last current cycle counter
+  async updateAccountsCopyTable (accountDataList, repairing, txTimestamp) {
+    let cycleNumber = -1
+    // if (!repairing) {
+    //   const lastCycle = this.p2p.state.getLastCycle()
+    //   cycleNumber = lastCycle.counter
+    // } else if (accountDataList.length > 0) {
+    //   const cycle = this.p2p.state.getCycleByTimestamp(accountDataList[0].timestamp + this.syncSettleTime)
+    //   cycleNumber = cycle.counter
+    // }
+    let cycle = this.p2p.state.getCycleByTimestamp(txTimestamp + this.syncSettleTime)
+    let cycleOffset = 0
+    if (cycle == null) {
+      cycle = this.p2p.state.getLastCycle()
+      // if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable error getting cycle by timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle returned:${cycle.counter} `)
+      cycleOffset = 1
+    }
+    cycleNumber = cycle.counter + cycleOffset
+    // const lastCycle = this.p2p.state.getLastCycle()
+    // let cycleNumber = lastCycle.counter
+
+    // extra safety testing
+
+    // TODO !!!  if cycle durations become variable we need to update this logic
+    let cycleStart = (cycle.start + (cycle.duration * cycleOffset)) * 1000
+    let cycleEnd = (cycle.start + (cycle.duration * (cycleOffset + 1))) * 1000
+    if (txTimestamp + this.syncSettleTime < cycleStart) {
+      if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable time error< ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+    }
+    if (txTimestamp + this.syncSettleTime >= cycleEnd) {
+      // if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+      cycleOffset++
+      cycleNumber = cycle.counter + cycleOffset
+      cycleStart = (cycle.start + (cycle.duration * cycleOffset)) * 1000
+      cycleEnd = (cycle.start + (cycle.duration * (cycleOffset + 1))) * 1000
+      if (txTimestamp + this.syncSettleTime >= cycleEnd) {
+        if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+      }
+    }
+    if (accountDataList[0].timestamp !== txTimestamp) {
+      if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable timestamps dot match txts:${txTimestamp} acc.ts:${accountDataList[0].timestamp} `)
+    }
+
+    // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable acc.timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle computed:${cycleNumber} `)
+
+    for (let accountEntry of accountDataList) {
+      let { accountId, data, timestamp, hash } = accountEntry
+
+      let backupObj = { accountId, data, timestamp, hash, cycleNumber }
+
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+
+      // todo perf. batching?
+      // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'updateAccountsCopyTableA ' + JSON.stringify(accountEntry))
+      // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'updateAccountsCopyTableB ' + JSON.stringify(backupObj))
+
+      // wrappedAccounts.push({ accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp })
+      await this.storage.createOrReplaceAccountCopy(backupObj)
+    }
+  }
+
+  // we dont have a cycle yet to save these records against so store them in a temp place
+  tempRecordTXByCycle (txTS, acceptedTx, passed) {
+    this.tempTXRecords.push({ txTS, acceptedTx, passed, redacted: -1 })
+  }
+
+  // call this before we start computing partitions so that we can make sure to get the TXs we need out of the temp list
+  processTempTXs (cycle) {
+    if (!this.tempTXRecords) {
+      return
+    }
+    let txsRecorded = 0
+    let txsTemp = 0
+
+    let newTempTX = []
+    let cycleEnd = (cycle.start + cycle.duration) * 1000
+    cycleEnd -= this.syncSettleTime // adjust by sync settle time
+    for (let txRecord of this.tempTXRecords) {
+      if (txRecord.redacted > 0) {
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair recordTXByCycle: ${utils.makeShortHash(txRecord.acceptedTx.id)} cycle: ${cycle.counter} redacted!!! ${txRecord.redacted}`)
+        continue
+      }
+      if (txRecord.txTS < cycleEnd) {
+        this.recordTXByCycle(txRecord.txTS, txRecord.acceptedTx, txRecord.passed)
+        txsRecorded++
+      } else {
+        newTempTX.push(txRecord)
+        txsTemp++
+      }
+    }
+
+    this.tempTXRecords = newTempTX
+
+    let txList = this.getTXList(cycle.counter, -1) // todo sharding: pass partition ID
+
+    txList.processed = true
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair processTempTXs txsRecorded: ${txsRecorded} txsTemp: ${txsTemp} `)
+  }
+
+  getTXList (cycleNumber, partitionId) {
+    let key = 'c' + cycleNumber
+    let txList = this.txByCycle[key]
+    if (!txList) {
+      txList = { hashes: [], passed: [], txs: [], processed: false } // , txById: {}
+      this.txByCycle[key] = txList
+    }
+    return txList
+  }
+
+  getTXListByKey (key, partitionId) {
+    let txList = this.txByCycle[key]
+    if (!txList) {
+      txList = { hashes: [], passed: [], txs: [], processed: false } //  ,txById: {}
+      this.txByCycle[key] = txList
+    }
+    return txList
+  }
+
+  // take this tx and create if needed and object for the current cylce that holds a list of passed and failed TXs
+  recordTXByCycle (txTS, acceptedTx, passed) {
+    // TODO sharding.  filter TSs by the partition they belong to. Double check that this is still needed
+
+    // get the cycle that this tx timestamp would belong to.
+    // add in syncSettleTime when selecting which bucket to put a transaction in
+    const cycle = this.p2p.state.getCycleByTimestamp(txTS + this.syncSettleTime)
+
+    if (!cycle) {
+      this.mainLogger.error('_repair Failed to find cycle that would contain this timestamp')
+    }
+
+    let cycleNumber = cycle.counter
+
+    let txList = this.getTXList(cycleNumber, -1) // todo sharding: pass partition ID
+
+    if (txList.processed) {
+      this.mainLogger.error(`_repair trying to record transaction after we have already finalized our parition object for cycle ${cycle.counter} `)
+    }
+
+    txList.hashes.push(acceptedTx.id)
+    txList.passed.push((passed) ? 1 : 0)
+    txList.txs.push(acceptedTx)
+    // txList.txById[acceptedTx.id] = acceptedTx
+    // TODO sharding.  need to add some periodic cleanup when we have more cycles than needed stored in this map!!!
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair recordTXByCycle: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length}`)
+  }
+
+  // updateOurTXData (cycleNumber, partitionId, txMap) {
+  //   // replace txList data
+  //   // re-create new partition obj and remove the old one
+
+  // }
+
+  getPartitionObject (cycleNumber, partitionId) {
+    let key = 'c' + cycleNumber
+    let partitionObjects = this.partitionObjectsByCycle[key]
+    for (let obj of partitionObjects) {
+      if (obj.Partition_id === partitionId) {
+        return obj
+      }
+    }
+  }
+
+  // TODO sharding.  may need to do periodic cleanup of this and other maps so we can remove data from very old cycles
+  storePartitionReceipt (cycleNumber, partitionReceipt) {
+    let key = 'c' + cycleNumber
+
+    if (!this.cycleReceiptsByCycleCounter) {
+      this.cycleReceiptsByCycleCounter = {}
+    }
+    if (!this.cycleReceiptsByCycleCounter[key]) {
+      this.cycleReceiptsByCycleCounter[key] = []
+    }
+    this.cycleReceiptsByCycleCounter[key].push(partitionReceipt)
+  }
+
+  findMostCommonResponse (cycleNumber, partitionId, ignoreList) {
+    let key = 'c' + cycleNumber
+    let responsesById = this.partitionResponsesByCycleById[key]
+    let key2 = 'p' + partitionId
+    let responses = responsesById[key2]
+
+    let hashCounting = {}
+    let topHash
+    let topCount = 0
+    let topResult = null
+    if (responses.length > 0) {
+      for (let partitionResult of responses) {
+        let hash = partitionResult.Partition_hash
+        let count = hashCounting[hash] || 0
+        count++
+        hashCounting[hash] = count
+        if (count > topCount) {
+          topCount = count
+          topHash = hash
+          topResult = partitionResult
+        }
+      }
+    }
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair findMostCommonResponse: ${utils.stringifyReduce(responsesById)} }`)
+    return [topHash, topCount, topResult]
+  }
+
+  // vote rate set to 0.5 / 0.8 => 0.625
+  static solveHashSets (hashSetList, lookAhead = 10, voteRate = 0.625, prevOutput = null) {
+    let output = []
+    let outputVotes = []
+    let solving = true
+    let index = 0
+    let lastOutputCount = 0 // output list length last time we went through the loop
+    let stepSize = 2
+
+    let totalVotePower = 0
+    for (let hashListEntry of hashSetList) {
+      totalVotePower += hashListEntry.votePower
+    }
+    let votesRequired = voteRate * Math.ceil(totalVotePower)
+
+    let maxElements = 0
+    for (let hashListEntry of hashSetList) {
+      maxElements = Math.max(maxElements, hashListEntry.hashSet.length / stepSize)
+    }
+
+    while (solving) {
+      let votes = {}
+      let topVote = { v: '', count: 0 }
+      let winnerFound = false
+      let totalVotes = 0
+      // for (let hashListEntry of hashSetList) {
+      for (let hashListIndex = 0; hashListIndex < hashSetList.length; hashListIndex++) {
+        let hashListEntry = hashSetList[hashListIndex]
+        if ((index + hashListEntry.indexOffset + 1) * stepSize > hashListEntry.hashSet.length) {
+          continue
+        }
+        let sliceStart = (index + hashListEntry.indexOffset) * stepSize
+        let v = hashListEntry.hashSet.slice(sliceStart, sliceStart + stepSize)
+        if (v === '') {
+          continue
+        }
+
+        let countEntry = votes[v] || { count: 0, ec: 0, voters: [] }
+        totalVotes += hashListEntry.votePower
+        countEntry.count += hashListEntry.votePower
+        countEntry.voters.push(hashListIndex)
+        votes[v] = countEntry
+        if (countEntry.count > topVote.count) {
+          topVote.count = countEntry.count
+          topVote.v = v
+          topVote.vote = countEntry
+        }
+        hashListEntry.lastValue = v
+      }
+      // if totalVotes < votesRequired then we are past hope of approving any more messages... I think.  I guess there are some cases where we could look back and approve one more
+      if (topVote.count === 0 || index > maxElements || totalVotes < votesRequired) {
+        solving = false
+        break
+      }
+      if (topVote.count >= votesRequired) {
+        winnerFound = true
+        output.push(topVote.v)
+        outputVotes.push(topVote)
+        // corrections for chains that do not match our top vote.
+        for (let k = 0; k < hashSetList.length; k++) {
+          let hashListEntryOther = hashSetList[k]
+          if (hashListEntryOther.lastValue === topVote.v) {
+            hashListEntryOther.errorStack = []
+          }
+        }
+      }
+
+      // if (index === 123) {
+      //   let foo = 5
+      //   foo++
+      // }
+
+      // for (let hashListEntry of hashSetList) {
+      for (let hashListIndex = 0; hashListIndex < hashSetList.length; hashListIndex++) {
+        let hashListEntry = hashSetList[hashListIndex]
+        // for nodes that did not match the top vote .. or all nodes if no winner yet.
+        if (!winnerFound || hashListEntry.lastValue !== topVote.v) {
+          // consider removing v..  since if we dont have a winner yet then top vote will get updated in this loop
+          hashListEntry.corrections.push({ i: index, tv: topVote, v: topVote.v, t: 'insert', bv: hashListEntry.lastValue, if: lastOutputCount })
+          hashListEntry.errorStack.push({ i: index, tv: topVote, v: topVote.v })
+          hashListEntry.indexOffset -= 1
+
+          let alreadyVoted = {} // has the given node already EC voted for this key?
+          // +1 look ahead to see if we can get back on track
+          // lookAhead of 0 seems to be more stable
+          // let lookAhead = 10 // hashListEntry.errorStack.length
+          for (let i = 0; i < hashListEntry.errorStack.length + lookAhead; i++) {
+            // using +2 since we just subtracted one from the index offset. anothe r +1 since we want to look ahead of where we just looked
+            let sliceStart = (index + hashListEntry.indexOffset + i + 2) * stepSize
+            if (sliceStart + 1 > hashListEntry.hashSet.length) {
+              continue
+            }
+            let v = hashListEntry.hashSet.slice(sliceStart, sliceStart + stepSize)
+            if (alreadyVoted[v]) {
+              continue
+            }
+
+            if (prevOutput && prevOutput[index + i + 2] === v) {
+              break
+            }
+
+            alreadyVoted[v] = true
+            let countEntry = votes[v] || { count: 0, ec: 0 }
+            countEntry.ec += hashListEntry.votePower
+
+            // check for possible winnner due to re arranging things
+            // a nuance here that we require there to be some official votes before in this row before we consider a tx..  will need to analyze this choice
+            if (!winnerFound && countEntry.count > 0 && countEntry.ec + countEntry.count >= votesRequired) {
+              topVote.ec = countEntry.ec
+              topVote.v = v
+              topVote.vote = countEntry
+              winnerFound = true
+              output.push(topVote.v)
+              outputVotes.push(topVote)
+              // todo roll back corrctions where nodes were already voting for the winner.
+              for (let k = 0; k < hashListIndex; k++) {
+                let hashListEntryOther = hashSetList[k]
+                if (hashListEntryOther.lastValue === topVote.v) {
+                  hashListEntryOther.errorStack.pop()
+                  hashListEntryOther.corrections.pop()
+                  hashListEntryOther.indexOffset++
+                }
+              }
+            }
+
+            if (winnerFound) {
+              if (v === topVote.v) {
+                // delete stuff off stack and bail
+                // +1 because we at least want to delete 1 entry if index i=0 of this loop gets us here
+                let tempCorrections = []
+                // for (let j = 0; j < i + 1; j++) {
+                //   let correction = null
+                //   //if (i < hashListEntry.errorStack.length)
+                //   {
+                //     hashListEntry.errorStack.pop()
+                //     correction = hashListEntry.corrections.pop()
+                //   }
+                //   tempCorrections.push({ i: index - j, t: 'extra', c: correction })
+                // }
+                let index2 = index + hashListEntry.indexOffset + i + 2
+                let lastIdx = -1
+
+                for (let j = 0; j < i + 1; j++) {
+                  let correction = null
+                  if (hashListEntry.errorStack.length > 0) {
+                    hashListEntry.errorStack.pop()
+                    correction = hashListEntry.corrections.pop()
+                  }
+                  let extraIdx = j + index2 - (i + 1)
+                  if (correction) {
+                    extraIdx = correction.i - 1
+                    lastIdx = extraIdx
+                  } else if (lastIdx > 0) {
+                    extraIdx = lastIdx
+                  }
+                  // correction to fix problem where we were over deleting stuff.
+                  // a bit more retroactive than I like.  problem happens in certain cases when there are two winners in a row that are not first pass winners
+                  // see 16z for example where this breaks..
+                  // if (hashListEntry.corrections.length > 0) {
+                  //   let nextCorrection = hashListEntry.corrections[hashListEntry.corrections.length - 1]
+                  //   if (nextCorrection && correction && nextCorrection.bv === correction.bv) {
+                  //     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` solveHashSets overdelete fix: i:${i} j:${j} index:${index} bv:${nextCorrection.bv}}`)
+                  //     continue
+                  //   }
+                  // }
+
+                  tempCorrections.push({ i: extraIdx, t: 'extra', c: correction, hi: index2 - (j + 1) })
+                }
+
+                hashListEntry.corrections = hashListEntry.corrections.concat(tempCorrections)
+                // +2 so we can go from being put one behind and go to 1 + i ahead.
+                hashListEntry.indexOffset += (i + 2)
+
+                hashListEntry.errorStack = [] // clear the error stack
+                break
+              } else {
+                // backfil checking
+                // let outputIndex = output.length - 1
+                // let tempV = v
+                // let stepsBack = 1
+                // while (output.length > 0 && outputIndex > 0 && output[outputIndex] === tempV) {
+                //   // work backwards through continuous errors and redact them as long as they match up
+                //   outputIndex--
+                //   stepsBack++
+                // }
+              }
+            }
+          }
+        }
+      }
+      index++
+      lastOutputCount = output.length
+    }
+
+    // trailing extras cleanup.
+    for (let hashListIndex = 0; hashListIndex < hashSetList.length; hashListIndex++) {
+      let hashListEntry = hashSetList[hashListIndex]
+
+      let extraIdx = index
+      while ((extraIdx + hashListEntry.indexOffset) * stepSize < hashListEntry.hashSet.length) {
+        let hi = extraIdx + hashListEntry.indexOffset // index2 - (j + 1)
+        hashListEntry.corrections.push({ i: extraIdx, t: 'extra', c: null, hi: hi })
+        extraIdx++
+      }
+    }
+
+    return output // { output, outputVotes }
+  }
+
+  // efficient transformation to create a lookup to go from answer space index to the local index space of a hashList entry
+  // also creates a list of local indicies of elements to remove
+  static expandIndexMapping (hashListEntry, output) {
+    hashListEntry.indexMap = []
+    hashListEntry.extraMap = []
+    let readPtr = 0
+    let writePtr = 0
+    let correctionIndex = 0
+    let currentCorrection = null
+    let extraBits = 0
+    while (writePtr < output.length) {
+      if (correctionIndex < hashListEntry.corrections.length && hashListEntry.corrections[correctionIndex].i <= writePtr) {
+        currentCorrection = hashListEntry.corrections[correctionIndex]
+        correctionIndex++
+      } else {
+        currentCorrection = null
+      }
+      if (!currentCorrection) {
+        hashListEntry.indexMap.push(readPtr)
+        writePtr++
+        readPtr++
+      } else if (currentCorrection.t === 'insert') {
+        hashListEntry.indexMap.push(-1)
+        writePtr++
+      } else if (currentCorrection.t === 'extra') {
+        // hashListEntry.extraMap.push({ i: currentCorrection.i, hi: currentCorrection.hi })
+        hashListEntry.extraMap.push(currentCorrection.hi)
+        extraBits++
+        continue
+      }
+      if (extraBits > 0) {
+        readPtr += extraBits
+        extraBits = 0
+      }
+    }
+
+    // final corrections:
+    while (correctionIndex < hashListEntry.corrections.length) {
+      currentCorrection = hashListEntry.corrections[correctionIndex]
+      correctionIndex++
+
+      if (currentCorrection.t === 'extra') {
+        // hashListEntry.extraMap.push({ i: currentCorrection.i, hi: currentCorrection.hi })
+        hashListEntry.extraMap.push(currentCorrection.hi)
+        extraBits++
+        continue
+      }
+    }
+  }
+
+  // todo cleanup.. just sign the partition object asap so we dont have to check if there is a valid sign object throughout the code (but would need to consider perf impact of this)
+  solveHashSetsPrep (cycleNumber, partitionId, ourNodeKey) {
+    let key = 'c' + cycleNumber
+    let responsesById = this.partitionResponsesByCycleById[key]
+    let key2 = 'p' + partitionId
+    let responses = responsesById[key2]
+
+    let hashSets = {}
+    let hashSetList = []
+    // group identical sets together
+    let hashCounting = {}
+    for (let partitionResult of responses) {
+      let hash = partitionResult.Partition_hash
+      let count = hashCounting[hash] || 0
+      if (count === 0) {
+        let owner = null
+        if (partitionResult.sign) {
+          owner = partitionResult.sign.owner
+        } else {
+          owner = ourNodeKey
+        }
+        let hashSet = { hash: hash, votePower: 0, hashSet: partitionResult.hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [owner], ourRow: false }
+        hashSets[hash] = hashSet
+        hashSetList.push(hashSets[hash])
+        partitionResult.hashSetList = hashSet
+      } else {
+        if (partitionResult.sign) {
+          hashSets[hash].owners.push(partitionResult.sign.owner)
+        }
+      }
+      if ((partitionResult.sign == null) || partitionResult.sign.owner === ourNodeKey) {
+        hashSets[hash].ourRow = true
+        // hashSets[hash].owners.push(ourNodeKey)
+      }
+
+      count++
+      hashCounting[hash] = count
+      hashSets[hash].votePower = count
+    }
+    // NOTE: the fields owners and ourRow are user data for shardus and not known or used by the solving algorithm
+
+    return hashSetList
   }
 }
 
