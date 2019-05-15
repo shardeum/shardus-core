@@ -46,7 +46,7 @@
   },
   "debug": {
     "loseReceiptChance": 0.000,
-    "loseTxChance": 0.02
+    "loseTxChance": 0.00
   },
   "statistics": {
     "save": true,
