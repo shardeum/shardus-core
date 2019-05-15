@@ -58,6 +58,8 @@ class StateManager extends EventEmitter {
     this.lastActiveNodeCount = 0
 
     this.queueStopped = false
+
+    this.extendedRepairLogging = false
   }
 
   /* -------- DATASYNC Functions ---------- */
@@ -1014,7 +1016,7 @@ class StateManager extends EventEmitter {
         // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results`)
 
         if (!payload) {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results: abort no payload`)
+          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair post_partition_results: abort no payload`)
           return
         }
 
@@ -1028,19 +1030,19 @@ class StateManager extends EventEmitter {
         }
 
         if (!payload.partitionResults) {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results: abort, partitionResults == null`)
+          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair post_partition_results: abort, partitionResults == null`)
           return
         }
 
         if (payload.partitionResults.length === 0) {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results: abort, partitionResults.length == 0`)
+          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair post_partition_results: abort, partitionResults.length == 0`)
           return
         }
 
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results ${utils.stringifyReduce(payload)}`)
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results ${utils.stringifyReduce(payload)}`)
 
         if (!payload.partitionResults[0].sign) {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results: abort, no sign object on partition`)
+          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair post_partition_results: abort, no sign object on partition`)
           return
         }
 
@@ -1063,31 +1065,10 @@ class StateManager extends EventEmitter {
           if (partitionResult) {
             responses.push(partitionResult)
           } else {
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results partitionResult missing`)
+            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair post_partition_results partitionResult missing`)
           }
 
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results partition: ${partitionResult.Partition_id} responses.length ${responses.length}  cycle:${payload.Cycle_number}`)
-
-          // // if enough data, and our response is prepped.
-          // if (responses.length > 3) {
-          //   let ourResult = null
-          //   for (let obj of ourPartitionValues) {
-          //     if (obj.Partition_id === partitionResult.Partition_id) {
-          //       ourResult = obj
-          //       break
-          //     }
-          //   }
-          //   // payload.Cycle_number
-          //   let [partitionReceipt, topResult, success] = await this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
-
-          //   if (!success) {
-          //     let cycle = this.p2p.state.getCycleByCounter(payload.Cycle_number)
-          //     await this.startRepairProcess(cycle, topResult)
-          //   } else if (partitionReceipt) {
-          //     // do we ever send partition receipt yet?
-          //     this.storePartitionReceipt(payload.Cycle_number, partitionReceipt)
-          //   }
-          // }
+          if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results partition: ${partitionResult.Partition_id} responses.length ${responses.length}  cycle:${payload.Cycle_number}`)
         }
 
         // Try to create receipts if we can
@@ -1407,6 +1388,10 @@ class StateManager extends EventEmitter {
     }
   }
 
+  // //////////////////////////////////////////////////////////////////////////
+  // //////////////////////////   END Old sync check     //////////////////////////
+  // //////////////////////////////////////////////////////////////////////////
+
   /* -------- APPSTATE Functions ---------- */
 
   async getAccountsStateHash (accountStart = '0'.repeat(64), accountEnd = 'f'.repeat(64), tsStart = 0, tsEnd = Date.now()) {
@@ -1500,13 +1485,29 @@ class StateManager extends EventEmitter {
     let ourLockID = -1
     let accountDataList
     let txTs = 0
+    let accountKeys = []
+    let ourAccountLocks
     try {
       let tx = acceptedTX.data
       // let receipt = acceptedTX.receipt
       let keysResponse = this.app.getKeyFromTransaction(tx)
       let { timestamp, debugInfo } = keysResponse
       txTs = timestamp
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'tryApplyTransaction ' + timestamp + ' ' + debugInfo)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  ts:${timestamp} repairing:${repairing}  Applying! ` + debugInfo)
+
+      if (repairing !== true) {
+        // get a list of modified account keys that we will lock
+        let { sourceKeys, targetKeys } = keysResponse
+        for (let accountID of sourceKeys) {
+          accountKeys.push(accountID)
+        }
+        for (let accountID of targetKeys) {
+          accountKeys.push(accountID)
+        }
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
+        ourAccountLocks = await this.bulkFifoLockAccounts(accountKeys)
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} `)
+      }
 
       ourLockID = await this.fifoLock('accountModification')
 
@@ -1537,6 +1538,10 @@ class StateManager extends EventEmitter {
       return false
     } finally {
       this.fifoUnlock('accountModification', ourLockID)
+      if (repairing !== true) {
+        this.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} `)
+      }
     }
 
     await this.updateAccountsCopyTable(accountDataList, repairing, txTs)
@@ -1885,8 +1890,8 @@ class StateManager extends EventEmitter {
       partitionResult.hashSet = hashSet
     }
 
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair partitionObject: ${utils.stringifyReduce(partitionObject)}`)
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair generatePartitionResult: ${utils.stringifyReduce(partitionResult)}`)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair partitionObject: ${utils.stringifyReduce(partitionObject)}`)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair generatePartitionResult: ${utils.stringifyReduce(partitionResult)}`)
 
     if (partitionObject.Txids && partitionObject.Txids.length > 0) {
       this.logger.playbackLogNote('partitionObject', 'c' + partitionObject.Cycle_number, partitionObject)
@@ -2124,7 +2129,7 @@ class StateManager extends EventEmitter {
             // now that we are done see if we can form a receipt with what we have on the off change that all other nodes have sent us their corrected receipts already
             let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
             let [partitionReceipt3, topResult3, success3] = receiptResults
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess immediate receipt check. cycle: ${cycleNumber} success:${success3} topResult:${utils.stringifyReduce(topResult3)}  partitionReceipt: ${utils.stringifyReduce({ partitionReceipt3 })}`)
+            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess immediate receipt check. cycle: ${cycleNumber} success:${success3} topResult:${utils.stringifyReduce(topResult3)}  partitionReceipt: ${utils.stringifyReduce({ partitionReceipt3 })}`)
 
             // see if we already have a winning hash to correct to
             if (!success3) {
@@ -2144,13 +2149,13 @@ class StateManager extends EventEmitter {
             } else {
               this.storePartitionReceipt(cycleNumber, partitionReceipt3)
               this.repairTrackerMarkFinished(repairTracker)
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess 2 allFinished, final cycle: ${cycleNumber} hash:${utils.stringifyReduce({ topResult2 })}`)
+              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess 2 allFinished, final cycle: ${cycleNumber} hash:${utils.stringifyReduce({ topResult3 })}`)
             }
           }
         }
       }
 
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess we repaired stuff so re-broadcast our results`)
+      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess we repaired stuff so re-broadcast our results`)
       // broadcast our upgraded result again
       // how about for just this partition?
       // TODO repair.  how to make this converge towards order and heal the network problems. is this the right time/place to broadcaast it?  I think it does converge now since merge does a strait copy of the winner
@@ -2161,8 +2166,64 @@ class StateManager extends EventEmitter {
       this.mainLogger.debug('_repair: startRepairProcess ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       this.fatalLogger.fatal('_repair: startRepairProcess ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       // throw new Error('FailAndRestartPartition0')
+
+      if (repairTracker.awaitWinningHash !== true) {
+        this.fatalLogger.fatal('_repair: startRepairProcess will attempt awaitWinningHash=true mode')
+        // if we fail try skipping to the last phase:
+        repairTracker.evaluationStarted = false
+        repairTracker.awaitWinningHash = true
+        await this.checkForGoodPartitionReciept(cycleNumber, partitionId)
+      }
     } finally {
       repairTracker.repairing = false // ? really
+    }
+  }
+
+  // todo refactor some of the duped code in here
+  // possibly have to split this into three functions to make that clean (find our result and the parition checking as sub funcitons... idk)
+  async checkForGoodPartitionReciept (cycleNumber, partitionId) {
+    let repairTracker = this._getRepairTrackerForCycle(cycleNumber, partitionId)
+
+    let key = 'c' + cycleNumber
+    let key2 = 'p' + partitionId
+
+    // get responses
+    let responsesById = this.partitionResponsesByCycleById[key]
+    let responses = responsesById[key2]
+
+    // find our result
+    let ourPartitionValues = this.partitionResultsByCycle[key]
+    let ourResult = null
+    for (let obj of ourPartitionValues) {
+      if (obj.Partition_id === partitionId) {
+        ourResult = obj
+        break
+      }
+    }
+
+    let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
+    let [partitionReceipt3, topResult3, success3] = receiptResults
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept immediate receipt check. cycle: ${cycleNumber} success:${success3} topResult:${utils.stringifyReduce(topResult3)}  partitionReceipt: ${utils.stringifyReduce({ partitionReceipt3 })}`)
+
+    // see if we already have a winning hash to correct to
+    if (!success3) {
+      if (repairTracker.awaitWinningHash) {
+        if (topResult3 == null) {
+          // if we are awaitWinningHash then wait for a top result before we start repair process again
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept awaitWinningHash:true but topResult == null so keep waiting `)
+        } else {
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept awaitWinningHash:true and we have a top result so start reparing! `)
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept: tryGeneratePartitionReciept failed start repair process ${receiptResults.length}`)
+          let cycle = this.p2p.state.getCycleByCounter(cycleNumber)
+          await utils.sleep(1000)
+          await this.startRepairProcess(cycle, topResult3, partitionId, ourResult.Partition_hash)
+          // we are correcting to another hash.  don't bother sending our hash out
+        }
+      }
+    } else {
+      this.storePartitionReceipt(cycleNumber, partitionReceipt3)
+      this.repairTrackerMarkFinished(repairTracker)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept 2 allFinished, final cycle: ${cycleNumber} hash:${utils.stringifyReduce({ topResult3 })}`)
     }
   }
 
@@ -2174,7 +2235,7 @@ class StateManager extends EventEmitter {
     let nodeToContact
 
     if (!allNodes) {
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: allNodes: undefined ')
+      if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: allNodes: undefined ')
       throw new Error('allNodes undefined')
     }
 
@@ -2254,7 +2315,7 @@ class StateManager extends EventEmitter {
     repairTracker.newFailedTXs = txs
     // this.storage.addAcceptedTransactions(txs) // commit the failed TXs to our db. not sure if this is strictly necessary
 
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: repairTracker updates: ' + utils.stringifyReduce(repairTracker))
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: repairTracker updates: ' + utils.stringifyReduce(repairTracker))
 
     this._mergeRepairDataIntoLocalState(repairTracker, ourPartitionObj, statusMap, partitionObject)
   }
@@ -2271,7 +2332,7 @@ class StateManager extends EventEmitter {
 
     txList.hashes = ourPartitionObj.Txids
     txList.passed = ourPartitionObj.Status
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _mergeRepairDataIntoLocalState:  key: ${key} txlist: ${utils.stringifyReduce({ hashes: txList.hashes, passed: txList.passed })} `)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair _mergeRepairDataIntoLocalState:  key: ${key} txlist: ${utils.stringifyReduce({ hashes: txList.hashes, passed: txList.passed })} `)
   }
 
   //  this works with syncTXsFromHashSetStrings to correct our partition object data. unlike the other version of this function this just creates entries on a
@@ -2288,21 +2349,6 @@ class StateManager extends EventEmitter {
     let newTxList = { hashes: [], passed: [], txs: [], thashes: [], tpassed: [], ttxs: [] }
     txList.newTxList = newTxList // append it to tx list for now.
     repairTracker.solutionDeltas.sort(function (a, b) { return a.i - b.i }) // why did b - a help us once??
-
-    // let extraIndex = 0
-    // for (let i = 0; i < txList.hashes.length; i++) {
-    //   let extra = -1
-    //   if (extraIndex < ourHashSet.extraMap.length) {
-    //     extra = ourHashSet.extraMap[extraIndex]
-    //   }
-    //   if (extra === i) {
-    //     extraIndex++
-    //     continue
-    //   }
-    //   newTxList.thashes.push(txList.hashes[i])
-    //   newTxList.tpassed.push(txList.passed[i])
-    //   newTxList.ttxs.push(txList.txs[i])
-    // }
 
     let debugSol = []
     for (let solution of repairTracker.solutionDeltas) {
@@ -2350,14 +2396,14 @@ class StateManager extends EventEmitter {
         newTxList.txs[i] = newTxList.ttxs[ourCounter]
         ourCounter++
         if (newTxList.hashes[i] == null) {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
         }
       } else {
         // repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j] })
         let solutionDelta = repairTracker.solutionDeltas[solutionIndex]
 
         if (!solutionDelta) {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error solutionDelta=null  solutionIndex: ${solutionIndex} i:${i} of ${ourHashSet.indexMap.length} deltas: ${utils.stringifyReduce(repairTracker.solutionDeltas)}`)
+          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error solutionDelta=null  solutionIndex: ${solutionIndex} i:${i} of ${ourHashSet.indexMap.length} deltas: ${utils.stringifyReduce(repairTracker.solutionDeltas)}`)
         }
         // insert the next one
         newTxList.hashes[i] = solutionDelta.tx.id
@@ -2365,7 +2411,7 @@ class StateManager extends EventEmitter {
         newTxList.txs[i] = solutionDelta.tx
         solutionIndex++
         if (newTxList.hashes[i] == null) {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 b error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 b error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
         }
       }
     }
@@ -2439,8 +2485,6 @@ class StateManager extends EventEmitter {
     // lets generate the indexMap and extraMap index tables for out hashlist solution
     StateManager.expandIndexMapping(ourSolution, output)
 
-    // hashListEntry.indexMap = []
-    // hashListEntry.extraMap = []
     // flag extras
     let requestsByHost = new Array(hashSetList.length).fill(null)
     for (let correction of ourSolution.corrections) {
@@ -2480,14 +2524,14 @@ class StateManager extends EventEmitter {
       if (requestsByHost[i] != null) {
         requestsByHost[i].requests.sort(function (a, b) { return a - b }) // sort these since the reponse for the host will also sort by timestamp
         let payload = { partitionId: partitionId, cycle: cycleNumber, tx_indicies: requestsByHost[i].hostIndex, hash: requestsByHost[i].hash }
-        console.log(`host group: ${i}  requests: ${utils.stringifyReduce(payload)}  hosts: ${utils.stringifyReduce(hashSetList[i].owners)} `)
+        if (this.extendedRepairLogging) console.log(`host group: ${i}  requests: ${utils.stringifyReduce(payload)}  hosts: ${utils.stringifyReduce(hashSetList[i].owners)} `)
         if (hashSetList[i].owners.length > 0) {
           let nodeToContact = this.p2p.state.getNodeByPubKey(hashSetList[i].owners[0])
 
           let result = await this.p2p.ask(nodeToContact, 'get_transactions_by_partition_index', payload)
           // { success: true, acceptedTX: result, passFail: passFailList }
           if (result.success === true) {
-            console.log(`get_transactions_by_partition_index ok!  payload: ${utils.stringifyReduce(payload)}`)
+            if (this.extendedRepairLogging) console.log(`get_transactions_by_partition_index ok!  payload: ${utils.stringifyReduce(payload)}`)
             for (let j = 0; j < result.acceptedTX.length; j++) {
               let acceptedTX = result.acceptedTX[j]
               if (result.passFail[j] === 1) {
@@ -2501,7 +2545,7 @@ class StateManager extends EventEmitter {
             }
           } else {
             // todo datasync:  assert/fail/or retry
-            console.log(`get_transactions_by_partition_index faied!  payload: ${utils.stringifyReduce(payload)}`)
+            if (this.extendedRepairLogging) console.log(`get_transactions_by_partition_index faied!  payload: ${utils.stringifyReduce(payload)}`)
           }
 
           // add these TXs to newPendingTXs or newFailedTXs  and the IDs to missingTXIds
@@ -2560,7 +2604,7 @@ class StateManager extends EventEmitter {
       // newFailedTXs: a list of TXs that we fetched, they had failed so we save them but do not apply them
       // extraTXIds: a list of TXIds that our partition has that the leading partition does not.  This is what we need to remove
       // missingTXIds: a list of TXIds that our partition has that the leading partition has that we don't.  We will need to add these in using the list newPendingTXs
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_getRepairTrackerForCycle: creating for cycle:${counter} partition:${partition}`)
+      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `_getRepairTrackerForCycle: creating for cycle:${counter} partition:${partition}`)
       repairTracker = { triedHashes: [],
         numNodes: this.lastActiveNodeCount, // num nodes that we send partition results to
         counter: counter,
@@ -2642,13 +2686,11 @@ class StateManager extends EventEmitter {
         allExtraTXids[tx] = 1
         // TODO Repair. ugh have to query our data and figure out which accounts need to be reset.
       }
-      // allTXsToApply[]
       // todo repair: hmmm also reset accounts have a tx we need to remove.
     }
 
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs: extra: ${utils.stringifyReduce(allExtraTXids)}  txIDToAcc: ${utils.stringifyReduce(txIDToAcc)}`)
 
-    // let accountStateEntries = {}
     // walk through all txs for this cycle.
     // get or create entries for accounts.
     // track when they have missing txs or wrong txs
@@ -2692,10 +2734,14 @@ class StateManager extends EventEmitter {
 
     // build and sort a list of TXs that we need to apply
 
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs txIDResetExtraCount: ${txIDResetExtraCount} allAccountsToResetById ${utils.stringifyReduce(allAccountsToResetById)}`)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs txIDResetExtraCount: ${txIDResetExtraCount} allAccountsToResetById ${utils.stringifyReduce(allAccountsToResetById)}`)
     // reset accounts
     let accountKeys = Object.keys(allAccountsToResetById)
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs revert accountKeys ${utils.stringifyReduce(accountKeys)}`)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs revert accountKeys ${utils.stringifyReduce(accountKeys)}`)
+
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs FIFO lock outer: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+    let ourAccountLocks = await this.bulkFifoLockAccounts(accountKeys)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs FIFO lock inner: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
 
     await this._revertAccounts(accountKeys, cycleNumber)
 
@@ -2710,8 +2756,8 @@ class StateManager extends EventEmitter {
     // sort the list by ascending timestamp
     newTXList.sort(function (a, b) { return a.timestamp - b.timestamp })
 
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs txList.length: ${txList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs txList.length: ${txList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
 
     let applyCount = 0
     let applyFailCount = 0
@@ -2765,15 +2811,30 @@ class StateManager extends EventEmitter {
 
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
     }
+    // unlock the accounts we locked...  todo maybe put this in a finally statement?
+    this.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs FIFO unlock: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+  }
 
-    // run the list but only for nodes that had a problem!!!
-    // run for allAccountsToResetById
+  async bulkFifoLockAccounts (accountIDs) {
+    // lock all the accounts we will modify
+    let wrapperLockId = await this.fifoLock('atomicWrapper')
+    let ourLocks = []
+    for (let accountKey of accountIDs) {
+      let ourLockID = await this.fifoLock(accountKey)
+      ourLocks.push(ourLockID)
+    }
+    this.fifoUnlock('atomicWrapper', wrapperLockId)
+    return ourLocks
+  }
 
-    // apply all TXs to accounts for cycle. (are those new pending TXs already worked into our local dataset or doe we do that now)
-    // node apply tx to just the accounts that have been reset! (save perf and complexity where there is overlap)
-    // update the repair entry stats?... idk.
-    // crap do we need to register a suspend lock on accounts that we cant work on yet... we will fail at updating them
-    // pre scan this?
+  bulkFifoUnlockAccounts (accountIDs, ourLocks) {
+    // unlock the accounts we locked
+    for (let i = 0; i < ourLocks.length; i++) {
+      let accountID = accountIDs[i]
+      let ourLockID = ourLocks[i]
+      this.fifoUnlock(accountID, ourLockID)
+    }
   }
 
   async _revertAccounts (accountIDs, cycleNumber) {
@@ -2798,22 +2859,11 @@ class StateManager extends EventEmitter {
             // accountData.data.data.data = { rewrite: cycleNumber }
           }
 
-          // if (accountData.data.owners && utils.isString(accountData.data.owners)) {
-          //   accountData.data.owners = JSON.parse(accountData.data.owners)
-          // }
-
-          // if (accountData.data.data && utils.isString(accountData.data.data)) {
-          //   accountData.data.data = JSON.parse(accountData.data.data)
-          // }
-          // if (accountData.data.txs && utils.isString(accountData.data.txs) === false) {
-          //   accountData.data.txs = stringify(accountData.data.txs)
-          // }
-
           if (accountData == null || accountData.data == null || accountData.data.data.address == null) {
             if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair _revertAccounts null account data found: ${accountData.data.address} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
           } else {
             // todo overkill
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts reset: ${utils.makeShortHash(accountData.data.data.address)} ts: ${utils.makeShortHash(accountData.data.data.timestamp)} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
+            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts reset: ${utils.makeShortHash(accountData.data.data.address)} ts: ${utils.makeShortHash(accountData.data.data.timestamp)} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
           }
         }
         // tell the app to replace the account data
@@ -2823,7 +2873,7 @@ class StateManager extends EventEmitter {
         if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts No replacment accounts found!!! cycle <= :${prevCycle}`)
       }
 
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts: ${accountIDs.length} replacmentAccounts ${replacmentAccounts.length} repairing cycle:${cycleNumber}`)
+      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts: ${accountIDs.length} replacmentAccounts ${replacmentAccounts.length} repairing cycle:${cycleNumber}`)
 
       // TODO prodution. consider if we need a better set of checks before we delete an account!
       // If we don't have a replacement copy for an account we should try to delete it
@@ -2898,10 +2948,6 @@ class StateManager extends EventEmitter {
     }
   }
 
-  // async createInitialAccountBackups () {
-  //   // After data syncing the node saves a copy of the account data in the Accounts Copy Table
-  // }
-
   async periodicCycleDataCleanup () {
     // On a periodic bases older copies of the account data where we have more than 2 copies for the same account can be deleted.
   }
@@ -2919,7 +2965,7 @@ class StateManager extends EventEmitter {
 
     let nodes = this.getRandomNodesInRange(broadcastTargets, accountStart, accountEnd, [])
     if (nodes.length === 0) {
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair broadcastPartitionResults: abort no nodes to send partition to`)
+      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair broadcastPartitionResults: abort no nodes to send partition to`)
       return // nothing to do
     }
 
@@ -2939,7 +2985,7 @@ class StateManager extends EventEmitter {
 
     let payload = { Cycle_number: cycleNumber, partitionResults: partitionResults }
 
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair broadcastPartitionResults ${utils.stringifyReduce(payload)}`)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair broadcastPartitionResults ${utils.stringifyReduce(payload)}`)
     // send the array of partition results for this current cycle.
     await this.p2p.tell(nodes, 'post_partition_results', payload)
   }
@@ -3009,27 +3055,13 @@ class StateManager extends EventEmitter {
     this.p2p.state.on('cycle_q4_start', async (lastCycle, time) => {
       // Also we would like the repair process to finish by the end of Q3 and definitely before the start of a new cycle. Otherwise the cycle duration may need to be increased.
     })
-
-    // // could just use a direct function call for this
-    // this.p2p.stateManager.on('applied', async (acceptedTX) => {
-    //   // Whenever a transaction is applied a copy of the account data is also also
-    //   // saved to the Accounts Copy Table. Within the same cycle the copy will overwrite
-    //   // the previous copy. A copy will be created for each cycle where the account was modified.
-    //   this.storage.updateOrReplaceAccountCopy()
-    // })
   }
 
   // originally this only recorder results if we were not repairing but it turns out we need to update our copies any time we apply state.
   // with the update we will calculate the cycle based on timestamp rather than using the last current cycle counter
   async updateAccountsCopyTable (accountDataList, repairing, txTimestamp) {
     let cycleNumber = -1
-    // if (!repairing) {
-    //   const lastCycle = this.p2p.state.getLastCycle()
-    //   cycleNumber = lastCycle.counter
-    // } else if (accountDataList.length > 0) {
-    //   const cycle = this.p2p.state.getCycleByTimestamp(accountDataList[0].timestamp + this.syncSettleTime)
-    //   cycleNumber = cycle.counter
-    // }
+
     let cycle = this.p2p.state.getCycleByTimestamp(txTimestamp + this.syncSettleTime)
     let cycleOffset = 0
     if (cycle == null) {
@@ -3038,11 +3070,8 @@ class StateManager extends EventEmitter {
       cycleOffset = 1
     }
     cycleNumber = cycle.counter + cycleOffset
-    // const lastCycle = this.p2p.state.getLastCycle()
-    // let cycleNumber = lastCycle.counter
 
     // extra safety testing
-
     // TODO !!!  if cycle durations become variable we need to update this logic
     let cycleStart = (cycle.start + (cycle.duration * cycleOffset)) * 1000
     let cycleEnd = (cycle.start + (cycle.duration * (cycleOffset + 1))) * 1000
@@ -3070,7 +3099,7 @@ class StateManager extends EventEmitter {
 
       let backupObj = { accountId, data, timestamp, hash, cycleNumber }
 
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
 
       // todo perf. batching?
       // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'updateAccountsCopyTableA ' + JSON.stringify(accountEntry))
@@ -3099,7 +3128,7 @@ class StateManager extends EventEmitter {
     cycleEnd -= this.syncSettleTime // adjust by sync settle time
     for (let txRecord of this.tempTXRecords) {
       if (txRecord.redacted > 0) {
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair recordTXByCycle: ${utils.makeShortHash(txRecord.acceptedTx.id)} cycle: ${cycle.counter} redacted!!! ${txRecord.redacted}`)
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair recordTXByCycle: ${utils.makeShortHash(txRecord.acceptedTx.id)} cycle: ${cycle.counter} redacted!!! ${txRecord.redacted}`)
         continue
       }
       if (txRecord.txTS < cycleEnd) {
@@ -3117,7 +3146,7 @@ class StateManager extends EventEmitter {
 
     txList.processed = true
 
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair processTempTXs txsRecorded: ${txsRecorded} txsTemp: ${txsTemp} `)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair processTempTXs txsRecorded: ${txsRecorded} txsTemp: ${txsTemp} `)
   }
 
   getTXList (cycleNumber, partitionId) {
@@ -3165,14 +3194,8 @@ class StateManager extends EventEmitter {
     // txList.txById[acceptedTx.id] = acceptedTx
     // TODO sharding.  need to add some periodic cleanup when we have more cycles than needed stored in this map!!!
 
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair recordTXByCycle: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length}`)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair recordTXByCycle: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length}`)
   }
-
-  // updateOurTXData (cycleNumber, partitionId, txMap) {
-  //   // replace txList data
-  //   // re-create new partition obj and remove the old one
-
-  // }
 
   getPartitionObject (cycleNumber, partitionId) {
     let key = 'c' + cycleNumber
@@ -3220,7 +3243,7 @@ class StateManager extends EventEmitter {
         }
       }
     }
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair findMostCommonResponse: ${utils.stringifyReduce(responsesById)} }`)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair findMostCommonResponse: ${utils.stringifyReduce(responsesById)} }`)
     return [topHash, topCount, topResult]
   }
 
@@ -3291,6 +3314,7 @@ class StateManager extends EventEmitter {
         }
       }
 
+      // Leaving this here, because it is a good spot to put a breakpoint when testing a data set where stuf went wrong (hashset.js)
       // if (index === 123) {
       //   let foo = 5
       //   foo++
