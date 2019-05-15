@@ -31,7 +31,8 @@ class Reporter {
       return
     }
     try {
-      await http.post(`${this.config.recipient}/joining`, { publicKey })
+      const nodeIpInfo = this.p2p.getIpInfo()
+      await http.post(`${this.config.recipient}/joining`, { publicKey, nodeIpInfo })
     } catch (e) {
       this.mainLogger.error('reportJoining: ' + e.name + ': ' + e.message + ' at ' + e.stack)
       console.error(e)
@@ -43,7 +44,8 @@ class Reporter {
       return
     }
     try {
-      await http.post(`${this.config.recipient}/joined`, { publicKey, nodeId })
+      const nodeIpInfo = this.p2p.getIpInfo()
+      await http.post(`${this.config.recipient}/joined`, { publicKey, nodeId, nodeIpInfo })
     } catch (e) {
       this.mainLogger.error('reportJoined: ' + e.name + ': ' + e.message + ' at ' + e.stack)
       console.error(e)
