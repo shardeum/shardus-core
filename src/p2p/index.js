@@ -516,6 +516,28 @@ class P2P extends EventEmitter {
     return signedJoinReq
   }
 
+  _createApoptosisMessage () {
+    const nodeId = this.id
+    const type = 'apoptosis'
+    const cycleCounter = this.getCycleCounter()
+    const timestamp = utils.getTime()
+    const message = {
+      nodeId,
+      type,
+      cycleCounter,
+      timestamp
+    }
+    const signedMsg = this.crypto.sign(message)
+    return signedMsg
+  }
+
+  async initApoptosis () {
+    const msg = this._createApoptosisMessage()
+    console.log(msg)
+    await this._submitWhenUpdatePhase('apoptosis', msg)
+    this.state.addApoptosisMessage(msg)
+  }
+
   isActive () {
     this.mainLogger.debug('Checking if active...')
     const status = this.state.getNodeStatus(this.id)

@@ -212,6 +212,18 @@ function setupRoutes () {
     await this.sendGossipIn('active', payload, tracker, sender)
   })
 
+  this.registerGossipHandler('apoptosis', async (payload, sender, tracker) => {
+    if (!payload) {
+      this.mainLogger.debug('No payload provided with `apoptosis` request.')
+      return
+    }
+    this.mainLogger.debug(`Payload for 'apoptosis' request: ${JSON.stringify(payload)}`)
+    // Attempt to add apoptosis message to cycle
+    const added = await this.state.addExtApoptosisMessage(payload)
+    if (!added) return this.mainLogger.debug(`Apoptosis message for ${payload.nodeId} not added.`)
+    await this.sendGossipIn('apoptosis', payload, tracker, sender)
+  })
+
   this.registerGossipHandler('certificate', async (payload, sender, tracker) => {
     if (!payload) {
       this.mainLogger.debug('No payload provided for the `certificate` request.')
@@ -255,5 +267,10 @@ function setupRoutes () {
 
   this.network.registerExternalGet('nodelist', async (req, res) => {
     return res.json({ nodelist: this.state.getAllNodes() })
+  })
+
+  this.network.registerExternalGet('apoptosis', async (req, res) => {
+    res.json({ apoptosis: true })
+    await this.initApoptosis()
   })
 }

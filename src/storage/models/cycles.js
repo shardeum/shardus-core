@@ -17,6 +17,7 @@ module.exports = [
     activated: { type: Sequelize.JSON, allowNull: false },
     removed: { type: Sequelize.JSON, allowNull: false },
     returned: { type: Sequelize.JSON, allowNull: false },
-    lost: { type: Sequelize.JSON, allowNull: false }
+    lost: { type: Sequelize.JSON, allowNull: false },
+    apoptosized: { type: Sequelize.JSON, allowNull: false }
   }
 ]

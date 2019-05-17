@@ -61,6 +61,7 @@ class P2PState extends EventEmitter {
         receivedCerts: false,
         toAccept: 0,
         scalingSeen: {},
+        apopSeen: {},
         startingDesired: 0,
         scaling: false
       },
@@ -70,7 +71,8 @@ class P2PState extends EventEmitter {
         scaling: {
           up: [],
           down: []
-        }
+        },
+        apoptosis: []
       },
       data: {
         start: null,
@@ -80,6 +82,7 @@ class P2PState extends EventEmitter {
         joined: [],
         removed: [],
         lost: [],
+        apoptosized: [],
         returned: [],
         activated: [],
         certificate: {},
@@ -441,7 +444,7 @@ class P2PState extends EventEmitter {
   // TODO: Update this to go through entire update types
   async addCycleUpdates (updates) {
     if (!this.cyclesStarted) return false
-    const { bestJoinRequests, active, scaling } = updates
+    const { bestJoinRequests, active, scaling, apoptosis } = updates
     for (const joinRequest of bestJoinRequests) {
       this._addJoinRequest(joinRequest)
     }
@@ -454,11 +457,89 @@ class P2PState extends EventEmitter {
     for (const scaleReq of scaling.down) {
       await this._addScalingRequest(scaleReq)
     }
+    for (const apopMsg of apoptosis) {
+      this.addApoptosisMessage(apopMsg)
+    }
     const cMarkerBefore = this.getCurrentCertificate().marker
     await this._createCycleMarker(false)
     const cMarkerAfter = this.getCurrentCertificate().marker
     if (cMarkerBefore === cMarkerAfter) return false
     return true
+  }
+
+  addApoptosisMessage (msg) {
+    if (!this.cyclesStarted) return false
+    const { nodeId, type, cycleCounter, timestamp, sign } = msg
+
+    // Validate that all required fields exist
+    if (!nodeId) {
+      this.mainLogger.debug('Node ID of node was not provided with apoptosis message.')
+      return false
+    }
+    if (!sign) {
+      this.mainLogger.debug('Apoptosis message was not signed.')
+      return false
+    }
+    if (!cycleCounter) {
+      this.mainLogger.debug('No cycleCounter given with apoptosis message.')
+      return false
+    }
+    if (!timestamp) {
+      this.mainLogger.debug('No timestamp given with apoptosis message.')
+      return false
+    }
+    if (!type) {
+      this.mainLogger.debug('No type given with apoptosis message.')
+      return false
+    }
+
+    if (type !== 'apoptosis') {
+      this.mainLogger.debug('Message is not of type `apoptosis`. Message cannot be added.')
+      return false
+    }
+
+    // Check if message already exists
+    if (this.currentCycle.metadata.apopSeen[nodeId]) {
+      this.mainLogger.debug('Apoptosis message already seen for this node. Cannot add message.')
+      return false
+    }
+
+    // Check if cycle counter if for this cycle or one before it
+    if (cycleCounter !== this.getCycleCounter() && cycleCounter !== this.getCycleCounter() - 1) {
+      // Invalid cycle counter
+      this.mainLogger.debug('Invalid cycleCounter for apoptosis message. Unable to add message.')
+      return false
+    }
+
+    // Check if node is in nodelist
+    let node
+    try {
+      node = this.getNode(nodeId)
+    } catch (e) {
+      this.mainLogger.debug('Node not found in nodelist. Apoptosis message invalid.')
+      return false
+    }
+
+    // Check if signature is valid and signed by expected node
+    const valid = this.crypto.verify(msg, node.publicKey)
+    if (!valid) {
+      this.mainLogger.debug('Apoptosis message signature invalid. Unable to add message.')
+      return false
+    }
+
+    // Add to cycle
+    this.currentCycle.metadata.apopSeen[nodeId] = true
+    this.currentCycle.updates.apoptosis.push(msg)
+    utils.insertSorted(this.currentCycle.data.apoptosized, nodeId)
+    return true
+  }
+
+  addExtApoptosisMessage (msg) {
+    if (!this.acceptChainUpdates) {
+      this.mainLogger.debug('Apoptosis message not added: Not accepting chain updates right now.')
+      return false
+    }
+    return this.addApoptosisMessage(msg)
   }
 
   async _setNodeStatus (nodeId, status) {
@@ -1004,7 +1085,10 @@ class P2PState extends EventEmitter {
     const removedNodes = this._getRemovedNodes()
     const removed = this.removeNodes(removedNodes)
 
-    const promises = [accepted, activated, removed, cycleAdded]
+    const apoptosizedNodes = this._getApoptosizedNodes()
+    const apoptosized = this.removeNodes(apoptosizedNodes)
+
+    const promises = [accepted, activated, removed, apoptosized, cycleAdded]
     try {
       await Promise.all(promises)
       this.mainLogger.info('Added cycle chain entry to database successfully!')
@@ -1024,6 +1108,7 @@ class P2PState extends EventEmitter {
     const joined = this.getJoined()
     const removed = this.getRemoved()
     const lost = this.getLost()
+    const apoptosized = this.getApoptosized()
     const returned = this.getReturned()
     const activated = this.getActivated()
     const expired = this.getExpiredCount()
@@ -1038,6 +1123,7 @@ class P2PState extends EventEmitter {
       joined,
       removed,
       lost,
+      apoptosized,
       returned,
       activated,
       expired
@@ -1163,6 +1249,10 @@ class P2PState extends EventEmitter {
 
   getRemoved () {
     return this.currentCycle.data.removed
+  }
+
+  getApoptosized () {
+    return this.currentCycle.data.apoptosized
   }
 
   getLost () {
@@ -1314,6 +1404,16 @@ class P2PState extends EventEmitter {
     const nodes = []
     const removedIds = this.getRemoved()
     for (const id of removedIds) {
+      const node = this.getNode(id)
+      nodes.push(node)
+    }
+    return nodes
+  }
+
+  _getApoptosizedNodes () {
+    const nodes = []
+    const apoppedIds = this.getApoptosized()
+    for (const id of apoppedIds) {
       const node = this.getNode(id)
       nodes.push(node)
     }
