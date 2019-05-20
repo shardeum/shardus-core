@@ -1504,9 +1504,9 @@ class StateManager extends EventEmitter {
         for (let accountID of targetKeys) {
           accountKeys.push(accountID)
         }
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
         ourAccountLocks = await this.bulkFifoLockAccounts(accountKeys)
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} `)
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} `)
       }
 
       ourLockID = await this.fifoLock('accountModification')
@@ -2545,7 +2545,7 @@ class StateManager extends EventEmitter {
             }
           } else {
             // todo datasync:  assert/fail/or retry
-            if (this.extendedRepairLogging) console.log(`get_transactions_by_partition_index faied!  payload: ${utils.stringifyReduce(payload)}`)
+            if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index faied!  payload: ${utils.stringifyReduce(payload)}`)
           }
 
           // add these TXs to newPendingTXs or newFailedTXs  and the IDs to missingTXIds
