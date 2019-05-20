@@ -432,36 +432,6 @@ class P2P extends EventEmitter {
     await utils.sleep(timeToWait)
   }
 
-  async _doCycleEvents () {
-    const { currentCycleMarker, cycleCounter, currentTime, cycleStart, cycleDuration } = this.getCycleMarkerInfo()
-    const lastCycle = this.state.getLastCycle()
-    if (!this._isInUpdatePhase(currentTime, cycleStart, cycleDuration)) {
-      await this._waitUntilUpdatePhase(currentTime, cycleStart, cycleDuration)
-    }
-    let time = utils.getTime('s')
-    console.log('Q1 ' + time)
-    this.emit('cycle_q1_start', lastCycle, currentCycleMarker, cycleCounter, time)
-
-    time = utils.getTime('s')
-    await this._waitUntilSecondPhase(time, cycleStart, cycleDuration)
-    console.log('Q2 ' + time)
-    this.emit('cycle_q2_start', lastCycle, currentCycleMarker, cycleCounter, time)
-
-    time = utils.getTime('s')
-    await this._waitUntilThirdPhase(time, cycleStart, cycleDuration)
-    console.log('Q3 ' + time)
-    this.emit('cycle_q3_start', lastCycle, currentCycleMarker, cycleCounter, time)
-
-    time = utils.getTime('s')
-    await this._waitUntilLastPhase(time, cycleStart, cycleDuration)
-    console.log('Q4 ' + time)
-    this.emit('cycle_q4_start', lastCycle, currentCycleMarker, cycleCounter, time)
-
-    time = utils.getTime('s')
-    await this._waitUntilEndOfCycle(time, cycleStart, cycleDuration)
-    setTimeout(() => this._doCycleEvents(), 0) // restart
-  }
-
   async _submitWhenUpdatePhase (route, message) {
     this.mainLogger.debug(`Submitting message: ${JSON.stringify(message)} on route: ${route} whenever it's not the second quarter of cycle...`)
     let cycleMarker
