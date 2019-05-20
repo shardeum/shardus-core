@@ -2470,7 +2470,7 @@ class StateManager extends EventEmitter {
     hashSetList2.sort(function (a, b) { return a.hash > b.hash }) // sort so that solution will be deterministic
     let hashSet = { hash: 'FORCED', votePower: 1000, hashSet: outputHashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [], ourRow: false }
     hashSetList2.push(hashSet)
-    output = StateManager.solveHashSets(hashSetList2, 10, 0.625, output)
+    output = StateManager.solveHashSets(hashSetList2, 40, 0.625, output)
     hashSetList = hashSetList2
 
     for (let hashSetEntry of hashSetList) {
@@ -3330,13 +3330,23 @@ class StateManager extends EventEmitter {
           hashListEntry.errorStack.push({ i: index, tv: topVote, v: topVote.v })
           hashListEntry.indexOffset -= 1
 
+          if (hashListEntry.waitForIndex > 0 && index < hashListEntry.waitForIndex) {
+            continue
+          }
+
+          if (hashListEntry.waitForIndex > 0 && hashListEntry.waitForIndex === index) {
+            hashListEntry.waitForIndex = -1
+            hashListEntry.waitedForThis = true
+          }
+
           let alreadyVoted = {} // has the given node already EC voted for this key?
           // +1 look ahead to see if we can get back on track
           // lookAhead of 0 seems to be more stable
           // let lookAhead = 10 // hashListEntry.errorStack.length
           for (let i = 0; i < hashListEntry.errorStack.length + lookAhead; i++) {
             // using +2 since we just subtracted one from the index offset. anothe r +1 since we want to look ahead of where we just looked
-            let sliceStart = (index + hashListEntry.indexOffset + i + 2) * stepSize
+            let thisIndex = (index + hashListEntry.indexOffset + i + 2)
+            let sliceStart = thisIndex * stepSize
             if (sliceStart + 1 > hashListEntry.hashSet.length) {
               continue
             }
@@ -3345,13 +3355,42 @@ class StateManager extends EventEmitter {
               continue
             }
 
-            if (prevOutput && prevOutput[index + i + 2] === v) {
-              break
+            // a hint to stop us from looking ahead too far
+            // if (prevOutput && prevOutput[index + i + 2] === v) {
+            //   break
+            // }
+
+            // scan ahead for other connections
+            if (prevOutput && !hashListEntry.waitedForThis) {
+              let foundMatch = false
+              let searchAhead = 5 // Math.max(10, lookAhead - i)
+              for (let k = 1; k < searchAhead; k++) {
+                let idx = index + k // + 2 + hashListEntry.indexOffset
+                if (prevOutput.length <= idx) {
+                  break
+                }
+                if (prevOutput && prevOutput[idx] === v) {
+                  foundMatch = true
+                  hashListEntry.waitForIndex = index + k
+                  hashListEntry.futureIndex = index + hashListEntry.indexOffset + i + 2
+                  hashListEntry.futureValue = v
+                }
+              }
+              if (foundMatch) {
+                break
+              }
             }
 
             alreadyVoted[v] = true
             let countEntry = votes[v] || { count: 0, ec: 0 }
-            countEntry.ec += hashListEntry.votePower
+
+            // only vote 10 spots ahead
+            if (i < 10) {
+              countEntry.ec += hashListEntry.votePower
+            }
+            if (i > 35) {
+              foo++
+            }
 
             // check for possible winnner due to re arranging things
             // a nuance here that we require there to be some official votes before in this row before we consider a tx..  will need to analyze this choice
@@ -3375,6 +3414,9 @@ class StateManager extends EventEmitter {
 
             if (winnerFound) {
               if (v === topVote.v) {
+                if (hashListEntry.waitedForThis) {
+                  hashListEntry.waitedForThis = false
+                }
                 // delete stuff off stack and bail
                 // +1 because we at least want to delete 1 entry if index i=0 of this loop gets us here
                 let tempCorrections = []
@@ -3414,12 +3456,15 @@ class StateManager extends EventEmitter {
                   //   }
                   // }
 
+                  // hashListEntry.indexOffset++
                   tempCorrections.push({ i: extraIdx, t: 'extra', c: correction, hi: index2 - (j + 1) })
                 }
 
                 hashListEntry.corrections = hashListEntry.corrections.concat(tempCorrections)
                 // +2 so we can go from being put one behind and go to 1 + i ahead.
                 hashListEntry.indexOffset += (i + 2)
+
+                // hashListEntry.indexOffset += (1)
 
                 hashListEntry.errorStack = [] // clear the error stack
                 break
@@ -3435,6 +3480,10 @@ class StateManager extends EventEmitter {
                 // }
               }
             }
+          }
+
+          if (hashListEntry.waitedForThis) {
+            hashListEntry.waitedForThis = false
           }
         }
       }
@@ -3474,6 +3523,11 @@ class StateManager extends EventEmitter {
       } else {
         currentCorrection = null
       }
+      if (extraBits > 0) {
+        readPtr += extraBits
+        extraBits = 0
+      }
+
       if (!currentCorrection) {
         hashListEntry.indexMap.push(readPtr)
         writePtr++
@@ -3486,10 +3540,6 @@ class StateManager extends EventEmitter {
         hashListEntry.extraMap.push(currentCorrection.hi)
         extraBits++
         continue
-      }
-      if (extraBits > 0) {
-        readPtr += extraBits
-        extraBits = 0
       }
     }
 
@@ -3528,7 +3578,7 @@ class StateManager extends EventEmitter {
         } else {
           owner = ourNodeKey
         }
-        let hashSet = { hash: hash, votePower: 0, hashSet: partitionResult.hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [owner], ourRow: false }
+        let hashSet = { hash: hash, votePower: 0, hashSet: partitionResult.hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [owner], ourRow: false, waitForIndex: -1 }
         hashSets[hash] = hashSet
         hashSetList.push(hashSets[hash])
         partitionResult.hashSetList = hashSet
@@ -3549,6 +3599,158 @@ class StateManager extends EventEmitter {
     // NOTE: the fields owners and ourRow are user data for shardus and not known or used by the solving algorithm
 
     return hashSetList
+  }
+
+  static testHashsetSolution (ourHashSet, solutionHashSet) {
+    // let payload = { partitionId: partitionId, cycle: cycleNumber, tx_indicies: requestsByHost[i].hostIndex, hash: requestsByHost[i].hash }
+    // repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j] })
+
+    // let txSourceList = txList
+    // if (txList.newTxList) {
+    //   txSourceList = txList.newTxList
+    // }
+
+    // solutionDeltas.sort(function (a, b) { return a.i - b.i }) // why did b - a help us once??
+
+    // let debugSol = []
+    // for (let solution of repairTracker.solutionDeltas) {
+    //   debugSol.push({ i: solution.i, tx: solution.tx.id.slice(0, 4) })
+    // }
+
+    let stepSize = 2
+    let makeTXArray = function (hashSet) {
+      let txArray = []
+      for (let i = 0; i < hashSet.hashSet.length / stepSize; i++) {
+        let offset = i * stepSize
+        let v = hashSet.hashSet.slice(offset, offset + stepSize)
+        txArray.push(v)
+      }
+      return txArray
+    }
+
+    let txSourceList = { hashes: makeTXArray(ourHashSet) }
+    let solutionTxList = { hashes: makeTXArray(solutionHashSet) }
+    let newTxList = { thashes: [], hashes: [] }
+
+    let solutionList = []
+    for (let correction of ourHashSet.corrections) {
+      if (correction.t === 'insert') {
+        solutionList.push(correction)
+      }
+    }
+
+    // hack remove extraneous extras../////////////
+    // let extraMap2 = []
+    // for (let i = 0; i < ourHashSet.extraMap.length; i++) {
+    //   let extraIndex = ourHashSet.extraMap[i]
+    //   let extraNeeded = false
+    //   for (let correction of ourHashSet.corrections) {
+    //     if (correction.i === extraIndex) {
+    //       extraNeeded = true
+    //       break
+    //     }
+    //   }
+    //   if (extraNeeded) {
+    //     continue
+    //   }
+    //   extraMap2.push(extraIndex)
+    // }
+    // ourHashSet.extraMap = extraMap2
+    // ///////////////////////////////////////
+
+    ourHashSet.extraMap.sort(function (a, b) { return a - b })
+    solutionList.sort(function (a, b) { return a.i - b.i })
+
+    let extraIndex = 0
+    for (let i = 0; i < txSourceList.hashes.length; i++) {
+      let extra = -1
+      if (extraIndex < ourHashSet.extraMap.length) {
+        extra = ourHashSet.extraMap[extraIndex]
+      }
+      if (extra === i) {
+        extraIndex++
+        continue
+      }
+      if (extra == null) {
+        console.log(`testHashsetSolution error extra == null at i: ${i}  extraIndex: ${extraIndex}`)
+        break
+      }
+      if (txSourceList.hashes[i] == null) {
+        console.log(`testHashsetSolution error null at i: ${i}  extraIndex: ${extraIndex}`)
+        break
+      }
+
+      newTxList.thashes.push(txSourceList.hashes[i])
+      // newTxList.tpassed.push(txSourceList.passed[i])
+      // newTxList.ttxs.push(txSourceList.txs[i])
+    }
+
+    let hashSet = ''
+    for (let hash of newTxList.thashes) {
+      hashSet += hash.slice(0, 2)
+    }
+
+    console.log(`extras removed: len: ${ourHashSet.indexMap.length}  extraIndex: ${extraIndex} ourPreHashSet: ${hashSet}`)
+
+    // Txids: txSourceData.hashes, // txid1, txid2, …],  - ordered from oldest to recent
+    // Status: txSourceData.passed, // [1,0, …],      - ordered corresponding to Txids; 1 for applied; 0 for failed
+    // build our data while skipping extras.
+
+    // insert corrections in order for each -1 in our local list (or write from our temp lists above)
+    let ourCounter = 0
+    let solutionIndex = 0
+    for (let i = 0; i < ourHashSet.indexMap.length; i++) {
+      let currentIndex = ourHashSet.indexMap[i]
+      if (currentIndex >= 0) {
+        // pull from our list? but we have already removed stuff?
+        newTxList.hashes[i] = newTxList.thashes[ourCounter]
+        // newTxList.passed[i] = newTxList.tpassed[ourCounter]
+        // newTxList.txs[i] = newTxList.ttxs[ourCounter]
+
+        if (newTxList.hashes[i] == null) {
+          console.log(`testHashsetSolution error null at i: ${i} solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+        }
+        ourCounter++
+      } else {
+        // repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j] })
+        // let solutionDelta = repairTracker.solutionDeltas[solutionIndex]
+
+        let correction = solutionList[solutionIndex]
+
+        if (correction == null) {
+          continue
+        }
+        // if (!solutionDelta) {
+        //   if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error solutionDelta=null  solutionIndex: ${solutionIndex} i:${i} of ${ourHashSet.indexMap.length} deltas: ${utils.stringifyReduce(repairTracker.solutionDeltas)}`)
+        // }
+        // insert the next one
+        newTxList.hashes[i] = solutionTxList.hashes[correction.i] // solutionDelta.tx.id
+
+        if (newTxList.hashes[i] == null) {
+          console.log(`testHashsetSolution error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+        }
+        // newTxList.passed[i] = solutionDelta.pf
+        // newTxList.txs[i] = solutionDelta.tx
+        solutionIndex++
+        // if (newTxList.hashes[i] == null) {
+        //   if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 b error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+        // }
+      }
+    }
+
+    hashSet = ''
+    for (let hash of newTxList.hashes) {
+      if (!hash) {
+        hashSet += 'xx'
+        continue
+      }
+      hashSet += hash.slice(0, 2)
+    }
+
+    console.log(`solved set len: ${hashSet.length / 2}  : ${hashSet}`)
+    // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 c  len: ${ourHashSet.indexMap.length}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter} ourHashSet: ${hashSet}`)
+
+    return true
   }
 }
 
