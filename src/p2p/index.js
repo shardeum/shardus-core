@@ -519,7 +519,7 @@ class P2P extends EventEmitter {
   _createApoptosisMessage () {
     const nodeId = this.id
     const type = 'apoptosis'
-    const cycleCounter = this.getCycleCounter()
+    const cycleCounter = this.state.getCycleCounter()
     const timestamp = utils.getTime()
     const message = {
       nodeId,
@@ -533,7 +533,6 @@ class P2P extends EventEmitter {
 
   async initApoptosis () {
     const msg = this._createApoptosisMessage()
-    console.log(msg)
     await this._submitWhenUpdatePhase('apoptosis', msg)
     this.state.addApoptosisMessage(msg)
   }
