@@ -1237,6 +1237,10 @@ class StateManager extends EventEmitter {
     this.p2p.unregisterInternal('get_account_data2')
     this.p2p.unregisterInternal('get_account_data3')
     this.p2p.unregisterInternal('get_account_data_by_list')
+    this.p2p.unregisterInternal('post_partition_results')
+    this.p2p.unregisterInternal('get_transactions_by_list')
+    this.p2p.unregisterInternal('get_transactions_by_partition_index')
+    this.p2p.unregisterInternal('get_partition_txids')
   }
 
   // //////////////////////////////////////////////////////////////////////////
