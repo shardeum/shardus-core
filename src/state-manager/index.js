@@ -60,6 +60,8 @@ class StateManager extends EventEmitter {
     this.queueStopped = false
 
     this.extendedRepairLogging = false
+
+    this.shardInfo = {}
   }
 
   /* -------- DATASYNC Functions ---------- */
@@ -211,6 +213,78 @@ class StateManager extends EventEmitter {
         await this.failandRestart()
       }
     }
+  }
+
+  updateShardValues () {
+    // save this per cycle?
+    this.shardinfo = StateManager._updateShardValues(this.p2p.state.getActiveNodes(null).length, this.config.sharding.nodesPerConsensusGroup, this.p2p.id)
+  }
+
+  static _updateShardValues (numNodes, nodesPerConsenusGroup, address) {
+    let shardinfo = {}
+
+    shardinfo.numActiveNodes = numNodes
+    shardinfo.numPartitions = shardinfo.numActiveNodes
+    shardinfo.nodesPerConsenusGroup = nodesPerConsenusGroup
+
+    console.log(`running _updateShardValues with the inputs: ${stringify(shardinfo)}`)
+
+    shardinfo.numVisiblePartitions = 2 * shardinfo.nodesPerConsenusGroup
+
+    shardinfo.addressPrefix = parseInt(address.slice(0, 8), 16)
+
+    shardinfo.addressPrefixHex = (shardinfo.addressPrefix).toString(16)
+    shardinfo.homePartition = Math.floor(shardinfo.numPartitions * (shardinfo.addressPrefix / 0xffffffff))
+
+    let x = Math.min(shardinfo.numActiveNodes / 2, shardinfo.nodesPerConsenusGroup)
+    let n = shardinfo.homePartition
+    shardinfo.x = x // for debug
+    shardinfo.n = n
+
+    shardinfo.partitionStart = (n - x)
+    while (shardinfo.partitionStart < 0) {
+      console.log(`wrapping partition start: ${shardinfo.partitionStart} to ${shardinfo.partitionStart + shardinfo.numPartitions}`)
+      shardinfo.partitionStart = shardinfo.partitionStart + shardinfo.numPartitions
+    }
+    shardinfo.partitionEnd = (n + x)
+    while (shardinfo.partitionEnd > shardinfo.numPartitions) {
+      console.log(`wrapping partition end: ${shardinfo.partitionEnd} to ${shardinfo.partitionEnd - shardinfo.numPartitions}`)
+      shardinfo.partitionEnd = shardinfo.partitionEnd - shardinfo.numPartitions
+    }
+
+    shardinfo.homeRange = StateManager.partitionToAddressRange2(shardinfo, shardinfo.homePartition)
+    // todo calculate more than one range if the partition end passed in greater than or equal to start... or potentially calculate that as part of the shardinfo
+    shardinfo.partitionRange = StateManager.partitionToAddressRange2(shardinfo, shardinfo.partitionStart, shardinfo.partitionEnd)
+    console.log(stringify(shardinfo))
+    return shardinfo
+  }
+
+  addressToPartition () {
+
+  }
+
+  // todo memoize this per cycle!!!
+  static partitionToAddressRange2 (shardInfo, partition, paritionMax = null) {
+    // let numPartitions = getNumPartitions()
+    // let partitionFraction = partition / numPartitions
+    // todo after enterprise: implement partition->address range math.  possibly store it in a lookup table
+    let result = {}
+    result.partition = partition
+    let startAddr = 0xffffffff * (partition / shardInfo.numPartitions)
+    startAddr = Math.floor(startAddr)
+
+    let endPartition = partition
+    if (paritionMax) {
+      endPartition = paritionMax
+    }
+    result.partitionEnd = endPartition
+    let endAddr = 0xffffffff * ((endPartition) / shardInfo.numPartitions)
+    endAddr = Math.floor(endAddr)
+
+    result.low = ('00000000' + (+startAddr).toString(16)).slice(-8) + '0'.repeat(56)
+    result.high = ('00000000' + (+endAddr).toString(16)).slice(-8) + 'f'.repeat(56)
+
+    return result
   }
 
   partitionToAddressRange (partition) {
