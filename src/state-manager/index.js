@@ -243,19 +243,50 @@ class StateManager extends EventEmitter {
     shardinfo.n = n
 
     shardinfo.partitionStart = (n - x)
-    while (shardinfo.partitionStart < 0) {
+    if (shardinfo.partitionStart < 0) {
       console.log(`wrapping partition start: ${shardinfo.partitionStart} to ${shardinfo.partitionStart + shardinfo.numPartitions}`)
-      shardinfo.partitionStart = shardinfo.partitionStart + shardinfo.numPartitions
+
+      shardinfo.partitionStart2 = shardinfo.partitionStart + shardinfo.numPartitions
+      shardinfo.partitionEnd2 = shardinfo.numPartitions
+
+      shardinfo.partitionStart = 0
     }
     shardinfo.partitionEnd = (n + x)
-    while (shardinfo.partitionEnd > shardinfo.numPartitions) {
+    if (shardinfo.partitionEnd > shardinfo.numPartitions) {
       console.log(`wrapping partition end: ${shardinfo.partitionEnd} to ${shardinfo.partitionEnd - shardinfo.numPartitions}`)
-      shardinfo.partitionEnd = shardinfo.partitionEnd - shardinfo.numPartitions
+      shardinfo.partitionEnd2 = shardinfo.partitionEnd - shardinfo.numPartitions
+      shardinfo.partitionStart2 = 0
+      shardinfo.partitionEnd = shardinfo.numPartitions
+    }
+
+    if (shardinfo.partitionStart2 === shardinfo.partitionEnd) {
+      console.log(`merging range: start2 === end`)
+
+      let s = shardinfo.partitionStart
+      let e = shardinfo.partitionEnd2
+      shardinfo.partitionStart = s
+      shardinfo.partitionEnd = e
+      shardinfo.partitionStart2 = null
+      shardinfo.partitionEnd2 = null
+    }
+    if (shardinfo.partitionStart === shardinfo.partitionEnd2) {
+      console.log(`merging range: start === end2`)
+
+      let s = shardinfo.partitionStart2
+      let e = shardinfo.partitionEnd
+      shardinfo.partitionStart = s
+      shardinfo.partitionEnd = e
+      shardinfo.partitionStart2 = null
+      shardinfo.partitionEnd2 = null
     }
 
     shardinfo.homeRange = StateManager.partitionToAddressRange2(shardinfo, shardinfo.homePartition)
     // todo calculate more than one range if the partition end passed in greater than or equal to start... or potentially calculate that as part of the shardinfo
     shardinfo.partitionRange = StateManager.partitionToAddressRange2(shardinfo, shardinfo.partitionStart, shardinfo.partitionEnd)
+
+    if (shardinfo.partitionStart2 !== null && shardinfo.partitionEnd2 !== null) {
+      shardinfo.partitionRange2 = StateManager.partitionToAddressRange2(shardinfo, shardinfo.partitionStart2, shardinfo.partitionEnd2)
+    }
     console.log(stringify(shardinfo))
     return shardinfo
   }
