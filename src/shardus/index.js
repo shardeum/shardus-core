@@ -271,7 +271,8 @@ class Shardus {
       // this.stateManager.enableSyncCheck()
 
       // Partition check and data repair (new)
-      this.stateManager.startSyncPartitions()
+      // disable data sync until it is ready for sharding
+      // this.stateManager.startSyncPartitions()
     }
   }
 
