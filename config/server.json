@@ -70,5 +70,8 @@
   "stateManager": {
     "stateTableBucketSize": 200,
     "accountBucketSize": 50
+  },
+  "sharding": {
+    "nodesPerConsensusGroup" : 50
   }
 }
