@@ -227,7 +227,7 @@ class StateManager extends EventEmitter {
     // shardinfo.address = address
     shardinfo.nodesPerConsenusGroup = nodesPerConsenusGroup
 
-    console.log(`running calculateShardValues with the inputs: ${stringify({ numNodes, nodesPerConsenusGroup, address })}`)
+    // console.log(`running calculateShardValues with the inputs: ${stringify({ numNodes, nodesPerConsenusGroup, address })}`)
 
     shardinfo.numPartitions = shardinfo.numActiveNodes
     shardinfo.numVisiblePartitions = 2 * shardinfo.nodesPerConsenusGroup
@@ -242,9 +242,12 @@ class StateManager extends EventEmitter {
     shardinfo.x = x // for debug
     shardinfo.n = n
 
+    // visible distance?
+    shardinfo.lookRange = Math.floor((nodesPerConsenusGroup / numNodes) * 0xffffffff)
+
     shardinfo.partitionStart = (n - x)
     if (shardinfo.partitionStart < 0) {
-      console.log(`wrapping partition start: ${shardinfo.partitionStart} to ${shardinfo.partitionStart + shardinfo.numPartitions}`)
+      // console.log(`wrapping partition start: ${shardinfo.partitionStart} to ${shardinfo.partitionStart + shardinfo.numPartitions}`)
 
       shardinfo.partitionStart2 = shardinfo.partitionStart + shardinfo.numPartitions
       shardinfo.partitionEnd2 = shardinfo.numPartitions
@@ -253,14 +256,14 @@ class StateManager extends EventEmitter {
     }
     shardinfo.partitionEnd = (n + x)
     if (shardinfo.partitionEnd > shardinfo.numPartitions) {
-      console.log(`wrapping partition end: ${shardinfo.partitionEnd} to ${shardinfo.partitionEnd - shardinfo.numPartitions}`)
+      // console.log(`wrapping partition end: ${shardinfo.partitionEnd} to ${shardinfo.partitionEnd - shardinfo.numPartitions}`)
       shardinfo.partitionEnd2 = shardinfo.partitionEnd - shardinfo.numPartitions
       shardinfo.partitionStart2 = 0
       shardinfo.partitionEnd = shardinfo.numPartitions
     }
 
     if (shardinfo.partitionStart2 === shardinfo.partitionEnd) {
-      console.log(`merging range: start2 === end`)
+      // console.log(`merging range: start2 === end`)
 
       let s = shardinfo.partitionStart
       let e = shardinfo.partitionEnd2
@@ -270,7 +273,7 @@ class StateManager extends EventEmitter {
       shardinfo.partitionEnd2 = null
     }
     if (shardinfo.partitionStart === shardinfo.partitionEnd2) {
-      console.log(`merging range: start === end2`)
+      // console.log(`merging range: start === end2`)
 
       let s = shardinfo.partitionStart2
       let e = shardinfo.partitionEnd
@@ -287,7 +290,7 @@ class StateManager extends EventEmitter {
     if (shardinfo.partitionStart2 !== null && shardinfo.partitionEnd2 !== null) {
       shardinfo.partitionRange2 = StateManager.partitionToAddressRange2(shardinfo, shardinfo.partitionStart2, shardinfo.partitionEnd2)
     }
-    console.log(stringify(shardinfo))
+    // console.log(stringify(shardinfo))
     return shardinfo
   }
 
@@ -305,13 +308,17 @@ class StateManager extends EventEmitter {
     let startAddr = 0xffffffff * (partition / shardInfo.numPartitions)
     startAddr = Math.floor(startAddr)
 
-    let endPartition = partition
+    let endPartition = partition + 1
     if (paritionMax) {
       endPartition = paritionMax
     }
+    // endPartition++ // include the full range of this partition
     result.partitionEnd = endPartition
     let endAddr = 0xffffffff * ((endPartition) / shardInfo.numPartitions)
     endAddr = Math.floor(endAddr)
+    if (paritionMax === null) {
+      endAddr-- // - 1 // subtract 1 so we don't go into the nex partition
+    }
 
     result.low = ('00000000' + (+startAddr).toString(16)).slice(-8) + '0'.repeat(56)
     result.high = ('00000000' + (+endAddr).toString(16)).slice(-8) + 'f'.repeat(56)
@@ -355,12 +362,87 @@ class StateManager extends EventEmitter {
     }
     for (const node of allNodes) {
       if (node.id >= lowAddress && node.id <= highAddress) {
-        if ((node.id in exclude) === false) {
+        if ((exclude.includes(node.id)) === false) {
           results.push(node)
           if (results.length >= count) {
             return results
           }
         }
+      }
+    }
+    return results
+  }
+
+  // todo save off per node calculations?
+  // get nodes with coverage of this range (does not support wrapping)
+  static getNodesThatCoverRange (lowAddress, highAddress, exclude, allNodes, nodeLookRange, numPartitions) {
+    // calculate each nodes address position.
+    // calculate if the nodes reach would cover our full range listed.
+    // could we use start + delete to avoid wrapping?
+
+    let range = []
+
+    let lowAddressNum = parseInt(lowAddress.slice(0, 8), 16) // assume trailing 0s
+    let highAddressNum = parseInt(highAddress.slice(0, 8), 16) + 1 // assume trailng fffs
+
+    // todo start and end loop at smarter areas for efficieny reasones!
+    for (let i = 0; i < allNodes.length; i++) {
+      let node = allNodes[i]
+      if (exclude.includes(node.id)) {
+        continue
+      }
+      // calculate node middle address..
+      let nodeAddressNum = parseInt(node.id.slice(0, 8), 16)
+      // Fix this the center of a partition boundry??
+      let homePartition = Math.floor(numPartitions * (nodeAddressNum / 0xffffffff))
+      let centeredAddress = Math.floor(((homePartition + 0.5) * 0xffffffff) / numPartitions)
+
+      if (Math.abs(centeredAddress - lowAddressNum) > nodeLookRange) {
+        continue
+      }
+      if (Math.abs(centeredAddress - highAddressNum) > nodeLookRange) {
+        continue
+      }
+      // we are in range!
+      range.push(node)
+    }
+    return range
+  }
+
+  // supports wrapping
+  getRandomNodesThatCoverRange2 (allNodes, count, partitionStart, partitionDelta, exclude) {
+
+    // calculate each nodes address position.
+    // calculate if the nodes reach would cover our full range listed.
+    // could we use start + delete to avoid wrapping?
+
+  }
+
+  // get nodes in count range to either side of our node
+  // position should be the position of the home node
+  static getNeigborNodesInRange (position, count, exclude, allNodes) {
+    // let allNodes = this.p2p.state.getNodesOrdered() // possibly faster version that does not need a copy
+    let results = []
+    let scanStart = position - Math.ceil(count / 2) // have to pick floor or ceiling and be consistent.
+    if (scanStart < 0) {
+      scanStart = allNodes.length + scanStart
+    }
+    let scanIndex = scanStart
+    for (let i = 0; i < count + 1; i++) {
+      if (scanIndex >= allNodes.length) {
+        scanIndex = 0
+      }
+      let node = allNodes[scanIndex]
+      scanIndex++
+      if (exclude.includes(node.id)) {
+        continue
+      }
+      if (node.status === 'active') {
+        results.push(node)
+      }
+
+      if (scanIndex === scanStart) {
+        break // we looped
       }
     }
     return results
