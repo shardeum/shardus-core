@@ -217,18 +217,19 @@ class StateManager extends EventEmitter {
 
   updateShardValues () {
     // save this per cycle?
-    this.shardinfo = StateManager._updateShardValues(this.p2p.state.getActiveNodes(null).length, this.config.sharding.nodesPerConsensusGroup, this.p2p.id)
+    this.shardinfo = StateManager.calculateShardValues(this.p2p.state.getActiveNodes(null).length, this.config.sharding.nodesPerConsensusGroup, this.p2p.id)
   }
 
-  static _updateShardValues (numNodes, nodesPerConsenusGroup, address) {
+  static calculateShardValues (numNodes, nodesPerConsenusGroup, address) {
     let shardinfo = {}
 
     shardinfo.numActiveNodes = numNodes
-    shardinfo.numPartitions = shardinfo.numActiveNodes
+    // shardinfo.address = address
     shardinfo.nodesPerConsenusGroup = nodesPerConsenusGroup
 
-    console.log(`running _updateShardValues with the inputs: ${stringify(shardinfo)}`)
+    console.log(`running calculateShardValues with the inputs: ${stringify({ numNodes, nodesPerConsenusGroup, address })}`)
 
+    shardinfo.numPartitions = shardinfo.numActiveNodes
     shardinfo.numVisiblePartitions = 2 * shardinfo.nodesPerConsenusGroup
 
     shardinfo.addressPrefix = parseInt(address.slice(0, 8), 16)
