@@ -3030,7 +3030,7 @@ class StateManager extends EventEmitter {
   async startSyncPartitions () {
     // await this.createInitialAccountBackups() // nm this is now part of regular data sync
     // register our handlers
-    this.p2p.state.on('cycle_q2_start', async (lastCycle, time) => {
+    this._registerListener(this.p2p.state, 'cycle_q2_start', async (lastCycle, time) => {
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startSyncPartitions:cycle_q2_start cycle: ${lastCycle.counter}`)
 
       // this will take temp TXs and make sure they are stored in the correct place for us to generate partitions
@@ -3052,13 +3052,9 @@ class StateManager extends EventEmitter {
       await this.broadcastPartitionResults(lastCycle.counter) // Cycle_number
     })
 
-    this.p2p.state.on('cycle_q2_start', async (lastCycle, time) => {
-
-    })
-
-    this.p2p.state.on('cycle_q4_start', async (lastCycle, time) => {
+    /* this._registerListener(this.p2p.state, 'cycle_q4_start', async (lastCycle, time) => {
       // Also we would like the repair process to finish by the end of Q3 and definitely before the start of a new cycle. Otherwise the cycle duration may need to be increased.
-    })
+    }) */
   }
 
   // originally this only recorder results if we were not repairing but it turns out we need to update our copies any time we apply state.

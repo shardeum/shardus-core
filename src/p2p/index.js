@@ -490,7 +490,7 @@ class P2P extends EventEmitter {
 
   _checkIfFirstSeedNode (seedNodes) {
     if (!seedNodes.length) throw new Error('Fatal: No seed nodes in seed list!')
-    // if (seedNodes.length > 1) return false
+    if (seedNodes.length > 1) return false
     const seed = seedNodes[0]
     const { externalIp, externalPort } = this.getIpInfo()
     if (externalIp === seed.ip && externalPort === seed.port) {
