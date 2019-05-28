@@ -218,19 +218,30 @@ class StateManager extends EventEmitter {
   updateShardValues () {
     // save this per cycle?
     this.shardinfo = StateManager.calculateShardValues(this.p2p.state.getActiveNodes(null).length, this.config.sharding.nodesPerConsensusGroup, this.p2p.id)
+
+  }
+
+  static calculateShardConstants(numNodes, nodesPerConsenusGroup, address) 
+  {
+    let shardConstants = {}
+
+    
+
+    return shardConstants
   }
 
   static calculateShardValues (numNodes, nodesPerConsenusGroup, address) {
     let shardinfo = {}
 
     shardinfo.numActiveNodes = numNodes
-    // shardinfo.address = address
+    shardinfo.address = address
     shardinfo.nodesPerConsenusGroup = nodesPerConsenusGroup
 
     // console.log(`running calculateShardValues with the inputs: ${stringify({ numNodes, nodesPerConsenusGroup, address })}`)
-
+    shardinfo.homeNodes = []
     shardinfo.numPartitions = shardinfo.numActiveNodes
     shardinfo.numVisiblePartitions = 2 * shardinfo.nodesPerConsenusGroup
+    shardinfo.extraWatchedPartitions = 0
 
     shardinfo.addressPrefix = parseInt(address.slice(0, 8), 16)
 
@@ -243,28 +254,29 @@ class StateManager extends EventEmitter {
     shardinfo.n = n
 
     // visible distance?
-    shardinfo.lookRange = Math.floor((nodesPerConsenusGroup / numNodes) * 0xffffffff)
-
+    shardinfo.lookRange = Math.floor((((shardinfo.numVisiblePartitions) / 2 + 0.5) / numNodes) * 0xffffffff) // 0.5 added since our search will look from the center of a partition
+    
     shardinfo.partitionStart = (n - x)
+    shardinfo.partitionStartVector = { start: shardinfo.partitionStart, dist: 2 * x, end: -1 }
     if (shardinfo.partitionStart < 0) {
       // console.log(`wrapping partition start: ${shardinfo.partitionStart} to ${shardinfo.partitionStart + shardinfo.numPartitions}`)
-
       shardinfo.partitionStart2 = shardinfo.partitionStart + shardinfo.numPartitions
       shardinfo.partitionEnd2 = shardinfo.numPartitions
-
       shardinfo.partitionStart = 0
+      shardinfo.partitionStartVector.start = shardinfo.partitionStart2
     }
     shardinfo.partitionEnd = (n + x)
+    shardinfo.partitionStartVector.end = shardinfo.partitionEnd
     if (shardinfo.partitionEnd > shardinfo.numPartitions) {
       // console.log(`wrapping partition end: ${shardinfo.partitionEnd} to ${shardinfo.partitionEnd - shardinfo.numPartitions}`)
       shardinfo.partitionEnd2 = shardinfo.partitionEnd - shardinfo.numPartitions
       shardinfo.partitionStart2 = 0
       shardinfo.partitionEnd = shardinfo.numPartitions
+      shardinfo.partitionStartVector.end = shardinfo.partitionEnd2
     }
 
     if (shardinfo.partitionStart2 === shardinfo.partitionEnd) {
       // console.log(`merging range: start2 === end`)
-
       let s = shardinfo.partitionStart
       let e = shardinfo.partitionEnd2
       shardinfo.partitionStart = s
@@ -274,7 +286,6 @@ class StateManager extends EventEmitter {
     }
     if (shardinfo.partitionStart === shardinfo.partitionEnd2) {
       // console.log(`merging range: start === end2`)
-
       let s = shardinfo.partitionStart2
       let e = shardinfo.partitionEnd
       shardinfo.partitionStart = s
@@ -294,8 +305,148 @@ class StateManager extends EventEmitter {
     return shardinfo
   }
 
+  static calculatePartitionRange(homePartition, numPartitions){
+
+
+
+
+
+  }
+
+
   addressToPartition () {
 
+  }
+
+  static computePartitionShardData (parititionShardDataMap, activeNodes, partitionStart, partitionsToScan, totalPartitions, nodesPerConsenusGroup) {
+    let partitionIndex = partitionStart
+
+    let numNodes = activeNodes.length
+
+    for (let i = 0; i < partitionsToScan; ++i) {
+      if (partitionIndex >= totalPartitions) {
+        partitionIndex = 0
+      }
+      // let node = activeNodes[partitionIndex]
+      // calcualte and save info for this partition
+      let fpAdressCenter = ((i + 0.5) / totalPartitions)
+      let addressPrefix = Math.floor(fpAdressCenter * 0xffffffff)
+
+      let addressPrefixHex = (addressPrefix).toString(16)
+      let address = addressPrefixHex + '7' + 'f'.repeat(55) // 55 + 1 + 8 = 64
+
+      let shardinfo = StateManager.calculateShardValues(numNodes, nodesPerConsenusGroup, address)
+      parititionShardDataMap.set(i, shardinfo)
+      // increment index:
+      partitionIndex++
+      if (partitionIndex === partitionStart) {
+        break // we looped
+      }
+      // calculate which nodes belong in partitions.
+    }
+    // link nodes to partitions.
+  }
+
+  // nodeShardData is a Map
+  static computeNodePartitionData (nodeShardDataMap, nodes, parititionShardDataMap, numPartitions, activeNodes) {
+    // link to shard data
+    for (let node of nodes) {
+      let nodeShardData = {}
+
+      // calculate node middle address..
+      let nodeAddressNum = parseInt(node.id.slice(0, 8), 16)
+      // Fix this the center of a partition boundry??
+      let homePartition = Math.floor(numPartitions * (nodeAddressNum / 0xffffffff))
+      let centeredAddress = Math.floor(((homePartition + 0.5) * 0xffffffff) / numPartitions)
+
+      nodeShardData.node = node
+      nodeShardData.nodeAddressNum = nodeAddressNum
+      nodeShardData.homePartition = homePartition
+      nodeShardData.centeredAddress = centeredAddress
+      nodeShardDataMap.set(node.id, nodeShardData)
+
+      // start with coverage of home partition
+      nodeShardData.shardscovered = [homePartition]
+      nodeShardData.partitionMin = homePartition
+      nodeShardData.partitionMax = homePartition
+      nodeShardData.ourNodeIndex = activeNodes.findIndex(function (_node) { return _node.id === node.id })
+
+      let partitionShard = parititionShardDataMap.get(homePartition)
+      partitionShard.homeNodes.push(nodeShardData)
+
+      // nodeShardData.partitionMin = partitionShard
+      // nodeShardData.partitionMax = partitionShard
+      let temp = partitionShard.partitionStartVector
+      nodeShardData.partitionStartVector = { ...temp }
+    }
+  }
+
+  static findHomeNode (address, nodeShardDataMap, parititionShardDataMap, numPartitions) {
+    let addressNum = parseInt(address.slice(0, 8), 16)
+    let homePartition = Math.floor(numPartitions * (addressNum / 0xffffffff))
+    let partitionShard = parititionShardDataMap.get(homePartition)
+
+    let nodesToSearch = []
+    // for(let node)
+    if (partitionShard.homeNodes.length === 0) {
+      for (let i = 0; i < numPartitions; i++) {
+
+        // get partitions to the left or right of us.  once we have home nodes stop computationt
+
+      }
+    } else {
+      nodesToSearch = partitionShard.homeNodes
+    }
+
+    let closestDitance = Number.MAX_SAFE_INTEGER
+    let homeNode = null
+    // find closest in list of home nodes
+    for (let nodeShardData in nodesToSearch) {
+
+    }
+  }
+
+  // trying to calculate what partitions a node will cover.
+  // we can calculate if our node should cover an extra partition due to consensus group span
+  // ..then funnel results into partition and node settting.
+  // add the home partition to the nodes covered list
+  //
+
+  static dilateNeighborCoverage (nodeShardDataMap, nodeShardData, extras) {
+    // // find our node index
+    // // shardinfo.ourNodeIndex = activeNodes.findIndex(function (node) { return node.id === shardinfo.address })
+    // let exclude = []
+    // // find nodes we provide consensus to
+    // shardinfo.consensusNodes = StateManager.getNeigborNodesInRange(shardinfo.ourNodeIndex, shardinfo.nodesInConsensusGroup, exclude, activeNodes)
+
+    for (let node of extras) {
+      let otherNodeShardData = nodeShardDataMap.get(node.id)
+
+      let partition = otherNodeShardData.homePartition
+
+      if (partition < nodeShardData.partitionStartVector.start && partition > nodeShardData.partitionStartVector.start) {
+
+      }
+      nodeShardData.partitionStartVector.start
+    }
+  }
+
+  // could make a faster version for sorted lists.. but not worth the complexity unless it shows up on a benchmark
+  static mergeNodeLists (listA, listB) {
+    let results = []
+    let extras = []
+    let map = {}
+    for (let node of listA) {
+      map[node.id] = true
+      results.push(node)
+    }
+    for (let node of listB) {
+      if (map[node.id] !== true) {
+        results.push(node)
+        extras.push(node)
+      }
+    }
+    return [results, extras]
   }
 
   // todo memoize this per cycle!!!
