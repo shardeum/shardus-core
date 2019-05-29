@@ -1427,7 +1427,7 @@ class P2PState extends EventEmitter {
       return seedNodes
     }
     // Make a deep copy of the nodelist ordered by join timestamp
-    const orderedNodes = utils.deepCopy(this.getNodesOrdered())
+    const orderedNodes = this.getNodesOrdered()
     // Remove nodes that are not active from our list
     const filteredNodes = []
     for (let i = 0; i < orderedNodes.length; i++) {
