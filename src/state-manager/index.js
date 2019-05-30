@@ -217,125 +217,233 @@ class StateManager extends EventEmitter {
 
   updateShardValues () {
     // save this per cycle?
-    this.shardinfo = StateManager.calculateShardValues(this.p2p.state.getActiveNodes(null).length, this.config.sharding.nodesPerConsensusGroup, this.p2p.id)
-
+    this.shardGlobals = StateManager.calculateShardGlobals(this.p2p.state.getActiveNodes(null).length, this.config.sharding.nodesPerConsensusGroup)
+    this.shardinfo = StateManager.calculateShardValues(this.shardGlobals, this.p2p.id)
   }
 
-  static calculateShardConstants(numNodes, nodesPerConsenusGroup, address) 
-  {
-    let shardConstants = {}
+  static calculateShardGlobals (numNodes, nodesPerConsenusGroup) {
+    let shardGlobals = {}
 
-    
+    shardGlobals.numActiveNodes = numNodes
+    shardGlobals.nodesPerConsenusGroup = nodesPerConsenusGroup
+    shardGlobals.numPartitions = shardGlobals.numActiveNodes
+    shardGlobals.numVisiblePartitions = 2 * shardGlobals.nodesPerConsenusGroup
 
-    return shardConstants
+    shardGlobals.consensusRadius = Math.floor((nodesPerConsenusGroup - 1) / 2)
+
+    shardGlobals.nodeLookRange = Math.floor((((shardGlobals.numVisiblePartitions + 1) / 2 + 0.5) / shardGlobals.numPartitions) * 0xffffffff) // 0.5 added since our search will look from the center of a partition
+
+    return shardGlobals
   }
 
-  static calculateShardValues (numNodes, nodesPerConsenusGroup, address) {
+  static calculateShardValues (shardGlobals, address) {
     let shardinfo = {}
-
-    shardinfo.numActiveNodes = numNodes
+    // shardinfo.numActiveNodes = numNodes
     shardinfo.address = address
-    shardinfo.nodesPerConsenusGroup = nodesPerConsenusGroup
 
-    // console.log(`running calculateShardValues with the inputs: ${stringify({ numNodes, nodesPerConsenusGroup, address })}`)
     shardinfo.homeNodes = []
-    shardinfo.numPartitions = shardinfo.numActiveNodes
-    shardinfo.numVisiblePartitions = 2 * shardinfo.nodesPerConsenusGroup
-    shardinfo.extraWatchedPartitions = 0
-
     shardinfo.addressPrefix = parseInt(address.slice(0, 8), 16)
-
     shardinfo.addressPrefixHex = (shardinfo.addressPrefix).toString(16)
-    shardinfo.homePartition = Math.floor(shardinfo.numPartitions * (shardinfo.addressPrefix / 0xffffffff))
-
-    let x = Math.min(shardinfo.numActiveNodes / 2, shardinfo.nodesPerConsenusGroup)
-    let n = shardinfo.homePartition
-    shardinfo.x = x // for debug
-    shardinfo.n = n
-
-    // visible distance?
-    shardinfo.lookRange = Math.floor((((shardinfo.numVisiblePartitions) / 2 + 0.5) / numNodes) * 0xffffffff) // 0.5 added since our search will look from the center of a partition
-    
-    shardinfo.partitionStart = (n - x)
-    shardinfo.partitionStartVector = { start: shardinfo.partitionStart, dist: 2 * x, end: -1 }
-    if (shardinfo.partitionStart < 0) {
-      // console.log(`wrapping partition start: ${shardinfo.partitionStart} to ${shardinfo.partitionStart + shardinfo.numPartitions}`)
-      shardinfo.partitionStart2 = shardinfo.partitionStart + shardinfo.numPartitions
-      shardinfo.partitionEnd2 = shardinfo.numPartitions
-      shardinfo.partitionStart = 0
-      shardinfo.partitionStartVector.start = shardinfo.partitionStart2
-    }
-    shardinfo.partitionEnd = (n + x)
-    shardinfo.partitionStartVector.end = shardinfo.partitionEnd
-    if (shardinfo.partitionEnd > shardinfo.numPartitions) {
-      // console.log(`wrapping partition end: ${shardinfo.partitionEnd} to ${shardinfo.partitionEnd - shardinfo.numPartitions}`)
-      shardinfo.partitionEnd2 = shardinfo.partitionEnd - shardinfo.numPartitions
-      shardinfo.partitionStart2 = 0
-      shardinfo.partitionEnd = shardinfo.numPartitions
-      shardinfo.partitionStartVector.end = shardinfo.partitionEnd2
-    }
-
-    if (shardinfo.partitionStart2 === shardinfo.partitionEnd) {
-      // console.log(`merging range: start2 === end`)
-      let s = shardinfo.partitionStart
-      let e = shardinfo.partitionEnd2
-      shardinfo.partitionStart = s
-      shardinfo.partitionEnd = e
-      shardinfo.partitionStart2 = null
-      shardinfo.partitionEnd2 = null
-    }
-    if (shardinfo.partitionStart === shardinfo.partitionEnd2) {
-      // console.log(`merging range: start === end2`)
-      let s = shardinfo.partitionStart2
-      let e = shardinfo.partitionEnd
-      shardinfo.partitionStart = s
-      shardinfo.partitionEnd = e
-      shardinfo.partitionStart2 = null
-      shardinfo.partitionEnd2 = null
-    }
-
-    shardinfo.homeRange = StateManager.partitionToAddressRange2(shardinfo, shardinfo.homePartition)
-    // todo calculate more than one range if the partition end passed in greater than or equal to start... or potentially calculate that as part of the shardinfo
-    shardinfo.partitionRange = StateManager.partitionToAddressRange2(shardinfo, shardinfo.partitionStart, shardinfo.partitionEnd)
-
-    if (shardinfo.partitionStart2 !== null && shardinfo.partitionEnd2 !== null) {
-      shardinfo.partitionRange2 = StateManager.partitionToAddressRange2(shardinfo, shardinfo.partitionStart2, shardinfo.partitionEnd2)
-    }
+    shardinfo.homePartition = Math.floor(shardGlobals.numPartitions * (shardinfo.addressPrefix / 0xffffffff))
+    shardinfo.homeRange = StateManager.partitionToAddressRange2(shardGlobals, shardinfo.homePartition)
     // console.log(stringify(shardinfo))
     return shardinfo
   }
 
-  static calculatePartitionRange(homePartition, numPartitions){
+  // static calculateStoredPartitions (shardGlobals, homePartition) {
+  //   let storedPartitions = []
+  //   let x = Math.min(shardGlobals.numActiveNodes / 2, shardGlobals.nodesPerConsenusGroup)
+  //   let n = homePartition
+  //   storedPartitions.x = x // for debug
+  //   storedPartitions.n = n
 
+  //   // visible distance?
+  //   // storedPartitions.lookRange = Math.floor((((shardGlobals.numVisiblePartitions) / 2 + 0.5) / shardGlobals.numActiveNodes) * 0xffffffff) // 0.5 added since our search will look from the center of a partition
 
+  //   storedPartitions.partitionStart = (n - x)
+  //   storedPartitions.partitionRangeVector = { start: storedPartitions.partitionStart, dist: 2 * x, end: -1 }
+  //   if (storedPartitions.partitionStart < 0) {
+  //     // console.log(`wrapping partition start: ${shardinfo.partitionStart} to ${shardinfo.partitionStart + shardinfo.numPartitions}`)
+  //     storedPartitions.partitionStart2 = storedPartitions.partitionStart + shardGlobals.numPartitions
+  //     storedPartitions.partitionEnd2 = shardGlobals.numPartitions
+  //     storedPartitions.partitionStart = 0
+  //     storedPartitions.partitionRangeVector.start = storedPartitions.partitionStart2
+  //   }
+  //   storedPartitions.partitionEnd = (n + x)
+  //   storedPartitions.partitionRangeVector.end = storedPartitions.partitionEnd
+  //   if (storedPartitions.partitionEnd > shardGlobals.numPartitions) {
+  //     // console.log(`wrapping partition end: ${shardinfo.partitionEnd} to ${shardinfo.partitionEnd - shardinfo.numPartitions}`)
+  //     storedPartitions.partitionEnd2 = storedPartitions.partitionEnd - shardGlobals.numPartitions
+  //     storedPartitions.partitionStart2 = 0
+  //     storedPartitions.partitionEnd = shardGlobals.numPartitions
+  //     storedPartitions.partitionRangeVector.end = storedPartitions.partitionEnd2
+  //   }
 
+  //   if (storedPartitions.partitionStart2 === storedPartitions.partitionEnd) {
+  //     // console.log(`merging range: start2 === end`)
+  //     let s = storedPartitions.partitionStart
+  //     let e = storedPartitions.partitionEnd2
+  //     storedPartitions.partitionStart = s
+  //     storedPartitions.partitionEnd = e
+  //     storedPartitions.partitionStart2 = null
+  //     storedPartitions.partitionEnd2 = null
+  //   }
+  //   if (storedPartitions.partitionStart === storedPartitions.partitionEnd2) {
+  //     // console.log(`merging range: start === end2`)
+  //     let s = storedPartitions.partitionStart2
+  //     let e = storedPartitions.partitionEnd
+  //     storedPartitions.partitionStart = s
+  //     storedPartitions.partitionEnd = e
+  //     storedPartitions.partitionStart2 = null
+  //     storedPartitions.partitionEnd2 = null
+  //   }
 
+  //   // todo calculate more than one range if the partition end passed in greater than or equal to start... or potentially calculate that as part of the shardinfo
+  //   storedPartitions.partitionRange = StateManager.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart, storedPartitions.partitionEnd)
 
+  //   if (storedPartitions.partitionStart2 !== null && storedPartitions.partitionEnd2 !== null) {
+  //     storedPartitions.partitionRange2 = StateManager.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart2, storedPartitions.partitionEnd2)
+  //   }
+  // }
+
+  static calculateStoredPartitions2 (shardGlobals, homePartition) {
+    let storedPartitions = []
+
+    // test if we will cover the full range by default
+    if (shardGlobals.numPartitions / 2 < shardGlobals.nodesPerConsenusGroup) {
+      storedPartitions.rangeIsSplit = false
+      storedPartitions.partitionStart = 0
+      storedPartitions.partitionEnd = shardGlobals.numPartitions - 1
+      return
+    }
+
+    let x = shardGlobals.nodesPerConsenusGroup
+    let n = homePartition
+    storedPartitions.x = x // for debug
+    storedPartitions.n = n
+
+    // storoage distance from center
+    // storedPartitions.lookRange = Math.floor((((shardGlobals.numVisiblePartitions) / 2 + 0.5) / shardGlobals.numActiveNodes) * 0xffffffff) // 0.5 added since our search will look from the center of a partition
+
+    storedPartitions.partitionStart = (n - x)
+    storedPartitions.partitionEnd = (n + x)
+
+    storedPartitions.homeRange = StateManager.partitionToAddressRange2(shardGlobals, homePartition)
+
+    StateManager.calculateStoredPartitions2Ranges(shardGlobals, storedPartitions)
+
+    return storedPartitions
   }
 
+  static calculateStoredPartitions2Ranges (shardGlobals, storedPartitions) {
+    storedPartitions.partitionRangeVector = { start: storedPartitions.partitionStart, dist: 2 * shardGlobals.nodesPerConsenusGroup, end: storedPartitions.partitionEnd }
+    storedPartitions.rangeIsSplit = false
 
-  addressToPartition () {
 
+
+    if (storedPartitions.partitionStart < 0) {
+      storedPartitions.rangeIsSplit = true
+      storedPartitions.partitionStart2 = storedPartitions.partitionStart + shardGlobals.numPartitions
+      storedPartitions.partitionEnd2 = shardGlobals.numPartitions - 1
+      storedPartitions.partitionStart1 = 0
+      storedPartitions.partitionEnd1 = storedPartitions.partitionEnd
+      storedPartitions.partitionRangeVector.start = storedPartitions.partitionStart2
+      storedPartitions.partitionStart = storedPartitions.partitionRangeVector.start
+    }
+    if (storedPartitions.partitionEnd >= shardGlobals.numPartitions) {
+      storedPartitions.rangeIsSplit = true
+      storedPartitions.partitionEnd1 = storedPartitions.partitionEnd - shardGlobals.numPartitions
+      storedPartitions.partitionStart1 = 0
+      storedPartitions.partitionStart2 = storedPartitions.partitionStart
+      storedPartitions.partitionEnd2 = shardGlobals.numPartitions - 1
+      storedPartitions.partitionRangeVector.end = storedPartitions.partitionEnd1
+      storedPartitions.partitionEnd = storedPartitions.partitionRangeVector.end
+    }
+
+    if (storedPartitions.partitionEnd < storedPartitions.partitionStart) {
+      storedPartitions.rangeIsSplit = true
+
+      storedPartitions.partitionEnd1 = storedPartitions.partitionEnd
+      storedPartitions.partitionStart1 = 0
+      storedPartitions.partitionStart2 = storedPartitions.partitionStart
+      storedPartitions.partitionEnd2 = shardGlobals.numPartitions - 1
+      storedPartitions.partitionRangeVector.end = storedPartitions.partitionEnd1
+      storedPartitions.partitionEnd = storedPartitions.partitionRangeVector.end
+    }
+
+    // did we wrap to cover the entire range, that should have early outed at the top of the function
+    if (storedPartitions.rangeIsSplit === true && (storedPartitions.partitionStart1 === storedPartitions.partitionEnd2 || storedPartitions.partitionStart2 === storedPartitions.partitionEnd1)) {
+      throw new Error('this should never happen: ' + stringify(storedPartitions))
+    }
+
+    // // todo calculate more than one range if the partition end passed in greater than or equal to start... or potentially calculate that as part of the shardinfo
+    storedPartitions.partitionRange = StateManager.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart, storedPartitions.partitionEnd)
+
+    if (storedPartitions.rangeIsSplit) {
+      storedPartitions.partitionRange2 = StateManager.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart2, storedPartitions.partitionEnd2)
+    }
   }
 
-  static computePartitionShardData (parititionShardDataMap, activeNodes, partitionStart, partitionsToScan, totalPartitions, nodesPerConsenusGroup) {
+  static testAddressInRange (address, storedPartitions) {
+    if (storedPartitions.rangeIsSplit) {
+      if ((address >= storedPartitions.partitionRange.low && address <= storedPartitions.partitionRange.high) ||
+      (address >= storedPartitions.partitionRange2.low && address <= storedPartitions.partitionRange2.high)) {
+        return true
+      }
+    } else {
+      if (address >= storedPartitions.partitionRange.low && address <= storedPartitions.partitionRange.high) {
+        return true
+      }
+    }
+    return false
+  }
+
+  static testInRange (partition, storedPartitions) {
+    if (storedPartitions.rangeIsSplit) {
+      if ((partition >= storedPartitions.partitionStart1 && partition <= storedPartitions.partitionEnd1) ||
+      (partition >= storedPartitions.partitionStart2 && partition <= storedPartitions.partitionEnd2)) {
+        return true
+      }
+    } else {
+      if (partition >= storedPartitions.partitionStart && partition <= storedPartitions.partitionEnd) {
+        return true
+      }
+    }
+    return false
+  }
+
+  static getPartitionsCovered (storedPartitions) {
+    let covered
+    if (storedPartitions.rangeIsSplit === true) {
+      covered = 2 + (storedPartitions.partitionEnd2 - storedPartitions.partitionStart2) + (storedPartitions.partitionEnd1 - storedPartitions.partitionStart1)
+    } else {
+      covered = 1 + storedPartitions.partitionEnd - storedPartitions.partitionStart
+    }
+    if (covered < 20) {
+      covered += 0
+    }
+
+    return covered
+  }
+
+  static computePartitionShardDataMap (shardGlobals, parititionShardDataMap, partitionStart, partitionsToScan) {
     let partitionIndex = partitionStart
 
-    let numNodes = activeNodes.length
+    let numPartitions = shardGlobals.numPartitions
 
     for (let i = 0; i < partitionsToScan; ++i) {
-      if (partitionIndex >= totalPartitions) {
+      if (partitionIndex >= numPartitions) {
         partitionIndex = 0
       }
       // let node = activeNodes[partitionIndex]
       // calcualte and save info for this partition
-      let fpAdressCenter = ((i + 0.5) / totalPartitions)
+      let fpAdressCenter = ((i + 0.5) / numPartitions)
       let addressPrefix = Math.floor(fpAdressCenter * 0xffffffff)
 
       let addressPrefixHex = (addressPrefix).toString(16)
       let address = addressPrefixHex + '7' + 'f'.repeat(55) // 55 + 1 + 8 = 64
 
-      let shardinfo = StateManager.calculateShardValues(numNodes, nodesPerConsenusGroup, address)
+      let shardinfo = StateManager.calculateShardValues(shardGlobals, address)
       parititionShardDataMap.set(i, shardinfo)
       // increment index:
       partitionIndex++
@@ -348,51 +456,127 @@ class StateManager extends EventEmitter {
   }
 
   // nodeShardData is a Map
-  static computeNodePartitionData (nodeShardDataMap, nodes, parititionShardDataMap, numPartitions, activeNodes) {
+  static computeNodePartitionDataMap (shardGlobals, nodeShardDataMap, nodesToGenerate, parititionShardDataMap, activeNodes, extendedData) {
+    // let numPartitions = shardGlobals.numPartitions
     // link to shard data
-    for (let node of nodes) {
-      let nodeShardData = {}
-
-      // calculate node middle address..
-      let nodeAddressNum = parseInt(node.id.slice(0, 8), 16)
-      // Fix this the center of a partition boundry??
-      let homePartition = Math.floor(numPartitions * (nodeAddressNum / 0xffffffff))
-      let centeredAddress = Math.floor(((homePartition + 0.5) * 0xffffffff) / numPartitions)
-
-      nodeShardData.node = node
-      nodeShardData.nodeAddressNum = nodeAddressNum
-      nodeShardData.homePartition = homePartition
-      nodeShardData.centeredAddress = centeredAddress
-      nodeShardDataMap.set(node.id, nodeShardData)
-
-      // start with coverage of home partition
-      nodeShardData.shardscovered = [homePartition]
-      nodeShardData.partitionMin = homePartition
-      nodeShardData.partitionMax = homePartition
-      nodeShardData.ourNodeIndex = activeNodes.findIndex(function (_node) { return _node.id === node.id })
-
-      let partitionShard = parititionShardDataMap.get(homePartition)
-      partitionShard.homeNodes.push(nodeShardData)
-
-      // nodeShardData.partitionMin = partitionShard
-      // nodeShardData.partitionMax = partitionShard
-      let temp = partitionShard.partitionStartVector
-      nodeShardData.partitionStartVector = { ...temp }
+    for (let node of nodesToGenerate) {
+      let nodeShardData = nodeShardDataMap.get(node.id)
+      if (!nodeShardData) {
+        nodeShardData = StateManager.computeNodePartitionData(shardGlobals, node, nodeShardDataMap, parititionShardDataMap, activeNodes, extendedData)
+      }
+      if (extendedData) {
+        StateManager.computeExtendedNodePartitionData(shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes)
+      }
     }
   }
 
-  static findHomeNode (address, nodeShardDataMap, parititionShardDataMap, numPartitions) {
+  static computeNodePartitionData (shardGlobals, node, nodeShardDataMap, parititionShardDataMap, activeNodes, extendedData) {
+    let numPartitions = shardGlobals.numPartitions
+
+    let nodeShardData = {}
+    // calculate node middle address..
+    let nodeAddressNum = parseInt(node.id.slice(0, 8), 16)
+    // Fix this the center of a partition boundry??
+    let homePartition = Math.floor(numPartitions * (nodeAddressNum / 0xffffffff))
+    // let homePartition = StateManager.addressToPartition(shardGlobals, node.id)
+    let centeredAddress = Math.floor(((homePartition + 0.5) * 0xffffffff) / numPartitions)
+
+    nodeShardData.node = node
+    nodeShardData.nodeAddressNum = nodeAddressNum
+    nodeShardData.homePartition = homePartition
+    nodeShardData.centeredAddress = centeredAddress
+    nodeShardData.extraWatchedPartitions = 0
+
+    // start with coverage of home partition
+    // nodeShardData.shardsCovered = [homePartition] // nod need to store this array..
+    // nodeShardData.partitionMin = homePartition
+    // nodeShardData.partitionMax = homePartition
+    nodeShardData.ourNodeIndex = activeNodes.findIndex(function (_node) { return _node.id === node.id })
+
+    // push the data in to the correct homenode list for the home partition
+    let partitionShard = parititionShardDataMap.get(homePartition)
+    partitionShard.homeNodes.push(nodeShardData)
+
+    // nodeShardData.partitionMin = partitionShard
+    // nodeShardData.partitionMax = partitionShard
+    nodeShardData.extendedData = false
+    if (extendedData) {
+      StateManager.computeExtendedNodePartitionData(shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes)
+    }
+
+    // let temp = partitionShard.partitionRangeVector
+    // nodeShardData.partitionRangeVector = { ...temp }
+
+    // set the data in our map
+    nodeShardDataMap.set(node.id, nodeShardData)
+
+    return nodeShardData
+  }
+
+  static computeExtendedNodePartitionData (shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes) {
+    if (nodeShardData.extendedData) {
+      return
+    }
+
+    nodeShardData.extendedData = true
+    nodeShardData.storedPartitions = StateManager.calculateStoredPartitions2(shardGlobals, nodeShardData.homePartition)
+
+    let exclude = [nodeShardData.node]
+    nodeShardData.nodeThatStoreOurParition = StateManager.getNodesThatCoverRange(shardGlobals, nodeShardData.storedPartitions.homeRange.low, nodeShardData.storedPartitions.homeRange.high, exclude, activeNodes)
+    nodeShardData.consensusNodeForOurNode = StateManager.getNeigborNodesInRange(nodeShardData.ourNodeIndex, shardGlobals.consensusRadius, exclude, activeNodes)
+    let [results, extras] = StateManager.mergeNodeLists(nodeShardData.nodeThatStoreOurParition, nodeShardData.consensusNodeForOurNode)
+
+    nodeShardData.nodeThatStoreOurParitionFull = results
+    nodeShardData.outOfDefaultRangeNodes = extras
+
+    nodeShardData.edgeNodes = StateManager.subtractNodeLists(nodeShardData.nodeThatStoreOurParitionFull, nodeShardData.consensusNodeForOurNode)
+    if (extras.length > 0) {
+      StateManager.dilateNeighborCoverage(shardGlobals, nodeShardDataMap, parititionShardDataMap, activeNodes, nodeShardData, extras)
+    }
+  }
+
+  static addressToPartition (shardGlobals, address) {
+    let numPartitions = shardGlobals.numPartitions
     let addressNum = parseInt(address.slice(0, 8), 16)
     let homePartition = Math.floor(numPartitions * (addressNum / 0xffffffff))
+    return [homePartition, addressNum]
+  }
+
+  static findHomeNode (shardGlobals, address, nodeShardDataMap, parititionShardDataMap) {
+    let [homePartition, addressNum] = StateManager.addressToPartition(shardGlobals, address)
     let partitionShard = parititionShardDataMap.get(homePartition)
+
+    let wrapIndex = function (shardGlobals, index) {
+      if (index < 0) {
+        index = index + shardGlobals.numPartitions
+      } else if (index >= shardGlobals.numPartitions) {
+        index = index - shardGlobals.numPartitions
+      }
+      return index
+    }
 
     let nodesToSearch = []
     // for(let node)
     if (partitionShard.homeNodes.length === 0) {
-      for (let i = 0; i < numPartitions; i++) {
-
+      for (let i = 1; i < shardGlobals.numPartitions; i++) {
         // get partitions to the left or right of us.  once we have home nodes stop computationt
+        let leftIndex = partitionShard.homePartition - i
+        let rightIndex = partitionShard.homePartition + i
+        leftIndex = wrapIndex(shardGlobals, leftIndex)
+        rightIndex = wrapIndex(shardGlobals, rightIndex)
 
+        let partitionShardLeft = parititionShardDataMap.get(leftIndex)
+        let partitionShardRight = parititionShardDataMap.get(rightIndex)
+
+        if (partitionShardLeft.homeNodes.length > 0) {
+          nodesToSearch = nodesToSearch.concat(partitionShardLeft.homeNodes)
+        }
+        if (partitionShardRight.homeNodes.length > 0) {
+          nodesToSearch = nodesToSearch.concat(partitionShardRight.homeNodes)
+        }
+        if (nodesToSearch.length > 0) {
+          break // we got something
+        }
       }
     } else {
       nodesToSearch = partitionShard.homeNodes
@@ -402,8 +586,13 @@ class StateManager extends EventEmitter {
     let homeNode = null
     // find closest in list of home nodes
     for (let nodeShardData in nodesToSearch) {
-
+      let distance = Math.abs(nodeShardData.nodeAddressNum - addressNum)
+      if (distance < closestDitance) {
+        closestDitance = distance
+        homeNode = nodeShardData
+      }
     }
+    return homeNode
   }
 
   // trying to calculate what partitions a node will cover.
@@ -412,26 +601,49 @@ class StateManager extends EventEmitter {
   // add the home partition to the nodes covered list
   //
 
-  static dilateNeighborCoverage (nodeShardDataMap, nodeShardData, extras) {
-    // // find our node index
-    // // shardinfo.ourNodeIndex = activeNodes.findIndex(function (node) { return node.id === shardinfo.address })
-    // let exclude = []
-    // // find nodes we provide consensus to
-    // shardinfo.consensusNodes = StateManager.getNeigborNodesInRange(shardinfo.ourNodeIndex, shardinfo.nodesInConsensusGroup, exclude, activeNodes)
+  static dilateNeighborCoverage (shardGlobals, nodeShardDataMap, parititionShardDataMap, activeNodes, nodeShardDataToModify, extras) {
+    let circularDistance = function (a, b, max) {
+      let directDist = Math.abs(a - b)
+
+      let wrapDist = directDist
+      if (a < b) {
+        wrapDist = Math.abs(a + (max - b))
+      } else if (b < a) {
+        wrapDist = Math.abs(b + (max - a))
+      }
+
+      return Math.min(directDist, wrapDist)
+    }
 
     for (let node of extras) {
       let otherNodeShardData = nodeShardDataMap.get(node.id)
 
-      let partition = otherNodeShardData.homePartition
-
-      if (partition < nodeShardData.partitionStartVector.start && partition > nodeShardData.partitionStartVector.start) {
-
+      if (!otherNodeShardData) {
+        otherNodeShardData = StateManager.computeNodePartitionData(shardGlobals, node, nodeShardDataMap, parititionShardDataMap, activeNodes, false)
       }
-      nodeShardData.partitionStartVector.start
+
+      let partition = otherNodeShardData.homePartition
+      // double check that this is not in our range.
+
+      if (StateManager.testInRange(partition, nodeShardDataToModify.storedPartitions)) {
+        continue
+      }
+
+      let partitionDistanceStart = circularDistance(partition, nodeShardDataToModify.storedPartitions.partitionStart, shardGlobals.numPartitions)
+      let partitionDistanceEnd = circularDistance(partition, nodeShardDataToModify.storedPartitions.partitionEnd, shardGlobals.numPartitions)
+
+      if (partitionDistanceStart < partitionDistanceEnd) {
+        nodeShardDataToModify.storedPartitions.partitionStart = partition
+        StateManager.calculateStoredPartitions2Ranges(shardGlobals, nodeShardDataToModify.storedPartitions)
+      } else {
+        nodeShardDataToModify.storedPartitions.partitionEnd = partition
+        StateManager.calculateStoredPartitions2Ranges(shardGlobals, nodeShardDataToModify.storedPartitions)
+      }
     }
   }
 
   // could make a faster version for sorted lists.. but not worth the complexity unless it shows up on a benchmark
+  // A + B
   static mergeNodeLists (listA, listB) {
     let results = []
     let extras = []
@@ -449,14 +661,29 @@ class StateManager extends EventEmitter {
     return [results, extras]
   }
 
+  // A - B
+  static subtractNodeLists (listA, listB) {
+    let results = []
+    let map = {}
+    for (let node of listB) {
+      map[node.id] = true
+    }
+    for (let node of listA) {
+      if (map[node.id] !== true) {
+        results.push(node)
+      }
+    }
+    return results
+  }
+
   // todo memoize this per cycle!!!
-  static partitionToAddressRange2 (shardInfo, partition, paritionMax = null) {
+  static partitionToAddressRange2 (shardGlobals, partition, paritionMax = null) {
     // let numPartitions = getNumPartitions()
     // let partitionFraction = partition / numPartitions
     // todo after enterprise: implement partition->address range math.  possibly store it in a lookup table
     let result = {}
     result.partition = partition
-    let startAddr = 0xffffffff * (partition / shardInfo.numPartitions)
+    let startAddr = 0xffffffff * (partition / shardGlobals.numPartitions)
     startAddr = Math.floor(startAddr)
 
     let endPartition = partition + 1
@@ -465,7 +692,7 @@ class StateManager extends EventEmitter {
     }
     // endPartition++ // include the full range of this partition
     result.partitionEnd = endPartition
-    let endAddr = 0xffffffff * ((endPartition) / shardInfo.numPartitions)
+    let endAddr = 0xffffffff * ((endPartition) / shardGlobals.numPartitions)
     endAddr = Math.floor(endAddr)
     if (paritionMax === null) {
       endAddr-- // - 1 // subtract 1 so we don't go into the nex partition
@@ -526,10 +753,27 @@ class StateManager extends EventEmitter {
 
   // todo save off per node calculations?
   // get nodes with coverage of this range (does not support wrapping)
-  static getNodesThatCoverRange (lowAddress, highAddress, exclude, allNodes, nodeLookRange, numPartitions) {
+  // todo could make a faster partition based versoin of this!
+  static getNodesThatCoverRange (shardGlobals, lowAddress, highAddress, exclude, activeNodes) {
     // calculate each nodes address position.
     // calculate if the nodes reach would cover our full range listed.
     // could we use start + delete to avoid wrapping?
+
+    let circularDistance = function (a, b, max) {
+      let directDist = Math.abs(a - b)
+
+      let wrapDist = directDist
+      if (a < b) {
+        wrapDist = Math.abs(a + (max - b))
+      } else if (b < a) {
+        wrapDist = Math.abs(b + (max - a))
+      }
+
+      return Math.min(directDist, wrapDist)
+    }
+
+    let numPartitions = shardGlobals.numPartitions
+    let nodeLookRange = shardGlobals.nodeLookRange
 
     let range = []
 
@@ -537,49 +781,51 @@ class StateManager extends EventEmitter {
     let highAddressNum = parseInt(highAddress.slice(0, 8), 16) + 1 // assume trailng fffs
 
     // todo start and end loop at smarter areas for efficieny reasones!
-    for (let i = 0; i < allNodes.length; i++) {
-      let node = allNodes[i]
+    for (let i = 0; i < activeNodes.length; i++) {
+      let node = activeNodes[i]
       if (exclude.includes(node.id)) {
         continue
       }
+
+      // could look up node by address??
+
       // calculate node middle address..
       let nodeAddressNum = parseInt(node.id.slice(0, 8), 16)
       // Fix this the center of a partition boundry??
       let homePartition = Math.floor(numPartitions * (nodeAddressNum / 0xffffffff))
       let centeredAddress = Math.floor(((homePartition + 0.5) * 0xffffffff) / numPartitions)
 
-      if (Math.abs(centeredAddress - lowAddressNum) > nodeLookRange) {
+      // Math.min(Math.abs(centeredAddress - lowAddressNum), Math.abs(centeredAddress - lowAddressNum))
+
+      if (circularDistance(centeredAddress, lowAddressNum, 0xffffffff) > nodeLookRange) {
         continue
       }
-      if (Math.abs(centeredAddress - highAddressNum) > nodeLookRange) {
+      if (circularDistance(centeredAddress, highAddressNum, 0xffffffff) > nodeLookRange) {
         continue
       }
+      // if (Math.abs(centeredAddress - lowAddressNum) > nodeLookRange) {
+      //   continue
+      // }
+      // if (Math.abs(centeredAddress - highAddressNum) > nodeLookRange) {
+      //   continue
+      // }
       // we are in range!
       range.push(node)
     }
     return range
   }
 
-  // supports wrapping
-  getRandomNodesThatCoverRange2 (allNodes, count, partitionStart, partitionDelta, exclude) {
-
-    // calculate each nodes address position.
-    // calculate if the nodes reach would cover our full range listed.
-    // could we use start + delete to avoid wrapping?
-
-  }
-
   // get nodes in count range to either side of our node
   // position should be the position of the home node
-  static getNeigborNodesInRange (position, count, exclude, allNodes) {
+  static getNeigborNodesInRange (position, radius, exclude, allNodes) {
     // let allNodes = this.p2p.state.getNodesOrdered() // possibly faster version that does not need a copy
     let results = []
-    let scanStart = position - Math.ceil(count / 2) // have to pick floor or ceiling and be consistent.
+    let scanStart = position - radius // have to pick floor or ceiling and be consistent.
     if (scanStart < 0) {
       scanStart = allNodes.length + scanStart
     }
     let scanIndex = scanStart
-    for (let i = 0; i < count + 1; i++) {
+    for (let i = 0; i < radius * 2 + 1; i++) {
       if (scanIndex >= allNodes.length) {
         scanIndex = 0
       }
