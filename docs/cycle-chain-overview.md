@@ -15,12 +15,12 @@ status of every node in the network.
 Nodes can suggest changes to the node list with signed messages, called
 __updates__, which are passed around to every node in the network.
 
-Nodes gather all the updates they see in a certain amount of time and put them
-into structures called __cycles__ Once the time to gather updates has passed,
-nodes compare their cycles to make sure they have the same updates. After
-applying the updates to their node lists, the nodes will start gathering updates
-for the next cycle. Cycles are created on a regular interval from the start of
-the network, for as long as the network runs.
+Nodes gather all the updates they see in a certain amount of time and put the
+changes described by the updates into structures called __cycles__. Once the
+time to gather updates has passed, nodes compare their cycles to make sure they
+have the same changes. After applying the changes to their node lists, the nodes
+will start gathering updates for the next cycle. Cycles are created on a regular
+interval from the start of the network, for as long as the network runs.
 
 The __cycle chain__ is the ordered list of all the cycles created by the
 network, going back to the first cycle it created.
