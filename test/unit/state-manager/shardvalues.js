@@ -1,4 +1,6 @@
 const StateManager = require('../../../src/state-manager')
+const ShardFunctions = require('../../../src/state-manager/shardFunctions.js')
+
 const crypto = require('shardus-crypto-utils')
 const utils = require('../../../src/utils')
 
@@ -36,7 +38,7 @@ let testIterations = 10
 let homeNodeQueryTests = 100
 
 let testAllNodesInList = true
-let numNodes = 100
+let numNodes = 1000
 for (let i = 0; i < testIterations; i++) {
   testCounter++
 
@@ -53,21 +55,21 @@ for (let i = 0; i < testIterations; i++) {
     innerLoopCount = numNodes
   }
 
-  let shardGlobals = StateManager.calculateShardGlobals(numNodes, nodesPerConsenusGroup)
+  let shardGlobals = ShardFunctions.calculateShardGlobals(numNodes, nodesPerConsenusGroup)
 
   let totalPartitions = numNodes
   // calculate data for all partitions
   let parititionShardDataMap = new Map()
-  StateManager.computePartitionShardDataMap(shardGlobals, parititionShardDataMap, 0, totalPartitions)
+  ShardFunctions.computePartitionShardDataMap(shardGlobals, parititionShardDataMap, 0, totalPartitions)
   // calculate data for all nodeds
   let nodeShardDataMap = new Map()
-  StateManager.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, true)
+  ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, true)
 
   let totalPartitionsCovered = 0
   for (var nodeShardData of nodeShardDataMap.values()) {
     extraNodesTotal += nodeShardData.outOfDefaultRangeNodes.length
 
-    totalPartitionsCovered += StateManager.getPartitionsCovered(nodeShardData.storedPartitions)
+    totalPartitionsCovered += ShardFunctions.getPartitionsCovered(nodeShardData.storedPartitions)
   }
 
   console.log(`test number ${i} partitions covered by a node avg: ${totalPartitionsCovered / innerLoopCount}`)
@@ -75,23 +77,36 @@ for (let i = 0; i < testIterations; i++) {
   // test home node search
   for (let j = 0; j < homeNodeQueryTests; ++j) {
     let address = crypto.randomBytes()
-    let homeNode = StateManager.findHomeNode(shardGlobals, address, parititionShardDataMap)
+    let homeNode = ShardFunctions.findHomeNode(shardGlobals, address, parititionShardDataMap)
     if (homeNode == null) {
-      homeNode = StateManager.findHomeNode(shardGlobals, address, parititionShardDataMap)
+      homeNode = ShardFunctions.findHomeNode(shardGlobals, address, parititionShardDataMap)
       throw new Error('home node not found')
     }
-    let inRange = StateManager.testAddressInRange(address, homeNode.storedPartitions)
+    let inRange = ShardFunctions.testAddressInRange(address, homeNode.storedPartitions)
     if (inRange === false) {
-      homeNode = StateManager.findHomeNode(shardGlobals, address, parititionShardDataMap)
-      inRange = StateManager.testAddressInRange(address, homeNode.storedPartitions)
-      throw new Error('home node not in range')
+      homeNode = ShardFunctions.findHomeNode(shardGlobals, address, parititionShardDataMap)
+      inRange = ShardFunctions.testAddressInRange(address, homeNode.storedPartitions)
+      throw new Error('home node not in range 1')
     }
-    let [homePartition, addressNum] = StateManager.addressToPartition(shardGlobals, address)
-    let inRange2 = StateManager.testInRange(homePartition, homeNode.storedPartitions)
+    let [homePartition, addressNum] = ShardFunctions.addressToPartition(shardGlobals, address)
+    let inRange2 = ShardFunctions.testInRange(homePartition, homeNode.storedPartitions)
     if (inRange2 === false) {
-      homeNode = StateManager.findHomeNode(shardGlobals, address, parititionShardDataMap)
-      inRange2 = StateManager.testInRange(homePartition, homeNode.storedPartitions)
-      throw new Error('home node not in range')
+      homeNode = ShardFunctions.findHomeNode(shardGlobals, address, parititionShardDataMap)
+      inRange2 = ShardFunctions.testInRange(homePartition, homeNode.storedPartitions)
+      throw new Error('home node not in range 2')
+    }
+
+    for (let node of homeNode.consensusNodeForOurNode) {
+      let inRange3 = ShardFunctions.testAddressInRange(node.id, homeNode.storedPartitions)
+      if (inRange3 === false) {
+        throw new Error('node not in range 1')
+      }
+    }
+    for (let node of homeNode.nodeThatStoreOurParitionFull) {
+      let inRange3 = ShardFunctions.testAddressInRange(node.id, homeNode.storedPartitions)
+      if (inRange3 === false) {
+        throw new Error('node not in range 2')
+      }
     }
   }
 }
