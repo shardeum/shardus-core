@@ -1,48 +1,72 @@
-# Cycle Chain / Node List Overview
+# Node List / Cycle Chain Overview
 
-In order to function properly, a Shardus network needs:
+In order to implement core network mechanisms, a Shardus network needs:
 
-1. All nodes to know about all other nodes.
-2. A way for all nodes to perform certain actions at the same time.
-3. A history of the nodes in the network and of the agreed upon actions performed.
+* Every node to keep a list of every other node in the network. (__node list__)
+* A way for nodes to suggest changes to the node list. (__updates__)
+* A way for nodes to agree upon and apply changes to their node lists at the
+  same time. (__cycles__)
+* A history of all the changes that were made to the node list.
+  (__cycle chain__)
 
-These are accomplished with the use of a network-wide node list and cycle chain.
+Every node keeps a copy of the __node list__, which has the information and
+status of every node in the network.
 
-The **node list** contains detailed information about every currently active node in the network.
+Nodes can suggest changes to the node list with signed messages, called
+__updates__, which are passed around to every node in the network.
 
-The **cycle chain** is a time-ordered list of cycles that record which nodes were active in the network during that cycle, and the network actions performed during that cycle.
+Nodes gather all the updates they see in a certain amount of time and put them
+into structures called __cycles__ Once the time to gather updates has passed,
+nodes compare their cycles to make sure they have the same updates. After
+applying the updates to their node lists, the nodes will start gathering updates
+for the next cycle. Cycles are created on a regular interval from the start of
+the network, for as long as the network runs.
 
-All active nodes in a network share the same cycle-chain, and agree upon the info that will be included in the next cycle before committing it to their copy of the chain. Cycles are created in a timely manner from when the network starts, for as long as the network runs.
+The __cycle chain__ is the ordered list of all the cycles created by the
+network, going back to the first cycle it created.
 
-To join a Shardus network, nodes must sync up to the networks node list and cycle chain. Once synced, they will be able to participate in deciding which actions the network performs. They will also receive and share network updates with other active nodes, which will be used in the creation of future cycles.
+To join a Shardus network, a node must sync up with the networks node list and
+cycle chain. Once it is synced, it will be able to suggest node list
+updates and participate in creating cycles.
 
-Cycles contain the following data:
+## Creating Cycles
 
-```JavaScript
-cycle: {
-  start: null,
-  duration: null,
-  counter: null,
-  previous: null,
-  joined: [],
-  removed: [],
+Cycles are created on a regular interval and contain the following data:
+
+```typescript
+interface Cycle {
+  start: number, // cycle start time (epoch)
+  duration: number, // cycle duration (ms)
+  counter: number, // cycle index number (starting from 0)
+  previous: string, // hash of the previous cycle
+  joined: [], // array of collected join requests
+  removed: [], // 
   lost: [],
   apoptosized: [],
   returned: [],
   activated: [],
   certificate: {},
-  expired: 0,
-  desired: 0
+  expired: number,
+  desired: number
 }
 ```
 
-The cycle creation process is marked by four phases:
+The time to create one cycle can be divided into four quarters, each initiated
+by a different function.
 
 [CYCLE CREATION DIAGRAM]
 
-## Network-level processes
+### Q1: `startUpdatePhase()`
 
-Network-level processes are used by the network to
+### Q2: `endUpdatePhase()`
+
+### Q3: `startCycleSync()`
+
+### Q4: `finalizeCycle()`
+
+## Network-level Processes
+
+These processes update the node list / cycle chain for every node in the network.
 
 ### Joining
 
@@ -58,8 +82,11 @@ Network-level processes are used by the network to
 
 ## Node-level processes
 
-### Re-syncing
+These processes are used by individual nodes to keep their own copies of the
+node list / cycle chain in sync with the rest of the network.
+
+### Syncing
 
 ### Repairing
 
-### Syncing
+### Re-syncing
