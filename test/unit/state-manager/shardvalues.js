@@ -33,9 +33,10 @@ let extraNodesTotal = 0
 let testCounter = 0
 // test 1
 let testIterations = 10
+let homeNodeQueryTests = 100
 
 let testAllNodesInList = true
-let numNodes = 1000
+let numNodes = 100
 for (let i = 0; i < testIterations; i++) {
   testCounter++
 
@@ -62,75 +63,37 @@ for (let i = 0; i < testIterations; i++) {
   let nodeShardDataMap = new Map()
   StateManager.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, true)
 
-  let totalPartitionsObserved = 0
   let totalPartitionsCovered = 0
   for (var nodeShardData of nodeShardDataMap.values()) {
     extraNodesTotal += nodeShardData.outOfDefaultRangeNodes.length
 
     totalPartitionsCovered += StateManager.getPartitionsCovered(nodeShardData.storedPartitions)
   }
-  //   for (let j = 0; j < innerLoopCount; j++) {
-  //     if (testAllNodesInList === true) {
-  //       nodeToObserve = activeNodes[j]
-  //     }
 
-  //     // let address = nodeToObserve.id
-  //     let shardInfo = StateManager.calculateShardValues(shardGlobals, nodeToObserve.id)
-  //     let exclude = [] // [ourNode.id]
-  //     let nodeInRange = StateManager.getNodesThatCoverRange(shardInfo.homeRange.low, shardInfo.homeRange.high, exclude, activeNodes, shardInfo.lookRange, shardInfo.numPartitions)
-  //     let ourNodeIndex = activeNodes.findIndex(function (node) { return node.id === nodeToObserve.id })
-  //     let nodeInRange2 = StateManager.getNeigborNodesInRange(ourNodeIndex, nodesPerConsenusGroup, exclude, activeNodes)
-  //     //   if (nodeInRange2.length !== 10) {
-  //     //     StateManager.getNeigborNodesInRange(shardInfo.homePartition, nodesInConsensusGroup, [ourNode.id], activeNodes)
-  //     //   }
-  //     // console.log(`our index in the node list: ${ourNodeIndex}  test number ${i}`)
-  //     //   console.log(` shardInfo: ${JSON.stringify(shardInfo)}`)
-  //     //
-  //     //     // console.log(` all nodes. len: ${activeNodes.length}  nodes: ${utils.stringifyReduce(activeNodes)}`)
-  //     //     console.log(` nodes that see our home partition len: ${nodeInRange.length}  nodes: ${utils.stringifyReduce(nodeInRange)}`)
-  //     //     console.log(` nodes in our consensus:  ${nodeInRange2.length}  nodes: ${utils.stringifyReduce(nodeInRange2)}`)
-  //     let [results, extras] = StateManager.mergeNodeLists(nodeInRange, nodeInRange2)
-  //     let partitionList = results
-
-  //     let addedNodes = partitionList.length - nodeInRange.length
-  //     extraNodesTotal += addedNodes
-
-  //     totalPartitionsObserved += partitionList.length
-
-  //     // shardInfo
-  //     for (let node in partitionList) {
-  //       let value = partitionsSeenByNodeId[node.id]
-  //       if (value == null) {
-  //         value = 0
-  //       }
-  //       value++
-  //       partitionsSeenByNodeId[node.id] = value
-  //     }
-
-  //     let nodesOutOfCoverage = findBnotInA(partitionList, nodeInRange2)
-
-  //     if (nodesOutOfCoverage.length > 0) {
-  //       console.log(` shardInfo: ${JSON.stringify(shardInfo)}`)
-  //       // console.log(` all nodes. len: ${activeNodes.length}  nodes: ${utils.stringifyReduce(activeNodes)}`)
-  //       console.log(` nodes that see our home partition len: ${nodeInRange.length}  nodes: ${utils.stringifyReduce(nodeInRange)}`)
-  //       console.log(` nodes in our consensus:  ${nodeInRange2.length}  nodes: ${utils.stringifyReduce(nodeInRange2)}`)
-  //       console.log(` ERROR some nodes in consensus not covered by partition:  ${nodesOutOfCoverage.length}  nodes: ${utils.stringifyReduce(nodesOutOfCoverage)}`)
-  //       break
-  //     }
-  //   }
-
-  //   let totalPartitionsCovered = 0
-  //   for (let node in activeNodes) {
-  //     let value = partitionsSeenByNodeId[node.id]
-  //     totalPartitionsCovered += value
-  //   }
-
-  // console.log(`test number ${i} nodes observing a parition avg: ${totalPartitionsObserved / innerLoopCount}`)
-
-  // console.log(`test number ${i} partitions covered by a node avg: ${totalPartitionsCovered / (innerLoopCount * activeNodes.length)}`)
   console.log(`test number ${i} partitions covered by a node avg: ${totalPartitionsCovered / innerLoopCount}`)
+
+  // test home node search
+  for (let j = 0; j < homeNodeQueryTests; ++j) {
+    let address = crypto.randomBytes()
+    let homeNode = StateManager.findHomeNode(shardGlobals, address, parititionShardDataMap)
+    if (homeNode == null) {
+      homeNode = StateManager.findHomeNode(shardGlobals, address, parititionShardDataMap)
+      throw new Error('home node not found')
+    }
+    let inRange = StateManager.testAddressInRange(address, homeNode.storedPartitions)
+    if (inRange === false) {
+      homeNode = StateManager.findHomeNode(shardGlobals, address, parititionShardDataMap)
+      inRange = StateManager.testAddressInRange(address, homeNode.storedPartitions)
+      throw new Error('home node not in range')
+    }
+    let [homePartition, addressNum] = StateManager.addressToPartition(shardGlobals, address)
+    let inRange2 = StateManager.testInRange(homePartition, homeNode.storedPartitions)
+    if (inRange2 === false) {
+      homeNode = StateManager.findHomeNode(shardGlobals, address, parititionShardDataMap)
+      inRange2 = StateManager.testInRange(homePartition, homeNode.storedPartitions)
+      throw new Error('home node not in range')
+    }
+  }
 }
 
 console.log(`Extra nodes total: ${extraNodesTotal} avg: ${extraNodesTotal / testCounter}  avg per node: ${extraNodesTotal / (testCounter * numNodes)}`)
-
-// StateManager.calculateShardValues(20, 30, 'd011ffff' + '3'.repeat(52))
