@@ -491,6 +491,28 @@ class ShardFunctions {
     }
     return results
   }
-}
 
+  static fastStableCorrespondingIndicies (size1, size2, index1) {
+    let results = []
+    if (size1 > size2) {
+      let value = Math.round((index1 / size1) * size2)
+      if (value === 0) {
+        value = 1
+      }
+      results.push(value)
+    } else {
+      let targetIndex = Math.round(index1 * (size2 / size1))
+      let range = Math.round(size2 / size1)
+      let start = Math.max(1, targetIndex - range)
+      let stop = Math.min(size2, targetIndex + range)
+      for (let i = start; i <= stop; i++) {
+        let res = ShardFunctions.fastStableCorrespondingIndicies(size2, size1, i)
+        if (res[0] === index1) {
+          results.push(i)
+        }
+      }
+    }
+    return results
+  }
+}
 module.exports = ShardFunctions
