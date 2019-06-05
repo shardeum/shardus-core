@@ -32,8 +32,7 @@
     "shardus-net": "gitlab:shardus/shardus-net",
     "sqlite": "3.0.0",
     "sqlite3": "4.0.6",
-    "tar": "4.4.8",
-    "typedoc": "^0.14.2"
+    "tar": "4.4.8"
   },
   "devDependencies": {
     "axios": "0.18.0",
@@ -42,6 +41,7 @@
     "nyc": "13.1.0",
     "standard": "12.0.1",
     "tap": "12.0.1",
-    "vorpal": "1.12.0"
+    "vorpal": "1.12.0",
+    "typedoc": "^0.14.2"
   }
 }
