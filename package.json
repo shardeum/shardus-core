@@ -10,7 +10,9 @@
     "test:unit:watch": "nodemon -x npm run test:unit",
     "test:integration": "tap --timeout=0 \"test/integration/**/*.spec.js\"",
     "test:integration:watch": "nodemon -x npm run test:integration",
-    "cover": "nyc tap --timeout=0 \"test/**/*.spec.js\" --coverage-report=html && codecov"
+    "cover": "nyc tap --timeout=0 \"test/**/*.spec.js\" --coverage-report=html && codecov",
+    "doc": "typedoc --includeDeclarations --excludeExternals --mode file --tsconfig tdconfig.json --out docs",
+    "doc-json": "typedoc --includeDeclarations --excludeExternals --mode file --tsconfig tdconfig.json --json documentation.json"
   },
   "repository": {
     "type": "git",
@@ -30,7 +32,8 @@
     "shardus-net": "gitlab:shardus/shardus-net",
     "sqlite": "3.0.0",
     "sqlite3": "4.0.6",
-    "tar": "4.4.8"
+    "tar": "4.4.8",
+    "typedoc": "^0.14.2"
   },
   "devDependencies": {
     "axios": "0.18.0",
