@@ -62,6 +62,9 @@ class StateManager extends EventEmitter {
     this.extendedRepairLogging = false
 
     this.shardInfo = {}
+
+    this.shardValuesByCycle = new Map()
+    this.currentCycleShardData = null
   }
 
   /* -------- DATASYNC Functions ---------- */
@@ -215,7 +218,7 @@ class StateManager extends EventEmitter {
     }
   }
 
-  updateShardValues () {
+  updateShardValues (cycleNumber) {
     let cycleShardData = {}
 
     // todo get current cycle..  store this by cycle?
@@ -238,6 +241,18 @@ class StateManager extends EventEmitter {
 
     // generate lightweight data for all active nodes  (note that last parameter is false to specify the lightweight data)
     ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, false)
+
+    this.currentCycleShardData = cycleShardData
+    this.shardValuesByCycle.set(cycleNumber, cycleShardData)
+  }
+
+  getCurrentCycleShardData () {
+    if (this.currentCycleShardData === null) {
+      let cycle = this.p2p.state.getLastCycle()
+      this.updateShardValues(cycle.counter)
+    }
+
+    return this.currentCycleShardData
   }
 
   partitionToAddressRange (partition) {
@@ -264,6 +279,18 @@ class StateManager extends EventEmitter {
       [array[i], array[j]] = [array[j], array[i]]
     }
   }
+
+  getRandomInt (max) {
+    return Math.floor(Math.random() * Math.floor(max))
+  }
+
+  getRandomIndex (list) {
+    let max = list.length - 1
+    return Math.floor(Math.random() * Math.floor(max))
+  }
+  // ////////////////////////////////////////////////////////////////////
+  //   DATASYNC
+  // ////////////////////////////////////////////////////////////////////
 
   // todo refactor: move to p2p?
   getRandomNodesInRange (count, lowAddress, highAddress, exclude) {
@@ -883,6 +910,10 @@ class StateManager extends EventEmitter {
     await this.processAccountData()
   }
 
+  // ////////////////////////////////////////////////////////////////////
+  //   ENDPOINTS
+  // ////////////////////////////////////////////////////////////////////
+
   registerEndpoints () {
     // alternatively we would need to query for accepted tx.
 
@@ -1253,6 +1284,77 @@ class StateManager extends EventEmitter {
       }
       await respond(result)
     })
+
+    // p2p TELL
+    this.p2p.registerInternal('route_to_home_node', async (payload, respond) => {
+      // gossip 'spread_tx_to_group' to transaction group
+      // Place tx in queue (if younger than m)
+
+      // make sure we don't already have it
+      let queueEntry = this.getQueueEntry(payload.txid, payload.timestamp)
+      if (queueEntry) {
+        return
+        // already have this in our queue
+      }
+
+      this.queueAcceptedTransaction2(payload.acceptedTx, true, null) // todo pass in sender?
+
+      // no response needed?
+    })
+
+    // p2p ASK
+    this.p2p.registerInternal('request_state_for_tx', async (payload, respond) => {
+      let response = { stateList: [] }
+      // app.GetReleventData(accountId, tx) -> wrappedAccountState  for local accounts
+      let queueEntry = this.getQueueEntry(payload.txid, payload.timestamp)
+      if (queueEntry == null) {
+        await respond(response)
+        return
+      }
+
+      for (let key of payload.keys) {
+        let data = queueEntry.collectedData[key]
+        if (data) {
+          response.stateList.push(data)
+        }
+      }
+      await respond(response)
+    })
+
+    // p2p TELL
+    this.p2p.registerInternal('broadcast_state', async (payload, respond) => {
+      // Save the wrappedAccountState with the rest our queue data
+      // let message = { stateList: datas, txid: queueEntry.acceptedTX.id }
+      // this.p2p.tell([correspondingEdgeNode], 'broadcast_state', message)
+
+      // make sure we have it
+      let queueEntry = this.getQueueEntry(payload.txid, payload.timestamp)
+      if (queueEntry == null) {
+        return
+      }
+      // add the data in
+      for (let data of payload.stateList) {
+        this.queueEntryAddData(queueEntry, data)
+      }
+    })
+
+    this.p2p.registerGossipHandler('spread_tx_to_group', async (payload, sender, tracker) => {
+      //  gossip 'spread_tx_to_group' to transaction group
+      // Place tx in queue (if younger than m)
+
+      let queueEntry = this.getQueueEntry(payload.id, payload.timestamp)
+      if (queueEntry) {
+        return
+        // already have this in our queue
+      }
+
+      // get transaction group. 3 accounds, merge lists.
+      let transactionGroup = this.queueEntryGetTransactionGroup(queueEntry)
+      this.p2p.sendGossipIn('spread_tx_to_group', payload, tracker, sender, transactionGroup)
+
+      this.queueAcceptedTransaction2(payload, false, sender)
+      // await this.queueAcceptedTransaction(acceptedTX, false, sender)
+    })
   }
 
   _unregisterEndpoints () {
@@ -1268,6 +1370,11 @@ class StateManager extends EventEmitter {
     this.p2p.unregisterInternal('get_transactions_by_list')
     this.p2p.unregisterInternal('get_transactions_by_partition_index')
     this.p2p.unregisterInternal('get_partition_txids')
+    // new shard endpoints:
+    this.p2p.unregisterInternal('route_to_home_node')
+    this.p2p.unregisterInternal('request_state_for_tx')
+    this.p2p.unregisterInternal('broadcast_state')
+    this.p2p.unregisterGossipHandler('spread_tx_to_group')
   }
 
   // //////////////////////////////////////////////////////////////////////////
@@ -1348,7 +1455,7 @@ class StateManager extends EventEmitter {
 
     // await this.applyAcceptedTx()
     for (let acceptedTx of acceptedTXs) {
-      this.queueAcceptedTransaction(acceptedTx, false)
+      this.queueAcceptedTransaction2(acceptedTx, false) // TODO!!!!! need to evaluate how this reacts with the new queue system..  this repair method is the old one anyhow though
     }
 
     // todo insert these in a sorted way to the new queue
@@ -1588,68 +1695,68 @@ class StateManager extends EventEmitter {
     return true
   }
 
-  queueAcceptedTransaction (acceptedTX, sendGossip = true, sender) {
-    let keysResponse = this.app.getKeyFromTransaction(acceptedTX.data)
-    let timestamp = keysResponse.timestamp
-    let txId = acceptedTX.receipt.txHash
+  // queueAcceptedTransaction (acceptedTX, sendGossip = true, sender) {
+  //   let keysResponse = this.app.getKeyFromTransaction(acceptedTX.data)
+  //   let timestamp = keysResponse.timestamp
+  //   let txId = acceptedTX.receipt.txHash
 
-    if (this.config.debug.loseTxChance > 0) {
-      let rand = Math.random()
-      if (this.config.debug.loseTxChance > rand) {
-        this.logger.playbackLogNote('tx_dropForTest', txId, 'dropping tx ' + timestamp)
-        return
-      }
-    }
+  //   if (this.config.debug.loseTxChance > 0) {
+  //     let rand = Math.random()
+  //     if (this.config.debug.loseTxChance > rand) {
+  //       this.logger.playbackLogNote('tx_dropForTest', txId, 'dropping tx ' + timestamp)
+  //       return
+  //     }
+  //   }
 
-    try {
-      let age = Date.now() - timestamp
-      if (age > this.queueSitTime * 0.9) {
-        this.fatalLogger.fatal('queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
-        // TODO consider throwing this out.  right now it is just a warning
-        this.logger.playbackLogNote('oldQueueInsertion', '', 'queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
-      }
+  //   try {
+  //     let age = Date.now() - timestamp
+  //     if (age > this.queueSitTime * 0.9) {
+  //       this.fatalLogger.fatal('queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
+  //       // TODO consider throwing this out.  right now it is just a warning
+  //       this.logger.playbackLogNote('oldQueueInsertion', '', 'queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
+  //     }
 
-      if (sendGossip) {
-        this.p2p.sendGossipIn('acceptedTx', acceptedTX, '', sender)
-        this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
-      }
-      // sorted insert
-      let index = this.newAcceptedTXQueue.length - 1
-      let lastTx = this.newAcceptedTXQueue[index]
-      while (index >= 0 && ((timestamp < lastTx.timestamp) || (timestamp === lastTx.timestamp && txId < lastTx.id))) {
-        index--
-        lastTx = this.newAcceptedTXQueue[index]
-      }
-      this.newAcceptedTXQueue.splice(index + 1, 0, acceptedTX)
-      this.logger.playbackLogNote('tx_addToQueue', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
-      this.emit('txQueued', acceptedTX.receipt.txHash)
+  //     if (sendGossip) {
+  //       this.p2p.sendGossipIn('acceptedTx', acceptedTX, '', sender)
+  //       this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
+  //     }
+  //     // sorted insert
+  //     let index = this.newAcceptedTXQueue.length - 1
+  //     let lastTx = this.newAcceptedTXQueue[index]
+  //     while (index >= 0 && ((timestamp < lastTx.timestamp) || (timestamp === lastTx.timestamp && txId < lastTx.id))) {
+  //       index--
+  //       lastTx = this.newAcceptedTXQueue[index]
+  //     }
+  //     this.newAcceptedTXQueue.splice(index + 1, 0, acceptedTX)
+  //     this.logger.playbackLogNote('tx_addToQueue', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
+  //     this.emit('txQueued', acceptedTX.receipt.txHash)
 
-      // start the queue if needed
-      this.tryStartAcceptedQueue()
-    } catch (error) {
-      this.logger.playbackLogNote('tx_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
-      this.fatalLogger.fatal('queueAcceptedTransaction failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
-      throw new Error(error)
-    }
-  }
+  //     // start the queue if needed
+  //     this.tryStartAcceptedQueue()
+  //   } catch (error) {
+  //     this.logger.playbackLogNote('tx_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
+  //     this.fatalLogger.fatal('queueAcceptedTransaction failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+  //     throw new Error(error)
+  //   }
+  // }
 
-  tryStartAcceptedQueue () {
-    if (!this.dataSyncMainPhaseComplete) {
-      return
-    }
-    if (!this.newAcceptedTXQueueRunning) {
-      this.processAcceptedTXQueue()
-    } else if (this.newAcceptedTXQueue.length > 0) {
-      this.interruptSleepIfNeeded(this.newAcceptedTXQueue[0].timestamp)
-    }
-  }
-  async _firstTimeQueueAwait () {
-    if (this.newAcceptedTXQueueRunning) {
-      this.fatalLogger.fatal('DATASYNC: newAcceptedTXQueueRunning')
-      return
-    }
-    await this.processAcceptedTXQueue(Date.now())
-  }
+  // tryStartAcceptedQueue () {
+  //   if (!this.dataSyncMainPhaseComplete) {
+  //     return
+  //   }
+  //   if (!this.newAcceptedTXQueueRunning) {
+  //     this.processAcceptedTXQueue()
+  //   } else if (this.newAcceptedTXQueue.length > 0) {
+  //     this.interruptSleepIfNeeded(this.newAcceptedTXQueue[0].timestamp)
+  //   }
+  // }
+  // async _firstTimeQueueAwait () {
+  //   if (this.newAcceptedTXQueueRunning) {
+  //     this.fatalLogger.fatal('DATASYNC: newAcceptedTXQueueRunning')
+  //     return
+  //   }
+  //   await this.processAcceptedTXQueue(Date.now())
+  // }
 
   async applyAcceptedTransaction (acceptedTX) {
     if (this.queueStopped) return
@@ -1714,54 +1821,386 @@ class StateManager extends EventEmitter {
     }
   }
 
-  async processAcceptedTXQueue (maxTimestamp = -1) {
-    try {
-      // wait untill next apply time available
-      // run as many apply tx as needed.
-      this.newAcceptedTXQueueRunning = true
+  // async processAcceptedTXQueue (maxTimestamp = -1) {
+  //   try {
+  //     // wait untill next apply time available
+  //     // run as many apply tx as needed.
+  //     this.newAcceptedTXQueueRunning = true
 
+  //     let acceptedTXCount = 0
+  //     let edgeFailDetected = false
+
+  //     while (this.newAcceptedTXQueue.length > 0) {
+  //       let currentTime = Date.now()
+  //       let txTime = this.newAcceptedTXQueue[0].timestamp
+  //       let txAge = currentTime - txTime
+  //       if (txAge < this.queueSitTime) {
+  //         let waitTime = this.queueSitTime - txAge
+  //         this.sleepInterrupt = this.interruptibleSleep(waitTime, txTime)
+  //         await this.sleepInterrupt.promise
+  //         continue
+  //       }
+
+  //       // apply the tx
+  //       let acceptedTX = this.newAcceptedTXQueue.shift()
+  //       this.logger.playbackLogNote('tx_workingOnTx', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
+  //       this.emit('txPopped', acceptedTX.receipt.txHash)
+  //       let txResult = await this.applyAcceptedTransaction(acceptedTX)
+
+  //       if (txResult.success) {
+  //         acceptedTXCount++
+  //       } else {
+  //         if (!edgeFailDetected && acceptedTXCount > 0) {
+  //           edgeFailDetected = true
+  //           if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `processAcceptedTXQueue edgeFail ${utils.stringifyReduce(acceptedTX)}`)
+  //           this.fatalLogger.fatal(this.dataPhaseTag + `processAcceptedTXQueue edgeFail ${utils.stringifyReduce(acceptedTX)}`) // todo: consider if this is just an error
+  //         }
+  //       }
+
+  //       // await utils.sleep(0)
+  //       if (maxTimestamp > 0 && txTime > maxTimestamp) {
+  //         if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `processAcceptedTXQueue reached max timestamp. ${maxTimestamp} Exiting with ${this.newAcceptedTXQueue.length} items remaining`)
+  //         this.newAcceptedTXQueueRunning = false
+  //         return
+  //       }
+  //     }
+  //   } finally {
+  //     this.newAcceptedTXQueueRunning = false
+  //   }
+  // }
+  //  ///////////////
+  /// ///    new sharde queue         ///////////
+  // ///////////////
+
+  // app.GetReleventData(accountId, tx) -> wrappedAccountState  for local accounts
+
+  initQueues () {
+    this.newAcceptedTXQueue = []
+  // out of order possible if if accounts are blocked
+  }
+
+  queueAcceptedTransaction2 (acceptedTX, sendGossip = true, sender) {
+    let keysResponse = this.app.getKeyFromTransaction(acceptedTX.data)
+    let timestamp = keysResponse.timestamp
+    let txId = acceptedTX.receipt.txHash
+
+    let txQueueEntry = { acceptedTx: acceptedTX, txKeys: keysResponse, collectedData: {}, homeNodes: {}, state: 'aging', dataCollected: 0, hasAll: false } // age comes from timestamp
+    // partition data would store stuff like our list of nodes that store this ts
+    // collected data is remote data we have recieved back
+    // //tx keys ... need a sorted list (deterministic) of partition.. closest to a number?
+
+    if (this.config.debug.loseTxChance > 0) {
+      let rand = Math.random()
+      if (this.config.debug.loseTxChance > rand) {
+        this.logger.playbackLogNote('tx_dropForTest', txId, 'dropping tx ' + timestamp)
+        return
+      }
+    }
+
+    try {
+      let age = Date.now() - timestamp
+      if (age > this.queueSitTime * 0.9) {
+        this.fatalLogger.fatal('queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
+        // TODO consider throwing this out.  right now it is just a warning
+        this.logger.playbackLogNote('oldQueueInsertion', '', 'queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
+      }
+
+      // Init home nodes!
+      for (let key of txQueueEntry.txKeys.allKeys) {
+        let homeNode = ShardFunctions.findHomeNode(this.currentCycleShardData.shardGlobals, key, this.currentCycleShardData.parititionShardDataMap)
+        txQueueEntry.homeNodes[key] = homeNode
+      }
+
+      // gossip 'spread_tx_to_group' to transaction group
+      if (sendGossip) {
+        // async sendGossipIn (type, payload, tracker = '', sender = null, nodes = this.state.getAllNodes())
+        let transactionGroup = this.queueEntryGetTransactionGroup(txQueueEntry)
+        this.p2p.sendGossipIn('spread_tx_to_group', acceptedTX, '', sender, transactionGroup)
+        // this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
+      }
+      // sorted insert = sort by timestamp
+      let index = this.newAcceptedTXQueue.length - 1
+      let lastTx = this.newAcceptedTXQueue[index]
+      while (index >= 0 && ((timestamp < lastTx.txKeys.timestamp) || (timestamp === lastTx.txKeys.timestamp && txId < lastTx.id))) {
+        index--
+        lastTx = this.newAcceptedTXQueue[index]
+      }
+
+      this.newAcceptedTXQueue.splice(index + 1, 0, txQueueEntry)
+      this.logger.playbackLogNote('tx_addToQueue', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
+      this.emit('txQueued', acceptedTX.receipt.txHash)
+
+      // start the queue if needed
+      this.tryStartAcceptedQueue2()
+    } catch (error) {
+      this.logger.playbackLogNote('tx_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
+      this.fatalLogger.fatal('queueAcceptedTransaction failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+      throw new Error(error)
+    }
+  }
+
+  tryStartAcceptedQueue2 () {
+    if (!this.dataSyncMainPhaseComplete) {
+      return
+    }
+    if (!this.newAcceptedTXQueueRunning) {
+      this.processAcceptedTXQueue2()
+    } else if (this.newAcceptedTXQueue.length > 0) {
+      this.interruptSleepIfNeeded(this.newAcceptedTXQueue[0].timestamp)
+    }
+  }
+  async _firstTimeQueueAwait () {
+    if (this.newAcceptedTXQueueRunning) {
+      this.fatalLogger.fatal('DATASYNC: newAcceptedTXQueueRunning')
+      return
+    }
+    await this.processAcceptedTXQueue2(Date.now())
+  }
+
+  getQueueEntry (txid, timestamp) {
+  // todo perf need an interpolated or binary search on a sorted list
+    for (let queueEntry of this.newAcceptedTXQueue) {
+      if (queueEntry.acceptedTx.id === txid) {
+        return queueEntry
+      }
+    }
+    return null
+  }
+
+  queueEntryAddData (queueEntry, data) {
+    if (queueEntry.collectedData[data.id] != null) {
+      return // already have the data
+    }
+    queueEntry.collectedData[data.id] = data
+    queueEntry.dataCollected++
+
+    if (queueEntry.dataCollected === queueEntry.txKeys.allKeys.length) {
+      queueEntry.hasAll = true
+    }
+  }
+
+  async queueEntryRequestMissingData (queueEntry) {
+    if (!queueEntry.requests) {
+      queueEntry.requests = {}
+    }
+    // just ask one or two then bail if we dont get all the data
+
+    // old method that sends N messages to n nodes
+    // for (let key of queueEntry.txKeys.allKeys) {
+    //   if (queueEntry.collectedData[key] == null && queueEntry.requests[key] == null) {
+    //     let homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
+    //     let message = { keys: [key], tx: queueEntry.acceptedTX.id, timestamp: queueEntry.acceptedTX.timestamp }
+    //     let randomIndex = this.getRandomInt(homeNodeShardData.consensusNodeForOurNode.length - 1)
+    //     let node = homeNodeShardData.consensusNodeForOurNode[randomIndex]
+    //     queueEntry.requests[key] = node
+    //     let result = await this.p2p.ask(node, 'request_state_for_tx', message)
+    //     for (let data of result.stateList) {
+    //       this.queueEntryAddData(queueEntry, data)
+    //     }
+    //     queueEntry.homeNodes[key] = null
+    //   }
+    // }
+
+    let allKeys = []
+    for (let key of queueEntry.txKeys.allKeys) {
+      if (queueEntry.collectedData[key] == null) {
+        allKeys.push(key)
+      }
+    }
+
+    for (let key of queueEntry.txKeys.allKeys) {
+      if (queueEntry.collectedData[key] == null && queueEntry.requests[key] == null) {
+        let homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
+        let message = { keys: allKeys, tx: queueEntry.acceptedTX.id, timestamp: queueEntry.acceptedTX.timestamp }
+        let randomIndex = this.getRandomInt(homeNodeShardData.consensusNodeForOurNode.length - 1)
+        let node = homeNodeShardData.consensusNodeForOurNode[randomIndex]
+
+        for (let key2 of allKeys) {
+          queueEntry.requests[key2] = node
+        }
+        let result = await this.p2p.ask(node, 'request_state_for_tx', message) // not sure if we should await this.
+        for (let data of result.stateList) {
+          this.queueEntryAddData(queueEntry, data)
+        }
+        if (queueEntry.hasAll === false) {
+          queueEntry.state = 'failed to get data'
+        }
+
+        queueEntry.homeNodes[key] = null
+      }
+    }
+  }
+
+  queueEntryGetTransactionGroup (queueEntry) {
+    if (queueEntry.transactionGroup != null) {
+      return queueEntry.transactionGroup
+    }
+    let txGroup = []
+    let uniqueNodes = {}
+    for (let key of queueEntry.txKeys.allKeys) {
+      let homeNode = queueEntry.homeNodes[key]
+      // txGroup = Array.concat(txGroup, homeNode.nodeThatStoreOurParitionFull)
+      for (let node of homeNode.nodeThatStoreOurParitionFull) {
+        uniqueNodes[node.id] = node
+      }
+    }
+    let values = Object.values(uniqueNodes)
+    for (let v of values) {
+      txGroup.push(v)
+    }
+    queueEntry.transactionGroup = txGroup
+    return txGroup
+  }
+
+  async tellCorrespondingNodes (queueEntry) {
+    // Report data to corresponding nodes
+    let ourNodeData = this.currentCycleShardData.nodeShardData
+    let ourConsensusIndex = ourNodeData.consensusNodeForOurNode.findIndex((a) => a.id === ourNodeData.node.id)
+
+    let correspondingEdgeNode = []
+
+    let edgeIndicies = ShardFunctions.fastStableCorrespondingIndicies(ourNodeData.consensusNodeForOurNode.length, ourNodeData.edgeNodes.length, ourConsensusIndex)
+    for (let index of edgeIndicies) {
+      correspondingEdgeNode.push(ourNodeData.edgeNodes[index - 1])
+    }
+
+    let correspondingAccNodes = []
+    let datas = {}
+
+    for (let key of queueEntry.txKeys.allKeys) {
+      if (ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)) { // todo Detect if our node covers this paritition..  need our partition data
+        let data = this.app.GetReleventData(key, queueEntry.appliedTX)
+        datas[key] = data
+      }
+    }
+
+    // calc our index in a list. deterministic closest fit.
+    let message = { stateList: datas, txid: queueEntry.acceptedTX.id }
+    this.p2p.tell([correspondingEdgeNode], 'broadcast_state', message)
+
+    for (let key of queueEntry.txKeys.allKeys) {
+      if (datas[key] != null) {
+        continue // this is data we have and are sending
+      }
+      // let randomIndex = this.getRandomIndex(queueEntry.homeNodes[key].nodeThatStoreOurParitionFull)
+      let otherHomeNode = queueEntry.homeNodes[key] // .nodeThatStoreOurParitionFull[randomIndex]
+
+      let indicies = ShardFunctions.fastStableCorrespondingIndicies(ourNodeData.consensusNodeForOurNode.length, otherHomeNode.consensusNodeForOurNode.length, ourConsensusIndex)
+      // correspondingAccNodes.push(node)
+      for (let index of indicies) {
+        correspondingEdgeNode.push(otherHomeNode.consensusNodeForOurNode[index - 1])
+      }
+    }
+    this.p2p.tell(correspondingAccNodes, 'broadcast_state', message)
+  }
+
+  async processAcceptedTXQueue2 () {
+    if (this.newAcceptedTXQueue.length === 0) {
+      return
+    }
+
+    try {
       let acceptedTXCount = 0
       let edgeFailDetected = false
 
-      while (this.newAcceptedTXQueue.length > 0) {
-        let currentTime = Date.now()
-        let txTime = this.newAcceptedTXQueue[0].timestamp
-        let txAge = currentTime - txTime
-        if (txAge < this.queueSitTime) {
-          let waitTime = this.queueSitTime - txAge
-          this.sleepInterrupt = this.interruptibleSleep(waitTime, txTime)
-          await this.sleepInterrupt.promise
-          continue
-        }
+      this.newAcceptedTXQueueRunning = true
+      let currentIndex = this.newAcceptedTXQueue.length - 1
 
-        // apply the tx
-        let acceptedTX = this.newAcceptedTXQueue.shift()
-        this.logger.playbackLogNote('tx_workingOnTx', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
-        this.emit('txPopped', acceptedTX.receipt.txHash)
-        let txResult = await this.applyAcceptedTransaction(acceptedTX)
+      let timeM = this.queueSitTime
+      let timeM2 = timeM * 2
+      let currentTime = Date.now() // when to update this?
 
-        if (txResult.success) {
-          acceptedTXCount++
-        } else {
-          if (!edgeFailDetected && acceptedTXCount > 0) {
-            edgeFailDetected = true
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `processAcceptedTXQueue edgeFail ${utils.stringifyReduce(acceptedTX)}`)
-            this.fatalLogger.fatal(this.dataPhaseTag + `processAcceptedTXQueue edgeFail ${utils.stringifyReduce(acceptedTX)}`) // todo: consider if this is just an error
+      let seenAccounts = [] // todo PERF we should be able to support using a variable that we save from one update to the next.  set that up after initial testing
+
+      let accountSeen = function (queueEntry) {
+        for (let key of queueEntry.txKeys.allKeys) {
+          if (seenAccounts[key] != null) {
+            return true
           }
         }
+        return false
+      }
+      let markAccountsSeen = function (queueEntry) {
+        for (let key of queueEntry.txKeys.allKeys) {
+          if (seenAccounts[key] == null) {
+            seenAccounts[key] = queueEntry
+          }
+        }
+      }
+      // if we are the oldest ref to this you can clear it.. only ok because younger refs will still reflag it in time
+      let clearAccountsSeen = function (queueEntry) {
+        for (let key of queueEntry.txKeys.allKeys) {
+          if (seenAccounts[key] === queueEntry) {
+            seenAccounts[key] = null
+          }
+        }
+      }
 
-        // await utils.sleep(0)
-        if (maxTimestamp > 0 && txTime > maxTimestamp) {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `processAcceptedTXQueue reached max timestamp. ${maxTimestamp} Exiting with ${this.newAcceptedTXQueue.length} items remaining`)
-          this.newAcceptedTXQueueRunning = false
-          return
+      while (this.newAcceptedTXQueue.length > 0) {
+        if (currentIndex < 0) {
+          break
+        }
+        let queueEntry = this.newAcceptedTXQueue[currentIndex]
+        let txTime = queueEntry.txKeys.timestamp
+        let txAge = currentTime - txTime
+        if (txAge < timeM) {
+          break
+        }
+
+        if (queueEntry.state === 'aging') {
+          queueEntry.state = 'processing'
+        } else if (queueEntry.state === 'processing') {
+          if (accountSeen(queueEntry) === false) {
+            this.tellCorrespondingNodes(queueEntry)
+            queueEntry.state = 'awaiting data'
+          }
+          markAccountsSeen(queueEntry)
+        } else if (queueEntry.state === 'awaiting data') {
+          markAccountsSeen(queueEntry)
+
+          // check if we have all accounts
+          if (queueEntry.hasAll === false && txAge > timeM2) {
+            // 7.  Manually request missing state
+            this.queueEntryRequestMissingData(queueEntry)
+          } else if (queueEntry.hasAll) {
+            queueEntry.state = 'applying'
+          }
+        } else if (queueEntry.state === 'applying') {
+          markAccountsSeen(queueEntry)
+
+          this.logger.playbackLogNote('tx_workingOnTx', `${queueEntry.acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTX)}`)
+          this.emit('txPopped', queueEntry.acceptedTX.receipt.txHash)
+          let txResult = await this.applyAcceptedTransaction(queueEntry.acceptedTX)
+          if (txResult.success) {
+            acceptedTXCount++
+            clearAccountsSeen(queueEntry)
+          } else {
+            clearAccountsSeen(queueEntry)
+            if (!edgeFailDetected && acceptedTXCount > 0) {
+              edgeFailDetected = true
+              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `processAcceptedTXQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTX)}`)
+              this.fatalLogger.fatal(this.dataPhaseTag + `processAcceptedTXQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTX)}`) // todo: consider if this is just an error
+            }
+          }
+          // remove from queue
+          this.newAcceptedTXQueue.splice(currentIndex, 1)
+        } else if (queueEntry.state === 'failed to get data') {
+          // TODO log
+          // remove from queue
+          this.newAcceptedTXQueue.splice(currentIndex, 1)
         }
       }
     } finally {
       this.newAcceptedTXQueueRunning = false
     }
+
+    // restart loop if there are still elements in it
+    if (this.newAcceptedTXQueue.length > 0) {
+      setTimeout(this.processAcceptedTXQueue2, 15)
+    }
   }
 
+  /// //////////////////
   async fifoLock (fifoName) {
     let thisFifo = this.fifoLocks[fifoName]
     if (thisFifo == null) {
@@ -3057,6 +3496,10 @@ class StateManager extends EventEmitter {
   async startSyncPartitions () {
     // await this.createInitialAccountBackups() // nm this is now part of regular data sync
     // register our handlers
+    this.p2p.state.on('cycle_q1_start', async (lastCycle, time) => {
+      this.updateShardValues(lastCycle.counter)
+    })
+
     this.p2p.state.on('cycle_q2_start', async (lastCycle, time) => {
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startSyncPartitions:cycle_q2_start cycle: ${lastCycle.counter}`)
 

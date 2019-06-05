@@ -256,7 +256,7 @@ class Shardus {
 
   _createAndLinkStateManager () {
     this.stateManager = new StateManager(this.verboseLogs, this.profiler, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto, this.config)
-    this._registerListener(this.consensus, 'accepted', (...txArgs) => this.stateManager.queueAcceptedTransaction(...txArgs))
+    this._registerListener(this.consensus, 'accepted', (...txArgs) => this.stateManager.queueAcceptedTransaction2(...txArgs))
   }
 
   async syncAppData () {
