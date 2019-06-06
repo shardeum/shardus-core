@@ -13,6 +13,7 @@ class Network {
     this.ipInfo = {}
     this.timeout = config.timeout * 1000
     this.internalRoutes = {}
+    this.externalRoutes = []
     this.extServer = null
     this.intServer = null
 
@@ -45,6 +46,7 @@ class Network {
       this.app.use(bodyParser.json())
       this.app.use(cors())
       this.app.use(storeRequests)
+      this._applyExternal()
       this.extServer = this.app.listen(this.ipInfo.externalPort, () => {
         const msg = `External server running on port ${this.ipInfo.externalPort}...`
         console.log(msg)
@@ -162,22 +164,43 @@ class Network {
 
     switch (method) {
       case 'GET':
-        this.app.get(formattedRoute, wrappedHandler)
+        this.externalRoutes.push(app => {
+          app.get(formattedRoute, wrappedHandler)
+        })
         break
       case 'POST':
-        this.app.post(formattedRoute, wrappedHandler)
+        this.externalRoutes.push(app => {
+          app.post(formattedRoute, wrappedHandler)
+        })
         break
       case 'PUT':
-        this.app.put(formattedRoute, wrappedHandler)
+        this.externalRoutes.push(app => {
+          app.put(formattedRoute, wrappedHandler)
+        })
         break
       case 'DELETE':
-        this.app.delete(formattedRoute, wrappedHandler)
+        this.externalRoutes.push(app => {
+          app.delete(formattedRoute, wrappedHandler)
+        })
         break
       case 'PATCH':
-        this.app.patch(formattedRoute, wrappedHandler)
+        this.externalRoutes.push(app => {
+          app.patch(formattedRoute, wrappedHandler)
+        })
         break
       default:
         throw new Error('Fatal: Invalid HTTP method for handler.')
+    }
+
+    if (this.extServer && this.extServer.listening) {
+      this._applyExternal()
+    }
+  }
+
+  _applyExternal () {
+    while (this.externalRoutes.length > 0) {
+      const routeFn = this.externalRoutes.pop()
+      routeFn(this.app)
     }
   }
 
