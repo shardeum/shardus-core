@@ -401,11 +401,11 @@ class Shardus {
       }
 
       // Required Methods:
-      if (typeof (application.validateTransaction) === 'function') {
-        applicationInterfaceImpl.validateTransaction = async (inTx) => application.validateTransaction(inTx)
-      } else {
-        throw new Error('Missing requried interface function. validateTransaction()')
-      }
+      // if (typeof (application.validateTransaction) === 'function') {
+      //   applicationInterfaceImpl.validateTransaction = async (inTx) => application.validateTransaction(inTx)
+      // } else {
+      //   throw new Error('Missing requried interface function. validateTransaction()')
+      // }
 
       if (typeof (application.validateTxnFields) === 'function') {
         applicationInterfaceImpl.validateTxnFields = (inTx) => application.validateTxnFields(inTx)
@@ -414,9 +414,21 @@ class Shardus {
       }
 
       if (typeof (application.apply) === 'function') {
-        applicationInterfaceImpl.apply = async (inTx, receipt) => application.apply(inTx, receipt)
+        applicationInterfaceImpl.apply = async (inTx, wrappedStates) => application.apply(inTx, wrappedStates)
       } else {
         throw new Error('Missing requried interface function. apply()')
+      }
+
+      if (typeof (application.apply) === 'function') {
+        applicationInterfaceImpl.setAccount = async (wrappedStates, applyResponse, accountFilter) => application.setAccount(wrappedStates, applyResponse, accountFilter)
+      } else {
+        throw new Error('Missing requried interface function. apply()')
+      }
+
+      if (typeof (application.apply) === 'function') {
+        applicationInterfaceImpl.getRelevantData = async (accountId, tx) => application.getRelevantData(accountId, tx)
+      } else {
+        throw new Error('Missing requried interface function. getRelevantData()')
       }
 
       if (typeof (application.getKeyFromTransaction) === 'function') {
