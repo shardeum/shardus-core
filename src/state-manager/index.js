@@ -1305,7 +1305,7 @@ class StateManager extends EventEmitter {
     // p2p ASK
     this.p2p.registerInternal('request_state_for_tx', async (payload, respond) => {
       let response = { stateList: [] }
-      // app.GetReleventData(accountId, tx) -> wrappedAccountState  for local accounts
+      // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
       let queueEntry = this.getQueueEntry(payload.txid, payload.timestamp)
       if (queueEntry == null) {
         await respond(response)
@@ -1619,7 +1619,7 @@ class StateManager extends EventEmitter {
   }
 
   // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
-  async tryApplyTransaction (acceptedTX, hasStateTableData, repairing, filter) {
+  async tryApplyTransaction (acceptedTX, hasStateTableData, repairing, filter, wrappedStates) {
     let ourLockID = -1
     let accountDataList
     let txTs = 0
@@ -1652,8 +1652,14 @@ class StateManager extends EventEmitter {
       if (this.verboseLogs) console.log(`tryApplyTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
       // if (this.verboseLogs) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
       this.applySoftLock = true
-      let { stateTableResults, accountData: _accountdata } = await this.app.apply(tx, filter)
+
+      // let replyObject = { stateTableResults: [], txId, txTimestamp, accountData: [] }
+      let applyResponse = await this.app.apply(tx, wrappedStates)
+      let { stateTableResults, accountData: _accountdata } = applyResponse
       accountDataList = _accountdata
+      // wrappedStates are side effected for now
+      await this.app.setAccount(wrappedStates, applyResponse, filter)
+
       this.applySoftLock = false
       // only write our state table data if we dont already have it in the db
       if (hasStateTableData === false) {
@@ -1758,7 +1764,7 @@ class StateManager extends EventEmitter {
   //   await this.processAcceptedTXQueue(Date.now())
   // }
 
-  async applyAcceptedTransaction (acceptedTX) {
+  async applyAcceptedTransaction (acceptedTX, wrappedStates) {
     if (this.queueStopped) return
     let tx = acceptedTX.data
     let keysResponse = this.app.getKeyFromTransaction(tx)
@@ -1783,18 +1789,20 @@ class StateManager extends EventEmitter {
     // Validate transaction through the application. Shardus can see inside the transaction
     this.profiler.profileSectionStart('validateTx')
     // todo add data fetch to the result and pass it into app apply(), include previous hashes
-    let transactionValidateResult = await this.app.validateTransaction(acceptedTX.data)
-    this.profiler.profileSectionEnd('validateTx')
-    if (transactionValidateResult.result !== 'pass') {
-      let keysResponse = this.app.getKeyFromTransaction(acceptedTX.data)
-      let timestamp = keysResponse.timestamp
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction validate failed: ' + timestamp)
-      this.mainLogger.error(`Failed to validate transaction. Reason: ${transactionValidateResult.reason} ts:${timestamp}`)
-      this.logger.playbackLogNote('tx_apply_rejected 2', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
-      return { success: false, reason: transactionValidateResult.reason }
-    }
+
+    // let transactionValidateResult = await this.app.validateTransaction(acceptedTX.data)
+    // this.profiler.profileSectionEnd('validateTx')
+    // if (transactionValidateResult.result !== 'pass') {
+    //   let keysResponse = this.app.getKeyFromTransaction(acceptedTX.data)
+    //   let timestamp = keysResponse.timestamp
+    //   if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction validate failed: ' + timestamp)
+    //   this.mainLogger.error(`Failed to validate transaction. Reason: ${transactionValidateResult.reason} ts:${timestamp}`)
+    //   this.logger.playbackLogNote('tx_apply_rejected 2', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
+    //   return { success: false, reason: transactionValidateResult.reason }
+    // }
+
     // todo2 refactor the state table data checks out of try apply and calculate them with less effort using results from validate
-    let applyResult = await this.tryApplyTransaction(acceptedTX, hasStateTableData)
+    let applyResult = await this.tryApplyTransaction(acceptedTX, hasStateTableData, null, null, wrappedStates)
     if (applyResult) {
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction SUCCEDED ' + timestamp)
       this.logger.playbackLogNote('tx_applied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
@@ -1872,7 +1880,7 @@ class StateManager extends EventEmitter {
   /// ///    new sharde queue         ///////////
   // ///////////////
 
-  // app.GetReleventData(accountId, tx) -> wrappedAccountState  for local accounts
+  // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
 
   initQueues () {
     this.newAcceptedTXQueue = []
@@ -1895,6 +1903,12 @@ class StateManager extends EventEmitter {
         this.logger.playbackLogNote('tx_dropForTest', txId, 'dropping tx ' + timestamp)
         return
       }
+    }
+
+    // todo faster hash lookup for this maybe?
+    let entry = this.getQueueEntry(acceptedTX.id, acceptedTX.timestamp)
+    if (entry) {
+      return // already in our queue
     }
 
     try {
@@ -2061,7 +2075,7 @@ class StateManager extends EventEmitter {
 
     let edgeIndicies = ShardFunctions.fastStableCorrespondingIndicies(ourNodeData.consensusNodeForOurNode.length, ourNodeData.edgeNodes.length, ourConsensusIndex)
     for (let index of edgeIndicies) {
-      correspondingEdgeNode.push(ourNodeData.edgeNodes[index - 1])
+      correspondingEdgeNode.push(ourNodeData.edgeNodes[index - 1]) // fastStableCorrespondingIndicies is one based so adjust for 0 based array
     }
 
     let correspondingAccNodes = []
@@ -2069,7 +2083,7 @@ class StateManager extends EventEmitter {
 
     for (let key of queueEntry.txKeys.allKeys) {
       if (ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)) { // todo Detect if our node covers this paritition..  need our partition data
-        let data = this.app.GetReleventData(key, queueEntry.appliedTX)
+        let data = this.app.getRelevantData(key, queueEntry.acceptedTx.data)
         datas[key] = data
       }
     }
@@ -2088,7 +2102,7 @@ class StateManager extends EventEmitter {
       let indicies = ShardFunctions.fastStableCorrespondingIndicies(ourNodeData.consensusNodeForOurNode.length, otherHomeNode.consensusNodeForOurNode.length, ourConsensusIndex)
       // correspondingAccNodes.push(node)
       for (let index of indicies) {
-        correspondingEdgeNode.push(otherHomeNode.consensusNodeForOurNode[index - 1])
+        correspondingEdgeNode.push(otherHomeNode.consensusNodeForOurNode[index - 1]) // fastStableCorrespondingIndicies is one based so adjust for 0 based array
       }
     }
     this.p2p.tell(correspondingAccNodes, 'broadcast_state', message)
@@ -2170,7 +2184,9 @@ class StateManager extends EventEmitter {
 
           this.logger.playbackLogNote('tx_workingOnTx', `${queueEntry.acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTX)}`)
           this.emit('txPopped', queueEntry.acceptedTX.receipt.txHash)
-          let txResult = await this.applyAcceptedTransaction(queueEntry.acceptedTX)
+
+          let wrappedStates = Object.values(queueEntry.collectedData)
+          let txResult = await this.applyAcceptedTransaction(queueEntry.acceptedTX, wrappedStates)
           if (txResult.success) {
             acceptedTXCount++
             clearAccountsSeen(queueEntry)
@@ -3264,7 +3280,7 @@ class StateManager extends EventEmitter {
             tx.data.receipt = JSON.parse(tx.data.receipt)
           }
 
-          let applied = await this.tryApplyTransaction(tx, hasStateTableData, true, acountsFilter)
+          let applied = await this.tryApplyTransaction(tx, hasStateTableData, true, acountsFilter) // TODO sharding.. how to get and pass the state wrapped account state in
           if (!applied) {
             applyFailCount++
             if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs apply failed`)
