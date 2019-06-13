@@ -67,6 +67,6 @@
     "accountBucketSize": 50
   },
   "sharding": {
-    "nodesPerConsensusGroup" : 50
+    "nodesPerConsensusGroup" : 3
   }
 }

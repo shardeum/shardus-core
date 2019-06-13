@@ -34,15 +34,15 @@ function findBnotInA (listA, listB) {
 let extraNodesTotal = 0
 let testCounter = 0
 // test 1
-let testIterations = 0
+let testIterations = 1
 let homeNodeQueryTests = 100
 
 let testAllNodesInList = true
-let numNodes = 1000
+let numNodes = 6
 for (let i = 0; i < testIterations; i++) {
   testCounter++
 
-  let nodesPerConsenusGroup = 10
+  let nodesPerConsenusGroup = 3
   let activeNodes = generateNodes(numNodes - 1)
   let ourId = 'deadbeef' + '3'.repeat(56)
   let ourNode = { id: ourId, status: 'active' }
