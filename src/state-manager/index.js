@@ -821,7 +821,7 @@ class StateManager extends EventEmitter {
 
     this.mainLogger.debug(`DATASYNC: processAccountData saving ${this.goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase}`)
     // failedHashes is a list of accounts that failed to match the hash reported by the server
-    let failedHashes = await this.app.setAccountData(this.goodAccounts) // repeatable form may need to call this in batches
+    let failedHashes = await this.checkAndSetAccountData(this.goodAccounts) // repeatable form may need to call this in batches
 
     if (failedHashes.length > 1000) {
       this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
@@ -915,6 +915,60 @@ class StateManager extends EventEmitter {
 
     // process the new accounts.
     await this.processAccountData()
+  }
+
+  // This will make calls to app.getAccountDataByRange but if we are close enough to real time it will query any newer data and return lastUpdateNeeded = true
+  async getAccountDataByRangeSmart (accountStart, accountEnd, tsStart, maxRecords) {
+    let tsEnd = Date.now()
+    let wrappedAccounts = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart, tsEnd, maxRecords)
+    let lastUpdateNeeded = false
+    let wrappedAccounts2 = []
+    let highestTs = 0
+    // do we need more updates
+    if (wrappedAccounts.length === 0) {
+      lastUpdateNeeded = true
+    } else {
+      // see if our newest record is new enough
+      highestTs = 0
+      for (let account of wrappedAccounts) {
+        if (account.timestamp > highestTs) {
+          highestTs = account.timestamp
+        }
+      }
+      let delta = tsEnd - highestTs
+      // if the data we go was close enough to current time then we are done
+      // may have to be carefull about how we tune this value relative to the rate that we make this query
+      // we should try to make this query more often then the delta.
+      console.log('delta ' + delta)
+      if (delta < this.queueSitTime) {
+        let tsStart2 = highestTs
+        wrappedAccounts2 = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart2, Date.now(), 10000000)
+        lastUpdateNeeded = true
+      }
+    }
+    return { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs }
+  }
+
+  async checkAndSetAccountData (accountRecords) {
+    let accountsToAdd = []
+    let failedHashes = []
+    for (let { accountId, stateId, data: recordData } of accountRecords) {
+      let hash = this.app.calculateAccountHash(recordData)
+      if (stateId === hash) {
+        // if (recordData.owners) recordData.owners = JSON.parse(recordData.owners)
+        // if (recordData.data) recordData.data = JSON.parse(recordData.data)
+        // if (recordData.txs) recordData.txs = JSON.parse(recordData.txs) // dont parse this, since it is already the string form we need to write it.
+        accountsToAdd.push(recordData)
+        console.log('setAccountData: ' + hash + ' txs: ' + recordData.txs)
+      } else {
+        console.log('setAccountData hash test failed: setAccountData for ' + accountId)
+        console.log('setAccountData hash test failed: details: ' + utils.stringifyReduce({ accountId, hash, stateId, recordData }))
+        failedHashes.push(accountId)
+      }
+    }
+    console.log('setAccountData: ' + accountsToAdd.length)
+    await this.app.setAccountData(accountsToAdd)
+    return failedHashes
   }
 
   // ////////////////////////////////////////////////////////////////////
@@ -1028,7 +1082,7 @@ class StateManager extends EventEmitter {
       let ourLockID = -1
       try {
         ourLockID = await this.fifoLock('accountModification')
-        accountData = await this.app.getAccountData3(payload.accountStart, payload.accountEnd, payload.tsStart, payload.maxRecords)
+        accountData = await this.getAccountDataByRangeSmart(payload.accountStart, payload.accountEnd, payload.tsStart, payload.maxRecords)
       } finally {
         this.fifoUnlock('accountModification', ourLockID)
       }
