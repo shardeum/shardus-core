@@ -133,7 +133,7 @@ class Shardus {
       this.statistics = new Statistics(this.config.baseDir, this.config.statistics, {
         counters: ['txInjected', 'txApplied', 'txRejected', 'txExpired'],
         watchers: {
-          queueLength: () => this.stateManager ? this.stateManager.newAcceptedTXQueue.length : 0,
+          queueLength: () => this.stateManager ? this.stateManager.newAcceptedTxQueue.length : 0,
           serverLoad: () => this.loadDetection ? this.loadDetection.getCurrentLoad() : 0
         },
         timers: ['txTimeInQueue']

@@ -40,12 +40,15 @@ class ShardFunctions {
   static calculateStoredPartitions2 (shardGlobals, homePartition) {
     let storedPartitions = []
 
+    storedPartitions.homeRange = ShardFunctions.partitionToAddressRange2(shardGlobals, homePartition)
     // test if we will cover the full range by default
-    if (shardGlobals.numPartitions / 2 < shardGlobals.nodesPerConsenusGroup) {
+    if (shardGlobals.numPartitions / 2 <= shardGlobals.nodesPerConsenusGroup) {
       storedPartitions.rangeIsSplit = false
       storedPartitions.partitionStart = 0
       storedPartitions.partitionEnd = shardGlobals.numPartitions - 1
-      return
+
+      ShardFunctions.calculateStoredPartitions2Ranges(shardGlobals, storedPartitions)
+      return storedPartitions
     }
 
     let x = shardGlobals.nodesPerConsenusGroup
@@ -55,8 +58,6 @@ class ShardFunctions {
 
     storedPartitions.partitionStart = (n - x)
     storedPartitions.partitionEnd = (n + x)
-
-    storedPartitions.homeRange = ShardFunctions.partitionToAddressRange2(shardGlobals, homePartition)
 
     ShardFunctions.calculateStoredPartitions2Ranges(shardGlobals, storedPartitions)
 
@@ -99,7 +100,7 @@ class ShardFunctions {
 
     // did we wrap to cover the entire range, that should have early outed at the top of the function
     if (storedPartitions.rangeIsSplit === true && (storedPartitions.partitionStart1 === storedPartitions.partitionEnd2 || storedPartitions.partitionStart2 === storedPartitions.partitionEnd1)) {
-      throw new Error('this should never happen: ' + stringify(storedPartitions))
+      throw new Error('this should never happen: ' + stringify(storedPartitions) + 'globals: ' + stringify(shardGlobals))
     }
     if (storedPartitions.rangeIsSplit) {
       storedPartitions.partitionRange = ShardFunctions.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart1, storedPartitions.partitionEnd1)
@@ -206,6 +207,9 @@ class ShardFunctions {
 
     // push the data in to the correct homenode list for the home partition
     let partitionShard = parititionShardDataMap.get(homePartition)
+    if (partitionShard == null) {
+      partitionShard = parititionShardDataMap.get(homePartition)
+    }
     partitionShard.homeNodes.push(nodeShardData)
 
     nodeShardData.extendedData = false
@@ -227,15 +231,19 @@ class ShardFunctions {
     nodeShardData.extendedData = true
     nodeShardData.storedPartitions = ShardFunctions.calculateStoredPartitions2(shardGlobals, nodeShardData.homePartition)
 
-    let exclude = [nodeShardData.node]
+    let exclude = [nodeShardData.node.id]
+
     nodeShardData.nodeThatStoreOurParition = ShardFunctions.getNodesThatCoverRange(shardGlobals, nodeShardData.storedPartitions.homeRange.low, nodeShardData.storedPartitions.homeRange.high, exclude, activeNodes)
     nodeShardData.consensusNodeForOurNode = ShardFunctions.getNeigborNodesInRange(nodeShardData.ourNodeIndex, shardGlobals.consensusRadius, exclude, activeNodes)
+
     let [results, extras] = ShardFunctions.mergeNodeLists(nodeShardData.nodeThatStoreOurParition, nodeShardData.consensusNodeForOurNode)
 
     nodeShardData.nodeThatStoreOurParitionFull = results
     nodeShardData.outOfDefaultRangeNodes = extras
 
     nodeShardData.edgeNodes = ShardFunctions.subtractNodeLists(nodeShardData.nodeThatStoreOurParitionFull, nodeShardData.consensusNodeForOurNode)
+    nodeShardData.edgeNodes = ShardFunctions.subtractNodeLists(nodeShardData.edgeNodes, exclude) // remove ourself!
+
     if (extras.length > 0) {
       ShardFunctions.dilateNeighborCoverage(shardGlobals, nodeShardDataMap, parititionShardDataMap, activeNodes, nodeShardData, extras)
     }
@@ -388,9 +396,11 @@ class ShardFunctions {
     result.partitionEnd = endPartition
     let endAddr = 0xffffffff * ((endPartition) / shardGlobals.numPartitions)
     endAddr = Math.floor(endAddr)
-    if (paritionMax === null) {
-      endAddr-- // - 1 // subtract 1 so we don't go into the nex partition
-    }
+
+    // it seems we dont need/want this code:
+    // if (paritionMax === null) {
+    //   endAddr-- // - 1 // subtract 1 so we don't go into the nex partition
+    // }
 
     result.low = ('00000000' + (+startAddr).toString(16)).slice(-8) + '0'.repeat(56)
     result.high = ('00000000' + (+endAddr).toString(16)).slice(-8) + 'f'.repeat(56)
@@ -470,12 +480,23 @@ class ShardFunctions {
     let scanStart = position - radius // have to pick floor or ceiling and be consistent.
     if (scanStart < 0) {
       scanStart = allNodes.length + scanStart
+
+      // //not sure if this is bad... need to make things work in the case there is only one node to look
+      if (scanStart < 0) {
+        scanStart = 0
+      }
     }
+
+    // if (exclude.length === allNodes.length) {
+    //   return results
+    // }
+
     let scanIndex = scanStart
     for (let i = 0; i < radius * 2 + 1; i++) {
       if (scanIndex >= allNodes.length) {
         scanIndex = 0
       }
+
       let node = allNodes[scanIndex]
       scanIndex++
       if (exclude.includes(node.id)) {
