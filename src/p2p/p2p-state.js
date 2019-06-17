@@ -94,6 +94,9 @@ class P2PState extends EventEmitter {
     // Sets nodelist and current cycle to a copy of the clean nodelist and cycle objects
     this.nodes = utils.deepCopy(this.cleanNodelist)
     this.currentCycle = utils.deepCopy(this.cleanCycle)
+
+    // Variables for lost node detection
+    this.lostNodesMeta = {}
   }
 
   async init () {

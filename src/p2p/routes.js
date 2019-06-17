@@ -322,11 +322,6 @@ function setupRoutes () {
   this.network.registerExternalGet('startlosttest', async (req, res) => {
     const randomNode = this.state.getRandomActiveNode()
     res.json({ nodeTested: randomNode.id })
-    await this.ask(randomNode, 'losttest')
-  })
-
-  // For use with testing lost detection
-  this.registerInternal('losttest', async () => {
-    return true
+    this._reportLostNode(randomNode)
   })
 }

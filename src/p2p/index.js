@@ -1754,7 +1754,39 @@ class P2P extends EventEmitter {
     return verifier
   }
 
-  async _reportLostNode (node) {
+  async _reportLostNode (target) {
+    // Add target (T) to lostNodesMeta, if not already there
+    let meta = this.state.lostNodesMeta[target.id]
+    if (meta) {
+      this.mainLogger.debug(`Node has already been reported.`)
+      return false
+    }
+    meta = {
+      node: target
+    }
+    this.state.lostNodesMeta[target.id] = meta
+    console.log('DBG', 'Meta', meta)
+    // During the next cycles Q1
+    this.state.once('cycle_q1_start', async () => {
+      // Create an investigate message for T
+      const lostMsg = this._generateLostMessage(target)
+      if (!lostMsg) {
+        this.mainLogger.debug(`Unable to report node. No lost message generated for node: ${JSON.stringify(target)}`)
+        return false
+      }
+      const verifier = this._getLostNodeVerifier(lostMsg)
+      if (!verifier) {
+        this.mainLogger.debug(`Unable to report node. No verifier found for lost message: ${JSON.stringify(lostMsg)}`)
+        return false
+      }
+      // Send it to investigator (I) for T
+      console.log('DBG', 'Investigator', JSON.stringify(verifier, null, 2))
+      console.log('DBG', 'InvestigateMsg', JSON.stringify(lostMsg, null, 2))
+      await this.tell([verifier], 'reportlost', lostMsg)
+      return true
+    })
+
+    /*
     const lostMsg = this._generateLostMessage(node)
     if (!lostMsg) {
       this.mainLogger.debug(`Unable to report node. No lost message generated for node: ${JSON.stringify(node)}`)
@@ -1768,6 +1800,7 @@ class P2P extends EventEmitter {
     console.log(JSON.stringify(verifier))
     await this.tell([verifier], 'reportlost', lostMsg)
     return true
+    */
   }
 }
 
