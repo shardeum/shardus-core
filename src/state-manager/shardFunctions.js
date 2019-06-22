@@ -537,7 +537,7 @@ class ShardFunctions {
   static debugFastStableCorrespondingIndicies (size1, size2, index1) {
     let results = []
     try {
-      ShardFunctions.fastStableCorrespondingIndicies(size1, size2, index1)
+      results = ShardFunctions.fastStableCorrespondingIndicies(size1, size2, index1)
     } catch (ex) {
       throw new Error(`stack overflow fastStableCorrespondingIndicies( ${size1},  ${size2}, ${index1} )`)
     }

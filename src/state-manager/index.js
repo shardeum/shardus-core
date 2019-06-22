@@ -2400,6 +2400,9 @@ class StateManager extends EventEmitter {
             let remoteHomeNode = queueEntry.homeNodes[key2]
 
             let ourLocalConsensusIndex = localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === ourNodeData.node.id)
+            if (ourLocalConsensusIndex === -1) {
+              continue
+            }
             let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.consensusNodeForOurNodeFull.length, ourLocalConsensusIndex)
 
             let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.edgeNodes.length, ourLocalConsensusIndex)
