@@ -205,6 +205,9 @@ class ShardFunctions {
 
     nodeShardData.ourNodeIndex = activeNodes.findIndex(function (_node) { return _node.id === node.id })
 
+    nodeShardData.consensusStartPartition = homePartition
+    nodeShardData.consensusEndPartition = homePartition
+
     // push the data in to the correct homenode list for the home partition
     let partitionShard = parititionShardDataMap.get(homePartition)
     if (partitionShard == null) {
@@ -235,8 +238,26 @@ class ShardFunctions {
 
     nodeShardData.nodeThatStoreOurParition = ShardFunctions.getNodesThatCoverRange(shardGlobals, nodeShardData.storedPartitions.homeRange.low, nodeShardData.storedPartitions.homeRange.high, exclude, activeNodes)
     nodeShardData.consensusNodeForOurNode = ShardFunctions.getNeigborNodesInRange(nodeShardData.ourNodeIndex, shardGlobals.consensusRadius, exclude, activeNodes)
+    nodeShardData.consensusNodeForOurNodeFull = ShardFunctions.getNeigborNodesInRange(nodeShardData.ourNodeIndex, shardGlobals.consensusRadius, [], activeNodes)
 
-    let [results, extras] = ShardFunctions.mergeNodeLists(nodeShardData.nodeThatStoreOurParition, nodeShardData.consensusNodeForOurNode)
+    // calcuate partition range for consensus
+    if (nodeShardData.consensusNodeForOurNode.length >= 2) {
+      // this logic only works because we know that getNeigborNodesInRange starts at the starting point
+      let startNode = nodeShardData.consensusNodeForOurNode[0]
+      let endNode = nodeShardData.consensusNodeForOurNode[nodeShardData.consensusNodeForOurNode.length - 1]
+      // ugh, not so efficient since we might have this data precalced in a map.. but way may also not have it
+      let nodeAddressNum = parseInt(startNode.id.slice(0, 8), 16)
+      let startPartition = Math.floor(shardGlobals.numPartitions * (nodeAddressNum / 0xffffffff))
+      nodeAddressNum = parseInt(endNode.id.slice(0, 8), 16)
+      let endPartition = Math.floor(shardGlobals.numPartitions * (nodeAddressNum / 0xffffffff))
+      nodeShardData.consensusStartPartition = startPartition
+      nodeShardData.consensusEndPartition = endPartition
+    }
+
+    // this list is a temporary list that counts as 2c range.  Stored nodes are the merged max of 2c range (2r on each side) and node in the 2c partition range
+    nodeShardData.c2NodeForOurNode = ShardFunctions.getNeigborNodesInRange(nodeShardData.ourNodeIndex, 2 * shardGlobals.consensusRadius, exclude, activeNodes)
+
+    let [results, extras] = ShardFunctions.mergeNodeLists(nodeShardData.nodeThatStoreOurParition, nodeShardData.c2NodeForOurNode)
 
     nodeShardData.nodeThatStoreOurParitionFull = results
     nodeShardData.outOfDefaultRangeNodes = extras
@@ -513,9 +534,20 @@ class ShardFunctions {
     return results
   }
 
+  static debugFastStableCorrespondingIndicies (size1, size2, index1) {
+    let results = []
+    try {
+      ShardFunctions.fastStableCorrespondingIndicies(size1, size2, index1)
+    } catch (ex) {
+      throw new Error(`stack overflow fastStableCorrespondingIndicies( ${size1},  ${size2}, ${index1} )`)
+    }
+
+    return results
+  }
+
   static fastStableCorrespondingIndicies (size1, size2, index1) {
     let results = []
-    if (size1 > size2) {
+    if (size1 >= size2) {
       let value = Math.round((index1 / size1) * size2)
       if (value === 0) {
         value = 1
@@ -534,6 +566,26 @@ class ShardFunctions {
       }
     }
     return results
+  }
+
+  static partitionInConsensusRange (i, minP, maxP) {
+    let key = i
+    if (minP === maxP) {
+      if (i !== minP) {
+        return false
+      }
+    } else if (maxP > minP) {
+      // are we outside the min to max range
+      if (key < minP || key > maxP) {
+        return false
+      }
+    } else {
+      // are we inside the min to max range (since the covered rage is inverted)
+      if (key > maxP && key < minP) {
+        return false
+      }
+    }
+    return true
   }
 }
 module.exports = ShardFunctions

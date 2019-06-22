@@ -376,6 +376,11 @@ class Shardus {
     await this.storage.clearAppRelatedState()
   }
 
+  // USED BY SIMPLECOINAPP
+  async getLocalOrRemoteAccount (address) {
+    return this.stateManager.getLocalOrRemoteAccount(address)
+  }
+
   async shutdown (exitProcess = true) {
     try {
       await this.exitHandler.exitCleanly(exitProcess)
@@ -484,7 +489,7 @@ class Shardus {
       }
 
       if (typeof (application.calculateAccountHash) === 'function') {
-        applicationInterfaceImpl.calculateAccountHash = async (account) => application.calculateAccountHash(account)
+        applicationInterfaceImpl.calculateAccountHash = (account) => application.calculateAccountHash(account)
       } else {
         // throw new Error('Missing requried interface function. apply()')
       }

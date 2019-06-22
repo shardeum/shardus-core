@@ -34,7 +34,7 @@ function findBnotInA (listA, listB) {
 let extraNodesTotal = 0
 let testCounter = 0
 // test 1
-let testIterations = 1
+let testIterations = 0
 let homeNodeQueryTests = 100
 
 let testAllNodesInList = true
@@ -115,8 +115,8 @@ if (testIterations > 0) {
   console.log(`Extra nodes total: ${extraNodesTotal} avg: ${extraNodesTotal / testCounter}  avg per node: ${extraNodesTotal / (testCounter * numNodes)}`)
 }
 
-let size1 = 10
-let size2 = 13
+let size1 = 3
+let size2 = 3
 console.log(` size1: ${size1}  size2: ${size2}`)
 for (let i = 1; i <= size1; i++) {
   let res = ShardFunctions.fastStableCorrespondingIndicies(size1, size2, i)

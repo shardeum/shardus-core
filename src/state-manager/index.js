@@ -19,6 +19,7 @@ class StateManager extends EventEmitter {
     this.app = app
     this.consensus = consensus
     this.logger = logger
+    this.shardLogger = logger.getLogger('shardDump')
 
     this.config = config
 
@@ -32,9 +33,13 @@ class StateManager extends EventEmitter {
     this.syncSettleTime = this.queueSitTime + 2000 // 3 * 10 // an estimate of max transaction settle time. todo make it a config or function of consensus later
 
     this.newAcceptedTxQueue = []
+    this.newAcceptedTxQueueTempInjest = []
+    this.archivedQueueEntries = []
     this.newAcceptedTxQueueRunning = false
     this.dataSyncMainPhaseComplete = false
     this.queueEntryCounter = 0
+    this.queueRestartCounter = 0
+    this.lastSeenAccountsMap = null
 
     this.clearPartitionData()
 
@@ -228,7 +233,9 @@ class StateManager extends EventEmitter {
     cycleShardData.nodeShardDataMap = new Map()
     cycleShardData.parititionShardDataMap = new Map()
     cycleShardData.activeNodes = this.p2p.state.getActiveNodes(null)
+    cycleShardData.activeNodes.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
     cycleShardData.ourNode = this.p2p.state.getNode(this.p2p.id) // ugh, I bet there is a nicer way to get our node
+    cycleShardData.cycleNumber = cycleNumber
 
     if (cycleShardData.activeNodes.length === 0) {
       return // no active nodes so stop calculating values
@@ -247,7 +254,8 @@ class StateManager extends EventEmitter {
     ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.nodeShardData.nodeThatStoreOurParitionFull, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true)
 
     // generate lightweight data for all active nodes  (note that last parameter is false to specify the lightweight data)
-    ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, false)
+    let fullDataForDebug = true // Set this to false for performance reasons!!! setting it to true saves us from having to recalculate stuff when we dump logs.
+    ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, fullDataForDebug)
 
     this.currentCycleShardData = cycleShardData
     this.shardValuesByCycle.set(cycleNumber, cycleShardData)
@@ -1352,7 +1360,7 @@ class StateManager extends EventEmitter {
       // Place tx in queue (if younger than m)
 
       // make sure we don't already have it
-      let queueEntry = this.getQueueEntry(payload.txid, payload.timestamp)
+      let queueEntry = this.getQueueEntrySafe(payload.txid, payload.timestamp)
       if (queueEntry) {
         return
         // already have this in our queue
@@ -1367,9 +1375,16 @@ class StateManager extends EventEmitter {
     this.p2p.registerInternal('request_state_for_tx', async (payload, respond) => {
       let response = { stateList: [] }
       // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
-      let queueEntry = this.getQueueEntry(payload.txid, payload.timestamp)
+      let queueEntry = this.getQueueEntrySafe(payload.txid, payload.timestamp)
       if (queueEntry == null) {
+        queueEntry = this.getQueueEntryArchived(payload.txid, payload.timestamp)
+      }
+
+      if (queueEntry == null) {
+        response.note = `failed to find queue entry: ${payload.txid}  ${payload.timestamp}`
         await respond(response)
+        // TODO ???? if we dont have a queue entry should we do db queries to get the needed data?
+        // my guess is probably not yet
         return
       }
 
@@ -1389,7 +1404,7 @@ class StateManager extends EventEmitter {
       // this.p2p.tell([correspondingEdgeNode], 'broadcast_state', message)
 
       // make sure we have it
-      let queueEntry = this.getQueueEntry(payload.txid, payload.timestamp)
+      let queueEntry = this.getQueueEntrySafe(payload.txid, payload.timestamp)
       if (queueEntry == null) {
         return
       }
@@ -1403,7 +1418,7 @@ class StateManager extends EventEmitter {
       //  gossip 'spread_tx_to_group' to transaction group
       // Place tx in queue (if younger than m)
 
-      let queueEntry = this.getQueueEntry(payload.id, payload.timestamp)
+      let queueEntry = this.getQueueEntrySafe(payload.id, payload.timestamp)
       if (queueEntry) {
         return
         // already have this in our queue
@@ -1413,13 +1428,46 @@ class StateManager extends EventEmitter {
       if (added === 'lost') {
         return // we are faking that the message got lost so bail here
       }
-      queueEntry = this.getQueueEntry(payload.id, payload.timestamp) // now that we added it to the queue, it should be possible to get the queueEntry now
+      queueEntry = this.getQueueEntrySafe(payload.id, payload.timestamp) // now that we added it to the queue, it should be possible to get the queueEntry now
 
       // get transaction group. 3 accounds, merge lists.
       let transactionGroup = this.queueEntryGetTransactionGroup(queueEntry)
-      this.p2p.sendGossipIn('spread_tx_to_group', payload, tracker, sender, transactionGroup)
+      if (queueEntry.ourNodeInvolved === false) {
+        // do not gossip this, we are not involved
+        return
+      }
+      if (transactionGroup.length > 1) {
+        this.p2p.sendGossipIn('spread_tx_to_group', payload, tracker, sender, transactionGroup)
+      }
 
       // await this.queueAcceptedTransaction(acceptedTX, false, sender)
+    })
+
+    this.p2p.registerInternal('get_account_data_with_queue_hints', async (payload, respond) => {
+      let result = {}
+      let accountData = null
+      let ourLockID = -1
+      try {
+        ourLockID = await this.fifoLock('accountModification')
+        accountData = await this.app.getAccountDataByList(payload.accountIds)
+      } finally {
+        this.fifoUnlock('accountModification', ourLockID)
+      }
+      if (accountData != null) {
+        for (let wrappedAccount of accountData) {
+          wrappedAccount.seenInQueue = false
+
+          if (this.lastSeenAccountsMap != null) {
+            let queueEntry = this.lastSeenAccountsMap[wrappedAccount.accountId]
+            if (queueEntry != null) {
+              wrappedAccount.seenInQueue = true
+            }
+          }
+        }
+      }
+
+      result.accountData = accountData
+      await respond(result)
     })
   }
 
@@ -1752,8 +1800,8 @@ class StateManager extends EventEmitter {
 
             if (accountEntry == null) {
               if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress))
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ' + utils.stringifyReduce(accountData))
-              this.fatalLogger.fatal(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ' + utils.stringifyReduce(accountData)) // todo: consider if this is just an error
+              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ')
+              this.fatalLogger.fatal(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ') // todo: consider if this is just an error
               // fail this because we already check if the before state was all zeroes
               return { success: false, hasStateTableData }
             } else {
@@ -2050,11 +2098,6 @@ class StateManager extends EventEmitter {
 
   // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
 
-  initQueues () {
-    this.newAcceptedTxQueue = []
-  // out of order possible if if accounts are blocked
-  }
-
   queueAcceptedTransaction2 (acceptedTX, sendGossip = true, sender) {
     let keysResponse = this.app.getKeyFromTransaction(acceptedTX.data)
     let timestamp = keysResponse.timestamp
@@ -2075,9 +2118,9 @@ class StateManager extends EventEmitter {
     }
 
     // todo faster hash lookup for this maybe?
-    let entry = this.getQueueEntry(acceptedTX.id, acceptedTX.timestamp)
+    let entry = this.getQueueEntrySafe(acceptedTX.id, acceptedTX.timestamp)
     if (entry) {
-      return false // already in our queue
+      return false // already in our queue, or temp queue
     }
 
     try {
@@ -2104,7 +2147,9 @@ class StateManager extends EventEmitter {
         try {
           // async sendGossipIn (type, payload, tracker = '', sender = null, nodes = this.state.getAllNodes())
           let transactionGroup = this.queueEntryGetTransactionGroup(txQueueEntry)
-          this.p2p.sendGossipIn('spread_tx_to_group', acceptedTX, '', sender, transactionGroup)
+          if (transactionGroup.length > 1) {
+            this.p2p.sendGossipIn('spread_tx_to_group', acceptedTX, '', sender, transactionGroup)
+          }
           // this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
         } catch (ex) {
           this.fatalLogger.fatal('txQueueEntry: ' + utils.stringifyReduce(txQueueEntry))
@@ -2118,19 +2163,23 @@ class StateManager extends EventEmitter {
         return // we are done, not involved!!!
       }
 
-      // sorted insert = sort by timestamp
-      // todo faster version (binary search? to find where we need to insert)
-      let index = this.newAcceptedTxQueue.length - 1
-      let lastTx = this.newAcceptedTxQueue[index]
-      while (index >= 0 && ((timestamp > lastTx.txKeys.timestamp) || (timestamp === lastTx.txKeys.timestamp && txId < lastTx.acceptedTx.id))) {
-        index--
-        lastTx = this.newAcceptedTxQueue[index]
-      }
+      // this.logger.playbackLogNote('tx_enqueueTx', `${txQueueEntry.acceptedTx.id}`, `qId: ${txQueueEntry.entryID} qRst:${this.queueRestartCounter} AcceptedTransaction: ${utils.stringifyReduce(txQueueEntry.acceptedTx)}`)
 
-      this.newAcceptedTxQueue.splice(index + 1, 0, txQueueEntry)
+      // // sorted insert = sort by timestamp
+      // // todo faster version (binary search? to find where we need to insert)
+      // let index = this.newAcceptedTxQueue.length - 1
+      // let lastTx = this.newAcceptedTxQueue[index]
+      // while (index >= 0 && ((timestamp > lastTx.txKeys.timestamp) || (timestamp === lastTx.txKeys.timestamp && txId < lastTx.acceptedTx.id))) {
+      //   index--
+      //   lastTx = this.newAcceptedTxQueue[index]
+      // }
 
-      this.logger.playbackLogNote('tx_addToQueue', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
-      this.emit('txQueued', acceptedTX.receipt.txHash)
+      // this.newAcceptedTxQueue.splice(index + 1, 0, txQueueEntry)
+
+      // this.logger.playbackLogNote('tx_addToQueue', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
+      // this.emit('txQueued', acceptedTX.receipt.txHash)
+
+      this.newAcceptedTxQueueTempInjest.push(txQueueEntry)
 
       // start the queue if needed
       this.tryStartAcceptedQueue2()
@@ -2148,9 +2197,11 @@ class StateManager extends EventEmitter {
     }
     if (!this.newAcceptedTxQueueRunning) {
       this.processAcceptedTxQueue2()
-    } else if (this.newAcceptedTxQueue.length > 0) {
-      this.interruptSleepIfNeeded(this.newAcceptedTxQueue[0].timestamp)
     }
+    // with the way the new lists are setup we lost our ablity to interrupt the timer but i am not sure that matters as much
+    // else if (this.newAcceptedTxQueue.length > 0 || this.newAcceptedTxQueueTempInjest.length > 0) {
+    //   this.interruptSleepIfNeeded(this.newAcceptedTxQueue[0].timestamp)
+    // }
   }
   async _firstTimeQueueAwait () {
     if (this.newAcceptedTxQueueRunning) {
@@ -2168,6 +2219,33 @@ class StateManager extends EventEmitter {
       }
     }
     return null
+  }
+
+  getQueueEntryPending (txid, timestamp) {
+    // todo perf need an interpolated or binary search on a sorted list
+    for (let queueEntry of this.newAcceptedTxQueueTempInjest) {
+      if (queueEntry.acceptedTx.id === txid) {
+        return queueEntry
+      }
+    }
+    return null
+  }
+
+  getQueueEntrySafe (txid, timestamp) {
+    let queueEntry = this.getQueueEntry(txid, timestamp)
+    if (queueEntry == null) {
+      return this.getQueueEntryPending(txid, timestamp)
+    }
+
+    return queueEntry
+  }
+
+  getQueueEntryArchived (txid, timestamp) {
+    for (let queueEntry of this.archivedQueueEntries) {
+      if (queueEntry.acceptedTx.id === txid) {
+        return queueEntry
+      }
+    }
   }
 
   queueEntryAddData (queueEntry, data) {
@@ -2214,19 +2292,32 @@ class StateManager extends EventEmitter {
     for (let key of queueEntry.txKeys.allKeys) {
       if (queueEntry.collectedData[key] == null && queueEntry.requests[key] == null) {
         let homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
-        let message = { keys: allKeys, tx: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
-        let randomIndex = this.getRandomInt(homeNodeShardData.consensusNodeForOurNode.length - 1)
-        let node = homeNodeShardData.consensusNodeForOurNode[randomIndex]
+
+        let randomIndex = this.getRandomInt(homeNodeShardData.consensusNodeForOurNodeFull.length - 1)
+        let node = homeNodeShardData.consensusNodeForOurNodeFull[randomIndex]
+
+        // make sure we didn't get or own node
+        while (node.id === this.currentCycleShardData.nodeShardData.node.id) {
+          randomIndex = this.getRandomInt(homeNodeShardData.consensusNodeForOurNodeFull.length - 1)
+          node = homeNodeShardData.consensusNodeForOurNodeFull[randomIndex]
+        }
+
+        // Todo: expand this to grab a consensus node from any of the involved consensus nodes.
 
         for (let key2 of allKeys) {
           queueEntry.requests[key2] = node
         }
+
+        let message = { keys: allKeys, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
         let result = await this.p2p.ask(node, 'request_state_for_tx', message) // not sure if we should await this.
         for (let data of result.stateList) {
           this.queueEntryAddData(queueEntry, data)
         }
         if (queueEntry.hasAll === false) {
           queueEntry.state = 'failed to get data'
+        } else {
+          queueEntry.state = 'got all missing data'
+          break
         }
 
         queueEntry.homeNodes[key] = null
@@ -2252,11 +2343,14 @@ class StateManager extends EventEmitter {
       for (let node of homeNode.nodeThatStoreOurParitionFull) { // not iterable!
         uniqueNodes[node.id] = node
       }
+      // make sure the home node is in there in case we hit and edge case
+      uniqueNodes[homeNode.node.id] = homeNode.node
     }
     queueEntry.ourNodeInvolved = true
     if (uniqueNodes[this.currentCycleShardData.ourNode.id] == null) {
       queueEntry.ourNodeInvolved = false
     }
+
     // make sure our node is included: needed for gossip! - although we may not care about the data!
     uniqueNodes[this.currentCycleShardData.ourNode.id] = this.currentCycleShardData.ourNode
 
@@ -2272,28 +2366,22 @@ class StateManager extends EventEmitter {
   async tellCorrespondingNodes (queueEntry) {
     // Report data to corresponding nodes
     let ourNodeData = this.currentCycleShardData.nodeShardData
-    let ourConsensusIndex = ourNodeData.consensusNodeForOurNode.findIndex((a) => a.id === ourNodeData.node.id)
-
     let correspondingEdgeNodes = []
-
-    let edgeIndicies = null
-
-    if (ourNodeData.edgeNodes.length > 0) {
-      edgeIndicies = ShardFunctions.fastStableCorrespondingIndicies(ourNodeData.consensusNodeForOurNode.length, ourNodeData.edgeNodes.length, ourConsensusIndex)
-      for (let index of edgeIndicies) {
-        correspondingEdgeNodes.push(ourNodeData.edgeNodes[index - 1]) // fastStableCorrespondingIndicies is one based so adjust for 0 based array
-      }
-    }
-
     let correspondingAccNodes = []
+    let dataKeysWeHave = []
+    let dataValuesWeHave = []
     let datas = {}
-
+    let remoteShardsByKey = {} // shard homenodes that we do not have the data for.
     for (let key of queueEntry.txKeys.allKeys) {
       if (ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)) { // todo Detect if our node covers this paritition..  need our partition data
         let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
         datas[key] = data
+        dataKeysWeHave.push(key)
+        dataValuesWeHave.push(data)
         // add this data to our own queue entry!!
         this.queueEntryAddData(queueEntry, data)
+      } else {
+        remoteShardsByKey[key] = queueEntry.homeNodes[key]
       }
     }
     let message = { stateList: datas, txid: queueEntry.acceptedTx.id }
@@ -2303,30 +2391,126 @@ class StateManager extends EventEmitter {
       this.p2p.tell(correspondingEdgeNodes, 'broadcast_state', message)
     }
 
+    let nodesToSendTo = {}
     for (let key of queueEntry.txKeys.allKeys) {
       if (datas[key] != null) {
-        continue // this is data we have and are sending
-      }
-      // let randomIndex = this.getRandomIndex(queueEntry.homeNodes[key].nodeThatStoreOurParitionFull)
-      let otherHomeNode = queueEntry.homeNodes[key] // .nodeThatStoreOurParitionFull[randomIndex]
+        for (let key2 of queueEntry.txKeys.allKeys) {
+          if (key !== key2) {
+            let localHomeNode = queueEntry.homeNodes[key]
+            let remoteHomeNode = queueEntry.homeNodes[key2]
 
-      let indicies = ShardFunctions.fastStableCorrespondingIndicies(ourNodeData.consensusNodeForOurNode.length, otherHomeNode.consensusNodeForOurNode.length, ourConsensusIndex)
-      // correspondingAccNodes.push(node)
-      for (let index of indicies) {
-        let node = otherHomeNode.consensusNodeForOurNode[index - 1]
-        if (node !== ourNodeData.node.id) {
-          correspondingAccNodes.push(node)
-        } // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+            let ourLocalConsensusIndex = localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === ourNodeData.node.id)
+            let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.consensusNodeForOurNodeFull.length, ourLocalConsensusIndex)
+
+            let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.edgeNodes.length, ourLocalConsensusIndex)
+
+            // for each remote node lets save it's id
+            for (let index of indicies) {
+              let node = remoteHomeNode.consensusNodeForOurNodeFull[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+              if (node !== ourNodeData.node.id) {
+                nodesToSendTo[node.id] = node
+              }
+            }
+            for (let index of edgeIndicies) {
+              let node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+              if (node !== ourNodeData.node.id) {
+                nodesToSendTo[node.id] = node
+              }
+            }
+
+            correspondingAccNodes = Object.values(nodesToSendTo)
+            let dataToSend = {}
+            dataToSend[key] = datas[key] // only sending just this one key at a time
+            message = { stateList: dataToSend, txid: queueEntry.acceptedTx.id }
+            if (correspondingAccNodes.length > 0) {
+              this.p2p.tell(correspondingAccNodes, 'broadcast_state', message)
+            }
+          }
+        }
       }
-    }
-    if (correspondingAccNodes.length > 0) {
-      this.p2p.tell(correspondingAccNodes, 'broadcast_state', message)
     }
   }
 
+  // // should work even if there are zero nodes to tell and should load data locally into queue entry
+  // async tellCorrespondingEdgeNodes (queueEntry) {
+  //   // Report data to corresponding nodes
+  //   let ourNodeData = this.currentCycleShardData.nodeShardData
+  //   let correspondingEdgeNodes = []
+  //   let correspondingAccNodes = []
+  //   let dataKeysWeHave = []
+  //   let dataValuesWeHave = []
+  //   let datas = {}
+  //   let remoteShardsByKey = {} // shard homenodes that we do not have the data for.
+  //   for (let key of queueEntry.txKeys.allKeys) {
+  //     if (ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)) { // todo Detect if our node covers this paritition..  need our partition data
+  //       let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
+  //       datas[key] = data
+  //       dataKeysWeHave.push(key)
+  //       dataValuesWeHave.push(data)
+  //       // add this data to our own queue entry!!
+  //       this.queueEntryAddData(queueEntry, data)
+  //     } else {
+  //       remoteShardsByKey[key] = queueEntry.homeNodes[key]
+  //     }
+  //   }
+  //   let message = { stateList: datas, txid: queueEntry.acceptedTx.id }
+  //   if (correspondingEdgeNodes != null && correspondingEdgeNodes.length > 0) {
+  //     // calc our index in a list. deterministic closest fit.
+
+  //     this.p2p.tell(correspondingEdgeNodes, 'broadcast_state', message)
+  //   }
+
+  //   let nodesToSendTo = {}
+  //   let edgeNodesToSendTo = {}
+  //   for (let key of queueEntry.txKeys.allKeys) {
+  //     if (datas[key] != null) {
+  //       // get edge nodes to send to.
+  //       let localHomeNode = queueEntry.homeNodes[key]
+  //       let ourLocalConsensusIndex = localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === ourNodeData.node.id)
+  //       let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, localHomeNode.edgeNodes.length, ourLocalConsensusIndex)
+
+  //       for (let index of indicies) {
+  //         let node = localHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+
+  //         if (node == null) {
+  //           throw new Error(`localHomeNode.edgeNodes len: ${localHomeNode.edgeNodes.length} indicies:${utils.stringifyReduce(indicies)} debugFastStableCorrespondingIndicies: ${[localHomeNode.consensusNodeForOurNodeFull.length, localHomeNode.edgeNodes.length, ourLocalConsensusIndex]}`)
+  //         }
+
+  //         if (node !== ourNodeData.node.id) {
+  //           nodesToSendTo[node.id] = node
+  //           edgeNodesToSendTo[node.id] = node // for debug
+  //         }
+  //       }
+  //     } else {
+  //       // if we get here we are dealing with the key of a shard that we do not have dat for, so we should send everythig we have to the corresponding node
+  //       let remoteHomeNode = queueEntry.homeNodes[key]
+
+  //       for (let keyOwned of dataKeysWeHave) {
+  //         let localHomeNode = queueEntry.homeNodes[keyOwned]
+  //         let ourLocalConsensusIndex = localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === ourNodeData.node.id)
+  //         let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.consensusNodeForOurNodeFull.length, ourLocalConsensusIndex)
+
+  //         // for each remote node lets save it's id
+  //         for (let index of indicies) {
+  //           let node = remoteHomeNode.consensusNodeForOurNodeFull[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+  //           if (node !== ourNodeData.node.id) {
+  //             nodesToSendTo[node.id] = node
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
+
+  //   correspondingAccNodes = Object.values(nodesToSendTo)
+  //   if (correspondingAccNodes.length > 0) {
+  //     this.p2p.tell(correspondingAccNodes, 'broadcast_state', message)
+  //   }
+  // }
+
   async processAcceptedTxQueue2 () {
+    let seenAccounts
     try {
-      if (this.newAcceptedTxQueue.length === 0) {
+      if (this.newAcceptedTxQueue.length === 0 && this.newAcceptedTxQueueTempInjest.length === 0) {
         return
       }
       if (this.newAcceptedTxQueueRunning === true) {
@@ -2348,7 +2532,7 @@ class StateManager extends EventEmitter {
       let timeM2 = timeM * 2
       let currentTime = Date.now() // when to update this?
 
-      let seenAccounts = [] // todo PERF we should be able to support using a variable that we save from one update to the next.  set that up after initial testing
+      seenAccounts = {}// todo PERF we should be able to support using a variable that we save from one update to the next.  set that up after initial testing
 
       let accountSeen = function (queueEntry) {
         for (let key of queueEntry.txKeys.allKeys) {
@@ -2373,9 +2557,29 @@ class StateManager extends EventEmitter {
           }
         }
       }
-      // let getLocalData = function (queueEntry) {
 
-      // }
+      // process any new queue entries that were added to the temporary list
+      if (this.newAcceptedTxQueueTempInjest.length > 0) {
+        for (let txQueueEntry of this.newAcceptedTxQueueTempInjest) {
+          let timestamp = txQueueEntry.txKeys.timestamp
+          let acceptedTx = txQueueEntry.acceptedTx
+          let txId = acceptedTx.receipt.txHash
+          // sorted insert = sort by timestamp
+          // todo faster version (binary search? to find where we need to insert)
+          let index = this.newAcceptedTxQueue.length - 1
+          let lastTx = this.newAcceptedTxQueue[index]
+
+          while (index >= 0 && ((timestamp > lastTx.txKeys.timestamp) || (timestamp === lastTx.txKeys.timestamp && txId < lastTx.acceptedTx.id))) {
+            index--
+            lastTx = this.newAcceptedTxQueue[index]
+          }
+
+          this.newAcceptedTxQueue.splice(index + 1, 0, txQueueEntry)
+          this.logger.playbackLogNote('tx_addToQueue', `${txId}`, `AcceptedTransaction: ${acceptedTx}`)
+          this.emit('txQueued', acceptedTx.receipt.txHash)
+        }
+        this.newAcceptedTxQueueTempInjest = []
+      }
 
       while (this.newAcceptedTxQueue.length > 0) {
         if (currentIndex < 0) {
@@ -2420,7 +2624,7 @@ class StateManager extends EventEmitter {
         } else if (queueEntry.state === 'applying') {
           markAccountsSeen(queueEntry)
 
-          this.logger.playbackLogNote('tx_workingOnTx', `${queueEntry.acceptedTx.id}`, `AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+          this.logger.playbackLogNote('tx_workingOnTx', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${this.queueRestartCounter} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
           this.emit('txPopped', queueEntry.acceptedTx.receipt.txHash)
 
           // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processAcceptedTxQueue2. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
@@ -2445,25 +2649,152 @@ class StateManager extends EventEmitter {
             clearAccountsSeen(queueEntry)
             // remove from queue
             this.newAcceptedTxQueue.splice(currentIndex, 1)
+            this.archivedQueueEntries.push(queueEntry)
+            if (this.archivedQueueEntries.length > 10000) { // todo make this a constant and decide what len should really be!
+              this.archivedQueueEntries.shift()
+            }
           }
         } else if (queueEntry.state === 'failed to get data') {
           // TODO log
           // remove from queue
           this.newAcceptedTxQueue.splice(currentIndex, 1)
+          this.archivedQueueEntries.push(queueEntry)
+          if (this.archivedQueueEntries.length > 10000) {
+            this.archivedQueueEntries.shift()
+          }
         }
         currentIndex--
       }
     } finally {
-      this.newAcceptedTxQueueRunning = false
-    }
+      // restart loop if there are still elements in it
+      if (this.newAcceptedTxQueue.length > 0 || this.newAcceptedTxQueueTempInjest.length > 0) {
+        setTimeout(() => { this.tryStartAcceptedQueue2() }, 15)
+      }
 
-    // restart loop if there are still elements in it
-    if (this.newAcceptedTxQueue.length > 0) {
-      setTimeout(() => { this.tryStartAcceptedQueue2() }, 15)
+      this.newAcceptedTxQueueRunning = false
+      this.lastSeenAccountsMap = seenAccounts
     }
   }
 
-  /// //////////////////
+  async dumpAccountDebugData () {
+    if (this.currentCycleShardData == null) {
+      return
+    }
+
+    // hmm how to deal with data that is changing... it cant!!
+    let partitionMap = this.currentCycleShardData.parititionShardDataMap
+
+    let ourNodeShardData = this.currentCycleShardData.nodeShardData
+    // partittions:
+    let partitionDump = { partitions: [] }
+    partitionDump.cycle = this.currentCycleShardData.cycleNumber
+
+    // todo port this to a static stard function!
+    // check if we are in the consenus group for this partition
+    let minP = ourNodeShardData.consensusStartPartition // storedPartitions.partitionStart
+    let maxP = ourNodeShardData.consensusEndPartition // storedPartitions.partitionEnd
+    partitionDump.rangesCovered = { ipPort: `${ourNodeShardData.node.externalIp}:${ourNodeShardData.node.externalPort}`, id: utils.makeShortHash(ourNodeShardData.node.id), fracID: (ourNodeShardData.nodeAddressNum / 0xffffffff), hP: ourNodeShardData.homePartition, cMin: minP, cMax: maxP, stMin: ourNodeShardData.storedPartitions.partitionStart, stMax: ourNodeShardData.storedPartitions.partitionEnd, numP: this.currentCycleShardData.shardGlobals.numPartitions }
+
+    // todo print out coverage map by node index
+
+    partitionDump.nodesCovered = { idx: ourNodeShardData.ourNodeIndex, ipPort: `${ourNodeShardData.node.externalIp}:${ourNodeShardData.node.externalPort}`, id: utils.makeShortHash(ourNodeShardData.node.id), fracID: (ourNodeShardData.nodeAddressNum / 0xffffffff), hP: ourNodeShardData.homePartition, consensus: [], stored: [], extra: [], numP: this.currentCycleShardData.shardGlobals.numPartitions }
+    for (let node of ourNodeShardData.consensusNodeForOurNode) {
+      let nodeData = this.currentCycleShardData.nodeShardDataMap.get(node.id)
+      partitionDump.nodesCovered.consensus.push({ idx: nodeData.ourNodeIndex, hp: nodeData.homePartition })
+    }
+    for (let node of ourNodeShardData.nodeThatStoreOurParitionFull) {
+      let nodeData = this.currentCycleShardData.nodeShardDataMap.get(node.id)
+      partitionDump.nodesCovered.stored.push({ idx: nodeData.ourNodeIndex, hp: nodeData.homePartition })
+    }
+
+    for (var [key, value] of partitionMap) {
+      let partition = { parititionID: key, accounts: [] }
+      partitionDump.partitions.push(partition)
+
+      // normal case
+      if (maxP > minP) {
+        // are we outside the min to max range
+        if (key < minP || key > maxP) {
+          partition.skip = { p: key, min: minP, max: maxP }
+          continue
+        }
+      } else {
+        // are we inside the min to max range (since the covered rage is inverted)
+        if (key > maxP && key < minP) {
+          partition.skip = { p: key, min: minP, max: maxP, inverted: true }
+          continue
+        }
+      }
+
+      let partitionShardData = value
+      let accountStart = partitionShardData.homeRange.low
+      let accountEnd = partitionShardData.homeRange.high
+      let wrappedAccounts = await this.app.getAccountData(accountStart, accountEnd, 10000000)
+      // { accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp }
+      for (let wrappedAccount of wrappedAccounts) {
+        let v = wrappedAccount.data.balance // hack, todo maybe ask app for a debug value
+        partition.accounts.push({ id: wrappedAccount.accountId, hash: wrappedAccount.stateId, v: v })
+      }
+    }
+
+    partitionDump.allNodeIds = []
+    for (let node of this.currentCycleShardData.activeNodes) {
+      partitionDump.allNodeIds.push(utils.makeShortHash(node.id))
+    }
+    // dump information about consensus group and edge nodes for each partition
+    // for (var [key, value] of this.currentCycleShardData.parititionShardDataMap){
+
+    // }
+
+    this.shardLogger.debug(utils.stringifyReduce(partitionDump))
+  }
+
+  // todo support metadata so we can serve up only a portion of the account
+  // todo 2? communicate directly back to client... could have security issue.
+  // todo 3? require a relatively stout client proof of work
+  async getLocalOrRemoteAccount (address) {
+    let wrappedAccount
+
+    // check if we have this account locally. (does it have to be consenus or just stored?)
+    let accountIsRemote = true
+
+    let ourNodeShardData = this.currentCycleShardData.nodeShardData
+    let minP = ourNodeShardData.consensusStartPartition
+    let maxP = ourNodeShardData.consensusEndPartition
+    let [homePartition, addressNum] = ShardFunctions.addressToPartition(this.currentCycleShardData.shardGlobals, address)
+    accountIsRemote = (ShardFunctions.partitionInConsensusRange(homePartition, minP, maxP) === false)
+
+    if (accountIsRemote) {
+      let homeNode = ShardFunctions.findHomeNode(this.currentCycleShardData.shardGlobals, address, this.currentCycleShardData.parititionShardDataMap)
+
+      let message = { accountIds: [address] }
+      let result = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
+      if (result != null && result.accountData != null && result.accountData.length > 0) {
+        wrappedAccount = result.accountData[0]
+        return wrappedAccount
+      }
+    } else {
+      // we are local!
+      let accountData = await this.app.getAccountDataByList([address])
+      if (accountData != null) {
+        for (let wrappedAccount of accountData) {
+          wrappedAccount.seenInQueue = false
+
+          if (this.lastSeenAccountsMap != null) {
+            let queueEntry = this.lastSeenAccountsMap[wrappedAccount.accountId]
+            if (queueEntry != null) {
+              wrappedAccount.seenInQueue = true
+            }
+          }
+        }
+      }
+      wrappedAccount = accountData[0]
+      return wrappedAccount
+    }
+    return null
+  }
+
+  /// /////////////////////////////////////////////////////////
   async fifoLock (fifoName) {
     let thisFifo = this.fifoLocks[fifoName]
     if (thisFifo == null) {
@@ -3759,6 +4090,7 @@ class StateManager extends EventEmitter {
   startShardCalculations () {
     this.p2p.state.on('cycle_q1_start', async (lastCycle, time) => {
       if (lastCycle) {
+        this.dumpAccountDebugData()
         this.updateShardValues(lastCycle.counter)
       }
     })
