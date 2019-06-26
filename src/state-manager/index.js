@@ -2128,7 +2128,7 @@ class StateManager extends EventEmitter {
       if (age > this.queueSitTime * 0.9) {
         this.fatalLogger.fatal('queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
         // TODO consider throwing this out.  right now it is just a warning
-        this.logger.playbackLogNote('oldQueueInsertion', '', 'queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
+        this.logger.playbackLogNote('shrd_oldQueueInsertion', '', 'queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
       }
 
       // Init home nodes!
@@ -2139,8 +2139,12 @@ class StateManager extends EventEmitter {
           if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` queueAcceptedTransaction2: ${key} `)
         }
 
+        let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
+        let relationString = ShardFunctions.getNodeRelation(homeNode, this.currentCycleShardData.ourNode.id)
         // route_to_home_node
+        this.logger.playbackLogNote('shrd_homeNodeSummary', `${txId}`, `account:${utils.makeShortHash(key)} rel:${relationString} summary:${utils.stringifyReduce(summaryObject)}`)
       }
+      txQueueEntry.uniqueKeys = Object.keys(txQueueEntry.homeNodes)
 
       // gossip 'spread_tx_to_group' to transaction group
       if (sendGossip) {
@@ -2160,6 +2164,8 @@ class StateManager extends EventEmitter {
       // see if our node shard data covers any of the accounts?
       this.queueEntryGetTransactionGroup(txQueueEntry) // this will compute our involvment
       if (txQueueEntry.ourNodeInvolved === false) {
+        this.logger.playbackLogNote('shrd_notInTxGroup', `${txId}`, ``)
+
         return // we are done, not involved!!!
       }
 
@@ -2184,7 +2190,7 @@ class StateManager extends EventEmitter {
       // start the queue if needed
       this.tryStartAcceptedQueue2()
     } catch (error) {
-      this.logger.playbackLogNote('tx_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
+      this.logger.playbackLogNote('shrd_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTX.id)}`)
       this.fatalLogger.fatal('queueAcceptedTransaction failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
       throw new Error(error)
     }
@@ -2255,9 +2261,28 @@ class StateManager extends EventEmitter {
     queueEntry.collectedData[data.id] = data
     queueEntry.dataCollected++
 
-    if (queueEntry.dataCollected === queueEntry.txKeys.allKeys.length) {
+    if (queueEntry.dataCollected === queueEntry.uniqueKeys.length) { //  queueEntry.tx Keys.allKeys.length
       queueEntry.hasAll = true
     }
+
+    this.logger.playbackLogNote('shrd_addData', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `key ${utils.makeShortHash(data.id)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}`)
+  }
+
+  queueEntryHasAllData (queueEntry) {
+    if (queueEntry.hasAll === true) {
+      return true
+    }
+    let dataCollected = 0
+    for (let key of queueEntry.uniqueKeys) {
+      if (queueEntry.collectedData[key] != null) {
+        dataCollected++
+      }
+    }
+    if (dataCollected === queueEntry.uniqueKeys.length) { //  queueEntry.tx Keys.allKeys.length uniqueKeys.length
+      queueEntry.hasAll = true
+      return true
+    }
+    return false
   }
 
   async queueEntryRequestMissingData (queueEntry) {
@@ -2267,7 +2292,7 @@ class StateManager extends EventEmitter {
     // just ask one or two then bail if we dont get all the data
 
     // old method that sends N messages to n nodes
-    // for (let key of queueEntry.txKeys.allKeys) {
+    // for (let key of queueEntry.uniqueKeys) {
     //   if (queueEntry.collectedData[key] == null && queueEntry.requests[key] == null) {
     //     let homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
     //     let message = { keys: [key], tx: queueEntry.acceptedTX.id, timestamp: queueEntry.acceptedTX.timestamp }
@@ -2283,13 +2308,15 @@ class StateManager extends EventEmitter {
     // }
 
     let allKeys = []
-    for (let key of queueEntry.txKeys.allKeys) {
+    for (let key of queueEntry.uniqueKeys) {
       if (queueEntry.collectedData[key] == null) {
         allKeys.push(key)
       }
     }
 
-    for (let key of queueEntry.txKeys.allKeys) {
+    this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_start', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
+
+    for (let key of queueEntry.uniqueKeys) {
       if (queueEntry.collectedData[key] == null && queueEntry.requests[key] == null) {
         let homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
 
@@ -2308,19 +2335,35 @@ class StateManager extends EventEmitter {
           queueEntry.requests[key2] = node
         }
 
+        let relationString = ShardFunctions.getNodeRelation(homeNodeShardData, this.currentCycleShardData.ourNode.id)
+        this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
+
         let message = { keys: allKeys, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
         let result = await this.p2p.ask(node, 'request_state_for_tx', message) // not sure if we should await this.
+        let dataCountReturned = 0
+        let accountIdsReturned = []
         for (let data of result.stateList) {
           this.queueEntryAddData(queueEntry, data)
-        }
-        if (queueEntry.hasAll === false) {
-          queueEntry.state = 'failed to get data'
-        } else {
-          queueEntry.state = 'got all missing data'
-          break
+          dataCountReturned++
+          accountIdsReturned.push(utils.makeShortHash(data.id))
         }
 
-        queueEntry.homeNodes[key] = null
+        if (queueEntry.hasAll === true) {
+          queueEntry.logstate = 'got all missing data'
+        } else {
+          queueEntry.logstate = 'failed to get data:' + queueEntry.hasAll
+        }
+
+        this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
+
+        // queueEntry.homeNodes[key] = null
+        for (let key2 of allKeys) {
+          queueEntry.requests[key2] = null
+        }
+
+        if (queueEntry.hasAll === true) {
+          break
+        }
       }
     }
   }
@@ -2331,7 +2374,7 @@ class StateManager extends EventEmitter {
     }
     let txGroup = []
     let uniqueNodes = {}
-    for (let key of queueEntry.txKeys.allKeys) {
+    for (let key of queueEntry.uniqueKeys) {
       let homeNode = queueEntry.homeNodes[key]
       // txGroup = Array.concat(txGroup, homeNode.nodeThatStoreOurParitionFull)
       if (homeNode == null) {
@@ -2366,14 +2409,30 @@ class StateManager extends EventEmitter {
   async tellCorrespondingNodes (queueEntry) {
     // Report data to corresponding nodes
     let ourNodeData = this.currentCycleShardData.nodeShardData
-    let correspondingEdgeNodes = []
+    // let correspondingEdgeNodes = []
     let correspondingAccNodes = []
     let dataKeysWeHave = []
     let dataValuesWeHave = []
     let datas = {}
     let remoteShardsByKey = {} // shard homenodes that we do not have the data for.
-    for (let key of queueEntry.txKeys.allKeys) {
-      if (ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)) { // todo Detect if our node covers this paritition..  need our partition data
+    for (let key of queueEntry.uniqueKeys) {
+      ///   test here
+      // let hasKey = ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)
+      // todo : if this works maybe a nicer or faster version could be used
+      let hasKey = false
+      let homeNode = queueEntry.homeNodes[key]
+      if (homeNode.node.id === ourNodeData.node.id) {
+        hasKey = true
+      } else {
+        for (let node of homeNode.nodeThatStoreOurParitionFull) {
+          if (node.id === ourNodeData.node.id) {
+            hasKey = true
+            break
+          }
+        }
+      }
+
+      if (hasKey) { // todo Detect if our node covers this paritition..  need our partition data
         let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
         datas[key] = data
         dataKeysWeHave.push(key)
@@ -2384,17 +2443,19 @@ class StateManager extends EventEmitter {
         remoteShardsByKey[key] = queueEntry.homeNodes[key]
       }
     }
-    let message = { stateList: datas, txid: queueEntry.acceptedTx.id }
-    if (correspondingEdgeNodes != null && correspondingEdgeNodes.length > 0) {
-      // calc our index in a list. deterministic closest fit.
-
-      this.p2p.tell(correspondingEdgeNodes, 'broadcast_state', message)
-    }
+    // let message = { stateList: datas, txid: queueEntry.acceptedTx.id }
+    // if (correspondingEdgeNodes != null && correspondingEdgeNodes.length > 0) {
+    //   // calc our index in a list. deterministic closest fit.
+    //   this.p2p.tell(correspondingEdgeNodes, 'broadcast_state', message)
+    // }
+    let message
+    let edgeNodeIds = []
+    let consensusNodeIds = []
 
     let nodesToSendTo = {}
-    for (let key of queueEntry.txKeys.allKeys) {
+    for (let key of queueEntry.uniqueKeys) {
       if (datas[key] != null) {
-        for (let key2 of queueEntry.txKeys.allKeys) {
+        for (let key2 of queueEntry.uniqueKeys) {
           if (key !== key2) {
             let localHomeNode = queueEntry.homeNodes[key]
             let remoteHomeNode = queueEntry.homeNodes[key2]
@@ -2403,29 +2464,35 @@ class StateManager extends EventEmitter {
             if (ourLocalConsensusIndex === -1) {
               continue
             }
-            let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.consensusNodeForOurNodeFull.length, ourLocalConsensusIndex)
 
-            let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.edgeNodes.length, ourLocalConsensusIndex)
+            // must add one to each lookup index!
+            let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.consensusNodeForOurNodeFull.length, ourLocalConsensusIndex + 1)
+            let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.edgeNodes.length, ourLocalConsensusIndex + 1)
 
             // for each remote node lets save it's id
             for (let index of indicies) {
               let node = remoteHomeNode.consensusNodeForOurNodeFull[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
               if (node !== ourNodeData.node.id) {
                 nodesToSendTo[node.id] = node
+                consensusNodeIds.push(node.id)
               }
             }
             for (let index of edgeIndicies) {
               let node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
               if (node !== ourNodeData.node.id) {
                 nodesToSendTo[node.id] = node
+                edgeNodeIds.push(node.id)
               }
             }
 
             correspondingAccNodes = Object.values(nodesToSendTo)
-            let dataToSend = {}
-            dataToSend[key] = datas[key] // only sending just this one key at a time
+            let dataToSend = []
+            dataToSend.push(datas[key]) // only sending just this one key at a time
             message = { stateList: dataToSend, txid: queueEntry.acceptedTx.id }
             if (correspondingAccNodes.length > 0) {
+              let remoteRelation = ShardFunctions.getNodeRelation(remoteHomeNode, this.currentCycleShardData.ourNode.id)
+              let localRelation = ShardFunctions.getNodeRelation(localHomeNode, this.currentCycleShardData.ourNode.id)
+              this.logger.playbackLogNote('shrd_tellCorrespondingNodes', `${queueEntry.acceptedTx.id}`, `remoteRel: ${remoteRelation} localrel: ${localRelation} qId: ${queueEntry.entryID} AccountBeingShared: ${utils.makeShortHash(key)} EdgeNodes:${utils.stringifyReduce(edgeNodeIds)} ConsesusNodes${utils.stringifyReduce(consensusNodeIds)}`)
               this.p2p.tell(correspondingAccNodes, 'broadcast_state', message)
             }
           }
@@ -2444,7 +2511,7 @@ class StateManager extends EventEmitter {
   //   let dataValuesWeHave = []
   //   let datas = {}
   //   let remoteShardsByKey = {} // shard homenodes that we do not have the data for.
-  //   for (let key of queueEntry.txKeys.allKeys) {
+  //   for (let key of queueEntry.uniqueKeys) {
   //     if (ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)) { // todo Detect if our node covers this paritition..  need our partition data
   //       let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
   //       datas[key] = data
@@ -2465,7 +2532,7 @@ class StateManager extends EventEmitter {
 
   //   let nodesToSendTo = {}
   //   let edgeNodesToSendTo = {}
-  //   for (let key of queueEntry.txKeys.allKeys) {
+  //   for (let key of queueEntry.uniqueKeys) {
   //     if (datas[key] != null) {
   //       // get edge nodes to send to.
   //       let localHomeNode = queueEntry.homeNodes[key]
@@ -2538,7 +2605,7 @@ class StateManager extends EventEmitter {
       seenAccounts = {}// todo PERF we should be able to support using a variable that we save from one update to the next.  set that up after initial testing
 
       let accountSeen = function (queueEntry) {
-        for (let key of queueEntry.txKeys.allKeys) {
+        for (let key of queueEntry.uniqueKeys) {
           if (seenAccounts[key] != null) {
             return true
           }
@@ -2546,7 +2613,7 @@ class StateManager extends EventEmitter {
         return false
       }
       let markAccountsSeen = function (queueEntry) {
-        for (let key of queueEntry.txKeys.allKeys) {
+        for (let key of queueEntry.uniqueKeys) {
           if (seenAccounts[key] == null) {
             seenAccounts[key] = queueEntry
           }
@@ -2554,7 +2621,7 @@ class StateManager extends EventEmitter {
       }
       // if we are the oldest ref to this you can clear it.. only ok because younger refs will still reflag it in time
       let clearAccountsSeen = function (queueEntry) {
-        for (let key of queueEntry.txKeys.allKeys) {
+        for (let key of queueEntry.uniqueKeys) {
           if (seenAccounts[key] === queueEntry) {
             seenAccounts[key] = null
           }
@@ -2578,7 +2645,7 @@ class StateManager extends EventEmitter {
           }
 
           this.newAcceptedTxQueue.splice(index + 1, 0, txQueueEntry)
-          this.logger.playbackLogNote('tx_addToQueue', `${txId}`, `AcceptedTransaction: ${acceptedTx}`)
+          this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)}`)
           this.emit('txQueued', acceptedTx.receipt.txHash)
         }
         this.newAcceptedTxQueueTempInjest = []
@@ -2614,6 +2681,11 @@ class StateManager extends EventEmitter {
 
           // check if we have all accounts
           if (queueEntry.hasAll === false && txAge > timeM2) {
+            if (this.queueEntryHasAllData(queueEntry) === true) {
+              this.logger.playbackLogNote('shrd_hadDataAfterall', `${queueEntry.acceptedTx.id}`, `This is kind of an error, and should not happen`)
+              continue
+            }
+
             // 7.  Manually request missing state
             try {
               this.queueEntryRequestMissingData(queueEntry)
@@ -2627,7 +2699,7 @@ class StateManager extends EventEmitter {
         } else if (queueEntry.state === 'applying') {
           markAccountsSeen(queueEntry)
 
-          this.logger.playbackLogNote('tx_workingOnTx', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${this.queueRestartCounter} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+          this.logger.playbackLogNote('shrd_workingOnTx', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${this.queueRestartCounter} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
           this.emit('txPopped', queueEntry.acceptedTx.receipt.txHash)
 
           // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processAcceptedTxQueue2. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
@@ -2647,6 +2719,9 @@ class StateManager extends EventEmitter {
                 this.fatalLogger.fatal(this.dataPhaseTag + `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`) // todo: consider if this is just an error
               }
             }
+          } catch (ex) {
+            this.mainLogger.debug('processAcceptedTxQueue2 applyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+            this.fatalLogger.fatal('processAcceptedTxQueue2 applyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
           } finally {
             // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processAcceptedTxQueue2. clear and remove. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
             clearAccountsSeen(queueEntry)
@@ -3887,7 +3962,12 @@ class StateManager extends EventEmitter {
     // lock all the accounts we will modify
     let wrapperLockId = await this.fifoLock('atomicWrapper')
     let ourLocks = []
+    let seen = {}
     for (let accountKey of accountIDs) {
+      if (seen[accountKey] === true) {
+        continue
+      }
+      seen[accountKey] = true
       let ourLockID = await this.fifoLock(accountKey)
       ourLocks.push(ourLockID)
     }
