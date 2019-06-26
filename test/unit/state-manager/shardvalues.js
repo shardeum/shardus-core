@@ -5,11 +5,17 @@ const crypto = require('shardus-crypto-utils')
 const utils = require('../../../src/utils')
 
 // generate a sorted list of nodes
-function generateNodes (count) {
+function generateNodes (count, predefinedList = null) {
   let nodeList = []
   for (let i = 0; i < count; ++i) {
     let newNode = { status: 'active' }
-    newNode.id = crypto.randomBytes()
+    if (predefinedList == null) {
+      newNode.id = crypto.randomBytes()
+    } else {
+      newNode.id = predefinedList[i]
+      newNode.id = newNode.id.slice(0, 4) + '7'.repeat(64 - 4)
+    }
+
     nodeList.push(newNode)
   }
   nodeList.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 }) // a[propName] == b[propName] ? 0 : a[propName] < b[propName] ? -1 : 1
@@ -32,23 +38,39 @@ function findBnotInA (listA, listB) {
 }
 
 let extraNodesTotal = 0
-let testCounter = 0
+let testCounter = 1
 // test 1
 let testIterations = 0
 let homeNodeQueryTests = 100
 
 let testAllNodesInList = true
 let numNodes = 6
+
+let useHardcodenodes = true
+let hardcodeNodes = ['068ex9699a', '3e7fx601a4', '4222xc48ab', '4d05xb7aaf', '5aacx228d3', '5b61xf5dca', '86b0x899cb', 'a4bdx83351', 'aa5ax8c81c', 'b432x1ecdc', 'dc16x79767', 'e0c3x00452', 'e8aexf9d78', 'e9f1xfc329', 'ff7fxcb7ef']
+
+if (useHardcodenodes) {
+  numNodes = hardcodeNodes.length
+}
+
+let debugStartsWith = '0683' // 'dc16'  '0683'
+
 for (let i = 0; i < testIterations; i++) {
   testCounter++
 
   let nodesPerConsenusGroup = 3
-  let activeNodes = generateNodes(numNodes - 1)
-  let ourId = 'deadbeef' + '3'.repeat(56)
-  let ourNode = { id: ourId, status: 'active' }
-  activeNodes.push(ourNode)
+  let activeNodes
+
+  if (useHardcodenodes === false) {
+    activeNodes = generateNodes(numNodes - 1)
+    let ourId = 'deadbeef' + '3'.repeat(56)
+    let ourNode = { id: ourId, status: 'active' }
+    activeNodes.push(ourNode)
+  } else {
+    activeNodes = generateNodes(numNodes, hardcodeNodes)
+  }
   activeNodes.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
-  let nodeToObserve = ourNode
+  // let nodeToObserve = ourNode
 
   let innerLoopCount = 1
   if (testAllNodesInList) {
@@ -63,6 +85,17 @@ for (let i = 0; i < testIterations; i++) {
   ShardFunctions.computePartitionShardDataMap(shardGlobals, parititionShardDataMap, 0, totalPartitions)
   // calculate data for all nodeds
   let nodeShardDataMap = new Map()
+
+  if (debugStartsWith != null) {
+    ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, false)
+
+    for (let node of activeNodes) {
+      if (node.id.indexOf(debugStartsWith) >= 0) {
+        ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, [node], parititionShardDataMap, activeNodes, true)
+      }
+    }
+  }
+
   ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, true)
 
   let totalPartitionsCovered = 0
@@ -76,7 +109,7 @@ for (let i = 0; i < testIterations; i++) {
 
   // test home node search
   for (let j = 0; j < homeNodeQueryTests; ++j) {
-    let address = crypto.randomBytes()
+    let address = crypto.randomBytes() // '160a' + '7'.repeat(60) //crypto.randomBytes()
     let homeNode = ShardFunctions.findHomeNode(shardGlobals, address, parititionShardDataMap)
     if (homeNode == null) {
       homeNode = ShardFunctions.findHomeNode(shardGlobals, address, parititionShardDataMap)
@@ -108,6 +141,15 @@ for (let i = 0; i < testIterations; i++) {
         throw new Error('node not in range 2')
       }
     }
+
+    for (let node of homeNode.nodeThatStoreOurParitionFull) {
+      let nodeData = nodeShardDataMap.get(node.id)
+      let inRange4 = ShardFunctions.testAddressInRange(address, nodeData.storedPartitions)
+      if (inRange4 === false) {
+        throw new Error('node not in range 2')
+      }
+    }
+
   }
 }
 
@@ -116,7 +158,7 @@ if (testIterations > 0) {
 }
 
 let size1 = 3
-let size2 = 3
+let size2 = 4
 console.log(` size1: ${size1}  size2: ${size2}`)
 for (let i = 1; i <= size1; i++) {
   let res = ShardFunctions.fastStableCorrespondingIndicies(size1, size2, i)

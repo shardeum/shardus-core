@@ -16,7 +16,8 @@ class ShardFunctions {
     shardGlobals.numPartitions = shardGlobals.numActiveNodes
     shardGlobals.numVisiblePartitions = 2 * shardGlobals.nodesPerConsenusGroup
     shardGlobals.consensusRadius = Math.floor((nodesPerConsenusGroup - 1) / 2)
-    shardGlobals.nodeLookRange = Math.floor((((shardGlobals.numVisiblePartitions + 1) / 2 + 0.5) / shardGlobals.numPartitions) * 0xffffffff) // 0.5 added since our search will look from the center of a partition
+    let partitionStoreRadius = (((shardGlobals.numVisiblePartitions) / 2) + 0) // removed the +1.0 that was getting added before we divded by two.  also the .5
+    shardGlobals.nodeLookRange = Math.floor((partitionStoreRadius / shardGlobals.numPartitions) * 0xffffffff) // 0.5 added since our search will look from the center of a partition
 
     return shardGlobals
   }
@@ -268,6 +269,63 @@ class ShardFunctions {
     if (extras.length > 0) {
       ShardFunctions.dilateNeighborCoverage(shardGlobals, nodeShardDataMap, parititionShardDataMap, activeNodes, nodeShardData, extras)
     }
+    nodeShardData.edgeNodes.sort(ShardFunctions.nodeSort)
+    nodeShardData.consensusNodeForOurNodeFull.sort(ShardFunctions.nodeSort)
+  }
+
+  static nodeSort (a, b) {
+    return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
+  }
+
+  static getHomeNodeSummaryObject (nodeShardData) {
+    if (nodeShardData.extendedData === false) {
+      return { noExtendedData: true, edge: [], consensus: [], storedFull: [] }
+    }
+    let result = { edge: [], consensus: [], storedFull: [] }
+
+    for (let node of nodeShardData.edgeNodes) {
+      result.edge.push(node.id)
+    }
+    for (let node of nodeShardData.consensusNodeForOurNodeFull) {
+      result.consensus.push(node.id)
+    }
+    for (let node of nodeShardData.nodeThatStoreOurParitionFull) {
+      result.storedFull.push(node.id)
+    }
+
+    result.edge.sort(function (a, b) { return a === b ? 0 : a < b ? -1 : 1 })
+    result.consensus.sort(function (a, b) { return a === b ? 0 : a < b ? -1 : 1 })
+    result.storedFull.sort(function (a, b) { return a === b ? 0 : a < b ? -1 : 1 })
+    return result
+  }
+
+  static getNodeRelation (nodeShardData, nodeId) {
+    if (nodeShardData.extendedData === false) {
+      return 'failed, no extended data'
+    }
+    let result = ''
+    if (nodeShardData.node.id === nodeId) {
+      result = 'home, '
+    }
+
+    for (let node of nodeShardData.nodeThatStoreOurParitionFull) {
+      if (node.id === nodeId) {
+        result += 'stored,'
+      }
+    }
+
+    for (let node of nodeShardData.edgeNodes) {
+      if (node.id === nodeId) {
+        result += 'edge,'
+      }
+    }
+
+    for (let node of nodeShardData.consensusNodeForOurNodeFull) {
+      if (node.id === nodeId) {
+        result += 'consensus,'
+      }
+    }
+    return result
   }
 
   static addressToPartition (shardGlobals, address) {
