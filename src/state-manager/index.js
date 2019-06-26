@@ -1790,26 +1790,28 @@ class StateManager extends EventEmitter {
         }
       }
       if (Array.isArray(targetKeys) && targetKeys.length > 0) {
-        targetAddress = targetKeys[0]
-        let accountStates = await this.storage.searchAccountStateTable(targetAddress, timestamp)
+        // targetAddress = targetKeys[0]
+        for (let targetAddress of targetKeys) {
+          let accountStates = await this.storage.searchAccountStateTable(targetAddress, timestamp)
 
-        if (accountStates.length !== 0) {
-          hasStateTableData = true
-          if (accountStates.length !== 0 && accountStates[0].stateBefore !== allZeroes64) {
-            let accountEntry = tryGetAccountData(targetAddress)
+          if (accountStates.length !== 0) {
+            hasStateTableData = true
+            if (accountStates.length !== 0 && accountStates[0].stateBefore !== allZeroes64) {
+              let accountEntry = tryGetAccountData(targetAddress)
 
-            if (accountEntry == null) {
-              if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress))
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ')
-              this.fatalLogger.fatal(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ') // todo: consider if this is just an error
-              // fail this because we already check if the before state was all zeroes
-              return { success: false, hasStateTableData }
-            } else {
-              targetState = accountEntry.stateId
-              if (accountStates[0].stateBefore !== targetState) {
-                if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2')
-                if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2 stateId: ' + utils.makeShortHash(targetState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(targetAddress))
+              if (accountEntry == null) {
+                if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress))
+                if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ')
+                this.fatalLogger.fatal(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ') // todo: consider if this is just an error
+                // fail this because we already check if the before state was all zeroes
                 return { success: false, hasStateTableData }
+              } else {
+                targetState = accountEntry.stateId
+                if (accountStates[0].stateBefore !== targetState) {
+                  if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2')
+                  if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2 stateId: ' + utils.makeShortHash(targetState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(targetAddress))
+                  return { success: false, hasStateTableData }
+                }
               }
             }
           }
@@ -1861,6 +1863,7 @@ class StateManager extends EventEmitter {
       let applyResponse = await this.app.apply(tx, wrappedStates)
       let { stateTableResults, accountData: _accountdata } = applyResponse
       accountDataList = _accountdata
+
       // wrappedStates are side effected for now
       await this.app.setAccount(wrappedStates, applyResponse, filter)
 
@@ -1968,7 +1971,7 @@ class StateManager extends EventEmitter {
   //   await this.processAcceptedTxQueue(Date.now())
   // }
 
-  async applyAcceptedTransaction (acceptedTX, wrappedStates) {
+  async applyAcceptedTransaction (acceptedTX, wrappedStates, filter) {
     if (this.queueStopped) return
     let tx = acceptedTX.data
     let keysResponse = this.app.getKeyFromTransaction(tx)
@@ -2018,7 +2021,7 @@ class StateManager extends EventEmitter {
     // }
 
     // todo2 refactor the state table data checks out of try apply and calculate them with less effort using results from validate
-    let applyResult = await this.tryApplyTransaction(acceptedTX, hasStateTableData, null, null, wrappedStates)
+    let applyResult = await this.tryApplyTransaction(acceptedTX, hasStateTableData, false, filter, wrappedStates)
     if (applyResult) {
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction SUCCEDED ' + timestamp)
       this.logger.playbackLogNote('tx_applied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
@@ -2104,7 +2107,7 @@ class StateManager extends EventEmitter {
     let txId = acceptedTX.receipt.txHash
 
     this.queueEntryCounter++
-    let txQueueEntry = { acceptedTx: acceptedTX, txKeys: keysResponse, collectedData: {}, homeNodes: {}, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter } // age comes from timestamp
+    let txQueueEntry = { acceptedTx: acceptedTX, txKeys: keysResponse, collectedData: {}, homeNodes: {}, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {} } // age comes from timestamp
     // partition data would store stuff like our list of nodes that store this ts
     // collected data is remote data we have recieved back
     // //tx keys ... need a sorted list (deterministic) of partition.. closest to a number?
@@ -2437,12 +2440,14 @@ class StateManager extends EventEmitter {
         datas[key] = data
         dataKeysWeHave.push(key)
         dataValuesWeHave.push(data)
+        queueEntry.localKeys[key] = true
         // add this data to our own queue entry!!
         this.queueEntryAddData(queueEntry, data)
       } else {
         remoteShardsByKey[key] = queueEntry.homeNodes[key]
       }
     }
+
     // let message = { stateList: datas, txid: queueEntry.acceptedTx.id }
     // if (correspondingEdgeNodes != null && correspondingEdgeNodes.length > 0) {
     //   // calc our index in a list. deterministic closest fit.
@@ -2707,7 +2712,8 @@ class StateManager extends EventEmitter {
           let wrappedStates = queueEntry.collectedData // Object.values(queueEntry.collectedData)
           try {
             // this.mainLogger.debug(` processAcceptedTxQueue2. applyAcceptedTransaction ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp} queuerestarts: ${this.queueRestartCounter} queueLen: ${this.newAcceptedTxQueue.length}`)
-            let txResult = await this.applyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates)
+            let filter = queueEntry.localKeys
+            let txResult = await this.applyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates, filter)
             if (txResult.success) {
               acceptedTXCount++
             // clearAccountsSeen(queueEntry)
