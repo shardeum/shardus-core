@@ -1909,51 +1909,7 @@ class StateManager extends EventEmitter {
     return true
   }
 
-  // queueAcceptedTransaction (acceptedTX, sendGossip = true, sender) {
-  //   let keysResponse = this.app.getKeyFromTransaction(acceptedTX.data)
-  //   let timestamp = keysResponse.timestamp
-  //   let txId = acceptedTX.receipt.txHash
-
-  //   if (this.config.debug.loseTxChance > 0) {
-  //     let rand = Math.random()
-  //     if (this.config.debug.loseTxChance > rand) {
-  //       this.logger.playbackLogNote('tx_dropForTest', txId, 'dropping tx ' + timestamp)
-  //       return
-  //     }
-  //   }
-
-  //   try {
-  //     let age = Date.now() - timestamp
-  //     if (age > this.queueSitTime * 0.9) {
-  //       this.fatalLogger.fatal('queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
-  //       // TODO consider throwing this out.  right now it is just a warning
-  //       this.logger.playbackLogNote('oldQueueInsertion', '', 'queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
-  //     }
-
-  //     if (sendGossip) {
-  //       this.p2p.sendGossipIn('acceptedTx', acceptedTX, '', sender)
-  //       this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
-  //     }
-  //     // sorted insert
-  //     let index = this.newAcceptedTxQueue.length - 1
-  //     let lastTx = this.newAcceptedTxQueue[index]
-  //     while (index >= 0 && ((timestamp < lastTx.timestamp) || (timestamp === lastTx.timestamp && txId < lastTx.id))) {
-  //       index--
-  //       lastTx = this.newAcceptedTxQueue[index]
-  //     }
-  //     this.newAcceptedTxQueue.splice(index + 1, 0, acceptedTX)
-  //     this.logger.playbackLogNote('tx_addToQueue', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
-  //     this.emit('txQueued', acceptedTX.receipt.txHash)
-
-  //     // start the queue if needed
-  //     this.tryStartAcceptedQueue()
-  //   } catch (error) {
-  //     this.logger.playbackLogNote('tx_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
-  //     this.fatalLogger.fatal('queueAcceptedTransaction failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
-  //     throw new Error(error)
-  //   }
-  // }
-
+  // leaving this for ref for a bit longer because it is interesting
   // tryStartAcceptedQueue () {
   //   if (!this.dataSyncMainPhaseComplete) {
   //     return
@@ -2010,17 +1966,6 @@ class StateManager extends EventEmitter {
     this.profiler.profileSectionStart('validateTx')
     // todo add data fetch to the result and pass it into app apply(), include previous hashes
 
-    // let transactionValidateResult = await this.app.validateTransaction(acceptedTX.data)
-    // this.profiler.profileSectionEnd('validateTx')
-    // if (transactionValidateResult.result !== 'pass') {
-    //   let keysResponse = this.app.getKeyFromTransaction(acceptedTX.data)
-    //   let timestamp = keysResponse.timestamp
-    //   if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction validate failed: ' + timestamp)
-    //   this.mainLogger.error(`Failed to validate transaction. Reason: ${transactionValidateResult.reason} ts:${timestamp}`)
-    //   this.logger.playbackLogNote('tx_apply_rejected 2', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
-    //   return { success: false, reason: transactionValidateResult.reason }
-    // }
-
     // todo2 refactor the state table data checks out of try apply and calculate them with less effort using results from validate
     let applyResult = await this.tryApplyTransaction(acceptedTX, hasStateTableData, false, filter, wrappedStates, localCachedData)
     if (applyResult) {
@@ -2049,53 +1994,6 @@ class StateManager extends EventEmitter {
     }
   }
 
-  // async processAcceptedTxQueue (maxTimestamp = -1) {
-  //   try {
-  //     // wait untill next apply time available
-  //     // run as many apply tx as needed.
-  //     this.newAcceptedTxQueueRunning = true
-
-  //     let acceptedTXCount = 0
-  //     let edgeFailDetected = false
-
-  //     while (this.newAcceptedTxQueue.length > 0) {
-  //       let currentTime = Date.now()
-  //       let txTime = this.newAcceptedTxQueue[0].timestamp
-  //       let txAge = currentTime - txTime
-  //       if (txAge < this.queueSitTime) {
-  //         let waitTime = this.queueSitTime - txAge
-  //         this.sleepInterrupt = this.interruptibleSleep(waitTime, txTime)
-  //         await this.sleepInterrupt.promise
-  //         continue
-  //       }
-
-  //       // apply the tx
-  //       let acceptedTX = this.newAcceptedTxQueue.shift()
-  //       this.logger.playbackLogNote('tx_workingOnTx', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
-  //       this.emit('txPopped', acceptedTX.receipt.txHash)
-  //       let txResult = await this.applyAcceptedTransaction(acceptedTX)
-
-  //       if (txResult.success) {
-  //         acceptedTXCount++
-  //       } else {
-  //         if (!edgeFailDetected && acceptedTXCount > 0) {
-  //           edgeFailDetected = true
-  //           if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(acceptedTX)}`)
-  //           this.fatalLogger.fatal(this.dataPhaseTag + `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(acceptedTX)}`) // todo: consider if this is just an error
-  //         }
-  //       }
-
-  //       // await utils.sleep(0)
-  //       if (maxTimestamp > 0 && txTime > maxTimestamp) {
-  //         if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `processAcceptedTxQueue reached max timestamp. ${maxTimestamp} Exiting with ${this.newAcceptedTxQueue.length} items remaining`)
-  //         this.newAcceptedTxQueueRunning = false
-  //         return
-  //       }
-  //     }
-  //   } finally {
-  //     this.newAcceptedTxQueueRunning = false
-  //   }
-  // }
   //  ///////////////
   /// ///    new sharde queue         ///////////
   // ///////////////
@@ -2172,22 +2070,6 @@ class StateManager extends EventEmitter {
 
         return // we are done, not involved!!!
       }
-
-      // this.logger.playbackLogNote('tx_enqueueTx', `${txQueueEntry.acceptedTx.id}`, `qId: ${txQueueEntry.entryID} qRst:${this.queueRestartCounter} AcceptedTransaction: ${utils.stringifyReduce(txQueueEntry.acceptedTx)}`)
-
-      // // sorted insert = sort by timestamp
-      // // todo faster version (binary search? to find where we need to insert)
-      // let index = this.newAcceptedTxQueue.length - 1
-      // let lastTx = this.newAcceptedTxQueue[index]
-      // while (index >= 0 && ((timestamp > lastTx.txKeys.timestamp) || (timestamp === lastTx.txKeys.timestamp && txId < lastTx.acceptedTx.id))) {
-      //   index--
-      //   lastTx = this.newAcceptedTxQueue[index]
-      // }
-
-      // this.newAcceptedTxQueue.splice(index + 1, 0, txQueueEntry)
-
-      // this.logger.playbackLogNote('tx_addToQueue', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
-      // this.emit('txQueued', acceptedTX.receipt.txHash)
 
       this.newAcceptedTxQueueTempInjest.push(txQueueEntry)
 
@@ -2298,23 +2180,6 @@ class StateManager extends EventEmitter {
     if (!queueEntry.requests) {
       queueEntry.requests = {}
     }
-    // just ask one or two then bail if we dont get all the data
-
-    // old method that sends N messages to n nodes
-    // for (let key of queueEntry.uniqueKeys) {
-    //   if (queueEntry.collectedData[key] == null && queueEntry.requests[key] == null) {
-    //     let homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
-    //     let message = { keys: [key], tx: queueEntry.acceptedTX.id, timestamp: queueEntry.acceptedTX.timestamp }
-    //     let randomIndex = this.getRandomInt(homeNodeShardData.consensusNodeForOurNode.length - 1)
-    //     let node = homeNodeShardData.consensusNodeForOurNode[randomIndex]
-    //     queueEntry.requests[key] = node
-    //     let result = await this.p2p.ask(node, 'request_state_for_tx', message)
-    //     for (let data of result.stateList) {
-    //       this.queueEntryAddData(queueEntry, data)
-    //     }
-    //     queueEntry.homeNodes[key] = null
-    //   }
-    // }
 
     let allKeys = []
     for (let key of queueEntry.uniqueKeys) {
@@ -2511,82 +2376,6 @@ class StateManager extends EventEmitter {
       }
     }
   }
-
-  // // should work even if there are zero nodes to tell and should load data locally into queue entry
-  // async tellCorrespondingEdgeNodes (queueEntry) {
-  //   // Report data to corresponding nodes
-  //   let ourNodeData = this.currentCycleShardData.nodeShardData
-  //   let correspondingEdgeNodes = []
-  //   let correspondingAccNodes = []
-  //   let dataKeysWeHave = []
-  //   let dataValuesWeHave = []
-  //   let datas = {}
-  //   let remoteShardsByKey = {} // shard homenodes that we do not have the data for.
-  //   for (let key of queueEntry.uniqueKeys) {
-  //     if (ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)) { // todo Detect if our node covers this paritition..  need our partition data
-  //       let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
-  //       datas[key] = data
-  //       dataKeysWeHave.push(key)
-  //       dataValuesWeHave.push(data)
-  //       // add this data to our own queue entry!!
-  //       this.queueEntryAddData(queueEntry, data)
-  //     } else {
-  //       remoteShardsByKey[key] = queueEntry.homeNodes[key]
-  //     }
-  //   }
-  //   let message = { stateList: datas, txid: queueEntry.acceptedTx.id }
-  //   if (correspondingEdgeNodes != null && correspondingEdgeNodes.length > 0) {
-  //     // calc our index in a list. deterministic closest fit.
-
-  //     this.p2p.tell(correspondingEdgeNodes, 'broadcast_state', message)
-  //   }
-
-  //   let nodesToSendTo = {}
-  //   let edgeNodesToSendTo = {}
-  //   for (let key of queueEntry.uniqueKeys) {
-  //     if (datas[key] != null) {
-  //       // get edge nodes to send to.
-  //       let localHomeNode = queueEntry.homeNodes[key]
-  //       let ourLocalConsensusIndex = localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === ourNodeData.node.id)
-  //       let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, localHomeNode.edgeNodes.length, ourLocalConsensusIndex)
-
-  //       for (let index of indicies) {
-  //         let node = localHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
-
-  //         if (node == null) {
-  //           throw new Error(`localHomeNode.edgeNodes len: ${localHomeNode.edgeNodes.length} indicies:${utils.stringifyReduce(indicies)} debugFastStableCorrespondingIndicies: ${[localHomeNode.consensusNodeForOurNodeFull.length, localHomeNode.edgeNodes.length, ourLocalConsensusIndex]}`)
-  //         }
-
-  //         if (node !== ourNodeData.node.id) {
-  //           nodesToSendTo[node.id] = node
-  //           edgeNodesToSendTo[node.id] = node // for debug
-  //         }
-  //       }
-  //     } else {
-  //       // if we get here we are dealing with the key of a shard that we do not have dat for, so we should send everythig we have to the corresponding node
-  //       let remoteHomeNode = queueEntry.homeNodes[key]
-
-  //       for (let keyOwned of dataKeysWeHave) {
-  //         let localHomeNode = queueEntry.homeNodes[keyOwned]
-  //         let ourLocalConsensusIndex = localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === ourNodeData.node.id)
-  //         let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.consensusNodeForOurNodeFull.length, ourLocalConsensusIndex)
-
-  //         // for each remote node lets save it's id
-  //         for (let index of indicies) {
-  //           let node = remoteHomeNode.consensusNodeForOurNodeFull[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
-  //           if (node !== ourNodeData.node.id) {
-  //             nodesToSendTo[node.id] = node
-  //           }
-  //         }
-  //       }
-  //     }
-  //   }
-
-  //   correspondingAccNodes = Object.values(nodesToSendTo)
-  //   if (correspondingAccNodes.length > 0) {
-  //     this.p2p.tell(correspondingAccNodes, 'broadcast_state', message)
-  //   }
-  // }
 
   async processAcceptedTxQueue2 () {
     let seenAccounts
@@ -2903,37 +2692,6 @@ class StateManager extends EventEmitter {
       }
 
       await this.app.setAccount(wrappedData, localCachedData[key], applyResponse)
-
-      // if (wrappedData.isPartial === false) {
-      //   let fullAccountData = wrappedData.data
-      //   let accountStateBefore = fullAccountData.hash
-      //   // update hashes:
-      //   let accountStateAfter = await this.dataRepo.updateAccountBalanceTxsSequenceHash(fullAccountData)
-      //   this.cachedStateID[wrappedData.id] = accountStateAfter
-      //   // add data to our required response object
-      //   this.shardus.applyResponseAddState(applyResponse, wrappedData, wrappedData.id, applyResponse.txId, applyResponse.txTimestamp, accountStateBefore, accountStateAfter, wrappedData.accountCreated)
-      // }
-      // if (wrappedData.isPartial === true) {
-      //   // need to load the data..  then modify it. then save it?
-      //   // what if we just want to write updates to db?  then how would we update the hash????  would require caching or basing the hash off of a subset of the data
-
-      //   // use localCache ... always!  (and it wil be passed in)
-
-      //   let fullAccountData = await this.dataRepo.getAccountByAddress(wrappedData.id) // any possiblity that this was cached earlier.. could figure out how to cache it locally. (return it in the get data for temp local account caching??)
-      //   if (fullAccountData == null) {
-      //     throw new Error(`unable to get data for account: ${utils.makeShortHash(wrappedData.id)}`)
-      //   }
-      //   let accountStateBefore = fullAccountData.hash
-      //   // automatic update of fields by name.. could do this in more bespoke way if needed
-      //   let dataKeys = Object.keys(wrappedData.data)
-      //   for (let key of dataKeys) {
-      //     fullAccountData[key] = wrappedData.data[key]
-      //   }
-      //   let accountStateAfter = await this.dataRepo.updateAccountBalanceTxsSequenceHash(fullAccountData)
-      //   this.cachedStateID[wrappedData.id] = accountStateAfter
-      //   // add data to our required response object
-      //   this.shardus.applyResponseAddState(applyResponse, wrappedData, wrappedData.id, applyResponse.txId, applyResponse.txTimestamp, accountStateBefore, accountStateAfter, wrappedData.accountCreated)
-      // }
     }
   }
 
@@ -3146,21 +2904,6 @@ class StateManager extends EventEmitter {
   }
 
   tryGeneratePartitionReciept (allResults, ourResult, repairPassHack = false) {
-    // let hashCounting = {}
-    // let topHash
-    // let topCount = 0
-    // let topResult = null
-    // for (let partitionResult of allResults) {
-    //   let hash = partitionResult.Partition_hash
-    //   let count = hashCounting[hash] || 0
-    //   count++
-    //   hashCounting[hash] = count
-    //   if (count > topCount) {
-    //     topCount = count
-    //     topHash = hash
-    //     topResult = partitionResult
-    //   }
-    // }
     let partitionId = ourResult.Partition_id
     let cycleCounter = ourResult.Cycle_number
 
