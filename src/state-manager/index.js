@@ -1824,7 +1824,7 @@ class StateManager extends EventEmitter {
   }
 
   // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
-  async tryApplyTransaction (acceptedTX, hasStateTableData, repairing, filter, wrappedStates) {
+  async tryApplyTransaction (acceptedTX, hasStateTableData, repairing, filter, wrappedStates, localCachedData) {
     let ourLockID = -1
     let accountDataList
     let txTs = 0
@@ -1865,7 +1865,8 @@ class StateManager extends EventEmitter {
       accountDataList = _accountdata
 
       // wrappedStates are side effected for now
-      await this.app.setAccount(wrappedStates, applyResponse, filter)
+
+      await this.setAccount(wrappedStates, localCachedData, applyResponse, filter)
 
       this.applySoftLock = false
       // only write our state table data if we dont already have it in the db
@@ -1971,7 +1972,7 @@ class StateManager extends EventEmitter {
   //   await this.processAcceptedTxQueue(Date.now())
   // }
 
-  async applyAcceptedTransaction (acceptedTX, wrappedStates, filter) {
+  async applyAcceptedTransaction (acceptedTX, wrappedStates, localCachedData, filter) {
     if (this.queueStopped) return
     let tx = acceptedTX.data
     let keysResponse = this.app.getKeyFromTransaction(tx)
@@ -2021,7 +2022,7 @@ class StateManager extends EventEmitter {
     // }
 
     // todo2 refactor the state table data checks out of try apply and calculate them with less effort using results from validate
-    let applyResult = await this.tryApplyTransaction(acceptedTX, hasStateTableData, false, filter, wrappedStates)
+    let applyResult = await this.tryApplyTransaction(acceptedTX, hasStateTableData, false, filter, wrappedStates, localCachedData)
     if (applyResult) {
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction SUCCEDED ' + timestamp)
       this.logger.playbackLogNote('tx_applied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
@@ -2107,7 +2108,7 @@ class StateManager extends EventEmitter {
     let txId = acceptedTX.receipt.txHash
 
     this.queueEntryCounter++
-    let txQueueEntry = { acceptedTx: acceptedTX, txKeys: keysResponse, collectedData: {}, homeNodes: {}, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {} } // age comes from timestamp
+    let txQueueEntry = { acceptedTx: acceptedTX, txKeys: keysResponse, collectedData: {}, homeNodes: {}, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {} } // age comes from timestamp
     // partition data would store stuff like our list of nodes that store this ts
     // collected data is remote data we have recieved back
     // //tx keys ... need a sorted list (deterministic) of partition.. closest to a number?
@@ -2266,6 +2267,11 @@ class StateManager extends EventEmitter {
 
     if (queueEntry.dataCollected === queueEntry.uniqueKeys.length) { //  queueEntry.tx Keys.allKeys.length
       queueEntry.hasAll = true
+    }
+
+    if (data.localCache) {
+      queueEntry.localCachedData[data.id] = data.localCache
+      delete data.localCache
     }
 
     this.logger.playbackLogNote('shrd_addData', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `key ${utils.makeShortHash(data.id)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}`)
@@ -2710,10 +2716,11 @@ class StateManager extends EventEmitter {
           // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processAcceptedTxQueue2. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
 
           let wrappedStates = queueEntry.collectedData // Object.values(queueEntry.collectedData)
+          let localCachedData = queueEntry.localCachedData
           try {
             // this.mainLogger.debug(` processAcceptedTxQueue2. applyAcceptedTransaction ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp} queuerestarts: ${this.queueRestartCounter} queueLen: ${this.newAcceptedTxQueue.length}`)
             let filter = queueEntry.localKeys
-            let txResult = await this.applyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates, filter)
+            let txResult = await this.applyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates, localCachedData, filter)
             if (txResult.success) {
               acceptedTXCount++
             // clearAccountsSeen(queueEntry)
@@ -2876,6 +2883,58 @@ class StateManager extends EventEmitter {
       return wrappedAccount
     }
     return null
+  }
+
+  async setAccount (wrappedStates, localCachedData, applyResponse, accountFilter = null) {
+    // let sourceAddress = inTx.srcAct
+    // let targetAddress = inTx.tgtAct
+    // let amount = inTx.txnAmt
+    // let type = inTx.txnType
+    // let time = inTx.txnTimestamp
+    let canWriteToAccount = function (accountId) {
+      return (!accountFilter) || (accountFilter[accountId] !== undefined)
+    }
+
+    let keys = Object.keys(wrappedStates)
+    for (let key of keys) {
+      let wrappedData = wrappedStates[key]
+      if (canWriteToAccount(wrappedData.id) === false) {
+        continue
+      }
+
+      await this.app.setAccount(wrappedData, localCachedData[key], applyResponse)
+
+      // if (wrappedData.isPartial === false) {
+      //   let fullAccountData = wrappedData.data
+      //   let accountStateBefore = fullAccountData.hash
+      //   // update hashes:
+      //   let accountStateAfter = await this.dataRepo.updateAccountBalanceTxsSequenceHash(fullAccountData)
+      //   this.cachedStateID[wrappedData.id] = accountStateAfter
+      //   // add data to our required response object
+      //   this.shardus.applyResponseAddState(applyResponse, wrappedData, wrappedData.id, applyResponse.txId, applyResponse.txTimestamp, accountStateBefore, accountStateAfter, wrappedData.accountCreated)
+      // }
+      // if (wrappedData.isPartial === true) {
+      //   // need to load the data..  then modify it. then save it?
+      //   // what if we just want to write updates to db?  then how would we update the hash????  would require caching or basing the hash off of a subset of the data
+
+      //   // use localCache ... always!  (and it wil be passed in)
+
+      //   let fullAccountData = await this.dataRepo.getAccountByAddress(wrappedData.id) // any possiblity that this was cached earlier.. could figure out how to cache it locally. (return it in the get data for temp local account caching??)
+      //   if (fullAccountData == null) {
+      //     throw new Error(`unable to get data for account: ${utils.makeShortHash(wrappedData.id)}`)
+      //   }
+      //   let accountStateBefore = fullAccountData.hash
+      //   // automatic update of fields by name.. could do this in more bespoke way if needed
+      //   let dataKeys = Object.keys(wrappedData.data)
+      //   for (let key of dataKeys) {
+      //     fullAccountData[key] = wrappedData.data[key]
+      //   }
+      //   let accountStateAfter = await this.dataRepo.updateAccountBalanceTxsSequenceHash(fullAccountData)
+      //   this.cachedStateID[wrappedData.id] = accountStateAfter
+      //   // add data to our required response object
+      //   this.shardus.applyResponseAddState(applyResponse, wrappedData, wrappedData.id, applyResponse.txId, applyResponse.txTimestamp, accountStateBefore, accountStateAfter, wrappedData.accountCreated)
+      // }
+    }
   }
 
   /// /////////////////////////////////////////////////////////
@@ -3942,7 +4001,8 @@ class StateManager extends EventEmitter {
             tx.data.receipt = JSON.parse(tx.data.receipt)
           }
 
-          let applied = await this.tryApplyTransaction(tx, hasStateTableData, true, acountsFilter) // TODO sharding.. how to get and pass the state wrapped account state in
+          // TODO need to fix this up!
+          let applied = await this.tryApplyTransaction(tx, hasStateTableData, true, acountsFilter, {}, {}) // TODO sharding.. how to get and pass the state wrapped account state in
           if (!applied) {
             applyFailCount++
             if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs apply failed`)
