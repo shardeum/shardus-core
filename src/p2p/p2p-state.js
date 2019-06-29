@@ -62,6 +62,10 @@ class P2PState extends EventEmitter {
         toAccept: 0,
         scalingSeen: {},
         apopSeen: {},
+        lostSeen: {
+          up: {},
+          down: {}
+        },
         startingDesired: 0,
         scaling: false
       },
@@ -72,7 +76,11 @@ class P2PState extends EventEmitter {
           up: [],
           down: []
         },
-        apoptosis: []
+        apoptosis: [],
+        lost: {
+          up: [],
+          down: []
+        }
       },
       data: {
         start: null,
@@ -82,6 +90,7 @@ class P2PState extends EventEmitter {
         joined: [],
         removed: [],
         lost: [],
+        refuted: [],
         apoptosized: [],
         returned: [],
         activated: [],
@@ -95,8 +104,7 @@ class P2PState extends EventEmitter {
     this.nodes = utils.deepCopy(this.cleanNodelist)
     this.currentCycle = utils.deepCopy(this.cleanCycle)
 
-    // Variables for lost node detection
-    this.lostNodesMeta = {}
+    this.lostNodes = null
   }
 
   async init () {
@@ -106,6 +114,10 @@ class P2PState extends EventEmitter {
     const nodes = await this.storage.listNodes()
     this.mainLogger.debug(`Loaded ${nodes.length} nodes from the database.`)
     this._addNodesToNodelist(nodes)
+  }
+
+  initLost (p2plostnodes) {
+    this.lostNodes = p2plostnodes
   }
 
   _resetNodelist () {
@@ -447,7 +459,7 @@ class P2PState extends EventEmitter {
   // TODO: Update this to go through entire update types
   async addCycleUpdates (updates) {
     if (!this.cyclesStarted) return false
-    const { bestJoinRequests, active, scaling, apoptosis } = updates
+    const { bestJoinRequests, active, scaling, apoptosis, lost } = updates
     for (const joinRequest of bestJoinRequests) {
       this._addJoinRequest(joinRequest)
     }
@@ -462,6 +474,12 @@ class P2PState extends EventEmitter {
     }
     for (const apopMsg of apoptosis) {
       this.addApoptosisMessage(apopMsg)
+    }
+    for (const lostDownMsg of lost.down) {
+      this.addLostMessage(lostDownMsg, true)
+    }
+    for (const lostUpMsg of lost.up) {
+      this.addLostMessage(lostUpMsg, true)
     }
     const cMarkerBefore = this.getCurrentCertificate().marker
     await this._createCycleMarker(false)
@@ -543,6 +561,67 @@ class P2PState extends EventEmitter {
       return false
     }
     return this.addApoptosisMessage(msg)
+  }
+
+  addLostMessage (msg, validate = false) {
+    if (msg.lostMessage) { // Is DownMessage
+      // Validate, if requested
+      if (validate) {
+        const [validated, reason] = this.lostNodes.validateDownMessage(msg)
+        if (!validated) {
+          this.mainLogger.debug(`Lost message not added: Invalid DownMessage: ${reason}: ${JSON.stringify(msg)}.`)
+          return false
+        }
+      }
+
+      const nodeId = msg.lostMessage.target
+
+      // If this node has an UpMessage, ignore
+      if (this.currentCycle.metadata.lostSeen.up[nodeId]) {
+        return false
+      }
+
+      // If this node already has a DownMessage, ignore
+      if (this.currentCycle.metadata.lostSeen.down[nodeId]) {
+        return false
+      }
+
+      // Add to cycle's lost nodes
+      this.currentCycle.metadata.lostSeen.down[nodeId] = true
+      this.currentCycle.updates.lost.down.push(msg)
+      utils.insertSorted(this.currentCycle.data.lost, nodeId)
+    } else if (msg.downMessage) { // Is UpMessage
+      // Validate, if requested
+      if (validate) {
+        const [validated, reason] = this.lostNodes.validateUpMessage(msg)
+        if (!validated) {
+          this.mainLogger.debug(`Lost message not added: Invalid UpMessage: ${reason}: ${JSON.stringify(msg)}.`)
+          return false
+        }
+      }
+
+      const nodeId = msg.downMessage.lostMessage.target
+
+      // If this node already has an UpMessage, ignore
+      if (this.currentCycle.metadata.lostSeen.up[nodeId]) {
+        return false
+      }
+
+      // Remove this node from cycles lost nodes, if he was put there
+      if (this.currentCycle.metadata.lostSeen.down[nodeId]) {
+        delete this.currentCycle.metadata.lostSeen.down[nodeId]
+        const updatesIdx = this.currentCycle.updates.lost.down.findIndex(msg => msg.lostMessage.target === nodeId)
+        if (updatesIdx > 0) this.currentCycle.updates.lost.down.splice(updatesIdx, 1)
+        const dataIdx = this.currentCycle.data.lost.findIndex(id => id === nodeId)
+        if (dataIdx > 0) this.currentCycle.updates.lost.down.splice(dataIdx, 1)
+      }
+
+      // Add to cycle's refuted nodes
+      this.currentCycle.metadata.lostSeen.up[nodeId] = true
+      this.currentCycle.updates.lost.up.push(msg)
+      utils.insertSorted(this.currentCycle.data.refuted, nodeId)
+    }
+    return true
   }
 
   async _setNodeStatus (nodeId, status) {
@@ -1091,7 +1170,10 @@ class P2PState extends EventEmitter {
     const apoptosizedNodes = this._getApoptosizedNodes()
     const apoptosized = this.removeNodes(apoptosizedNodes)
 
-    const promises = [accepted, activated, removed, apoptosized, cycleAdded]
+    const lostNodes = this._getLostNodes()
+    const lost = this.removeNodes(lostNodes)
+
+    const promises = [accepted, activated, removed, apoptosized, lost, cycleAdded]
     try {
       await Promise.all(promises)
       this.mainLogger.info('Added cycle chain entry to database successfully!')
@@ -1111,6 +1193,7 @@ class P2PState extends EventEmitter {
     const joined = this.getJoined()
     const removed = this.getRemoved()
     const lost = this.getLost()
+    const refuted = this.getRefuted()
     const apoptosized = this.getApoptosized()
     const returned = this.getReturned()
     const activated = this.getActivated()
@@ -1126,6 +1209,7 @@ class P2PState extends EventEmitter {
       joined,
       removed,
       lost,
+      refuted,
       apoptosized,
       returned,
       activated,
@@ -1260,6 +1344,10 @@ class P2PState extends EventEmitter {
 
   getLost () {
     return this.currentCycle.data.lost
+  }
+
+  getRefuted () {
+    return this.currentCycle.data.refuted
   }
 
   getReturned () {
@@ -1417,6 +1505,26 @@ class P2PState extends EventEmitter {
     const nodes = []
     const apoppedIds = this.getApoptosized()
     for (const id of apoppedIds) {
+      const node = this.getNode(id)
+      nodes.push(node)
+    }
+    return nodes
+  }
+
+  _getLostNodes () {
+    const nodes = []
+    const lostIds = this.getLost()
+    for (const id of lostIds) {
+      const node = this.getNode(id)
+      nodes.push(node)
+    }
+    return nodes
+  }
+
+  _getRefutedNodes () {
+    const nodes = []
+    const refutedIds = this.getRefuted()
+    for (const id of refutedIds) {
       const node = this.getNode(id)
       nodes.push(node)
     }

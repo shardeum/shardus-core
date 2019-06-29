@@ -1,0 +1,138 @@
+All nodes keep meta data for lostNodes in an obj, lostNodesMeta
+
+During a cycle (C0), if S contacts T and encounters a timeout:
+  S adds T to lostNodesMeta, if T isn't already there, and waits for next (C1) cycles Q1:
+  During the next (C1) Q1 phase, S computes I for T and sends an InvestigateTx to I, then waits for next (C2) cycles Q1:
+    During the next (C2) Q1 phase:
+      If S gets DownTx gossip for T from I, S (and all others) mark T for removal in next (C3) cycles Q1 phase:
+        During next (C3) Q1 phase, S (and all others) prepare to add T to cycle lostNodes:
+          If S (and all others) get UpTx gossip from T, S (and all others) remove T from lostNodesMeta, path ends.
+          Else, S (and all others) add T to cycle lostNodes, path ends.
+      Else, S removes T from lostNodesMeta, all good, path ends.
+
+I, upon receiving a an InvestigateTx for T in (C1) Q1 phase:
+  Adds T to lostNodesMeta, Pings T to check if he's alive and waits until next (C2) cycles Q1:
+    If T responds before next (C2) Q1, remove T from lostNodesMeta, all good, path ends.
+    Else, I gossips DownTx for T to all nodes in (C2) Q1
+
+===
+
+Source Node
+
+  1. Requested investigation of T by investigator I. Marked T as lost
+  2. Investigator did not report T as lost. Unmarked T as lost
+  3. END
+
+  OR
+
+  1. Requested investigation of T by investigator I. Marked T as lost
+  2. Investigator reported T as lost. Waiting 1 cycle for T to refute...
+  3. No response from T. Added T to this cycle's lost nodes
+  4. END
+
+  OR
+
+  1. Requested investigation of T by investigator I. Marked T as lost
+  2. Investigator reported T as lost. Waiting 1 cycle for T to refute...
+  3. T refuted lost status. Unmarked T as lost
+  4. END
+
+Target Node
+
+  1. Got lost node ping from investigator I, sent response
+  2. END
+
+  OR
+
+  1. Reported by investigator I as lost. Sent refute message
+  2. END
+
+Investigator Node
+
+  1. S requested investigation of T. Marked T as lost. Sent ping. Waiting 1 cycle for T to respond...
+  2. T responded to ping. Unmarked T as lost
+  3. END
+
+  OR
+
+  1. S requested investigation of T. Marked T as lost. Sent ping. Waiting 1 cycle for T to respond...
+  2. No response from T. Reported T as lost. Waiting 1 cycle for T to refute...
+  3. T did not refute lost status. Added T to this cycle's lost nodes
+  4. END
+
+  OR
+
+  1. S requested investigation of T. Marked T as lost. Sent ping. Waiting 1 cycle for T to respond...
+  2. No response from T. Reported T as lost. Waiting 1 cycle for T to refute...
+  3. T refuted lost status. Unmarked T as lost.
+  4. END
+
+===
+
+node
+
+node {
+  address: 'a5c6930c7f47765a2064978ea3800c2e503c1d6a3ba15627a1365f5cf2e20673',
+  externalIp: '127.0.0.1',
+  externalPort: 9001,
+  internalIp: '127.0.0.1',
+  internalPort: 9005,
+  joinRequestTimestamp: 1560970177,
+  publicKey: 'a5c6930c7f47765a2064978ea3800c2e503c1d6a3ba15627a1365f5cf2e20673',
+  curvePublicKey: '6421e49e082565b9ba3f6fc89f446956e7d222852cdbfe5572d464278e33487b',
+  id: 'af5dd329c3d6017648e6b292700b95de6519fc3e5489842ff0d16164fa4c85a3',
+  cycleJoined: 'c002a4f485da1a33babd0e74c31c45f7f7a4b3852998ce6f73c1e721dcb42374',
+  status: 'active'
+}
+
+payload seen by internal route handler
+
+{
+  "payload": {...},
+  "sender": "0ea3b98388d7329623553248dca5d73791e0e29972101347529e24a5cbb9af28",
+  "tag": "6a89e10bee33a3807934608968f030fe2703c8f27e76cafbf6c34e8f5adf73d85e8a8aaee6696f08c45123a37915e6b3ea2499cb06fb301e2a12a35d62c1bac8",
+  "tracker": "key_0ea3x9af28_1560985884008_2"
+}
+
+===
+
+interface LostNodesMeta {
+  [nodeId: string]: LostNodeMetaData
+}
+
+interface LostNodeMetaData {
+  id: string,
+  status: LostNodeStatus
+  messages: {
+    lost: LostMessage
+    down: DownMessage
+    up: UpMessage
+  }
+}
+
+type LostNodeStatus = 'unflagged' | flagged' | 'reported' | 'down' | 'up'
+
+interface LostMessage {
+  source: string,
+  target: string,
+  investigator: string,
+  lastCycleMarker: string,
+  cycleCouner: number,
+  timestamp: string
+}
+
+interface DownMessage {
+  lostMessage: LostMessage
+}
+
+interface UpMessage {
+  downMessage: downMessage
+}
+
+===
+
+Q1: startUpdatePhase
+  proposeLost
+
+Q3: startCycleSync
+  applyLost

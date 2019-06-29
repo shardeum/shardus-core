@@ -191,38 +191,6 @@ function setupRoutes () {
     }
   })
 
-  this.registerInternal('ping', async (payload, respond) => {
-    // await respond({ success: true })
-  })
-
-  this.registerInternal('reportlost', async (payload) => {
-    const verifier = this._getLostNodeVerifier(payload)
-    if (!verifier) {
-      this.mainLogger.debug(`Unable to report node. No verifier found for lost message: ${JSON.stringify(payload)}`)
-      return
-    }
-    // Check if we are the verifier
-    // TODO: Get verifier
-    // Validate lost message
-    // const validate = this.validateLostMessage()
-
-    // Ping reported node
-    const reportedNode = this.state.getNode(payload.node)
-
-    try {
-      await this.ask(reportedNode, 'ping')
-    } catch (e) {
-      // If no response, we construct a message and gossip it to notify nodes that this node has gone down
-      const message = {
-        original: payload
-      }
-      const signedMsg = this.crypto.sign(message)
-      // We wait until the next update phase to gossip this message
-      // TODO: Pass lost request to state
-      await this.sendGossipIn('lost', signedMsg)
-    }
-  })
-
   // -------- GOSSIP Routes ----------
 
   this.registerGossipHandler('join', async (payload, sender, tracker) => {
@@ -295,18 +263,6 @@ function setupRoutes () {
     await this.sendGossipIn('scaling', payload, tracker)
   })
 
-  this.registerGossipHandler('lost', async (payload, sender, tracker) => {
-    if (!payload) {
-      this.mainLogger.debug('No payload provided for the `lost` request.')
-      return
-    }
-    // TODO: add processing of lost request
-    // const added = this.state.addExtLostRequest
-    const added = true
-    if (!added) return
-    await this.sendGossipIn('lost', payload, tracker)
-  })
-
   // -------- DEMO Routes ----------
 
   this.network.registerExternalGet('nodelist', async (req, res) => {
@@ -316,12 +272,5 @@ function setupRoutes () {
   this.network.registerExternalGet('apoptosis', async (req, res) => {
     res.json({ apoptosis: true })
     await this.initApoptosis()
-  })
-
-  // Used to start a test of the lost node detection
-  this.network.registerExternalGet('startlosttest', async (req, res) => {
-    const randomNode = this.state.getRandomActiveNode()
-    res.json({ nodeTested: randomNode.id })
-    this._reportLostNode(randomNode)
   })
 }
