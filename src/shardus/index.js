@@ -424,14 +424,14 @@ class Shardus {
         throw new Error('Missing requried interface function. apply()')
       }
 
-      if (typeof (application.apply) === 'function') {
+      if (typeof (application.setAccount) === 'function') {
         // applicationInterfaceImpl.setAccount = async (wrappedStates, applyResponse, accountFilter) => application.setAccount(wrappedStates, applyResponse, accountFilter)
         applicationInterfaceImpl.setAccount = async (wrappedData, localCache, applyResponse) => application.setAccount(wrappedData, localCache, applyResponse)
       } else {
-        throw new Error('Missing requried interface function. apply()')
+        throw new Error('Missing requried interface function. setAccount()')
       }
 
-      if (typeof (application.apply) === 'function') {
+      if (typeof (application.getRelevantData) === 'function') {
         applicationInterfaceImpl.getRelevantData = async (accountId, tx) => application.getRelevantData(accountId, tx)
       } else {
         throw new Error('Missing requried interface function. getRelevantData()')
