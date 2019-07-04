@@ -43,16 +43,27 @@ class P2PLostNodes {
    */
   proposeLost () {
     const currentCycleCounter = this.state.getCycleCounter() || 0
+    const activeNodesById = this.state.getActiveNodes(this.p2p.id).reduce((obj, node) => {
+      obj[node.id] = node
+      return obj
+    }, {})
 
     for (const target in this.lostNodesMeta) {
       const meta = this.lostNodesMeta[target]
       if (!meta) continue
 
+      // If target is no longer an active node, unflag it
+      if (!activeNodesById[target]) {
+        this._unflagLostNode(target)
+        this.mainLogger.debug(`Lost Detection: Unflagged target ${target} because it is no longer active.`)
+        continue
+      }
+
       const status = meta.status
       const lostMsg = meta.messages.lost
       const age = lostMsg ? currentCycleCounter - lostMsg.cycleCounter : 0
-      const isInvestigator = lostMsg ? this.p2p.id === lostMsg.investigator : false
-      const isTarget = lostMsg ? this.p2p.id === lostMsg.target : false
+      const amInvestigator = lostMsg ? this.p2p.id === lostMsg.investigator : false
+      const amTarget = lostMsg ? this.p2p.id === lostMsg.target : false
 
       switch (true) {
         case (status === this.statuses.flagged): {
@@ -69,7 +80,7 @@ class P2PLostNodes {
           })
           break
         }
-        case (status === this.statuses.reported && age >= 1 && isInvestigator): {
+        case (status === this.statuses.reported && age >= 1 && amInvestigator): {
           // Gossip DownMesage for target
           const downMsg = this._createDownMsg(lostMsg)
           const [added, reason] = this._addDownMessage(downMsg)
@@ -82,7 +93,7 @@ class P2PLostNodes {
           })
           break
         }
-        case (status === this.statuses.down && age >= 2 && isTarget): {
+        case (status === this.statuses.down && age >= 2 && amTarget): {
           // Gossip UpMessage for target
           const downMsg = meta.messages.down
           const upMsg = this._createUpMsg(downMsg)
@@ -268,12 +279,16 @@ class P2PLostNodes {
     if (source === target) return [false, '"source" is "target"']
     if (target === investigator) return [false, '"target" is "investigator"']
     if (investigator === source) return [false, '"investigator" is "source"']
-    // Ensure all node id's map to actual nodes
-    const sourceNode = this.state.getNode(source)
+    // Ensure all node id's map to active nodes
+    const activeNodesById = this.state.getActiveNodes().reduce((obj, node) => {
+      obj[node.id] = node
+      return obj
+    }, {})
+    const sourceNode = activeNodesById[source]
     if (!sourceNode) return [false, '"source" id does not map to a node in the network']
-    const targetNode = this.state.getNode(target)
+    const targetNode = activeNodesById[target]
     if (!targetNode) return [false, '"target" id does not map to a node in the network']
-    const investigatorNode = this.state.getNode(investigator)
+    const investigatorNode = activeNodesById[investigator]
     if (!investigatorNode) return [false, '"investigator" does not map to a node in the network']
     // Ensure lastCycleMarker is correst for cycleCounter
     const myLastCycle = this.state.getCycleByCounter(cycleCounter - 1)

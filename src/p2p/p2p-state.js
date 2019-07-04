@@ -932,6 +932,7 @@ class P2PState extends EventEmitter {
   // Q1
   _startUpdatePhase (startTime, phaseLen) {
     if (this.shouldStop) return
+    this.mainLogger.debug(`P2P State: Started C${this.getCycleCounter()} Q1`)
     this.mainLogger.debug('Starting update phase...')
     this.acceptChainUpdates = true
     const endTime = startTime + phaseLen
@@ -1032,6 +1033,7 @@ class P2PState extends EventEmitter {
   // Q2
   _endUpdatePhase (startTime, phaseLen) {
     if (this.shouldStop) return
+    this.mainLogger.debug(`P2P State: Started C${this.getCycleCounter()} Q2`)
     this.mainLogger.debug('Ending update phase...')
     this.acceptChainUpdates = false
     const endTime = startTime + phaseLen
@@ -1049,6 +1051,7 @@ class P2PState extends EventEmitter {
   // Q3
   async _startCycleSync (startTime, phaseLen) {
     if (this.shouldStop) return
+    this.mainLogger.debug(`P2P State: Started C${this.getCycleCounter()} Q3`)
     this.mainLogger.debug('Starting cycle sync phase...')
     await this._createCycleMarker()
     const endTime = startTime + phaseLen
@@ -1066,6 +1069,7 @@ class P2PState extends EventEmitter {
   // Q4
   async _finalizeCycle (startTime, phaseLen) {
     if (this.shouldStop) return
+    this.mainLogger.debug(`P2P State: Started C${this.getCycleCounter()} Q4`)
     this.mainLogger.debug('Starting cycle finalization phase...')
     const endTime = startTime + phaseLen
 
