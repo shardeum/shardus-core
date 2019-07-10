@@ -264,7 +264,7 @@ class P2PState extends EventEmitter {
     this.currentCycle.data.desired = newDesired
 
     // If scaling flag changed, trigger computeCycleMarker
-    await this._createCycleMarker()
+    this._createCycleMarker()
   }
 
   async _addToScalingRequests (scalingRequest) {
@@ -482,7 +482,7 @@ class P2PState extends EventEmitter {
       this.addLostMessage(lostUpMsg, true)
     }
     const cMarkerBefore = this.getCurrentCertificate().marker
-    await this._createCycleMarker(false)
+    this._createCycleMarker(false)
     const cMarkerAfter = this.getCurrentCertificate().marker
     if (cMarkerBefore === cMarkerAfter) return false
     return true
@@ -1053,7 +1053,7 @@ class P2PState extends EventEmitter {
     if (this.shouldStop) return
     this.mainLogger.debug(`P2P State: Started C${this.getCycleCounter()} Q3`)
     this.mainLogger.debug('Starting cycle sync phase...')
-    await this._createCycleMarker()
+    this._createCycleMarker()
     const endTime = startTime + phaseLen
 
     const lastCycle = this.getLastCycle()
@@ -1090,7 +1090,7 @@ class P2PState extends EventEmitter {
     this.unfinalizedReady = true
   }
 
-  async _createCycleMarker (gossip = true) {
+  _createCycleMarker (gossip = true) {
     this.mainLogger.info('Creating new cycle marker...')
     this._addJoiningNodes()
     this._removeExcessNodes()
@@ -1104,7 +1104,7 @@ class P2PState extends EventEmitter {
     const [added] = this.addCertificate(certificate)
     if (!added) return
     if (!gossip) return
-    await this.p2p.sendGossipIn('certificate', certificate)
+    this.p2p.sendGossipIn('certificate', certificate)
   }
 
   async addUnfinalizedAndStart (cycle) {

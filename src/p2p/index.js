@@ -463,7 +463,7 @@ class P2P extends EventEmitter {
       await this._waitUntilUpdatePhase(currentTime, cycleStart, cycleDuration)
     }
     if (this.verboseLogs) this.mainLogger.debug(`Gossiping message: ${JSON.stringify(message)} on '${route}'.`)
-    await this.sendGossipIn(route, message)
+    this.sendGossipIn(route, message)
   }
 
   async _attemptJoin (seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration) {

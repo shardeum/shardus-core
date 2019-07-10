@@ -110,7 +110,7 @@ interface LostNodeMetaData {
   }
 }
 
-type LostNodeStatus = 'unflagged' | flagged' | 'reported' | 'down' | 'up'
+type LostNodeStatus = 'unflagged' | 'flagged' | 'reported' | 'down' | 'up'
 
 interface LostMessage {
   source: string,

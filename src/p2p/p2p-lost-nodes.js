@@ -159,15 +159,15 @@ class P2PLostNodes {
       if (this.respondToPing) await respond({ success: true })
     })
 
-    this.p2p.registerGossipHandler('lostnodedown', async (payload, sender, tracker) => {
+    this.p2p.registerGossipHandler('lostnodedown', (payload, sender, tracker) => {
       const downMsg = payload
-      const [added, reason] = await this._addDownMessage(downMsg)
+      const [added, reason] = this._addDownMessage(downMsg)
       if (!added) {
         this.mainLogger.debug(`Lost Detection: Invalid downMsg: ${reason}: ${JSON.stringify(downMsg)}: ${JSON.stringify(downMsg)}`)
         return
       }
       this.mainLogger.debug(`Lost Detection: Investigator reported target ${downMsg.lostMessage.target} as down. Waiting 1 cycle for target to refute...`)
-      await this.p2p.sendGossipIn('lostnodedown', downMsg, tracker)
+      this.p2p.sendGossipIn('lostnodedown', downMsg, tracker)
     })
 
     this.p2p.registerGossipHandler('lostnodeup', async (payload, sender, tracker) => {
@@ -178,7 +178,7 @@ class P2PLostNodes {
         return
       }
       this.mainLogger.debug(`Lost Detection: Target ${upMsg.downMessage.lostMessage.target} refuted lost status.`)
-      await this.p2p.sendGossipIn('lostnodeup', upMsg, tracker)
+      this.p2p.sendGossipIn('lostnodeup', upMsg, tracker)
     })
 
     // [TODO] Testing routes, remove before release
@@ -251,11 +251,12 @@ class P2PLostNodes {
     const { target } = lostMsg
     // Add lostMsg to lostNodesMeta
     let meta = this.lostNodesMeta[target]
-    if (!meta) {
-      const targetNode = this.state.getNode(target)
-      meta = this._createLostNodeMeta(targetNode)
-      this.lostNodesMeta[target] = meta
+    if (meta && meta.messages.lost) {
+      return [false, `a LostMessage already exists for target ${target}`]
     }
+    const targetNode = this.state.getNode(target)
+    meta = this._createLostNodeMeta(targetNode)
+    this.lostNodesMeta[target] = meta
     meta.status = this.statuses.reported
     meta.messages.lost = lostMsg
     return [true, 'All good']

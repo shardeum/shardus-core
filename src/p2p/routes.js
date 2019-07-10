@@ -154,10 +154,10 @@ function setupRoutes () {
       const [added] = this.state.addCertificate(hisCertificate, true)
       if (!added) {
         const myCertificate = this.state.getCurrentCertificate()
-        await this.sendGossipIn('certificate', myCertificate)
+        this.sendGossipIn('certificate', myCertificate)
         return
       }
-      await this.sendGossipIn('certificate', hisCertificate)
+      this.sendGossipIn('certificate', hisCertificate)
     }
   })
 
@@ -209,7 +209,7 @@ function setupRoutes () {
     // Add status update of given node to queue
     const added = await this.state.addStatusUpdate(payload)
     if (!added) return this.mainLogger.debug(`Status update to active for ${payload.nodeId} not added.`)
-    await this.sendGossipIn('active', payload, tracker, sender)
+    this.sendGossipIn('active', payload, tracker, sender)
   })
 
   this.registerGossipHandler('apoptosis', async (payload, sender, tracker) => {
@@ -221,7 +221,7 @@ function setupRoutes () {
     // Attempt to add apoptosis message to cycle
     const added = await this.state.addExtApoptosisMessage(payload)
     if (!added) return this.mainLogger.debug(`Apoptosis message for ${payload.nodeId} not added.`)
-    await this.sendGossipIn('apoptosis', payload, tracker, sender)
+    this.sendGossipIn('apoptosis', payload, tracker, sender)
   })
 
   this.registerGossipHandler('certificate', async (payload, sender, tracker) => {
@@ -244,13 +244,13 @@ function setupRoutes () {
           const [added] = this.state.addCertificate(certificate, true)
           if (!added) {
             const ourCert = this.state.getCurrentCertificate()
-            await this.sendGossipIn('certificate', ourCert, tracker, sender)
+            this.sendGossipIn('certificate', ourCert, tracker, sender)
             return
           }
           break
       }
     }
-    await this.sendGossipIn('certificate', certificate, tracker, sender)
+    this.sendGossipIn('certificate', certificate, tracker, sender)
   })
 
   this.registerGossipHandler('scaling', async (payload, sender, tracker) => {
@@ -260,7 +260,7 @@ function setupRoutes () {
     }
     const added = await this.state.addExtScalingRequest(payload)
     if (!added) return
-    await this.sendGossipIn('scaling', payload, tracker)
+    this.sendGossipIn('scaling', payload, tracker)
   })
 
   // -------- DEMO Routes ----------
