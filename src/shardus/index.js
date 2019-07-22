@@ -258,7 +258,7 @@ class Shardus {
 
   _createAndLinkStateManager () {
     this.stateManager = new StateManager(this.verboseLogs, this.profiler, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto, this.config)
-    this._registerListener(this.consensus, 'accepted', (...txArgs) => this.stateManager.queueAcceptedTransaction2(...txArgs))
+    this._registerListener(this.consensus, 'accepted', (...txArgs) => this.stateManager.queueAcceptedTransaction(...txArgs))
   }
 
   async syncAppData () {
@@ -373,13 +373,13 @@ class Shardus {
   }
 
   // USED BY SIMPLECOINAPP
-  applyResponseAddState (resultObject, accountData, accountId, txId, txTimestamp, stateBefore, stateAfter, accountCreated) {
+  applyResponseAddState (resultObject, accountData, localCache, accountId, txId, txTimestamp, stateBefore, stateAfter, accountCreated) {
     let state = { accountId, txId, txTimestamp, stateBefore, stateAfter }
     if (accountCreated) {
       state.stateBefore = allZeroes64
     }
     resultObject.stateTableResults.push(state)
-    resultObject.accountData.push({ accountId, data: accountData, txId, timestamp: txTimestamp, hash: stateAfter })
+    resultObject.accountData.push({ accountId, data: accountData, txId, timestamp: txTimestamp, hash: stateAfter, localCache: localCache })
   }
 
   // USED BY SIMPLECOINAPP
@@ -390,6 +390,31 @@ class Shardus {
   // USED BY SIMPLECOINAPP
   async getLocalOrRemoteAccount (address) {
     return this.stateManager.getLocalOrRemoteAccount(address)
+  }
+
+  createWrappedResponse (accountId, accountCreated, hash, timestamp, fullData) {
+    // create and return the response object, it will default to full data.
+    return { accountId: accountId, accountCreated, isPartial: false, stateId: hash, timestamp: timestamp, data: fullData }
+  }
+
+  setPartialData (response, partialData, userTag) {
+    // if the account was just created we have to do something special and ignore partial data
+    if (response.accountCreated) {
+      response.localCache = response.data
+      return
+    }
+    response.isPartial = true
+    // otherwise we will convert this response to be using partial data
+    response.localCache = response.data
+    response.data = partialData
+    response.userTag = userTag
+  }
+
+  genericApplyPartialUpate (fullObject, updatedPartialObject) {
+    let dataKeys = Object.keys(updatedPartialObject)
+    for (let key of dataKeys) {
+      fullObject[key] = updatedPartialObject[key]
+    }
   }
 
   async shutdown (exitProcess = true) {
@@ -435,11 +460,16 @@ class Shardus {
         throw new Error('Missing requried interface function. apply()')
       }
 
-      if (typeof (application.setAccount) === 'function') {
-        // applicationInterfaceImpl.setAccount = async (wrappedStates, applyResponse, accountFilter) => application.setAccount(wrappedStates, applyResponse, accountFilter)
-        applicationInterfaceImpl.setAccount = async (wrappedData, localCache, applyResponse) => application.setAccount(wrappedData, localCache, applyResponse)
+      if (typeof (application.updateAccountFull) === 'function') {
+        applicationInterfaceImpl.updateAccountFull = async (wrappedStates, localCache, applyResponse) => application.updateAccountFull(wrappedStates, localCache, applyResponse)
       } else {
-        throw new Error('Missing requried interface function. setAccount()')
+        throw new Error('Missing requried interface function. updateAccountFull()')
+      }
+
+      if (typeof (application.updateAccountPartial) === 'function') {
+        applicationInterfaceImpl.updateAccountPartial = async (wrappedStates, localCache, applyResponse) => application.updateAccountPartial(wrappedStates, localCache, applyResponse)
+      } else {
+        throw new Error('Missing requried interface function. updateAccountPartial()')
       }
 
       if (typeof (application.getRelevantData) === 'function') {

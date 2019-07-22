@@ -4,7 +4,12 @@ const ShardFunctions = require('./shardFunctions.js')
 // const stringify = require('fast-stable-stringify')
 
 // todo m12: need error handling on all the p2p requests.
+
 const allZeroes64 = '0'.repeat(64)
+
+const cHashSetStepSize = 4
+const cHashSetTXStepSize = 2
+const cHashSetDataStepSize = 2
 
 class StateManager extends EventEmitter {
   constructor (verboseLogs, profiler, app, consensus, logger, storage, p2p, crypto, config) {
@@ -1076,7 +1081,7 @@ class StateManager extends EventEmitter {
       let ourLockID = -1
       try {
         ourLockID = await this.fifoLock('accountModification')
-        accountData = await this.app.getAccountData2(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, payload.maxRecords)
+        accountData = await this.app.getAccountDataByRange(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, payload.maxRecords)
       } finally {
         this.fifoUnlock('accountModification', ourLockID)
       }
@@ -1366,7 +1371,7 @@ class StateManager extends EventEmitter {
         // already have this in our queue
       }
 
-      this.queueAcceptedTransaction2(payload.acceptedTx, true, null) // todo pass in sender?
+      this.queueAcceptedTransaction(payload.acceptedTx, true, null) // todo pass in sender?
 
       // no response needed?
     })
@@ -1424,7 +1429,7 @@ class StateManager extends EventEmitter {
         // already have this in our queue
       }
 
-      let added = this.queueAcceptedTransaction2(payload, false, sender)
+      let added = this.queueAcceptedTransaction(payload, false, sender)
       if (added === 'lost') {
         return // we are faking that the message got lost so bail here
       }
@@ -1569,7 +1574,7 @@ class StateManager extends EventEmitter {
 
     // await this.applyAcceptedTx()
     for (let acceptedTx of acceptedTXs) {
-      this.queueAcceptedTransaction2(acceptedTx, false) // TODO!!!!! need to evaluate how this reacts with the new queue system..  this repair method is the old one anyhow though
+      this.queueAcceptedTransaction(acceptedTx, false)
     }
 
     // todo insert these in a sorted way to the new queue
@@ -1735,25 +1740,14 @@ class StateManager extends EventEmitter {
   async testAccountTimesAndStateTable2 (tx, wrappedStates) {
     let hasStateTableData = false
 
-    // let accountStates = {}
-    // for (let wrappedData of wrappedStates) {
-    //   accountStates[wrappedData.id] = wrappedData
-    // }
-
     function tryGetAccountData (accountID) {
-      // for (let accountEntry of accountData) {
-      //   if (accountEntry.accountId === accountID) {
-      //     return accountEntry
-      //   }
-      // }
-      // return null
       return wrappedStates[accountID]
     }
 
     try {
       let keysResponse = this.app.getKeyFromTransaction(tx)
       let { sourceKeys, targetKeys, timestamp } = keysResponse
-      let sourceAddress, targetAddress, sourceState, targetState
+      let sourceAddress, sourceState, targetState
 
       // check account age to make sure it is older than the tx
       let failedAgeCheck = false
@@ -1823,6 +1817,35 @@ class StateManager extends EventEmitter {
     return { success: true, hasStateTableData }
   }
 
+  async testAccountTime (tx, wrappedStates) {
+    function tryGetAccountData (accountID) {
+      return wrappedStates[accountID]
+    }
+
+    try {
+      let keysResponse = this.app.getKeyFromTransaction(tx)
+      let { timestamp } = keysResponse // sourceKeys, targetKeys,
+      // check account age to make sure it is older than the tx
+      let failedAgeCheck = false
+
+      let accountKeys = Object.keys(wrappedStates)
+      for (let key of accountKeys) {
+        let accountEntry = tryGetAccountData(key)
+        if (accountEntry.timestamp >= timestamp) {
+          failedAgeCheck = true
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTime account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
+        }
+      }
+      if (failedAgeCheck) {
+        // if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountTimesAndStateTable accounts have future state ' + timestamp)
+        return false
+      }
+    } catch (ex) {
+      this.fatalLogger.fatal('testAccountTime failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      return false
+    }
+    return true // { success: true, hasStateTableData }
+  }
   // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
   async tryApplyTransaction (acceptedTX, hasStateTableData, repairing, filter, wrappedStates, localCachedData) {
     let ourLockID = -1
@@ -1830,6 +1853,7 @@ class StateManager extends EventEmitter {
     let txTs = 0
     let accountKeys = []
     let ourAccountLocks
+    let applyResponse
     try {
       let tx = acceptedTX.data
       // let receipt = acceptedTX.receipt
@@ -1860,12 +1884,11 @@ class StateManager extends EventEmitter {
 
       // let replyObject = { stateTableResults: [], txId, txTimestamp, accountData: [] }
       // let wrappedStatesList = Object.values(wrappedStates)
-      let applyResponse = await this.app.apply(tx, wrappedStates)
+      applyResponse = await this.app.apply(tx, wrappedStates)
       let { stateTableResults, accountData: _accountdata } = applyResponse
-      accountDataList = _accountdata
+      accountDataList = _accountdata // oops we may need to compute full data if a paritial situaiton!
 
       // wrappedStates are side effected for now
-
       await this.setAccount(wrappedStates, localCachedData, applyResponse, filter)
 
       this.applySoftLock = false
@@ -1885,7 +1908,7 @@ class StateManager extends EventEmitter {
     } catch (ex) {
       this.fatalLogger.fatal('tryApplyTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
 
-      if (!repairing) this.tempRecordTXByCycle(txTs, acceptedTX, false)
+      if (!repairing) this.tempRecordTXByCycle(txTs, acceptedTX, false, applyResponse)
 
       return false
     } finally {
@@ -1896,12 +1919,27 @@ class StateManager extends EventEmitter {
       }
     }
 
-    await this.updateAccountsCopyTable(accountDataList, repairing, txTs)
+    // have to wrestle with the data a bit so we can backup the full account and not jsut the partial account!
+    // let dataResultsByKey = {}
+    let dataResultsFullList = []
+    for (let wrappedData of applyResponse.accountData) {
+      // if (wrappedData.isPartial === false) {
+      //   dataResultsFullList.push(wrappedData.data)
+      // } else {
+      //   dataResultsFullList.push(wrappedData.localCache)
+      // }
+      if (wrappedData.localCache != null) {
+        dataResultsFullList.push(wrappedData)
+      }
+      // dataResultsByKey[wrappedData.accountId] = wrappedData.data
+    }
+
+    await this.updateAccountsCopyTable(dataResultsFullList, repairing, txTs)
 
     if (!repairing) {
       // await this.updateAccountsCopyTable(accountDataList)
 
-      this.tempRecordTXByCycle(txTs, acceptedTX, true)
+      this.tempRecordTXByCycle(txTs, acceptedTX, true, applyResponse)
 
       this.emit('txApplied', acceptedTX)
     }
@@ -1940,11 +1978,6 @@ class StateManager extends EventEmitter {
     let allkeys = []
     allkeys = allkeys.concat(sourceKeys)
     allkeys = allkeys.concat(targetKeys)
-
-    // let accountStates = {}
-    // for (let wrappedData of wrappedStates) {
-    //   accountStates[wrappedData.id] = wrappedData
-    // }
 
     for (let key of allkeys) {
       if (wrappedStates[key] == null) {
@@ -2000,7 +2033,7 @@ class StateManager extends EventEmitter {
 
   // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
 
-  queueAcceptedTransaction2 (acceptedTX, sendGossip = true, sender) {
+  queueAcceptedTransaction (acceptedTX, sendGossip = true, sender) {
     let keysResponse = this.app.getKeyFromTransaction(acceptedTX.data)
     let timestamp = keysResponse.timestamp
     let txId = acceptedTX.receipt.txHash
@@ -2038,7 +2071,7 @@ class StateManager extends EventEmitter {
         let homeNode = ShardFunctions.findHomeNode(this.currentCycleShardData.shardGlobals, key, this.currentCycleShardData.parititionShardDataMap)
         txQueueEntry.homeNodes[key] = homeNode
         if (homeNode == null) {
-          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` queueAcceptedTransaction2: ${key} `)
+          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` queueAcceptedTransaction: ${key} `)
         }
 
         let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
@@ -2141,10 +2174,10 @@ class StateManager extends EventEmitter {
   }
 
   queueEntryAddData (queueEntry, data) {
-    if (queueEntry.collectedData[data.id] != null) {
+    if (queueEntry.collectedData[data.accountId] != null) {
       return // already have the data
     }
-    queueEntry.collectedData[data.id] = data
+    queueEntry.collectedData[data.accountId] = data
     queueEntry.dataCollected++
 
     if (queueEntry.dataCollected === queueEntry.uniqueKeys.length) { //  queueEntry.tx Keys.allKeys.length
@@ -2152,7 +2185,7 @@ class StateManager extends EventEmitter {
     }
 
     if (data.localCache) {
-      queueEntry.localCachedData[data.id] = data.localCache
+      queueEntry.localCachedData[data.accountId] = data.localCache
       delete data.localCache
     }
 
@@ -2687,11 +2720,15 @@ class StateManager extends EventEmitter {
     let keys = Object.keys(wrappedStates)
     for (let key of keys) {
       let wrappedData = wrappedStates[key]
-      if (canWriteToAccount(wrappedData.id) === false) {
+      if (canWriteToAccount(wrappedData.accountId) === false) {
         continue
       }
 
-      await this.app.setAccount(wrappedData, localCachedData[key], applyResponse)
+      if (wrappedData.isPartial) {
+        await this.app.updateAccountPartial(wrappedData, localCachedData[key], applyResponse)
+      } else {
+        await this.app.updateAccountFull(wrappedData, localCachedData[key], applyResponse)
+      }
     }
   }
 
@@ -2847,11 +2884,31 @@ class StateManager extends EventEmitter {
     let partitionHash = this.crypto.hash(partitionObject)
     let partitionResult = { Partition_hash: partitionHash, Partition_id: partitionObject.Partition_id, Cycle_number: partitionObject.Cycle_number }
 
+    // let stepSize = cHashSetStepSize
     if (this.useHashSets) {
-      let hashSet = ''
-      for (let hash of partitionObject.Txids) {
-        hashSet += hash.slice(0, 2)
-      }
+      // let hashSet = ''
+      // for (let hash of partitionObject.Txids) {
+      //   hashSet += hash.slice(0, stepSize)
+      // }
+      // partitionResult.hashSet = hashSet
+
+      // let stateSet = ''
+      // for (let statesOfTx of partitionObject.States) {
+      //   for (let state of statesOfTx) {
+      //     stateSet += state.slice(0, 2)
+      //   }
+      //   stateSet += '.' // test delimiter.
+      // }
+      // for (let i = 0; i < partitionObject.Txids.length; ++i) {
+      //   let hash = partitionObject.Txids[i]
+      //   let state = partitionObject.States[i]
+      //   hashSet += hash.slice(0, 2)
+      //   let statehash = this.crypto.hash(state) // todo could probably non crpyto hash these.
+      //   hashSet += statehash.slice(0, 2)
+      // }
+      // partitionResult.hashSet = hashSet
+
+      let hashSet = StateManager.createHashSetString(partitionObject.Txids, partitionObject.States) // TXSTATE_TODO
       partitionResult.hashSet = hashSet
     }
 
@@ -2888,7 +2945,9 @@ class StateManager extends EventEmitter {
       Cycle_marker: lastCycle.marker,
       Txids: txSourceData.hashes, // txid1, txid2, …],  - ordered from oldest to recent
       Status: txSourceData.passed, // [1,0, …],      - ordered corresponding to Txids; 1 for applied; 0 for failed
+      States: txSourceData.states, // array of array of states
       Chain: [] // [partition_hash_341, partition_hash_342, partition_hash_343, …]
+      // TODO need to implment chain logic!
     }
     return partitionObject
   }
@@ -3274,6 +3333,7 @@ class StateManager extends EventEmitter {
     // just simple assignment.  if we changed things to merge the best N results this would need to change.
     ourPartitionObj.Txids = [...otherPartitionObject.Txids]
     ourPartitionObj.Status = [...otherPartitionObject.Status]
+    ourPartitionObj.States = [...otherPartitionObject.States]
 
     // add/remove them somewhere else?  to the structure used to generate the lists
     // let look at where a partition object is generated.
@@ -3282,6 +3342,7 @@ class StateManager extends EventEmitter {
 
     txList.hashes = ourPartitionObj.Txids
     txList.passed = ourPartitionObj.Status
+    txList.states = ourPartitionObj.States // TXSTATE_TODO
     if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair _mergeRepairDataIntoLocalState:  key: ${key} txlist: ${utils.stringifyReduce({ hashes: txList.hashes, passed: txList.passed })} `)
   }
 
@@ -3296,13 +3357,13 @@ class StateManager extends EventEmitter {
       txSourceList = txList.newTxList
     }
     // let newTxList = { hashes: [...txList.hashes], passed: [...txList.passed], txs: [...txList.txs] }
-    let newTxList = { hashes: [], passed: [], txs: [], thashes: [], tpassed: [], ttxs: [] }
+    let newTxList = { hashes: [], passed: [], txs: [], thashes: [], tpassed: [], ttxs: [], tstates: [], states: [] }
     txList.newTxList = newTxList // append it to tx list for now.
     repairTracker.solutionDeltas.sort(function (a, b) { return a.i - b.i }) // why did b - a help us once??
 
     let debugSol = []
     for (let solution of repairTracker.solutionDeltas) {
-      debugSol.push({ i: solution.i, tx: solution.tx.id.slice(0, 4) })
+      debugSol.push({ i: solution.i, tx: solution.tx.id.slice(0, 4), st: solution.state }) // TXSTATE_TODO
     }
 
     ourHashSet.extraMap.sort(function (a, b) { return a - b })
@@ -3321,12 +3382,16 @@ class StateManager extends EventEmitter {
       newTxList.thashes.push(txSourceList.hashes[i])
       newTxList.tpassed.push(txSourceList.passed[i])
       newTxList.ttxs.push(txSourceList.txs[i])
+      newTxList.tstates.push(txSourceList.states[i]) // TXSTATE_TODO
     }
 
-    let hashSet = ''
-    for (let hash of newTxList.thashes) {
-      hashSet += hash.slice(0, 2)
-    }
+    // let stepSize = cHashSetStepSize
+    // let hashSet = ''
+    // for (let hash of newTxList.thashes) {
+    //   hashSet += hash.slice(0, stepSize)
+    // }
+
+    let hashSet = StateManager.createHashSetString(newTxList.thashes, newTxList.states) // TXSTATE_TODO
 
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a  len: ${ourHashSet.indexMap.length}  extraIndex: ${extraIndex} ourPreHashSet: ${hashSet}`)
 
@@ -3337,43 +3402,53 @@ class StateManager extends EventEmitter {
     // insert corrections in order for each -1 in our local list (or write from our temp lists above)
     let ourCounter = 0
     let solutionIndex = 0
-    for (let i = 0; i < ourHashSet.indexMap.length; i++) {
-      let currentIndex = ourHashSet.indexMap[i]
-      if (currentIndex >= 0) {
+    try {
+      for (let i = 0; i < ourHashSet.indexMap.length; i++) {
+        let currentIndex = ourHashSet.indexMap[i]
+        if (currentIndex >= 0) {
         // pull from our list? but we have already removed stuff?
-        newTxList.hashes[i] = newTxList.thashes[ourCounter]
-        newTxList.passed[i] = newTxList.tpassed[ourCounter]
-        newTxList.txs[i] = newTxList.ttxs[ourCounter]
-        ourCounter++
-        if (newTxList.hashes[i] == null) {
-          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
-        }
-      } else {
+          newTxList.hashes[i] = newTxList.thashes[ourCounter]
+          newTxList.passed[i] = newTxList.tpassed[ourCounter]
+          newTxList.txs[i] = newTxList.ttxs[ourCounter]
+          newTxList.states[i] = newTxList.tstates[ourCounter]
+          ourCounter++
+          if (newTxList.hashes[i] == null) {
+            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+            throw new Error('aborting data repair. fatal problem')
+          }
+        } else {
         // repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j] })
-        let solutionDelta = repairTracker.solutionDeltas[solutionIndex]
+          let solutionDelta = repairTracker.solutionDeltas[solutionIndex]
 
-        if (!solutionDelta) {
-          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error solutionDelta=null  solutionIndex: ${solutionIndex} i:${i} of ${ourHashSet.indexMap.length} deltas: ${utils.stringifyReduce(repairTracker.solutionDeltas)}`)
-        }
-        // insert the next one
-        newTxList.hashes[i] = solutionDelta.tx.id
-        newTxList.passed[i] = solutionDelta.pf
-        newTxList.txs[i] = solutionDelta.tx
-        solutionIndex++
-        if (newTxList.hashes[i] == null) {
-          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 b error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+          if (!solutionDelta) {
+            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error solutionDelta=null  solutionIndex: ${solutionIndex} i:${i} of ${ourHashSet.indexMap.length} deltas: ${utils.stringifyReduce(repairTracker.solutionDeltas)}`)
+          }
+          // insert the next one
+          newTxList.hashes[i] = solutionDelta.tx.id
+          newTxList.passed[i] = solutionDelta.pf
+          newTxList.txs[i] = solutionDelta.tx
+          newTxList.states[i] = solutionDelta.state // TXSTATE_TODO
+          solutionIndex++
+          if (newTxList.hashes[i] == null) {
+            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 b error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+          }
         }
       }
+    } catch (ex) {
+      this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 c  Exception when applying solution. going apoptosis. solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter} ourHashSet: ${hashSet}`)
+      this.p2p.initApoptosis()
+      throw new Error('aborting data repair. starting apoptosis')
     }
 
     hashSet = ''
-    for (let hash of newTxList.hashes) {
-      if (!hash) {
-        hashSet += 'xx'
-        continue
-      }
-      hashSet += hash.slice(0, 2)
-    }
+    // for (let hash of newTxList.hashes) {
+    //   if (!hash) {
+    //     hashSet += 'xx'
+    //     continue
+    //   }
+    //   hashSet += hash.slice(0, stepSize)
+    // }
+    hashSet = StateManager.createHashSetString(newTxList.hashes, newTxList.states) // TXSTATE_TODO
 
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 c  len: ${ourHashSet.indexMap.length}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter} ourHashSet: ${hashSet}`)
 
@@ -3435,6 +3510,7 @@ class StateManager extends EventEmitter {
     // lets generate the indexMap and extraMap index tables for out hashlist solution
     StateManager.expandIndexMapping(ourSolution, output)
 
+    let insertCount = 0
     // flag extras
     let requestsByHost = new Array(hashSetList.length).fill(null)
     for (let correction of ourSolution.corrections) {
@@ -3450,20 +3526,25 @@ class StateManager extends EventEmitter {
         // no entries found so init one
         if (greedyAsk < 0) {
           greedyAsk = voters[0]
-          requestsByHost[greedyAsk] = { requests: [], hostIndex: [] }
+          requestsByHost[greedyAsk] = { requests: [], hostIndex: [], stateSnippets: [] }
         }
         // generate the index map for the server we will ask as needed
         if (hashSetList[greedyAsk].indexMap == null) {
           StateManager.expandIndexMapping(hashSetList[greedyAsk], output)
         }
         // use the remote hosts index map to determine for the exact index.
-        requestsByHost[greedyAsk].hostIndex.push(hashSetList[greedyAsk].indexMap[index]) // todo calc this on host side, requires some cache mgmt!
+        let hostIndex = hashSetList[greedyAsk].indexMap[index]
+        requestsByHost[greedyAsk].hostIndex.push(hostIndex) // todo calc this on host side, requires some cache mgmt!
 
         // just ask for the correction and let the remote host do the translation!
         requestsByHost[greedyAsk].requests.push(index)
 
         // send the hash we are asking for so we will have a ref for the index
         requestsByHost[greedyAsk].hash = hashSetList[greedyAsk].hash
+
+        // grab chars from the solution that will rep the data hash we want
+        requestsByHost[greedyAsk].stateSnippets.push(correction.v.slice(cHashSetTXStepSize, cHashSetTXStepSize + cHashSetDataStepSize))
+        insertCount++
       }
     }
 
@@ -3472,16 +3553,19 @@ class StateManager extends EventEmitter {
 
     for (let i = 0; i < requestsByHost.length; i++) {
       if (requestsByHost[i] != null) {
-        requestsByHost[i].requests.sort(function (a, b) { return a - b }) // sort these since the reponse for the host will also sort by timestamp
+        // I think we don't need this anymore:
+        // requestsByHost[i].requests.sort(function (a, b) { return a - b }) // sort these since the reponse for the host will also sort by timestamp
+
         let payload = { partitionId: partitionId, cycle: cycleNumber, tx_indicies: requestsByHost[i].hostIndex, hash: requestsByHost[i].hash }
-        if (this.extendedRepairLogging) console.log(`host group: ${i}  requests: ${utils.stringifyReduce(payload)}  hosts: ${utils.stringifyReduce(hashSetList[i].owners)} `)
+        if (this.extendedRepairLogging) console.log(`get_transactions_by_partition_index ok!  payload: ${utils.stringifyReduce(payload)}`)
+        if (this.extendedRepairLogging) console.log(`requestsByHost[i].stateSnippets ${utils.stringifyReduce(requestsByHost[i].stateSnippets)} `)
         if (hashSetList[i].owners.length > 0) {
-          let nodeToContact = this.p2p.state.getNodeByPubKey(hashSetList[i].owners[0]) // TODO consider checking getNode if we are dealing with ids instead of address
+          let nodeToContact = this.p2p.state.getNodeByPubKey(hashSetList[i].owners[0])
 
           let result = await this.p2p.ask(nodeToContact, 'get_transactions_by_partition_index', payload)
           // { success: true, acceptedTX: result, passFail: passFailList }
           if (result.success === true) {
-            if (this.extendedRepairLogging) console.log(`get_transactions_by_partition_index ok!  payload: ${utils.stringifyReduce(payload)}`)
+            if (this.extendedRepairLogging) console.log(`get_transactions_by_partition_index ok! count:${result.acceptedTX.length} payload: ${utils.stringifyReduce(payload)}`)
             for (let j = 0; j < result.acceptedTX.length; j++) {
               let acceptedTX = result.acceptedTX[j]
               if (result.passFail[j] === 1) {
@@ -3490,8 +3574,14 @@ class StateManager extends EventEmitter {
               } else {
                 repairTracker.newFailedTXs.push(acceptedTX) // todo perf:  could make the response more complex so that it does not return the full tx for falied ones!.   this could take a fair amount of work.
               }
+
+              if (acceptedTX == null) {
+                if (this.verboseLogs) this.mainLogger.error(`syncTXsFromHashSetStrings acceptedTX == null  j:${j} i:${i} pf:${result.passFail[j]}`)
+              }
               // update our solution deltas.. hopefully that is enough info to patch up our state.
-              repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j] })
+              //   // TXSTATE_TODO   need a way to set state on this entry!
+              //      probably best to just copy it from what we queried?
+              repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j], state: requestsByHost[i].stateSnippets[j] })
             }
           } else {
             // todo datasync:  assert/fail/or retry
@@ -3502,6 +3592,10 @@ class StateManager extends EventEmitter {
           // host needs to give us pass/fail info
         }
       }
+    }
+
+    if (insertCount !== repairTracker.solutionDeltas.length) {
+      if (this.verboseLogs) this.mainLogger.error(`insertCount !== repairTracker.solutionDeltas.length: ${insertCount} , ${repairTracker.solutionDeltas.length} `)
     }
 
     // calculate extraTXIds
@@ -3693,7 +3787,7 @@ class StateManager extends EventEmitter {
     let ourAccountLocks = await this.bulkFifoLockAccounts(accountKeys)
     if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs FIFO lock inner: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
 
-    await this._revertAccounts(accountKeys, cycleNumber)
+    let replacmentAccounts = await this._revertAccounts(accountKeys, cycleNumber)
 
     // convert allNewTXsById map to newTXList list
     let newTXList = []
@@ -3712,6 +3806,17 @@ class StateManager extends EventEmitter {
     let applyCount = 0
     let applyFailCount = 0
     let hasEffect = false
+
+    let accountValuesByKey = {}
+    // let wrappedAccountResults = this.app.getAccountDataByList(accountKeys)
+    // for (let wrappedData of wrappedAccountResults) {
+    //   wrappedData.isPartial = false
+    //   accountValuesByKey[wrappedData.accountId] = wrappedData
+    // }
+    // let wrappedAccountResults=[]
+    // for(let key of accountKeys){
+    //   this.app.get
+    // }
     for (let tx of newTXList) {
       let keysFilter = txIDToAcc[tx.id]
       // need a transform to map all txs that would matter.
@@ -3744,8 +3849,41 @@ class StateManager extends EventEmitter {
             tx.data.receipt = JSON.parse(tx.data.receipt)
           }
 
-          // TODO need to fix this up!
-          let applied = await this.tryApplyTransaction(tx, hasStateTableData, true, acountsFilter, {}, {}) // TODO sharding.. how to get and pass the state wrapped account state in
+          // todo needs wrapped states! and/or localCachedData
+
+          // Need to build up this data.
+          let keysResponse = this.app.getKeyFromTransaction(tx.data)
+          let wrappedStates = {}
+          let localCachedData = {}
+          for (let key of keysResponse.allKeys) {
+            // build wrapped states
+            // let wrappedState = await this.app.getRelevantData(key, tx.data)
+
+            let wrappedState = accountValuesByKey[key] // need to init ths data. allAccountsToResetById[key]
+            if (wrappedState == null) {
+              // Theoretically could get this data from when we revert the data above..
+              wrappedState = await this.app.getRelevantData(key, tx.data)
+              accountValuesByKey[key] = wrappedState
+            } else {
+              wrappedState.accountCreated = false // kinda crazy assumption
+            }
+            wrappedStates[key] = wrappedState
+            localCachedData[key] = wrappedState.localCache
+            // delete wrappedState.localCache
+          }
+
+          let success = await this.testAccountTime(tx.data, wrappedStates)
+
+          if (!success) {
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis.' + utils.stringifyReduce(tx))
+            this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` testAccountTime failed. calling apoptosis.`)
+            this.p2p.initApoptosis()
+            // return { success: false, reason: 'testAccountTime failed' }
+            break
+          }
+
+          let applied = await this.tryApplyTransaction(tx, hasStateTableData, true, acountsFilter, wrappedStates, localCachedData) // TODO app interface changes.. how to get and pass the state wrapped account state in, (maybe simple function right above this
+          // accountValuesByKey = {} // clear this.  it forces more db work but avoids issue with some stale flags
           if (!applied) {
             applyFailCount++
             if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs apply failed`)
@@ -3799,13 +3937,13 @@ class StateManager extends EventEmitter {
     let cycleStart = cycle.start * 1000
     cycleEnd -= this.syncSettleTime // adjust by sync settle time
     cycleStart -= this.syncSettleTime // adjust by sync settle time
-
+    let replacmentAccounts
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts start  numAccounts: ${accountIDs.length} repairing cycle:${cycleNumber}`)
 
     try {
       // query our account copies that are less than or equal to this cycle!
       let prevCycle = cycleNumber - 1
-      let replacmentAccounts = await this.storage.getAccountReplacmentCopies(accountIDs, prevCycle)
+      replacmentAccounts = await this.storage.getAccountReplacmentCopies(accountIDs, prevCycle)
 
       if (replacmentAccounts.length > 0) {
         for (let accountData of replacmentAccounts) {
@@ -3815,11 +3953,11 @@ class StateManager extends EventEmitter {
             // accountData.data.data.data = { rewrite: cycleNumber }
           }
 
-          if (accountData == null || accountData.data == null || accountData.data.data.address == null) {
-            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair _revertAccounts null account data found: ${accountData.data.address} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
+          if (accountData == null || accountData.data == null || accountData.accountId == null) {
+            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair _revertAccounts null account data found: ${accountData.accountId} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
           } else {
             // todo overkill
-            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts reset: ${utils.makeShortHash(accountData.data.data.address)} ts: ${utils.makeShortHash(accountData.data.data.timestamp)} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
+            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts reset: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
           }
         }
         // tell the app to replace the account data
@@ -3840,9 +3978,6 @@ class StateManager extends EventEmitter {
       let debug = []
       for (let accountData of replacmentAccounts) {
         accountsReverted[accountData.accountId] = 1
-        // if (accountData.data.timestamp >= requiredOlderThanAge) {
-        //   accountsToDelete.push(accountData.id)
-        // }
         if (accountData.cycleNumber > prevCycle) {
           if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair _revertAccounts cycle too new for backup restore: ${accountData.cycleNumber}  cycleNumber:${cycleNumber} timestamp:${accountData.timestamp}`)
         }
@@ -3902,6 +4037,8 @@ class StateManager extends EventEmitter {
       this.mainLogger.debug('_repair: _revertAccounts mergeAndApplyTXRepairs ' + ` ${utils.stringifyReduce({ cycleNumber, cycleEnd, cycleStart, accountIDs })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       this.fatalLogger.fatal('_repair: _revertAccounts mergeAndApplyTXRepairs ' + ` ${utils.stringifyReduce({ cycleNumber, cycleEnd, cycleStart, accountIDs })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
     }
+
+    return replacmentAccounts // this is for debugging reference
   }
 
   async periodicCycleDataCleanup () {
@@ -4076,8 +4213,8 @@ class StateManager extends EventEmitter {
   }
 
   // we dont have a cycle yet to save these records against so store them in a temp place
-  tempRecordTXByCycle (txTS, acceptedTx, passed) {
-    this.tempTXRecords.push({ txTS, acceptedTx, passed, redacted: -1 })
+  tempRecordTXByCycle (txTS, acceptedTx, passed, applyResponse) {
+    this.tempTXRecords.push({ txTS, acceptedTx, passed, redacted: -1, applyResponse: applyResponse })
   }
 
   // call this before we start computing partitions so that we can make sure to get the TXs we need out of the temp list
@@ -4097,7 +4234,7 @@ class StateManager extends EventEmitter {
         continue
       }
       if (txRecord.txTS < cycleEnd) {
-        this.recordTXByCycle(txRecord.txTS, txRecord.acceptedTx, txRecord.passed)
+        this.recordTXByCycle(txRecord.txTS, txRecord.acceptedTx, txRecord.passed, txRecord.applyResponse)
         txsRecorded++
       } else {
         newTempTX.push(txRecord)
@@ -4118,7 +4255,7 @@ class StateManager extends EventEmitter {
     let key = 'c' + cycleNumber
     let txList = this.txByCycle[key]
     if (!txList) {
-      txList = { hashes: [], passed: [], txs: [], processed: false } // , txById: {}
+      txList = { hashes: [], passed: [], txs: [], processed: false, states: [] } // , txById: {}
       this.txByCycle[key] = txList
     }
     return txList
@@ -4127,14 +4264,14 @@ class StateManager extends EventEmitter {
   getTXListByKey (key, partitionId) {
     let txList = this.txByCycle[key]
     if (!txList) {
-      txList = { hashes: [], passed: [], txs: [], processed: false } //  ,txById: {}
+      txList = { hashes: [], passed: [], txs: [], processed: false, states: [] } //  ,txById: {}  states may be an array of arraywith account after states
       this.txByCycle[key] = txList
     }
     return txList
   }
 
   // take this tx and create if needed and object for the current cylce that holds a list of passed and failed TXs
-  recordTXByCycle (txTS, acceptedTx, passed) {
+  recordTXByCycle (txTS, acceptedTx, passed, applyResponse) {
     // TODO sharding.  filter TSs by the partition they belong to. Double check that this is still needed
 
     // get the cycle that this tx timestamp would belong to.
@@ -4156,6 +4293,17 @@ class StateManager extends EventEmitter {
     txList.hashes.push(acceptedTx.id)
     txList.passed.push((passed) ? 1 : 0)
     txList.txs.push(acceptedTx)
+
+    if (applyResponse != null && applyResponse.accountData != null) {
+      let states = []
+      for (let accountData of applyResponse.accountData) {
+        states.push(utils.makeShortHash(accountData.hash)) // TXSTATE_TODO need to get only certain state data!.. hash of local states?
+      }
+      txList.states.push(states[0]) // TXSTATE_TODO does this check out?
+    } else {
+      txList.states.push('xxxx')
+    }
+
     // txList.txById[acceptedTx.id] = acceptedTx
     // TODO sharding.  need to add some periodic cleanup when we have more cycles than needed stored in this map!!!
 
@@ -4219,7 +4367,7 @@ class StateManager extends EventEmitter {
     let solving = true
     let index = 0
     let lastOutputCount = 0 // output list length last time we went through the loop
-    let stepSize = 2
+    let stepSize = cHashSetStepSize
 
     let totalVotePower = 0
     for (let hashListEntry of hashSetList) {
@@ -4353,9 +4501,6 @@ class StateManager extends EventEmitter {
             if (i < 10) {
               countEntry.ec += hashListEntry.votePower
             }
-            // if (i > 35) {
-            //   foo++
-            // }
 
             // check for possible winnner due to re arranging things
             // a nuance here that we require there to be some official votes before in this row before we consider a tx..  will need to analyze this choice
@@ -4579,23 +4724,24 @@ class StateManager extends EventEmitter {
 
     // let debugSol = []
     // for (let solution of repairTracker.solutionDeltas) {
-    //   debugSol.push({ i: solution.i, tx: solution.tx.id.slice(0, 4) })
+    //   debugSol.push({ i: solution.i, tx: solution.tx.id.slice(0, 4) })  // TXSTATE_TODO
     // }
 
-    let stepSize = 2
+    let stepSize = cHashSetStepSize
     let makeTXArray = function (hashSet) {
       let txArray = []
       for (let i = 0; i < hashSet.hashSet.length / stepSize; i++) {
         let offset = i * stepSize
         let v = hashSet.hashSet.slice(offset, offset + stepSize)
         txArray.push(v)
+        // need to slice out state???
       }
       return txArray
     }
 
     let txSourceList = { hashes: makeTXArray(ourHashSet) }
     let solutionTxList = { hashes: makeTXArray(solutionHashSet) }
-    let newTxList = { thashes: [], hashes: [] }
+    let newTxList = { thashes: [], hashes: [], states: [] }
 
     let solutionList = []
     for (let correction of ourHashSet.corrections) {
@@ -4651,9 +4797,12 @@ class StateManager extends EventEmitter {
     }
 
     let hashSet = ''
-    for (let hash of newTxList.thashes) {
-      hashSet += hash.slice(0, 2)
-    }
+    // for (let hash of newTxList.thashes) {
+    //   hashSet += hash.slice(0, stepSize)
+
+    //   // todo add in the account state stuff..
+    // }
+    hashSet = StateManager.createHashSetString(newTxList.thashes, newTxList.states) // TXSTATE_TODO
 
     console.log(`extras removed: len: ${ourHashSet.indexMap.length}  extraIndex: ${extraIndex} ourPreHashSet: ${hashSet}`)
 
@@ -4691,6 +4840,8 @@ class StateManager extends EventEmitter {
         // insert the next one
         newTxList.hashes[i] = solutionTxList.hashes[correction.i] // solutionDelta.tx.id
 
+        // newTxList.states[i] = solutionTxList.states[correction.i] // TXSTATE_TODO
+
         if (newTxList.hashes[i] == null) {
           console.log(`testHashsetSolution error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
         }
@@ -4704,18 +4855,36 @@ class StateManager extends EventEmitter {
     }
 
     hashSet = ''
-    for (let hash of newTxList.hashes) {
-      if (!hash) {
-        hashSet += 'xx'
-        continue
-      }
-      hashSet += hash.slice(0, 2)
-    }
+    // for (let hash of newTxList.hashes) {
+    //   if (!hash) {
+    //     hashSet += 'xx'
+    //     continue
+    //   }
+    //   hashSet += hash.slice(0, stepSize)
+    // }
+    hashSet = StateManager.createHashSetString(newTxList.hashes, newTxList.states) // TXSTATE_TODO
 
-    console.log(`solved set len: ${hashSet.length / 2}  : ${hashSet}`)
+    console.log(`solved set len: ${hashSet.length / stepSize}  : ${hashSet}`)
     // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 c  len: ${ourHashSet.indexMap.length}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter} ourHashSet: ${hashSet}`)
 
     return true
+  }
+
+  static createHashSetString (txHashes, dataHashes) {
+    let hashSet = ''
+    for (let i = 0; i < txHashes.length; i++) {
+      let txHash = txHashes[i]
+      let dataHash = dataHashes[i]
+      if (!txHash) {
+        txHash = 'xx'
+      }
+      if (!dataHash) {
+        dataHash = 'xx'
+      }
+      hashSet += txHash.slice(0, cHashSetTXStepSize)
+      hashSet += dataHash.slice(0, cHashSetDataStepSize)
+    }
+    return hashSet
   }
 }
 

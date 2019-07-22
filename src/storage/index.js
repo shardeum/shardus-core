@@ -284,6 +284,7 @@ class Storage {
     try {
       await this._delete(this.storageModels.accountStates, null, { truncate: true })
       await this._delete(this.storageModels.acceptedTxs, null, { truncate: true })
+      await this._delete(this.storageModels.accountsCopy, null, { truncate: true })
     } catch (e) {
       throw new Error(e)
     }
@@ -500,8 +501,6 @@ class Storage {
       throw new Error(e)
     }
   }
-
-
 
   async createAccountCopies (accountCopies) {
     this._checkInit()

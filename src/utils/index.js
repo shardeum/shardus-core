@@ -161,6 +161,10 @@ const isString = (x) => {
   return Object.prototype.toString.call(x) === '[object String]'
 }
 
+const isNumeric = (x) => {
+  return isNaN(x) === false
+}
+
 const makeShortHash = (x, n = 4) => {
   if (!x) {
     return x
@@ -296,6 +300,7 @@ exports.getClosestHash = getClosestHash
 exports.setAlarm = setAlarm
 exports.isObject = isObject
 exports.isString = isString
+exports.isNumeric = isNumeric
 exports.makeShortHash = makeShortHash
 exports.stringifyReduce = stringifyReduce
 exports.robustPromiseAll = robustPromiseAll
