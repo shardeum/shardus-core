@@ -870,6 +870,10 @@ class StateManager extends EventEmitter {
   }
 
   async writeCombinedAccountDataToBackups (failedHashes) {
+    if (failedHashes.length === 0) {
+      return // nothing to do yet
+    }
+
     let failedAccountsById = {}
     for (let hash of failedHashes) {
       failedAccountsById[hash] = true
