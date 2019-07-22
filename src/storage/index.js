@@ -7,8 +7,8 @@ const stringify = require('fast-stable-stringify')
 // const utils = require('../utils')
 
 // const SequelizeStorage = require('./sequelizeStorage')
-// const Sqlite3Storage = require('./sqlite3storage')
-const BetterSqlite3Storage = require('./betterSqlite3storage')
+const Sqlite3Storage = require('./sqlite3storage')
+// const BetterSqlite3Storage = require('./betterSqlite3storage')
 
 class Storage {
   constructor (baseDir, config, logger, profiler) {
@@ -17,11 +17,19 @@ class Storage {
     this.mainLogger = logger.getLogger('main')
     // this.storage = new SequelizeStorage(models, config, logger, baseDir, this.profiler)
 
-    this.storage = new BetterSqlite3Storage(models, config, logger, baseDir, this.profiler)
+    // this.storage = new BetterSqlite3Storage(models, config, logger, baseDir, this.profiler)
+    this.storage = new Sqlite3Storage(models, config, logger, baseDir, this.profiler)
   }
 
   async init () {
     await this.storage.init()
+
+    await this.storage.runCreate('CREATE TABLE if not exists `acceptedTxs` (`id` VARCHAR(255) NOT NULL PRIMARY KEY, `timestamp` BIGINT NOT NULL, `data` JSON NOT NULL, `status` VARCHAR(255) NOT NULL, `receipt` JSON NOT NULL)')
+    await this.storage.runCreate('CREATE TABLE if not exists `accountStates` ( `accountId` VARCHAR(255) NOT NULL, `txId` VARCHAR(255) NOT NULL, `txTimestamp` BIGINT NOT NULL, `stateBefore` VARCHAR(255) NOT NULL, `stateAfter` VARCHAR(255) NOT NULL,  PRIMARY KEY (`accountId`, `txTimestamp`))')
+    await this.storage.runCreate('CREATE TABLE if not exists `cycles` (`counter` BIGINT NOT NULL UNIQUE PRIMARY KEY, `certificate` JSON NOT NULL, `previous` TEXT NOT NULL, `marker` TEXT NOT NULL, `start` BIGINT NOT NULL, `duration` BIGINT NOT NULL, `active` BIGINT NOT NULL, `desired` BIGINT NOT NULL, `expired` BIGINT NOT NULL, `joined` JSON NOT NULL, `activated` JSON NOT NULL, `removed` JSON NOT NULL, `returned` JSON NOT NULL, `lost` JSON NOT NULL, `refuted` JSON NOT NULL, `apoptosized` JSON NOT NULL)')
+    await this.storage.runCreate('CREATE TABLE if not exists `nodes` (`id` TEXT NOT NULL PRIMARY KEY, `publicKey` TEXT NOT NULL, `curvePublicKey` TEXT NOT NULL, `cycleJoined` TEXT NOT NULL, `internalIp` VARCHAR(255) NOT NULL, `externalIp` VARCHAR(255) NOT NULL, `internalPort` SMALLINT NOT NULL, `externalPort` SMALLINT NOT NULL, `joinRequestTimestamp` BIGINT NOT NULL, `address` VARCHAR(255) NOT NULL, `status` VARCHAR(255) NOT NULL)')
+    await this.storage.runCreate('CREATE TABLE if not exists `properties` (`key` VARCHAR(255) NOT NULL PRIMARY KEY, `value` JSON)')
+    await this.storage.runCreate('CREATE TABLE if not exists `accountsCopy` (`accountId` VARCHAR(255) NOT NULL, `cycleNumber` BIGINT NOT NULL, `data` JSON NOT NULL, `timestamp` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, PRIMARY KEY (`accountId`, `cycleNumber`))')
 
     // get models and helper methods from the storage class we just initializaed.
     this.storageModels = this.storage.storageModels
