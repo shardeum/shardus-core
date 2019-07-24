@@ -1,8 +1,11 @@
 {
   "name": "shardus-enterprise-server",
   "version": "0.0.0",
-  "description": "The shardus enterprise server",
+  "description": "The Shardus Enterprise Server",
   "main": "index.js",
+  "config": {
+    "dist": "./dist"
+  },
   "scripts": {
     "test": "standard && tap --timeout=0 \"test/**/*.spec.js\"",
     "test:watch": "nodemon -x npm run test",
@@ -12,7 +15,8 @@
     "test:integration:watch": "nodemon -x npm run test:integration",
     "cover": "nyc tap --timeout=0 \"test/**/*.spec.js\" --coverage-report=html && codecov",
     "doc": "typedoc --includeDeclarations --excludeExternals --mode file --tsconfig tdconfig.json --out docs",
-    "doc-json": "typedoc --includeDeclarations --excludeExternals --mode file --tsconfig tdconfig.json --json documentation.json"
+    "doc-json": "typedoc --includeDeclarations --excludeExternals --mode file --tsconfig tdconfig.json --json documentation.json",
+    "build": "webpack && node scripts/build.js"
   },
   "repository": {
     "type": "git",
@@ -36,12 +40,16 @@
   },
   "devDependencies": {
     "axios": "0.18.0",
+    "bytenode-webpack-plugin": "1.0.1",
     "codecov": "3.1.0",
     "nodemon": "1.18.4",
     "nyc": "13.1.0",
     "standard": "12.0.1",
     "tap": "12.0.1",
+    "typedoc": "0.14.2",
     "vorpal": "1.12.0",
-    "typedoc": "^0.14.2"
+    "webpack": "4.36.1",
+    "webpack-cli": "3.3.6",
+    "webpack-node-externals": "1.7.2"
   }
 }
