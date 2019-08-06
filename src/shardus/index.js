@@ -533,14 +533,16 @@ class Shardus {
   }
 
   registerExceptionHandler () {
-    process.on('uncaughtException', async (err) => {
-      this.fatalLogger.fatal('uncaughtException: ' + err.name + ': ' + err.message + ' at ' + err.stack)
-      try {
-        await this.exitHandler.exitCleanly()
-      } catch (e) {
-        console.error('uncaughtException: ' + e.name + ': ' + e.message + ' at ' + e.stack)
-        process.exit(1)
-      }
+    const logFatalAndExit = (err) => {
+      console.log('Encountered a fatal error. Check fatal log for details.')
+      this.fatalLogger.fatal('unhandledRejection: ' + err.stack)
+      this.exitHandler.exitCleanly()
+    }
+    process.on('uncaughtException', (err) => {
+      logFatalAndExit(err)
+    })
+    process.on('unhandledRejection', (err) => {
+      logFatalAndExit(err)
     })
   }
 

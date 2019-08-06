@@ -143,10 +143,10 @@ class Network extends EventEmitter {
 
   async shutdown () {
     try {
-      await Promise.all([
-        closeServer(this.extServer),
-        this.sn.stopListening(this.intServer)
-      ])
+      const promises = []
+      if (this.extServer) promises.push(closeServer(this.extServer))
+      if (this.sn) promises.push(this.sn.stopListening(this.intServer))
+      await Promise.all(promises)
     } catch (e) {
       throw e
     }

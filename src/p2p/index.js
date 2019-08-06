@@ -112,7 +112,12 @@ class P2P extends EventEmitter {
   }
 
   async _discoverIp (ipServer) {
-    let { ip } = await http.get(ipServer)
+    let ip
+    try {
+      ({ ip } = await http.get(ipServer))
+    } catch (e) {
+      throw Error(`Fatal: Could not discover IP from external IP server ${ipServer}: ` + e.message)
+    }
     this.mainLogger.debug(`Discovered IP: ${ip}`)
     return ip
   }
@@ -128,13 +133,23 @@ class P2P extends EventEmitter {
   // TODO: add way to compare time from major server head requests like google.com
   async _checkTimeSynced (timeServer) {
     const localTime = utils.getTime('s')
-    let timestamp = await http.get(timeServer)
+    let timestamp
+    try {
+      timestamp = await http.get(timeServer)
+    } catch (e) {
+      throw Error(`Fatal: Could not get timestamp from external time server ${timeServer}: ` + e.message)
+    }
     return this._checkWithinSyncLimit(localTime, timestamp)
   }
 
   async _getSeedListSigned () {
     const nodeInfo = this.getPublicNodeInfo()
-    const seedListSigned = await http.post(this.seedList, { nodeInfo })
+    let seedListSigned
+    try {
+      seedListSigned = await http.post(this.seedList, { nodeInfo })
+    } catch (e) {
+      throw Error(`Fatal: Could not get seed list from seed node server ${this.seedList}: ` + e.message)
+    }
     this.mainLogger.debug(`Got signed seed list: ${JSON.stringify(seedListSigned)}`)
     return seedListSigned
   }
