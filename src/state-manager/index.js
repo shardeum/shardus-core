@@ -77,6 +77,8 @@ class StateManager extends EventEmitter {
     this.shardValuesByCycle = new Map()
     this.currentCycleShardData = null
 
+    this.syncTrackerIndex = 1 // increments up for each new sync tracker we create gets maped to calls.
+
     this.startShardCalculations() // too early?
   }
 
@@ -103,6 +105,8 @@ class StateManager extends EventEmitter {
     this.mapAccountData = {}
 
     this.fifoLocks = {}
+
+    this.syncTrackers = []
   }
 
   // TODO: Milestone 14-15? this will take a short list of account IDs and get us resynced on them
@@ -134,6 +138,48 @@ class StateManager extends EventEmitter {
     this.isSyncingAcceptedTxs = false
   }
 
+  // range should be in this format:
+  //       rangeIsSplit = true
+  // partitionRange {low , high}
+  // partitionRange2 {low , high}
+  // use ShardFunctions.partitionToAddressRange2() to calc
+  createSyncTracker (partition, cycle) {
+    let range = {}
+    let index = this.syncTrackerIndex++
+    let syncTracker = { partition, range, queueEntries: [], cycle, index }
+    syncTracker.syncStarted = false
+    syncTracker.syncFinished = false
+
+    this.syncTrackers.push(syncTracker) // we should maintain this order.
+
+    return syncTracker
+  }
+
+  createSyncTrackerByRange (range, cycle) {
+    let partition = -1
+    let index = this.syncTrackerIndex++
+    let syncTracker = { partition, range, queueEntries: [], cycle, index }
+    syncTracker.syncStarted = false
+    syncTracker.syncFinished = false
+
+    this.syncTrackers.push(syncTracker) // we should maintain this order.
+
+    return syncTracker
+  }
+
+  getSyncTracker (address) {
+    // return the sync tracker.
+    for (let i = 0; i < this.syncTrackers.length; i++) {
+      let syncTracker = this.syncTrackers[i]
+
+      // need to see if address is in range. if so return the tracker.
+      if (ShardFunctions.testAddressInRange(address, syncTracker.range)) {
+        return syncTracker
+      }
+    }
+    return null
+  }
+
   // syncs transactions and application state data
   // This is the main outer loop that will loop over the different partitions
   // The last step catch up on the acceptedTx queue
@@ -154,11 +200,95 @@ class StateManager extends EventEmitter {
     this.mainLogger.debug(`DATASYNC: starting syncStateData`)
 
     this.requiredNodeCount = requiredNodeCount
-    // in the future, loop through and call this for each partition
-    // todo after enterprise: use only the address range that our node needs
-    for (let i = 0; i < this.getNumPartitions(); i++) {
-      await this.syncStateDataForPartition(i)
-      this.completedPartitions.push(i)
+
+    while (this.currentCycleShardData == null) {
+      this.getCurrentCycleShardData()
+      await utils.sleep(1000)
+    }
+    let nodeShardData = this.currentCycleShardData.nodeShardData
+    console.log('GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
+
+    // get list of partitions to sync
+    let partitionsToSync = []
+    let rangesToSync = []
+    let num = nodeShardData.storedPartitionspartitionEnd1 - nodeShardData.storedPartitionspartitionStart1
+    for (let i = nodeShardData.storedPartitionspartitionStart1; i < num; i++) {
+      partitionsToSync.push(i)
+    }
+    if (nodeShardData.storedPartitions.rangeIsSplit) {
+      num = nodeShardData.storedPartitionspartitionEnd2 - nodeShardData.storedPartitionspartitionStart2
+      for (let i = nodeShardData.storedPartitionspartitionStart2; i < num; i++) {
+        partitionsToSync.push(i)
+      }
+    }
+    let cycle = this.currentCycleShardData.cycleNumber
+    // create the sync trackers
+    // for (let partition of partitionsToSync) {
+    //   this.createSyncTracker(partition, cycle)
+    // }
+
+    // for (let syncTracker of this.syncTrackers) {
+    //   let partition = syncTracker.partition
+    //   console.log(`syncStateData partition: ${partition}  time ${Date.now()}`)
+
+    //   await this.syncStateDataForRange(syncTracker.range)
+    //   this.completedPartitions.push(partition)
+    //   this.clearPartitionData()
+    // }
+
+    let homePartition = nodeShardData.homePartition
+
+    console.log(`homePartition: ${homePartition} storedPartitions: ${utils.stringifyReduce(nodeShardData.storedPartitions)}`)
+    if (nodeShardData.storedPartitions.partitionStart1 < homePartition && nodeShardData.storedPartitions.partitionEnd1 > homePartition) {
+      // two ranges
+      let range1 = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, nodeShardData.storedPartitions.partitionStart1, homePartition)
+      let range2 = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, homePartition, nodeShardData.storedPartitions.partitionEnd1)
+
+      // stich the addresses together
+      let [centerAddr, centerAddrPlusOne] = ShardFunctions.findCenterAddressPair(range1.high, range2.low)
+      range1.high = centerAddr
+      range2.low = centerAddrPlusOne
+      rangesToSync.push(range1)
+      rangesToSync.push(range2)
+      console.log(`range1:2  s:${nodeShardData.storedPartitions.partitionStart1} e:${nodeShardData.storedPartitions.partitionEnd1} h: ${homePartition} `)
+    } else {
+      // one range
+      rangesToSync.push(nodeShardData.storedPartitions.partitionRange)
+      console.log(`range1:1  s:${nodeShardData.storedPartitions.partitionStart1} e:${nodeShardData.storedPartitions.partitionEnd1} h: ${homePartition} `)
+    }
+    if (nodeShardData.storedPartitions.rangeIsSplit) {
+      if (nodeShardData.storedPartitions.partitionStart2 < homePartition && nodeShardData.storedPartitions.partitionEnd2 > homePartition) {
+      // two ranges
+        let range1 = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, nodeShardData.storedPartitions.partitionStart2, homePartition)
+        let range2 = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, homePartition, nodeShardData.storedPartitions.partitionEnd2)
+        // stich the addresses together
+        let [centerAddr, centerAddrPlusOne] = ShardFunctions.findCenterAddressPair(range1.high, range2.low)
+        range1.high = centerAddr
+        range2.low = centerAddrPlusOne
+        rangesToSync.push(range1)
+        rangesToSync.push(range2)
+        console.log(`range2:2  s:${nodeShardData.storedPartitions.partitionStart2} e:${nodeShardData.storedPartitions.partitionEnd2} h: ${homePartition} `)
+      } else {
+        // one range
+        rangesToSync.push(nodeShardData.storedPartitions.partitionRange2)
+        console.log(`range2:1  s:${nodeShardData.storedPartitions.partitionStart2} e:${nodeShardData.storedPartitions.partitionEnd2} h: ${homePartition} `)
+      }
+    }
+
+    console.log(`syncStateData ranges: ${utils.stringifyReduce(rangesToSync)}}`)
+
+    for (let range of rangesToSync) {
+      // let nodes = ShardFunctions.getNodesThatCoverRange(this.currentCycleShardData.shardGlobals, range.low, range.high, this.currentCycleShardData.ourNode, this.currentCycleShardData.activeNodes)
+      this.createSyncTrackerByRange(range, cycle)
+    }
+
+    for (let syncTracker of this.syncTrackers) {
+      // let partition = syncTracker.partition
+      console.log(`syncTracker start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
+      syncTracker.syncStarted = true
+      await this.syncStateDataForRange(syncTracker.range)
+      syncTracker.syncFinished = true
+
       this.clearPartitionData()
     }
 
@@ -178,10 +308,11 @@ class StateManager extends EventEmitter {
     this.tryStartAcceptedQueue2()
   }
 
-  async syncStateDataForPartition (partition) {
+  async syncStateDataForRange (range) {
     try {
-      this.currentPartition = partition
-      this.addressRange = this.partitionToAddressRange(partition)
+      let partition = ''
+      this.currentRange = range
+      this.addressRange = range // this.partitionToAddressRange(partition)
 
       this.partitionStartTimeStamp = Date.now()
 
@@ -269,22 +400,25 @@ class StateManager extends EventEmitter {
   getCurrentCycleShardData () {
     if (this.currentCycleShardData === null) {
       let cycle = this.p2p.state.getLastCycle()
+      if (cycle == null) {
+        return null
+      }
       this.updateShardValues(cycle.counter)
     }
 
     return this.currentCycleShardData
   }
 
-  partitionToAddressRange (partition) {
-    // let numPartitions = getNumPartitions()
-    // let partitionFraction = partition / numPartitions
-    // todo after enterprise: implement partition->address range math.  possibly store it in a lookup table
-    let result = {}
-    result.partition = partition
-    result.low = '0'.repeat(64)
-    result.high = 'f'.repeat(64)
-    return result
-  }
+  // partitionToAddressRange (partition) {
+  //   // let numPartitions = getNumPartitions()
+  //   // let partitionFraction = partition / numPartitions
+  //   // todo after enterprise: implement partition->address range math.  possibly store it in a lookup table
+  //   let result = {}
+  //   result.partition = partition
+  //   result.low = '0'.repeat(64)
+  //   result.high = 'f'.repeat(64)
+  //   return result
+  // }
 
   getNumPartitions () {
     // hardcoded to one in enterprise
@@ -311,6 +445,25 @@ class StateManager extends EventEmitter {
   // ////////////////////////////////////////////////////////////////////
   //   DATASYNC
   // ////////////////////////////////////////////////////////////////////
+
+  // todo need a faster more scalable version of this if we get past afew hundred nodes.
+  getActiveNodesInRange (lowAddress, highAddress, exclude = []) {
+    let allNodes = this.p2p.state.getActiveNodes(this.p2p.id)
+    this.lastActiveNodeCount = allNodes.length
+    let results = []
+    let count = allNodes.length
+    for (const node of allNodes) {
+      if (node.id >= lowAddress && node.id <= highAddress) {
+        if ((exclude.includes(node.id)) === false) {
+          results.push(node)
+          if (results.length >= count) {
+            return results
+          }
+        }
+      }
+    }
+    return results
+  }
 
   // todo refactor: move to p2p?
   getRandomNodesInRange (count, lowAddress, highAddress, exclude) {
@@ -373,7 +526,11 @@ class StateManager extends EventEmitter {
         let result = await this.p2p.ask(node, 'get_account_state_hash', message)
         return result
       }
-      let nodes = this.p2p.state.getActiveNodes(this.p2p.id)
+
+      let centerNode = ShardFunctions.getCenterHomeNode(this.currentCycleShardData.shardGlobals, this.currentCycleShardData.parititionShardDataMap, lowAddress, highAddress)
+      let nodes = ShardFunctions.getNodesByProximity(this.currentCycleShardData.shardGlobals, this.currentCycleShardData.activeNodes, centerNode.ourNodeIndex, this.p2p.id, 40)
+
+      // let nodes = this.getActiveNodesInRange(lowAddress, highAddress) // this.p2p.state.getActiveNodes(this.p2p.id)
       if (nodes.length === 0) {
         this.mainLogger.debug(`no nodes available`)
         return // nothing to do
@@ -382,7 +539,7 @@ class StateManager extends EventEmitter {
       let result
       let winners
       try {
-        [result, winners] = await this.p2p.robustQuery(nodes, queryFn, equalFn, 3)
+        [result, winners] = await this.p2p.robustQuery(nodes, queryFn, equalFn, 3, false)
       } catch (ex) {
         this.mainLogger.debug('syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         this.fatalLogger.fatal('syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -707,7 +864,7 @@ class StateManager extends EventEmitter {
     //   await this.syncStateDataForPartition(this.currentPartition)
     // }, 1000)
     await utils.sleep(1000)
-    await this.syncStateDataForPartition(this.currentPartition)
+    await this.syncStateDataForRange(this.currentRange)
   }
 
   // just a placeholder for later
@@ -2533,6 +2690,8 @@ class StateManager extends EventEmitter {
           } else if (queueEntry.hasAll) {
             queueEntry.state = 'applying'
           }
+
+          // TODO Need condition to check if age is greater than M3? to fail the tx from the queue
         } else if (queueEntry.state === 'applying') {
           markAccountsSeen(queueEntry)
 
@@ -3244,7 +3403,7 @@ class StateManager extends EventEmitter {
     // get node ID from signing.
     // obj.sign = { owner: pk, sig }
     let signingNode = topResult.sign.owner
-    let allNodes = this.p2p.state.getActiveNodes(this.p2p.id)
+    let allNodes = this.p2p.state.getActiveNodes(this.p2p.id) // todo convert to a versio of this: this.getActiveNodesInRange(lowAddress, highAddress) //
     let nodeToContact
 
     if (!allNodes) {

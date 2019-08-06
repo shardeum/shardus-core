@@ -26,6 +26,19 @@ class ShardFunctions {
     return ('00000000' + input).slice(-8)
   }
 
+  static calculateInitialSyncData (shardGlobals, address) {
+    let shardInfo = ShardFunctions.calculateShardValues(shardGlobals, address)
+    let storedPartitions = ShardFunctions.calculateStoredPartitions2(shardGlobals, shardInfo.homePartition)
+
+    // storedPartitions.partitionRange = ShardFunctions.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart1, storedPartitions.partitionEnd1)
+    // storedPartitions.partitionRange2 = ShardFunctions.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart2, storedPartitions.partitionEnd2)
+
+    // storedPartitions.partitionRange = ShardFunctions.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart, storedPartitions.partitionEnd)
+
+    // storedPartitions.rangeIsSplit
+    return storedPartitions
+  }
+
   static calculateShardValues (shardGlobals, address) {
     let shardinfo = {}
     shardinfo.address = address
@@ -214,7 +227,10 @@ class ShardFunctions {
     if (partitionShard == null) {
       partitionShard = parititionShardDataMap.get(homePartition)
     }
-    partitionShard.homeNodes.push(nodeShardData)
+
+    if (nodeShardData.ourNodeIndex !== -1) {
+      partitionShard.homeNodes.push(nodeShardData)
+    }
 
     nodeShardData.extendedData = false
     if (extendedData) {
@@ -468,6 +484,9 @@ class ShardFunctions {
     let startAddr = 0xffffffff * (partition / shardGlobals.numPartitions)
     startAddr = Math.floor(startAddr)
 
+    result.p_low = partition
+    result.p_high = paritionMax
+
     let endPartition = partition + 1
     if (paritionMax) {
       endPartition = paritionMax + 1
@@ -590,6 +609,63 @@ class ShardFunctions {
       }
     }
     return results
+  }
+
+  static getNodesByProximity (shardGlobals, activeNodes, position, excludeID, count = 10) {
+    let allNodes = activeNodes
+    let results = []
+    let leftScanIndex = position
+    let rightScanIndex = position - 1
+    for (let i = 0; i < Math.ceil(count / 2); i++) {
+      leftScanIndex--
+      rightScanIndex++
+      if (rightScanIndex >= allNodes.length) {
+        rightScanIndex = 0
+      }
+      if (leftScanIndex < 0) {
+        leftScanIndex = allNodes.length - 1
+      }
+      let node = allNodes[rightScanIndex]
+      if (node.id !== excludeID) {
+        if (node.status === 'active') {
+          results.push(node)
+        }
+      }
+      node = allNodes[leftScanIndex]
+      if (node.id !== excludeID) {
+        if (node.status === 'active') {
+          results.push(node)
+        }
+      }
+
+      if (rightScanIndex === leftScanIndex) {
+        break // we looped
+      }
+      if (((rightScanIndex - leftScanIndex) * (rightScanIndex - leftScanIndex)) === 1) {
+        break // we almost looped
+      }
+    }
+    return results
+  }
+
+  static findCenterAddressPair (lowAddress, highAddress) {
+    let leftAddressNum = parseInt(lowAddress.slice(0, 8), 16)
+    let nodeAddressNum = parseInt(highAddress.slice(0, 8), 16)
+
+    let centerNum = Math.round((leftAddressNum + nodeAddressNum) * 0.5)
+
+    let addressPrefixHex = ShardFunctions.leadZeros8((centerNum).toString(16))
+    let addressPrefixHex2 = ShardFunctions.leadZeros8((centerNum + 1).toString(16))
+
+    let centerAddr = addressPrefixHex + 'f'.repeat(56)
+    let centerAddrPlusOne = addressPrefixHex2 + '0'.repeat(56)
+    return [centerAddr, centerAddrPlusOne]
+  }
+
+  static getCenterHomeNode (shardGlobals, parititionShardDataMap, lowAddress, highAddress) {
+    let [centerAddr, centerAddrPlusOne] = ShardFunctions.findCenterAddressPair(lowAddress, highAddress)
+
+    return ShardFunctions.findHomeNode(shardGlobals, centerAddr, parititionShardDataMap)
   }
 
   static debugFastStableCorrespondingIndicies (size1, size2, index1) {

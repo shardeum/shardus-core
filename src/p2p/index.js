@@ -583,7 +583,7 @@ class P2P extends EventEmitter {
     return true
   }
 
-  async robustQuery (nodes = [], queryFn, equalityFn, redundancy = 3) {
+  async robustQuery (nodes = [], queryFn, equalityFn, redundancy = 3, shuffleNodes = true) {
     if (nodes.length === 0) throw new Error('No nodes given.')
     if (typeof queryFn !== 'function') throw new Error(`Provided queryFn ${queryFn} is not a valid function.`)
     if (typeof equalityFn !== 'function') equalityFn = util.isDeepStrictEqual
@@ -637,7 +637,9 @@ class P2P extends EventEmitter {
     let errors = 0
 
     nodes = [...nodes]
-    shuffleArray(nodes)
+    if (shuffleNodes === true) {
+      shuffleArray(nodes)
+    }
     const nodeCount = nodes.length
 
     const queryNodes = async (nodes) => {
