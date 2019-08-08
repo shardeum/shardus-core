@@ -7,7 +7,12 @@
   },
   "p2p": {
     "ipServer": "api.ipify.org/?format=json",
-    "timeServer": "http://arimaa.com/timestamp/",
+    "timeServers": [
+      "0.pool.ntp.org",
+      "1.pool.ntp.org",
+      "2.pool.ntp.org",
+      "3.pool.ntp.org"
+    ],
     "syncLimit": 180,
     "cycleDuration": 15,
     "maxRejoinTime": 20,

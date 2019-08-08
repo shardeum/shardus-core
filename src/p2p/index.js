@@ -1,5 +1,6 @@
 const util = require('util')
 const EventEmitter = require('events')
+const Sntp = require('@hapi/sntp')
 const utils = require('../utils')
 const http = require('../http')
 const P2PState = require('./p2p-state')
@@ -18,7 +19,7 @@ class P2P extends EventEmitter {
     this.ipInfo = config.ipInfo
     this.id = null
     this.ipServer = config.ipServer
-    this.timeServer = config.timeServer
+    this.timeServers = config.timeServers
     this.seedList = config.seedList
     this.syncLimit = config.syncLimit
     this.maxRejoinTime = config.maxRejoinTime
@@ -130,16 +131,19 @@ class P2P extends EventEmitter {
     return true
   }
 
-  // TODO: add way to compare time from major server head requests like google.com
-  async _checkTimeSynced (timeServer) {
-    const localTime = utils.getTime('s')
-    let timestamp
-    try {
-      timestamp = await http.get(timeServer)
-    } catch (e) {
-      throw Error(`Fatal: Could not get timestamp from external time server ${timeServer}: ` + e.message)
+  async _checkTimeSynced (timeServers) {
+    for (const host of timeServers) {
+      try {
+        const time = await Sntp.time({
+          host,
+          timeout: 10000
+        })
+        return time.t <= this.syncLimit
+      } catch (e) {
+        this.mainLogger.warn(`Couldn't fetch ntp time from server at ${host}`)
+      }
     }
-    return this._checkWithinSyncLimit(localTime, timestamp)
+    throw Error('Unable to check local time against time servers.')
   }
 
   async _getSeedListSigned () {
@@ -1126,8 +1130,12 @@ class P2P extends EventEmitter {
 
   async _discoverNetwork (seedNodes) {
     // Check if our time is synced to network time server
-    let timeSynced = await this._checkTimeSynced(this.timeServer)
-    if (!timeSynced) throw new Error('Local time out of sync with time server.')
+    try {
+      let timeSynced = await this._checkTimeSynced(this.timeServers)
+      if (!timeSynced) this.mainLogger.warn('Local time out of sync with time server.')
+    } catch (e) {
+      this.mainLogger.warn(e.message)
+    }
 
     // Check if we are first seed node
     const isFirstSeed = this._checkIfFirstSeedNode(seedNodes)
