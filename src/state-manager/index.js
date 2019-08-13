@@ -1,7 +1,7 @@
 const EventEmitter = require('events')
 const utils = require('../utils')
 const ShardFunctions = require('./shardFunctions.js')
-// const stringify = require('fast-stable-stringify')
+const stringify = require('fast-stable-stringify')
 
 // todo m12: need error handling on all the p2p requests.
 
@@ -47,6 +47,7 @@ class StateManager extends EventEmitter {
     this.lastSeenAccountsMap = null
 
     this.clearPartitionData()
+    this.syncTrackers = []
 
     this.acceptedTXQueue = []
     this.acceptedTXByHash = {}
@@ -105,8 +106,6 @@ class StateManager extends EventEmitter {
     this.mapAccountData = {}
 
     this.fifoLocks = {}
-
-    this.syncTrackers = []
   }
 
   // TODO: Milestone 14-15? this will take a short list of account IDs and get us resynced on them
@@ -173,7 +172,8 @@ class StateManager extends EventEmitter {
       let syncTracker = this.syncTrackers[i]
 
       // need to see if address is in range. if so return the tracker.
-      if (ShardFunctions.testAddressInRange(address, syncTracker.range)) {
+      // if (ShardFunctions.testAddressInRange(address, syncTracker.range)) {
+      if (syncTracker.range.low < address && address < syncTracker.range.high) {
         return syncTracker
       }
     }
@@ -285,12 +285,29 @@ class StateManager extends EventEmitter {
     for (let syncTracker of this.syncTrackers) {
       // let partition = syncTracker.partition
       console.log(`syncTracker start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
+      this.logger.playbackLogNote('shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+
       syncTracker.syncStarted = true
       await this.syncStateDataForRange(syncTracker.range)
       syncTracker.syncFinished = true
 
+      // allow syncing queue entries to resume!
+      for (let queueEntry of syncTracker.queueEntries) {
+        queueEntry.syncCounter--
+        if (queueEntry.syncCounter <= 0) {
+          queueEntry.state = 'aging'
+          this.logger.playbackLogNote('shrd_sync_wakeupTX', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
+        }
+      }
+      syncTracker.queueEntries = []
+
+      this.logger.playbackLogNote('shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
       this.clearPartitionData()
     }
+
+    // this.syncTrackers = []  //dont clear this untill we get a new cycle!
+
+    // this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, ` qId: ${txQueueEntry.entryID}`)
 
     // one we have all of the initial data the last thing to do is get caught up on transactions
     // This will await the queue processing up to Date.now()
@@ -306,6 +323,8 @@ class StateManager extends EventEmitter {
     this.dataPhaseTag = 'STATESYNC: '
     this.dataSyncMainPhaseComplete = true
     this.tryStartAcceptedQueue2()
+
+    this.logger.playbackLogNote('shrd_sync_mainphaseComplete', ` `, `  `)
   }
 
   async syncStateDataForRange (range) {
@@ -395,6 +414,44 @@ class StateManager extends EventEmitter {
 
     this.currentCycleShardData = cycleShardData
     this.shardValuesByCycle.set(cycleNumber, cycleShardData)
+
+    // calculate nodes that would just now start syncing edge data because the network shrank.
+
+    // calculate if there are any nearby nodes that are syncing right now.
+
+    cycleShardData.syncingNeighbors = this.p2p.state.getOrderedSyncingNeighbors(cycleShardData.ourNode)
+
+    if (cycleShardData.syncingNeighbors.length > 0) {
+      cycleShardData.syncingNeighborsTxGroup = [...cycleShardData.syncingNeighbors]
+      cycleShardData.syncingNeighborsTxGroup.push(cycleShardData.ourNode)
+      cycleShardData.hasSyncingNeighbors = true
+    } else {
+      cycleShardData.hasSyncingNeighbors = false
+    }
+
+    console.log(`updateShardValues  cycle:${cycleShardData.cycleNumber} `)
+
+    if (cycleShardData.ourNode.status === 'active') {
+      if (this.syncTrackers != null) {
+        for (let i = this.syncTrackers.length - 1; i >= 0; i--) {
+          let syncTracker = this.syncTrackers[i]
+          if (syncTracker.syncFinished === true) {
+            this.logger.playbackLogNote('shrd_sync_trackerRangeClear', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+
+            // allow syncing queue entries to resume!
+            for (let queueEntry of syncTracker.queueEntries) {
+              queueEntry.syncCounter--
+              if (queueEntry.syncCounter <= 0) {
+                queueEntry.state = 'aging'
+                this.logger.playbackLogNote('shrd_sync_wakeupTX', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
+              }
+            }
+            syncTracker.queueEntries = []
+            this.syncTrackers.splice(i, 1)
+          }
+        }
+      }
+    }
   }
 
   getCurrentCycleShardData () {
@@ -1555,9 +1612,9 @@ class StateManager extends EventEmitter {
       }
 
       for (let key of payload.keys) {
-        let data = queueEntry.collectedData[key]
+        let data = queueEntry.originalData[key] // collectedData
         if (data) {
-          response.stateList.push(data)
+          response.stateList.push(JSON.parse(data))
         }
       }
       await respond(response)
@@ -1577,6 +1634,9 @@ class StateManager extends EventEmitter {
       // add the data in
       for (let data of payload.stateList) {
         this.queueEntryAddData(queueEntry, data)
+        if (queueEntry.state === 'syncing') {
+          this.logger.playbackLogNote('shrd_sync_gettingData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
+        }
       }
     })
 
@@ -1594,8 +1654,15 @@ class StateManager extends EventEmitter {
       if (added === 'lost') {
         return // we are faking that the message got lost so bail here
       }
+      if (added === 'out of range') {
+        return // we are faking that the message got lost so bail here
+      }
+      if (added === 'notReady') {
+        return // we are faking that the message got lost so bail here
+      }
       queueEntry = this.getQueueEntrySafe(payload.id, payload.timestamp) // now that we added it to the queue, it should be possible to get the queueEntry now
 
+      // how did this work before??
       // get transaction group. 3 accounds, merge lists.
       let transactionGroup = this.queueEntryGetTransactionGroup(queueEntry)
       if (queueEntry.ourNodeInvolved === false) {
@@ -2095,6 +2162,16 @@ class StateManager extends EventEmitter {
       // dataResultsByKey[wrappedData.accountId] = wrappedData.data
     }
 
+    // this is just for debug!!!
+    if (dataResultsFullList[0] == null) {
+      for (let wrappedData of applyResponse.accountData) {
+        if (wrappedData.localCache != null) {
+          dataResultsFullList.push(wrappedData)
+        }
+        // dataResultsByKey[wrappedData.accountId] = wrappedData.data
+      }
+    }
+
     await this.updateAccountsCopyTable(dataResultsFullList, repairing, txTs)
 
     if (!repairing) {
@@ -2142,6 +2219,7 @@ class StateManager extends EventEmitter {
 
     for (let key of allkeys) {
       if (wrappedStates[key] == null) {
+        if (this.verboseLogs) console.log(`applyAcceptedTransaction missing some account data. timestamp:${timestamp}  key: ${utils.makeShortHash(key)}  debuginfo:${debugInfo}`)
         return { success: false, reason: 'missing some account data' }
       }
     }
@@ -2195,12 +2273,16 @@ class StateManager extends EventEmitter {
   // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
 
   queueAcceptedTransaction (acceptedTX, sendGossip = true, sender) {
+    if (this.currentCycleShardData == null) {
+      return 'notReady' // it is too early to care about thie tx
+    }
+
     let keysResponse = this.app.getKeyFromTransaction(acceptedTX.data)
     let timestamp = keysResponse.timestamp
     let txId = acceptedTX.receipt.txHash
 
     this.queueEntryCounter++
-    let txQueueEntry = { acceptedTx: acceptedTX, txKeys: keysResponse, collectedData: {}, homeNodes: {}, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {} } // age comes from timestamp
+    let txQueueEntry = { acceptedTx: acceptedTX, txKeys: keysResponse, collectedData: {}, originalData: {}, homeNodes: {}, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [] } // age comes from timestamp
     // partition data would store stuff like our list of nodes that store this ts
     // collected data is remote data we have recieved back
     // //tx keys ... need a sorted list (deterministic) of partition.. closest to a number?
@@ -2242,10 +2324,25 @@ class StateManager extends EventEmitter {
       }
       txQueueEntry.uniqueKeys = Object.keys(txQueueEntry.homeNodes)
 
+      // if we are syncing this area mark it as good.
+      for (let key of txQueueEntry.uniqueKeys) {
+        let syncTracker = this.getSyncTracker(key)
+        if (syncTracker != null) {
+          txQueueEntry.state = 'syncing'
+          txQueueEntry.syncCounter++
+          txQueueEntry.didSync = true // mark that this tx had to sync, this flag should never be cleared, we will use it later to not through stuff away.
+          syncTracker.queueEntries.push(txQueueEntry) // same tx may get pushed in multiple times. that's ok.
+          txQueueEntry.syncKeys.push(key) // used later to instruct what local data we should JIT load
+          txQueueEntry.localKeys[key] = true // used for the filter
+          this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, ` qId: ${txQueueEntry.entryID}`)
+        }
+      }
+
+      // if not active yet also mark it as syncing?  but would be good to test range somehow?
+
       // gossip 'spread_tx_to_group' to transaction group
       if (sendGossip) {
         try {
-          // async sendGossipIn (type, payload, tracker = '', sender = null, nodes = this.state.getAllNodes())
           let transactionGroup = this.queueEntryGetTransactionGroup(txQueueEntry)
           if (transactionGroup.length > 1) {
             this.p2p.sendGossipIn('spread_tx_to_group', acceptedTX, '', sender, transactionGroup)
@@ -2253,16 +2350,22 @@ class StateManager extends EventEmitter {
           // this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
         } catch (ex) {
           this.fatalLogger.fatal('txQueueEntry: ' + utils.stringifyReduce(txQueueEntry))
-
-          // let transactionGroup = this.queueEntryGetTransactionGroup(txQueueEntry)
         }
       }
-      // see if our node shard data covers any of the accounts?
-      this.queueEntryGetTransactionGroup(txQueueEntry) // this will compute our involvment
-      if (txQueueEntry.ourNodeInvolved === false) {
-        this.logger.playbackLogNote('shrd_notInTxGroup', `${txId}`, ``)
 
-        return // we are done, not involved!!!
+      if (txQueueEntry.didSync === false) {
+        // see if our node shard data covers any of the accounts?
+        this.queueEntryGetTransactionGroup(txQueueEntry) // this will compute our involvment
+        if (txQueueEntry.ourNodeInvolved === false) {
+          this.logger.playbackLogNote('shrd_notInTxGroup', `${txId}`, ``)
+
+          return 'out of range'// we are done, not involved!!!
+        } else {
+          if (this.currentCycleShardData.hasSyncingNeighbors === true) {
+            this.logger.playbackLogNote('shrd_sync_tx', `${txId}`, `nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighborsTxGroup.map(x => x.id))}`)
+            this.p2p.sendGossipAll('spread_tx_to_group', acceptedTX, '', sender, this.currentCycleShardData.syncingNeighborsTxGroup)
+          }
+        }
       }
 
       this.newAcceptedTxQueueTempInjest.push(txQueueEntry)
@@ -2341,6 +2444,8 @@ class StateManager extends EventEmitter {
     queueEntry.collectedData[data.accountId] = data
     queueEntry.dataCollected++
 
+    queueEntry.originalData[data.accountId] = stringify(data)
+
     if (queueEntry.dataCollected === queueEntry.uniqueKeys.length) { //  queueEntry.tx Keys.allKeys.length
       queueEntry.hasAll = true
     }
@@ -2350,7 +2455,7 @@ class StateManager extends EventEmitter {
       delete data.localCache
     }
 
-    this.logger.playbackLogNote('shrd_addData', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `key ${utils.makeShortHash(data.id)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}`)
+    this.logger.playbackLogNote('shrd_addData', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `key ${utils.makeShortHash(data.accountId)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}`)
   }
 
   queueEntryHasAllData (queueEntry) {
@@ -2571,6 +2676,14 @@ class StateManager extends EventEmitter {
     }
   }
 
+  removeFromQueue (queueEntry, currentIndex) {
+    this.newAcceptedTxQueue.splice(currentIndex, 1)
+    this.archivedQueueEntries.push(queueEntry)
+    if (this.archivedQueueEntries.length > 10000) {
+      this.archivedQueueEntries.shift()
+    }
+  }
+
   async processAcceptedTxQueue2 () {
     let seenAccounts
     try {
@@ -2594,10 +2707,12 @@ class StateManager extends EventEmitter {
 
       let timeM = this.queueSitTime
       let timeM2 = timeM * 2
+      let timeM3 = timeM * 3
       let currentTime = Date.now() // when to update this?
 
       seenAccounts = {}// todo PERF we should be able to support using a variable that we save from one update to the next.  set that up after initial testing
 
+      // todo move these functions out where they are not constantly regenerate
       let accountSeen = function (queueEntry) {
         for (let key of queueEntry.uniqueKeys) {
           if (seenAccounts[key] != null) {
@@ -2638,6 +2753,17 @@ class StateManager extends EventEmitter {
             lastTx = this.newAcceptedTxQueue[index]
           }
 
+          // for (let key of txQueueEntry.uniqueKeys) {
+          //   let syncTracker = this.getSyncTracker(key)
+          //   if (syncTracker != null) {
+          //     txQueueEntry.state = 'syncing'
+          //     txQueueEntry.syncCounter++
+          //     txQueueEntry.didSync = true // mark that this tx had to sync, this flag should never be cleared, we will use it later to not through stuff away.
+          //     syncTracker.queueEntries.push(txQueueEntry) // same tx may get pushed in multiple times. that's ok.
+          //     this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, ` qId: ${txQueueEntry.entryID}`)
+          //   }
+          // }
+
           this.newAcceptedTxQueue.splice(index + 1, 0, txQueueEntry)
           this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)}`)
           this.emit('txQueued', acceptedTx.receipt.txHash)
@@ -2656,7 +2782,16 @@ class StateManager extends EventEmitter {
           break
         }
 
-        if (queueEntry.state === 'aging') {
+        // // fail the message if older than m3
+        // if (queueEntry.hasAll === false && txAge > timeM3) {
+        //   queueEntry.state = 'failed'
+        //   removeFromQueue(queueEntry, currentIndex)
+        //   continue
+        // }
+
+        if (queueEntry.state === 'syncing') {
+          markAccountsSeen(queueEntry)
+        } else if (queueEntry.state === 'aging') {
           queueEntry.state = 'processing'
         } else if (queueEntry.state === 'processing') {
           if (accountSeen(queueEntry) === false) {
@@ -2680,6 +2815,12 @@ class StateManager extends EventEmitter {
               continue
             }
 
+            // if (queueEntry.hasAll === false && txAge > timeM3) {
+            //   queueEntry.state = 'failed'
+            //   removeFromQueue(queueEntry, currentIndex)
+            //   continue
+            // }
+
             // 7.  Manually request missing state
             try {
               this.queueEntryRequestMissingData(queueEntry)
@@ -2699,6 +2840,17 @@ class StateManager extends EventEmitter {
           this.emit('txPopped', queueEntry.acceptedTx.receipt.txHash)
 
           // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processAcceptedTxQueue2. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
+
+          if (queueEntry.didSync) {
+            this.logger.playbackLogNote('shrd_sync_applying', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
+
+            // if we did sync it is time to JIT query local data.  alternatively could have other nodes send us this data, but that could be very high bandwidth.
+            for (let key of queueEntry.syncKeys) {
+              let wrappedState = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
+              this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)}`)
+              queueEntry.localCachedData[key] = wrappedState.localCache
+            }
+          }
 
           let wrappedStates = queueEntry.collectedData // Object.values(queueEntry.collectedData)
           let localCachedData = queueEntry.localCachedData
@@ -2724,20 +2876,44 @@ class StateManager extends EventEmitter {
             // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processAcceptedTxQueue2. clear and remove. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
             clearAccountsSeen(queueEntry)
             // remove from queue
-            this.newAcceptedTxQueue.splice(currentIndex, 1)
-            this.archivedQueueEntries.push(queueEntry)
-            if (this.archivedQueueEntries.length > 10000) { // todo make this a constant and decide what len should really be!
-              this.archivedQueueEntries.shift()
+            // this.newAcceptedTxQueue.splice(currentIndex, 1)
+            // this.archivedQueueEntries.push(queueEntry)
+            // if (this.archivedQueueEntries.length > 10000) { // todo make this a constant and decide what len should really be!
+            //   this.archivedQueueEntries.shift()
+            // }
+            this.removeFromQueue(queueEntry, currentIndex)
+            queueEntry.state = 'applied'
+          }
+
+          // do we have any syncing neighbors?
+          if (this.currentCycleShardData.hasSyncingNeighbors === true) {
+            // let dataToSend = Object.values(queueEntry.collectedData)
+            let dataToSend = []
+
+            let keys = Object.keys(queueEntry.originalData)
+            for (let key of keys) {
+              dataToSend.push(JSON.parse(queueEntry.originalData[key]))
+            }
+
+            // maybe have to send localcache over, or require the syncing node to grab this data itself JIT!
+            // let localCacheTransport = Object.values(queueEntry.localCachedData)
+
+            // send data to syncing neighbors.
+            if (this.currentCycleShardData.syncingNeighbors.length > 0) {
+              let message = { stateList: dataToSend, txid: queueEntry.acceptedTx.id }
+              this.logger.playbackLogNote('shrd_sync_dataTell', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} AccountBeingShared: ${utils.makeShortHash(message.txid)} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighbors.map(x => x.id))}`)
+              this.p2p.tell(this.currentCycleShardData.syncingNeighbors, 'broadcast_state', message)
             }
           }
         } else if (queueEntry.state === 'failed to get data') {
           // TODO log
           // remove from queue
-          this.newAcceptedTxQueue.splice(currentIndex, 1)
-          this.archivedQueueEntries.push(queueEntry)
-          if (this.archivedQueueEntries.length > 10000) {
-            this.archivedQueueEntries.shift()
-          }
+          // this.newAcceptedTxQueue.splice(currentIndex, 1)
+          // this.archivedQueueEntries.push(queueEntry)
+          // if (this.archivedQueueEntries.length > 10000) {
+          //   this.archivedQueueEntries.shift()
+          // }
+          this.removeFromQueue(queueEntry, currentIndex)
         }
         currentIndex--
       }

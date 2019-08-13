@@ -1631,6 +1631,46 @@ class P2P extends EventEmitter {
   }
 
   /**
+   * Send Gossip to all nodes in this list, special case broadcast, never use this for regular gossip.
+   */
+  async sendGossipAll (type, payload, tracker = '', sender = null, nodes = this.state.getAllNodes()) {
+    if (nodes.length === 0) return
+
+    if (tracker === '') {
+      tracker = this.createGossipTracker()
+    }
+
+    if (this.verboseLogs) this.mainLogger.debug(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
+    const gossipPayload = { type: type, data: payload }
+
+    const gossipHash = this.crypto.hash(gossipPayload)
+    if (this.gossipedHashesSent.has(gossipHash)) {
+      if (this.verboseLogs) this.mainLogger.debug(`Gossip already sent: ${gossipHash.substring(0, 5)}`)
+      return
+    }
+    // Find out your own index in the nodes array
+    const myIdx = nodes.findIndex(node => node.id === this.id)
+    if (myIdx < 0) throw new Error('Could not find self in nodes array')
+    // Map back recipient idxs to node objects
+    let recipients = nodes
+    if (sender != null) {
+      recipients = removeNodesByID(recipients, [sender])
+    }
+    try {
+      if (this.verboseLogs) this.mainLogger.debug(`GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(recipients.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+      for (const node of recipients) {
+        this.logger.playbackLog('self', node, 'GossipInSend', type, tracker, gossipPayload)
+      }
+      await this.tell(recipients, 'gossip', gossipPayload, true, tracker)
+    } catch (ex) {
+      if (this.verboseLogs) this.mainLogger.error(`Failed to sendGossip(${utils.stringifyReduce(payload)}) Exception => ${ex}`)
+      this.fatalLogger.fatal('sendGossipIn: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+    }
+    this.gossipedHashesSent.set(gossipHash, false)
+    if (this.verboseLogs) this.mainLogger.debug(`End of sendGossipIn(${utils.stringifyReduce(payload)})`)
+  }
+
+  /**
  * Handle Goosip Transactions
  * Payload: {type: ['receipt', 'trustedTransaction'], data: {}}
  */

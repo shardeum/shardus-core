@@ -828,6 +828,51 @@ class P2PState extends EventEmitter {
     this.nodes.ordered.splice(index, 1)
   }
 
+  getOrderedSyncingNeighbors (node) {
+    let index = this._getNodeOrderedIndex(node)
+
+    let leftIndex = index - 1
+    let rightIndex = index + 1
+
+    if (leftIndex < 0) {
+      leftIndex = this.nodes.ordered.length - 1
+    }
+    if (rightIndex >= this.nodes.ordered.length) {
+      rightIndex = 0
+    }
+    let results = []
+    if (leftIndex !== index) {
+      let node = this.nodes.ordered[leftIndex]
+      while (node.status === 'syncing') {
+        results.push(node)
+        leftIndex--
+        if (leftIndex < 0) {
+          leftIndex = this.nodes.ordered.length - 1
+        }
+        if (rightIndex === index) {
+          break
+        }
+        node = this.nodes.ordered[leftIndex]
+      }
+    }
+    if (rightIndex !== index) {
+      let node = this.nodes.ordered[rightIndex]
+      while (node.status === 'syncing') {
+        results.push(node)
+        rightIndex++
+        if (rightIndex >= this.nodes.ordered.length) {
+          rightIndex = 0
+        }
+        if (rightIndex === index) {
+          break
+        }
+        node = this.nodes.ordered[rightIndex]
+      }
+    }
+    // todo what about two nodes syncing next to each other.  should we keep expanding to catch runs of syncing nodes.
+    return results
+  }
+
   _removeNodesFromNodelist (nodes) {
     for (const node of nodes) {
       this._removeNodeFromNodelist(node)
