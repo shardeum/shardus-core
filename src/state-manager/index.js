@@ -80,6 +80,9 @@ class StateManager extends EventEmitter {
 
     this.syncTrackerIndex = 1 // increments up for each new sync tracker we create gets maped to calls.
 
+    this.preTXQueue = []
+    this.readyforTXs = false
+
     this.startShardCalculations() // too early?
   }
 
@@ -187,10 +190,13 @@ class StateManager extends EventEmitter {
     // Dont sync if first node
     if (this.p2p.isFirstSeed) {
       this.dataSyncMainPhaseComplete = true
+
+      this.readyforTXs = true
       return
     }
 
     this.isSyncingAcceptedTxs = true
+
     await utils.sleep(5000) // Temporary delay to make it easier to attach a debugger
     console.log('syncStateData start')
     // delete and re-create some tables before we sync:
@@ -204,6 +210,7 @@ class StateManager extends EventEmitter {
     while (this.currentCycleShardData == null) {
       this.getCurrentCycleShardData()
       await utils.sleep(1000)
+      this.logger.playbackLogNote('shrd_sync_waitForShardData', ` `, ` ${utils.stringifyReduce(this.currentCycleShardData)} `)
     }
     let nodeShardData = this.currentCycleShardData.nodeShardData
     console.log('GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
@@ -282,6 +289,11 @@ class StateManager extends EventEmitter {
       this.createSyncTrackerByRange(range, cycle)
     }
 
+    // could potentially push this back a bit.
+    this.readyforTXs = true
+
+    await utils.sleep(8000) // sleep to make sure we are listening to some txs before we sync them
+
     for (let syncTracker of this.syncTrackers) {
       // let partition = syncTracker.partition
       console.log(`syncTracker start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
@@ -343,6 +355,8 @@ class StateManager extends EventEmitter {
       await this.syncStateTableData(lowAddress, highAddress, 0, Date.now() - this.syncSettleTime)
       this.mainLogger.debug(`DATASYNC: partition: ${partition}, syncStateTableData 1st pass done.`)
 
+      this.readyforTXs = true // open the floodgates of queuing stuffs.
+
       await this.syncAccountData(lowAddress, highAddress)
       this.mainLogger.debug(`DATASYNC: partition: ${partition}, syncAccountData done.`)
 
@@ -382,6 +396,10 @@ class StateManager extends EventEmitter {
   }
 
   updateShardValues (cycleNumber) {
+    if (this.currentCycleShardData == null) {
+      this.logger.playbackLogNote('shrd_sync_firstCycle', `${cycleNumber}`, ` first init `)
+    }
+
     let cycleShardData = {}
 
     // todo get current cycle..  store this by cycle?
@@ -432,6 +450,14 @@ class StateManager extends EventEmitter {
     console.log(`updateShardValues  cycle:${cycleShardData.cycleNumber} `)
 
     if (cycleShardData.ourNode.status === 'active') {
+      // if (this.preTXQueue.length > 0) {
+      //   for (let tx of this.preTXQueue) {
+      //     this.logger.playbackLogNote('shrd_sync_preTX', ` `, ` ${utils.stringifyReduce(tx)} `)
+      //     this.queueAcceptedTransaction(tx, false, null)
+      //   }
+      //   this.preTXQueue = []
+      // }
+
       if (this.syncTrackers != null) {
         for (let i = this.syncTrackers.length - 1; i >= 0; i--) {
           let syncTracker = this.syncTrackers[i]
@@ -443,6 +469,7 @@ class StateManager extends EventEmitter {
               queueEntry.syncCounter--
               if (queueEntry.syncCounter <= 0) {
                 queueEntry.state = 'aging'
+                this.updateHomeInformation(queueEntry)
                 this.logger.playbackLogNote('shrd_sync_wakeupTX', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
               }
             }
@@ -1635,7 +1662,7 @@ class StateManager extends EventEmitter {
       for (let data of payload.stateList) {
         this.queueEntryAddData(queueEntry, data)
         if (queueEntry.state === 'syncing') {
-          this.logger.playbackLogNote('shrd_sync_gettingData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
+          this.logger.playbackLogNote('shrd_sync_gotBroadcastData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
         }
       }
     })
@@ -2270,45 +2297,9 @@ class StateManager extends EventEmitter {
   /// ///    new sharde queue         ///////////
   // ///////////////
 
-  // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
-
-  queueAcceptedTransaction (acceptedTX, sendGossip = true, sender) {
-    if (this.currentCycleShardData == null) {
-      return 'notReady' // it is too early to care about thie tx
-    }
-
-    let keysResponse = this.app.getKeyFromTransaction(acceptedTX.data)
-    let timestamp = keysResponse.timestamp
-    let txId = acceptedTX.receipt.txHash
-
-    this.queueEntryCounter++
-    let txQueueEntry = { acceptedTx: acceptedTX, txKeys: keysResponse, collectedData: {}, originalData: {}, homeNodes: {}, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [] } // age comes from timestamp
-    // partition data would store stuff like our list of nodes that store this ts
-    // collected data is remote data we have recieved back
-    // //tx keys ... need a sorted list (deterministic) of partition.. closest to a number?
-
-    if (this.config.debug.loseTxChance > 0) {
-      let rand = Math.random()
-      if (this.config.debug.loseTxChance > rand) {
-        this.logger.playbackLogNote('tx_dropForTest', txId, 'dropping tx ' + timestamp)
-        return 'lost'
-      }
-    }
-
-    // todo faster hash lookup for this maybe?
-    let entry = this.getQueueEntrySafe(acceptedTX.id, acceptedTX.timestamp)
-    if (entry) {
-      return false // already in our queue, or temp queue
-    }
-
-    try {
-      let age = Date.now() - timestamp
-      if (age > this.queueSitTime * 0.9) {
-        this.fatalLogger.fatal('queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
-        // TODO consider throwing this out.  right now it is just a warning
-        this.logger.playbackLogNote('shrd_oldQueueInsertion', '', 'queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
-      }
-
+  updateHomeInformation (txQueueEntry) {
+    if (this.currentCycleShardData != null && txQueueEntry.hasShardInfo === false) {
+      let txId = txQueueEntry.acceptedTx.receipt.txHash
       // Init home nodes!
       for (let key of txQueueEntry.txKeys.allKeys) {
         let homeNode = ShardFunctions.findHomeNode(this.currentCycleShardData.shardGlobals, key, this.currentCycleShardData.parititionShardDataMap)
@@ -2322,7 +2313,87 @@ class StateManager extends EventEmitter {
         // route_to_home_node
         this.logger.playbackLogNote('shrd_homeNodeSummary', `${txId}`, `account:${utils.makeShortHash(key)} rel:${relationString} summary:${utils.stringifyReduce(summaryObject)}`)
       }
-      txQueueEntry.uniqueKeys = Object.keys(txQueueEntry.homeNodes)
+
+      txQueueEntry.hasShardInfo = true
+    }
+  }
+
+  // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
+
+  //
+  //
+  //
+  //    QQQ
+  //   Q    Q
+  //   Q    Q
+  //   Q    Q
+  //    QQQ Q
+  //         Q
+  //
+
+  queueAcceptedTransaction (acceptedTx, sendGossip = true, sender) {
+    // dropping these too early.. hmm  we finished syncing before we had the first shard data.
+    // if (this.currentCycleShardData == null) {
+    //   // this.preTXQueue.push(acceptedTX)
+    //   return 'notReady' // it is too early to care about the tx
+    // }
+    if (this.readyforTXs === false) {
+      return 'notReady' // it is too early to care about the tx
+    }
+
+    let keysResponse = this.app.getKeyFromTransaction(acceptedTx.data)
+    let timestamp = keysResponse.timestamp
+    let txId = acceptedTx.receipt.txHash
+
+    this.queueEntryCounter++
+    let txQueueEntry = { acceptedTx: acceptedTx, txKeys: keysResponse, collectedData: {}, originalData: {}, homeNodes: {}, hasShardInfo: false, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [] } // age comes from timestamp
+    // partition data would store stuff like our list of nodes that store this ts
+    // collected data is remote data we have recieved back
+    // //tx keys ... need a sorted list (deterministic) of partition.. closest to a number?
+
+    if (this.config.debug.loseTxChance > 0) {
+      let rand = Math.random()
+      if (this.config.debug.loseTxChance > rand) {
+        this.logger.playbackLogNote('tx_dropForTest', txId, 'dropping tx ' + timestamp)
+        return 'lost'
+      }
+    }
+
+    // todo faster hash lookup for this maybe?
+    let entry = this.getQueueEntrySafe(acceptedTx.id, acceptedTx.timestamp)
+    if (entry) {
+      return false // already in our queue, or temp queue
+    }
+
+    try {
+      let age = Date.now() - timestamp
+      if (age > this.queueSitTime * 0.9) {
+        this.fatalLogger.fatal('queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
+        // TODO consider throwing this out.  right now it is just a warning
+        this.logger.playbackLogNote('shrd_oldQueueInsertion', '', 'queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
+      }
+      let keyHash = {}
+      for (let key of txQueueEntry.txKeys.allKeys) {
+        keyHash[key] = true
+      }
+      txQueueEntry.uniqueKeys = Object.keys(keyHash)
+
+      // if (this.currentCycleShardData == null) {
+      //   // Init home nodes!
+      //   for (let key of txQueueEntry.txKeys.allKeys) {
+      //     let homeNode = ShardFunctions.findHomeNode(this.currentCycleShardData.shardGlobals, key, this.currentCycleShardData.parititionShardDataMap)
+      //     txQueueEntry.homeNodes[key] = homeNode
+      //     if (homeNode == null) {
+      //       if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` queueAcceptedTransaction: ${key} `)
+      //     }
+
+      //     let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
+      //     let relationString = ShardFunctions.getNodeRelation(homeNode, this.currentCycleShardData.ourNode.id)
+      //     // route_to_home_node
+      //     this.logger.playbackLogNote('shrd_homeNodeSummary', `${txId}`, `account:${utils.makeShortHash(key)} rel:${relationString} summary:${utils.stringifyReduce(summaryObject)}`)
+      //   }
+      // }
+      this.updateHomeInformation(txQueueEntry)
 
       // if we are syncing this area mark it as good.
       for (let key of txQueueEntry.uniqueKeys) {
@@ -2338,42 +2409,40 @@ class StateManager extends EventEmitter {
         }
       }
 
-      // if not active yet also mark it as syncing?  but would be good to test range somehow?
-
-      // gossip 'spread_tx_to_group' to transaction group
-      if (sendGossip) {
-        try {
-          let transactionGroup = this.queueEntryGetTransactionGroup(txQueueEntry)
-          if (transactionGroup.length > 1) {
-            this.p2p.sendGossipIn('spread_tx_to_group', acceptedTX, '', sender, transactionGroup)
-          }
+      if (txQueueEntry.hasShardInfo) {
+        if (sendGossip) {
+          try {
+            let transactionGroup = this.queueEntryGetTransactionGroup(txQueueEntry)
+            if (transactionGroup.length > 1) {
+              this.p2p.sendGossipIn('spread_tx_to_group', acceptedTx, '', sender, transactionGroup)
+            }
           // this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
-        } catch (ex) {
-          this.fatalLogger.fatal('txQueueEntry: ' + utils.stringifyReduce(txQueueEntry))
+          } catch (ex) {
+            this.fatalLogger.fatal('txQueueEntry: ' + utils.stringifyReduce(txQueueEntry))
+          }
         }
-      }
 
-      if (txQueueEntry.didSync === false) {
+        if (txQueueEntry.didSync === false) {
         // see if our node shard data covers any of the accounts?
-        this.queueEntryGetTransactionGroup(txQueueEntry) // this will compute our involvment
-        if (txQueueEntry.ourNodeInvolved === false) {
-          this.logger.playbackLogNote('shrd_notInTxGroup', `${txId}`, ``)
+          this.queueEntryGetTransactionGroup(txQueueEntry) // this will compute our involvment
+          if (txQueueEntry.ourNodeInvolved === false) {
+            this.logger.playbackLogNote('shrd_notInTxGroup', `${txId}`, ``)
 
-          return 'out of range'// we are done, not involved!!!
-        } else {
-          if (this.currentCycleShardData.hasSyncingNeighbors === true) {
-            this.logger.playbackLogNote('shrd_sync_tx', `${txId}`, `nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighborsTxGroup.map(x => x.id))}`)
-            this.p2p.sendGossipAll('spread_tx_to_group', acceptedTX, '', sender, this.currentCycleShardData.syncingNeighborsTxGroup)
+            return 'out of range'// we are done, not involved!!!
+          } else {
+            if (this.currentCycleShardData.hasSyncingNeighbors === true) {
+              this.logger.playbackLogNote('shrd_sync_tx', `${txId}`, `nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighborsTxGroup.map(x => x.id))}`)
+              this.p2p.sendGossipAll('spread_tx_to_group', acceptedTx, '', sender, this.currentCycleShardData.syncingNeighborsTxGroup)
+            }
           }
         }
       }
-
       this.newAcceptedTxQueueTempInjest.push(txQueueEntry)
 
       // start the queue if needed
       this.tryStartAcceptedQueue2()
     } catch (error) {
-      this.logger.playbackLogNote('shrd_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTX.id)}`)
+      this.logger.playbackLogNote('shrd_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)}`)
       this.fatalLogger.fatal('queueAcceptedTransaction failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
       throw new Error(error)
     }
@@ -2847,7 +2916,7 @@ class StateManager extends EventEmitter {
             // if we did sync it is time to JIT query local data.  alternatively could have other nodes send us this data, but that could be very high bandwidth.
             for (let key of queueEntry.syncKeys) {
               let wrappedState = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
-              this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)}`)
+              this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)} hash:${wrappedState.stateId}`)
               queueEntry.localCachedData[key] = wrappedState.localCache
             }
           }
