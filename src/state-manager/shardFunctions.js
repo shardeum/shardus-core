@@ -48,6 +48,7 @@ class ShardFunctions {
     shardinfo.addressPrefixHex = ShardFunctions.leadZeros8((shardinfo.addressPrefix).toString(16))
     shardinfo.homePartition = Math.floor(shardGlobals.numPartitions * (shardinfo.addressPrefix / 0xffffffff))
     shardinfo.homeRange = ShardFunctions.partitionToAddressRange2(shardGlobals, shardinfo.homePartition)
+    shardinfo.coveredBy = {} // consensus nodes that cover us.
     return shardinfo
   }
 
@@ -201,6 +202,28 @@ class ShardFunctions {
         ShardFunctions.computeExtendedNodePartitionData(shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes)
       }
     }
+
+    // need some post update step.
+
+    // if (extendedData) {
+    // for( let node of nodesToGenerate ){
+
+    //   ShardFunctions.updateFullConsensusGroup(shardGlobals, nodeShardDataMap, nodesToGenerate, parititionShardDataMap, activeNodes, extendedData)
+    // }
+    // }
+  }
+
+  static computeNodePartitionDataMapExt (shardGlobals, nodeShardDataMap, nodesToGenerate, parititionShardDataMap, activeNodes) {
+    for (let node of nodesToGenerate) {
+      let nodeShardData = nodeShardDataMap.get(node.id)
+      if (!nodeShardData) {
+        nodeShardData = ShardFunctions.computeNodePartitionData(shardGlobals, node, nodeShardDataMap, parititionShardDataMap, activeNodes)
+      }
+      // ShardFunctions.computeExtendedNodePartitionData(shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes)
+      //
+      // this wont be able to extend things though.
+      ShardFunctions.updateFullConsensusGroup(shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes)
+    }
   }
 
   static computeNodePartitionData (shardGlobals, node, nodeShardDataMap, parititionShardDataMap, activeNodes, extendedData) {
@@ -240,7 +263,38 @@ class ShardFunctions {
     // set the data in our map
     nodeShardDataMap.set(node.id, nodeShardData)
 
+    nodeShardData.needsUpdateToFullConsensusGroup = true
+
     return nodeShardData
+  }
+
+  static updateFullConsensusGroup (shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes) {
+    let homePartition = nodeShardData.homePartition
+    let shardPartitionData = parititionShardDataMap.get(homePartition)
+
+    // let changes = false
+    // for(let node of nodeShardData.consensusNodeForOurNodeFull){
+    //   if(shardPartitionData.coveredBy.has(node.id) === false){
+
+    //     nodeShardData.consensusNodeForOurNodeFull.push(shardPartitionData.coveredBy.get(node.id))
+    //     changes = true
+    //   }
+
+    // }
+
+    // if we dont have full data then we need to walk left and right of our minand max consensus nodes untill we find one that does not track our home partition
+    //  any new ones we encouter should be added to our full range.
+
+    // if we calculate full data this version is good enough:
+
+    nodeShardData.consensusNodeForOurNodeFull = Object.values(shardPartitionData.coveredBy)
+    nodeShardData.needsUpdateToFullConsensusGroup = false
+    nodeShardData.consensusNodeForOurNodeFull.sort(ShardFunctions.nodeSort)
+
+    // merge into our full list for sake of TX calcs.  todo could try to be smart an only do this in some cases.
+    let [results, extras] = ShardFunctions.mergeNodeLists(nodeShardData.nodeThatStoreOurParition, nodeShardData.consensusNodeForOurNodeFull)
+
+    nodeShardData.nodeThatStoreOurParitionFull = results
   }
 
   static computeExtendedNodePartitionData (shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes) {
@@ -269,6 +323,14 @@ class ShardFunctions {
       let endPartition = Math.floor(shardGlobals.numPartitions * (nodeAddressNum / 0xffffffff))
       nodeShardData.consensusStartPartition = startPartition
       nodeShardData.consensusEndPartition = endPartition
+
+      // the jit verison really needs to be a third passs. otherwise we could face recursion problems.
+    }
+
+    for (let i = nodeShardData.consensusStartPartition; i <= nodeShardData.consensusEndPartition; i++) {
+      let shardPartitionData = parititionShardDataMap.get(i)
+
+      shardPartitionData.coveredBy[nodeShardData.node.id] = nodeShardData.node // { idx: nodeShardData.ourNodeIndex }
     }
 
     // this list is a temporary list that counts as 2c range.  Stored nodes are the merged max of 2c range (2r on each side) and node in the 2c partition range
@@ -616,7 +678,8 @@ class ShardFunctions {
     let results = []
     let leftScanIndex = position
     let rightScanIndex = position - 1
-    for (let i = 0; i < Math.ceil(count / 2); i++) {
+    let maxIterations = Math.ceil(count / 2)
+    for (let i = 0; i < maxIterations; i++) {
       leftScanIndex--
       rightScanIndex++
       if (rightScanIndex >= allNodes.length) {
@@ -641,8 +704,13 @@ class ShardFunctions {
       if (rightScanIndex === leftScanIndex) {
         break // we looped
       }
+      // check if our pointers have looped around
       if (((rightScanIndex - leftScanIndex) * (rightScanIndex - leftScanIndex)) === 1) {
-        break // we almost looped
+        // but only if we are past the first step. (since on the first step we are 1 apart.)
+        // but if maxIterations is really low can bail early, not sure that would matte anyways.
+        if (i > 0 || maxIterations <= 1) {
+          break // we almost looped
+        }
       }
     }
     return results

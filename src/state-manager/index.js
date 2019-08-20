@@ -430,6 +430,9 @@ class StateManager extends EventEmitter {
     let fullDataForDebug = true // Set this to false for performance reasons!!! setting it to true saves us from having to recalculate stuff when we dump logs.
     ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, fullDataForDebug)
 
+    // TODO if fullDataForDebug gets turned false we will update the guts of this calculation
+    ShardFunctions.computeNodePartitionDataMapExt(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes)
+
     this.currentCycleShardData = cycleShardData
     this.shardValuesByCycle.set(cycleNumber, cycleShardData)
 
@@ -479,6 +482,9 @@ class StateManager extends EventEmitter {
         }
       }
     }
+
+    // this will be a huge log.
+    this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${cycleNumber} data: ${utils.stringifyReduce(cycleShardData)}`)
   }
 
   getCurrentCycleShardData () {
@@ -2378,21 +2384,6 @@ class StateManager extends EventEmitter {
       }
       txQueueEntry.uniqueKeys = Object.keys(keyHash)
 
-      // if (this.currentCycleShardData == null) {
-      //   // Init home nodes!
-      //   for (let key of txQueueEntry.txKeys.allKeys) {
-      //     let homeNode = ShardFunctions.findHomeNode(this.currentCycleShardData.shardGlobals, key, this.currentCycleShardData.parititionShardDataMap)
-      //     txQueueEntry.homeNodes[key] = homeNode
-      //     if (homeNode == null) {
-      //       if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` queueAcceptedTransaction: ${key} `)
-      //     }
-
-      //     let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
-      //     let relationString = ShardFunctions.getNodeRelation(homeNode, this.currentCycleShardData.ourNode.id)
-      //     // route_to_home_node
-      //     this.logger.playbackLogNote('shrd_homeNodeSummary', `${txId}`, `account:${utils.makeShortHash(key)} rel:${relationString} summary:${utils.stringifyReduce(summaryObject)}`)
-      //   }
-      // }
       this.updateHomeInformation(txQueueEntry)
 
       // if we are syncing this area mark it as good.
@@ -2687,11 +2678,6 @@ class StateManager extends EventEmitter {
       }
     }
 
-    // let message = { stateList: datas, txid: queueEntry.acceptedTx.id }
-    // if (correspondingEdgeNodes != null && correspondingEdgeNodes.length > 0) {
-    //   // calc our index in a list. deterministic closest fit.
-    //   this.p2p.tell(correspondingEdgeNodes, 'broadcast_state', message)
-    // }
     let message
     let edgeNodeIds = []
     let consensusNodeIds = []
@@ -2753,6 +2739,19 @@ class StateManager extends EventEmitter {
     }
   }
 
+  //
+  // PPPP
+  // P   P
+  // P   P
+  // PPPP
+  // P
+  // P
+  // p
+  //
+  //
+  //
+  //
+  //
   async processAcceptedTxQueue2 () {
     let seenAccounts
     try {
@@ -2776,7 +2775,7 @@ class StateManager extends EventEmitter {
 
       let timeM = this.queueSitTime
       let timeM2 = timeM * 2
-      let timeM3 = timeM * 3
+      // let timeM3 = timeM * 3
       let currentTime = Date.now() // when to update this?
 
       seenAccounts = {}// todo PERF we should be able to support using a variable that we save from one update to the next.  set that up after initial testing
@@ -2821,17 +2820,6 @@ class StateManager extends EventEmitter {
             index--
             lastTx = this.newAcceptedTxQueue[index]
           }
-
-          // for (let key of txQueueEntry.uniqueKeys) {
-          //   let syncTracker = this.getSyncTracker(key)
-          //   if (syncTracker != null) {
-          //     txQueueEntry.state = 'syncing'
-          //     txQueueEntry.syncCounter++
-          //     txQueueEntry.didSync = true // mark that this tx had to sync, this flag should never be cleared, we will use it later to not through stuff away.
-          //     syncTracker.queueEntries.push(txQueueEntry) // same tx may get pushed in multiple times. that's ok.
-          //     this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, ` qId: ${txQueueEntry.entryID}`)
-          //   }
-          // }
 
           this.newAcceptedTxQueue.splice(index + 1, 0, txQueueEntry)
           this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)}`)
@@ -3037,6 +3025,11 @@ class StateManager extends EventEmitter {
         // are we outside the min to max range
         if (key < minP || key > maxP) {
           partition.skip = { p: key, min: minP, max: maxP }
+          continue
+        }
+      } else if (maxP === minP) {
+        if (key !== maxP) {
+          partition.skip = { p: key, min: minP, max: maxP, noSpread: true }
           continue
         }
       } else {

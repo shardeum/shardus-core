@@ -40,20 +40,24 @@ function findBnotInA (listA, listB) {
 let extraNodesTotal = 0
 let testCounter = 1
 // test 1
-let testIterations = 0
+let testIterations = 1
 let homeNodeQueryTests = 100
 
 let testAllNodesInList = true
 let numNodes = 6
 
 let useHardcodenodes = true
-let hardcodeNodes = ['068ex9699a', '3e7fx601a4', '4222xc48ab', '4d05xb7aaf', '5aacx228d3', '5b61xf5dca', '86b0x899cb', 'a4bdx83351', 'aa5ax8c81c', 'b432x1ecdc', 'dc16x79767', 'e0c3x00452', 'e8aexf9d78', 'e9f1xfc329', 'ff7fxcb7ef']
+// let hardcodeNodes = ['068ex9699a', '3e7fx601a4', '4222xc48ab', '4d05xb7aaf', '5aacx228d3', '5b61xf5dca', '86b0x899cb', 'a4bdx83351', 'aa5ax8c81c', 'b432x1ecdc', 'dc16x79767', 'e0c3x00452', 'e8aexf9d78', 'e9f1xfc329', 'ff7fxcb7ef']
+let hardcodeNodes = ['16d0x3f6b2', '29d2x27971', '3b7ex5a91f', '4f57x3315c', '5d07x8bd45', '601dx69c34', '65c2xfc59d', '97dax03078', '9a01xa8f84', 'b050x62c87', 'b120x366ef', 'b48cxcf41f', 'd65fxae412', 'd875x49a69', 'e6d6x24afc']
 
 if (useHardcodenodes) {
   numNodes = hardcodeNodes.length
 }
 
-let debugStartsWith = '0683' // 'dc16'  '0683'
+let debugStartsWith = '97da' // 97da 5d07 'dc16'  '0683'
+let debugAccount = '5c43' + '3'.repeat(60)
+let debugNode = null
+// 5c43xba41c account test.. need to expand it.
 
 for (let i = 0; i < testIterations; i++) {
   testCounter++
@@ -92,11 +96,40 @@ for (let i = 0; i < testIterations; i++) {
     for (let node of activeNodes) {
       if (node.id.indexOf(debugStartsWith) >= 0) {
         ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, [node], parititionShardDataMap, activeNodes, true)
+        debugNode = node
       }
     }
   }
 
   ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, true)
+
+  ShardFunctions.computeNodePartitionDataMapExt(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes)
+
+
+  let shardParition = parititionShardDataMap.get(5)
+ 
+  if (debugAccount != null) {
+    let [partition, addrNum] = ShardFunctions.addressToPartition(shardGlobals, debugAccount )
+
+    let ourNodeData = nodeShardDataMap.get(debugNode.id)
+
+    let inRange = ShardFunctions.testInRange(partition, ourNodeData.storedPartitions)
+    let homeNode = ShardFunctions.findHomeNode(shardGlobals, debugAccount, parititionShardDataMap)
+    let hasKey = false
+    if (homeNode.node.id === ourNodeData.node.id) {
+      hasKey = true
+    } else {
+      for (let node of homeNode.nodeThatStoreOurParitionFull) {
+        if (node.id === ourNodeData.node.id) {
+          hasKey = true
+          break
+        }
+      }
+    }
+    // nodeShardDataMap[]
+
+    let end = 'now'
+  }
 
   let totalPartitionsCovered = 0
   for (var nodeShardData of nodeShardDataMap.values()) {
@@ -149,7 +182,6 @@ for (let i = 0; i < testIterations; i++) {
         throw new Error('node not in range 2')
       }
     }
-
   }
 }
 
