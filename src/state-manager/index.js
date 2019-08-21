@@ -229,19 +229,6 @@ class StateManager extends EventEmitter {
       }
     }
     let cycle = this.currentCycleShardData.cycleNumber
-    // create the sync trackers
-    // for (let partition of partitionsToSync) {
-    //   this.createSyncTracker(partition, cycle)
-    // }
-
-    // for (let syncTracker of this.syncTrackers) {
-    //   let partition = syncTracker.partition
-    //   console.log(`syncStateData partition: ${partition}  time ${Date.now()}`)
-
-    //   await this.syncStateDataForRange(syncTracker.range)
-    //   this.completedPartitions.push(partition)
-    //   this.clearPartitionData()
-    // }
 
     let homePartition = nodeShardData.homePartition
 
@@ -722,125 +709,6 @@ class StateManager extends EventEmitter {
       // If the hash matches then update our Account State Table with the data
       await this.storage.addAccountStates(this.combinedAccountStateData) // keep in memory copy for faster processing...
       this.inMemoryStateTableData = this.inMemoryStateTableData.concat(this.combinedAccountStateData)
-    }
-  }
-
-  // sync account data by address range
-  async syncAccountDataOld (lowAddress, highAddress) {
-    // Sync the Account data
-    //   Use the /get_account_data API to get the data from the Account Table using any of the nodes that had a matching hash
-    console.log(`syncAccountData` + '   time:' + Date.now())
-
-    let queryLow = lowAddress
-    let queryHigh = highAddress
-
-    let moreDataRemaining = true
-
-    this.combinedAccountData = []
-    let loopCount = 0
-    // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
-    while (moreDataRemaining) {
-      // max records artificially low to make testing coverage better.  todo refactor: make it a config or calculate based on data size
-      let message = { accountStart: queryLow, accountEnd: queryHigh, maxRecords: 3 }
-      let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
-      // accountData is in the form [{accountId, stateId, data}] for n accounts.
-      let accountData = result.accountData
-
-      let lastAccount
-      let firstAccount
-      // get the address of the last account received so we can use it as the low address for our next query
-      if (accountData.length > 0) {
-        lastAccount = accountData[accountData.length - 1]
-        firstAccount = accountData[0]
-        if (lastAccount.accountId > queryLow) {
-          queryLow = lastAccount.accountId
-        }
-      }
-
-      // if this is a repeated query, clear out any dupes from the new list we just got
-      // there should be only one dupe in since account ids are unique
-      if (loopCount > 0 && accountData.length > 0) {
-        if (this.combinedAccountData[this.combinedAccountData.length - 1].accountId === firstAccount.accountId) {
-          accountData.shift()
-        }
-      }
-
-      if (accountData.length === 0) {
-        moreDataRemaining = false
-      } else {
-        this.mainLogger.debug(`DATASYNC: syncAccountData got ${accountData.length} more records`)
-        this.combinedAccountData = this.combinedAccountData.concat(accountData)
-        loopCount++
-      }
-    }
-  }
-
-  // syncs account data up to a certain time by making time based queries
-  async syncAccountDataOld2 (lowAddress, highAddress) {
-    // Sync the Account data
-    //   Use the /get_account_data API to get the data from the Account Table using any of the nodes that had a matching hash
-    console.log(`syncAccountData2` + '   time:' + Date.now())
-
-    let queryLow = lowAddress
-    let queryHigh = highAddress
-
-    let moreDataRemaining = true
-
-    this.combinedAccountData = []
-    let loopCount = 0
-
-    let startTime = 0
-    let endTime = this.mainStartingTs + 50000 // todo get better end time
-    let lowTimeQuery = startTime
-    // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
-    while (moreDataRemaining) {
-      // max records artificially low to make testing coverage better.  todo refactor: make it a config or calculate based on data size
-      let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, tsEnd: endTime, maxRecords: 3 }
-      let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data2', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
-      // accountData is in the form [{accountId, stateId, data}] for n accounts.
-      let accountData = result.accountData
-
-      // get the timestamp of the last account data received so we can use it as the low timestamp for our next query
-      if (accountData.length > 0) {
-        let lastAccount = accountData[accountData.length - 1]
-        if (lastAccount.timestamp > lowTimeQuery) {
-          lowTimeQuery = lastAccount.timestamp
-          startTime = lowTimeQuery
-        }
-      }
-
-      // If this is a repeated query, clear out any dupes from the new list we just got.
-      // There could be many rows that use the stame timestamp so we will search and remove them
-      let dataDuplicated = true
-      if (loopCount > 0) {
-        while (accountData.length > 0 && dataDuplicated) {
-          let stateData = accountData[0]
-          dataDuplicated = false
-          for (let i = this.combinedAccountData.length - 1; i >= 0; i--) {
-            let existingStateData = this.combinedAccountData[i]
-            if ((existingStateData.timestamp === stateData.timestamp) && (existingStateData.accountId === stateData.accountId)) {
-              dataDuplicated = true
-              break
-            }
-            // once we get to an older timestamp we can stop looking, the outer loop will be done also
-            if (existingStateData.timestamp < stateData.timestamp) {
-              break
-            }
-          }
-          if (dataDuplicated) {
-            accountData.shift()
-          }
-        }
-      }
-
-      if (accountData.length === 0) {
-        moreDataRemaining = false
-      } else {
-        this.mainLogger.debug(`DATASYNC: syncAccountData2 got ${accountData.length} more records`)
-        this.combinedAccountData = this.combinedAccountData.concat(accountData)
-        loopCount++
-        // await utils.sleep(500)
-      }
     }
   }
 
@@ -2325,8 +2193,6 @@ class StateManager extends EventEmitter {
       txQueueEntry.hasShardInfo = true
     }
   }
-
-  // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
 
   //
   //
