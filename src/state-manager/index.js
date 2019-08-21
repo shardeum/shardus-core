@@ -446,6 +446,8 @@ class StateManager extends EventEmitter {
       cycleShardData.syncingNeighborsTxGroup = [...cycleShardData.syncingNeighbors]
       cycleShardData.syncingNeighborsTxGroup.push(cycleShardData.ourNode)
       cycleShardData.hasSyncingNeighbors = true
+
+      this.logger.playbackLogNote('shrd_sync_neighbors', `${cycleShardData.cycleNumber}`, ` neighbors: ${utils.stringifyReduce(cycleShardData.syncingNeighbors.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
     } else {
       cycleShardData.hasSyncingNeighbors = false
     }
@@ -699,7 +701,7 @@ class StateManager extends EventEmitter {
         if (accountStateData.length === 0) {
           moreDataRemaining = false
         } else {
-          this.mainLogger.debug(`DATASYNC: syncStateTableData got ${accountStateData.length} more records`)
+          this.mainLogger.debug(`DATASYNC: syncStateTableData got ${accountStateData.length} more records from ${utils.makeShortHash(this.dataSourceNode.id) + ':' + this.dataSourceNode.externalPort}`)
           this.combinedAccountStateData = this.combinedAccountStateData.concat(accountStateData)
           loopCount++
         }
@@ -2421,8 +2423,10 @@ class StateManager extends EventEmitter {
 
             return 'out of range'// we are done, not involved!!!
           } else {
+            let tempList = this.p2p.state.getOrderedSyncingNeighbors(this.currentCycleShardData.ourNode)
+
             if (this.currentCycleShardData.hasSyncingNeighbors === true) {
-              this.logger.playbackLogNote('shrd_sync_tx', `${txId}`, `nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighborsTxGroup.map(x => x.id))}`)
+              this.logger.playbackLogNote('shrd_sync_tx', `${txId}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighborsTxGroup.map(x => x.id))}`)
               this.p2p.sendGossipAll('spread_tx_to_group', acceptedTx, '', sender, this.currentCycleShardData.syncingNeighborsTxGroup)
             }
           }

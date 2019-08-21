@@ -48,14 +48,15 @@ let numNodes = 6
 
 let useHardcodenodes = true
 // let hardcodeNodes = ['068ex9699a', '3e7fx601a4', '4222xc48ab', '4d05xb7aaf', '5aacx228d3', '5b61xf5dca', '86b0x899cb', 'a4bdx83351', 'aa5ax8c81c', 'b432x1ecdc', 'dc16x79767', 'e0c3x00452', 'e8aexf9d78', 'e9f1xfc329', 'ff7fxcb7ef']
-let hardcodeNodes = ['16d0x3f6b2', '29d2x27971', '3b7ex5a91f', '4f57x3315c', '5d07x8bd45', '601dx69c34', '65c2xfc59d', '97dax03078', '9a01xa8f84', 'b050x62c87', 'b120x366ef', 'b48cxcf41f', 'd65fxae412', 'd875x49a69', 'e6d6x24afc']
+// let hardcodeNodes = ['16d0x3f6b2', '29d2x27971', '3b7ex5a91f', '4f57x3315c', '5d07x8bd45', '601dx69c34', '65c2xfc59d', '97dax03078', '9a01xa8f84', 'b050x62c87', 'b120x366ef', 'b48cxcf41f', 'd65fxae412', 'd875x49a69', 'e6d6x24afc']
+let hardcodeNodes = ['1181x916b1', '1f40x556d2', '2837x2e9da', '2c6bx1c5b3', '3cacx91e08', '4124x4a6c7', '66ebx6e880', '6759xe4f9e', '73cbxaffd8', '76eax30249', '97efxf9461', 'a0c6x751bd', 'b1c3x8d872', 'c778x9b37e', 'd1e9xfe682', 'ed93x9ac1b']
 
 if (useHardcodenodes) {
   numNodes = hardcodeNodes.length
 }
 
-let debugStartsWith = '97da' // 97da 5d07 'dc16'  '0683'
-let debugAccount = '5c43' + '3'.repeat(60)
+let debugStartsWith = 'ed93' // 97da 5d07 'dc16'  '0683'
+let debugAccount = 'ffaa' + '3'.repeat(60) // 5c43
 let debugNode = null
 // 5c43xba41c account test.. need to expand it.
 
@@ -105,11 +106,13 @@ for (let i = 0; i < testIterations; i++) {
 
   ShardFunctions.computeNodePartitionDataMapExt(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes)
 
+  let homeNode = ShardFunctions.findHomeNode(shardGlobals, debugAccount, parititionShardDataMap)
+  // let shardParition = parititionShardDataMap.get(5)
 
-  let shardParition = parititionShardDataMap.get(5)
- 
+  let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
+
   if (debugAccount != null) {
-    let [partition, addrNum] = ShardFunctions.addressToPartition(shardGlobals, debugAccount )
+    let [partition, addrNum] = ShardFunctions.addressToPartition(shardGlobals, debugAccount)
 
     let ourNodeData = nodeShardDataMap.get(debugNode.id)
 

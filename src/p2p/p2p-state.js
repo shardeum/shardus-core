@@ -849,7 +849,7 @@ class P2PState extends EventEmitter {
         if (leftIndex < 0) {
           leftIndex = this.nodes.ordered.length - 1
         }
-        if (rightIndex === index) {
+        if (leftIndex === index) {
           break
         }
         node = this.nodes.ordered[leftIndex]

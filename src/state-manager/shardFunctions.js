@@ -327,10 +327,23 @@ class ShardFunctions {
       // the jit verison really needs to be a third passs. otherwise we could face recursion problems.
     }
 
-    for (let i = nodeShardData.consensusStartPartition; i <= nodeShardData.consensusEndPartition; i++) {
-      let shardPartitionData = parititionShardDataMap.get(i)
+    if (nodeShardData.consensusStartPartition <= nodeShardData.consensusEndPartition) {
+      for (let i = nodeShardData.consensusStartPartition; i <= nodeShardData.consensusEndPartition; i++) {
+        let shardPartitionData = parititionShardDataMap.get(i)
 
-      shardPartitionData.coveredBy[nodeShardData.node.id] = nodeShardData.node // { idx: nodeShardData.ourNodeIndex }
+        shardPartitionData.coveredBy[nodeShardData.node.id] = nodeShardData.node // { idx: nodeShardData.ourNodeIndex }
+      }
+    } else {
+      for (let i = 0; i <= nodeShardData.consensusEndPartition; i++) {
+        let shardPartitionData = parititionShardDataMap.get(i)
+
+        shardPartitionData.coveredBy[nodeShardData.node.id] = nodeShardData.node // { idx: nodeShardData.ourNodeIndex }
+      }
+      for (let i = nodeShardData.consensusStartPartition; i < shardGlobals.numPartitions; i++) {
+        let shardPartitionData = parititionShardDataMap.get(i)
+
+        shardPartitionData.coveredBy[nodeShardData.node.id] = nodeShardData.node // { idx: nodeShardData.ourNodeIndex }
+      }
     }
 
     // this list is a temporary list that counts as 2c range.  Stored nodes are the merged max of 2c range (2r on each side) and node in the 2c partition range
@@ -580,11 +593,15 @@ class ShardFunctions {
       let directDist = Math.abs(a - b)
 
       let wrapDist = directDist
-      if (a < b) {
-        wrapDist = Math.abs(a + (max - b))
-      } else if (b < a) {
-        wrapDist = Math.abs(b + (max - a))
-      }
+      // if (a < b) {
+      //   wrapDist = Math.abs(a + (max - b))
+      // } else if (b < a) {
+      //   wrapDist = Math.abs(b + (max - a))
+      // }
+
+      let wrapDist1 = Math.abs(a + (max - b))
+      let wrapDist2 = Math.abs(b + (max - a))
+      wrapDist = Math.min(wrapDist1, wrapDist2)
 
       return Math.min(directDist, wrapDist)
     }

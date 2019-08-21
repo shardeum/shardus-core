@@ -1619,7 +1619,7 @@ class P2P extends EventEmitter {
     try {
       if (this.verboseLogs) this.mainLogger.debug(`GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(recipients.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
       for (const node of recipients) {
-        this.logger.playbackLog('self', node, 'GossipInSend', type, tracker, gossipPayload)
+        this.logger.playbackLog('self', node.id, 'GossipInSend', type, tracker, gossipPayload)
       }
       await this.tell(recipients, 'gossip', gossipPayload, true, tracker)
     } catch (ex) {
@@ -1659,7 +1659,7 @@ class P2P extends EventEmitter {
     try {
       if (this.verboseLogs) this.mainLogger.debug(`GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(recipients.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
       for (const node of recipients) {
-        this.logger.playbackLog('self', node, 'GossipInSend', type, tracker, gossipPayload)
+        this.logger.playbackLog('self', node.id, 'GossipInSendAll', type, tracker, gossipPayload)
       }
       await this.tell(recipients, 'gossip', gossipPayload, true, tracker)
     } catch (ex) {
