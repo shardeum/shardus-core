@@ -26,19 +26,6 @@ class ShardFunctions {
     return ('00000000' + input).slice(-8)
   }
 
-  static calculateInitialSyncData (shardGlobals, address) {
-    let shardInfo = ShardFunctions.calculateShardValues(shardGlobals, address)
-    let storedPartitions = ShardFunctions.calculateStoredPartitions2(shardGlobals, shardInfo.homePartition)
-
-    // storedPartitions.partitionRange = ShardFunctions.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart1, storedPartitions.partitionEnd1)
-    // storedPartitions.partitionRange2 = ShardFunctions.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart2, storedPartitions.partitionEnd2)
-
-    // storedPartitions.partitionRange = ShardFunctions.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart, storedPartitions.partitionEnd)
-
-    // storedPartitions.rangeIsSplit
-    return storedPartitions
-  }
-
   static calculateShardValues (shardGlobals, address) {
     let shardinfo = {}
     shardinfo.address = address

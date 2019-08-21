@@ -3,8 +3,6 @@ const utils = require('../utils')
 const ShardFunctions = require('./shardFunctions.js')
 const stringify = require('fast-stable-stringify')
 
-// todo m12: need error handling on all the p2p requests.
-
 const allZeroes64 = '0'.repeat(64)
 
 const cHashSetStepSize = 4
@@ -61,10 +59,10 @@ class StateManager extends EventEmitter {
     }
 
     this.dataPhaseTag = 'DATASYNC: '
-    // this.accountRepair
+  
     this.applySoftLock = false
 
-    this.initStateSyncData() // to early?
+    this.initStateSyncData()
 
     this.useHashSets = true
     this.lastActiveNodeCount = 0
@@ -83,12 +81,10 @@ class StateManager extends EventEmitter {
     this.preTXQueue = []
     this.readyforTXs = false
 
-    this.startShardCalculations() // too early?
+    this.startShardCalculations()
   }
 
-  /* -------- DATASYNC Functions ---------- */
-
-  // this clears state data related to the current partion we are processing.
+  // this clears state data related to the current partion we are syncing.
   clearPartitionData () {
     // These are all for the given partition
     this.addressRange = null
@@ -111,40 +107,179 @@ class StateManager extends EventEmitter {
     this.fifoLocks = {}
   }
 
-  // TODO: Milestone 14-15? this will take a short list of account IDs and get us resynced on them
-  async resyncIndividualAccounts (accountsList) {
-    this.isSyncingAcceptedTxs = true
-    // make sure we are patched up to date on state data
-    // get fresh copies of account data
-    // catch up to tx queue
+  // ////////////////////////////////////////////////////////////////////
+  //   SHARD CALCULATIONS
+  // ////////////////////////////////////////////////////////////////////
 
-    this.isSyncingAcceptedTxs = false
+  // This is called once per cycle to update to calculate the necessary shard values.
+  updateShardValues (cycleNumber) {
+    if (this.currentCycleShardData == null) {
+      this.logger.playbackLogNote('shrd_sync_firstCycle', `${cycleNumber}`, ` first init `)
+    }
+
+    let cycleShardData = {}
+
+    // todo get current cycle..  store this by cycle?
+    cycleShardData.nodeShardDataMap = new Map()
+    cycleShardData.parititionShardDataMap = new Map()
+    cycleShardData.activeNodes = this.p2p.state.getActiveNodes(null)
+    cycleShardData.activeNodes.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
+    cycleShardData.ourNode = this.p2p.state.getNode(this.p2p.id) // ugh, I bet there is a nicer way to get our node
+    cycleShardData.cycleNumber = cycleNumber
+
+    if (cycleShardData.activeNodes.length === 0) {
+      return // no active nodes so stop calculating values
+    }
+
+    // save this per cycle?
+    cycleShardData.shardGlobals = ShardFunctions.calculateShardGlobals(cycleShardData.activeNodes.length, this.config.sharding.nodesPerConsensusGroup)
+
+    // partition shard data
+    ShardFunctions.computePartitionShardDataMap(cycleShardData.shardGlobals, cycleShardData.parititionShardDataMap, 0, cycleShardData.shardGlobals.numPartitions)
+
+    // get extended data for our node
+    cycleShardData.nodeShardData = ShardFunctions.computeNodePartitionData(cycleShardData.shardGlobals, cycleShardData.ourNode, cycleShardData.nodeShardDataMap, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true)
+
+    // generate full data for nodes that store our home partition
+    ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.nodeShardData.nodeThatStoreOurParitionFull, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true)
+
+    // generate lightweight data for all active nodes  (note that last parameter is false to specify the lightweight data)
+    let fullDataForDebug = true // Set this to false for performance reasons!!! setting it to true saves us from having to recalculate stuff when we dump logs.
+    ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, fullDataForDebug)
+
+    // TODO if fullDataForDebug gets turned false we will update the guts of this calculation
+    ShardFunctions.computeNodePartitionDataMapExt(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes)
+
+    this.currentCycleShardData = cycleShardData
+    this.shardValuesByCycle.set(cycleNumber, cycleShardData)
+
+    // calculate nodes that would just now start syncing edge data because the network shrank.
+
+    // calculate if there are any nearby nodes that are syncing right now.
+    cycleShardData.syncingNeighbors = this.p2p.state.getOrderedSyncingNeighbors(cycleShardData.ourNode)
+
+    if (cycleShardData.syncingNeighbors.length > 0) {
+      cycleShardData.syncingNeighborsTxGroup = [...cycleShardData.syncingNeighbors]
+      cycleShardData.syncingNeighborsTxGroup.push(cycleShardData.ourNode)
+      cycleShardData.hasSyncingNeighbors = true
+
+      this.logger.playbackLogNote('shrd_sync_neighbors', `${cycleShardData.cycleNumber}`, ` neighbors: ${utils.stringifyReduce(cycleShardData.syncingNeighbors.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+    } else {
+      cycleShardData.hasSyncingNeighbors = false
+    }
+
+    console.log(`updateShardValues  cycle:${cycleShardData.cycleNumber} `)
+
+    if (cycleShardData.ourNode.status === 'active') {
+      // if (this.preTXQueue.length > 0) {
+      //   for (let tx of this.preTXQueue) {
+      //     this.logger.playbackLogNote('shrd_sync_preTX', ` `, ` ${utils.stringifyReduce(tx)} `)
+      //     this.queueAcceptedTransaction(tx, false, null)
+      //   }
+      //   this.preTXQueue = []
+      // }
+
+      if (this.syncTrackers != null) {
+        for (let i = this.syncTrackers.length - 1; i >= 0; i--) {
+          let syncTracker = this.syncTrackers[i]
+          if (syncTracker.syncFinished === true) {
+            this.logger.playbackLogNote('shrd_sync_trackerRangeClear', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+
+            // allow syncing queue entries to resume!
+            for (let queueEntry of syncTracker.queueEntries) {
+              queueEntry.syncCounter--
+              if (queueEntry.syncCounter <= 0) {
+                queueEntry.state = 'aging'
+                this.updateHomeInformation(queueEntry)
+                this.logger.playbackLogNote('shrd_sync_wakeupTX', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
+              }
+            }
+            syncTracker.queueEntries = []
+            this.syncTrackers.splice(i, 1)
+          }
+        }
+      }
+    }
+
+    // this will be a huge log.
+    this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${cycleNumber} data: ${utils.stringifyReduce(cycleShardData)}`)
   }
 
-  // TODO: Milestone 13.  this is the resync procedure that keeps existing app data and attempts to update it
-  async resyncStateData (requiredNodeCount) {
-    this.isSyncingAcceptedTxs = true
-    // 1. Determine the time window that needs to be covered (when were we last active)
+  getCurrentCycleShardData () {
+    if (this.currentCycleShardData === null) {
+      let cycle = this.p2p.state.getLastCycle()
+      if (cycle == null) {
+        return null
+      }
+      this.updateShardValues(cycle.counter)
+    }
 
-    // 2. query accepted transactions for the given range
-
-    // 3. query state table data to cover the range
-
-    // 4. re-processAccountData .  similar to process data but should handle working with only accounts that had new transactions in the given time.
-
-    // 5. any error handling / loops etc.
-
-    // 6a. catch up to tx queue
-
-    // 6. optionally?  validate hashes on our data range? over a givn time..
-    this.isSyncingAcceptedTxs = false
+    return this.currentCycleShardData
   }
 
-  // range should be in this format:
-  //       rangeIsSplit = true
-  // partitionRange {low , high}
-  // partitionRange2 {low , high}
-  // use ShardFunctions.partitionToAddressRange2() to calc
+  // todo refactor: this into a util, grabbed it from p2p
+  // From: https://stackoverflow.com/a/12646864
+  shuffleArray (array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]]
+    }
+  }
+
+  getRandomInt (max) {
+    return Math.floor(Math.random() * Math.floor(max))
+  }
+
+  getRandomIndex (list) {
+    let max = list.length - 1
+    return Math.floor(Math.random() * Math.floor(max))
+  }
+
+  // todo need a faster more scalable version of this if we get past afew hundred nodes.
+  getActiveNodesInRange (lowAddress, highAddress, exclude = []) {
+    let allNodes = this.p2p.state.getActiveNodes(this.p2p.id)
+    this.lastActiveNodeCount = allNodes.length
+    let results = []
+    let count = allNodes.length
+    for (const node of allNodes) {
+      if (node.id >= lowAddress && node.id <= highAddress) {
+        if ((exclude.includes(node.id)) === false) {
+          results.push(node)
+          if (results.length >= count) {
+            return results
+          }
+        }
+      }
+    }
+    return results
+  }
+
+  // todo refactor: move to p2p?
+  getRandomNodesInRange (count, lowAddress, highAddress, exclude) {
+    let allNodes = this.p2p.state.getActiveNodes(this.p2p.id)
+    this.lastActiveNodeCount = allNodes.length
+    this.shuffleArray(allNodes)
+    let results = []
+    if (allNodes.length <= count) {
+      count = allNodes.length
+    }
+    for (const node of allNodes) {
+      if (node.id >= lowAddress && node.id <= highAddress) {
+        if ((exclude.includes(node.id)) === false) {
+          results.push(node)
+          if (results.length >= count) {
+            return results
+          }
+        }
+      }
+    }
+    return results
+  }
+
+  // ////////////////////////////////////////////////////////////////////
+  //   DATASYNC
+  // ////////////////////////////////////////////////////////////////////
+
   createSyncTracker (partition, cycle) {
     let range = {}
     let index = this.syncTrackerIndex++
@@ -321,7 +456,7 @@ class StateManager extends EventEmitter {
     // update the debug tag and restart the queue
     this.dataPhaseTag = 'STATESYNC: '
     this.dataSyncMainPhaseComplete = true
-    this.tryStartAcceptedQueue2()
+    this.tryStartAcceptedQueue()
 
     this.logger.playbackLogNote('shrd_sync_mainphaseComplete', ` `, `  `)
   }
@@ -380,190 +515,6 @@ class StateManager extends EventEmitter {
         await this.failandRestart()
       }
     }
-  }
-
-  updateShardValues (cycleNumber) {
-    if (this.currentCycleShardData == null) {
-      this.logger.playbackLogNote('shrd_sync_firstCycle', `${cycleNumber}`, ` first init `)
-    }
-
-    let cycleShardData = {}
-
-    // todo get current cycle..  store this by cycle?
-    cycleShardData.nodeShardDataMap = new Map()
-    cycleShardData.parititionShardDataMap = new Map()
-    cycleShardData.activeNodes = this.p2p.state.getActiveNodes(null)
-    cycleShardData.activeNodes.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
-    cycleShardData.ourNode = this.p2p.state.getNode(this.p2p.id) // ugh, I bet there is a nicer way to get our node
-    cycleShardData.cycleNumber = cycleNumber
-
-    if (cycleShardData.activeNodes.length === 0) {
-      return // no active nodes so stop calculating values
-    }
-
-    // save this per cycle?
-    cycleShardData.shardGlobals = ShardFunctions.calculateShardGlobals(cycleShardData.activeNodes.length, this.config.sharding.nodesPerConsensusGroup)
-
-    // partition shard data
-    ShardFunctions.computePartitionShardDataMap(cycleShardData.shardGlobals, cycleShardData.parititionShardDataMap, 0, cycleShardData.shardGlobals.numPartitions)
-
-    // get extended data for our node
-    cycleShardData.nodeShardData = ShardFunctions.computeNodePartitionData(cycleShardData.shardGlobals, cycleShardData.ourNode, cycleShardData.nodeShardDataMap, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true)
-
-    // generate full data for nodes that store our home partition
-    ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.nodeShardData.nodeThatStoreOurParitionFull, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true)
-
-    // generate lightweight data for all active nodes  (note that last parameter is false to specify the lightweight data)
-    let fullDataForDebug = true // Set this to false for performance reasons!!! setting it to true saves us from having to recalculate stuff when we dump logs.
-    ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, fullDataForDebug)
-
-    // TODO if fullDataForDebug gets turned false we will update the guts of this calculation
-    ShardFunctions.computeNodePartitionDataMapExt(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes)
-
-    this.currentCycleShardData = cycleShardData
-    this.shardValuesByCycle.set(cycleNumber, cycleShardData)
-
-    // calculate nodes that would just now start syncing edge data because the network shrank.
-
-    // calculate if there are any nearby nodes that are syncing right now.
-
-    cycleShardData.syncingNeighbors = this.p2p.state.getOrderedSyncingNeighbors(cycleShardData.ourNode)
-
-    if (cycleShardData.syncingNeighbors.length > 0) {
-      cycleShardData.syncingNeighborsTxGroup = [...cycleShardData.syncingNeighbors]
-      cycleShardData.syncingNeighborsTxGroup.push(cycleShardData.ourNode)
-      cycleShardData.hasSyncingNeighbors = true
-
-      this.logger.playbackLogNote('shrd_sync_neighbors', `${cycleShardData.cycleNumber}`, ` neighbors: ${utils.stringifyReduce(cycleShardData.syncingNeighbors.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
-    } else {
-      cycleShardData.hasSyncingNeighbors = false
-    }
-
-    console.log(`updateShardValues  cycle:${cycleShardData.cycleNumber} `)
-
-    if (cycleShardData.ourNode.status === 'active') {
-      // if (this.preTXQueue.length > 0) {
-      //   for (let tx of this.preTXQueue) {
-      //     this.logger.playbackLogNote('shrd_sync_preTX', ` `, ` ${utils.stringifyReduce(tx)} `)
-      //     this.queueAcceptedTransaction(tx, false, null)
-      //   }
-      //   this.preTXQueue = []
-      // }
-
-      if (this.syncTrackers != null) {
-        for (let i = this.syncTrackers.length - 1; i >= 0; i--) {
-          let syncTracker = this.syncTrackers[i]
-          if (syncTracker.syncFinished === true) {
-            this.logger.playbackLogNote('shrd_sync_trackerRangeClear', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
-
-            // allow syncing queue entries to resume!
-            for (let queueEntry of syncTracker.queueEntries) {
-              queueEntry.syncCounter--
-              if (queueEntry.syncCounter <= 0) {
-                queueEntry.state = 'aging'
-                this.updateHomeInformation(queueEntry)
-                this.logger.playbackLogNote('shrd_sync_wakeupTX', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
-              }
-            }
-            syncTracker.queueEntries = []
-            this.syncTrackers.splice(i, 1)
-          }
-        }
-      }
-    }
-
-    // this will be a huge log.
-    this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${cycleNumber} data: ${utils.stringifyReduce(cycleShardData)}`)
-  }
-
-  getCurrentCycleShardData () {
-    if (this.currentCycleShardData === null) {
-      let cycle = this.p2p.state.getLastCycle()
-      if (cycle == null) {
-        return null
-      }
-      this.updateShardValues(cycle.counter)
-    }
-
-    return this.currentCycleShardData
-  }
-
-  // partitionToAddressRange (partition) {
-  //   // let numPartitions = getNumPartitions()
-  //   // let partitionFraction = partition / numPartitions
-  //   // todo after enterprise: implement partition->address range math.  possibly store it in a lookup table
-  //   let result = {}
-  //   result.partition = partition
-  //   result.low = '0'.repeat(64)
-  //   result.high = 'f'.repeat(64)
-  //   return result
-  // }
-
-  getNumPartitions () {
-    // hardcoded to one in enterprise
-    return 1
-  }
-
-  // todo refactor: this into a util, grabbed it from p2p
-  // From: https://stackoverflow.com/a/12646864
-  shuffleArray (array) {
-    for (let i = array.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [array[i], array[j]] = [array[j], array[i]]
-    }
-  }
-
-  getRandomInt (max) {
-    return Math.floor(Math.random() * Math.floor(max))
-  }
-
-  getRandomIndex (list) {
-    let max = list.length - 1
-    return Math.floor(Math.random() * Math.floor(max))
-  }
-  // ////////////////////////////////////////////////////////////////////
-  //   DATASYNC
-  // ////////////////////////////////////////////////////////////////////
-
-  // todo need a faster more scalable version of this if we get past afew hundred nodes.
-  getActiveNodesInRange (lowAddress, highAddress, exclude = []) {
-    let allNodes = this.p2p.state.getActiveNodes(this.p2p.id)
-    this.lastActiveNodeCount = allNodes.length
-    let results = []
-    let count = allNodes.length
-    for (const node of allNodes) {
-      if (node.id >= lowAddress && node.id <= highAddress) {
-        if ((exclude.includes(node.id)) === false) {
-          results.push(node)
-          if (results.length >= count) {
-            return results
-          }
-        }
-      }
-    }
-    return results
-  }
-
-  // todo refactor: move to p2p?
-  getRandomNodesInRange (count, lowAddress, highAddress, exclude) {
-    let allNodes = this.p2p.state.getActiveNodes(this.p2p.id)
-    this.lastActiveNodeCount = allNodes.length
-    this.shuffleArray(allNodes)
-    let results = []
-    if (allNodes.length <= count) {
-      count = allNodes.length
-    }
-    for (const node of allNodes) {
-      if (node.id >= lowAddress && node.id <= highAddress) {
-        if ((exclude.includes(node.id)) === false) {
-          results.push(node)
-          if (results.length >= count) {
-            return results
-          }
-        }
-      }
-    }
-    return results
   }
 
   async syncStateTableData (lowAddress, highAddress, startTime, endTime) {
@@ -1627,9 +1578,9 @@ class StateManager extends EventEmitter {
     this.p2p.unregisterGossipHandler('spread_tx_to_group')
   }
 
-  // //////////////////////////////////////////////////////////////////////////
-  // //////////////////////////   Old sync check     //////////////////////////
-  // //////////////////////////////////////////////////////////////////////////
+  // ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  // //////////////////////////   Old simple sync check, could be handy for debugging/test?   //////////////////////////
+  // ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   enableSyncCheck () {
     // return // hack no sync check , dont check in!!!!!
     this._registerListener(this.p2p.state, 'newCycle', (cycles) => process.nextTick(async () => {
@@ -2169,9 +2120,9 @@ class StateManager extends EventEmitter {
     }
   }
 
-  //  ///////////////
-  /// ///    new sharde queue         ///////////
-  // ///////////////
+  // /////////////////////////////////////////////////////////////////////////////////////////////////////////
+  // ////   Transaction Queue Handling        ////////////////////////////////////////////////////////////////
+  // /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   updateHomeInformation (txQueueEntry) {
     if (this.currentCycleShardData != null && txQueueEntry.hasShardInfo === false) {
@@ -2301,7 +2252,7 @@ class StateManager extends EventEmitter {
       this.newAcceptedTxQueueTempInjest.push(txQueueEntry)
 
       // start the queue if needed
-      this.tryStartAcceptedQueue2()
+      this.tryStartAcceptedQueue()
     } catch (error) {
       this.logger.playbackLogNote('shrd_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)}`)
       this.fatalLogger.fatal('queueAcceptedTransaction failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
@@ -2310,12 +2261,12 @@ class StateManager extends EventEmitter {
     return true
   }
 
-  tryStartAcceptedQueue2 () {
+  tryStartAcceptedQueue () {
     if (!this.dataSyncMainPhaseComplete) {
       return
     }
     if (!this.newAcceptedTxQueueRunning) {
-      this.processAcceptedTxQueue2()
+      this.processAcceptedTxQueue()
     }
     // with the way the new lists are setup we lost our ablity to interrupt the timer but i am not sure that matters as much
     // else if (this.newAcceptedTxQueue.length > 0 || this.newAcceptedTxQueueTempInjest.length > 0) {
@@ -2327,7 +2278,7 @@ class StateManager extends EventEmitter {
       this.fatalLogger.fatal('DATASYNC: newAcceptedTxQueueRunning')
       return
     }
-    await this.processAcceptedTxQueue2(Date.now())
+    await this.processAcceptedTxQueue(Date.now())
   }
 
   getQueueEntry (txid, timestamp) {
@@ -2622,7 +2573,7 @@ class StateManager extends EventEmitter {
   //
   //
   //
-  async processAcceptedTxQueue2 () {
+  async processAcceptedTxQueue () {
     let seenAccounts
     try {
       if (this.newAcceptedTxQueue.length === 0 && this.newAcceptedTxQueueTempInjest.length === 0) {
@@ -2847,7 +2798,7 @@ class StateManager extends EventEmitter {
     } finally {
       // restart loop if there are still elements in it
       if (this.newAcceptedTxQueue.length > 0 || this.newAcceptedTxQueueTempInjest.length > 0) {
-        setTimeout(() => { this.tryStartAcceptedQueue2() }, 15)
+        setTimeout(() => { this.tryStartAcceptedQueue() }, 15)
       }
 
       this.newAcceptedTxQueueRunning = false
