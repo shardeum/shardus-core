@@ -75,25 +75,27 @@ class Shardus {
     this.exitHandler.registerSync('crypto', () => {
       this.crypto.stopAllGenerators()
     })
-    this.exitHandler.registerAsync('network', () => {
+    this.exitHandler.registerAsync('network', async () => {
       this.mainLogger.info('Shutting down networking...')
-      return this.network.shutdown()
+      await this.network.shutdown()
     })
-    this.exitHandler.registerAsync('shardus', () => {
+    this.exitHandler.registerAsync('shardus', async () => {
       this.mainLogger.info('Writing heartbeat to database before exiting...')
-      return this._writeHeartbeat()
+      await this._writeHeartbeat()
     })
-    this.exitHandler.registerAsync('storage', () => {
-      return this.storage.close()
+    this.exitHandler.registerAsync('storage', async () => {
+      this.mainLogger.info('Closing Database connections...')
+      await this.storage.close()
     })
-    this.exitHandler.registerAsync('application', () => {
-      this.mainLogger.info('Closing the application...')
+    this.exitHandler.registerAsync('application', async () => {
       if (this.app && this.app.close) {
-        return this.app.close()
+        this.mainLogger.info('Shutting down the application...')
+        await this.app.close()
       }
     })
-    this.exitHandler.registerAsync('logger', () => {
-      return this.logger.shutdown()
+    this.exitHandler.registerAsync('logger', async () => {
+      this.mainLogger.info('Shutting down logs...')
+      await this.logger.shutdown()
     })
 
     this.logger.playbackLogState('constructed', '', '')

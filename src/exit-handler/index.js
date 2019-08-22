@@ -1,35 +1,38 @@
 class ExitHandler {
   constructor () {
-    this.syncFuncs = {}
-    this.asyncFuncs = {}
+    this.exited = false
+    this.syncFuncs = new Map()
+    this.asyncFuncs = new Map()
   }
 
   // Modules can use this to register synchronous cleanup functions
   registerSync (who, func) {
-    this.syncFuncs[who] = func
+    this.syncFuncs.set(who, func)
   }
 
   // Modules can use this to register asynchronous cleanup functions
   registerAsync (who, func) {
-    this.asyncFuncs[who] = func
+    this.asyncFuncs.set(who, func)
   }
 
   // Cleans up all modules with registered async functions
   async _cleanupAsync () {
-    for (const func of Object.values(this.asyncFuncs)) {
+    for (const [, func] of this.asyncFuncs) {
       await func()
     }
   }
 
   // Cleans up all modules with registered sync functions
   _cleanupSync () {
-    for (const func of Object.values(this.syncFuncs)) {
+    for (const [, func] of this.syncFuncs) {
       func()
     }
   }
 
   // Exits after cleaning up with all registered functions
   async exitCleanly (exitProcess = true) {
+    if (this.exited) return
+    this.exited = true
     this._cleanupSync()
     try {
       await this._cleanupAsync()

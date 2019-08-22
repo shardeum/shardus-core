@@ -14,7 +14,7 @@ class BetterSqlite3Storage {
     this.storageConfig.options.storage = path.join(this.baseDir, this.storageConfig.options.storage)
     this.profiler = profiler
     // Setup logger
-    this.mainLogger = logger.getLogger('default')
+    this.mainLogger = logger.getLogger('main')
     // Start Sequelize and load models
     // this.sequelize = new Sequelize(...Object.values(storageConfig))
     // for (let [modelName, modelAttributes] of models) this.sequelize.define(modelName, modelAttributes)
@@ -110,7 +110,7 @@ class BetterSqlite3Storage {
     this.mainLogger.info('Database initialized.')
   }
   async close () {
-    this.mainLogger.info('Closing Database connections.')
+    // this.mainLogger.info('Closing Database connections.')
     await this.db.close()
   }
 

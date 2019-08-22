@@ -113,7 +113,7 @@ class Sqlite3Storage {
     this.mainLogger.info('Database initialized.')
   }
   async close () {
-    this.mainLogger.info('Closing Database connections.')
+    // this.mainLogger.info('Closing Database connections.')
     await this.db.close()
   }
 

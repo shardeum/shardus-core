@@ -148,7 +148,7 @@ class Network extends EventEmitter {
       if (this.sn) promises.push(this.sn.stopListening(this.intServer))
       await Promise.all(promises)
     } catch (e) {
-      throw e
+      if (e.code !== 'ERR_SERVER_NOT_RUNNING') throw e
     }
   }
 

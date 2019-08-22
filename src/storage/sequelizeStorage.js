@@ -34,7 +34,7 @@ class SequelizeStorage {
     this.mainLogger.info('Database initialized.')
   }
   async close () {
-    this.mainLogger.info('Closing Database connections.')
+    // this.mainLogger.info('Closing Database connections.')
     await this.sequelize.close()
   }
 

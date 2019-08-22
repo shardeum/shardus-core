@@ -81,7 +81,6 @@ class Logger {
   // Tells this module that the server is shutting down, returns a Promise that resolves when all logs have been written to file, sockets are closed, etc.
   shutdown () {
     return new Promise((resolve) => {
-      this.getLogger('main').info('Logger shutting down cleanly...')
       log4js.shutdown(() => {
         resolve('done')
       })

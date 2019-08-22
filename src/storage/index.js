@@ -35,7 +35,6 @@ class Storage {
     this.initialized = true
   }
   async close () {
-    this.mainLogger.info('Closing Database connections.')
     await this.storage.close()
   }
 
