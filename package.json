@@ -38,7 +38,8 @@
     "shardus-net": "gitlab:shardus/shardus-net",
     "sqlite": "3.0.0",
     "sqlite3": "4.0.6",
-    "tar": "4.4.8"
+    "tar-fs": "github:shardus/tar-fs",
+    "trie-prefix-tree": "1.5.1"
   },
   "devDependencies": {
     "axios": "0.18.0",

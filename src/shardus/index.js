@@ -126,8 +126,8 @@ class Shardus {
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto)
     await this.p2p.init(this.network)
     this.debug = new Debug(this.config.baseDir, this.network)
-    this.debug.addFolder(this.logger.logDir, './logs')
-    this.debug.addFolder(path.parse(this.storage.storage.storageConfig.options.storage).dir, './db')
+    this.debug.addToArchive(this.logger.logDir, './logs')
+    this.debug.addToArchive(path.parse(this.storage.storage.storageConfig.options.storage).dir, './db')
 
     if (this.app) {
       this.statistics = new Statistics(this.config.baseDir, this.config.statistics, {
@@ -138,7 +138,7 @@ class Shardus {
         },
         timers: ['txTimeInQueue']
       }, this)
-      this.debug.addFile('./statistics.tsv', './statistics.tsv')
+      this.debug.addToArchive('./statistics.tsv', './statistics.tsv')
 
       this.loadDetection = new LoadDetection(this.config.loadDetection, this.statistics)
       this.statistics.on('snapshot', () => this.loadDetection.updateLoad())
