@@ -278,82 +278,81 @@ class Shardus {
   }
 
   /**
-   * Handle incoming tranaction requests
+   * Submit a transaction into the network
+   * Returns an object that tells whether a tx was successful or not and the reason why.
+   * Throws an error if an application was not provided to shardus.
+   *
+   * {
+   *   success: boolean,
+   *   reason: string
+   * }
+   *
    */
-  put (req, res) {
+  put (tx) {
     if (!this.appProvided) throw new Error('Please provide an App object to Shardus.setup before calling Shardus.put')
 
-    if (!this.stateManager.dataSyncMainPhaseComplete) {
-      return res.status(200).send({ success: false, reason: 'Node is still syncing.' })
-    }
+    if (this.verboseLogs) this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(tx)}`) // not reducing tx here so we can get the long hashes
 
-    if (this.verboseLogs) this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(req.body)}`) // not reducing tx here so we can get the long hashes
+    if (!this.stateManager.dataSyncMainPhaseComplete) {
+      this.statistics.incrementCounter('txRejected')
+      return { success: false, reason: 'Node is still syncing.' }
+    }
 
     if (this.rateLimiting.isOverloaded()) {
       this.statistics.incrementCounter('txRejected')
-      return res.status(200).send({ success: false, reason: 'Maximum load exceeded.' })
-    } else {
-      res.status(200).send({ success: true, reason: 'Transaction queued, poll for results.' })
+      return { success: false, reason: 'Maximum load exceeded.' }
     }
 
-    // retrieve incoming transaction from HTTP request
-    let inTransaction = req.body
-    let shardusTransaction = {}
+    if (typeof tx !== 'object') {
+      this.statistics.incrementCounter('txRejected')
+      return { success: false, reason: `Invalid Transaction! ${utils.stringifyReduce(tx)}` }
+    }
 
     try {
-      if (typeof inTransaction !== 'object') {
-        return { success: false, reason: `Invalid Transaction! ${utils.stringifyReduce(inTransaction)}` }
-      }
-      /**
-       * Perform basic validation of the transaction fields. Also, validate the transaction timestamp
-       */
+      // Perform basic validation of the transaction fields
       if (this.verboseLogs) this.mainLogger.debug(`Performing initial validation of the transaction`)
-      const initValidationResp = this.app.validateTxnFields(inTransaction)
+      const initValidationResp = this.app.validateTxnFields(tx)
       if (this.verboseLogs) this.mainLogger.debug(`InitialValidationResponse: ${utils.stringifyReduce(initValidationResp)}`)
 
+      // Validate the transaction timestamp
       const timestamp = initValidationResp.txnTimestamp
       if (this._isTransactionTimestampExpired(timestamp)) {
-        this.fatalLogger.fatal(`Transaction Expired: ${utils.stringifyReduce(inTransaction)}`)
+        this.fatalLogger.fatal(`Transaction Expired: ${utils.stringifyReduce(tx)}`)
         this.statistics.incrementCounter('txExpired')
         return { success: false, reason: 'Transaction Expired' }
       }
 
-      /**
-       * {txnReceivedTimestamp, sign, inTxn:{srcAct, tgtAct, tnxAmt, txnType, seqNum, timestamp, signs}}
-       * Timestamping the transaction of when the transaction was received. Sign the complete transaction
-       * with the node SK
-       * ToDo: Check with Omar if validateTransaction () methods needs receivedTimestamp and Node Signature
-       */
-      shardusTransaction.receivedTimestamp = Date.now()
-      shardusTransaction.inTransaction = inTransaction
+      const shardusTx = {}
+      shardusTx.receivedTimestamp = Date.now()
+      shardusTx.inTransaction = tx
+      const txId = this.crypto.hash(tx)
 
-      let txId = this.crypto.hash(inTransaction)
-
+      if (this.verboseLogs) this.mainLogger.debug(`shardusTx. shortTxID: ${txId} txID: ${utils.makeShortHash(txId)} TX data: ${utils.stringifyReduce(shardusTx)}`)
       this.profiler.profileSectionStart('put')
 
-      if (this.verboseLogs) this.mainLogger.debug(`ShardusTransaction. shortTxID: ${txId} txID: ${utils.makeShortHash(txId)} TX data: ${utils.stringifyReduce(shardusTransaction)}`)
+      const signedShardusTx = this.crypto.sign(shardusTx)
 
-      shardusTransaction = this.crypto.sign(shardusTransaction)
-
-      if (this.verboseLogs) this.mainLogger.debug('Transaction Valided')
-      // Perform Consensus -- Currently no algorithm is being used
-      // At this point the transaction is injected. Add a playback log
-      this.logger.playbackLogNote('tx_injected', `${txId}`, `Transaction: ${utils.stringifyReduce(inTransaction)}`)
+      if (this.verboseLogs) this.mainLogger.debug('Transaction validated')
       this.statistics.incrementCounter('txInjected')
+      this.logger.playbackLogNote('tx_injected', `${txId}`, `Transaction: ${utils.stringifyReduce(tx)}`)
       this.profiler.profileSectionStart('consensusInject')
-      this.consensus.inject(shardusTransaction).then(transactionReceipt => {
-        this.profiler.profileSectionEnd('consensusInject')
-        if (this.verboseLogs) this.mainLogger.debug(`Received Consensus. Receipt: ${utils.stringifyReduce(transactionReceipt)}`)
-      })
-    } catch (ex) {
-      this.fatalLogger.fatal(`Put: Failed to process transaction. Exception: ${ex}`)
-      this.fatalLogger.fatal('put: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      return { success: false, reason: `Failed to process trasnaction: ${utils.stringifyReduce(inTransaction)} ${ex}` }
+
+      this.consensus.inject(signedShardusTx)
+        .then(txReceipt => {
+          this.profiler.profileSectionEnd('consensusInject')
+          if (this.verboseLogs) this.mainLogger.debug(`Received Consensus. Receipt: ${utils.stringifyReduce(txReceipt)}`)
+        })
+    } catch (err) {
+      this.fatalLogger.fatal(`Put: Failed to process transaction. Exception: ${err}`)
+      this.fatalLogger.fatal('Put: ' + err.name + ': ' + err.message + ' at ' + err.stack)
+      return { success: false, reason: `Failed to process transaction: ${utils.stringifyReduce(tx)} ${err}` }
     } finally {
       this.profiler.profileSectionEnd('put')
     }
-    if (this.verboseLogs) this.mainLogger.debug(`End of injectTransaction ${utils.stringifyReduce(inTransaction)}`)
-    return { success: true, reason: 'Transaction successfully processed' }
+
+    if (this.verboseLogs) this.mainLogger.debug(`End of injectTransaction ${utils.stringifyReduce(tx)}`)
+
+    return { success: true, reason: 'Transaction queued, poll for results.' }
   }
 
   // Returns info about this node
