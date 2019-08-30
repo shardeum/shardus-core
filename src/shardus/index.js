@@ -356,6 +356,16 @@ class Shardus {
     return { success: true, reason: 'Transaction successfully processed' }
   }
 
+  // Returns info about this node
+  getNodeId () {
+    return this.p2p.getNodeId()
+  }
+
+  // Returns node info given a node id
+  getNode (id) {
+    return this.p2p.state.getNode(id)
+  }
+
   // USED BY SIMPLECOINAPP
   createApplyResponse (txId, txTimestamp) {
     let replyObject = { stateTableResults: [], txId, txTimestamp, accountData: [] }
