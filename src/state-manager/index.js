@@ -46,6 +46,7 @@ class StateManager extends EventEmitter {
 
     this.clearPartitionData()
     this.syncTrackers = []
+    this.runtimeSyncTrackerSyncing = false
 
     this.acceptedTXQueue = []
     this.acceptedTXByHash = {}
@@ -238,16 +239,52 @@ class StateManager extends EventEmitter {
       range.low = ShardFunctions.leadZeros8((range.startAddr).toString(16)) + '0'.repeat(56)
       range.high = ShardFunctions.leadZeros8((range.endAddr).toString(16)) + 'f'.repeat(56)
       // create sync trackers
-      // this.createSyncTrackerByRange(range, cycle)
+      this.createSyncTrackerByRange(range, cycle)
     }
 
+    if (coverageChanges.length > 0) {
+      this.syncRuntimeTrackers()
+    }
     // launch sync trackers
-
     // coverage changes... should have a list of changes
     // should note if the changes are an increase or reduction in covered area.
     // log the changes.
-
     // next would be to create some syncTrackers based to cover increases
+  }
+
+  async syncRuntimeTrackers () {
+    // await utils.sleep(8000) // sleep to make sure we are listening to some txs before we sync them // I think we can skip this.
+
+    if (this.runtimeSyncTrackerSyncing === true) {
+      return
+    }
+
+    this.runtimeSyncTrackerSyncing = true
+
+    let startedCount = 0
+    do {
+      // async collection safety:
+      //   we work on a copy of the list
+      //   we start the loop over again if any work was done.  this allows us to pick up changes that got added in later
+      let arrayCopy = this.syncTrackers.slice(0)
+      for (let syncTracker of arrayCopy) {
+        if (syncTracker.syncStarted === false) {
+          // let partition = syncTracker.partition
+          console.log(`rtsyncTracker start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
+          this.logger.playbackLogNote('rt_shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+
+          syncTracker.syncStarted = true
+          startedCount++
+          await this.syncStateDataForRange(syncTracker.range)
+          syncTracker.syncFinished = true
+
+          this.logger.playbackLogNote('rt_shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+          this.clearPartitionData()
+        }
+      }
+    } while (startedCount > 0)
+
+    this.runtimeSyncTrackerSyncing = false
   }
 
   getCurrentCycleShardData () {
