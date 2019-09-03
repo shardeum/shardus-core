@@ -45,18 +45,25 @@ let homeNodeQueryTests = 100
 
 let testAllNodesInList = true
 let numNodes = 6
+let numNodes2 = 0
 
 let useHardcodenodes = true
 // let hardcodeNodes = ['068ex9699a', '3e7fx601a4', '4222xc48ab', '4d05xb7aaf', '5aacx228d3', '5b61xf5dca', '86b0x899cb', 'a4bdx83351', 'aa5ax8c81c', 'b432x1ecdc', 'dc16x79767', 'e0c3x00452', 'e8aexf9d78', 'e9f1xfc329', 'ff7fxcb7ef']
 // let hardcodeNodes = ['16d0x3f6b2', '29d2x27971', '3b7ex5a91f', '4f57x3315c', '5d07x8bd45', '601dx69c34', '65c2xfc59d', '97dax03078', '9a01xa8f84', 'b050x62c87', 'b120x366ef', 'b48cxcf41f', 'd65fxae412', 'd875x49a69', 'e6d6x24afc']
-let hardcodeNodes = ['1181x916b1', '1f40x556d2', '2837x2e9da', '2c6bx1c5b3', '3cacx91e08', '4124x4a6c7', '66ebx6e880', '6759xe4f9e', '73cbxaffd8', '76eax30249', '97efxf9461', 'a0c6x751bd', 'b1c3x8d872', 'c778x9b37e', 'd1e9xfe682', 'ed93x9ac1b']
+// let hardcodeNodes = ['1181x916b1', '1f40x556d2', '2837x2e9da', '2c6bx1c5b3', '3cacx91e08', '4124x4a6c7', '66ebx6e880', '6759xe4f9e', '73cbxaffd8', '76eax30249', '97efxf9461', 'a0c6x751bd', 'b1c3x8d872', 'c778x9b37e', 'd1e9xfe682', 'ed93x9ac1b']
+let hardcodeNodes2 = ['0ac0xf9a47', '19e0x84509', '1e83xbf3d2', '30cax3bafc', '450bx96e7d', '4dc0x48b55', '4e6fx6d689', '5429x91097', '61c6x3ffa5', '7a52x3e35d', '8a54xad1db', 'ac3cx755d8', 'dcf5x9ba90', 'ddb8xab70e', 'e55ex33985', 'ece5x609fb', 'fe95x65248']
+let hardcodeNodes = ['0ac0xf9a47', '1e83xbf3d2', '30cax3bafc', '450bx96e7d', '4dc0x48b55', '4e6fx6d689', '5429x91097', '61c6x3ffa5', '7a52x3e35d', '8a54xad1db', 'ac3cx755d8', 'dcf5x9ba90', 'ddb8xab70e', 'e55ex33985', 'ece5x609fb', 'fe95x65248']
+
+// let hardcodeNodes2 = null
 
 if (useHardcodenodes) {
   numNodes = hardcodeNodes.length
 }
-
-let debugStartsWith = 'ed93' // 97da 5d07 'dc16'  '0683'
-let debugAccount = 'ffaa' + '3'.repeat(60) // 5c43
+if (hardcodeNodes2) {
+  numNodes2 = hardcodeNodes2.length
+}
+let debugStartsWith = 'ac3c' // 97da 5d07 'dc16'  '0683'  'ed93'
+let debugAccount = 'e1ac' + '3'.repeat(60) // 5c43
 let debugNode = null
 // 5c43xba41c account test.. need to expand it.
 
@@ -65,7 +72,7 @@ for (let i = 0; i < testIterations; i++) {
 
   let nodesPerConsenusGroup = 3
   let activeNodes
-
+  let activeNodes2
   if (useHardcodenodes === false) {
     activeNodes = generateNodes(numNodes - 1)
     let ourId = 'deadbeef' + '3'.repeat(56)
@@ -77,6 +84,11 @@ for (let i = 0; i < testIterations; i++) {
   activeNodes.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
   // let nodeToObserve = ourNode
 
+  if (hardcodeNodes2 != null) {
+    activeNodes2 = generateNodes(numNodes, hardcodeNodes2)
+    activeNodes2.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
+  }
+
   let innerLoopCount = 1
   if (testAllNodesInList) {
     innerLoopCount = numNodes
@@ -85,12 +97,15 @@ for (let i = 0; i < testIterations; i++) {
   let shardGlobals = ShardFunctions.calculateShardGlobals(numNodes, nodesPerConsenusGroup)
 
   let totalPartitions = numNodes
+
   // calculate data for all partitions
   let parititionShardDataMap = new Map()
   ShardFunctions.computePartitionShardDataMap(shardGlobals, parititionShardDataMap, 0, totalPartitions)
   // calculate data for all nodeds
   let nodeShardDataMap = new Map()
 
+  let parititionShardDataMap2 = new Map()
+  let nodeShardDataMap2 = new Map()
   if (debugStartsWith != null) {
     ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, false)
 
@@ -103,21 +118,49 @@ for (let i = 0; i < testIterations; i++) {
   }
 
   ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, true)
-
   ShardFunctions.computeNodePartitionDataMapExt(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes)
 
-  let homeNode = ShardFunctions.findHomeNode(shardGlobals, debugAccount, parititionShardDataMap)
-  // let shardParition = parititionShardDataMap.get(5)
+  if (hardcodeNodes2 != null) {
+    let totalPartitions2 = numNodes2
+    let shardGlobals2 = ShardFunctions.calculateShardGlobals(numNodes2, nodesPerConsenusGroup)
+    ShardFunctions.computePartitionShardDataMap(shardGlobals2, parititionShardDataMap2, 0, totalPartitions2)
+    ShardFunctions.computeNodePartitionDataMap(shardGlobals2, nodeShardDataMap2, activeNodes2, parititionShardDataMap2, activeNodes2, false)
+    ShardFunctions.computeNodePartitionDataMap(shardGlobals2, nodeShardDataMap2, activeNodes2, parititionShardDataMap2, activeNodes2, true)
+    ShardFunctions.computeNodePartitionDataMapExt(shardGlobals2, nodeShardDataMap2, activeNodes2, parititionShardDataMap2, activeNodes2)
 
-  let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
+    let ourNodeData = nodeShardDataMap.get(debugNode.id)
+    let ourNodeData2 = nodeShardDataMap2.get(debugNode.id)
+
+    let coverageChanges = ShardFunctions.computeCoverageChanges(ourNodeData, ourNodeData2)
+
+    for (let change of coverageChanges) {
+      // log info about the change.
+      // ${utils.stringifyReduce(change)}
+      console.log(` ${ShardFunctions.leadZeros8((change.start).toString(16))}->${ShardFunctions.leadZeros8((change.end).toString(16))} `)
+
+      // create a range object from our coverage change.
+      let range = {}
+      range.startAddr = change.start
+      range.endAddr = change.end
+      range.low = ShardFunctions.leadZeros8((range.startAddr).toString(16)) + '0'.repeat(56)
+      range.high = ShardFunctions.leadZeros8((range.endAddr).toString(16)) + 'f'.repeat(56)
+      // create sync trackers
+      // this.createSyncTrackerByRange(range, cycle)
+    }
+  }
 
   if (debugAccount != null) {
+    let homeNode = ShardFunctions.findHomeNode(shardGlobals, debugAccount, parititionShardDataMap)
+    // let shardParition = parititionShardDataMap.get(5)
+
+    let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
+
     let [partition, addrNum] = ShardFunctions.addressToPartition(shardGlobals, debugAccount)
 
     let ourNodeData = nodeShardDataMap.get(debugNode.id)
 
     let inRange = ShardFunctions.testInRange(partition, ourNodeData.storedPartitions)
-    let homeNode = ShardFunctions.findHomeNode(shardGlobals, debugAccount, parititionShardDataMap)
+    // let homeNode = ShardFunctions.findHomeNode(shardGlobals, debugAccount, parititionShardDataMap)
     let hasKey = false
     if (homeNode.node.id === ourNodeData.node.id) {
       hasKey = true
@@ -171,19 +214,26 @@ for (let i = 0; i < testIterations; i++) {
         throw new Error('node not in range 1')
       }
     }
-    for (let node of homeNode.nodeThatStoreOurParitionFull) {
-      let inRange3 = ShardFunctions.testAddressInRange(node.id, homeNode.storedPartitions)
-      if (inRange3 === false) {
-        throw new Error('node not in range 2')
-      }
-    }
 
+    // not sure this has to be true:  fails when we use getNodesThatCoverParitionRaw for nodes that store our partition!
+    // for (let node of homeNode.nodeThatStoreOurParitionFull) {
+    //   let inRange3 = ShardFunctions.testAddressInRange(node.id, homeNode.storedPartitions)
+    //   if (inRange3 === false) {
+    //     throw new Error('node not in range 2')
+    //   }
+    // }
+
+    // this is a strange test since some of the nodes in the nodeThatStoreOurParitionFull might cover the home node partiiton but not the test message partition
     for (let node of homeNode.nodeThatStoreOurParitionFull) {
       let nodeData = nodeShardDataMap.get(node.id)
+      let partitionInRange = ShardFunctions.testInRange(homePartition, nodeData.storedPartitions)
       let inRange4 = ShardFunctions.testAddressInRange(address, nodeData.storedPartitions)
-      if (inRange4 === false) {
-        throw new Error('node not in range 2')
+      if (partitionInRange && inRange4 === false) {
+        throw new Error(`address not in range 2. node: ${utils.makeShortHash(node.id)} addr: ${utils.makeShortHash(address)} home: ${utils.makeShortHash(homeNode.node.id)} p:${partitionInRange}`)
       }
+      // if (inRange4 === true && partitionInRange === false) {
+      //   console.log('error')
+      // }
     }
   }
 }

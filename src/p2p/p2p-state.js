@@ -43,6 +43,7 @@ class P2PState extends EventEmitter {
     // Defines a clean nodelist that we will use for restoring the nodeslist to a clean state
     this.cleanNodelist = {
       ordered: [],
+      addressOrdered: [],
       current: {},
       byIp: {},
       byPubKey: {}
@@ -721,6 +722,17 @@ class P2PState extends EventEmitter {
     return utils.binarySearch(ordered, node, comparator)
   }
 
+  _getNodeAddressOrderedIndex (node) {
+    const ordered = this.nodes.addressOrdered
+    // First check the first index of the ordered list, as this is most likely when removing nodes
+    if (ordered[0].id === node.id) return 0
+    // Then perform a b-search for the rest of the search
+    const comparator = (a, b) => {
+      return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
+    }
+    return utils.binarySearch(ordered, node, comparator)
+  }
+
   _getExpiredCountInternal () {
     // This line allows for a configuration in which nodes never expire
     if (this.nodeExpiryAge === 0) return 0
@@ -826,47 +838,54 @@ class P2PState extends EventEmitter {
     delete this.nodes.byIp[internalHost]
     const index = this._getNodeOrderedIndex(node)
     this.nodes.ordered.splice(index, 1)
+
+    const index2 = this._getNodeAddressOrderedIndex(node)
+    this.nodes.addressOrdered.splice(index2, 1)
   }
 
   getOrderedSyncingNeighbors (node) {
-    let index = this._getNodeOrderedIndex(node)
+    let index = this._getNodeAddressOrderedIndex(node)
+
+    // cycleShardData.activeNodes.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
+
+    console.log(`getOrderedSyncingNeighbors find: ${utils.stringifyReduce(node.id)} index: ${index} all:  ${utils.stringifyReduce(this.nodes.addressOrdered.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
 
     let leftIndex = index - 1
     let rightIndex = index + 1
 
     if (leftIndex < 0) {
-      leftIndex = this.nodes.ordered.length - 1
+      leftIndex = this.nodes.addressOrdered.length - 1
     }
-    if (rightIndex >= this.nodes.ordered.length) {
+    if (rightIndex >= this.nodes.addressOrdered.length) {
       rightIndex = 0
     }
     let results = []
     if (leftIndex !== index) {
-      let node = this.nodes.ordered[leftIndex]
+      let node = this.nodes.addressOrdered[leftIndex]
       while (node.status === 'syncing') {
         results.push(node)
         leftIndex--
         if (leftIndex < 0) {
-          leftIndex = this.nodes.ordered.length - 1
+          leftIndex = this.nodes.addressOrdered.length - 1
         }
         if (leftIndex === index) {
           break
         }
-        node = this.nodes.ordered[leftIndex]
+        node = this.nodes.addressOrdered[leftIndex]
       }
     }
     if (rightIndex !== index) {
-      let node = this.nodes.ordered[rightIndex]
+      let node = this.nodes.addressOrdered[rightIndex]
       while (node.status === 'syncing') {
         results.push(node)
         rightIndex++
-        if (rightIndex >= this.nodes.ordered.length) {
+        if (rightIndex >= this.nodes.addressOrdered.length) {
           rightIndex = 0
         }
         if (rightIndex === index) {
           break
         }
-        node = this.nodes.ordered[rightIndex]
+        node = this.nodes.addressOrdered[rightIndex]
       }
     }
     // todo what about two nodes syncing next to each other.  should we keep expanding to catch runs of syncing nodes.
@@ -905,6 +924,10 @@ class P2PState extends EventEmitter {
         return this.crypto.isGreaterHash(a.id, b.id) ? 1 : -1
       }
       return a.joinRequestTimestamp > b.joinRequestTimestamp ? 1 : -1
+    })
+
+    utils.insertSorted(this.nodes.addressOrdered, node, (a, b) => {
+      return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
     })
   }
 

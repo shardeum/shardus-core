@@ -59,7 +59,7 @@ class StateManager extends EventEmitter {
     }
 
     this.dataPhaseTag = 'DATASYNC: '
-  
+
     this.applySoftLock = false
 
     this.initStateSyncData()
@@ -137,11 +137,16 @@ class StateManager extends EventEmitter {
     // partition shard data
     ShardFunctions.computePartitionShardDataMap(cycleShardData.shardGlobals, cycleShardData.parititionShardDataMap, 0, cycleShardData.shardGlobals.numPartitions)
 
+    // generate limited data for all nodes data for all nodes.
+    ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, false)
+
     // get extended data for our node
     cycleShardData.nodeShardData = ShardFunctions.computeNodePartitionData(cycleShardData.shardGlobals, cycleShardData.ourNode, cycleShardData.nodeShardDataMap, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true)
 
     // generate full data for nodes that store our home partition
     ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.nodeShardData.nodeThatStoreOurParitionFull, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true)
+
+    // cycleShardData.nodeShardData = cycleShardData.nodeShardDataMap.get(cycleShardData.ourNode.id)
 
     // generate lightweight data for all active nodes  (note that last parameter is false to specify the lightweight data)
     let fullDataForDebug = true // Set this to false for performance reasons!!! setting it to true saves us from having to recalculate stuff when we dump logs.
@@ -191,7 +196,7 @@ class StateManager extends EventEmitter {
               if (queueEntry.syncCounter <= 0) {
                 queueEntry.state = 'aging'
                 this.updateHomeInformation(queueEntry)
-                this.logger.playbackLogNote('shrd_sync_wakeupTX', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
+                this.logger.playbackLogNote('shrd_sync_wakeupTX', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`)
               }
             }
             syncTracker.queueEntries = []
@@ -199,10 +204,50 @@ class StateManager extends EventEmitter {
           }
         }
       }
+
+      this.calculateChangeInCoverage()
     }
 
     // this will be a huge log.
     this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${cycleNumber} data: ${utils.stringifyReduce(cycleShardData)}`)
+  }
+
+  calculateChangeInCoverage () {
+    // maybe this should be a shard function so we can run unit tests on it for expanding or shrinking networks!
+    let newSharddata = this.currentCycleShardData
+
+    let oldShardData = this.shardValuesByCycle.get(newSharddata.cycleNumber - 1)
+
+    if (oldShardData == null) {
+      // log ?
+      return
+    }
+    let cycle = this.currentCycleShardData.cycleNumber
+    // oldShardData.shardGlobals, newSharddata.shardGlobals
+    let coverageChanges = ShardFunctions.computeCoverageChanges(oldShardData.nodeShardData, newSharddata.nodeShardData)
+
+    for (let change of coverageChanges) {
+      // log info about the change.
+      // ${utils.stringifyReduce(change)}
+      this.logger.playbackLogNote('shrd_sync_change', `${oldShardData.cycleNumber}->${newSharddata.cycleNumber}`, ` ${ShardFunctions.leadZeros8((change.start).toString(16))}->${ShardFunctions.leadZeros8((change.end).toString(16))} `)
+
+      // create a range object from our coverage change.
+      let range = {}
+      range.startAddr = change.start
+      range.endAddr = change.end
+      range.low = ShardFunctions.leadZeros8((range.startAddr).toString(16)) + '0'.repeat(56)
+      range.high = ShardFunctions.leadZeros8((range.endAddr).toString(16)) + 'f'.repeat(56)
+      // create sync trackers
+      // this.createSyncTrackerByRange(range, cycle)
+    }
+
+    // launch sync trackers
+
+    // coverage changes... should have a list of changes
+    // should note if the changes are an increase or reduction in covered area.
+    // log the changes.
+
+    // next would be to create some syncTrackers based to cover increases
   }
 
   getCurrentCycleShardData () {
@@ -280,22 +325,22 @@ class StateManager extends EventEmitter {
   //   DATASYNC
   // ////////////////////////////////////////////////////////////////////
 
-  createSyncTracker (partition, cycle) {
-    let range = {}
-    let index = this.syncTrackerIndex++
-    let syncTracker = { partition, range, queueEntries: [], cycle, index }
-    syncTracker.syncStarted = false
-    syncTracker.syncFinished = false
+  // createSyncTracker (partition, cycle) {
+  //   let range = {}
+  //   let index = this.syncTrackerIndex++
+  //   let syncTracker = { partition, range, queueEntries: [], cycle, index }
+  //   syncTracker.syncStarted = false
+  //   syncTracker.syncFinished = false
 
-    this.syncTrackers.push(syncTracker) // we should maintain this order.
+  //   this.syncTrackers.push(syncTracker) // we should maintain this order.
 
-    return syncTracker
-  }
+  //   return syncTracker
+  // }
 
   createSyncTrackerByRange (range, cycle) {
-    let partition = -1
+    // let partition = -1
     let index = this.syncTrackerIndex++
-    let syncTracker = { partition, range, queueEntries: [], cycle, index }
+    let syncTracker = { range, queueEntries: [], cycle, index } // partition,
     syncTracker.syncStarted = false
     syncTracker.syncFinished = false
 
@@ -426,14 +471,14 @@ class StateManager extends EventEmitter {
       syncTracker.syncFinished = true
 
       // allow syncing queue entries to resume!
-      for (let queueEntry of syncTracker.queueEntries) {
-        queueEntry.syncCounter--
-        if (queueEntry.syncCounter <= 0) {
-          queueEntry.state = 'aging'
-          this.logger.playbackLogNote('shrd_sync_wakeupTX', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
-        }
-      }
-      syncTracker.queueEntries = []
+      // for (let queueEntry of syncTracker.queueEntries) {
+      //   queueEntry.syncCounter--
+      //   if (queueEntry.syncCounter <= 0) {
+      //     queueEntry.state = 'aging'
+      //     this.logger.playbackLogNote('shrd_sync_wakeupTX', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
+      //   }
+      // }
+      // syncTracker.queueEntries = []
 
       this.logger.playbackLogNote('shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
       this.clearPartitionData()
@@ -463,7 +508,7 @@ class StateManager extends EventEmitter {
 
   async syncStateDataForRange (range) {
     try {
-      let partition = ''
+      let partition = 'notUsed'
       this.currentRange = range
       this.addressRange = range // this.partitionToAddressRange(partition)
 
@@ -2254,7 +2299,7 @@ class StateManager extends EventEmitter {
       // start the queue if needed
       this.tryStartAcceptedQueue()
     } catch (error) {
-      this.logger.playbackLogNote('shrd_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)}`)
+      this.logger.playbackLogNote('shrd_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)}`)
       this.fatalLogger.fatal('queueAcceptedTransaction failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
       throw new Error(error)
     }
@@ -2643,7 +2688,7 @@ class StateManager extends EventEmitter {
           }
 
           this.newAcceptedTxQueue.splice(index + 1, 0, txQueueEntry)
-          this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)}`)
+          this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)}`)
           this.emit('txQueued', acceptedTx.receipt.txHash)
         }
         this.newAcceptedTxQueueTempInjest = []
@@ -2779,7 +2824,7 @@ class StateManager extends EventEmitter {
             // send data to syncing neighbors.
             if (this.currentCycleShardData.syncingNeighbors.length > 0) {
               let message = { stateList: dataToSend, txid: queueEntry.acceptedTx.id }
-              this.logger.playbackLogNote('shrd_sync_dataTell', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} AccountBeingShared: ${utils.makeShortHash(message.txid)} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighbors.map(x => x.id))}`)
+              this.logger.playbackLogNote('shrd_sync_dataTell', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} AccountBeingShared: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)} txid: ${utils.makeShortHash(message.txid)} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighbors.map(x => x.id))}`)
               this.p2p.tell(this.currentCycleShardData.syncingNeighbors, 'broadcast_state', message)
             }
           }

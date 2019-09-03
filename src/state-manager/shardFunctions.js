@@ -2,6 +2,12 @@
 // const utils = require('../utils')
 const stringify = require('fast-stable-stringify')
 
+const cSetNoOverlapIfGTE = 16
+const cSetSuperIfGTE = 4
+const cSetEqualIfEQ = 0
+const cSetSuperLeftMask = 8
+const cSetSuperRightMask = 4
+
 class ShardFunctions {
   static calculateShardGlobals (numNodes, nodesPerConsenusGroup) {
     let shardGlobals = {}
@@ -183,13 +189,22 @@ class ShardFunctions {
     for (let node of nodesToGenerate) {
       let nodeShardData = nodeShardDataMap.get(node.id)
       if (!nodeShardData) {
-        nodeShardData = ShardFunctions.computeNodePartitionData(shardGlobals, node, nodeShardDataMap, parititionShardDataMap, activeNodes, extendedData)
+        nodeShardData = ShardFunctions.computeNodePartitionData(shardGlobals, node, nodeShardDataMap, parititionShardDataMap, activeNodes, false)
       }
+      // if (extendedData) {
+      //   ShardFunctions.computeExtendedNodePartitionData(shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes)
+      // }
+    }
+    // second pass for extended data
+    for (let node of nodesToGenerate) {
+      let nodeShardData = nodeShardDataMap.get(node.id)
+      // if (!nodeShardData) {
+      //   nodeShardData = ShardFunctions.computeNodePartitionData(shardGlobals, node, nodeShardDataMap, parititionShardDataMap, activeNodes, extendedData)
+      // }
       if (extendedData) {
         ShardFunctions.computeExtendedNodePartitionData(shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes)
       }
     }
-
     // need some post update step.
 
     // if (extendedData) {
@@ -225,7 +240,7 @@ class ShardFunctions {
     nodeShardData.nodeAddressNum = nodeAddressNum
     nodeShardData.homePartition = homePartition
     nodeShardData.centeredAddress = centeredAddress
-    nodeShardData.extraWatchedPartitions = 0
+    // nodeShardData.extraWatchedPartitions = 0 // unused
 
     nodeShardData.ourNodeIndex = activeNodes.findIndex(function (_node) { return _node.id === node.id })
 
@@ -281,6 +296,11 @@ class ShardFunctions {
     // merge into our full list for sake of TX calcs.  todo could try to be smart an only do this in some cases.
     let [results, extras] = ShardFunctions.mergeNodeLists(nodeShardData.nodeThatStoreOurParition, nodeShardData.consensusNodeForOurNodeFull)
 
+    // not sure if we need to do this
+    // if (extras.length > 0) {
+    //   ShardFunctions.dilateNeighborCoverage(shardGlobals, nodeShardDataMap, parititionShardDataMap, activeNodes, nodeShardData, extras)
+    // }
+
     nodeShardData.nodeThatStoreOurParitionFull = results
   }
 
@@ -290,11 +310,15 @@ class ShardFunctions {
     }
 
     nodeShardData.extendedData = true
-    nodeShardData.storedPartitions = ShardFunctions.calculateStoredPartitions2(shardGlobals, nodeShardData.homePartition)
+    if (nodeShardData.storedPartitions == null) {
+      nodeShardData.storedPartitions = ShardFunctions.calculateStoredPartitions2(shardGlobals, nodeShardData.homePartition)
+    }
 
     let exclude = [nodeShardData.node.id]
 
-    nodeShardData.nodeThatStoreOurParition = ShardFunctions.getNodesThatCoverRange(shardGlobals, nodeShardData.storedPartitions.homeRange.low, nodeShardData.storedPartitions.homeRange.high, exclude, activeNodes)
+    // tried a better way but it dies of needing data we dont have yet..
+    nodeShardData.nodeThatStoreOurParition = ShardFunctions.getNodesThatCoverParitionRaw(shardGlobals, nodeShardDataMap, nodeShardData.homePartition, exclude, activeNodes)
+    // nodeShardData.nodeThatStoreOurParition = ShardFunctions.getNodesThatCoverRange(shardGlobals, nodeShardData.storedPartitions.homeRange.low, nodeShardData.storedPartitions.homeRange.high, exclude, activeNodes)
     nodeShardData.consensusNodeForOurNode = ShardFunctions.getNeigborNodesInRange(nodeShardData.ourNodeIndex, shardGlobals.consensusRadius, exclude, activeNodes)
     nodeShardData.consensusNodeForOurNodeFull = ShardFunctions.getNeigborNodesInRange(nodeShardData.ourNodeIndex, shardGlobals.consensusRadius, [], activeNodes)
 
@@ -349,10 +373,265 @@ class ShardFunctions {
     }
     nodeShardData.edgeNodes.sort(ShardFunctions.nodeSort)
     nodeShardData.consensusNodeForOurNodeFull.sort(ShardFunctions.nodeSort)
+    nodeShardData.nodeThatStoreOurParitionFull.sort(ShardFunctions.nodeSort)
   }
 
   static nodeSort (a, b) {
     return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
+  }
+
+  // conditions aStart < aEnd && bStart < bEnd
+  // static setBits (aStart, aEnd, bStart, bEnd) {
+  //   let value = 0
+  //   // no overlap
+  //   if (bStart >= aEnd) {
+  //     value |= 32
+  //   }
+  //   if (bEnd <= aStart) {
+  //     value |= 16
+  //   }
+  //   // superset bits
+  //   if (bStart < aStart) {
+  //     value |= 8
+  //   }
+  //   if (bEnd > aEnd) {
+  //     value |= 4
+  //   }
+  //   // // subset bits
+  //   if (bStart > aStart && bStart < aEnd) {
+  //     value |= 2
+  //   }
+  //   if (bEnd > aStart && bEnd < aEnd) {
+  //     value |= 1
+  //   }
+  //   return value
+  // }
+
+  //  a=old, b=new
+  static setOverlap (aStart, aEnd, bStart, bEnd) {
+    return !((bStart >= aEnd) || (bEnd <= aStart))
+  }
+
+  static setEpanded (aStart, aEnd, bStart, bEnd) {
+    return (bStart < aStart) || (bEnd > aEnd)
+  }
+
+  static setEpandedLeft (aStart, aEnd, bStart, bEnd) {
+    return (bStart < aStart)
+  }
+  static setEpandedRight (aStart, aEnd, bStart, bEnd) {
+    return (bEnd > aEnd)
+  }
+  //  a=old, b=new
+  static setShrink (aStart, aEnd, bStart, bEnd) {
+    return (bStart > aStart && bStart < aEnd) || (bEnd > aStart && bEnd < aEnd)
+  }
+
+  // static setErrors (aStart, aEnd, bStart, bEnd) {
+  //   return !((aStart < aEnd) && (bStart < bEnd))
+  // }
+  // const cSetNoOverlapIfGTE = 16
+  // const cSetSuperIfGTE = 4
+  // const cSetEqualIfEQ = 0
+  // const cSetSuperLeftMask = 8
+  // const cSetSuperRightMask = 4
+
+  // overshoot.
+
+  // calculate this for self and neighbor nodes!!  how far to scan into neighors. // oldShardData_shardGlobals, newSharddata_shardGlobals,
+  static computeCoverageChanges (oldShardDataNodeShardData, newSharddataNodeShardData) {
+    let coverageChanges = []
+
+    let oldStoredPartitions = oldShardDataNodeShardData.storedPartitions
+    let newStoredPartitions = newSharddataNodeShardData.storedPartitions
+
+    // let d1s = 0
+    // let d1e = 0
+    // let d2s = 0
+    // let d2e = 0
+    // calcs will all be in integers and assume we have 0000s for start ranges and ffffs for end ranges.
+    if (oldStoredPartitions.rangeIsSplit) {
+      if (newStoredPartitions.rangeIsSplit) {
+        // OLD:  [xxxxx-----------------------xx]
+        // NEW:  [xxxxxxx-------------------xxxx]
+
+        // partitionRange, partitionRange2
+        let oldStart1 = oldStoredPartitions.partitionRange.startAddr
+        let oldEnd1 = oldStoredPartitions.partitionRange.endAddr
+
+        let newStart1 = newStoredPartitions.partitionRange.startAddr
+        let newEnd1 = newStoredPartitions.partitionRange.endAddr
+
+        // d1s = newStart1 - oldStart1
+        // d1e = newEnd1 - oldEnd1
+
+        let oldStart2 = oldStoredPartitions.partitionRange2.startAddr
+        let oldEnd2 = oldStoredPartitions.partitionRange2.endAddr
+
+        let newStart2 = newStoredPartitions.partitionRange2.startAddr
+        let newEnd2 = newStoredPartitions.partitionRange2.endAddr
+
+        // d2s = newStart2 - oldStart2
+        // d2e = newEnd2 - oldEnd2
+
+        if (oldStart1 >= oldEnd1 || oldStart2 >= oldEnd2 || newStart1 >= newEnd1 || newStart2 >= newEnd2) {
+          throw new Error('invalid ranges')
+        }
+
+        if (ShardFunctions.setOverlap(oldStart1, oldEnd1, newStart1, newEnd1)) {
+          if (ShardFunctions.setEpandedLeft(oldStart1, oldEnd1, newStart1, newEnd1)) {
+            coverageChanges.push({ start: newStart1, end: oldStart1 })
+          }
+          if (ShardFunctions.setEpandedRight(oldStart1, oldEnd1, newStart1, newEnd1)) {
+            coverageChanges.push({ start: oldEnd1, end: newEnd1 })
+          }
+        }
+
+        if (ShardFunctions.setOverlap(oldStart2, oldEnd2, newStart2, newEnd2)) {
+          if (ShardFunctions.setEpandedLeft(oldStart2, oldEnd2, newStart2, newEnd2)) {
+            coverageChanges.push({ start: newStart2, end: oldStart2 })
+          }
+          if (ShardFunctions.setEpandedRight(oldStart2, oldEnd2, newStart2, newEnd2)) {
+            coverageChanges.push({ start: oldEnd2, end: newEnd2 })
+          }
+        }
+      } else {
+        // old is split, new is single
+        //  node this is not all cass.
+        // case 1:
+        // OLD:  [xxxxxxxxxxxx--------------xx]
+        // NEW:  [----xxxxxxxx----------------]
+        // case 2:
+        // OLD:  [xxx---------------xxxxxxxxxx]
+        // NEW:  [------------------xxxxxxxx--]
+        // case 3:
+        // OLD:  [xxx-------------xxxxxxxxxxxx]
+        // NEW:  [------------------xxxxxxxx--]
+        // case 4:  overlaps both new sets...  compare to both..
+        // OLD:  [xxx-------------xxxxxxxxxxxx]
+        // NEW:  [--xxxxxxxxxxxxxxxxxxxxxxxx--]
+        //          post pass.  need to not overlap expanded areas.
+        //
+        let oldStart1 = oldStoredPartitions.partitionRange.startAddr
+        let oldEnd1 = oldStoredPartitions.partitionRange.endAddr
+        let oldStart2 = oldStoredPartitions.partitionRange2.startAddr
+        let oldEnd2 = oldStoredPartitions.partitionRange2.endAddr
+
+        let newStart1 = newStoredPartitions.partitionRange.startAddr
+        let newEnd1 = newStoredPartitions.partitionRange.endAddr
+
+        if (oldStart1 >= oldEnd1 || oldStart2 >= oldEnd2 || newStart1 >= newEnd1) {
+          throw new Error('invalid ranges')
+        }
+
+        // Test overlaps first, need permutations
+        // Then can get differences.
+        // If no overlap then entire value is a difference.
+        if (ShardFunctions.setOverlap(oldStart1, oldEnd1, newStart1, newEnd1)) {
+          if (ShardFunctions.setEpandedLeft(oldStart1, oldEnd1, newStart1, newEnd1)) {
+            coverageChanges.push({ start: newStart1, end: oldStart1 })
+          }
+          if (ShardFunctions.setEpandedRight(oldStart1, oldEnd1, newStart1, newEnd1)) {
+            coverageChanges.push({ start: oldEnd1, end: newEnd1 })
+          }
+        } else if (ShardFunctions.setOverlap(oldStart2, oldEnd2, newStart1, newEnd1)) {
+          if (ShardFunctions.setEpandedLeft(oldStart2, oldEnd2, newStart1, newEnd1)) {
+            coverageChanges.push({ start: newStart1, end: oldStart2 })
+          }
+          if (ShardFunctions.setEpandedRight(oldStart2, oldEnd2, newStart1, newEnd1)) {
+            coverageChanges.push({ start: oldEnd2, end: newEnd1 })
+          }
+        }
+      }
+    } else {
+      if (newStoredPartitions.rangeIsSplit) {
+        // old is single, new is split
+        //  node this is not all cass.
+        // case 1:
+        // OLD:  [----xxxxxxxx----------------]
+        // NEW:  [xxxxxxxxxxxx--------------xx]
+        // case 2:
+        // OLD:  [------------------xxxxxxxx--]
+        // NEW:  [xxx---------------xxxxxxxxxx]
+        // case 3:  expansion in both directions.
+        // OLD:  [------------------xxxxxxxx--]
+        // NEW:  [xxx-------------xxxxxxxxxxxx]
+        // case 4:  overlaps both new sets...  compare to both..
+        // OLD:  [--xxxxxxxxxxxxxxxxxxxxxxxx--]
+        // NEW:  [xxx-------------xxxxxxxxxxxx]
+        let oldStart1 = oldStoredPartitions.partitionRange.startAddr
+        let oldEnd1 = oldStoredPartitions.partitionRange.endAddr
+
+        let newStart1 = newStoredPartitions.partitionRange.startAddr
+        let newEnd1 = newStoredPartitions.partitionRange.endAddr
+        let newStart2 = newStoredPartitions.partitionRange2.startAddr
+        let newEnd2 = newStoredPartitions.partitionRange2.endAddr
+
+        if (oldStart1 >= oldEnd1 || newStart1 >= newEnd1 || newEnd2 > newStart2) {
+          throw new Error('invalid ranges')
+        }
+        // d1s = newStart1 - oldStart1
+        // d1e = newEnd1 - oldEnd1
+
+        // d2s = newStart2 - oldStart2
+        // d2e = newEnd2 - oldEnd2
+
+        // Test overlaps first, need permutations
+        // Then can get differences.
+        // If no overlap then entire value is a difference.
+
+        if (ShardFunctions.setOverlap(oldStart1, oldEnd1, newStart1, newEnd1)) {
+          if (ShardFunctions.setEpandedLeft(oldStart1, oldEnd1, newStart1, newEnd1)) {
+            coverageChanges.push({ start: newStart1, end: oldStart1 })
+          }
+          if (ShardFunctions.setEpandedRight(oldStart1, oldEnd1, newStart1, newEnd1)) {
+            coverageChanges.push({ start: oldEnd1, end: newEnd1 })
+          }
+        }
+
+        if (ShardFunctions.setOverlap(oldStart1, oldEnd1, newStart2, newEnd2)) {
+          if (ShardFunctions.setEpandedLeft(oldStart1, oldEnd1, newStart2, newEnd2)) {
+            coverageChanges.push({ start: newStart2, end: oldStart1 })
+          }
+          if (ShardFunctions.setEpandedRight(oldStart1, oldEnd1, newStart2, newEnd2)) {
+            coverageChanges.push({ start: oldEnd1, end: newEnd2 })
+          }
+        }
+      } else {
+        // partitionRange
+
+        let oldStart1 = oldStoredPartitions.partitionRange.startAddr
+        let oldEnd1 = oldStoredPartitions.partitionRange.endAddr
+
+        let newStart1 = newStoredPartitions.partitionRange.startAddr
+        let newEnd1 = newStoredPartitions.partitionRange.endAddr
+
+        // d1s = newStart1 - oldStart1
+        // d1e = newEnd1 - oldEnd1
+
+        if (oldStart1 >= oldEnd1 || newStart1 >= newEnd1) {
+          throw new Error('invalid ranges')
+        }
+
+        if (ShardFunctions.setOverlap(oldStart1, oldEnd1, newStart1, newEnd1)) {
+          if (ShardFunctions.setEpandedLeft(oldStart1, oldEnd1, newStart1, newEnd1)) {
+            coverageChanges.push({ start: newStart1, end: oldStart1 })
+          }
+          if (ShardFunctions.setEpandedRight(oldStart1, oldEnd1, newStart1, newEnd1)) {
+            coverageChanges.push({ start: oldEnd1, end: newEnd1 })
+          }
+        }
+      }
+
+      return coverageChanges
+    }
+
+    // this needs to understande address ranges.
+
+    // should it also understand changed in what partitions are covered.
+    // oldShardData_nodeShardData
+
+    // calculate new and edge partitions?   then calculate change between partitions? --- NO!
   }
 
   static getHomeNodeSummaryObject (nodeShardData) {
@@ -469,15 +748,19 @@ class ShardFunctions {
     let circularDistance = function (a, b, max) {
       let directDist = Math.abs(a - b)
       let wrapDist = directDist
-      if (a < b) {
-        wrapDist = Math.abs(a + (max - b))
-      } else if (b < a) {
-        wrapDist = Math.abs(b + (max - a))
-      }
+      // if (a < b) {
+      //   wrapDist = Math.abs(a + (max - b))
+      // } else if (b < a) {
+      //   wrapDist = Math.abs(b + (max - a))
+      // }
+      let wrapDist1 = Math.abs(a + (max - b))
+      let wrapDist2 = Math.abs(b + (max - a))
+      wrapDist = Math.min(wrapDist1, wrapDist2)
 
       return Math.min(directDist, wrapDist)
     }
 
+    let changed = false
     for (let node of extras) {
       let otherNodeShardData = nodeShardDataMap.get(node.id)
 
@@ -497,11 +780,16 @@ class ShardFunctions {
 
       if (partitionDistanceStart < partitionDistanceEnd) {
         nodeShardDataToModify.storedPartitions.partitionStart = partition
-        ShardFunctions.calculateStoredPartitions2Ranges(shardGlobals, nodeShardDataToModify.storedPartitions)
+        changed = true
+        // ShardFunctions.calculateStoredPartitions2Ranges(shardGlobals, nodeShardDataToModify.storedPartitions)
       } else {
         nodeShardDataToModify.storedPartitions.partitionEnd = partition
-        ShardFunctions.calculateStoredPartitions2Ranges(shardGlobals, nodeShardDataToModify.storedPartitions)
+        changed = true
+        // ShardFunctions.calculateStoredPartitions2Ranges(shardGlobals, nodeShardDataToModify.storedPartitions)
       }
+    }
+    if (changed) {
+      ShardFunctions.calculateStoredPartitions2Ranges(shardGlobals, nodeShardDataToModify.storedPartitions)
     }
   }
 
@@ -562,8 +850,11 @@ class ShardFunctions {
     //   endAddr-- // - 1 // subtract 1 so we don't go into the nex partition
     // }
 
-    result.low = ('00000000' + (+startAddr).toString(16)).slice(-8) + '0'.repeat(56)
-    result.high = ('00000000' + (+endAddr).toString(16)).slice(-8) + 'f'.repeat(56)
+    result.startAddr = startAddr
+    result.endAddr = endAddr
+
+    result.low = ('00000000' + (startAddr).toString(16)).slice(-8) + '0'.repeat(56)
+    result.high = ('00000000' + (endAddr).toString(16)).slice(-8) + 'f'.repeat(56)
 
     return result
   }
@@ -602,6 +893,10 @@ class ShardFunctions {
     let highAddressNum = parseInt(highAddress.slice(0, 8), 16) + 1 // assume trailng fffs
 
     // todo start and end loop at smarter areas for efficieny reasones!
+    let distLow = 0
+    let distHigh = 0
+
+    // This isn't a great loop to have for effiency reasons.
     for (let i = 0; i < activeNodes.length; i++) {
       let node = activeNodes[i]
       if (exclude.includes(node.id)) {
@@ -618,12 +913,19 @@ class ShardFunctions {
 
       // Math.min(Math.abs(centeredAddress - lowAddressNum), Math.abs(centeredAddress - lowAddressNum))
 
-      if (circularDistance(centeredAddress, lowAddressNum, 0xffffffff) > nodeLookRange) {
+      distLow = circularDistance(centeredAddress, lowAddressNum, 0xffffffff) - nodeLookRange
+      distHigh = circularDistance(centeredAddress, highAddressNum, 0xffffffff) - nodeLookRange
+      // if (circularDistance(centeredAddress, lowAddressNum, 0xffffffff) > nodeLookRange) {
+      //   continue
+      // }
+      // if (circularDistance(centeredAddress, highAddressNum, 0xffffffff) > nodeLookRange) {
+      //   continue
+      // }
+
+      if (distLow > 0 && distHigh > 0) {
         continue
       }
-      if (circularDistance(centeredAddress, highAddressNum, 0xffffffff) > nodeLookRange) {
-        continue
-      }
+
       // if (Math.abs(centeredAddress - lowAddressNum) > nodeLookRange) {
       //   continue
       // }
@@ -634,6 +936,30 @@ class ShardFunctions {
       range.push(node)
     }
     return range
+  }
+
+  // NOTE this is a raw answer.  edge cases with consensus node coverage can increase the results of our raw answer that is given here
+  static getNodesThatCoverParitionRaw (shardGlobals, nodeShardDataMap, partition, exclude, activeNodes) {
+    let results = []
+
+    // TODO perf.  faster verison that expands from our node index. (needs a sorted list of nodes.)
+    for (let i = 0; i < activeNodes.length; i++) {
+      let node = activeNodes[i]
+      if (exclude.includes(node.id)) {
+        continue
+      }
+      let nodeShardData = nodeShardDataMap.get(node.id)
+
+      if (nodeShardData.storedPartitions == null) {
+        nodeShardData.storedPartitions = ShardFunctions.calculateStoredPartitions2(shardGlobals, nodeShardData.homePartition)
+      }
+      if (ShardFunctions.testInRange(partition, nodeShardData.storedPartitions) !== true) {
+        continue
+      }
+
+      results.push(node)
+    }
+    return results
   }
 
   // get nodes in count range to either side of our node
@@ -677,6 +1003,8 @@ class ShardFunctions {
     return results
   }
 
+  // This builds a sorted list of nodes based on how close they are to a given address
+  // todo count should be based off of something in shard globals.  this will matter for large networks.
   static getNodesByProximity (shardGlobals, activeNodes, position, excludeID, count = 10) {
     let allNodes = activeNodes
     let results = []
