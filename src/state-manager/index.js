@@ -259,32 +259,38 @@ class StateManager extends EventEmitter {
       return
     }
 
-    this.runtimeSyncTrackerSyncing = true
+    try {
+      this.runtimeSyncTrackerSyncing = true
 
-    let startedCount = 0
-    do {
-      // async collection safety:
-      //   we work on a copy of the list
-      //   we start the loop over again if any work was done.  this allows us to pick up changes that got added in later
-      let arrayCopy = this.syncTrackers.slice(0)
-      for (let syncTracker of arrayCopy) {
-        if (syncTracker.syncStarted === false) {
-          // let partition = syncTracker.partition
-          console.log(`rtsyncTracker start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
-          this.logger.playbackLogNote('rt_shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+      let startedCount = 0
+      do {
+        // async collection safety:
+        //   we work on a copy of the list
+        //   we start the loop over again if any work was done.  this allows us to pick up changes that got added in later
+        startedCount = 0
+        let arrayCopy = this.syncTrackers.slice(0)
+        for (let syncTracker of arrayCopy) {
+          if (syncTracker.syncStarted === false) {
+            // let partition = syncTracker.partition
+            console.log(`rtsyncTracker start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
+            this.logger.playbackLogNote('rt_shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
 
-          syncTracker.syncStarted = true
-          startedCount++
-          await this.syncStateDataForRange(syncTracker.range)
-          syncTracker.syncFinished = true
+            syncTracker.syncStarted = true
+            startedCount++
+            await this.syncStateDataForRange(syncTracker.range)
+            syncTracker.syncFinished = true
 
-          this.logger.playbackLogNote('rt_shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
-          this.clearPartitionData()
+            this.logger.playbackLogNote('rt_shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+            this.clearPartitionData()
+          }
         }
-      }
-    } while (startedCount > 0)
-
-    this.runtimeSyncTrackerSyncing = false
+      } while (startedCount > 0)
+    } catch (ex) {
+      this.mainLogger.debug('syncRuntimeTrackers: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.fatalLogger.fatal('syncRuntimeTrackers: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+    } finally {
+      this.runtimeSyncTrackerSyncing = false
+    }
   }
 
   getCurrentCycleShardData () {
