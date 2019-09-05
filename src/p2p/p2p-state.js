@@ -655,6 +655,14 @@ class P2PState extends EventEmitter {
     await Promise.all(promises)
   }
 
+  async _setNodesActiveTimestamp (nodeIds, timestamp) {
+    for (const id of nodeIds) {
+      const node = this.getNode(id)
+      node.activeTimestamp = timestamp
+      await this.storage.updateNodes({ id }, { activeTimestamp: timestamp })
+    }
+  }
+
   // For use for internal updates to status for this node
   async directStatusUpdate (nodeId, status, updateDb = true) {
     // Check if we actually know about this node
@@ -1230,6 +1238,7 @@ class P2PState extends EventEmitter {
 
     this.mainLogger.debug(`Nodes to be activated this cycle: ${JSON.stringify(cycleInfo.activated)}`)
     const activated = this._setNodesToStatus(cycleInfo.activated, 'active')
+    this._setNodesActiveTimestamp(cycleInfo.activated, cycleInfo.start)
 
     // Get certificate from cycleInfo and then remove it from the object
     const certificate = cycleInfo.certificate

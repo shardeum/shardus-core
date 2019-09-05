@@ -274,7 +274,8 @@ class P2P extends EventEmitter {
     // TODO: Change this to actual selectable address
     const address = publicKey
     const joinRequestTimestamp = utils.getTime('s')
-    const nodeInfo = { publicKey, externalIp, externalPort, internalIp, internalPort, address, joinRequestTimestamp }
+    const activeTimestamp = 0
+    const nodeInfo = { publicKey, externalIp, externalPort, internalIp, internalPort, address, joinRequestTimestamp, activeTimestamp }
     this.mainLogger.debug(`Node info of this node: ${JSON.stringify(nodeInfo)}`)
     return nodeInfo
   }

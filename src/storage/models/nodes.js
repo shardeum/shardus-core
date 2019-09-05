@@ -12,6 +12,7 @@ module.exports = [
     internalPort: { type: Sequelize.SMALLINT, allowNull: false },
     externalPort: { type: Sequelize.SMALLINT, allowNull: false },
     joinRequestTimestamp: { type: Sequelize.BIGINT, allowNull: false },
+    activeTimestamp: { type: Sequelize.BIGINT, allowNull: false },
     address: { type: Sequelize.STRING, allowNull: false },
     status: { type: Sequelize.STRING, allowNull: false }
   }
