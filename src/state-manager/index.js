@@ -125,8 +125,14 @@ class StateManager extends EventEmitter {
     cycleShardData.parititionShardDataMap = new Map()
     cycleShardData.activeNodes = this.p2p.state.getActiveNodes(null)
     cycleShardData.activeNodes.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
-    cycleShardData.ourNode = this.p2p.state.getNode(this.p2p.id) // ugh, I bet there is a nicer way to get our node
     cycleShardData.cycleNumber = cycleNumber
+
+    try {
+      cycleShardData.ourNode = this.p2p.state.getNode(this.p2p.id) // ugh, I bet there is a nicer way to get our node
+    } catch (ex) {
+      this.logger.playbackLogNote('shrd_sync_notactive', `${cycleNumber}`, `  `)
+      return
+    }
 
     if (cycleShardData.activeNodes.length === 0) {
       return // no active nodes so stop calculating values
@@ -1664,6 +1670,7 @@ class StateManager extends EventEmitter {
     this.p2p.unregisterInternal('request_state_for_tx')
     this.p2p.unregisterInternal('broadcast_state')
     this.p2p.unregisterGossipHandler('spread_tx_to_group')
+    this.p2p.unregisterInternal('get_account_data_with_queue_hints')
   }
 
   // ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

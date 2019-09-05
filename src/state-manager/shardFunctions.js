@@ -567,7 +567,7 @@ class ShardFunctions {
         let newStart2 = newStoredPartitions.partitionRange2.startAddr
         let newEnd2 = newStoredPartitions.partitionRange2.endAddr
 
-        if (oldStart1 >= oldEnd1 || newStart1 >= newEnd1 || newEnd2 > newStart2) {
+        if (oldStart1 >= oldEnd1 || newStart1 >= newEnd1 || newStart2 >= newEnd2) {
           throw new Error('invalid ranges')
         }
         // d1s = newStart1 - oldStart1
@@ -622,10 +622,9 @@ class ShardFunctions {
           }
         }
       }
-
-      return coverageChanges
     }
 
+    return coverageChanges
     // this needs to understande address ranges.
 
     // should it also understand changed in what partitions are covered.
