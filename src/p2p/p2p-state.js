@@ -1064,7 +1064,7 @@ class P2PState extends EventEmitter {
     const toAccept = this.currentCycle.metadata.toAccept
 
     // If length of array is bigger, do this precheck
-    const competing = bestRequests.length >= toAccept
+    const competing = toAccept > 0 && bestRequests.length >= toAccept
     if (competing) {
       const lastIndex = bestRequests.length - 1
       const lowest = bestRequests[lastIndex]
