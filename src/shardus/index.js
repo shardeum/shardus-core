@@ -26,11 +26,11 @@ class Shardus {
     this.fatalLogger = this.logger.getLogger('fatal')
     this.exitHandler = new ExitHandler()
     this.storage = new Storage(config.baseDir, storageConfig, this.logger, this.profiler)
-    this.crypto = {}
+    this.crypto = null
     this.network = new Network(config.network, this.logger)
-    this.p2p = {}
-    this.debug = {}
-    this.consensus = {}
+    this.p2p = null
+    this.debug = null
+    this.consensus = null
     this.appProvided = null
     this.app = null
     this.reporter = null
@@ -47,6 +47,8 @@ class Shardus {
     this.heartbeatInterval = config.heartbeatInterval
     this.heartbeatTimer = null
 
+    // levelStr not correctly defined in logger type definition, so ignore it
+    // @ts-ignore
     if (this.mainLogger && ['TRACE'].includes(this.mainLogger.level.levelStr)) {
       this.verboseLogs = true
     }
@@ -100,6 +102,10 @@ class Shardus {
 
     this.logger.playbackLogState('constructed', '', '')
   }
+
+  /**
+   * @typedef {import('./index').App} App
+   */
 
   setup (app) {
     if (app === null) {
@@ -431,12 +437,9 @@ class Shardus {
   }
 
   /**
- * getApplicaitonInterface() method acts as an interface between Shardus core and Application
- * It validates the implementation of Shardus Application Interface
- * @param {Application} Application running on Shardus network
- * @returns {applicationInterfaceImpl} Shardus application interface implementation
- * @throws {Exception} If the interface is not appropriately implemented
- */
+   * @param {App} application
+   * @returns {App}
+   */
   _getApplicationInterface (application) {
     this.mainLogger.debug('Start of _getApplicationInterfaces()')
     let applicationInterfaceImpl = {}
@@ -445,13 +448,6 @@ class Shardus {
         // throw new Error('Invalid Application Instance')
         return null
       }
-
-      // Required Methods:
-      // if (typeof (application.validateTransaction) === 'function') {
-      //   applicationInterfaceImpl.validateTransaction = async (inTx) => application.validateTransaction(inTx)
-      // } else {
-      //   throw new Error('Missing requried interface function. validateTransaction()')
-      // }
 
       if (typeof (application.validateTxnFields) === 'function') {
         applicationInterfaceImpl.validateTxnFields = (inTx) => application.validateTxnFields(inTx)
@@ -501,24 +497,26 @@ class Shardus {
       } else {
         // throw new Error('Missing requried interface function. apply()')
       }
-      if (typeof (application.handleHttpRequest) === 'function') {
-        applicationInterfaceImpl.handleHttpRequest = async (httpMethod, uri, req, res) => application.handleHttpRequest(httpMethod, uri, req, res)
-      } else {
-        // throw new Error('Missing requried interface function. apply()')
-      }
 
-      // TEMP endpoints for workaround. delete this later.
-      if (typeof (application.onAccounts) === 'function') {
-        applicationInterfaceImpl.onAccounts = async (req, res) => application.onAccounts(req, res)
-      } else {
-        // throw new Error('Missing requried interface function. apply()')
-      }
+      // unused at the moment
+      // if (typeof (application.handleHttpRequest) === 'function') {
+      //   applicationInterfaceImpl.handleHttpRequest = async (httpMethod, uri, req, res) => application.handleHttpRequest(httpMethod, uri, req, res)
+      // } else {
+      //   // throw new Error('Missing requried interface function. apply()')
+      // }
 
-      if (typeof (application.onGetAccount) === 'function') {
-        applicationInterfaceImpl.onGetAccount = async (req, res) => application.onGetAccount(req, res)
-      } else {
-        // throw new Error('Missing requried interface function. apply()')
-      }
+      // // TEMP endpoints for workaround. delete this later.
+      // if (typeof (application.onAccounts) === 'function') {
+      //   applicationInterfaceImpl.onAccounts = async (req, res) => application.onAccounts(req, res)
+      // } else {
+      //   // throw new Error('Missing requried interface function. apply()')
+      // }
+
+      // if (typeof (application.onGetAccount) === 'function') {
+      //   applicationInterfaceImpl.onGetAccount = async (req, res) => application.onGetAccount(req, res)
+      // } else {
+      //   // throw new Error('Missing requried interface function. apply()')
+      // }
 
       // App.get_account_data (Acc_start, Acc_end, Max_records)
       // Provides the functionality defined for /get_accounts API
@@ -581,7 +579,10 @@ class Shardus {
       throw new Error(ex)
     }
     this.mainLogger.debug('End of _getApplicationInterfaces()')
-    return applicationInterfaceImpl
+
+    // hack to force this to the correct answer.. not sure why other type correction methods did not work..
+    return /** @type {App} */(/** @type {unknown} */(applicationInterfaceImpl))
+    // return applicationInterfaceImpl
   }
 
   _registerRoutes () {

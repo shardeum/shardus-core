@@ -28,7 +28,7 @@ const deepCopy = (obj) => {
 }
 
 const readJson = (filename) => {
-  const file = readFileSync(filename)
+  const file = /** @type {string} */(/** @type {unknown} */(readFileSync(filename)))
   const config = JSON.parse(file)
   return config
 }
@@ -287,6 +287,18 @@ const robustPromiseAll = async (promises) => {
   return [resolved, errors]
 }
 
+const sortAsc = (a, b) => {
+  return a === b ? 0 : a < b ? -1 : 1
+}
+
+const sortDec = (a, b) => {
+  return a === b ? 0 : a > b ? -1 : 1
+}
+
+const sortHashAsc = (a, b) => {
+  return a === b ? 0 : a.hash < b.hash ? -1 : 1
+}
+
 exports.sleep = sleep
 exports.getTime = getTime
 exports.deepCopy = deepCopy
@@ -304,3 +316,6 @@ exports.isNumeric = isNumeric
 exports.makeShortHash = makeShortHash
 exports.stringifyReduce = stringifyReduce
 exports.robustPromiseAll = robustPromiseAll
+exports.sortAsc = sortAsc
+exports.sortDec = sortDec
+exports.sortHashAsc = sortHashAsc

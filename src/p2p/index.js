@@ -1619,7 +1619,7 @@ class P2P extends EventEmitter {
       return
     }
     nodes.sort((first, second) => first.id.localeCompare(second.id, 'en', { sensitivity: 'variant' }))
-    const nodeIdxs = new Array(nodes.length).fill().map((curr, idx) => idx)
+    const nodeIdxs = new Array(nodes.length).fill(0).map((curr, idx) => idx)
     // Find out your own index in the nodes array
     const myIdx = nodes.findIndex(node => node.id === this.id)
     if (myIdx < 0) throw new Error('Could not find self in nodes array')
@@ -1719,9 +1719,18 @@ class P2P extends EventEmitter {
   }
 
   /**
- * @param {type} example:- 'receipt', 'transaction'
- * @param {handler} example:- function
+ * Callback for handling gossip.
+ *
+ * @callback handleGossipCallback
+ * @param {any} data the data response of the callback
+ * @param {Node} sender
+ * @param {string} tracker the tracking string
  */
+
+  /**
+   * @param {string} type
+   * @param {handleGossipCallback} handler
+   */
   registerGossipHandler (type, handler) {
     this.gossipHandlers[type] = handler
   }

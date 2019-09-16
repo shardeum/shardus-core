@@ -1,5 +1,9 @@
 import { start } from "repl";
 
+/**
+ * @typedef {import('express').Handler} Handler
+ */
+
 // Type definitions for Shardus
 // Project: Shardus Enterprise Server
 // Definitions by: Erik Xavier
@@ -19,57 +23,76 @@ declare class Shardus {
   start(exitProcOnFail?: boolean): void
   /**
    * Register an external endpoint to shardus enterprise server
+   * https://shardus.gitlab.io/docs/developer/main-concepts/building-a-poc-app/shardus-app-interface/register-external-get.html
    * @param route The route to register an external GET endpoint
    * @param handler An express.js standard route handler function
    */
-  registerExternalGet(route: string, handler: (req: object, res: object) => void): void
-  /**
-   * Register an external endpoint to shardus enterprise server
+  registerExternalGet(route: string, handler: Handler): void
+  /**.
+   * Register an external endpoint to shardus enterprise server.  version 2
+   * https://shardus.gitlab.io/docs/developer/main-concepts/building-a-poc-app/shardus-app-interface/register-external-get.html
    * @param route The route to register an external POST endpoint
    * @param handler An express.js standard route handler function
    */  
-  registerExternalPost(route: string, handler: (req: object, res: object) => void): void
+  registerExternalPost(route: string, handler: Handler): void
   /**
    * Register an external endpoint to shardus enterprise server
    * @param route The route to register an external PUT endpoint
    * @param handler An express.js standard route handler function
    */  
-  registerExternalPut(route: string, handler: (req: object, res: object) => void): void
+  registerExternalPut(route: string, handler: Handler): void
   /**
    * Register an external endpoint to shardus enterprise server
    * @param route The route to register an external DELETE endpoint
    * @param handler An express.js standard route handler function
    */  
-  registerExternalDelete(route: string, handler: (req: object, res: object) => void): void
+  registerExternalDelete(route: string, handler: Handler): void
   /**
    * Register an external endpoint to shardus enterprise server
    * @param route The route to register an external PATCH endpoint
    * @param handler An express.js standard route handler function
    */  
-  registerExternalPatch(route: string, handler: (req: object, res: object) => void): void
+  registerExternalPatch(route: string, handler: Handler): void
   /**
    * Handle incoming transaction requests
-   * @param req An express Require parameter
-   * @param res An express Response parameter
+   * 
+   * @param tx the transaction
    */
-  put(req: object, res: object): Shardus.IncomingTransactionResult
+  put(tx: object): Shardus.IncomingTransactionResult
   /**
    * A function that clears shardus App related State
    */
-  resetAppReleatedState(): void
+  resetAppRelatedState(): void
   /**
    * A function that executes a cleanup and terminates the server
    * @param exitProcess Flag to define if process.exit() should be called or not. Default: true
    */
   shutdown(exitProcess?: boolean): void
+
+  /**
+   * Returns the application associated with the shardus module
+   * @param Application The configured application
+   */  
+  _getApplicationInterface(Application: Shardus.App): Shardus.App
+
+  createApplyResponse(txId: string, txTimestamp: number): Shardus.ApplyResponse
+
+  createWrappedResponse(accountId: string, accountCreated: boolean, hash: string, timestamp: number, fullData: any): Shardus.WrappedResponse
+
+  setPartialData(response: any, partialData: any, userTag: any): void
+
+  genericApplyPartialUpate(fullAccountData: any, updatedPartialAccount: any): void
+
+  applyResponseAddState(applyResponse: any, fullAccountData: any, localCache: any, accountId: string, txId: string, txTimestamp: number, accountStateBefore: string, accountStateAfter: string, accountCreated: number): void
+
+  getLocalOrRemoteAccount(address: string): WrappedDataFromQueue
+  // not sure where this def should go?
+  // profiler: any
 }
 
 declare namespace Shardus {
   export interface App {
-    /**
-     * A function responsible for validation an incoming transaction
-     */
-    validateTransaction: (inTx: Shardus.IncomingTransaction) => Shardus.IncomingTransactionResult
+
     /**
      * A function responsible for validation the incoming transaction fields
      */
@@ -77,7 +100,15 @@ declare namespace Shardus {
     /**
      * A function responsible for applying an accepted transaction
      */
-    apply: (inTx: Shardus.IncomingTransaction) => Shardus.ApplyResponse
+    apply: (inTx: Shardus.IncomingTransaction, wrappedStates: any) => Shardus.ApplyResponse
+
+
+    updateAccountFull: (wrappedStates: any, localCache: any, applyResponse: any) => void
+
+    updateAccountPartial: (wrappedStates: any, localCache: any, applyResponse: any) => void
+
+    getRelevantData: (accountId: string, tx: any) => any
+
     /**
      * A function that returns the Keys for the accounts involved in the transaction
      */
@@ -90,6 +121,23 @@ declare namespace Shardus {
      * A function that will be called when the shardus instance shuts down
      */
     close: () => void
+
+    getAccountData: (accountStart: string, accountEnd: string, maxRecords: number) => any
+
+    getAccountDataByRange: (accountStart: string, accountEnd: string, tsStart: number, tsEnd: number, maxRecords: number) => any
+
+    calculateAccountHash: (account: string) => any
+
+    setAccountData: (accountRecords: any) => any
+
+    resetAccountData: (accountRecords: any) => any
+
+    deleteAccountData: (addressList: any) => any
+
+    getAccountDataByList: (addressList: any) => any
+
+    deleteLocalAccountData: () => void
+
   }
   
   export interface TransactionKeys {
@@ -101,12 +149,24 @@ declare namespace Shardus {
      * An array of the target keys
      */    
     targetKeys: string[]
+    /**
+     * all keys
+     */ 
+    allKeys: string[]
+    /**
+     * Timestamp for the transaction
+     */
+    timestamp: int
+    /**
+     * debug info string
+     */
+    debugInfo: string
   }
   export interface ApplyResponse {
     /**
      * The statle table results array
      */
-    stateTableResults: StateObject[],
+    stateTableResults: StateTableObject[],
     /**
      * Transaction ID
      */
@@ -114,24 +174,20 @@ declare namespace Shardus {
     /**
      * Transaction timestamp
      */
-    txTimestamp: string,
+    txTimestamp: number,
     /**
      * Account data array
      */
-    accountData: AccountData[]
+    accountData: AccountData2[]
   }
 
-  export interface StateObject {
-    /** Account ID */
+  export interface WrappedResponse {
     accountId: string,
-    /** Transaction ID */
-    txId: string,
-    /** Transaction Timestamp */
-    txTimestamp: string,
-    /** The hash of the state before applying the transaction */
-    stateBefore: string,
-    /** The hash of the state after applying the transaction */
-    stateAfter: string
+    accountCreated: boolean,
+    isPartial: boolean,
+    stateId: string,
+    timestamp: number,
+    data: any
   }
 
   export interface AccountData {
@@ -147,11 +203,84 @@ declare namespace Shardus {
     hash: string,
   }
 
+  export interface WrappedData {
+    /** Account ID */
+    accountId: string,
+    /** hash of the data blob */
+    stateId: string,
+    /** data blob opaqe */
+    data: any,
+    /** Timestamp */
+    timestamp: number,
+  }
+  seenInQueue
+
+  export interface WrappedDataFromQueue extends WrappedData {
+    /** is this account still in the queue */
+    seenInQueue: boolean,
+  }
+
+  export interface AccountData2 {
+    /** Account ID */
+    accountId: string,
+    /** Account Data */
+    data: string,
+    /** Transaction ID */
+    txId: string,
+    /** Timestamp */
+    txTimestamp: string,
+    /** Account hash */
+    hash: string,
+    /** Account data */
+    accountData: any,
+    /** localCache */
+    localCache: any,
+  }
+
+  // createWrappedResponse (accountId, accountCreated, hash, timestamp, fullData) {
+  //   // create and return the response object, it will default to full data.
+  //   return { accountId: accountId, accountCreated, isPartial: false, stateId: hash, timestamp: timestamp, data: fullData }
+  // }
+
+  // createApplyResponse (txId, txTimestamp) {
+  //   let replyObject = { stateTableResults: [], txId, txTimestamp, accountData: [] }
+  //   return replyObject
+  // }
+
+  // // USED BY SIMPLECOINAPP
+  // applyResponseAddState (resultObject, accountData, localCache, accountId, txId, txTimestamp, stateBefore, stateAfter, accountCreated) {
+  //   let state = { accountId, txId, txTimestamp, stateBefore, stateAfter }
+  //   if (accountCreated) {
+  //     state.stateBefore = allZeroes64
+  //   }
+  //   resultObject.stateTableResults.push(state)
+  //   resultObject.accountData.push({ accountId, data: accountData, txId, timestamp: txTimestamp, hash: stateAfter, localCache: localCache })
+  // }
+
+
+
+
+  export interface StateTableObject {
+    /** Account ID */
+    accountId: string,
+    /** Transaction ID */
+    txId: string,
+    /** Transaction Timestamp */
+    txTimestamp: string,
+    /** The hash of the state before applying the transaction */
+    stateBefore: string,
+    /** The hash of the state after applying the transaction */
+    stateAfter: string
+  }
+
+  // NEED to loosen this defination..  shardus should not know this much!!!  maybe just move it to the app side
   export interface IncomingTransaction {
     /** Source account address for the transaction */
     srcAct: string,
     /** Target account address for the transaction */
-    tgtAct: string,
+    tgtActs?: string,
+    /** Target account addresses for the transaction */
+    tgtAct?: string,    
     /** The transaction type */
     txnType: string,
     /** The transaction amount */
@@ -166,14 +295,14 @@ declare namespace Shardus {
 
   export interface Sign {
     /** The key of the owner */
-    onwer: string,
+    owner: string,
     /** The hash of the object's signature signed by the owner */
     sig: string
   }
 
   export interface IncomingTransactionResult {
     /** The result for the incoming transaction */
-    result: Results,
+    result: string,    //was Results before.. but having trouble with that
     /** The reason for the transaction result */
     reason: string,
     /** The timestamp for the result */
@@ -304,5 +433,18 @@ declare namespace Shardus {
       /**  */
       accountBucketSize?: number
     }
+  }
+
+  export interface Node {
+    id: string,
+    publicKey: string,
+    cycleJoined: number,
+    internalIp: string,
+    externalIp: string,
+    internalPort: number,
+    externalPort: number,
+    joinRequestTimestamp: number,
+    address: string,
+    status: string,
   }
 }

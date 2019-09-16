@@ -3,7 +3,7 @@
 const Sequelize = require('sequelize')
 const Op = Sequelize.Op
 const models = require('./models')
-const stringify = require('fast-stable-stringify')
+// const stringify = require('fast-stable-stringify')
 // const utils = require('../utils')
 
 // const SequelizeStorage = require('./sequelizeStorage')
@@ -302,32 +302,6 @@ class Storage {
     this._checkInit()
     try {
       await this._create(this.storageModels.acceptedTxs, acceptedTransactions, { createOrReplace: true })
-    } catch (e) {
-      throw new Error(e)
-    }
-  }
-
-  async addAcceptedTransactions2 (acceptedTransactions) {
-    this._checkInit()
-    try {
-      // await this._create(this.storageModels.acceptedTxs, acceptedTransactions)
-      acceptedTransactions = acceptedTransactions[0] // hack
-      if (acceptedTransactions == null) {
-        console.log('fail no atx')
-        return
-      }
-      let ts = Date.now()
-      let query = `INSERT INTO acceptedTxs (id,timestamp,data,status,receipt,createdAt,updatedAt) VALUES ('${acceptedTransactions.id}', '${acceptedTransactions.timestamp}', '${stringify(acceptedTransactions.data)}', '${acceptedTransactions.status}', '${stringify(acceptedTransactions.receipt)}', '${ts}', '${ts}' )`
-      // console.log('find:' + this.sequelize.QueryTypes.INSERT)
-      // console.log('b' + this.sequelize.QueryType.INSERT)
-      // await this._rawQuery(this.storageModels.acceptedTxs, query)
-      // await this.sequelize.query({ query, values: [] }, { model: this.storageModels.acceptedTxs, type: this.sequelize.QueryType.INSERT })
-      await this.sequelize.query(query, { model: this.storageModels.acceptedTxs, type: this.sequelize.QueryTypes.INSERT })
-
-      // await this._rawQuery(this.storageModels.acceptedTxs, `INSERT INTO acceptedTxs (id,timestamp,data,status,receipt,createdAt,updatedAt) VALUES ("${acceptedTransactions.id}", "${acceptedTransactions.timestamp}", "${stringify(acceptedTransactions.data)}", "${acceptedTransactions.status}", "${stringify(acceptedTransactions.receipt)}", "${ts}", "${ts}" )`)
-      // await this._rawQuery(this.storageModels.acceptedTxs, `INSERT INTO acceptedTxs (id,timestamp,data,status,receipt) VALUES (${acceptedTransactions.id}, ${acceptedTransactions.timestamp}, ${stringify(acceptedTransactions.data)}, ${acceptedTransactions.status}, ${stringify(acceptedTransactions.receipt)} )`)
-      // await this.sequelize.query(`INSERT INTO acceptedTxs (id,timestamp,data,status,receipt,createdAt,updatedAt) VALUES ('${acceptedTransactions.id}', '${acceptedTransactions.timestamp}', '${stringify(acceptedTransactions.data)}', '${acceptedTransactions.status}', '${stringify(acceptedTransactions.receipt)}', '${ts}', '${ts}')`,
-      //   { model: this.storageModels.acceptedTxs, type: this.sequelize.QueryType.INSERT })
     } catch (e) {
       throw new Error(e)
     }

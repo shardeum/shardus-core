@@ -9,7 +9,25 @@ const cHashSetStepSize = 4
 const cHashSetTXStepSize = 2
 const cHashSetDataStepSize = 2
 
+// some addtional types up here /////////////////////////
+/**
+   * @typedef {Object} SimpleRange A simple address range
+   * @property {string} low Starting index
+   * @property {string} high End index
+   */
+
+/**
+   * @typedef {import('../shardus/index').App} App
+   */
 class StateManager extends EventEmitter {
+  /**
+   * @param {boolean} verboseLogs
+   * @param {import("../shardus").App} app
+   * @param {import("../consensus")} consensus
+   * @param {import("../p2p")} p2p
+   * @param {import("../crypto")} crypto
+   * @param {any} config
+   */
   constructor (verboseLogs, profiler, app, consensus, logger, storage, p2p, crypto, config) {
     super()
     this.verboseLogs = verboseLogs
@@ -19,6 +37,9 @@ class StateManager extends EventEmitter {
     this.p2p = p2p
     this.crypto = crypto
     this.storage = storage
+    /**
+     * @type {App}
+     */
     this.app = app
     this.consensus = consensus
     this.logger = logger
@@ -83,6 +104,7 @@ class StateManager extends EventEmitter {
     this.readyforTXs = false
 
     this.startShardCalculations()
+    this.sleepInterrupt = undefined
   }
 
   // this clears state data related to the current partion we are syncing.
@@ -444,19 +466,20 @@ class StateManager extends EventEmitter {
     let nodeShardData = this.currentCycleShardData.nodeShardData
     console.log('GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
 
-    // get list of partitions to sync
-    let partitionsToSync = []
     let rangesToSync = []
-    let num = nodeShardData.storedPartitionspartitionEnd1 - nodeShardData.storedPartitionspartitionStart1
-    for (let i = nodeShardData.storedPartitionspartitionStart1; i < num; i++) {
-      partitionsToSync.push(i)
-    }
-    if (nodeShardData.storedPartitions.rangeIsSplit) {
-      num = nodeShardData.storedPartitionspartitionEnd2 - nodeShardData.storedPartitionspartitionStart2
-      for (let i = nodeShardData.storedPartitionspartitionStart2; i < num; i++) {
-        partitionsToSync.push(i)
-      }
-    }
+
+    // get list of partitions to sync.  Strong typing helped figure out this block was dead code (had a serious bug)
+    // let partitionsToSync = []
+    // let num = nodeShardData.storedPartitions.partitionEnd1 - nodeShardData.storedPartitions.partitionStart1
+    // for (let i = nodeShardData.storedPartitions.partitionStart1; i < num; i++) {
+    //   partitionsToSync.push(i)
+    // }
+    // if (nodeShardData.storedPartitions.rangeIsSplit) {
+    //   num = nodeShardData.storedPartitions.partitionEnd2 - nodeShardData.storedPartitions.partitionStart2
+    //   for (let i = nodeShardData.storedPartitions.partitionStart2; i < num; i++) {
+    //     partitionsToSync.push(i)
+    //   }
+    // }
     let cycle = this.currentCycleShardData.cycleNumber
 
     let homePartition = nodeShardData.homePartition
@@ -555,6 +578,9 @@ class StateManager extends EventEmitter {
     this.logger.playbackLogNote('shrd_sync_mainphaseComplete', ` `, `  `)
   }
 
+  /**
+   * @param {SimpleRange} range
+   */
   async syncStateDataForRange (range) {
     try {
       let partition = 'notUsed'
@@ -1728,12 +1754,14 @@ class StateManager extends EventEmitter {
     let result = await this.p2p.ask(helper, 'get_accepted_transactions', message) // todo perf, could await these in parallel
     let acceptedTXs = result.transactions
 
-    let toParse = ''
+    let toParse = {}
     try {
       for (let i = 0; i < acceptedTXs.length; i++) {
         toParse = acceptedTXs[i]
         if (utils.isObject(toParse) === false) {
-          acceptedTXs[i] = JSON.parse(toParse)
+          // this is crazy, could have been nicer to just ignore the error:
+          let funtime = /** @type {string} */ (/** @type {unknown} */ (toParse))
+          acceptedTXs[i] = JSON.parse(funtime)
           // this.logger.playbackLogNote('restoreByTx', '', `parsed: ${acceptedTXs[i]}`)
         } else {
           // this.logger.playbackLogNote('restoreByTx', '', acceptedTXs[i])
@@ -2063,7 +2091,7 @@ class StateManager extends EventEmitter {
       // let wrappedStatesList = Object.values(wrappedStates)
       applyResponse = await this.app.apply(tx, wrappedStates)
       let { stateTableResults, accountData: _accountdata } = applyResponse
-      accountDataList = _accountdata // oops we may need to compute full data if a paritial situaiton!
+      accountDataList = _accountdata
 
       // wrappedStates are side effected for now
       await this.setAccount(wrappedStates, localCachedData, applyResponse, filter)
@@ -2072,7 +2100,7 @@ class StateManager extends EventEmitter {
       // only write our state table data if we dont already have it in the db
       if (hasStateTableData === false) {
         for (let stateT of stateTableResults) {
-          if (this.verboseLogs) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId))
+          if (this.verboseLogs) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
           if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
         }
         await this.storage.addAccountStates(stateTableResults)
@@ -2335,7 +2363,8 @@ class StateManager extends EventEmitter {
 
             return 'out of range'// we are done, not involved!!!
           } else {
-            let tempList = this.p2p.state.getOrderedSyncingNeighbors(this.currentCycleShardData.ourNode)
+            // let tempList =  // can be returned by the function below
+            this.p2p.state.getOrderedSyncingNeighbors(this.currentCycleShardData.ourNode)
 
             if (this.currentCycleShardData.hasSyncingNeighbors === true) {
               this.logger.playbackLogNote('shrd_sync_tx', `${txId}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighborsTxGroup.map(x => x.id))}`)
@@ -2373,7 +2402,7 @@ class StateManager extends EventEmitter {
       this.fatalLogger.fatal('DATASYNC: newAcceptedTxQueueRunning')
       return
     }
-    await this.processAcceptedTxQueue(Date.now())
+    await this.processAcceptedTxQueue()
   }
 
   getQueueEntry (txid, timestamp) {
@@ -2991,7 +3020,7 @@ class StateManager extends EventEmitter {
     let ourNodeShardData = this.currentCycleShardData.nodeShardData
     let minP = ourNodeShardData.consensusStartPartition
     let maxP = ourNodeShardData.consensusEndPartition
-    let [homePartition, addressNum] = ShardFunctions.addressToPartition(this.currentCycleShardData.shardGlobals, address)
+    let [homePartition] = ShardFunctions.addressToPartition(this.currentCycleShardData.shardGlobals, address)
     accountIsRemote = (ShardFunctions.partitionInConsensusRange(homePartition, minP, maxP) === false)
 
     if (accountIsRemote) {
@@ -3198,7 +3227,7 @@ class StateManager extends EventEmitter {
   }
 
   generatePartitionResult (partitionObject) {
-    let partitionHash = this.crypto.hash(partitionObject)
+    let partitionHash = /** @type {string} */(this.crypto.hash(partitionObject))
     let partitionResult = { Partition_hash: partitionHash, Partition_id: partitionObject.Partition_id, Cycle_number: partitionObject.Cycle_number }
 
     // let stepSize = cHashSetStepSize
@@ -3631,13 +3660,13 @@ class StateManager extends EventEmitter {
     }
 
     // ask for missing txs of other node
-    payload = { Tx_ids: missingAcceptedTxIDs }
-    let txs = await this.p2p.ask(nodeToContact, 'get_transactions_by_list', payload)
+    let payload2 = { Tx_ids: missingAcceptedTxIDs }
+    let txs = await this.p2p.ask(nodeToContact, 'get_transactions_by_list', payload2)
     repairTracker.newPendingTXs = txs // ?
 
     // get failed txs that we are missing
-    payload = { Tx_ids: missingFailedTXs }
-    txs = await this.p2p.ask(nodeToContact, 'get_transactions_by_list', payload)
+    payload2 = { Tx_ids: missingFailedTXs }
+    txs = await this.p2p.ask(nodeToContact, 'get_transactions_by_list', payload2)
     repairTracker.newFailedTXs = txs
     // this.storage.addAcceptedTransactions(txs) // commit the failed TXs to our db. not sure if this is strictly necessary
 
@@ -3773,8 +3802,8 @@ class StateManager extends EventEmitter {
       this.mainLogger.error(`Failed to match our hashset to the solution hashSet: ${hashSet}  solution: ${repairTracker.outputHashSet}  `)
 
       let hashSetList = []
-      hashSetList.push({ hash: 'a1', votePower: 1, hashSet: hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0 })
-      hashSetList.push({ hash: 'b1', votePower: 10, hashSet: repairTracker.outputHashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0 })
+      hashSetList.push({ hash: 'a1', votePower: 1, hashSet: hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, indexMap: [], extraMap: [] })
+      hashSetList.push({ hash: 'b1', votePower: 10, hashSet: repairTracker.outputHashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, indexMap: [], extraMap: [] })
       let output = StateManager.solveHashSets(hashSetList)
       for (let hashSetEntry of hashSetList) {
         this.mainLogger.error(JSON.stringify(hashSetEntry))
@@ -3797,7 +3826,8 @@ class StateManager extends EventEmitter {
     }
 
     let hashSetList = this.solveHashSetsPrep(cycleCounter, partitionId, this.crypto.getPublicKey())
-    hashSetList.sort(function (a, b) { return a.hash > b.hash }) // sort so that solution will be deterministic
+    // hashSetList.sort(function (a, b) { return a.hash > b.hash }) // sort so that solution will be deterministic
+    hashSetList.sort(utils.sortHashAsc)
     let output = StateManager.solveHashSets(hashSetList)
 
     let outputHashSet = ''
@@ -3809,7 +3839,8 @@ class StateManager extends EventEmitter {
     // REFLOW HACK.  when we randomize host selection should make sure not to pick this forced solution as an answer
     // TODO perf:  if we fixed the algorith we could probably do this in one pass instead
     let hashSetList2 = this.solveHashSetsPrep(cycleCounter, partitionId, this.crypto.getPublicKey())
-    hashSetList2.sort(function (a, b) { return a.hash > b.hash }) // sort so that solution will be deterministic
+    // hashSetList2.sort(function (a, b) { return a.hash > b.hash }) // sort so that solution will be deterministic
+    hashSetList2.sort(utils.sortHashAsc) // sort so that solution will be deterministic
     let hashSet = { hash: 'FORCED', votePower: 1000, hashSet: outputHashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [], ourRow: false }
     hashSetList2.push(hashSet)
     output = StateManager.solveHashSets(hashSetList2, 40, 0.625, output)
@@ -4104,7 +4135,8 @@ class StateManager extends EventEmitter {
     let ourAccountLocks = await this.bulkFifoLockAccounts(accountKeys)
     if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs FIFO lock inner: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
 
-    let replacmentAccounts = await this._revertAccounts(accountKeys, cycleNumber)
+    // let replacmentAccounts =  //returned by the below function for debug
+    await this._revertAccounts(accountKeys, cycleNumber)
 
     // convert allNewTXsById map to newTXList list
     let newTXList = []
