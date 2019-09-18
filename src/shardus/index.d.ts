@@ -1,4 +1,5 @@
 import { start } from "repl";
+import { Certificate } from "crypto";
 
 /**
  * @typedef {import('express').Handler} Handler
@@ -112,7 +113,7 @@ declare namespace Shardus {
     /**
      * A function that returns the Keys for the accounts involved in the transaction
      */
-    getKeyFromTransaction: (inTx: Shardus.IncomingTransaction) => TransactionKeys
+    getKeyFromTransaction: (inTx: Shardus.OpaqueTransaction) => TransactionKeys
     /**
      * A function that returns the State ID for a given Account Address
      */
@@ -447,4 +448,39 @@ declare namespace Shardus {
     address: string,
     status: string,
   }
+
+  export interface Cycle {
+    counter: number,
+    certificate: any, // todo proper definition of certificate!
+    previous: string,
+    marker: string,
+    start: number,
+    duration: number,
+    active: number,
+    desired: number,
+    expired: number,
+    joined: string[],
+    activated: string[],
+    removed: string[],
+    returned: string[],
+    lost: string[],
+    refuted: string[],
+    apoptosized: string[],
+  }
+
+  export interface AcceptedTx {
+    id: string,
+    timestamp: number,
+    data: object,
+    status: string,
+    receipt: object,
+  }
+
+  /**
+   * OpaqueTransaction is the way shardus should see transactions internally. it should not be able to mess with parameters individually
+   */
+  export interface OpaqueTransaction extends object {
+
+  }
+
 }

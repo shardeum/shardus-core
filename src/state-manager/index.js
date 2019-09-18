@@ -19,6 +19,146 @@ const cHashSetDataStepSize = 2
 /**
    * @typedef {import('../shardus/index').App} App
    */
+
+/**
+   * @typedef {import('../shardus/index').Cycle} Cycle
+   */
+/**
+   * @typedef {import('../shardus/index').Sign} Sign
+   */
+/**
+   * @typedef {import('../shardus/index').AcceptedTx} AcceptedTx
+   */
+/**
+   * @typedef {import('../shardus/index').ApplyResponse} ApplyResponse
+   */
+
+// ///////////////////////// Lots of type definitions for partitions
+
+/**
+   * @typedef {Object} PartitionObject a partition object
+   * @property {number} Partition_id
+   * @property {number} Partitions
+   * @property {number} Cycle_number
+   * @property {string} Cycle_marker
+   * @property {string[]} Txids
+   * @property {number[]} Status
+   * @property {string[]} States
+   * @property {any[]} Chain todo more specific data type
+   */
+
+/**
+   * @typedef {Object} PartitionResult a partition result
+   * @property {number} Partition_id
+   * @property {string} Partition_hash
+   * @property {number} Cycle_number
+   * @property {string} hashSet
+   * @property {Sign} [sign]
+   */
+
+/**
+   * @typedef {Object} RepairTracker a partition object
+   * @property {string[]} triedHashes
+   * @property {number} numNodes
+   * @property {number} counter
+   * @property {number} partitionId
+   * @property {string} key
+   * @property {string} key2
+   * @property {string[]} removedTXIds
+   * @property {string[]} repairedTXs
+   * @property {string[]} newPendingTXs
+   * @property {string[]} newFailedTXs
+   * @property {string[]} extraTXIds
+   * @property {string[]} missingTXIds
+   * @property {boolean} repairing
+   * @property {boolean} repairsNeeded
+   * @property {boolean} busy
+   * @property {boolean} txRepairComplete
+   * @property {boolean} evaluationStarted
+   * @property {boolean} awaitWinningHash
+   * @property {boolean} repairsFullyComplete
+   */
+
+/**
+ * @typedef {Object} TempTxRecord an object to hold a temp tx record for processing later
+ * @property {number} txTS
+ * @property {AcceptedTx} acceptedTx
+ * @property {boolean} passed
+ * @property {ApplyResponse} applyResponse
+ * @property {number} redacted below 0 for not redacted. a value above zero indicates the cycle this was redacted
+ */
+
+// we have this structure for solving hashes generically
+// let hashSet = { hash: hash, votePower: 0, hashSet: partitionResult.hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [owner], ourRow: false, waitForIndex: -1 }
+
+/**
+   * @typedef {Object} GenericHashSetEntry some generic data that represents a vote for hash set comparison
+   * @property {string} hash
+   * @property {number} votePower
+   * @property {string} hashSet
+   * @property {string} lastValue
+   * @property {HashSetEntryError[]} errorStack
+   * @property {HashSetEntryCorrection[]} corrections
+   * @property {number} indexOffset
+   *  {string[]} owners a list of owner addresses that have this solution
+   *  {boolean} ourRow
+   * @property {number} waitForIndex
+   * @property {boolean} [waitedForThis]
+   * @property {number[]} [indexMap] this gets added when you call expandIndexMapping
+   * @property {number[]} [extraMap] this gets added when you call expandIndexMapping
+   * @property {number} [futureIndex]
+   * @property {string} [futureValue]
+   */
+
+/**
+   * @typedef {Object} IHashSetEntryPartitions extends GenericHashSetEntry some generic data that represents a vote for hash set comparison
+   * @property {string[]} owners a list of owner addresses that have this solution
+   * @property {boolean} [ourRow]
+   * @property {boolean} [outRow]
+   */
+
+/**
+ * @typedef {GenericHashSetEntry & IHashSetEntryPartitions} HashSetEntryPartitions
+ */
+
+/**
+   * @typedef {Object} HashSetEntryCorrection some generic data that represents a vote for hash set comparison
+   * @property {number} i index
+   * @property {Vote} tv top vote index
+   * @property {string} v top vote value
+   * @property {string} t type 'insert', 'extra'
+   * @property {string} bv last value
+   * @property {number} if lat output count?
+   * @property {number} [hi] another index.
+   * @property {HashSetEntryCorrection} [c] reference to the correction that this one is replacing/overriding
+   */
+
+/**
+   * @typedef {Object} HashSetEntryError some generic data that represents a vote for hash set comparison
+   * @property {number} i index
+   * @property {Vote} tv top vote index
+   * @property {string} v top vote value
+   */
+
+/**
+   * @typedef {Object} Vote vote for a value
+   * @property {string} v vote value
+   * @property {number} count number of votes
+   * @property {CountEntry} [vote] reference to another vote object
+   * @property {number} [ec] count based on vote power
+   * @property {number[]} [voters] hashlist index of the voters for this vote
+   */
+
+/**
+   * @typedef {Object} CountEntry vote count tracking
+   * @property {number} count number of votes
+   * @property {number} ec count based on vote power
+   * @property {number[]} voters hashlist index of the voters for this vote
+   */
+
+/**
+ * StateManager
+ */
 class StateManager extends EventEmitter {
   /**
    * @param {boolean} verboseLogs
@@ -3175,8 +3315,9 @@ class StateManager extends EventEmitter {
   //  //////////////////////////////////////////////////          Data Repair                    ///////////////////////////////////////////////////////////
   //  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  // by what index? partition?
-  // trigger this in the q2 phase
+  /**
+   * @param {Cycle} lastCycle
+   */
   generatePartitionObjects (lastCycle) {
     // TODO sharding.  when we add state sharding need to loop over partitions.
     let partitionObject = this.generatePartitionObject(lastCycle, 1)
@@ -3226,34 +3367,18 @@ class StateManager extends EventEmitter {
     // return [partitionObject, partitionResult]
   }
 
+  /**
+   * @param {PartitionObject} partitionObject
+   * @returns {PartitionResult}
+   * { Partition_id: any; Partitions?: number; Cycle_number: any; Cycle_marker?: string; Txids: any; Status?: number[]; States: any; Chain?: any[]; }
+   */
   generatePartitionResult (partitionObject) {
     let partitionHash = /** @type {string} */(this.crypto.hash(partitionObject))
-    let partitionResult = { Partition_hash: partitionHash, Partition_id: partitionObject.Partition_id, Cycle_number: partitionObject.Cycle_number }
+    /** @type {PartitionResult} */
+    let partitionResult = { Partition_hash: partitionHash, Partition_id: partitionObject.Partition_id, Cycle_number: partitionObject.Cycle_number, hashSet: '' }
 
     // let stepSize = cHashSetStepSize
     if (this.useHashSets) {
-      // let hashSet = ''
-      // for (let hash of partitionObject.Txids) {
-      //   hashSet += hash.slice(0, stepSize)
-      // }
-      // partitionResult.hashSet = hashSet
-
-      // let stateSet = ''
-      // for (let statesOfTx of partitionObject.States) {
-      //   for (let state of statesOfTx) {
-      //     stateSet += state.slice(0, 2)
-      //   }
-      //   stateSet += '.' // test delimiter.
-      // }
-      // for (let i = 0; i < partitionObject.Txids.length; ++i) {
-      //   let hash = partitionObject.Txids[i]
-      //   let state = partitionObject.States[i]
-      //   hashSet += hash.slice(0, 2)
-      //   let statehash = this.crypto.hash(state) // todo could probably non crpyto hash these.
-      //   hashSet += statehash.slice(0, 2)
-      // }
-      // partitionResult.hashSet = hashSet
-
       let hashSet = StateManager.createHashSetString(partitionObject.Txids, partitionObject.States) // TXSTATE_TODO
       partitionResult.hashSet = hashSet
     }
@@ -3276,6 +3401,12 @@ class StateManager extends EventEmitter {
   //   Status: [1,0, …],      - ordered corresponding to Txids; 1 for applied; 0 for failed
   //   Chain: [partition_hash_341, partition_hash_342, partition_hash_343, …]
   // }
+
+  /**
+   * @param {Cycle} lastCycle todo define cycle!!
+   * @param {number} partitionId
+   * @returns {PartitionObject}
+   */
   generatePartitionObject (lastCycle, partitionId) {
     let txList = this.getTXList(lastCycle.counter, partitionId)
 
@@ -3284,6 +3415,7 @@ class StateManager extends EventEmitter {
       txSourceData = txList.newTxList
     }
 
+    /** @type {PartitionObject} */
     let partitionObject = {
       Partition_id: partitionId,
       Partitions: 1,
@@ -3298,6 +3430,10 @@ class StateManager extends EventEmitter {
     return partitionObject
   }
 
+  /**
+   * partitionObjectToTxMaps
+   * @param {PartitionObject} partitionObject
+   */
   partitionObjectToTxMaps (partitionObject) {
     let statusMap = {}
     for (let i = 0; i < partitionObject.Txids.length; i++) {
@@ -3308,6 +3444,12 @@ class StateManager extends EventEmitter {
     return statusMap
   }
 
+  /**
+   * @param {PartitionResult[]} allResults
+   * @param {PartitionResult} ourResult
+   * @param {boolean} [repairPassHack]
+   * @returns {any[]} todo upgrade to return an object for destructuring
+   */
   tryGeneratePartitionReciept (allResults, ourResult, repairPassHack = false) {
     let partitionId = ourResult.Partition_id
     let cycleCounter = ourResult.Cycle_number
@@ -3315,7 +3457,8 @@ class StateManager extends EventEmitter {
     let repairTracker = this._getRepairTrackerForCycle(cycleCounter, partitionId)
     repairTracker.busy = true // mark busy so we won't try to start this task again while in the middle of it
 
-    let [topHash, topCount, topResult] = this.findMostCommonResponse(cycleCounter, partitionId, repairTracker.triedHashes)
+    // Tried hashes is not working correctly at the moment, it is an unused parameter. I am not even sure we want to ignore hashes
+    let { topHash, topCount, topResult } = this.findMostCommonResponse(cycleCounter, partitionId, repairTracker.triedHashes)
 
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryGeneratePartitoinReciept repairTracker: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
 
@@ -3359,6 +3502,13 @@ class StateManager extends EventEmitter {
     return [partitionReceipt, topResult, true]
   }
 
+  /**
+   * startRepairProcess
+   * @param {Cycle} cycle
+   * @param {PartitionResult} topResult
+   * @param {number} partitionId
+   * @param {string} ourLastResultHash
+   */
   async startRepairProcess (cycle, topResult, partitionId, ourLastResultHash) {
     let repairTracker = this._getRepairTrackerForCycle(cycle.counter, partitionId)
 
@@ -3380,7 +3530,7 @@ class StateManager extends EventEmitter {
       key2 = 'p' + partitionId
 
       if (topResult) {
-        repairTracker.triedHashes.push(topResult)
+        repairTracker.triedHashes.push(topResult.Partition_hash)
         await this.syncTXsFromWinningHash(topResult)
       } else {
         if (this.useHashSets) {
@@ -3536,6 +3686,11 @@ class StateManager extends EventEmitter {
 
   // todo refactor some of the duped code in here
   // possibly have to split this into three functions to make that clean (find our result and the parition checking as sub funcitons... idk)
+  /**
+   * checkForGoodPartitionReciept
+   * @param {number} cycleNumber
+   * @param {number} partitionId
+   */
   async checkForGoodPartitionReciept (cycleNumber, partitionId) {
     let repairTracker = this._getRepairTrackerForCycle(cycleNumber, partitionId)
 
@@ -3582,6 +3737,10 @@ class StateManager extends EventEmitter {
     }
   }
 
+  /**
+   * syncTXsFromWinningHash
+   * @param {PartitionResult} topResult
+   */
   async syncTXsFromWinningHash (topResult) {
     // get node ID from signing.
     // obj.sign = { owner: pk, sig }
@@ -3675,6 +3834,13 @@ class StateManager extends EventEmitter {
     this._mergeRepairDataIntoLocalState(repairTracker, ourPartitionObj, statusMap, partitionObject)
   }
 
+  /**
+   * _mergeRepairDataIntoLocalState
+   * @param {*} repairTracker todo repair tracker type
+   * @param {PartitionObject} ourPartitionObj
+   * @param {*} otherStatusMap todo status map, but this is unused
+   * @param {PartitionObject} otherPartitionObject
+   */
   _mergeRepairDataIntoLocalState (repairTracker, ourPartitionObj, otherStatusMap, otherPartitionObject) {
     // just simple assignment.  if we changed things to merge the best N results this would need to change.
     ourPartitionObj.Txids = [...otherPartitionObject.Txids]
@@ -3801,9 +3967,10 @@ class StateManager extends EventEmitter {
     if (repairTracker.outputHashSet !== hashSet) {
       this.mainLogger.error(`Failed to match our hashset to the solution hashSet: ${hashSet}  solution: ${repairTracker.outputHashSet}  `)
 
+      /** @type {GenericHashSetEntry[]} */
       let hashSetList = []
-      hashSetList.push({ hash: 'a1', votePower: 1, hashSet: hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, indexMap: [], extraMap: [] })
-      hashSetList.push({ hash: 'b1', votePower: 10, hashSet: repairTracker.outputHashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, indexMap: [], extraMap: [] })
+      hashSetList.push(/** @type {GenericHashSetEntry} */{ hash: 'a1', votePower: 1, hashSet: hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, indexMap: [], extraMap: [], waitForIndex: -1 })
+      hashSetList.push(/** @type {GenericHashSetEntry} */{ hash: 'b1', votePower: 10, hashSet: repairTracker.outputHashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, indexMap: [], extraMap: [], waitForIndex: -1 })
       let output = StateManager.solveHashSets(hashSetList)
       for (let hashSetEntry of hashSetList) {
         this.mainLogger.error(JSON.stringify(hashSetEntry))
@@ -3825,7 +3992,7 @@ class StateManager extends EventEmitter {
       return
     }
 
-    let hashSetList = this.solveHashSetsPrep(cycleCounter, partitionId, this.crypto.getPublicKey())
+    let hashSetList = /** @type {HashSetEntryPartitions[]} */(this.solveHashSetsPrep(cycleCounter, partitionId, this.crypto.getPublicKey()))
     // hashSetList.sort(function (a, b) { return a.hash > b.hash }) // sort so that solution will be deterministic
     hashSetList.sort(utils.sortHashAsc)
     let output = StateManager.solveHashSets(hashSetList)
@@ -3838,10 +4005,11 @@ class StateManager extends EventEmitter {
 
     // REFLOW HACK.  when we randomize host selection should make sure not to pick this forced solution as an answer
     // TODO perf:  if we fixed the algorith we could probably do this in one pass instead
-    let hashSetList2 = this.solveHashSetsPrep(cycleCounter, partitionId, this.crypto.getPublicKey())
+    let hashSetList2 = /** @type {HashSetEntryPartitions[]} */(this.solveHashSetsPrep(cycleCounter, partitionId, this.crypto.getPublicKey()))
     // hashSetList2.sort(function (a, b) { return a.hash > b.hash }) // sort so that solution will be deterministic
     hashSetList2.sort(utils.sortHashAsc) // sort so that solution will be deterministic
-    let hashSet = { hash: 'FORCED', votePower: 1000, hashSet: outputHashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [], ourRow: false }
+    /** @type {HashSetEntryPartitions} */
+    let hashSet = { hash: 'FORCED', votePower: 1000, hashSet: outputHashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [], ourRow: false, indexMap: [], extraMap: [], waitForIndex: -1 }
     hashSetList2.push(hashSet)
     output = StateManager.solveHashSets(hashSetList2, 40, 0.625, output)
     hashSetList = hashSetList2
@@ -3853,7 +4021,7 @@ class StateManager extends EventEmitter {
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + JSON.stringify(output))
     // find our solution
     let ourSolution = hashSetList.find((a) => a.ourRow === true) // owner
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'ourSolution: ' + JSON.stringify({ ourSolution, len: ourSolution.length }))
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'ourSolution: ' + JSON.stringify({ ourSolution, len: ourSolution.hash.length }))
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'solved outputHashSet: ' + outputHashSet)
     // lets generate the indexMap and extraMap index tables for out hashlist solution
     StateManager.expandIndexMapping(ourSolution, output)
@@ -3979,6 +4147,12 @@ class StateManager extends EventEmitter {
   //   //
   // }
 
+  /**
+   * _getRepairTrackerForCycle
+   * @param {number} counter
+   * @param {number} partition
+   * @returns {RepairTracker}
+   */
   _getRepairTrackerForCycle (counter, partition) {
     let key = 'c' + counter
     let key2 = 'p' + partition
@@ -4022,10 +4196,18 @@ class StateManager extends EventEmitter {
     return repairTracker
   }
 
+  /**
+   * repairTrackerMarkFinished
+   * @param {RepairTracker} repairTracker
+   */
   repairTrackerMarkFinished (repairTracker) {
     repairTracker.repairsFullyComplete = true
   }
 
+  /**
+   * repairTrackerClearForNextRepair
+   * @param {RepairTracker} repairTracker
+   */
   repairTrackerClearForNextRepair (repairTracker) {
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` repairTrackerClearForNextRepair cycleNumber: ${repairTracker.counter} parition: ${repairTracker.partitionId} `)
     repairTracker.removedTXIds = []
@@ -4036,6 +4218,10 @@ class StateManager extends EventEmitter {
     repairTracker.missingTXIds = []
   }
 
+  /**
+   * mergeAndApplyTXRepairs
+   * @param {number} cycleNumber
+   */
   async mergeAndApplyTXRepairs (cycleNumber) {
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs cycleNumber ${cycleNumber}`)
     // this will call into some of the funtions at the bottom of this file
@@ -4254,6 +4440,10 @@ class StateManager extends EventEmitter {
     if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs FIFO unlock: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
   }
 
+  /**
+   * bulkFifoLockAccounts
+   * @param {string[]} accountIDs
+   */
   async bulkFifoLockAccounts (accountIDs) {
     // lock all the accounts we will modify
     let wrapperLockId = await this.fifoLock('atomicWrapper')
@@ -4271,6 +4461,11 @@ class StateManager extends EventEmitter {
     return ourLocks
   }
 
+  /**
+   * bulkFifoUnlockAccounts
+   * @param {string[]} accountIDs
+   * @param {number[]} ourLocks
+   */
   bulkFifoUnlockAccounts (accountIDs, ourLocks) {
     // unlock the accounts we locked
     for (let i = 0; i < ourLocks.length; i++) {
@@ -4280,6 +4475,11 @@ class StateManager extends EventEmitter {
     }
   }
 
+  /**
+   * _revertAccounts
+   * @param {string[]} accountIDs
+   * @param {number} cycleNumber
+   */
   async _revertAccounts (accountIDs, cycleNumber) {
     let cycle = this.p2p.state.getCycleByCounter(cycleNumber)
     let cycleEnd = (cycle.start + cycle.duration) * 1000
@@ -4394,6 +4594,10 @@ class StateManager extends EventEmitter {
     // On a periodic bases older copies of the account data where we have more than 2 copies for the same account can be deleted.
   }
 
+  /**
+   * broadcastPartitionResults
+   * @param {number} cycleNumber
+   */
   async broadcastPartitionResults (cycleNumber) {
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair broadcastPartitionResults for cycle: ${cycleNumber}`)
 
@@ -4449,6 +4653,7 @@ class StateManager extends EventEmitter {
     }
 
     if (!this.tempTXRecords) {
+      /** @type {TempTxRecord[]} */
       this.tempTXRecords = [] // temporary store for TXs that we put in a partition object after a cycle is complete. an array that holds any TXs (i.e. from different cycles), code will filter out what it needs
     }
 
@@ -4508,8 +4713,14 @@ class StateManager extends EventEmitter {
     }) */
   }
 
-  // originally this only recorder results if we were not repairing but it turns out we need to update our copies any time we apply state.
-  // with the update we will calculate the cycle based on timestamp rather than using the last current cycle counter
+  /**
+   * updateAccountsCopyTable
+   * originally this only recorder results if we were not repairing but it turns out we need to update our copies any time we apply state.
+   * with the update we will calculate the cycle based on timestamp rather than using the last current cycle counter
+   * @param {any} accountDataList todo need to use wrapped account data here
+   * @param {boolean} repairing
+   * @param {number} txTimestamp
+   */
   async updateAccountsCopyTable (accountDataList, repairing, txTimestamp) {
     let cycleNumber = -1
 
@@ -4561,12 +4772,23 @@ class StateManager extends EventEmitter {
     }
   }
 
-  // we dont have a cycle yet to save these records against so store them in a temp place
+  /**
+ * tempRecordTXByCycle
+ * we dont have a cycle yet to save these records against so store them in a temp place
+ * @param {number} txTS
+ * @param {AcceptedTx} acceptedTx
+ * @param {boolean} passed
+ * @param {ApplyResponse} applyResponse
+ */
   tempRecordTXByCycle (txTS, acceptedTx, passed, applyResponse) {
     this.tempTXRecords.push({ txTS, acceptedTx, passed, redacted: -1, applyResponse: applyResponse })
   }
 
-  // call this before we start computing partitions so that we can make sure to get the TXs we need out of the temp list
+  /**
+   * processTempTXs
+   * call this before we start computing partitions so that we can make sure to get the TXs we need out of the temp list
+   * @param {Cycle} cycle
+   */
   processTempTXs (cycle) {
     if (!this.tempTXRecords) {
       return
@@ -4659,6 +4881,12 @@ class StateManager extends EventEmitter {
     if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair recordTXByCycle: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length}`)
   }
 
+  /**
+   * getPartitionObject
+   * @param {number} cycleNumber
+   * @param {number} partitionId
+   * @returns {PartitionObject}
+   */
   getPartitionObject (cycleNumber, partitionId) {
     let key = 'c' + cycleNumber
     let partitionObjects = this.partitionObjectsByCycle[key]
@@ -4669,7 +4897,12 @@ class StateManager extends EventEmitter {
     }
   }
 
-  // TODO sharding.  may need to do periodic cleanup of this and other maps so we can remove data from very old cycles
+  /**
+   * storePartitionReceipt
+   * TODO sharding.  may need to do periodic cleanup of this and other maps so we can remove data from very old cycles
+   * @param {number} cycleNumber
+   * @param {any} partitionReceipt
+   */
   storePartitionReceipt (cycleNumber, partitionReceipt) {
     let key = 'c' + cycleNumber
 
@@ -4682,6 +4915,13 @@ class StateManager extends EventEmitter {
     this.cycleReceiptsByCycleCounter[key].push(partitionReceipt)
   }
 
+  /**
+   * findMostCommonResponse
+   * @param {number} cycleNumber
+   * @param {number} partitionId
+   * @param {string[]} ignoreList currently unused and broken todo resolve this.
+   * @return {{topHash: string, topCount: number, topResult: PartitionResult}}
+   */
   findMostCommonResponse (cycleNumber, partitionId, ignoreList) {
     let key = 'c' + cycleNumber
     let responsesById = this.partitionResponsesByCycleById[key]
@@ -4706,10 +4946,18 @@ class StateManager extends EventEmitter {
       }
     }
     if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair findMostCommonResponse: ${utils.stringifyReduce(responsesById)} }`)
-    return [topHash, topCount, topResult]
+    return { topHash, topCount, topResult }
   }
 
   // vote rate set to 0.5 / 0.8 => 0.625
+  /**
+   * solveHashSets
+   * @param {GenericHashSetEntry[]} hashSetList
+   * @param {number} lookAhead
+   * @param {number} voteRate
+   * @param {string[]} prevOutput
+   * @returns {string[]}
+   */
   static solveHashSets (hashSetList, lookAhead = 10, voteRate = 0.625, prevOutput = null) {
     let output = []
     let outputVotes = []
@@ -4878,6 +5126,8 @@ class StateManager extends EventEmitter {
                 }
                 // delete stuff off stack and bail
                 // +1 because we at least want to delete 1 entry if index i=0 of this loop gets us here
+
+                /** @type {HashSetEntryCorrection[]} */
                 let tempCorrections = []
                 // for (let j = 0; j < i + 1; j++) {
                 //   let correction = null
@@ -4892,6 +5142,7 @@ class StateManager extends EventEmitter {
                 let lastIdx = -1
 
                 for (let j = 0; j < i + 1; j++) {
+                  /** @type {HashSetEntryCorrection} */
                   let correction = null
                   if (hashListEntry.errorStack.length > 0) {
                     hashListEntry.errorStack.pop()
@@ -4916,7 +5167,9 @@ class StateManager extends EventEmitter {
                   // }
 
                   // hashListEntry.indexOffset++
-                  tempCorrections.push({ i: extraIdx, t: 'extra', c: correction, hi: index2 - (j + 1) })
+                  /** @type {HashSetEntryCorrection} */
+                  let tempCorrection = { i: extraIdx, t: 'extra', c: correction, hi: index2 - (j + 1), tv: null, v: null, bv: null, if: -1 } // added tv: null, v: null, bv: null, if: -1
+                  tempCorrections.push(tempCorrection)
                 }
 
                 hashListEntry.corrections = hashListEntry.corrections.concat(tempCorrections)
@@ -4957,7 +5210,7 @@ class StateManager extends EventEmitter {
       let extraIdx = index
       while ((extraIdx + hashListEntry.indexOffset) * stepSize < hashListEntry.hashSet.length) {
         let hi = extraIdx + hashListEntry.indexOffset // index2 - (j + 1)
-        hashListEntry.corrections.push({ i: extraIdx, t: 'extra', c: null, hi: hi })
+        hashListEntry.corrections.push({ i: extraIdx, t: 'extra', c: null, hi: hi, tv: null, v: null, bv: null, if: -1 }) // added , tv: null, v: null, bv: null, if: -1
         extraIdx++
       }
     }
@@ -4967,6 +5220,11 @@ class StateManager extends EventEmitter {
 
   // efficient transformation to create a lookup to go from answer space index to the local index space of a hashList entry
   // also creates a list of local indicies of elements to remove
+  /**
+   * expandIndexMapping
+   * @param {GenericHashSetEntry} hashListEntry
+   * @param {*} output TODO get correct type here
+   */
   static expandIndexMapping (hashListEntry, output) {
     hashListEntry.indexMap = []
     hashListEntry.extraMap = []
@@ -5016,7 +5274,14 @@ class StateManager extends EventEmitter {
     }
   }
 
-  // todo cleanup.. just sign the partition object asap so we dont have to check if there is a valid sign object throughout the code (but would need to consider perf impact of this)
+  /**
+   * solveHashSetsPrep
+   * todo cleanup.. just sign the partition object asap so we dont have to check if there is a valid sign object throughout the code (but would need to consider perf impact of this)
+   * @param {number} cycleNumber
+   * @param {number} partitionId
+   * @param {string} ourNodeKey
+   * @return {GenericHashSetEntry[]}
+   */
   solveHashSetsPrep (cycleNumber, partitionId, ourNodeKey) {
     let key = 'c' + cycleNumber
     let responsesById = this.partitionResponsesByCycleById[key]
@@ -5037,6 +5302,7 @@ class StateManager extends EventEmitter {
         } else {
           owner = ourNodeKey
         }
+        /** @type {HashSetEntryPartitions} */
         let hashSet = { hash: hash, votePower: 0, hashSet: partitionResult.hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [owner], ourRow: false, waitForIndex: -1 }
         hashSets[hash] = hashSet
         hashSetList.push(hashSets[hash])
@@ -5060,6 +5326,12 @@ class StateManager extends EventEmitter {
     return hashSetList
   }
 
+  /**
+   * testHashsetSolution
+   * @param {GenericHashSetEntry} ourHashSet
+   * @param {GenericHashSetEntry} solutionHashSet
+   * @returns {boolean}
+   */
   static testHashsetSolution (ourHashSet, solutionHashSet) {
     // let payload = { partitionId: partitionId, cycle: cycleNumber, tx_indicies: requestsByHost[i].hostIndex, hash: requestsByHost[i].hash }
     // repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j] })
@@ -5219,6 +5491,12 @@ class StateManager extends EventEmitter {
     return true
   }
 
+  /**
+   * createHashSetString
+   * @param {*} txHashes // todo find correct values
+   * @param {*} dataHashes
+   * @returns {*} //todo correct type
+   */
   static createHashSetString (txHashes, dataHashes) {
     let hashSet = ''
     for (let i = 0; i < txHashes.length; i++) {
