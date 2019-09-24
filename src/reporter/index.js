@@ -110,8 +110,15 @@ class Reporter {
       const reportInterval = this.config.interval
       const nodeIpInfo = this.p2p.getIpInfo()
 
+      // report only if we are active in te networks.
+      // only knowingly report deltas.
+      let partitionReport = null
+      if (this.stateManager != null) {
+        partitionReport = this.stateManager.getPartitionReport(true, true)
+      }
+
       try {
-        await this._sendReport({ appState, cycleMarker, cycleCounter, nodelistHash, desiredNodes, txInjected, txApplied, txRejected, txExpired, reportInterval, nodeIpInfo })
+        await this._sendReport({ appState, cycleMarker, cycleCounter, nodelistHash, desiredNodes, txInjected, txApplied, txRejected, txExpired, reportInterval, nodeIpInfo, partitionReport })
       } catch (e) {
         this.mainLogger.error('startReporting: ' + e.name + ': ' + e.message + ' at ' + e.stack)
         console.error(e)

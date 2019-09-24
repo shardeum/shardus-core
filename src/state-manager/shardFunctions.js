@@ -12,8 +12,7 @@ const stringify = require('fast-stable-stringify')
  * @typedef {import('../shardus/index').Node} Node
  */
 
-class ShardFunctions {
-  /**
+/**
    * @typedef {Object} ShardGlobals global shard values
    * @property {number} numActiveNodes number of active nodes
    * @property {number} nodesPerConsenusGroup number of nodes per consesus group
@@ -24,6 +23,69 @@ class ShardFunctions {
    * @property {number} endAddr End address in numeric form (4 bytes)
    */
 
+/**
+   * @typedef {Object} ShardInfo global shard values
+   * @property {string} address address used in calculation
+   * @property {Node[]} homeNodes number of active nodes    todo get p2p node info
+   * @property {number} addressPrefix numeric address prefix
+   * @property {string} addressPrefixHex number of partitions
+   * @property {number} homePartition the home partition
+   * @property {AddressRange} homeRange consenus radius (number of nodes to each side of us that hold consensus data)
+   * @property {Object.<string, Node>} coveredBy the nodes that cover us for consenus.  todo make this a object of string->node
+   */
+
+/**
+   * @typedef {Object} StoredPartition Data for a StoredPartition
+   * @property {AddressRange} homeRange range for the home partition
+   * @property {boolean} rangeIsSplit is the range split
+   * @property {number} partitionStart Starting index
+   * @property {number} partitionEnd End index
+   * @property {number} [partitionStart1] The user's age.
+   * @property {number} [partitionEnd1] End index
+   * @property {number} [partitionStart2] The user's age.
+   * @property {number} [partitionEnd2] End index
+   * @property {{ start: number; dist: number; end: number; }} [partitionRangeVector]
+   * @property {number} [x] For debug: shardGlobals.nodesPerConsenusGroup
+   * @property {number} [n] For debug: homePartition
+   * @property {AddressRange} [partitionRange]
+   * @property {AddressRange} [partitionRange2]
+   */
+
+/**
+   * @typedef {Object} NodeShardData shard data for a node
+   * @property {Node} node our node
+   * @property {number} nodeAddressNum numeric address prefix
+   * @property {number} homePartition number of partitions
+   * @property {number} centeredAddress the home partition
+   * @property {number} ourNodeIndex the home partition
+   * @property {number} consensusStartPartition
+   * @property {number} consensusEndPartition
+   * @property {boolean} extendedData have we calculated extended data yet
+   * @property {boolean} needsUpdateToFullConsensusGroup
+   * extended data below here
+   * @property {StoredPartition} storedPartitions consenus radius (number of nodes to each side of us that hold consensus data)
+   * property {Map<string,Node>} coveredBy the nodes that cover us for consenus // removed not sure this goes here
+   * @property {Node[]} nodeThatStoreOurParition
+   * @property {Node[]} nodeThatStoreOurParitionFull
+   * @property {Node[]} consensusNodeForOurNode
+   * @property {Node[]} consensusNodeForOurNodeFull
+   * @property {Node[]} edgeNodes
+   * @property {Node[]} c2NodeForOurNode
+   * @property {Node[]} outOfDefaultRangeNodes
+   */
+/**
+   * @typedef {Object} AddressRange A range of addresses
+   * @property {number} partition the partition
+   * @property {number} p_low End index
+   * @property {number} p_high The user's age.
+   * @property {number} partitionEnd
+   * @property {number} startAddr Start address in numeric form (4 bytes)
+   * @property {number} endAddr End address in numeric form (4 bytes)
+   * @property {string} low End address in 64 char string
+   * @property {string} high End address in 64 char string
+   */
+
+class ShardFunctions {
   /**
    * calculateShardGlobals
    * @param {number} numNodes
@@ -55,17 +117,6 @@ class ShardFunctions {
     return ('00000000' + input).slice(-8)
   }
 
-  /**
-   * @typedef {Object} ShardInfo global shard values
-   * @property {string} address address used in calculation
-   * @property {Node[]} homeNodes number of active nodes    todo get p2p node info
-   * @property {number} addressPrefix numeric address prefix
-   * @property {string} addressPrefixHex number of partitions
-   * @property {number} homePartition the home partition
-   * @property {AddressRange} homeRange consenus radius (number of nodes to each side of us that hold consensus data)
-   * @property {any} coveredBy the nodes that cover us for consenus.  todo make this a object of string->node
-   */
-
   static calculateShardValues (shardGlobals, address) {
     /**
      * @type {ShardInfo}
@@ -80,23 +131,6 @@ class ShardFunctions {
     shardinfo.coveredBy = {} // consensus nodes that cover us.
     return shardinfo
   }
-
-  /**
-   * @typedef {Object} StoredPartition Data for a StoredPartition
-   * @property {AddressRange} homeRange range for the home partition
-   * @property {boolean} rangeIsSplit is the range split
-   * @property {number} partitionStart Starting index
-   * @property {number} partitionEnd End index
-   * @property {number} [partitionStart1] The user's age.
-   * @property {number} [partitionEnd1] End index
-   * @property {number} [partitionStart2] The user's age.
-   * @property {number} [partitionEnd2] End index
-   * @property {{ start: number; dist: number; end: number; }} [partitionRangeVector]
-   * @property {number} [x] For debug: shardGlobals.nodesPerConsenusGroup
-   * @property {number} [n] For debug: homePartition
-   * @property {AddressRange} [partitionRange]
-   * @property {AddressRange} [partitionRange2]
-   */
 
   static calculateStoredPartitions2 (shardGlobals, homePartition) {
   /**
@@ -288,29 +322,6 @@ class ShardFunctions {
     }
   }
 
-  /**
-   * @typedef {Object} NodeShardData shard data for a node
-   * @property {Node} node our node
-   * @property {number} nodeAddressNum numeric address prefix
-   * @property {number} homePartition number of partitions
-   * @property {number} centeredAddress the home partition
-   * @property {number} ourNodeIndex the home partition
-   * @property {number} consensusStartPartition
-   * @property {number} consensusEndPartition
-   * @property {boolean} extendedData have we calculated extended data yet
-   * @property {boolean} needsUpdateToFullConsensusGroup
-   * extended data below here
-   * @property {StoredPartition} storedPartitions consenus radius (number of nodes to each side of us that hold consensus data)
-   * @property {Map<string,Node>} coveredBy the nodes that cover us for consenus
-   * @property {Node[]} nodeThatStoreOurParition
-   * @property {Node[]} nodeThatStoreOurParitionFull
-   * @property {Node[]} consensusNodeForOurNode
-   * @property {Node[]} consensusNodeForOurNodeFull
-   * @property {Node[]} edgeNodes
-   * @property {Node[]} c2NodeForOurNode
-   * @property {Node[]} outOfDefaultRangeNodes
-   */
-
   static computeNodePartitionData (shardGlobals, node, nodeShardDataMap, parititionShardDataMap, activeNodes, extendedData) {
     let numPartitions = shardGlobals.numPartitions
 
@@ -472,6 +483,29 @@ class ShardFunctions {
 
   static nodeSort (a, b) {
     return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
+  }
+
+  /**
+   * getConsenusPartitions
+   * @param {ShardGlobals} shardGlobals
+   * @param {NodeShardData} nodeShardData the node we want to get a list of consensus partions from
+   * @returns {number[]} a list of partitions
+   */
+  static getConsenusPartitions (shardGlobals, nodeShardData) {
+    let consensusPartitions = []
+    if (nodeShardData.consensusStartPartition <= nodeShardData.consensusEndPartition) {
+      for (let i = nodeShardData.consensusStartPartition; i <= nodeShardData.consensusEndPartition; i++) {
+        consensusPartitions.push(i)
+      }
+    } else {
+      for (let i = 0; i <= nodeShardData.consensusEndPartition; i++) {
+        consensusPartitions.push(i)
+      }
+      for (let i = nodeShardData.consensusStartPartition; i < shardGlobals.numPartitions; i++) {
+        consensusPartitions.push(i)
+      }
+    }
+    return consensusPartitions
   }
 
   // conditions aStart < aEnd && bStart < bEnd
@@ -929,18 +963,6 @@ class ShardFunctions {
     }
     return results
   }
-
-  /**
-   * @typedef {Object} AddressRange A range of addresses
-   * @property {number} partition the partition
-   * @property {number} p_low End index
-   * @property {number} p_high The user's age.
-   * @property {number} partitionEnd
-   * @property {number} startAddr Start address in numeric form (4 bytes)
-   * @property {number} endAddr End address in numeric form (4 bytes)
-   * @property {string} low End address in 64 char string
-   * @property {string} high End address in 64 char string
-   */
 
   // todo memoize this per cycle!!!
   static partitionToAddressRange2 (shardGlobals, partition, paritionMax = null) {

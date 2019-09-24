@@ -2,6 +2,10 @@ const EventEmitter = require('events')
 const utils = require('../utils')
 const Random = require('../random')
 
+/**
+ * @typedef {import('../shardus/index').Node} Node
+ */
+
 class P2PState extends EventEmitter {
   constructor (config, logger, storage, p2p, crypto) {
     super()
@@ -730,6 +734,11 @@ class P2PState extends EventEmitter {
     return utils.binarySearch(ordered, node, comparator)
   }
 
+  /**
+   * _getNodeAddressOrderedIndex
+   * @param {Node} node
+   * @returns {number|boolean} tricky because binary search can also return false
+   */
   _getNodeAddressOrderedIndex (node) {
     const ordered = this.nodes.addressOrdered
     // First check the first index of the ordered list, as this is most likely when removing nodes
@@ -853,12 +862,18 @@ class P2PState extends EventEmitter {
 
   getOrderedSyncingNeighbors (node) {
     let index = this._getNodeAddressOrderedIndex(node)
+    let results = []
 
+    if (index === false) {
+      console.log(`getOrderedSyncingNeighbors failed to find ${utils.stringifyReduce(node.id)}`)
+      return results
+    }
     // cycleShardData.activeNodes.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
-
     console.log(`getOrderedSyncingNeighbors find: ${utils.stringifyReduce(node.id)} index: ${index} all:  ${utils.stringifyReduce(this.nodes.addressOrdered.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
 
+    // @ts-ignore
     let leftIndex = index - 1
+    // @ts-ignore
     let rightIndex = index + 1
 
     if (leftIndex < 0) {
@@ -867,7 +882,7 @@ class P2PState extends EventEmitter {
     if (rightIndex >= this.nodes.addressOrdered.length) {
       rightIndex = 0
     }
-    let results = []
+
     if (leftIndex !== index) {
       let node = this.nodes.addressOrdered[leftIndex]
       while (node.status === 'syncing') {
@@ -1646,8 +1661,9 @@ class P2PState extends EventEmitter {
   }
 
   getRandomActiveNode () {
-    const nodes = this.getActiveNodes(this.id)
+    const nodes = this.getActiveNodes(this.p2p.id)
     const random = Random()
+    // @ts-ignore todo test that it is really ok to ignore this.
     const randIndex = random.randomInt(0, nodes.length - 1)
     return nodes[randIndex]
   }
