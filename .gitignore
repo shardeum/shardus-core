@@ -84,3 +84,6 @@ statistics.tsv
 
 # Dist files
 dist/
+
+# VS Code IDE files
+.vscode
