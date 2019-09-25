@@ -61,10 +61,10 @@ class Consensus extends EventEmitter {
 
       if (this.mainLogs) this.mainLogger.debug(`Creating the receipt for the transaction: StateID: ${stateId} short stateID: ${utils.makeShortHash(stateId)} `)
       transactionReceipt = this.createReceipt(inTransaction, stateId, targetStateId)
-      if (this.mainLogs) this.mainLogger.debug(`Done Creating the receipt for the transaction: StateID: ${stateId} short stateID: ${utils.makeShortHash(stateId)} `)      
+      if (this.mainLogs) this.mainLogger.debug(`Done Creating the receipt for the transaction: StateID: ${stateId} short stateID: ${utils.makeShortHash(stateId)} `)
     } catch (ex) {
       this.logger.getLogger('main').error(`Inject: Failed to process Transaction. Exception: ${ex}`)
-      this.fatalLogger.fatal('inject: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)    
+      this.fatalLogger.fatal('inject: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       this.logger.playbackLogNote('tx_consensus_rejected', `${this.crypto.hash(inTransaction)}`, `Transaction: ${utils.stringifyReduce(inTransaction)}`)
       throw new Error(ex)
     }

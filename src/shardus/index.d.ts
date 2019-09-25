@@ -471,9 +471,17 @@ declare namespace Shardus {
   export interface AcceptedTx {
     id: string,
     timestamp: number,
-    data: object,
+    data: OpaqueTransaction,
     status: string,
-    receipt: object,
+    receipt: TxReceipt,
+  }
+
+  export interface TxReceipt {
+    txHash: string,
+    sign?: Shardus.Sign,    
+    time: number, //transaction timestamp    
+    stateId: string, //hash of the source account.  this should be phased out or modified to handle multiple sources
+    targetStateId: string, //hash of the target account.  this should be phased out or modified to handle multiple targets
   }
 
   /**

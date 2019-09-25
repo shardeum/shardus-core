@@ -66,6 +66,13 @@ const cHashSetDataStepSize = 2
    * @property {number} Cycle_number
    * @property {string} hashSet
    * @property {Sign} [sign]
+   * // property {any} \[hashSetList\] this seems to be used as debug. considering commenting it out in solveHashSetsPrep for safety.
+   */
+
+/**
+   * @typedef {Object} PartitionReceipt a partition reciept
+   * @property {PartitionResult[]} resultsList
+   * @property {Sign} [sign]
    */
 
 /**
@@ -78,7 +85,7 @@ const cHashSetDataStepSize = 2
    * @property {string} key2
    * @property {string[]} removedTXIds
    * @property {string[]} repairedTXs
-   * @property {string[]} newPendingTXs
+   * @property {AcceptedTx[]} newPendingTXs
    * @property {string[]} newFailedTXs
    * @property {string[]} extraTXIds
    * @property {string[]} missingTXIds
@@ -89,7 +96,17 @@ const cHashSetDataStepSize = 2
    * @property {boolean} evaluationStarted
    * @property {boolean} awaitWinningHash
    * @property {boolean} repairsFullyComplete
+   * @property {SolutionDelta[]} [solutionDeltas]
+   * @property {string} [outputHashSet]
    */
+
+/**
+ * @typedef {Object} SolutionDelta an object to hold a temp tx record for processing later
+ * @property {number} i index into our request list: requestsByHost.requests
+ * @property {AcceptedTx} tx
+ * @property {boolean} pf
+ * @property {string} state a string snipped from our solution hash set
+ */
 
 /**
  * @typedef {Object} TempTxRecord an object to hold a temp tx record for processing later
@@ -100,6 +117,17 @@ const cHashSetDataStepSize = 2
  * @property {number} redacted below 0 for not redacted. a value above zero indicates the cycle this was redacted
  */
 
+/**
+ * @typedef {Object} TxTallyList an object that tracks our TXs that we are storing for later.
+ * @property {string[]} hashes
+ * @property {number[]} passed AcceptedTx?
+ * @property {any[]} txs
+ * @property {boolean} processed
+ * @property {any[]} states below 0 for not redacted. a value above zero indicates the cycle this was redacted
+ * @property {any} [newTxList] this gets added on when we are reparing something newTxList seems to have a different format than existing types.
+ */
+
+// txList = { hashes: [], passed: [], txs: [], processed: false, states: [] }
 // we have this structure for solving hashes generically
 // let hashSet = { hash: hash, votePower: 0, hashSet: partitionResult.hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [owner], ourRow: false, waitForIndex: -1 }
 
@@ -1531,16 +1559,15 @@ class StateManager extends EventEmitter {
             return
           }
 
-          // /** @type {PartitionResult[]} */
           let partitionResults = payload.partitionResults
-          let key = 'c' + payload.Cycle_number
+          let cycleKey = 'c' + payload.Cycle_number
 
-          /** @type {Object.<string, PartitionResult[]>} */
-          let responsesById = this.partitionResponsesByCycleById[key]
-          if (!responsesById) {
-            responsesById = {}
-            this.partitionResponsesByCycleById[key] = responsesById
+          let allResponsesByPartition = this.allPartitionResponsesByCycleByPartition[cycleKey]
+          if (!allResponsesByPartition) {
+            allResponsesByPartition = {}
+            this.allPartitionResponsesByCycleByPartition[cycleKey] = allResponsesByPartition
           }
+          let ourPartitionResults = this.ourPartitionResultsByCycle[cycleKey]
 
           if (!payload.partitionResults) {
             if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair post_partition_results: abort, partitionResults == null`)
@@ -1555,43 +1582,40 @@ class StateManager extends EventEmitter {
           if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results ${utils.stringifyReduce(payload)}`)
 
           if (!payload.partitionResults[0].sign) {
+            // TODO security need to check that this is signed by a valid and correct node
             if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair post_partition_results: abort, no sign object on partition`)
             return
           }
 
           let owner = payload.partitionResults[0].sign.owner
-          // merge these responses in
-          let ourPartitionValues = this.partitionResultsByCycle[key]
+          // merge results from this message into our colleciton of allResponses
           for (let partitionResult of partitionResults) {
-            let key2 = 'p' + partitionResult.Partition_id
-            let responses = responsesById[key2]
+            let partitionKey1 = 'p' + partitionResult.Partition_id
+            let responses = allResponsesByPartition[partitionKey1]
             if (!responses) {
               responses = []
-              responsesById[key2] = responses
+              allResponsesByPartition[partitionKey1] = responses
             }
             // clean out an older response from same node if on exists
             responses = responses.filter(item => (item.sign == null) || item.sign.owner !== owner)
-            responsesById[key2] = responses // have to re-assign this since it is a new ref to the array
+            allResponsesByPartition[partitionKey1] = responses // have to re-assign this since it is a new ref to the array
 
-            // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_resultsB responses.length ${responses.length} `)
             // add the result ot the list of responses
             if (partitionResult) {
               responses.push(partitionResult)
             } else {
               if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair post_partition_results partitionResult missing`)
             }
-
             if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results partition: ${partitionResult.Partition_id} responses.length ${responses.length}  cycle:${payload.Cycle_number}`)
           }
 
-          // Try to create receipts if we can
-          var partitionKeys = Object.keys(responsesById)
+          var partitionKeys = Object.keys(allResponsesByPartition)
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results partitionKeys: ${partitionKeys.length}`)
 
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results partitionKeys: ${partitionKeys}`)
-
-          // not sure we need full loop here, maybe just the one realated to this response?... except we could get lots of partitions in the response
+          // Loop through all the partition keys and check our progress for each partition covered
+          // todo perf consider only looping through keys of partitions that changed from this update?
           for (let partitionKey of partitionKeys) {
-            let responses = responsesById[partitionKey]
+            let responses = allResponsesByPartition[partitionKey]
             // if enough data, and our response is prepped.
             let repairTracker
             let partitionId = null // todo sharding ? need to deal with more that one partition response here!!
@@ -1607,7 +1631,7 @@ class StateManager extends EventEmitter {
                 continue
               }
             } else {
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results no responses. ${partitionKey} responses: ${responses.length}. repairTracker: ${utils.stringifyReduce(repairTracker)} responsesById: ${utils.stringifyReduce(responsesById)}`)
+              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results no responses. ${partitionKey} responses: ${responses.length}. repairTracker: ${utils.stringifyReduce(repairTracker)} responsesById: ${utils.stringifyReduce(allResponsesByPartition)}`)
               continue
             }
 
@@ -1615,13 +1639,12 @@ class StateManager extends EventEmitter {
             if (this.useHashSets) {
               responsesRequired = 1 + Math.ceil(repairTracker.numNodes * 0.9) // get responses from 90% of the node we have sent to
             }
-            // are there enough responses to try generating a receipt
+            // are there enough responses to try generating a receipt?
             if (responses.length >= responsesRequired && (repairTracker.evaluationStarted === false || repairTracker.awaitWinningHash)) {
               repairTracker.evaluationStarted = true
 
-              // let partitionId = responses[0].Partition_id
               let ourResult = null
-              for (let obj of ourPartitionValues) {
+              for (let obj of ourPartitionResults) {
                 if (obj.Partition_id === partitionId) {
                   ourResult = obj
                   break
@@ -1633,15 +1656,12 @@ class StateManager extends EventEmitter {
                 return
               }
 
-              // payload.Cycle_number
               let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
-
-              let [partitionReceipt, topResult, success] = receiptResults
-              // return [null, topResult, false, hashSetList, output, ourSolution]
+              let { partitionReceipt, topResult, success } = receiptResults
               if (!success) {
                 if (repairTracker.awaitWinningHash) {
                   if (topResult == null) {
-                  // if we are awaitWinningHash then wait for a top result before we start repair process again
+                    // if we are awaitWinningHash then wait for a top result before we start repair process again
                     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair awaitWinningHash:true but topResult == null so keep waiting `)
                     continue
                   } else {
@@ -1649,7 +1669,7 @@ class StateManager extends EventEmitter {
                   }
                 }
 
-                if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results: tryGeneratePartitionReciept failed start repair process ${receiptResults.length}`)
+                if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results: tryGeneratePartitionReciept failed start repair process ${receiptResults}`)
                 let cycle = this.p2p.state.getCycleByCounter(payload.Cycle_number)
                 await this.startRepairProcess(cycle, topResult, partitionId, ourResult.Partition_hash)
               } else if (partitionReceipt) {
@@ -1657,15 +1677,13 @@ class StateManager extends EventEmitter {
                 if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results 3 allFinished, final cycle: ${payload.Cycle_number} hash:${utils.stringifyReduce({ topResult })}`)
                 // do we ever send partition receipt yet?
                 this.storePartitionReceipt(payload.Cycle_number, partitionReceipt)
-
                 this.repairTrackerMarkFinished(repairTracker)
               }
             } else {
               if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results not enough responses awaitWinningHash: ${repairTracker.awaitWinningHash} resp: ${responses.length}. required:${responsesRequired} repairTracker: ${utils.stringifyReduce(repairTracker)}`)
             }
+            // End of loop over partitions.  Continue looping if there are other partions that we need to check for completion.
           }
-
-        // partitionResults
         } finally {
         // this.fifoUnlock('accountModification', ourLockID)
         }
@@ -3405,6 +3423,7 @@ class StateManager extends EventEmitter {
   }
 
   /**
+   * generatePartitionObjects
    * @param {Cycle} lastCycle
    */
   generatePartitionObjects (lastCycle) {
@@ -3427,41 +3446,41 @@ class StateManager extends EventEmitter {
       this.nextCycleReportToSend.res.push({ i: partitionResult.Partition_id, h: partitionResult.Partition_hash })
 
       // byId?
-      let key = 'c' + lastCycle.counter
+      let cycleKey = 'c' + lastCycle.counter
 
       let partitionObjects = [partitionObject]
       let partitionResults = [partitionResult]
 
-      this.partitionObjectsByCycle[key] = partitionObjects
-      this.partitionResultsByCycle[key] = partitionResults // todo in the future there could be many results (one per covered partition)
+      this.partitionObjectsByCycle[cycleKey] = partitionObjects
+      this.ourPartitionResultsByCycle[cycleKey] = partitionResults // todo in the future there could be many results (one per covered partition)
 
-      let partitionResultsByHash = this.recentPartitionObjectsByCycleByHash[key]
+      let partitionResultsByHash = this.recentPartitionObjectsByCycleByHash[cycleKey]
       if (partitionResultsByHash == null) {
         partitionResultsByHash = {}
-        this.recentPartitionObjectsByCycleByHash[key] = partitionResultsByHash
+        this.recentPartitionObjectsByCycleByHash[cycleKey] = partitionResultsByHash
       }
       // todo sharding done?  seems ok :   need to loop and put all results in this list
       // todo perf, need to clean out data from older cycles..
       partitionResultsByHash[partitionResult.Partition_hash] = partitionObject
 
       // add our result to the list of all other results
-      let responsesById = this.partitionResponsesByCycleById[key]
-      if (!responsesById) {
-        responsesById = {}
-        this.partitionResponsesByCycleById[key] = responsesById
+      let responsesByPartition = this.allPartitionResponsesByCycleByPartition[cycleKey]
+      if (!responsesByPartition) {
+        responsesByPartition = {}
+        this.allPartitionResponsesByCycleByPartition[cycleKey] = responsesByPartition
       }
       // this part should be good to go for sharding.
       for (let pResult of partitionResults) {
-        let key2 = 'p' + pResult.Partition_id
-        let responses = responsesById[key2]
+        let partitionKey = 'p' + pResult.Partition_id
+        let responses = responsesByPartition[partitionKey]
         if (!responses) {
           responses = []
-          responsesById[key2] = responses
+          responsesByPartition[partitionKey] = responses
         }
         let ourID = this.crypto.getPublicKey()
         // clean out an older response from same node if on exists
         responses = responses.filter(item => item.sign && item.sign.owner !== ourID) // if the item is not signed clear it!
-        responsesById[key2] = responses // have to re-assign this since it is a new ref to the array
+        responsesByPartition[partitionKey] = responses // have to re-assign this since it is a new ref to the array
         responses.push(pResult)
       }
     }
@@ -3469,9 +3488,9 @@ class StateManager extends EventEmitter {
   }
 
   /**
+   * generatePartitionResult
    * @param {PartitionObject} partitionObject
    * @returns {PartitionResult}
-   * { Partition_id: any; Partitions?: number; Cycle_number: any; Cycle_marker?: string; Txids: any; Status?: number[]; States: any; Chain?: any[]; }
    */
   generatePartitionResult (partitionObject) {
     let partitionHash = /** @type {string} */(this.crypto.hash(partitionObject))
@@ -3493,17 +3512,9 @@ class StateManager extends EventEmitter {
     // nodeid in form of the signer!
     return partitionResult
   }
-  // {
-  //   Partition_id: 342,
-  //   Partitions: 500, - total number of partitions during this cycle
-  //   Cycle_number: 5329,
-  //   Cycle_marker: 0x123abc… ,
-  //   Txids: [txid1, txid2, …],  - ordered from oldest to recent
-  //   Status: [1,0, …],      - ordered corresponding to Txids; 1 for applied; 0 for failed
-  //   Chain: [partition_hash_341, partition_hash_342, partition_hash_343, …]
-  // }
 
   /**
+   * generatePartitionObject
    * @param {Cycle} lastCycle todo define cycle!!
    * @param {number} partitionId
    * @returns {PartitionObject}
@@ -3526,7 +3537,7 @@ class StateManager extends EventEmitter {
       Status: txSourceData.passed, // [1,0, …],      - ordered corresponding to Txids; 1 for applied; 0 for failed
       States: txSourceData.states, // array of array of states
       Chain: [] // [partition_hash_341, partition_hash_342, partition_hash_343, …]
-      // TODO need to implment chain logic!
+      // TODO prodution need to implment chain logic.  Chain logic is important for making a block chain out of are partition objects
     }
     return partitionObject
   }
@@ -3546,10 +3557,11 @@ class StateManager extends EventEmitter {
   }
 
   /**
+   * tryGeneratePartitionReciept
    * @param {PartitionResult[]} allResults
    * @param {PartitionResult} ourResult
    * @param {boolean} [repairPassHack]
-   * @returns {any[]} todo upgrade to return an object for destructuring
+   * @returns {{ partitionReceipt: PartitionReceipt; topResult: PartitionResult; success: boolean }}
    */
   tryGeneratePartitionReciept (allResults, ourResult, repairPassHack = false) {
     let partitionId = ourResult.Partition_id
@@ -3583,15 +3595,15 @@ class StateManager extends EventEmitter {
       if (this.useHashSets) {
         // bail in a way that will cause us to use the hashset strings
         if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair tryGeneratePartitoinReciept: did not win, useHashSets: ' + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
-        return [null, null, false]
+        return { partitionReceipt: null, topResult: null, success: false }
       }
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair tryGeneratePartitoinReciept: top hash failed: ' + utils.makeShortHash(topHash) + ` ${topCount} / ${requiredHalf}`)
-      return [null, topResult, false]
+      return { partitionReceipt: null, topResult, success: false }
     }
 
     if (ourResult.Partition_hash !== topHash) {
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair tryGeneratePartitoinReciept: our hash does not match: ' + utils.makeShortHash(topHash) + ` our hash: ${ourResult.Partition_hash}`)
-      return [null, topResult, false]
+      return { partitionReceipt: null, topResult, success: false }
     }
 
     let partitionReceipt = {
@@ -3600,7 +3612,7 @@ class StateManager extends EventEmitter {
 
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryGeneratePartitoinReciept OK! ${utils.stringifyReduce({ partitionReceipt, topResult })}`)
 
-    return [partitionReceipt, topResult, true]
+    return { partitionReceipt, topResult, success: true }
   }
 
   /**
@@ -3656,11 +3668,11 @@ class StateManager extends EventEmitter {
       this.generatePartitionObjects(cycle) // this will stomp our old results TODO PERF: (a bit inefficient since it works on all partitions)
 
       // get responses
-      let responsesById = this.partitionResponsesByCycleById[key]
+      let responsesById = this.allPartitionResponsesByCycleByPartition[key]
       let responses = responsesById[key2]
 
       // find our result
-      let ourPartitionValues = this.partitionResultsByCycle[key]
+      let ourPartitionValues = this.ourPartitionResultsByCycle[key]
       let ourResult = null
       for (let obj of ourPartitionValues) {
         if (obj.Partition_id === partitionId) {
@@ -3673,7 +3685,7 @@ class StateManager extends EventEmitter {
 
       // check if our hash now matches the majority one, maybe even re check the majority hash..?
       let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult, true)
-      let [partitionReceipt, topResult2, success] = receiptResults
+      let { partitionReceipt, topResult: topResult2, success } = receiptResults
 
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess tryGeneratePartitionReciept: ${utils.stringifyReduce({ partitionReceipt, topResult2, success })}  `)
 
@@ -3735,7 +3747,7 @@ class StateManager extends EventEmitter {
             // TODO SHARDING... need to refactor this so it happens per partition before we are all done
             // now that we are done see if we can form a receipt with what we have on the off change that all other nodes have sent us their corrected receipts already
             let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
-            let [partitionReceipt3, topResult3, success3] = receiptResults
+            let { partitionReceipt: partitionReceipt3, topResult: topResult3, success: success3 } = receiptResults
             if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess immediate receipt check. cycle: ${cycleNumber} success:${success3} topResult:${utils.stringifyReduce(topResult3)}  partitionReceipt: ${utils.stringifyReduce({ partitionReceipt3 })}`)
 
             // see if we already have a winning hash to correct to
@@ -3746,7 +3758,7 @@ class StateManager extends EventEmitter {
                   if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess awaitWinningHash:true but topResult == null so keep waiting `)
                 } else {
                   if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess awaitWinningHash:true and we have a top result so start reparing! `)
-                  if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess: tryGeneratePartitionReciept failed start repair process ${receiptResults.length}`)
+                  if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess: tryGeneratePartitionReciept failed start repair process ${receiptResults}`)
                   let cycle = this.p2p.state.getCycleByCounter(cycleNumber)
                   await utils.sleep(1000)
                   await this.startRepairProcess(cycle, topResult3, partitionId, ourResult.Partition_hash)
@@ -3800,11 +3812,11 @@ class StateManager extends EventEmitter {
     let key2 = 'p' + partitionId
 
     // get responses
-    let responsesById = this.partitionResponsesByCycleById[key]
+    let responsesById = this.allPartitionResponsesByCycleByPartition[key]
     let responses = responsesById[key2]
 
     // find our result
-    let ourPartitionValues = this.partitionResultsByCycle[key]
+    let ourPartitionValues = this.ourPartitionResultsByCycle[key]
     let ourResult = null
     for (let obj of ourPartitionValues) {
       if (obj.Partition_id === partitionId) {
@@ -3814,7 +3826,7 @@ class StateManager extends EventEmitter {
     }
 
     let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
-    let [partitionReceipt3, topResult3, success3] = receiptResults
+    let { partitionReceipt: partitionReceipt3, topResult: topResult3, success: success3 } = receiptResults
     if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept immediate receipt check. cycle: ${cycleNumber} success:${success3} topResult:${utils.stringifyReduce(topResult3)}  partitionReceipt: ${utils.stringifyReduce({ partitionReceipt3 })}`)
 
     // see if we already have a winning hash to correct to
@@ -3825,7 +3837,7 @@ class StateManager extends EventEmitter {
           if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept awaitWinningHash:true but topResult == null so keep waiting `)
         } else {
           if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept awaitWinningHash:true and we have a top result so start reparing! `)
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept: tryGeneratePartitionReciept failed start repair process ${receiptResults.length}`)
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept: tryGeneratePartitionReciept failed start repair process ${receiptResults}`)
           let cycle = this.p2p.state.getCycleByCounter(cycleNumber)
           await utils.sleep(1000)
           await this.startRepairProcess(cycle, topResult3, partitionId, ourResult.Partition_hash)
@@ -3938,7 +3950,7 @@ class StateManager extends EventEmitter {
 
   /**
    * _mergeRepairDataIntoLocalState
-   * @param {*} repairTracker todo repair tracker type
+   * @param {RepairTracker} repairTracker todo repair tracker type
    * @param {PartitionObject} ourPartitionObj
    * @param {*} otherStatusMap todo status map, but this is unused
    * @param {PartitionObject} otherPartitionObject
@@ -3962,6 +3974,13 @@ class StateManager extends EventEmitter {
 
   //  this works with syncTXsFromHashSetStrings to correct our partition object data. unlike the other version of this function this just creates entries on a
   //  temp member newTxList that will be used for the next partition object calculation
+
+  /**
+   * @param {RepairTracker} repairTracker
+   * @param {PartitionObject} ourPartitionObj
+   * @param {any} ourLastResultHash
+   * @param {GenericHashSetEntry & IHashSetEntryPartitions} ourHashSet
+   */
   _mergeRepairDataIntoLocalState2 (repairTracker, ourPartitionObj, ourLastResultHash, ourHashSet) {
     let key = repairTracker.key
     let txList = this.getTXListByKey(key, repairTracker.partitionId)
@@ -4088,6 +4107,12 @@ class StateManager extends EventEmitter {
     return true
   }
 
+  /**
+   * @param {number} cycleNumber
+   * @param {number} partitionId
+   * @param {RepairTracker} repairTracker
+   * @param {string} ourLastResultHash
+   */
   async syncTXsFromHashSetStrings (cycleNumber, partitionId, repairTracker, ourLastResultHash) {
     let cycleCounter = cycleNumber
     if (!this.useHashSets) {
@@ -4130,6 +4155,7 @@ class StateManager extends EventEmitter {
 
     let insertCount = 0
     // flag extras
+    /** @type {{ requests: number[]; hostIndex: number[]; stateSnippets: string[]; hash?: string }[]} */
     let requestsByHost = new Array(hashSetList.length).fill(null)
     for (let correction of ourSolution.corrections) {
       let index = correction.i
@@ -4391,7 +4417,8 @@ class StateManager extends EventEmitter {
       let repairEntry = repairsByPartition[key]
       for (let tx of repairEntry.newPendingTXs) {
         if (utils.isString(tx.data)) {
-          tx.data = JSON.parse(tx.data) // JIT parse.. is that ok?
+          // @ts-ignore sometimes we have a data field that gets stuck as a string.  would be smarter to fix this upstream.
+          tx.data = JSON.parse(tx.data)
         }
         let keysResponse = this.app.getKeyFromTransaction(tx.data)
 
@@ -4456,7 +4483,7 @@ class StateManager extends EventEmitter {
           }
         }
       } else {
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs txList not found for: cycle: ${cycleNumber} in ${utils.stringifyReduce(this.txByCycle)}`)
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs txList not found for: cycle: ${cycleNumber} in ${utils.stringifyReduce(this.txByCycleByPartition)}`)
       }
 
       // build and sort a list of TXs that we need to apply
@@ -4486,7 +4513,7 @@ class StateManager extends EventEmitter {
       newTXList.sort(function (a, b) { return a.timestamp - b.timestamp })
 
       if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs txList.length: ${txList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
+      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs newTXList.length: ${newTXList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
 
       let applyCount = 0
       let applyFailCount = 0
@@ -4778,7 +4805,7 @@ class StateManager extends EventEmitter {
 
     // console.log(`numnodes: ${nodes.length}`)
 
-    let partitionResults = this.partitionResultsByCycle['c' + cycleNumber]
+    let partitionResults = this.ourPartitionResultsByCycle['c' + cycleNumber]
 
     // nodeThatStoreOurParitionFull
     let partitionResultsByNodeID = new Map() // use a map?
@@ -4811,7 +4838,7 @@ class StateManager extends EventEmitter {
       }
 
       let repairTracker = this._getRepairTrackerForCycle(cycleNumber, partitionResult.Partition_id) // was Cycle_number
-      repairTracker.numNodes = coverCount - 2 // todo sharding re-evaluate this and thing of a better perf solution
+      repairTracker.numNodes = coverCount - 1 // todo sharding re-evaluate this and thing of a better perf solution
     }
 
     // let payload = { Cycle_number: cycleNumber, partitionResults: partitionResults }
@@ -4839,36 +4866,43 @@ class StateManager extends EventEmitter {
 
   initStateSyncData () {
     if (!this.partitionObjectsByCycle) {
-      this.partitionObjectsByCycle = {} // our partition objects by cycle.  index by cycle counter key to get an array
+      /** @type { Object.<string,PartitionObject[]>} our partition objects by cycle.  index by cycle counter key to get an array */
+      this.partitionObjectsByCycle = {}
     }
-    if (!this.partitionResultsByCycle) {
-      // /** @type {Map<string,PartitionResult>} */
-      this.partitionResultsByCycle = {} // our partition results by cycle.  index by cycle counter key to get an array
+    if (!this.ourPartitionResultsByCycle) {
+      /** @type { Object.<string,PartitionResult[]>} our partition results by cycle.  index by cycle counter key to get an array */
+      this.ourPartitionResultsByCycle = {}
     }
 
     if (!this.repairTrackingByCycleById) {
-      this.repairTrackingByCycleById = {} // tracks state for repairing partitions. index by cycle counter key to get the repair object, index by parition
+      /** @type {Object.<string, Object.<string,RepairTracker>>} tracks state for repairing partitions. index by cycle counter key to get the repair object, index by parition */
+      this.repairTrackingByCycleById = {}
     }
 
     if (!this.recentPartitionObjectsByCycleByHash) {
-      this.recentPartitionObjectsByCycleByHash = {} // our partition objects by cycle.  index by cycle counter key to get an array
+      /** @type {Object.<string, Object.<string,PartitionObject>>} our partition objects by cycle.  index by cycle counter key to get an array */
+      this.recentPartitionObjectsByCycleByHash = {}
     }
 
     if (!this.tempTXRecords) {
-      /** @type {TempTxRecord[]} */
-      this.tempTXRecords = [] // temporary store for TXs that we put in a partition object after a cycle is complete. an array that holds any TXs (i.e. from different cycles), code will filter out what it needs
-    }
-
-    if (!this.txByCycle) {
-      this.txByCycle = {}
+      /** @type {TempTxRecord[]} temporary store for TXs that we put in a partition object after a cycle is complete. an array that holds any TXs (i.e. from different cycles), code will filter out what it needs */
+      this.tempTXRecords = []
     }
 
     if (!this.txByCycleByPartition) {
+      // txList = { hashes: [], passed: [], txs: [], processed: false, states: [] }
+      // TxTallyList
+      /** @type {Object.<string, Object.<string,TxTallyList>>} */
       this.txByCycleByPartition = {}
     }
 
-    if (!this.partitionResponsesByCycleById) {
-      this.partitionResponsesByCycleById = {} // Stores the partition responses that other nodes push to us.  Index by cycle key, then index by partition id
+    // if (!this.txByCycleByPartition) {
+    //   this.txByCycleByPartition = {}
+    // }
+
+    if (!this.allPartitionResponsesByCycleByPartition) {
+      /** @type {Object.<string, Object.<string,PartitionResult[]>>} Stores the partition responses that other nodes push to us.  Index by cycle key, then index by partition id */
+      this.allPartitionResponsesByCycleByPartition = {}
     }
   }
 
@@ -4902,7 +4936,7 @@ class StateManager extends EventEmitter {
       // pre-allocate the next cycle data to be safe!
       let prekey = 'c' + (lastCycle.counter + 1)
       this.partitionObjectsByCycle[prekey] = []
-      this.partitionResultsByCycle[prekey] = []
+      this.ourPartitionResultsByCycle[prekey] = []
 
       // Nodes generate the partition result for all partitions they cover.
       // Nodes broadcast the set of partition results to N adjacent peers on each side; where N is
@@ -5031,14 +5065,20 @@ class StateManager extends EventEmitter {
   }
 
   // TODO sharding  done! need to split this out by partition
+  /**
+   * getTXList
+   * @param {number} cycleNumber
+   * @param {number} partitionId
+   * @returns {TxTallyList}
+   */
   getTXList (cycleNumber, partitionId) {
     let key = 'c' + cycleNumber
-    let txListByPartition = this.txByCycle[key]
+    let txListByPartition = this.txByCycleByPartition[key]
     let pkey = 'p' + partitionId
     // now search for the correct partition
     if (!txListByPartition) {
       txListByPartition = {}
-      this.txByCycle[key] = txListByPartition
+      this.txByCycleByPartition[key] = txListByPartition
     }
     let txList = txListByPartition[pkey]
     if (!txList) {
@@ -5049,6 +5089,12 @@ class StateManager extends EventEmitter {
   }
 
   // TODO sharding  done! need to split this out by partition
+  /**
+   * getTXListByKey
+   * @param {string} key
+   * @param {number} partitionId
+   * @returns {TxTallyList}
+   */
   getTXListByKey (key, partitionId) {
     // let txList = this.txByCycle[key]
     // if (!txList) {
@@ -5056,12 +5102,12 @@ class StateManager extends EventEmitter {
     //   this.txByCycle[key] = txList
     // }
 
-    let txListByPartition = this.txByCycle[key]
+    let txListByPartition = this.txByCycleByPartition[key]
     let pkey = 'p' + partitionId
     // now search for the correct partition
     if (!txListByPartition) {
       txListByPartition = {}
-      this.txByCycle[key] = txListByPartition
+      this.txByCycleByPartition[key] = txListByPartition
     }
     let txList = txListByPartition[pkey]
     if (!txList) {
@@ -5072,6 +5118,13 @@ class StateManager extends EventEmitter {
   }
 
   // take this tx and create if needed and object for the current cylce that holds a list of passed and failed TXs
+  /**
+   * recordTXByCycle
+   * @param {number} txTS
+   * @param {AcceptedTx} acceptedTx
+   * @param {boolean} passed
+   * @param {ApplyResponse} applyResponse
+   */
   recordTXByCycle (txTS, acceptedTx, passed, applyResponse) {
     // TODO sharding.  done because it uses getTXList . filter TSs by the partition they belong to. Double check that this is still needed
 
@@ -5134,13 +5187,15 @@ class StateManager extends EventEmitter {
   /**
    * storePartitionReceipt
    * TODO sharding perf.  may need to do periodic cleanup of this and other maps so we can remove data from very old cycles
+   * TODO production need to do something with this data
    * @param {number} cycleNumber
-   * @param {any} partitionReceipt
+   * @param {PartitionReceipt} partitionReceipt
    */
   storePartitionReceipt (cycleNumber, partitionReceipt) {
     let key = 'c' + cycleNumber
 
     if (!this.cycleReceiptsByCycleCounter) {
+      /** @type {Object.<string, PartitionReceipt[]>} a map of cycle keys to lists of partition receipts.  */
       this.cycleReceiptsByCycleCounter = {}
     }
     if (!this.cycleReceiptsByCycleCounter[key]) {
@@ -5158,7 +5213,7 @@ class StateManager extends EventEmitter {
    */
   findMostCommonResponse (cycleNumber, partitionId, ignoreList) {
     let key = 'c' + cycleNumber
-    let responsesById = this.partitionResponsesByCycleById[key]
+    let responsesById = this.allPartitionResponsesByCycleByPartition[key]
     let key2 = 'p' + partitionId
     let responses = responsesById[key2]
 
@@ -5518,7 +5573,7 @@ class StateManager extends EventEmitter {
    */
   solveHashSetsPrep (cycleNumber, partitionId, ourNodeKey) {
     let key = 'c' + cycleNumber
-    let responsesById = this.partitionResponsesByCycleById[key]
+    let responsesById = this.allPartitionResponsesByCycleByPartition[key]
     let key2 = 'p' + partitionId
     let responses = responsesById[key2]
 
@@ -5540,7 +5595,7 @@ class StateManager extends EventEmitter {
         let hashSet = { hash: hash, votePower: 0, hashSet: partitionResult.hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [owner], ourRow: false, waitForIndex: -1 }
         hashSets[hash] = hashSet
         hashSetList.push(hashSets[hash])
-        partitionResult.hashSetList = hashSet
+        // partitionResult.hashSetList = hashSet //Seems like this was only ever used for debugging, going to ax it to be safe!
       } else {
         if (partitionResult.sign) {
           hashSets[hash].owners.push(partitionResult.sign.owner)
