@@ -505,7 +505,8 @@ class P2P extends EventEmitter {
     const timeOffset = currentTime - localTime
     this.mainLogger.debug(`Time offset with selected node: ${timeOffset}`)
     let nodeId = null
-    while (!nodeId) {
+    let attempts = 2
+    while (!nodeId && attempts > 0) {
       const { currentCycleMarker, nextCycleMarker, cycleStart, cycleDuration } = await this._fetchCycleMarker(seedNodes)
       if (nextCycleMarker) {
         // Use next cycle marker
@@ -519,6 +520,7 @@ class P2P extends EventEmitter {
         const joinRequest = await this._createJoinRequest(currentCycleMarker)
         nodeId = await this._attemptJoin(seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration)
       }
+      attempts--
     }
     return nodeId
   }
@@ -771,7 +773,7 @@ class P2P extends EventEmitter {
       const cycleMarkerInfo = await http.get(`${node.ip}:${node.port}/cyclemarker`)
       return cycleMarkerInfo
     }
-    const [cycleMarkerInfo] = await this.robustQuery(nodes, queryFn, () => this._isSameCycleMarkerInfo)
+    const [cycleMarkerInfo] = await this.robustQuery(nodes, queryFn, this._isSameCycleMarkerInfo.bind(this))
     return cycleMarkerInfo
   }
 
@@ -782,12 +784,18 @@ class P2P extends EventEmitter {
       return { cycleJoined }
     }
     let query
-    while (!query || !query[0]) {
+    let attempts = 2
+    while ((!query || !query[0]) && attempts > 0) {
       try {
         query = await this.robustQuery(seedNodes, queryFn)
       } catch (e) {
         this.mainLogger.error(e)
       }
+      attempts--
+    }
+    if (attempts <= 0) {
+      this.mainLogger.info('Unable to get consistent cycle marker from seednodes.')
+      return null
     }
     const { cycleJoined } = query[0]
     if (!cycleJoined) {
@@ -803,7 +811,7 @@ class P2P extends EventEmitter {
       const cycleMarkerInfo = await this.ask(node, 'cyclemarker')
       return cycleMarkerInfo
     }
-    const [cycleMarkerInfo] = await this.robustQuery(nodes, queryFn, (query1, query2) => this._isSameCycleMarkerInfo)
+    const [cycleMarkerInfo] = await this.robustQuery(nodes, queryFn, this._isSameCycleMarkerInfo.bind(this))
     return cycleMarkerInfo
   }
 
@@ -1725,27 +1733,24 @@ class P2P extends EventEmitter {
   }
 
   async startup () {
-    const seedNodes = await this._getSeedNodes()
-    this.isFirstSeed = await this._discoverNetwork(seedNodes)
-    const needJoin = await this._checkIfNeedJoin()
-
     // Emit the 'joining' event before attempting to join
     const publicKey = this.crypto.getPublicKey()
     this.mainLogger.debug('Emitting `joining` event.')
     this.emit('joining', publicKey)
 
-    // If joining was unsuccessful, emit the 'failed' event
-    let joined = true
-    if (needJoin) joined = await this._joinNetwork(seedNodes)
-    if (!joined) {
-      this.emit('failed')
-      return false
+    // Get new seednodes and attempt to join until you are successful
+    let seedNodes, needJoin
+    let joined = false
+    while (!joined) {
+      seedNodes = await this._getSeedNodes()
+      this.isFirstSeed = await this._discoverNetwork(seedNodes)
+      needJoin = await this._checkIfNeedJoin()
+
+      joined = true
+      if (needJoin) joined = await this._joinNetwork(seedNodes)
     }
 
-    // Emit the 'joined' event before attempting to sync to the network
-    this.mainLogger.debug('Emitting `joined` event.')
-    this.emit('joined', this.id, publicKey)
-
+    // Once joined, sync to the network
     await this._syncToNetwork(seedNodes)
     /*
     if (this.dataSync) {
