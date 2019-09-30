@@ -279,7 +279,7 @@ class Shardus {
       // this.stateManager.enableSyncCheck()
 
       // Partition check and data repair (new)
-      this.stateManager.startSyncPartitions()
+      // disable and compare this.stateManager.startSyncPartitions()
     }
   }
 
