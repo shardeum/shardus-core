@@ -244,8 +244,10 @@ class Network extends EventEmitter {
 }
 
 function closeServer (server) {
-  return new Promise((resolve, reject) => {
-    server.close(err => err ? reject(err) : resolve())
+  return new Promise((resolve) => {
+    server.close()
+    server.unref()
+    resolve()
   })
 }
 
