@@ -3231,6 +3231,11 @@ class StateManager extends EventEmitter {
     let [homePartition] = ShardFunctions.addressToPartition(this.currentCycleShardData.shardGlobals, address)
     accountIsRemote = (ShardFunctions.partitionInConsensusRange(homePartition, minP, maxP) === false)
 
+    // hack to say we have all the data
+    if (this.currentCycleShardData.activeNodes.length <= this.currentCycleShardData.shardGlobals.consensusRadius) {
+      accountIsRemote = false
+    }
+
     if (accountIsRemote) {
       let homeNode = ShardFunctions.findHomeNode(this.currentCycleShardData.shardGlobals, address, this.currentCycleShardData.parititionShardDataMap)
 
