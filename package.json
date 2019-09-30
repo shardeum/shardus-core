@@ -1,7 +1,7 @@
 {
-  "name": "shardus-enterprise-server",
+  "name": "shardus-global-server",
   "version": "0.0.0",
-  "description": "The Shardus Enterprise Server",
+  "description": "The Shardus Global Server",
   "main": "index.js",
   "config": {
     "dist": "./dist"
@@ -20,7 +20,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@gitlab.com:shardus/enterprise/shardus-enterprise-server.git"
+    "url": "git@gitlab.com:shardus/global/shardus-global-server.git"
   },
   "dependencies": {
     "@hapi/sntp": "3.1.1",
