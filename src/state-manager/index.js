@@ -437,7 +437,7 @@ class StateManager extends EventEmitter {
         }
       }
 
-      this.calculateChangeInCoverage()
+      // this.calculateChangeInCoverage()
     }
 
     // calculate our consensus partitions for use by data repair:
@@ -1186,16 +1186,35 @@ class StateManager extends EventEmitter {
       }
 
       if (!account.syncData) {
-        account.syncData = {}
+        account.syncData = { timestamp: 0 }
       }
 
       if (account.stateId === stateData.stateAfter) {
         // mark it good.
         account.syncData.uptodate = true
         account.syncData.anyMatch = true
+        if (stateData.txTimestamp > account.syncData.timestamp) {
+          account.syncData.missingTX = false // finding a good match can clear the old error. this relys on things being in order!
+          account.syncData.timestamp = stateData.txTimestamp
+        }
       } else {
-        //
-        account.syncData.uptodate = false
+        // this state table data does not match up with what we have for the account
+        if (stateData.txTimestamp > account.syncData.timestamp) {
+          account.syncData.uptodate = false
+          // account.syncData.stateData = stateData
+          // chceck if we are missing a tx to handle this.
+          let txRef = this.acceptedTXByHash[stateData.txId]
+          if (txRef == null) {
+            // account.syncData.missingTX = true
+            // if (stateData.txTimestamp > account.syncData.timestamp) {
+            account.syncData.missingTX = true
+            // account.syncData.timestamp = stateData.txTimestamp
+            // }
+            // should we try to un foul the missingTX flag here??
+          }
+
+          account.syncData.timestamp = stateData.txTimestamp
+        }
       }
     }
 
@@ -1213,6 +1232,7 @@ class StateManager extends EventEmitter {
     this.goodAccounts = []
     let noSyncData = 0
     let noMatches = 0
+    let outOfDateNoTxs = 0
     for (let account of this.combinedAccountData) {
       if (!account.syncData) {
         // this account was not found in state data
@@ -1222,13 +1242,29 @@ class StateManager extends EventEmitter {
         // this account was in state data but none of the state table stateAfter matched our state
         this.accountsWithStateConflict.push(account)
         noMatches++
+      } else if (account.syncData.missingTX) {
+        //
+        this.accountsWithStateConflict.push(account)
+        outOfDateNoTxs++
       } else {
+        // could be good but need to check if we got stamped with some older datas.
+        // if (account.syncData.uptodate === false) {
+        //   // check for a missing transaction.
+        //   // need to check above so that a right cant clear a wrong.
+        //   let txRef = this.acceptedTXByHash[account.syncData.stateData.txId]
+        //   if (txRef == null) {
+        //     this.mainLogger.debug(`DATASYNC: processAccountData account not up to date ${utils.stringifyReduce(account)}`)
+        //     this.accountsWithStateConflict.push(account)
+        //     outOfDateNoTxs++
+        //     continue
+        //   }
+        // }
         delete account.syncData
         this.goodAccounts.push(account)
       }
     }
 
-    this.mainLogger.debug(`DATASYNC: processAccountData saving ${this.goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase}`)
+    this.mainLogger.debug(`DATASYNC: processAccountData saving ${this.goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase} outOfDateNoTxs: ${outOfDateNoTxs}`)
     // failedHashes is a list of accounts that failed to match the hash reported by the server
     let failedHashes = await this.checkAndSetAccountData(this.goodAccounts) // repeatable form may need to call this in batches
 
@@ -4890,14 +4926,14 @@ class StateManager extends EventEmitter {
     }
 
     if (!this.tempTXRecords) {
-      /** @type {TempTxRecord[]} temporary store for TXs that we put in a partition object after a cycle is complete. an array that holds any TXs (i.e. from different cycles), code will filter out what it needs */
+      /** @type {TempTxRecord[]} temporary store for TXs that we put in a partition object after a cycle is complete. an array that holds any TXs (i.e. from different cycles), code will filter out what it needs @see TempTxRecord */
       this.tempTXRecords = []
     }
 
     if (!this.txByCycleByPartition) {
       // txList = { hashes: [], passed: [], txs: [], processed: false, states: [] }
       // TxTallyList
-      /** @type {Object.<string, Object.<string,TxTallyList>>} */
+      /** @type {Object.<string, Object.<string,TxTallyList>>} TxTallyList data indexed by cycle key and partition key. @see TxTallyList */
       this.txByCycleByPartition = {}
     }
 
@@ -4918,6 +4954,12 @@ class StateManager extends EventEmitter {
         this.updateShardValues(lastCycle.counter)
       }
     })
+
+    this._registerListener(this.p2p.state, 'cycle_q3_start', async (lastCycle, time) => {
+      if (this.currentCycleShardData && this.currentCycleShardData.ourNode.status === 'active') {
+        this.calculateChangeInCoverage()
+      }
+    })
   }
 
   async startSyncPartitions () {
@@ -4930,7 +4972,6 @@ class StateManager extends EventEmitter {
 
     this._registerListener(this.p2p.state, 'cycle_q2_start', async (lastCycle, time) => {
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startSyncPartitions:cycle_q2_start cycle: ${lastCycle.counter}`)
-
       // this will take temp TXs and make sure they are stored in the correct place for us to generate partitions
       this.processTempTXs(lastCycle)
 

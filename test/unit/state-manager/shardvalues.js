@@ -47,12 +47,16 @@ let testAllNodesInList = true
 let numNodes = 6
 let numNodes2 = 0
 
+/** @type {boolean} */
 let useHardcodenodes = true
 // let hardcodeNodes = ['068ex9699a', '3e7fx601a4', '4222xc48ab', '4d05xb7aaf', '5aacx228d3', '5b61xf5dca', '86b0x899cb', 'a4bdx83351', 'aa5ax8c81c', 'b432x1ecdc', 'dc16x79767', 'e0c3x00452', 'e8aexf9d78', 'e9f1xfc329', 'ff7fxcb7ef']
 // let hardcodeNodes = ['16d0x3f6b2', '29d2x27971', '3b7ex5a91f', '4f57x3315c', '5d07x8bd45', '601dx69c34', '65c2xfc59d', '97dax03078', '9a01xa8f84', 'b050x62c87', 'b120x366ef', 'b48cxcf41f', 'd65fxae412', 'd875x49a69', 'e6d6x24afc']
 // let hardcodeNodes = ['1181x916b1', '1f40x556d2', '2837x2e9da', '2c6bx1c5b3', '3cacx91e08', '4124x4a6c7', '66ebx6e880', '6759xe4f9e', '73cbxaffd8', '76eax30249', '97efxf9461', 'a0c6x751bd', 'b1c3x8d872', 'c778x9b37e', 'd1e9xfe682', 'ed93x9ac1b']
-let hardcodeNodes2 = ['0ac0xf9a47', '19e0x84509', '1e83xbf3d2', '30cax3bafc', '450bx96e7d', '4dc0x48b55', '4e6fx6d689', '5429x91097', '61c6x3ffa5', '7a52x3e35d', '8a54xad1db', 'ac3cx755d8', 'dcf5x9ba90', 'ddb8xab70e', 'e55ex33985', 'ece5x609fb', 'fe95x65248']
-let hardcodeNodes = ['0ac0xf9a47', '1e83xbf3d2', '30cax3bafc', '450bx96e7d', '4dc0x48b55', '4e6fx6d689', '5429x91097', '61c6x3ffa5', '7a52x3e35d', '8a54xad1db', 'ac3cx755d8', 'dcf5x9ba90', 'ddb8xab70e', 'e55ex33985', 'ece5x609fb', 'fe95x65248']
+// let hardcodeNodes2 = ['0ac0xf9a47', '19e0x84509', '1e83xbf3d2', '30cax3bafc', '450bx96e7d', '4dc0x48b55', '4e6fx6d689', '5429x91097', '61c6x3ffa5', '7a52x3e35d', '8a54xad1db', 'ac3cx755d8', 'dcf5x9ba90', 'ddb8xab70e', 'e55ex33985', 'ece5x609fb', 'fe95x65248']
+// let hardcodeNodes = ['0ac0xf9a47', '1e83xbf3d2', '30cax3bafc', '450bx96e7d', '4dc0x48b55', '4e6fx6d689', '5429x91097', '61c6x3ffa5', '7a52x3e35d', '8a54xad1db', 'ac3cx755d8', 'dcf5x9ba90', 'ddb8xab70e', 'e55ex33985', 'ece5x609fb', 'fe95x65248']
+
+let hardcodeNodes2 = ['0861xe349b', '13b5x72241', '22e3x54e31', '2301x41f85', '3d28xd21aa', '78b1x23027', '7d43xb8b78', '843bx3f78d', '902dx9bf68', '9c99x9469d', 'be14x1ce18', 'dd2fx5419e', 'e2b1x19f9a', 'e9a9xbb0c4', 'fd7fx6ffa1']
+let hardcodeNodes = ['0861xe349b', '13b5x72241', '22e3x54e31', '2301x41f85', '3d28xd21aa', '78b1x23027', '7d43xb8b78', '843bx3f78d', '902dx9bf68', '9c99x9469d', 'be14x1ce18', 'dd2fx5419e', 'e2b1x19f9a', 'e9a9xbb0c4']
 
 // let hardcodeNodes2 = null
 
@@ -62,8 +66,8 @@ if (useHardcodenodes) {
 if (hardcodeNodes2) {
   numNodes2 = hardcodeNodes2.length
 }
-let debugStartsWith = 'ac3c' // 97da 5d07 'dc16'  '0683'  'ed93'
-let debugAccount = 'e1ac' + '3'.repeat(60) // 5c43
+let debugStartsWith = '3d28' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c
+let debugAccount = '86d4' + '3'.repeat(60) // 5c43
 let debugNode = null
 // 5c43xba41c account test.. need to expand it.
 
@@ -73,6 +77,7 @@ for (let i = 0; i < testIterations; i++) {
   let nodesPerConsenusGroup = 3
   let activeNodes
   let activeNodes2
+  // @ts-ignore the error below make no sense!
   if (useHardcodenodes === false) {
     activeNodes = generateNodes(numNodes - 1)
     let ourId = 'deadbeef' + '3'.repeat(56)

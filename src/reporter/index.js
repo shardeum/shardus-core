@@ -116,6 +116,7 @@ class Reporter {
       if (this.stateManager != null) {
         partitionReport = this.stateManager.getPartitionReport(true, true)
       }
+      //globalSync
 
       try {
         await this._sendReport({ appState, cycleMarker, cycleCounter, nodelistHash, desiredNodes, txInjected, txApplied, txRejected, txExpired, reportInterval, nodeIpInfo, partitionReport })

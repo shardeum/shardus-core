@@ -860,6 +860,9 @@ class P2PState extends EventEmitter {
     this.nodes.addressOrdered.splice(index2, 1)
   }
 
+  /**
+   * @param {import("../shardus").Node} node
+   */
   getOrderedSyncingNeighbors (node) {
     let index = this._getNodeAddressOrderedIndex(node)
     let results = []
@@ -869,7 +872,7 @@ class P2PState extends EventEmitter {
       return results
     }
     // cycleShardData.activeNodes.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
-    console.log(`getOrderedSyncingNeighbors find: ${utils.stringifyReduce(node.id)} index: ${index} all:  ${utils.stringifyReduce(this.nodes.addressOrdered.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+    // console.log(`getOrderedSyncingNeighbors find: ${utils.stringifyReduce(node.id)} index: ${index} all:  ${utils.stringifyReduce(this.nodes.addressOrdered.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
 
     // @ts-ignore
     let leftIndex = index - 1
@@ -911,6 +914,11 @@ class P2PState extends EventEmitter {
         node = this.nodes.addressOrdered[rightIndex]
       }
     }
+
+    // if (results.length > 0) {
+    //   console.log(`getOrderedSyncingNeighbors find: our node: ${utils.stringifyReduce(node.id)} syncing neighbors:  ${utils.stringifyReduce(results.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+    // }
+
     // todo what about two nodes syncing next to each other.  should we keep expanding to catch runs of syncing nodes.
     return results
   }
