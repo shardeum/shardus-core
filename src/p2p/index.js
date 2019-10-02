@@ -1750,14 +1750,33 @@ class P2P extends EventEmitter {
     // Get new seednodes and attempt to join until you are successful
     let seedNodes, needJoin
     let joined = false
+    // outerJoinAttemps is set to a high number incase we want to build a large network and need the node to keep trying to join for awhile.
+    let outerJoinAttemps = 100
     while (!joined) {
       seedNodes = await this._getSeedNodes()
       this.isFirstSeed = await this._discoverNetwork(seedNodes)
       needJoin = await this._checkIfNeedJoin()
 
-      joined = true
-      if (needJoin) joined = await this._joinNetwork(seedNodes)
+      if (needJoin === false) {
+        joined = true
+      }
+      if (needJoin) {
+        joined = await this._joinNetwork(seedNodes)
+        if (joined === false) {
+          this.mainLogger.debug('join failed. outer attemps left: ' + outerJoinAttemps)
+          // if we failed to join exit the flow
+          outerJoinAttemps--
+          if (outerJoinAttemps <= 0) {
+            this.mainLogger.debug('join failed. no more outer join attempts left')
+            return false
+          }
+        }
+      }
     }
+
+    // Emit the 'joined' event before attempting to sync to the network
+    this.mainLogger.debug('Emitting `joined` event.')
+    this.emit('joined', this.id, publicKey)
 
     // Once joined, sync to the network
     await this._syncToNetwork(seedNodes)
