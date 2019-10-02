@@ -1415,7 +1415,7 @@ class P2P extends EventEmitter {
   }
 
   allowTransactions () {
-    return this.state.getActiveCount() >= this.state.minNodes
+    return true // this.state.getActiveCount() >= this.state.minNodes
   }
 
   // Finds a node either in nodelist or in seedNodes listhis.mainLogger.debug(`Node ID to look up: ${nodeId}`)t if told to
