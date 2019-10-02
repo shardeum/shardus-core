@@ -494,7 +494,7 @@ class Shardus {
       if (typeof (application.close) === 'function') {
         applicationInterfaceImpl.close = async () => application.close()
       } else {
-        // throw new Error('Missing requried interface function. apply()')
+        throw new Error('Missing requried interface function. close()')
       }
 
       // unused at the moment
@@ -523,19 +523,19 @@ class Shardus {
       if (typeof (application.getAccountData) === 'function') {
         applicationInterfaceImpl.getAccountData = async (accountStart, accountEnd, maxRecords) => application.getAccountData(accountStart, accountEnd, maxRecords)
       } else {
-        // throw new Error('Missing requried interface function. apply()')
+        throw new Error('Missing requried interface function. getAccountData()')
       }
 
       if (typeof (application.getAccountDataByRange) === 'function') {
         applicationInterfaceImpl.getAccountDataByRange = async (accountStart, accountEnd, tsStart, tsEnd, maxRecords) => application.getAccountDataByRange(accountStart, accountEnd, tsStart, tsEnd, maxRecords)
       } else {
-        // throw new Error('Missing requried interface function. apply()')
+        throw new Error('Missing requried interface function. getAccountDataByRange()')
       }
 
       if (typeof (application.calculateAccountHash) === 'function') {
         applicationInterfaceImpl.calculateAccountHash = (account) => application.calculateAccountHash(account)
       } else {
-        // throw new Error('Missing requried interface function. apply()')
+        throw new Error('Missing requried interface function. calculateAccountHash()')
       }
 
       // App.set_account_data (Acc_records)
@@ -545,32 +545,32 @@ class Shardus {
       if (typeof (application.setAccountData) === 'function') {
         applicationInterfaceImpl.setAccountData = async (accountRecords) => application.setAccountData(accountRecords)
       } else {
-        // throw new Error('Missing requried interface function. apply()')
+        throw new Error('Missing requried interface function. setAccountData()')
       }
 
       // pass array of account copies to this (only looks at the data field) and it will reset the account state
       if (typeof (application.resetAccountData) === 'function') {
         applicationInterfaceImpl.resetAccountData = async (accountRecords) => application.resetAccountData(accountRecords)
       } else {
-        // throw new Error('Missing requried interface function. apply()')
+        throw new Error('Missing requried interface function. resetAccountData()')
       }
 
       // pass array of account ids to this and it will delete the accounts
       if (typeof (application.deleteAccountData) === 'function') {
         applicationInterfaceImpl.deleteAccountData = async (addressList) => application.deleteAccountData(addressList)
       } else {
-        // throw new Error('Missing requried interface function. apply()')
+        throw new Error('Missing requried interface function. deleteAccountData()')
       }
 
       if (typeof (application.getAccountDataByList) === 'function') {
         applicationInterfaceImpl.getAccountDataByList = async (addressList) => application.getAccountDataByList(addressList)
       } else {
-        // throw new Error('Missing requried interface function. apply()')
+        throw new Error('Missing requried interface function. getAccountDataByList()')
       }
       if (typeof (application.deleteLocalAccountData) === 'function') {
         applicationInterfaceImpl.deleteLocalAccountData = async () => application.deleteLocalAccountData()
       } else {
-        // throw new Error('Missing requried interface function. apply()')
+        throw new Error('Missing requried interface function. deleteLocalAccountData()')
       }
     } catch (ex) {
       this.fatalLogger.fatal(`Required application interface not implemented. Exception: ${ex}`)
