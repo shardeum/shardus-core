@@ -3236,6 +3236,9 @@ class StateManager extends EventEmitter {
       // { accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp }
       for (let wrappedAccount of wrappedAccounts) {
         let v = wrappedAccount.data.balance // hack, todo maybe ask app for a debug value
+        if (this.app.getAccountDebugValue != null) {
+          v = this.app.getAccountDebugValue(wrappedAccount)
+        }
         partition.accounts.push({ id: wrappedAccount.accountId, hash: wrappedAccount.stateId, v: v })
       }
     }

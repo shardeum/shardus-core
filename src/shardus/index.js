@@ -487,7 +487,8 @@ class Shardus {
       if (typeof (application.getStateId) === 'function') {
         applicationInterfaceImpl.getStateId = async (accountAddress, mustExist) => application.getStateId(accountAddress, mustExist)
       } else {
-        throw new Error('Missing requried interface function. getStateId()')
+        // throw new Error('Missing requried interface function. getStateId()')
+        this.mainLogger.log('getStateId not used by global server')
       }
 
       // opitonal methods
@@ -571,6 +572,11 @@ class Shardus {
         applicationInterfaceImpl.deleteLocalAccountData = async () => application.deleteLocalAccountData()
       } else {
         throw new Error('Missing requried interface function. deleteLocalAccountData()')
+      }
+      if (typeof (application.getAccountDebugValue) === 'function') {
+        applicationInterfaceImpl.getAccountDebugValue = (wrappedAccount) => application.getAccountDebugValue(wrappedAccount)
+      } else {
+        // throw new Error('Missing requried interface function. deleteLocalAccountData()')
       }
     } catch (ex) {
       this.fatalLogger.fatal(`Required application interface not implemented. Exception: ${ex}`)

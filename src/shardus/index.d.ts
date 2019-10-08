@@ -139,6 +139,7 @@ declare namespace Shardus {
 
     deleteLocalAccountData: () => void
 
+    getAccountDebugValue: (wrappedAccount: any) => string
   }
   
   export interface TransactionKeys {

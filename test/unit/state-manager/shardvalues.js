@@ -59,9 +59,13 @@ let useHardcodenodes = true
 // let hardcodeNodes = ['0861xe349b', '13b5x72241', '22e3x54e31', '2301x41f85', '3d28xd21aa', '78b1x23027', '7d43xb8b78', '843bx3f78d', '902dx9bf68', '9c99x9469d', 'be14x1ce18', 'dd2fx5419e', 'e2b1x19f9a', 'e9a9xbb0c4']
 
 // let hardcodeNodes = ['05a6xa2f35', '06e3x5a6b6', '0b63x1bfab', '16c6xffeb6', '1788x01997', '2926x7106a', '6eb5xd541f', '9296x4ee2e', 'ae7fx325be', 'e2edx6a490', 'fed0x5de0b']
-let hardcodeNodes = ['0325xa8adb', '05a6xa2f35', '06e3x5a6b6', '0b63x1bfab', '16c6xffeb6', '1788x01997', '2926x7106a', '2fb3xc044f', '37aex2b600', '3e76x08324', '6eb5xd541f', '87aaxcc9fb', '9296x4ee2e', 'ae7fx325be', 'c7d2xb1a40', 'e0bcxbd49c', 'e2edx6a490', 'fed0x5de0b']
+// let hardcodeNodes = ['0325xa8adb', '05a6xa2f35', '06e3x5a6b6', '0b63x1bfab', '16c6xffeb6', '1788x01997', '2926x7106a', '2fb3xc044f', '37aex2b600', '3e76x08324', '6eb5xd541f', '87aaxcc9fb', '9296x4ee2e', 'ae7fx325be', 'c7d2xb1a40', 'e0bcxbd49c', 'e2edx6a490', 'fed0x5de0b']
 
-let hardcodeNodes2 = ['0325xa8adb', '05a6xa2f35', '06e3x5a6b6', '0b63x1bfab', '16c6xffeb6', '1788x01997', '2926x7106a', '2fb3xc044f', '37aex2b600', '3e76x08324', '6eb5xd541f', '87aaxcc9fb', '9296x4ee2e', '9c39x1ff15', 'ae7fx325be', 'b29exe5d79', 'c7d2xb1a40', 'e0bcxbd49c', 'e2edx6a490', 'fed0x5de0b']
+// let hardcodeNodes2 = ['0325xa8adb', '05a6xa2f35', '06e3x5a6b6', '0b63x1bfab', '16c6xffeb6', '1788x01997', '2926x7106a', '2fb3xc044f', '37aex2b600', '3e76x08324', '6eb5xd541f', '87aaxcc9fb', '9296x4ee2e', '9c39x1ff15', 'ae7fx325be', 'b29exe5d79', 'c7d2xb1a40', 'e0bcxbd49c', 'e2edx6a490', 'fed0x5de0b']
+
+let hardcodeNodes = ['5a37x87a3d', '5c42x61036', '84ebx211db']
+
+let hardcodeNodes2 = ['5a37x87a3d', '5c42x61036', '84ebx211db']
 
 // let hardcodeNodes2 = null
 
@@ -71,7 +75,7 @@ if (useHardcodenodes) {
 if (hardcodeNodes2) {
   numNodes2 = hardcodeNodes2.length
 }
-let debugStartsWith = '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
+let debugStartsWith = '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
 let debugID = debugStartsWith.slice(0, 4) + '7'.repeat(64 - 4)
 let debugAccount = '386e' + '3'.repeat(60) // 5c43
 let debugNode = null
@@ -127,30 +131,30 @@ for (let i = 0; i < testIterations; i++) {
     }
   }
   if (debugStartsWith != null) {
-    // this was the earlier simple way
-    ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, false)
-    for (let node of activeNodes) {
-      if (node.id.indexOf(debugStartsWith) >= 0) {
-        ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, [node], parititionShardDataMap, activeNodes, true)
-        debugNode = node
-      }
-    }
-
-    // // this is an exact match for the calculations done in the shardus server:
-    // // generate limited data for all nodes data for all nodes.
+    // // this was the earlier simple way
     // ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, false)
-    // // get extended data for our node
-    // nodeShardData = ShardFunctions.computeNodePartitionData(shardGlobals, ourNode, nodeShardDataMap, parititionShardDataMap, activeNodes, true)
-    // // generate full data for nodes that store our home partition
-    // ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, nodeShardData.nodeThatStoreOurParitionFull, parititionShardDataMap, activeNodes, true)
-    // // cycleShardData.nodeShardData = cycleShardData.nodeShardDataMap.get(cycleShardData.ourNode.id)
+    // for (let node of activeNodes) {
+    //   if (node.id.indexOf(debugStartsWith) >= 0) {
+    //     ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, [node], parititionShardDataMap, activeNodes, true)
+    //     debugNode = node
+    //   }
+    // }
 
-    // // generate lightweight data for all active nodes  (note that last parameter is false to specify the lightweight data)
-    // let fullDataForDebug = true // Set this to false for performance reasons!!! setting it to true saves us from having to recalculate stuff when we dump logs.
-    // ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, fullDataForDebug)
+    // this is an exact match for the calculations done in the shardus server:
+    // generate limited data for all nodes data for all nodes.
+    ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, false)
+    // get extended data for our node
+    nodeShardData = ShardFunctions.computeNodePartitionData(shardGlobals, ourNode, nodeShardDataMap, parititionShardDataMap, activeNodes, true)
+    // generate full data for nodes that store our home partition
+    ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, nodeShardData.nodeThatStoreOurParitionFull, parititionShardDataMap, activeNodes, true)
+    // cycleShardData.nodeShardData = cycleShardData.nodeShardDataMap.get(cycleShardData.ourNode.id)
 
-    // // this is the function that messes up out calculations
-    // ShardFunctions.computeNodePartitionDataMapExt(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes)
+    // generate lightweight data for all active nodes  (note that last parameter is false to specify the lightweight data)
+    let fullDataForDebug = true // Set this to false for performance reasons!!! setting it to true saves us from having to recalculate stuff when we dump logs.
+    ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, fullDataForDebug)
+
+    // this is the function that messes up out calculations
+    ShardFunctions.computeNodePartitionDataMapExt(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes)
   }
 
   ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, true)
