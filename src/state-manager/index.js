@@ -3011,7 +3011,7 @@ class StateManager extends EventEmitter {
           }
 
           this.newAcceptedTxQueue.splice(index + 1, 0, txQueueEntry)
-          this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)}`)
+          this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)} indexInserted: ${index + 1}`)
           this.emit('txQueued', acceptedTx.receipt.txHash)
         }
         this.newAcceptedTxQueueTempInjest = []
@@ -3039,6 +3039,7 @@ class StateManager extends EventEmitter {
           markAccountsSeen(queueEntry)
         } else if (queueEntry.state === 'aging') {
           queueEntry.state = 'processing'
+          markAccountsSeen(queueEntry)
         } else if (queueEntry.state === 'processing') {
           if (accountSeen(queueEntry) === false) {
             try {
@@ -3080,75 +3081,77 @@ class StateManager extends EventEmitter {
 
           // TODO Need condition to check if age is greater than M3? to fail the tx from the queue
         } else if (queueEntry.state === 'applying') {
-          markAccountsSeen(queueEntry)
+          if (accountSeen(queueEntry) === false) {
+            markAccountsSeen(queueEntry)
 
-          this.logger.playbackLogNote('shrd_workingOnTx', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${this.queueRestartCounter} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-          this.emit('txPopped', queueEntry.acceptedTx.receipt.txHash)
+            this.logger.playbackLogNote('shrd_workingOnTx', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${this.queueRestartCounter} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+            this.emit('txPopped', queueEntry.acceptedTx.receipt.txHash)
 
-          // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processAcceptedTxQueue2. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
+            // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processAcceptedTxQueue2. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
 
-          if (queueEntry.didSync) {
-            this.logger.playbackLogNote('shrd_sync_applying', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
+            if (queueEntry.didSync) {
+              this.logger.playbackLogNote('shrd_sync_applying', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
 
-            // if we did sync it is time to JIT query local data.  alternatively could have other nodes send us this data, but that could be very high bandwidth.
-            for (let key of queueEntry.syncKeys) {
-              let wrappedState = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
-              this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)} hash:${wrappedState.stateId}`)
-              queueEntry.localCachedData[key] = wrappedState.localCache
-            }
-          }
-
-          let wrappedStates = queueEntry.collectedData // Object.values(queueEntry.collectedData)
-          let localCachedData = queueEntry.localCachedData
-          try {
-            // this.mainLogger.debug(` processAcceptedTxQueue2. applyAcceptedTransaction ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp} queuerestarts: ${this.queueRestartCounter} queueLen: ${this.newAcceptedTxQueue.length}`)
-            let filter = queueEntry.localKeys
-            let txResult = await this.applyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates, localCachedData, filter)
-            if (txResult.success) {
-              acceptedTXCount++
-            // clearAccountsSeen(queueEntry)
-            } else {
-            // clearAccountsSeen(queueEntry)
-              if (!edgeFailDetected && acceptedTXCount > 0) {
-                edgeFailDetected = true
-                if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-                this.fatalLogger.fatal(this.dataPhaseTag + `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`) // todo: consider if this is just an error
+              // if we did sync it is time to JIT query local data.  alternatively could have other nodes send us this data, but that could be very high bandwidth.
+              for (let key of queueEntry.syncKeys) {
+                let wrappedState = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
+                this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)} hash:${wrappedState.stateId}`)
+                queueEntry.localCachedData[key] = wrappedState.localCache
               }
             }
-          } catch (ex) {
-            this.mainLogger.debug('processAcceptedTxQueue2 applyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-            this.fatalLogger.fatal('processAcceptedTxQueue2 applyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-          } finally {
+
+            let wrappedStates = queueEntry.collectedData // Object.values(queueEntry.collectedData)
+            let localCachedData = queueEntry.localCachedData
+            try {
+            // this.mainLogger.debug(` processAcceptedTxQueue2. applyAcceptedTransaction ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp} queuerestarts: ${this.queueRestartCounter} queueLen: ${this.newAcceptedTxQueue.length}`)
+              let filter = queueEntry.localKeys
+              let txResult = await this.applyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates, localCachedData, filter)
+              if (txResult.success) {
+                acceptedTXCount++
+                // clearAccountsSeen(queueEntry)
+              } else {
+                // clearAccountsSeen(queueEntry)
+                if (!edgeFailDetected && acceptedTXCount > 0) {
+                  edgeFailDetected = true
+                  if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+                  this.fatalLogger.fatal(this.dataPhaseTag + `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`) // todo: consider if this is just an error
+                }
+              }
+            } catch (ex) {
+              this.mainLogger.debug('processAcceptedTxQueue2 applyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+              this.fatalLogger.fatal('processAcceptedTxQueue2 applyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+            } finally {
             // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processAcceptedTxQueue2. clear and remove. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
-            clearAccountsSeen(queueEntry)
-            // remove from queue
-            // this.newAcceptedTxQueue.splice(currentIndex, 1)
-            // this.archivedQueueEntries.push(queueEntry)
-            // if (this.archivedQueueEntries.length > 10000) { // todo make this a constant and decide what len should really be!
-            //   this.archivedQueueEntries.shift()
-            // }
-            this.removeFromQueue(queueEntry, currentIndex)
-            queueEntry.state = 'applied'
-          }
-
-          // do we have any syncing neighbors?
-          if (this.currentCycleShardData.hasSyncingNeighbors === true) {
-            // let dataToSend = Object.values(queueEntry.collectedData)
-            let dataToSend = []
-
-            let keys = Object.keys(queueEntry.originalData)
-            for (let key of keys) {
-              dataToSend.push(JSON.parse(queueEntry.originalData[key]))
+              clearAccountsSeen(queueEntry)
+              // remove from queue
+              // this.newAcceptedTxQueue.splice(currentIndex, 1)
+              // this.archivedQueueEntries.push(queueEntry)
+              // if (this.archivedQueueEntries.length > 10000) { // todo make this a constant and decide what len should really be!
+              //   this.archivedQueueEntries.shift()
+              // }
+              this.removeFromQueue(queueEntry, currentIndex)
+              queueEntry.state = 'applied'
             }
 
-            // maybe have to send localcache over, or require the syncing node to grab this data itself JIT!
-            // let localCacheTransport = Object.values(queueEntry.localCachedData)
+            // do we have any syncing neighbors?
+            if (this.currentCycleShardData.hasSyncingNeighbors === true) {
+            // let dataToSend = Object.values(queueEntry.collectedData)
+              let dataToSend = []
 
-            // send data to syncing neighbors.
-            if (this.currentCycleShardData.syncingNeighbors.length > 0) {
-              let message = { stateList: dataToSend, txid: queueEntry.acceptedTx.id }
-              this.logger.playbackLogNote('shrd_sync_dataTell', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} AccountBeingShared: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)} txid: ${utils.makeShortHash(message.txid)} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighbors.map(x => x.id))}`)
-              this.p2p.tell(this.currentCycleShardData.syncingNeighbors, 'broadcast_state', message)
+              let keys = Object.keys(queueEntry.originalData)
+              for (let key of keys) {
+                dataToSend.push(JSON.parse(queueEntry.originalData[key]))
+              }
+
+              // maybe have to send localcache over, or require the syncing node to grab this data itself JIT!
+              // let localCacheTransport = Object.values(queueEntry.localCachedData)
+
+              // send data to syncing neighbors.
+              if (this.currentCycleShardData.syncingNeighbors.length > 0) {
+                let message = { stateList: dataToSend, txid: queueEntry.acceptedTx.id }
+                this.logger.playbackLogNote('shrd_sync_dataTell', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} AccountBeingShared: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)} txid: ${utils.makeShortHash(message.txid)} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighbors.map(x => x.id))}`)
+                this.p2p.tell(this.currentCycleShardData.syncingNeighbors, 'broadcast_state', message)
+              }
             }
           }
         } else if (queueEntry.state === 'failed to get data') {
