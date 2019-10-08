@@ -64,7 +64,9 @@ class Logger {
 
     this.playbackLogEnabled = false
     this._playbackLogger = this.getLogger('playback')
+    // @ts-ignore
     this._playbackTrace = ['TRACE'].includes(this._playbackLogger.level.levelStr)
+    // @ts-ignore
     this._playbackDebug = ['DEBUG'].includes(this._playbackLogger.level.levelStr)
     if (this._playbackTrace || this._playbackDebug) {
       this.playbackLogEnabled = true

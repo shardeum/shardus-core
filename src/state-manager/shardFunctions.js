@@ -391,7 +391,9 @@ class ShardFunctions {
     nodeShardData.consensusNodeForOurNodeFull.sort(ShardFunctions.nodeSort)
 
     // merge into our full list for sake of TX calcs.  todo could try to be smart an only do this in some cases.
-    let [results] = ShardFunctions.mergeNodeLists(nodeShardData.nodeThatStoreOurParition, nodeShardData.consensusNodeForOurNodeFull)
+    // let [results] = ShardFunctions.mergeNodeLists(nodeShardData.nodeThatStoreOurParition, nodeShardData.consensusNodeForOurNodeFull)
+    // switched nodeThatStoreOurParition to nodeThatStoreOurParitionFull to improve the quality of the results.
+    let [results] = ShardFunctions.mergeNodeLists(nodeShardData.nodeThatStoreOurParitionFull, nodeShardData.consensusNodeForOurNodeFull)
 
     // not sure if we need to do this
     // if (extras.length > 0) {
@@ -399,6 +401,7 @@ class ShardFunctions {
     // }
 
     nodeShardData.nodeThatStoreOurParitionFull = results
+    nodeShardData.nodeThatStoreOurParitionFull.sort(ShardFunctions.nodeSort)
   }
 
   /**

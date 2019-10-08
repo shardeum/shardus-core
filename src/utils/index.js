@@ -249,6 +249,76 @@ const stringifyReduce = (val, isArrayProp) => {
   }
 }
 
+const stringifyReduceLimit = (val, isArrayProp, limit = 100) => {
+  var i, max, str, keys, key, propVal, toStr
+
+  if (limit < 0) {
+    return str + 'LIMIT'
+  }
+  if (val === true) {
+    return 'true'
+  }
+  if (val === false) {
+    return 'false'
+  }
+  switch (typeof val) {
+    case 'object':
+      if (val === null) {
+        return null
+      } else if (val.toJSON && typeof val.toJSON === 'function') {
+        return stringifyReduceLimit(val.toJSON(), isArrayProp, limit)
+      } else {
+        toStr = objToString.call(val)
+        if (toStr === '[object Array]') {
+          str = '['
+          max = val.length - 1
+          for (i = 0; i < max; i++) {
+            str += stringifyReduceLimit(val[i], true, limit - str.length) + ','
+            if (str.length > limit) {
+              return str + 'LIMIT'
+            }
+          }
+          if (max > -1) {
+            str += stringifyReduceLimit(val[i], true, limit - str.length)
+          }
+          return str + ']'
+        } else if (toStr === '[object Object]') {
+          // only object is left
+          keys = objKeys(val).sort()
+          max = keys.length
+          str = ''
+          i = 0
+          while (i < max) {
+            key = keys[i]
+            propVal = stringifyReduceLimit(val[key], false, limit - str.length)
+            if (propVal !== undefined) {
+              if (str) {
+                str += ','
+              }
+              str += JSON.stringify(key) + ':' + propVal
+            }
+            i++
+
+            if (str.length > limit) {
+              return str + 'LIMIT'
+            }
+          }
+          return '{' + str + '}'
+        } else {
+          return JSON.stringify(val)
+        }
+      }
+    case 'function':
+    case 'undefined':
+      return isArrayProp ? null : undefined
+    case 'string':
+      let reduced = makeShortHash(val)
+      return JSON.stringify(reduced)
+    default:
+      return isFinite(val) ? val : null
+  }
+}
+
 // Returns an array of two arrays, one will all resolved promises, and one with all rejected promises
 const robustPromiseAll = async (promises) => {
   // This is how we wrap a promise to prevent it from rejecting directing in the Promise.all and causing a short circuit
@@ -315,6 +385,7 @@ exports.isString = isString
 exports.isNumeric = isNumeric
 exports.makeShortHash = makeShortHash
 exports.stringifyReduce = stringifyReduce
+exports.stringifyReduceLimit = stringifyReduceLimit
 exports.robustPromiseAll = robustPromiseAll
 exports.sortAsc = sortAsc
 exports.sortDec = sortDec

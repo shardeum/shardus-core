@@ -1458,7 +1458,7 @@ class P2P extends EventEmitter {
     // Check to see if node is in expected node group
     const node = this._findNodeInGroup(wrappedPayload.sender, nodeGroup)
     if (!node) {
-      this.mainLogger.debug(`Invalid sender on internal payload: ${JSON.stringify(wrappedPayload)}`)
+      this.mainLogger.debug(`Invalid sender on internal payload. sender: ${wrappedPayload.sender} payload: ${utils.stringifyReduceLimit(wrappedPayload)}`)
       return [null]
     }
     const authenticatedByNode = this._authenticateByNode(wrappedPayload, node)
@@ -1476,7 +1476,7 @@ class P2P extends EventEmitter {
 
   _wrapAndTagMessage (msg, tracker = '', recipientNode) {
     if (!msg) throw new Error('No message given to wrap and tag!')
-    this.mainLogger.debug(`Attaching sender ${this.id} to the message: ${JSON.stringify(msg)}`)
+    if (this.verboseLogs) this.mainLogger.debug(`Attaching sender ${this.id} to the message: ${utils.stringifyReduceLimit(msg)}`)
     const wrapped = {
       payload: msg,
       sender: this.id,
@@ -1535,7 +1535,7 @@ class P2P extends EventEmitter {
       const respondWrapped = async (response) => {
         const node = this.state.getNode(sender)
         const signedResponse = this._wrapAndTagMessage(response, tracker, node)
-        this.mainLogger.debug(`The signed wrapped response to send back: ${JSON.stringify(signedResponse)}`)
+        if (this.verboseLogs) this.mainLogger.debug(`The signed wrapped response to send back: ${utils.stringifyReduceLimit(signedResponse)}`)
         if (route !== 'gossip') {
           this.logger.playbackLog(sender, 'self', 'InternalRecvResp', route, tracker, response)
         }

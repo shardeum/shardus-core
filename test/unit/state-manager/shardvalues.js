@@ -55,8 +55,13 @@ let useHardcodenodes = true
 // let hardcodeNodes2 = ['0ac0xf9a47', '19e0x84509', '1e83xbf3d2', '30cax3bafc', '450bx96e7d', '4dc0x48b55', '4e6fx6d689', '5429x91097', '61c6x3ffa5', '7a52x3e35d', '8a54xad1db', 'ac3cx755d8', 'dcf5x9ba90', 'ddb8xab70e', 'e55ex33985', 'ece5x609fb', 'fe95x65248']
 // let hardcodeNodes = ['0ac0xf9a47', '1e83xbf3d2', '30cax3bafc', '450bx96e7d', '4dc0x48b55', '4e6fx6d689', '5429x91097', '61c6x3ffa5', '7a52x3e35d', '8a54xad1db', 'ac3cx755d8', 'dcf5x9ba90', 'ddb8xab70e', 'e55ex33985', 'ece5x609fb', 'fe95x65248']
 
-let hardcodeNodes2 = ['0861xe349b', '13b5x72241', '22e3x54e31', '2301x41f85', '3d28xd21aa', '78b1x23027', '7d43xb8b78', '843bx3f78d', '902dx9bf68', '9c99x9469d', 'be14x1ce18', 'dd2fx5419e', 'e2b1x19f9a', 'e9a9xbb0c4', 'fd7fx6ffa1']
-let hardcodeNodes = ['0861xe349b', '13b5x72241', '22e3x54e31', '2301x41f85', '3d28xd21aa', '78b1x23027', '7d43xb8b78', '843bx3f78d', '902dx9bf68', '9c99x9469d', 'be14x1ce18', 'dd2fx5419e', 'e2b1x19f9a', 'e9a9xbb0c4']
+// let hardcodeNodes2 = ['0861xe349b', '13b5x72241', '22e3x54e31', '2301x41f85', '3d28xd21aa', '78b1x23027', '7d43xb8b78', '843bx3f78d', '902dx9bf68', '9c99x9469d', 'be14x1ce18', 'dd2fx5419e', 'e2b1x19f9a', 'e9a9xbb0c4', 'fd7fx6ffa1']
+// let hardcodeNodes = ['0861xe349b', '13b5x72241', '22e3x54e31', '2301x41f85', '3d28xd21aa', '78b1x23027', '7d43xb8b78', '843bx3f78d', '902dx9bf68', '9c99x9469d', 'be14x1ce18', 'dd2fx5419e', 'e2b1x19f9a', 'e9a9xbb0c4']
+
+// let hardcodeNodes = ['05a6xa2f35', '06e3x5a6b6', '0b63x1bfab', '16c6xffeb6', '1788x01997', '2926x7106a', '6eb5xd541f', '9296x4ee2e', 'ae7fx325be', 'e2edx6a490', 'fed0x5de0b']
+let hardcodeNodes = ['0325xa8adb', '05a6xa2f35', '06e3x5a6b6', '0b63x1bfab', '16c6xffeb6', '1788x01997', '2926x7106a', '2fb3xc044f', '37aex2b600', '3e76x08324', '6eb5xd541f', '87aaxcc9fb', '9296x4ee2e', 'ae7fx325be', 'c7d2xb1a40', 'e0bcxbd49c', 'e2edx6a490', 'fed0x5de0b']
+
+let hardcodeNodes2 = ['0325xa8adb', '05a6xa2f35', '06e3x5a6b6', '0b63x1bfab', '16c6xffeb6', '1788x01997', '2926x7106a', '2fb3xc044f', '37aex2b600', '3e76x08324', '6eb5xd541f', '87aaxcc9fb', '9296x4ee2e', '9c39x1ff15', 'ae7fx325be', 'b29exe5d79', 'c7d2xb1a40', 'e0bcxbd49c', 'e2edx6a490', 'fed0x5de0b']
 
 // let hardcodeNodes2 = null
 
@@ -66,8 +71,9 @@ if (useHardcodenodes) {
 if (hardcodeNodes2) {
   numNodes2 = hardcodeNodes2.length
 }
-let debugStartsWith = '3d28' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c
-let debugAccount = '86d4' + '3'.repeat(60) // 5c43
+let debugStartsWith = '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
+let debugID = debugStartsWith.slice(0, 4) + '7'.repeat(64 - 4)
+let debugAccount = '386e' + '3'.repeat(60) // 5c43
 let debugNode = null
 // 5c43xba41c account test.. need to expand it.
 
@@ -90,7 +96,7 @@ for (let i = 0; i < testIterations; i++) {
   // let nodeToObserve = ourNode
 
   if (hardcodeNodes2 != null) {
-    activeNodes2 = generateNodes(numNodes, hardcodeNodes2)
+    activeNodes2 = generateNodes(numNodes2, hardcodeNodes2)
     activeNodes2.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
   }
 
@@ -111,15 +117,40 @@ for (let i = 0; i < testIterations; i++) {
 
   let parititionShardDataMap2 = new Map()
   let nodeShardDataMap2 = new Map()
-  if (debugStartsWith != null) {
-    ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, false)
 
+  let nodeShardData = null
+  let ourNode = null
+  for (let node of activeNodes) {
+    if (node.id === debugID) {
+      ourNode = node
+      debugNode = node
+    }
+  }
+  if (debugStartsWith != null) {
+    // this was the earlier simple way
+    ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, false)
     for (let node of activeNodes) {
       if (node.id.indexOf(debugStartsWith) >= 0) {
         ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, [node], parititionShardDataMap, activeNodes, true)
         debugNode = node
       }
     }
+
+    // // this is an exact match for the calculations done in the shardus server:
+    // // generate limited data for all nodes data for all nodes.
+    // ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, false)
+    // // get extended data for our node
+    // nodeShardData = ShardFunctions.computeNodePartitionData(shardGlobals, ourNode, nodeShardDataMap, parititionShardDataMap, activeNodes, true)
+    // // generate full data for nodes that store our home partition
+    // ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, nodeShardData.nodeThatStoreOurParitionFull, parititionShardDataMap, activeNodes, true)
+    // // cycleShardData.nodeShardData = cycleShardData.nodeShardDataMap.get(cycleShardData.ourNode.id)
+
+    // // generate lightweight data for all active nodes  (note that last parameter is false to specify the lightweight data)
+    // let fullDataForDebug = true // Set this to false for performance reasons!!! setting it to true saves us from having to recalculate stuff when we dump logs.
+    // ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, fullDataForDebug)
+
+    // // this is the function that messes up out calculations
+    // ShardFunctions.computeNodePartitionDataMapExt(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes)
   }
 
   ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, true)
@@ -160,11 +191,15 @@ for (let i = 0; i < testIterations; i++) {
 
     let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
 
+    console.log(` summary:${utils.stringifyReduce(summaryObject)}`)
+
     let [partition, addrNum] = ShardFunctions.addressToPartition(shardGlobals, debugAccount)
 
     let ourNodeData = nodeShardDataMap.get(debugNode.id)
 
     let inRange = ShardFunctions.testInRange(partition, ourNodeData.storedPartitions)
+
+    // homeNode.nodeThatStoreOurParitionFull
     // let homeNode = ShardFunctions.findHomeNode(shardGlobals, debugAccount, parititionShardDataMap)
     let hasKey = false
     if (homeNode.node.id === ourNodeData.node.id) {
@@ -183,10 +218,10 @@ for (let i = 0; i < testIterations; i++) {
   }
 
   let totalPartitionsCovered = 0
-  for (var nodeShardData of nodeShardDataMap.values()) {
-    extraNodesTotal += nodeShardData.outOfDefaultRangeNodes.length
+  for (var nodeShardData2 of nodeShardDataMap.values()) {
+    extraNodesTotal += nodeShardData2.outOfDefaultRangeNodes.length
 
-    totalPartitionsCovered += ShardFunctions.getPartitionsCovered(nodeShardData.storedPartitions)
+    totalPartitionsCovered += ShardFunctions.getPartitionsCovered(nodeShardData2.storedPartitions)
   }
 
   console.log(`test number ${i} partitions covered by a node avg: ${totalPartitionsCovered / innerLoopCount}`)

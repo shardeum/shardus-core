@@ -4950,8 +4950,9 @@ class StateManager extends EventEmitter {
   startShardCalculations () {
     this.p2p.state.on('cycle_q1_start', async (lastCycle, time) => {
       if (lastCycle) {
-        this.dumpAccountDebugData()
+        // this.dumpAccountDebugData()
         this.updateShardValues(lastCycle.counter)
+        this.dumpAccountDebugData() // better to print values after an update!
       }
     })
 
