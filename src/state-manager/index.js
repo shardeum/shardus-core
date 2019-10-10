@@ -2969,17 +2969,17 @@ class StateManager extends EventEmitter {
 
       seenAccounts = {}// todo PERF we should be able to support using a variable that we save from one update to the next.  set that up after initial testing
 
-      let seenAccounts2 = new Map()
+      // let seenAccounts2 = new Map()
       // todo move these functions out where they are not constantly regenerate
       let accountSeen = function (queueEntry) {
         for (let key of queueEntry.uniqueKeys) {
           if (seenAccounts[key] != null) {
             return true
           }
-          if (seenAccounts2.has(key)) {
-            this.fatalLogger.fatal('map fail in seenAccounts')
-            return true
-          }
+          // if (seenAccounts2.has(key)) {
+          //   this.fatalLogger.fatal('map fail in seenAccounts')
+          //   return true
+          // }
         }
         return false
       }
@@ -2988,7 +2988,7 @@ class StateManager extends EventEmitter {
           if (seenAccounts[key] == null) {
             seenAccounts[key] = queueEntry
           }
-          seenAccounts2.set(key, true)
+          // seenAccounts2.set(key, true)
         }
       }
       // if we are the oldest ref to this you can clear it.. only ok because younger refs will still reflag it in time
@@ -2997,16 +2997,19 @@ class StateManager extends EventEmitter {
           if (seenAccounts[key] === queueEntry) {
             seenAccounts[key] = null
           }
-          seenAccounts2.delete(key)
+          // seenAccounts2.delete(key)
         }
       }
 
       let app = this.app
+      let verboseLogs = this.verboseLogs
       let debugAccountData = function (queueEntry, app) {
         let debugStr = ''
-        for (let key of queueEntry.uniqueKeys) {
-          if (queueEntry.collectedData[key] != null) {
-            debugStr += utils.makeShortHash(key) + ' : ' + app.getAccountDebugValue(queueEntry.collectedData[key]) + ', '
+        if (verboseLogs) {
+          for (let key of queueEntry.uniqueKeys) {
+            if (queueEntry.collectedData[key] != null) {
+              debugStr += utils.makeShortHash(key) + ' : ' + app.getAccountDebugValue(queueEntry.collectedData[key]) + ', '
+            }
           }
         }
         return debugStr
@@ -3070,7 +3073,7 @@ class StateManager extends EventEmitter {
             markAccountsSeen(queueEntry)
             try {
               await this.tellCorrespondingNodes(queueEntry)
-              this.logger.playbackLogNote('shrd_processing', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  values: ${debugAccountData(queueEntry, app)}`)
+              if (this.verboseLogs) this.logger.playbackLogNote('shrd_processing', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  values: ${debugAccountData(queueEntry, app)}`)
             } catch (ex) {
               this.mainLogger.debug('processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
               this.fatalLogger.fatal('processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -3111,7 +3114,7 @@ class StateManager extends EventEmitter {
           if (accountSeen(queueEntry) === false) {
             markAccountsSeen(queueEntry)
 
-            this.logger.playbackLogNote('shrd_workingOnTx', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+            if (this.verboseLogs) this.logger.playbackLogNote('shrd_workingOnTx', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
             this.emit('txPopped', queueEntry.acceptedTx.receipt.txHash)
 
             // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processAcceptedTxQueue2. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
@@ -3159,7 +3162,7 @@ class StateManager extends EventEmitter {
               this.removeFromQueue(queueEntry, currentIndex)
               queueEntry.state = 'applied'
 
-              this.logger.playbackLogNote('shrd_workingOnTxFinished', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+              if (this.verboseLogs) this.logger.playbackLogNote('shrd_workingOnTxFinished', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
             }
 
             // do we have any syncing neighbors?
