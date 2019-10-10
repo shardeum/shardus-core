@@ -2704,7 +2704,7 @@ class StateManager extends EventEmitter {
       delete data.localCache
     }
 
-    this.logger.playbackLogNote('shrd_addData', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `key ${utils.makeShortHash(data.accountId)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}`)
+    this.logger.playbackLogNote('shrd_addData', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `key ${utils.makeShortHash(data.accountId)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}  ${queueEntry.acceptedTx.timestamp}`)
   }
 
   queueEntryHasAllData (queueEntry) {
@@ -2955,12 +2955,12 @@ class StateManager extends EventEmitter {
       }
       this.queueRestartCounter++
 
+      let localRestartCounter = this.queueRestartCounter
+
       this.newAcceptedTxQueueRunning = true
 
       let acceptedTXCount = 0
       let edgeFailDetected = false
-
-      let currentIndex = this.newAcceptedTxQueue.length - 1
 
       let timeM = this.queueSitTime
       let timeM2 = timeM * 2
@@ -2969,10 +2969,15 @@ class StateManager extends EventEmitter {
 
       seenAccounts = {}// todo PERF we should be able to support using a variable that we save from one update to the next.  set that up after initial testing
 
+      let seenAccounts2 = new Map()
       // todo move these functions out where they are not constantly regenerate
       let accountSeen = function (queueEntry) {
         for (let key of queueEntry.uniqueKeys) {
           if (seenAccounts[key] != null) {
+            return true
+          }
+          if (seenAccounts2.has(key)) {
+            this.fatalLogger.fatal('map fail in seenAccounts')
             return true
           }
         }
@@ -2983,6 +2988,7 @@ class StateManager extends EventEmitter {
           if (seenAccounts[key] == null) {
             seenAccounts[key] = queueEntry
           }
+          seenAccounts2.set(key, true)
         }
       }
       // if we are the oldest ref to this you can clear it.. only ok because younger refs will still reflag it in time
@@ -2991,7 +2997,19 @@ class StateManager extends EventEmitter {
           if (seenAccounts[key] === queueEntry) {
             seenAccounts[key] = null
           }
+          seenAccounts2.delete(key)
         }
+      }
+
+      let app = this.app
+      let debugAccountData = function (queueEntry, app) {
+        let debugStr = ''
+        for (let key of queueEntry.uniqueKeys) {
+          if (queueEntry.collectedData[key] != null) {
+            debugStr += utils.makeShortHash(key) + ' : ' + app.getAccountDebugValue(queueEntry.collectedData[key]) + ', '
+          }
+        }
+        return debugStr
       }
 
       // process any new queue entries that were added to the temporary list
@@ -3017,6 +3035,9 @@ class StateManager extends EventEmitter {
         this.newAcceptedTxQueueTempInjest = []
       }
 
+      let currentIndex = this.newAcceptedTxQueue.length - 1
+
+      let lastLog = 0
       while (this.newAcceptedTxQueue.length > 0) {
         if (currentIndex < 0) {
           break
@@ -3028,6 +3049,10 @@ class StateManager extends EventEmitter {
           break
         }
 
+        if (localRestartCounter < this.queueRestartCounter && lastLog !== this.queueRestartCounter) {
+          lastLog = this.queueRestartCounter
+          this.logger.playbackLogNote('queueRestart_error', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  qrstGlobal:${this.queueRestartCounter}}`)
+        }
         // // fail the message if older than m3
         // if (queueEntry.hasAll === false && txAge > timeM3) {
         //   queueEntry.state = 'failed'
@@ -3042,8 +3067,10 @@ class StateManager extends EventEmitter {
           markAccountsSeen(queueEntry)
         } else if (queueEntry.state === 'processing') {
           if (accountSeen(queueEntry) === false) {
+            markAccountsSeen(queueEntry)
             try {
               await this.tellCorrespondingNodes(queueEntry)
+              this.logger.playbackLogNote('shrd_processing', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  values: ${debugAccountData(queueEntry, app)}`)
             } catch (ex) {
               this.mainLogger.debug('processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
               this.fatalLogger.fatal('processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -3084,7 +3111,7 @@ class StateManager extends EventEmitter {
           if (accountSeen(queueEntry) === false) {
             markAccountsSeen(queueEntry)
 
-            this.logger.playbackLogNote('shrd_workingOnTx', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${this.queueRestartCounter} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+            this.logger.playbackLogNote('shrd_workingOnTx', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
             this.emit('txPopped', queueEntry.acceptedTx.receipt.txHash)
 
             // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processAcceptedTxQueue2. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
@@ -3103,7 +3130,7 @@ class StateManager extends EventEmitter {
             let wrappedStates = queueEntry.collectedData // Object.values(queueEntry.collectedData)
             let localCachedData = queueEntry.localCachedData
             try {
-            // this.mainLogger.debug(` processAcceptedTxQueue2. applyAcceptedTransaction ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp} queuerestarts: ${this.queueRestartCounter} queueLen: ${this.newAcceptedTxQueue.length}`)
+            // this.mainLogger.debug(` processAcceptedTxQueue2. applyAcceptedTransaction ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp} queuerestarts: ${localRestartCounter} queueLen: ${this.newAcceptedTxQueue.length}`)
               let filter = queueEntry.localKeys
               let txResult = await this.applyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates, localCachedData, filter)
               if (txResult.success) {
@@ -3131,6 +3158,8 @@ class StateManager extends EventEmitter {
               // }
               this.removeFromQueue(queueEntry, currentIndex)
               queueEntry.state = 'applied'
+
+              this.logger.playbackLogNote('shrd_workingOnTxFinished', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
             }
 
             // do we have any syncing neighbors?
