@@ -125,6 +125,7 @@ class Logger {
         let shorthash = utils.makeShortHash(input.id)
         let out = shorthash + ':' + input.externalPort
         this._nodeInfos[input.id] = { node: input, out, shorthash }
+        return out
       }
       return stringify(input)
     }
