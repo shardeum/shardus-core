@@ -1306,6 +1306,22 @@ class ShardFunctions {
     return [centerAddr, centerAddrPlusOne]
   }
 
+  /**
+   * This will find two address that are close to what we want
+   * @param {string} address
+   * @returns {{address1:string; address2:string}}
+   */
+  static getNextAdjacentAddresses (address) {
+    let addressNum = parseInt(address.slice(0, 8), 16)
+
+    let addressPrefixHex = ShardFunctions.leadZeros8((addressNum).toString(16))
+    let addressPrefixHex2 = ShardFunctions.leadZeros8((addressNum + 1).toString(16))
+
+    let address1 = addressPrefixHex + 'f'.repeat(56)
+    let address2 = addressPrefixHex2 + '0'.repeat(56)
+    return { address1, address2 }
+  }
+
   static getCenterHomeNode (shardGlobals, parititionShardDataMap, lowAddress, highAddress) {
     let [centerAddr] = ShardFunctions.findCenterAddressPair(lowAddress, highAddress)
 

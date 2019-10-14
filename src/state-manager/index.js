@@ -693,39 +693,127 @@ class StateManager extends EventEmitter {
     let homePartition = nodeShardData.homePartition
 
     console.log(`homePartition: ${homePartition} storedPartitions: ${utils.stringifyReduce(nodeShardData.storedPartitions)}`)
-    if (nodeShardData.storedPartitions.partitionStart1 < homePartition && nodeShardData.storedPartitions.partitionEnd1 > homePartition) {
-      // two ranges
-      let range1 = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, nodeShardData.storedPartitions.partitionStart1, homePartition)
-      let range2 = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, homePartition, nodeShardData.storedPartitions.partitionEnd1)
+    // old tracker calculations.
+    // if (nodeShardData.storedPartitions.partitionStart1 < homePartition && nodeShardData.storedPartitions.partitionEnd1 > homePartition) {
+    //   // two ranges
+    //   let range1 = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, nodeShardData.storedPartitions.partitionStart1, homePartition)
+    //   let range2 = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, homePartition, nodeShardData.storedPartitions.partitionEnd1)
 
-      // stich the addresses together
-      let [centerAddr, centerAddrPlusOne] = ShardFunctions.findCenterAddressPair(range1.high, range2.low)
-      range1.high = centerAddr
-      range2.low = centerAddrPlusOne
-      rangesToSync.push(range1)
-      rangesToSync.push(range2)
-      console.log(`range1:2  s:${nodeShardData.storedPartitions.partitionStart1} e:${nodeShardData.storedPartitions.partitionEnd1} h: ${homePartition} `)
+    //   // stich the addresses together
+    //   let [centerAddr, centerAddrPlusOne] = ShardFunctions.findCenterAddressPair(range1.high, range2.low)
+    //   range1.high = centerAddr
+    //   range2.low = centerAddrPlusOne
+    //   rangesToSync.push(range1)
+    //   rangesToSync.push(range2)
+    //   console.log(`range1:2  s:${nodeShardData.storedPartitions.partitionStart1} e:${nodeShardData.storedPartitions.partitionEnd1} h: ${homePartition} `)
+    // } else {
+    //   // one range
+    //   rangesToSync.push(nodeShardData.storedPartitions.partitionRange)
+    //   console.log(`range1:1  s:${nodeShardData.storedPartitions.partitionStart1} e:${nodeShardData.storedPartitions.partitionEnd1} h: ${homePartition} `)
+    // }
+    // if (nodeShardData.storedPartitions.rangeIsSplit) {
+    //   if (nodeShardData.storedPartitions.partitionStart2 < homePartition && nodeShardData.storedPartitions.partitionEnd2 > homePartition) {
+    //   // two ranges
+    //     let range1 = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, nodeShardData.storedPartitions.partitionStart2, homePartition)
+    //     let range2 = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, homePartition, nodeShardData.storedPartitions.partitionEnd2)
+    //     // stich the addresses together
+    //     let [centerAddr, centerAddrPlusOne] = ShardFunctions.findCenterAddressPair(range1.high, range2.low)
+    //     range1.high = centerAddr
+    //     range2.low = centerAddrPlusOne
+    //     rangesToSync.push(range1)
+    //     rangesToSync.push(range2)
+    //     console.log(`range2:2  s:${nodeShardData.storedPartitions.partitionStart2} e:${nodeShardData.storedPartitions.partitionEnd2} h: ${homePartition} `)
+    //   } else {
+    //     // one range
+    //     rangesToSync.push(nodeShardData.storedPartitions.partitionRange2)
+    //     console.log(`range2:1  s:${nodeShardData.storedPartitions.partitionStart2} e:${nodeShardData.storedPartitions.partitionEnd2} h: ${homePartition} `)
+    //   }
+    // }
+
+    let chunksGuide = 4
+    let syncRangeGoal = Math.max(1, Math.min(chunksGuide, Math.floor(this.currentCycleShardData.shardGlobals.numPartitions / chunksGuide)))
+    let partitionsCovered = 0
+    let partitionsPerRange = 1
+
+    if (nodeShardData.storedPartitions.rangeIsSplit === true) {
+      partitionsCovered = nodeShardData.storedPartitions.partitionEnd1 - nodeShardData.storedPartitions.partitionStart1
+      partitionsCovered += nodeShardData.storedPartitions.partitionEnd2 - nodeShardData.storedPartitions.partitionStart2
+      partitionsPerRange = Math.max(Math.floor(partitionsCovered / syncRangeGoal), 1)
+      console.log(`syncRangeGoal ${syncRangeGoal}  chunksGuide:${chunksGuide} numPartitions:${this.currentCycleShardData.shardGlobals.numPartitions} partitionsPerRange:${partitionsPerRange}`)
+
+      let start = nodeShardData.storedPartitions.partitionStart1
+      let end = nodeShardData.storedPartitions.partitionEnd1
+      let currentStart = start
+      let currentEnd = 0
+      let nextLowAddress = null
+      let i = 0
+      while (currentEnd < end) {
+        currentEnd = Math.min(currentStart + partitionsPerRange, end)
+        let range = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, currentStart, currentEnd)
+
+        let { address1, address2 } = ShardFunctions.getNextAdjacentAddresses(range.high)
+        range.high = address1
+
+        if (nextLowAddress != null) {
+          range.low = nextLowAddress
+        }
+        console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition}  a1: ${range.low} a2: ${range.high}`)
+        nextLowAddress = address2
+        currentStart = currentEnd
+        i++
+        rangesToSync.push(range)
+      }
+
+      start = nodeShardData.storedPartitions.partitionStart2
+      end = nodeShardData.storedPartitions.partitionEnd2
+      currentStart = start
+      currentEnd = 0
+      nextLowAddress = null
+
+      while (currentEnd < end) {
+        currentEnd = Math.min(currentStart + partitionsPerRange, end)
+        let range = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, currentStart, currentEnd)
+
+        let { address1, address2 } = ShardFunctions.getNextAdjacentAddresses(range.high)
+        range.high = address1
+
+        if (nextLowAddress != null) {
+          range.low = nextLowAddress
+        }
+        console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition} a1: ${range.low} a2: ${range.high}`)
+
+        nextLowAddress = address2
+        currentStart = currentEnd
+        i++
+        rangesToSync.push(range)
+      }
     } else {
-      // one range
-      rangesToSync.push(nodeShardData.storedPartitions.partitionRange)
-      console.log(`range1:1  s:${nodeShardData.storedPartitions.partitionStart1} e:${nodeShardData.storedPartitions.partitionEnd1} h: ${homePartition} `)
-    }
-    if (nodeShardData.storedPartitions.rangeIsSplit) {
-      if (nodeShardData.storedPartitions.partitionStart2 < homePartition && nodeShardData.storedPartitions.partitionEnd2 > homePartition) {
-      // two ranges
-        let range1 = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, nodeShardData.storedPartitions.partitionStart2, homePartition)
-        let range2 = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, homePartition, nodeShardData.storedPartitions.partitionEnd2)
-        // stich the addresses together
-        let [centerAddr, centerAddrPlusOne] = ShardFunctions.findCenterAddressPair(range1.high, range2.low)
-        range1.high = centerAddr
-        range2.low = centerAddrPlusOne
-        rangesToSync.push(range1)
-        rangesToSync.push(range2)
-        console.log(`range2:2  s:${nodeShardData.storedPartitions.partitionStart2} e:${nodeShardData.storedPartitions.partitionEnd2} h: ${homePartition} `)
-      } else {
-        // one range
-        rangesToSync.push(nodeShardData.storedPartitions.partitionRange2)
-        console.log(`range2:1  s:${nodeShardData.storedPartitions.partitionStart2} e:${nodeShardData.storedPartitions.partitionEnd2} h: ${homePartition} `)
+      partitionsCovered = nodeShardData.storedPartitions.partitionEnd - nodeShardData.storedPartitions.partitionStart
+      partitionsPerRange = Math.max(Math.floor(partitionsCovered / syncRangeGoal), 1)
+      console.log(`syncRangeGoal ${syncRangeGoal}  chunksGuide:${chunksGuide} numPartitions:${this.currentCycleShardData.shardGlobals.numPartitions} partitionsPerRange:${partitionsPerRange}`)
+
+      let start = nodeShardData.storedPartitions.partitionStart
+      let end = nodeShardData.storedPartitions.partitionEnd
+
+      let currentStart = start
+      let currentEnd = 0
+      let nextLowAddress = null
+      let i = 0
+      while (currentEnd < end) {
+        currentEnd = Math.min(currentStart + partitionsPerRange, end)
+        let range = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, currentStart, currentEnd)
+
+        let { address1, address2 } = ShardFunctions.getNextAdjacentAddresses(range.high)
+        range.high = address1
+
+        if (nextLowAddress != null) {
+          range.low = nextLowAddress
+        }
+        console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition}  a1: ${range.low} a2: ${range.high}`)
+        nextLowAddress = address2
+        currentStart = currentEnd
+        i++
+        rangesToSync.push(range)
       }
     }
 
