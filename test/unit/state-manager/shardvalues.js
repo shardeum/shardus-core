@@ -63,10 +63,11 @@ let useHardcodenodes = true
 
 // let hardcodeNodes2 = ['0325xa8adb', '05a6xa2f35', '06e3x5a6b6', '0b63x1bfab', '16c6xffeb6', '1788x01997', '2926x7106a', '2fb3xc044f', '37aex2b600', '3e76x08324', '6eb5xd541f', '87aaxcc9fb', '9296x4ee2e', '9c39x1ff15', 'ae7fx325be', 'b29exe5d79', 'c7d2xb1a40', 'e0bcxbd49c', 'e2edx6a490', 'fed0x5de0b']
 
-let hardcodeNodes = ['5a37x87a3d', '5c42x61036', '84ebx211db']
+// let hardcodeNodes = ['5a37x87a3d', '5c42x61036', '84ebx211db']
+// let hardcodeNodes2 = ['5a37x87a3d', '5c42x61036', '84ebx211db']
 
-let hardcodeNodes2 = ['5a37x87a3d', '5c42x61036', '84ebx211db']
-
+let hardcodeNodes = ['0e6dx4047f', '1a02x90b21', '2479xba65c', '2512xbae99', '25e8xd16e3', '25f9x78474', '2e7fx69a34', '3395x341b0', '4403x0eaf9', '508fxcaa6e', '6ac4xec02d', '7238xc8cce', '72dax72106', '73eexdf738', '781cxaaae3', '7852x9ea56', '81e2x6bac8', '83cdxf22bc', '8675xc4b3b', '8af7x952e1', 'a1f2x02066', 'b002x24eb1', 'b68ex952c5', 'b6eexf00d4', 'c51bx318ed', 'c7cbx74fed', 'c9d0x44e0b', 'ce46xb48f9', 'd1d0xb78eb', 'd47cx41d3b', 'dac0x4999b', 'ddfex2f319', 'e598xe41ac', 'ec85xccb47', 'f391x66f35']
+let hardcodeNodes2 = null // ['0e6dx4047f', '1a02x90b21', '2479xba65c', '2512xbae99', '25e8xd16e3', '25f9x78474', '2e7fx69a34', '3395x341b0', '4403x0eaf9', '508fxcaa6e', '6ac4xec02d', '7238xc8cce', '72dax72106', '73eexdf738', '781cxaaae3', '7852x9ea56', '81e2x6bac8', '83cdxf22bc', '8675xc4b3b', '8af7x952e1', 'a1f2x02066', 'b002x24eb1', 'b68ex952c5', 'b6eexf00d4', 'c51bx318ed', 'c7cbx74fed', 'c9d0x44e0b', 'ce46xb48f9', 'd1d0xb78eb', 'd47cx41d3b', 'dac0x4999b', 'ddfex2f319', 'e598xe41ac', 'ec85xccb47', 'f391x66f35']
 // let hardcodeNodes2 = null
 
 if (useHardcodenodes) {
@@ -75,9 +76,9 @@ if (useHardcodenodes) {
 if (hardcodeNodes2) {
   numNodes2 = hardcodeNodes2.length
 }
-let debugStartsWith = '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
+let debugStartsWith = '7459' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
 let debugID = debugStartsWith.slice(0, 4) + '7'.repeat(64 - 4)
-let debugAccount = '386e' + '3'.repeat(60) // 5c43
+let debugAccount = '75ed' + '3'.repeat(60) // 5c43 386e
 let debugNode = null
 // 5c43xba41c account test.. need to expand it.
 
@@ -130,8 +131,15 @@ for (let i = 0; i < testIterations; i++) {
       debugNode = node
     }
   }
+
+  if (debugStartsWith != null && ourNode == null) {
+    // debugID
+    ourNode = { status: 'syncing', id: debugID }
+    debugNode = ourNode
+  }
+
   if (debugStartsWith != null) {
-    // // this was the earlier simple way
+    // this was the earlier simple way
     // ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, false)
     // for (let node of activeNodes) {
     //   if (node.id.indexOf(debugStartsWith) >= 0) {

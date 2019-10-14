@@ -351,6 +351,14 @@ class ShardFunctions {
     }
 
     if (nodeShardData.ourNodeIndex !== -1) {
+      // make sure we have not already added this data to the homenode list. This was happening for our own node.
+      for (let i = 0; i < partitionShard.homeNodes.length; i++) {
+        let hn = partitionShard.homeNodes[i]
+        if (hn.node === nodeShardData.node) {
+          partitionShard.homeNodes.splice(i, 1)
+          break
+        }
+      }
       partitionShard.homeNodes.push(nodeShardData)
     }
 
@@ -421,67 +429,128 @@ class ShardFunctions {
       nodeShardData.storedPartitions = ShardFunctions.calculateStoredPartitions2(shardGlobals, nodeShardData.homePartition)
     }
 
+    let nodeIsActive = nodeShardData.ourNodeIndex !== -1
     let exclude = [nodeShardData.node.id]
     let excludeNodeArray = [nodeShardData.node]
 
     // tried a better way but it dies of needing data we dont have yet..
     nodeShardData.nodeThatStoreOurParition = ShardFunctions.getNodesThatCoverParitionRaw(shardGlobals, nodeShardDataMap, nodeShardData.homePartition, exclude, activeNodes)
     // nodeShardData.nodeThatStoreOurParition = ShardFunctions.getNodesThatCoverRange(shardGlobals, nodeShardData.storedPartitions.homeRange.low, nodeShardData.storedPartitions.homeRange.high, exclude, activeNodes)
-    nodeShardData.consensusNodeForOurNode = ShardFunctions.getNeigborNodesInRange(nodeShardData.ourNodeIndex, shardGlobals.consensusRadius, exclude, activeNodes)
-    nodeShardData.consensusNodeForOurNodeFull = ShardFunctions.getNeigborNodesInRange(nodeShardData.ourNodeIndex, shardGlobals.consensusRadius, [], activeNodes)
 
-    // calcuate partition range for consensus
-    if (nodeShardData.consensusNodeForOurNode.length >= 2) {
+    // check if node is active because there are many calculations that are invalid or wrong if you try to compute them with a node that is not active in the network.
+    // This is because consenus calcualtions are based on distance to other active nodes.
+    if (nodeIsActive) {
+      nodeShardData.consensusNodeForOurNode = ShardFunctions.getNeigborNodesInRange(nodeShardData.ourNodeIndex, shardGlobals.consensusRadius, exclude, activeNodes)
+      nodeShardData.consensusNodeForOurNodeFull = ShardFunctions.getNeigborNodesInRange(nodeShardData.ourNodeIndex, shardGlobals.consensusRadius, [], activeNodes)
+
+      // calcuate partition range for consensus
+      if (nodeShardData.consensusNodeForOurNode.length >= 2) {
       // this logic only works because we know that getNeigborNodesInRange starts at the starting point
-      let startNode = nodeShardData.consensusNodeForOurNode[0]
-      let endNode = nodeShardData.consensusNodeForOurNode[nodeShardData.consensusNodeForOurNode.length - 1]
-      // ugh, not so efficient since we might have this data precalced in a map.. but way may also not have it
-      let nodeAddressNum = parseInt(startNode.id.slice(0, 8), 16)
-      let startPartition = Math.floor(shardGlobals.numPartitions * (nodeAddressNum / 0xffffffff))
-      nodeAddressNum = parseInt(endNode.id.slice(0, 8), 16)
-      let endPartition = Math.floor(shardGlobals.numPartitions * (nodeAddressNum / 0xffffffff))
-      nodeShardData.consensusStartPartition = startPartition
-      nodeShardData.consensusEndPartition = endPartition
+        let startNode = nodeShardData.consensusNodeForOurNode[0]
+        let endNode = nodeShardData.consensusNodeForOurNode[nodeShardData.consensusNodeForOurNode.length - 1]
+        // ugh, not so efficient since we might have this data precalced in a map.. but way may also not have it
+        let nodeAddressNum = parseInt(startNode.id.slice(0, 8), 16)
+        let startPartition = Math.floor(shardGlobals.numPartitions * (nodeAddressNum / 0xffffffff))
+        nodeAddressNum = parseInt(endNode.id.slice(0, 8), 16)
+        let endPartition = Math.floor(shardGlobals.numPartitions * (nodeAddressNum / 0xffffffff))
+        nodeShardData.consensusStartPartition = startPartition
+        nodeShardData.consensusEndPartition = endPartition
 
-      // the jit verison really needs to be a third passs. otherwise we could face recursion problems.
-    }
+        // test to see if we need to adjust our stored range.  this could happen if the consensus range is outside of our stored range!
+        let storedRangeChange = false
+        // the normal case
+        if (startPartition < endPartition) {
+          if (nodeShardData.consensusStartPartition < nodeShardData.storedPartitions.partitionStart) {
+            nodeShardData.storedPartitions.partitionStart = nodeShardData.consensusStartPartition
+            storedRangeChange = true
+          }
+          if (nodeShardData.consensusEndPartition > nodeShardData.storedPartitions.partitionEnd) {
+            nodeShardData.storedPartitions.partitionStart = nodeShardData.consensusStartPartition
+            storedRangeChange = true
+          }
+        }
+        // the split index case (wraps the circle)
+        if (startPartition > endPartition) {
+          if (nodeShardData.consensusStartPartition > nodeShardData.storedPartitions.partitionStart) {
+            nodeShardData.storedPartitions.partitionStart = nodeShardData.consensusStartPartition
+            storedRangeChange = true
+          }
+          if (nodeShardData.consensusEndPartition < nodeShardData.storedPartitions.partitionEnd) {
+            nodeShardData.storedPartitions.partitionStart = nodeShardData.consensusStartPartition
+            storedRangeChange = true
+          }
+        }
+        if (storedRangeChange) {
+          ShardFunctions.calculateStoredPartitions2Ranges(shardGlobals, nodeShardData.storedPartitions)
+        }
 
-    if (nodeShardData.consensusStartPartition <= nodeShardData.consensusEndPartition) {
-      for (let i = nodeShardData.consensusStartPartition; i <= nodeShardData.consensusEndPartition; i++) {
-        let shardPartitionData = parititionShardDataMap.get(i)
-
-        shardPartitionData.coveredBy[nodeShardData.node.id] = nodeShardData.node // { idx: nodeShardData.ourNodeIndex }
+      // todo? the jit verison really needs to be a third passs. otherwise we could face recursion problems.
       }
+
+      if (nodeShardData.consensusStartPartition <= nodeShardData.consensusEndPartition) {
+        for (let i = nodeShardData.consensusStartPartition; i <= nodeShardData.consensusEndPartition; i++) {
+          let shardPartitionData = parititionShardDataMap.get(i)
+
+          shardPartitionData.coveredBy[nodeShardData.node.id] = nodeShardData.node // { idx: nodeShardData.ourNodeIndex }
+        }
+      } else {
+        for (let i = 0; i <= nodeShardData.consensusEndPartition; i++) {
+          let shardPartitionData = parititionShardDataMap.get(i)
+
+          shardPartitionData.coveredBy[nodeShardData.node.id] = nodeShardData.node // { idx: nodeShardData.ourNodeIndex }
+        }
+        for (let i = nodeShardData.consensusStartPartition; i < shardGlobals.numPartitions; i++) {
+          let shardPartitionData = parititionShardDataMap.get(i)
+
+          shardPartitionData.coveredBy[nodeShardData.node.id] = nodeShardData.node // { idx: nodeShardData.ourNodeIndex }
+        }
+      }
+
+      // this list is a temporary list that counts as 2c range.  Stored nodes are the merged max of 2c range (2r on each side) and node in the 2c partition range
+      nodeShardData.c2NodeForOurNode = ShardFunctions.getNeigborNodesInRange(nodeShardData.ourNodeIndex, 2 * shardGlobals.consensusRadius, exclude, activeNodes)
+
+      let [results, extras] = ShardFunctions.mergeNodeLists(nodeShardData.nodeThatStoreOurParition, nodeShardData.c2NodeForOurNode)
+
+      nodeShardData.nodeThatStoreOurParitionFull = results
+      nodeShardData.outOfDefaultRangeNodes = extras
+
+      nodeShardData.edgeNodes = ShardFunctions.subtractNodeLists(nodeShardData.nodeThatStoreOurParitionFull, nodeShardData.consensusNodeForOurNode)
+      nodeShardData.edgeNodes = ShardFunctions.subtractNodeLists(nodeShardData.edgeNodes, excludeNodeArray) // remove ourself!
+
+      if (extras.length > 0) {
+        ShardFunctions.dilateNeighborCoverage(shardGlobals, nodeShardDataMap, parititionShardDataMap, activeNodes, nodeShardData, extras)
+      }
+      nodeShardData.edgeNodes.sort(ShardFunctions.nodeSort)
+      nodeShardData.consensusNodeForOurNodeFull.sort(ShardFunctions.nodeSort)
+      nodeShardData.nodeThatStoreOurParitionFull.sort(ShardFunctions.nodeSort)
     } else {
-      for (let i = 0; i <= nodeShardData.consensusEndPartition; i++) {
-        let shardPartitionData = parititionShardDataMap.get(i)
+      nodeShardData.consensusNodeForOurNode = []
+      nodeShardData.consensusNodeForOurNodeFull = []
+      nodeShardData.c2NodeForOurNode = []
 
-        shardPartitionData.coveredBy[nodeShardData.node.id] = nodeShardData.node // { idx: nodeShardData.ourNodeIndex }
-      }
-      for (let i = nodeShardData.consensusStartPartition; i < shardGlobals.numPartitions; i++) {
-        let shardPartitionData = parititionShardDataMap.get(i)
+      nodeShardData.nodeThatStoreOurParitionFull = nodeShardData.nodeThatStoreOurParition.slice(0)
+      nodeShardData.outOfDefaultRangeNodes = []
+      nodeShardData.edgeNodes = nodeShardData.nodeThatStoreOurParitionFull.slice(0) // just dupe the stored list.
+      nodeShardData.edgeNodes = ShardFunctions.subtractNodeLists(nodeShardData.edgeNodes, excludeNodeArray) // remove ourself!
 
-        shardPartitionData.coveredBy[nodeShardData.node.id] = nodeShardData.node // { idx: nodeShardData.ourNodeIndex }
-      }
+      nodeShardData.edgeNodes.sort(ShardFunctions.nodeSort)
+      nodeShardData.consensusNodeForOurNodeFull.sort(ShardFunctions.nodeSort)
+      nodeShardData.nodeThatStoreOurParitionFull.sort(ShardFunctions.nodeSort)
     }
 
-    // this list is a temporary list that counts as 2c range.  Stored nodes are the merged max of 2c range (2r on each side) and node in the 2c partition range
-    nodeShardData.c2NodeForOurNode = ShardFunctions.getNeigborNodesInRange(nodeShardData.ourNodeIndex, 2 * shardGlobals.consensusRadius, exclude, activeNodes)
+    // original end of this function:
+    // nodeShardData.edgeNodes = ShardFunctions.subtractNodeLists(nodeShardData.nodeThatStoreOurParitionFull, nodeShardData.consensusNodeForOurNode)
+    // nodeShardData.edgeNodes = ShardFunctions.subtractNodeLists(nodeShardData.edgeNodes, excludeNodeArray) // remove ourself!
 
-    let [results, extras] = ShardFunctions.mergeNodeLists(nodeShardData.nodeThatStoreOurParition, nodeShardData.c2NodeForOurNode)
+    // if (extras.length > 0) {
+    //   ShardFunctions.dilateNeighborCoverage(shardGlobals, nodeShardDataMap, parititionShardDataMap, activeNodes, nodeShardData, extras)
+    // }
 
-    nodeShardData.nodeThatStoreOurParitionFull = results
-    nodeShardData.outOfDefaultRangeNodes = extras
+    // nodeShardData.edgeNodes = ShardFunctions.subtractNodeLists(nodeShardData.edgeNodes, excludeNodeArray) // remove ourself!
 
-    nodeShardData.edgeNodes = ShardFunctions.subtractNodeLists(nodeShardData.nodeThatStoreOurParitionFull, nodeShardData.consensusNodeForOurNode)
-    nodeShardData.edgeNodes = ShardFunctions.subtractNodeLists(nodeShardData.edgeNodes, excludeNodeArray) // remove ourself!
-
-    if (extras.length > 0) {
-      ShardFunctions.dilateNeighborCoverage(shardGlobals, nodeShardDataMap, parititionShardDataMap, activeNodes, nodeShardData, extras)
-    }
-    nodeShardData.edgeNodes.sort(ShardFunctions.nodeSort)
-    nodeShardData.consensusNodeForOurNodeFull.sort(ShardFunctions.nodeSort)
-    nodeShardData.nodeThatStoreOurParitionFull.sort(ShardFunctions.nodeSort)
+    // nodeShardData.edgeNodes.sort(ShardFunctions.nodeSort)
+    // nodeShardData.consensusNodeForOurNodeFull.sort(ShardFunctions.nodeSort)
+    // nodeShardData.nodeThatStoreOurParitionFull.sort(ShardFunctions.nodeSort)
   }
 
   static nodeSort (a, b) {
