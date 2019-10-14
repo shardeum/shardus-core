@@ -200,6 +200,12 @@ class ShardFunctions {
       storedPartitions.partitionEnd = storedPartitions.partitionRangeVector.end
     }
 
+    // alias to start and end 1 in the simple case.  sync code expects values for these
+    if (storedPartitions.rangeIsSplit === false) {
+      storedPartitions.partitionStart1 = storedPartitions.partitionStart
+      storedPartitions.partitionEnd1 = storedPartitions.partitionEnd
+    }
+
     // did we wrap to cover the entire range, that should have early outed at the top of the function
     if (storedPartitions.rangeIsSplit === true && (storedPartitions.partitionStart1 === storedPartitions.partitionEnd2 || storedPartitions.partitionStart2 === storedPartitions.partitionEnd1)) {
       throw new Error('this should never happen: ' + stringify(storedPartitions) + 'globals: ' + stringify(shardGlobals))
