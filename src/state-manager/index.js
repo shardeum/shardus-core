@@ -1194,6 +1194,13 @@ class StateManager extends EventEmitter {
     await this.syncStateDataForRange(this.currentRange)
   }
 
+  failAndDontRestartSync () {
+    this.mainLogger.debug(`DATASYNC: failAndDontRestartSync`)
+    // need to clear more?
+    this.clearPartitionData()
+    this.syncTrackers = []
+  }
+
   // just a placeholder for later
   recordPotentialBadnode () {
     // The may need to live on the p2p class, or call into it
@@ -4272,6 +4279,13 @@ class StateManager extends EventEmitter {
     }
 
     return true
+  }
+
+  initApoptosisAndQuitSyncing () {
+    console.log('initApoptosisAndQuitSyncing ' + utils.getTime('s'))
+    this.mainLogger.error(this.dataPhaseTag + `initApoptosisAndQuitSyncing `)
+    this.failAndDontRestartSync()
+    this.p2p.initApoptosis()
   }
 
   /**

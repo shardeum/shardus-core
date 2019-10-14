@@ -19,6 +19,7 @@ class Storage {
 
     // this.storage = new BetterSqlite3Storage(models, config, logger, baseDir, this.profiler)
     this.storage = new Sqlite3Storage(models, config, logger, baseDir, this.profiler)
+    this.stateManager = null
   }
 
   async init () {
@@ -311,8 +312,16 @@ class Storage {
     this._checkInit()
     try {
       await this._create(this.storageModels.accountStates, accountStates)
+
+      // throw new Error('test failue. fake')
     } catch (e) {
-      throw new Error(e)
+      // this.mainLogger.fatal('addAccountStates error ' + JSON.stringify(e))
+      // throw new Error(e)
+
+      this.mainLogger.fatal('addAccountStates db failure.  start apoptosis ' + JSON.stringify(e))
+      // stop state manager from syncing?
+
+      this.stateManager.initApoptosisAndQuitSyncing()
     }
   }
 
