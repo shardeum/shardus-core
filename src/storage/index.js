@@ -311,7 +311,8 @@ class Storage {
   async addAccountStates (accountStates) {
     this._checkInit()
     try {
-      await this._create(this.storageModels.accountStates, accountStates)
+      // NOt sure if it is good to do , { createOrReplace: true }  but testing it out
+      await this._create(this.storageModels.accountStates, accountStates, { createOrReplace: true })
 
       // throw new Error('test failue. fake')
     } catch (e) {
