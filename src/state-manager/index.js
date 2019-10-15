@@ -1775,10 +1775,12 @@ class StateManager extends EventEmitter {
               repairTracker.evaluationStarted = true
 
               let ourResult = null
-              for (let obj of ourPartitionResults) {
-                if (obj.Partition_id === partitionId) {
-                  ourResult = obj
-                  break
+              if (ourPartitionResults != null) {
+                for (let obj of ourPartitionResults) {
+                  if (obj.Partition_id === partitionId) {
+                    ourResult = obj
+                    break
+                  }
                 }
               }
               if (ourResult == null) {
