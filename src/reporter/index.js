@@ -98,7 +98,7 @@ class Reporter {
   startReporting () {
     // Creates and sends a report every `interval` seconds
     this.reportTimer = setInterval(async () => {
-      const appState = this.stateManager ? await this.stateManager.getAccountsStateHash() : allZeroes64
+      let appState = this.stateManager ? await this.stateManager.getAccountsStateHash() : allZeroes64
       const cycleMarker = this.p2p.getCycleMarker()
       const cycleCounter = this.p2p.state.getCycleCounter()
       const nodelistHash = this.p2p.getNodelistHash()
@@ -113,13 +113,17 @@ class Reporter {
       // report only if we are active in te networks.
       // only knowingly report deltas.
       let partitionReport = null
+      let globalSync = null
       if (this.stateManager != null) {
         partitionReport = this.stateManager.getPartitionReport(true, true)
+        globalSync = this.stateManager.stateIsGood
+
+        // Hack to code a green or red color for app state:
+        // appState = globalSync ? '00ff00ff' : 'ff0000ff'
       }
-      // globalSync
 
       try {
-        await this._sendReport({ appState, cycleMarker, cycleCounter, nodelistHash, desiredNodes, txInjected, txApplied, txRejected, txExpired, reportInterval, nodeIpInfo, partitionReport })
+        await this._sendReport({ appState, cycleMarker, cycleCounter, nodelistHash, desiredNodes, txInjected, txApplied, txRejected, txExpired, reportInterval, nodeIpInfo, partitionReport, globalSync })
       } catch (e) {
         this.mainLogger.error('startReporting: ' + e.name + ': ' + e.message + ' at ' + e.stack)
         console.error(e)

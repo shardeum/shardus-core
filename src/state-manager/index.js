@@ -307,6 +307,10 @@ class StateManager extends EventEmitter {
     this.lastCycleReported = -1
     this.partitionReportDirty = false
     this.nextCycleReportToSend = null
+
+    // this controls the repair portion of data repair.
+    this.canDataRepair = false
+    this.stateIsGood = true
   }
 
   // this clears state data related to the current partion we are syncing.
@@ -3576,9 +3580,9 @@ class StateManager extends EventEmitter {
    * getPartitionReport used by reporting (monitor server) to query if there is a partition report ready
    * @param {boolean} consensusOnly
    * @param {boolean} smallHashes
-   * @returns {Promise<any>}
+   * @returns {any}
    */
-  async getPartitionReport (consensusOnly, smallHashes) {
+  getPartitionReport (consensusOnly, smallHashes) {
     let response = {}
     if (this.nextCycleReportToSend != null) {
       if (this.lastCycleReported < this.nextCycleReportToSend.cycleNumber || this.partitionReportDirty === true) {
@@ -3593,9 +3597,22 @@ class StateManager extends EventEmitter {
         this.lastCycleReported = this.nextCycleReportToSend.cycleNumber // update reported cycle
         this.nextCycleReportToSend = null // clear it because we sent it
         this.partitionReportDirty = false // not dirty anymore
+
+        this.mainLogger.debug('getPartitionReport: ' + `insync: ${this.stateIsGood} ` + utils.stringifyReduce(response))
       }
     }
     return response
+  }
+
+  /**
+   * @param {PartitionObject} partitionObject
+   */
+  poMicroDebug (partitionObject) {
+    let header = `c${partitionObject.Cycle_number}p${partitionObject.Partition_id}`
+
+    // need to get a list of compacted TXs in order. also addresses. timestamps?  make it so tools can process easily. (align timestamps view.)
+
+    this.mainLogger.debug('poMicroDebug: ' + header)
   }
 
   /**
@@ -3629,6 +3646,8 @@ class StateManager extends EventEmitter {
 
       this.partitionObjectsByCycle[cycleKey] = partitionObjects
       this.ourPartitionResultsByCycle[cycleKey] = partitionResults // todo in the future there could be many results (one per covered partition)
+
+      this.poMicroDebug(partitionObject)
 
       let partitionResultsByHash = this.recentPartitionObjectsByCycleByHash[cycleKey]
       if (partitionResultsByHash == null) {
@@ -3799,6 +3818,11 @@ class StateManager extends EventEmitter {
    * @param {string} ourLastResultHash
    */
   async startRepairProcess (cycle, topResult, partitionId, ourLastResultHash) {
+    this.stateIsGood = false
+    if (this.canDataRepair === false) {
+      return
+    }
+
     let repairTracker = this._getRepairTrackerForCycle(cycle.counter, partitionId)
 
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess begin.  repairTracker: ${utils.stringifyReduce(repairTracker)}`)
@@ -5331,7 +5355,11 @@ class StateManager extends EventEmitter {
 
     let lastCycleShardValues = this.shardValuesByCycle.get(cycle.counter)
 
-    for (let partitionID of lastCycleShardValues.ourConsensusPartitions) {
+    // for (let partitionID of lastCycleShardValues.ourConsensusPartitions) {
+    for (let accountData of applyResponse.accountData) {
+      /** @type {NodeShardData} */
+      let homeNode = ShardFunctions.findHomeNode(lastCycleShardValues.shardGlobals, accountData.accountId, lastCycleShardValues.parititionShardDataMap)
+      let partitionID = homeNode.homePartition
       let txList = this.getTXList(cycleNumber, partitionID) // todo sharding - done: pass partition ID
 
       if (txList.processed) {

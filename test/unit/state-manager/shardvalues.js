@@ -66,9 +66,12 @@ let useHardcodenodes = true
 // let hardcodeNodes = ['5a37x87a3d', '5c42x61036', '84ebx211db']
 // let hardcodeNodes2 = ['5a37x87a3d', '5c42x61036', '84ebx211db']
 
-let hardcodeNodes = ['0e6dx4047f', '1a02x90b21', '2479xba65c', '2512xbae99', '25e8xd16e3', '25f9x78474', '2e7fx69a34', '3395x341b0', '4403x0eaf9', '508fxcaa6e', '6ac4xec02d', '7238xc8cce', '72dax72106', '73eexdf738', '781cxaaae3', '7852x9ea56', '81e2x6bac8', '83cdxf22bc', '8675xc4b3b', '8af7x952e1', 'a1f2x02066', 'b002x24eb1', 'b68ex952c5', 'b6eexf00d4', 'c51bx318ed', 'c7cbx74fed', 'c9d0x44e0b', 'ce46xb48f9', 'd1d0xb78eb', 'd47cx41d3b', 'dac0x4999b', 'ddfex2f319', 'e598xe41ac', 'ec85xccb47', 'f391x66f35']
-let hardcodeNodes2 = null // ['0e6dx4047f', '1a02x90b21', '2479xba65c', '2512xbae99', '25e8xd16e3', '25f9x78474', '2e7fx69a34', '3395x341b0', '4403x0eaf9', '508fxcaa6e', '6ac4xec02d', '7238xc8cce', '72dax72106', '73eexdf738', '781cxaaae3', '7852x9ea56', '81e2x6bac8', '83cdxf22bc', '8675xc4b3b', '8af7x952e1', 'a1f2x02066', 'b002x24eb1', 'b68ex952c5', 'b6eexf00d4', 'c51bx318ed', 'c7cbx74fed', 'c9d0x44e0b', 'ce46xb48f9', 'd1d0xb78eb', 'd47cx41d3b', 'dac0x4999b', 'ddfex2f319', 'e598xe41ac', 'ec85xccb47', 'f391x66f35']
+// let hardcodeNodes = ['0e6dx4047f', '1a02x90b21', '2479xba65c', '2512xbae99', '25e8xd16e3', '25f9x78474', '2e7fx69a34', '3395x341b0', '4403x0eaf9', '508fxcaa6e', '6ac4xec02d', '7238xc8cce', '72dax72106', '73eexdf738', '781cxaaae3', '7852x9ea56', '81e2x6bac8', '83cdxf22bc', '8675xc4b3b', '8af7x952e1', 'a1f2x02066', 'b002x24eb1', 'b68ex952c5', 'b6eexf00d4', 'c51bx318ed', 'c7cbx74fed', 'c9d0x44e0b', 'ce46xb48f9', 'd1d0xb78eb', 'd47cx41d3b', 'dac0x4999b', 'ddfex2f319', 'e598xe41ac', 'ec85xccb47', 'f391x66f35']
+// let hardcodeNodes2 = null // ['0e6dx4047f', '1a02x90b21', '2479xba65c', '2512xbae99', '25e8xd16e3', '25f9x78474', '2e7fx69a34', '3395x341b0', '4403x0eaf9', '508fxcaa6e', '6ac4xec02d', '7238xc8cce', '72dax72106', '73eexdf738', '781cxaaae3', '7852x9ea56', '81e2x6bac8', '83cdxf22bc', '8675xc4b3b', '8af7x952e1', 'a1f2x02066', 'b002x24eb1', 'b68ex952c5', 'b6eexf00d4', 'c51bx318ed', 'c7cbx74fed', 'c9d0x44e0b', 'ce46xb48f9', 'd1d0xb78eb', 'd47cx41d3b', 'dac0x4999b', 'ddfex2f319', 'e598xe41ac', 'ec85xccb47', 'f391x66f35']
 // let hardcodeNodes2 = null
+
+let hardcodeNodes = ['2054x6b984', '42b5x19622', '4efbx6ce6c', '55e5xaf076', '7a5ax9365e', '7f3exb4a97', '8d7dxfd5f5', 'b0a6x24dfa', 'c04exda76e', 'ed19xfd9ba']
+let hardcodeNodes2 = null
 
 if (useHardcodenodes) {
   numNodes = hardcodeNodes.length
@@ -76,7 +79,7 @@ if (useHardcodenodes) {
 if (hardcodeNodes2) {
   numNodes2 = hardcodeNodes2.length
 }
-let debugStartsWith = '7459' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
+let debugStartsWith = '2054' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
 let debugID = debugStartsWith.slice(0, 4) + '7'.repeat(64 - 4)
 let debugAccount = '75ed' + '3'.repeat(60) // 5c43 386e
 let debugNode = null
