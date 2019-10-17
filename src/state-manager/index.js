@@ -5378,10 +5378,13 @@ class StateManager extends EventEmitter {
 
     let lastCycleShardValues = this.shardValuesByCycle.get(cycle.counter)
 
+    let keysResponse = this.app.getKeyFromTransaction(acceptedTx.data)
+    let { allKeys } = keysResponse
+
     // for (let partitionID of lastCycleShardValues.ourConsensusPartitions) {
-    for (let accountData of applyResponse.accountData) {
+    for (let accountKey of allKeys) {
       /** @type {NodeShardData} */
-      let homeNode = ShardFunctions.findHomeNode(lastCycleShardValues.shardGlobals, accountData.accountId, lastCycleShardValues.parititionShardDataMap)
+      let homeNode = ShardFunctions.findHomeNode(lastCycleShardValues.shardGlobals, accountKey, lastCycleShardValues.parititionShardDataMap)
       let partitionID = homeNode.homePartition
       let txList = this.getTXList(cycleNumber, partitionID) // todo sharding - done: pass partition ID
 
