@@ -486,10 +486,15 @@ class P2PState extends EventEmitter {
     for (const lostUpMsg of lost.up) {
       this.addLostMessage(lostUpMsg, true)
     }
-    const cMarkerBefore = this.getCurrentCertificate().marker
-    this._createCycleMarker(false)
-    const cMarkerAfter = this.getCurrentCertificate().marker
-    if (cMarkerBefore === cMarkerAfter) return false
+    try {
+      const cMarkerBefore = this.getCurrentCertificate().marker
+      this._createCycleMarker(false)
+      const cMarkerAfter = this.getCurrentCertificate().marker
+      if (cMarkerBefore === cMarkerAfter) return false
+    } catch (err) {
+      console.log(err)
+      return false
+    }
     return true
   }
 
