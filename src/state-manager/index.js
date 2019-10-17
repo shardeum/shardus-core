@@ -453,6 +453,21 @@ class StateManager extends EventEmitter {
     this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${cycleNumber} data: ${utils.stringifyReduce(cycleShardData)}`)
   }
 
+  /**
+   * getShardDataForCycle
+   * @param {number} cycleNumber
+   * @returns {CycleShardData}
+   */
+  getShardDataForCycle (cycleNumber) {
+    if (this.shardValuesByCycle == null) {
+      return null
+    }
+
+    let shardData = this.shardValuesByCycle.get(cycleNumber)
+
+    return shardData
+  }
+
   calculateChangeInCoverage () {
     // maybe this should be a shard function so we can run unit tests on it for expanding or shrinking networks!
     let newSharddata = this.currentCycleShardData

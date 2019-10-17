@@ -49,6 +49,7 @@ const stringify = require('fast-stable-stringify')
    * @property {number} [n] For debug: homePartition
    * @property {AddressRange} [partitionRange]
    * @property {AddressRange} [partitionRange2]
+   * @property {number} [partitionsCovered] Number of partitions covered by this node
    */
 
 /**
@@ -170,6 +171,7 @@ class ShardFunctions {
     storedPartitions.partitionRangeVector = { start: storedPartitions.partitionStart, dist: 2 * shardGlobals.nodesPerConsenusGroup, end: storedPartitions.partitionEnd }
     storedPartitions.rangeIsSplit = false
 
+    storedPartitions.partitionsCovered = 0
     if (storedPartitions.partitionStart < 0) {
       storedPartitions.rangeIsSplit = true
       storedPartitions.partitionStart2 = storedPartitions.partitionStart + shardGlobals.numPartitions
@@ -213,8 +215,12 @@ class ShardFunctions {
     if (storedPartitions.rangeIsSplit) {
       storedPartitions.partitionRange = ShardFunctions.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart1, storedPartitions.partitionEnd1)
       storedPartitions.partitionRange2 = ShardFunctions.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart2, storedPartitions.partitionEnd2)
+
+      storedPartitions.partitionsCovered = 2 + (storedPartitions.partitionEnd1 - storedPartitions.partitionStart1) + (storedPartitions.partitionEnd2 - storedPartitions.partitionStart2)
     } else {
       storedPartitions.partitionRange = ShardFunctions.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart, storedPartitions.partitionEnd)
+
+      storedPartitions.partitionsCovered = 1 + (storedPartitions.partitionEnd1 - storedPartitions.partitionStart1)
     }
   }
 

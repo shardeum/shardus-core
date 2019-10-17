@@ -1,6 +1,10 @@
 const http = require('../http')
 const allZeroes64 = '0'.repeat(64)
 
+/**
+   * @typedef {import('../state-manager/index').CycleShardData} CycleShardData
+   */
+
 class Reporter {
   constructor (config, logger, p2p, statistics, stateManager, profiler) {
     this.config = config
@@ -119,11 +123,36 @@ class Reporter {
         globalSync = this.stateManager.stateIsGood
 
         // Hack to code a green or red color for app state:
-        // appState = globalSync ? '00ff00ff' : 'ff0000ff'
+        appState = globalSync ? '00ff00ff' : 'ff0000ff'
+      }
+
+      let partitions = 0
+      let partitionsCovered = 0
+      if (this.stateManager != null) {
+        /** @type {CycleShardData} */
+        let shardData = this.stateManager.currentCycleShardData //   getShardDataForCycle(cycleCounter)
+        if (shardData != null) {
+          partitions = shardData.shardGlobals.numPartitions
+          partitionsCovered = shardData.nodeShardData.storedPartitions.partitionsCovered
+        }
       }
 
       try {
-        await this._sendReport({ appState, cycleMarker, cycleCounter, nodelistHash, desiredNodes, txInjected, txApplied, txRejected, txExpired, reportInterval, nodeIpInfo, partitionReport, globalSync })
+        await this._sendReport({ appState,
+          cycleMarker,
+          cycleCounter,
+          nodelistHash,
+          desiredNodes,
+          txInjected,
+          txApplied,
+          txRejected,
+          txExpired,
+          reportInterval,
+          nodeIpInfo,
+          partitionReport,
+          globalSync,
+          partitions,
+          partitionsCovered })
       } catch (e) {
         this.mainLogger.error('startReporting: ' + e.name + ': ' + e.message + ' at ' + e.stack)
         console.error(e)
