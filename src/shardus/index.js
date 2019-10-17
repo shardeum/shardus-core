@@ -162,7 +162,7 @@ class Shardus {
       this._attemptCreateAppliedListener()
     }
 
-    this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this.statistics, this.stateManager, this.profiler) : null
+    this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this.statistics, this.stateManager, this.profiler, this.loadDetection) : null
 
     this._registerRoutes()
 

@@ -6,13 +6,14 @@ const allZeroes64 = '0'.repeat(64)
    */
 
 class Reporter {
-  constructor (config, logger, p2p, statistics, stateManager, profiler) {
+  constructor (config, logger, p2p, statistics, stateManager, profiler, loadDetection) {
     this.config = config
     this.mainLogger = logger.getLogger('main')
     this.p2p = p2p
     this.statistics = statistics
     this.stateManager = stateManager
     this.profiler = profiler
+    this.loadDetection = loadDetection
     this.logger = logger
 
     this.reportTimer = null
@@ -137,6 +138,11 @@ class Reporter {
         }
       }
 
+      // Server load
+      const currentLoad = this.loadDetection.getCurrentLoad()
+      const queueLength = this.statistics.getWatcherValue('queueLength')
+      const txTimeInQueue = this.statistics.getAverage('txTimeInQueue') / 1000 // ms to sec
+
       try {
         await this._sendReport({ appState,
           cycleMarker,
@@ -152,7 +158,11 @@ class Reporter {
           partitionReport,
           globalSync,
           partitions,
-          partitionsCovered })
+          partitionsCovered,
+          currentLoad,
+          queueLength,
+          txTimeInQueue
+        })
       } catch (e) {
         this.mainLogger.error('startReporting: ' + e.name + ': ' + e.message + ' at ' + e.stack)
         console.error(e)
