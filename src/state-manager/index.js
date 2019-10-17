@@ -5153,6 +5153,14 @@ class StateManager extends EventEmitter {
     // })
 
     this._registerListener(this.p2p.state, 'cycle_q2_start', async (lastCycle, time) => {
+      if (lastCycle == null) {
+        return
+      }
+      let lastCycleShardValues = this.shardValuesByCycle.get(lastCycle.counter)
+      if (lastCycleShardValues == null) {
+        return
+      }
+
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startSyncPartitions:cycle_q2_start cycle: ${lastCycle.counter}`)
       // this will take temp TXs and make sure they are stored in the correct place for us to generate partitions
       this.processTempTXs(lastCycle)
