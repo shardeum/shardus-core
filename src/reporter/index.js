@@ -112,6 +112,7 @@ class Reporter {
       const txApplied = this.statistics ? this.statistics.getPreviousElement('txApplied') : 0
       const txRejected = this.statistics ? this.statistics.getPreviousElement('txRejected') : 0
       const txExpired = this.statistics ? this.statistics.getPreviousElement('txExpired') : 0
+      const txProcessed = this.statistics ? this.statistics.getPreviousElement('txProcessed') : 0
       const reportInterval = this.config.interval
       const nodeIpInfo = this.p2p.getIpInfo()
 
@@ -153,6 +154,7 @@ class Reporter {
           txApplied,
           txRejected,
           txExpired,
+          txProcessed,
           reportInterval,
           nodeIpInfo,
           partitionReport,

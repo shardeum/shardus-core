@@ -137,7 +137,7 @@ class Shardus {
 
     if (this.app) {
       this.statistics = new Statistics(this.config.baseDir, this.config.statistics, {
-        counters: ['txInjected', 'txApplied', 'txRejected', 'txExpired'],
+        counters: ['txInjected', 'txApplied', 'txRejected', 'txExpired', 'txProcessed'],
         watchers: {
           queueLength: () => this.stateManager ? this.stateManager.newAcceptedTxQueue.length : 0,
           serverLoad: () => this.loadDetection ? this.loadDetection.getCurrentLoad() : 0
@@ -249,6 +249,7 @@ class Shardus {
     this._registerListener(this.stateManager, 'txQueued', txId => this.statistics.startTimer('txTimeInQueue', txId))
     this._registerListener(this.stateManager, 'txPopped', txId => this.statistics.stopTimer('txTimeInQueue', txId))
     this._registerListener(this.stateManager, 'txApplied', () => this.statistics.incrementCounter('txApplied'))
+    this._registerListener(this.stateManager, 'txProcessed', () => this.statistics.incrementCounter('txProcessed'))
   }
 
   _attemptRemoveAppliedListener () {
