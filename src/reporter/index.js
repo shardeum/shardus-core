@@ -140,8 +140,8 @@ class Reporter {
 
       // Server load
       const currentLoad = this.loadDetection.getCurrentLoad()
-      const queueLength = this.statistics.getWatcherValue('queueLength')
-      const txTimeInQueue = this.statistics.getAverage('txTimeInQueue') / 1000 // ms to sec
+      const queueLength = this.statistics.getPreviousElement('queueLength')
+      const txTimeInQueue = this.statistics.getPreviousElement('txTimeInQueue') / 1000 // ms to sec
 
       try {
         await this._sendReport({ appState,
