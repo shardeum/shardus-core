@@ -2515,6 +2515,10 @@ class StateManager extends EventEmitter {
 
       this.tempRecordTXByCycle(txTs, acceptedTX, true, applyResponse)
 
+      if (this.p2p.getNodeId() === acceptedTX.transactionGroup[0].id) {
+        this.emit('txProcessed')
+      }
+
       this.emit('txApplied', acceptedTX)
     }
 
@@ -3251,6 +3255,7 @@ class StateManager extends EventEmitter {
             try {
             // this.mainLogger.debug(` processAcceptedTxQueue2. applyAcceptedTransaction ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp} queuerestarts: ${localRestartCounter} queueLen: ${this.newAcceptedTxQueue.length}`)
               let filter = queueEntry.localKeys
+              queueEntry.acceptedTx.transactionGroup = queueEntry.transactionGroup // Used to not double count txProcessed
               let txResult = await this.applyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates, localCachedData, filter)
               if (txResult.success) {
                 acceptedTXCount++
