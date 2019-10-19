@@ -404,7 +404,11 @@ class Shardus {
 
   // USED BY SIMPLECOINAPP
   async getLocalOrRemoteAccount (address) {
-    return this.stateManager.getLocalOrRemoteAccount(address)
+    if (this.stateManager.dataSyncMainPhaseComplete) {
+      return this.stateManager.getLocalOrRemoteAccount(address)
+    } else {
+      return null
+    }
   }
 
   createWrappedResponse (accountId, accountCreated, hash, timestamp, fullData) {
