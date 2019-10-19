@@ -404,7 +404,7 @@ class Shardus {
 
   // USED BY SIMPLECOINAPP
   async getLocalOrRemoteAccount (address) {
-    if (this.stateManager.dataSyncMainPhaseComplete) {
+    if (this.p2p.allowTransactions()) {
       return this.stateManager.getLocalOrRemoteAccount(address)
     } else {
       return null
