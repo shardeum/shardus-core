@@ -381,6 +381,10 @@ class Shardus {
     return this.p2p.state.getNode(id)
   }
 
+  getLatestCycles (amount = 1) {
+    return this.p2p.getLatestCycles(amount)
+  }
+
   // USED BY SIMPLECOINAPP
   createApplyResponse (txId, txTimestamp) {
     let replyObject = { stateTableResults: [], txId, txTimestamp, accountData: [] }
