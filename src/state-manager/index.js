@@ -4874,9 +4874,14 @@ class StateManager extends EventEmitter {
    * @param {number[]} ourLocks
    */
   bulkFifoUnlockAccounts (accountIDs, ourLocks) {
+    let seen = {}
     // unlock the accounts we locked
     for (let i = 0; i < ourLocks.length; i++) {
       let accountID = accountIDs[i]
+      if (seen[accountID] === true) {
+        continue
+      }
+      seen[accountID] = true
       let ourLockID = ourLocks[i]
       this.fifoUnlock(accountID, ourLockID)
     }
