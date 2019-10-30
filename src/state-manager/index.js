@@ -3011,14 +3011,14 @@ class StateManager extends EventEmitter {
             // for each remote node lets save it's id
             for (let index of indicies) {
               let node = remoteHomeNode.consensusNodeForOurNodeFull[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
-              if (node !== ourNodeData.node.id) {
+              if (node != null && node !== ourNodeData.node.id) {
                 nodesToSendTo[node.id] = node
                 consensusNodeIds.push(node.id)
               }
             }
             for (let index of edgeIndicies) {
               let node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
-              if (node !== ourNodeData.node.id) {
+              if (node != null && node !== ourNodeData.node.id) {
                 nodesToSendTo[node.id] = node
                 edgeNodeIds.push(node.id)
               }
