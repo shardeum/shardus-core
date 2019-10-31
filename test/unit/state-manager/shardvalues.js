@@ -70,7 +70,22 @@ let useHardcodenodes = true
 // let hardcodeNodes2 = null // ['0e6dx4047f', '1a02x90b21', '2479xba65c', '2512xbae99', '25e8xd16e3', '25f9x78474', '2e7fx69a34', '3395x341b0', '4403x0eaf9', '508fxcaa6e', '6ac4xec02d', '7238xc8cce', '72dax72106', '73eexdf738', '781cxaaae3', '7852x9ea56', '81e2x6bac8', '83cdxf22bc', '8675xc4b3b', '8af7x952e1', 'a1f2x02066', 'b002x24eb1', 'b68ex952c5', 'b6eexf00d4', 'c51bx318ed', 'c7cbx74fed', 'c9d0x44e0b', 'ce46xb48f9', 'd1d0xb78eb', 'd47cx41d3b', 'dac0x4999b', 'ddfex2f319', 'e598xe41ac', 'ec85xccb47', 'f391x66f35']
 // let hardcodeNodes2 = null
 
-let hardcodeNodes = ['2054x6b984', '42b5x19622', '4efbx6ce6c', '55e5xaf076', '7a5ax9365e', '7f3exb4a97', '8d7dxfd5f5', 'b0a6x24dfa', 'c04exda76e', 'ed19xfd9ba']
+// let hardcodeNodes = ['2054x6b984', '42b5x19622', '4efbx6ce6c', '55e5xaf076', '7a5ax9365e', '7f3exb4a97', '8d7dxfd5f5', 'b0a6x24dfa', 'c04exda76e', 'ed19xfd9ba']
+// let hardcodeNodes2 = null
+
+// let hardcodeNodes = ['147dxa6d28', '181bxf0697', '248ax315a9', '3068x6e56b', '33ebx5e423', '5f0fx95c7a', '9962xbf55f', 'd117xa3a73', 'e3d3xe4a5c', 'e6a2x24703']
+// let hardcodeNodes2 = null
+
+// let hardcodeNodes = ['02f2x50374', '1021xc4369', '1799xd547f', '242ex4bfbd', '30f0xea8a3', '3272x2a306', '4c96x8d210', '584dxd832a', '5c7fx2facc', '5c93x0f2a7', '7180xec580', '736cx7fa64', '750fx967f0', '7899x94a79', '89c9x85be0', '8c8bx815ad', '9adcx77753', 'a15fxd63a0', 'abc6xaa20f', 'd32ax93c1c', 'dc40x2b6ff', 'dd43xf3b5d', 'e986x67b4e', 'f0c4xea4f5', 'f211xb2904']
+// let hardcodeNodes2 = null
+
+// let hardcodeNodes = ['0692x2deec', '09afxee4b7', '0f3dxa312c', '18ecx3e3a1', '19c7x99e80', '19dfxcf9c7', '23d5xad4c5', '243dx817b9', '255fxd9030', '2642x4e37c', '3650x09963', '3f22x7a3ac', '42caxd50c0', '5307x662e7', '5e38xcc93f', '62c6xeee41', '653dx9f470', '677bx704a7', '7405xab8a5', '7b92x57e84', '911bx2a167', 'ac56x69db7', 'ae13xaa045', 'af8dxc0da5', 'b234x4ae35', 'c972x70e00', 'd6b5x79ed1', 'd8adxe7bd2', 'dcd7xdd2e1', 'e622xfadab']
+// let hardcodeNodes2 = null
+
+// let hardcodeNodes = ['01cex1bed2', '0793xc7aee', '180bx3a172', '24afxce02d', '2d2ax053f6', '30aex6b5ca', '33d7x0a28e', '42bbx0242f', '43cax9b811', '5c70xdee7d', '5fcfx2f32d', '7303xfd71e', '7354xcedbc', '7b78xf936e', '7eabx5deea', '8609xcccf4', '88ecx4c9ab', '8c5axb8364', '93e3x87831', '9a91xb2cd3', '9d1dx51f4a', '9facx0e61c', 'a452x1f73d', 'a8e6xdd19c', 'bef0x7edf8', 'bfa5x12bbf', 'e116x7c34b', 'e89bxde077', 'eae4xeefb1', 'ffc1x1151f']
+// let hardcodeNodes2 = null
+
+let hardcodeNodes = ["026bxf7f00","0fc2xbacb7","28eax6717f","2eedx05dcb","2f61x7203b","4796x1567b","5b52xf1dcb","5f20x3ef8b","600exc4756","63f1xc1c27","6cedx984cc","7fcbx33304","8bc4x50269","9626x288b0","97e8x87793","9f9ax480fd","a025x12af2","a305x7ad5c","ad6cx46a0d","ae04xd207d","b9f6x5fbbe","be73xff460","c356xdf16c","df3cx4ce46","e125x67ab3","e7e9x509e7","efcdx3c1cf","f84cx19324","f982x85d31","ff98x91e85"]
 let hardcodeNodes2 = null
 
 if (useHardcodenodes) {
@@ -79,7 +94,7 @@ if (useHardcodenodes) {
 if (hardcodeNodes2) {
   numNodes2 = hardcodeNodes2.length
 }
-let debugStartsWith = '2054' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
+let debugStartsWith = '8bc4' // '33d7' //'0692' // '23d5' // 'f211' //'147d' // '2054' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
 let debugID = debugStartsWith.slice(0, 4) + '7'.repeat(64 - 4)
 let debugAccount = '75ed' + '3'.repeat(60) // 5c43 386e
 let debugNode = null
@@ -88,7 +103,7 @@ let debugNode = null
 for (let i = 0; i < testIterations; i++) {
   testCounter++
 
-  let nodesPerConsenusGroup = 3
+  let nodesPerConsenusGroup = 5
   let activeNodes
   let activeNodes2
   // @ts-ignore the error below make no sense!
@@ -166,6 +181,8 @@ for (let i = 0; i < testIterations; i++) {
 
     // this is the function that messes up out calculations
     ShardFunctions.computeNodePartitionDataMapExt(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes)
+
+    console.log('storedPartitions' + utils.stringifyReduce(nodeShardData.storedPartitions))
   }
 
   ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, true)
