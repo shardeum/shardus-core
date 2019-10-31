@@ -222,6 +222,11 @@ class ShardFunctions {
 
       storedPartitions.partitionsCovered = 1 + (storedPartitions.partitionEnd1 - storedPartitions.partitionStart1)
     }
+
+    if (storedPartitions.partitionsCovered <= 2) {
+      let a = 1
+      a++
+    }
   }
 
   static testAddressInRange (address, storedPartitions) {
@@ -426,6 +431,75 @@ class ShardFunctions {
 
   /**
    * @param {ShardGlobals} shardGlobals
+   * @param {number} s1
+   * @param {number} e1
+   * @param {number} s2
+   * @param {number} e2
+   * @param {number} start
+   * @param {number} end
+   * @returns {{s1:number; e1: number; s2: number; e2: number; split: boolean; changed: boolean }}
+   */
+  static mergeDiverseRanges (shardGlobals, s1, e1, s2, e2, start, end) {
+    let results = { s1, e1, s2, e2, split: true, changed: false }
+
+    let leftOverlap = false
+    let rightOverlap = false
+    // left overlap?
+    if (s1 >= start && e1 >= start) {
+      leftOverlap = true
+    }
+    // right overlap
+    if (s2 <= end && e2 >= end) {
+      rightOverlap = true
+    }
+
+    if (leftOverlap === false && rightOverlap === false) {
+      let partitionDistanceStart = ShardFunctions.circularDistance(start, e1, shardGlobals.numPartitions)
+      let partitionDistanceEnd = ShardFunctions.circularDistance(end, s2, shardGlobals.numPartitions)
+
+      if (partitionDistanceStart < partitionDistanceEnd) {
+        if (results.e1 < end) {
+          results.e1 = end
+          results.changed = true
+          return results
+        }
+      } else {
+        if (results.s2 > start) {
+          results.s2 = start
+          results.changed = true
+          return results
+        }
+      }
+    }
+
+    if (leftOverlap === true && rightOverlap === true) {
+      // actually this would be the entire full range
+      if (results.e1 !== results.e2) {
+        results.split = false
+        results.e1 = results.e2 // s1 -> e1 covers entire range
+        results.changed = true
+        return results
+      }
+    }
+
+    if (leftOverlap) {
+      if (results.e1 < end) {
+        results.e1 = end
+        results.changed = true
+      }
+    }
+    if (rightOverlap) {
+      if (results.s2 > start) {
+        results.s2 = start
+        results.changed = true
+      }
+    }
+
+    return results
+  }
+
+  /**
+   * @param {ShardGlobals} shardGlobals
    * @param {Map<string, NodeShardData>} nodeShardDataMap
    * @param {Map<number, ShardInfo>} parititionShardDataMap
    * @param {NodeShardData} nodeShardData
@@ -457,7 +531,8 @@ class ShardFunctions {
 
       // calcuate partition range for consensus
       if (nodeShardData.consensusNodeForOurNode.length >= 2) {
-      // this logic only works because we know that getNeigborNodesInRange starts at the starting point
+        // nodeShardData.consensusNodeForOurNode.sort(ShardFunctions.nodeSort)
+        // this logic only works because we know that getNeigborNodesInRange starts at the starting point
         let startNode = nodeShardData.consensusNodeForOurNode[0]
         let endNode = nodeShardData.consensusNodeForOurNode[nodeShardData.consensusNodeForOurNode.length - 1]
         // ugh, not so efficient since we might have this data precalced in a map.. but way may also not have it
@@ -472,26 +547,96 @@ class ShardFunctions {
         let storedRangeChange = false
         // the normal case
         if (startPartition < endPartition) {
-          if (nodeShardData.consensusStartPartition < nodeShardData.storedPartitions.partitionStart) {
-            nodeShardData.storedPartitions.partitionStart = nodeShardData.consensusStartPartition
-            storedRangeChange = true
+          if (nodeShardData.storedPartitions.partitionStart < nodeShardData.storedPartitions.partitionEnd) {
+            if (nodeShardData.consensusStartPartition < nodeShardData.storedPartitions.partitionStart) {
+              nodeShardData.storedPartitions.partitionStart = nodeShardData.consensusStartPartition
+              storedRangeChange = true
+            }
+            if (nodeShardData.consensusEndPartition > nodeShardData.storedPartitions.partitionEnd) {
+              nodeShardData.storedPartitions.partitionEnd = nodeShardData.consensusEndPartition
+              storedRangeChange = true
+            }
+          } else if (nodeShardData.storedPartitions.partitionStart > nodeShardData.storedPartitions.partitionEnd) {
+            // but stored doesn't wrap
+            let s1 = nodeShardData.storedPartitions.partitionStart1
+            let e1 = nodeShardData.storedPartitions.partitionEnd1
+            let s2 = nodeShardData.storedPartitions.partitionStart2
+            let e2 = nodeShardData.storedPartitions.partitionEnd2
+            let start = startPartition
+            let end = endPartition
+            let results = ShardFunctions.mergeDiverseRanges(shardGlobals, s1, e1, s2, e2, start, end)
+
+            storedRangeChange = results.changed
+            if (storedRangeChange) {
+              nodeShardData.storedPartitions.partitionStart = results.s2
+              nodeShardData.storedPartitions.partitionEnd = results.e1
+              if (results.split === false) {
+                nodeShardData.storedPartitions.partitionStart = results.s1
+                nodeShardData.storedPartitions.partitionEnd = results.e1
+              }
+            }
           }
-          if (nodeShardData.consensusEndPartition > nodeShardData.storedPartitions.partitionEnd) {
-            nodeShardData.storedPartitions.partitionStart = nodeShardData.consensusStartPartition
-            storedRangeChange = true
-          }
+
+          // else if (nodeShardData.storedPartitions.partitionStart > nodeShardData.storedPartitions.partitionEnd) {
+          //   // but stored doesn't wrap
+          //   if (nodeShardData.consensusStartPartition < nodeShardData.storedPartitions.partitionStart) {
+          //     nodeShardData.storedPartitions.partitionStart = nodeShardData.consensusStartPartition
+          //     storedRangeChange = true
+          //   }
+          //   if (nodeShardData.consensusEndPartition > nodeShardData.storedPartitions.partitionEnd) {
+          //     nodeShardData.storedPartitions.partitionEnd = nodeShardData.consensusEndPartition
+          //     storedRangeChange = true
+          //   }
+          // }
         }
         // the split index case (wraps the circle)
         if (startPartition > endPartition) {
-          if (nodeShardData.consensusStartPartition > nodeShardData.storedPartitions.partitionStart) {
-            nodeShardData.storedPartitions.partitionStart = nodeShardData.consensusStartPartition
-            storedRangeChange = true
+          if (nodeShardData.storedPartitions.partitionStart > nodeShardData.storedPartitions.partitionEnd) {
+            if (nodeShardData.consensusStartPartition < nodeShardData.storedPartitions.partitionStart && nodeShardData.consensusStartPartition > nodeShardData.storedPartitions.partitionEnd) {
+              nodeShardData.storedPartitions.partitionStart = nodeShardData.consensusStartPartition
+              storedRangeChange = true
+            }
+            if (nodeShardData.consensusEndPartition > nodeShardData.storedPartitions.partitionEnd && nodeShardData.consensusEndPartition < nodeShardData.storedPartitions.partitionStart) {
+              nodeShardData.storedPartitions.partitionEnd = nodeShardData.consensusEndPartition
+              storedRangeChange = true
+            }
+          } else if (nodeShardData.storedPartitions.partitionStart < nodeShardData.storedPartitions.partitionEnd) {
+            // but stored does wrap
+
+            // is this the right one.
+            let s1 = 0
+            let e1 = endPartition
+            let s2 = startPartition
+            let e2 = shardGlobals.numPartitions - 1 // last partition
+            let start = nodeShardData.storedPartitions.partitionStart
+            let end = nodeShardData.storedPartitions.partitionEnd
+            let results = ShardFunctions.mergeDiverseRanges(shardGlobals, s1, e1, s2, e2, start, end)
+
+            storedRangeChange = results.changed
+            if (storedRangeChange) {
+              nodeShardData.storedPartitions.partitionStart = results.s2
+              nodeShardData.storedPartitions.partitionEnd = results.e1
+
+              if (results.split === false) {
+                nodeShardData.storedPartitions.partitionStart = results.s1
+                nodeShardData.storedPartitions.partitionEnd = results.e1
+              }
+            }
           }
-          if (nodeShardData.consensusEndPartition < nodeShardData.storedPartitions.partitionEnd) {
-            nodeShardData.storedPartitions.partitionStart = nodeShardData.consensusStartPartition
-            storedRangeChange = true
-          }
+
+          // else if (nodeShardData.storedPartitions.partitionStart < nodeShardData.storedPartitions.partitionEnd) {
+          //   // but stored does wrap
+          //   if (nodeShardData.consensusStartPartition > nodeShardData.storedPartitions.partitionStart) {
+          //     nodeShardData.storedPartitions.partitionStart = nodeShardData.consensusStartPartition
+          //     storedRangeChange = true
+          //   }
+          //   if (nodeShardData.consensusEndPartition < nodeShardData.storedPartitions.partitionEnd) {
+          //     nodeShardData.storedPartitions.partitionEnd = nodeShardData.consensusEndPartition
+          //     storedRangeChange = true
+          //   }
+          // }
         }
+
         if (storedRangeChange) {
           ShardFunctions.calculateStoredPartitions2Ranges(shardGlobals, nodeShardData.storedPartitions)
         }
@@ -955,21 +1100,36 @@ class ShardFunctions {
     return homeNode
   }
 
-  static dilateNeighborCoverage (shardGlobals, nodeShardDataMap, parititionShardDataMap, activeNodes, nodeShardDataToModify, extras) {
-    let circularDistance = function (a, b, max) {
-      let directDist = Math.abs(a - b)
-      let wrapDist = directDist
-      // if (a < b) {
-      //   wrapDist = Math.abs(a + (max - b))
-      // } else if (b < a) {
-      //   wrapDist = Math.abs(b + (max - a))
-      // }
-      let wrapDist1 = Math.abs(a + (max - b))
-      let wrapDist2 = Math.abs(b + (max - a))
-      wrapDist = Math.min(wrapDist1, wrapDist2)
+  static circularDistance (a, b, max) {
+    let directDist = Math.abs(a - b)
+    let wrapDist = directDist
+    // if (a < b) {
+    //   wrapDist = Math.abs(a + (max - b))
+    // } else if (b < a) {
+    //   wrapDist = Math.abs(b + (max - a))
+    // }
+    let wrapDist1 = Math.abs(a + (max - b))
+    let wrapDist2 = Math.abs(b + (max - a))
+    wrapDist = Math.min(wrapDist1, wrapDist2)
 
-      return Math.min(directDist, wrapDist)
-    }
+    return Math.min(directDist, wrapDist)
+  }
+
+  static dilateNeighborCoverage (shardGlobals, nodeShardDataMap, parititionShardDataMap, activeNodes, nodeShardDataToModify, extras) {
+    // let circularDistance = function (a, b, max) {
+    //   let directDist = Math.abs(a - b)
+    //   let wrapDist = directDist
+    //   // if (a < b) {
+    //   //   wrapDist = Math.abs(a + (max - b))
+    //   // } else if (b < a) {
+    //   //   wrapDist = Math.abs(b + (max - a))
+    //   // }
+    //   let wrapDist1 = Math.abs(a + (max - b))
+    //   let wrapDist2 = Math.abs(b + (max - a))
+    //   wrapDist = Math.min(wrapDist1, wrapDist2)
+
+    //   return Math.min(directDist, wrapDist)
+    // }
 
     let changed = false
     for (let node of extras) {
@@ -986,8 +1146,8 @@ class ShardFunctions {
         continue
       }
 
-      let partitionDistanceStart = circularDistance(partition, nodeShardDataToModify.storedPartitions.partitionStart, shardGlobals.numPartitions)
-      let partitionDistanceEnd = circularDistance(partition, nodeShardDataToModify.storedPartitions.partitionEnd, shardGlobals.numPartitions)
+      let partitionDistanceStart = ShardFunctions.circularDistance(partition, nodeShardDataToModify.storedPartitions.partitionStart, shardGlobals.numPartitions)
+      let partitionDistanceEnd = ShardFunctions.circularDistance(partition, nodeShardDataToModify.storedPartitions.partitionEnd, shardGlobals.numPartitions)
 
       if (partitionDistanceStart < partitionDistanceEnd) {
         nodeShardDataToModify.storedPartitions.partitionStart = partition
