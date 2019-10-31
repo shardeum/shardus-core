@@ -7,8 +7,8 @@ const models = require('./models')
 // const utils = require('../utils')
 
 // const SequelizeStorage = require('./sequelizeStorage')
-// const Sqlite3Storage = require('./sqlite3storage')
-const BetterSqlite3Storage = require('./betterSqlite3storage')
+const Sqlite3Storage = require('./sqlite3storage')
+// const BetterSqlite3Storage = require('./betterSqlite3storage')
 
 class Storage {
   constructor (baseDir, config, logger, profiler) {
@@ -17,8 +17,8 @@ class Storage {
     this.mainLogger = logger.getLogger('main')
     // this.storage = new SequelizeStorage(models, config, logger, baseDir, this.profiler)
 
-    this.storage = new BetterSqlite3Storage(models, config, logger, baseDir, this.profiler)
-    // this.storage = new Sqlite3Storage(models, config, logger, baseDir, this.profiler)
+    // this.storage = new BetterSqlite3Storage(models, config, logger, baseDir, this.profiler)
+    this.storage = new Sqlite3Storage(models, config, logger, baseDir, this.profiler)
     this.stateManager = null
   }
 
@@ -311,7 +311,7 @@ class Storage {
   async addAccountStates (accountStates) {
     this._checkInit()
     try {
-      // NOt sure if it is good to do , { createOrReplace: true }  but testing it out
+      // Adding { createOrReplace: true }  helps fix some issues we were having, but may make it hard to catch certain types of mistakes. (since it will suppress duped key issue)
       await this._create(this.storageModels.accountStates, accountStates, { createOrReplace: true })
 
       // throw new Error('test failue. fake')
