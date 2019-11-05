@@ -8,8 +8,8 @@ const distDir = path.resolve(rootDir, process.env.npm_package_config_dist)
 const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), { encoding: 'utf8' }))
 
 const packageJsonNew = Object.assign({}, packageJson)
-packageJsonNew.name = 'shardus-enterprise-server-dist'
-packageJsonNew.description = 'The distribution version of the Shardus Enterprise Server'
+packageJsonNew.name = packageJson.name + '-dist'
+packageJsonNew.description = `Compiled version of ${packageJson.name}.`
 delete packageJsonNew.config
 delete packageJsonNew.scripts
 delete packageJsonNew.repository
