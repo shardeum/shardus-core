@@ -1,3 +1,3 @@
-# shardus-enterprise-server
+# shardus-global-server
 
-Enterprise version of the Shardus distributed ledger
+Global version of the Shardus distributed ledger
