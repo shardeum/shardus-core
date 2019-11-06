@@ -85,7 +85,10 @@ let useHardcodenodes = true
 // let hardcodeNodes = ['01cex1bed2', '0793xc7aee', '180bx3a172', '24afxce02d', '2d2ax053f6', '30aex6b5ca', '33d7x0a28e', '42bbx0242f', '43cax9b811', '5c70xdee7d', '5fcfx2f32d', '7303xfd71e', '7354xcedbc', '7b78xf936e', '7eabx5deea', '8609xcccf4', '88ecx4c9ab', '8c5axb8364', '93e3x87831', '9a91xb2cd3', '9d1dx51f4a', '9facx0e61c', 'a452x1f73d', 'a8e6xdd19c', 'bef0x7edf8', 'bfa5x12bbf', 'e116x7c34b', 'e89bxde077', 'eae4xeefb1', 'ffc1x1151f']
 // let hardcodeNodes2 = null
 
-let hardcodeNodes = ["026bxf7f00","0fc2xbacb7","28eax6717f","2eedx05dcb","2f61x7203b","4796x1567b","5b52xf1dcb","5f20x3ef8b","600exc4756","63f1xc1c27","6cedx984cc","7fcbx33304","8bc4x50269","9626x288b0","97e8x87793","9f9ax480fd","a025x12af2","a305x7ad5c","ad6cx46a0d","ae04xd207d","b9f6x5fbbe","be73xff460","c356xdf16c","df3cx4ce46","e125x67ab3","e7e9x509e7","efcdx3c1cf","f84cx19324","f982x85d31","ff98x91e85"]
+// let hardcodeNodes = ["026bxf7f00","0fc2xbacb7","28eax6717f","2eedx05dcb","2f61x7203b","4796x1567b","5b52xf1dcb","5f20x3ef8b","600exc4756","63f1xc1c27","6cedx984cc","7fcbx33304","8bc4x50269","9626x288b0","97e8x87793","9f9ax480fd","a025x12af2","a305x7ad5c","ad6cx46a0d","ae04xd207d","b9f6x5fbbe","be73xff460","c356xdf16c","df3cx4ce46","e125x67ab3","e7e9x509e7","efcdx3c1cf","f84cx19324","f982x85d31","ff98x91e85"]
+// let hardcodeNodes2 = null
+
+let hardcodeNodes = ['4ca7xe03b8', '5d85x8ca39', '9c66x6b491', 'c21ax78bee', 'ed57xe1d15']
 let hardcodeNodes2 = null
 
 if (useHardcodenodes) {
@@ -94,7 +97,7 @@ if (useHardcodenodes) {
 if (hardcodeNodes2) {
   numNodes2 = hardcodeNodes2.length
 }
-let debugStartsWith = '8bc4' // '33d7' //'0692' // '23d5' // 'f211' //'147d' // '2054' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
+let debugStartsWith = '4ca7' // '8bc4' // '33d7' //'0692' // '23d5' // 'f211' //'147d' // '2054' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
 let debugID = debugStartsWith.slice(0, 4) + '7'.repeat(64 - 4)
 let debugAccount = '75ed' + '3'.repeat(60) // 5c43 386e
 let debugNode = null
@@ -183,6 +186,10 @@ for (let i = 0; i < testIterations; i++) {
     ShardFunctions.computeNodePartitionDataMapExt(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes)
 
     console.log('storedPartitions' + utils.stringifyReduce(nodeShardData.storedPartitions))
+
+    // calc consensus partitions
+    let ourConsensusPartitions = ShardFunctions.getConsenusPartitions(shardGlobals, nodeShardData)
+    console.log('ourConsensusPartitions ' + utils.stringifyReduce(ourConsensusPartitions) + `  consensusEndPartition: ${nodeShardData.consensusEndPartition} consensusStartPartition ${nodeShardData.consensusStartPartition}`)
   }
 
   ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, true)

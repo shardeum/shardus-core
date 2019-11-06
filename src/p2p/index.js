@@ -1479,19 +1479,19 @@ class P2P extends EventEmitter {
   _extractPayload (wrappedPayload, nodeGroup) {
     if (wrappedPayload.error) {
       const error = wrappedPayload.error
-      this.mainLogger.debug(`Failed to extract payload. Error: ${error}`)
+      this.mainLogger.debug(`_extractPayload Failed to extract payload. Error: ${error}`)
       return [null]
     }
     // Check to see if node is in expected node group
     const node = this._findNodeInGroup(wrappedPayload.sender, nodeGroup)
     if (!node) {
-      this.mainLogger.debug(`Invalid sender on internal payload. sender: ${wrappedPayload.sender} payload: ${utils.stringifyReduceLimit(wrappedPayload)}`)
+      this.mainLogger.debug(`_extractPayload Invalid sender on internal payload. sender: ${wrappedPayload.sender} payload: ${utils.stringifyReduceLimit(wrappedPayload)}`)
       return [null]
     }
     const authenticatedByNode = this._authenticateByNode(wrappedPayload, node)
     // Check if actually signed by that node
     if (!authenticatedByNode) {
-      this.mainLogger.debug('Internal payload not authenticated by an expected node.')
+      this.mainLogger.debug('_extractPayload Internal payload not authenticated by an expected node.')
       return [null]
     }
     const payload = wrappedPayload.payload

@@ -287,7 +287,7 @@ class StateManager extends EventEmitter {
 
     this.queueStopped = false
 
-    this.extendedRepairLogging = false
+    this.extendedRepairLogging = true
 
     this.shardInfo = {}
 
@@ -309,7 +309,7 @@ class StateManager extends EventEmitter {
     this.nextCycleReportToSend = null
 
     // this controls the repair portion of data repair.
-    this.canDataRepair = false
+    this.canDataRepair = true
     this.stateIsGood = true
   }
 
@@ -1825,7 +1825,7 @@ class StateManager extends EventEmitter {
                   }
                 }
 
-                if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results: tryGeneratePartitionReciept failed start repair process ${receiptResults}`)
+                if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results: tryGeneratePartitionReciept failed start repair process 1 ${utils.stringifyReduce(receiptResults)}`)
                 let cycle = this.p2p.state.getCycleByCounter(payload.Cycle_number)
                 await this.startRepairProcess(cycle, topResult, partitionId, ourResult.Partition_hash)
               } else if (partitionReceipt) {
@@ -3653,6 +3653,9 @@ class StateManager extends EventEmitter {
 
     this.nextCycleReportToSend = { res: [], cycleNumber: lastCycle.counter }
 
+    let partitionObjects = []
+    let partitionResults = []
+    let cycleKey = 'c' + lastCycle.counter
     for (let partitionNumber of partitions) {
       // TODO sharding - done.  when we add state sharding need to loop over partitions.
       let partitionObject = this.generatePartitionObject(lastCycle, partitionNumber)
@@ -3662,14 +3665,17 @@ class StateManager extends EventEmitter {
 
       this.nextCycleReportToSend.res.push({ i: partitionResult.Partition_id, h: partitionResult.Partition_hash })
 
-      // byId?
-      let cycleKey = 'c' + lastCycle.counter
+      // let partitionObjects = [partitionObject]
+      // let partitionResults = [partitionResult]
 
-      let partitionObjects = [partitionObject]
-      let partitionResults = [partitionResult]
+      // this.partitionObjectsByCycle[cycleKey] = partitionObjects
+      // this.ourPartitionResultsByCycle[cycleKey] = partitionResults // todo in the future there could be many results (one per covered partition)
+
+      partitionObjects.push(partitionObject)
+      partitionResults.push(partitionResult)
 
       this.partitionObjectsByCycle[cycleKey] = partitionObjects
-      this.ourPartitionResultsByCycle[cycleKey] = partitionResults // todo in the future there could be many results (one per covered partition)
+      this.ourPartitionResultsByCycle[cycleKey] = partitionResults
 
       this.poMicroDebug(partitionObject)
 
@@ -3681,28 +3687,31 @@ class StateManager extends EventEmitter {
       // todo sharding done?  seems ok :   need to loop and put all results in this list
       // todo perf, need to clean out data from older cycles..
       partitionResultsByHash[partitionResult.Partition_hash] = partitionObject
-
-      // add our result to the list of all other results
-      let responsesByPartition = this.allPartitionResponsesByCycleByPartition[cycleKey]
-      if (!responsesByPartition) {
-        responsesByPartition = {}
-        this.allPartitionResponsesByCycleByPartition[cycleKey] = responsesByPartition
-      }
-      // this part should be good to go for sharding.
-      for (let pResult of partitionResults) {
-        let partitionKey = 'p' + pResult.Partition_id
-        let responses = responsesByPartition[partitionKey]
-        if (!responses) {
-          responses = []
-          responsesByPartition[partitionKey] = responses
-        }
-        let ourID = this.crypto.getPublicKey()
-        // clean out an older response from same node if on exists
-        responses = responses.filter(item => item.sign && item.sign.owner !== ourID) // if the item is not signed clear it!
-        responsesByPartition[partitionKey] = responses // have to re-assign this since it is a new ref to the array
-        responses.push(pResult)
-      }
     }
+
+    // outside of the main loop
+    // add our result to the list of all other results
+    let responsesByPartition = this.allPartitionResponsesByCycleByPartition[cycleKey]
+    if (!responsesByPartition) {
+      responsesByPartition = {}
+      this.allPartitionResponsesByCycleByPartition[cycleKey] = responsesByPartition
+    }
+
+    // this part should be good to go for sharding.
+    for (let pResult of partitionResults) {
+      let partitionKey = 'p' + pResult.Partition_id
+      let responses = responsesByPartition[partitionKey]
+      if (!responses) {
+        responses = []
+        responsesByPartition[partitionKey] = responses
+      }
+      let ourID = this.crypto.getPublicKey()
+      // clean out an older response from same node if on exists
+      responses = responses.filter(item => item.sign && item.sign.owner !== ourID) // if the item is not signed clear it!
+      responsesByPartition[partitionKey] = responses // have to re-assign this since it is a new ref to the array
+      responses.push(pResult)
+    }
+
     // return [partitionObject, partitionResult]
   }
 
@@ -3786,25 +3795,29 @@ class StateManager extends EventEmitter {
     let partitionId = ourResult.Partition_id
     let cycleCounter = ourResult.Cycle_number
 
+    let key = 'c' + cycleCounter
+    let key2 = 'p' + partitionId
+    let debugKey = `rkeys: ${key} ${key2}`
+
     let repairTracker = this._getRepairTrackerForCycle(cycleCounter, partitionId)
     repairTracker.busy = true // mark busy so we won't try to start this task again while in the middle of it
 
     // Tried hashes is not working correctly at the moment, it is an unused parameter. I am not even sure we want to ignore hashes
     let { topHash, topCount, topResult } = this.findMostCommonResponse(cycleCounter, partitionId, repairTracker.triedHashes)
 
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryGeneratePartitoinReciept repairTracker: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair  ${debugKey} tryGeneratePartitoinReciept repairTracker: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
 
     let requiredHalf = Math.max(1, allResults.length / 2)
     if (this.useHashSets && repairPassHack) {
       // hack force our node to win:
       topCount = requiredHalf
       topHash = ourResult.Partition_hash
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryGeneratePartitoinReciept hack force win: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair  ${debugKey} tryGeneratePartitoinReciept hack force win: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
     }
 
     let resultsList = []
     if (topCount >= requiredHalf) {
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair tryGeneratePartitoinReciept: top hash wins: ' + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair  ${debugKey} tryGeneratePartitoinReciept: top hash wins: ` + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
       for (let partitionResult of allResults) {
         if (partitionResult.Partition_hash === topHash) {
           resultsList.push(partitionResult)
@@ -3813,15 +3826,15 @@ class StateManager extends EventEmitter {
     } else {
       if (this.useHashSets) {
         // bail in a way that will cause us to use the hashset strings
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair tryGeneratePartitoinReciept: did not win, useHashSets: ' + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair  ${debugKey} tryGeneratePartitoinReciept: did not win, useHashSets: ` + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
         return { partitionReceipt: null, topResult: null, success: false }
       }
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair tryGeneratePartitoinReciept: top hash failed: ' + utils.makeShortHash(topHash) + ` ${topCount} / ${requiredHalf}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair  ${debugKey} tryGeneratePartitoinReciept: top hash failed: ` + utils.makeShortHash(topHash) + ` ${topCount} / ${requiredHalf}`)
       return { partitionReceipt: null, topResult, success: false }
     }
 
     if (ourResult.Partition_hash !== topHash) {
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair tryGeneratePartitoinReciept: our hash does not match: ' + utils.makeShortHash(topHash) + ` our hash: ${ourResult.Partition_hash}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair  ${debugKey} tryGeneratePartitoinReciept: our hash does not match: ` + utils.makeShortHash(topHash) + ` our hash: ${ourResult.Partition_hash}`)
       return { partitionReceipt: null, topResult, success: false }
     }
 
@@ -3829,7 +3842,7 @@ class StateManager extends EventEmitter {
       resultsList
     }
 
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryGeneratePartitoinReciept OK! ${utils.stringifyReduce({ partitionReceipt, topResult })}`)
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair  ${debugKey} tryGeneratePartitoinReciept OK! ${utils.stringifyReduce({ partitionReceipt, topResult })}`)
 
     return { partitionReceipt, topResult, success: true }
   }
@@ -3858,6 +3871,7 @@ class StateManager extends EventEmitter {
     let cycleNumber
     let key
     let key2
+    let debugKey
 
     let usedSyncTXsFromHashSetStrings = false
     try {
@@ -3865,6 +3879,7 @@ class StateManager extends EventEmitter {
       cycleNumber = cycle.counter // topResult.Cycle_number
       key = 'c' + cycleNumber
       key2 = 'p' + partitionId
+      debugKey = `rkeys: ${key} ${key2}`
 
       if (topResult) {
         repairTracker.triedHashes.push(topResult.Partition_hash)
@@ -3876,7 +3891,7 @@ class StateManager extends EventEmitter {
           if (retCode === 100) {
             // syncTXsFromHashSetStrings has failed
             repairTracker.awaitWinningHash = true
-            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` syncTXsFromHashSetStrings failed so we will set awaitWinningHash=true and hope a hash code wins  `)
+            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` syncTXsFromHashSetStrings failed so we will set awaitWinningHash=true and hope a hash code wins ${debugKey} `)
             return
           }
 
@@ -3887,7 +3902,7 @@ class StateManager extends EventEmitter {
         }
       }
 
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess syncTXs finished.  `)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess syncTXs finished. ${debugKey} `)
 
       this.generatePartitionObjects(cycle) // this will stomp our old results TODO PERF: (a bit inefficient since it works on all partitions)
 
@@ -3905,16 +3920,16 @@ class StateManager extends EventEmitter {
         }
       }
 
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess our result: ${utils.stringifyReduce(ourResult)} obj: ${utils.stringifyReduce(this.partitionObjectsByCycle[key])} `)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess our result: ${debugKey} ${utils.stringifyReduce(ourResult)} obj: ${utils.stringifyReduce(this.partitionObjectsByCycle[key])} `)
 
       // check if our hash now matches the majority one, maybe even re check the majority hash..?
       let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult, true)
       let { partitionReceipt, topResult: topResult2, success } = receiptResults
 
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess tryGeneratePartitionReciept: ${utils.stringifyReduce({ partitionReceipt, topResult2, success })}  `)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess tryGeneratePartitionReciept: ${debugKey} ${utils.stringifyReduce({ partitionReceipt, topResult2, success })}  `)
 
       if (!success) {
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess success==false starting repair again in 3 seconds!`)
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess success==false starting repair again in 3 seconds! ${debugKey}`)
 
         let cycle = this.p2p.state.getCycleByCounter(cycleNumber)
 
@@ -3922,7 +3937,7 @@ class StateManager extends EventEmitter {
         await this.startRepairProcess(cycle, topResult2, partitionId, ourResult.Partition_hash)
         return
       } else if (partitionReceipt) {
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess success==ok`)
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess success==ok ${debugKey}`)
 
         if (usedSyncTXsFromHashSetStrings === false) {
           // do we ever send partition receipt yet?
@@ -3941,7 +3956,7 @@ class StateManager extends EventEmitter {
         let repairsByPartition = this.repairTrackingByCycleById[key]
 
         if (!repairsByPartition) {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess repairsByPartition==null ${key} ck: ${cycleKey} `)
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess repairsByPartition==null ${debugKey} ck: ${cycleKey} `)
         }
 
         // check that all the repair keys are good
@@ -3949,22 +3964,25 @@ class StateManager extends EventEmitter {
         for (let partitionKey of repairKeys) {
           let repairTracker1 = repairsByPartition[partitionKey]
           if ((repairTracker1.txRepairComplete === false && repairTracker1.evaluationStarted) || repairTracker1.evaluationStarted === false) {
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess repairTracker1 ${utils.stringifyReduce(repairTracker1)} `)
-            allFinished = false // TODO sharding done. turned all finished = false line back on   need to fix this logic so that we make sure all partitions are good before we proceed to merge and apply things
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess repairTracker1 ${debugKey} txRepairComplete === false ${utils.stringifyReduce(repairTracker1)} `)
+            // Dont clear all finished ... we can try repairing one parition at a time with the data we have i gues..
+            //      what will happen if a TX applies to two accounts in two diff partitions we own.  well it will reset account and play tx in each partition.
+            // allFinished = false // TODO sharding done. turned all finished = false line back on   need to fix this logic so that we make sure all partitions are good before we proceed to merge and apply things
             // TODO sharding looks ok but needs testing.
             // perhaps check that awaitWinningHash == true for all of them now? idk..
           }
         }
+
         if (allFinished) {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess allFinished, start merge and apply cycle: ${cycleNumber}`)
-          await this.mergeAndApplyTXRepairs(cycleNumber)
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess allFinished, start merge and apply ${debugKey}`)
+          await this.mergeAndApplyTXRepairs(cycleNumber, partitionId)
 
           // only declare victory after we matched hashes
           if (usedSyncTXsFromHashSetStrings === false) {
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess 1 allFinished, final cycle: ${cycleNumber} hash:${utils.stringifyReduce({ topResult2 })}`)
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess 1 allFinished, final ${debugKey} hash:${utils.stringifyReduce({ topResult2 })}`)
             return
           } else {
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess set evaluationStarted=false so we can tally up hashes again ${cycleNumber}`)
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess set evaluationStarted=false so we can tally up hashes again ${debugKey}`)
             repairTracker.evaluationStarted = false
             repairTracker.awaitWinningHash = true
 
@@ -3972,17 +3990,17 @@ class StateManager extends EventEmitter {
             // now that we are done see if we can form a receipt with what we have on the off change that all other nodes have sent us their corrected receipts already
             let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
             let { partitionReceipt: partitionReceipt3, topResult: topResult3, success: success3 } = receiptResults
-            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess immediate receipt check. cycle: ${cycleNumber} success:${success3} topResult:${utils.stringifyReduce(topResult3)}  partitionReceipt: ${utils.stringifyReduce({ partitionReceipt3 })}`)
+            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess immediate receipt check. ${debugKey} success:${success3} topResult:${utils.stringifyReduce(topResult3)}  partitionReceipt: ${utils.stringifyReduce({ partitionReceipt3 })}`)
 
             // see if we already have a winning hash to correct to
             if (!success3) {
               if (repairTracker.awaitWinningHash) {
                 if (topResult3 == null) {
                   // if we are awaitWinningHash then wait for a top result before we start repair process again
-                  if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess awaitWinningHash:true but topResult == null so keep waiting `)
+                  if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess awaitWinningHash:true but topResult == null so keep waiting ${debugKey}`)
                 } else {
-                  if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess awaitWinningHash:true and we have a top result so start reparing! `)
-                  if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess: tryGeneratePartitionReciept failed start repair process ${receiptResults}`)
+                  if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess awaitWinningHash:true and we have a top result so start reparing! ${debugKey}`)
+                  if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess: tryGeneratePartitionReciept failed start repair process 2 ${debugKey}  ${utils.stringifyReduce(receiptResults)}`)
                   let cycle = this.p2p.state.getCycleByCounter(cycleNumber)
                   await utils.sleep(1000)
                   await this.startRepairProcess(cycle, topResult3, partitionId, ourResult.Partition_hash)
@@ -3992,13 +4010,13 @@ class StateManager extends EventEmitter {
             } else {
               this.storePartitionReceipt(cycleNumber, partitionReceipt3)
               this.repairTrackerMarkFinished(repairTracker)
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess 2 allFinished, final cycle: ${cycleNumber} hash:${utils.stringifyReduce({ topResult3 })}`)
+              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess 2 allFinished, final ${debugKey} hash:${utils.stringifyReduce({ topResult3 })}`)
             }
           }
         }
       }
 
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess we repaired stuff so re-broadcast our results`)
+      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess we repaired stuff so re-broadcast our results ${debugKey}`)
       // broadcast our upgraded result again
       // how about for just this partition?
       // TODO repair.  how to make this converge towards order and heal the network problems. is this the right time/place to broadcaast it?  I think it does converge now since merge does a strait copy of the winner
@@ -4034,6 +4052,7 @@ class StateManager extends EventEmitter {
 
     let key = 'c' + cycleNumber
     let key2 = 'p' + partitionId
+    let debugKey = `rkeys: ${key} ${key2}`
 
     // get responses
     let responsesById = this.allPartitionResponsesByCycleByPartition[key]
@@ -4051,17 +4070,17 @@ class StateManager extends EventEmitter {
 
     let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
     let { partitionReceipt: partitionReceipt3, topResult: topResult3, success: success3 } = receiptResults
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept immediate receipt check. cycle: ${cycleNumber} success:${success3} topResult:${utils.stringifyReduce(topResult3)}  partitionReceipt: ${utils.stringifyReduce({ partitionReceipt3 })}`)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept immediate receipt check. ${debugKey} success:${success3} topResult:${utils.stringifyReduce(topResult3)}  partitionReceipt: ${utils.stringifyReduce({ partitionReceipt3 })}`)
 
     // see if we already have a winning hash to correct to
     if (!success3) {
       if (repairTracker.awaitWinningHash) {
         if (topResult3 == null) {
           // if we are awaitWinningHash then wait for a top result before we start repair process again
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept awaitWinningHash:true but topResult == null so keep waiting `)
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept awaitWinningHash:true but topResult == null so keep waiting ${debugKey}`)
         } else {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept awaitWinningHash:true and we have a top result so start reparing! `)
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept: tryGeneratePartitionReciept failed start repair process ${receiptResults}`)
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept awaitWinningHash:true and we have a top result so start reparing! ${debugKey}`)
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept: tryGeneratePartitionReciept failed start repair process 3 ${debugKey} ${utils.stringifyReduce(receiptResults)}`)
           let cycle = this.p2p.state.getCycleByCounter(cycleNumber)
           await utils.sleep(1000)
           await this.startRepairProcess(cycle, topResult3, partitionId, ourResult.Partition_hash)
@@ -4071,7 +4090,7 @@ class StateManager extends EventEmitter {
     } else {
       this.storePartitionReceipt(cycleNumber, partitionReceipt3)
       this.repairTrackerMarkFinished(repairTracker)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept 2 allFinished, final cycle: ${cycleNumber} hash:${utils.stringifyReduce({ topResult3 })}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept 2 allFinished, final ${debugKey} hash:${utils.stringifyReduce({ topResult3 })}`)
     }
   }
 
@@ -4580,9 +4599,10 @@ class StateManager extends EventEmitter {
   /**
    * mergeAndApplyTXRepairs
    * @param {number} cycleNumber
+   * @param {number} specificParition the old version of this would repair all partitions but we had to wait.  this works on just one partition
    */
-  async mergeAndApplyTXRepairs (cycleNumber) {
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs cycleNumber ${cycleNumber}`)
+  async mergeAndApplyTXRepairs (cycleNumber, specificParition) {
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs cycleNumber ${cycleNumber} partition: ${specificParition}`)
     // this will call into some of the funtions at the bottom of this file
 
     // let allTXsToApply = {}
@@ -4635,6 +4655,11 @@ class StateManager extends EventEmitter {
     let lastCycleShardValues = this.shardValuesByCycle.get(cycleNumber)
 
     for (let partitionID of lastCycleShardValues.ourConsensusPartitions) {
+      // this is an attempt to just repair one parition.
+      if (partitionID !== specificParition) {
+        continue
+      }
+
       let allTXsToApply = {}
       let allExtraTXids = {}
       let allAccountsToResetById = {}
@@ -5047,6 +5072,8 @@ class StateManager extends EventEmitter {
     let partitionResultsByNodeID = new Map() // use a map?
     let nodesToTell = []
 
+    // Either this logic is wrong or it is called too soon.
+
     // sign results as needed
     for (let i = 0; i < partitionResults.length; i++) {
       /** @type {PartitionResult} */
@@ -5084,6 +5111,7 @@ class StateManager extends EventEmitter {
 
     // do we really want to send to all?  this will max out eventually.. but a bit worried it wont scale or be robust enough.
     // need some way to thin this out.
+
     let promises = []
     for (let nodeId of nodesToTell) {
       if (nodeId === lastCycleShardValues.ourNode.id) {
@@ -5491,7 +5519,8 @@ class StateManager extends EventEmitter {
         }
       }
     }
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair findMostCommonResponse: ${utils.stringifyReduce(responsesById)} }`)
+    // reaponsesById: ${utils.stringifyReduce(responsesById)}
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair findMostCommonResponse: retVal: ${utils.stringifyReduce({ topHash, topCount, topResult })}  responses: ${utils.stringifyReduce(responses)} `)
     return { topHash, topCount, topResult }
   }
 
