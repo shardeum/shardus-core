@@ -223,10 +223,10 @@ class ShardFunctions {
       storedPartitions.partitionsCovered = 1 + (storedPartitions.partitionEnd1 - storedPartitions.partitionStart1)
     }
 
-    if (storedPartitions.partitionsCovered <= 2) {
-      let a = 1
-      a++
-    }
+    // if (storedPartitions.partitionsCovered <= 2) {
+    //   let a = 1
+    //   a++
+    // }
   }
 
   static testAddressInRange (address, storedPartitions) {
@@ -540,6 +540,13 @@ class ShardFunctions {
         let startPartition = Math.floor(shardGlobals.numPartitions * (nodeAddressNum / 0xffffffff))
         nodeAddressNum = parseInt(endNode.id.slice(0, 8), 16)
         let endPartition = Math.floor(shardGlobals.numPartitions * (nodeAddressNum / 0xffffffff))
+
+        // special case when there are very small networks and the consensus range should wrap around.
+        if (startPartition === endPartition && startNode.id > endNode.id) {
+          startPartition = 0
+          endPartition = shardGlobals.numPartitions - 1
+        }
+
         nodeShardData.consensusStartPartition = startPartition
         nodeShardData.consensusEndPartition = endPartition
 
