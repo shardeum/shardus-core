@@ -26,6 +26,7 @@ class P2P extends EventEmitter {
     this.difficulty = config.difficulty
     this.queryDelay = config.queryDelay
     this.netadmin = config.netadmin || 'default'
+    this.minNodesToAllowTxs = config.minNodesToAllowTxs
     this.seedNodes = null
     this.isFirstSeed = false
     this.acceptInternal = false
@@ -1415,8 +1416,7 @@ class P2P extends EventEmitter {
   }
 
   allowTransactions () {
-    // return true // this.state.getActiveCount() >= this.state.minNodes
-    return this.state.getActiveCount() >= 3 // a test option
+    return this.state.getActiveCount() >= this.minNodesToAllowTxs
   }
 
   // Finds a node either in nodelist or in seedNodes listhis.mainLogger.debug(`Node ID to look up: ${nodeId}`)t if told to
