@@ -162,7 +162,7 @@ class P2P extends EventEmitter {
   async _getSeedNodes () {
     let seedListSigned = await this._getSeedListSigned()
     if (!this.crypto.verify(seedListSigned, this.netadmin)) throw Error('Fatal: Seed list was not signed by specified netadmin!')
-    return seedListSigned.seedNodes
+    return seedListSigned.nodeList
   }
 
   async _fetchSeedNodeInfo (seedNode) {
