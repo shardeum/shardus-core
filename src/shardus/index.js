@@ -309,6 +309,11 @@ class Shardus {
       return { success: false, reason: 'Node is still syncing.' }
     }
 
+    if (!this.stateManager.hasCycleShardData()) {
+      this.statistics.incrementCounter('txRejected')
+      return { success: false, reason: 'Not ready to accept transactions, shard calculations pending' }
+    }
+
     if (!this.p2p.allowTransactions()) {
       this.statistics.incrementCounter('txRejected')
       return { success: false, reason: 'Network conditions to allow transactions are not met.' }
@@ -589,6 +594,7 @@ class Shardus {
       if (typeof (application.getAccountDebugValue) === 'function') {
         applicationInterfaceImpl.getAccountDebugValue = (wrappedAccount) => application.getAccountDebugValue(wrappedAccount)
       } else {
+        applicationInterfaceImpl.getAccountDebugValue = (wrappedAccount) => 'getAccountDebugValue() missing on app'
         // throw new Error('Missing requried interface function. deleteLocalAccountData()')
       }
     } catch (ex) {

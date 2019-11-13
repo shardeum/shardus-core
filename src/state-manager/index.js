@@ -560,6 +560,10 @@ class StateManager extends EventEmitter {
     return this.currentCycleShardData
   }
 
+  hasCycleShardData () {
+    return this.currentCycleShardData != null
+  }
+
   // todo refactor: this into a util, grabbed it from p2p
   // From: https://stackoverflow.com/a/12646864
   shuffleArray (array) {
