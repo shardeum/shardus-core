@@ -68,13 +68,16 @@ class P2P extends EventEmitter {
     this.archivers = new P2PArchivers(this.logger, this, this.state, this.crypto)
 
     this.state.on('cycle_q3_start', () => {
-      const joinRequests = this.archivers.getJoinedArchivers()
-      this.state.addJoinedArchivers(joinRequests)
+      const joinRequests = this.archivers.getArchiverUpdates()
+      for (const joinRequest of joinRequests) {
+        this.state.addArchiverUpdate(joinRequest)
+      }
     })
 
     this.state.on('newCycle', (cycles) => {
-      const lastCycle = cycles[cycles.length - 1]
-      this.archivers.addArchivers(lastCycle.joinedArchivers)
+      const cycle = cycles[cycles.length - 1]
+      this.archivers.updateArchivers(cycle.joinedArchivers)
+      this.archivers.sendCycle(cycle)
       this.archivers.resetJoinRequests()
     })
 
@@ -181,7 +184,10 @@ class P2P extends EventEmitter {
     const archiver = this.existingArchivers[0]
     let seedListSigned = await this._getSeedListSigned()
     if (!this.crypto.verify(seedListSigned, archiver.publicKey)) throw Error('Fatal: Seed list was not signed by archiver!')
-    this.archivers.addJoinRequest(seedListSigned.joinRequest)
+    if (seedListSigned.joinRequest) {
+      this.archivers.addJoinRequest(seedListSigned.joinRequest)
+      this.archivers.addCycleRecipient(seedListSigned.joinRequest.nodeInfo)
+    }
     return seedListSigned.nodeList
   }
 

@@ -1,4 +1,4 @@
-// const utils = require('../utils')
+const http = require('../http')
 
 class P2PArchivers {
   constructor (logger, p2p, state, crypto) {
@@ -8,27 +8,46 @@ class P2PArchivers {
     this.crypto = crypto
     this.joinRequests = []
     this.archiversList = []
+    this.cycleRecipients = []
   }
 
   resetJoinRequests () {
     this.joinRequests = []
   }
 
-  addJoinRequest (joinRequest) {
-    if (this.state.acceptJoinRequests && this.crypto.verify(joinRequest)) {
-      this.joinRequests.push(joinRequest)
-      return true
+  async addJoinRequest (joinRequest, tracker, gossip = true) {
+    if (this.state.acceptJoinRequests === false) {
+      return false
     }
-    return false
+    if (this.crypto.verify(joinRequest) === false) {
+      return false
+    }
+    this.joinRequests.push(joinRequest)
+    if (gossip === true) {
+      await this.p2p.sendGossipIn('joinarchiver', joinRequest, tracker)
+    }
+    return true
   }
 
-  getJoinedArchivers () {
+  getArchiverUpdates () {
     return this.joinRequests
   }
 
-  addArchivers (joinedArchivers) {
-    for (const joinRequest of joinedArchivers) {
-      this.archiversList.push(joinRequest.nodeInfo)
+  updateArchivers (joinedArchivers) {
+    // Update archiversList
+    for (const nodeInfo of joinedArchivers) {
+      this.archiversList.push(nodeInfo)
+    }
+  }
+
+  addCycleRecipient (nodeInfo) {
+    this.cycleRecipients.push(nodeInfo)
+  }
+
+  sendCycle (cycle) {
+    for (const nodeInfo of this.cycleRecipients) {
+      const nodeUrl = `http://${nodeInfo.ip}:${nodeInfo.port}/newcycle`
+      http.post(nodeUrl, cycle)
     }
   }
 
@@ -52,8 +71,19 @@ class P2PArchivers {
       this.mainLogger.debug('Archiver join request accepted!')
     })
 
-    this.p2p.network.registerExternalGet('archivers', async (req, res) => {
-      return res.json({ archivers: this.archiversList })
+    this.p2p.registerGossipHandler('joinarchiver', async (payload, sender, tracker) => {
+      if (!this.state.acceptJoinRequests) return this.mainLogger.debug('Archiver join request not accepted. Not accepting join requests currently.')
+      const accepted = await this.addJoinRequest(payload, tracker, false)
+      if (!accepted) return this.mainLogger.debug('Archiver join request not accepted.')
+      this.mainLogger.debug('Archiver join request accepted!')
+    })
+
+    this.p2p.network.registerExternalGet('archivers', (req, res) => {
+      res.json({ archivers: this.archiversList })
+    })
+
+    this.p2p.network.registerExternalGet('cyclerecipients', (req, res) => {
+      res.json({ cycleRecipients: this.cycleRecipients })
     })
   }
 }

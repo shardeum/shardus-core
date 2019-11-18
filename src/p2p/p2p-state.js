@@ -76,6 +76,7 @@ class P2PState extends EventEmitter {
       },
       updates: {
         bestJoinRequests: [],
+        archiverJoinRequests: [],
         active: [],
         scaling: {
           up: [],
@@ -465,9 +466,12 @@ class P2PState extends EventEmitter {
   // TODO: Update this to go through entire update types
   async addCycleUpdates (updates) {
     if (!this.cyclesStarted) return false
-    const { bestJoinRequests, active, scaling, apoptosis, lost } = updates
+    const { bestJoinRequests, archiverJoinRequests, active, scaling, apoptosis, lost } = updates
     for (const joinRequest of bestJoinRequests) {
       this._addJoinRequest(joinRequest)
+    }
+    for (const archiverJoinRequest of archiverJoinRequests) {
+      this.addArchiverUpdate(archiverJoinRequest)
     }
     for (const activeRequest of active) {
       this.addStatusUpdate(activeRequest)
@@ -635,11 +639,11 @@ class P2PState extends EventEmitter {
     return true
   }
 
-  addJoinedArchivers (joinRequests) {
-    const joinedArchivers = this.currentCycle.data.joinedArchivers
-    for (const joinRequest of joinRequests) {
-      joinedArchivers.push(joinRequest.nodeInfo.publicKey)
-    }
+  addArchiverUpdate (joinRequest) {
+    // Add to cycle updates in archiverJoinRequests
+    this.currentCycle.updates.archiverJoinRequests.push(joinRequest)
+    // Add to cycle data in joinedArchivers
+    this.currentCycle.data.joinedArchivers.push(joinRequest.nodeInfo)
   }
 
   async _setNodeStatus (nodeId, status) {
