@@ -22,7 +22,7 @@
             "type": "node",
             "request": "attach",
             "name": "Attach by Process ManualID",
-            "processId": "15684", //"${command:PickProcess}"
+            "processId": "${command:PickProcess}", // or hardcode the process id here i.e. "15684"
             "port": 9229,
             //"restart": true,
             "sourceMaps": true,
