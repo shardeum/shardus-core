@@ -210,6 +210,7 @@ const cHashSetDataStepSize = 2
    * @property {boolean} hasSyncingNeighbors
    * @property {number[]} voters hashlist index of the voters for this vote
    * @property {number[]} [ourConsensusPartitions] list of partitions that we do consensus on
+   * @property {number[]} [ourStoredPartitions] list of stored parititions
    */
 
 /**
@@ -311,6 +312,18 @@ class StateManager extends EventEmitter {
     // this controls the repair portion of data repair.
     this.canDataRepair = true
     this.stateIsGood = true
+
+    /** @type {RepairTracker[]} */
+    this.dataRepairStack = []
+
+    /** @type {number} */
+    this.dataRepairsCompleted = 0
+    /** @type {number} */
+    this.dataRepairsStarted = 0
+
+    this.repairAllStoredPartitions = true
+
+    this.repairStartedMap = new Map()
   }
 
   // this clears state data related to the current partion we are syncing.
@@ -446,8 +459,11 @@ class StateManager extends EventEmitter {
 
     // calculate our consensus partitions for use by data repair:
     // cycleShardData.ourConsensusPartitions = []
-    let partitions = ShardFunctions.getConsenusPartitions(cycleShardData.shardGlobals, cycleShardData.nodeShardData)
+    let partitions = ShardFunctions.getConsenusPartitionList(cycleShardData.shardGlobals, cycleShardData.nodeShardData)
     cycleShardData.ourConsensusPartitions = partitions
+
+    let partitions2 = ShardFunctions.getStoredPartitionList(cycleShardData.shardGlobals, cycleShardData.nodeShardData)
+    cycleShardData.ourStoredPartitions = partitions2
 
     // this will be a huge log.
     this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${cycleNumber} data: ${utils.stringifyReduce(cycleShardData)}`)
@@ -3650,6 +3666,9 @@ class StateManager extends EventEmitter {
     // lastCycleShardValues.ourConsensusPartitions = partitions
 
     let partitions = lastCycleShardValues.ourConsensusPartitions
+    if (this.repairAllStoredPartitions === true) {
+      partitions = lastCycleShardValues.ourStoredPartitions
+    }
 
     this.nextCycleReportToSend = { res: [], cycleNumber: lastCycle.counter }
 
@@ -3880,6 +3899,17 @@ class StateManager extends EventEmitter {
       key = 'c' + cycleNumber
       key2 = 'p' + partitionId
       debugKey = `rkeys: ${key} ${key2}`
+
+      let combinedKey = key + key2
+      if (this.repairStartedMap.has(combinedKey)) {
+        if (this.verboseLogs) this.mainLogger.error(`repairStats: Already started repair on ${combinedKey}`)
+      } else {
+        this.dataRepairStack.push(repairTracker)
+        this.dataRepairsStarted++
+        this.repairStartedMap.set(combinedKey, true)
+
+        if (this.verboseLogs) this.mainLogger.log(`repairStats: staring repair ${combinedKey}`)
+      }
 
       if (topResult) {
         repairTracker.triedHashes.push(topResult.Partition_hash)
@@ -4311,6 +4341,8 @@ class StateManager extends EventEmitter {
         }
       }
     } catch (ex) {
+      this.mainLogger.debug('_repair: _mergeRepairDataIntoLocalState2 ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.fatalLogger.fatal('_repair: _mergeRepairDataIntoLocalState2 ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 c  Exception when applying solution. going apoptosis. solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter} ourHashSet: ${hashSet}`)
       this.p2p.initApoptosis()
       throw new Error('aborting data repair. starting apoptosis')
@@ -4570,6 +4602,16 @@ class StateManager extends EventEmitter {
         awaitWinningHash: false,
         repairsFullyComplete: false }
       repairsByPartition[key2] = repairTracker
+
+      // this.dataRepairStack.push(repairTracker)
+      // this.dataRepairsStarted++
+
+      // let combinedKey = key + key2
+      // if (this.repairStartedMap.has(combinedKey)) {
+      //   if (this.verboseLogs) this.mainLogger.error(`Already started repair on ${combinedKey}`)
+      // } else {
+      //   this.repairStartedMap.set(combinedKey, true)
+      // }
     }
     return repairTracker
   }
@@ -4580,6 +4622,29 @@ class StateManager extends EventEmitter {
    */
   repairTrackerMarkFinished (repairTracker) {
     repairTracker.repairsFullyComplete = true
+
+    let combinedKey = repairTracker.key + repairTracker.key2
+    if (this.repairStartedMap.has(combinedKey)) {
+      this.dataRepairsCompleted++
+      if (this.verboseLogs) this.mainLogger.log(`repairStats: finished repair ${combinedKey}`)
+    } else {
+      // should be a trace?
+      if (this.verboseLogs) this.mainLogger.log(`repairStats: Calling complete on a key we dont have ${combinedKey}`)
+    }
+
+    for (let i = this.dataRepairStack.length - 1; i >= 0; i--) {
+      let repairTracker1 = this.dataRepairStack[i]
+      if (repairTracker1 === repairTracker) {
+        this.dataRepairStack.splice(i, 1)
+      }
+    }
+
+    if (this.dataRepairStack.length === 0) {
+      if (this.stateIsGood === false) {
+        if (this.verboseLogs) this.mainLogger.error(`No active data repair going on`)
+      }
+      this.stateIsGood = true
+    }
   }
 
   /**

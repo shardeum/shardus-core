@@ -188,7 +188,7 @@ for (let i = 0; i < testIterations; i++) {
     console.log('storedPartitions' + utils.stringifyReduce(nodeShardData.storedPartitions))
 
     // calc consensus partitions
-    let ourConsensusPartitions = ShardFunctions.getConsenusPartitions(shardGlobals, nodeShardData)
+    let ourConsensusPartitions = ShardFunctions.getConsenusPartitionList(shardGlobals, nodeShardData)
     console.log('ourConsensusPartitions ' + utils.stringifyReduce(ourConsensusPartitions) + `  consensusEndPartition: ${nodeShardData.consensusEndPartition} consensusStartPartition ${nodeShardData.consensusStartPartition}`)
   }
 

@@ -727,7 +727,7 @@ class ShardFunctions {
    * @param {NodeShardData} nodeShardData the node we want to get a list of consensus partions from
    * @returns {number[]} a list of partitions
    */
-  static getConsenusPartitions (shardGlobals, nodeShardData) {
+  static getConsenusPartitionList (shardGlobals, nodeShardData) {
     let consensusPartitions = []
     if (nodeShardData.consensusStartPartition <= nodeShardData.consensusEndPartition) {
       for (let i = nodeShardData.consensusStartPartition; i <= nodeShardData.consensusEndPartition; i++) {
@@ -742,6 +742,29 @@ class ShardFunctions {
       }
     }
     return consensusPartitions
+  }
+
+  /**
+   * getStoredPartitions
+   * @param {ShardGlobals} shardGlobals
+   * @param {NodeShardData} nodeShardData the node we want to get a list of consensus partions from
+   * @returns {number[]} a list of partitions
+   */
+  static getStoredPartitionList (shardGlobals, nodeShardData) {
+    let storedPartitionList = []
+    if (nodeShardData.storedPartitions.partitionStart <= nodeShardData.storedPartitions.partitionEnd) {
+      for (let i = 0; i <= nodeShardData.storedPartitions.partitionEnd; i++) {
+        storedPartitionList.push(i)
+      }
+    } else {
+      for (let i = 0; i <= nodeShardData.storedPartitions.partitionEnd; i++) {
+        storedPartitionList.push(i)
+      }
+      for (let i = nodeShardData.storedPartitions.partitionStart; i < shardGlobals.numPartitions; i++) {
+        storedPartitionList.push(i)
+      }
+    }
+    return storedPartitionList
   }
 
   // conditions aStart < aEnd && bStart < bEnd

@@ -506,7 +506,7 @@ class Shardus {
         applicationInterfaceImpl.getStateId = async (accountAddress, mustExist) => application.getStateId(accountAddress, mustExist)
       } else {
         // throw new Error('Missing requried interface function. getStateId()')
-        this.mainLogger.log('getStateId not used by global server')
+        this.mainLogger.debug('getStateId not used by global server')
       }
 
       // opitonal methods

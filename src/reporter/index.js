@@ -116,6 +116,8 @@ class Reporter {
       const reportInterval = this.config.interval
       const nodeIpInfo = this.p2p.getIpInfo()
 
+      let repairsStarted = 0
+      let repairsFinished = 0
       // report only if we are active in te networks.
       // only knowingly report deltas.
       let partitionReport = null
@@ -124,6 +126,8 @@ class Reporter {
         partitionReport = this.stateManager.getPartitionReport(true, true)
         globalSync = this.stateManager.stateIsGood
 
+        repairsStarted = this.stateManager.dataRepairsStarted
+        repairsFinished = this.stateManager.dataRepairsCompleted
         // Hack to code a green or red color for app state:
         appState = globalSync ? '00ff00ff' : 'ff0000ff'
       }
@@ -145,7 +149,10 @@ class Reporter {
       const txTimeInQueue = this.statistics.getPreviousElement('txTimeInQueue') / 1000 // ms to sec
 
       try {
-        await this._sendReport({ appState,
+        await this._sendReport({
+          repairsStarted,
+          repairsFinished,
+          appState,
           cycleMarker,
           cycleCounter,
           nodelistHash,
