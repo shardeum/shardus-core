@@ -93,6 +93,7 @@ class P2PState extends EventEmitter {
         counter: null,
         previous: null,
         joined: [],
+        joinedArchivers: [],
         removed: [],
         lost: [],
         refuted: [],
@@ -632,6 +633,13 @@ class P2PState extends EventEmitter {
       utils.insertSorted(this.currentCycle.data.refuted, nodeId)
     }
     return true
+  }
+
+  addJoinedArchivers (joinRequests) {
+    const joinedArchivers = this.currentCycle.data.joinedArchivers
+    for (const joinRequest of joinRequests) {
+      joinedArchivers.push(joinRequest.nodeInfo.publicKey)
+    }
   }
 
   async _setNodeStatus (nodeId, status) {
@@ -1300,6 +1308,7 @@ class P2PState extends EventEmitter {
     const active = this.getActiveCount()
     const desired = this.getNextDesiredCount()
     const joined = this.getJoined()
+    const joinedArchivers = this.getJoinedArchivers()
     const removed = this.getRemoved()
     const lost = this.getLost()
     const refuted = this.getRefuted()
@@ -1316,6 +1325,7 @@ class P2PState extends EventEmitter {
       active,
       desired,
       joined,
+      joinedArchivers,
       removed,
       lost,
       refuted,
@@ -1441,6 +1451,10 @@ class P2PState extends EventEmitter {
 
   getJoined () {
     return this.currentCycle.data.joined
+  }
+
+  getJoinedArchivers () {
+    return this.currentCycle.data.joinedArchivers
   }
 
   getRemoved () {

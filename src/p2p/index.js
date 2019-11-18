@@ -5,6 +5,7 @@ const utils = require('../utils')
 const http = require('../http')
 const P2PState = require('./p2p-state')
 const P2PLostNodes = require('./p2p-lost-nodes')
+const P2PArchivers = require('./p2p-archivers')
 const routes = require('./routes')
 
 class P2P extends EventEmitter {
@@ -20,12 +21,11 @@ class P2P extends EventEmitter {
     this.id = null
     this.ipServer = config.ipServer
     this.timeServers = config.timeServers
-    this.seedList = config.seedList
+    this.existingArchivers = config.existingArchivers
     this.syncLimit = config.syncLimit
     this.maxRejoinTime = config.maxRejoinTime
     this.difficulty = config.difficulty
     this.queryDelay = config.queryDelay
-    this.netadmin = config.netadmin || 'default'
     this.minNodesToAllowTxs = config.minNodesToAllowTxs
     this.seedNodes = null
     this.isFirstSeed = false
@@ -53,6 +53,7 @@ class P2P extends EventEmitter {
       this.scalingRequested = false
     })
 
+    // Init lost node detection
     this.lostNodes = new P2PLostNodes(this.logger, this, this.state, this.crypto)
     this.state.initLost(this.lostNodes)
 
@@ -61,6 +62,20 @@ class P2P extends EventEmitter {
     })
     this.state.on('cycle_q3_start', () => {
       this.lostNodes.applyLost()
+    })
+
+    // Init saving archiver nodes into cycles
+    this.archivers = new P2PArchivers(this.logger, this, this.state, this.crypto)
+
+    this.state.on('cycle_q3_start', () => {
+      const joinRequests = this.archivers.getJoinedArchivers()
+      this.state.addJoinedArchivers(joinRequests)
+    })
+
+    this.state.on('newCycle', (cycles) => {
+      const lastCycle = cycles[cycles.length - 1]
+      this.archivers.addArchivers(lastCycle.joinedArchivers)
+      this.archivers.resetJoinRequests()
     })
 
     this.InternalRecvCounter = 0
@@ -91,6 +106,7 @@ class P2P extends EventEmitter {
   _registerRoutes () {
     routes.register(this)
     this.lostNodes.registerRoutes()
+    this.archivers.registerRoutes()
   }
 
   _verifyExternalInfo (ipInfo) {
@@ -148,20 +164,24 @@ class P2P extends EventEmitter {
   }
 
   async _getSeedListSigned () {
+    const archiver = this.existingArchivers[0]
+    const nodeListUrl = `http://${archiver.ip}:${archiver.port}/nodelist`
     const nodeInfo = this.getPublicNodeInfo()
     let seedListSigned
     try {
-      seedListSigned = await http.post(this.seedList, { nodeInfo })
+      seedListSigned = await http.post(nodeListUrl, { nodeInfo })
     } catch (e) {
-      throw Error(`Fatal: Could not get seed list from seed node server ${this.seedList}: ` + e.message)
+      throw Error(`Fatal: Could not get seed list from seed node server ${nodeListUrl}: ` + e.message)
     }
     this.mainLogger.debug(`Got signed seed list: ${JSON.stringify(seedListSigned)}`)
     return seedListSigned
   }
 
   async _getSeedNodes () {
+    const archiver = this.existingArchivers[0]
     let seedListSigned = await this._getSeedListSigned()
-    if (!this.crypto.verify(seedListSigned, this.netadmin)) throw Error('Fatal: Seed list was not signed by specified netadmin!')
+    if (!this.crypto.verify(seedListSigned, archiver.publicKey)) throw Error('Fatal: Seed list was not signed by archiver!')
+    this.archivers.addJoinRequest(seedListSigned.joinRequest)
     return seedListSigned.nodeList
   }
 
