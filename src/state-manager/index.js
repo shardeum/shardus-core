@@ -3908,7 +3908,7 @@ class StateManager extends EventEmitter {
         this.dataRepairsStarted++
         this.repairStartedMap.set(combinedKey, true)
 
-        if (this.verboseLogs) this.mainLogger.log(`repairStats: staring repair ${combinedKey}`)
+        if (this.verboseLogs) this.mainLogger.debug(`repairStats: staring repair ${combinedKey}`)
       }
 
       if (topResult) {
@@ -4626,10 +4626,10 @@ class StateManager extends EventEmitter {
     let combinedKey = repairTracker.key + repairTracker.key2
     if (this.repairStartedMap.has(combinedKey)) {
       this.dataRepairsCompleted++
-      if (this.verboseLogs) this.mainLogger.log(`repairStats: finished repair ${combinedKey}`)
+      if (this.verboseLogs) this.mainLogger.debug(`repairStats: finished repair ${combinedKey}`)
     } else {
       // should be a trace?
-      if (this.verboseLogs) this.mainLogger.log(`repairStats: Calling complete on a key we dont have ${combinedKey}`)
+      if (this.verboseLogs) this.mainLogger.debug(`repairStats: Calling complete on a key we dont have ${combinedKey}`)
     }
 
     for (let i = this.dataRepairStack.length - 1; i >= 0; i--) {
