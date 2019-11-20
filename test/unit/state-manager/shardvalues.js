@@ -37,6 +37,47 @@ function findBnotInA (listA, listB) {
   return results
 }
 
+function getClosestNodes (shardGlobals, parititionShardDataMap, activeNodes, hash, count = 1) {
+  // if (this.currentCycleShardData == null) {
+  //   throw new Error('getClosestNodes: network not ready')
+  // }
+  // let cycleShardData = this.currentCycleShardData
+  let homeNode = ShardFunctions.findHomeNode(shardGlobals, hash, parititionShardDataMap)
+  let homeNodeIndex = homeNode.ourNodeIndex
+  let idToExclude = ''
+  let results = ShardFunctions.getNodesByProximity(shardGlobals, activeNodes, homeNodeIndex, idToExclude, count, true)
+
+  return results
+}
+
+function isNodeInDistancePartition (shardGlobals, hash, nodeId, distance) {
+  // if (this.currentCycleShardData == null) {
+  //   throw new Error('isNodeInDistance: network not ready')
+  // }
+  // let cycleShardData = this.currentCycleShardData
+  let [homePartition, addressNum] = ShardFunctions.addressToPartition(shardGlobals, nodeId)
+  let [homePartition2, addressNum2] = ShardFunctions.addressToPartition(shardGlobals, hash)
+  let partitionDistance = Math.abs(homePartition2 - homePartition)
+  if (partitionDistance <= distance) {
+    return true
+  }
+  return false
+}
+
+function isNodeInDistance (shardGlobals, parititionShardDataMap, hash, nodeId, distance) {
+  let someNode = ShardFunctions.findHomeNode(shardGlobals, nodeId, parititionShardDataMap)
+  let someNodeIndex = someNode.ourNodeIndex
+
+  let homeNode = ShardFunctions.findHomeNode(shardGlobals, hash, parititionShardDataMap)
+  let homeNodeIndex = homeNode.ourNodeIndex
+
+  let partitionDistance = Math.abs(someNodeIndex - homeNodeIndex)
+  if (partitionDistance <= distance) {
+    return true
+  }
+  return false
+}
+
 let extraNodesTotal = 0
 let testCounter = 1
 // test 1
@@ -79,17 +120,16 @@ let useHardcodenodes = true
 // let hardcodeNodes = ['02f2x50374', '1021xc4369', '1799xd547f', '242ex4bfbd', '30f0xea8a3', '3272x2a306', '4c96x8d210', '584dxd832a', '5c7fx2facc', '5c93x0f2a7', '7180xec580', '736cx7fa64', '750fx967f0', '7899x94a79', '89c9x85be0', '8c8bx815ad', '9adcx77753', 'a15fxd63a0', 'abc6xaa20f', 'd32ax93c1c', 'dc40x2b6ff', 'dd43xf3b5d', 'e986x67b4e', 'f0c4xea4f5', 'f211xb2904']
 // let hardcodeNodes2 = null
 
-// let hardcodeNodes = ['0692x2deec', '09afxee4b7', '0f3dxa312c', '18ecx3e3a1', '19c7x99e80', '19dfxcf9c7', '23d5xad4c5', '243dx817b9', '255fxd9030', '2642x4e37c', '3650x09963', '3f22x7a3ac', '42caxd50c0', '5307x662e7', '5e38xcc93f', '62c6xeee41', '653dx9f470', '677bx704a7', '7405xab8a5', '7b92x57e84', '911bx2a167', 'ac56x69db7', 'ae13xaa045', 'af8dxc0da5', 'b234x4ae35', 'c972x70e00', 'd6b5x79ed1', 'd8adxe7bd2', 'dcd7xdd2e1', 'e622xfadab']
-// let hardcodeNodes2 = null
+let hardcodeNodes = ['0692x2deec', '09afxee4b7', '0f3dxa312c', '18ecx3e3a1', '19c7x99e80', '19dfxcf9c7', '23d5xad4c5', '243dx817b9', '255fxd9030', '2642x4e37c', '3650x09963', '3f22x7a3ac', '42caxd50c0', '5307x662e7', '5e38xcc93f', '62c6xeee41', '653dx9f470', '677bx704a7', '7405xab8a5', '7b92x57e84', '911bx2a167', 'ac56x69db7', 'ae13xaa045', 'af8dxc0da5', 'b234x4ae35', 'c972x70e00', 'd6b5x79ed1', 'd8adxe7bd2', 'dcd7xdd2e1', 'e622xfadab']
+let hardcodeNodes2 = null
 
 // let hardcodeNodes = ['01cex1bed2', '0793xc7aee', '180bx3a172', '24afxce02d', '2d2ax053f6', '30aex6b5ca', '33d7x0a28e', '42bbx0242f', '43cax9b811', '5c70xdee7d', '5fcfx2f32d', '7303xfd71e', '7354xcedbc', '7b78xf936e', '7eabx5deea', '8609xcccf4', '88ecx4c9ab', '8c5axb8364', '93e3x87831', '9a91xb2cd3', '9d1dx51f4a', '9facx0e61c', 'a452x1f73d', 'a8e6xdd19c', 'bef0x7edf8', 'bfa5x12bbf', 'e116x7c34b', 'e89bxde077', 'eae4xeefb1', 'ffc1x1151f']
 // let hardcodeNodes2 = null
 
 // let hardcodeNodes = ["026bxf7f00","0fc2xbacb7","28eax6717f","2eedx05dcb","2f61x7203b","4796x1567b","5b52xf1dcb","5f20x3ef8b","600exc4756","63f1xc1c27","6cedx984cc","7fcbx33304","8bc4x50269","9626x288b0","97e8x87793","9f9ax480fd","a025x12af2","a305x7ad5c","ad6cx46a0d","ae04xd207d","b9f6x5fbbe","be73xff460","c356xdf16c","df3cx4ce46","e125x67ab3","e7e9x509e7","efcdx3c1cf","f84cx19324","f982x85d31","ff98x91e85"]
 // let hardcodeNodes2 = null
-
-let hardcodeNodes = ['4ca7xe03b8', '5d85x8ca39', '9c66x6b491', 'c21ax78bee', 'ed57xe1d15']
-let hardcodeNodes2 = null
+// let hardcodeNodes = ['4ca7xe03b8', '5d85x8ca39', '9c66x6b491', 'c21ax78bee', 'ed57xe1d15']
+// let hardcodeNodes2 = null
 
 if (useHardcodenodes) {
   numNodes = hardcodeNodes.length
@@ -97,7 +137,7 @@ if (useHardcodenodes) {
 if (hardcodeNodes2) {
   numNodes2 = hardcodeNodes2.length
 }
-let debugStartsWith = '4ca7' // '8bc4' // '33d7' //'0692' // '23d5' // 'f211' //'147d' // '2054' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
+let debugStartsWith = '18ec' // '8bc4' // '33d7' //'0692' // '23d5' // 'f211' //'147d' // '2054' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
 let debugID = debugStartsWith.slice(0, 4) + '7'.repeat(64 - 4)
 let debugAccount = '75ed' + '3'.repeat(60) // 5c43 386e
 let debugNode = null
@@ -190,6 +230,23 @@ for (let i = 0; i < testIterations; i++) {
     // calc consensus partitions
     let ourConsensusPartitions = ShardFunctions.getConsenusPartitionList(shardGlobals, nodeShardData)
     console.log('ourConsensusPartitions ' + utils.stringifyReduce(ourConsensusPartitions) + `  consensusEndPartition: ${nodeShardData.consensusEndPartition} consensusStartPartition ${nodeShardData.consensusStartPartition}`)
+
+    let hash = debugAccount
+
+    let closestNodes = getClosestNodes(shardGlobals, parititionShardDataMap, activeNodes, hash, 4)
+
+    let inDist = isNodeInDistancePartition(shardGlobals, hash, debugID, 2)
+
+    console.log(`getClosestNodes  ${closestNodes.length}    inDist:${inDist}  nodes:${closestNodes.map((node) => utils.stringifyReduce(node.id)).join(',')}`)
+    for (let node of activeNodes) {
+      if(node.id.slice(0,4) === '653d') {
+        let a = true //  653d  911b
+      }
+      let inDist2 = isNodeInDistancePartition(shardGlobals, hash, node.id, 2)
+      let inDist3 = isNodeInDistance(shardGlobals, parititionShardDataMap, hash, node.id, 2)
+
+      console.log(`isNodeInDistance  ${node.id}    inDist:${inDist2}  inDist3:${inDist3}`)
+    }
   }
 
   ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, true)

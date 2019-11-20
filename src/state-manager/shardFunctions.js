@@ -1240,9 +1240,7 @@ class ShardFunctions {
 
   // todo memoize this per cycle!!!
   static partitionToAddressRange2 (shardGlobals, partition, paritionMax = null) {
-    /**
-     * @type {AddressRange}
-     */
+    /** @type {AddressRange} */
     let result = {}
     result.partition = partition
     let startAddr = 0xffffffff * (partition / shardGlobals.numPartitions)
@@ -1441,12 +1439,15 @@ class ShardFunctions {
    * @param {any} excludeID
    * @param {number} [count]
    */
-  static getNodesByProximity (shardGlobals, activeNodes, position, excludeID, count = 10) {
+  static getNodesByProximity (shardGlobals, activeNodes, position, excludeID, count = 10, centeredScan = false) {
     let allNodes = activeNodes
     let results = []
     let leftScanIndex = position
     let rightScanIndex = position - 1
     let maxIterations = Math.ceil(count / 2)
+    if (centeredScan) {
+      maxIterations++
+    }
     for (let i = 0; i < maxIterations; i++) {
       leftScanIndex--
       rightScanIndex++
@@ -1462,6 +1463,11 @@ class ShardFunctions {
           results.push(node)
         }
       }
+
+      if (centeredScan && i === maxIterations - 1) {
+        break // done, because we don't need the left index.
+      }
+
       node = allNodes[leftScanIndex]
       if (node.id !== excludeID) {
         if (node.status === 'active') {

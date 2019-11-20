@@ -390,6 +390,30 @@ class Shardus {
     return this.p2p.getLatestCycles(amount)
   }
 
+  /**
+ * @typedef {import('../shardus/index').Node} Node
+ */
+  /**
+   * getClosestNodes finds the closes nodes to a certain hash value
+   * @param {string} hash any hash address (256bit 64 characters)
+   * @param {number} count how many nodes to return
+   * @returns {string[]} returns a list of nodes ids that are closest. roughly in order of closeness
+   */
+  getClosestNodes (hash, count = 1) {
+    return this.stateManager.getClosestNodes(hash, count).map((node) => node.id)
+  }
+
+  /**
+   * isNodeInDistance
+   * @param {string} hash any hash address (256bit 64 characters)
+   * @param {string} nodeId id of a node
+   * @param {number} distance how far away can this node be to the home node of the hash
+   * @returns {boolean} is the node in the distance to the target
+   */
+  isNodeInDistance (hash, nodeId, distance) {
+    return this.stateManager.isNodeInDistance(hash, nodeId, distance)
+  }
+
   // USED BY SIMPLECOINAPP
   createApplyResponse (txId, txTimestamp) {
     let replyObject = { stateTableResults: [], txId, txTimestamp, accountData: [] }

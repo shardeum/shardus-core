@@ -3481,6 +3481,61 @@ class StateManager extends EventEmitter {
     return null
   }
 
+  /**
+   * getClosestNodes
+   * @param {string} hash
+   * @param {number} count
+   * @returns {Node[]}
+   */
+  getClosestNodes (hash, count = 1) {
+    if (this.currentCycleShardData == null) {
+      throw new Error('getClosestNodes: network not ready')
+    }
+    let cycleShardData = this.currentCycleShardData
+    let homeNode = ShardFunctions.findHomeNode(cycleShardData.shardGlobals, hash, cycleShardData.parititionShardDataMap)
+    let homeNodeIndex = homeNode.ourNodeIndex
+    let idToExclude = ''
+    let results = ShardFunctions.getNodesByProximity(cycleShardData.shardGlobals, cycleShardData.activeNodes, homeNodeIndex, idToExclude, count, true)
+
+    return results
+  }
+
+  // /**
+  //  * isNodeInDistance
+  //  * @param {string} hash
+  //  * @param {string} nodeId
+  //  * @param {number} distance
+  //  * @returns {boolean}
+  //  */
+  // isNodeInDistance (hash, nodeId, distance) {
+  //   if (this.currentCycleShardData == null) {
+  //     throw new Error('isNodeInDistance: network not ready')
+  //   }
+  //   let cycleShardData = this.currentCycleShardData
+  //   let [homePartition, addressNum] = ShardFunctions.addressToPartition(cycleShardData.shardGlobals, nodeId)
+  //   let [homePartition2, addressNum2] = ShardFunctions.addressToPartition(cycleShardData.shardGlobals, hash)
+  //   let partitionDistance = Math.abs(homePartition2 - homePartition)
+  //   if (partitionDistance < distance) {
+  //     return true
+  //   }
+  //   return false
+  // }
+
+  isNodeInDistance (shardGlobals, parititionShardDataMap, hash, nodeId, distance) {
+    let cycleShardData = this.currentCycleShardData
+    let someNode = ShardFunctions.findHomeNode(cycleShardData.shardGlobals, nodeId, cycleShardData.parititionShardDataMap)
+    let someNodeIndex = someNode.ourNodeIndex
+
+    let homeNode = ShardFunctions.findHomeNode(cycleShardData.shardGlobals, hash, cycleShardData.parititionShardDataMap)
+    let homeNodeIndex = homeNode.ourNodeIndex
+
+    let partitionDistance = Math.abs(someNodeIndex - homeNodeIndex)
+    if (partitionDistance <= distance) {
+      return true
+    }
+    return false
+  }
+
   async setAccount (wrappedStates, localCachedData, applyResponse, accountFilter = null) {
     // let sourceAddress = inTx.srcAct
     // let targetAddress = inTx.tgtAct
