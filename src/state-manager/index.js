@@ -79,10 +79,10 @@ const cHashSetDataStepSize = 2
    * @typedef {Object} RepairTracker a partition object
    * @property {string[]} triedHashes
    * @property {number} numNodes
-   * @property {number} counter
-   * @property {number} partitionId
-   * @property {string} key
-   * @property {string} key2
+   * @property {number} counter cycle number for the repair obbject
+   * @property {number} partitionId partition id for the repair object
+   * @property {string} key this key is based on the cycle counter in the form c###  where ### is the cycle number (can be as many digits as needed)
+   * @property {string} key2 this key is based on the partition in the form p## where ## is the partition number (can be as many digits as needed)
    * @property {string[]} removedTXIds
    * @property {string[]} repairedTXs
    * @property {AcceptedTx[]} newPendingTXs
@@ -144,8 +144,8 @@ const cHashSetDataStepSize = 2
    *  {boolean} ourRow
    * @property {number} waitForIndex
    * @property {boolean} [waitedForThis]
-   * @property {number[]} [indexMap] this gets added when you call expandIndexMapping
-   * @property {number[]} [extraMap] this gets added when you call expandIndexMapping
+   * @property {number[]} [indexMap] this gets added when you call expandIndexMapping. index map is our index to the solution output
+   * @property {number[]} [extraMap] this gets added when you call expandIndexMapping. extra map is the index in our list that is an extra
    * @property {number} [futureIndex]
    * @property {string} [futureValue]
    */
@@ -324,6 +324,8 @@ class StateManager extends EventEmitter {
     this.repairAllStoredPartitions = true
 
     this.repairStartedMap = new Map()
+
+    this.doDataCleanup = false
   }
 
   // this clears state data related to the current partion we are syncing.
@@ -1879,6 +1881,7 @@ class StateManager extends EventEmitter {
       let result = {}
 
       let passFailList = []
+      let statesList = []
       try {
         // let partitionId = payload.partitionId
         let cycle = payload.cycle
@@ -1901,12 +1904,15 @@ class StateManager extends EventEmitter {
           let passFail = partitionObject.Status[index]
           passFailList.push(passFail)
         }
-
+        for (let index of indicies) {
+          let state = partitionObject.States[index]
+          statesList.push(state)
+        }
         result = await this.storage.queryAcceptedTransactionsByIds(txIDList)
       } finally {
       }
       // TODO fix pass fail sorting.. it is probably all wrong and out of sync, but currently nothing fails.
-      await respond({ success: true, acceptedTX: result, passFail: passFailList })
+      await respond({ success: true, acceptedTX: result, passFail: passFailList, statesList: statesList })
     })
 
     // /get_partition_txids (Partition_id, Cycle_number)
@@ -3703,7 +3709,7 @@ class StateManager extends EventEmitter {
    * @param {PartitionObject} partitionObject
    */
   poMicroDebug (partitionObject) {
-    let header = `c${partitionObject.Cycle_number}p${partitionObject.Partition_id}`
+    let header = `c${partitionObject.Cycle_number} p${partitionObject.Partition_id}`
 
     // need to get a list of compacted TXs in order. also addresses. timestamps?  make it so tools can process easily. (align timestamps view.)
 
@@ -4065,6 +4071,7 @@ class StateManager extends EventEmitter {
           // only declare victory after we matched hashes
           if (usedSyncTXsFromHashSetStrings === false) {
             if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess 1 allFinished, final ${debugKey} hash:${utils.stringifyReduce({ topResult2 })}`)
+            this.repairTrackerMarkFinished(repairTracker)
             return
           } else {
             if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess set evaluationStarted=false so we can tally up hashes again ${debugKey}`)
@@ -4181,6 +4188,7 @@ class StateManager extends EventEmitter {
 
   /**
    * syncTXsFromWinningHash
+   * This is used when a simple vote of hashes revealse a most popular hash.  In this case we can just sync the txs from any of the nodes that had this winning hash
    * @param {PartitionResult} topResult
    */
   async syncTXsFromWinningHash (topResult) {
@@ -4278,6 +4286,7 @@ class StateManager extends EventEmitter {
 
   /**
    * _mergeRepairDataIntoLocalState
+   * used with syncTXsFromWinningHash in the simple case where a most popular hash wins.
    * @param {RepairTracker} repairTracker todo repair tracker type
    * @param {PartitionObject} ourPartitionObj
    * @param {*} otherStatusMap todo status map, but this is unused
@@ -4304,6 +4313,8 @@ class StateManager extends EventEmitter {
   //  temp member newTxList that will be used for the next partition object calculation
 
   /**
+   * _mergeRepairDataIntoLocalState2
+   * used by syncTXsFromHashSetStrings in the complex case where we had to run consensus on individual transactions and request transactions from possibly multiple nodes
    * @param {RepairTracker} repairTracker
    * @param {PartitionObject} ourPartitionObj
    * @param {any} ourLastResultHash
@@ -4312,6 +4323,9 @@ class StateManager extends EventEmitter {
   _mergeRepairDataIntoLocalState2 (repairTracker, ourPartitionObj, ourLastResultHash, ourHashSet) {
     let key = repairTracker.key
     let txList = this.getTXListByKey(key, repairTracker.partitionId)
+
+    // repairTracker.solutionDeltas holds all the solutions we got from asking different nodes for the the transactions we are missing
+    // repairTracker.extraTXIds holds the txids (hashes) of the transactions that are extra and need to be removed from the partition object.
 
     let txSourceList = txList
     if (txList.newTxList) {
@@ -4330,6 +4344,7 @@ class StateManager extends EventEmitter {
     ourHashSet.extraMap.sort(function (a, b) { return a - b })
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 z ourHashSet.extraMap: ${utils.stringifyReduce(ourHashSet.extraMap)} debugSol: ${utils.stringifyReduce(debugSol)}`)
 
+    // build up a working list for the solution but leave out the extra entries.
     let extraIndex = 0
     for (let i = 0; i < txSourceList.hashes.length; i++) {
       let extra = -1
@@ -4373,12 +4388,16 @@ class StateManager extends EventEmitter {
           newTxList.txs[i] = newTxList.ttxs[ourCounter]
           newTxList.states[i] = newTxList.tstates[ourCounter]
           ourCounter++
+          // if we get into this check it is because it seemed we did not have a tx locally even though the calculations thought we did
           if (newTxList.hashes[i] == null) {
-            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}  newTxList.hashes.length: ${newTxList.hashes.length} ourHashSet.indexMap.length:${ourHashSet.indexMap.length}`)
+            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error null at i: ${i}  newTxList:${utils.stringifyReduce(newTxList)}`)
+            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error null at i: ${i}  txSourceList:${utils.stringifyReduce(txSourceList)}`)
             throw new Error('aborting data repair. fatal problem')
           }
         } else {
-        // repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j] })
+          // Index was set to -1 and the transaction was something that we had to query other nodes for.  The results of this got put in repairTracker.solutionDeltas
+          // repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j] })
           let solutionDelta = repairTracker.solutionDeltas[solutionIndex]
 
           if (!solutionDelta) {
@@ -4445,6 +4464,13 @@ class StateManager extends EventEmitter {
   }
 
   /**
+   * syncTXsFromHashSetStrings
+   * This is used when there is no clear winning hash and we must do consensus on each transaction
+   *  This takes the various hashset strings we have collected and feeds them in to a general purpose solver
+   *  The first pass in the solver finds the consensus merged string
+   *  The secon pass of the solver helps generate the solution operations needed to make our data match the solved list (i.e. delete or insert certain elements)
+   *  After the solvers are run we can build lists of requests to one or more nodes and ask for missing transactions. (get_transactions_by_partition_index)
+   *  Finally we can call _mergeRepairDataIntoLocalState2 to to merge the results that we queried for into our set of data that is used for forming partition objects.
    * @param {number} cycleNumber
    * @param {number} partitionId
    * @param {RepairTracker} repairTracker
@@ -4456,18 +4482,29 @@ class StateManager extends EventEmitter {
       return
     }
 
+    let key1 = 'c' + cycleNumber
+    let key2 = 'p' + partitionId
+    let debugKey = `rkeys: ${key1} ${key2}`
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `syncTXsFromHashSetStrings: ${debugKey}`)
+
+    // This will create an set of input to send to the general purpose solver
     let hashSetList = /** @type {HashSetEntryPartitions[]} */(this.solveHashSetsPrep(cycleCounter, partitionId, this.crypto.getPublicKey()))
     // hashSetList.sort(function (a, b) { return a.hash > b.hash }) // sort so that solution will be deterministic
     hashSetList.sort(utils.sortHashAsc)
+    // This runs the general purose solver
     let output = StateManager.solveHashSets(hashSetList)
-
+    // build a hashset string from the solved output
     let outputHashSet = ''
     for (let hash of output) {
       outputHashSet += hash
     }
     repairTracker.outputHashSet = outputHashSet
 
-    // REFLOW HACK.  when we randomize host selection should make sure not to pick this forced solution as an answer
+    // Now that we have run the solver once we will run it a again with a large vote for the previous computed winner
+    // The only reason this is done is because solveHashSets is not quite as good as it needs to be at generating change list but it can do better if
+    // the first pass finds the answer and the second pass finds the delta to the answer rather than doing it all at once.
+
+    // REFLOW HACK.  when we randomize host selection should make sure not to pick this forced solution as an answer (edit: not sure what this means any more.)
     // TODO perf:  if we fixed the algorith we could probably do this in one pass instead
     let hashSetList2 = /** @type {HashSetEntryPartitions[]} */(this.solveHashSetsPrep(cycleCounter, partitionId, this.crypto.getPublicKey()))
     // hashSetList2.sort(function (a, b) { return a.hash > b.hash }) // sort so that solution will be deterministic
@@ -4478,10 +4515,14 @@ class StateManager extends EventEmitter {
     output = StateManager.solveHashSets(hashSetList2, 40, 0.625, output)
     hashSetList = hashSetList2
 
+    // now that we have run the solver a second time we need to process the results and figure out which nodes to ask for missing transactions
+
+    // expand details and print out all the entries.
     for (let hashSetEntry of hashSetList) {
-      StateManager.expandIndexMapping(hashSetEntry, output) // expand them all for debug.  TODO perf: remove this line
+      StateManager.expandIndexMapping(hashSetEntry, output) // expand them all for debug.  (this data gets used later so not really a perf hit)
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + JSON.stringify(hashSetEntry))
     }
+
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + JSON.stringify(output))
     // find our solution
     let ourSolution = hashSetList.find((a) => a.ourRow === true) // owner
@@ -4502,6 +4543,10 @@ class StateManager extends EventEmitter {
         for (let i = 0; i < voters.length; i++) {
           if (requestsByHost[voters[i]]) {
             greedyAsk = voters[i]
+            // added this for perf, needs testing:  (once we get a a valid greedyAsk value bail from the loop)
+            // if (greedyAsk >= 0){
+            //   continue
+            // }
           }
         }
         // no entries found so init one
@@ -4513,7 +4558,7 @@ class StateManager extends EventEmitter {
         if (hashSetList[greedyAsk].indexMap == null) {
           StateManager.expandIndexMapping(hashSetList[greedyAsk], output)
         }
-        // use the remote hosts index map to determine for the exact index.
+        // use the remote hosts index map to determine for the exact index. this will get assigned to tx_indicies and the
         let hostIndex = hashSetList[greedyAsk].indexMap[index]
         requestsByHost[greedyAsk].hostIndex.push(hostIndex) // todo calc this on host side, requires some cache mgmt!
 
@@ -4562,7 +4607,11 @@ class StateManager extends EventEmitter {
               // update our solution deltas.. hopefully that is enough info to patch up our state.
               //   // TXSTATE_TODO   need a way to set state on this entry!
               //      probably best to just copy it from what we queried?
-              repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j], state: requestsByHost[i].stateSnippets[j] })
+
+              // now we have statesList also
+              let state = requestsByHost[i].stateSnippets[j] // snippets are just the first 2 characters of state if we have stateList use that instead.
+              state = result.statesList[j]
+              repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j], state: state })
             }
           } else {
             // todo datasync:  assert/fail/or retry
@@ -5151,48 +5200,113 @@ class StateManager extends EventEmitter {
     return replacmentAccounts // this is for debugging reference
   }
 
-  async periodicCycleDataCleanup () {
+  // could do this every 5 cycles instead to save perf.
+  periodicCycleDataCleanup (oldestCycle) {
     // On a periodic bases older copies of the account data where we have more than 2 copies for the same account can be deleted.
+
+    if (oldestCycle < 0) {
+      return
+    }
+
+    if (this.repairTrackingByCycleById == null) {
+      return
+    }
+    if (this.allPartitionResponsesByCycleByPartition == null) {
+      return
+    }
+    if (this.ourPartitionResultsByCycle == null) {
+      return
+    }
+    if (this.shardValuesByCycle == null) {
+      return
+    }
+
+    this.mainLogger.debug('Clearing out old data Start')
+
+    let removedrepairTrackingByCycleById = 0
+    let removedallPartitionResponsesByCycleByPartition = 0
+    let removedourPartitionResultsByCycle = 0
+    let removedshardValuesByCycle = 0
+    // let oldestCycleKey = 'c' + oldestCycle
+    // cleanup old repair trackers
+    for (let cycleKey of Object.keys(this.repairTrackingByCycleById)) {
+      let cycle = cycleKey.slice(1)
+      let cycleNum = parseInt(cycle)
+      if (cycleNum < oldestCycle) {
+        // delete old cycle
+        delete this.repairTrackingByCycleById[cycleKey]
+        removedrepairTrackingByCycleById++
+      }
+    }
+
+    // cleanup old partition objects / receipts.
+    // let responsesById = this.allPartitionResponsesByCycleByPartition[key]
+    // let ourPartitionValues = this.ourPartitionResultsByCycle[key]
+    for (let cycleKey of Object.keys(this.allPartitionResponsesByCycleByPartition)) {
+      let cycle = cycleKey.slice(1)
+      let cycleNum = parseInt(cycle)
+      if (cycleNum < oldestCycle) {
+        // delete old cycle
+        delete this.allPartitionResponsesByCycleByPartition[cycleKey]
+        removedallPartitionResponsesByCycleByPartition++
+      }
+    }
+
+    for (let cycleKey of Object.keys(this.ourPartitionResultsByCycle)) {
+      let cycle = cycleKey.slice(1)
+      let cycleNum = parseInt(cycle)
+      if (cycleNum < oldestCycle) {
+        // delete old cycle
+        delete this.ourPartitionResultsByCycle[cycleKey]
+        removedourPartitionResultsByCycle++
+      }
+    }
+
+    // cleanup this.shardValuesByCycle
+    for (let cycleKey of Object.keys(this.shardValuesByCycle)) {
+      let cycle = cycleKey.slice(1)
+      let cycleNum = parseInt(cycle)
+      if (cycleNum < oldestCycle) {
+        // delete old cycle
+        delete this.shardValuesByCycle[cycleKey]
+        removedshardValuesByCycle++
+      }
+    }
+
+    this.mainLogger.debug(`Clearing out old data Cleared: ${removedrepairTrackingByCycleById} ${removedallPartitionResponsesByCycleByPartition} ${removedourPartitionResultsByCycle} ${removedshardValuesByCycle}`)
+
+    // TODO 1 calculate timestamp for oldest accepted TX to delete.
+
+    // TODO effient process to query all accounts and get rid of themm but keep at least one table entry (prefably the newest)
+    // could do this in two steps
   }
 
+  //
+  //    PPPPPPPP
+  //    P       P
+  //    P       P
+  //    P       P
+  //    PPPPPPPP
+  //    P       P
+  //    P       P
+  //    P       P
+  //    PPPPPPPP
+  //
+  //
+  //
   /**
    * broadcastPartitionResults
    * @param {number} cycleNumber
    */
   async broadcastPartitionResults (cycleNumber) {
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair broadcastPartitionResults for cycle: ${cycleNumber}`)
-
-    // let accountStart = '0'.repeat(64) // TODO sharding.  Solved use partition ranges and only send to in range nodes
-    // let accountEnd = 'f'.repeat(64)
-
-    // let broadcastTargets = 6
-    // if (this.useHashSets) {
-    //   broadcastTargets = 100
-    // }
-
     // per partition need to figure out which node cover it.
     // then get a list of all the results we need to send to a given node and send them at once.
     // need a way to do this in semi parallel?
     let lastCycleShardValues = this.shardValuesByCycle.get(cycleNumber)
-    // for (let partitionID of lastCycleShardValues.ourConsensusPartitions) {
-    //   let partitionShardData = lastCycleShardValues.parititionShardDataMap.get(partitionID)
-    // }
-
-    // let nodes = this.getRandomNodesInRange(broadcastTargets, accountStart, accountEnd, [])
-    // if (nodes.length === 0) {
-    //   if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair broadcastPartitionResults: abort no nodes to send partition to`)
-    //   return // nothing to do
-    // }
-
-    // console.log(`numnodes: ${nodes.length}`)
-
     let partitionResults = this.ourPartitionResultsByCycle['c' + cycleNumber]
-
-    // nodeThatStoreOurParitionFull
     let partitionResultsByNodeID = new Map() // use a map?
     let nodesToTell = []
-
-    // Either this logic is wrong or it is called too soon.
 
     // sign results as needed
     for (let i = 0; i < partitionResults.length; i++) {
@@ -5205,46 +5319,46 @@ class StateManager extends EventEmitter {
       /** @type {ShardInfo} */
       let partitionShardData = lastCycleShardValues.parititionShardDataMap.get(partitionResult.Partition_id)
       // calculate nodes that care about this partition here
+      // since we are using store partitions use storedBy
+      // if we transfer back to covered partitions can switch back to coveredBy
       let coverCount = 0
-      for (let nodeId in partitionShardData.coveredBy) {
-        if (partitionShardData.coveredBy.hasOwnProperty(nodeId)) {
+      for (let nodeId in partitionShardData.storedBy) {
+        if (partitionShardData.storedBy.hasOwnProperty(nodeId)) {
           coverCount++
-          let asdf
+          let partitionResultsToSend
+          // If we haven't recorded this node yet create a new results object for it
           if (partitionResultsByNodeID.has(nodeId) === false) {
             nodesToTell.push(nodeId)
-            asdf = { results: [], node: partitionShardData.coveredBy[nodeId] }
-            partitionResultsByNodeID.set(nodeId, asdf)
+            partitionResultsToSend = { results: [], node: partitionShardData.storedBy[nodeId], debugStr: `c${partitionResult.Cycle_number} ` }
+            partitionResultsByNodeID.set(nodeId, partitionResultsToSend)
           }
-          asdf = partitionResultsByNodeID.get(nodeId)
-          asdf.results.push(partitionResult)
+          partitionResultsToSend = partitionResultsByNodeID.get(nodeId)
+          partitionResultsToSend.results.push(partitionResult)
+          partitionResultsToSend.debugStr += `p${partitionResult.Partition_id} `
         }
       }
 
-      let repairTracker = this._getRepairTrackerForCycle(cycleNumber, partitionResult.Partition_id) // was Cycle_number
+      let repairTracker = this._getRepairTrackerForCycle(cycleNumber, partitionResult.Partition_id)
       repairTracker.numNodes = coverCount - 1 // todo sharding re-evaluate this and thing of a better perf solution
     }
-
-    // let payload = { Cycle_number: cycleNumber, partitionResults: partitionResults }
-    // if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair broadcastPartitionResults ${utils.stringifyReduce(payload)}`)
-    // send the array of partition results for this current cycle.
-    // await this.p2p.tell(nodes, 'post_partition_results', payload)
-
-    // do we really want to send to all?  this will max out eventually.. but a bit worried it wont scale or be robust enough.
-    // need some way to thin this out.
 
     let promises = []
     for (let nodeId of nodesToTell) {
       if (nodeId === lastCycleShardValues.ourNode.id) {
         continue
       }
-      let asdf = partitionResultsByNodeID.get(nodeId)
-      let payload = { Cycle_number: cycleNumber, partitionResults: asdf.results }
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair broadcastPartitionResults to ${nodeId} res: ${utils.stringifyReduce(payload)}`)
-      let promise = this.p2p.tell([asdf.node], 'post_partition_results', payload)
+      let partitionResultsToSend = partitionResultsByNodeID.get(nodeId)
+      let payload = { Cycle_number: cycleNumber, partitionResults: partitionResultsToSend.results }
+      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair broadcastPartitionResults to ${nodeId} debugStr: ${partitionResultsToSend.debugStr} res: ${utils.stringifyReduce(payload)}`)
+      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair broadcastPartitionResults to ${nodeId} debugStr: ${partitionResultsToSend.debugStr} res: ${utils.stringifyReduce(payload)}`)
+
+      let shorthash = utils.makeShortHash(partitionResultsToSend.node.id)
+      let toNodeStr = shorthash + ':' + partitionResultsToSend.node.externalPort
+      this.logger.playbackLogNote('broadcastPartitionResults', `${cycleNumber}`, `to ${toNodeStr} ${partitionResultsToSend.debugStr} `)
+      let promise = this.p2p.tell([partitionResultsToSend.node], 'post_partition_results', payload)
       promises.push(promise)
     }
 
-    // do we really want to wait?
     await Promise.all(promises)
   }
 
@@ -5302,6 +5416,25 @@ class StateManager extends EventEmitter {
     this._registerListener(this.p2p.state, 'cycle_q3_start', async (lastCycle, time) => {
       if (this.currentCycleShardData && this.currentCycleShardData.ourNode.status === 'active') {
         this.calculateChangeInCoverage()
+      }
+
+      if (lastCycle == null) {
+        return
+      }
+      let lastCycleShardValues = this.shardValuesByCycle.get(lastCycle.counter)
+      if (lastCycleShardValues == null) {
+        return
+      }
+
+      // do this every 5 cycles.
+      if (lastCycle % 5 !== 0) {
+        return
+      }
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startSyncPartitions:cycle_q3_start cycle: ${lastCycle.counter}`)
+
+      if (this.doDataCleanup === true) {
+        // clean up cycle data that is more than 10 cycles old.
+        this.periodicCycleDataCleanup(lastCycle.counter - 10)
       }
     })
   }
@@ -5489,7 +5622,8 @@ class StateManager extends EventEmitter {
   // TODO sharding  done! need to split this out by partition
   /**
    * getTXListByKey
-   * @param {string} key
+   * just an alternative to getTXList where the calling code has alredy formed the cycle key
+   * @param {string} key the cycle based key c##
    * @param {number} partitionId
    * @returns {TxTallyList}
    */
@@ -5913,23 +6047,30 @@ class StateManager extends EventEmitter {
     return output // { output, outputVotes }
   }
 
-  // efficient transformation to create a lookup to go from answer space index to the local index space of a hashList entry
-  // also creates a list of local indicies of elements to remove
   /**
    * expandIndexMapping
+   * efficient transformation to create a lookup to go from answer space index to the local index space of a hashList entry
+   * also creates a list of local indicies of elements to remove
    * @param {GenericHashSetEntry} hashListEntry
-   * @param {*} output TODO get correct type here
+   * @param {string[]} output This is the output that we got from the general solver
    */
   static expandIndexMapping (hashListEntry, output) {
+    // index map is our index to the solution output
     hashListEntry.indexMap = []
+    // extra map is the index in our list that is an extra
     hashListEntry.extraMap = []
     let readPtr = 0
     let writePtr = 0
     let correctionIndex = 0
     let currentCorrection = null
     let extraBits = 0
+    // This will walk the input and output indicies st that same time
     while (writePtr < output.length) {
+      // Get the current correction.  We walk this with the correctionIndex
       if (correctionIndex < hashListEntry.corrections.length && hashListEntry.corrections[correctionIndex].i <= writePtr) {
+        currentCorrection = hashListEntry.corrections[correctionIndex]
+        correctionIndex++
+      } else if (correctionIndex < hashListEntry.corrections.length && hashListEntry.corrections[correctionIndex] != null && hashListEntry.corrections[correctionIndex].t === 'extra' && hashListEntry.corrections[correctionIndex].hi === readPtr) {
         currentCorrection = hashListEntry.corrections[correctionIndex]
         correctionIndex++
       } else {
@@ -5940,17 +6081,23 @@ class StateManager extends EventEmitter {
         extraBits = 0
       }
 
+      // increment pointers based on if there is a correction to write and what type of correction it is
       if (!currentCorrection) {
+        // no correction to consider so we just write to the index map and advance the read and write pointer
         hashListEntry.indexMap.push(readPtr)
         writePtr++
         readPtr++
       } else if (currentCorrection.t === 'insert') {
+        // insert means the fix for this slot is to insert an item, since we dont have it this will be -1
         hashListEntry.indexMap.push(-1)
         writePtr++
       } else if (currentCorrection.t === 'extra') {
         // hashListEntry.extraMap.push({ i: currentCorrection.i, hi: currentCorrection.hi })
         hashListEntry.extraMap.push(currentCorrection.hi)
         extraBits++
+        if (currentCorrection.c === null) {
+          writePtr++
+        }
         continue
       }
     }
@@ -5963,7 +6110,7 @@ class StateManager extends EventEmitter {
       if (currentCorrection.t === 'extra') {
         // hashListEntry.extraMap.push({ i: currentCorrection.i, hi: currentCorrection.hi })
         hashListEntry.extraMap.push(currentCorrection.hi)
-        extraBits++
+        // extraBits++
         continue
       }
     }

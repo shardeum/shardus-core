@@ -31,7 +31,8 @@ const stringify = require('fast-stable-stringify')
    * @property {string} addressPrefixHex number of partitions
    * @property {number} homePartition the home partition
    * @property {AddressRange} homeRange consenus radius (number of nodes to each side of us that hold consensus data)
-   * @property {Object.<string, Node>} coveredBy the nodes that cover us for consenus.  todo make this a object of string->node
+   * @property {Object.<string, Node>} coveredBy the nodes that cover us for consenus.
+   * @property {Object.<string, Node>} storedBy the nodes that cover us for storage.
    */
 
 /**
@@ -130,6 +131,7 @@ class ShardFunctions {
     shardinfo.homePartition = Math.floor(shardGlobals.numPartitions * (shardinfo.addressPrefix / 0xffffffff))
     shardinfo.homeRange = ShardFunctions.partitionToAddressRange2(shardGlobals, shardinfo.homePartition)
     shardinfo.coveredBy = {} // consensus nodes that cover us.
+    shardinfo.storedBy = {}
     return shardinfo
   }
 
@@ -700,6 +702,26 @@ class ShardFunctions {
       nodeShardData.edgeNodes.sort(ShardFunctions.nodeSort)
       nodeShardData.consensusNodeForOurNodeFull.sort(ShardFunctions.nodeSort)
       nodeShardData.nodeThatStoreOurParitionFull.sort(ShardFunctions.nodeSort)
+    }
+
+    // storedBy
+    if (nodeShardData.storedPartitions.rangeIsSplit === false) {
+      for (let i = nodeShardData.storedPartitions.partitionStart; i <= nodeShardData.storedPartitions.partitionEnd; i++) {
+        let shardPartitionData = parititionShardDataMap.get(i)
+
+        shardPartitionData.storedBy[nodeShardData.node.id] = nodeShardData.node // { idx: nodeShardData.ourNodeIndex }
+      }
+    } else {
+      for (let i = 0; i <= nodeShardData.storedPartitions.partitionEnd; i++) {
+        let shardPartitionData = parititionShardDataMap.get(i)
+
+        shardPartitionData.storedBy[nodeShardData.node.id] = nodeShardData.node // { idx: nodeShardData.ourNodeIndex }
+      }
+      for (let i = nodeShardData.storedPartitions.partitionStart; i < shardGlobals.numPartitions; i++) {
+        let shardPartitionData = parititionShardDataMap.get(i)
+
+        shardPartitionData.storedBy[nodeShardData.node.id] = nodeShardData.node // { idx: nodeShardData.ourNodeIndex }
+      }
     }
 
     // original end of this function:

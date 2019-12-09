@@ -442,12 +442,32 @@ class Storage {
     }
   }
 
+  // First pass would be to get timestamp for N accounts
+  // Then can batch these into delete statements that will be sure not to delete accounts that are to old.
+  //
   async clearAccountStateTableByList (addressList, tsStart, tsEnd) {
     this._checkInit()
     try {
       await this._delete(
         this.storageModels.accountStates,
         { txTimestamp: { [Op.between]: [tsStart, tsEnd] }, accountId: { [Op.in]: addressList } },
+        {
+          attributes: { exclude: ['createdAt', 'updatedAt', 'id'] },
+          raw: true
+        }
+      )
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
+  // use this to clear out older accepted TXs
+  async clearAcceptedTX (tsStart, tsEnd) {
+    this._checkInit()
+    try {
+      await this._delete(
+        this.storageModels.acceptedTxs,
+        { timestamp: { [Op.between]: [tsStart, tsEnd] } },
         {
           attributes: { exclude: ['createdAt', 'updatedAt', 'id'] },
           raw: true

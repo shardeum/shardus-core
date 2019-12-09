@@ -10,7 +10,12 @@
             "name": "Attach by Process ID",
             "processId": "${command:PickProcess}"
         },
-
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "otherTests",
+            "program": "${workspaceFolder}\\test\\unit\\state-manager\\otherTests.js"
+        },
         {
             "type": "node",
             "request": "launch",
