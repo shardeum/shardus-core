@@ -95,6 +95,7 @@ class P2PState extends EventEmitter {
         previous: null,
         joined: [],
         joinedArchivers: [],
+        joinedConsensors: [],
         removed: [],
         lost: [],
         refuted: [],
@@ -331,10 +332,16 @@ class P2PState extends EventEmitter {
     const joining = this._getBestNodes()
     this.mainLogger.debug(`Joining nodes: ${JSON.stringify(joining)}`)
     const joined = this.currentCycle.data.joined
+    const joinedConsensors = this.currentCycle.data.joinedConsensors
     this.mainLogger.debug(`Current joined: ${JSON.stringify(joined)}`)
     joined.length = 0
     for (const node of joining) {
       joined.push(node.publicKey)
+      joinedConsensors.push({
+        ip: node.externalIp,
+        port: node.externalPort,
+        publicKey: node.publicKey
+      })
     }
     this.mainLogger.debug(`Joined after update: ${JSON.stringify(joined)}`)
   }
@@ -1313,6 +1320,7 @@ class P2PState extends EventEmitter {
     const desired = this.getNextDesiredCount()
     const joined = this.getJoined()
     const joinedArchivers = this.getJoinedArchivers()
+    const joinedConsensors = this.getJoinedConsensors()
     const removed = this.getRemoved()
     const lost = this.getLost()
     const refuted = this.getRefuted()
@@ -1330,6 +1338,7 @@ class P2PState extends EventEmitter {
       desired,
       joined,
       joinedArchivers,
+      joinedConsensors,
       removed,
       lost,
       refuted,
@@ -1459,6 +1468,10 @@ class P2PState extends EventEmitter {
 
   getJoinedArchivers () {
     return this.currentCycle.data.joinedArchivers
+  }
+
+  getJoinedConsensors () {
+    return this.currentCycle.data.joinedConsensors
   }
 
   getRemoved () {
