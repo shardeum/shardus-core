@@ -11,11 +11,12 @@ class Profiler {
     let section = this.sectionTimes[sectionName]
     if (section == null) {
       let t = BigInt(0)
-      section = { name: sectionName, total: t }
+      section = { name: sectionName, total: t, c: 0 }
       this.sectionTimes[sectionName] = section
     }
     section.start = process.hrtime.bigint()
     section.started = true
+    section.c++
   }
 
   profileSectionEnd (sectionName) {
@@ -44,7 +45,7 @@ class Profiler {
     for (let key in this.sectionTimes) {
       if (this.sectionTimes.hasOwnProperty(key)) {
         let section = this.sectionTimes[key]
-        result += `${section.name}: ${(section.total / divider)},  ` // ${section.total} :
+        result += `${section.name}: total ${(section.total / divider)} avg:${section.total / (divider * BigInt(section.c))} ,  ` // ${section.total} :
         section.total = BigInt(0)
       }
     }

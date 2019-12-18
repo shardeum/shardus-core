@@ -148,6 +148,9 @@ const cHashSetDataStepSize = 2
    * @property {number[]} [extraMap] this gets added when you call expandIndexMapping. extra map is the index in our list that is an extra
    * @property {number} [futureIndex]
    * @property {string} [futureValue]
+   * @property {number} [pinIdx] current Pin index of this entry.. modified by solver.
+   * @property {any} [pinObj] the object/vote we are pinned to.  todo make this a type!!
+   * @property {object[]} [ownVotes]
    */
 
 /**
@@ -5221,6 +5224,10 @@ class StateManager extends EventEmitter {
       return
     }
 
+    // Partition receipts and cycles:
+    // partitionObjectsByCycle
+    // cycleReceiptsByCycleCounter
+
     this.mainLogger.debug('Clearing out old data Start')
 
     let removedrepairTrackingByCycleById = 0
@@ -5811,18 +5818,20 @@ class StateManager extends EventEmitter {
       let topVote = { v: '', count: 0 }
       let winnerFound = false
       let totalVotes = 0
-      // for (let hashListEntry of hashSetList) {
+      // Loop through each entry list
       for (let hashListIndex = 0; hashListIndex < hashSetList.length; hashListIndex++) {
+        // if we are already past the end of this entry list then skip
         let hashListEntry = hashSetList[hashListIndex]
         if ((index + hashListEntry.indexOffset + 1) * stepSize > hashListEntry.hashSet.length) {
           continue
         }
+        // don't remember what this bail condition was.
         let sliceStart = (index + hashListEntry.indexOffset) * stepSize
         let v = hashListEntry.hashSet.slice(sliceStart, sliceStart + stepSize)
         if (v === '') {
           continue
         }
-
+        // place votes for this value
         let countEntry = votes[v] || { count: 0, ec: 0, voters: [] }
         totalVotes += hashListEntry.votePower
         countEntry.count += hashListEntry.votePower
@@ -5835,11 +5844,13 @@ class StateManager extends EventEmitter {
         }
         hashListEntry.lastValue = v
       }
+
       // if totalVotes < votesRequired then we are past hope of approving any more messages... I think.  I guess there are some cases where we could look back and approve one more
       if (topVote.count === 0 || index > maxElements || totalVotes < votesRequired) {
         solving = false
         break
       }
+      // can we find a winner in a simple way where there was a winner based on the next item to look at in all the arrays.
       if (topVote.count >= votesRequired) {
         winnerFound = true
         output.push(topVote.v)
@@ -6047,6 +6058,252 @@ class StateManager extends EventEmitter {
     return output // { output, outputVotes }
   }
 
+  // figures out i A is Greater than B
+  // possibly need an alternate version of this solver
+  // needs to account for vote power!
+  static compareVoteObjects (voteA, voteB, strict) {
+    // { winIdx: null, val: v, count: 0, ec: 0, lowestIndex: index, voters: [], voteTally: Array(hashSetList.length) }
+    // { i: index }
+
+    let agtb = 0
+    let bgta = 0
+
+    for (let i = 0; i < voteA.voteTally.length; i++) {
+      let vtA = voteA.voteTally[i]
+      let vtB = voteB.voteTally[i]
+      if (vtA != null && vtB != null) {
+        if (vtA.i > vtB.i) {
+          agtb += vtA.p // vote power.  note A and B are the same node so power will be equal.
+        }
+        if (vtB.i > vtA.i) {
+          bgta += vtB.p // vote power.
+        }
+      }
+    }
+    // what to do with strict.
+    if (strict && agtb > 0) {
+      return 1
+    }
+    return agtb - bgta
+    // what to return?
+  }
+
+  static compareVoteObjects2 (voteA, voteB, strict) {
+    // return voteB.votesseen - voteA.votesseen
+    return voteA.votesseen - voteB.votesseen
+  }
+
+  // when sorting / computing need to figure out if pinning will short cirquit another vote.
+  // at the moment this seems
+
+  // vote rate set to 0.5 / 0.8 => 0.625
+  /**
+   * solveHashSets
+   * @param {GenericHashSetEntry[]} hashSetList
+   * @param {number} lookAhead
+   * @param {number} voteRate
+   *
+   * @returns {string[]}
+   */
+  static solveHashSets2 (hashSetList, lookAhead = 10, voteRate = 0.625) {
+    let output = []
+    // let outputVotes = []
+    let solving = true
+    let index = 0
+    let stepSize = cHashSetStepSize
+
+    let totalVotePower = 0
+    for (let hashListEntry of hashSetList) {
+      totalVotePower += hashListEntry.votePower
+      // init the pinIdx
+      hashListEntry.pinIdx = -1
+      hashListEntry.pinObj = null
+    }
+    let votesRequired = voteRate * Math.ceil(totalVotePower)
+
+    let maxElements = 0
+    for (let hashListEntry of hashSetList) {
+      maxElements = Math.max(maxElements, hashListEntry.hashSet.length / stepSize)
+    }
+
+    // todo backtrack each vote. list of what vote cast at each step.
+    // solve this for only one object... or solve for all and compare solvers?
+
+    // map of array of vote entries
+    let votes = {}
+    let votesseen = 0
+    while (solving) {
+      // Loop through each entry list
+      solving = false
+      for (let hashListIndex = 0; hashListIndex < hashSetList.length; hashListIndex++) {
+        // if we are already past the end of this entry list then skip
+        let hashListEntry = hashSetList[hashListIndex]
+        if ((index + 1) * stepSize > hashListEntry.hashSet.length) {
+          continue
+        }
+        // don't remember what this bail condition was.
+        let sliceStart = (index) * stepSize
+        let v = hashListEntry.hashSet.slice(sliceStart, sliceStart + stepSize)
+        if (v === '') {
+          continue
+        }
+        solving = true // keep it going
+        let votesArray = votes[v]
+        if (votesArray == null) {
+          votesseen++
+          let votObject = { winIdx: null, val: v, count: 0, ec: 0, lowestIndex: index, voters: [], voteTally: Array(hashSetList.length), votesseen }
+          votesArray = [votObject]
+          votes[v] = votesArray
+
+          hashListEntry.ownVotes.push(votObject)
+        }
+
+        // get lowest value in list that we have not voted on and is not pinned by our best vote.
+        let currentVoteObject = null
+        for (let voteIndex = votesArray.length - 1; voteIndex >= 0; voteIndex--) {
+          let voteObject = votesArray[voteIndex]
+
+          let ourVoteTally = voteObject.voteTally[hashListIndex]
+          if (ourVoteTally != null) {
+            // we voted
+            break
+          }
+
+          // how to check pinIdx?  do we have to analys neighbor pinIdx?
+          // use pinObj  to see if the last pinObj A is greater than this obj B.
+          // if (hashListEntry.pinObj != null) {
+          //   if (hashListEntry.pinObj.val === voteObject.val) {
+          //     let compare = StateManager.compareVoteObjects(hashListEntry.pinObj, voteObject, false)
+          //     if (compare <= 0) {
+          //       continue // or break;
+          //     }
+          //   }
+          // }
+          currentVoteObject = voteObject
+        }
+
+        if (currentVoteObject == null) {
+          // create new vote object
+          votesseen++
+          currentVoteObject = { winIdx: null, val: v, count: 0, ec: 0, lowestIndex: index, voters: [], voteTally: Array(hashSetList.length), votesseen }
+          votesArray.push(currentVoteObject)
+          hashListEntry.ownVotes.push(currentVoteObject)
+        }
+
+        currentVoteObject.voters.push(hashListIndex)
+        currentVoteObject.voteTally[hashListIndex] = { i: index, p: hashListEntry.votePower } // could this be a simple index
+        currentVoteObject.count += hashListEntry.votePower
+
+        if (currentVoteObject.winIdx !== null) {
+          // this already won before but we should still update our own pinIdx
+
+          hashListEntry.pinIdx = index
+          hashListEntry.pinObj = currentVoteObject
+        } if (currentVoteObject.count >= votesRequired) {
+          for (let i = 0; i < hashSetList.length; i++) {
+            let tallyObject = currentVoteObject.voteTally[i]
+            if (tallyObject != null) {
+              let tallyHashListEntry = hashSetList[i]
+              tallyHashListEntry.pinIdx = tallyObject.i
+              tallyHashListEntry.pinObj = currentVoteObject
+            }
+            currentVoteObject.winIdx = index
+          }
+        }
+      }
+
+      index++
+    }
+
+    // need backtracking ref for how each list tracks the votses
+
+    // Collect a list of all vodes
+    let allVotes = []
+    for (const votesArray of Object.values(votes)) {
+      for (let voteObj of votesArray) {
+        allVotes.push(voteObj)
+      }
+    }
+    // apply a partial order sort, n
+    // allVotes.sort(function (a, b) { return StateManager.compareVoteObjects(a, b, false) })
+
+    // generate solutions!
+
+    // count only votes that have won!
+    // when / how is it safe to detect a win?
+
+    let allWinningVotes = []
+    for (let voteObj of allVotes) {
+      // IF was a a winning vote?
+      if (voteObj.winIdx !== null) {
+        allWinningVotes.push(voteObj)
+      }
+    }
+    allWinningVotes.sort(function (a, b) { return StateManager.compareVoteObjects(a, b, false) })
+    let finalIdx = 0
+    for (let voteObj of allWinningVotes) {
+      // IF was a a winning vote?
+      if (voteObj.winIdx !== null) {
+        // allWinningVotes.push(voteObj)
+        output.push(voteObj.val)
+        voteObj.finalIdx = finalIdx
+        finalIdx++
+      }
+    }
+    // to sort the values we could look at the order things were finalized..
+    // but you could have a case where an earlier message is legitimately finialized later on.
+
+    // let aTest = votes['55403088d5636488d3ff17d7d90c052e'][0]
+    // let bTest = votes['779980ea84b8a5eac2dc3d07013377e5'][0]
+    // console.log(StateManager.compareVoteObjects(aTest, bTest, false))
+    // console.log(StateManager.compareVoteObjects(bTest, aTest, false))
+
+    // correction solver:
+    for (let hashListIndex = 0; hashListIndex < hashSetList.length; hashListIndex++) {
+    // if we are already past the end of this entry list then skip
+    // let hashListIndex = 2
+
+      let hashListEntry = hashSetList[hashListIndex]
+      hashListEntry.corrections = [] // clear this
+      // console.log(`solution for set ${hashListIndex}  locallen:${hashListEntry.hashSet.length / stepSize} `)
+      let winningVoteIndex = 0
+      for (let voteObj of allWinningVotes) {
+        if (voteObj.voteTally[hashListIndex] == null) {
+          // console.log(`missing @${voteObj.finalIdx} v:${voteObj.val}`)
+          // bv: hashListEntry.lastValue, if: lastOutputCount  are old.
+          hashListEntry.corrections.push({ i: winningVoteIndex, tv: voteObj, v: voteObj.val, t: 'insert', bv: null, if: -1 })
+        }
+        winningVoteIndex++
+      }
+
+      for (let voteObj of hashListEntry.ownVotes) {
+        let localIdx = voteObj.voteTally[hashListIndex].i
+        if (voteObj.winIdx == null) {
+          // console.log(`extra @${stringify(voteObj.voteTally[hashListIndex])} v:${voteObj.val}`)
+          hashListEntry.corrections.push({ i: localIdx, t: 'extra', c: null, hi: localIdx, tv: null, v: null, bv: null, if: -1 })
+        }
+        // localIdx++
+      }
+
+      hashListEntry.corrections.sort((a, b) => a.i - b.i)
+      winningVoteIndex = 0
+    }
+
+    // generate corrections for main entry.
+    // hashListEntry.corrections.push({ i: index, tv: topVote, v: topVote.v, t: 'insert', bv: hashListEntry.lastValue, if: lastOutputCount })
+    // hashListEntry.errorStack.push({ i: index, tv: topVote, v: topVote.v })
+    // hashListEntry.indexOffset -= 1
+
+    // trailing extras:
+    // while ((extraIdx + hashListEntry.indexOffset) * stepSize < hashListEntry.hashSet.length) {
+    //   let hi = extraIdx + hashListEntry.indexOffset // index2 - (j + 1)
+    //   hashListEntry.corrections.push({ i: extraIdx, t: 'extra', c: null, hi: hi, tv: null, v: null, bv: null, if: -1 }) // added , tv: null, v: null, bv: null, if: -1
+    //   extraIdx++
+    // }
+
+    return output // { output, outputVotes }
+  }
+
   /**
    * expandIndexMapping
    * efficient transformation to create a lookup to go from answer space index to the local index space of a hashList entry
@@ -6055,6 +6312,8 @@ class StateManager extends EventEmitter {
    * @param {string[]} output This is the output that we got from the general solver
    */
   static expandIndexMapping (hashListEntry, output) {
+    // hashListEntry.corrections.sort(function (a, b) { return a.i === b.i ? 0 : a.i < b.i ? -1 : 1 })
+
     // index map is our index to the solution output
     hashListEntry.indexMap = []
     // extra map is the index in our list that is an extra
@@ -6067,7 +6326,7 @@ class StateManager extends EventEmitter {
     // This will walk the input and output indicies st that same time
     while (writePtr < output.length) {
       // Get the current correction.  We walk this with the correctionIndex
-      if (correctionIndex < hashListEntry.corrections.length && hashListEntry.corrections[correctionIndex].i <= writePtr) {
+      if (correctionIndex < hashListEntry.corrections.length && hashListEntry.corrections[correctionIndex] != null && hashListEntry.corrections[correctionIndex].t === 'insert' && hashListEntry.corrections[correctionIndex].i <= writePtr) {
         currentCorrection = hashListEntry.corrections[correctionIndex]
         correctionIndex++
       } else if (correctionIndex < hashListEntry.corrections.length && hashListEntry.corrections[correctionIndex] != null && hashListEntry.corrections[correctionIndex].t === 'extra' && hashListEntry.corrections[correctionIndex].hi === readPtr) {
@@ -6095,9 +6354,9 @@ class StateManager extends EventEmitter {
         // hashListEntry.extraMap.push({ i: currentCorrection.i, hi: currentCorrection.hi })
         hashListEntry.extraMap.push(currentCorrection.hi)
         extraBits++
-        if (currentCorrection.c === null) {
-          writePtr++
-        }
+        // if (currentCorrection.c === null) {
+        //   writePtr++
+        // }
         continue
       }
     }
@@ -6174,7 +6433,7 @@ class StateManager extends EventEmitter {
    * @param {GenericHashSetEntry} solutionHashSet
    * @returns {boolean}
    */
-  static testHashsetSolution (ourHashSet, solutionHashSet) {
+  static testHashsetSolution (ourHashSet, solutionHashSet, log = false) {
     // let payload = { partitionId: partitionId, cycle: cycleNumber, tx_indicies: requestsByHost[i].hostIndex, hash: requestsByHost[i].hash }
     // repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j] })
 
@@ -6246,11 +6505,11 @@ class StateManager extends EventEmitter {
         continue
       }
       if (extra == null) {
-        console.log(`testHashsetSolution error extra == null at i: ${i}  extraIndex: ${extraIndex}`)
+        if (log) console.log(`testHashsetSolution error extra == null at i: ${i}  extraIndex: ${extraIndex}`)
         break
       }
       if (txSourceList.hashes[i] == null) {
-        console.log(`testHashsetSolution error null at i: ${i}  extraIndex: ${extraIndex}`)
+        if (log) console.log(`testHashsetSolution error null at i: ${i}  extraIndex: ${extraIndex}`)
         break
       }
 
@@ -6267,7 +6526,7 @@ class StateManager extends EventEmitter {
     // }
     hashSet = StateManager.createHashSetString(newTxList.thashes, newTxList.states) // TXSTATE_TODO
 
-    console.log(`extras removed: len: ${ourHashSet.indexMap.length}  extraIndex: ${extraIndex} ourPreHashSet: ${hashSet}`)
+    if (log) console.log(`extras removed: len: ${ourHashSet.indexMap.length}  extraIndex: ${extraIndex} ourPreHashSet: ${hashSet}`)
 
     // Txids: txSourceData.hashes, // txid1, txid2, …],  - ordered from oldest to recent
     // Status: txSourceData.passed, // [1,0, …],      - ordered corresponding to Txids; 1 for applied; 0 for failed
@@ -6285,7 +6544,7 @@ class StateManager extends EventEmitter {
         // newTxList.txs[i] = newTxList.ttxs[ourCounter]
 
         if (newTxList.hashes[i] == null) {
-          console.log(`testHashsetSolution error null at i: ${i} solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+          if (log) console.log(`testHashsetSolution error null at i: ${i} solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
         }
         ourCounter++
       } else {
@@ -6306,7 +6565,7 @@ class StateManager extends EventEmitter {
         // newTxList.states[i] = solutionTxList.states[correction.i] // TXSTATE_TODO
 
         if (newTxList.hashes[i] == null) {
-          console.log(`testHashsetSolution error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+          if (log) console.log(`testHashsetSolution error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
         }
         // newTxList.passed[i] = solutionDelta.pf
         // newTxList.txs[i] = solutionDelta.tx
@@ -6327,7 +6586,7 @@ class StateManager extends EventEmitter {
     // }
     hashSet = StateManager.createHashSetString(newTxList.hashes, newTxList.states) // TXSTATE_TODO
 
-    console.log(`solved set len: ${hashSet.length / stepSize}  : ${hashSet}`)
+    if (log) console.log(`solved set len: ${hashSet.length / stepSize}  : ${hashSet}`)
     // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 c  len: ${ourHashSet.indexMap.length}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter} ourHashSet: ${hashSet}`)
 
     return true

@@ -23,6 +23,12 @@
             "program": "${workspaceFolder}\\test\\unit\\state-manager\\shardvalues.js"
         },
         {
+            "type": "node",
+            "request": "launch",
+            "name": "hashset2",
+            "program": "${workspaceFolder}\\test\\unit\\state-manager\\hashset2.js"
+        },        
+        {
             //this seems to work pretty well when other methods are breaking.
             "type": "node",
             "request": "attach",
