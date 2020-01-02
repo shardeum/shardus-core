@@ -102,6 +102,7 @@ class P2PState extends EventEmitter {
         apoptosized: [],
         returned: [],
         activated: [],
+        activatedPublicKeys: [],
         certificate: {},
         expired: 0,
         desired: 0
@@ -335,9 +336,10 @@ class P2PState extends EventEmitter {
     const joinedConsensors = this.currentCycle.data.joinedConsensors
     this.mainLogger.debug(`Current joined: ${JSON.stringify(joined)}`)
     joined.length = 0
+    joinedConsensors.length = 0
     for (const node of joining) {
-      joined.push(node.publicKey)
-      joinedConsensors.push({
+      utils.insertSorted(joined, node.publicKey)
+      utils.insertSorted(joinedConsensors, {
         ip: node.externalIp,
         port: node.externalPort,
         publicKey: node.publicKey
@@ -364,6 +366,7 @@ class P2PState extends EventEmitter {
 
   computeNodeId (publicKey, cycleMarker) {
     const nodeId = this.crypto.hash({ publicKey, cycleMarker })
+    this.mainLogger.debug(`Node ID computation: publicKey: ${publicKey}, cycleMarker: ${cycleMarker}`)
     this.mainLogger.debug(`Node ID is: ${nodeId}`)
     return nodeId
   }
@@ -464,6 +467,9 @@ class P2PState extends EventEmitter {
     // Finally add the update after all validation has passed
     this.currentCycle.updates[status].push(update)
     utils.insertSorted(this.currentCycle.data[type], nodeId)
+    if (type === 'activated') {
+      utils.insertSorted(this.currentCycle.data.activatedPublicKeys, publicKey)
+    }
     // Mark node as seen for this cycle
     this._markNodeAsSeen(nodeId)
     this.mainLogger.debug(`Node ${nodeId} added to ${type} list for this cycle.`)
@@ -648,9 +654,9 @@ class P2PState extends EventEmitter {
 
   addArchiverUpdate (joinRequest) {
     // Add to cycle updates in archiverJoinRequests
-    this.currentCycle.updates.archiverJoinRequests.push(joinRequest)
+    utils.insertSorted(this.currentCycle.updates.archiverJoinRequests, joinRequest)
     // Add to cycle data in joinedArchivers
-    this.currentCycle.data.joinedArchivers.push(joinRequest.nodeInfo)
+    utils.insertSorted(this.currentCycle.data.joinedArchivers, joinRequest.nodeInfo)
   }
 
   async _setNodeStatus (nodeId, status) {
@@ -869,6 +875,7 @@ class P2PState extends EventEmitter {
   _removeNodeFromNodelist (node) {
     if (node.id === this.p2p.id) {
       this.mainLogger.info(`We have been marked for removal from the network. Commencing restart process. Current cycle marker: ${this.getCurrentCycleMarker()}`)
+      // [TODO] We need to make the removal process strictly ordered to prevent undeterministic behavior
       this.emit('removed')
     }
     delete this.nodes[node.status][node.id]
@@ -1268,6 +1275,7 @@ class P2PState extends EventEmitter {
     }
     if (updateDb) await this.storage.addCycles(cycles)
     for (let i = 0; i < cycles.length; i++) {
+      this.emit('syncedCycle', cycles[i])
       delete cycles[i].certificate
       this.cycles.push(cycles[i])
     }
@@ -1327,6 +1335,7 @@ class P2PState extends EventEmitter {
     const apoptosized = this.getApoptosized()
     const returned = this.getReturned()
     const activated = this.getActivated()
+    const activatedPublicKeys = this.getActivatedPublicKeys()
     const expired = this.getExpiredCount()
 
     const cycleInfo = {
@@ -1345,6 +1354,7 @@ class P2PState extends EventEmitter {
       apoptosized,
       returned,
       activated,
+      activatedPublicKeys,
       expired
     }
     if (withCert) {
@@ -1498,6 +1508,10 @@ class P2PState extends EventEmitter {
     const activated = this.currentCycle.data.activated
     this.mainLogger.debug(`Result of getActivated: ${JSON.stringify(activated)}`)
     return activated
+  }
+
+  getActivatedPublicKeys () {
+    return this.currentCycle.data.activatedPublicKeys
   }
 
   getLastCycle () {

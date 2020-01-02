@@ -17,6 +17,7 @@ module.exports = [
     joinedArchivers: { type: Sequelize.JSON, allowNull: false },
     joinedConsensors: { type: Sequelize.JSON, allowNull: false },
     activated: { type: Sequelize.JSON, allowNull: false },
+    activatedPublicKeys: { type: Sequelize.JSON, allowNull: false },
     removed: { type: Sequelize.JSON, allowNull: false },
     returned: { type: Sequelize.JSON, allowNull: false },
     lost: { type: Sequelize.JSON, allowNull: false },

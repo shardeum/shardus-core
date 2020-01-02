@@ -67,6 +67,10 @@ class P2P extends EventEmitter {
     // Init saving archiver nodes into cycles
     this.archivers = new P2PArchivers(this.logger, this, this.state, this.crypto)
 
+    this.state.on('removed', () => {
+      this.archivers.reset()
+    })
+
     this.state.on('cycle_q3_start', () => {
       const joinRequests = this.archivers.getArchiverUpdates()
       for (const joinRequest of joinRequests) {
@@ -74,10 +78,14 @@ class P2P extends EventEmitter {
       }
     })
 
+    this.state.on('syncedCycle', (cycle) => {
+      this.archivers.updateArchivers(cycle.joinedArchivers)
+    })
+
     this.state.on('newCycle', (cycles) => {
       const cycle = cycles[cycles.length - 1]
       this.archivers.updateArchivers(cycle.joinedArchivers)
-      this.archivers.sendCycle(cycle)
+      this.archivers.sendData(cycle)
       this.archivers.resetJoinRequests()
     })
 
@@ -170,9 +178,10 @@ class P2P extends EventEmitter {
     const archiver = this.existingArchivers[0]
     const nodeListUrl = `http://${archiver.ip}:${archiver.port}/nodelist`
     const nodeInfo = this.getPublicNodeInfo()
+    const { nextCycleMarker: firstCycleMarker } = this.getCycleMarkerInfo()
     let seedListSigned
     try {
-      seedListSigned = await http.post(nodeListUrl, { nodeInfo })
+      seedListSigned = await http.post(nodeListUrl, { nodeInfo, firstCycleMarker })
     } catch (e) {
       throw Error(`Fatal: Could not get seed list from seed node server ${nodeListUrl}: ` + e.message)
     }
@@ -183,10 +192,14 @@ class P2P extends EventEmitter {
   async _getSeedNodes () {
     const archiver = this.existingArchivers[0]
     let seedListSigned = await this._getSeedListSigned()
-    if (!this.crypto.verify(seedListSigned, archiver.publicKey)) throw Error('Fatal: Seed list was not signed by archiver!')
-    if (seedListSigned.joinRequest) {
-      this.archivers.addJoinRequest(seedListSigned.joinRequest)
-      this.archivers.addCycleRecipient(seedListSigned.joinRequest.nodeInfo)
+    if (!this.crypto.verify(seedListSigned, archiver.publicKey)) throw Error('Fatal: _getSeedNodes seed list was not signed by archiver!')
+    const joinRequest = seedListSigned.joinRequest
+    const dataRequest = seedListSigned.dataRequest
+    if (joinRequest) {
+      if (this.archivers.addJoinRequest(joinRequest) === false) throw Error('Fatal: _getSeedNodes join request not accepted!')
+    }
+    if (dataRequest) {
+      if (this.archivers.addDataRecipient(joinRequest.nodeInfo, dataRequest) === false) throw Error('Fatal: _getSeedNodes data request not accepted!')
     }
     return seedListSigned.nodeList
   }
@@ -1782,6 +1795,16 @@ class P2P extends EventEmitter {
     while (!joined) {
       seedNodes = await this._getSeedNodes()
       this.isFirstSeed = await this._discoverNetwork(seedNodes)
+
+      // Remove yourself from seedNodes if you are present in them but not firstSeed
+      const ourIpInfo = this.getIpInfo()
+      if (this.isFirstSeed === false) {
+        const ourIdx = seedNodes.findIndex(node => node.ip === ourIpInfo.externalIp && node.port === ourIpInfo.externalPort)
+        if (ourIdx > -1) {
+          seedNodes.splice(ourIdx, 1)
+        }
+      }
+
       needJoin = await this._checkIfNeedJoin()
 
       if (needJoin === false) {
