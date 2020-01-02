@@ -27,7 +27,13 @@
             "request": "launch",
             "name": "hashset2",
             "program": "${workspaceFolder}\\test\\unit\\state-manager\\hashset2.js"
-        },        
+        },    
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "functionTests",
+            "program": "${workspaceFolder}\\test\\unit\\state-manager\\functionTests.js"
+        },     
         {
             //this seems to work pretty well when other methods are breaking.
             "type": "node",

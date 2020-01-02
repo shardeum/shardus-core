@@ -231,6 +231,12 @@ class StateManager extends EventEmitter {
   constructor (verboseLogs, profiler, app, consensus, logger, storage, p2p, crypto, config) {
     super()
     this.verboseLogs = verboseLogs
+
+    // debug hack
+    if (p2p == null) {
+      return
+    }
+
     this.profiler = profiler
     this.mainLogger = logger.getLogger('main')
     this.fatalLogger = logger.getLogger('fatal')
@@ -327,6 +333,7 @@ class StateManager extends EventEmitter {
     this.repairAllStoredPartitions = true
 
     this.repairStartedMap = new Map()
+    this.repairCompletedMap = new Map()
 
     this.doDataCleanup = false
   }
@@ -1854,7 +1861,7 @@ class StateManager extends EventEmitter {
                 if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results 3 allFinished, final cycle: ${payload.Cycle_number} hash:${utils.stringifyReduce({ topResult })}`)
                 // do we ever send partition receipt yet?
                 this.storePartitionReceipt(payload.Cycle_number, partitionReceipt)
-                this.repairTrackerMarkFinished(repairTracker)
+                this.repairTrackerMarkFinished(repairTracker, 'post_partition_results')
               }
             } else {
               if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results not enough responses awaitWinningHash: ${repairTracker.awaitWinningHash} resp: ${responses.length}. required:${responsesRequired} repairTracker: ${utils.stringifyReduce(repairTracker)}`)
@@ -4074,7 +4081,7 @@ class StateManager extends EventEmitter {
           // only declare victory after we matched hashes
           if (usedSyncTXsFromHashSetStrings === false) {
             if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess 1 allFinished, final ${debugKey} hash:${utils.stringifyReduce({ topResult2 })}`)
-            this.repairTrackerMarkFinished(repairTracker)
+            this.repairTrackerMarkFinished(repairTracker, 'startRepairProcess:A')
             return
           } else {
             if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess set evaluationStarted=false so we can tally up hashes again ${debugKey}`)
@@ -4104,7 +4111,7 @@ class StateManager extends EventEmitter {
               }
             } else {
               this.storePartitionReceipt(cycleNumber, partitionReceipt3)
-              this.repairTrackerMarkFinished(repairTracker)
+              this.repairTrackerMarkFinished(repairTracker, 'startRepairProcess:B')
               if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess 2 allFinished, final ${debugKey} hash:${utils.stringifyReduce({ topResult3 })}`)
             }
           }
@@ -4184,7 +4191,7 @@ class StateManager extends EventEmitter {
       }
     } else {
       this.storePartitionReceipt(cycleNumber, partitionReceipt3)
-      this.repairTrackerMarkFinished(repairTracker)
+      this.repairTrackerMarkFinished(repairTracker, 'checkForGoodPartitionReciept')
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept 2 allFinished, final ${debugKey} hash:${utils.stringifyReduce({ topResult3 })}`)
     }
   }
@@ -4323,16 +4330,26 @@ class StateManager extends EventEmitter {
    * @param {any} ourLastResultHash
    * @param {GenericHashSetEntry & IHashSetEntryPartitions} ourHashSet
    */
-  _mergeRepairDataIntoLocalState2 (repairTracker, ourPartitionObj, ourLastResultHash, ourHashSet) {
+  _mergeRepairDataIntoLocalState2 (repairTracker, ourPartitionObj, ourLastResultHash, ourHashSet, txListOverride = null) {
     let key = repairTracker.key
-    let txList = this.getTXListByKey(key, repairTracker.partitionId)
+    let txList = null
+    if (txListOverride != null) {
+      txList = txListOverride
+    } else {
+      txList = this.getTXListByKey(key, repairTracker.partitionId)
+    }
+
+    let key2 = 'p' + repairTracker.partitionId
+    let debugKey = `rkeys: ${key} ${key2}`
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 ${debugKey}`)
 
     // repairTracker.solutionDeltas holds all the solutions we got from asking different nodes for the the transactions we are missing
     // repairTracker.extraTXIds holds the txids (hashes) of the transactions that are extra and need to be removed from the partition object.
 
     let txSourceList = txList
     if (txList.newTxList) {
-      txSourceList = txList.newTxList
+    //  txSourceList = txList.newTxList  //not sure if we should keep this... or at least update the part where we remove extra entries
     }
     // let newTxList = { hashes: [...txList.hashes], passed: [...txList.passed], txs: [...txList.txs] }
     let newTxList = { hashes: [], passed: [], txs: [], thashes: [], tpassed: [], ttxs: [], tstates: [], states: [] }
@@ -4345,19 +4362,19 @@ class StateManager extends EventEmitter {
     }
 
     ourHashSet.extraMap.sort(function (a, b) { return a - b })
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 z ourHashSet.extraMap: ${utils.stringifyReduce(ourHashSet.extraMap)} debugSol: ${utils.stringifyReduce(debugSol)}`)
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 z  ${debugKey} ourHashSet.extraMap: ${utils.stringifyReduce(ourHashSet.extraMap)} debugSol: ${utils.stringifyReduce(debugSol)}`)
 
     // build up a working list for the solution but leave out the extra entries.
     let extraIndex = 0
     for (let i = 0; i < txSourceList.hashes.length; i++) {
-      let extra = -1
-      if (extraIndex < ourHashSet.extraMap.length) {
-        extra = ourHashSet.extraMap[extraIndex]
-      }
-      if (extra === i) {
-        extraIndex++
-        continue
-      }
+      // let extra = -1
+      // if (extraIndex < ourHashSet.extraMap.length) {
+      //   extra = ourHashSet.extraMap[extraIndex]
+      // }
+      // if (extra === i) {
+      //   extraIndex++
+      //   continue
+      // }
       newTxList.thashes.push(txSourceList.hashes[i])
       newTxList.tpassed.push(txSourceList.passed[i])
       newTxList.ttxs.push(txSourceList.txs[i])
@@ -4370,9 +4387,9 @@ class StateManager extends EventEmitter {
     //   hashSet += hash.slice(0, stepSize)
     // }
 
-    let hashSet = StateManager.createHashSetString(newTxList.thashes, newTxList.states) // TXSTATE_TODO
+    let hashSet = StateManager.createHashSetString(newTxList.thashes, newTxList.tstates) // TXSTATE_TODO
 
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a  len: ${ourHashSet.indexMap.length}  extraIndex: ${extraIndex} ourPreHashSet: ${hashSet}`)
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a  ${debugKey} len: ${ourHashSet.indexMap.length}  extraIndex: ${extraIndex} ourPreHashSet: ${hashSet}`)
 
     // Txids: txSourceData.hashes, // txid1, txid2, …],  - ordered from oldest to recent
     // Status: txSourceData.passed, // [1,0, …],      - ordered corresponding to Txids; 1 for applied; 0 for failed
@@ -4386,16 +4403,18 @@ class StateManager extends EventEmitter {
         let currentIndex = ourHashSet.indexMap[i]
         if (currentIndex >= 0) {
         // pull from our list? but we have already removed stuff?
-          newTxList.hashes[i] = newTxList.thashes[ourCounter]
-          newTxList.passed[i] = newTxList.tpassed[ourCounter]
-          newTxList.txs[i] = newTxList.ttxs[ourCounter]
-          newTxList.states[i] = newTxList.tstates[ourCounter]
+          newTxList.hashes[i] = newTxList.thashes[currentIndex]
+          newTxList.passed[i] = newTxList.tpassed[currentIndex]
+          newTxList.txs[i] = newTxList.ttxs[currentIndex]
+          newTxList.states[i] = newTxList.tstates[currentIndex]
           ourCounter++
           // if we get into this check it is because it seemed we did not have a tx locally even though the calculations thought we did
           if (newTxList.hashes[i] == null) {
-            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}  newTxList.hashes.length: ${newTxList.hashes.length} ourHashSet.indexMap.length:${ourHashSet.indexMap.length}`)
-            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error null at i: ${i}  newTxList:${utils.stringifyReduce(newTxList)}`)
-            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error null at i: ${i}  txSourceList:${utils.stringifyReduce(txSourceList)}`)
+            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 ${debugKey} a error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}  newTxList.hashes.length: ${newTxList.hashes.length} newTxList.thashes.length: ${newTxList.thashes.length} ourHashSet.indexMap.length:${ourHashSet.indexMap.length} txSourceList.hashes.length: ${txSourceList.hashes.length}`)
+            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 ${debugKey} a error null at i: ${i}  newTxList:${utils.stringifyReduce(newTxList)}`)
+            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 ${debugKey} a error null at i: ${i}  txSourceList:${utils.stringifyReduce(txSourceList)}`)
+
+            // if (this.verboseLogs) this.mainLogger.error('failnugget:' + stringify({ txList, repairTracker, ourHashSet }))
             throw new Error('aborting data repair. fatal problem')
           }
         } else {
@@ -4421,6 +4440,8 @@ class StateManager extends EventEmitter {
       this.mainLogger.debug('_repair: _mergeRepairDataIntoLocalState2 ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       this.fatalLogger.fatal('_repair: _mergeRepairDataIntoLocalState2 ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 c  Exception when applying solution. going apoptosis. solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter} ourHashSet: ${hashSet}`)
+
+      if (this.verboseLogs) this.mainLogger.error('failnugget2:' + stringify({ txList, repairTracker, ourHashSet }))
       this.p2p.initApoptosis()
       throw new Error('aborting data repair. starting apoptosis')
     }
@@ -4442,9 +4463,9 @@ class StateManager extends EventEmitter {
 
       /** @type {GenericHashSetEntry[]} */
       let hashSetList = []
-      hashSetList.push(/** @type {GenericHashSetEntry} */{ hash: 'a1', votePower: 1, hashSet: hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, indexMap: [], extraMap: [], waitForIndex: -1 })
-      hashSetList.push(/** @type {GenericHashSetEntry} */{ hash: 'b1', votePower: 10, hashSet: repairTracker.outputHashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, indexMap: [], extraMap: [], waitForIndex: -1 })
-      let output = StateManager.solveHashSets(hashSetList)
+      hashSetList.push(/** @type {GenericHashSetEntry} */{ hash: 'a1', votePower: 1, hashSet: hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, indexMap: [], extraMap: [], waitForIndex: -1, ownVotes: [] })
+      hashSetList.push(/** @type {GenericHashSetEntry} */{ hash: 'b1', votePower: 10, hashSet: repairTracker.outputHashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, indexMap: [], extraMap: [], waitForIndex: -1, ownVotes: [] })
+      let output = StateManager.solveHashSets2(hashSetList)
       for (let hashSetEntry of hashSetList) {
         this.mainLogger.error(JSON.stringify(hashSetEntry))
       }
@@ -4495,7 +4516,7 @@ class StateManager extends EventEmitter {
     // hashSetList.sort(function (a, b) { return a.hash > b.hash }) // sort so that solution will be deterministic
     hashSetList.sort(utils.sortHashAsc)
     // This runs the general purose solver
-    let output = StateManager.solveHashSets(hashSetList)
+    let output = StateManager.solveHashSets2(hashSetList)
     // build a hashset string from the solved output
     let outputHashSet = ''
     for (let hash of output) {
@@ -4513,9 +4534,9 @@ class StateManager extends EventEmitter {
     // hashSetList2.sort(function (a, b) { return a.hash > b.hash }) // sort so that solution will be deterministic
     hashSetList2.sort(utils.sortHashAsc) // sort so that solution will be deterministic
     /** @type {HashSetEntryPartitions} */
-    let hashSet = { hash: 'FORCED', votePower: 1000, hashSet: outputHashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [], ourRow: false, indexMap: [], extraMap: [], waitForIndex: -1 }
+    let hashSet = { hash: 'FORCED', votePower: 1000, hashSet: outputHashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [], ourRow: false, indexMap: [], extraMap: [], waitForIndex: -1, ownVotes: [] }
     hashSetList2.push(hashSet)
-    output = StateManager.solveHashSets(hashSetList2, 40, 0.625, output)
+    output = StateManager.solveHashSets2(hashSetList2, 40, 0.625)//, output)
     hashSetList = hashSetList2
 
     // now that we have run the solver a second time we need to process the results and figure out which nodes to ask for missing transactions
@@ -4542,7 +4563,9 @@ class StateManager extends EventEmitter {
       let index = correction.i
       if (correction.t === 'insert') {
         let greedyAsk = -1 // todo perf: could try non greedy
-        let voters = correction.tv.vote.voters
+
+        let voters = correction.tv.voters // correction.tv.vote.voters  old solver needed this:
+
         for (let i = 0; i < voters.length; i++) {
           if (requestsByHost[voters[i]]) {
             greedyAsk = voters[i]
@@ -4586,15 +4609,15 @@ class StateManager extends EventEmitter {
         // requestsByHost[i].requests.sort(function (a, b) { return a - b }) // sort these since the reponse for the host will also sort by timestamp
 
         let payload = { partitionId: partitionId, cycle: cycleNumber, tx_indicies: requestsByHost[i].hostIndex, hash: requestsByHost[i].hash }
-        if (this.extendedRepairLogging) console.log(`get_transactions_by_partition_index ok!  payload: ${utils.stringifyReduce(payload)}`)
-        if (this.extendedRepairLogging) console.log(`requestsByHost[i].stateSnippets ${utils.stringifyReduce(requestsByHost[i].stateSnippets)} `)
+        if (this.extendedRepairLogging) console.log(`get_transactions_by_partition_index ok! ${debugKey} payload: ${utils.stringifyReduce(payload)}`)
+        if (this.extendedRepairLogging) console.log(`requestsByHost[i].stateSnippets ${debugKey} ${utils.stringifyReduce(requestsByHost[i].stateSnippets)} `)
         if (hashSetList[i].owners.length > 0) {
           let nodeToContact = this.p2p.state.getNodeByPubKey(hashSetList[i].owners[0])
 
           let result = await this.p2p.ask(nodeToContact, 'get_transactions_by_partition_index', payload)
           // { success: true, acceptedTX: result, passFail: passFailList }
           if (result.success === true) {
-            if (this.extendedRepairLogging) console.log(`get_transactions_by_partition_index ok! count:${result.acceptedTX.length} payload: ${utils.stringifyReduce(payload)}`)
+            if (this.extendedRepairLogging) console.log(`get_transactions_by_partition_index ok! ${debugKey} count:${result.acceptedTX.length} payload: ${utils.stringifyReduce(payload)}`)
             for (let j = 0; j < result.acceptedTX.length; j++) {
               let acceptedTX = result.acceptedTX[j]
               if (result.passFail[j] === 1) {
@@ -4605,7 +4628,7 @@ class StateManager extends EventEmitter {
               }
 
               if (acceptedTX == null) {
-                if (this.verboseLogs) this.mainLogger.error(`syncTXsFromHashSetStrings acceptedTX == null  j:${j} i:${i} pf:${result.passFail[j]}`)
+                if (this.verboseLogs) this.mainLogger.error(`syncTXsFromHashSetStrings acceptedTX == null ${debugKey} j:${j} i:${i} pf:${result.passFail[j]}`)
               }
               // update our solution deltas.. hopefully that is enough info to patch up our state.
               //   // TXSTATE_TODO   need a way to set state on this entry!
@@ -4618,7 +4641,7 @@ class StateManager extends EventEmitter {
             }
           } else {
             // todo datasync:  assert/fail/or retry
-            if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index faied!  payload: ${utils.stringifyReduce(payload)}`)
+            if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index faied! ${debugKey} payload: ${utils.stringifyReduce(payload)}`)
           }
 
           // add these TXs to newPendingTXs or newFailedTXs  and the IDs to missingTXIds
@@ -4628,7 +4651,7 @@ class StateManager extends EventEmitter {
     }
 
     if (insertCount !== repairTracker.solutionDeltas.length) {
-      if (this.verboseLogs) this.mainLogger.error(`insertCount !== repairTracker.solutionDeltas.length: ${insertCount} , ${repairTracker.solutionDeltas.length} `)
+      if (this.verboseLogs) this.mainLogger.error(`${debugKey} insertCount !== repairTracker.solutionDeltas.length: ${insertCount} , ${repairTracker.solutionDeltas.length} `)
     }
 
     // calculate extraTXIds
@@ -4727,16 +4750,21 @@ class StateManager extends EventEmitter {
    * repairTrackerMarkFinished
    * @param {RepairTracker} repairTracker
    */
-  repairTrackerMarkFinished (repairTracker) {
+  repairTrackerMarkFinished (repairTracker, debugTag) {
     repairTracker.repairsFullyComplete = true
 
     let combinedKey = repairTracker.key + repairTracker.key2
     if (this.repairStartedMap.has(combinedKey)) {
-      this.dataRepairsCompleted++
-      if (this.verboseLogs) this.mainLogger.debug(`repairStats: finished repair ${combinedKey}`)
+      if (this.repairCompletedMap.has(combinedKey)) {
+        if (this.verboseLogs) this.mainLogger.debug(`repairStats: finished repair ${combinedKey} -alreadyFlagged  tag:${debugTag}`)
+      } else {
+        this.dataRepairsCompleted++
+        this.repairCompletedMap.set(combinedKey, true)
+        if (this.verboseLogs) this.mainLogger.debug(`repairStats: finished repair ${combinedKey} tag:${debugTag}`)
+      }
     } else {
       // should be a trace?
-      if (this.verboseLogs) this.mainLogger.debug(`repairStats: Calling complete on a key we dont have ${combinedKey}`)
+      if (this.verboseLogs) this.mainLogger.debug(`repairStats: Calling complete on a key we dont have ${combinedKey} tag:${debugTag}`)
     }
 
     for (let i = this.dataRepairStack.length - 1; i >= 0; i--) {
@@ -4748,7 +4776,7 @@ class StateManager extends EventEmitter {
 
     if (this.dataRepairStack.length === 0) {
       if (this.stateIsGood === false) {
-        if (this.verboseLogs) this.mainLogger.error(`No active data repair going on`)
+        if (this.verboseLogs) this.mainLogger.error(`No active data repair going on tag:${debugTag}`)
       }
       this.stateIsGood = true
     }
@@ -4983,7 +5011,8 @@ class StateManager extends EventEmitter {
             // no need to apply this tx because it would do nothing
               continue
             }
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs apply tx ${utils.makeShortHash(tx.id)} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
+
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs apply tx ${utils.makeShortHash(tx.id)} ${tx.timestamp} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
             let hasStateTableData = false // may or may not have it but not tracking yet
 
             // HACK!!  receipts sent across the net to us may need to get re parsed
@@ -6155,7 +6184,7 @@ class StateManager extends EventEmitter {
           votesArray = [votObject]
           votes[v] = votesArray
 
-          hashListEntry.ownVotes.push(votObject)
+          // hashListEntry.ownVotes.push(votObject)
         }
 
         // get lowest value in list that we have not voted on and is not pinned by our best vote.
@@ -6171,14 +6200,15 @@ class StateManager extends EventEmitter {
 
           // how to check pinIdx?  do we have to analys neighbor pinIdx?
           // use pinObj  to see if the last pinObj A is greater than this obj B.
-          // if (hashListEntry.pinObj != null) {
-          //   if (hashListEntry.pinObj.val === voteObject.val) {
-          //     let compare = StateManager.compareVoteObjects(hashListEntry.pinObj, voteObject, false)
-          //     if (compare <= 0) {
-          //       continue // or break;
-          //     }
-          //   }
-          // }
+          if (hashListEntry.pinObj != null && hashListEntry.pinObj !== voteObject) {
+            // if (hashListEntry.pinObj.val === voteObject.val)
+            {
+              let compare = StateManager.compareVoteObjects(hashListEntry.pinObj, voteObject, false)
+              if (compare > 0) {
+                continue // or break;
+              }
+            }
+          }
           currentVoteObject = voteObject
         }
 
@@ -6187,12 +6217,13 @@ class StateManager extends EventEmitter {
           votesseen++
           currentVoteObject = { winIdx: null, val: v, count: 0, ec: 0, lowestIndex: index, voters: [], voteTally: Array(hashSetList.length), votesseen }
           votesArray.push(currentVoteObject)
-          hashListEntry.ownVotes.push(currentVoteObject)
+          // hashListEntry.ownVotes.push(currentVoteObject)
         }
 
         currentVoteObject.voters.push(hashListIndex)
         currentVoteObject.voteTally[hashListIndex] = { i: index, p: hashListEntry.votePower } // could this be a simple index
         currentVoteObject.count += hashListEntry.votePower
+        hashListEntry.ownVotes.push(currentVoteObject)
 
         if (currentVoteObject.winIdx !== null) {
           // this already won before but we should still update our own pinIdx
@@ -6207,8 +6238,8 @@ class StateManager extends EventEmitter {
               tallyHashListEntry.pinIdx = tallyObject.i
               tallyHashListEntry.pinObj = currentVoteObject
             }
-            currentVoteObject.winIdx = index
           }
+          currentVoteObject.winIdx = index
         }
       }
 
@@ -6265,6 +6296,7 @@ class StateManager extends EventEmitter {
 
       let hashListEntry = hashSetList[hashListIndex]
       hashListEntry.corrections = [] // clear this
+      // hashListEntry.instructions = []
       // console.log(`solution for set ${hashListIndex}  locallen:${hashListEntry.hashSet.length / stepSize} `)
       let winningVoteIndex = 0
       for (let voteObj of allWinningVotes) {
@@ -6273,6 +6305,7 @@ class StateManager extends EventEmitter {
           // bv: hashListEntry.lastValue, if: lastOutputCount  are old.
           hashListEntry.corrections.push({ i: winningVoteIndex, tv: voteObj, v: voteObj.val, t: 'insert', bv: null, if: -1 })
         }
+        // what if we have it but it is in the wrong spot!!
         winningVoteIndex++
       }
 
@@ -6285,8 +6318,29 @@ class StateManager extends EventEmitter {
         // localIdx++
       }
 
+      // not so sure about this sort  local vs. global index space.
       hashListEntry.corrections.sort((a, b) => a.i - b.i)
       winningVoteIndex = 0
+
+      // hashListEntry.allWinningVotes = allWinningVotes
+
+      // build index map now!
+      hashListEntry.indexMap = []
+      hashListEntry.extraMap = []
+
+      for (let voteObj of allWinningVotes) {
+        if (voteObj.voteTally[hashListIndex] == null) {
+          hashListEntry.indexMap.push(-1)
+        } else {
+          hashListEntry.indexMap.push(voteObj.voteTally[hashListIndex].i)
+        }
+      }
+      for (let voteObj of hashListEntry.ownVotes) {
+        let localIdx = voteObj.voteTally[hashListIndex].i
+        if (voteObj.winIdx == null) {
+          hashListEntry.extraMap.push(localIdx)
+        }
+      }
     }
 
     // generate corrections for main entry.
@@ -6314,65 +6368,66 @@ class StateManager extends EventEmitter {
   static expandIndexMapping (hashListEntry, output) {
     // hashListEntry.corrections.sort(function (a, b) { return a.i === b.i ? 0 : a.i < b.i ? -1 : 1 })
 
-    // index map is our index to the solution output
-    hashListEntry.indexMap = []
-    // extra map is the index in our list that is an extra
-    hashListEntry.extraMap = []
-    let readPtr = 0
-    let writePtr = 0
-    let correctionIndex = 0
-    let currentCorrection = null
-    let extraBits = 0
-    // This will walk the input and output indicies st that same time
-    while (writePtr < output.length) {
-      // Get the current correction.  We walk this with the correctionIndex
-      if (correctionIndex < hashListEntry.corrections.length && hashListEntry.corrections[correctionIndex] != null && hashListEntry.corrections[correctionIndex].t === 'insert' && hashListEntry.corrections[correctionIndex].i <= writePtr) {
-        currentCorrection = hashListEntry.corrections[correctionIndex]
-        correctionIndex++
-      } else if (correctionIndex < hashListEntry.corrections.length && hashListEntry.corrections[correctionIndex] != null && hashListEntry.corrections[correctionIndex].t === 'extra' && hashListEntry.corrections[correctionIndex].hi === readPtr) {
-        currentCorrection = hashListEntry.corrections[correctionIndex]
-        correctionIndex++
-      } else {
-        currentCorrection = null
-      }
-      if (extraBits > 0) {
-        readPtr += extraBits
-        extraBits = 0
-      }
+    // // index map is our index to the solution output
+    // hashListEntry.indexMap = []
+    // // extra map is the index in our list that is an extra
+    // hashListEntry.extraMap = []
+    // let readPtr = 0
+    // let writePtr = 0
+    // let correctionIndex = 0
+    // let currentCorrection = null
+    // let extraBits = 0
+    // // This will walk the input and output indicies st that same time
+    // while (writePtr < output.length) {
+    //   // Get the current correction.  We walk this with the correctionIndex
+    //   if (correctionIndex < hashListEntry.corrections.length && hashListEntry.corrections[correctionIndex] != null && hashListEntry.corrections[correctionIndex].t === 'insert' && hashListEntry.corrections[correctionIndex].i <= writePtr) {
+    //     currentCorrection = hashListEntry.corrections[correctionIndex]
+    //     correctionIndex++
+    //   } else if (correctionIndex < hashListEntry.corrections.length && hashListEntry.corrections[correctionIndex] != null && hashListEntry.corrections[correctionIndex].t === 'extra' && hashListEntry.corrections[correctionIndex].hi <= readPtr) {
+    //     currentCorrection = hashListEntry.corrections[correctionIndex]
+    //     correctionIndex++
+    //   } else {
+    //     currentCorrection = null
+    //   }
+    //   // if (extraBits > 0) {
+    //   //   readPtr += extraBits
+    //   //   extraBits = 0
+    //   // }
 
-      // increment pointers based on if there is a correction to write and what type of correction it is
-      if (!currentCorrection) {
-        // no correction to consider so we just write to the index map and advance the read and write pointer
-        hashListEntry.indexMap.push(readPtr)
-        writePtr++
-        readPtr++
-      } else if (currentCorrection.t === 'insert') {
-        // insert means the fix for this slot is to insert an item, since we dont have it this will be -1
-        hashListEntry.indexMap.push(-1)
-        writePtr++
-      } else if (currentCorrection.t === 'extra') {
-        // hashListEntry.extraMap.push({ i: currentCorrection.i, hi: currentCorrection.hi })
-        hashListEntry.extraMap.push(currentCorrection.hi)
-        extraBits++
-        // if (currentCorrection.c === null) {
-        //   writePtr++
-        // }
-        continue
-      }
-    }
+    //   // increment pointers based on if there is a correction to write and what type of correction it is
+    //   if (!currentCorrection) {
+    //     // no correction to consider so we just write to the index map and advance the read and write pointer
+    //     hashListEntry.indexMap.push(readPtr)
+    //     writePtr++
+    //     readPtr++
+    //   } else if (currentCorrection.t === 'insert') {
+    //     // insert means the fix for this slot is to insert an item, since we dont have it this will be -1
+    //     hashListEntry.indexMap.push(-1)
+    //     writePtr++
+    //   } else if (currentCorrection.t === 'extra') {
+    //     // hashListEntry.extraMap.push({ i: currentCorrection.i, hi: currentCorrection.hi })
+    //     hashListEntry.extraMap.push(currentCorrection.hi)
+    //     extraBits++
+    //     readPtr++
+    //     // if (currentCorrection.c === null) {
+    //     //   writePtr++
+    //     // }
+    //     continue
+    //   }
+    // }
 
-    // final corrections:
-    while (correctionIndex < hashListEntry.corrections.length) {
-      currentCorrection = hashListEntry.corrections[correctionIndex]
-      correctionIndex++
+    // // final corrections:
+    // while (correctionIndex < hashListEntry.corrections.length) {
+    //   currentCorrection = hashListEntry.corrections[correctionIndex]
+    //   correctionIndex++
 
-      if (currentCorrection.t === 'extra') {
-        // hashListEntry.extraMap.push({ i: currentCorrection.i, hi: currentCorrection.hi })
-        hashListEntry.extraMap.push(currentCorrection.hi)
-        // extraBits++
-        continue
-      }
-    }
+    //   if (currentCorrection.t === 'extra') {
+    //     // hashListEntry.extraMap.push({ i: currentCorrection.i, hi: currentCorrection.hi })
+    //     hashListEntry.extraMap.push(currentCorrection.hi)
+    //     // extraBits++
+    //     continue
+    //   }
+    // }
   }
 
   /**
@@ -6404,7 +6459,7 @@ class StateManager extends EventEmitter {
           owner = ourNodeKey
         }
         /** @type {HashSetEntryPartitions} */
-        let hashSet = { hash: hash, votePower: 0, hashSet: partitionResult.hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [owner], ourRow: false, waitForIndex: -1 }
+        let hashSet = { hash: hash, votePower: 0, hashSet: partitionResult.hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [owner], ourRow: false, waitForIndex: -1, ownVotes: [] }
         hashSets[hash] = hashSet
         hashSetList.push(hashSets[hash])
         // partitionResult.hashSetList = hashSet //Seems like this was only ever used for debugging, going to ax it to be safe!
@@ -6539,12 +6594,13 @@ class StateManager extends EventEmitter {
       let currentIndex = ourHashSet.indexMap[i]
       if (currentIndex >= 0) {
         // pull from our list? but we have already removed stuff?
-        newTxList.hashes[i] = newTxList.thashes[ourCounter]
+        newTxList.hashes[i] = txSourceList.hashes[currentIndex] // newTxList.thashes[ourCounter]
         // newTxList.passed[i] = newTxList.tpassed[ourCounter]
         // newTxList.txs[i] = newTxList.ttxs[ourCounter]
 
         if (newTxList.hashes[i] == null) {
           if (log) console.log(`testHashsetSolution error null at i: ${i} solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+          return false
         }
         ourCounter++
       } else {
@@ -6584,7 +6640,11 @@ class StateManager extends EventEmitter {
     //   }
     //   hashSet += hash.slice(0, stepSize)
     // }
-    hashSet = StateManager.createHashSetString(newTxList.hashes, newTxList.states) // TXSTATE_TODO
+    hashSet = StateManager.createHashSetString(newTxList.hashes, null) // TXSTATE_TODO  newTxList.states
+
+    if (solutionHashSet.hashSet !== hashSet) {
+      return false
+    }
 
     if (log) console.log(`solved set len: ${hashSet.length / stepSize}  : ${hashSet}`)
     // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 c  len: ${ourHashSet.indexMap.length}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter} ourHashSet: ${hashSet}`)
@@ -6600,18 +6660,33 @@ class StateManager extends EventEmitter {
    */
   static createHashSetString (txHashes, dataHashes) {
     let hashSet = ''
-    for (let i = 0; i < txHashes.length; i++) {
-      let txHash = txHashes[i]
-      let dataHash = dataHashes[i]
-      if (!txHash) {
-        txHash = 'xx'
+
+    if (dataHashes == null) {
+      for (let i = 0; i < txHashes.length; i++) {
+        let txHash = txHashes[i]
+
+        if (!txHash) {
+          txHash = 'xx'
+        }
+
+        hashSet += txHash.slice(0, cHashSetTXStepSize + cHashSetDataStepSize)
       }
-      if (!dataHash) {
-        dataHash = 'xx'
+      return hashSet
+    } else {
+      for (let i = 0; i < txHashes.length; i++) {
+        let txHash = txHashes[i]
+        let dataHash = dataHashes[i]
+        if (!txHash) {
+          txHash = 'xx'
+        }
+        if (!dataHash) {
+          dataHash = 'xx'
+        }
+        hashSet += txHash.slice(0, cHashSetTXStepSize)
+        hashSet += dataHash.slice(0, cHashSetDataStepSize)
       }
-      hashSet += txHash.slice(0, cHashSetTXStepSize)
-      hashSet += dataHash.slice(0, cHashSetDataStepSize)
     }
+
     return hashSet
   }
 }
