@@ -310,7 +310,7 @@ class StateManager extends EventEmitter {
     this.nextCycleReportToSend = null
 
     // this controls the repair portion of data repair.
-    this.canDataRepair = true
+    this.canDataRepair = false
     this.stateIsGood = true
 
     /** @type {RepairTracker[]} */
