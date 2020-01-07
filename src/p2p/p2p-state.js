@@ -900,6 +900,16 @@ class P2PState extends EventEmitter {
 
     if (index === false) {
       console.log(`getOrderedSyncingNeighbors failed to find ${utils.stringifyReduce(node.id)}`)
+
+      if (this.nodes != null && this.nodes.addressOrdered != null) {
+        const ordered = this.nodes.addressOrdered
+        let orderedString = `---orderedNodes ${utils.stringifyReduce(ordered.map((a) => a.id))}`
+        console.log(orderedString)
+
+        this.mainLogger.error(`getOrderedSyncingNeighbors failed to find ${utils.stringifyReduce(node.id)} nodeList:${orderedString}`)
+      } else {
+        this.mainLogger.error(`getOrderedSyncingNeighbors failed to find ${utils.stringifyReduce(node.id)} nodeList: not available`)
+      }
       return results
     }
     // cycleShardData.activeNodes.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
