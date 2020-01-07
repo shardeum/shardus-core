@@ -257,6 +257,7 @@ class Shardus {
     this._unregisterListener('txQueued')
     this._unregisterListener('txPopped')
     this._unregisterListener('txApplied')
+    this._unregisterListener('txProcessed')
   }
 
   _unlinkStateManager () {
