@@ -674,7 +674,7 @@ class StateManager extends EventEmitter {
 
       // need to see if address is in range. if so return the tracker.
       // if (ShardFunctions.testAddressInRange(address, syncTracker.range)) {
-      if (syncTracker.range.low < address && address < syncTracker.range.high) {
+      if (syncTracker.range.low <= address && address <= syncTracker.range.high) {
         return syncTracker
       }
     }
