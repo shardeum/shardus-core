@@ -220,7 +220,7 @@ class Shardus {
 
   _registerListener (emitter, event, callback) {
     if (this._listeners[event]) {
-      this.mainLogger.fatal('Shardus can only register one listener per event!')
+      this.mainLogger.fatal('Shardus can only register one listener per event! EVENT: ', event)
       return
     }
     emitter.on(event, callback)
