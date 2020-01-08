@@ -15,9 +15,11 @@ const RateLimiting = require('../rate-limiting')
 const Profiler = require('../utils/profiler.js')
 const allZeroes64 = '0'.repeat(64)
 const path = require('path')
+const EventEmitter = require('events')
 
-class Shardus {
+class Shardus extends EventEmitter {
   constructor ({ server: config, logs: logsConfig, storage: storageConfig }) {
+    super()
     this.profiler = new Profiler()
     this.config = config
     this.verboseLogs = false
@@ -182,6 +184,7 @@ class Shardus {
         this.reporter.startReporting()
       }
       if (this.statistics) this.statistics.startSnapshots()
+      this.emit('active', nodeId)
     })
     this.p2p.on('failed', () => {
       this.shutdown(exitProcOnFail)
@@ -487,6 +490,10 @@ class Shardus {
     for (let key of dataKeys) {
       fullObject[key] = updatedPartialObject[key]
     }
+  }
+
+  isActive () {
+    return this.p2p.isActive()
   }
 
   async shutdown (exitProcess = true) {
