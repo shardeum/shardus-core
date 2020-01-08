@@ -274,7 +274,15 @@ class Shardus {
   async syncAppData () {
     if (this.stateManager) await this.stateManager.syncStateData(3)
 
-    await this.p2p.goActive()
+    if (this.p2p.isFirstSeed) {
+      await this.p2p.goActive()
+      await this.app.sync()
+    } else {
+      await this.app.sync()
+      await this.p2p.goActive()
+    }
+    // Set network joinable to true
+
     console.log('Server ready!')
 
     if (this.stateManager) {
@@ -289,6 +297,10 @@ class Shardus {
     }
   }
 
+  set (tx) {
+    return this.put(tx, true)
+  }
+
   /**
    * Submit a transaction into the network
    * Returns an object that tells whether a tx was successful or not and the reason why.
@@ -300,7 +312,7 @@ class Shardus {
    * }
    *
    */
-  put (tx) {
+  put (tx, set = false) {
     if (!this.appProvided) throw new Error('Please provide an App object to Shardus.setup before calling Shardus.put')
 
     if (this.verboseLogs) this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(tx)}`) // not reducing tx here so we can get the long hashes
@@ -315,9 +327,16 @@ class Shardus {
       return { success: false, reason: 'Not ready to accept transactions, shard calculations pending' }
     }
 
-    if (!this.p2p.allowTransactions()) {
-      this.statistics.incrementCounter('txRejected')
-      return { success: false, reason: 'Network conditions to allow transactions are not met.' }
+    if (set === false) {
+      if (!this.p2p.allowTransactions()) {
+        this.statistics.incrementCounter('txRejected')
+        return { success: false, reason: 'Network conditions to allow transactions are not met.' }
+      }
+    } else {
+      if (!this.p2p.allowSet()) {
+        this.statistics.incrementCounter('txRejected')
+        return { success: false, reason: 'Network conditions to allow app init via set' }
+      }
     }
 
     if (this.rateLimiting.isOverloaded()) {
@@ -621,6 +640,13 @@ class Shardus {
       } else {
         applicationInterfaceImpl.getAccountDebugValue = (wrappedAccount) => 'getAccountDebugValue() missing on app'
         // throw new Error('Missing requried interface function. deleteLocalAccountData()')
+      }
+
+      if (typeof (application.sync) === 'function') {
+        applicationInterfaceImpl.sync = async () => application.sync()
+      } else {
+        let thisPtr = this
+        applicationInterfaceImpl.sync = async function () { thisPtr.mainLogger.debug('no app.sync() function defined') }
       }
     } catch (ex) {
       this.fatalLogger.fatal(`Required application interface not implemented. Exception: ${ex}`)

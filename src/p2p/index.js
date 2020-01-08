@@ -1458,6 +1458,10 @@ class P2P extends EventEmitter {
     return this.state.getActiveCount() >= this.minNodesToAllowTxs
   }
 
+  allowSet () {
+    return this.state.getActiveCount() === 1
+  }
+
   // Finds a node either in nodelist or in seedNodes listhis.mainLogger.debug(`Node ID to look up: ${nodeId}`)t if told to
   _findNodeInGroup (nodeId, group) {
     if (!group) {

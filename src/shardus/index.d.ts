@@ -59,7 +59,13 @@ declare class Shardus {
    * 
    * @param tx the transaction
    */
-  put(tx: object): Shardus.IncomingTransactionResult
+  put(tx: object, [set]:boolean): Shardus.IncomingTransactionResult
+  /**
+   * Handle incoming set requests
+   * 
+   * @param tx the set tx
+   */
+  set(tx: object): Shardus.IncomingTransactionResult
   /**
    * A function that clears shardus App related State
    */
@@ -140,6 +146,13 @@ declare namespace Shardus {
     deleteLocalAccountData: () => void
 
     getAccountDebugValue: (wrappedAccount: any) => string
+
+    /**
+     * This gives the application a chance to sync or load initial data before going active.
+     * If it is the first node it can use .set() to set data
+     * If it is not the first node it could use getLocalOrRemote() to query data it needs.
+     */
+    sync: () => any
   }
   
   export interface TransactionKeys {
