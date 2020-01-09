@@ -147,6 +147,20 @@ class P2PArchivers {
     }
   }
 
+  sendPartitionData (partitionReceipt, paritionObject) {
+    for (const nodeInfo of this.cycleRecipients) {
+      const nodeUrl = `http://${nodeInfo.ip}:${nodeInfo.port}/post_partition`
+      http.post(nodeUrl, { partitionReceipt, paritionObject })
+    }
+  }
+
+  sendTransactionData (partitionNumber, cycleNumber, transactions) {
+    for (const nodeInfo of this.cycleRecipients) {
+      const nodeUrl = `http://${nodeInfo.ip}:${nodeInfo.port}/post_transactions`
+      http.post(nodeUrl, { partitionNumber, cycleNumber, transactions })
+    }
+  }
+
   registerRoutes () {
     this.p2p.network.registerExternalPost('joinarchiver', async (req, res) => {
       if (!this.state.acceptJoinRequests) {

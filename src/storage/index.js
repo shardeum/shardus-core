@@ -461,6 +461,25 @@ class Storage {
     }
   }
 
+  async clearAccountStateTableOlderThan (tsEnd) {
+    this._checkInit()
+    try {
+      await this._query('Delete from accountStates where txTimestamp < ? and txTimestamp not in (SELECT min(txTimestamp)  from accountStates group by accountId)',
+        `${tsEnd}`
+      )
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
+  // Select accountId from (SELECT min(txTimestamp), *  from accountStates group by accountId)
+
+  // clear out entries but keep oldest..  should and with a max time option
+  // Delete from accountStates where txTimestamp not in (SELECT min(txTimestamp)  from accountStates group by accountId)
+  // need raw option.
+
+  // Delete from accountStates where txTimestamp < 1577915740875 and txTimestamp not in (SELECT min(txTimestamp)  from accountStates group by accountId)
+
   // use this to clear out older accepted TXs
   async clearAcceptedTX (tsStart, tsEnd) {
     this._checkInit()

@@ -76,6 +76,12 @@ const cHashSetDataStepSize = 2
    */
 
 /**
+   * @typedef {Object} CombinedPartitionReceipt a partition reciept that contains one copy of of the data and all of the signatures for that data
+   * @property {PartitionResult} result with signatures moved to a list
+   * @property {Sign[]} signatures
+   */
+
+/**
    * @typedef {Object} RepairTracker a partition object
    * @property {string[]} triedHashes
    * @property {number} numNodes
@@ -336,6 +342,11 @@ class StateManager extends EventEmitter {
     this.repairCompletedMap = new Map()
 
     this.doDataCleanup = false
+
+    this.sendArchiveData = false
+    this.purgeArchiveData = false
+
+    this.sentReceipts = new Map()
   }
 
   // this clears state data related to the current partion we are syncing.
@@ -1874,6 +1885,39 @@ class StateManager extends EventEmitter {
       // result.accountData = accountData
       // await respond(result)
       })
+
+    // /post_partition_results (Partition_results)
+    //   Partition_results - array of objects with the fields {Partition_id, Cycle_number, Partition_hash, Node_id, Node_sign}
+    //   Returns nothing
+
+    // this.p2p.registerInternal('post_partition_receipt',
+    //   /**
+    //   * This is how to typedef a callback!
+    //  * @param {PartitionReceipt} payload
+    //  * @param {any} respond
+    //  */
+    //   async (payload, respond) => {
+    //     try {
+    //       if (!payload) {
+    //         if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair post_partition_results: abort no payload`)
+    //         return
+    //       }
+
+    //       let partitionResults = payload.partitionResults
+    //       let cycleKey = 'c' + payload.Cycle_number
+
+    //       let allResponsesByPartition = this.allPartitionResponsesByCycleByPartition[cycleKey]
+    //       if (!allResponsesByPartition) {
+    //         allResponsesByPartition = {}
+    //         this.allPartitionResponsesByCycleByPartition[cycleKey] = allResponsesByPartition
+    //       }
+    //       let ourPartitionResults = this.ourPartitionResultsByCycle[cycleKey]
+
+    //     } finally {
+
+    //     }
+
+    //   })
 
     // /get_transactions_by_list (Tx_ids)
     //   Tx_ids - array of transaction ids
@@ -3876,6 +3920,7 @@ class StateManager extends EventEmitter {
 
   /**
    * tryGeneratePartitionReciept
+   * Generate a receipt if we have consensus
    * @param {PartitionResult[]} allResults
    * @param {PartitionResult} ourResult
    * @param {boolean} [repairPassHack]
@@ -5777,6 +5822,8 @@ class StateManager extends EventEmitter {
       this.cycleReceiptsByCycleCounter[key] = []
     }
     this.cycleReceiptsByCycleCounter[key].push(partitionReceipt)
+
+    this.trySendAndPurgeReceipts(partitionReceipt)
   }
 
   /**
@@ -6688,6 +6735,91 @@ class StateManager extends EventEmitter {
     }
 
     return hashSet
+  }
+
+  /**
+   * sendPartitionData
+   * @param {PartitionReceipt} partitionReceipt
+   * @param {PartitionObject} paritionObject
+   */
+  sendPartitionData (partitionReceipt, paritionObject) {
+    if (partitionReceipt.resultsList.length === 0) {
+      return
+    }
+    // CombinedPartitionReceipt
+
+    let partitionReceiptCopy = JSON.parse(stringify(partitionReceipt.resultsList[0]))
+
+    /** @type {CombinedPartitionReceipt} */
+    let combinedReciept = { result: partitionReceiptCopy, signatures: partitionReceipt.resultsList.map((a) => a.sign) }
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' sendPartitionData ' + utils.stringifyReduceLimit({ combinedReciept, paritionObject }))
+
+    // send it
+    // this.p2p.archivers.sendPartitionData(combinedReciept, paritionObject)
+  }
+
+  sendTransactionData (partitionNumber, cycleNumber, transactions) {
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' sendTransactionData ' + utils.stringifyReduceLimit({ partitionNumber, cycleNumber, transactions }))
+
+    // send it
+    // this.p2p.archivers.sendTransactionData(partitionNumber, cycleNumber, transactions)
+  }
+
+  purgeTransactionData () {
+    let tsStart = 0
+    let tsEnd = 0
+    this.storage.clearAcceptedTX(tsStart, tsEnd)
+  }
+
+  purgeStateTableData () {
+    // do this by timestamp maybe..
+    // this happnes on a slower scale.
+    let tsEnd = 0 // todo get newest time to keep
+    this.storage.clearAccountStateTableOlderThan(tsEnd)
+  }
+
+  /**
+   * trySendAndPurgeReciepts
+   * @param {PartitionReceipt} partitionReceipt
+   */
+  trySendAndPurgeReceipts (partitionReceipt) {
+    if (partitionReceipt.resultsList.length === 0) {
+      return
+    }
+    let cycleNumber = partitionReceipt.resultsList[0].Cycle_number
+    let partitionId = partitionReceipt.resultsList[0].Partition_id
+    let key = `c${cycleNumber}p${partitionId}`
+    if (this.sentReceipts.has(key)) {
+      return
+    }
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' trySendAndPurgeReceipts ' + key)
+
+    this.sentReceipts.set(key, true)
+    try {
+      if (this.sendArchiveData === true) {
+        let paritionObject = this.getPartitionObject(cycleNumber, partitionId) // todo get object
+        this.sendPartitionData(partitionReceipt, paritionObject)
+      }
+    } finally {
+
+    }
+
+    if (this.sendTransactionData) {
+      let txList = this.getTXList(cycleNumber, partitionId)
+
+      this.sendTransactionData(partitionId, cycleNumber, txList.txs)
+    }
+
+    if (this.purgeArchiveData === true) {
+      // alreay sort of doing this in another spot.
+
+      // check if all partitions for this cycle have been handled!! then clear data in that time range.
+      // need to record time range.
+
+      // or check for open repairs. older than what we want to clear out.
+    }
   }
 }
 
