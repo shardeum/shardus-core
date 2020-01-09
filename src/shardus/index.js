@@ -285,6 +285,7 @@ class Shardus extends EventEmitter {
       await this.p2p.goActive()
     }
     // Set network joinable to true
+    this.p2p.setJoinRequestToggle(true)
 
     console.log('Server ready!')
 
