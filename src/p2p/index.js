@@ -39,6 +39,8 @@ class P2P extends EventEmitter {
     this.gossipedHashes = new Map()
     this.gossipedHashesSent = new Map() // TODO Perf: both of these lists need some eventual cleaning.  Perferably keep a sorted list also and periodically remove expired messages from the map and list
 
+    this.joinRequestToggle = false
+
     this.verboseLogs = false
     if (this.mainLogger && ['TRACE'].includes(this.mainLogger.level.levelStr)) {
       this.verboseLogs = true
@@ -1880,6 +1882,10 @@ class P2P extends EventEmitter {
 
   async _reportLostNode (node) {
     return this.lostNodes.reportLost(node)
+  }
+
+  setJoinRequestToggle (bool) {
+    this.joinRequestToggle = bool
   }
 }
 
