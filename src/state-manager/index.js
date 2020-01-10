@@ -891,6 +891,7 @@ class StateManager extends EventEmitter {
         i++
         rangesToSync.push(range)
       }
+      console.log('NODE_SHARD_DATA', nodeShardData)
     }
 
     // if we don't have a range to sync yet manually sync the whole range.
