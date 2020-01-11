@@ -3643,6 +3643,7 @@ class StateManager extends EventEmitter {
     nodes = nodes.map(node => ({ id: node.id, distance: hashNumber - parseInt(node.id, 16) }))
     nodes.sort((a, b) => a.distance < b.distance)
     console.log('NODES', nodes)
+    return nodes.slice(0, count).map(node => node.id)
   }
 
   // /**
