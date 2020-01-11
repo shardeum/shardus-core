@@ -427,6 +427,10 @@ class Shardus extends EventEmitter {
     return this.stateManager.getClosestNodes(hash, count).map((node) => node.id)
   }
 
+  getClosestNodesGlobal (hash, count) {
+    return this.stateManager.getClosestNodes(hash, count).map(node => node.id)
+  }
+
   /**
    * isNodeInDistance
    * @param {string} hash any hash address (256bit 64 characters)
