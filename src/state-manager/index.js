@@ -3638,7 +3638,7 @@ class StateManager extends EventEmitter {
   }
 
   getClosestNodesGlobal (hash, count) {
-    let nodes = this.p2p.state.getActiveNodes(this.p2p.id)
+    let nodes = this.p2p.state.getActiveNodes()
     console.log('NODES', nodes)
   }
 
