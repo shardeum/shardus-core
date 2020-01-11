@@ -428,7 +428,7 @@ class Shardus extends EventEmitter {
   }
 
   getClosestNodesGlobal (hash, count) {
-    return this.stateManager.getClosestNodes(hash, count).map(node => node.id)
+    return this.stateManager.getClosestNodesGlobal(hash, count).map(node => node.id)
   }
 
   /**
