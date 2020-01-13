@@ -244,7 +244,7 @@ class TimerRing {
     const durations = []
     for (const id in this.ids) {
       const startTime = this.ids[id]
-      console.log('START_TIME ', startTime, 'ID', id)
+      // console.log('START_TIME ', startTime, 'ID', id)
       const duration = Date.now() - startTime
       utils.insertSorted(durations, duration, (a, b) => a - b)
     }
