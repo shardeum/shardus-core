@@ -933,9 +933,14 @@ class StateManager extends EventEmitter {
 
     // one we have all of the initial data the last thing to do is get caught up on transactions
     // This will await the queue processing up to Date.now()
-    await this._firstTimeQueueAwait()
 
     console.log('syncStateData end' + '   time:' + Date.now())
+  }
+
+  async startCatchUpQueue () {
+    await this._firstTimeQueueAwait()
+
+    console.log('syncStateData startCatchUpQueue ' + '   time:' + Date.now())
 
     // all complete!
     this.mainLogger.debug(`DATASYNC: complete`)
