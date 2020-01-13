@@ -4655,6 +4655,11 @@ class StateManager extends EventEmitter {
         let voters = correction.tv.voters // correction.tv.vote.voters  old solver needed this:
 
         for (let i = 0; i < voters.length; i++) {
+          if (voters[i] === hashSetList.length - 1) {
+            // Because of FORCED solution the last voter is always a invalid?
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `skipped greedy index (type1) for FORCED ${voters[i]}`)
+            continue
+          }
           if (requestsByHost[voters[i]]) {
             greedyAsk = voters[i]
             // added this for perf, needs testing:  (once we get a a valid greedyAsk value bail from the loop)
@@ -4665,7 +4670,14 @@ class StateManager extends EventEmitter {
         }
         // no entries found so init one
         if (greedyAsk < 0) {
-          greedyAsk = voters[0]
+          // greedyAsk = voters[0]
+          let findValidIndex = 0
+          do {
+            greedyAsk = voters[findValidIndex]
+            findValidIndex++
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `skipped greedy index (type2) for FORCED ${greedyAsk}`)
+          } while (greedyAsk === hashSetList.length - 1 && findValidIndex < voters.length)
+
           requestsByHost[greedyAsk] = { requests: [], hostIndex: [], stateSnippets: [] }
         }
         // generate the index map for the server we will ask as needed
