@@ -468,6 +468,10 @@ class Shardus extends EventEmitter {
     }
   }
 
+  async getRemoteAccount (address) {
+    return this.stateManager.getRemoteAccount(address)
+  }
+
   createWrappedResponse (accountId, accountCreated, hash, timestamp, fullData) {
     // create and return the response object, it will default to full data.
     return { accountId: accountId, accountCreated, isPartial: false, stateId: hash, timestamp: timestamp, data: fullData }

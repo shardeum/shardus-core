@@ -3504,11 +3504,24 @@ class StateManager extends EventEmitter {
     this.shardLogger.debug(utils.stringifyReduce(partitionDump))
   }
 
+  async waitForShardData () {
+    // wait for shard data
+    while (this.currentCycleShardData == null) {
+      this.getCurrentCycleShardData()
+      await utils.sleep(1000)
+      this.logger.playbackLogNote('_waitForShardData', ` `, ` ${utils.stringifyReduce(this.currentCycleShardData)} `)
+    }
+  }
+
   // todo support metadata so we can serve up only a portion of the account
   // todo 2? communicate directly back to client... could have security issue.
   // todo 3? require a relatively stout client proof of work
   async getLocalOrRemoteAccount (address) {
     let wrappedAccount
+
+    if (this.currentCycleShardData == null) {
+      await this.waitForShardData()
+    }
 
     // check if we have this account locally. (does it have to be consenus or just stored?)
     let accountIsRemote = true
@@ -3551,6 +3564,23 @@ class StateManager extends EventEmitter {
       wrappedAccount = accountData[0]
       return wrappedAccount
     }
+    return null
+  }
+
+  async getRemoteAccount (address) {
+    let wrappedAccount
+
+    await this.waitForShardData()
+
+    let homeNode = ShardFunctions.findHomeNode(this.currentCycleShardData.shardGlobals, address, this.currentCycleShardData.parititionShardDataMap)
+
+    let message = { accountIds: [address] }
+    let result = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
+    if (result != null && result.accountData != null && result.accountData.length > 0) {
+      wrappedAccount = result.accountData[0]
+      return wrappedAccount
+    }
+
     return null
   }
 
