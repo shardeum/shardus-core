@@ -202,7 +202,6 @@ class Shardus extends EventEmitter {
       if (this.statistics) {
         this.statistics.stopSnapshots()
         this.statistics.initialize()
-        this.statistics.cleanup()
       }
       if (this.reporter) {
         this.reporter.stopReporting()
