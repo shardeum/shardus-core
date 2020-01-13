@@ -19,6 +19,12 @@
         {
             "type": "node",
             "request": "launch",
+            "name": "testhash",
+            "program": "${workspaceFolder}\\test\\unit\\state-manager\\testhash.js"
+        },
+        {
+            "type": "node",
+            "request": "launch",
             "name": "shardValues",
             "program": "${workspaceFolder}\\test\\unit\\state-manager\\shardvalues.js"
         },
