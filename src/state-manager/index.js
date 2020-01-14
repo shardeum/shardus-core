@@ -726,6 +726,7 @@ class StateManager extends EventEmitter {
       this.dataSyncMainPhaseComplete = true
 
       this.readyforTXs = true
+      this.mainLogger.debug(`DATASYNC: isFirstSeed = true. skipping sync`)
       return
     }
 
@@ -892,6 +893,12 @@ class StateManager extends EventEmitter {
       }
     }
 
+    // if we don't have a range to sync yet manually sync the whole range.
+    if (rangesToSync.length === 0) {
+      console.log(`syncStateData ranges: pushing full range, no ranges found`)
+      let range = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, 0, this.currentCycleShardData.shardGlobals.numPartitions - 1)
+      rangesToSync.push(range)
+    }
     console.log(`syncStateData ranges: ${utils.stringifyReduce(rangesToSync)}}`)
 
     for (let range of rangesToSync) {
@@ -3549,7 +3556,18 @@ class StateManager extends EventEmitter {
       let result = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
       if (result != null && result.accountData != null && result.accountData.length > 0) {
         wrappedAccount = result.accountData[0]
+        if (wrappedAccount == null) {
+          if (this.verboseLogs) this.getAccountFailDump(address, 'remote result.accountData[0] == null')
+        }
         return wrappedAccount
+      } else {
+        if (result == null) {
+          if (this.verboseLogs) this.getAccountFailDump(address, 'remote request missing data: result == null')
+        } else if (result.accountData == null) {
+          if (this.verboseLogs) this.getAccountFailDump(address, 'remote request missing data: result.accountData == null ' + utils.stringifyReduce(result))
+        } else if (result.accountData.length <= 0) {
+          if (this.verboseLogs) this.getAccountFailDump(address, 'remote request missing data: result.accountData.length <= 0 ' + utils.stringifyReduce(result))
+        }
       }
     } else {
       // we are local!
@@ -3565,11 +3583,21 @@ class StateManager extends EventEmitter {
             }
           }
         }
+      } else {
+        if (this.verboseLogs) this.getAccountFailDump(address, 'getAccountDataByList() returned null')
+        return null
       }
       wrappedAccount = accountData[0]
+      if (wrappedAccount == null) {
+        if (this.verboseLogs) this.getAccountFailDump(address, 'accountData[0] == null')
+      }
       return wrappedAccount
     }
     return null
+  }
+  getAccountFailDump (address, message) {
+    // this.currentCycleShardData
+    this.logger.playbackLogNote('getAccountFailDump', ` `, `${utils.makeShortHash(address)} ${message} `)
   }
 
   async getRemoteAccount (address) {
