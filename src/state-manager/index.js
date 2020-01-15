@@ -3693,6 +3693,7 @@ class StateManager extends EventEmitter {
     }
 
     let keys = Object.keys(wrappedStates)
+    keys.sort() // have to sort this because object.keys is non sorted and we always use the [0] index for hashset strings
     for (let key of keys) {
       let wrappedData = wrappedStates[key]
       if (canWriteToAccount(wrappedData.accountId) === false) {
