@@ -231,9 +231,14 @@ for (let i = 0; i < testIterations; i++) {
     let ourConsensusPartitions = ShardFunctions.getConsenusPartitionList(shardGlobals, nodeShardData)
     console.log('ourConsensusPartitions ' + utils.stringifyReduce(ourConsensusPartitions) + `  consensusEndPartition: ${nodeShardData.consensusEndPartition} consensusStartPartition ${nodeShardData.consensusStartPartition}`)
 
-    let hash = debugAccount
+    let hash = '0'.repeat(64) // debugAccount
 
-    let closestNodes = getClosestNodes(shardGlobals, parititionShardDataMap, activeNodes, hash, 4)
+    let closestNodes = getClosestNodes(shardGlobals, parititionShardDataMap, activeNodes, hash, 1)
+
+
+    let closestNodes2 = getClosestNodes(shardGlobals, parititionShardDataMap, activeNodes, hash, 2)
+
+    let closestNodes3 = getClosestNodes(shardGlobals, parititionShardDataMap, activeNodes, hash, 300)
 
     let inDist = isNodeInDistancePartition(shardGlobals, hash, debugID, 2)
 

@@ -3640,7 +3640,7 @@ class StateManager extends EventEmitter {
   getClosestNodesGlobal (hash, count) {
     let hashNumber = parseInt(hash.slice(0, 7), 16)
     let nodes = this.p2p.state.getActiveNodes()
-    nodes = nodes.map(node => ({ id: node.id, distance: hashNumber - parseInt(node.id.slice(0, 5), 16) }))
+    nodes = nodes.map(node => ({ id: node.id, distance: Math.abs(hashNumber - parseInt(node.id.slice(0, 7), 16)) }))
     nodes.sort((a, b) => a.distance < b.distance)
     console.log('SORTED NODES BY DISTANCE', nodes)
     return nodes.slice(0, count).map(node => node.id)

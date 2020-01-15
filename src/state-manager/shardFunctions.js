@@ -1483,6 +1483,9 @@ class ShardFunctions {
       if (node.id !== excludeID) {
         if (node.status === 'active') {
           results.push(node)
+          if (results.length === count) {
+            return results
+          }
         }
       }
 
@@ -1494,6 +1497,9 @@ class ShardFunctions {
       if (node.id !== excludeID) {
         if (node.status === 'active') {
           results.push(node)
+          if (results.length === count) {
+            return results
+          }
         }
       }
 
