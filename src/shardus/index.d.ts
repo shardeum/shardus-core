@@ -147,6 +147,8 @@ declare namespace Shardus {
 
     getAccountDebugValue: (wrappedAccount: any) => string
 
+    canDebugDropTx: (tx: any) => boolean
+    
     /**
      * This gives the application a chance to sync or load initial data before going active.
      * If it is the first node it can use .set() to set data

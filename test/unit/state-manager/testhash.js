@@ -53,3 +53,18 @@ console.log(crypto.hashObj(JSON.parse(account1)))
 // let keys = Object.keys(keyHash)
 
 // console.log(utils.stringifyReduce(keys))
+
+
+let tx4 = '{"amount":1,"from":"0000000000000000000000000000000000000000000000000000000000000000","sign":{"owner":"4d294ca759148f82437d6b88cf82e17d68ea6010c7824139bc2fcd65db4a4684","sig":"14d757625fb406af3463e2105768a8bf261a9c9855c2f01b1d3b6a58817a11d300a4b0101a85c462ddac22e2aa57fac2f834f9fb6f73b1ffb1bdcf3023fa7c0b68d996c3154d7743559ef4fd8aa693e3e333a3765f7a684df34be446da223145"},"timestamp":1579040886726,"to":"4d294ca759148f82437d6b88cf82e17d68ea6010c7824139bc2fcd65db4a4684","type":"create"}'
+console.log(crypto.hashObj(JSON.parse(tx4)))
+
+
+let tx4b = '{"amount":1,"from":"0000000000000000000000000000000000000000000000000000000000000000","timestamp":1579040886726,"to":"4d294ca759148f82437d6b88cf82e17d68ea6010c7824139bc2fcd65db4a4684","type":"create"}'
+console.log(crypto.hashObj(JSON.parse(tx4b)))
+
+
+let testcode1 = '299022'  // 'b667d2ec3caec2d0506428e4b7499b9a10aa09239e67ac880785a9a72997600c'
+
+let testcode2 = '948699'
+console.log(crypto.hash((testcode1)))
+console.log(crypto.hash((testcode2)))

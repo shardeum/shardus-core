@@ -2772,8 +2772,10 @@ class StateManager extends EventEmitter {
     if (this.config.debug.loseTxChance > 0) {
       let rand = Math.random()
       if (this.config.debug.loseTxChance > rand) {
-        this.logger.playbackLogNote('tx_dropForTest', txId, 'dropping tx ' + timestamp)
-        return 'lost'
+        if (this.app.canDebugDropTx(acceptedTx.data)) {
+          this.logger.playbackLogNote('tx_dropForTest', txId, 'dropping tx ' + timestamp)
+          return 'lost'
+        }
       }
     }
 

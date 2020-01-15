@@ -658,6 +658,12 @@ class Shardus extends EventEmitter {
         // throw new Error('Missing requried interface function. deleteLocalAccountData()')
       }
 
+      if (typeof (application.getAccountDebugValue) === 'function') {
+        applicationInterfaceImpl.canDebugDropTx = (tx) => application.canDebugDropTx(tx)
+      } else {
+        applicationInterfaceImpl.canDebugDropTx = (tx) => true
+      }
+
       if (typeof (application.sync) === 'function') {
         applicationInterfaceImpl.sync = async () => application.sync()
       } else {
