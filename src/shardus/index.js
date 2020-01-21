@@ -26,6 +26,7 @@ class Shardus extends EventEmitter {
     this.logger = new Logger(config.baseDir, logsConfig)
     this.mainLogger = this.logger.getLogger('main')
     this.fatalLogger = this.logger.getLogger('fatal')
+    this.appLogger = this.logger.getLogger('app')
     this.exitHandler = new ExitHandler()
     this.storage = new Storage(config.baseDir, storageConfig, this.logger, this.profiler)
     this.crypto = null
@@ -303,6 +304,10 @@ class Shardus extends EventEmitter {
 
   set (tx) {
     return this.put(tx, true)
+  }
+
+  log (...data) {
+    this.appLogger.debug(...data)
   }
 
   /**
