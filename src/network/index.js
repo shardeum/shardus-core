@@ -52,7 +52,7 @@ class Network extends EventEmitter {
       this.extServer = this.app.listen(this.ipInfo.externalPort, () => {
         const msg = `External server running on port ${this.ipInfo.externalPort}...`
         console.log(msg)
-        this.mainLogger.info(msg)
+        this.mainLogger.info('Network: ' + msg)
         resolve()
       })
     })
@@ -67,7 +67,7 @@ class Network extends EventEmitter {
       if (!data) throw new Error('No data provided in request...')
       const { route, payload } = data
       if (!route) {
-        this.mainLogger.debug(`Unable to read request, payload of received message: ${JSON.stringify(data)}`)
+        this.mainLogger.debug('Network: ' + `Unable to read request, payload of received message: ${JSON.stringify(data)}`)
         throw new Error('Unable to read request, no route specified.')
       }
       if (!this.internalRoutes[route]) throw new Error('Unable to handle request, invalid route.')
@@ -98,9 +98,17 @@ class Network extends EventEmitter {
       if (!logged) this.logger.playbackLog('self', node, 'InternalTell', route, id, message)
       this.InternalTellCounter++
       const promise = this.sn.send(node.internalPort, node.internalIp, data)
+      promise.catch(err => {
+        this.mainLogger.error('Network: ' + err)
+        this.emit('error', node)
+      })
       promises.push(promise)
     }
-    await Promise.all(promises)
+    try {
+      await Promise.all(promises)
+    } catch (err) {
+      this.mainLogger.error('Network: ' + err)
+    }
   }
 
   ask (node, route, message, logged = false) {
@@ -118,12 +126,17 @@ class Network extends EventEmitter {
       }
       const onTimeout = () => {
         const err = new Error('Request timed out.')
-        this.mainLogger.error(err)
+        this.mainLogger.error('Network: ' + err)
         this.emit('timeout', node)
         reject(err)
       }
       if (!logged) this.logger.playbackLog('self', node, 'InternalAsk', route, id, message)
-      await this.sn.send(node.internalPort, node.internalIp, data, this.timeout, onRes, onTimeout)
+      try {
+        await this.sn.send(node.internalPort, node.internalIp, data, this.timeout, onRes, onTimeout)
+      } catch (err) {
+        this.mainLogger.error('Network: ' + err)
+        this.emit('error', node)
+      }
     })
   }
 

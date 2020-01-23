@@ -1073,6 +1073,7 @@ class StateManager extends EventEmitter {
       }
       let queryFn = async (node) => {
         let result = await this.p2p.ask(node, 'get_account_state_hash', message)
+        if (result === false) { this.mainLogger.error('ASK FAIL 1') }
         return result
       }
 
@@ -1121,6 +1122,7 @@ class StateManager extends EventEmitter {
       while (moreDataRemaining) {
         let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: lowTimeQuery, tsEnd: endTime }
         let result = await this.p2p.ask(this.dataSourceNode, 'get_account_state', message)
+        if (result === false) { this.mainLogger.error('ASK FAIL 2') }
 
         let accountStateData = result.accountStates
         // get the timestamp of the last account state received so we can use it as the low timestamp for our next query
@@ -1202,6 +1204,7 @@ class StateManager extends EventEmitter {
       // max records artificially low to make testing coverage better.  todo refactor: make it a config or calculate based on data size
       let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, maxRecords: this.config.stateManager.accountBucketSize }
       let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data3', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
+      if (result === false) { this.mainLogger.error('ASK FAIL 3') }
       // accountData is in the form [{accountId, stateId, data}] for n accounts.
       let accountData = result.data.wrappedAccounts
 
@@ -1553,6 +1556,7 @@ class StateManager extends EventEmitter {
 
     let message = { accountIds: addressList }
     let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
+    if (result === false) { this.mainLogger.error('ASK FAIL 4') }
 
     this.combinedAccountData = this.combinedAccountData.concat(result.accountData)
 
@@ -2260,6 +2264,7 @@ class StateManager extends EventEmitter {
       }
       let queryFn = async (node) => {
         let result = await this.p2p.ask(node, 'get_account_state_hash', message)
+        if (result === false) { this.mainLogger.error('ASK FAIL 5') }
         return result
       }
       // let nodes = this.p2p.state.getAllNodes(this.p2p.id)
@@ -2288,6 +2293,7 @@ class StateManager extends EventEmitter {
 
     let message = { tsStart: timeStart, tsEnd: timeEnd, limit: 10000 }
     let result = await this.p2p.ask(helper, 'get_accepted_transactions', message) // todo perf, could await these in parallel
+    if (result === false) { this.mainLogger.error('ASK FAIL 6') }
     let acceptedTXs = result.transactions
 
     let toParse = {}
@@ -2350,6 +2356,7 @@ class StateManager extends EventEmitter {
 
     let message = { accountStart: accountStart, accountEnd: accountEnd, tsStart: timeStart, tsEnd: timeEnd }
     let remoteAccountStates = await this.p2p.ask(helper, 'get_account_state', message) // todo perf, could await these in parallel
+    if (remoteAccountStates === false) { this.mainLogger.error('ASK FAIL 7') }
     let accountStates = await this.storage.queryAccountStateTable(accountStart, accountEnd, timeStart, timeEnd, 100000000)
 
     let compareFn = (a, b) => {
@@ -2376,6 +2383,7 @@ class StateManager extends EventEmitter {
 
     let message2 = { accountIds: accountsToPatch }
     let accountData = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message2)
+    if (accountData === false) { this.mainLogger.error('ASK FAIL 8') }
 
     if (accountData) {
       // for(let account in accountData) {
@@ -3061,6 +3069,7 @@ class StateManager extends EventEmitter {
 
         let message = { keys: allKeys, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
         let result = await this.p2p.ask(node, 'request_state_for_tx', message) // not sure if we should await this.
+        if (result === false) { this.mainLogger.error('ASK FAIL 9') }
         let dataCountReturned = 0
         let accountIdsReturned = []
         for (let data of result.stateList) {
@@ -3628,6 +3637,7 @@ class StateManager extends EventEmitter {
 
       let message = { accountIds: [address] }
       let result = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
+      if (result === false) { this.mainLogger.error('ASK FAIL 10') }
       if (result != null && result.accountData != null && result.accountData.length > 0) {
         wrappedAccount = result.accountData[0]
         if (wrappedAccount == null) {
@@ -3683,6 +3693,7 @@ class StateManager extends EventEmitter {
 
     let message = { accountIds: [address] }
     let result = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
+    if (result === false) { this.mainLogger.error('ASK FAIL 11') }
     if (result != null && result.accountData != null && result.accountData.length > 0) {
       wrappedAccount = result.accountData[0]
       return wrappedAccount
@@ -4497,6 +4508,7 @@ class StateManager extends EventEmitter {
     let payload = { Cycle_number: topResult.Cycle_number, Partition_id: topResult.Partition_id }
     /** @type {PartitionObject} */
     let partitionObject = await this.p2p.ask(nodeToContact, 'get_partition_txids', payload)
+    if (partitionObject === false) { this.mainLogger.error('ASK FAIL 12') }
 
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: partitionObject: ' + utils.stringifyReduce(partitionObject))
 
@@ -4590,11 +4602,13 @@ class StateManager extends EventEmitter {
     // ask for missing txs of other node
     let payload2 = { Tx_ids: missingAcceptedTxIDs }
     let txs = await this.p2p.ask(nodeToContact, 'get_transactions_by_list', payload2)
+    if (txs === false) { this.mainLogger.error('ASK FAIL 13') }
     repairTracker.newPendingTXs = txs // ?
 
     // get failed txs that we are missing
     payload2 = { Tx_ids: missingFailedTXs }
     txs = await this.p2p.ask(nodeToContact, 'get_transactions_by_list', payload2)
+    if (txs === false) { this.mainLogger.error('ASK FAIL 14') }
     repairTracker.newFailedTXs = txs
     // this.storage.addAcceptedTransactions(txs) // commit the failed TXs to our db. not sure if this is strictly necessary
 
@@ -4974,6 +4988,7 @@ class StateManager extends EventEmitter {
           let nodeToContact = this.p2p.state.getNodeByPubKey(hashSetList[i].owners[0])
 
           let result = await this.p2p.ask(nodeToContact, 'get_transactions_by_partition_index', payload)
+          if (result === false) { this.mainLogger.error('ASK FAIL 15') }
           // { success: true, acceptedTX: result, passFail: passFailList }
           if (result.success === true) {
             let returnedResults = 0

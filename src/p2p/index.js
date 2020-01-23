@@ -109,10 +109,12 @@ class P2P extends EventEmitter {
     // Set up the network after we are sure we have our current IP info
     this.network = network
     await this.network.setup(this.getIpInfo())
-    this.network.on('timeout', async (node) => {
+    const reportLost = async node => {
       if (!this.isActive()) return
       await this._reportLostNode(node)
-    })
+    }
+    this.network.on('timeout', reportLost)
+    this.network.on('error', reportLost)
     this._registerRoutes()
   }
 
@@ -1549,7 +1551,11 @@ class P2P extends EventEmitter {
       const signedMessage = this._wrapAndTagMessage(message, tracker, node)
       promises.push(this.network.tell([node], route, signedMessage, logged))
     }
-    await Promise.all(promises)
+    try {
+      await Promise.all(promises)
+    } catch (err) {
+      this.mainLogger.debug('P2P TELL: failed', err)
+    }
   }
 
   // Our own P2P version of the network ask, with a sign added, and sign verified on other side
@@ -1558,7 +1564,13 @@ class P2P extends EventEmitter {
       tracker = this.createMsgTracker()
     }
     const signedMessage = this._wrapAndTagMessage(message, tracker, node)
-    const signedResponse = await this.network.ask(node, route, signedMessage, logged)
+    let signedResponse
+    try {
+      signedResponse = await this.network.ask(node, route, signedMessage, logged)
+    } catch (err) {
+      this.mainLogger.debug('P2P ASK: failed', err)
+      return false
+    }
     this.mainLogger.debug(`Result of network-level ask: ${JSON.stringify(signedResponse)}`)
     const [response] = this._extractPayload(signedResponse, [node])
     if (!response) {
