@@ -98,8 +98,10 @@ const cHashSetDataStepSize = 2
    * @property {boolean} repairing
    * @property {boolean} repairsNeeded
    * @property {boolean} busy
+   * @property {boolean} txRepairReady we have the TXs and TX data we need to apply data repairs
    * @property {boolean} txRepairComplete
    * @property {boolean} evaluationStarted
+   * @property {boolean} evaluationComplete not sure if we really need this
    * @property {boolean} awaitWinningHash
    * @property {boolean} repairsFullyComplete
    * @property {SolutionDelta[]} [solutionDeltas]
@@ -121,6 +123,14 @@ const cHashSetDataStepSize = 2
  * @property {boolean} passed
  * @property {ApplyResponse} applyResponse
  * @property {number} redacted below 0 for not redacted. a value above zero indicates the cycle this was redacted
+ */
+
+/**
+ * @typedef {Object} UpdateRepairData   newTXList, allAccountsToResetById, partitionId
+ * @property {AcceptedTx[]} newTXList
+ * @property {Object.<string, number>} allAccountsToResetById
+ * @property {number} partitionId
+ * @property {Object.<string, { sourceKeys:string[], targetKeys:string[] } >} txIDToAcc
  */
 
 /**
@@ -339,7 +349,7 @@ class StateManager extends EventEmitter {
 
     // the original way this was setup was to reset and apply repair results one partition at a time.
     // this could create issue if we have a TX spanning multiple paritions that are locally owned.
-    this.resetAndApplyPerPartition = true
+    this.resetAndApplyPerPartition = false
 
     /** @type {RepairTracker[]} */
     this.dataRepairStack = []
@@ -353,6 +363,11 @@ class StateManager extends EventEmitter {
 
     this.repairStartedMap = new Map()
     this.repairCompletedMap = new Map()
+
+    /** @type {Object.<string, PartitionReceipt[]>} a map of cycle keys to lists of partition receipts.  */
+    this.partitionReceiptsByCycleCounter = {}
+    /** @type {Object.<string, PartitionReceipt>} a map of cycle keys to lists of partition receipts.  */
+    this.ourPartitionReceiptsByCycleCounter = {}
 
     this.doDataCleanup = false
 
@@ -1888,6 +1903,11 @@ class StateManager extends EventEmitter {
                   } else {
                     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair awaitWinningHash:true and we have a top result so start reparing! `)
                   }
+                }
+
+                if (this.resetAndApplyPerPartition === false && repairTracker.txRepairReady === true) {
+                  if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair txRepairReady:true bail here for some strange reason.. not sure aout this yet `)
+                  continue
                 }
 
                 if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results: tryGeneratePartitionReciept failed start repair process 1 ${utils.stringifyReduce(receiptResults)}`)
@@ -4175,12 +4195,15 @@ class StateManager extends EventEmitter {
         if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess success==ok ${debugKey}`)
 
         if (usedSyncTXsFromHashSetStrings === false) {
-          // do we ever send partition receipt yet?
           this.storePartitionReceipt(cycleNumber, partitionReceipt)
           repairTracker.txRepairComplete = true
         } else {
           repairTracker.awaitWinningHash = true
         }
+
+        repairTracker.txRepairReady = true
+
+        this.mainLogger.debug(`startRepairProcess testAndApplyRepairs ${debugKey} txRepairReady `)
 
         // are all repairs complete. if so apply them to accounts.
         // look at the repair tracker for every partition.
@@ -4222,6 +4245,7 @@ class StateManager extends EventEmitter {
             } else {
               if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess set evaluationStarted=false so we can tally up hashes again ${debugKey}`)
               repairTracker.evaluationStarted = false
+              // repairTracker.evaluationComplete = true
               repairTracker.awaitWinningHash = true
 
               // TODO SHARDING... need to refactor this so it happens per partition before we are all done
@@ -4254,30 +4278,9 @@ class StateManager extends EventEmitter {
           }
         } else if (this.resetAndApplyPerPartition === false) {
           // this is where the new version of the code can live that stashes the data somewhere save and applies things all at once later.
-
-          // let repairKeys = Object.keys(repairsByPartition)
-          // for (let partitionKey of repairKeys) {
-          //   let repairTracker1 = repairsByPartition[partitionKey]
-          //   if ((repairTracker1.txRepairComplete === false && repairTracker1.evaluationStarted) || repairTracker1.evaluationStarted === false) {
-          //     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess repairTracker1 ${debugKey} txRepairComplete === false ${utils.stringifyReduce(repairTracker1)} `)
-          //   // allFinished = false // TODO sharding done. turned all finished = false line back on   need to fix this logic so that we make sure all partitions are good before we proceed to merge and apply things
-          //   // TODO sharding looks ok but needs testing.
-          //   // perhaps check that awaitWinningHash == true for all of them now? idk..
-          //   }
-          // }
-
           this.updateTrackingAndPrepareRepairs(cycleNumber, partitionId)
 
-          let repairKeys = Object.keys(repairsByPartition)
-          for (let partitionKey of repairKeys) {
-            let repairTracker1 = repairsByPartition[partitionKey]
-            if ((repairTracker1.txRepairComplete === false && repairTracker1.evaluationStarted) || repairTracker1.evaluationStarted === false) {
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess repairTracker1 ${debugKey} txRepairComplete === false ${utils.stringifyReduce(repairTracker1)} `)
-              allFinished = false // TODO sharding done. turned all finished = false line back on   need to fix this logic so that we make sure all partitions are good before we proceed to merge and apply things
-            // TODO sharding looks ok but needs testing.
-            // perhaps check that awaitWinningHash == true for all of them now? idk..
-            }
-          }
+          this.testAndApplyRepairs(cycleNumber)
         }
       }
 
@@ -4304,6 +4307,31 @@ class StateManager extends EventEmitter {
     } finally {
       repairTracker.repairing = false // ? really
     }
+  }
+
+  async testAndApplyRepairs (cycleNumber) {
+    // can we apply the repairs
+
+    this.mainLogger.debug(`testAndApplyRepairs c:${cycleNumber} `)
+
+    let key = 'c' + cycleNumber
+    let repairsByPartition = this.repairTrackingByCycleById[key]
+    let repairKeys = Object.keys(repairsByPartition)
+    for (let partitionKey of repairKeys) {
+      let repairTracker1 = repairsByPartition[partitionKey]
+      if ((repairTracker1.txRepairReady === false && repairTracker1.evaluationStarted && repairTracker1.repairsFullyComplete === false) || repairTracker1.evaluationStarted === false) {
+        // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess repairTracker1 ${debugKey} txRepairReady === false ${utils.stringifyReduce(repairTracker1)} `)
+        this.mainLogger.debug(`testAndApplyRepairs c:${cycleNumber} -not ready yet:${partitionKey} txRepairReady:${repairTracker1.txRepairReady} evaluationStarted:${repairTracker1.evaluationStarted}  numkeys:${repairKeys.length} repairsFullyComplete:${repairTracker1.repairsFullyComplete}`)
+        return
+      }
+    }
+
+    this.mainLogger.debug(`testAndApplyRepairs c:${cycleNumber} -starting repair apply! `)
+    await this.applyAllPreparedRepairs(cycleNumber)
+    // where all do we track do something with the all finished status
+    // if (usedSyncTXsFromHashSetStrings === false) {
+    // } else {
+    // }
   }
 
   // todo refactor some of the duped code in here
@@ -4366,6 +4394,10 @@ class StateManager extends EventEmitter {
    * @param {PartitionResult} topResult
    */
   async syncTXsFromWinningHash (topResult) {
+    if (topResult.sign == null) {
+      this.mainLogger.fatal(this.dataPhaseTag + ` _repair syncTXsFromWinningHash: topResult.sign=null ${utils.stringifyReduce(topResult)}`)
+    }
+
     // get node ID from signing.
     // obj.sign = { owner: pk, sig }
     let signingNode = topResult.sign.owner
@@ -4904,7 +4936,9 @@ class StateManager extends EventEmitter {
         repairsNeeded: false,
         busy: false,
         txRepairComplete: false,
+        txRepairReady: false,
         evaluationStarted: false,
+        evaluationComplete: false,
         awaitWinningHash: false,
         repairsFullyComplete: false }
       repairsByPartition[key2] = repairTracker
@@ -5230,7 +5264,9 @@ class StateManager extends EventEmitter {
 
       let allTXsToApply = {}
       let allExtraTXids = {}
+      /** @type {Object.<string, number>} */
       let allAccountsToResetById = {}
+      /** @type {Object.<string, { sourceKeys:string[], targetKeys:string[] } >} */
       let txIDToAcc = {}
       let allNewTXsById = {}
       // get all txs and sort them
@@ -5276,7 +5312,7 @@ class StateManager extends EventEmitter {
       let txList = this.getTXList(cycleNumber, partitionID) // done todo sharding: pass partition ID
 
       let txIDToAccCount = 0
-      let txIDResetExtraCount = 0
+      // let txIDResetExtraCount = 0
       // build a list with our existing txs, but dont include the bad ones
       if (txList) {
         for (let i = 0; i < txList.txs.length; i++) {
@@ -5290,11 +5326,11 @@ class StateManager extends EventEmitter {
             let { sourceKeys, targetKeys } = keysResponse
             for (let accountID of sourceKeys) {
               allAccountsToResetById[accountID] = 1
-              txIDResetExtraCount++
+              // txIDResetExtraCount++
             }
             for (let accountID of targetKeys) {
               allAccountsToResetById[accountID] = 1
-              txIDResetExtraCount++
+              // txIDResetExtraCount++
             }
           } else {
           // a good tx that we had earlier
@@ -5329,21 +5365,16 @@ class StateManager extends EventEmitter {
       if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair updateTrackingAndPrepareRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
       if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair updateTrackingAndPrepareRepairs newTXList.length: ${newTXList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
 
-      // put these calculated batt
+      // Save the results of this computation for later
+      /** @type {UpdateRepairData}  */
+      let updateData = { newTXList, allAccountsToResetById, partitionId: specificParition, txIDToAcc }
+      let ckey = 'c' + cycleNumber
+      if (this.repairUpdateDataByCycle[ckey] == null) {
+        this.repairUpdateDataByCycle[ckey] = []
+      }
+      this.repairUpdateDataByCycle[ckey].push(updateData)
 
-      // let wrappedAccountResults = this.app.getAccountDataByList(accountKeys)
-      // for (let wrappedData of wrappedAccountResults) {
-      //   wrappedData.isPartial = false
-      //   accountValuesByKey[wrappedData.accountId] = wrappedData
-      // }
-      // let wrappedAccountResults=[]
-      // for(let key of accountKeys){
-      //   this.app.get
-      // }
-
-      // so we have newTXList and allAccountsToResetById
-
-      // how will the partition object get updated though
+      // how will the partition object get updated though??
     }
   }
 
@@ -5353,44 +5384,41 @@ class StateManager extends EventEmitter {
    */
   async applyAllPreparedRepairs (cycleNumber) {
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs cycleNumber ${cycleNumber}`)
-    // walk through all txs for this cycle.
-    // get or create entries for accounts.
-    // track when they have missing txs or wrong txs
 
-    let lastCycleShardValues = this.shardValuesByCycle.get(cycleNumber)
+    this.mainLogger.debug(`applyAllPreparedRepairs c:${cycleNumber}`)
 
-    // combine all txs to deploy and combine all accounts to delete.
-    // then sort TXs by timestamps.  secondary sort for TXs should match up with common tiebreakers.
+    let ckey = 'c' + cycleNumber
+    let repairDataList = this.repairUpdateDataByCycle[ckey]
 
-    // // todo sharding - done extracted tx list calcs to run just for this partition inside of here. how does this relate to having a shard for every??
-    // // convert allNewTXsById map to newTXList list
-    // let newTXList = []
-    // let txKeys = Object.keys(allNewTXsById)
-    // for (let txKey of txKeys) {
-    //   let tx = allNewTXsById[txKey]
-    //   newTXList.push(tx)
-    // }
-    // // sort the list by ascending timestamp
-    // newTXList.sort(function (a, b) { return a.timestamp - b.timestamp })
+    let txIDToAcc = {}
+    let allAccountsToResetById = {}
+    let newTXList = []
+    for (let repairData of repairDataList) {
+      newTXList = newTXList.concat(repairData.newTXList)
+      allAccountsToResetById = Object.assign(allAccountsToResetById, repairData.allAccountsToResetById)
+      txIDToAcc = Object.assign(txIDToAcc, repairData.txIDToAcc)
+    }
 
-    // for (let partitionID of lastCycleShardValues.ourConsensusPartitions) {
+    newTXList.sort(function (a, b) { return a.timestamp - b.timestamp })
+
+    /// ////////////////////////
 
     // build and sort a list of TXs that we need to apply
 
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs txIDResetExtraCount: ${txIDResetExtraCount} allAccountsToResetById ${utils.stringifyReduce(allAccountsToResetById)}`)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs allAccountsToResetById ${utils.stringifyReduce(allAccountsToResetById)}`)
     // reset accounts
     let accountKeys = Object.keys(allAccountsToResetById)
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs revert accountKeys ${utils.stringifyReduce(accountKeys)}`)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs revert accountKeys ${utils.stringifyReduce(accountKeys)}`)
 
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs FIFO lock outer: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs FIFO lock outer: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
     let ourAccountLocks = await this.bulkFifoLockAccounts(accountKeys)
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs FIFO lock inner: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs FIFO lock inner: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
 
     // let replacmentAccounts =  //returned by the below function for debug
     await this._revertAccounts(accountKeys, cycleNumber)
 
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs newTXList.length: ${newTXList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs newTXList.length: ${newTXList.length}`)
 
     let applyCount = 0
     let applyFailCount = 0
@@ -5423,7 +5451,7 @@ class StateManager extends EventEmitter {
             continue
           }
 
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs apply tx ${utils.makeShortHash(tx.id)} ${tx.timestamp} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs apply tx ${utils.makeShortHash(tx.id)} ${tx.timestamp} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
           let hasStateTableData = false // may or may not have it but not tracking yet
 
           // HACK!!  receipts sent across the net to us may need to get re parsed
@@ -5457,8 +5485,8 @@ class StateManager extends EventEmitter {
           let success = await this.testAccountTime(tx.data, wrappedStates)
 
           if (!success) {
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis.' + utils.stringifyReduce(tx))
-            this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` testAccountTime failed. calling apoptosis.`)
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' applyAllPreparedRepairs testAccountTime failed. calling apoptosis.' + utils.stringifyReduce(tx))
+            this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` applyAllPreparedRepairs testAccountTime failed. calling apoptosis.`)
             this.p2p.initApoptosis()
             // return { success: false, reason: 'testAccountTime failed' }
             break
@@ -5468,24 +5496,24 @@ class StateManager extends EventEmitter {
           // accountValuesByKey = {} // clear this.  it forces more db work but avoids issue with some stale flags
           if (!applied) {
             applyFailCount++
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs apply failed`)
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs apply failed`)
           } else {
             applyCount++
           }
         } else {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs no for ${tx.id} in ${utils.stringifyReduce(txIDToAcc)}`)
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs no for ${tx.id} in ${utils.stringifyReduce(txIDToAcc)}`)
         }
       } catch (ex) {
-        this.mainLogger.debug('_repair: startRepairProcess mergeAndApplyTXRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-        this.fatalLogger.fatal('_repair: startRepairProcess mergeAndApplyTXRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        this.mainLogger.debug('_repair: startRepairProcess applyAllPreparedRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        this.fatalLogger.fatal('_repair: startRepairProcess applyAllPreparedRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       }
 
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
     }
 
     // unlock the accounts we locked...  todo maybe put this in a finally statement?
     this.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs FIFO unlock: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs FIFO unlock: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
     // }
   }
 
@@ -5823,6 +5851,11 @@ class StateManager extends EventEmitter {
     if (!this.repairTrackingByCycleById) {
       /** @type {Object.<string, Object.<string,RepairTracker>>} tracks state for repairing partitions. index by cycle counter key to get the repair object, index by parition */
       this.repairTrackingByCycleById = {}
+    }
+
+    if (!this.repairUpdateDataByCycle) {
+      /** @type {Object.<string, UpdateRepairData[]>}  */
+      this.repairUpdateDataByCycle = {}
     }
 
     if (!this.recentPartitionObjectsByCycleByHash) {
@@ -6181,16 +6214,35 @@ class StateManager extends EventEmitter {
   storePartitionReceipt (cycleNumber, partitionReceipt) {
     let key = 'c' + cycleNumber
 
-    if (!this.cycleReceiptsByCycleCounter) {
+    if (!this.partitionReceiptsByCycleCounter) {
       /** @type {Object.<string, PartitionReceipt[]>} a map of cycle keys to lists of partition receipts.  */
-      this.cycleReceiptsByCycleCounter = {}
+      this.partitionReceiptsByCycleCounter = {}
     }
-    if (!this.cycleReceiptsByCycleCounter[key]) {
-      this.cycleReceiptsByCycleCounter[key] = []
+    if (!this.partitionReceiptsByCycleCounter[key]) {
+      this.partitionReceiptsByCycleCounter[key] = []
     }
-    this.cycleReceiptsByCycleCounter[key].push(partitionReceipt)
+    this.partitionReceiptsByCycleCounter[key].push(partitionReceipt)
 
-    this.trySendAndPurgeReceipts(partitionReceipt)
+    this.trySendAndPurgeReceiptsToArchives(partitionReceipt)
+  }
+
+  storeOurPartitionReceipt (cycleNumber, partitionReceipt) {
+    let key = 'c' + cycleNumber
+
+    if (!this.ourPartitionReceiptsByCycleCounter) {
+      /** @type {Object.<string, PartitionReceipt>} a map of cycle keys to our partition receipt.  */
+      this.ourPartitionReceiptsByCycleCounter = {}
+    }
+    this.ourPartitionReceiptsByCycleCounter[key] = partitionReceipt
+  }
+
+  getPartitionReceipt (cycleNumber) {
+    let key = 'c' + cycleNumber
+
+    if (!this.ourPartitionReceiptsByCycleCounter) {
+      return null
+    }
+    return this.ourPartitionReceiptsByCycleCounter[key]
   }
 
   /**
@@ -7150,7 +7202,7 @@ class StateManager extends EventEmitter {
    * trySendAndPurgeReciepts
    * @param {PartitionReceipt} partitionReceipt
    */
-  trySendAndPurgeReceipts (partitionReceipt) {
+  trySendAndPurgeReceiptsToArchives (partitionReceipt) {
     if (partitionReceipt.resultsList.length === 0) {
       return
     }
