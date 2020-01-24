@@ -1823,7 +1823,9 @@ class P2P extends EventEmitter {
         }
       }
 
-      needJoin = await this._checkIfNeedJoin()
+      // needJoin = await this._checkIfNeedJoin()
+      // [AS] This should make the server start from scratch each time it starts
+      needJoin = true
 
       if (needJoin === false) {
         joined = true
