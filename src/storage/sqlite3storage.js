@@ -21,6 +21,14 @@ class Sqlite3Storage {
     // this.models = this.sequelize.models
     this.initialized = false
 
+    // [AS] Delete database if it already exists; fixes weirdness when restarting from a clean slate
+    try {
+      fs.unlinkSync(this.storageConfig.options.storage)
+      this.mainLogger.info('Storage: sqlite3storage: constructor: Deleted existing db file')
+    } catch (err) {
+      this.mainLogger.info('Storage: sqlite3storage: constructor: Failed to delete existing db file: ' + err)
+    }
+
     this.storageModels = {}
     for (let [modelName, modelAttributes] of models) {
       this.sqlite3Define(modelName, modelAttributes)
