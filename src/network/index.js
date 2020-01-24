@@ -64,24 +64,29 @@ class Network extends EventEmitter {
       port: this.ipInfo.internalPort
     })
     this.intServer = await this.sn.listen(async (data, remote, respond) => {
-      if (!data) throw new Error('No data provided in request...')
-      const { route, payload } = data
-      if (!route) {
-        this.mainLogger.debug('Network: ' + `Unable to read request, payload of received message: ${JSON.stringify(data)}`)
-        throw new Error('Unable to read request, no route specified.')
-      }
-      if (!this.internalRoutes[route]) throw new Error('Unable to handle request, invalid route.')
-      const handler = this.internalRoutes[route]
-      if (!payload) {
-        await handler(null, respond)
-        return
-      }
-      await handler(payload, respond)
-      if (this.verboseLogsNet) {
-        this.netLogger.debug('Internal\t' + JSON.stringify({
-          url: route,
-          body: payload
-        }))
+      try {
+        if (!data) throw new Error('No data provided in request...')
+        const { route, payload } = data
+        if (!route) {
+          this.mainLogger.debug('Network: ' + `Unable to read request, payload of received message: ${JSON.stringify(data)}`)
+          throw new Error('Unable to read request, no route specified.')
+        }
+        if (!this.internalRoutes[route]) throw new Error('Unable to handle request, invalid route.')
+        const handler = this.internalRoutes[route]
+        if (!payload) {
+          await handler(null, respond)
+          return
+        }
+        await handler(payload, respond)
+        if (this.verboseLogsNet) {
+          this.netLogger.debug('Internal\t' + JSON.stringify({
+            url: route,
+            body: payload
+          }))
+        }
+      } catch (err) {
+        this.mainLogger.error('Network: _setupInternal: ' + err)
+        respond({ status: 'Internal route error: ' + err })
       }
     })
     console.log(`Internal server running on port ${this.ipInfo.internalPort}...`)
