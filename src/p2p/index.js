@@ -1887,11 +1887,18 @@ class P2P extends EventEmitter {
   }
 
   async restart () {
+    console.log('Restarting, then rejoining network...')
     this.acceptInternal = false
     this.state.stopCycles()
+
+    // Exit process
+    process.exit()
+
+    /*
     await this.state.clear()
     console.log('Restarting, then rejoining network...')
     await this.startup()
+    */
   }
 
   async _reportLostNode (node) {
