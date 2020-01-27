@@ -16,6 +16,7 @@ const Profiler = require('../utils/profiler.js')
 const allZeroes64 = '0'.repeat(64)
 const path = require('path')
 const EventEmitter = require('events')
+const saveConsoleOutput = require('./saveConsoleOutput')
 
 class Shardus extends EventEmitter {
   constructor ({ server: config, logs: logsConfig, storage: storageConfig }) {
@@ -24,6 +25,11 @@ class Shardus extends EventEmitter {
     this.config = config
     this.verboseLogs = false
     this.logger = new Logger(config.baseDir, logsConfig)
+
+    if (logsConfig.saveConsoleOutput) {
+      saveConsoleOutput.startSaving(path.join(config.baseDir, logsConfig.dir))
+    }
+
     this.mainLogger = this.logger.getLogger('main')
     this.fatalLogger = this.logger.getLogger('fatal')
     this.appLogger = this.logger.getLogger('app')

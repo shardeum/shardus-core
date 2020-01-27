@@ -1,4 +1,5 @@
 {
+  "saveConsoleOutput": true,
   "dir": "logs",
   "files": {"main": "", "fatal": "", "net": ""},
   "options": {
