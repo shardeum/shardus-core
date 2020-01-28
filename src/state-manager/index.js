@@ -1982,12 +1982,16 @@ class StateManager extends EventEmitter {
 
       let passFailList = []
       let statesList = []
+      let acceptedTXs = null
       try {
         // let partitionId = payload.partitionId
         let cycle = payload.cycle
         let indicies = payload.tx_indicies
         let hash = payload.hash
+        let partitionId = payload.partitionId
 
+        let expectedResults = indicies.length
+        let returnedResults = 0
         let key = 'c' + cycle
         let partitionObjectsByHash = this.recentPartitionObjectsByCycleByHash[key]
         if (!partitionObjectsByHash) {
@@ -2007,12 +2011,59 @@ class StateManager extends EventEmitter {
         for (let index of indicies) {
           let state = partitionObject.States[index]
           statesList.push(state)
+          if (state != null) {
+            returnedResults++
+          }
         }
-        result = await this.storage.queryAcceptedTransactionsByIds(txIDList)
+
+        if (returnedResults < expectedResults) {
+          if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send ${returnedResults} < ${expectedResults}`)
+        }
+        acceptedTXs = await this.storage.queryAcceptedTransactionsByIds(txIDList)
+
+        // if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send2 `)
+
+        if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index results ${utils.stringifyReduce(acceptedTXs)} snippets ${utils.stringifyReduce(payload.debugSnippets)} `)
+        if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index results2:${utils.stringifyReduce(acceptedTXs.map(x => x.id))} snippets:${utils.stringifyReduce(payload.debugSnippets)} txid:${utils.stringifyReduce(txIDList)} `)
+
+        if (acceptedTXs != null && acceptedTXs.length < expectedResults) {
+          // find an log missing results:
+          // for(let txid of txIDList)
+          let received = {}
+          for (let acceptedTX of acceptedTXs) {
+            received[acceptedTX.id] = true
+          }
+          let missingTXs = []
+          let missingTXHash = {}
+          for (let txid of txIDList) {
+            if (received[txid] !== true) {
+              missingTXs.push(txid)
+              missingTXHash[txid] = true
+            }
+          }
+          let finds = -1
+          let txTally = this.getTXList(cycle, partitionId)
+          let found = []
+          if (txTally) {
+            finds = 0
+            for (let tx of txTally.txs) {
+              if (missingTXHash[tx.id] === true) {
+                finds++
+                acceptedTXs.push(tx)
+                found.push(tx.id)
+              }
+            }
+          }
+          if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send3 ${acceptedTXs.length} < ${expectedResults} findsFixed: ${finds}  missing: ${utils.stringifyReduce(missingTXs)} found: ${utils.stringifyReduce(found)}`)
+        } else {
+
+        }
+      } catch (ex) {
+        this.fatalLogger.fatal('get_transactions_by_partition_index failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       } finally {
       }
       // TODO fix pass fail sorting.. it is probably all wrong and out of sync, but currently nothing fails.
-      await respond({ success: true, acceptedTX: result, passFail: passFailList, statesList: statesList })
+      await respond({ success: true, acceptedTX: acceptedTXs, passFail: passFailList, statesList: statesList })
     })
 
     // /get_partition_txids (Partition_id, Cycle_number)
@@ -2597,7 +2648,7 @@ class StateManager extends EventEmitter {
       this.storage.addAcceptedTransactions([acceptedTX])
     } catch (ex) {
       this.fatalLogger.fatal('tryApplyTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-
+      this.mainLogger.debug(`tryApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
       if (!repairing) this.tempRecordTXByCycle(txTs, acceptedTX, false, applyResponse)
 
       return false
@@ -4753,7 +4804,7 @@ class StateManager extends EventEmitter {
 
     let insertCount = 0
     // flag extras
-    /** @type {{ requests: number[]; hostIndex: number[]; stateSnippets: string[]; hash?: string }[]} */
+    /** @type {{ requests: number[]; hostIndex: number[]; stateSnippets: string[]; hash?: string; txSnippets: string[] }[]} */
     let requestsByHost = new Array(hashSetList.length).fill(null)
     for (let correction of ourSolution.corrections) {
       let index = correction.i
@@ -4786,7 +4837,7 @@ class StateManager extends EventEmitter {
             if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `skipped greedy index (type2) for FORCED ${greedyAsk}`)
           } while (greedyAsk === hashSetList.length - 1 && findValidIndex < voters.length)
 
-          requestsByHost[greedyAsk] = { requests: [], hostIndex: [], stateSnippets: [] }
+          requestsByHost[greedyAsk] = { requests: [], hostIndex: [], stateSnippets: [], txSnippets: [] }
         }
         // generate the index map for the server we will ask as needed
         if (hashSetList[greedyAsk].indexMap == null) {
@@ -4802,6 +4853,7 @@ class StateManager extends EventEmitter {
         // send the hash we are asking for so we will have a ref for the index
         requestsByHost[greedyAsk].hash = hashSetList[greedyAsk].hash
 
+        requestsByHost[greedyAsk].txSnippets.push(correction.v)
         // grab chars from the solution that will rep the data hash we want
         requestsByHost[greedyAsk].stateSnippets.push(correction.v.slice(cHashSetTXStepSize, cHashSetTXStepSize + cHashSetDataStepSize))
         insertCount++
@@ -4816,16 +4868,22 @@ class StateManager extends EventEmitter {
         // I think we don't need this anymore:
         // requestsByHost[i].requests.sort(function (a, b) { return a - b }) // sort these since the reponse for the host will also sort by timestamp
 
-        let payload = { partitionId: partitionId, cycle: cycleNumber, tx_indicies: requestsByHost[i].hostIndex, hash: requestsByHost[i].hash }
+        let payload = { partitionId: partitionId, cycle: cycleNumber, tx_indicies: requestsByHost[i].hostIndex, hash: requestsByHost[i].hash, debugSnippets: requestsByHost[i].txSnippets }
         if (this.extendedRepairLogging) console.log(`get_transactions_by_partition_index ok! ${debugKey} payload: ${utils.stringifyReduce(payload)}`)
         if (this.extendedRepairLogging) console.log(`requestsByHost[i].stateSnippets ${debugKey} ${utils.stringifyReduce(requestsByHost[i].stateSnippets)} `)
         if (hashSetList[i].owners.length > 0) {
+          // not sure how that worked!!
+          // let nodeToContact = this.p2p.state.getNodeByPubKey(hashSetList[i].owners[0])
+
+          //  need to make this use the requestsByHost
           let nodeToContact = this.p2p.state.getNodeByPubKey(hashSetList[i].owners[0])
 
           let result = await this.p2p.ask(nodeToContact, 'get_transactions_by_partition_index', payload)
           // { success: true, acceptedTX: result, passFail: passFailList }
           if (result.success === true) {
-            if (this.extendedRepairLogging) console.log(`get_transactions_by_partition_index ok! ${debugKey} count:${result.acceptedTX.length} payload: ${utils.stringifyReduce(payload)}`)
+            let returnedResults = 0
+            let expectedResults = payload.tx_indicies.length
+            if (this.extendedRepairLogging) console.log(`get_transactions_by_partition_index ok! ${debugKey} count:${result.acceptedTX.length} payload: ${utils.stringifyReduce(payload)} reqCount:${payload.tx_indicies.length}`)
             for (let j = 0; j < result.acceptedTX.length; j++) {
               let acceptedTX = result.acceptedTX[j]
               if (result.passFail[j] === 1) {
@@ -4846,10 +4904,15 @@ class StateManager extends EventEmitter {
               let state = requestsByHost[i].stateSnippets[j] // snippets are just the first 2 characters of state if we have stateList use that instead.
               state = result.statesList[j]
               repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j], state: state })
+              returnedResults++
+            }
+
+            if (returnedResults < expectedResults) {
+              if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults recv ${returnedResults} < ${expectedResults}`)
             }
           } else {
             // todo datasync:  assert/fail/or retry
-            if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index faied! ${debugKey} payload: ${utils.stringifyReduce(payload)}`)
+            if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index failed! ${debugKey} payload: ${utils.stringifyReduce(payload)}`)
           }
 
           // add these TXs to newPendingTXs or newFailedTXs  and the IDs to missingTXIds
@@ -5213,9 +5276,13 @@ class StateManager extends EventEmitter {
             if (!success) {
               if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis.' + utils.stringifyReduce(tx))
               this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` testAccountTime failed. calling apoptosis.`)
-              this.p2p.initApoptosis()
-              // return { success: false, reason: 'testAccountTime failed' }
-              break
+
+              this.fatalLogger.fatal(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis.' + utils.stringifyReduce(tx))
+
+              return
+              // this.p2p.initApoptosis() // todo turn this back on
+              // // return { success: false, reason: 'testAccountTime failed' }
+              // break
             }
 
             let applied = await this.tryApplyTransaction(tx, hasStateTableData, true, acountsFilter, wrappedStates, localCachedData) // TODO app interface changes.. how to get and pass the state wrapped account state in, (maybe simple function right above this
@@ -5253,15 +5320,20 @@ class StateManager extends EventEmitter {
     // walk through all txs for this cycle.
     // get or create entries for accounts.
     // track when they have missing txs or wrong txs
-
+    let debugKey = `c${cycleNumber}p${specificParition}`
     let lastCycleShardValues = this.shardValuesByCycle.get(cycleNumber)
+    let paritionsServiced = 0
+    try {
+      // this was locking us to consensus only partitions. really just preap anything that is called on this fuciton since other logic may be doing work
+      // on stored partitions.
 
-    for (let partitionID of lastCycleShardValues.ourConsensusPartitions) {
-      // this is an attempt to just repair one parition.
-      if (partitionID !== specificParition) {
-        continue
-      }
-
+      // for (let partitionID of lastCycleShardValues.ourConsensusPartitions) {
+      // // this is an attempt to just repair one parition.
+      //   if (partitionID !== specificParition) {
+      //     continue
+      //   }
+      let partitionID = specificParition
+      paritionsServiced++
       let allTXsToApply = {}
       let allExtraTXids = {}
       /** @type {Object.<string, number>} */
@@ -5333,13 +5405,13 @@ class StateManager extends EventEmitter {
               // txIDResetExtraCount++
             }
           } else {
-          // a good tx that we had earlier
+            // a good tx that we had earlier
             let keysResponse = this.app.getKeyFromTransaction(tx.data)
             let { sourceKeys, targetKeys } = keysResponse
             allNewTXsById[tx.id] = tx
             txIDToAcc[tx.id] = { sourceKeys, targetKeys }
             txIDToAccCount++
-          // we will only play back the txs on accounts that point to allAccountsToResetById
+            // we will only play back the txs on accounts that point to allAccountsToResetById
           }
         }
       } else {
@@ -5375,6 +5447,15 @@ class StateManager extends EventEmitter {
       this.repairUpdateDataByCycle[ckey].push(updateData)
 
       // how will the partition object get updated though??
+      // }
+
+      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair updateTrackingAndPrepareRepairs finished`)
+      if (paritionsServiced === 0) {
+        this.fatalLogger.fatal(`_updateTrackingAndPrepareRepairs failed. not partitions serviced: ${debugKey} our consensus:${utils.stringifyReduce(lastCycleShardValues.ourConsensusPartitions)} `)
+      }
+    } catch (ex) {
+      this.mainLogger.debug('__updateTrackingAndPrepareRepairs: exception ' + ` ${debugKey} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.fatalLogger.fatal('__updateTrackingAndPrepareRepairs: exception ' + ` ${debugKey} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
     }
   }
 
@@ -5383,6 +5464,11 @@ class StateManager extends EventEmitter {
    * @param {number} cycleNumber
    */
   async applyAllPreparedRepairs (cycleNumber) {
+    if (this.applyAllPreparedRepairsRunning === true) {
+      return
+    }
+    this.applyAllPreparedRepairsRunning = true
+
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs cycleNumber ${cycleNumber}`)
 
     this.mainLogger.debug(`applyAllPreparedRepairs c:${cycleNumber}`)
@@ -5397,7 +5483,9 @@ class StateManager extends EventEmitter {
       newTXList = newTXList.concat(repairData.newTXList)
       allAccountsToResetById = Object.assign(allAccountsToResetById, repairData.allAccountsToResetById)
       txIDToAcc = Object.assign(txIDToAcc, repairData.txIDToAcc)
+      this.mainLogger.debug(`applyAllPreparedRepairs reset:${Object.keys(repairData.allAccountsToResetById).length} txIDToAcc:${Object.keys(repairData.txIDToAcc).length} keys: ${utils.stringifyReduce(Object.keys(repairData.allAccountsToResetById))} `)
     }
+    this.mainLogger.debug(`applyAllPreparedRepairs total reset:${Object.keys(allAccountsToResetById).length} txIDToAcc:${Object.keys(txIDToAcc).length}`)
 
     newTXList.sort(function (a, b) { return a.timestamp - b.timestamp })
 
@@ -5426,7 +5514,14 @@ class StateManager extends EventEmitter {
 
     let accountValuesByKey = {}
 
+    let seenTXs = {}
     for (let tx of newTXList) {
+      if (seenTXs[tx.id] === true) {
+        this.mainLogger.debug(`applyAllPreparedRepairs skipped double: ${utils.makeShortHash(tx.id)} ${tx.timestamp} `)
+        continue
+      }
+      seenTXs[tx.id] = true
+
       let keysFilter = txIDToAcc[tx.id]
       // need a transform to map all txs that would matter.
       try {
@@ -5487,9 +5582,12 @@ class StateManager extends EventEmitter {
           if (!success) {
             if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' applyAllPreparedRepairs testAccountTime failed. calling apoptosis.' + utils.stringifyReduce(tx))
             this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` applyAllPreparedRepairs testAccountTime failed. calling apoptosis.`)
-            this.p2p.initApoptosis()
-            // return { success: false, reason: 'testAccountTime failed' }
-            break
+            this.fatalLogger.fatal(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis.' + utils.stringifyReduce(tx))
+
+            return
+            // this.p2p.initApoptosis() // todo turn this back on
+            // // return { success: false, reason: 'testAccountTime failed' }
+            // break
           }
 
           let applied = await this.tryApplyTransaction(tx, hasStateTableData, true, acountsFilter, wrappedStates, localCachedData) // TODO app interface changes.. how to get and pass the state wrapped account state in, (maybe simple function right above this
@@ -5515,6 +5613,7 @@ class StateManager extends EventEmitter {
     this.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
     if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs FIFO unlock: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
     // }
+    this.applyAllPreparedRepairsRunning = false
   }
 
   /**
@@ -5858,6 +5957,8 @@ class StateManager extends EventEmitter {
       this.repairUpdateDataByCycle = {}
     }
 
+    this.applyAllPreparedRepairsRunning = false
+
     if (!this.recentPartitionObjectsByCycleByHash) {
       /** @type {Object.<string, Object.<string,PartitionObject>>} our partition objects by cycle.  index by cycle counter key to get an array */
       this.recentPartitionObjectsByCycleByHash = {}
@@ -6158,7 +6259,9 @@ class StateManager extends EventEmitter {
     let keysResponse = this.app.getKeyFromTransaction(acceptedTx.data)
     let { allKeys } = keysResponse
 
+    let seenParitions = {}
     // for (let partitionID of lastCycleShardValues.ourConsensusPartitions) {
+
     for (let accountKey of allKeys) {
       /** @type {NodeShardData} */
       let homeNode = ShardFunctions.findHomeNode(lastCycleShardValues.shardGlobals, accountKey, lastCycleShardValues.parititionShardDataMap)
@@ -6169,16 +6272,30 @@ class StateManager extends EventEmitter {
         this.mainLogger.error(`_repair trying to record transaction after we have already finalized our parition object for cycle ${cycle.counter} `)
       }
 
+      let key = 'p' + partitionID
+      if (seenParitions[key] != null) {
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair recordTXByCycle: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
+        // skip because this partition already has this TX!
+        continue
+      }
+      seenParitions[key] = true
+
       txList.hashes.push(acceptedTx.id)
       txList.passed.push((passed) ? 1 : 0)
       txList.txs.push(acceptedTx)
 
       if (applyResponse != null && applyResponse.accountData != null) {
         let states = []
+        let foundAccountIndex = 0
+        let index = 0
         for (let accountData of applyResponse.accountData) {
+          if (accountData.accountId === accountKey) {
+            foundAccountIndex = index
+          }
           states.push(utils.makeShortHash(accountData.hash)) // TXSTATE_TODO need to get only certain state data!.. hash of local states?
+          index++
         }
-        txList.states.push(states[0]) // TXSTATE_TODO does this check out?
+        txList.states.push(states[foundAccountIndex]) // TXSTATE_TODO does this check out?
       } else {
         txList.states.push('xxxx')
       }

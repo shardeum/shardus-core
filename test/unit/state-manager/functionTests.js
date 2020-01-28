@@ -8,7 +8,7 @@ let stateManager = new StateManager(false)
 let testInput = null
 try {
   var localDir = path.resolve('./test/unit/state-manager/')
-  var data = fs.readFileSync(path.join(localDir, 'debugInput1.txt'), 'utf8')
+  var data = fs.readFileSync(path.join(localDir, 'debugInput2.txt'), 'utf8')
   //console.log(data)
 
   testInput = JSON.parse(data)
