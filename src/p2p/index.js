@@ -1568,15 +1568,20 @@ class P2P extends EventEmitter {
     try {
       signedResponse = await this.network.ask(node, route, signedMessage, logged)
     } catch (err) {
-      this.mainLogger.debug('P2P ASK: failed', err)
+      this.mainLogger.error('P2P: ask: network.ask: ' + err)
       return false
     }
     this.mainLogger.debug(`Result of network-level ask: ${JSON.stringify(signedResponse)}`)
-    const [response] = this._extractPayload(signedResponse, [node])
-    if (!response) {
-      throw new Error(`Unable to verify response to ask request: ${route} -- ${JSON.stringify(message)} from node: ${node.id}`)
+    try {
+      const [response] = this._extractPayload(signedResponse, [node])
+      if (!response) {
+        throw new Error(`Unable to verify response to ask request: ${route} -- ${JSON.stringify(message)} from node: ${node.id}`)
+      }
+      return response
+    } catch (err) {
+      this.mainLogger.error('P2P: ask: _extractPayload: ' + err)
+      return false
     }
-    return response
   }
 
   registerInternal (route, handler) {

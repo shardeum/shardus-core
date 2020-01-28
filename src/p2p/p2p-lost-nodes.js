@@ -226,6 +226,9 @@ class P2PLostNodes {
           }
         }
       })
+      .catch(err => {
+        if (err) this.mainLogger.error('P2PLostNodes: _investigateLostNode: p2p.ask: ' + err)
+      })
     this.mainLogger.debug(`Lost Detection: Marked target ${target} as lost. Pinged target. Waiting 1 cycle for target to respond...`)
   }
 
