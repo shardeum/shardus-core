@@ -117,12 +117,19 @@ class P2PState extends EventEmitter {
   }
 
   async init () {
+    /**
+     * [AS] Now that nodes are expected to exit and be restarted fresh by
+     * another watcher process, it doesn't make sense to load DB state anymore
+     */
+
+    /*
     const cycles = await this.storage.listCycles()
     this.mainLogger.debug(`Loaded ${cycles.length} cycles from the database.`)
     this.cycles = cycles
     const nodes = await this.storage.listNodes()
     this.mainLogger.debug(`Loaded ${nodes.length} nodes from the database.`)
     this._addNodesToNodelist(nodes)
+    */
   }
 
   initLost (p2plostnodes) {
