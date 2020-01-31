@@ -518,7 +518,12 @@ class P2P extends EventEmitter {
       cycleMarker = await this._fetchCycleMarkerInternal(this.state.getActiveNodes())
     } catch (e) {
       this.mainLogger.warn('Could not get cycleMarker from nodes. Querying seedNodes for it...')
-      cycleMarker = await this._fetchCycleMarkerInternal(this.seedNodes)
+      try {
+        cycleMarker = await this._fetchCycleMarkerInternal(this.seedNodes)
+      } catch (err) {
+        this.mainLogger.error('_submitWhenUpdatePhase could not get cycleMarker from seedNodes. Exiting... ' + err)
+        process.exit()
+      }
     }
     const { currentTime, cycleStart, cycleDuration } = cycleMarker
 
@@ -787,9 +792,15 @@ class P2P extends EventEmitter {
       const { nodelistHash } = await this.ask(node, 'nodelisthash')
       return { nodelistHash }
     }
-    const [response] = await this.robustQuery(nodes, queryFn)
-    const { nodelistHash } = response
-    return nodelistHash
+    try {
+      const [response] = await this.robustQuery(nodes, queryFn)
+      const { nodelistHash } = response
+      return nodelistHash
+    } catch (err) {
+      this.mainLogger.error('_syncToNetwork > _fetchNodelistHash failed, initialized apoptosis: ' + err)
+      await this.initApoptosis()
+      process.exit()
+    }
   }
 
   async _fetchVerifiedNodelist (nodes, nodelistHash) {
@@ -797,9 +808,15 @@ class P2P extends EventEmitter {
       const { nodelist } = await this.ask(node, 'nodelist')
       return { nodelist }
     }
-    let verifyFn = (nodelist) => this._verifyNodelist(nodelist, nodelistHash)
-    const { nodelist } = await this._sequentialQuery(nodes, queryFn, verifyFn)
-    return nodelist
+    try {
+      let verifyFn = (nodelist) => this._verifyNodelist(nodelist, nodelistHash)
+      const { nodelist } = await this._sequentialQuery(nodes, queryFn, verifyFn)
+      return nodelist
+    } catch (err) {
+      this.mainLogger.error('_syncToNetwork > _fetchVerifiedNodelist failed, initialized apoptosis: ' + err)
+      await this.initApoptosis()
+      process.exit()
+    }
   }
 
   _isSameCycleMarkerInfo (info1, info2) {
@@ -891,7 +908,13 @@ class P2P extends EventEmitter {
     } catch (e) {
       this.mainLogger.warn('Could not get cycleMarker from nodes. Querying seedNodes for it...')
       this.mainLogger.debug(e)
-      ;({ cycleCounter } = await this._fetchCycleMarkerInternal(seedNodes))
+      try {
+        ;({ cycleCounter } = await this._fetchCycleMarkerInternal(seedNodes))
+      } catch (err) {
+        this.mainLogger.error('_syncToNetwork > _fetchLatestCycleChain: Could not get cycleMarker from seedNodes. Apoptosis then Exiting... ' + err)
+        await this.initApoptosis()
+        process.exit()
+      }
     }
     this.mainLogger.debug(`Fetched cycle counter: ${cycleCounter}`)
 
@@ -907,7 +930,13 @@ class P2P extends EventEmitter {
     } catch (e) {
       this.mainLogger.warn('Could not get cycleChainHash from nodes. Querying seedNodes for it...')
       this.mainLogger.debug(e)
-      cycleChainHash = await this._fetchCycleChainHash(seedNodes, chainStart, chainEnd)
+      try {
+        cycleChainHash = await this._fetchCycleChainHash(seedNodes, chainStart, chainEnd)
+      } catch (err) {
+        this.mainLogger.error('syncToNetwork > _fetchLatestCycleChain: Could not get cycleChainHash from seed nodes. Apoptosis then Exiting... ' + err)
+        await this.initApoptosis()
+        process.exit()
+      }
     }
 
     this.mainLogger.debug(`Fetched cycle chain hash: ${cycleChainHash}`)
@@ -917,9 +946,15 @@ class P2P extends EventEmitter {
     try {
       chainAndCerts = await this._fetchVerifiedCycleChain(nodes, cycleChainHash, chainStart, chainEnd)
     } catch (e) {
-      this.mainLogger.warn('Could not get verified cycleChain from nodes. Querying seedNodes for it...')
+      this.mainLogger.warn('_fetchLatestCycleChain: Could not get verified cycleChain from nodes. Querying seedNodes for it...')
       this.mainLogger.debug(e)
-      chainAndCerts = await this._fetchVerifiedCycleChain(seedNodes, cycleChainHash, chainStart, chainEnd)
+      try {
+        chainAndCerts = await this._fetchVerifiedCycleChain(seedNodes, cycleChainHash, chainStart, chainEnd)
+      } catch (err) {
+        this.mainLogger.error('syncToNetwork > _fetchVerifiedCycleChain: Could not get cycleChainHash from seed nodes. Apoptosis then Exiting... ' + err)
+        await this.initApoptosis()
+        process.exit()
+      }
     }
 
     return chainAndCerts
@@ -984,7 +1019,13 @@ class P2P extends EventEmitter {
     } catch (e) {
       this.mainLogger.warn('Could not get cycleChainHash from nodes. Querying seedNodes for it...')
       this.mainLogger.debug(e)
-      cycleChainHash = await this._fetchCycleChainHash(seedNodes, chainStart, chainEnd)
+      try {
+        cycleChainHash = await this._fetchCycleChainHash(seedNodes, chainStart, chainEnd)
+      } catch (err) {
+        this.mainLogger.error('_syncUpChainAndNodelist > _fetchFinalizedChain: Could not get cycleChainHash from seedNodes. Apoptosis then Exiting... ' + err)
+        await this.initApoptosis()
+        process.exit()
+      }
     }
 
     this.mainLogger.debug(`Fetched cycle chain hash: ${cycleChainHash}`)
@@ -994,9 +1035,15 @@ class P2P extends EventEmitter {
     try {
       chainAndCerts = await this._fetchVerifiedCycleChain(nodes, cycleChainHash, chainStart, chainEnd)
     } catch (e) {
-      this.mainLogger.warn('Could not get verified cycleChain from nodes. Querying seedNodes for it...')
+      this.mainLogger.warn('_fetchFinalizedChain: Could not get verified cycleChain from nodes. Querying seedNodes for it...')
       this.mainLogger.debug(e)
-      chainAndCerts = await this._fetchVerifiedCycleChain(seedNodes, cycleChainHash, chainStart, chainEnd)
+      try {
+        chainAndCerts = await this._fetchVerifiedCycleChain(seedNodes, cycleChainHash, chainStart, chainEnd)
+      } catch (err) {
+        this.mainLogger.error('syncUpChainAndNodelist > _fetchFinalizedChain: Could get verified cycleChain from seedNodes. Apoptosis then Exiting... ' + err)
+        await this.initApoptosis()
+        process.exit()
+      }
     }
     return chainAndCerts
   }
@@ -1015,7 +1062,13 @@ class P2P extends EventEmitter {
       } catch (e) {
         this.mainLogger.warn('Could not get cycleMarker from nodes. Querying seedNodes for it...')
         this.mainLogger.debug(e)
-        cycleMarker = await this._fetchCycleMarkerInternal(seedNodes)
+        try {
+          cycleMarker = await this._fetchCycleMarkerInternal(seedNodes)
+        } catch (err) {
+          this.mainLogger.error('_syncUpChainAndNodelist > getCycleMarkerSafely> getCycleMarker: Could not get cycleMarker from seedNodes. Apoptosis then Exiting... ' + err)
+          await this.initApoptosis()
+          process.exit()
+        }
       }
       this.mainLogger.debug(`Fetched cycle marker: ${JSON.stringify(cycleMarker)}`)
       return cycleMarker
@@ -1300,7 +1353,13 @@ class P2P extends EventEmitter {
         cycleMarker = await this._fetchCycleMarkerInternal(this.state.getActiveNodes())
       } catch (e) {
         this.mainLogger.warn('Unable to get cycle marker internally from active nodes. Falling back to seed nodes...')
-        cycleMarker = await this._fetchCycleMarkerInternal(this.seedNodes)
+        try {
+          cycleMarker = await this._fetchCycleMarkerInternal(this.seedNodes)
+        } catch (err) {
+          this.mainLogger.error('_syncToNetwork > getUnfinalized: Could not get cycle marker from seed nodes. Apoptosis then Exiting... ' + err)
+          this.initApoptosis()
+          process.exit()
+        }
       }
       const { cycleStart, cycleDuration } = cycleMarker
       const currentTime = utils.getTime('s')
@@ -1894,7 +1953,9 @@ class P2P extends EventEmitter {
   async restart () {
     console.log('Restarting, then rejoining network...')
     this.acceptInternal = false
-    this.state.stopCycles()
+
+    // [AS] exit-handler calls >> p2p.cleanUpSync >> p2p.state.stopCycles
+    // this.state.stopCycles()
 
     // Exit process
     process.exit()

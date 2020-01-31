@@ -1232,7 +1232,12 @@ class P2PState extends EventEmitter {
       this._startNewCycle()
     }, endTime)
     if (this.getActiveNodes(this.p2p.id).length > 0) {
-      await this.p2p.requestUpdatesFromRandom()
+      try {
+        await this.p2p.requestUpdatesFromRandom()
+      } catch (err) {
+        this.mainLogger.error('Q4 _finalizeCycle: Could not request updates from random. Exiting ' + err)
+        process.exit()
+      }
     }
     this.unfinalizedReady = true
   }

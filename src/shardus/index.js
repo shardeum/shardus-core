@@ -48,6 +48,8 @@ class Shardus extends EventEmitter {
     this.loadDetection = null
     this.rateLimiting = null
 
+    this.mainLogger.log(`Server started with pid: ${process.pid}`)
+
     this.mainLogger.fatal(`===== Server config: =====`)
     this.mainLogger.fatal(JSON.stringify(config, null, 2))
 
