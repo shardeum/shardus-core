@@ -916,6 +916,14 @@ class P2P extends EventEmitter {
         process.exit()
       }
     }
+
+    // Check for bad cycleCounter data
+    if (!cycleCounter || cycleCounter < 0) {
+      this.mainLogger.error('_syncToNetwork > _fetchLatestCycleChain: Got bad cycleCounter. Apoptosis and Exiting...')
+      await this.initApoptosis()
+      process.exit()
+    }
+
     this.mainLogger.debug(`Fetched cycle counter: ${cycleCounter}`)
 
     // Determine cycle counter numbers to get, at most, the last 1000 cycles
@@ -939,6 +947,13 @@ class P2P extends EventEmitter {
       }
     }
 
+    // Check for bad cycleChainHash data
+    if (!cycleChainHash || cycleChainHash === '') {
+      this.mainLogger.error('_syncToNetwork > _fetchLatestCycleChain: Got bad cycleChainHash. Apoptosis and Exiting...')
+      await this.initApoptosis()
+      process.exit()
+    }
+
     this.mainLogger.debug(`Fetched cycle chain hash: ${cycleChainHash}`)
 
     // Get verified cycle chain
@@ -955,6 +970,13 @@ class P2P extends EventEmitter {
         await this.initApoptosis()
         process.exit()
       }
+    }
+
+    // Check for bad chainAndCerts data
+    if (!chainAndCerts || Array.isArray(chainAndCerts) || chainAndCerts.length < 1) {
+      this.mainLogger.error('_syncToNetwork > _fetchLatestCycleChain: Got bad chainAndCerts. Apoptosis and Exiting...')
+      await this.initApoptosis()
+      process.exit()
     }
 
     return chainAndCerts
@@ -1210,6 +1232,14 @@ class P2P extends EventEmitter {
   }
 
   _validateJoinRequest (joinRequest) {
+    // Reject join requests from nodes who's ip and port are already in the network
+    const intIp = joinRequest.nodeInfo.internalIp
+    const intPort = joinRequest.nodeInfo.internalPort
+    const intHost = `${intIp}:${intPort}`
+    const existingNode = this.state.nodes.byIp[intHost]
+    if (existingNode) {
+      return false
+    }
     // TODO: implement actual validation (call to application side?)
     return true
   }
