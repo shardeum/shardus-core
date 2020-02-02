@@ -1978,7 +1978,7 @@ class StateManager extends EventEmitter {
     })
 
     this.p2p.registerInternal('get_transactions_by_partition_index', async (payload, respond) => {
-      let result = {}
+      // let result = {}
 
       let passFailList = []
       let statesList = []
@@ -4067,6 +4067,7 @@ class StateManager extends EventEmitter {
   /**
    * partitionObjectToTxMaps
    * @param {PartitionObject} partitionObject
+   * @returns {Object.<string,number>}
    */
   partitionObjectToTxMaps (partitionObject) {
     let statusMap = {}
@@ -4075,6 +4076,25 @@ class StateManager extends EventEmitter {
       let status = partitionObject.Status[i]
       statusMap[tx] = status
     }
+    /** @type {Object.<string,number>} */
+    // @ts-ignore
+    return statusMap
+  }
+
+  /**
+   * partitionObjectToStateMaps
+   * @param {PartitionObject} partitionObject
+   * @returns {Object.<string,string>}
+   */
+  partitionObjectToStateMaps (partitionObject) {
+    let statusMap = {}
+    for (let i = 0; i < partitionObject.Txids.length; i++) {
+      let tx = partitionObject.Txids[i]
+      let state = partitionObject.States[i]
+      statusMap[tx] = state
+    }
+    /** @type {Object.<string,string>} */
+    // @ts-ignore
     return statusMap
   }
 
@@ -4186,7 +4206,7 @@ class StateManager extends EventEmitter {
 
         if (this.verboseLogs) this.mainLogger.debug(`repairStats: staring repair ${combinedKey}`)
       }
-
+      topResult = null // hack
       if (topResult) {
         repairTracker.triedHashes.push(topResult.Partition_hash)
         await this.syncTXsFromWinningHash(topResult)
@@ -4475,11 +4495,12 @@ class StateManager extends EventEmitter {
 
     // get the list of tx ids for a partition?..
     let payload = { Cycle_number: topResult.Cycle_number, Partition_id: topResult.Partition_id }
+    /** @type {PartitionObject} */
     let partitionObject = await this.p2p.ask(nodeToContact, 'get_partition_txids', payload)
 
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: partitionObject: ' + utils.stringifyReduce(partitionObject))
 
-    let statusMap = this.partitionObjectToTxMaps(partitionObject)
+    let winningStatusMap = this.partitionObjectToTxMaps(partitionObject)
     let ourPartitionObj = this.getPartitionObject(topResult.Cycle_number, topResult.Partition_id)
 
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: ourPartitionObj: ' + utils.stringifyReduce(ourPartitionObj))
@@ -4487,6 +4508,9 @@ class StateManager extends EventEmitter {
     let ourStatusMap = this.partitionObjectToTxMaps(ourPartitionObj)
     // need to match up on all data, but only sync what we need and remove what we dont.
 
+    // get state data:
+    let winningStateMap = this.partitionObjectToStateMaps(partitionObject)
+    let ourStateMap = this.partitionObjectToStateMaps(ourPartitionObj)
     // filter to only get accepted txs
 
     // for (let i = 0; i < partitionObject.Txids.length; i++) {
@@ -4495,6 +4519,8 @@ class StateManager extends EventEmitter {
     //     acceptedTXIDs.push(partitionObject.Txids[i])
     //   }
     // }
+
+    // partitionObjectToStateMaps // check states too?
 
     let repairTracker = this._getRepairTrackerForCycle(topResult.Cycle_number, topResult.Partition_id)
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: _getRepairTrackerForCycle: ' + utils.stringifyReduce(repairTracker))
@@ -4516,12 +4542,48 @@ class StateManager extends EventEmitter {
       }
     }
     let invalidAcceptedTxIDs = []
+    let extraFailedState = 0
+    let extraFailedStatus = 0
     for (let i = 0; i < ourPartitionObj.Txids.length; i++) {
       // let status = ourPartitionObj.Status[i]
       let tx = ourPartitionObj.Txids[i]
-      if (statusMap.hasOwnProperty(tx) === false) {
+      if (winningStatusMap.hasOwnProperty(tx) === false) {
         invalidAcceptedTxIDs.push(tx)
         repairTracker.extraTXIds.push(tx)
+      } else {
+        // both paritions have this tx but need to test the pass/fail and hash value for the partition
+        let failed = false
+        // check if state or status is wrong!
+        if (winningStateMap.hasOwnProperty(tx)) {
+          let winState = winningStateMap[tx]
+          let ourState = ourStateMap[tx]
+          if (winState !== ourState) {
+            failed = true
+            extraFailedState++
+          }
+        }
+        if (winningStatusMap.hasOwnProperty(tx)) {
+          let winStatus = winningStatusMap[tx]
+          let ourStatus = ourStatusMap[tx]
+          if (winStatus !== ourStatus) {
+            failed = true
+            extraFailedStatus++
+          }
+        }
+        if (failed) {
+          // Extra
+          invalidAcceptedTxIDs.push(tx)
+          repairTracker.extraTXIds.push(tx)
+          // And we need the missing one!
+          let status = winningStatusMap[tx]
+          if (status === 1) {
+            missingAcceptedTxIDs.push(tx)
+          } else {
+            missingFailedTXs.push(tx)
+          }
+          repairTracker.missingTXIds.push(tx)
+          allMissingTXs.push(tx)
+        }
       }
     }
 
@@ -4536,9 +4598,9 @@ class StateManager extends EventEmitter {
     repairTracker.newFailedTXs = txs
     // this.storage.addAcceptedTransactions(txs) // commit the failed TXs to our db. not sure if this is strictly necessary
 
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: repairTracker updates: ' + utils.stringifyReduce(repairTracker))
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair syncTXsFromWinningHash: extraFailedState:${extraFailedState} extraFailedStatus:${extraFailedStatus} repairTracker updates: ` + utils.stringifyReduce(repairTracker) + ` invalidAcceptedTxIDs: ${invalidAcceptedTxIDs.length}`)
 
-    this._mergeRepairDataIntoLocalState(repairTracker, ourPartitionObj, statusMap, partitionObject)
+    this._mergeRepairDataIntoLocalState(repairTracker, ourPartitionObj, winningStatusMap, partitionObject)
   }
 
   /**
@@ -5417,7 +5479,7 @@ class StateManager extends EventEmitter {
       let txList = this.getTXList(cycleNumber, partitionID) // done todo sharding: pass partition ID
 
       let txIDToAccCount = 0
-      // let txIDResetExtraCount = 0
+      let txIDResetExtraCount = 0
       // build a list with our existing txs, but dont include the bad ones
       if (txList) {
         for (let i = 0; i < txList.txs.length; i++) {
@@ -5431,11 +5493,11 @@ class StateManager extends EventEmitter {
             let { sourceKeys, targetKeys } = keysResponse
             for (let accountID of sourceKeys) {
               allAccountsToResetById[accountID] = 1
-              // txIDResetExtraCount++
+              txIDResetExtraCount++
             }
             for (let accountID of targetKeys) {
               allAccountsToResetById[accountID] = 1
-              // txIDResetExtraCount++
+              txIDResetExtraCount++
             }
           } else {
             // a good tx that we had earlier
@@ -5447,6 +5509,7 @@ class StateManager extends EventEmitter {
             // we will only play back the txs on accounts that point to allAccountsToResetById
           }
         }
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair updateTrackingAndPrepareRepairs txIDResetExtraCount:${txIDResetExtraCount} txIDToAccCount: ${txIDToAccCount}`)
       } else {
         if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair updateTrackingAndPrepareRepairs txList not found for: cycle: ${cycleNumber} in ${utils.stringifyReduce(this.txByCycleByPartition)}`)
       }
@@ -5516,7 +5579,7 @@ class StateManager extends EventEmitter {
       newTXList = newTXList.concat(repairData.newTXList)
       allAccountsToResetById = Object.assign(allAccountsToResetById, repairData.allAccountsToResetById)
       txIDToAcc = Object.assign(txIDToAcc, repairData.txIDToAcc)
-      this.mainLogger.debug(`applyAllPreparedRepairs reset:${Object.keys(repairData.allAccountsToResetById).length} txIDToAcc:${Object.keys(repairData.txIDToAcc).length} keys: ${utils.stringifyReduce(Object.keys(repairData.allAccountsToResetById))} `)
+      this.mainLogger.debug(`applyAllPreparedRepairs c${cycleNumber}p${repairData.partitionId} reset:${Object.keys(repairData.allAccountsToResetById).length} txIDToAcc:${Object.keys(repairData.txIDToAcc).length} keys: ${utils.stringifyReduce(Object.keys(repairData.allAccountsToResetById))} `)
     }
     this.mainLogger.debug(`applyAllPreparedRepairs total reset:${Object.keys(allAccountsToResetById).length} txIDToAcc:${Object.keys(txIDToAcc).length}`)
 
