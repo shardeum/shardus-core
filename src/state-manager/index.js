@@ -92,7 +92,7 @@ const cHashSetDataStepSize = 2
    * @property {string[]} removedTXIds
    * @property {string[]} repairedTXs
    * @property {AcceptedTx[]} newPendingTXs
-   * @property {string[]} newFailedTXs
+   * @property {AcceptedTx[]} newFailedTXs
    * @property {string[]} extraTXIds
    * @property {string[]} missingTXIds
    * @property {boolean} repairing
@@ -4560,9 +4560,42 @@ class StateManager extends EventEmitter {
     let key = repairTracker.key
     let txList = this.getTXListByKey(key, repairTracker.partitionId)
 
-    txList.hashes = ourPartitionObj.Txids
-    txList.passed = ourPartitionObj.Status
-    txList.states = ourPartitionObj.States // TXSTATE_TODO
+    // txList.hashes = ourPartitionObj.Txids
+    // txList.passed = ourPartitionObj.Status
+    // txList.states = ourPartitionObj.States // TXSTATE_TODO
+
+    let newTxList = { hashes: [...ourPartitionObj.Txids], passed: [...ourPartitionObj.Status], states: [...ourPartitionObj.States] }
+    // let newTxList = { hashes: [], passed: [], txs: [], thashes: [], tpassed: [], ttxs: [], tstates: [], states: [] }
+    txList.newTxList = newTxList
+
+    // build a map that merges our tx data
+    let allTXs = {}
+    for (let tx of txList.txs) {
+      allTXs[tx.id] = tx
+    }
+    for (let tx of repairTracker.newPendingTXs) {
+      allTXs[tx.id] = tx
+    }
+    for (let tx of repairTracker.newFailedTXs) {
+      allTXs[tx.id] = tx
+    }
+    let txs = []
+    let missingTXs = []
+    // build a list of txs based on our map and list of hashes.
+    for (let txID of txList.hashes) {
+      let tx = allTXs[txID]
+      if (tx != null) {
+        txs.push(tx)
+      } else {
+        missingTXs.push(txID)
+      }
+    }
+    if (missingTXs.length > 0) {
+      this.fatalLogger.fatal(` _mergeRepairDataIntoLocalState missing some TXS :${utils.stringifyReduce(missingTXs)}  `)
+    }
+
+    // Set the txs!
+    newTxList.txs = txs
     if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair _mergeRepairDataIntoLocalState:  key: ${key} txlist: ${utils.stringifyReduce({ hashes: txList.hashes, passed: txList.passed })} `)
   }
 
