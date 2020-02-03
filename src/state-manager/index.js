@@ -2023,10 +2023,10 @@ class StateManager extends EventEmitter {
 
         // if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send2 `)
 
-        if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index results ${utils.stringifyReduce(acceptedTXs)} snippets ${utils.stringifyReduce(payload.debugSnippets)} `)
-        if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index results2:${utils.stringifyReduce(acceptedTXs.map(x => x.id))} snippets:${utils.stringifyReduce(payload.debugSnippets)} txid:${utils.stringifyReduce(txIDList)} `)
-
         if (acceptedTXs != null && acceptedTXs.length < expectedResults) {
+          if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index results ${utils.stringifyReduce(acceptedTXs)} snippets ${utils.stringifyReduce(payload.debugSnippets)} `)
+          if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index results2:${utils.stringifyReduce(acceptedTXs.map(x => x.id))} snippets:${utils.stringifyReduce(payload.debugSnippets)} txid:${utils.stringifyReduce(txIDList)} `)
+
           // find an log missing results:
           // for(let txid of txIDList)
           let received = {}
@@ -5374,10 +5374,10 @@ class StateManager extends EventEmitter {
 
               this.fatalLogger.fatal(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis.' + utils.stringifyReduce(tx))
 
-              return
-              // this.p2p.initApoptosis() // todo turn this back on
+              // return
+              this.p2p.initApoptosis() // todo turn this back on
               // // return { success: false, reason: 'testAccountTime failed' }
-              // break
+              break
             }
 
             let applied = await this.tryApplyTransaction(tx, hasStateTableData, true, acountsFilter, wrappedStates, localCachedData) // TODO app interface changes.. how to get and pass the state wrapped account state in, (maybe simple function right above this
@@ -5680,10 +5680,10 @@ class StateManager extends EventEmitter {
             this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` applyAllPreparedRepairs testAccountTime failed. calling apoptosis.`)
             this.fatalLogger.fatal(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis.' + utils.stringifyReduce(tx))
 
-            return
-            // this.p2p.initApoptosis() // todo turn this back on
+            // return
+            this.p2p.initApoptosis() // todo turn this back on
             // // return { success: false, reason: 'testAccountTime failed' }
-            // break
+            break
           }
 
           let applied = await this.tryApplyTransaction(tx, hasStateTableData, true, acountsFilter, wrappedStates, localCachedData) // TODO app interface changes.. how to get and pass the state wrapped account state in, (maybe simple function right above this
