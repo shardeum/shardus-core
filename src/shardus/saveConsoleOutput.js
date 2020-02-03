@@ -4,10 +4,10 @@ const { PassThrough } = require('stream')
 const { join } = require('path')
 
 function startSaving (baseDir) {
-// Create a file to save combined stdout and stderr output
+  // Create a file to save combined stdout and stderr output
   const outFile = createWriteStream(join(baseDir, 'out.txt'))
 
-  // Create stdout and stderr passthroughs that write to the output file too
+  // Create passthroughs that write to stdout, stderr, and the output file
   const outPass = new PassThrough()
   outPass.pipe(process.stdout)
   outPass.pipe(outFile)
