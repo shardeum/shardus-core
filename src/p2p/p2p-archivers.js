@@ -92,6 +92,9 @@ class P2PArchivers {
 
     const recipientUrl = `http://${recipient.nodeInfo.ip}:${recipient.nodeInfo.port}/newdata`
     http.post(recipientUrl, taggedDataResponse)
+      .catch(err => {
+        this.logError(`addDataRecipient: Failed to post to ${recipientUrl} ` + err)
+      })
   }
 
   removeDataRecipient (publicKey) {
@@ -151,6 +154,9 @@ class P2PArchivers {
     for (const nodeInfo of this.cycleRecipients) {
       const nodeUrl = `http://${nodeInfo.ip}:${nodeInfo.port}/post_partition`
       http.post(nodeUrl, { partitionReceipt, paritionObject })
+        .catch(err => {
+          this.logError(`sendPartitionData: Failed to post to ${nodeUrl} ` + err)
+        })
     }
   }
 
@@ -158,6 +164,9 @@ class P2PArchivers {
     for (const nodeInfo of this.cycleRecipients) {
       const nodeUrl = `http://${nodeInfo.ip}:${nodeInfo.port}/post_transactions`
       http.post(nodeUrl, { partitionNumber, cycleNumber, transactions })
+        .catch(err => {
+          this.logError(`sendTransactionData: Failed to post to ${nodeUrl} ` + err)
+        })
     }
   }
 
