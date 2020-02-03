@@ -369,7 +369,7 @@ class StateManager extends EventEmitter {
     /** @type {Object.<string, PartitionReceipt>} a map of cycle keys to lists of partition receipts.  */
     this.ourPartitionReceiptsByCycleCounter = {}
 
-    this.doDataCleanup = false
+    this.doDataCleanup = true
 
     this.sendArchiveData = false
     this.purgeArchiveData = false
@@ -5903,6 +5903,8 @@ class StateManager extends EventEmitter {
       return
     }
 
+    // todo refactor some of the common code below.  may be put the counters in a map.
+
     // Partition receipts and cycles:
     // partitionObjectsByCycle
     // cycleReceiptsByCycleCounter
@@ -5958,6 +5960,63 @@ class StateManager extends EventEmitter {
         removedshardValuesByCycle++
       }
     }
+
+    // cleanup this.shardValuesByCycle
+    for (let cycleKey of Object.keys(this.shardValuesByCycle)) {
+      let cycle = cycleKey.slice(1)
+      let cycleNum = parseInt(cycle)
+      if (cycleNum < oldestCycle) {
+        // delete old cycle
+        delete this.shardValuesByCycle[cycleKey]
+        removedshardValuesByCycle++
+      }
+    }
+
+    // cleanup this.txByCycleByPartition
+    for (let cycleKey of Object.keys(this.txByCycleByPartition)) {
+      let cycle = cycleKey.slice(1)
+      let cycleNum = parseInt(cycle)
+      if (cycleNum < oldestCycle) {
+        // delete old cycle
+        delete this.txByCycleByPartition[cycleKey]
+        // removedshardValuesByCycle++
+      }
+    }
+    // cleanup this.recentPartitionObjectsByCycleByHash
+    for (let cycleKey of Object.keys(this.recentPartitionObjectsByCycleByHash)) {
+      let cycle = cycleKey.slice(1)
+      let cycleNum = parseInt(cycle)
+      if (cycleNum < oldestCycle) {
+        // delete old cycle
+        delete this.recentPartitionObjectsByCycleByHash[cycleKey]
+        // removedshardValuesByCycle++
+      }
+    }
+    // cleanup this.repairUpdateDataByCycle
+    for (let cycleKey of Object.keys(this.repairUpdateDataByCycle)) {
+      let cycle = cycleKey.slice(1)
+      let cycleNum = parseInt(cycle)
+      if (cycleNum < oldestCycle) {
+        // delete old cycle
+        delete this.repairUpdateDataByCycle[cycleKey]
+        // removedshardValuesByCycle++
+      }
+    }
+    // cleanup this.partitionObjectsByCycle
+    for (let cycleKey of Object.keys(this.partitionObjectsByCycle)) {
+      let cycle = cycleKey.slice(1)
+      let cycleNum = parseInt(cycle)
+      if (cycleNum < oldestCycle) {
+        // delete old cycle
+        delete this.partitionObjectsByCycle[cycleKey]
+        // removedshardValuesByCycle++
+      }
+    }
+
+    // this.txByCycleByPartition
+    // this.recentPartitionObjectsByCycleByHash
+    // this.repairUpdateDataByCycle
+    // this.partitionObjectsByCycle
 
     this.mainLogger.debug(`Clearing out old data Cleared: ${removedrepairTrackingByCycleById} ${removedallPartitionResponsesByCycleByPartition} ${removedourPartitionResultsByCycle} ${removedshardValuesByCycle}`)
 
