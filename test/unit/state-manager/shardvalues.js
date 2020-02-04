@@ -3,6 +3,7 @@ const ShardFunctions = require('../../../src/state-manager/shardFunctions.js')
 
 const crypto = require('shardus-crypto-utils')
 const utils = require('../../../src/utils')
+crypto('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
 
 // generate a sorted list of nodes
 function generateNodes (count, predefinedList = null) {
@@ -120,7 +121,11 @@ let useHardcodenodes = true
 // let hardcodeNodes = ['02f2x50374', '1021xc4369', '1799xd547f', '242ex4bfbd', '30f0xea8a3', '3272x2a306', '4c96x8d210', '584dxd832a', '5c7fx2facc', '5c93x0f2a7', '7180xec580', '736cx7fa64', '750fx967f0', '7899x94a79', '89c9x85be0', '8c8bx815ad', '9adcx77753', 'a15fxd63a0', 'abc6xaa20f', 'd32ax93c1c', 'dc40x2b6ff', 'dd43xf3b5d', 'e986x67b4e', 'f0c4xea4f5', 'f211xb2904']
 // let hardcodeNodes2 = null
 
-let hardcodeNodes = ['0692x2deec', '09afxee4b7', '0f3dxa312c', '18ecx3e3a1', '19c7x99e80', '19dfxcf9c7', '23d5xad4c5', '243dx817b9', '255fxd9030', '2642x4e37c', '3650x09963', '3f22x7a3ac', '42caxd50c0', '5307x662e7', '5e38xcc93f', '62c6xeee41', '653dx9f470', '677bx704a7', '7405xab8a5', '7b92x57e84', '911bx2a167', 'ac56x69db7', 'ae13xaa045', 'af8dxc0da5', 'b234x4ae35', 'c972x70e00', 'd6b5x79ed1', 'd8adxe7bd2', 'dcd7xdd2e1', 'e622xfadab']
+// let hardcodeNodes = ['0692x2deec', '09afxee4b7', '0f3dxa312c', '18ecx3e3a1', '19c7x99e80', '19dfxcf9c7', '23d5xad4c5', '243dx817b9', '255fxd9030', '2642x4e37c', '3650x09963', '3f22x7a3ac', '42caxd50c0', '5307x662e7', '5e38xcc93f', '62c6xeee41', '653dx9f470', '677bx704a7', '7405xab8a5', '7b92x57e84', '911bx2a167', 'ac56x69db7', 'ae13xaa045', 'af8dxc0da5', 'b234x4ae35', 'c972x70e00', 'd6b5x79ed1', 'd8adxe7bd2', 'dcd7xdd2e1', 'e622xfadab']
+// let hardcodeNodes2 = null
+
+//
+let hardcodeNodes = ['11e8xddd45', '12c8xa6128', '1cb5x276fc', '2556x0d3cc', '3636xb84b3', '36f3x39cc0', '3b3dxe390d', '3ca6x4570b', '3eb3x6a829', '462fx9f1ea', '58c8x1d30f', '5e98xb924f', '621fxcdebc', '773fx3f03c', '8226x56b59', '9008x1db00', '98aax3d65a', '9cf3x5a8d6', '9f9dx52237', 'a795xbecb0', 'bf7cx31bf8', 'd69exef4b6', 'f44dxfff17', 'fb18x295a2', 'fcbbx3f509']
 let hardcodeNodes2 = null
 
 // let hardcodeNodes = ['01cex1bed2', '0793xc7aee', '180bx3a172', '24afxce02d', '2d2ax053f6', '30aex6b5ca', '33d7x0a28e', '42bbx0242f', '43cax9b811', '5c70xdee7d', '5fcfx2f32d', '7303xfd71e', '7354xcedbc', '7b78xf936e', '7eabx5deea', '8609xcccf4', '88ecx4c9ab', '8c5axb8364', '93e3x87831', '9a91xb2cd3', '9d1dx51f4a', '9facx0e61c', 'a452x1f73d', 'a8e6xdd19c', 'bef0x7edf8', 'bfa5x12bbf', 'e116x7c34b', 'e89bxde077', 'eae4xeefb1', 'ffc1x1151f']
@@ -235,7 +240,6 @@ for (let i = 0; i < testIterations; i++) {
 
     let closestNodes = getClosestNodes(shardGlobals, parititionShardDataMap, activeNodes, hash, 1)
 
-
     let closestNodes2 = getClosestNodes(shardGlobals, parititionShardDataMap, activeNodes, hash, 2)
 
     let closestNodes3 = getClosestNodes(shardGlobals, parititionShardDataMap, activeNodes, hash, 300)
@@ -244,13 +248,24 @@ for (let i = 0; i < testIterations; i++) {
 
     console.log(`getClosestNodes  ${closestNodes.length}    inDist:${inDist}  nodes:${closestNodes.map((node) => utils.stringifyReduce(node.id)).join(',')}`)
     for (let node of activeNodes) {
-      if(node.id.slice(0,4) === '653d') {
+      if (node.id.slice(0, 4) === '653d') {
         let a = true //  653d  911b
       }
       let inDist2 = isNodeInDistancePartition(shardGlobals, hash, node.id, 2)
       let inDist3 = isNodeInDistance(shardGlobals, parititionShardDataMap, hash, node.id, 2)
 
       console.log(`isNodeInDistance  ${node.id}    inDist:${inDist2}  inDist3:${inDist3}`)
+    }
+
+    let foo = nodeShardDataMap.keys()
+    for (let key of nodeShardDataMap.keys()) {
+      if(key === 'bf7c777777777777777777777777777777777777777777777777777777777777'){
+        let a = 1
+      }
+      let nodeData = nodeShardDataMap.get(key)
+      let partitions2 = ShardFunctions.getStoredPartitionList(shardGlobals, nodeData)
+   
+      console.log(`node stored: ${utils.stringifyReduce(partitions2)} ${key}`)
     }
   }
 

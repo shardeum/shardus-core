@@ -775,7 +775,7 @@ class ShardFunctions {
   static getStoredPartitionList (shardGlobals, nodeShardData) {
     let storedPartitionList = []
     if (nodeShardData.storedPartitions.partitionStart <= nodeShardData.storedPartitions.partitionEnd) {
-      for (let i = 0; i <= nodeShardData.storedPartitions.partitionEnd; i++) {
+      for (let i = nodeShardData.storedPartitions.partitionStart; i <= nodeShardData.storedPartitions.partitionEnd; i++) {
         storedPartitionList.push(i)
       }
     } else {
