@@ -14,31 +14,46 @@
             "type": "node",
             "request": "launch",
             "name": "otherTests",
-            "program": "${workspaceFolder}\\test\\unit\\state-manager\\otherTests.js"
+            "program": "${workspaceFolder}\\test\\unit\\state-manager\\otherTests.js",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
         },
         {
             "type": "node",
             "request": "launch",
             "name": "testhash",
-            "program": "${workspaceFolder}\\test\\unit\\state-manager\\testhash.js"
+            "program": "${workspaceFolder}\\test\\unit\\state-manager\\testhash.js",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
         },
         {
             "type": "node",
             "request": "launch",
             "name": "shardValues",
-            "program": "${workspaceFolder}\\test\\unit\\state-manager\\shardvalues.js"
+            "program": "${workspaceFolder}\\test\\unit\\state-manager\\shardvalues.js",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
         },
         {
             "type": "node",
             "request": "launch",
             "name": "hashset2",
-            "program": "${workspaceFolder}\\test\\unit\\state-manager\\hashset2.js"
+            "program": "${workspaceFolder}\\test\\unit\\state-manager\\hashset2.js",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
         },    
         {
             "type": "node",
             "request": "launch",
             "name": "functionTests",
-            "program": "${workspaceFolder}\\test\\unit\\state-manager\\functionTests.js"
+            "program": "${workspaceFolder}\\test\\unit\\state-manager\\functionTests.js",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
         },     
         {
             //this seems to work pretty well when other methods are breaking.
@@ -49,20 +64,29 @@
             "port": 9229,
             //"restart": true,
             "sourceMaps": true,
-            "protocol": "inspector" 
+            "protocol": "inspector" ,
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
         },
         {
             "type": "node",
             "request": "attach",
             "name": "Attach by Process ID legacy 5858",
             "processId": "${command:PickProcess}",
-            "port": 5858
+            "port": 5858,
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
         },        
         {
             "type": "node",
             "request": "launch",
             "name": "Launch Program",
-            "program": "${workspaceFolder}\\index.js"
+            "program": "${workspaceFolder}\\index.js",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
         }
     ]
 }
