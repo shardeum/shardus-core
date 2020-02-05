@@ -105,6 +105,7 @@ class Network extends EventEmitter {
       const promise = this.sn.send(node.internalPort, node.internalIp, data)
       promise.catch(err => {
         this.mainLogger.error('Network: ' + err)
+        this.mainLogger.error(err.stack)
         this.emit('error', node)
       })
       promises.push(promise)
@@ -132,6 +133,7 @@ class Network extends EventEmitter {
       const onTimeout = () => {
         const err = new Error('Request timed out.')
         this.mainLogger.error('Network: ' + err)
+        this.mainLogger.error(err.stack)
         this.emit('timeout', node)
         reject(err)
       }
