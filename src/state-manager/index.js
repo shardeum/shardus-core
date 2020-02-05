@@ -6373,6 +6373,19 @@ class StateManager extends EventEmitter {
   }
 
   /**
+   * sortTXRecords
+   * @param {TempTxRecord} a
+   * @param {TempTxRecord} b
+   * @returns {number}
+   */
+  sortTXRecords (a, b) {
+    if (a.acceptedTx.timestamp === b.acceptedTx.timestamp) {
+      return utils.sortAsc(a.acceptedTx.id, b.acceptedTx.id)
+    }
+    return a.acceptedTx.timestamp - b.acceptedTx.timestamp
+  }
+
+  /**
    * processTempTXs
    * call this before we start computing partitions so that we can make sure to get the TXs we need out of the temp list
    * @param {Cycle} cycle
@@ -6387,6 +6400,10 @@ class StateManager extends EventEmitter {
     let newTempTX = []
     let cycleEnd = (cycle.start + cycle.duration) * 1000
     cycleEnd -= this.syncSettleTime // adjust by sync settle time
+
+    // sort our records before recording them!
+    this.tempTXRecords.sort(this.sortTXRecords)
+
     for (let txRecord of this.tempTXRecords) {
       if (txRecord.redacted > 0) {
         if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair recordTXByCycle: ${utils.makeShortHash(txRecord.acceptedTx.id)} cycle: ${cycle.counter} redacted!!! ${txRecord.redacted}`)
