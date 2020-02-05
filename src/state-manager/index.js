@@ -44,7 +44,12 @@ const cHashSetDataStepSize = 2
 /**
    * @typedef {import('./shardFunctions.js').ShardInfo} ShardInfo
    */
-
+/**
+   * @typedef {import('./shardFunctions.js').AddressRange} AddressRange
+   */
+/**
+   * @typedef {import('./shardFunctions.js').BasicAddressRange} BasicAddressRange
+   */
 // ///////////////////////// Lots of type definitions for partitions
 
 /**
@@ -141,6 +146,38 @@ const cHashSetDataStepSize = 2
  * @property {boolean} processed
  * @property {any[]} states below 0 for not redacted. a value above zero indicates the cycle this was redacted
  * @property {any} [newTxList] this gets added on when we are reparing something newTxList seems to have a different format than existing types.
+ */
+
+/**
+ * @typedef {Object} QueueEntry
+ * @property {AcceptedTx} acceptedTx
+ * @property {any} txKeys
+ * @property {any} collectedData
+ * @property {any} originalData
+ * @property {any} homeNodes
+ * @property {boolean} hasShardInfo
+ * @property {string} state
+ * @property {number} dataCollected
+ * @property {boolean} hasAll
+ * @property {number} entryID based on the incrementing queueEntryCounter
+ * @property {Object.<string,boolean>} localKeys
+ * @property {any} localCachedData
+ * @property {number} syncCounter
+ * @property {boolean} didSync
+ * @property {any[]} syncKeys
+ * @property {any} [uniqueKeys]
+ * @property {boolean} [ourNodeInvolved]
+ * @property {Node[]} [transactionGroup]
+ */
+
+/**
+ * @typedef {Object} SyncTracker
+ * @property {boolean} syncStarted
+ * @property {boolean} syncFinished
+ * @property {any} range
+ * @property {number} cycle
+ * @property {number} index
+ * @property {QueueEntry[]} queueEntries
  */
 
 // txList = { hashes: [], passed: [], txs: [], processed: false, states: [] }
@@ -288,6 +325,7 @@ class StateManager extends EventEmitter {
     this.lastSeenAccountsMap = null
 
     this.clearPartitionData()
+    /** @type {SyncTracker[]} */
     this.syncTrackers = []
     this.runtimeSyncTrackerSyncing = false
 
@@ -529,9 +567,7 @@ class StateManager extends EventEmitter {
     if (this.shardValuesByCycle == null) {
       return null
     }
-
     let shardData = this.shardValuesByCycle.get(cycleNumber)
-
     return shardData
   }
 
@@ -555,7 +591,8 @@ class StateManager extends EventEmitter {
       this.logger.playbackLogNote('shrd_sync_change', `${oldShardData.cycleNumber}->${newSharddata.cycleNumber}`, ` ${ShardFunctions.leadZeros8((change.start).toString(16))}->${ShardFunctions.leadZeros8((change.end).toString(16))} `)
 
       // create a range object from our coverage change.
-      let range = {}
+      /** @type {BasicAddressRange} */
+      let range = { startAddr: 0, endAddr: 0, low: '', high: '' } // this init is a somewhat wastefull way to allow the type to be happy.
       range.startAddr = change.start
       range.endAddr = change.end
       range.low = ShardFunctions.leadZeros8((range.startAddr).toString(16)) + '0'.repeat(56)
@@ -706,10 +743,17 @@ class StateManager extends EventEmitter {
   //   return syncTracker
   // }
 
+  /**
+   * createSyncTrackerByRange
+   * @param {BasicAddressRange} range
+   * @param {number} cycle
+   * @return {SyncTracker}
+   */
   createSyncTrackerByRange (range, cycle) {
     // let partition = -1
     let index = this.syncTrackerIndex++
-    let syncTracker = { range, queueEntries: [], cycle, index } // partition,
+    /** @type {SyncTracker} */
+    let syncTracker = { range, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false } // partition,
     syncTracker.syncStarted = false
     syncTracker.syncFinished = false
 
@@ -2843,6 +2887,7 @@ class StateManager extends EventEmitter {
     let txId = acceptedTx.receipt.txHash
 
     this.queueEntryCounter++
+    /** @type {QueueEntry} */
     let txQueueEntry = { acceptedTx: acceptedTx, txKeys: keysResponse, collectedData: {}, originalData: {}, homeNodes: {}, hasShardInfo: false, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [] } // age comes from timestamp
     // partition data would store stuff like our list of nodes that store this ts
     // collected data is remote data we have recieved back
@@ -2953,6 +2998,9 @@ class StateManager extends EventEmitter {
       this.fatalLogger.fatal('DATASYNC: newAcceptedTxQueueRunning')
       return
     }
+
+    this.logger.playbackLogNote('_firstTimeQueueAwait', `this.newAcceptedTxQueue.length:${this.newAcceptedTxQueue.length} this.newAcceptedTxQueue.length:${this.newAcceptedTxQueue.length}`)
+
     await this.processAcceptedTxQueue()
   }
 
@@ -3098,6 +3146,11 @@ class StateManager extends EventEmitter {
     }
   }
 
+  /**
+   * queueEntryGetTransactionGroup
+   * @param {QueueEntry} queueEntry
+   * @returns {Node[]}
+   */
   queueEntryGetTransactionGroup (queueEntry) {
     if (queueEntry.transactionGroup != null) {
       return queueEntry.transactionGroup
@@ -4508,6 +4561,7 @@ class StateManager extends EventEmitter {
     let payload = { Cycle_number: topResult.Cycle_number, Partition_id: topResult.Partition_id }
     /** @type {PartitionObject} */
     let partitionObject = await this.p2p.ask(nodeToContact, 'get_partition_txids', payload)
+    // @ts-ignore This will get fixed when we go to throwing exceptions!
     if (partitionObject === false) { this.mainLogger.error('ASK FAIL 12') }
 
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: partitionObject: ' + utils.stringifyReduce(partitionObject))
@@ -5384,10 +5438,10 @@ class StateManager extends EventEmitter {
             let success = await this.testAccountTime(tx.data, wrappedStates)
 
             if (!success) {
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis.' + utils.stringifyReduce(tx))
-              this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` testAccountTime failed. calling apoptosis.`)
+              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs' + utils.stringifyReduce(tx))
+              this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs`)
 
-              this.fatalLogger.fatal(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis.' + utils.stringifyReduce(tx))
+              this.fatalLogger.fatal(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs' + utils.stringifyReduce(tx))
 
               // return
               this.p2p.initApoptosis() // todo turn this back on
@@ -5691,9 +5745,9 @@ class StateManager extends EventEmitter {
           let success = await this.testAccountTime(tx.data, wrappedStates)
 
           if (!success) {
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' applyAllPreparedRepairs testAccountTime failed. calling apoptosis.' + utils.stringifyReduce(tx))
-            this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` applyAllPreparedRepairs testAccountTime failed. calling apoptosis.`)
-            this.fatalLogger.fatal(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis.' + utils.stringifyReduce(tx))
+            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs' + utils.stringifyReduce(tx))
+            this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs`)
+            this.fatalLogger.fatal(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis. applyAllPreparedRepairs' + utils.stringifyReduce(tx))
 
             // return
             this.p2p.initApoptosis() // todo turn this back on
@@ -6069,6 +6123,14 @@ class StateManager extends EventEmitter {
       let coverCount = 0
       for (let nodeId in partitionShardData.storedBy) {
         if (partitionShardData.storedBy.hasOwnProperty(nodeId)) {
+          // Test if node is active!!
+          let possibleNode = partitionShardData.storedBy[nodeId]
+
+          if (possibleNode.status !== 'active') {
+            // don't count non active nodes for participating in the system.
+            continue
+          }
+
           coverCount++
           let partitionResultsToSend
           // If we haven't recorded this node yet create a new results object for it
@@ -6208,6 +6270,11 @@ class StateManager extends EventEmitter {
         return
       }
 
+      if (this.currentCycleShardData.ourNode.status !== 'active') {
+        // dont participate just yet.
+        return
+      }
+
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startSyncPartitions:cycle_q2_start cycle: ${lastCycle.counter}`)
       // this will take temp TXs and make sure they are stored in the correct place for us to generate partitions
       this.processTempTXs(lastCycle)
@@ -6246,6 +6313,7 @@ class StateManager extends EventEmitter {
 
     let cycle = this.p2p.state.getCycleByTimestamp(txTimestamp + this.syncSettleTime)
     let cycleOffset = 0
+    // todo review this assumption. seems ok at the moment.  are there times cycle could be null and getting the last cycle is not a valid answer?
     if (cycle == null) {
       cycle = this.p2p.state.getLastCycle()
       // if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable error getting cycle by timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle returned:${cycle.counter} `)

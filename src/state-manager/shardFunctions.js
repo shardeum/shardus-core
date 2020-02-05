@@ -87,6 +87,14 @@ const stringify = require('fast-stable-stringify')
    * @property {string} high End address in 64 char string
    */
 
+/**
+   * @typedef {Object} BasicAddressRange A range of addresses
+   * @property {number} startAddr Start address in numeric form (4 bytes)
+   * @property {number} endAddr End address in numeric form (4 bytes)
+   * @property {string} low End address in 64 char string
+   * @property {string} high End address in 64 char string
+   */
+
 class ShardFunctions {
   /**
    * calculateShardGlobals
