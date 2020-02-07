@@ -2,7 +2,8 @@
   "name": "shardus-global-server",
   "version": "0.0.0",
   "description": "The Shardus Global Server",
-  "main": "index.js",
+  "main": "./build/src/index.js",
+  "types": "./build/src/index.d.ts",
   "config": {
     "dist": "./dist"
   },
@@ -16,7 +17,14 @@
     "cover": "nyc tap --timeout=0 \"test/**/*.spec.js\" --coverage-report=html && codecov",
     "doc": "typedoc --includeDeclarations --excludeExternals --mode file --tsconfig tdconfig.json --out docs",
     "doc-json": "typedoc --includeDeclarations --excludeExternals --mode file --tsconfig tdconfig.json --json documentation.json",
-    "build": "webpack && node scripts/build.js"
+    "build": "webpack && node scripts/build.js",
+    "check": "gts check",
+    "clean": "gts clean",
+    "compile": "tsc -p .",
+    "fix": "gts fix",
+    "prepare": "npm run compile",
+    "pretest": "npm run compile",
+    "posttest": "npm run check"
   },
   "repository": {
     "type": "git",
@@ -52,6 +60,9 @@
     "vorpal": "1.12.0",
     "webpack": "4.36.1",
     "webpack-cli": "3.3.6",
-    "webpack-node-externals": "1.7.2"
+    "webpack-node-externals": "1.7.2",
+    "gts": "^1.1.2",
+    "typescript": "~3.7.0",
+    "@types/node": "^10.0.3"
   }
 }

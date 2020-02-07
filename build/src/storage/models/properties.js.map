@@ -1,0 +1,1 @@
+{"version":3,"file":"properties.js","sourceRoot":"","sources":["../../../../src/storage/models/properties.js"],"names":[],"mappings":";AAAA,MAAM,SAAS,GAAG,OAAO,CAAC,WAAW,CAAC,CAAA;AAEtC,MAAM,CAAC,OAAO,GAAG;IACf,YAAY;IACZ;QACE,GAAG,EAAE,EAAE,IAAI,EAAE,SAAS,CAAC,MAAM,EAAE,SAAS,EAAE,KAAK,EAAE,UAAU,EAAE,IAAI,EAAE;QACnE,KAAK,EAAE,SAAS,CAAC,IAAI;KACtB;CACF,CAAA"}

@@ -1,0 +1,33 @@
+export = Logger;
+declare class Logger {
+    constructor(baseDir: any, config: any);
+    baseDir: any;
+    config: any;
+    logs: {};
+    logDir: string | null;
+    log4Conf: any;
+    _checkValidConfig(): void;
+    _addFileNamesToAppenders(): void;
+    _configureLogs(): import("log4js").Log4js;
+    getLogger(logger: any): import("log4js").Logger;
+    _setupLogs(): void;
+    playbackLogEnabled: boolean | undefined;
+    _playbackLogger: import("log4js").Logger | undefined;
+    _playbackTrace: boolean | undefined;
+    _playbackDebug: boolean | undefined;
+    _seenAddresses: {} | undefined;
+    _shortStrings: {} | undefined;
+    _playbackOwner_host: string | undefined;
+    _playbackOwner: string | undefined;
+    _playbackIPInfo: any;
+    _nodeInfos: {} | undefined;
+    shutdown(): Promise<any>;
+    setPlaybackIPInfo(ipInfo: any): void;
+    setPlaybackID(nodeID: any): void;
+    _playbackNodeID: any;
+    identifyNode(input: any): any;
+    processDesc(desc: any): any;
+    playbackLog(from: any, to: any, type: any, endpoint: any, id: any, desc: any): void;
+    playbackLogState(newState: any, id: any, desc: any): void;
+    playbackLogNote(noteCategory: any, id: any, desc: any): void;
+}
