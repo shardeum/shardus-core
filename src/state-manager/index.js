@@ -6005,26 +6005,30 @@ class StateManager extends EventEmitter {
     }
 
     // cleanup this.shardValuesByCycle
-    for (let cycleKey of Object.keys(this.shardValuesByCycle)) {
-      let cycle = cycleKey.slice(1)
-      let cycleNum = parseInt(cycle)
+    for (let cycleKey of this.shardValuesByCycle.keys()) {
+      let cycleNum = cycleKey
       if (cycleNum < oldestCycle) {
         // delete old cycle
-        delete this.shardValuesByCycle[cycleKey]
+        this.shardValuesByCycle.delete(cycleNum)
         removedshardValuesByCycle++
       }
     }
 
-    // cleanup this.shardValuesByCycle
-    for (let cycleKey of Object.keys(this.shardValuesByCycle)) {
-      let cycle = cycleKey.slice(1)
-      let cycleNum = parseInt(cycle)
-      if (cycleNum < oldestCycle) {
-        // delete old cycle
-        delete this.shardValuesByCycle[cycleKey]
-        removedshardValuesByCycle++
-      }
-    }
+    // // cleanup this.shardValuesByCycle
+    // for (let cycleKey of Object.keys(this.shardValuesByCycle)) {
+    //   let cycle = cycleKey.slice(1)
+    //   let cycleNum = parseInt(cycle)
+    //   if (cycleNum < oldestCycle) {
+    //     // delete old cycle
+    //     delete this.shardValuesByCycle[cycleKey]
+    //     removedshardValuesByCycle++
+    //   }
+    // }
+
+    let removedtxByCycleByPartition = 0
+    let removedrecentPartitionObjectsByCycleByHash = 0
+    let removedrepairUpdateDataByCycle = 0
+    let removedpartitionObjectsByCycle = 0
 
     // cleanup this.txByCycleByPartition
     for (let cycleKey of Object.keys(this.txByCycleByPartition)) {
@@ -6033,7 +6037,7 @@ class StateManager extends EventEmitter {
       if (cycleNum < oldestCycle) {
         // delete old cycle
         delete this.txByCycleByPartition[cycleKey]
-        // removedshardValuesByCycle++
+        removedtxByCycleByPartition++
       }
     }
     // cleanup this.recentPartitionObjectsByCycleByHash
@@ -6043,7 +6047,7 @@ class StateManager extends EventEmitter {
       if (cycleNum < oldestCycle) {
         // delete old cycle
         delete this.recentPartitionObjectsByCycleByHash[cycleKey]
-        // removedshardValuesByCycle++
+        removedrecentPartitionObjectsByCycleByHash++
       }
     }
     // cleanup this.repairUpdateDataByCycle
@@ -6053,7 +6057,7 @@ class StateManager extends EventEmitter {
       if (cycleNum < oldestCycle) {
         // delete old cycle
         delete this.repairUpdateDataByCycle[cycleKey]
-        // removedshardValuesByCycle++
+        removedrepairUpdateDataByCycle++
       }
     }
     // cleanup this.partitionObjectsByCycle
@@ -6063,16 +6067,37 @@ class StateManager extends EventEmitter {
       if (cycleNum < oldestCycle) {
         // delete old cycle
         delete this.partitionObjectsByCycle[cycleKey]
-        // removedshardValuesByCycle++
+        removedpartitionObjectsByCycle++
       }
     }
 
-    // this.txByCycleByPartition
-    // this.recentPartitionObjectsByCycleByHash
-    // this.repairUpdateDataByCycle
-    // this.partitionObjectsByCycle
+    let removepartitionReceiptsByCycleCounter = 0
+    let removeourPartitionReceiptsByCycleCounter = 0
+    // cleanup this.partitionReceiptsByCycleCounter
+    for (let cycleKey of Object.keys(this.partitionReceiptsByCycleCounter)) {
+      let cycle = cycleKey.slice(1)
+      let cycleNum = parseInt(cycle)
+      if (cycleNum < oldestCycle) {
+        // delete old cycle
+        delete this.partitionReceiptsByCycleCounter[cycleKey]
+        removepartitionReceiptsByCycleCounter++
+      }
+    }
 
-    this.mainLogger.debug(`Clearing out old data Cleared: ${removedrepairTrackingByCycleById} ${removedallPartitionResponsesByCycleByPartition} ${removedourPartitionResultsByCycle} ${removedshardValuesByCycle}`)
+    // cleanup this.ourPartitionReceiptsByCycleCounter
+    for (let cycleKey of Object.keys(this.ourPartitionReceiptsByCycleCounter)) {
+      let cycle = cycleKey.slice(1)
+      let cycleNum = parseInt(cycle)
+      if (cycleNum < oldestCycle) {
+        // delete old cycle
+        delete this.ourPartitionReceiptsByCycleCounter[cycleKey]
+        removeourPartitionReceiptsByCycleCounter++
+      }
+    }
+
+    // archivedQueueEntries todo?  could walk through the list and get rid of really old txs? (but growth is capped at 10k elements)
+
+    this.mainLogger.debug(`Clearing out old data Cleared: ${removedrepairTrackingByCycleById} ${removedallPartitionResponsesByCycleByPartition} ${removedourPartitionResultsByCycle} ${removedshardValuesByCycle} ${removedtxByCycleByPartition} ${removedrecentPartitionObjectsByCycleByHash} ${removedrepairUpdateDataByCycle} ${removedpartitionObjectsByCycle} ${removepartitionReceiptsByCycleCounter} ${removeourPartitionReceiptsByCycleCounter}`)
 
     // TODO 1 calculate timestamp for oldest accepted TX to delete.
 
@@ -6241,7 +6266,7 @@ class StateManager extends EventEmitter {
       }
 
       // do this every 5 cycles.
-      if (lastCycle % 5 !== 0) {
+      if (lastCycle.counter % 5 !== 0) {
         return
       }
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startSyncPartitions:cycle_q3_start cycle: ${lastCycle.counter}`)
