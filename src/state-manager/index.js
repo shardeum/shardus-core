@@ -168,6 +168,7 @@ const cHashSetDataStepSize = 2
  * @property {any} [uniqueKeys]
  * @property {boolean} [ourNodeInvolved]
  * @property {Node[]} [transactionGroup]
+ * @property {number} [approximateCycleAge]
  */
 
 /**
@@ -317,7 +318,10 @@ class StateManager extends EventEmitter {
 
     this.newAcceptedTxQueue = []
     this.newAcceptedTxQueueTempInjest = []
+    /** @type {QueueEntry[]} */
     this.archivedQueueEntries = []
+    /** @type {number} archivedQueueEntryMaxCount is a maximum amount of queue entries to store, usually we should never have this many stored since tx age will be used to clean up the list  */
+    this.archivedQueueEntryMaxCount = 50000
     this.newAcceptedTxQueueRunning = false
     this.dataSyncMainPhaseComplete = false
     this.queueEntryCounter = 0
@@ -3039,6 +3043,8 @@ class StateManager extends EventEmitter {
         return queueEntry
       }
     }
+    // todo make this and error.
+    this.mainLogger.error(`getQueueEntryArchived failed to find: ${txid}`)
   }
 
   queueEntryAddData (queueEntry, data) {
@@ -3281,10 +3287,16 @@ class StateManager extends EventEmitter {
     }
   }
 
+  /**
+   * removeFromQueue remove an item from the queue and place it in the archivedQueueEntries list for awhile in case we have to access it again
+   * @param {QueueEntry} queueEntry
+   * @param {number} currentIndex
+   */
   removeFromQueue (queueEntry, currentIndex) {
     this.newAcceptedTxQueue.splice(currentIndex, 1)
     this.archivedQueueEntries.push(queueEntry)
-    if (this.archivedQueueEntries.length > 10000) {
+    // period cleanup will usually get rid of these sooner if the list fills up
+    if (this.archivedQueueEntries.length > this.archivedQueueEntryMaxCount) {
       this.archivedQueueEntries.shift()
     }
   }
@@ -3392,6 +3404,7 @@ class StateManager extends EventEmitter {
             lastTx = this.newAcceptedTxQueue[index]
           }
 
+          txQueueEntry.approximateCycleAge = this.currentCycleShardData.cycleNumber
           this.newAcceptedTxQueue.splice(index + 1, 0, txQueueEntry)
           this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)} indexInserted: ${index + 1}`)
           this.emit('txQueued', acceptedTx.receipt.txHash)
@@ -6095,9 +6108,22 @@ class StateManager extends EventEmitter {
       }
     }
 
-    // archivedQueueEntries todo?  could walk through the list and get rid of really old txs? (but growth is capped at 10k elements)
+    // start at the front of the archivedQueueEntries fifo and remove old entries untill they are current.
+    let oldQueueEntries = true
+    let archivedEntriesRemoved = 0
+    while (oldQueueEntries && this.archivedQueueEntries.length > 0) {
+      let queueEntry = this.archivedQueueEntries[0]
+      // the time is approximate so make sure it is older than five cycles.
+      if (queueEntry.approximateCycleAge && queueEntry.approximateCycleAge < oldestCycle - 1) {
+        this.archivedQueueEntries.shift()
+        archivedEntriesRemoved++
+      } else {
+        oldQueueEntries = false
+        break
+      }
+    }
 
-    this.mainLogger.debug(`Clearing out old data Cleared: ${removedrepairTrackingByCycleById} ${removedallPartitionResponsesByCycleByPartition} ${removedourPartitionResultsByCycle} ${removedshardValuesByCycle} ${removedtxByCycleByPartition} ${removedrecentPartitionObjectsByCycleByHash} ${removedrepairUpdateDataByCycle} ${removedpartitionObjectsByCycle} ${removepartitionReceiptsByCycleCounter} ${removeourPartitionReceiptsByCycleCounter}`)
+    this.mainLogger.debug(`Clearing out old data Cleared: ${removedrepairTrackingByCycleById} ${removedallPartitionResponsesByCycleByPartition} ${removedourPartitionResultsByCycle} ${removedshardValuesByCycle} ${removedtxByCycleByPartition} ${removedrecentPartitionObjectsByCycleByHash} ${removedrepairUpdateDataByCycle} ${removedpartitionObjectsByCycle} ${removepartitionReceiptsByCycleCounter} ${removeourPartitionReceiptsByCycleCounter} archQ:${archivedEntriesRemoved}`)
 
     // TODO 1 calculate timestamp for oldest accepted TX to delete.
 
@@ -6269,9 +6295,9 @@ class StateManager extends EventEmitter {
       if (lastCycle.counter % 5 !== 0) {
         return
       }
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startSyncPartitions:cycle_q3_start cycle: ${lastCycle.counter}`)
 
       if (this.doDataCleanup === true) {
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startSyncPartitions:cycle_q3_start-clean cycle: ${lastCycle.counter}`)
         // clean up cycle data that is more than 10 cycles old.
         this.periodicCycleDataCleanup(lastCycle.counter - 10)
       }
