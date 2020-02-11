@@ -369,6 +369,18 @@ const sortHashAsc = (a, b) => {
   return a === b ? 0 : a.hash < b.hash ? -1 : 1
 }
 
+const sortAscProp = (a, b, propName) => {
+  let aVal = a[propName]
+  let bVal = b[propName]
+  return aVal === bVal ? 0 : aVal < bVal ? -1 : 1
+}
+
+const sortDecProp = (a, b, propName) => {
+  let aVal = a[propName]
+  let bVal = b[propName]
+  return aVal === bVal ? 0 : aVal > bVal ? -1 : 1
+}
+
 exports.sleep = sleep
 exports.getTime = getTime
 exports.deepCopy = deepCopy
@@ -389,4 +401,6 @@ exports.stringifyReduceLimit = stringifyReduceLimit
 exports.robustPromiseAll = robustPromiseAll
 exports.sortAsc = sortAsc
 exports.sortDec = sortDec
+exports.sortAscProp = sortAscProp
+exports.sortDecProp = sortDecProp
 exports.sortHashAsc = sortHashAsc

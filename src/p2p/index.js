@@ -1752,6 +1752,10 @@ class P2P extends EventEmitter {
     if (this.verboseLogs) this.mainLogger.debug(`End of sendGossip(${utils.stringifyReduce(payload)})`)
   }
 
+  sortByID (first, second) {
+    return utils.sortAscProp(first, second, 'id')
+  }
+
   /**
    * Send Gossip to all nodes, using gossip in
    */
@@ -1770,7 +1774,8 @@ class P2P extends EventEmitter {
       if (this.verboseLogs) this.mainLogger.debug(`Gossip already sent: ${gossipHash.substring(0, 5)}`)
       return
     }
-    nodes.sort((first, second) => first.id.localeCompare(second.id, 'en', { sensitivity: 'variant' }))
+    // nodes.sort((first, second) => first.id.localeCompare(second.id, 'en', { sensitivity: 'variant' }))
+    nodes.sort(this.sortByID)
     const nodeIdxs = new Array(nodes.length).fill(0).map((curr, idx) => idx)
     // Find out your own index in the nodes array
     const myIdx = nodes.findIndex(node => node.id === this.id)

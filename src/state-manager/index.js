@@ -5986,7 +5986,7 @@ class StateManager extends EventEmitter {
     // cleanup old repair trackers
     for (let cycleKey of Object.keys(this.repairTrackingByCycleById)) {
       let cycle = cycleKey.slice(1)
-      let cycleNum = parseInt(cycle)
+      let cycleNum = parseInt(cycle, 10)
       if (cycleNum < oldestCycle) {
         // delete old cycle
         delete this.repairTrackingByCycleById[cycleKey]
@@ -5999,7 +5999,7 @@ class StateManager extends EventEmitter {
     // let ourPartitionValues = this.ourPartitionResultsByCycle[key]
     for (let cycleKey of Object.keys(this.allPartitionResponsesByCycleByPartition)) {
       let cycle = cycleKey.slice(1)
-      let cycleNum = parseInt(cycle)
+      let cycleNum = parseInt(cycle, 10)
       if (cycleNum < oldestCycle) {
         // delete old cycle
         delete this.allPartitionResponsesByCycleByPartition[cycleKey]
@@ -6009,7 +6009,7 @@ class StateManager extends EventEmitter {
 
     for (let cycleKey of Object.keys(this.ourPartitionResultsByCycle)) {
       let cycle = cycleKey.slice(1)
-      let cycleNum = parseInt(cycle)
+      let cycleNum = parseInt(cycle, 10)
       if (cycleNum < oldestCycle) {
         // delete old cycle
         delete this.ourPartitionResultsByCycle[cycleKey]
@@ -6030,7 +6030,7 @@ class StateManager extends EventEmitter {
     // // cleanup this.shardValuesByCycle
     // for (let cycleKey of Object.keys(this.shardValuesByCycle)) {
     //   let cycle = cycleKey.slice(1)
-    //   let cycleNum = parseInt(cycle)
+    //   let cycleNum = parseInt(cycle, 10)
     //   if (cycleNum < oldestCycle) {
     //     // delete old cycle
     //     delete this.shardValuesByCycle[cycleKey]
@@ -6046,7 +6046,7 @@ class StateManager extends EventEmitter {
     // cleanup this.txByCycleByPartition
     for (let cycleKey of Object.keys(this.txByCycleByPartition)) {
       let cycle = cycleKey.slice(1)
-      let cycleNum = parseInt(cycle)
+      let cycleNum = parseInt(cycle, 10)
       if (cycleNum < oldestCycle) {
         // delete old cycle
         delete this.txByCycleByPartition[cycleKey]
@@ -6056,7 +6056,7 @@ class StateManager extends EventEmitter {
     // cleanup this.recentPartitionObjectsByCycleByHash
     for (let cycleKey of Object.keys(this.recentPartitionObjectsByCycleByHash)) {
       let cycle = cycleKey.slice(1)
-      let cycleNum = parseInt(cycle)
+      let cycleNum = parseInt(cycle, 10)
       if (cycleNum < oldestCycle) {
         // delete old cycle
         delete this.recentPartitionObjectsByCycleByHash[cycleKey]
@@ -6066,7 +6066,7 @@ class StateManager extends EventEmitter {
     // cleanup this.repairUpdateDataByCycle
     for (let cycleKey of Object.keys(this.repairUpdateDataByCycle)) {
       let cycle = cycleKey.slice(1)
-      let cycleNum = parseInt(cycle)
+      let cycleNum = parseInt(cycle, 10)
       if (cycleNum < oldestCycle) {
         // delete old cycle
         delete this.repairUpdateDataByCycle[cycleKey]
@@ -6076,7 +6076,7 @@ class StateManager extends EventEmitter {
     // cleanup this.partitionObjectsByCycle
     for (let cycleKey of Object.keys(this.partitionObjectsByCycle)) {
       let cycle = cycleKey.slice(1)
-      let cycleNum = parseInt(cycle)
+      let cycleNum = parseInt(cycle, 10)
       if (cycleNum < oldestCycle) {
         // delete old cycle
         delete this.partitionObjectsByCycle[cycleKey]
@@ -6089,7 +6089,7 @@ class StateManager extends EventEmitter {
     // cleanup this.partitionReceiptsByCycleCounter
     for (let cycleKey of Object.keys(this.partitionReceiptsByCycleCounter)) {
       let cycle = cycleKey.slice(1)
-      let cycleNum = parseInt(cycle)
+      let cycleNum = parseInt(cycle, 10)
       if (cycleNum < oldestCycle) {
         // delete old cycle
         delete this.partitionReceiptsByCycleCounter[cycleKey]
@@ -6100,7 +6100,7 @@ class StateManager extends EventEmitter {
     // cleanup this.ourPartitionReceiptsByCycleCounter
     for (let cycleKey of Object.keys(this.ourPartitionReceiptsByCycleCounter)) {
       let cycle = cycleKey.slice(1)
-      let cycleNum = parseInt(cycle)
+      let cycleNum = parseInt(cycle, 10)
       if (cycleNum < oldestCycle) {
         // delete old cycle
         delete this.ourPartitionReceiptsByCycleCounter[cycleKey]
