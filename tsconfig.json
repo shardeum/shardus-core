@@ -6,6 +6,8 @@
     "allowJs": true,
     "resolveJsonModule": true,
     "noEmitOnError": false,
+    "strict": true,
+    "noImplicitAny": false
   },
   "include": [
     "src/**/*.js",
