@@ -6,11 +6,11 @@
     "allowJs": true,
     "resolveJsonModule": true,
     "noEmitOnError": false,
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "noImplicitReturns": true,
-    "noImplicitThis": true
+    "strict": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "noImplicitReturns": false,
+    "noImplicitThis": false
   },
   "include": [
     "src/**/*.js",
