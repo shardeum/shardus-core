@@ -428,7 +428,7 @@ class Shardus extends EventEmitter {
   }
 
   /**
- * @typedef {import('../shardus/index').Node} Node
+ * @typedef {import('../shardus/index.js').Node} Node
  */
   /**
    * getClosestNodes finds the closes nodes to a certain hash value

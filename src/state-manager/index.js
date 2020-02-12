@@ -17,23 +17,23 @@ const cHashSetDataStepSize = 2
    */
 
 /**
-   * @typedef {import('../shardus/index').App} App
+   * @typedef {import('../shardus/index.js').App} App
    */
 
 /**
-   * @typedef {import('../shardus/index').Cycle} Cycle
+   * @typedef {import('../shardus/index.js').Cycle} Cycle
    */
 /**
-   * @typedef {import('../shardus/index').Sign} Sign
+   * @typedef {import('../shardus/index.js').Sign} Sign
    */
 /**
- * @typedef {import('../shardus/index').Node} Node
+ * @typedef {import('../shardus/index.js').Node} Node
  */
 /**
-   * @typedef {import('../shardus/index').AcceptedTx} AcceptedTx
+   * @typedef {import('../shardus/index.js').AcceptedTx} AcceptedTx
    */
 /**
-   * @typedef {import('../shardus/index').ApplyResponse} ApplyResponse
+   * @typedef {import('../shardus/index.js').ApplyResponse} ApplyResponse
    */
 /**
    * @typedef {import('./shardFunctions.js').ShardGlobals} ShardGlobals

@@ -776,9 +776,7 @@ declare class StateManager {
      */
     trySendAndPurgeReceiptsToArchives(partitionReceipt: PartitionReceipt): void;
 }
-declare namespace StateManager {
-    export { solveHashSets, compareVoteObjects, compareVoteObjects2, solveHashSets2, expandIndexMapping, testHashsetSolution, createHashSetString, SimpleRange, App, Cycle, Sign, Node, AcceptedTx, ApplyResponse, ShardGlobals, NodeShardData, ShardInfo, AddressRange, BasicAddressRange, PartitionObject, PartitionResult, PartitionReceipt, CombinedPartitionReceipt, RepairTracker, SolutionDelta, TempTxRecord, UpdateRepairData, TxTallyList, QueueEntry, SyncTracker, GenericHashSetEntry, IHashSetEntryPartitions, HashSetEntryPartitions, HashSetEntryCorrection, HashSetEntryError, Vote, CountEntry, CycleShardData };
-}
+
 type App = any;
 type SyncTracker = {
     syncStarted: boolean;

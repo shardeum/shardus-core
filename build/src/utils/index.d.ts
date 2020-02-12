@@ -18,4 +18,6 @@ export function stringifyReduceLimit(val: any, isArrayProp: any, limit?: number)
 export function robustPromiseAll(promises: any): Promise<any[][]>;
 export function sortAsc(a: any, b: any): 1 | -1 | 0;
 export function sortDec(a: any, b: any): 1 | -1 | 0;
+export function sortAscProp(a: any, b: any, propName: any): 1 | -1 | 0;
+export function sortDecProp(a: any, b: any, propName: any): 1 | -1 | 0;
 export function sortHashAsc(a: any, b: any): 1 | -1 | 0;

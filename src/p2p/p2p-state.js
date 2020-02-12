@@ -3,7 +3,7 @@ const utils = require('../utils')
 const Random = require('../random')
 
 /**
- * @typedef {import('../shardus/index').Node} Node
+ * @typedef {import('../shardus/index.js').Node} Node
  */
 
 class P2PState extends EventEmitter {
