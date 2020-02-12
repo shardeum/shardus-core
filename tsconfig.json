@@ -1,6 +1,17 @@
 {
-  "extends": "./node_modules/gts/tsconfig-google.json",
+  
   "compilerOptions": {
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "declaration": true,
+    "forceConsistentCasingInFileNames": true,
+    "lib": ["es2016"],
+    "module": "commonjs",
+    "noFallthroughCasesInSwitch": true,
+    "pretty": true,
+    "sourceMap": true,
+    "target": "es2017",
+
     "rootDir": ".",
     "outDir": "build",
     "allowJs": true,
@@ -19,4 +30,7 @@
     "test/**/*.js",
     "test/**/*.ts"
   ],
+  "exclude": [
+    "node_modules"
+  ]
 }
