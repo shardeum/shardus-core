@@ -1,4 +1,6 @@
-const StateManager = require('../../../src/state-manager')
+// @ts-nocheck
+/*eslint-disable*/
+// const StateManager = require('../../../src/state-manager')
 const ShardFunctions = require('../../../src/state-manager/shardFunctions.js')
 
 const crypto = require('shardus-crypto-utils')
@@ -23,20 +25,20 @@ function generateNodes (count, predefinedList = null) {
   return nodeList
 }
 
-function findBnotInA (listA, listB) {
-  let mapA = {}
-  let results = []
-  for (let node of listA) {
-    mapA[node.id] = true
-  }
+// function findBnotInA (listA, listB) {
+//   let mapA = {}
+//   let results = []
+//   for (let node of listA) {
+//     mapA[node.id] = true
+//   }
 
-  for (let node of listB) {
-    if (mapA[node.id] !== true) {
-      results.push(node)
-    }
-  }
-  return results
-}
+//   for (let node of listB) {
+//     if (mapA[node.id] !== true) {
+//       results.push(node)
+//     }
+//   }
+//   return results
+// }
 
 function getClosestNodes (shardGlobals, parititionShardDataMap, activeNodes, hash, count = 1) {
   // if (this.currentCycleShardData == null) {
@@ -56,8 +58,8 @@ function isNodeInDistancePartition (shardGlobals, hash, nodeId, distance) {
   //   throw new Error('isNodeInDistance: network not ready')
   // }
   // let cycleShardData = this.currentCycleShardData
-  let [homePartition, addressNum] = ShardFunctions.addressToPartition(shardGlobals, nodeId)
-  let [homePartition2, addressNum2] = ShardFunctions.addressToPartition(shardGlobals, hash)
+  let { homePartition } = ShardFunctions.addressToPartition(shardGlobals, nodeId)
+  let { homePartition: homePartition2 } = ShardFunctions.addressToPartition(shardGlobals, hash)
   let partitionDistance = Math.abs(homePartition2 - homePartition)
   if (partitionDistance <= distance) {
     return true
@@ -240,6 +242,7 @@ for (let i = 0; i < testIterations; i++) {
 
     let closestNodes = getClosestNodes(shardGlobals, parititionShardDataMap, activeNodes, hash, 1)
 
+    // @ts-ignore
     let closestNodes2 = getClosestNodes(shardGlobals, parititionShardDataMap, activeNodes, hash, 2)
 
     let closestNodes3 = getClosestNodes(shardGlobals, parititionShardDataMap, activeNodes, hash, 300)
@@ -259,12 +262,12 @@ for (let i = 0; i < testIterations; i++) {
 
     let foo = nodeShardDataMap.keys()
     for (let key of nodeShardDataMap.keys()) {
-      if(key === 'bf7c777777777777777777777777777777777777777777777777777777777777'){
+      if (key === 'bf7c777777777777777777777777777777777777777777777777777777777777') {
         let a = 1
       }
       let nodeData = nodeShardDataMap.get(key)
       let partitions2 = ShardFunctions.getStoredPartitionList(shardGlobals, nodeData)
-   
+
       console.log(`node stored: ${utils.stringifyReduce(partitions2)} ${key}`)
     }
   }
@@ -309,7 +312,7 @@ for (let i = 0; i < testIterations; i++) {
 
     console.log(` summary:${utils.stringifyReduce(summaryObject)}`)
 
-    let [partition, addrNum] = ShardFunctions.addressToPartition(shardGlobals, debugAccount)
+    let { homePartition: partition } = ShardFunctions.addressToPartition(shardGlobals, debugAccount)
 
     let ourNodeData = nodeShardDataMap.get(debugNode.id)
 
@@ -356,7 +359,7 @@ for (let i = 0; i < testIterations; i++) {
       inRange = ShardFunctions.testAddressInRange(address, homeNode.storedPartitions)
       throw new Error('home node not in range 1')
     }
-    let [homePartition, addressNum] = ShardFunctions.addressToPartition(shardGlobals, address)
+    let { homePartition, addressNum } = ShardFunctions.addressToPartition(shardGlobals, address)
     let inRange2 = ShardFunctions.testInRange(homePartition, homeNode.storedPartitions)
     if (inRange2 === false) {
       homeNode = ShardFunctions.findHomeNode(shardGlobals, address, parititionShardDataMap)
@@ -406,3 +409,5 @@ for (let i = 1; i <= size1; i++) {
 
   console.log(` index: ${i}  res: ${JSON.stringify(res)}`)
 }
+
+/* eslint-enable */

@@ -3689,7 +3689,7 @@ class StateManager extends EventEmitter {
     let ourNodeShardData = this.currentCycleShardData.nodeShardData
     let minP = ourNodeShardData.consensusStartPartition
     let maxP = ourNodeShardData.consensusEndPartition
-    let [homePartition] = ShardFunctions.addressToPartition(this.currentCycleShardData.shardGlobals, address)
+    let { homePartition } = ShardFunctions.addressToPartition(this.currentCycleShardData.shardGlobals, address)
     accountIsRemote = (ShardFunctions.partitionInConsensusRange(homePartition, minP, maxP) === false)
 
     // hack to say we have all the data
