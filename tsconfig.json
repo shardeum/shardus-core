@@ -7,8 +7,10 @@
     "resolveJsonModule": true,
     "noEmitOnError": false,
     "strict": true,
-    "noImplicitAny": false,
-    "strictNullChecks": true
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true
   },
   "include": [
     "src/**/*.js",
