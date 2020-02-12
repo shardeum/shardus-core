@@ -1252,7 +1252,11 @@ class ShardFunctions {
 
   static findHomeNode (shardGlobals: ShardGlobals, address: string, parititionShardDataMap: Map<number, ShardInfo>): NodeShardData | null {
     let [homePartition, addressNum] = ShardFunctions.addressToPartition(shardGlobals, address)
-    let partitionShard = parititionShardDataMap.get(homePartition) as ShardInfo // TSConversion  is this good or should we check for null?
+    let partitionShard = parititionShardDataMap.get(homePartition)
+
+    if(partitionShard == null){
+      return null
+    }
 
     let wrapIndex = function (shardGlobals, index) {
       if (index < 0) {
@@ -1272,13 +1276,13 @@ class ShardFunctions {
         leftIndex = wrapIndex(shardGlobals, leftIndex)
         rightIndex = wrapIndex(shardGlobals, rightIndex)
 
-        let partitionShardLeft = parititionShardDataMap.get(leftIndex) as ShardInfo// activeNodes[leftIndex].id)
-        let partitionShardRight = parititionShardDataMap.get(rightIndex) as ShardInfo// activeNodes[rightIndex].id)
+        let partitionShardLeft = parititionShardDataMap.get(leftIndex)
+        let partitionShardRight = parititionShardDataMap.get(rightIndex)
 
-        if (partitionShardLeft.homeNodes.length > 0) {
+        if (partitionShardLeft != null && partitionShardLeft.homeNodes.length > 0) {
           nodesToSearch = nodesToSearch.concat(partitionShardLeft.homeNodes)
         }
-        if (partitionShardRight.homeNodes.length > 0) {
+        if (partitionShardRight != null && partitionShardRight.homeNodes.length > 0) {
           nodesToSearch = nodesToSearch.concat(partitionShardRight.homeNodes)
         }
         if (nodesToSearch.length > 0) {
