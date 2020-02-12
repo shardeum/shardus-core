@@ -234,9 +234,9 @@
    */
 
 
-type App = import("../shardus").App;
+type App = import("../shardus/shardus-types").App;
 type QueueEntry = {
-    acceptedTx: import("../shardus").AcceptedTx;
+    acceptedTx: import("../shardus/shardus-types").AcceptedTx;
     txKeys: any;
     collectedData: any;
     originalData: any;
@@ -258,7 +258,7 @@ type QueueEntry = {
     syncKeys: any[];
     uniqueKeys?: any;
     ourNodeInvolved?: boolean;
-    transactionGroup?: import("../shardus").Node[];
+    transactionGroup?: import("../shardus/shardus-types").Node[];
     approximateCycleAge?: number;
 };
 type SyncTracker = {
@@ -272,16 +272,16 @@ type SyncTracker = {
 type CycleShardData = {
     shardGlobals: any;
     cycleNumber: number;
-    ourNode: import("../shardus").Node;
+    ourNode: import("../shardus/shardus-types").Node;
     /**
      * our node's node shard data
      */
     nodeShardData: any;
     nodeShardDataMap: Map<string, any>;
     parititionShardDataMap: Map<number, any>;
-    activeNodes: import("../shardus").Node[];
-    syncingNeighbors: import("../shardus").Node[];
-    syncingNeighborsTxGroup: import("../shardus").Node[];
+    activeNodes: import("../shardus/shardus-types").Node[];
+    syncingNeighbors: import("../shardus/shardus-types").Node[];
+    syncingNeighborsTxGroup: import("../shardus/shardus-types").Node[];
     hasSyncingNeighbors: boolean;
     /**
      * hashlist index of the voters for this vote
@@ -320,8 +320,8 @@ type RepairTracker = {
     key2: string;
     removedTXIds: string[];
     repairedTXs: string[];
-    newPendingTXs: import("../shardus").AcceptedTx[];
-    newFailedTXs: import("../shardus").AcceptedTx[];
+    newPendingTXs: import("../shardus/shardus-types").AcceptedTx[];
+    newFailedTXs: import("../shardus/shardus-types").AcceptedTx[];
     extraTXIds: string[];
     missingTXIds: string[];
     repairing: boolean;
@@ -347,7 +347,7 @@ type RepairTracker = {
  */
 type PartitionReceipt = {
     resultsList: PartitionResult[];
-    sign?: import("../shardus").Sign;
+    sign?: import("../shardus/shardus-types").Sign;
 };
 /**
  * A simple address range
@@ -389,7 +389,7 @@ type PartitionResult = {
     /**
      * // property {any} \[hashSetList\] this seems to be used as debug. considering commenting it out in solveHashSetsPrep for safety.
      */
-    sign?: import("../shardus").Sign;
+    sign?: import("../shardus/shardus-types").Sign;
 };
 /**
  * some generic data that represents a vote for hash set comparison
@@ -443,7 +443,7 @@ type IHashSetEntryPartitions = {
  * newTXList, allAccountsToResetById, partitionId
  */
 type UpdateRepairData = {
-    newTXList: import("../shardus").AcceptedTx[];
+    newTXList: import("../shardus/shardus-types").AcceptedTx[];
     allAccountsToResetById: {
         [x: string]: number;
     };
@@ -460,9 +460,9 @@ type UpdateRepairData = {
  */
 type TempTxRecord = {
     txTS: number;
-    acceptedTx: import("../shardus").AcceptedTx;
+    acceptedTx: import("../shardus/shardus-types").AcceptedTx;
     passed: boolean;
-    applyResponse: import("../shardus").ApplyResponse;
+    applyResponse: import("../shardus/shardus-types").ApplyResponse;
     /**
      * below 0 for not redacted. a value above zero indicates the cycle this was redacted
      */
@@ -488,11 +488,11 @@ type TxTallyList = {
      */
     newTxList?: any;
 };
-type Cycle = import("../shardus").Cycle;
-type Sign = import("../shardus").Sign;
+type Cycle = import("../shardus/shardus-types").Cycle;
+type Sign = import("../shardus/shardus-types").Sign;
 //type Node = import("../shardus").Node;
-type AcceptedTx = import("../shardus").AcceptedTx;
-type ApplyResponse = import("../shardus").ApplyResponse;
+type AcceptedTx = import("../shardus/shardus-types").AcceptedTx;
+type ApplyResponse = import("../shardus/shardus-types").ApplyResponse;
 // type ShardGlobals = any;
 // type NodeShardData = any;
 // type ShardInfo = any;
@@ -506,7 +506,7 @@ type CombinedPartitionReceipt = {
      * with signatures moved to a list
      */
     result: PartitionResult;
-    signatures: import("../shardus").Sign[];
+    signatures: import("../shardus/shardus-types").Sign[];
 };
 /**
  * an object to hold a temp tx record for processing later
@@ -516,7 +516,7 @@ type SolutionDelta = {
      * index into our request list: requestsByHost.requests
      */
     i: number;
-    tx: import("../shardus").AcceptedTx;
+    tx: import("../shardus/shardus-types").AcceptedTx;
     pf: boolean;
     /**
      * a string snipped from our solution hash set

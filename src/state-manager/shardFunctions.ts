@@ -1,4 +1,4 @@
-import Shardus = require('../shardus');
+import Shardus = require('../shardus/shardus-types');
 
 // const utils = require('../utils')
 const stringify = require('fast-stable-stringify')
