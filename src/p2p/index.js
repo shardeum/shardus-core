@@ -8,6 +8,8 @@ const P2PLostNodes = require('./p2p-lost-nodes')
 const P2PArchivers = require('./p2p-archivers')
 const routes = require('./routes')
 
+import { startup } from './p2p-startup'
+
 class P2P extends EventEmitter {
   constructor (config, logger, storage, crypto) {
     super()
@@ -1898,85 +1900,8 @@ class P2P extends EventEmitter {
     }
   }
 
-  async startup () {
-    // Emit the 'joining' event before attempting to join
-    const publicKey = this.crypto.getPublicKey()
-    this.mainLogger.debug('Emitting `joining` event.')
-    this.emit('joining', publicKey)
-
-    // Get new seednodes and attempt to join until you are successful
-    let seedNodes, needJoin
-    let joined = false
-    // outerJoinAttemps is set to a high number incase we want to build a large network and need the node to keep trying to join for awhile.
-    let outerJoinAttemps = 100
-    while (!joined) {
-      seedNodes = await this._getSeedNodes()
-      this.isFirstSeed = await this._discoverNetwork(seedNodes)
-
-      // Remove yourself from seedNodes if you are present in them but not firstSeed
-      const ourIpInfo = this.getIpInfo()
-      if (this.isFirstSeed === false) {
-        const ourIdx = seedNodes.findIndex(node => node.ip === ourIpInfo.externalIp && node.port === ourIpInfo.externalPort)
-        if (ourIdx > -1) {
-          seedNodes.splice(ourIdx, 1)
-        }
-      }
-
-      // needJoin = await this._checkIfNeedJoin()
-      // [AS] This should make the server start from scratch each time it starts
-      needJoin = true
-
-      if (needJoin === false) {
-        joined = true
-      }
-      if (needJoin) {
-        joined = await this._joinNetwork(seedNodes)
-        if (joined === false) {
-          this.mainLogger.debug('join failed. outer attemps left: ' + outerJoinAttemps)
-          // if we failed to join exit the flow
-          outerJoinAttemps--
-          if (outerJoinAttemps <= 0) {
-            this.mainLogger.debug('join failed. no more outer join attempts left')
-            return false
-          }
-        }
-      }
-    }
-
-    // Emit the 'joined' event before attempting to sync to the network
-    this.mainLogger.debug('Emitting `joined` event.')
-    this.emit('joined', this.id, publicKey)
-
-    // Once joined, sync to the network
-    await this._syncToNetwork(seedNodes)
-    /*
-    if (this.dataSync) {
-      if (this.isFirstSeed) {
-        this.dataSync.registerSyncEndpoints()
-      } else {
-        await this.dataSync.syncStateData(3)
-      }
-    }
-
-    await this.goActive()
-    */
-
-    // turning this off until after enterprise, should figure out a way to work it in before we go active
-    // if (this.dataSync && isFirstSeed === false) {
-    //   // TODO potentially not ready to share state data with other nodes yet, may need a state for this so we dont get flagged as dishonest
-    //   await this.dataSync.patchRemainingStateData()
-    // }
-
-    // This is also for testing purposes
-    // console.log('Server ready!')
-
-    /*
-    if (this.dataSync && this.isFirstSeed === false) {
-      await this.dataSync.finalTXCatchup(false)
-    }
-    */
-    this.emit('initialized')
-    return true
+  startup () {
+    return startup(this)
   }
 
   cleanupSync () {

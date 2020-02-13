@@ -21,7 +21,8 @@
     "noImplicitAny": false,
     "strictNullChecks": false,
     "noImplicitReturns": false,
-    "noImplicitThis": false
+    "noImplicitThis": false,
+    "esModuleInterop": true
   },
   "include": [
     "src/**/*.js",
