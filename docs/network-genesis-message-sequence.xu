@@ -1,0 +1,40 @@
+xu {
+  a [label="Archiver"],
+  c1 [label="Consensor 1"],
+  c2 [label="Consensor 2"],
+  c3 [label="Consensor 3"];
+
+  --- [label="Identify the network"];
+
+  c1 => a [label="POST /nodelist: c1", arcskip="1"],
+  c2 => a [label="POST /nodelist: c2", arcskip="2"],
+  c3 => a [label="POST /nodelist: c3", arcskip="3"];
+
+  a >> c1 [label="nodelist: []", arcskip="1"];
+  a >> c2 [label="nodelist: [c1]", arcskip="2"];
+  a >> c3 [label="nodelist: [c1]", arcskip="3"];
+
+  |||;
+  |||;
+
+  --- [label="Join the network"];
+  
+  c2 => c1 [label="POST /join: c2", arcskip="1"],
+  c3 => c1 [label="POST /join: c3", arcskip="2"];
+
+  |||;
+  |||;
+
+  c3 loop c1 [label="Until joined = true..."] {
+    c2 => c1 [label="GET /joined: c2", arcskip="1"],
+    c3 => c1 [label="GET /joined: c3", arcskip="2"];
+
+    c1 >> c2 [label="{ joined: false }", arcskip="1"];
+    c1 >> c3 [label="{ joined: false }", arcskip="2"];
+
+    |||;
+    |||;
+  };
+
+  --- [label="Sync up with the network"];
+}
