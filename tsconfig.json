@@ -11,16 +11,17 @@
     "pretty": true,
     "sourceMap": true,
     "target": "es2017",
+
     "rootDir": ".",
     "outDir": "build",
     "allowJs": true,
     "resolveJsonModule": true,
-    "noEmitOnError": true,
-    "strict": true,
+    "noEmitOnError": false,
+    "strict": false,
     "noImplicitAny": false,
     "strictNullChecks": false,
-    "noImplicitReturns": true,
-    "noImplicitThis": true
+    "noImplicitReturns": false,
+    "noImplicitThis": false
   },
   "include": [
     "src/**/*.js",
