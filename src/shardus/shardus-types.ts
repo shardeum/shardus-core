@@ -1,5 +1,6 @@
 import { start } from "repl";
 import { Certificate } from "crypto";
+import { RequestHandler } from "express";
 
 // Type definitions for Shardus
 // Project: Shardus Enterprise Server
@@ -24,32 +25,36 @@ declare class Shardus {
    * @param route The route to register an external GET endpoint
    * @param handler An express.js standard route handler function
    */
-  registerExternalGet(route: string, handler: any): void
+  registerExternalGet(route: string, handler: RequestHandler): void
   /**.
    * Register an external endpoint to shardus enterprise server.  version 2
    * https://shardus.gitlab.io/docs/developer/main-concepts/building-a-poc-app/shardus-app-interface/register-external-get.html
    * @param route The route to register an external POST endpoint
    * @param handler An express.js standard route handler function
    */  
-  registerExternalPost(route: string, handler: any): void
+  registerExternalPost(route: string, handler: RequestHandler): void
   /**
    * Register an external endpoint to shardus enterprise server
    * @param route The route to register an external PUT endpoint
    * @param handler An express.js standard route handler function
    */  
-  registerExternalPut(route: string, handler: any): void
+  registerExternalPut(route: string, handler: RequestHandler): void
   /**
    * Register an external endpoint to shardus enterprise server
    * @param route The route to register an external DELETE endpoint
    * @param handler An express.js standard route handler function
    */  
-  registerExternalDelete(route: string, handler: any): void
+  registerExternalDelete(route: string, handler: RequestHandler): void
   /**
    * Register an external endpoint to shardus enterprise server
    * @param route The route to register an external PATCH endpoint
    * @param handler An express.js standard route handler function
    */  
-  registerExternalPatch(route: string, handler: any): void
+  registerExternalPatch(route: string, handler: RequestHandler): void
+  /**
+   * Register handler for caught exceptions on http requests
+   */
+  registerExceptionHandler(): void
   /**
    * Handle incoming transaction requests
    * 
@@ -63,6 +68,11 @@ declare class Shardus {
    * @param tx the set tx
    */
   set(tx: object): Shardus.IncomingTransactionResult
+  /**
+   * Logging for the application
+   * @param data The data you want the application to log
+   */
+  log(...data: any): void
   /**
    * A function that clears shardus App related State
    */
@@ -87,16 +97,27 @@ declare class Shardus {
 
   genericApplyPartialUpate(fullAccountData: any, updatedPartialAccount: any): void
 
-  applyResponseAddState(applyResponse: any, fullAccountData: any, localCache: any, accountId: string, txId: string, txTimestamp: number, accountStateBefore: string, accountStateAfter: string, accountCreated: number): void
+  applyResponseAddState(applyResponse: any, fullAccountData: any, localCache: any, accountId: string, txId: string, txTimestamp: number, accountStateBefore: string, accountStateAfter: string, accountCreated: boolean): void
 
-  getLocalOrRemoteAccount(address: string): Shardus.WrappedDataFromQueue
+  getLocalOrRemoteAccount(address: string): Promise<Shardus.WrappedDataFromQueue>
+
+  getRemoteAccount(address: string): Promise<Shardus.WrappedDataFromQueue>
+
+  getLatestCycles(): Shardus.Cycle[]
+
+  getNodeId(): string
+
+  getClosestNodes(hash: string, number: number): string[]
+
+  getNode(nodeId: string): Shardus.Node
   // not sure where this def should go?
   // profiler: any
+  p2p: any
 }
 
 declare namespace Shardus {
   export interface App {
-
+    validateTransaction: (...data: any) => any
     /**
      * A function responsible for validation the incoming transaction fields
      */
@@ -107,11 +128,11 @@ declare namespace Shardus {
     apply: (inTx: Shardus.IncomingTransaction, wrappedStates: any) => Shardus.ApplyResponse
 
 
-    updateAccountFull: (wrappedStates: any, localCache: any, applyResponse: any) => void
+    updateAccountFull: (wrappedState: WrappedResponse, localCache: any, applyResponse: Shardus.ApplyResponse) => void
 
-    updateAccountPartial: (wrappedStates: any, localCache: any, applyResponse: any) => void
+    updateAccountPartial: (wrappedState: WrappedResponse, localCache: any, applyResponse: Shardus.ApplyResponse) => void
 
-    getRelevantData: (accountId: string, tx: any) => any
+    getRelevantData: (accountId: string, tx: object) => any
 
     /**
      * A function that returns the Keys for the accounts involved in the transaction
@@ -130,13 +151,13 @@ declare namespace Shardus {
 
     getAccountDataByRange: (accountStart: string, accountEnd: string, tsStart: number, tsEnd: number, maxRecords: number) => any
 
-    calculateAccountHash: (account: string) => any
+    calculateAccountHash: (account: any) => string
 
-    setAccountData: (accountRecords: any) => any
+    setAccountData: (accountRecords: any[]) => void
 
-    resetAccountData: (accountRecords: any) => any
+    resetAccountData: (accountRecords: any[]) => void
 
-    deleteAccountData: (addressList: any) => any
+    deleteAccountData: (addressList: string[]) => void
 
     getAccountDataByList: (addressList: any) => any
 
@@ -174,7 +195,7 @@ declare namespace Shardus {
     /**
      * debug info string
      */
-    debugInfo: string
+    debugInfo?: string
   }
   export interface ApplyResponse {
     /**
@@ -316,11 +337,11 @@ declare namespace Shardus {
 
   export interface IncomingTransactionResult {
     /** The result for the incoming transaction */
-    result: string,    //was Results before.. but having trouble with that
+    success: boolean,    //was Results before.. but having trouble with that
     /** The reason for the transaction result */
     reason: string,
     /** The timestamp for the result */
-    txnTimestamp?: string
+    txnTimestamp?: number
   }
 
   enum Results { pass, fail }
@@ -502,7 +523,6 @@ declare namespace Shardus {
    * OpaqueTransaction is the way shardus should see transactions internally. it should not be able to mess with parameters individually
    */
   export interface OpaqueTransaction extends ObjectAlias {
-
   }
 
 }

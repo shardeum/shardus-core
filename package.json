@@ -50,6 +50,7 @@
     "trie-prefix-tree": "1.5.1"
   },
   "devDependencies": {
+    "@types/express": "^4.17.2",
     "@types/node": "^13.7.0",
     "axios": "^0.19.2",
     "bytenode-webpack-plugin": "1.0.4",
