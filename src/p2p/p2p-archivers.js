@@ -31,7 +31,7 @@ class P2PArchivers {
     this.joinRequests = []
   }
 
-  async addJoinRequest (joinRequest, tracker, gossip = true) {
+  addJoinRequest (joinRequest, tracker, gossip = true) {
     // [TODO] Verify signature
 
     if (this.state.acceptJoinRequests === false) {

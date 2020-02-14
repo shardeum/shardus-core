@@ -8,7 +8,7 @@ const P2PLostNodes = require('./p2p-lost-nodes')
 const P2PArchivers = require('./p2p-archivers')
 const routes = require('./routes')
 
-import { startup } from './p2p-startup'
+const P2PStartup = require('./p2p-startup')
 
 class P2P extends EventEmitter {
   constructor (config, logger, storage, crypto) {
@@ -195,19 +195,8 @@ class P2P extends EventEmitter {
     return seedListSigned
   }
 
-  async _getSeedNodes () {
-    const archiver = this.existingArchivers[0]
-    let seedListSigned = await this._getSeedListSigned()
-    if (!this.crypto.verify(seedListSigned, archiver.publicKey)) throw Error('Fatal: _getSeedNodes seed list was not signed by archiver!')
-    const joinRequest = seedListSigned.joinRequest
-    const dataRequest = seedListSigned.dataRequest
-    if (joinRequest) {
-      if (this.archivers.addJoinRequest(joinRequest) === false) throw Error('Fatal: _getSeedNodes join request not accepted!')
-    }
-    if (dataRequest) {
-      if (this.archivers.addDataRecipient(joinRequest.nodeInfo, dataRequest) === false) throw Error('Fatal: _getSeedNodes data request not accepted!')
-    }
-    return seedListSigned.nodeList
+  _getSeedNodes () {
+    return P2PStartup._getSeedNodes(this)
   }
 
   async _fetchSeedNodeInfo (seedNode) {
@@ -1268,181 +1257,16 @@ class P2P extends EventEmitter {
     return true
   }
 
-  async _discoverNetwork (seedNodes) {
-    // Check if our time is synced to network time server
-    try {
-      let timeSynced = await this._checkTimeSynced(this.timeServers)
-      if (!timeSynced) this.mainLogger.warn('Local time out of sync with time server.')
-    } catch (e) {
-      this.mainLogger.warn(e.message)
-    }
-
-    // Check if we are first seed node
-    const isFirstSeed = this._checkIfFirstSeedNode(seedNodes)
-    if (!isFirstSeed) {
-      this.mainLogger.info('You are not the first seed node...')
-      return false
-    }
-    this.mainLogger.info('You are the first seed node!')
-    return true
+  _discoverNetwork (seedNodes) {
+    return P2PStartup._discoverNetwork(this, seedNodes)
   }
 
-  async _joinNetwork (seedNodes) {
-    this.mainLogger.debug('Clearing P2P state...')
-    await this.state.clear()
-
-    // Sets our IPs and ports for internal and external network in the database
-    await this.storage.setProperty('externalIp', this.getIpInfo().externalIp)
-    await this.storage.setProperty('externalPort', this.getIpInfo().externalPort)
-    await this.storage.setProperty('internalIp', this.getIpInfo().internalIp)
-    await this.storage.setProperty('internalPort', this.getIpInfo().internalPort)
-
-    if (this.isFirstSeed) {
-      this.mainLogger.debug('Joining network...')
-
-      // This is for testing purposes
-      console.log('Doing initial setup for server...')
-
-      const cycleMarker = this.state.getCurrentCycleMarker()
-      const joinRequest = await this._createJoinRequest(cycleMarker)
-      this.state.startCycles()
-      this.state.addNewJoinRequest(joinRequest)
-
-      // Sleep for cycle duration before updating status
-      // TODO: Make this more deterministic
-      await utils.sleep(Math.ceil(this.state.getCurrentCycleDuration() / 2) * 1000)
-      const { nextCycleMarker } = this.getCycleMarkerInfo()
-      this.mainLogger.debug(`Public key: ${joinRequest.nodeInfo.publicKey}`)
-      this.mainLogger.debug(`Next cycle marker: ${nextCycleMarker}`)
-      const nodeId = this.state.computeNodeId(joinRequest.nodeInfo.publicKey, nextCycleMarker)
-      this.mainLogger.debug(`Computed node ID to be set for this node: ${nodeId}`)
-      await this._setNodeId(nodeId)
-
-      return true
-    }
-
-    const nodeId = await this._join(seedNodes)
-    if (!nodeId) {
-      this.mainLogger.info('Unable to join network. Shutting down...')
-      return false
-    }
-    this.mainLogger.info('Successfully joined the network!')
-    await this._setNodeId(nodeId)
-    return true
+  _joinNetwork (seedNodes) {
+    return P2PStartup._joinNetwork(this, seedNodes)
   }
 
   async _syncToNetwork (seedNodes) {
-    // If you are first node, there is nothing to sync to
-    if (this.isFirstSeed) {
-      this.mainLogger.info('No syncing required...')
-      this.acceptInternal = true
-      return true
-    }
-
-    // If not first seed, we need to sync to network
-    this.mainLogger.info('Syncing to network...')
-
-    // Get full node info for seed nodes
-    this.mainLogger.debug('Fetching seed node info...')
-    this.seedNodes = await this._fetchSeedNodesInfo(seedNodes)
-
-    // Get hash of nodelist
-    this.mainLogger.debug('Fetching nodelist hash...')
-    const nodelistHash = await this._fetchNodelistHash(this.seedNodes)
-    this.mainLogger.debug(`Nodelist hash is: ${nodelistHash}.`)
-
-    // Get and verify nodelist aganist hash
-    this.mainLogger.debug('Fetching verified nodelist...')
-    const nodelist = await this._fetchVerifiedNodelist(this.seedNodes, nodelistHash)
-    this.mainLogger.debug(`Nodelist is: ${JSON.stringify(nodelist)}.`)
-
-    // Add retrieved nodelist to the state
-    await this.state.addNodes(nodelist)
-
-    // After we have the node list, we can turn on internal routes
-    this.acceptInternal = true
-
-    this.mainLogger.debug('Fetching latest cycle chain...')
-    const nodes = this.state.getActiveNodes()
-    const { cycleChain, cycleMarkerCerts } = await this._fetchLatestCycleChain(this.seedNodes, nodes)
-    this.mainLogger.debug(`Retrieved cycle chain: ${JSON.stringify(cycleChain)}`)
-    try {
-      await this.state.addCycles(cycleChain, cycleMarkerCerts)
-    } catch (e) {
-      this.mainLogger.error('_syncToNetwork: ' + e.name + ': ' + e.message + ' at ' + e.stack)
-      this.mainLogger.info('Unable to add cycles. Sync failed...')
-      return false
-    }
-
-    // Get in cadence, then start cycles
-
-    // let firstTime = true
-
-    const getUnfinalized = async () => {
-      this.mainLogger.debug('Getting unfinalized cycle data...')
-      let cycleMarker
-      try {
-        cycleMarker = await this._fetchCycleMarkerInternal(this.state.getActiveNodes())
-      } catch (e) {
-        this.mainLogger.warn('Unable to get cycle marker internally from active nodes. Falling back to seed nodes...')
-        try {
-          cycleMarker = await this._fetchCycleMarkerInternal(this.seedNodes)
-        } catch (err) {
-          this.mainLogger.error('_syncToNetwork > getUnfinalized: Could not get cycle marker from seed nodes. Apoptosis then Exiting... ' + err)
-          this.initApoptosis()
-          process.exit()
-        }
-      }
-      const { cycleStart, cycleDuration } = cycleMarker
-      const currentTime = utils.getTime('s')
-
-      // First we wait until the beginning of the final quarter
-      await this._waitUntilLastPhase(currentTime, cycleStart, cycleDuration)
-
-      // DEBUG: to trigger _syncUpChainAndNodelist()
-      // if (firstTime) {
-      //   const toSleep = Math.ceil(Math.random() * 10) * Math.ceil(Math.random() * 10) * 1000
-      //   this.mainLogger.debug(`First unfinalized attempt... Sleeping for ${toSleep} ms in order to prompt again.`)
-      //   await utils.sleep(toSleep)
-      //   firstTime = false
-      //   let cycleMarker
-      //   try {
-      //     cycleMarker = await this._fetchCycleMarkerInternal(this.state.getActiveNodes())
-      //   } catch (e) {
-      //     this.mainLogger.warn('Unable to get cycle marker internally from active nodes. Falling back to seed nodes...')
-      //     cycleMarker = await this._fetchCycleMarkerInternal(this.seedNodes)
-      //   }
-      //   const { cycleStart, cycleDuration } = cycleMarker
-      //   const currentTime = utils.getTime('s')
-
-      //   // First we wait until the beginning of the final quarter
-      //   await this._waitUntilUpdatePhase(currentTime, cycleStart, cycleDuration)
-      // }
-
-      // Then we get the unfinalized cycle data
-      let unfinalized
-      try {
-        unfinalized = await this._fetchUnfinalizedCycle(this.state.getActiveNodes())
-      } catch (e) {
-        this.mainLogger.warn('Unable to get cycle marker internally from active nodes. Falling back to seed nodes...')
-        unfinalized = await this._fetchUnfinalizedCycle(this.seedNodes)
-      }
-      return unfinalized
-    }
-
-    let unfinalized = null
-
-    // We keep trying to keep our chain and sync and try to get unfinalized cycle data until we are able to get the unfinalized data in time
-    while (!unfinalized) {
-      await this._syncUpChainAndNodelist()
-      unfinalized = await getUnfinalized()
-    }
-
-    // We add the unfinalized cycle data and start cycles
-    await this.state.addUnfinalizedAndStart(unfinalized)
-
-    this.mainLogger.info('Successfully synced to the network!')
-    return true
+    return P2PStartup._syncToNetwork(this, seedNodes)
   }
 
   _createStatusUpdate (type) {
@@ -1901,7 +1725,7 @@ class P2P extends EventEmitter {
   }
 
   startup () {
-    return startup(this)
+    return P2PStartup.startup(this)
   }
 
   cleanupSync () {
