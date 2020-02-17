@@ -1,6 +1,17 @@
+import { ShardusConfiguration } from '../shardus/shardus-types'
+import Shardus = require('../shardus/shardus-types')
+
+//import ShardFunctions from './shardFunctions'
+//import './shardFunctions.ts'
+//const ShardFunctions = require('./shardFunctions.js')
+import {ShardGlobals,ShardInfo,StoredPartition,NodeShardData,AddressRange, HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange} from  './shardFunctionTypes'
+//import ShardFunctionTypes = require( './shardFunctionTypes')
+//import ShardFunctions = require( './shardFunctions')
+import ShardFunctions from './shardFunctions.js'
+
 const EventEmitter = require('events')
 const utils = require('../utils')
-const ShardFunctions = require('./shardFunctions.js')
+
 const stringify = require('fast-stable-stringify')
 
 const allZeroes64 = '0'.repeat(64)
@@ -9,266 +20,17 @@ const cHashSetStepSize = 4
 const cHashSetTXStepSize = 2
 const cHashSetDataStepSize = 2
 
-// some addtional types up here /////////////////////////
-/**
-   * @typedef {Object} SimpleRange A simple address range
-   * @property {string} low Starting index
-   * @property {string} high End index
-   */
+// not sure about this.
+type Consensus = import("../consensus")
+type Profiler = import("../utils/profiler")
+type P2P = import("../p2p")
+type Storage = import("../storage")
+type Crypto = import("../crypto")
+type Logger = import("../logger")
 
-/**
-   * @typedef {import('../shardus/index.js').App} App
-   */
+//let shardFunctions = import("./shardFunctions").
+//type foo = ShardFunctionTypes.BasicAddressRange
 
-/**
-   * @typedef {import('../shardus/index.js').Cycle} Cycle
-   */
-/**
-   * @typedef {import('../shardus/index.js').Sign} Sign
-   */
-/**
- * @typedef {import('../shardus/index.js').Node} Node
- */
-/**
-   * @typedef {import('../shardus/index.js').AcceptedTx} AcceptedTx
-   */
-/**
-   * @typedef {import('../shardus/index.js').ApplyResponse} ApplyResponse
-   */
-/**
-   * @typedef {import('./shardFunctions.js').ShardGlobals} ShardGlobals
-   */
-/**
-   * @typedef {import('./shardFunctions.js').NodeShardData} NodeShardData
-   */
-/**
-   * @typedef {import('./shardFunctions.js').ShardInfo} ShardInfo
-   */
-/**
-   * @typedef {import('./shardFunctions.js').AddressRange} AddressRange
-   */
-/**
-   * @typedef {import('./shardFunctions.js').BasicAddressRange} BasicAddressRange
-   */
-// ///////////////////////// Lots of type definitions for partitions
-
-/**
-   * @typedef {Object} PartitionObject a partition object
-   * @property {number} Partition_id
-   * @property {number} Partitions
-   * @property {number} Cycle_number
-   * @property {string} Cycle_marker
-   * @property {string[]} Txids
-   * @property {number[]} Status
-   * @property {string[]} States
-   * @property {any[]} Chain todo more specific data type
-   */
-
-/**
-   * @typedef {Object} PartitionResult a partition result
-   * @property {number} Partition_id
-   * @property {string} Partition_hash
-   * @property {number} Cycle_number
-   * @property {string} hashSet
-   * @property {Sign} [sign]
-   * // property {any} \[hashSetList\] this seems to be used as debug. considering commenting it out in solveHashSetsPrep for safety.
-   */
-
-/**
-   * @typedef {Object} PartitionReceipt a partition reciept
-   * @property {PartitionResult[]} resultsList
-   * @property {Sign} [sign]
-   */
-
-/**
-   * @typedef {Object} CombinedPartitionReceipt a partition reciept that contains one copy of of the data and all of the signatures for that data
-   * @property {PartitionResult} result with signatures moved to a list
-   * @property {Sign[]} signatures
-   */
-
-/**
-   * @typedef {Object} RepairTracker a partition object
-   * @property {string[]} triedHashes
-   * @property {number} numNodes
-   * @property {number} counter cycle number for the repair obbject
-   * @property {number} partitionId partition id for the repair object
-   * @property {string} key this key is based on the cycle counter in the form c###  where ### is the cycle number (can be as many digits as needed)
-   * @property {string} key2 this key is based on the partition in the form p## where ## is the partition number (can be as many digits as needed)
-   * @property {string[]} removedTXIds
-   * @property {string[]} repairedTXs
-   * @property {AcceptedTx[]} newPendingTXs
-   * @property {AcceptedTx[]} newFailedTXs
-   * @property {string[]} extraTXIds
-   * @property {string[]} missingTXIds
-   * @property {boolean} repairing
-   * @property {boolean} repairsNeeded
-   * @property {boolean} busy
-   * @property {boolean} txRepairReady we have the TXs and TX data we need to apply data repairs
-   * @property {boolean} txRepairComplete
-   * @property {boolean} evaluationStarted
-   * @property {boolean} evaluationComplete not sure if we really need this
-   * @property {boolean} awaitWinningHash
-   * @property {boolean} repairsFullyComplete
-   * @property {SolutionDelta[]} [solutionDeltas]
-   * @property {string} [outputHashSet]
-   */
-
-/**
- * @typedef {Object} SolutionDelta an object to hold a temp tx record for processing later
- * @property {number} i index into our request list: requestsByHost.requests
- * @property {AcceptedTx} tx
- * @property {boolean} pf
- * @property {string} state a string snipped from our solution hash set
- */
-
-/**
- * @typedef {Object} TempTxRecord an object to hold a temp tx record for processing later
- * @property {number} txTS
- * @property {AcceptedTx} acceptedTx
- * @property {boolean} passed
- * @property {ApplyResponse} applyResponse
- * @property {number} redacted below 0 for not redacted. a value above zero indicates the cycle this was redacted
- */
-
-/**
- * @typedef {Object} UpdateRepairData   newTXList, allAccountsToResetById, partitionId
- * @property {AcceptedTx[]} newTXList
- * @property {Object.<string, number>} allAccountsToResetById
- * @property {number} partitionId
- * @property {Object.<string, { sourceKeys:string[], targetKeys:string[] } >} txIDToAcc
- */
-
-/**
- * @typedef {Object} TxTallyList an object that tracks our TXs that we are storing for later.
- * @property {string[]} hashes
- * @property {number[]} passed AcceptedTx?
- * @property {any[]} txs
- * @property {boolean} processed
- * @property {any[]} states below 0 for not redacted. a value above zero indicates the cycle this was redacted
- * @property {any} [newTxList] this gets added on when we are reparing something newTxList seems to have a different format than existing types.
- */
-
-/**
- * @typedef {Object} QueueEntry
- * @property {AcceptedTx} acceptedTx
- * @property {any} txKeys
- * @property {any} collectedData
- * @property {any} originalData
- * @property {any} homeNodes
- * @property {boolean} hasShardInfo
- * @property {string} state
- * @property {number} dataCollected
- * @property {boolean} hasAll
- * @property {number} entryID based on the incrementing queueEntryCounter
- * @property {Object.<string,boolean>} localKeys
- * @property {any} localCachedData
- * @property {number} syncCounter
- * @property {boolean} didSync
- * @property {any[]} syncKeys
- * @property {any} [uniqueKeys]
- * @property {boolean} [ourNodeInvolved]
- * @property {Node[]} [transactionGroup]
- * @property {number} [approximateCycleAge]
- */
-
-/**
- * @typedef {Object} SyncTracker
- * @property {boolean} syncStarted
- * @property {boolean} syncFinished
- * @property {any} range
- * @property {number} cycle
- * @property {number} index
- * @property {QueueEntry[]} queueEntries
- */
-
-// txList = { hashes: [], passed: [], txs: [], processed: false, states: [] }
-// we have this structure for solving hashes generically
-// let hashSet = { hash: hash, votePower: 0, hashSet: partitionResult.hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [owner], ourRow: false, waitForIndex: -1 }
-
-/**
-   * @typedef {Object} GenericHashSetEntry some generic data that represents a vote for hash set comparison
-   * @property {string} hash
-   * @property {number} votePower
-   * @property {string} hashSet
-   * @property {string} lastValue
-   * @property {HashSetEntryError[]} errorStack
-   * @property {HashSetEntryCorrection[]} corrections
-   * @property {number} indexOffset
-   *  {string[]} owners a list of owner addresses that have this solution
-   *  {boolean} ourRow
-   * @property {number} waitForIndex
-   * @property {boolean} [waitedForThis]
-   * @property {number[]} [indexMap] this gets added when you call expandIndexMapping. index map is our index to the solution output
-   * @property {number[]} [extraMap] this gets added when you call expandIndexMapping. extra map is the index in our list that is an extra
-   * @property {number} [futureIndex]
-   * @property {string} [futureValue]
-   * @property {number} [pinIdx] current Pin index of this entry.. modified by solver.
-   * @property {any} [pinObj] the object/vote we are pinned to.  todo make this a type!!
-   * @property {object[]} [ownVotes]
-   */
-
-/**
-   * @typedef {Object} IHashSetEntryPartitions extends GenericHashSetEntry some generic data that represents a vote for hash set comparison
-   * @property {string[]} owners a list of owner addresses that have this solution
-   * @property {boolean} [ourRow]
-   * @property {boolean} [outRow]
-   */
-
-/**
- * @typedef {GenericHashSetEntry & IHashSetEntryPartitions} HashSetEntryPartitions
- */
-
-/**
-   * @typedef {Object} HashSetEntryCorrection some generic data that represents a vote for hash set comparison
-   * @property {number} i index
-   * @property {Vote} tv top vote index
-   * @property {string} v top vote value
-   * @property {string} t type 'insert', 'extra'
-   * @property {string} bv last value
-   * @property {number} if lat output count?
-   * @property {number} [hi] another index.
-   * @property {HashSetEntryCorrection} [c] reference to the correction that this one is replacing/overriding
-   */
-
-/**
-   * @typedef {Object} HashSetEntryError some generic data that represents a vote for hash set comparison
-   * @property {number} i index
-   * @property {Vote} tv top vote index
-   * @property {string} v top vote value
-   */
-
-/**
-   * @typedef {Object} Vote vote for a value
-   * @property {string} v vote value
-   * @property {number} count number of votes
-   * @property {CountEntry} [vote] reference to another vote object
-   * @property {number} [ec] count based on vote power
-   * @property {number[]} [voters] hashlist index of the voters for this vote
-   */
-
-/**
-   * @typedef {Object} CountEntry vote count tracking
-   * @property {number} count number of votes
-   * @property {number} ec count based on vote power
-   * @property {number[]} voters hashlist index of the voters for this vote
-   */
-
-/**
-   * @typedef {Object} CycleShardData
-   * @property {ShardGlobals} shardGlobals
-   * @property {number} cycleNumber
-   * @property {Node} ourNode
-   * @property {NodeShardData} nodeShardData our node's node shard data
-   * @property {Map<string, NodeShardData>} nodeShardDataMap
-   * @property {Map<number, ShardInfo>} parititionShardDataMap
-   * @property {Node[]} activeNodes
-   * @property {Node[]} syncingNeighbors
-   * @property {Node[]} syncingNeighborsTxGroup
-   * @property {boolean} hasSyncingNeighbors
-   * @property {number[]} voters hashlist index of the voters for this vote
-   * @property {number[]} [ourConsensusPartitions] list of partitions that we do consensus on
-   * @property {number[]} [ourStoredPartitions] list of stored parititions
-   */
 
 /**
  * StateManager
@@ -276,13 +38,14 @@ const cHashSetDataStepSize = 2
 class StateManager extends EventEmitter {
   /**
    * @param {boolean} verboseLogs
+   * @param {import("../utils/profiler")} profiler
    * @param {import("../shardus").App} app
    * @param {import("../consensus")} consensus
    * @param {import("../p2p")} p2p
    * @param {import("../crypto")} crypto
    * @param {any} config
    */
-  constructor (verboseLogs, profiler, app, consensus, logger, storage, p2p, crypto, config) {
+  constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage : Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     super()
     this.verboseLogs = verboseLogs
 
@@ -290,7 +53,6 @@ class StateManager extends EventEmitter {
     if (p2p == null) {
       return
     }
-
     this.profiler = profiler
     this.mainLogger = logger.getLogger('main')
     this.fatalLogger = logger.getLogger('fatal')
@@ -447,13 +209,12 @@ class StateManager extends EventEmitter {
   // ////////////////////////////////////////////////////////////////////
 
   // This is called once per cycle to update to calculate the necessary shard values.
-  updateShardValues (cycleNumber) {
+  updateShardValues (cycleNumber: number) {
     if (this.currentCycleShardData == null) {
       this.logger.playbackLogNote('shrd_sync_firstCycle', `${cycleNumber}`, ` first init `)
     }
 
-    /** @type {CycleShardData} */
-    let cycleShardData = {}
+    let cycleShardData = {} as CycleShardData
 
     // todo get current cycle..  store this by cycle?
     cycleShardData.nodeShardDataMap = new Map()
@@ -474,7 +235,7 @@ class StateManager extends EventEmitter {
     }
 
     // save this per cycle?
-    cycleShardData.shardGlobals = ShardFunctions.calculateShardGlobals(cycleShardData.activeNodes.length, this.config.sharding.nodesPerConsensusGroup)
+    cycleShardData.shardGlobals = ShardFunctions.calculateShardGlobals(cycleShardData.activeNodes.length, this.config.sharding.nodesPerConsensusGroup as number)
 
     // partition shard data
     ShardFunctions.computePartitionShardDataMap(cycleShardData.shardGlobals, cycleShardData.parititionShardDataMap, 0, cycleShardData.shardGlobals.numPartitions)
@@ -567,7 +328,7 @@ class StateManager extends EventEmitter {
    * @param {number} cycleNumber
    * @returns {CycleShardData}
    */
-  getShardDataForCycle (cycleNumber) {
+  getShardDataForCycle (cycleNumber: number) : CycleShardData | null {
     if (this.shardValuesByCycle == null) {
       return null
     }
@@ -575,7 +336,7 @@ class StateManager extends EventEmitter {
     return shardData
   }
 
-  calculateChangeInCoverage () {
+  calculateChangeInCoverage (): void {
     // maybe this should be a shard function so we can run unit tests on it for expanding or shrinking networks!
     let newSharddata = this.currentCycleShardData
 
@@ -595,8 +356,8 @@ class StateManager extends EventEmitter {
       this.logger.playbackLogNote('shrd_sync_change', `${oldShardData.cycleNumber}->${newSharddata.cycleNumber}`, ` ${ShardFunctions.leadZeros8((change.start).toString(16))}->${ShardFunctions.leadZeros8((change.end).toString(16))} `)
 
       // create a range object from our coverage change.
-      /** @type {BasicAddressRange} */
-      let range = { startAddr: 0, endAddr: 0, low: '', high: '' } // this init is a somewhat wastefull way to allow the type to be happy.
+ 
+      let range = { startAddr: 0, endAddr: 0, low: '', high: '' } as BasicAddressRange // this init is a somewhat wastefull way to allow the type to be happy.
       range.startAddr = change.start
       range.endAddr = change.end
       range.low = ShardFunctions.leadZeros8((range.startAddr).toString(16)) + '0'.repeat(56)
@@ -615,7 +376,7 @@ class StateManager extends EventEmitter {
     // next would be to create some syncTrackers based to cover increases
   }
 
-  async syncRuntimeTrackers () {
+  async syncRuntimeTrackers (): Promise<void> {
     // await utils.sleep(8000) // sleep to make sure we are listening to some txs before we sync them // I think we can skip this.
 
     if (this.runtimeSyncTrackerSyncing === true) {
@@ -656,7 +417,7 @@ class StateManager extends EventEmitter {
     }
   }
 
-  getCurrentCycleShardData () {
+  getCurrentCycleShardData (): CycleShardData | null {
     if (this.currentCycleShardData === null) {
       let cycle = this.p2p.state.getLastCycle()
       if (cycle == null) {
@@ -674,47 +435,47 @@ class StateManager extends EventEmitter {
 
   // todo refactor: this into a util, grabbed it from p2p
   // From: https://stackoverflow.com/a/12646864
-  shuffleArray (array) {
+  shuffleArray (array: any[]) {
     for (let i = array.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [array[i], array[j]] = [array[j], array[i]]
     }
   }
 
-  getRandomInt (max) {
+  getRandomInt (max: number): number {
     return Math.floor(Math.random() * Math.floor(max))
   }
 
-  getRandomIndex (list) {
-    let max = list.length - 1
-    return Math.floor(Math.random() * Math.floor(max))
-  }
+  // getRandomIndex (list: any[]) {
+  //   let max = list.length - 1
+  //   return Math.floor(Math.random() * Math.floor(max))
+  // }
 
   // todo need a faster more scalable version of this if we get past afew hundred nodes.
-  getActiveNodesInRange (lowAddress, highAddress, exclude = []) {
-    let allNodes = this.p2p.state.getActiveNodes(this.p2p.id)
-    this.lastActiveNodeCount = allNodes.length
-    let results = []
-    let count = allNodes.length
-    for (const node of allNodes) {
-      if (node.id >= lowAddress && node.id <= highAddress) {
-        if ((exclude.includes(node.id)) === false) {
-          results.push(node)
-          if (results.length >= count) {
-            return results
-          }
-        }
-      }
-    }
-    return results
-  }
+  // getActiveNodesInRange (lowAddress: string, highAddress: string, exclude = []): Shardus.Node[] {
+  //   let allNodes = this.p2p.state.getActiveNodes(this.p2p.id) as Shardus.Node[]
+  //   this.lastActiveNodeCount = allNodes.length
+  //   let results = [] as Shardus.Node[]
+  //   let count = allNodes.length
+  //   for (const node of allNodes) {
+  //     if (node.id >= lowAddress && node.id <= highAddress) {
+  //       if ((exclude.includes(node.id)) === false) {
+  //         results.push(node)
+  //         if (results.length >= count) {
+  //           return results
+  //         }
+  //       }
+  //     }
+  //   }
+  //   return results
+  // }
 
   // todo refactor: move to p2p?
-  getRandomNodesInRange (count, lowAddress, highAddress, exclude) {
+  getRandomNodesInRange (count: number, lowAddress: string, highAddress: string, exclude: string[]): Shardus.Node[] {
     let allNodes = this.p2p.state.getActiveNodes(this.p2p.id)
     this.lastActiveNodeCount = allNodes.length
     this.shuffleArray(allNodes)
-    let results = []
+    let results = [] as Shardus.Node[]
     if (allNodes.length <= count) {
       count = allNodes.length
     }
@@ -753,11 +514,10 @@ class StateManager extends EventEmitter {
    * @param {number} cycle
    * @return {SyncTracker}
    */
-  createSyncTrackerByRange (range, cycle) {
+  createSyncTrackerByRange (range: BasicAddressRange, cycle: number): SyncTracker {
     // let partition = -1
     let index = this.syncTrackerIndex++
-    /** @type {SyncTracker} */
-    let syncTracker = { range, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false } // partition,
+    let syncTracker = { range, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false } as SyncTracker// partition,
     syncTracker.syncStarted = false
     syncTracker.syncFinished = false
 
@@ -766,7 +526,7 @@ class StateManager extends EventEmitter {
     return syncTracker
   }
 
-  getSyncTracker (address) {
+  getSyncTracker (address: string): SyncTracker | null {
     // return the sync tracker.
     for (let i = 0; i < this.syncTrackers.length; i++) {
       let syncTracker = this.syncTrackers[i]
@@ -783,7 +543,7 @@ class StateManager extends EventEmitter {
   // syncs transactions and application state data
   // This is the main outer loop that will loop over the different partitions
   // The last step catch up on the acceptedTx queue
-  async syncStateData (requiredNodeCount) {
+  async syncStateData (requiredNodeCount: number) {
     // Dont sync if first node
     if (this.p2p.isFirstSeed) {
       this.dataSyncMainPhaseComplete = true
@@ -813,7 +573,7 @@ class StateManager extends EventEmitter {
     let nodeShardData = this.currentCycleShardData.nodeShardData
     console.log('GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
 
-    let rangesToSync = []
+    let rangesToSync = [] as AddressRange[]
 
     // get list of partitions to sync.  Strong typing helped figure out this block was dead code (had a serious bug)
     // let partitionsToSync = []
@@ -884,7 +644,7 @@ class StateManager extends EventEmitter {
       let end = nodeShardData.storedPartitions.partitionEnd1
       let currentStart = start
       let currentEnd = 0
-      let nextLowAddress = null
+      let nextLowAddress:string | null = null
       let i = 0
       while (currentEnd < end) {
         currentEnd = Math.min(currentStart + partitionsPerRange, end)
@@ -936,7 +696,7 @@ class StateManager extends EventEmitter {
 
       let currentStart = start
       let currentEnd = 0
-      let nextLowAddress = null
+      let nextLowAddress: string|null = null
       let i = 0
       while (currentEnd < end) {
         currentEnd = Math.min(currentStart + partitionsPerRange, end)
@@ -1125,6 +885,11 @@ class StateManager extends EventEmitter {
       }
 
       let centerNode = ShardFunctions.getCenterHomeNode(this.currentCycleShardData.shardGlobals, this.currentCycleShardData.parititionShardDataMap, lowAddress, highAddress)
+      if(centerNode == null){
+        this.mainLogger.debug(`centerNode not found`)
+        return
+      }
+      
       let nodes = ShardFunctions.getNodesByProximity(this.currentCycleShardData.shardGlobals, this.currentCycleShardData.activeNodes, centerNode.ourNodeIndex, this.p2p.id, 40)
 
       // let nodes = this.getActiveNodesInRange(lowAddress, highAddress) // this.p2p.state.getActiveNodes(this.p2p.id)
@@ -1549,7 +1314,7 @@ class StateManager extends EventEmitter {
     this.combinedAccountData = [] // we can clear this now.
   }
 
-  async writeCombinedAccountDataToBackups (failedHashes) {
+  async writeCombinedAccountDataToBackups (failedHashes: string[]) {
     if (failedHashes.length === 0) {
       return // nothing to do yet
     }
@@ -1561,14 +1326,14 @@ class StateManager extends EventEmitter {
 
     const lastCycle = this.p2p.state.getLastCycle()
     let cycleNumber = lastCycle.counter
-    let accountCopies = []
+    let accountCopies:AccountCopy[] = []
     for (let accountEntry of this.goodAccounts) {
       // check failed hashes
       if (failedAccountsById[accountEntry.stateId]) {
         continue
       }
       // wrappedAccounts.push({ accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp })
-      let accountCopy = { accountId: accountEntry.accountId, data: accountEntry.data, timestamp: accountEntry.timestamp, hash: accountEntry.stateId, cycleNumber }
+      let accountCopy: AccountCopy = { accountId: accountEntry.accountId, data: accountEntry.data, timestamp: accountEntry.timestamp, hash: accountEntry.stateId, cycleNumber }
       accountCopies.push(accountCopy)
     }
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'writeCombinedAccountDataToBackups ' + accountCopies.length + ' ' + JSON.stringify(accountCopies[0]))
@@ -1586,7 +1351,7 @@ class StateManager extends EventEmitter {
       return
     }
     if (this.verboseLogs) this.mainLogger.debug(`DATASYNC: syncFailedAcccounts start`)
-    let addressList = []
+    let addressList:string[] = []
     for (let accountEntry of this.accountsWithStateConflict) {
       if (accountEntry.data && accountEntry.data.address) {
         addressList.push(accountEntry.data.address)
@@ -1647,9 +1412,10 @@ class StateManager extends EventEmitter {
     return { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs }
   }
 
-  async checkAndSetAccountData (accountRecords) {
-    let accountsToAdd = []
-    let failedHashes = []
+  // TSConversion TODO need to fix some any types
+  async checkAndSetAccountData (accountRecords: any[]): Promise<string[]> {
+    let accountsToAdd:any[] = []
+    let failedHashes:string[] = []
     for (let { accountId, stateId, data: recordData } of accountRecords) {
       let hash = this.app.calculateAccountHash(recordData)
       if (stateId === hash) {
@@ -1699,7 +1465,7 @@ class StateManager extends EventEmitter {
     // Returns a single hash of the data from the Account State Table determined by the input parameters; sort by Tx_ts  then Tx_id before taking the hash
     // Updated names:  accountStart , accountEnd, tsStart, tsEnd
     this.p2p.registerInternal('get_account_state_hash', async (payload, respond) => {
-      let result = {}
+      let result = {} as {stateHash: string}
 
       // yikes need to potentially hash only N records at a time and return an array of hashes
       let stateHash = await this.getAccountsStateHash(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd)
@@ -1715,7 +1481,7 @@ class StateManager extends EventEmitter {
     // Returns data from the Account State Table determined by the input parameters; limits result to 1000 records (as configured)
     // Updated names:  accountStart , accountEnd, tsStart, tsEnd
     this.p2p.registerInternal('get_account_state', async (payload, respond) => {
-      let result = {}
+      let result = {} as {accountStates: Shardus.StateTableObject[] }
       // max records set artificially low for better test coverage
       // todo m11: make configs for how many records to query
       let accountStates = await this.storage.queryAccountStateTable(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, this.config.stateManager.stateTableBucketSize)
@@ -1729,7 +1495,7 @@ class StateManager extends EventEmitter {
     // Returns data from the Accepted Tx Table starting with Ts_start; limits result to 500 records (as configured)
     // Updated names: tsStart, tsEnd
     this.p2p.registerInternal('get_accepted_transactions', async (payload, respond) => {
-      let result = {}
+      let result = {} as {transactions: Shardus.AcceptedTx[] }
 
       if (!payload.limit) {
         payload.limit = 10
@@ -1747,7 +1513,7 @@ class StateManager extends EventEmitter {
     // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
     // Updated names:  accountStart , accountEnd
     this.p2p.registerInternal('get_account_data', async (payload, respond) => {
-      let result = {}
+      let result = {} as {accountData: Shardus.AccountData[] | null}
       let accountData = null
       let ourLockID = -1
       try {
@@ -1761,7 +1527,7 @@ class StateManager extends EventEmitter {
     })
 
     this.p2p.registerInternal('get_account_data2', async (payload, respond) => {
-      let result = {}
+      let result = {} as {accountData: Shardus.AccountData[] | null}
       let accountData = null
       let ourLockID = -1
       try {
@@ -1775,7 +1541,7 @@ class StateManager extends EventEmitter {
     })
 
     this.p2p.registerInternal('get_account_data3', async (payload, respond) => {
-      let result = {}
+      let result = {} //TSConversion  This is complicated !!  as {data: Shardus.AccountData[] | null}
       let accountData = null
       let ourLockID = -1
       try {
@@ -4922,7 +4688,7 @@ class StateManager extends EventEmitter {
    * @param {RepairTracker} repairTracker
    * @param {string} ourLastResultHash
    */
-  async syncTXsFromHashSetStrings (cycleNumber, partitionId, repairTracker, ourLastResultHash) {
+  async syncTXsFromHashSetStrings (cycleNumber, partitionId, repairTracker, ourLastResultHash): Promise<100 | undefined> {
     let cycleCounter = cycleNumber
     if (!this.useHashSets) {
       return
@@ -5126,6 +4892,7 @@ class StateManager extends EventEmitter {
       return 100 // ugh super hack ret value
     }
     // todo print hash set here.
+    return
   }
 
   // async applyHashSetSolution (solution) {
@@ -7022,8 +6789,8 @@ class StateManager extends EventEmitter {
    *
    * @returns {string[]}
    */
-  static solveHashSets2 (hashSetList, lookAhead = 10, voteRate = 0.625) {
-    let output = []
+  static solveHashSets2 (hashSetList: GenericHashSetEntry[], lookAhead:number = 10, voteRate:number = 0.625): string[] {
+    let output:string[] = []
     // let outputVotes = []
     let solving = true
     let index = 0
@@ -7047,7 +6814,7 @@ class StateManager extends EventEmitter {
     // solve this for only one object... or solve for all and compare solvers?
 
     // map of array of vote entries
-    let votes = {}
+    let votes = {} as {[x:string]:ExtendedVote[]}
     let votesseen = 0
     while (solving) {
       // Loop through each entry list
@@ -7065,10 +6832,11 @@ class StateManager extends EventEmitter {
           continue
         }
         solving = true // keep it going
-        let votesArray = votes[v]
+        let votesArray:ExtendedVote[] = votes[v]
         if (votesArray == null) {
           votesseen++
-          let votObject = { winIdx: null, val: v, count: 0, ec: 0, lowestIndex: index, voters: [], voteTally: Array(hashSetList.length), votesseen }
+          //TSConversion this was potetially a major bug, v was missing from this structure before!
+          let votObject:ExtendedVote = { winIdx: null, val: v,v, count: 0, ec: 0, lowestIndex: index, voters: [], voteTally: Array(hashSetList.length), votesseen } as ExtendedVote
           votesArray = [votObject]
           votes[v] = votesArray
 
@@ -7076,7 +6844,7 @@ class StateManager extends EventEmitter {
         }
 
         // get lowest value in list that we have not voted on and is not pinned by our best vote.
-        let currentVoteObject = null
+        let currentVoteObject:ExtendedVote | null = null
         for (let voteIndex = votesArray.length - 1; voteIndex >= 0; voteIndex--) {
           let voteObject = votesArray[voteIndex]
 
@@ -7103,10 +6871,12 @@ class StateManager extends EventEmitter {
         if (currentVoteObject == null) {
           // create new vote object
           votesseen++
-          currentVoteObject = { winIdx: null, val: v, count: 0, ec: 0, lowestIndex: index, voters: [], voteTally: Array(hashSetList.length), votesseen }
+          //TSConversion this was potetially a major bug, v was missing from this structure before!
+          currentVoteObject = { winIdx: null, val: v,v, count: 0, ec: 0, lowestIndex: index, voters: [], voteTally: Array(hashSetList.length), votesseen } as ExtendedVote
           votesArray.push(currentVoteObject)
           // hashListEntry.ownVotes.push(currentVoteObject)
         }
+        
 
         currentVoteObject.voters.push(hashListIndex)
         currentVoteObject.voteTally[hashListIndex] = { i: index, p: hashListEntry.votePower } // could this be a simple index
@@ -7137,7 +6907,7 @@ class StateManager extends EventEmitter {
     // need backtracking ref for how each list tracks the votses
 
     // Collect a list of all vodes
-    let allVotes = []
+    let allVotes:ExtendedVote[] = []
     for (const votesArray of Object.values(votes)) {
       for (let voteObj of votesArray) {
         allVotes.push(voteObj)
@@ -7151,7 +6921,7 @@ class StateManager extends EventEmitter {
     // count only votes that have won!
     // when / how is it safe to detect a win?
 
-    let allWinningVotes = []
+    let allWinningVotes:ExtendedVote[] = []
     for (let voteObj of allVotes) {
       // IF was a a winning vote?
       if (voteObj.winIdx !== null) {
@@ -7326,28 +7096,28 @@ class StateManager extends EventEmitter {
    * @param {string} ourNodeKey
    * @return {GenericHashSetEntry[]}
    */
-  solveHashSetsPrep (cycleNumber, partitionId, ourNodeKey) {
+  solveHashSetsPrep (cycleNumber:number, partitionId:number, ourNodeKey:string):HashSetEntryPartitions[] {
     let key = 'c' + cycleNumber
     let responsesById = this.allPartitionResponsesByCycleByPartition[key]
     let key2 = 'p' + partitionId
     let responses = responsesById[key2]
 
-    let hashSets = {}
-    let hashSetList = []
+    let hashSets = {} as {[hash:string]: HashSetEntryPartitions}
+    let hashSetList:HashSetEntryPartitions[] = []
     // group identical sets together
     let hashCounting = {}
     for (let partitionResult of responses) {
       let hash = partitionResult.Partition_hash
       let count = hashCounting[hash] || 0
       if (count === 0) {
-        let owner = null
+        let owner:string|null = null
         if (partitionResult.sign) {
           owner = partitionResult.sign.owner
         } else {
           owner = ourNodeKey
         }
-        /** @type {HashSetEntryPartitions} */
-        let hashSet = { hash: hash, votePower: 0, hashSet: partitionResult.hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [owner], ourRow: false, waitForIndex: -1, ownVotes: [] }
+        //TSConversion had to assert that owner is not null with owner!  seems ok
+        let hashSet:HashSetEntryPartitions = { hash: hash, votePower: 0, hashSet: partitionResult.hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [owner!], ourRow: false, waitForIndex: -1, ownVotes: [] }
         hashSets[hash] = hashSet
         hashSetList.push(hashSets[hash])
         // partitionResult.hashSetList = hashSet //Seems like this was only ever used for debugging, going to ax it to be safe!
@@ -7376,7 +7146,7 @@ class StateManager extends EventEmitter {
    * @param {GenericHashSetEntry} solutionHashSet
    * @returns {boolean}
    */
-  static testHashsetSolution (ourHashSet, solutionHashSet, log = false) {
+  static testHashsetSolution (ourHashSet: GenericHashSetEntry, solutionHashSet: GenericHashSetEntry, log:boolean = false) {
     // let payload = { partitionId: partitionId, cycle: cycleNumber, tx_indicies: requestsByHost[i].hostIndex, hash: requestsByHost[i].hash }
     // repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j] })
 
@@ -7393,8 +7163,8 @@ class StateManager extends EventEmitter {
     // }
 
     let stepSize = cHashSetStepSize
-    let makeTXArray = function (hashSet) {
-      let txArray = []
+    let makeTXArray = function (hashSet: GenericHashSetEntry): string[]  {
+      let txArray:string[] = []
       for (let i = 0; i < hashSet.hashSet.length / stepSize; i++) {
         let offset = i * stepSize
         let v = hashSet.hashSet.slice(offset, offset + stepSize)
@@ -7406,9 +7176,9 @@ class StateManager extends EventEmitter {
 
     let txSourceList = { hashes: makeTXArray(ourHashSet) }
     let solutionTxList = { hashes: makeTXArray(solutionHashSet) }
-    let newTxList = { thashes: [], hashes: [], states: [] }
+    let newTxList = { thashes: [], hashes: [], states: [] } as {thashes:string[], hashes:string[], states:string[]}
 
-    let solutionList = []
+    let solutionList: HashSetEntryCorrection[] = []
     for (let correction of ourHashSet.corrections) {
       if (correction.t === 'insert') {
         solutionList.push(correction)
@@ -7434,6 +7204,14 @@ class StateManager extends EventEmitter {
     // ourHashSet.extraMap = extraMap2
     // ///////////////////////////////////////
 
+    if(ourHashSet.extraMap == null){
+      if (log) console.log(`testHashsetSolution: ourHashSet.extraMap missing`)
+      return false
+    }
+    if(ourHashSet.indexMap == null){
+      if (log) console.log(`testHashsetSolution: ourHashSet.indexMap missing`)
+      return false
+    }
     ourHashSet.extraMap.sort(function (a, b) { return a - b })
     solutionList.sort(function (a, b) { return a.i - b.i })
 
