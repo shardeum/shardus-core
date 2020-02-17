@@ -22,7 +22,7 @@ type QueueEntry = {
     syncCounter: number;
     didSync: boolean;
     syncKeys: any[];
-    uniqueKeys?: any;
+    uniqueKeys?: string[];
     ourNodeInvolved?: boolean;
     transactionGroup?: import("../shardus/shardus-types").Node[];
     approximateCycleAge?: number;
@@ -374,8 +374,9 @@ type ExtendedVote = Vote & {
     winIdx: number|null;
     val:string;
     lowestIndex:number;
-    voteTally: number[] // { i: index, p: hashListEntry.votePower } 
-    votesseen: any
+    voteTally: { i: number, p: number }[];  // number[] // { i: index, p: hashListEntry.votePower } 
+    votesseen: any;
+    finalIdx: number;
 }
 
 //{ winIdx: null, val: v, count: 0, ec: 0, lowestIndex: index, voters: [], voteTally: Array(hashSetList.length), votesseen }

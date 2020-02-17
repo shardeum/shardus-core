@@ -123,9 +123,9 @@ class StateManager extends EventEmitter {
 
     /** @type {Map<number, CycleShardData>} */
     this.shardValuesByCycle = new Map()
-    /** @type {CycleShardData} */
-    this.currentCycleShardData = null
-
+   
+    this.currentCycleShardData = null as CycleShardData
+ 
     this.syncTrackerIndex = 1 // increments up for each new sync tracker we create gets maped to calls.
 
     this.preTXQueue = []
@@ -1513,7 +1513,7 @@ class StateManager extends EventEmitter {
     // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
     // Updated names:  accountStart , accountEnd
     this.p2p.registerInternal('get_account_data', async (payload, respond) => {
-      let result = {} as {accountData: Shardus.AccountData[] | null}
+      let result = {} as {accountData: Shardus.AccountData[] | null}//TSConversion  This is complicated !! check app for details.
       let accountData = null
       let ourLockID = -1
       try {
@@ -1527,7 +1527,7 @@ class StateManager extends EventEmitter {
     })
 
     this.p2p.registerInternal('get_account_data2', async (payload, respond) => {
-      let result = {} as {accountData: Shardus.AccountData[] | null}
+      let result = {} as {accountData: Shardus.AccountData[] | null}//TSConversion  This is complicated !!
       let accountData = null
       let ourLockID = -1
       try {
@@ -1541,7 +1541,7 @@ class StateManager extends EventEmitter {
     })
 
     this.p2p.registerInternal('get_account_data3', async (payload, respond) => {
-      let result = {} //TSConversion  This is complicated !!  as {data: Shardus.AccountData[] | null}
+      let result = {} as {data: Shardus.AccountData[] | null} //TSConversion  This is complicated !!(due to app wrapping)  as {data: Shardus.AccountData[] | null}
       let accountData = null
       let ourLockID = -1
       try {
@@ -1561,7 +1561,7 @@ class StateManager extends EventEmitter {
     // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
     // Updated names:  accountIds, max records
     this.p2p.registerInternal('get_account_data_by_list', async (payload, respond) => {
-      let result = {}
+      let result = {} as {accountData: Shardus.AccountData[] | null}
       let accountData = null
       let ourLockID = -1
       try {
@@ -1923,7 +1923,7 @@ class StateManager extends EventEmitter {
 
     // p2p ASK
     this.p2p.registerInternal('request_state_for_tx', async (payload, respond) => {
-      let response = { stateList: [] }
+      let response = { stateList: [] , note: ""}
       // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
       let queueEntry = this.getQueueEntrySafe(payload.txid, payload.timestamp)
       if (queueEntry == null) {
@@ -2004,7 +2004,7 @@ class StateManager extends EventEmitter {
     })
 
     this.p2p.registerInternal('get_account_data_with_queue_hints', async (payload, respond) => {
-      let result = {}
+      let result = {} as {accountData: Shardus.AccountData[] | null}//TSConversion  This is complicated !! check app for details.
       let accountData = null
       let ourLockID = -1
       try {
@@ -2109,20 +2109,23 @@ class StateManager extends EventEmitter {
     if (result === false) { this.mainLogger.error('ASK FAIL 6') }
     let acceptedTXs = result.transactions
 
-    let toParse = {}
+    let toParse = {} //as (AcceptedTx & string)[] 
     try {
       for (let i = 0; i < acceptedTXs.length; i++) {
         toParse = acceptedTXs[i]
         if (utils.isObject(toParse) === false) {
           // this is crazy, could have been nicer to just ignore the error:
-          let funtime = /** @type {string} */ (/** @type {unknown} */ (toParse))
+          //let funtime =  /** @type {string} */ (/** @type {unknown} */ (toParse))
+          let funtime = toParse as string
           acceptedTXs[i] = JSON.parse(funtime)
           // this.logger.playbackLogNote('restoreByTx', '', `parsed: ${acceptedTXs[i]}`)
         } else {
           // this.logger.playbackLogNote('restoreByTx', '', acceptedTXs[i])
-
-          toParse.data = JSON.parse(toParse.data)
-          toParse.receipt = JSON.parse(toParse.receipt)
+          // This is pretty crazy but is need to explain to TS that some forms of this data may need to have data and receipt parsed more.
+          let acceptedTX = toParse as AcceptedTx
+          let partiallyParsed = toParse as {data:string, receipt:string}
+          acceptedTX.data = JSON.parse(partiallyParsed.data)
+          acceptedTX.receipt = JSON.parse(partiallyParsed.receipt)
         }
       }
     } catch (ex) {
@@ -2134,7 +2137,7 @@ class StateManager extends EventEmitter {
 
     // await this.applyAcceptedTx()
     for (let acceptedTx of acceptedTXs) {
-      this.queueAcceptedTransaction(acceptedTx, false)
+      this.queueAcceptedTransaction(acceptedTx, false, helper)
     }
 
     // todo insert these in a sorted way to the new queue
@@ -2641,7 +2644,7 @@ class StateManager extends EventEmitter {
   //         Q
   //          QQ
 
-  queueAcceptedTransaction (acceptedTx, sendGossip = true, sender) {
+  queueAcceptedTransaction (acceptedTx:AcceptedTx, sendGossip:boolean = true, sender: Shardus.Node) {
     // dropping these too early.. hmm  we finished syncing before we had the first shard data.
     // if (this.currentCycleShardData == null) {
     //   // this.preTXQueue.push(acceptedTX)
@@ -2656,8 +2659,7 @@ class StateManager extends EventEmitter {
     let txId = acceptedTx.receipt.txHash
 
     this.queueEntryCounter++
-    /** @type {QueueEntry} */
-    let txQueueEntry = { acceptedTx: acceptedTx, txKeys: keysResponse, collectedData: {}, originalData: {}, homeNodes: {}, hasShardInfo: false, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [] } // age comes from timestamp
+    let txQueueEntry:QueueEntry = { acceptedTx: acceptedTx, txKeys: keysResponse, collectedData: {}, originalData: {}, homeNodes: {}, hasShardInfo: false, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [] } // age comes from timestamp
     // partition data would store stuff like our list of nodes that store this ts
     // collected data is remote data we have recieved back
     // //tx keys ... need a sorted list (deterministic) of partition.. closest to a number?
@@ -3359,7 +3361,7 @@ class StateManager extends EventEmitter {
 
     let ourNodeShardData = this.currentCycleShardData.nodeShardData
     // partittions:
-    let partitionDump = { partitions: [] }
+    let partitionDump = { partitions: [], cycle:0, rangesCovered:{},nodesCovered:{},allNodeIds:[]  }
     partitionDump.cycle = this.currentCycleShardData.cycleNumber
 
     // todo port this to a static stard function!
@@ -3369,19 +3371,22 @@ class StateManager extends EventEmitter {
     partitionDump.rangesCovered = { ipPort: `${ourNodeShardData.node.externalIp}:${ourNodeShardData.node.externalPort}`, id: utils.makeShortHash(ourNodeShardData.node.id), fracID: (ourNodeShardData.nodeAddressNum / 0xffffffff), hP: ourNodeShardData.homePartition, cMin: minP, cMax: maxP, stMin: ourNodeShardData.storedPartitions.partitionStart, stMax: ourNodeShardData.storedPartitions.partitionEnd, numP: this.currentCycleShardData.shardGlobals.numPartitions }
 
     // todo print out coverage map by node index
-
+    
     partitionDump.nodesCovered = { idx: ourNodeShardData.ourNodeIndex, ipPort: `${ourNodeShardData.node.externalIp}:${ourNodeShardData.node.externalPort}`, id: utils.makeShortHash(ourNodeShardData.node.id), fracID: (ourNodeShardData.nodeAddressNum / 0xffffffff), hP: ourNodeShardData.homePartition, consensus: [], stored: [], extra: [], numP: this.currentCycleShardData.shardGlobals.numPartitions }
+ 
     for (let node of ourNodeShardData.consensusNodeForOurNode) {
       let nodeData = this.currentCycleShardData.nodeShardDataMap.get(node.id)
+      //@ts-ignore just debug junk
       partitionDump.nodesCovered.consensus.push({ idx: nodeData.ourNodeIndex, hp: nodeData.homePartition })
     }
     for (let node of ourNodeShardData.nodeThatStoreOurParitionFull) {
       let nodeData = this.currentCycleShardData.nodeShardDataMap.get(node.id)
+      //@ts-ignore just debug junk
       partitionDump.nodesCovered.stored.push({ idx: nodeData.ourNodeIndex, hp: nodeData.homePartition })
     }
 
     for (var [key, value] of partitionMap) {
-      let partition = { parititionID: key, accounts: [] }
+      let partition = { parititionID: key, accounts: [], skip:{} }
       partitionDump.partitions.push(partition)
 
       // normal case
@@ -3418,7 +3423,7 @@ class StateManager extends EventEmitter {
       }
     }
 
-    partitionDump.allNodeIds = []
+    //partitionDump.allNodeIds = []
     for (let node of this.currentCycleShardData.activeNodes) {
       partitionDump.allNodeIds.push(utils.makeShortHash(node.id))
     }
@@ -4457,7 +4462,7 @@ class StateManager extends EventEmitter {
    * @param {*} otherStatusMap todo status map, but this is unused
    * @param {PartitionObject} otherPartitionObject
    */
-  _mergeRepairDataIntoLocalState (repairTracker, ourPartitionObj, otherStatusMap, otherPartitionObject) {
+  _mergeRepairDataIntoLocalState (repairTracker:RepairTracker, ourPartitionObj:PartitionObject, otherStatusMap, otherPartitionObject: PartitionObject) {
     // just simple assignment.  if we changed things to merge the best N results this would need to change.
     ourPartitionObj.Txids = [...otherPartitionObject.Txids]
     ourPartitionObj.Status = [...otherPartitionObject.Status]
@@ -4472,7 +4477,7 @@ class StateManager extends EventEmitter {
     // txList.passed = ourPartitionObj.Status
     // txList.states = ourPartitionObj.States // TXSTATE_TODO
 
-    let newTxList = { hashes: [...ourPartitionObj.Txids], passed: [...ourPartitionObj.Status], states: [...ourPartitionObj.States] }
+    let newTxList = { hashes: [...ourPartitionObj.Txids], passed: [...ourPartitionObj.Status], states: [...ourPartitionObj.States], txs:[] }
     // let newTxList = { hashes: [], passed: [], txs: [], thashes: [], tpassed: [], ttxs: [], tstates: [], states: [] }
     txList.newTxList = newTxList
 
@@ -6499,7 +6504,7 @@ class StateManager extends EventEmitter {
 
     while (solving) {
       let votes = {}
-      let topVote = { v: '', count: 0 }
+      let topVote = { v: '', count: 0, vote:null, ec: null }
       let winnerFound = false
       let totalVotes = 0
       // Loop through each entry list
