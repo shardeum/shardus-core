@@ -29,7 +29,7 @@ class P2P extends EventEmitter {
     this.difficulty = config.difficulty
     this.queryDelay = config.queryDelay
     this.minNodesToAllowTxs = config.minNodesToAllowTxs
-    this.seedNodes = null
+    this.activeNodeInfos = null
     this.isFirstSeed = false
     this.acceptInternal = false
 
@@ -92,6 +92,9 @@ class P2P extends EventEmitter {
       this.archivers.sendData(cycle)
       this.archivers.resetJoinRequests()
     })
+
+    // Init context for startup
+    P2PStartup.setContext(this)
 
     this.InternalRecvCounter = 0
     this.keyCounter = 0
@@ -193,28 +196,6 @@ class P2P extends EventEmitter {
     }
     this.mainLogger.debug(`Got signed seed list: ${JSON.stringify(seedListSigned)}`)
     return seedListSigned
-  }
-
-  _getSeedNodes () {
-    return P2PStartup._getSeedNodes(this)
-  }
-
-  async _fetchSeedNodeInfo (seedNode) {
-    const { nodeInfo } = await http.get(`${seedNode.ip}:${seedNode.port}/nodeinfo`)
-    return nodeInfo
-  }
-
-  async _fetchSeedNodesInfo (seedNodes) {
-    const promises = []
-    for (let i = 0; i < seedNodes.length; i++) {
-      const node = seedNodes[i]
-      promises[i] = this._fetchSeedNodeInfo(node)
-    }
-    const [results, errors] = await utils.robustPromiseAll(promises)
-    for (const error of errors) {
-      this.mainLogger.warn(error)
-    }
-    return results
   }
 
   async _setNodeId (id, updateDb = true) {
@@ -365,18 +346,6 @@ class P2P extends EventEmitter {
     return false
   }
 
-  _getNonSeedNodes (seedNodes = []) {
-    // Get all nodes minus ourself
-    const nodes = this.state.getAllNodes(this.id)
-    // Make a copy of the nodeslist
-    const nodesCopy = utils.deepCopy(nodes)
-    if (!seedNodes.length) throw new Error('Fatal: No seed nodes provided!')
-    for (const seedNode of seedNodes) {
-      delete nodesCopy[seedNode]
-    }
-    return nodesCopy
-  }
-
   getNodelistHash () {
     const nodelist = this.state.getAllNodes()
     const nodelistHash = this.crypto.hash({ nodelist })
@@ -510,7 +479,7 @@ class P2P extends EventEmitter {
     } catch (e) {
       this.mainLogger.warn('Could not get cycleMarker from nodes. Querying seedNodes for it...')
       try {
-        cycleMarker = await this._fetchCycleMarkerInternal(this.seedNodes)
+        cycleMarker = await this._fetchCycleMarkerInternal(this.activeNodeInfos)
       } catch (err) {
         this.mainLogger.error('_submitWhenUpdatePhase could not get cycleMarker from seedNodes. Exiting... ' + err)
         process.exit()
@@ -778,38 +747,6 @@ class P2P extends EventEmitter {
     return ourHash === cycleChainHash
   }
 
-  async _fetchNodelistHash (nodes) {
-    let queryFn = async (node) => {
-      const { nodelistHash } = await this.ask(node, 'nodelisthash')
-      return { nodelistHash }
-    }
-    try {
-      const [response] = await this.robustQuery(nodes, queryFn)
-      const { nodelistHash } = response
-      return nodelistHash
-    } catch (err) {
-      this.mainLogger.error('_syncToNetwork > _fetchNodelistHash failed, initialized apoptosis: ' + err)
-      await this.initApoptosis()
-      process.exit()
-    }
-  }
-
-  async _fetchVerifiedNodelist (nodes, nodelistHash) {
-    let queryFn = async (node) => {
-      const { nodelist } = await this.ask(node, 'nodelist')
-      return { nodelist }
-    }
-    try {
-      let verifyFn = (nodelist) => this._verifyNodelist(nodelist, nodelistHash)
-      const { nodelist } = await this._sequentialQuery(nodes, queryFn, verifyFn)
-      return nodelist
-    } catch (err) {
-      this.mainLogger.error('_syncToNetwork > _fetchVerifiedNodelist failed, initialized apoptosis: ' + err)
-      await this.initApoptosis()
-      process.exit()
-    }
-  }
-
   _isSameCycleMarkerInfo (info1, info2) {
     const cm1 = utils.deepCopy(info1)
     const cm2 = utils.deepCopy(info2)
@@ -1061,137 +998,6 @@ class P2P extends EventEmitter {
     return chainAndCerts
   }
 
-  async _syncUpChainAndNodelist () {
-    const nodes = this.state.getActiveNodes(this.isActive() ? this.id : null)
-    const seedNodes = this.seedNodes
-
-    this.mainLogger.info('Syncing up cycle chain and nodelist...')
-
-    const getCycleMarker = async () => {
-      // Get current cycle counter
-      let cycleMarker
-      try {
-        cycleMarker = await this._fetchCycleMarkerInternal(nodes)
-      } catch (e) {
-        this.mainLogger.warn('Could not get cycleMarker from nodes. Querying seedNodes for it...')
-        this.mainLogger.debug(e)
-        try {
-          cycleMarker = await this._fetchCycleMarkerInternal(seedNodes)
-        } catch (err) {
-          this.mainLogger.error('_syncUpChainAndNodelist > getCycleMarkerSafely> getCycleMarker: Could not get cycleMarker from seedNodes. Apoptosis then Exiting... ' + err)
-          await this.initApoptosis()
-          process.exit()
-        }
-      }
-      this.mainLogger.debug(`Fetched cycle marker: ${JSON.stringify(cycleMarker)}`)
-      return cycleMarker
-    }
-
-    // Gets cycle marker and ensures that we are not at the boundary of a cycle
-    const getCycleMarkerSafely = async () => {
-      let cycleMarker
-      let isInLastPhase = false
-
-      // We want to make sure we are not in the last phase, so we don't accidentally miss a cycle
-      do {
-        cycleMarker = await getCycleMarker()
-        isInLastPhase = this._isInLastPhase(utils.getTime('s'), cycleMarker.cycleStart, cycleMarker.cycleDuration)
-        if (!isInLastPhase) break
-        await this._waitUntilEndOfCycle(utils.getTime('s'), cycleMarker.cycleStart, cycleMarker.cycleDuration)
-      } while (isInLastPhase)
-      return cycleMarker
-    }
-
-    const { cycleCounter } = await getCycleMarkerSafely()
-
-    const lastCycleCounter = this.state.getLastCycleCounter()
-    // If our last recorded cycle counter is one less than we currently see, we are synced up
-    if (lastCycleCounter === cycleCounter - 1) return true
-
-    // We want to sync from the cycle directly after our current cycle, until the latest cycle
-    let chainStart = lastCycleCounter + 1
-    let chainEnd = cycleCounter
-
-    const { cycleChain, cycleMarkerCerts } = await this._fetchFinalizedChain(seedNodes, nodes, chainStart, chainEnd)
-    this.mainLogger.debug(`Retrieved cycle chain: ${JSON.stringify(cycleChain)}`)
-    try {
-      await this.state.addCycles(cycleChain, cycleMarkerCerts)
-    } catch (e) {
-      this.mainLogger.error('_syncUpChainAndNodelist: ' + e.name + ': ' + e.message + ' at ' + e.stack)
-      this.mainLogger.info('Unable to add cycles. Sync up failed...')
-      throw new Error('Unable to sync chain. Sync up failed...')
-    }
-
-    // DEBUG: to trigger _fetchNodeByPublicKey()
-    // const publicKey = this.seedNodes[0].publicKey
-    // console.log(publicKey)
-    // console.log(nodes)
-    // const node = await this._fetchNodeByPublicKey(nodes, publicKey)
-
-    // Check through cycles we resynced, gather all nodes we need nodeinfo on (by pubKey)
-    // Also keep track of which nodes went active
-    // Robust query for all the nodes' node info, and add nodes
-    // Then go back through and mark all nodes that you saw as active if they aren't
-
-    // TODO: Refactor: Consider if this needs to be done cycle by cycle or if it can just be done all at once
-    const toAdd = []
-    const toSetActive = []
-    const toRemove = []
-    for (let cycle of cycleChain) {
-      // If nodes joined in this cycle, add them to toAdd list
-      if (cycle.joined.length) {
-        for (const publicKey of cycle.joined) {
-          toAdd.push(publicKey)
-        }
-      }
-
-      // If nodes went active in this cycle, add them to toSetActive list
-      if (cycle.activated.length) {
-        for (const id of cycle.activated) {
-          toSetActive.push(id)
-        }
-      }
-
-      // If nodes were removed in this cycle, make sure to remove them
-      if (cycle.removed.length) {
-        for (const id of cycle.removed) {
-          toRemove.push(id)
-        }
-      }
-    }
-
-    // We populate an array with all the queries we need to make for missing nodes
-    this.mainLogger.debug(`Missed the following nodes joining: ${JSON.stringify(toAdd)}. Fetching their info to add to nodelist.`)
-    const queries = []
-    for (const pubKey of toAdd) {
-      queries.push(this._fetchNodeByPublicKey(nodes, pubKey))
-    }
-    // We try to get all the nodes that we missed in the given cycles
-    const [results, errors] = await utils.robustPromiseAll(queries)
-    // Then we add them one by one to our state
-    for (const node of results) {
-      await this.state.addNode(node)
-    }
-    // TODO: add proper error handling
-    if (errors.length) {
-      this.mainLogger.warn('Errors from _syncUpChainAndNodelist()!')
-    }
-
-    // After we finish adding our missing nodes, we try to add any active status updates we missed
-    this.mainLogger.debug(`Missed active updates for the following nodes: ${JSON.stringify(toSetActive)}. Attempting to update the status for each one.`)
-    for (const id of toSetActive) {
-      await this.state.directStatusUpdate(id, 'active')
-    }
-
-    this.mainLogger.debug(`Missed removing the following nodes: ${JSON.stringify(toRemove)}. Attempting to remove each node.`)
-    for (const id of toRemove) {
-      const node = this.state.getNode(id)
-      await this.state.removeNode(node)
-    }
-    const synced = await this._syncUpChainAndNodelist()
-    return synced
-  }
-
   async _requestCycleUpdates (nodeId) {
     let node
     try {
@@ -1255,18 +1061,6 @@ class P2P extends EventEmitter {
     if (!active) return true
     await this.sendGossipIn('join', joinRequest, tracker)
     return true
-  }
-
-  _discoverNetwork (seedNodes) {
-    return P2PStartup._discoverNetwork(this, seedNodes)
-  }
-
-  _joinNetwork (seedNodes) {
-    return P2PStartup._joinNetwork(this, seedNodes)
-  }
-
-  async _syncToNetwork (seedNodes) {
-    return P2PStartup._syncToNetwork(this, seedNodes)
   }
 
   _createStatusUpdate (type) {
@@ -1725,7 +1519,7 @@ class P2P extends EventEmitter {
   }
 
   startup () {
-    return P2PStartup.startup(this)
+    return P2PStartup.startup()
   }
 
   cleanupSync () {
@@ -1739,16 +1533,9 @@ class P2P extends EventEmitter {
     this.acceptInternal = false
 
     // [AS] exit-handler calls >> p2p.cleanUpSync >> p2p.state.stopCycles
-    // this.state.stopCycles()
 
     // Exit process
     process.exit()
-
-    /*
-    await this.state.clear()
-    console.log('Restarting, then rejoining network...')
-    await this.startup()
-    */
   }
 
   async _reportLostNode (node) {

@@ -1,0 +1,48 @@
+msc {
+  N1 [label="Syncing/\nActive\nNode 1"],
+  AN2 [label="Active Node 2"],
+  AN3 [label="Active Node 3"],
+  AN4 [label="Active Node 4"];
+
+  N1 => * [label="Proposal: {Apoptosize Me ~N1}", arcskip="1"],
+  |||;
+  N1 => N1 [label="Exit"];
+
+  AN2 box AN4 [label="Save node's apoptosis proposal"];
+
+  N1 strict AN4 [label="Cycle 1"] {
+
+    --- [label="Quarter 1"];
+
+      ... [label="Propose changes"];
+
+      AN2 loop AN4 [label="Saved apoptosis proposals"] {
+
+        AN2 alt AN4 [label="Node not marked for apoptosis"] {
+          AN2 box AN2 [label="Mark node for apoptosis"];
+          AN2 => * [label="Gossip: {Apoptosize Me ~N1}", arcskip="1"];
+          |||;
+          AN3 box AN4 [label="Mark node for apoptosis"];
+          --- [label="Node already marked for apoptosis"];
+          AN2 box AN4 [label="Do nothing"];
+        };
+      };
+
+    --- [label="Quarter 2"];
+
+      ... [label="Create cycle from proposed changed"];
+
+    --- [label="Quarter 3"];
+
+      ... [label="Synchronize on cycle"];
+
+    --- [label="Quarter 4"];
+
+      ... [label="Apply cycle changes"];
+
+      AN2 loop AN4 [label="Nodes marked for apoptosis"] {
+        AN2 box AN4 [label="Remove N1 from Node List"];
+      };
+
+  };
+}

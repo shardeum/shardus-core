@@ -3,7 +3,7 @@ Shardus Consensor Startup
 
 ## 1. Identify the network
 
-1. Load a list of archivers from config
+1. Load a list of existing archivers from config
 
 2. Pick an archiver and ask it for a list of active nodes
    * Include your own info when you ask
