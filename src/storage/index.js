@@ -10,6 +10,8 @@ const models = require('./models')
 const Sqlite3Storage = require('./sqlite3storage')
 // const BetterSqlite3Storage = require('./betterSqlite3storage')
 
+const P2PApoptosis = require('../p2p/p2p-apoptosis')
+
 class Storage {
   constructor (baseDir, config, logger, profiler) {
     this.profiler = profiler
@@ -31,6 +33,8 @@ class Storage {
     await this.storage.runCreate('CREATE TABLE if not exists `nodes` (`id` TEXT NOT NULL PRIMARY KEY, `publicKey` TEXT NOT NULL, `curvePublicKey` TEXT NOT NULL, `cycleJoined` TEXT NOT NULL, `internalIp` VARCHAR(255) NOT NULL, `externalIp` VARCHAR(255) NOT NULL, `internalPort` SMALLINT NOT NULL, `externalPort` SMALLINT NOT NULL, `joinRequestTimestamp` BIGINT NOT NULL, `activeTimestamp` BIGINT NOT NULL, `address` VARCHAR(255) NOT NULL, `status` VARCHAR(255) NOT NULL)')
     await this.storage.runCreate('CREATE TABLE if not exists `properties` (`key` VARCHAR(255) NOT NULL PRIMARY KEY, `value` JSON)')
     await this.storage.runCreate('CREATE TABLE if not exists `accountsCopy` (`accountId` VARCHAR(255) NOT NULL, `cycleNumber` BIGINT NOT NULL, `data` JSON NOT NULL, `timestamp` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, PRIMARY KEY (`accountId`, `cycleNumber`))')
+
+    await this.storage.run(P2PApoptosis.addCycleFieldQuery)
 
     // get models and helper methods from the storage class we just initializaed.
     this.storageModels = this.storage.storageModels

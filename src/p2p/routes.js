@@ -212,6 +212,7 @@ function setupRoutes () {
     this.sendGossipIn('active', payload, tracker, sender)
   })
 
+  /*
   this.registerGossipHandler('apoptosis', async (payload, sender, tracker) => {
     if (!payload) {
       this.mainLogger.debug('No payload provided with `apoptosis` request.')
@@ -223,6 +224,7 @@ function setupRoutes () {
     if (!added) return this.mainLogger.debug(`Apoptosis message for ${payload.nodeId} not added.`)
     this.sendGossipIn('apoptosis', payload, tracker, sender)
   })
+  */
 
   this.registerGossipHandler('certificate', async (payload, sender, tracker) => {
     if (!payload) {

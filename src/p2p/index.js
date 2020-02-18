@@ -9,6 +9,7 @@ const P2PArchivers = require('./p2p-archivers')
 const routes = require('./routes')
 
 const P2PStartup = require('./p2p-startup')
+const P2PApoptosis = require('./p2p-apoptosis')
 
 class P2P extends EventEmitter {
   constructor (config, logger, storage, crypto) {
@@ -96,6 +97,9 @@ class P2P extends EventEmitter {
     // Init context for startup
     P2PStartup.setContext(this)
 
+    // Init context for apoptosis
+    P2PApoptosis.setContext(this)
+
     this.InternalRecvCounter = 0
     this.keyCounter = 0
   }
@@ -127,6 +131,8 @@ class P2P extends EventEmitter {
     routes.register(this)
     this.lostNodes.registerRoutes()
     this.archivers.registerRoutes()
+    for (const route of P2PApoptosis.internalRoutes) this.registerInternal(route.name, route.handler)
+    for (const route of P2PApoptosis.gossipRoutes) this.registerGossipHandler(route.name, route.handler)
   }
 
   _verifyExternalInfo (ipInfo) {
@@ -577,10 +583,21 @@ class P2P extends EventEmitter {
     return signedMsg
   }
 
-  async initApoptosis () {
+  async initApoptosis (activeNodes) {
+    /*
     const msg = this._createApoptosisMessage()
     await this._submitWhenUpdatePhase('apoptosis', msg)
     this.state.addApoptosisMessage(msg)
+    */
+    if (!activeNodes) {
+      if (this.id) {
+        activeNodes = this.state.getActiveNodes(this.id)
+      } else {
+        activeNodes = this.activeNodeInfos
+      }
+    }
+
+    P2PApoptosis.apoptosizeSelf(activeNodes)
   }
 
   isActive () {

@@ -2,6 +2,8 @@ const EventEmitter = require('events')
 const utils = require('../utils')
 const Random = require('../random')
 
+const P2PApoptosis = require('./p2p-apoptosis')
+
 /**
  * @typedef {import('../shardus/index.js').Node} Node
  */
@@ -511,6 +513,14 @@ class P2PState extends EventEmitter {
     for (const lostUpMsg of lost.up) {
       this.addLostMessage(lostUpMsg, true)
     }
+
+    /**
+     * Call submodule cycle hooks to update their changes to the cycle data
+     * based off of received updates
+     */
+    P2PApoptosis.updateChangesToCycle(updates[P2PApoptosis.cycleUpdatesName])
+    P2PApoptosis.addChangesToCycle(this.currentCycle)
+
     try {
       const cMarkerBefore = this.getCurrentCertificate().marker
       this._createCycleMarker(false)
@@ -1042,6 +1052,11 @@ class P2PState extends EventEmitter {
 
   _resetCurrentCycle () {
     this.currentCycle = utils.deepCopy(this.cleanCycle)
+
+    /**
+     * Call submodule cycle hooks to reset their own cycle data 
+     */
+    P2PApoptosis.resetCycle(this.currentCycle)
   }
 
   // Kicks off the whole cycle and cycle marker creation system
@@ -1250,6 +1265,12 @@ class P2PState extends EventEmitter {
     this.mainLogger.info('Creating new cycle marker...')
     this._addJoiningNodes()
     this._removeExcessNodes()
+
+    /**
+     * Call submodule cycle hooks to add their changes to cycle data/updates
+     */
+    P2PApoptosis.addChangesToCycle(this.currentCycle)
+
     this.mainLogger.debug('Getting cycle info to create cycle marker...')
     const cycleInfo = this.getCycleInfo(false)
     this.mainLogger.debug('Computing cycle marker before creating certificate...')
@@ -1260,6 +1281,11 @@ class P2PState extends EventEmitter {
     const [added] = this.addCertificate(certificate)
     if (!added) return
     if (!gossip) return
+    /**
+     * Triggers comparison of cycle certificates and cycle updates if different
+     * See 'cycleupdates' internal route
+     * See 'certificates' gossip route
+     */
     this.p2p.sendGossipIn('certificate', certificate)
   }
 
@@ -1336,6 +1362,14 @@ class P2PState extends EventEmitter {
     const lost = this.removeNodes(lostNodes)
 
     const promises = [accepted, activated, removed, apoptosized, lost, cycleAdded]
+
+    /**
+     * Call submodule cycle hooks to apply cycle changes to the actual p2p state
+     */
+    promises.concat([
+      P2PApoptosis.applyCycleChangesToState(cycleInfo[P2PApoptosis.cycleDataName])
+    ])
+
     try {
       await Promise.all(promises)
       this.mainLogger.info('Added cycle chain entry to database successfully!')
@@ -1383,6 +1417,16 @@ class P2PState extends EventEmitter {
       activatedPublicKeys,
       expired
     }
+
+    /**
+     * Copy fields added by submodules from cycle data into cycleInfo
+     */
+    for (const dataName of [
+      P2PApoptosis.cycleDataName
+    ]) {
+      cycleInfo[dataName] = this.currentCycle.data[dataName]
+    }
+
     if (withCert) {
       cycleInfo.certificate = this.getCurrentCertificate()
     }

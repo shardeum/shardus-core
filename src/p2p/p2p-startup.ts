@@ -83,9 +83,9 @@ async function getActiveNodes() {
       );
     }
   }
-  const dataRequest = seedListSigned.dataRequest
+  const dataRequest = seedListSigned.dataRequest;
   if (dataRequest) {
-    p2p.archivers.addDataRecipient(joinRequest.nodeInfo, dataRequest)
+    p2p.archivers.addDataRecipient(joinRequest.nodeInfo, dataRequest);
   }
   return seedListSigned.nodeList;
 }
@@ -196,7 +196,7 @@ async function syncToNetwork(activeNodes: Node[]) {
     p2p.mainLogger.error('Fetch nodeinfo error: ' + err);
   }
   if (checkNodeInfos(nodeInfoResults) === false) {
-    abort(
+    await abort(
       '_syncToNetwork > fetchNodeInfo failed. Apoptosis then restarting...'
     );
   }
@@ -207,7 +207,7 @@ async function syncToNetwork(activeNodes: Node[]) {
   const nodelistHashResult = await fetchNodelistHash(p2p.activeNodeInfos);
   p2p.mainLogger.debug(`Nodelist hash result is: ${nodelistHashResult}.`);
   if (checkNodelistHash(nodelistHashResult) === false) {
-    abort(
+    await abort(
       '_syncToNetwork > fetchNodelistHash failed. Apoptosis then restarting...'
     );
   }
@@ -215,13 +215,10 @@ async function syncToNetwork(activeNodes: Node[]) {
 
   // Get and verify nodelist aganist hash
   p2p.mainLogger.debug('Fetching verified nodelist...');
-  const nodelistResult = await fetchNodelist(
-    p2p.activeNodeInfos,
-    nodelistHash
-  );
+  const nodelistResult = await fetchNodelist(p2p.activeNodeInfos, nodelistHash);
   p2p.mainLogger.debug(`Nodelist result is: ${JSON.stringify(nodelistResult)}`);
   if (checkNodelist(nodelistResult) === false) {
-    abort(
+    await abort(
       '_syncToNetwork > fetchNodelist failed. Apoptosis then restarting...'
     );
   }
@@ -270,7 +267,7 @@ async function syncToNetwork(activeNodes: Node[]) {
           '_syncToNetwork > getUnfinalized: Could not get cycle marker from seed nodes. Apoptosis then Exiting... ' +
             err
         );
-        p2p.initApoptosis();
+        await p2p.initApoptosis();
         process.exit();
       }
     }
@@ -330,10 +327,10 @@ function checkNodeInfos(results: unknown): boolean {
           // [TODO] Check range
           return true;
         }
-      } 
-    } 
+      }
+    }
   }
-  return false
+  return false;
 }
 
 async function fetchNodelistHash(nodes: NodeInfo[]) {
@@ -356,18 +353,18 @@ function checkNodelistHash(results: unknown): boolean {
   if (exists(results)) {
     return true;
   }
-  return false
+  return false;
 }
 
-async function fetchNodelist (nodes, nodelistHash) {
-  const queryFn = async (node) => {
-    const { nodelist } = await p2p.ask(node, 'nodelist')
-    return { nodelist }
-  }
+async function fetchNodelist(nodes, nodelistHash) {
+  const queryFn = async node => {
+    const { nodelist } = await p2p.ask(node, 'nodelist');
+    return { nodelist };
+  };
   try {
-    const verifyFn = (nodelist) => p2p._verifyNodelist(nodelist, nodelistHash)
-    const { nodelist } = await p2p._sequentialQuery(nodes, queryFn, verifyFn)
-    return nodelist
+    const verifyFn = nodelist => p2p._verifyNodelist(nodelist, nodelistHash);
+    const { nodelist } = await p2p._sequentialQuery(nodes, queryFn, verifyFn);
+    return nodelist;
   } catch (err) {
     p2p.mainLogger.error('fetchNodelistHash failed: ' + err);
     return undefined;
@@ -379,7 +376,7 @@ function checkNodelist(results: unknown): boolean {
   if (exists(results)) {
     return true;
   }
-  return false
+  return false;
 }
 
 async function syncUpChainAndNodelist() {
@@ -547,12 +544,12 @@ async function syncUpChainAndNodelist() {
   return synced;
 }
 
-function abort(message: string) {
+async function abort(message: string) {
   p2p.mainLogger.error(message);
-  p2p.initApoptosis();
+  await p2p.initApoptosis();
   process.exit();
 }
 
-function exists (thing: unknown) {
-  return thing !== null && typeof thing !== 'undefined'
+function exists(thing: unknown) {
+  return thing !== null && typeof thing !== 'undefined';
 }

@@ -1,4 +1,5 @@
 const Sequelize = require('sequelize')
+const P2PApoptosis = require('../../p2p/p2p-apoptosis')
 
 // dont forget to add the certificate field as JSON
 module.exports = [
@@ -22,6 +23,7 @@ module.exports = [
     returned: { type: Sequelize.JSON, allowNull: false },
     lost: { type: Sequelize.JSON, allowNull: false },
     refuted: { type: Sequelize.JSON, allowNull: false },
-    apoptosized: { type: Sequelize.JSON, allowNull: false }
+    apoptosized: { type: Sequelize.JSON, allowNull: false },
+    ...P2PApoptosis.sequelizeCycleFieldModel
   }
 ]
