@@ -264,7 +264,7 @@ type TxTallyList = {
     newTxList?: NewTXList;
 };
 
-type NewTXList = { hashes: string[], passed: number[], txs: any[], thashes: string[], tpassed: number[], ttxs: any[], tstates: any[], states: any[] }
+type NewTXList = { hashes: string[], passed: number[], txs: any[], thashes: string[], tpassed: number[], ttxs: any[], tstates: any[], states: any[], processed: boolean }
 
 type Cycle = import("../shardus/shardus-types").Cycle;
 type Sign = import("../shardus/shardus-types").Sign;

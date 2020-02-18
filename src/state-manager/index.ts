@@ -70,6 +70,24 @@ class StateManager extends EventEmitter {
 
     fifoLocks:FifoLockObjectMap
 
+    //data sync and data repair structure defined
+    /** partition objects by cycle.  index by cycle counter key to get an array */
+    partitionObjectsByCycle:{[cycleKey:string]: PartitionObject[]} 
+    /** our partition Results by cycle.  index by cycle counter key to get an array */
+    ourPartitionResultsByCycle:{[cycleKey:string]: PartitionResult[]}
+    /** tracks state for repairing partitions. index by cycle counter key to get the repair object, index by parition  */
+    repairTrackingByCycleById:{[cycleKey:string]: RepairTracker}
+    /** UpdateRepairData by cycle key */
+    repairUpdateDataByCycle:{[cycleKey:string]: UpdateRepairData[]}
+    /** partition objects by cycle by hash.   */
+    recentPartitionObjectsByCycleByHash:{[cycleKey:string]: {[hash:string]: PartitionObject}}
+    /** temporary store for TXs that we put in a partition object after a cycle is complete. an array that holds any TXs (i.e. from different cycles), code will filter out what it needs @see TempTxRecord */
+    tempTXRecords:TempTxRecord[]
+    /** TxTallyList data indexed by cycle key and partition key. @see TxTallyList */
+    txByCycleByPartition:{[cycleKey:string]: {[partitionKey:string]: TxTallyList}}
+    /** Stores the partition responses that other nodes push to us.  Index by cycle key, then index by partition id */
+    allPartitionResponsesByCycleByPartition:{[cycleKey:string]: {[partitionKey:string]: PartitionResult[]}}
+
   constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage : Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     super()
     this.verboseLogs = verboseLogs
@@ -166,6 +184,19 @@ class StateManager extends EventEmitter {
     //Fifo locks.
     this.fifoLocks = {}
 
+ 
+    // Init data sync structures!
+    this.partitionObjectsByCycle = {}
+    this.ourPartitionResultsByCycle = {}
+    this.repairTrackingByCycleById = {}
+    this.repairUpdateDataByCycle = {}
+    this.applyAllPreparedRepairsRunning = false
+    this.recentPartitionObjectsByCycleByHash = {}
+    this.tempTXRecords = []
+    this.txByCycleByPartition = {}
+    this.allPartitionResponsesByCycleByPartition = {}
+    
+
     // debug hack
     if (p2p == null) {
       return
@@ -210,7 +241,7 @@ class StateManager extends EventEmitter {
     // this.dataPhaseTag = 'DATASYNC: '
     // this.applySoftLock = false
 
-    this.initStateSyncData()
+    
 
     // this.useHashSets = true
     // this.lastActiveNodeCount = 0
@@ -1765,7 +1796,7 @@ class StateManager extends EventEmitter {
               allResponsesByPartition[partitionKey1] = responses
             }
             // clean out an older response from same node if on exists
-            responses = responses.filter((item:SignedObject) => (item.sign == null) || item.sign.owner !== owner)
+            responses = responses.filter((item) => (item.sign == null) || item.sign.owner !== owner)
             allResponsesByPartition[partitionKey1] = responses // have to re-assign this since it is a new ref to the array
 
             // add the result ot the list of responses
@@ -4074,7 +4105,7 @@ class StateManager extends EventEmitter {
       }
       let ourID = this.crypto.getPublicKey()
       // clean out an older response from same node if on exists
-      responses = responses.filter((item:SignedObject) => item.sign && item.sign.owner !== ourID) // if the item is not signed clear it!
+      responses = responses.filter((item) => item.sign && item.sign.owner !== ourID) // if the item is not signed clear it!
       responsesByPartition[partitionKey] = responses // have to re-assign this since it is a new ref to the array
       responses.push(pResult)
     }
@@ -4119,6 +4150,7 @@ class StateManager extends EventEmitter {
 
     let txSourceData = txList
     if (txList.newTxList) {
+      // TSConversion this forced us to add processed to newTxList.  probably a good fis for an oversight
       txSourceData = txList.newTxList
     }
 
@@ -4700,8 +4732,8 @@ class StateManager extends EventEmitter {
     // txList.passed = ourPartitionObj.Status
     // txList.states = ourPartitionObj.States // TXSTATE_TODO
 
-    //TxTallyList  CLConversion Added thashes: [], tpassed: [], ttxs: [], tstates: []  to make this type fit.  should double check tha tthis doesnt break things.
-    let newTxList:NewTXList = { hashes: [...ourPartitionObj.Txids], passed: [...ourPartitionObj.Status], states: [...ourPartitionObj.States], txs:[], thashes: [], tpassed: [], ttxs: [], tstates: [] }
+    //TxTallyList  CLConversion Added thashes: [], tpassed: [], ttxs: [], tstates: []  to make this type fit.  should double check tha tthis doesnt break things. also had to add processed
+    let newTxList:NewTXList = { hashes: [...ourPartitionObj.Txids], passed: [...ourPartitionObj.Status], states: [...ourPartitionObj.States], txs:[], thashes: [], tpassed: [], ttxs: [], tstates: [], processed:false }
     // let newTxList = { hashes: [], passed: [], txs: [], thashes: [], tpassed: [], ttxs: [], tstates: [], states: [] }
     txList.newTxList = newTxList
 
@@ -4782,8 +4814,8 @@ class StateManager extends EventEmitter {
     if (txList.newTxList) {
     //  txSourceList = txList.newTxList  //not sure if we should keep this... or at least update the part where we remove extra entries
     }
-    // let newTxList = { hashes: [...txList.hashes], passed: [...txList.passed], txs: [...txList.txs] }
-    let newTxList:NewTXList = { hashes: [], passed: [], txs: [], thashes: [], tpassed: [], ttxs: [], tstates: [], states: [] }
+    // let newTxList = { hashes: [...txList.hashes], passed: [...txList.passed], txs: [...txList.txs] }  forced to add processed here.
+    let newTxList:NewTXList = { hashes: [], passed: [], txs: [], thashes: [], tpassed: [], ttxs: [], tstates: [], states: [], processed:false }
     txList.newTxList = newTxList // append it to tx list for now.
     repairTracker.solutionDeltas.sort(this._sortNumberI) // function (a, b) { return a.i - b.i }) // why did b - a help us once??
 
@@ -6239,54 +6271,54 @@ class StateManager extends EventEmitter {
     await Promise.all(promises)
   }
 
-  initStateSyncData () {
-    if (!this.partitionObjectsByCycle) {
-      /** @type { Object.<string,PartitionObject[]>} our partition objects by cycle.  index by cycle counter key to get an array */
-      this.partitionObjectsByCycle = {}
-    }
-    if (!this.ourPartitionResultsByCycle) {
-      /** @type { Object.<string,PartitionResult[]>} our partition results by cycle.  index by cycle counter key to get an array */
-      this.ourPartitionResultsByCycle = {}
-    }
+  // initStateSyncData () {
+  //   if (!this.partitionObjectsByCycle) {
+  //     /** @type { Object.<string,PartitionObject[]>} our partition objects by cycle.  index by cycle counter key to get an array */
+  //     this.partitionObjectsByCycle = {}
+  //   }
+  //   if (!this.ourPartitionResultsByCycle) {
+  //     /** @type { Object.<string,PartitionResult[]>} our partition results by cycle.  index by cycle counter key to get an array */
+  //     this.ourPartitionResultsByCycle = {}
+  //   }
 
-    if (!this.repairTrackingByCycleById) {
-      /** @type {Object.<string, Object.<string,RepairTracker>>} tracks state for repairing partitions. index by cycle counter key to get the repair object, index by parition */
-      this.repairTrackingByCycleById = {}
-    }
+  //   if (!this.repairTrackingByCycleById) {
+  //     /** @type {Object.<string, Object.<string,RepairTracker>>} tracks state for repairing partitions. index by cycle counter key to get the repair object, index by parition */
+  //     this.repairTrackingByCycleById = {}
+  //   }
 
-    if (!this.repairUpdateDataByCycle) {
-      /** @type {Object.<string, UpdateRepairData[]>}  */
-      this.repairUpdateDataByCycle = {}
-    }
+  //   if (!this.repairUpdateDataByCycle) {
+  //     /** @type {Object.<string, UpdateRepairData[]>}  */
+  //     this.repairUpdateDataByCycle = {}
+  //   }
 
-    this.applyAllPreparedRepairsRunning = false
+  //   this.applyAllPreparedRepairsRunning = false
 
-    if (!this.recentPartitionObjectsByCycleByHash) {
-      /** @type {Object.<string, Object.<string,PartitionObject>>} our partition objects by cycle.  index by cycle counter key to get an array */
-      this.recentPartitionObjectsByCycleByHash = {}
-    }
+  //   if (!this.recentPartitionObjectsByCycleByHash) {
+  //     /** @type {Object.<string, Object.<string,PartitionObject>>} our partition objects by cycle.  index by cycle counter key to get an array */
+  //     this.recentPartitionObjectsByCycleByHash = {}
+  //   }
 
-    if (!this.tempTXRecords) {
-      /** @type {TempTxRecord[]} temporary store for TXs that we put in a partition object after a cycle is complete. an array that holds any TXs (i.e. from different cycles), code will filter out what it needs @see TempTxRecord */
-      this.tempTXRecords = []
-    }
+  //   if (!this.tempTXRecords) {
+  //     /** @type {TempTxRecord[]} temporary store for TXs that we put in a partition object after a cycle is complete. an array that holds any TXs (i.e. from different cycles), code will filter out what it needs @see TempTxRecord */
+  //     this.tempTXRecords = []
+  //   }
 
-    if (!this.txByCycleByPartition) {
-      // txList = { hashes: [], passed: [], txs: [], processed: false, states: [] }
-      // TxTallyList
-      /** @type {Object.<string, Object.<string,TxTallyList>>} TxTallyList data indexed by cycle key and partition key. @see TxTallyList */
-      this.txByCycleByPartition = {}
-    }
+  //   if (!this.txByCycleByPartition) {
+  //     // txList = { hashes: [], passed: [], txs: [], processed: false, states: [] }
+  //     // TxTallyList
+  //     /** @type {Object.<string, Object.<string,TxTallyList>>} TxTallyList data indexed by cycle key and partition key. @see TxTallyList */
+  //     this.txByCycleByPartition = {}
+  //   }
 
-    // if (!this.txByCycleByPartition) {
-    //   this.txByCycleByPartition = {}
-    // }
+  //   // if (!this.txByCycleByPartition) {
+  //   //   this.txByCycleByPartition = {}
+  //   // }
 
-    if (!this.allPartitionResponsesByCycleByPartition) {
-      /** @type {Object.<string, Object.<string,PartitionResult[]>>} Stores the partition responses that other nodes push to us.  Index by cycle key, then index by partition id */
-      this.allPartitionResponsesByCycleByPartition = {}
-    }
-  }
+  //   if (!this.allPartitionResponsesByCycleByPartition) {
+  //     /** @type {Object.<string, Object.<string,PartitionResult[]>>} Stores the partition responses that other nodes push to us.  Index by cycle key, then index by partition id */
+  //     this.allPartitionResponsesByCycleByPartition = {}
+  //   }
+  // }
 
   startShardCalculations () {
     //this.p2p.state.on('cycle_q1_start', async (lastCycle, time) => {
@@ -6338,6 +6370,9 @@ class StateManager extends EventEmitter {
       }
       let lastCycleShardValues = this.shardValuesByCycle.get(lastCycle.counter)
       if (lastCycleShardValues == null) {
+        return
+      }
+      if(this.currentCycleShardData == null){
         return
       }
 
@@ -6494,6 +6529,12 @@ class StateManager extends EventEmitter {
 
     let lastCycleShardValues = this.shardValuesByCycle.get(cycle.counter)
 
+    if(lastCycleShardValues == null){
+      throw new Error('processTempTXs lastCycleShardValues == null')
+    }
+    if(lastCycleShardValues.ourConsensusPartitions == null){
+      throw new Error('processTempTXs ourConsensusPartitions == null')
+    }
     // lastCycleShardValues.ourConsensusPartitions is not iterable
     for (let partitionID of lastCycleShardValues.ourConsensusPartitions) {
       let txList = this.getTXList(cycle.counter, partitionID) // todo sharding - done.: pass partition ID
