@@ -1,4 +1,7 @@
+//import { ShardGlobals } from "./shardFunctionTypes";
 
+//import { WrappedData } from "../shardus/shardus-types";
+//imports up top break the export, boo.
 
 type App = import("../shardus/shardus-types").App;
 type QueueEntry = {
@@ -407,3 +410,61 @@ type AccountCopy = {
     hash: string;
     cycleNumber: number;
 };
+
+
+//Transaction Related
+type TimeRangeandLimit = {tsStart:number, tsEnd:number, limit:number}
+type AccountAddressAndTimeRange = {accountStart:string, accountEnd:string, tsStart:number, tsEnd:number}
+type AccountRangeAndLimit = {accountStart:string, accountEnd:string, maxRecords:number}
+
+type AccountStateHashReq = AccountAddressAndTimeRange
+type AccountStateHashResp = {stateHash: string};
+
+type GossipAcceptedTxRecv = {acceptedTX: AcceptedTx, sender: import("../shardus/shardus-types").Node, tracker: string}
+
+
+type GetAccountStateReq = AccountAddressAndTimeRange & {stateTableBucketSize: number}
+
+type AcceptedTransactionsReq = TimeRangeandLimit
+type GetAccountDataReq = AccountRangeAndLimit
+
+type GetAccountData2Req = AccountAddressAndTimeRange & {maxRecords:number}
+
+type GetAccountData3Req = {accountStart:string, accountEnd:string, tsStart:number, maxRecords:number}
+
+type PosPartitionResults = { partitionResults: PartitionResult[]; Cycle_number: number; }
+
+type GetTransactionsByListReq = {Tx_ids:string[]}
+
+type TransactionsByPartitionReq = { cycle: number; tx_indicies: any; hash: string; partitionId: number; debugSnippets: any }
+
+type GetPartitionTxidsReq = { Partition_id: any; Cycle_number: string }
+
+type RouteToHomeNodeReq = { txid: any; timestamp: any; acceptedTx: import("../shardus/shardus-types").AcceptedTx }
+
+
+// Sync related
+type StateHashResult = {stateHash:string}
+
+type WrappedStates = {[accountID:string]:import("../shardus/shardus-types").WrappedData}
+type AccountFilter = {[accountID:string]:boolean}
+
+type SimpleDistanceObject = {distance:number}
+type StringNodeObjectMap = {[accountID:string]:import("../shardus/shardus-types").Node}
+type AcceptedTxObjectById = {[txid:string]: import("../shardus/shardus-types").AcceptedTx}
+//localCachedData, applyResponse
+
+//fifoLocks
+
+//wrappedData.isPartial
+
+type DebugDumpPartitionAccount = { id: string, hash: string, v: string }
+type DebugDumpNodesCovered = { idx: number, ipPort:string, id: string, fracID: number, hP: number, consensus: [], stored: [], extra: [], numP: number }
+type DebugDumpRangesCovered = { ipPort:string, id: string, fracID: number, hP: number, cMin: number, cMax: number, stMin: number, stMax: number, numP: number }
+type DebugDumpPartition = {parititionID:number, accounts:DebugDumpPartitionAccount[], skip:DebugDumpPartitionSkip} // {[id:string]:string}
+type DebugDumpPartitionSkip = { p: number, min: number, max: number, noSpread?: boolean, inverted?:boolean }
+type DebugDumpPartitions =  { partitions: DebugDumpPartition[], cycle:number, rangesCovered:DebugDumpRangesCovered,nodesCovered:DebugDumpNodesCovered,allNodeIds:string[]  }
+
+
+//queue process related:
+type SeenAccounts = {[accountId:string]: (QueueEntry | null)}

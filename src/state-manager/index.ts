@@ -45,39 +45,49 @@ class StateManager extends EventEmitter {
    * @param {import("../crypto")} crypto
    * @param {any} config
    */
+
+    app:Shardus.App;
+    storage:Storage;
+    p2p:P2P;
+    crypto:Crypto;
+    config:Shardus.ShardusConfiguration;
+    profiler:Profiler
+
+    archivedQueueEntries:QueueEntry[];
+    syncTrackers:SyncTracker[];
+    shardValuesByCycle:Map<number, CycleShardData>;
+    currentCycleShardData: (CycleShardData | null);
+
+    dataRepairStack :RepairTracker[]
+    dataRepairsCompleted:number 
+    dataRepairsStarted:number
+    repairAllStoredPartitions:boolean
+    repairStartedMap : Map<string,boolean>
+    repairCompletedMap: Map<string,boolean>
+
+    partitionReceiptsByCycleCounter :  {[cycleKey:string]:PartitionReceipt[] } //Object.<string, PartitionReceipt[]> // a map of cycle keys to lists of partition receipts. 
+    ourPartitionReceiptsByCycleCounter: {[cycleKey:string]:PartitionReceipt } //Object.<string, PartitionReceipt> //a map of cycle keys to lists of partition receipts.
+
   constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage : Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     super()
     this.verboseLogs = verboseLogs
 
-    // debug hack
-    if (p2p == null) {
-      return
-    }
-    this.profiler = profiler
-    this.mainLogger = logger.getLogger('main')
-    this.fatalLogger = logger.getLogger('fatal')
     this.p2p = p2p
     this.crypto = crypto
     this.storage = storage
-    /**
-     * @type {App}
-     */
     this.app = app
     this.consensus = consensus
     this.logger = logger
-    this.shardLogger = logger.getLogger('shardDump')
-
     this.config = config
+    this.profiler = profiler
 
+    //BLOCK1
     this._listeners = {}
-
     this.completedPartitions = []
     this.mainStartingTs = Date.now()
-
     this.queueSitTime = 6000 // todo make this a setting. and tie in with the value in consensus
     // this.syncSettleTime = 8000 // 3 * 10 // an estimate of max transaction settle time. todo make it a config or function of consensus later
     this.syncSettleTime = this.queueSitTime + 2000 // 3 * 10 // an estimate of max transaction settle time. todo make it a config or function of consensus later
-
     this.newAcceptedTxQueue = []
     this.newAcceptedTxQueueTempInjest = []
     /** @type {QueueEntry[]} */
@@ -90,50 +100,32 @@ class StateManager extends EventEmitter {
     this.queueRestartCounter = 0
     this.lastSeenAccountsMap = null
 
-    this.clearPartitionData()
+    //BLOCK2
     /** @type {SyncTracker[]} */
     this.syncTrackers = []
     this.runtimeSyncTrackerSyncing = false
 
     this.acceptedTXQueue = []
     this.acceptedTXByHash = {}
-    this.registerEndpoints()
 
-    this.isSyncingAcceptedTxs = true // default is true so we will start adding to our tx queue asap
-
-    this.verboseLogs = false
-    if (this.mainLogger && ['TRACE'].includes(this.mainLogger.level.levelStr)) {
-      this.verboseLogs = true
-    }
-
+    //BLOCK3
     this.dataPhaseTag = 'DATASYNC: '
-
     this.applySoftLock = false
 
-    this.initStateSyncData()
-
+    //BLOCK4
     this.useHashSets = true
     this.lastActiveNodeCount = 0
-
     this.queueStopped = false
-
     this.extendedRepairLogging = true
-
     this.shardInfo = {}
-
     /** @type {Map<number, CycleShardData>} */
     this.shardValuesByCycle = new Map()
-   
-    this.currentCycleShardData = null as CycleShardData
- 
+    this.currentCycleShardData = null as CycleShardData | null
     this.syncTrackerIndex = 1 // increments up for each new sync tracker we create gets maped to calls.
-
     this.preTXQueue = []
     this.readyforTXs = false
 
-    this.startShardCalculations()
     this.sleepInterrupt = undefined
-
     this.lastCycleReported = -1
     this.partitionReportDirty = false
     this.nextCycleReportToSend = null
@@ -147,38 +139,125 @@ class StateManager extends EventEmitter {
       }
     }
 
-    this.logger.playbackLogNote('canDataRepair', `0`, `canDataRepair: ${this.canDataRepair}  `)
-
     this.stateIsGood = true
-
     // the original way this was setup was to reset and apply repair results one partition at a time.
     // this could create issue if we have a TX spanning multiple paritions that are locally owned.
     this.resetAndApplyPerPartition = false
-
     /** @type {RepairTracker[]} */
     this.dataRepairStack = []
-
     /** @type {number} */
     this.dataRepairsCompleted = 0
     /** @type {number} */
     this.dataRepairsStarted = 0
-
     this.repairAllStoredPartitions = true
-
     this.repairStartedMap = new Map()
     this.repairCompletedMap = new Map()
-
     /** @type {Object.<string, PartitionReceipt[]>} a map of cycle keys to lists of partition receipts.  */
     this.partitionReceiptsByCycleCounter = {}
     /** @type {Object.<string, PartitionReceipt>} a map of cycle keys to lists of partition receipts.  */
     this.ourPartitionReceiptsByCycleCounter = {}
-
     this.doDataCleanup = true
-
     this.sendArchiveData = false
     this.purgeArchiveData = false
-
     this.sentReceipts = new Map()
+
+    // debug hack
+    if (p2p == null) {
+      return
+    }
+
+    this.mainLogger = logger.getLogger('main')
+    this.fatalLogger = logger.getLogger('fatal')
+    this.shardLogger = logger.getLogger('shardDump')
+
+    // this._listeners = {}
+    // this.completedPartitions = []
+    // this.mainStartingTs = Date.now()
+    // this.queueSitTime = 6000 // todo make this a setting. and tie in with the value in consensus
+    // // this.syncSettleTime = 8000 // 3 * 10 // an estimate of max transaction settle time. todo make it a config or function of consensus later
+    // this.syncSettleTime = this.queueSitTime + 2000 // 3 * 10 // an estimate of max transaction settle time. todo make it a config or function of consensus later
+    // this.newAcceptedTxQueue = []
+    // this.newAcceptedTxQueueTempInjest = []
+    // /** @type {QueueEntry[]} */
+    // this.archivedQueueEntries = []
+    // /** @type {number} archivedQueueEntryMaxCount is a maximum amount of queue entries to store, usually we should never have this many stored since tx age will be used to clean up the list  */
+    // this.archivedQueueEntryMaxCount = 50000
+    // this.newAcceptedTxQueueRunning = false
+    // this.dataSyncMainPhaseComplete = false
+    // this.queueEntryCounter = 0
+    // this.queueRestartCounter = 0
+    // this.lastSeenAccountsMap = null
+
+    this.clearPartitionData()
+    // /** @type {SyncTracker[]} */
+    // this.syncTrackers = []
+    // this.runtimeSyncTrackerSyncing = false
+
+    // this.acceptedTXQueue = []
+    // this.acceptedTXByHash = {}
+    this.registerEndpoints()
+
+    this.isSyncingAcceptedTxs = true // default is true so we will start adding to our tx queue asap
+    this.verboseLogs = false
+    if (this.mainLogger && ['TRACE'].includes(this.mainLogger.level.levelStr)) {
+      this.verboseLogs = true
+    }
+    // this.dataPhaseTag = 'DATASYNC: '
+    // this.applySoftLock = false
+
+    this.initStateSyncData()
+
+    // this.useHashSets = true
+    // this.lastActiveNodeCount = 0
+    // this.queueStopped = false
+    // this.extendedRepairLogging = true
+    // this.shardInfo = {}
+    // /** @type {Map<number, CycleShardData>} */
+    // this.shardValuesByCycle = new Map()
+    // this.currentCycleShardData = null as CycleShardData | null
+    // this.syncTrackerIndex = 1 // increments up for each new sync tracker we create gets maped to calls.
+    // this.preTXQueue = []
+    // this.readyforTXs = false
+
+    this.startShardCalculations()
+    // this.sleepInterrupt = undefined
+    // this.lastCycleReported = -1
+    // this.partitionReportDirty = false
+    // this.nextCycleReportToSend = null
+
+    // this.canDataRepair = false
+    // // this controls the repair portion of data repair.
+    // if (this.config && this.config.debug) {
+    //   this.canDataRepair = this.config.debug.canDataRepair
+    //   if (this.canDataRepair == null) {
+    //     this.canDataRepair = false
+    //   }
+    // }
+
+    // this.stateIsGood = true
+    // // the original way this was setup was to reset and apply repair results one partition at a time.
+    // // this could create issue if we have a TX spanning multiple paritions that are locally owned.
+    // this.resetAndApplyPerPartition = false
+    // /** @type {RepairTracker[]} */
+    // this.dataRepairStack = []
+    // /** @type {number} */
+    // this.dataRepairsCompleted = 0
+    // /** @type {number} */
+    // this.dataRepairsStarted = 0
+    // this.repairAllStoredPartitions = true
+    // this.repairStartedMap = new Map()
+    // this.repairCompletedMap = new Map()
+    // /** @type {Object.<string, PartitionReceipt[]>} a map of cycle keys to lists of partition receipts.  */
+    // this.partitionReceiptsByCycleCounter = {}
+    // /** @type {Object.<string, PartitionReceipt>} a map of cycle keys to lists of partition receipts.  */
+    // this.ourPartitionReceiptsByCycleCounter = {}
+    // this.doDataCleanup = true
+    // this.sendArchiveData = false
+    // this.purgeArchiveData = false
+    // this.sentReceipts = new Map()
+
+    this.logger.playbackLogNote('canDataRepair', `0`, `canDataRepair: ${this.canDataRepair}  `)
+
   }
 
   // this clears state data related to the current partion we are syncing.
@@ -190,7 +269,7 @@ class StateManager extends EventEmitter {
 
     // this.state = EnumSyncState.NotStarted
     this.allFailedHashes = []
-    this.inMemoryStateTableData = []
+    this.inMemoryStateTableData = [] as Shardus.StateTableObject[]
 
     this.combinedAccountData = []
     this.lastStateSyncEndtime = 0
@@ -232,6 +311,10 @@ class StateManager extends EventEmitter {
 
     if (cycleShardData.activeNodes.length === 0) {
       return // no active nodes so stop calculating values
+    }
+
+    if(this.config == null || this.config.sharding == null){
+      throw new Error("this.config.sharding == null")
     }
 
     // save this per cycle?
@@ -333,12 +416,20 @@ class StateManager extends EventEmitter {
       return null
     }
     let shardData = this.shardValuesByCycle.get(cycleNumber)
-    return shardData
+    //kind of silly but dealing with undefined response from get TSConversion: todo investigate merit of |null vs. |undefined conventions
+    if(shardData != null){
+      return shardData
+    }
+    return null
   }
 
   calculateChangeInCoverage (): void {
     // maybe this should be a shard function so we can run unit tests on it for expanding or shrinking networks!
     let newSharddata = this.currentCycleShardData
+
+    if(newSharddata == null || this.currentCycleShardData == null){
+      return
+    }
 
     let oldShardData = this.shardValuesByCycle.get(newSharddata.cycleNumber - 1)
 
@@ -787,7 +878,7 @@ class StateManager extends EventEmitter {
   /**
    * @param {SimpleRange} range
    */
-  async syncStateDataForRange (range) {
+  async syncStateDataForRange (range: SimpleRange) {
     try {
       let partition = 'notUsed'
       this.currentRange = range
@@ -843,8 +934,12 @@ class StateManager extends EventEmitter {
     }
   }
 
-  async syncStateTableData (lowAddress, highAddress, startTime, endTime) {
+  async syncStateTableData (lowAddress: string, highAddress: string, startTime: number, endTime: number) {
     let searchingForGoodData = true
+
+    if(this.currentCycleShardData == null){
+      return
+    }
 
     console.log(`syncStateTableData startTime: ${startTime} endTime: ${endTime}` + '   time:' + Date.now())
     this.mainLogger.debug(`DATASYNC: syncStateTableData startTime: ${startTime} endTime: ${endTime} low: ${lowAddress} high: ${highAddress} `)
@@ -875,10 +970,10 @@ class StateManager extends EventEmitter {
       queryHigh = highAddress
       let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, tsEnd: endTime }
 
-      let equalFn = (a, b) => {
+      let equalFn = (a:AccountStateHashResp, b:AccountStateHashResp) => {
         return a.stateHash === b.stateHash
       }
-      let queryFn = async (node) => {
+      let queryFn = async (node: Shardus.Node) => {
         let result = await this.p2p.ask(node, 'get_account_state_hash', message)
         if (result === false) { this.mainLogger.error('ASK FAIL 1') }
         return result
@@ -890,7 +985,7 @@ class StateManager extends EventEmitter {
         return
       }
       
-      let nodes = ShardFunctions.getNodesByProximity(this.currentCycleShardData.shardGlobals, this.currentCycleShardData.activeNodes, centerNode.ourNodeIndex, this.p2p.id, 40)
+      let nodes:Shardus.Node[] = ShardFunctions.getNodesByProximity(this.currentCycleShardData.shardGlobals, this.currentCycleShardData.activeNodes, centerNode.ourNodeIndex, this.p2p.id, 40)
 
       // let nodes = this.getActiveNodesInRange(lowAddress, highAddress) // this.p2p.state.getActiveNodes(this.p2p.id)
       if (nodes.length === 0) {
@@ -916,7 +1011,7 @@ class StateManager extends EventEmitter {
           throw new Error('FailAndRestartPartition1')
         }
         this.dataSourceNode = winners[0] // Todo random index
-        this.mainLogger.debug(`DATASYNC: got hash ${result.stateHash} from ${utils.stringifyReduce(winners.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+        this.mainLogger.debug(`DATASYNC: got hash ${result.stateHash} from ${utils.stringifyReduce(winners.map( (node:Shardus.Node ) => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
         firstHash = result.stateHash
       } else {
         this.mainLogger.debug(`DATASYNC: robustQuery get_account_state_hash failed`)
@@ -996,10 +1091,15 @@ class StateManager extends EventEmitter {
     }
   }
 
-  async syncAccountData (lowAddress, highAddress) {
+  async syncAccountData (lowAddress:string, highAddress:string) {
     // Sync the Account data
     //   Use the /get_account_data API to get the data from the Account Table using any of the nodes that had a matching hash
     console.log(`syncAccountData3` + '   time:' + Date.now())
+
+    if(this.config.stateManager == null){
+      throw new Error("this.config.stateManager == null")
+    }
+
 
     let queryLow = lowAddress
     let queryHigh = highAddress
@@ -1159,12 +1259,13 @@ class StateManager extends EventEmitter {
     let missingTXs = 0
     let handledButOk = 0
     let otherMissingCase = 0
-    let missingButOkAccountIDs = {}
+    let missingButOkAccountIDs:{[id:string]: boolean} = {}
 
-    let missingAccountIDs = {}
+    let missingAccountIDs:{[id:string]: boolean} = {}
 
     this.mainLogger.debug(`DATASYNC: processAccountData stateTableCount: ${this.inMemoryStateTableData.length} unique accounts: ${uniqueAccounts}  initial combined len: ${initialCombinedAccountLength}`)
     // For each account in the Account data make sure the entry in the Account State Table has the same State_after value; if not remove the record from the Account data
+    
     for (let stateData of this.inMemoryStateTableData) {
       account = this.mapAccountData[stateData.accountId]
       // does the state data table have a node and we don't have data for it?
@@ -1314,12 +1415,12 @@ class StateManager extends EventEmitter {
     this.combinedAccountData = [] // we can clear this now.
   }
 
-  async writeCombinedAccountDataToBackups (failedHashes: string[]) {
+  async writeCombinedAccountDataToBackups (failedHashes: string[]) {  // ?:{[id:string]: boolean}
     if (failedHashes.length === 0) {
       return // nothing to do yet
     }
 
-    let failedAccountsById = {}
+    let failedAccountsById:{[id:string]: boolean} = {}
     for (let hash of failedHashes) {
       failedAccountsById[hash] = true
     }
@@ -1345,7 +1446,7 @@ class StateManager extends EventEmitter {
   //   Use the /get_account_data_by_list API to get the data for the accounts that need to be looked up later from any of the nodes that had a matching hash but different from previously used nodes
   //   Repeat the “Sync the Account State Table Second Pass” step
   //   Repeat the “Process the Account data” step
-  async syncFailedAcccounts (lowAddress, highAddress) {
+  async syncFailedAcccounts (lowAddress:string, highAddress:string) {
     if (this.accountsWithStateConflict.length === 0 && this.missingAccountData.length === 0) {
       this.mainLogger.debug(`DATASYNC: syncFailedAcccounts no failed hashes to sync`)
       return
@@ -1381,7 +1482,7 @@ class StateManager extends EventEmitter {
   }
 
   // This will make calls to app.getAccountDataByRange but if we are close enough to real time it will query any newer data and return lastUpdateNeeded = true
-  async getAccountDataByRangeSmart (accountStart, accountEnd, tsStart, maxRecords) {
+  async getAccountDataByRangeSmart (accountStart:string, accountEnd:string, tsStart:number, maxRecords:number) {
     let tsEnd = Date.now()
     let wrappedAccounts = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart, tsEnd, maxRecords)
     let lastUpdateNeeded = false
@@ -1448,13 +1549,14 @@ class StateManager extends EventEmitter {
     //   Record Joined timestamp
     //   Even a syncing node will receive accepted transactions
     //   Starts receiving accepted transaction and saving them to Accepted Tx Table
-    this.p2p.registerGossipHandler('acceptedTx', async (acceptedTX, sender, tracker) => {
+    this.p2p.registerGossipHandler('acceptedTx', async (acceptedTX:AcceptedTx, sender:Shardus.Node, tracker:string) => {
       // docs mention putting this in a table but it seems so far that an in memory queue should be ok
       // should we filter, or instead rely on gossip in to only give us TXs that matter to us?
 
       this.p2p.sendGossipIn('acceptedTx', acceptedTX, tracker, sender)
 
-      await this.queueAcceptedTransaction(acceptedTX, false, sender)
+      this.queueAcceptedTransaction(acceptedTX, false, sender)
+      //Note await not needed so beware if you add code below this.
     })
 
     // /get_account_state_hash (Acc_start, Acc_end, Ts_start, Ts_end)
@@ -1464,14 +1566,15 @@ class StateManager extends EventEmitter {
     // Ts_end - get data older than this timestamp
     // Returns a single hash of the data from the Account State Table determined by the input parameters; sort by Tx_ts  then Tx_id before taking the hash
     // Updated names:  accountStart , accountEnd, tsStart, tsEnd
-    this.p2p.registerInternal('get_account_state_hash', async (payload, respond) => {
-      let result = {} as {stateHash: string}
+    this.p2p.registerInternal('get_account_state_hash', async (payload:AccountStateHashReq, respond: (arg0: AccountStateHashResp) => any) => {
+      let result = {} as AccountStateHashResp
 
       // yikes need to potentially hash only N records at a time and return an array of hashes
       let stateHash = await this.getAccountsStateHash(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd)
       result.stateHash = stateHash
       await respond(result)
     })
+
 
     //    /get_account_state (Acc_start, Acc_end, Ts_start, Ts_end)
     // Acc_start - get data for accounts starting with this account id; inclusive
@@ -1480,8 +1583,13 @@ class StateManager extends EventEmitter {
     // Ts_end - get data older than this timestamp
     // Returns data from the Account State Table determined by the input parameters; limits result to 1000 records (as configured)
     // Updated names:  accountStart , accountEnd, tsStart, tsEnd
-    this.p2p.registerInternal('get_account_state', async (payload, respond) => {
+    this.p2p.registerInternal('get_account_state', async (payload:GetAccountStateReq, respond: (arg0: { accountStates: Shardus.StateTableObject[] }) => any) => {
       let result = {} as {accountStates: Shardus.StateTableObject[] }
+
+      if(this.config.stateManager == null){
+        throw new Error("this.config.stateManager == null") //TODO TSConversion  would be nice to eliminate some of these config checks.
+      }
+  
       // max records set artificially low for better test coverage
       // todo m11: make configs for how many records to query
       let accountStates = await this.storage.queryAccountStateTable(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, this.config.stateManager.stateTableBucketSize)
@@ -1494,7 +1602,7 @@ class StateManager extends EventEmitter {
     // Ts_end - get data older than this timestamp
     // Returns data from the Accepted Tx Table starting with Ts_start; limits result to 500 records (as configured)
     // Updated names: tsStart, tsEnd
-    this.p2p.registerInternal('get_accepted_transactions', async (payload, respond) => {
+    this.p2p.registerInternal('get_accepted_transactions', async (payload:AcceptedTransactionsReq, respond: (arg0: { transactions: Shardus.AcceptedTx[] }) => any) => {
       let result = {} as {transactions: Shardus.AcceptedTx[] }
 
       if (!payload.limit) {
@@ -1512,7 +1620,7 @@ class StateManager extends EventEmitter {
     // For applications with multiple “Account” tables the returned data is grouped by table name.
     // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
     // Updated names:  accountStart , accountEnd
-    this.p2p.registerInternal('get_account_data', async (payload, respond) => {
+    this.p2p.registerInternal('get_account_data', async (payload:GetAccountDataReq, respond: (arg0: { accountData: Shardus.AccountData[] | null }) => any) => {
       let result = {} as {accountData: Shardus.AccountData[] | null}//TSConversion  This is complicated !! check app for details.
       let accountData = null
       let ourLockID = -1
@@ -1526,7 +1634,7 @@ class StateManager extends EventEmitter {
       await respond(result)
     })
 
-    this.p2p.registerInternal('get_account_data2', async (payload, respond) => {
+    this.p2p.registerInternal('get_account_data2', async (payload:GetAccountData2Req, respond: (arg0: { accountData: Shardus.AccountData[] | null }) => any) => {
       let result = {} as {accountData: Shardus.AccountData[] | null}//TSConversion  This is complicated !!
       let accountData = null
       let ourLockID = -1
@@ -1540,8 +1648,8 @@ class StateManager extends EventEmitter {
       await respond(result)
     })
 
-    this.p2p.registerInternal('get_account_data3', async (payload, respond) => {
-      let result = {} as {data: Shardus.AccountData[] | null} //TSConversion  This is complicated !!(due to app wrapping)  as {data: Shardus.AccountData[] | null}
+    this.p2p.registerInternal('get_account_data3', async (payload:GetAccountData3Req, respond: (arg0: { data: Shardus.AccountData[]  }) => any) => {
+      let result = {} as {data: Shardus.AccountData[] } //TSConversion  This is complicated !!(due to app wrapping)  as {data: Shardus.AccountData[] | null}
       let accountData = null
       let ourLockID = -1
       try {
@@ -1560,7 +1668,7 @@ class StateManager extends EventEmitter {
     // For applications with multiple “Account” tables the returned data is grouped by table name.
     // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
     // Updated names:  accountIds, max records
-    this.p2p.registerInternal('get_account_data_by_list', async (payload, respond) => {
+    this.p2p.registerInternal('get_account_data_by_list', async (payload: { accountIds: any }, respond: (arg0: { accountData: Shardus.AccountData[] | null }) => any) => {
       let result = {} as {accountData: Shardus.AccountData[] | null}
       let accountData = null
       let ourLockID = -1
@@ -1584,7 +1692,7 @@ class StateManager extends EventEmitter {
      * @param {{ partitionResults: PartitionResult[]; Cycle_number: number; }} payload
      * @param {any} respond
      */
-      async (payload, respond) => {
+      async (payload: PosPartitionResults, respond) => {
       // let result = {}
       // let ourLockID = -1
         try {
@@ -1785,8 +1893,8 @@ class StateManager extends EventEmitter {
     // /get_transactions_by_list (Tx_ids)
     //   Tx_ids - array of transaction ids
     //   Returns data from the Transactions Table for just the given transaction ids
-    this.p2p.registerInternal('get_transactions_by_list', async (payload, respond) => {
-      let result = {}
+    this.p2p.registerInternal('get_transactions_by_list', async (payload: GetTransactionsByListReq, respond) => {
+      let result = [] as AcceptedTx[]
       try {
         result = await this.storage.queryAcceptedTransactionsByIds(payload.Tx_ids)
       } finally {
@@ -1794,7 +1902,7 @@ class StateManager extends EventEmitter {
       await respond(result)
     })
 
-    this.p2p.registerInternal('get_transactions_by_partition_index', async (payload, respond) => {
+    this.p2p.registerInternal('get_transactions_by_partition_index', async (payload: TransactionsByPartitionReq, respond: (arg0: { success: boolean; acceptedTX?: any; passFail?: any[]; statesList?: any[] }) => any) => {
       // let result = {}
 
       let passFailList = []
@@ -1887,7 +1995,7 @@ class StateManager extends EventEmitter {
     //   Partition_id
     //   Cycle_number
     //   Returns the partition object which contains the txids along with the status
-    this.p2p.registerInternal('get_partition_txids', async (payload, respond) => {
+    this.p2p.registerInternal('get_partition_txids', async (payload: GetPartitionTxidsReq, respond: (arg0: {}) => any) => {
       let result = {}
       try {
         let id = payload.Partition_id
@@ -1905,7 +2013,7 @@ class StateManager extends EventEmitter {
     })
 
     // p2p TELL
-    this.p2p.registerInternal('route_to_home_node', async (payload, respond) => {
+    this.p2p.registerInternal('route_to_home_node', async (payload: RouteToHomeNodeReq, respond: any) => {
       // gossip 'spread_tx_to_group' to transaction group
       // Place tx in queue (if younger than m)
 
@@ -2055,160 +2163,160 @@ class StateManager extends EventEmitter {
   // ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   // //////////////////////////   Old simple sync check, could be handy for debugging/test?   //////////////////////////
   // ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  enableSyncCheck () {
-    // return // hack no sync check , dont check in!!!!!
-    this._registerListener(this.p2p.state, 'newCycle', (cycles) => process.nextTick(async () => {
-      if (cycles.length < 2) {
-        return
-      }
-      let thisCycle = cycles[cycles.length - 1]
-      let lastCycle = cycles[cycles.length - 2]
-      let endTime = thisCycle.start * 1000
-      let startTime = lastCycle.start * 1000
+  // enableSyncCheck () {
+  //   // return // hack no sync check , dont check in!!!!!
+  //   this._registerListener(this.p2p.state, 'newCycle', (cycles: Shardus.Cycle[]) => process.nextTick(async () => {
+  //     if (cycles.length < 2) {
+  //       return
+  //     }
+  //     let thisCycle = cycles[cycles.length - 1]
+  //     let lastCycle = cycles[cycles.length - 2]
+  //     let endTime = thisCycle.start * 1000
+  //     let startTime = lastCycle.start * 1000
 
-      let accountStart = '0'.repeat(64)
-      let accountEnd = 'f'.repeat(64)
-      let message = { accountStart, accountEnd, tsStart: startTime, tsEnd: endTime }
+  //     let accountStart = '0'.repeat(64)
+  //     let accountEnd = 'f'.repeat(64)
+  //     let message = { accountStart, accountEnd, tsStart: startTime, tsEnd: endTime }
 
-      await utils.sleep(this.syncSettleTime) // wait a few seconds for things to settle
+  //     await utils.sleep(this.syncSettleTime) // wait a few seconds for things to settle
 
-      let equalFn = (a, b) => {
-        return a.stateHash === b.stateHash
-      }
-      let queryFn = async (node) => {
-        let result = await this.p2p.ask(node, 'get_account_state_hash', message)
-        if (result === false) { this.mainLogger.error('ASK FAIL 5') }
-        return result
-      }
-      // let nodes = this.p2p.state.getAllNodes(this.p2p.id)
-      let nodes = this.getRandomNodesInRange(100, accountStart, accountEnd, [])
-      if (nodes.length === 0) {
-        return // nothing to do
-      }
-      let [result, winners] = await this.p2p.robustQuery(nodes, queryFn, equalFn, 3)
-      if (result && result.stateHash) {
-        let stateHash = await this.getAccountsStateHash(accountStart, accountEnd, startTime, endTime)
-        if (stateHash === result.stateHash) {
-          this.logger.playbackLogNote('appStateCheck', '', `Hashes Match = ${utils.makeShortHash(stateHash)} num cycles:${cycles.length} start: ${startTime}  end:${endTime}`)
-        } else {
-          this.logger.playbackLogNote('appStateCheck', '', `Hashes Dont Match ourState: ${utils.makeShortHash(stateHash)} otherState: ${utils.makeShortHash(result.stateHash)} window: ${startTime} to ${endTime}`)
-          // winners[0]
-          await this.restoreAccountDataByTx(winners, accountStart, accountEnd, startTime, endTime)
-        }
-      }
-    }))
-  }
+  //     let equalFn = (a:StateHashResult, b:StateHashResult) => {
+  //       return a.stateHash === b.stateHash
+  //     }
+  //     let queryFn = async (node: Shardus.Node) => {
+  //       let result = await this.p2p.ask(node, 'get_account_state_hash', message)
+  //       if (result === false) { this.mainLogger.error('ASK FAIL 5') }
+  //       return result
+  //     }
+  //     // let nodes = this.p2p.state.getAllNodes(this.p2p.id)
+  //     let nodes = this.getRandomNodesInRange(100, accountStart, accountEnd, [])
+  //     if (nodes.length === 0) {
+  //       return // nothing to do
+  //     }
+  //     let [result, winners] = await this.p2p.robustQuery(nodes, queryFn, equalFn, 3)
+  //     if (result && result.stateHash) {
+  //       let stateHash = await this.getAccountsStateHash(accountStart, accountEnd, startTime, endTime)
+  //       if (stateHash === result.stateHash) {
+  //         this.logger.playbackLogNote('appStateCheck', '', `Hashes Match = ${utils.makeShortHash(stateHash)} num cycles:${cycles.length} start: ${startTime}  end:${endTime}`)
+  //       } else {
+  //         this.logger.playbackLogNote('appStateCheck', '', `Hashes Dont Match ourState: ${utils.makeShortHash(stateHash)} otherState: ${utils.makeShortHash(result.stateHash)} window: ${startTime} to ${endTime}`)
+  //         // winners[0]
+  //         await this.restoreAccountDataByTx(winners, accountStart, accountEnd, startTime, endTime)
+  //       }
+  //     }
+  //   }))
+  // }
 
-  async restoreAccountDataByTx (nodes, accountStart, accountEnd, timeStart, timeEnd) {
-    this.logger.playbackLogNote('restoreByTx', '', `start`)
+  // async restoreAccountDataByTx (nodes:Shardus.Node[], accountStart:string, accountEnd:string, timeStart:number, timeEnd:number) : Promise<void> {
+  //   this.logger.playbackLogNote('restoreByTx', '', `start`)
 
-    let helper = nodes[0]
+  //   let helper = nodes[0]
 
-    let message = { tsStart: timeStart, tsEnd: timeEnd, limit: 10000 }
-    let result = await this.p2p.ask(helper, 'get_accepted_transactions', message) // todo perf, could await these in parallel
-    if (result === false) { this.mainLogger.error('ASK FAIL 6') }
-    let acceptedTXs = result.transactions
+  //   let message = { tsStart: timeStart, tsEnd: timeEnd, limit: 10000 }
+  //   let result = await this.p2p.ask(helper, 'get_accepted_transactions', message) // todo perf, could await these in parallel
+  //   if (result === false) { this.mainLogger.error('ASK FAIL 6') }
+  //   let acceptedTXs = result.transactions
 
-    let toParse = {} //as (AcceptedTx & string)[] 
-    try {
-      for (let i = 0; i < acceptedTXs.length; i++) {
-        toParse = acceptedTXs[i]
-        if (utils.isObject(toParse) === false) {
-          // this is crazy, could have been nicer to just ignore the error:
-          //let funtime =  /** @type {string} */ (/** @type {unknown} */ (toParse))
-          let funtime = toParse as string
-          acceptedTXs[i] = JSON.parse(funtime)
-          // this.logger.playbackLogNote('restoreByTx', '', `parsed: ${acceptedTXs[i]}`)
-        } else {
-          // this.logger.playbackLogNote('restoreByTx', '', acceptedTXs[i])
-          // This is pretty crazy but is need to explain to TS that some forms of this data may need to have data and receipt parsed more.
-          let acceptedTX = toParse as AcceptedTx
-          let partiallyParsed = toParse as {data:string, receipt:string}
-          acceptedTX.data = JSON.parse(partiallyParsed.data)
-          acceptedTX.receipt = JSON.parse(partiallyParsed.receipt)
-        }
-      }
-    } catch (ex) {
-      this.fatalLogger.fatal('restoreByTx error: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack + ' while parsing: ' + toParse)
-    }
-    this.acceptedTXQueue = this.acceptedTXQueue.concat(acceptedTXs)
+  //   let toParse = {} //as (AcceptedTx & string)[] 
+  //   try {
+  //     for (let i = 0; i < acceptedTXs.length; i++) {
+  //       toParse = acceptedTXs[i]
+  //       if (utils.isObject(toParse) === false) {
+  //         // this is crazy, could have been nicer to just ignore the error:
+  //         //let funtime =  /** @type {string} */ (/** @type {unknown} */ (toParse))
+  //         let funtime = toParse as string
+  //         acceptedTXs[i] = JSON.parse(funtime)
+  //         // this.logger.playbackLogNote('restoreByTx', '', `parsed: ${acceptedTXs[i]}`)
+  //       } else {
+  //         // this.logger.playbackLogNote('restoreByTx', '', acceptedTXs[i])
+  //         // This is pretty crazy but is need to explain to TS that some forms of this data may need to have data and receipt parsed more.
+  //         let acceptedTX = toParse as AcceptedTx
+  //         let partiallyParsed = toParse as {data:string, receipt:string}
+  //         acceptedTX.data = JSON.parse(partiallyParsed.data)
+  //         acceptedTX.receipt = JSON.parse(partiallyParsed.receipt)
+  //       }
+  //     }
+  //   } catch (ex) {
+  //     this.fatalLogger.fatal('restoreByTx error: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack + ' while parsing: ' + toParse)
+  //   }
+  //   this.acceptedTXQueue = this.acceptedTXQueue.concat(acceptedTXs)
 
-    this.logger.playbackLogNote('restoreByTx', '', `tx count: ${this.acceptedTXQueue.length} queue: `) // ${utils.stringifyReduce(this.acceptedTXQueue)}
+  //   this.logger.playbackLogNote('restoreByTx', '', `tx count: ${this.acceptedTXQueue.length} queue: `) // ${utils.stringifyReduce(this.acceptedTXQueue)}
 
-    // await this.applyAcceptedTx()
-    for (let acceptedTx of acceptedTXs) {
-      this.queueAcceptedTransaction(acceptedTx, false, helper)
-    }
+  //   // await this.applyAcceptedTx()
+  //   for (let acceptedTx of acceptedTXs) {
+  //     this.queueAcceptedTransaction(acceptedTx, false, helper)
+  //   }
 
-    // todo insert these in a sorted way to the new queue
+  //   // todo insert these in a sorted way to the new queue
 
-    this.logger.playbackLogNote('restoreByTx', '', `end`)
-  }
+  //   this.logger.playbackLogNote('restoreByTx', '', `end`)
+  // }
 
-  // Code Not in use, but could be used as a reference for future code
-  sortedArrayDifference (a, b, compareFn) {
-    let results = []
-    // let aIdx = 0
-    let bIdx = 0
+  // // Code Not in use, but could be used as a reference for future code
+  // sortedArrayDifference (a, b, compareFn) {
+  //   let results = []
+  //   // let aIdx = 0
+  //   let bIdx = 0
 
-    for (let i = 0; i < a.length; ++i) {
-      let aEntry = a[i]
-      let bEntry = b[bIdx]
-      let cmp = compareFn(aEntry, bEntry)
-      if (cmp === 0) {
-        bIdx++
-      } else if (cmp < 1) {
-        results.push(aEntry)
-      } else {
-        // nothing
-      }
-    }
-    return results
-  }
+  //   for (let i = 0; i < a.length; ++i) {
+  //     let aEntry = a[i]
+  //     let bEntry = b[bIdx]
+  //     let cmp = compareFn(aEntry, bEntry)
+  //     if (cmp === 0) {
+  //       bIdx++
+  //     } else if (cmp < 1) {
+  //       results.push(aEntry)
+  //     } else {
+  //       // nothing
+  //     }
+  //   }
+  //   return results
+  // }
 
   // Code Not in use/finished, but could be used as a reference for future code
-  async restoreAccountData (nodes, accountStart, accountEnd, timeStart, timeEnd) {
-    let helper = nodes[0]
+  // async restoreAccountData (nodes: Shardus.Node[], accountStart:string, accountEnd:string, timeStart:number, timeEnd:number) : Promise<void> {
+  //   let helper = nodes[0]
 
-    let message = { accountStart: accountStart, accountEnd: accountEnd, tsStart: timeStart, tsEnd: timeEnd }
-    let remoteAccountStates = await this.p2p.ask(helper, 'get_account_state', message) // todo perf, could await these in parallel
-    if (remoteAccountStates === false) { this.mainLogger.error('ASK FAIL 7') }
-    let accountStates = await this.storage.queryAccountStateTable(accountStart, accountEnd, timeStart, timeEnd, 100000000)
+  //   let message = { accountStart: accountStart, accountEnd: accountEnd, tsStart: timeStart, tsEnd: timeEnd }
+  //   let remoteAccountStates = await this.p2p.ask(helper, 'get_account_state', message) // todo perf, could await these in parallel
+  //   if (remoteAccountStates === false) { this.mainLogger.error('ASK FAIL 7') }
+  //   let accountStates = await this.storage.queryAccountStateTable(accountStart, accountEnd, timeStart, timeEnd, 100000000)
 
-    let compareFn = (a, b) => {
-      if (a.txTimestamp !== b.txTimestamp) {
-        return (a.txTimestamp > b.txTimestamp) ? 1 : -1
-      } else if (a.accountId !== b.accountId) {
-        return (a.accountId > b.accountId) ? 1 : -1
-      } else {
-        return 0
-      }
-    }
-    let diff = this.sortedArrayDifference(remoteAccountStates, accountStates, compareFn)
-    if (diff.length <= 0) {
-      return // give up
-    }
-    let accountsToPatch = []
-    // patch account states
-    await this.storage.addAccountStates(diff)
-    for (let state of diff) {
-      if (state.accountId) {
-        accountsToPatch.push(state.accountId)
-      }
-    }
+  //   let compareFn = (a:Shardus.StateTableObject, b:Shardus.StateTableObject) => {
+  //     if (a.txTimestamp !== b.txTimestamp) {
+  //       return (a.txTimestamp > b.txTimestamp) ? 1 : -1
+  //     } else if (a.accountId !== b.accountId) {
+  //       return (a.accountId > b.accountId) ? 1 : -1
+  //     } else {
+  //       return 0
+  //     }
+  //   }
+  //   let diff = this.sortedArrayDifference(remoteAccountStates, accountStates, compareFn)
+  //   if (diff.length <= 0) {
+  //     return // give up
+  //   }
+  //   let accountsToPatch = []
+  //   // patch account states
+  //   await this.storage.addAccountStates(diff)
+  //   for (let state of diff) {
+  //     if (state.accountId) {
+  //       accountsToPatch.push(state.accountId)
+  //     }
+  //   }
 
-    let message2 = { accountIds: accountsToPatch }
-    let accountData = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message2)
-    if (accountData === false) { this.mainLogger.error('ASK FAIL 8') }
+  //   let message2 = { accountIds: accountsToPatch }
+  //   let accountData = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message2)
+  //   if (accountData === false) { this.mainLogger.error('ASK FAIL 8') }
 
-    if (accountData) {
-      // for(let account in accountData) {
-      //   //if exists update.
-      //   //else create
-      // }
-      // todo  this.todo.patchUpdateAccounts(accountData)
-    }
-  }
+  //   if (accountData) {
+  //     // for(let account in accountData) {
+  //     //   //if exists update.
+  //     //   //else create
+  //     // }
+  //     // todo  this.todo.patchUpdateAccounts(accountData)
+  //   }
+  // }
 
   // //////////////////////////////////////////////////////////////////////////
   // //////////////////////////   END Old sync check     //////////////////////////
@@ -2222,90 +2330,90 @@ class StateManager extends EventEmitter {
     return stateHash
   }
 
-  async testAccountTimesAndStateTable (tx, accountData) {
+  // async testAccountTimesAndStateTable (tx, accountData) {
+  //   let hasStateTableData = false
+
+  //   function tryGetAccountData (accountID) {
+  //     for (let accountEntry of accountData) {
+  //       if (accountEntry.accountId === accountID) {
+  //         return accountEntry
+  //       }
+  //     }
+  //     return null
+  //   }
+
+  //   try {
+  //     let keysResponse = this.app.getKeyFromTransaction(tx)
+  //     let { sourceKeys, targetKeys, timestamp } = keysResponse
+  //     let sourceAddress, targetAddress, sourceState, targetState
+
+  //     // check account age to make sure it is older than the tx
+  //     let failedAgeCheck = false
+  //     for (let accountEntry of accountData) {
+  //       if (accountEntry.timestamp >= timestamp) {
+  //         failedAgeCheck = true
+  //         if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
+  //       }
+  //     }
+  //     if (failedAgeCheck) {
+  //       // if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountTimesAndStateTable accounts have future state ' + timestamp)
+  //       return { success: false, hasStateTableData }
+  //     }
+
+  //     // check state table
+  //     if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
+  //       sourceAddress = sourceKeys[0]
+  //       let accountStates = await this.storage.searchAccountStateTable(sourceAddress, timestamp)
+  //       if (accountStates.length !== 0) {
+  //         let accountEntry = tryGetAccountData(sourceAddress)
+  //         if (accountEntry == null) {
+  //           return { success: false, hasStateTableData }
+  //         }
+  //         sourceState = accountEntry.stateId
+  //         hasStateTableData = true
+  //         if (accountStates.length === 0 || accountStates[0].stateBefore !== sourceState) {
+  //           if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1')
+  //           if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1 stateId: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
+  //           return { success: false, hasStateTableData }
+  //         }
+  //       }
+  //     }
+  //     if (Array.isArray(targetKeys) && targetKeys.length > 0) {
+  //       targetAddress = targetKeys[0]
+  //       let accountStates = await this.storage.searchAccountStateTable(targetAddress, timestamp)
+
+  //       if (accountStates.length !== 0) {
+  //         hasStateTableData = true
+  //         if (accountStates.length !== 0 && accountStates[0].stateBefore !== allZeroes64) {
+  //           let accountEntry = tryGetAccountData(targetAddress)
+
+  //           if (accountEntry == null) {
+  //             if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress))
+  //             if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ' + utils.stringifyReduce(accountData))
+  //             this.fatalLogger.fatal(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ' + utils.stringifyReduce(accountData)) // todo: consider if this is just an error
+  //             // fail this because we already check if the before state was all zeroes
+  //             return { success: false, hasStateTableData }
+  //           } else {
+  //             targetState = accountEntry.stateId
+  //             if (accountStates[0].stateBefore !== targetState) {
+  //               if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2')
+  //               if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2 stateId: ' + utils.makeShortHash(targetState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(targetAddress))
+  //               return { success: false, hasStateTableData }
+  //             }
+  //           }
+  //         }
+  //       }
+  //     }
+  //   } catch (ex) {
+  //     this.fatalLogger.fatal('testAccountTimesAndStateTable failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+  //   }
+  //   return { success: true, hasStateTableData }
+  // }
+
+  async testAccountTimesAndStateTable2 (tx:Shardus.OpaqueTransaction, wrappedStates:WrappedStates) {
     let hasStateTableData = false
 
-    function tryGetAccountData (accountID) {
-      for (let accountEntry of accountData) {
-        if (accountEntry.accountId === accountID) {
-          return accountEntry
-        }
-      }
-      return null
-    }
-
-    try {
-      let keysResponse = this.app.getKeyFromTransaction(tx)
-      let { sourceKeys, targetKeys, timestamp } = keysResponse
-      let sourceAddress, targetAddress, sourceState, targetState
-
-      // check account age to make sure it is older than the tx
-      let failedAgeCheck = false
-      for (let accountEntry of accountData) {
-        if (accountEntry.timestamp >= timestamp) {
-          failedAgeCheck = true
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
-        }
-      }
-      if (failedAgeCheck) {
-        // if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountTimesAndStateTable accounts have future state ' + timestamp)
-        return { success: false, hasStateTableData }
-      }
-
-      // check state table
-      if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
-        sourceAddress = sourceKeys[0]
-        let accountStates = await this.storage.searchAccountStateTable(sourceAddress, timestamp)
-        if (accountStates.length !== 0) {
-          let accountEntry = tryGetAccountData(sourceAddress)
-          if (accountEntry == null) {
-            return { success: false, hasStateTableData }
-          }
-          sourceState = accountEntry.stateId
-          hasStateTableData = true
-          if (accountStates.length === 0 || accountStates[0].stateBefore !== sourceState) {
-            if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1')
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1 stateId: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
-            return { success: false, hasStateTableData }
-          }
-        }
-      }
-      if (Array.isArray(targetKeys) && targetKeys.length > 0) {
-        targetAddress = targetKeys[0]
-        let accountStates = await this.storage.searchAccountStateTable(targetAddress, timestamp)
-
-        if (accountStates.length !== 0) {
-          hasStateTableData = true
-          if (accountStates.length !== 0 && accountStates[0].stateBefore !== allZeroes64) {
-            let accountEntry = tryGetAccountData(targetAddress)
-
-            if (accountEntry == null) {
-              if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress))
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ' + utils.stringifyReduce(accountData))
-              this.fatalLogger.fatal(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ' + utils.stringifyReduce(accountData)) // todo: consider if this is just an error
-              // fail this because we already check if the before state was all zeroes
-              return { success: false, hasStateTableData }
-            } else {
-              targetState = accountEntry.stateId
-              if (accountStates[0].stateBefore !== targetState) {
-                if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2')
-                if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2 stateId: ' + utils.makeShortHash(targetState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(targetAddress))
-                return { success: false, hasStateTableData }
-              }
-            }
-          }
-        }
-      }
-    } catch (ex) {
-      this.fatalLogger.fatal('testAccountTimesAndStateTable failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-    }
-    return { success: true, hasStateTableData }
-  }
-
-  async testAccountTimesAndStateTable2 (tx, wrappedStates) {
-    let hasStateTableData = false
-
-    function tryGetAccountData (accountID) {
+    function tryGetAccountData (accountID:string) {
       return wrappedStates[accountID]
     }
 
@@ -2382,8 +2490,8 @@ class StateManager extends EventEmitter {
     return { success: true, hasStateTableData }
   }
 
-  async testAccountTime (tx, wrappedStates) {
-    function tryGetAccountData (accountID) {
+  async testAccountTime (tx:AcceptedTx, wrappedStates:WrappedStates) {
+    function tryGetAccountData (accountID:string) {
       return wrappedStates[accountID]
     }
 
@@ -2412,7 +2520,7 @@ class StateManager extends EventEmitter {
     return true // { success: true, hasStateTableData }
   }
   // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
-  async tryApplyTransaction (acceptedTX, hasStateTableData, repairing, filter, wrappedStates, localCachedData) {
+  async tryApplyTransaction (acceptedTX:AcceptedTx, hasStateTableData:boolean, repairing:boolean, filter:AccountFilter, wrappedStates:WrappedStates, localCachedData) {
     let ourLockID = -1
     let accountDataList
     let txTs = 0
@@ -2449,7 +2557,9 @@ class StateManager extends EventEmitter {
 
       // let replyObject = { stateTableResults: [], txId, txTimestamp, accountData: [] }
       // let wrappedStatesList = Object.values(wrappedStates)
-      applyResponse = await this.app.apply(tx, wrappedStates)
+
+      // TSConversion need to check how save this cast is for the apply fuction, should probably do more in depth look at the tx param.
+      applyResponse = await this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
       let { stateTableResults, accountData: _accountdata } = applyResponse
       accountDataList = _accountdata
 
@@ -2516,6 +2626,7 @@ class StateManager extends EventEmitter {
 
       this.tempRecordTXByCycle(txTs, acceptedTX, true, applyResponse)
 
+      //WOW this was not good!  had acceptedTX.transactionGroup[0].id
       if (this.p2p.getNodeId() === acceptedTX.transactionGroup[0].id) {
         this.emit('txProcessed')
       }
@@ -2545,7 +2656,7 @@ class StateManager extends EventEmitter {
   //   await this.processAcceptedTxQueue(Date.now())
   // }
 
-  async applyAcceptedTransaction (acceptedTX, wrappedStates, localCachedData, filter) {
+  async applyAcceptedTransaction (acceptedTX:AcceptedTx, wrappedStates:WrappedStates, localCachedData, filter) {
     if (this.queueStopped) return
     let tx = acceptedTX.data
     let keysResponse = this.app.getKeyFromTransaction(tx)
@@ -2644,7 +2755,7 @@ class StateManager extends EventEmitter {
   //         Q
   //          QQ
 
-  queueAcceptedTransaction (acceptedTx:AcceptedTx, sendGossip:boolean = true, sender: Shardus.Node) {
+  queueAcceptedTransaction (acceptedTx:AcceptedTx, sendGossip:boolean = true, sender: Shardus.Node  |  null) {
     // dropping these too early.. hmm  we finished syncing before we had the first shard data.
     // if (this.currentCycleShardData == null) {
     //   // this.preTXQueue.push(acceptedTX)
@@ -2653,7 +2764,10 @@ class StateManager extends EventEmitter {
     if (this.readyforTXs === false) {
       return 'notReady' // it is too early to care about the tx
     }
-
+    if(this.currentCycleShardData == null)
+    {
+      return 'notReady'
+    }
     let keysResponse = this.app.getKeyFromTransaction(acceptedTx.data)
     let timestamp = keysResponse.timestamp
     let txId = acceptedTx.receipt.txHash
@@ -2664,7 +2778,7 @@ class StateManager extends EventEmitter {
     // collected data is remote data we have recieved back
     // //tx keys ... need a sorted list (deterministic) of partition.. closest to a number?
 
-    if (this.config.debug.loseTxChance > 0) {
+    if (this.config.debug != null && this.config.debug.loseTxChance && this.config.debug.loseTxChance > 0) {
       let rand = Math.random()
       if (this.config.debug.loseTxChance > rand) {
         if (this.app.canDebugDropTx(acceptedTx.data)) {
@@ -2852,7 +2966,12 @@ class StateManager extends EventEmitter {
     return false
   }
 
+  // THIS QUEUE ENTRY seems to be way off spec from the normal one, what is up?
   async queueEntryRequestMissingData (queueEntry) {
+    if(this.currentCycleShardData == null)
+    {
+      return
+    }
     if (!queueEntry.requests) {
       queueEntry.requests = {}
     }
@@ -2924,12 +3043,19 @@ class StateManager extends EventEmitter {
    * @param {QueueEntry} queueEntry
    * @returns {Node[]}
    */
-  queueEntryGetTransactionGroup (queueEntry) {
+  queueEntryGetTransactionGroup (queueEntry:QueueEntry): Shardus.Node[] {
+    if(this.currentCycleShardData == null){
+      throw new Error('queueEntryGetTransactionGroup: currentCycleShardData == null')
+    }
+    if(queueEntry.uniqueKeys == null){
+      throw new Error('queueEntryGetTransactionGroup: queueEntry.uniqueKeys == null')
+    }
     if (queueEntry.transactionGroup != null) {
       return queueEntry.transactionGroup
     }
     let txGroup = []
-    let uniqueNodes = {}
+    let uniqueNodes:StringNodeObjectMap = {}
+
     for (let key of queueEntry.uniqueKeys) {
       let homeNode = queueEntry.homeNodes[key]
       // txGroup = Array.concat(txGroup, homeNode.nodeThatStoreOurParitionFull)
@@ -2962,7 +3088,13 @@ class StateManager extends EventEmitter {
   }
 
   // should work even if there are zero nodes to tell and should load data locally into queue entry
-  async tellCorrespondingNodes (queueEntry) {
+  async tellCorrespondingNodes (queueEntry:QueueEntry) {
+    if(this.currentCycleShardData == null){
+      throw new Error('tellCorrespondingNodes: currentCycleShardData == null')
+    }
+    if(queueEntry.uniqueKeys == null){
+      throw new Error('tellCorrespondingNodes: queueEntry.uniqueKeys == null')
+    }
     // Report data to corresponding nodes
     let ourNodeData = this.currentCycleShardData.nodeShardData
     // let correspondingEdgeNodes = []
@@ -3059,7 +3191,7 @@ class StateManager extends EventEmitter {
    * @param {QueueEntry} queueEntry
    * @param {number} currentIndex
    */
-  removeFromQueue (queueEntry, currentIndex) {
+  removeFromQueue (queueEntry: QueueEntry, currentIndex: number) {
     this.newAcceptedTxQueue.splice(currentIndex, 1)
     this.archivedQueueEntries.push(queueEntry)
     // period cleanup will usually get rid of these sooner if the list fills up
@@ -3082,8 +3214,13 @@ class StateManager extends EventEmitter {
   //
   //
   async processAcceptedTxQueue () {
-    let seenAccounts
+    let seenAccounts: SeenAccounts
     try {
+      if(this.currentCycleShardData == null)
+      {
+        return
+      }
+
       if (this.newAcceptedTxQueue.length === 0 && this.newAcceptedTxQueueTempInjest.length === 0) {
         return
       }
@@ -3111,7 +3248,11 @@ class StateManager extends EventEmitter {
 
       // let seenAccounts2 = new Map()
       // todo move these functions out where they are not constantly regenerate
-      let accountSeen = function (queueEntry) {
+      let accountSeen = function (queueEntry: QueueEntry) {
+        if(queueEntry.uniqueKeys == null){
+          //TSConversion double check if this needs extra logging
+          return false
+        }
         for (let key of queueEntry.uniqueKeys) {
           if (seenAccounts[key] != null) {
             return true
@@ -3123,7 +3264,11 @@ class StateManager extends EventEmitter {
         }
         return false
       }
-      let markAccountsSeen = function (queueEntry) {
+      let markAccountsSeen = function (queueEntry: QueueEntry) {
+        if(queueEntry.uniqueKeys == null){
+          //TSConversion double check if this needs extra logging
+          return
+        }
         for (let key of queueEntry.uniqueKeys) {
           if (seenAccounts[key] == null) {
             seenAccounts[key] = queueEntry
@@ -3132,7 +3277,11 @@ class StateManager extends EventEmitter {
         }
       }
       // if we are the oldest ref to this you can clear it.. only ok because younger refs will still reflag it in time
-      let clearAccountsSeen = function (queueEntry) {
+      let clearAccountsSeen = function (queueEntry: QueueEntry) {
+        if(queueEntry.uniqueKeys == null){
+          //TSConversion double check if this needs extra logging
+          return
+        }
         for (let key of queueEntry.uniqueKeys) {
           if (seenAccounts[key] === queueEntry) {
             seenAccounts[key] = null
@@ -3143,9 +3292,13 @@ class StateManager extends EventEmitter {
 
       let app = this.app
       let verboseLogs = this.verboseLogs
-      let debugAccountData = function (queueEntry, app) {
+      let debugAccountData = function (queueEntry: QueueEntry, app: Shardus.App) {
         let debugStr = ''
         if (verboseLogs) {
+          if(queueEntry.uniqueKeys == null){
+            //TSConversion double check if this needs extra logging
+            return utils.makeShortHash(queueEntry.acceptedTx.id) + ' uniqueKeys empty error'
+          }
           for (let key of queueEntry.uniqueKeys) {
             if (queueEntry.collectedData[key] != null) {
               debugStr += utils.makeShortHash(key) + ' : ' + app.getAccountDebugValue(queueEntry.collectedData[key]) + ', '
@@ -3278,7 +3431,7 @@ class StateManager extends EventEmitter {
               let filter = queueEntry.localKeys
               queueEntry.acceptedTx.transactionGroup = queueEntry.transactionGroup // Used to not double count txProcessed
               let txResult = await this.applyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates, localCachedData, filter)
-              if (txResult.success) {
+              if (txResult != null && txResult.success) {
                 acceptedTXCount++
                 // clearAccountsSeen(queueEntry)
               } else {
@@ -3361,7 +3514,7 @@ class StateManager extends EventEmitter {
 
     let ourNodeShardData = this.currentCycleShardData.nodeShardData
     // partittions:
-    let partitionDump = { partitions: [], cycle:0, rangesCovered:{},nodesCovered:{},allNodeIds:[]  }
+    let partitionDump:DebugDumpPartitions = { partitions: [], cycle:0, rangesCovered:{} as DebugDumpRangesCovered,nodesCovered:{} as DebugDumpNodesCovered,allNodeIds:[]  }
     partitionDump.cycle = this.currentCycleShardData.cycleNumber
 
     // todo port this to a static stard function!
@@ -3386,7 +3539,7 @@ class StateManager extends EventEmitter {
     }
 
     for (var [key, value] of partitionMap) {
-      let partition = { parititionID: key, accounts: [], skip:{} }
+      let partition:DebugDumpPartition = { parititionID: key, accounts: [], skip:{} as DebugDumpPartitionSkip }
       partitionDump.partitions.push(partition)
 
       // normal case
@@ -3447,13 +3600,16 @@ class StateManager extends EventEmitter {
   // todo support metadata so we can serve up only a portion of the account
   // todo 2? communicate directly back to client... could have security issue.
   // todo 3? require a relatively stout client proof of work
-  async getLocalOrRemoteAccount (address) {
+  async getLocalOrRemoteAccount (address:string) {
     let wrappedAccount
 
     if (this.currentCycleShardData == null) {
       await this.waitForShardData()
     }
-
+    // TSConversion since this should never happen due to the above function should we assert that the value is non null?.  Still need to figure out the best practice.
+    if (this.currentCycleShardData == null) {
+      throw new Error('getLocalOrRemoteAccount: network not ready')
+    }
     // check if we have this account locally. (does it have to be consenus or just stored?)
     let accountIsRemote = true
 
@@ -3470,7 +3626,9 @@ class StateManager extends EventEmitter {
 
     if (accountIsRemote) {
       let homeNode = ShardFunctions.findHomeNode(this.currentCycleShardData.shardGlobals, address, this.currentCycleShardData.parititionShardDataMap)
-
+      if(homeNode== null){
+        throw new Error(`getLocalOrRemoteAccount: no home node found`)
+      }
       let message = { accountIds: [address] }
       let result = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
       if (result === false) { this.mainLogger.error('ASK FAIL 10') }
@@ -3515,18 +3673,24 @@ class StateManager extends EventEmitter {
     }
     return null
   }
-  getAccountFailDump (address, message) {
+  getAccountFailDump (address: string, message: string) {
     // this.currentCycleShardData
     this.logger.playbackLogNote('getAccountFailDump', ` `, `${utils.makeShortHash(address)} ${message} `)
   }
 
-  async getRemoteAccount (address) {
+  async getRemoteAccount (address:string) {
     let wrappedAccount
 
     await this.waitForShardData()
+    // TSConversion since this should never happen due to the above function should we assert that the value is non null?.  Still need to figure out the best practice.
+    if (this.currentCycleShardData == null) {
+      throw new Error('getRemoteAccount: network not ready')
+    }
 
     let homeNode = ShardFunctions.findHomeNode(this.currentCycleShardData.shardGlobals, address, this.currentCycleShardData.parititionShardDataMap)
-
+    if(homeNode== null){
+      throw new Error(`getRemoteAccount: no home node found`)
+    }
     let message = { accountIds: [address] }
     let result = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
     if (result === false) { this.mainLogger.error('ASK FAIL 11') }
@@ -3544,12 +3708,15 @@ class StateManager extends EventEmitter {
    * @param {number} count
    * @returns {Node[]}
    */
-  getClosestNodes (hash, count = 1) {
+  getClosestNodes (hash:string, count:number = 1) : Shardus.Node[] {
     if (this.currentCycleShardData == null) {
       throw new Error('getClosestNodes: network not ready')
     }
     let cycleShardData = this.currentCycleShardData
     let homeNode = ShardFunctions.findHomeNode(cycleShardData.shardGlobals, hash, cycleShardData.parititionShardDataMap)
+    if(homeNode == null){
+      throw new Error(`getClosestNodes: no home node found`)
+    }
     let homeNodeIndex = homeNode.ourNodeIndex
     let idToExclude = ''
     let results = ShardFunctions.getNodesByProximity(cycleShardData.shardGlobals, cycleShardData.activeNodes, homeNodeIndex, idToExclude, count, true)
@@ -3557,13 +3724,23 @@ class StateManager extends EventEmitter {
     return results
   }
 
-  getClosestNodesGlobal (hash, count) {
+  _distanceSort(a:SimpleDistanceObject, b:SimpleDistanceObject){
+    if(a.distance === b.distance){
+      return 0
+    }
+    if(a.distance < b.distance){
+      return -1
+    } else{
+      return 1
+    }
+  }
+  getClosestNodesGlobal (hash:string, count:number) {
     let hashNumber = parseInt(hash.slice(0, 7), 16)
     let nodes = this.p2p.state.getActiveNodes()
-    nodes = nodes.map(node => ({ id: node.id, distance: Math.abs(hashNumber - parseInt(node.id.slice(0, 7), 16)) }))
-    nodes.sort((a, b) => a.distance < b.distance)
+    let nodeDistMap:{id:string, distance:number}[] = nodes.map(node => ({ id: node.id, distance: Math.abs(hashNumber - parseInt(node.id.slice(0, 7), 16)) }))
+    nodeDistMap.sort(this._distanceSort)////(a, b) => a.distance < b.distance)
     console.log('SORTED NODES BY DISTANCE', nodes)
-    return nodes.slice(0, count).map(node => node.id)
+    return nodeDistMap.slice(0, count).map(node => node.id)
   }
 
   // /**
@@ -3587,12 +3764,22 @@ class StateManager extends EventEmitter {
   //   return false
   // }
 
-  isNodeInDistance (shardGlobals, parititionShardDataMap, hash, nodeId, distance) {
+  // TSConversion todo see if we need to log any of the new early exits.
+  isNodeInDistance (shardGlobals: ShardGlobals, parititionShardDataMap: ParititionShardDataMap, hash:string, nodeId:string, distance:number) {
     let cycleShardData = this.currentCycleShardData
+    if(cycleShardData == null){
+      return false
+    }
     let someNode = ShardFunctions.findHomeNode(cycleShardData.shardGlobals, nodeId, cycleShardData.parititionShardDataMap)
+    if(someNode == null){
+      return false
+    }
     let someNodeIndex = someNode.ourNodeIndex
 
     let homeNode = ShardFunctions.findHomeNode(cycleShardData.shardGlobals, hash, cycleShardData.parititionShardDataMap)
+    if(homeNode == null){
+      return false
+    }
     let homeNodeIndex = homeNode.ourNodeIndex
 
     let partitionDistance = Math.abs(someNodeIndex - homeNodeIndex)
@@ -3602,13 +3789,14 @@ class StateManager extends EventEmitter {
     return false
   }
 
-  async setAccount (wrappedStates, localCachedData, applyResponse, accountFilter = null) {
+  // TODO WrappedStates
+  async setAccount (wrappedStates, localCachedData, applyResponse, accountFilter?:AccountFilter) {
     // let sourceAddress = inTx.srcAct
     // let targetAddress = inTx.tgtAct
     // let amount = inTx.txnAmt
     // let type = inTx.txnType
     // let time = inTx.txnTimestamp
-    let canWriteToAccount = function (accountId) {
+    let canWriteToAccount = function (accountId:string) {
       return (!accountFilter) || (accountFilter[accountId] !== undefined)
     }
 
@@ -3629,7 +3817,7 @@ class StateManager extends EventEmitter {
   }
 
   /// /////////////////////////////////////////////////////////
-  async fifoLock (fifoName) {
+  async fifoLock (fifoName:string) {
     let thisFifo = this.fifoLocks[fifoName]
     if (thisFifo == null) {
       thisFifo = { fifoName, queueCounter: 0, waitingList: [], lastServed: 0, queueLocked: false, lockOwner: null }
@@ -3662,7 +3850,7 @@ class StateManager extends EventEmitter {
     return ourID
   }
 
-  fifoUnlock (fifoName, id) {
+  fifoUnlock (fifoName:string, id: number) {
     let thisFifo = this.fifoLocks[fifoName]
     if (id === -1 || !thisFifo) {
       return // nothing to do
@@ -4462,7 +4650,7 @@ class StateManager extends EventEmitter {
    * @param {*} otherStatusMap todo status map, but this is unused
    * @param {PartitionObject} otherPartitionObject
    */
-  _mergeRepairDataIntoLocalState (repairTracker:RepairTracker, ourPartitionObj:PartitionObject, otherStatusMap, otherPartitionObject: PartitionObject) {
+  _mergeRepairDataIntoLocalState (repairTracker:RepairTracker, ourPartitionObj:PartitionObject, otherStatusMap:any, otherPartitionObject: PartitionObject) {
     // just simple assignment.  if we changed things to merge the best N results this would need to change.
     ourPartitionObj.Txids = [...otherPartitionObject.Txids]
     ourPartitionObj.Status = [...otherPartitionObject.Status]
@@ -4477,12 +4665,13 @@ class StateManager extends EventEmitter {
     // txList.passed = ourPartitionObj.Status
     // txList.states = ourPartitionObj.States // TXSTATE_TODO
 
+    //TxTallyList
     let newTxList = { hashes: [...ourPartitionObj.Txids], passed: [...ourPartitionObj.Status], states: [...ourPartitionObj.States], txs:[] }
     // let newTxList = { hashes: [], passed: [], txs: [], thashes: [], tpassed: [], ttxs: [], tstates: [], states: [] }
     txList.newTxList = newTxList
 
     // build a map that merges our tx data
-    let allTXs = {}
+    let allTXs:AcceptedTxObjectById = {}
     for (let tx of txList.txs) {
       allTXs[tx.id] = tx
     }
@@ -4515,6 +4704,13 @@ class StateManager extends EventEmitter {
   //  this works with syncTXsFromHashSetStrings to correct our partition object data. unlike the other version of this function this just creates entries on a
   //  temp member newTxList that will be used for the next partition object calculation
 
+  // Todo , made this quick, maybe reorganize them into a group.
+  _sortNumberI (a:{i:number}, b:{i:number}) { 
+    return a.i - b.i 
+  }
+  _sortNumber (a:number, b:number) { 
+    return a - b
+  }
   /**
    * _mergeRepairDataIntoLocalState2
    * used by syncTXsFromHashSetStrings in the complex case where we had to run consensus on individual transactions and request transactions from possibly multiple nodes
@@ -4523,7 +4719,7 @@ class StateManager extends EventEmitter {
    * @param {any} ourLastResultHash
    * @param {GenericHashSetEntry & IHashSetEntryPartitions} ourHashSet
    */
-  _mergeRepairDataIntoLocalState2 (repairTracker, ourPartitionObj, ourLastResultHash, ourHashSet, txListOverride = null) {
+  _mergeRepairDataIntoLocalState2 (repairTracker:RepairTracker, ourPartitionObj:PartitionObject, ourLastResultHash:any, ourHashSet:HashSetEntryPartitions, txListOverride = null) {
     let key = repairTracker.key
     let txList = null
     if (txListOverride != null) {
@@ -4540,6 +4736,13 @@ class StateManager extends EventEmitter {
     // repairTracker.solutionDeltas holds all the solutions we got from asking different nodes for the the transactions we are missing
     // repairTracker.extraTXIds holds the txids (hashes) of the transactions that are extra and need to be removed from the partition object.
 
+    if(repairTracker.solutionDeltas == null){
+      throw new Error('_mergeRepairDataIntoLocalState2 repairTracker.solutionDeltas == null')
+    }
+    if(ourHashSet.extraMap == null){
+      throw new Error('_mergeRepairDataIntoLocalState2 ourHashSet.extraMap')
+    }
+
     let txSourceList = txList
     if (txList.newTxList) {
     //  txSourceList = txList.newTxList  //not sure if we should keep this... or at least update the part where we remove extra entries
@@ -4547,14 +4750,14 @@ class StateManager extends EventEmitter {
     // let newTxList = { hashes: [...txList.hashes], passed: [...txList.passed], txs: [...txList.txs] }
     let newTxList = { hashes: [], passed: [], txs: [], thashes: [], tpassed: [], ttxs: [], tstates: [], states: [] }
     txList.newTxList = newTxList // append it to tx list for now.
-    repairTracker.solutionDeltas.sort(function (a, b) { return a.i - b.i }) // why did b - a help us once??
+    repairTracker.solutionDeltas.sort(this._sortNumberI) // function (a, b) { return a.i - b.i }) // why did b - a help us once??
 
     let debugSol = []
     for (let solution of repairTracker.solutionDeltas) {
       debugSol.push({ i: solution.i, tx: solution.tx.id.slice(0, 4), st: solution.state }) // TXSTATE_TODO
     }
 
-    ourHashSet.extraMap.sort(function (a, b) { return a - b })
+    ourHashSet.extraMap.sort(this._sortNumber) // function (a, b) { return a - b })
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 z  ${debugKey} ourHashSet.extraMap: ${utils.stringifyReduce(ourHashSet.extraMap)} debugSol: ${utils.stringifyReduce(debugSol)}`)
 
     // build up a working list for the solution but leave out the extra entries.
@@ -6041,7 +6244,8 @@ class StateManager extends EventEmitter {
   }
 
   startShardCalculations () {
-    this.p2p.state.on('cycle_q1_start', async (lastCycle, time) => {
+    //this.p2p.state.on('cycle_q1_start', async (lastCycle, time) => {
+    this._registerListener(this.p2p.state, 'cycle_q1_start', async (lastCycle, time) => {  
       if (lastCycle) {
         // this.dumpAccountDebugData()
         this.updateShardValues(lastCycle.counter)
