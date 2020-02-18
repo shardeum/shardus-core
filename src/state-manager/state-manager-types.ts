@@ -1,3 +1,5 @@
+//import { AccountData } from "../shardus/shardus-types";
+
 //import { ShardGlobals } from "./shardFunctionTypes";
 
 //import { WrappedData } from "../shardus/shardus-types";
@@ -6,10 +8,10 @@
 type App = import("../shardus/shardus-types").App;
 type QueueEntry = {
     acceptedTx: import("../shardus/shardus-types").AcceptedTx;
-    txKeys: any;
+    txKeys: import("../shardus/shardus-types").TransactionKeys
     collectedData: any;
     originalData: any;
-    homeNodes: any;
+    homeNodes: {[accountID:string]:import('./shardFunctionTypes').NodeShardData};
     hasShardInfo: boolean;
     state: string;
     dataCollected: number;
@@ -25,11 +27,15 @@ type QueueEntry = {
     syncCounter: number;
     didSync: boolean;
     syncKeys: any[];
+    logstate: string; // logging state
+    requests: {[key:string]:import("../shardus/shardus-types").Node} // map of account keys to the node that we are requesting the account data from 
     uniqueKeys?: string[];
     ourNodeInvolved?: boolean;
     transactionGroup?: import("../shardus/shardus-types").Node[];
     approximateCycleAge?: number;
+    
 };
+
 type SyncTracker = {
     syncStarted: boolean;
     syncFinished: boolean;
@@ -255,8 +261,11 @@ type TxTallyList = {
     /**
      * this gets added on when we are reparing something newTxList seems to have a different format than existing types.
      */
-    newTxList?: any;
+    newTxList?: NewTXList;
 };
+
+type NewTXList = { hashes: string[], passed: number[], txs: any[], thashes: string[], tpassed: number[], ttxs: any[], tstates: any[], states: any[] }
+
 type Cycle = import("../shardus/shardus-types").Cycle;
 type Sign = import("../shardus/shardus-types").Sign;
 //type Node = import("../shardus").Node;
@@ -286,7 +295,7 @@ type SolutionDelta = {
      */
     i: number;
     tx: import("../shardus/shardus-types").AcceptedTx;
-    pf: boolean;
+    pf: number; // TSConversion was a boolean
     /**
      * a string snipped from our solution hash set
      */
@@ -373,6 +382,8 @@ type Vote = {
     voters?: number[];
 };
 
+type StringVoteObjectMap = {[vote:string]:Vote}
+
 type ExtendedVote = Vote & {
     winIdx: number|null;
     val:string;
@@ -381,6 +392,8 @@ type ExtendedVote = Vote & {
     votesseen: any;
     finalIdx: number;
 }
+
+type StringExtendedVoteObjectMap = {[vote:string]:ExtendedVote}
 
 //{ winIdx: null, val: v, count: 0, ec: 0, lowestIndex: index, voters: [], voteTally: Array(hashSetList.length), votesseen }
 
@@ -401,6 +414,9 @@ type CountEntry = {
      */
     voters: number[];
 };
+
+type StringCountEntryObjectMap = {[vote:string]:CountEntry}
+
 
 //let accountCopy = { accountId: accountEntry.accountId, data: accountEntry.data, timestamp: accountEntry.timestamp, hash: accountEntry.stateId, cycleNumber }
 type AccountCopy = {
@@ -431,29 +447,40 @@ type GetAccountDataReq = AccountRangeAndLimit
 type GetAccountData2Req = AccountAddressAndTimeRange & {maxRecords:number}
 
 type GetAccountData3Req = {accountStart:string, accountEnd:string, tsStart:number, maxRecords:number}
+type GetAccountData3Resp = { data: GetAccountDataByRangeSmart }
 
 type PosPartitionResults = { partitionResults: PartitionResult[]; Cycle_number: number; }
 
 type GetTransactionsByListReq = {Tx_ids:string[]}
 
+
 type TransactionsByPartitionReq = { cycle: number; tx_indicies: any; hash: string; partitionId: number; debugSnippets: any }
+type TransactionsByPartitionResp = { success: boolean; acceptedTX?: any; passFail?: any[]; statesList?: any[] }
 
 type GetPartitionTxidsReq = { Partition_id: any; Cycle_number: string }
 
 type RouteToHomeNodeReq = { txid: any; timestamp: any; acceptedTx: import("../shardus/shardus-types").AcceptedTx }
 
+type RequestStateForTxReq = { txid: string; timestamp: number; keys: any }
+type RequestStateForTxResp = { stateList: any[]; note: string }
 
 // Sync related
 type StateHashResult = {stateHash:string}
 
 type WrappedStates = {[accountID:string]:import("../shardus/shardus-types").WrappedData}
-type AccountFilter = {[accountID:string]:boolean}
+type WrappedStateArray = import("../shardus/shardus-types").WrappedData[]
+//type AccountFilter = {[accountID:string]:boolean}
+type AccountFilter = {[accountID:string]:number}
+type AccountBoolObjectMap = AccountFilter
 
 type SimpleDistanceObject = {distance:number}
 type StringNodeObjectMap = {[accountID:string]:import("../shardus/shardus-types").Node}
 type AcceptedTxObjectById = {[txid:string]: import("../shardus/shardus-types").AcceptedTx}
 //localCachedData, applyResponse
+type TxObjectById = AcceptedTxObjectById
 
+type TxIDToKeyObjectMap = {[accountID:string]:import("../shardus/shardus-types").TransactionKeys}
+type TxIDToSourceTargetObjectMap = {[accountID:string]:{ sourceKeys:string[], targetKeys:string[] }}
 //fifoLocks
 
 //wrappedData.isPartial
@@ -468,3 +495,22 @@ type DebugDumpPartitions =  { partitions: DebugDumpPartition[], cycle:number, ra
 
 //queue process related:
 type SeenAccounts = {[accountId:string]: (QueueEntry | null)}
+type LocalCachedData = {[accountId:string]:any }
+//type AllNewTXsById = {[accountId:string]: }
+type AccountValuesByKey = {[accountId:string]:any }
+
+// repair related
+type StatusMap = {[txid:string]:number}
+type StateMap = {[txid:string]:string}
+type GetAccountDataByRangeSmart =  { wrappedAccounts:WrappedStateArray, lastUpdateNeeded:boolean, wrappedAccounts2:WrappedStateArray, highestTs:number }
+
+//generic relocate?
+type SignedObject = {sign: {owner:string}}
+type StringBoolObjectMap = {[key:string]:boolean}
+type StringNumberObjectMap = {[key:string]:number}
+type NumberStringObjectMap = {[index:number]:string}
+type StringStringObjectMap = {[key:string]:string}
+
+type FifoWaitingEntry = { id: number }
+type FifoLock = { fifoName:string, queueCounter: number, waitingList: FifoWaitingEntry[], lastServed: number, queueLocked: boolean, lockOwner: number }
+type FifoLockObjectMap = {[lockID:string]:FifoLock}

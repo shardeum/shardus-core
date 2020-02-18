@@ -68,6 +68,8 @@ class StateManager extends EventEmitter {
     partitionReceiptsByCycleCounter :  {[cycleKey:string]:PartitionReceipt[] } //Object.<string, PartitionReceipt[]> // a map of cycle keys to lists of partition receipts. 
     ourPartitionReceiptsByCycleCounter: {[cycleKey:string]:PartitionReceipt } //Object.<string, PartitionReceipt> //a map of cycle keys to lists of partition receipts.
 
+    fifoLocks:FifoLockObjectMap
+
   constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage : Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     super()
     this.verboseLogs = verboseLogs
@@ -160,6 +162,9 @@ class StateManager extends EventEmitter {
     this.sendArchiveData = false
     this.purgeArchiveData = false
     this.sentReceipts = new Map()
+
+    //Fifo locks.
+    this.fifoLocks = {}
 
     // debug hack
     if (p2p == null) {
@@ -1115,8 +1120,10 @@ class StateManager extends EventEmitter {
     while (moreDataRemaining) {
       // max records artificially low to make testing coverage better.  todo refactor: make it a config or calculate based on data size
       let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, maxRecords: this.config.stateManager.accountBucketSize }
-      let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data3', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
-      if (result === false) { this.mainLogger.error('ASK FAIL 3') }
+      let r:GetAccountData3Resp | boolean = await this.p2p.ask(this.dataSourceNode, 'get_account_data3', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
+      if (r === false) { this.mainLogger.error('ASK FAIL 3') }
+      // TSConversion need to consider better error handling here!
+      let result:GetAccountData3Resp = r as GetAccountData3Resp
       // accountData is in the form [{accountId, stateId, data}] for n accounts.
       let accountData = result.data.wrappedAccounts
 
@@ -1482,7 +1489,7 @@ class StateManager extends EventEmitter {
   }
 
   // This will make calls to app.getAccountDataByRange but if we are close enough to real time it will query any newer data and return lastUpdateNeeded = true
-  async getAccountDataByRangeSmart (accountStart:string, accountEnd:string, tsStart:number, maxRecords:number) {
+  async getAccountDataByRangeSmart (accountStart:string, accountEnd:string, tsStart:number, maxRecords:number): Promise<GetAccountDataByRangeSmart> {
     let tsEnd = Date.now()
     let wrappedAccounts = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart, tsEnd, maxRecords)
     let lastUpdateNeeded = false
@@ -1648,12 +1655,14 @@ class StateManager extends EventEmitter {
       await respond(result)
     })
 
-    this.p2p.registerInternal('get_account_data3', async (payload:GetAccountData3Req, respond: (arg0: { data: Shardus.AccountData[]  }) => any) => {
-      let result = {} as {data: Shardus.AccountData[] } //TSConversion  This is complicated !!(due to app wrapping)  as {data: Shardus.AccountData[] | null}
-      let accountData = null
+    this.p2p.registerInternal('get_account_data3', async (payload:GetAccountData3Req, respond: (arg0: { data: GetAccountDataByRangeSmart }) => any) => {
+      let result = {} as {data: GetAccountDataByRangeSmart } //TSConversion  This is complicated !!(due to app wrapping)  as {data: Shardus.AccountData[] | null}
+      let accountData:GetAccountDataByRangeSmart = null
       let ourLockID = -1
       try {
         ourLockID = await this.fifoLock('accountModification')
+        // returns { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs }
+        //GetAccountDataByRangeSmart
         accountData = await this.getAccountDataByRangeSmart(payload.accountStart, payload.accountEnd, payload.tsStart, payload.maxRecords)
       } finally {
         this.fifoUnlock('accountModification', ourLockID)
@@ -1690,9 +1699,9 @@ class StateManager extends EventEmitter {
       /**
       * This is how to typedef a callback!
      * @param {{ partitionResults: PartitionResult[]; Cycle_number: number; }} payload
-     * @param {any} respond
+     * @param {any} respond TSConversion is it ok to just set respond to any?
      */
-      async (payload: PosPartitionResults, respond) => {
+      async (payload: PosPartitionResults, respond:any) => {
       // let result = {}
       // let ourLockID = -1
         try {
@@ -1756,7 +1765,7 @@ class StateManager extends EventEmitter {
               allResponsesByPartition[partitionKey1] = responses
             }
             // clean out an older response from same node if on exists
-            responses = responses.filter(item => (item.sign == null) || item.sign.owner !== owner)
+            responses = responses.filter((item:SignedObject) => (item.sign == null) || item.sign.owner !== owner)
             allResponsesByPartition[partitionKey1] = responses // have to re-assign this since it is a new ref to the array
 
             // add the result ot the list of responses
@@ -1893,7 +1902,7 @@ class StateManager extends EventEmitter {
     // /get_transactions_by_list (Tx_ids)
     //   Tx_ids - array of transaction ids
     //   Returns data from the Transactions Table for just the given transaction ids
-    this.p2p.registerInternal('get_transactions_by_list', async (payload: GetTransactionsByListReq, respond) => {
+    this.p2p.registerInternal('get_transactions_by_list', async (payload: GetTransactionsByListReq, respond: (arg0: Shardus.AcceptedTx[]) => any) => {
       let result = [] as AcceptedTx[]
       try {
         result = await this.storage.queryAcceptedTransactionsByIds(payload.Tx_ids)
@@ -1902,7 +1911,7 @@ class StateManager extends EventEmitter {
       await respond(result)
     })
 
-    this.p2p.registerInternal('get_transactions_by_partition_index', async (payload: TransactionsByPartitionReq, respond: (arg0: { success: boolean; acceptedTX?: any; passFail?: any[]; statesList?: any[] }) => any) => {
+    this.p2p.registerInternal('get_transactions_by_partition_index', async (payload: TransactionsByPartitionReq, respond: (arg0: TransactionsByPartitionResp) => any) => {
       // let result = {}
 
       let passFailList = []
@@ -1950,16 +1959,16 @@ class StateManager extends EventEmitter {
 
         if (acceptedTXs != null && acceptedTXs.length < expectedResults) {
           if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index results ${utils.stringifyReduce(acceptedTXs)} snippets ${utils.stringifyReduce(payload.debugSnippets)} `)
-          if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index results2:${utils.stringifyReduce(acceptedTXs.map(x => x.id))} snippets:${utils.stringifyReduce(payload.debugSnippets)} txid:${utils.stringifyReduce(txIDList)} `)
+          if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index results2:${utils.stringifyReduce(acceptedTXs.map((x:Shardus.AcceptedTx) => x.id))} snippets:${utils.stringifyReduce(payload.debugSnippets)} txid:${utils.stringifyReduce(txIDList)} `)
 
           // find an log missing results:
           // for(let txid of txIDList)
-          let received = {}
+          let received:StringBoolObjectMap = {}
           for (let acceptedTX of acceptedTXs) {
             received[acceptedTX.id] = true
           }
-          let missingTXs = []
-          let missingTXHash = {}
+          let missingTXs:string[] = []
+          let missingTXHash:StringBoolObjectMap = {}
           for (let txid of txIDList) {
             if (received[txid] !== true) {
               missingTXs.push(txid)
@@ -2018,7 +2027,7 @@ class StateManager extends EventEmitter {
       // Place tx in queue (if younger than m)
 
       // make sure we don't already have it
-      let queueEntry = this.getQueueEntrySafe(payload.txid, payload.timestamp)
+      let queueEntry = this.getQueueEntrySafe(payload.txid)//, payload.timestamp)
       if (queueEntry) {
         return
         // already have this in our queue
@@ -2030,12 +2039,12 @@ class StateManager extends EventEmitter {
     })
 
     // p2p ASK
-    this.p2p.registerInternal('request_state_for_tx', async (payload, respond) => {
-      let response = { stateList: [] , note: ""}
+    this.p2p.registerInternal('request_state_for_tx', async (payload: RequestStateForTxReq, respond: (arg0: RequestStateForTxResp) => any) => {
+      let response:RequestStateForTxResp = { stateList: [] , note: ""}
       // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
-      let queueEntry = this.getQueueEntrySafe(payload.txid, payload.timestamp)
+      let queueEntry = this.getQueueEntrySafe(payload.txid)// , payload.timestamp)
       if (queueEntry == null) {
-        queueEntry = this.getQueueEntryArchived(payload.txid, payload.timestamp)
+        queueEntry = this.getQueueEntryArchived(payload.txid)// , payload.timestamp)
       }
 
       if (queueEntry == null) {
@@ -2056,13 +2065,13 @@ class StateManager extends EventEmitter {
     })
 
     // p2p TELL
-    this.p2p.registerInternal('broadcast_state', async (payload, respond) => {
+    this.p2p.registerInternal('broadcast_state', async (payload: { txid: string; stateList: any[] }, respond: any) => {
       // Save the wrappedAccountState with the rest our queue data
       // let message = { stateList: datas, txid: queueEntry.acceptedTX.id }
       // this.p2p.tell([correspondingEdgeNode], 'broadcast_state', message)
 
       // make sure we have it
-      let queueEntry = this.getQueueEntrySafe(payload.txid, payload.timestamp)
+      let queueEntry = this.getQueueEntrySafe(payload.txid)// , payload.timestamp)
       if (queueEntry == null) {
         return
       }
@@ -2079,7 +2088,7 @@ class StateManager extends EventEmitter {
       //  gossip 'spread_tx_to_group' to transaction group
       // Place tx in queue (if younger than m)
 
-      let queueEntry = this.getQueueEntrySafe(payload.id, payload.timestamp)
+      let queueEntry = this.getQueueEntrySafe(payload.id)// , payload.timestamp)
       if (queueEntry) {
         return
         // already have this in our queue
@@ -2095,13 +2104,18 @@ class StateManager extends EventEmitter {
       if (added === 'notReady') {
         return // we are faking that the message got lost so bail here
       }
-      queueEntry = this.getQueueEntrySafe(payload.id, payload.timestamp) // now that we added it to the queue, it should be possible to get the queueEntry now
+      queueEntry = this.getQueueEntrySafe(payload.id) //, payload.timestamp) // now that we added it to the queue, it should be possible to get the queueEntry now
 
+      if(queueEntry == null){
+        // do not gossip this, we are not involved
+        this.fatalLogger.fatal(`spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(payload.id)}` )
+        return
+      }
       // how did this work before??
       // get transaction group. 3 accounds, merge lists.
       let transactionGroup = this.queueEntryGetTransactionGroup(queueEntry)
       if (queueEntry.ourNodeInvolved === false) {
-        // do not gossip this, we are not involved
+
         return
       }
       if (transactionGroup.length > 1) {
@@ -2111,7 +2125,7 @@ class StateManager extends EventEmitter {
       // await this.queueAcceptedTransaction(acceptedTX, false, sender)
     })
 
-    this.p2p.registerInternal('get_account_data_with_queue_hints', async (payload, respond) => {
+    this.p2p.registerInternal('get_account_data_with_queue_hints', async (payload: { accountIds: string[] }, respond: (arg0: { accountData: Shardus.AccountData[] }) => any) => {
       let result = {} as {accountData: Shardus.AccountData[] | null}//TSConversion  This is complicated !! check app for details.
       let accountData = null
       let ourLockID = -1
@@ -2520,7 +2534,7 @@ class StateManager extends EventEmitter {
     return true // { success: true, hasStateTableData }
   }
   // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
-  async tryApplyTransaction (acceptedTX:AcceptedTx, hasStateTableData:boolean, repairing:boolean, filter:AccountFilter, wrappedStates:WrappedStates, localCachedData) {
+  async tryApplyTransaction (acceptedTX:AcceptedTx, hasStateTableData:boolean, repairing:boolean, filter:AccountFilter, wrappedStates:WrappedStates, localCachedData:LocalCachedData ) {
     let ourLockID = -1
     let accountDataList
     let txTs = 0
@@ -2627,7 +2641,10 @@ class StateManager extends EventEmitter {
       this.tempRecordTXByCycle(txTs, acceptedTX, true, applyResponse)
 
       //WOW this was not good!  had acceptedTX.transactionGroup[0].id
-      if (this.p2p.getNodeId() === acceptedTX.transactionGroup[0].id) {
+      //if (this.p2p.getNodeId() === acceptedTX.transactionGroup[0].id) {
+      
+      let queueEntry:QueueEntry = this.getQueueEntry(acceptedTX.id )
+      if (queueEntry != null && queueEntry.transactionGroup != null && this.p2p.getNodeId() === queueEntry.transactionGroup[0].id) {  
         this.emit('txProcessed')
       }
 
@@ -2656,7 +2673,7 @@ class StateManager extends EventEmitter {
   //   await this.processAcceptedTxQueue(Date.now())
   // }
 
-  async applyAcceptedTransaction (acceptedTX:AcceptedTx, wrappedStates:WrappedStates, localCachedData, filter) {
+  async applyAcceptedTransaction (acceptedTX:AcceptedTx, wrappedStates:WrappedStates, localCachedData:LocalCachedData, filter:AccountFilter) {
     if (this.queueStopped) return
     let tx = acceptedTX.data
     let keysResponse = this.app.getKeyFromTransaction(tx)
@@ -2665,7 +2682,7 @@ class StateManager extends EventEmitter {
     if (this.verboseLogs) console.log('applyAcceptedTransaction ' + timestamp + ' ' + debugInfo)
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction ' + timestamp + ' ' + debugInfo)
 
-    let allkeys = []
+    let allkeys:string[] = []
     allkeys = allkeys.concat(sourceKeys)
     allkeys = allkeys.concat(targetKeys)
 
@@ -2701,8 +2718,8 @@ class StateManager extends EventEmitter {
     return { success: applyResult, reason: 'apply result' }
   }
 
-  interruptibleSleep (ms, targetTime) {
-    let resolveFn = null
+  interruptibleSleep (ms: number, targetTime: number) {
+    let resolveFn:any = null //TSConversion just setting this to any for now.
     let promise = new Promise(resolve => {
       resolveFn = resolve
       setTimeout(resolve, ms)
@@ -2710,7 +2727,7 @@ class StateManager extends EventEmitter {
     return { promise, resolveFn, targetTime }
   }
 
-  interruptSleepIfNeeded (targetTime) {
+  interruptSleepIfNeeded (targetTime: number) {
     if (this.sleepInterrupt) {
       if (targetTime < this.sleepInterrupt.targetTime) {
         this.sleepInterrupt.resolveFn()
@@ -2722,7 +2739,7 @@ class StateManager extends EventEmitter {
   // ////   Transaction Queue Handling        ////////////////////////////////////////////////////////////////
   // /////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  updateHomeInformation (txQueueEntry) {
+  updateHomeInformation (txQueueEntry:QueueEntry) {
     if (this.currentCycleShardData != null && txQueueEntry.hasShardInfo === false) {
       let txId = txQueueEntry.acceptedTx.receipt.txHash
       // Init home nodes!
@@ -2731,6 +2748,7 @@ class StateManager extends EventEmitter {
         txQueueEntry.homeNodes[key] = homeNode
         if (homeNode == null) {
           if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` queueAcceptedTransaction: ${key} `)
+          throw new Error(`updateHomeInformation homeNode == null ${txQueueEntry}`)
         }
 
         let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
@@ -2773,7 +2791,7 @@ class StateManager extends EventEmitter {
     let txId = acceptedTx.receipt.txHash
 
     this.queueEntryCounter++
-    let txQueueEntry:QueueEntry = { acceptedTx: acceptedTx, txKeys: keysResponse, collectedData: {}, originalData: {}, homeNodes: {}, hasShardInfo: false, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [] } // age comes from timestamp
+    let txQueueEntry:QueueEntry = { acceptedTx: acceptedTx, txKeys: keysResponse, collectedData: {}, originalData: {}, homeNodes: {}, hasShardInfo: false, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [], logstate:'', requests:{} } // age comes from timestamp
     // partition data would store stuff like our list of nodes that store this ts
     // collected data is remote data we have recieved back
     // //tx keys ... need a sorted list (deterministic) of partition.. closest to a number?
@@ -2789,7 +2807,7 @@ class StateManager extends EventEmitter {
     }
 
     // todo faster hash lookup for this maybe?
-    let entry = this.getQueueEntrySafe(acceptedTx.id, acceptedTx.timestamp)
+    let entry = this.getQueueEntrySafe(acceptedTx.id) // , acceptedTx.timestamp)
     if (entry) {
       return false // already in our queue, or temp queue
     }
@@ -2801,7 +2819,7 @@ class StateManager extends EventEmitter {
         // TODO consider throwing this out.  right now it is just a warning
         this.logger.playbackLogNote('shrd_oldQueueInsertion', '', 'queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
       }
-      let keyHash = {}
+      let keyHash:StringBoolObjectMap = {}
       for (let key of txQueueEntry.txKeys.allKeys) {
         keyHash[key] = true
       }
@@ -2889,7 +2907,7 @@ class StateManager extends EventEmitter {
     await this.processAcceptedTxQueue()
   }
 
-  getQueueEntry (txid, timestamp) {
+  getQueueEntry (txid: string) : QueueEntry | null {
   // todo perf need an interpolated or binary search on a sorted list
     for (let queueEntry of this.newAcceptedTxQueue) {
       if (queueEntry.acceptedTx.id === txid) {
@@ -2899,7 +2917,7 @@ class StateManager extends EventEmitter {
     return null
   }
 
-  getQueueEntryPending (txid, timestamp) {
+  getQueueEntryPending (txid: string): QueueEntry | null {
     // todo perf need an interpolated or binary search on a sorted list
     for (let queueEntry of this.newAcceptedTxQueueTempInjest) {
       if (queueEntry.acceptedTx.id === txid) {
@@ -2909,16 +2927,16 @@ class StateManager extends EventEmitter {
     return null
   }
 
-  getQueueEntrySafe (txid, timestamp) {
-    let queueEntry = this.getQueueEntry(txid, timestamp)
+  getQueueEntrySafe (txid: string): QueueEntry | null {
+    let queueEntry = this.getQueueEntry(txid)
     if (queueEntry == null) {
-      return this.getQueueEntryPending(txid, timestamp)
+      return this.getQueueEntryPending(txid)
     }
 
     return queueEntry
   }
 
-  getQueueEntryArchived (txid, timestamp) {
+  getQueueEntryArchived (txid: string): QueueEntry | null {
     for (let queueEntry of this.archivedQueueEntries) {
       if (queueEntry.acceptedTx.id === txid) {
         return queueEntry
@@ -2928,7 +2946,7 @@ class StateManager extends EventEmitter {
     this.mainLogger.error(`getQueueEntryArchived failed to find: ${txid}`)
   }
 
-  queueEntryAddData (queueEntry, data) {
+  queueEntryAddData (queueEntry:QueueEntry, data:any) {
     if (queueEntry.collectedData[data.accountId] != null) {
       return // already have the data
     }
@@ -2949,9 +2967,12 @@ class StateManager extends EventEmitter {
     this.logger.playbackLogNote('shrd_addData', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `key ${utils.makeShortHash(data.accountId)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}  ${queueEntry.acceptedTx.timestamp}`)
   }
 
-  queueEntryHasAllData (queueEntry) {
+  queueEntryHasAllData (queueEntry: QueueEntry) {
     if (queueEntry.hasAll === true) {
       return true
+    }
+    if(queueEntry.uniqueKeys == null){
+      throw new Error(`queueEntryHasAllData (queueEntry.uniqueKeys == null)`)
     }
     let dataCollected = 0
     for (let key of queueEntry.uniqueKeys) {
@@ -2967,13 +2988,16 @@ class StateManager extends EventEmitter {
   }
 
   // THIS QUEUE ENTRY seems to be way off spec from the normal one, what is up?
-  async queueEntryRequestMissingData (queueEntry) {
+  async queueEntryRequestMissingData (queueEntry:QueueEntry) {
     if(this.currentCycleShardData == null)
     {
       return
     }
     if (!queueEntry.requests) {
       queueEntry.requests = {}
+    }
+    if (queueEntry.uniqueKeys == null){
+      throw new Error('queueEntryRequestMissingData')
     }
 
     let allKeys = []
@@ -3101,8 +3125,8 @@ class StateManager extends EventEmitter {
     let correspondingAccNodes = []
     let dataKeysWeHave = []
     let dataValuesWeHave = []
-    let datas = {}
-    let remoteShardsByKey = {} // shard homenodes that we do not have the data for.
+    let datas:{[accountID:string]:any} = {}
+    let remoteShardsByKey:{[accountID:string]:NodeShardData} = {} // shard homenodes that we do not have the data for.
     for (let key of queueEntry.uniqueKeys) {
       ///   test here
       // let hasKey = ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)
@@ -3137,7 +3161,7 @@ class StateManager extends EventEmitter {
     let edgeNodeIds = []
     let consensusNodeIds = []
 
-    let nodesToSendTo = {}
+    let nodesToSendTo:StringNodeObjectMap = {}
     for (let key of queueEntry.uniqueKeys) {
       if (datas[key] != null) {
         for (let key2 of queueEntry.uniqueKeys) {
@@ -3790,7 +3814,7 @@ class StateManager extends EventEmitter {
   }
 
   // TODO WrappedStates
-  async setAccount (wrappedStates, localCachedData, applyResponse, accountFilter?:AccountFilter) {
+  async setAccount (wrappedStates:WrappedStates, localCachedData:LocalCachedData, applyResponse: Shardus.ApplyResponse, accountFilter?:AccountFilter) {
     // let sourceAddress = inTx.srcAct
     // let targetAddress = inTx.tgtAct
     // let amount = inTx.txnAmt
@@ -3804,6 +3828,11 @@ class StateManager extends EventEmitter {
     keys.sort() // have to sort this because object.keys is non sorted and we always use the [0] index for hashset strings
     for (let key of keys) {
       let wrappedData = wrappedStates[key]
+      if(wrappedData == null){
+        // TSConversion todo: harden this. throw exception?
+        continue
+      }
+
       if (canWriteToAccount(wrappedData.accountId) === false) {
         continue
       }
@@ -3817,15 +3846,16 @@ class StateManager extends EventEmitter {
   }
 
   /// /////////////////////////////////////////////////////////
-  async fifoLock (fifoName:string) {
+  async fifoLock (fifoName:string): Promise<number> {
     let thisFifo = this.fifoLocks[fifoName]
+    let ourID = thisFifo.queueCounter
+    let entry = { id: ourID }
     if (thisFifo == null) {
-      thisFifo = { fifoName, queueCounter: 0, waitingList: [], lastServed: 0, queueLocked: false, lockOwner: null }
+
+      thisFifo = { fifoName, queueCounter: 0, waitingList: [], lastServed: 0, queueLocked: false, lockOwner: ourID }
       this.fifoLocks[fifoName] = thisFifo
     }
     thisFifo.queueCounter++
-    let ourID = thisFifo.queueCounter
-    let entry = { id: ourID }
 
     if (thisFifo.waitingList.length > 0 || thisFifo.queueLocked) {
       thisFifo.waitingList.push(entry)
@@ -3875,7 +3905,7 @@ class StateManager extends EventEmitter {
     this.newAcceptedTxQueue = []
   }
 
-  _registerListener (emitter, event, callback) {
+  _registerListener (emitter:any, event:string, callback:any) {
     if (this._listeners[event]) {
       this.mainLogger.fatal('State Manager can only register one listener per event!')
       return
@@ -3884,7 +3914,7 @@ class StateManager extends EventEmitter {
     this._listeners[event] = [emitter, callback]
   }
 
-  _unregisterListener (event) {
+  _unregisterListener (event:string) {
     if (!this._listeners[event]) {
       this.mainLogger.warn(`This event listener doesn't exist! Event: \`${event}\` in StateManager`)
       return
@@ -3932,7 +3962,8 @@ class StateManager extends EventEmitter {
    * @param {boolean} smallHashes
    * @returns {any}
    */
-  getPartitionReport (consensusOnly, smallHashes) {
+  // TSConversion todo define partition report. for now use any
+  getPartitionReport (consensusOnly:boolean, smallHashes:boolean): any {
     let response = {}
     if (this.nextCycleReportToSend != null) {
       if (this.lastCycleReported < this.nextCycleReportToSend.cycleNumber || this.partitionReportDirty === true) {
@@ -3957,7 +3988,7 @@ class StateManager extends EventEmitter {
   /**
    * @param {PartitionObject} partitionObject
    */
-  poMicroDebug (partitionObject) {
+  poMicroDebug (partitionObject: PartitionObject) {
     let header = `c${partitionObject.Cycle_number} p${partitionObject.Partition_id}`
 
     // need to get a list of compacted TXs in order. also addresses. timestamps?  make it so tools can process easily. (align timestamps view.)
@@ -3969,15 +4000,22 @@ class StateManager extends EventEmitter {
    * generatePartitionObjects
    * @param {Cycle} lastCycle
    */
-  generatePartitionObjects (lastCycle) {
+  generatePartitionObjects (lastCycle:Shardus.Cycle) {
     let lastCycleShardValues = this.shardValuesByCycle.get(lastCycle.counter)
 
     // let partitions = ShardFunctions.getConsenusPartitions(lastCycleShardValues.shardGlobals, lastCycleShardValues.nodeShardData)
     // lastCycleShardValues.ourConsensusPartitions = partitions
 
+    if(lastCycleShardValues == null){
+      throw new Error('generatePartitionObjects lastCycleShardValues == null' + lastCycle.counter)
+    }
+
     let partitions = lastCycleShardValues.ourConsensusPartitions
     if (this.repairAllStoredPartitions === true) {
       partitions = lastCycleShardValues.ourStoredPartitions
+    }
+    if(partitions == null){
+      throw new Error('generatePartitionObjects partitions == null')
     }
 
     this.nextCycleReportToSend = { res: [], cycleNumber: lastCycle.counter }
@@ -4036,7 +4074,7 @@ class StateManager extends EventEmitter {
       }
       let ourID = this.crypto.getPublicKey()
       // clean out an older response from same node if on exists
-      responses = responses.filter(item => item.sign && item.sign.owner !== ourID) // if the item is not signed clear it!
+      responses = responses.filter((item:SignedObject) => item.sign && item.sign.owner !== ourID) // if the item is not signed clear it!
       responsesByPartition[partitionKey] = responses // have to re-assign this since it is a new ref to the array
       responses.push(pResult)
     }
@@ -4049,7 +4087,7 @@ class StateManager extends EventEmitter {
    * @param {PartitionObject} partitionObject
    * @returns {PartitionResult}
    */
-  generatePartitionResult (partitionObject) {
+  generatePartitionResult (partitionObject:PartitionObject): PartitionResult {
     let partitionHash = /** @type {string} */(this.crypto.hash(partitionObject))
     /** @type {PartitionResult} */
     let partitionResult = { Partition_hash: partitionHash, Partition_id: partitionObject.Partition_id, Cycle_number: partitionObject.Cycle_number, hashSet: '' }
@@ -4076,7 +4114,7 @@ class StateManager extends EventEmitter {
    * @param {number} partitionId
    * @returns {PartitionObject}
    */
-  generatePartitionObject (lastCycle, partitionId) {
+  generatePartitionObject (lastCycle: Cycle, partitionId: number) {
     let txList = this.getTXList(lastCycle.counter, partitionId)
 
     let txSourceData = txList
@@ -4104,15 +4142,13 @@ class StateManager extends EventEmitter {
    * @param {PartitionObject} partitionObject
    * @returns {Object.<string,number>}
    */
-  partitionObjectToTxMaps (partitionObject) {
-    let statusMap = {}
+  partitionObjectToTxMaps (partitionObject: PartitionObject) : StatusMap {
+    let statusMap:StatusMap = {}
     for (let i = 0; i < partitionObject.Txids.length; i++) {
       let tx = partitionObject.Txids[i]
       let status = partitionObject.Status[i]
       statusMap[tx] = status
     }
-    /** @type {Object.<string,number>} */
-    // @ts-ignore
     return statusMap
   }
 
@@ -4121,15 +4157,13 @@ class StateManager extends EventEmitter {
    * @param {PartitionObject} partitionObject
    * @returns {Object.<string,string>}
    */
-  partitionObjectToStateMaps (partitionObject) {
-    let statusMap = {}
+  partitionObjectToStateMaps (partitionObject:PartitionObject) : StateMap {
+    let statusMap:StateMap = {}
     for (let i = 0; i < partitionObject.Txids.length; i++) {
       let tx = partitionObject.Txids[i]
       let state = partitionObject.States[i]
       statusMap[tx] = state
     }
-    /** @type {Object.<string,string>} */
-    // @ts-ignore
     return statusMap
   }
 
@@ -4141,7 +4175,7 @@ class StateManager extends EventEmitter {
    * @param {boolean} [repairPassHack]
    * @returns {{ partitionReceipt: PartitionReceipt; topResult: PartitionResult; success: boolean }}
    */
-  tryGeneratePartitionReciept (allResults, ourResult, repairPassHack = false) {
+  tryGeneratePartitionReciept (allResults:PartitionResult[], ourResult:PartitionResult, repairPassHack = false) {
     let partitionId = ourResult.Partition_id
     let cycleCounter = ourResult.Cycle_number
 
@@ -4204,7 +4238,7 @@ class StateManager extends EventEmitter {
    * @param {number} partitionId
    * @param {string} ourLastResultHash
    */
-  async startRepairProcess (cycle, topResult, partitionId, ourLastResultHash) {
+  async startRepairProcess (cycle:Cycle, topResult:PartitionResult, partitionId:number, ourLastResultHash:string) {
     this.stateIsGood = false
     if (this.canDataRepair === false) {
       return
@@ -4447,7 +4481,7 @@ class StateManager extends EventEmitter {
    * @param {number} cycleNumber
    * @param {number} partitionId
    */
-  async checkForGoodPartitionReciept (cycleNumber, partitionId) {
+  async checkForGoodPartitionReciept (cycleNumber:number, partitionId:number) {
     let repairTracker = this._getRepairTrackerForCycle(cycleNumber, partitionId)
 
     let key = 'c' + cycleNumber
@@ -4499,9 +4533,10 @@ class StateManager extends EventEmitter {
    * This is used when a simple vote of hashes revealse a most popular hash.  In this case we can just sync the txs from any of the nodes that had this winning hash
    * @param {PartitionResult} topResult
    */
-  async syncTXsFromWinningHash (topResult) {
+  async syncTXsFromWinningHash (topResult:PartitionResult) {
     if (topResult.sign == null) {
       this.mainLogger.fatal(this.dataPhaseTag + ` _repair syncTXsFromWinningHash: topResult.sign=null ${utils.stringifyReduce(topResult)}`)
+      throw new Error(`syncTXsFromWinningHash topResult.sign  ${utils.stringifyReduceLimit(topResult, 100)}`)
     }
 
     // get node ID from signing.
@@ -4547,7 +4582,7 @@ class StateManager extends EventEmitter {
 
     // get state data:
     let winningStateMap = this.partitionObjectToStateMaps(partitionObject)
-    let ourStateMap = this.partitionObjectToStateMaps(ourPartitionObj)
+    let ourStateMap =     this.partitionObjectToStateMaps(ourPartitionObj)
     // filter to only get accepted txs
 
     // for (let i = 0; i < partitionObject.Txids.length; i++) {
@@ -4665,8 +4700,8 @@ class StateManager extends EventEmitter {
     // txList.passed = ourPartitionObj.Status
     // txList.states = ourPartitionObj.States // TXSTATE_TODO
 
-    //TxTallyList
-    let newTxList = { hashes: [...ourPartitionObj.Txids], passed: [...ourPartitionObj.Status], states: [...ourPartitionObj.States], txs:[] }
+    //TxTallyList  CLConversion Added thashes: [], tpassed: [], ttxs: [], tstates: []  to make this type fit.  should double check tha tthis doesnt break things.
+    let newTxList:NewTXList = { hashes: [...ourPartitionObj.Txids], passed: [...ourPartitionObj.Status], states: [...ourPartitionObj.States], txs:[], thashes: [], tpassed: [], ttxs: [], tstates: [] }
     // let newTxList = { hashes: [], passed: [], txs: [], thashes: [], tpassed: [], ttxs: [], tstates: [], states: [] }
     txList.newTxList = newTxList
 
@@ -4719,9 +4754,9 @@ class StateManager extends EventEmitter {
    * @param {any} ourLastResultHash
    * @param {GenericHashSetEntry & IHashSetEntryPartitions} ourHashSet
    */
-  _mergeRepairDataIntoLocalState2 (repairTracker:RepairTracker, ourPartitionObj:PartitionObject, ourLastResultHash:any, ourHashSet:HashSetEntryPartitions, txListOverride = null) {
+  _mergeRepairDataIntoLocalState2 (repairTracker:RepairTracker, ourPartitionObj:PartitionObject, ourLastResultHash:any, ourHashSet:HashSetEntryPartitions, txListOverride:TxTallyList = null) {
     let key = repairTracker.key
-    let txList = null
+    let txList:TxTallyList = null
     if (txListOverride != null) {
       txList = txListOverride
     } else {
@@ -4748,7 +4783,7 @@ class StateManager extends EventEmitter {
     //  txSourceList = txList.newTxList  //not sure if we should keep this... or at least update the part where we remove extra entries
     }
     // let newTxList = { hashes: [...txList.hashes], passed: [...txList.passed], txs: [...txList.txs] }
-    let newTxList = { hashes: [], passed: [], txs: [], thashes: [], tpassed: [], ttxs: [], tstates: [], states: [] }
+    let newTxList:NewTXList = { hashes: [], passed: [], txs: [], thashes: [], tpassed: [], ttxs: [], tstates: [], states: [] }
     txList.newTxList = newTxList // append it to tx list for now.
     repairTracker.solutionDeltas.sort(this._sortNumberI) // function (a, b) { return a.i - b.i }) // why did b - a help us once??
 
@@ -4896,7 +4931,7 @@ class StateManager extends EventEmitter {
    * @param {RepairTracker} repairTracker
    * @param {string} ourLastResultHash
    */
-  async syncTXsFromHashSetStrings (cycleNumber, partitionId, repairTracker, ourLastResultHash): Promise<100 | undefined> {
+  async syncTXsFromHashSetStrings (cycleNumber: number, partitionId: number, repairTracker: RepairTracker, ourLastResultHash: string): Promise<100 | undefined> {
     let cycleCounter = cycleNumber
     if (!this.useHashSets) {
       return
@@ -5027,8 +5062,10 @@ class StateManager extends EventEmitter {
           //  need to make this use the requestsByHost
           let nodeToContact = this.p2p.state.getNodeByPubKey(hashSetList[i].owners[0])
 
-          let result = await this.p2p.ask(nodeToContact, 'get_transactions_by_partition_index', payload)
-          if (result === false) { this.mainLogger.error('ASK FAIL 15') }
+          let r:TransactionsByPartitionResp | boolean = await this.p2p.ask(nodeToContact, 'get_transactions_by_partition_index', payload)
+          //TSConversion kinda funky way to handle an ask result that can also be false
+          if (r === false) { this.mainLogger.error('ASK FAIL 15') }
+          let result:TransactionsByPartitionResp = r as TransactionsByPartitionResp
           // { success: true, acceptedTX: result, passFail: passFailList }
           if (result.success === true) {
             let returnedResults = 0
@@ -5115,7 +5152,7 @@ class StateManager extends EventEmitter {
    * @param {number} partition
    * @returns {RepairTracker}
    */
-  _getRepairTrackerForCycle (counter, partition) {
+  _getRepairTrackerForCycle (counter:number, partition:number) {
     let key = 'c' + counter
     let key2 = 'p' + partition
     let repairsByPartition = this.repairTrackingByCycleById[key]
@@ -5173,8 +5210,9 @@ class StateManager extends EventEmitter {
   /**
    * repairTrackerMarkFinished
    * @param {RepairTracker} repairTracker
+   * @param {string} debugTag
    */
-  repairTrackerMarkFinished (repairTracker, debugTag) {
+  repairTrackerMarkFinished (repairTracker: RepairTracker, debugTag:string) {
     repairTracker.repairsFullyComplete = true
 
     let combinedKey = repairTracker.key + repairTracker.key2
@@ -5210,7 +5248,7 @@ class StateManager extends EventEmitter {
    * repairTrackerClearForNextRepair
    * @param {RepairTracker} repairTracker
    */
-  repairTrackerClearForNextRepair (repairTracker) {
+  repairTrackerClearForNextRepair (repairTracker: RepairTracker) {
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` repairTrackerClearForNextRepair cycleNumber: ${repairTracker.counter} parition: ${repairTracker.partitionId} `)
     repairTracker.removedTXIds = []
     repairTracker.repairedTXs = []
@@ -5225,13 +5263,19 @@ class StateManager extends EventEmitter {
    * @param {number} cycleNumber
    * @param {number} specificParition the old version of this would repair all partitions but we had to wait.  this works on just one partition
    */
-  async mergeAndApplyTXRepairs (cycleNumber, specificParition) {
+  async mergeAndApplyTXRepairs (cycleNumber:number, specificParition: number) {
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs cycleNumber ${cycleNumber} partition: ${specificParition}`)
     // walk through all txs for this cycle.
     // get or create entries for accounts.
     // track when they have missing txs or wrong txs
 
     let lastCycleShardValues = this.shardValuesByCycle.get(cycleNumber)
+    if(lastCycleShardValues == null){
+      throw new Error('mergeAndApplyTXRepairs lastCycleShardValues == null')
+    }
+    if(lastCycleShardValues.ourConsensusPartitions == null){
+      throw new Error('mergeAndApplyTXRepairs lastCycleShardValues.ourConsensusPartitions')
+    }
 
     for (let partitionID of lastCycleShardValues.ourConsensusPartitions) {
       // this is an attempt to just repair one parition.
@@ -5239,11 +5283,11 @@ class StateManager extends EventEmitter {
         continue
       }
 
-      let allTXsToApply = {}
-      let allExtraTXids = {}
-      let allAccountsToResetById = {}
-      let txIDToAcc = {}
-      let allNewTXsById = {}
+      let allTXsToApply:StringNumberObjectMap = {}
+      let allExtraTXids:StringNumberObjectMap = {}
+      let allAccountsToResetById:StringNumberObjectMap = {}
+      let txIDToAcc:TxIDToSourceTargetObjectMap = {}
+      let allNewTXsById:TxObjectById = {}
       // get all txs and sort them
       let repairsByPartition = this.repairTrackingByCycleById['c' + cycleNumber]
       // let partitionKeys = Object.keys(repairsByPartition)
@@ -5354,7 +5398,7 @@ class StateManager extends EventEmitter {
       let applyFailCount = 0
       let hasEffect = false
 
-      let accountValuesByKey = {}
+      let accountValuesByKey:AccountValuesByKey = {}
       // let wrappedAccountResults = this.app.getAccountDataByList(accountKeys)
       // for (let wrappedData of wrappedAccountResults) {
       //   wrappedData.isPartial = false
@@ -5371,7 +5415,7 @@ class StateManager extends EventEmitter {
         // need a transform to map all txs that would matter.
         try {
           if (keysFilter) {
-            let acountsFilter = {} // this is a filter of accounts that we want to write to
+            let acountsFilter:AccountFilter = {} // this is a filter of accounts that we want to write to
             // find which accounts need txs applied.
             hasEffect = false
             for (let accountID of keysFilter.sourceKeys) {
@@ -5403,8 +5447,8 @@ class StateManager extends EventEmitter {
 
             // Need to build up this data.
             let keysResponse = this.app.getKeyFromTransaction(tx.data)
-            let wrappedStates = {}
-            let localCachedData = {}
+            let wrappedStates:WrappedStates = {}
+            let localCachedData:LocalCachedData = {}
             for (let key of keysResponse.allKeys) {
             // build wrapped states
             // let wrappedState = await this.app.getRelevantData(key, tx.data)
@@ -5466,7 +5510,7 @@ class StateManager extends EventEmitter {
    * @param {number} cycleNumber
    * @param {number} specificParition the old version of this would repair all partitions but we had to wait.  this works on just one partition
    */
-  async updateTrackingAndPrepareRepairs (cycleNumber, specificParition) {
+  async updateTrackingAndPrepareRepairs (cycleNumber: number, specificParition: number) {
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair updateTrackingAndPrepareRepairs cycleNumber ${cycleNumber} partition: ${specificParition}`)
     // walk through all txs for this cycle.
     // get or create entries for accounts.
@@ -5485,13 +5529,13 @@ class StateManager extends EventEmitter {
       //   }
       let partitionID = specificParition
       paritionsServiced++
-      let allTXsToApply = {}
-      let allExtraTXids = {}
+      let allTXsToApply:StringNumberObjectMap = {}
+      let allExtraTXids:StringNumberObjectMap = {}
       /** @type {Object.<string, number>} */
-      let allAccountsToResetById = {}
+      let allAccountsToResetById:StringNumberObjectMap = {}
       /** @type {Object.<string, { sourceKeys:string[], targetKeys:string[] } >} */
-      let txIDToAcc = {}
-      let allNewTXsById = {}
+      let txIDToAcc:TxIDToSourceTargetObjectMap = {}
+      let allNewTXsById:TxObjectById = {}
       // get all txs and sort them
       let repairsByPartition = this.repairTrackingByCycleById['c' + cycleNumber]
       // let partitionKeys = Object.keys(repairsByPartition)
@@ -5591,7 +5635,7 @@ class StateManager extends EventEmitter {
 
       // Save the results of this computation for later
       /** @type {UpdateRepairData}  */
-      let updateData = { newTXList, allAccountsToResetById, partitionId: specificParition, txIDToAcc }
+      let updateData:UpdateRepairData = { newTXList, allAccountsToResetById, partitionId: specificParition, txIDToAcc }
       let ckey = 'c' + cycleNumber
       if (this.repairUpdateDataByCycle[ckey] == null) {
         this.repairUpdateDataByCycle[ckey] = []
@@ -5615,7 +5659,7 @@ class StateManager extends EventEmitter {
    * updateTrackingAndPrepareChanges
    * @param {number} cycleNumber
    */
-  async applyAllPreparedRepairs (cycleNumber) {
+  async applyAllPreparedRepairs (cycleNumber:number) {
     if (this.applyAllPreparedRepairsRunning === true) {
       return
     }
@@ -5628,9 +5672,9 @@ class StateManager extends EventEmitter {
     let ckey = 'c' + cycleNumber
     let repairDataList = this.repairUpdateDataByCycle[ckey]
 
-    let txIDToAcc = {}
-    let allAccountsToResetById = {}
-    let newTXList = []
+    let txIDToAcc:TxIDToKeyObjectMap = {}
+    let allAccountsToResetById:AccountBoolObjectMap = {}
+    let newTXList:AcceptedTx[] = []
     for (let repairData of repairDataList) {
       newTXList = newTXList.concat(repairData.newTXList)
       allAccountsToResetById = Object.assign(allAccountsToResetById, repairData.allAccountsToResetById)
@@ -5664,9 +5708,10 @@ class StateManager extends EventEmitter {
     let applyFailCount = 0
     let hasEffect = false
 
-    let accountValuesByKey = {}
+    // TSConversion WrappedStates issue
+    let accountValuesByKey:WrappedStates = {}
 
-    let seenTXs = {}
+    let seenTXs:StringBoolObjectMap = {}
     for (let tx of newTXList) {
       if (seenTXs[tx.id] === true) {
         this.mainLogger.debug(`applyAllPreparedRepairs skipped double: ${utils.makeShortHash(tx.id)} ${tx.timestamp} `)
@@ -5678,7 +5723,7 @@ class StateManager extends EventEmitter {
       // need a transform to map all txs that would matter.
       try {
         if (keysFilter) {
-          let acountsFilter = {} // this is a filter of accounts that we want to write to
+          let acountsFilter:AccountFilter = {} // this is a filter of accounts that we want to write to
           // find which accounts need txs applied.
           hasEffect = false
           for (let accountID of keysFilter.sourceKeys) {
@@ -5710,8 +5755,8 @@ class StateManager extends EventEmitter {
 
           // Need to build up this data.
           let keysResponse = this.app.getKeyFromTransaction(tx.data)
-          let wrappedStates = {}
-          let localCachedData = {}
+          let wrappedStates:WrappedStates = {}
+          let localCachedData:LocalCachedData = {}
           for (let key of keysResponse.allKeys) {
             // build wrapped states
             // let wrappedState = await this.app.getRelevantData(key, tx.data)
@@ -5772,11 +5817,11 @@ class StateManager extends EventEmitter {
    * bulkFifoLockAccounts
    * @param {string[]} accountIDs
    */
-  async bulkFifoLockAccounts (accountIDs) {
+  async bulkFifoLockAccounts (accountIDs:string[]) {
     // lock all the accounts we will modify
     let wrapperLockId = await this.fifoLock('atomicWrapper')
     let ourLocks = []
-    let seen = {}
+    let seen:StringBoolObjectMap = {}
     for (let accountKey of accountIDs) {
       if (seen[accountKey] === true) {
         continue
@@ -5794,8 +5839,8 @@ class StateManager extends EventEmitter {
    * @param {string[]} accountIDs
    * @param {number[]} ourLocks
    */
-  bulkFifoUnlockAccounts (accountIDs, ourLocks) {
-    let seen = {}
+  bulkFifoUnlockAccounts (accountIDs:string[], ourLocks:number[]) {
+    let seen:StringBoolObjectMap = {}
     // unlock the accounts we locked
     for (let i = 0; i < ourLocks.length; i++) {
       let accountID = accountIDs[i]
@@ -5813,7 +5858,7 @@ class StateManager extends EventEmitter {
    * @param {string[]} accountIDs
    * @param {number} cycleNumber
    */
-  async _revertAccounts (accountIDs, cycleNumber) {
+  async _revertAccounts (accountIDs:string[], cycleNumber:number) {
     let cycle = this.p2p.state.getCycleByCounter(cycleNumber)
     let cycleEnd = (cycle.start + cycle.duration) * 1000
     let cycleStart = cycle.start * 1000
@@ -5855,8 +5900,8 @@ class StateManager extends EventEmitter {
       // If we don't have a replacement copy for an account we should try to delete it
 
       // Find any accountIDs not in resetAccountData
-      let accountsReverted = {}
-      let accountsToDelete = []
+      let accountsReverted:StringNumberObjectMap = {}
+      let accountsToDelete:string[] = []
       let debug = []
       for (let accountData of replacmentAccounts) {
         accountsReverted[accountData.accountId] = 1
@@ -5882,7 +5927,7 @@ class StateManager extends EventEmitter {
       // mark for kill future txlist stuff for any accounts we nuked
 
       // make a map to find impacted accounts
-      let accMap = {}
+      let accMap:StringNumberObjectMap = {}
       for (let accid of accountIDs) {
         accMap[accid] = 1
       }
@@ -5924,7 +5969,7 @@ class StateManager extends EventEmitter {
   }
 
   // could do this every 5 cycles instead to save perf.
-  periodicCycleDataCleanup (oldestCycle) {
+  periodicCycleDataCleanup (oldestCycle:number) {
     // On a periodic bases older copies of the account data where we have more than 2 copies for the same account can be deleted.
 
     if (oldestCycle < 0) {
@@ -6122,7 +6167,7 @@ class StateManager extends EventEmitter {
    * broadcastPartitionResults
    * @param {number} cycleNumber
    */
-  async broadcastPartitionResults (cycleNumber) {
+  async broadcastPartitionResults (cycleNumber:number) {
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair broadcastPartitionResults for cycle: ${cycleNumber}`)
     // per partition need to figure out which node cover it.
     // then get a list of all the results we need to send to a given node and send them at once.
@@ -6245,7 +6290,7 @@ class StateManager extends EventEmitter {
 
   startShardCalculations () {
     //this.p2p.state.on('cycle_q1_start', async (lastCycle, time) => {
-    this._registerListener(this.p2p.state, 'cycle_q1_start', async (lastCycle, time) => {  
+    this._registerListener(this.p2p.state, 'cycle_q1_start', async (lastCycle: Shardus.Cycle, time:number) => {  
       if (lastCycle) {
         // this.dumpAccountDebugData()
         this.updateShardValues(lastCycle.counter)
@@ -6253,7 +6298,7 @@ class StateManager extends EventEmitter {
       }
     })
 
-    this._registerListener(this.p2p.state, 'cycle_q3_start', async (lastCycle, time) => {
+    this._registerListener(this.p2p.state, 'cycle_q3_start', async (lastCycle: Shardus.Cycle, time:number) => {
       if (this.currentCycleShardData && this.currentCycleShardData.ourNode.status === 'active') {
         this.calculateChangeInCoverage()
       }
@@ -6287,7 +6332,7 @@ class StateManager extends EventEmitter {
     //   this.updateShardValues(lastCycle.counter)
     // })
 
-    this._registerListener(this.p2p.state, 'cycle_q2_start', async (lastCycle, time) => {
+    this._registerListener(this.p2p.state, 'cycle_q2_start', async (lastCycle: Shardus.Cycle, time: number) => {
       if (lastCycle == null) {
         return
       }
@@ -6330,11 +6375,11 @@ class StateManager extends EventEmitter {
    * updateAccountsCopyTable
    * originally this only recorder results if we were not repairing but it turns out we need to update our copies any time we apply state.
    * with the update we will calculate the cycle based on timestamp rather than using the last current cycle counter
-   * @param {any} accountDataList todo need to use wrapped account data here
+   * @param {any} accountDataList todo need to use wrapped account data here  TSConversion todo non any type 
    * @param {boolean} repairing
    * @param {number} txTimestamp
    */
-  async updateAccountsCopyTable (accountDataList, repairing, txTimestamp) {
+  async updateAccountsCopyTable (accountDataList: Shardus.AccountData[], repairing: boolean, txTimestamp: number) {
     let cycleNumber = -1
 
     let cycle = this.p2p.state.getCycleByTimestamp(txTimestamp + this.syncSettleTime)
@@ -6364,6 +6409,7 @@ class StateManager extends EventEmitter {
         if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
       }
     }
+    // TSConversion need to sort out account types!!!
     if (accountDataList[0].timestamp !== txTimestamp) {
       if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable timestamps dot match txts:${txTimestamp} acc.ts:${accountDataList[0].timestamp} `)
     }
@@ -6394,7 +6440,7 @@ class StateManager extends EventEmitter {
  * @param {boolean} passed
  * @param {ApplyResponse} applyResponse
  */
-  tempRecordTXByCycle (txTS, acceptedTx, passed, applyResponse) {
+  tempRecordTXByCycle (txTS: number, acceptedTx: AcceptedTx, passed: boolean, applyResponse: ApplyResponse) {
     this.tempTXRecords.push({ txTS, acceptedTx, passed, redacted: -1, applyResponse: applyResponse })
   }
 
@@ -6404,7 +6450,7 @@ class StateManager extends EventEmitter {
    * @param {TempTxRecord} b
    * @returns {number}
    */
-  sortTXRecords (a, b) {
+  sortTXRecords (a: TempTxRecord, b: TempTxRecord): number {
     if (a.acceptedTx.timestamp === b.acceptedTx.timestamp) {
       return utils.sortAsc(a.acceptedTx.id, b.acceptedTx.id)
     }
@@ -6416,7 +6462,7 @@ class StateManager extends EventEmitter {
    * call this before we start computing partitions so that we can make sure to get the TXs we need out of the temp list
    * @param {Cycle} cycle
    */
-  processTempTXs (cycle) {
+  processTempTXs (cycle: Cycle) {
     if (!this.tempTXRecords) {
       return
     }
@@ -6465,7 +6511,7 @@ class StateManager extends EventEmitter {
    * @param {number} partitionId
    * @returns {TxTallyList}
    */
-  getTXList (cycleNumber, partitionId) {
+  getTXList (cycleNumber: number, partitionId: number): TxTallyList {
     let key = 'c' + cycleNumber
     let txListByPartition = this.txByCycleByPartition[key]
     let pkey = 'p' + partitionId
@@ -6490,7 +6536,7 @@ class StateManager extends EventEmitter {
    * @param {number} partitionId
    * @returns {TxTallyList}
    */
-  getTXListByKey (key, partitionId) {
+  getTXListByKey (key: string, partitionId: number): TxTallyList {
     // let txList = this.txByCycle[key]
     // if (!txList) {
     //   txList = { hashes: [], passed: [], txs: [], processed: false, states: [] } //  ,txById: {}  states may be an array of arraywith account after states
@@ -6520,7 +6566,7 @@ class StateManager extends EventEmitter {
    * @param {boolean} passed
    * @param {ApplyResponse} applyResponse
    */
-  recordTXByCycle (txTS, acceptedTx, passed, applyResponse) {
+  recordTXByCycle (txTS: number, acceptedTx: AcceptedTx, passed: boolean, applyResponse: ApplyResponse) {
     // TODO sharding.  done because it uses getTXList . filter TSs by the partition they belong to. Double check that this is still needed
 
     // get the cycle that this tx timestamp would belong to.
@@ -6540,7 +6586,7 @@ class StateManager extends EventEmitter {
     let keysResponse = this.app.getKeyFromTransaction(acceptedTx.data)
     let { allKeys } = keysResponse
 
-    let seenParitions = {}
+    let seenParitions:StringBoolObjectMap = {}
     // for (let partitionID of lastCycleShardValues.ourConsensusPartitions) {
 
     for (let accountKey of allKeys) {
@@ -6592,7 +6638,7 @@ class StateManager extends EventEmitter {
    * @param {number} partitionId
    * @returns {PartitionObject}
    */
-  getPartitionObject (cycleNumber, partitionId) {
+  getPartitionObject (cycleNumber: number, partitionId: number): PartitionObject {
     let key = 'c' + cycleNumber
     let partitionObjects = this.partitionObjectsByCycle[key]
     for (let obj of partitionObjects) {
@@ -6609,11 +6655,10 @@ class StateManager extends EventEmitter {
    * @param {number} cycleNumber
    * @param {PartitionReceipt} partitionReceipt
    */
-  storePartitionReceipt (cycleNumber, partitionReceipt) {
+  storePartitionReceipt (cycleNumber: number, partitionReceipt: PartitionReceipt) {
     let key = 'c' + cycleNumber
 
     if (!this.partitionReceiptsByCycleCounter) {
-      /** @type {Object.<string, PartitionReceipt[]>} a map of cycle keys to lists of partition receipts.  */
       this.partitionReceiptsByCycleCounter = {}
     }
     if (!this.partitionReceiptsByCycleCounter[key]) {
@@ -6624,17 +6669,16 @@ class StateManager extends EventEmitter {
     this.trySendAndPurgeReceiptsToArchives(partitionReceipt)
   }
 
-  storeOurPartitionReceipt (cycleNumber, partitionReceipt) {
+  storeOurPartitionReceipt (cycleNumber:number, partitionReceipt:PartitionReceipt) {
     let key = 'c' + cycleNumber
 
     if (!this.ourPartitionReceiptsByCycleCounter) {
-      /** @type {Object.<string, PartitionReceipt>} a map of cycle keys to our partition receipt.  */
       this.ourPartitionReceiptsByCycleCounter = {}
     }
     this.ourPartitionReceiptsByCycleCounter[key] = partitionReceipt
   }
 
-  getPartitionReceipt (cycleNumber) {
+  getPartitionReceipt (cycleNumber:number) {
     let key = 'c' + cycleNumber
 
     if (!this.ourPartitionReceiptsByCycleCounter) {
@@ -6650,13 +6694,13 @@ class StateManager extends EventEmitter {
    * @param {string[]} ignoreList currently unused and broken todo resolve this.
    * @return {{topHash: string, topCount: number, topResult: PartitionResult}}
    */
-  findMostCommonResponse (cycleNumber, partitionId, ignoreList) {
+  findMostCommonResponse (cycleNumber: number, partitionId: number, ignoreList: string[]): { topHash: string; topCount: number; topResult: PartitionResult } {
     let key = 'c' + cycleNumber
     let responsesById = this.allPartitionResponsesByCycleByPartition[key]
     let key2 = 'p' + partitionId
     let responses = responsesById[key2]
 
-    let hashCounting = {}
+    let hashCounting:StringNumberObjectMap = {}
     let topHash
     let topCount = 0
     let topResult = null
@@ -6687,7 +6731,7 @@ class StateManager extends EventEmitter {
    * @param {string[]} prevOutput
    * @returns {string[]}
    */
-  static solveHashSets (hashSetList, lookAhead = 10, voteRate = 0.625, prevOutput = null) {
+  static solveHashSets (hashSetList: GenericHashSetEntry[], lookAhead: number = 10, voteRate: number = 0.625, prevOutput: string[] = null): string[] {
     let output = []
     let outputVotes = []
     let solving = true
@@ -6707,8 +6751,8 @@ class StateManager extends EventEmitter {
     }
 
     while (solving) {
-      let votes = {}
-      let topVote = { v: '', count: 0, vote:null, ec: null }
+      let votes:StringCountEntryObjectMap = {}
+      let topVote:Vote = { v: '', count: 0, vote:null, ec: null }
       let winnerFound = false
       let totalVotes = 0
       // Loop through each entry list
@@ -6725,7 +6769,7 @@ class StateManager extends EventEmitter {
           continue
         }
         // place votes for this value
-        let countEntry = votes[v] || { count: 0, ec: 0, voters: [] }
+        let countEntry:CountEntry = votes[v] || { count: 0, ec: 0, voters: [] }
         totalVotes += hashListEntry.votePower
         countEntry.count += hashListEntry.votePower
         countEntry.voters.push(hashListIndex)
@@ -6782,7 +6826,7 @@ class StateManager extends EventEmitter {
             hashListEntry.waitedForThis = true
           }
 
-          let alreadyVoted = {} // has the given node already EC voted for this key?
+          let alreadyVoted:StringBoolObjectMap = {} // has the given node already EC voted for this key?
           // +1 look ahead to see if we can get back on track
           // lookAhead of 0 seems to be more stable
           // let lookAhead = 10 // hashListEntry.errorStack.length
@@ -6825,7 +6869,7 @@ class StateManager extends EventEmitter {
             }
 
             alreadyVoted[v] = true
-            let countEntry = votes[v] || { count: 0, ec: 0 }
+            let countEntry:CountEntry = votes[v] || { count: 0, ec: 0, voters: [] } // TSConversion added a missing voters[] object here. looks good to my code inspection but need to validate it with tests!
 
             // only vote 10 spots ahead
             if (i < 10) {
@@ -6901,7 +6945,7 @@ class StateManager extends EventEmitter {
 
                   // hashListEntry.indexOffset++
                   /** @type {HashSetEntryCorrection} */
-                  let tempCorrection = { i: extraIdx, t: 'extra', c: correction, hi: index2 - (j + 1), tv: null, v: null, bv: null, if: -1 } // added tv: null, v: null, bv: null, if: -1
+                  let tempCorrection:HashSetEntryCorrection = { i: extraIdx, t: 'extra', c: correction, hi: index2 - (j + 1), tv: null, v: null, bv: null, if: -1 } // added tv: null, v: null, bv: null, if: -1
                   tempCorrections.push(tempCorrection)
                 }
 
@@ -6954,7 +6998,7 @@ class StateManager extends EventEmitter {
   // figures out i A is Greater than B
   // possibly need an alternate version of this solver
   // needs to account for vote power!
-  static compareVoteObjects (voteA, voteB, strict) {
+  static compareVoteObjects (voteA: ExtendedVote, voteB: ExtendedVote, strict: boolean) {
     // { winIdx: null, val: v, count: 0, ec: 0, lowestIndex: index, voters: [], voteTally: Array(hashSetList.length) }
     // { i: index }
 
@@ -6981,10 +7025,10 @@ class StateManager extends EventEmitter {
     // what to return?
   }
 
-  static compareVoteObjects2 (voteA, voteB, strict) {
-    // return voteB.votesseen - voteA.votesseen
-    return voteA.votesseen - voteB.votesseen
-  }
+  // static compareVoteObjects2 (voteA, voteB, strict) {
+  //   // return voteB.votesseen - voteA.votesseen
+  //   return voteA.votesseen - voteB.votesseen
+  // }
 
   // when sorting / computing need to figure out if pinning will short cirquit another vote.
   // at the moment this seems
@@ -7232,7 +7276,7 @@ class StateManager extends EventEmitter {
    * @param {GenericHashSetEntry} hashListEntry
    * @param {string[]} output This is the output that we got from the general solver
    */
-  static expandIndexMapping (hashListEntry, output) {
+  static expandIndexMapping (hashListEntry: GenericHashSetEntry, output: string[]) {
     // hashListEntry.corrections.sort(function (a, b) { return a.i === b.i ? 0 : a.i < b.i ? -1 : 1 })
 
     // // index map is our index to the solution output
@@ -7314,7 +7358,7 @@ class StateManager extends EventEmitter {
     let hashSets = {} as {[hash:string]: HashSetEntryPartitions}
     let hashSetList:HashSetEntryPartitions[] = []
     // group identical sets together
-    let hashCounting = {}
+    let hashCounting:StringNumberObjectMap = {}
     for (let partitionResult of responses) {
       let hash = partitionResult.Partition_hash
       let count = hashCounting[hash] || 0
@@ -7355,7 +7399,7 @@ class StateManager extends EventEmitter {
    * @param {GenericHashSetEntry} solutionHashSet
    * @returns {boolean}
    */
-  static testHashsetSolution (ourHashSet: GenericHashSetEntry, solutionHashSet: GenericHashSetEntry, log:boolean = false) {
+  static testHashsetSolution (ourHashSet: GenericHashSetEntry, solutionHashSet: GenericHashSetEntry, log:boolean = false): boolean {
     // let payload = { partitionId: partitionId, cycle: cycleNumber, tx_indicies: requestsByHost[i].hostIndex, hash: requestsByHost[i].hash }
     // repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j] })
 
@@ -7533,7 +7577,7 @@ class StateManager extends EventEmitter {
    * @param {*} dataHashes
    * @returns {*} //todo correct type
    */
-  static createHashSetString (txHashes, dataHashes) {
+  static createHashSetString (txHashes:string[], dataHashes:string[]) {
     let hashSet = ''
 
     if (dataHashes == null) {
@@ -7570,7 +7614,7 @@ class StateManager extends EventEmitter {
    * @param {PartitionReceipt} partitionReceipt
    * @param {PartitionObject} paritionObject
    */
-  sendPartitionData (partitionReceipt, paritionObject) {
+  sendPartitionData (partitionReceipt:PartitionReceipt, paritionObject:PartitionObject) {
     if (partitionReceipt.resultsList.length === 0) {
       return
     }
@@ -7587,7 +7631,7 @@ class StateManager extends EventEmitter {
     // this.p2p.archivers.sendPartitionData(combinedReciept, paritionObject)
   }
 
-  sendTransactionData (partitionNumber, cycleNumber, transactions) {
+  sendTransactionData (partitionNumber: number, cycleNumber: number, transactions:AcceptedTx[]) {
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' sendTransactionData ' + utils.stringifyReduceLimit({ partitionNumber, cycleNumber, transactions }))
 
     // send it
@@ -7611,7 +7655,7 @@ class StateManager extends EventEmitter {
    * trySendAndPurgeReciepts
    * @param {PartitionReceipt} partitionReceipt
    */
-  trySendAndPurgeReceiptsToArchives (partitionReceipt) {
+  trySendAndPurgeReceiptsToArchives (partitionReceipt:PartitionReceipt) {
     if (partitionReceipt.resultsList.length === 0) {
       return
     }

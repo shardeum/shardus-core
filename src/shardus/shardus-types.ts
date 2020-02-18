@@ -1,6 +1,8 @@
 import { start } from "repl";
 import { Certificate } from "crypto";
-import { RequestHandler } from "express";
+//import { RequestHandler } from "express"; //express was causing problems.
+
+type RequestHandler = any 
 
 // Type definitions for Shardus
 // Project: Shardus Enterprise Server
@@ -159,7 +161,7 @@ declare namespace Shardus {
 
     deleteAccountData: (addressList: string[]) => void
 
-    getAccountDataByList: (addressList: any) => any
+    getAccountDataByList: (addressList: string[]) => any
 
     deleteLocalAccountData: () => void
 
@@ -233,7 +235,7 @@ declare namespace Shardus {
     /** Transaction ID */
     txId: string,
     /** Timestamp */
-    timestamp: string,
+    timestamp: string,  // is it ok to use string here, how about data?
     /** Account hash */
     hash: string,
   }
