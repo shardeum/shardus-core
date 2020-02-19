@@ -136,7 +136,7 @@ class ShardFunctions {
       throw new Error('this should never happen: ' + stringify(storedPartitions) + 'globals: ' + stringify(shardGlobals))
     }
     if (storedPartitions.rangeIsSplit) {
-      if(storedPartitions.partitionStart2 && storedPartitions.partitionEnd2 ){
+      if(storedPartitions.partitionStart2 >= 0 && storedPartitions.partitionEnd2  >= 0){
         storedPartitions.partitionRange = ShardFunctions.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart1, storedPartitions.partitionEnd1)
         storedPartitions.partitionRange2 = ShardFunctions.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart2, storedPartitions.partitionEnd2)  
         storedPartitions.partitionsCovered = 2 + (storedPartitions.partitionEnd1 - storedPartitions.partitionStart1) + (storedPartitions.partitionEnd2 - storedPartitions.partitionStart2)
@@ -145,7 +145,7 @@ class ShardFunctions {
       }
     } else {
       storedPartitions.partitionRange = ShardFunctions.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart, storedPartitions.partitionEnd)
-      if(storedPartitions.partitionStart1 && storedPartitions.partitionEnd1){
+      if(storedPartitions.partitionStart1 >= 0 && storedPartitions.partitionEnd1 >= 0){
         storedPartitions.partitionsCovered = 1 + (storedPartitions.partitionEnd1 - storedPartitions.partitionStart1)
       } else {
         // throw new Error('missing ranges in storedPartitions 2')
