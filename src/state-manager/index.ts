@@ -3914,14 +3914,13 @@ class StateManager extends EventEmitter {
   /// /////////////////////////////////////////////////////////
   async fifoLock (fifoName:string): Promise<number> {
     let thisFifo = this.fifoLocks[fifoName]
-    let ourID = thisFifo.queueCounter
-    let entry = { id: ourID }
     if (thisFifo == null) {
-
-      thisFifo = { fifoName, queueCounter: 0, waitingList: [], lastServed: 0, queueLocked: false, lockOwner: ourID }
+      thisFifo = { fifoName, queueCounter: 0, waitingList: [], lastServed: 0, queueLocked: false, lockOwner: 1 }
       this.fifoLocks[fifoName] = thisFifo
     }
     thisFifo.queueCounter++
+    let ourID = thisFifo.queueCounter
+    let entry = { id: ourID }
 
     if (thisFifo.waitingList.length > 0 || thisFifo.queueLocked) {
       thisFifo.waitingList.push(entry)
