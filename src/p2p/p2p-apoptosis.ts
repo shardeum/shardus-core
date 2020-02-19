@@ -42,7 +42,6 @@ export const internalRoutes = [
     handler: (payload, respond) => {
       log(`Got proposal: ${JSON.stringify(payload)}`);
       if (addProposal(payload)) p2p.sendGossipIn('apoptosis', payload);
-      respond({ apoptosized: true });
     },
   },
 ];
