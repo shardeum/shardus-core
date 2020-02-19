@@ -1524,7 +1524,7 @@ class StateManager extends EventEmitter {
     let tsEnd = Date.now()
     let wrappedAccounts = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart, tsEnd, maxRecords)
     let lastUpdateNeeded = false
-    let wrappedAccounts2 = []
+    let wrappedAccounts2:WrappedStateArray = []
     let highestTs = 0
     // do we need more updates
     if (wrappedAccounts.length === 0) {
@@ -1658,8 +1658,8 @@ class StateManager extends EventEmitter {
     // For applications with multiple “Account” tables the returned data is grouped by table name.
     // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
     // Updated names:  accountStart , accountEnd
-    this.p2p.registerInternal('get_account_data', async (payload:GetAccountDataReq, respond: (arg0: { accountData: Shardus.AccountData[] | null }) => any) => {
-      let result = {} as {accountData: Shardus.AccountData[] | null}//TSConversion  This is complicated !! check app for details.
+    this.p2p.registerInternal('get_account_data', async (payload:GetAccountDataReq, respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => any) => {
+      let result = {} as {accountData: Shardus.WrappedData[] | null}//TSConversion  This is complicated !! check app for details.
       let accountData = null
       let ourLockID = -1
       try {
@@ -1672,8 +1672,8 @@ class StateManager extends EventEmitter {
       await respond(result)
     })
 
-    this.p2p.registerInternal('get_account_data2', async (payload:GetAccountData2Req, respond: (arg0: { accountData: Shardus.AccountData[] | null }) => any) => {
-      let result = {} as {accountData: Shardus.AccountData[] | null}//TSConversion  This is complicated !!
+    this.p2p.registerInternal('get_account_data2', async (payload:GetAccountData2Req, respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => any) => {
+      let result = {} as {accountData: Shardus.WrappedData[] | null}//TSConversion  This is complicated !!
       let accountData = null
       let ourLockID = -1
       try {
@@ -1708,8 +1708,8 @@ class StateManager extends EventEmitter {
     // For applications with multiple “Account” tables the returned data is grouped by table name.
     // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
     // Updated names:  accountIds, max records
-    this.p2p.registerInternal('get_account_data_by_list', async (payload: { accountIds: any }, respond: (arg0: { accountData: Shardus.AccountData[] | null }) => any) => {
-      let result = {} as {accountData: Shardus.AccountData[] | null}
+    this.p2p.registerInternal('get_account_data_by_list', async (payload: { accountIds: any }, respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => any) => {
+      let result = {} as {accountData: Shardus.WrappedData[] | null}
       let accountData = null
       let ourLockID = -1
       try {
@@ -2168,18 +2168,20 @@ class StateManager extends EventEmitter {
       }
       if (accountData != null) {
         for (let wrappedAccount of accountData) {
-          wrappedAccount.seenInQueue = false
+
+          let wrappedAccountInQueueRef = wrappedAccount as Shardus.WrappedDataFromQueue
+          wrappedAccountInQueueRef.seenInQueue = false
 
           if (this.lastSeenAccountsMap != null) {
-            let queueEntry = this.lastSeenAccountsMap[wrappedAccount.accountId]
+            let queueEntry = this.lastSeenAccountsMap[wrappedAccountInQueueRef.accountId]
             if (queueEntry != null) {
-              wrappedAccount.seenInQueue = true
+              wrappedAccountInQueueRef.seenInQueue = true
             }
           }
         }
       }
-
-      result.accountData = accountData
+      // we cast up the array return type because we have attached the seenInQueue memeber to the data.
+      result.accountData = accountData as Shardus.WrappedDataFromQueue[]
       await respond(result)
     })
   }
@@ -2571,7 +2573,7 @@ class StateManager extends EventEmitter {
     let txTs = 0
     let accountKeys = []
     let ourAccountLocks = null
-    let applyResponse: Shardus.ApplyResponse | null
+    let applyResponse: Shardus.ApplyResponse | null = null
     try {
       let tx = acceptedTX.data
       // let receipt = acceptedTX.receipt
@@ -2671,7 +2673,9 @@ class StateManager extends EventEmitter {
         // dataResultsByKey[wrappedData.accountId] = wrappedData.data
       }
     }
-
+    // if(dataResultsFullList == null){
+    //   throw new Error(`tryApplyTransaction (dataResultsFullList == null  ${txTs} ${utils.stringifyReduce(acceptedTX)} `);
+    // }
     await this.updateAccountsCopyTable(dataResultsFullList, repairing, txTs)
 
     if (!repairing) {
@@ -2682,7 +2686,7 @@ class StateManager extends EventEmitter {
       //WOW this was not good!  had acceptedTX.transactionGroup[0].id
       //if (this.p2p.getNodeId() === acceptedTX.transactionGroup[0].id) {
       
-      let queueEntry:QueueEntry = this.getQueueEntry(acceptedTX.id )
+      let queueEntry:QueueEntry | null = this.getQueueEntry(acceptedTX.id )
       if (queueEntry != null && queueEntry.transactionGroup != null && this.p2p.getNodeId() === queueEntry.transactionGroup[0].id) {  
         this.emit('txProcessed')
       }
@@ -2784,6 +2788,9 @@ class StateManager extends EventEmitter {
       // Init home nodes!
       for (let key of txQueueEntry.txKeys.allKeys) {
         let homeNode = ShardFunctions.findHomeNode(this.currentCycleShardData.shardGlobals, key, this.currentCycleShardData.parititionShardDataMap)
+        if(homeNode == null){
+          throw new Error(`updateHomeInformation homeNode == null ${key}`)
+        }
         txQueueEntry.homeNodes[key] = homeNode
         if (homeNode == null) {
           if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` queueAcceptedTransaction: ${key} `)
@@ -2983,11 +2990,16 @@ class StateManager extends EventEmitter {
     }
     // todo make this and error.
     this.mainLogger.error(`getQueueEntryArchived failed to find: ${txid}`)
+    return null
   }
 
   queueEntryAddData (queueEntry:QueueEntry, data:any) {
     if (queueEntry.collectedData[data.accountId] != null) {
       return // already have the data
+    }
+    if(queueEntry.uniqueKeys == null){
+      // cant have all data yet if we dont even have unique keys.
+      throw new Error(`Attempting to add data and uniqueKeys are not available yet: ${utils.stringifyReduceLimit(queueEntry, 200)}`)
     }
     queueEntry.collectedData[data.accountId] = data
     queueEntry.dataCollected++
@@ -3091,7 +3103,10 @@ class StateManager extends EventEmitter {
 
         // queueEntry.homeNodes[key] = null
         for (let key2 of allKeys) {
-          queueEntry.requests[key2] = null
+          //consider deleteing these instead?  
+          //TSConversion changed to a delete opertaion should double check this
+          //queueEntry.requests[key2] = null
+          delete queueEntry.requests[key2]
         }
 
         if (queueEntry.hasAll === true) {
@@ -3278,6 +3293,7 @@ class StateManager extends EventEmitter {
   //
   async processAcceptedTxQueue () {
     let seenAccounts: SeenAccounts
+    seenAccounts = {}// todo PERF we should be able to support using a variable that we save from one update to the next.  set that up after initial testing
     try {
       if(this.currentCycleShardData == null)
       {
@@ -3307,7 +3323,6 @@ class StateManager extends EventEmitter {
       // let timeM3 = timeM * 3
       let currentTime = Date.now() // when to update this?
 
-      seenAccounts = {}// todo PERF we should be able to support using a variable that we save from one update to the next.  set that up after initial testing
 
       // let seenAccounts2 = new Map()
       // todo move these functions out where they are not constantly regenerate
@@ -3663,8 +3678,8 @@ class StateManager extends EventEmitter {
   // todo support metadata so we can serve up only a portion of the account
   // todo 2? communicate directly back to client... could have security issue.
   // todo 3? require a relatively stout client proof of work
-  async getLocalOrRemoteAccount (address:string) : Promise<Shardus.WrappedDataFromQueue> {
-    let wrappedAccount: Shardus.WrappedDataFromQueue
+  async getLocalOrRemoteAccount (address:string) : Promise<Shardus.WrappedDataFromQueue | null> {
+    let wrappedAccount: Shardus.WrappedDataFromQueue | null = null
 
     if (this.currentCycleShardData == null) {
       await this.waitForShardData()
@@ -3714,7 +3729,7 @@ class StateManager extends EventEmitter {
     } else {
       // we are local!
       let accountData = await this.app.getAccountDataByList([address])
-      let wrappedAccount: Shardus.WrappedDataFromQueue
+      //let wrappedAccount: Shardus.WrappedDataFromQueue
       if (accountData != null) {
         for (let wrappedAccountEntry of accountData) {
           // We are going to add in new data here, which upgrades the account wrapper to a new type.
@@ -4306,14 +4321,14 @@ class StateManager extends EventEmitter {
     let debugKey
 
     let usedSyncTXsFromHashSetStrings = false
-    try {
-      // partitionId = partitionId // topResult.Partition_id
-      cycleNumber = cycle.counter // topResult.Cycle_number
-      key = 'c' + cycleNumber
-      key2 = 'p' + partitionId
-      debugKey = `rkeys: ${key} ${key2}`
+    // partitionId = partitionId // topResult.Partition_id
+    cycleNumber = cycle.counter // topResult.Cycle_number
+    key = 'c' + cycleNumber
+    key2 = 'p' + partitionId
+    debugKey = `rkeys: ${key} ${key2}`  
+    let combinedKey = key + key2      
 
-      let combinedKey = key + key2
+    try {
       if (this.repairStartedMap.has(combinedKey)) {
         if (this.verboseLogs) this.mainLogger.error(`repairStats: Already started repair on ${combinedKey}`)
       } else {
@@ -4463,6 +4478,9 @@ class StateManager extends EventEmitter {
                   }
                 }
               } else {
+                if(partitionReceipt3 == null){
+                  throw new Error(`startRepairProcess partitionReceipt3 == null ${cycleNumber}`)
+                }
                 this.storePartitionReceipt(cycleNumber, partitionReceipt3)
                 this.repairTrackerMarkFinished(repairTracker, 'startRepairProcess:B')
                 if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess 2 allFinished, final ${debugKey} hash:${utils.stringifyReduce({ topResult3 })}`)
@@ -4502,7 +4520,7 @@ class StateManager extends EventEmitter {
     }
   }
 
-  async testAndApplyRepairs (cycleNumber) {
+  async testAndApplyRepairs (cycleNumber: number) {
     // can we apply the repairs
 
     this.mainLogger.debug(`testAndApplyRepairs c:${cycleNumber} `)
@@ -4554,7 +4572,9 @@ class StateManager extends EventEmitter {
         break
       }
     }
-
+    if(ourResult == null){
+      throw new Error(`checkForGoodPartitionReciept ourResult == null ${debugKey}`)
+    }
     let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
     let { partitionReceipt: partitionReceipt3, topResult: topResult3, success: success3 } = receiptResults
     if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept immediate receipt check. ${debugKey} success:${success3} topResult:${utils.stringifyReduce(topResult3)}  partitionReceipt: ${utils.stringifyReduce({ partitionReceipt3 })}`)
@@ -4575,6 +4595,9 @@ class StateManager extends EventEmitter {
         }
       }
     } else {
+      if(partitionReceipt3 == null){
+        throw new Error(`checkForGoodPartitionReciept partitionReceipt3 == null ${debugKey}`)
+      }
       this.storePartitionReceipt(cycleNumber, partitionReceipt3)
       this.repairTrackerMarkFinished(repairTracker, 'checkForGoodPartitionReciept')
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept 2 allFinished, final ${debugKey} hash:${utils.stringifyReduce({ topResult3 })}`)
@@ -4811,9 +4834,9 @@ class StateManager extends EventEmitter {
    * @param {any} ourLastResultHash
    * @param {GenericHashSetEntry & IHashSetEntryPartitions} ourHashSet
    */
-  _mergeRepairDataIntoLocalState2 (repairTracker:RepairTracker, ourPartitionObj:PartitionObject, ourLastResultHash:any, ourHashSet:HashSetEntryPartitions, txListOverride:TxTallyList = null) {
+  _mergeRepairDataIntoLocalState2 (repairTracker:RepairTracker, ourPartitionObj:PartitionObject, ourLastResultHash:any, ourHashSet:HashSetEntryPartitions, txListOverride:TxTallyList | null = null) {
     let key = repairTracker.key
-    let txList:TxTallyList = null
+    let txList:TxTallyList | null = null
     if (txListOverride != null) {
       txList = txListOverride
     } else {
@@ -4876,6 +4899,10 @@ class StateManager extends EventEmitter {
     // }
 
     let hashSet = StateManager.createHashSetString(newTxList.thashes, newTxList.tstates) // TXSTATE_TODO
+
+    if(ourHashSet.indexMap == null){
+      throw new Error(`_mergeRepairDataIntoLocalState2 ourHashSet.indexMap == null ${debugKey}`); 
+    }
 
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a  ${debugKey} len: ${ourHashSet.indexMap.length}  extraIndex: ${extraIndex} ourPreHashSet: ${hashSet}`)
 
@@ -4944,15 +4971,19 @@ class StateManager extends EventEmitter {
     // }
     hashSet = StateManager.createHashSetString(newTxList.hashes, newTxList.states) // TXSTATE_TODO
 
+    // if(hashSet == null){
+    //   throw new Error(`_mergeRepairDataIntoLocalState2 hashSet == null 2 ${debugKey}`); 
+    // }
+
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 c  len: ${ourHashSet.indexMap.length}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter} ourHashSet: ${hashSet}`)
 
     if (repairTracker.outputHashSet !== hashSet) {
       this.mainLogger.error(`Failed to match our hashset to the solution hashSet: ${hashSet}  solution: ${repairTracker.outputHashSet}  `)
 
       /** @type {GenericHashSetEntry[]} */
-      let hashSetList = []
+      let hashSetList:GenericHashSetEntry[] = []
       hashSetList.push(/** @type {GenericHashSetEntry} */{ hash: 'a1', votePower: 1, hashSet: hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, indexMap: [], extraMap: [], waitForIndex: -1, ownVotes: [] })
-      hashSetList.push(/** @type {GenericHashSetEntry} */{ hash: 'b1', votePower: 10, hashSet: repairTracker.outputHashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, indexMap: [], extraMap: [], waitForIndex: -1, ownVotes: [] })
+      hashSetList.push(/** @type {GenericHashSetEntry} */{ hash: 'b1', votePower: 10, hashSet: repairTracker.outputHashSet!, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, indexMap: [], extraMap: [], waitForIndex: -1, ownVotes: [] })
       let output = StateManager.solveHashSets2(hashSetList)
       for (let hashSetEntry of hashSetList) {
         this.mainLogger.error(JSON.stringify(hashSetEntry))
@@ -5038,6 +5069,9 @@ class StateManager extends EventEmitter {
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + JSON.stringify(output))
     // find our solution
     let ourSolution = hashSetList.find((a) => a.ourRow === true) // owner
+    if(ourSolution == null){
+      throw new Error(`syncTXsFromHashSetStrings ourSolution == null 2 ${debugKey}`); 
+    }
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'ourSolution: ' + JSON.stringify({ ourSolution, len: ourSolution.hash.length }))
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'solved outputHashSet: ' + outputHashSet)
     // lets generate the indexMap and extraMap index tables for out hashlist solution
@@ -5053,7 +5087,9 @@ class StateManager extends EventEmitter {
         let greedyAsk = -1 // todo perf: could try non greedy
 
         let voters = correction.tv.voters // correction.tv.vote.voters  old solver needed this:
-
+        if(voters == null){
+          throw new Error(`syncTXsFromHashSetStrings voters == null  ${debugKey}  ${utils.stringifyReduce(correction)}`); 
+        }
         for (let i = 0; i < voters.length; i++) {
           if (voters[i] === hashSetList.length - 1) {
             // Because of FORCED solution the last voter is always a invalid?
@@ -5084,8 +5120,13 @@ class StateManager extends EventEmitter {
         if (hashSetList[greedyAsk].indexMap == null) {
           StateManager.expandIndexMapping(hashSetList[greedyAsk], output)
         }
+
         // use the remote hosts index map to determine for the exact index. this will get assigned to tx_indicies and the
-        let hostIndex = hashSetList[greedyAsk].indexMap[index]
+        let hashSet = hashSetList[greedyAsk]
+        if(hashSet == null || hashSet.indexMap == null){
+          throw new Error(`syncTXsFromHashSetStrings hashSet == null  ${debugKey} ${utils.stringifyReduce(hashSet)} `);
+        }
+        let hostIndex = hashSet.indexMap[index]
         requestsByHost[greedyAsk].hostIndex.push(hostIndex) // todo calc this on host side, requires some cache mgmt!
 
         // just ask for the correction and let the remote host do the translation!
@@ -5130,6 +5171,9 @@ class StateManager extends EventEmitter {
             if (this.extendedRepairLogging) console.log(`get_transactions_by_partition_index ok! ${debugKey} count:${result.acceptedTX.length} payload: ${utils.stringifyReduce(payload)} reqCount:${payload.tx_indicies.length}`)
             for (let j = 0; j < result.acceptedTX.length; j++) {
               let acceptedTX = result.acceptedTX[j]
+              if(result.passFail == null){
+                throw new Error(`syncTXsFromHashSetStrings (result.passFail == null  ${debugKey} ${utils.stringifyReduce(result)} `);
+              }
               if (result.passFail[j] === 1) {
                 repairTracker.newPendingTXs.push(acceptedTX)
                 repairTracker.missingTXIds.push(acceptedTX.id)
@@ -5146,6 +5190,9 @@ class StateManager extends EventEmitter {
 
               // now we have statesList also
               let state = requestsByHost[i].stateSnippets[j] // snippets are just the first 2 characters of state if we have stateList use that instead.
+              if(result.statesList == null){
+                throw new Error(`syncTXsFromHashSetStrings (result.statesList == null  ${debugKey} ${utils.stringifyReduce(result)} `);
+              }
               state = result.statesList[j]
               repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j], state: state })
               returnedResults++
@@ -5179,6 +5226,9 @@ class StateManager extends EventEmitter {
     let partitionObject = partitionObjectsByHash[ourSolution.hash]
     if (!partitionObject) {
       return
+    }
+    if(ourSolution.extraMap == null){
+      throw new Error(`syncTXsFromHashSetStrings (ourSolution.extraMap == null  ${debugKey} ${utils.stringifyReduce(ourSolution)} `);
     }
     // next use our extraMap indicies to grab the actual transactions we need for the list
     for (let i = 0; i < ourSolution.extraMap.length; i++) {
@@ -5710,7 +5760,7 @@ class StateManager extends EventEmitter {
 
       if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair updateTrackingAndPrepareRepairs finished`)
       if (paritionsServiced === 0) {
-        this.fatalLogger.fatal(`_updateTrackingAndPrepareRepairs failed. not partitions serviced: ${debugKey} our consensus:${utils.stringifyReduce(lastCycleShardValues.ourConsensusPartitions)} `)
+        this.fatalLogger.fatal(`_updateTrackingAndPrepareRepairs failed. not partitions serviced: ${debugKey} our consensus:${utils.stringifyReduce(lastCycleShardValues?.ourConsensusPartitions)} `)
       }
     } catch (ex) {
       this.mainLogger.debug('__updateTrackingAndPrepareRepairs: exception ' + ` ${debugKey} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -6832,7 +6882,7 @@ class StateManager extends EventEmitter {
    * @param {string[]} prevOutput
    * @returns {string[]}
    */
-  static solveHashSets (hashSetList: GenericHashSetEntry[], lookAhead: number = 10, voteRate: number = 0.625, prevOutput: string[] = null): string[] {
+  static solveHashSets (hashSetList: GenericHashSetEntry[], lookAhead: number = 10, voteRate: number = 0.625, prevOutput: string[] | null = null): string[] {
     let output = []
     let outputVotes = []
     let solving = true
@@ -6853,7 +6903,7 @@ class StateManager extends EventEmitter {
 
     while (solving) {
       let votes:StringCountEntryObjectMap = {}
-      let topVote:Vote = { v: '', count: 0, vote:null, ec: null }
+      let topVote:Vote = { v: '', count: 0, vote:undefined, ec: undefined }
       let winnerFound = false
       let totalVotes = 0
       // Loop through each entry list
@@ -7685,7 +7735,7 @@ class StateManager extends EventEmitter {
    * @param {*} dataHashes
    * @returns {*} //todo correct type
    */
-  static createHashSetString (txHashes:string[], dataHashes:string[]) {
+  static createHashSetString (txHashes:string[], dataHashes:string[] | null) {
     let hashSet = ''
 
     if (dataHashes == null) {
