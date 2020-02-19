@@ -134,7 +134,7 @@ declare namespace Shardus {
 
     updateAccountPartial: (wrappedState: WrappedResponse, localCache: any, applyResponse: Shardus.ApplyResponse) => void
 
-    getRelevantData: (accountId: string, tx: object) => any
+    getRelevantData: (accountId: string, tx: object) => WrappedResponses
 
     /**
      * A function that returns the Keys for the accounts involved in the transaction

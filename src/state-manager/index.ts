@@ -76,7 +76,7 @@ class StateManager extends EventEmitter {
     /** our partition Results by cycle.  index by cycle counter key to get an array */
     ourPartitionResultsByCycle:{[cycleKey:string]: PartitionResult[]}
     /** tracks state for repairing partitions. index by cycle counter key to get the repair object, index by parition  */
-    repairTrackingByCycleById:{[cycleKey:string]: RepairTracker}
+    repairTrackingByCycleById:{[cycleKey:string]:{[id:string]: RepairTracker} }
     /** UpdateRepairData by cycle key */
     repairUpdateDataByCycle:{[cycleKey:string]: UpdateRepairData[]}
     /** partition objects by cycle by hash.   */
@@ -1688,7 +1688,7 @@ class StateManager extends EventEmitter {
 
     this.p2p.registerInternal('get_account_data3', async (payload:GetAccountData3Req, respond: (arg0: { data: GetAccountDataByRangeSmart }) => any) => {
       let result = {} as {data: GetAccountDataByRangeSmart } //TSConversion  This is complicated !!(due to app wrapping)  as {data: Shardus.AccountData[] | null}
-      let accountData:GetAccountDataByRangeSmart = null
+      let accountData:GetAccountDataByRangeSmart | null = null
       let ourLockID = -1
       try {
         ourLockID = await this.fifoLock('accountModification')
@@ -2156,8 +2156,8 @@ class StateManager extends EventEmitter {
       // await this.queueAcceptedTransaction(acceptedTX, false, sender)
     })
 
-    this.p2p.registerInternal('get_account_data_with_queue_hints', async (payload: { accountIds: string[] }, respond: (arg0: { accountData: Shardus.AccountData[] }) => any) => {
-      let result = {} as {accountData: Shardus.AccountData[] | null}//TSConversion  This is complicated !! check app for details.
+    this.p2p.registerInternal('get_account_data_with_queue_hints', async (payload: { accountIds: string[] }, respond: (arg0: GetAccountDataWithQueueHintsResp) => any) => {
+      let result = {} as GetAccountDataWithQueueHintsResp //TSConversion  This is complicated !! check app for details.
       let accountData = null
       let ourLockID = -1
       try {
@@ -2535,7 +2535,7 @@ class StateManager extends EventEmitter {
     return { success: true, hasStateTableData }
   }
 
-  async testAccountTime (tx:AcceptedTx, wrappedStates:WrappedStates) {
+  async testAccountTime (tx:Shardus.OpaqueTransaction, wrappedStates:WrappedStates) {
     function tryGetAccountData (accountID:string) {
       return wrappedStates[accountID]
     }
@@ -2570,7 +2570,7 @@ class StateManager extends EventEmitter {
     let accountDataList
     let txTs = 0
     let accountKeys = []
-    let ourAccountLocks
+    let ourAccountLocks = null
     let applyResponse
     try {
       let tx = acceptedTX.data
@@ -2604,7 +2604,7 @@ class StateManager extends EventEmitter {
       // let wrappedStatesList = Object.values(wrappedStates)
 
       // TSConversion need to check how save this cast is for the apply fuction, should probably do more in depth look at the tx param.
-      applyResponse = await this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
+      applyResponse = this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
       let { stateTableResults, accountData: _accountdata } = applyResponse
       accountDataList = _accountdata
 
@@ -2628,13 +2628,21 @@ class StateManager extends EventEmitter {
     } catch (ex) {
       this.fatalLogger.fatal('tryApplyTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       this.mainLogger.debug(`tryApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
-      if (!repairing) this.tempRecordTXByCycle(txTs, acceptedTX, false, applyResponse)
+      if(applyResponse){
+        // TSConversion do we really want to record this?
+        if (!repairing) this.tempRecordTXByCycle(txTs, acceptedTX, false, applyResponse)
+      } else {
+        // this.fatalLogger.fatal('tryApplyTransaction failed: applyResponse == null')
+      }
+      
 
       return false
     } finally {
       this.fifoUnlock('accountModification', ourLockID)
       if (repairing !== true) {
-        this.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
+        if(ourAccountLocks != null){
+          this.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
+        }
         if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} `)
       }
     }
@@ -3685,8 +3693,9 @@ class StateManager extends EventEmitter {
         throw new Error(`getLocalOrRemoteAccount: no home node found`)
       }
       let message = { accountIds: [address] }
-      let result = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
-      if (result === false) { this.mainLogger.error('ASK FAIL 10') }
+      let r:GetAccountDataWithQueueHintsResp | boolean = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
+      if (r === false) { this.mainLogger.error('ASK FAIL 10') }
+      let result = r as GetAccountDataWithQueueHintsResp
       if (result != null && result.accountData != null && result.accountData.length > 0) {
         wrappedAccount = result.accountData[0]
         if (wrappedAccount == null) {
@@ -3845,7 +3854,7 @@ class StateManager extends EventEmitter {
   }
 
   // TODO WrappedStates
-  async setAccount (wrappedStates:WrappedStates, localCachedData:LocalCachedData, applyResponse: Shardus.ApplyResponse, accountFilter?:AccountFilter) {
+  async setAccount (wrappedStates:WrappedResponses, localCachedData:LocalCachedData, applyResponse: Shardus.ApplyResponse, accountFilter?:AccountFilter) {
     // let sourceAddress = inTx.srcAct
     // let targetAddress = inTx.tgtAct
     // let amount = inTx.txnAmt
@@ -3892,7 +3901,7 @@ class StateManager extends EventEmitter {
       thisFifo.waitingList.push(entry)
       // wait till we are at the front of the queue, and the queue is not locked
       while (thisFifo.waitingList[0].id !== ourID || thisFifo.queueLocked) {
-      // perf optimization to reduce the amount of times we have to sleep (attempt to come out of sleep at close to the right time)
+      // todo perf optimization to reduce the amount of times we have to sleep (attempt to come out of sleep at close to the right time)
         let sleepEstimate = ourID - thisFifo.lastServed
         if (sleepEstimate < 1) {
           sleepEstimate = 1
@@ -4270,7 +4279,7 @@ class StateManager extends EventEmitter {
    * @param {number} partitionId
    * @param {string} ourLastResultHash
    */
-  async startRepairProcess (cycle:Cycle, topResult:PartitionResult, partitionId:number, ourLastResultHash:string) {
+  async startRepairProcess (cycle:Cycle, topResult:PartitionResult | null, partitionId:number, ourLastResultHash:string) {
     this.stateIsGood = false
     if (this.canDataRepair === false) {
       return
@@ -4307,8 +4316,9 @@ class StateManager extends EventEmitter {
 
         if (this.verboseLogs) this.mainLogger.debug(`repairStats: staring repair ${combinedKey}`)
       }
-      topResult = null // hack
+      topResult = null // hack to force full synce
       if (topResult) {
+        // @ts-ignore  have to ignore due to topResult hack
         repairTracker.triedHashes.push(topResult.Partition_hash)
         await this.syncTXsFromWinningHash(topResult)
       } else {
@@ -4345,6 +4355,10 @@ class StateManager extends EventEmitter {
           ourResult = obj
           break
         }
+      }
+
+      if(ourResult == null){
+        throw new Error(`startRepairProcess ourResult == null`)
       }
 
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess our result: ${debugKey} ${utils.stringifyReduce(ourResult)} obj: ${utils.stringifyReduce(this.partitionObjectsByCycle[key])} `)
@@ -4608,6 +4622,10 @@ class StateManager extends EventEmitter {
     let ourPartitionObj = this.getPartitionObject(topResult.Cycle_number, topResult.Partition_id)
 
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: ourPartitionObj: ' + utils.stringifyReduce(ourPartitionObj))
+
+    if(ourPartitionObj == null){
+      throw new Error(`syncTXsFromWinningHash ourPartitionObj == null  ${topResult.Cycle_number} ${topResult.Partition_id}`)
+    }
 
     let ourStatusMap = this.partitionObjectToTxMaps(ourPartitionObj)
     // need to match up on all data, but only sync what we need and remove what we dont.
@@ -5470,9 +5488,15 @@ class StateManager extends EventEmitter {
             if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs apply tx ${utils.makeShortHash(tx.id)} ${tx.timestamp} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
             let hasStateTableData = false // may or may not have it but not tracking yet
 
+            // TSConversion old way used to do this but seem incorrect to have receipt under data!
             // HACK!!  receipts sent across the net to us may need to get re parsed
-            if (utils.isString(tx.data.receipt)) {
-              tx.data.receipt = JSON.parse(tx.data.receipt)
+            // if (utils.isString(tx.data.receipt)) {
+            //   tx.data.receipt = JSON.parse(tx.data.receipt)
+            // }
+
+            if (utils.isString(tx.receipt)) {
+              //@ts-ignore
+              tx.receipt = JSON.parse(tx.receipt)
             }
 
             // todo needs wrapped states! and/or localCachedData
@@ -5778,9 +5802,14 @@ class StateManager extends EventEmitter {
           if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs apply tx ${utils.makeShortHash(tx.id)} ${tx.timestamp} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
           let hasStateTableData = false // may or may not have it but not tracking yet
 
-          // HACK!!  receipts sent across the net to us may need to get re parsed
-          if (utils.isString(tx.data.receipt)) {
-            tx.data.receipt = JSON.parse(tx.data.receipt)
+          // TSConversion old way used to do this but seem incorrect to have receipt under data!
+          // // HACK!!  receipts sent across the net to us may need to get re parsed
+          // if (utils.isString(tx.data.receipt)) {
+          //   tx.data.receipt = JSON.parse(tx.data.receipt)
+          // }
+          if (utils.isString(tx.receipt)) {
+            //@ts-ignore
+            tx.receipt = JSON.parse(tx.receipt)
           }
 
           // todo needs wrapped states! and/or localCachedData
@@ -6209,6 +6238,9 @@ class StateManager extends EventEmitter {
     let partitionResultsByNodeID = new Map() // use a map?
     let nodesToTell = []
 
+    if(lastCycleShardValues == null){
+      throw new Error(`broadcastPartitionResults lastCycleShardValues == null  ${cycleNumber}`)
+    }
     // sign results as needed
     for (let i = 0; i < partitionResults.length; i++) {
       /** @type {PartitionResult} */
@@ -6629,10 +6661,15 @@ class StateManager extends EventEmitter {
 
     let seenParitions:StringBoolObjectMap = {}
     // for (let partitionID of lastCycleShardValues.ourConsensusPartitions) {
-
+    if(lastCycleShardValues == null){
+      throw new Error(`recordTXByCycle lastCycleShardValues == null`)
+    }
     for (let accountKey of allKeys) {
       /** @type {NodeShardData} */
       let homeNode = ShardFunctions.findHomeNode(lastCycleShardValues.shardGlobals, accountKey, lastCycleShardValues.parititionShardDataMap)
+      if(homeNode == null){
+        throw new Error(`recordTXByCycle homeNode == null`)
+      }
       let partitionID = homeNode.homePartition
       let txList = this.getTXList(cycleNumber, partitionID) // todo sharding - done: pass partition ID
 
@@ -6679,7 +6716,7 @@ class StateManager extends EventEmitter {
    * @param {number} partitionId
    * @returns {PartitionObject}
    */
-  getPartitionObject (cycleNumber: number, partitionId: number): PartitionObject {
+  getPartitionObject (cycleNumber: number, partitionId: number): PartitionObject | null {
     let key = 'c' + cycleNumber
     let partitionObjects = this.partitionObjectsByCycle[key]
     for (let obj of partitionObjects) {
@@ -6687,6 +6724,7 @@ class StateManager extends EventEmitter {
         return obj
       }
     }
+    return null
   }
 
   /**
@@ -7170,7 +7208,12 @@ class StateManager extends EventEmitter {
           votesArray.push(currentVoteObject)
           // hashListEntry.ownVotes.push(currentVoteObject)
         }
-        
+        if(currentVoteObject.voters == null){
+          throw new Error('solveHashSets2 currentVoteObject.voters == null')
+        }
+        if(hashListEntry == null || hashListEntry.ownVotes == null){
+          throw new Error(`solveHashSets2 hashListEntry == null ${hashListEntry == null}`)
+        }
 
         currentVoteObject.voters.push(hashListIndex)
         currentVoteObject.voteTally[hashListIndex] = { i: index, p: hashListEntry.votePower } // could this be a simple index
@@ -7260,7 +7303,9 @@ class StateManager extends EventEmitter {
         // what if we have it but it is in the wrong spot!!
         winningVoteIndex++
       }
-
+      if(hashListEntry == null || hashListEntry.ownVotes == null){
+        throw new Error(`solveHashSets2 hashListEntry == null 2 ${hashListEntry == null}`)
+      }
       for (let voteObj of hashListEntry.ownVotes) {
         let localIdx = voteObj.voteTally[hashListIndex].i
         if (voteObj.winIdx == null) {
@@ -7713,6 +7758,10 @@ class StateManager extends EventEmitter {
     try {
       if (this.sendArchiveData === true) {
         let paritionObject = this.getPartitionObject(cycleNumber, partitionId) // todo get object
+        if(paritionObject == null){
+          this.fatalLogger.fatal(` trySendAndPurgeReceiptsToArchives paritionObject == null ${cycleNumber} ${partitionId}`)
+          throw new Error(`trySendAndPurgeReceiptsToArchives paritionObject == null`)
+        }
         this.sendPartitionData(partitionReceipt, paritionObject)
       }
     } finally {

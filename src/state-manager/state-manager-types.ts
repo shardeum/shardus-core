@@ -464,6 +464,8 @@ type RouteToHomeNodeReq = { txid: any; timestamp: any; acceptedTx: import("../sh
 type RequestStateForTxReq = { txid: string; timestamp: number; keys: any }
 type RequestStateForTxResp = { stateList: any[]; note: string }
 
+type GetAccountDataWithQueueHintsResp = { accountData: import("../shardus/shardus-types").AccountData[] | null}
+
 // Sync related
 type StateHashResult = {stateHash:string}
 
@@ -472,6 +474,8 @@ type WrappedStateArray = import("../shardus/shardus-types").WrappedData[]
 //type AccountFilter = {[accountID:string]:boolean}
 type AccountFilter = {[accountID:string]:number}
 type AccountBoolObjectMap = AccountFilter
+
+type WrappedResponses = {[accountID:string]:import("../shardus/shardus-types").WrappedResponse}
 
 type SimpleDistanceObject = {distance:number}
 type StringNodeObjectMap = {[accountID:string]:import("../shardus/shardus-types").Node}
