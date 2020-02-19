@@ -2676,7 +2676,11 @@ class StateManager extends EventEmitter {
     // if(dataResultsFullList == null){
     //   throw new Error(`tryApplyTransaction (dataResultsFullList == null  ${txTs} ${utils.stringifyReduce(acceptedTX)} `);
     // }
-    await this.updateAccountsCopyTable(dataResultsFullList, repairing, txTs)
+
+    // TSConversion verified that app.setAccount calls shardus.applyResponseAddState  that adds hash and txid to the data and turns it into AccountData
+    let upgradedAccountDataList:Shardus.AccountData[] = (dataResultsFullList as unknown) as Shardus.AccountData[]
+
+    await this.updateAccountsCopyTable(upgradedAccountDataList, repairing, txTs)
 
     if (!repairing) {
       // await this.updateAccountsCopyTable(accountDataList)
@@ -6759,17 +6763,20 @@ class StateManager extends EventEmitter {
           // take a look at backup data?
 
           //TSConversion some uncertainty with around hash being on the data or not.  added logggin.
-          // @ts-ignore
-          if(accountData.hash != null){
-            // @ts-ignore
-            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug( ` _repair recordTXByCycle:  how is this possible: ${utils.makeShortHash(accountData.accountId)} acc hash: ${utils.makeShortHash(accountData.hash)} acc stateID: ${utils.makeShortHash(accountData.stateId)}`)
+          // // @ts-ignore
+          // if(accountData.hash != null){
+          //   // @ts-ignore
+          //   if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug( ` _repair recordTXByCycle:  how is this possible: ${utils.makeShortHash(accountData.accountId)} acc hash: ${utils.makeShortHash(accountData.hash)} acc stateID: ${utils.makeShortHash(accountData.stateId)}`)
  
-          }
-          if(accountData.stateId == null){
-            // @ts-ignore
-            throw new Error(`missing state id for ${utils.makeShortHash(accountData.accountId)} acc hash: ${utils.makeShortHash(accountData.hash)} acc stateID: ${utils.makeShortHash(accountData.stateId)} `)
-          }
-          states.push(utils.makeShortHash(accountData.stateId)) 
+          // }
+          // if(accountData.stateId == null){
+          //   // @ts-ignore
+          //   throw new Error(`missing state id for ${utils.makeShortHash(accountData.accountId)} acc hash: ${utils.makeShortHash(accountData.hash)} acc stateID: ${utils.makeShortHash(accountData.stateId)} `)
+          // }
+
+          // account data got upgraded earlier to have hash on it
+
+          states.push(utils.makeShortHash(((accountData as unknown) as Shardus.AccountData).hash)) 
           index++
         }
         txList.states.push(states[foundAccountIndex]) // TXSTATE_TODO does this check out?
@@ -6845,14 +6852,14 @@ class StateManager extends EventEmitter {
    * @param {string[]} ignoreList currently unused and broken todo resolve this.
    * @return {{topHash: string, topCount: number, topResult: PartitionResult}}
    */
-  findMostCommonResponse (cycleNumber: number, partitionId: number, ignoreList: string[]): { topHash: string; topCount: number; topResult: PartitionResult } {
+  findMostCommonResponse (cycleNumber: number, partitionId: number, ignoreList: string[]): { topHash: string | null; topCount: number; topResult: PartitionResult | null } {
     let key = 'c' + cycleNumber
     let responsesById = this.allPartitionResponsesByCycleByPartition[key]
     let key2 = 'p' + partitionId
     let responses = responsesById[key2]
 
     let hashCounting:StringNumberObjectMap = {}
-    let topHash
+    let topHash = null
     let topCount = 0
     let topResult = null
     if (responses.length > 0) {
@@ -7096,6 +7103,8 @@ class StateManager extends EventEmitter {
 
                   // hashListEntry.indexOffset++
                   /** @type {HashSetEntryCorrection} */
+
+                  // @ts-ignore  solveHashSets is unused at the moment not going to bother with ts fixup
                   let tempCorrection:HashSetEntryCorrection = { i: extraIdx, t: 'extra', c: correction, hi: index2 - (j + 1), tv: null, v: null, bv: null, if: -1 } // added tv: null, v: null, bv: null, if: -1
                   tempCorrections.push(tempCorrection)
                 }
@@ -7138,6 +7147,7 @@ class StateManager extends EventEmitter {
       let extraIdx = index
       while ((extraIdx + hashListEntry.indexOffset) * stepSize < hashListEntry.hashSet.length) {
         let hi = extraIdx + hashListEntry.indexOffset // index2 - (j + 1)
+        // @ts-ignore  solveHashSets is unused at the moment not going to bother with ts fixup
         hashListEntry.corrections.push({ i: extraIdx, t: 'extra', c: null, hi: hi, tv: null, v: null, bv: null, if: -1 }) // added , tv: null, v: null, bv: null, if: -1
         extraIdx++
       }
@@ -7240,6 +7250,7 @@ class StateManager extends EventEmitter {
         if (votesArray == null) {
           votesseen++
           //TSConversion this was potetially a major bug, v was missing from this structure before!
+          // @ts-ignore TSConversion solveHashSets2 is unused. but need to hold off o fixing up these potential nulls
           let votObject:ExtendedVote = { winIdx: null, val: v,v, count: 0, ec: 0, lowestIndex: index, voters: [], voteTally: Array(hashSetList.length), votesseen } as ExtendedVote
           votesArray = [votObject]
           votes[v] = votesArray
@@ -7276,6 +7287,7 @@ class StateManager extends EventEmitter {
           // create new vote object
           votesseen++
           //TSConversion this was potetially a major bug, v was missing from this structure before!
+          // @ts-ignore TSConversion solveHashSets2 is unused. but need to hold off o fixing up these potential nulls
           currentVoteObject = { winIdx: null, val: v,v, count: 0, ec: 0, lowestIndex: index, voters: [], voteTally: Array(hashSetList.length), votesseen } as ExtendedVote
           votesArray.push(currentVoteObject)
           // hashListEntry.ownVotes.push(currentVoteObject)
@@ -7370,6 +7382,7 @@ class StateManager extends EventEmitter {
         if (voteObj.voteTally[hashListIndex] == null) {
           // console.log(`missing @${voteObj.finalIdx} v:${voteObj.val}`)
           // bv: hashListEntry.lastValue, if: lastOutputCount  are old.
+          // @ts-ignore TSConversion solveHashSets2 is unused. but need to hold off o fixing up these potential nulls
           hashListEntry.corrections.push({ i: winningVoteIndex, tv: voteObj, v: voteObj.val, t: 'insert', bv: null, if: -1 })
         }
         // what if we have it but it is in the wrong spot!!
@@ -7382,6 +7395,7 @@ class StateManager extends EventEmitter {
         let localIdx = voteObj.voteTally[hashListIndex].i
         if (voteObj.winIdx == null) {
           // console.log(`extra @${stringify(voteObj.voteTally[hashListIndex])} v:${voteObj.val}`)
+          // @ts-ignore TSConversion solveHashSets2 is unused. but need to hold off o fixing up these potential nulls
           hashListEntry.corrections.push({ i: localIdx, t: 'extra', c: null, hi: localIdx, tv: null, v: null, bv: null, if: -1 })
         }
         // localIdx++
