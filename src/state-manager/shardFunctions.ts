@@ -148,13 +148,17 @@ class ShardFunctions {
       if(storedPartitions.partitionStart1 && storedPartitions.partitionEnd1){
         storedPartitions.partitionsCovered = 1 + (storedPartitions.partitionEnd1 - storedPartitions.partitionStart1)
       } else {
-        throw new Error('missing ranges in storedPartitions 2')
+        // throw new Error('missing ranges in storedPartitions 2')
+        throw new Error(`missing ranges in storedPartitions 2b  ${storedPartitions.partitionStart1} ${storedPartitions.partitionEnd1} ${stringify(storedPartitions)}`)
       }
     }
     // if (storedPartitions.partitionsCovered <= 2) {
     //   let a = 1
     //   a++
     // }
+
+
+
   }
 
   static testAddressInRange (address: string, storedPartitions: StoredPartition) : boolean {
