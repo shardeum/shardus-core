@@ -2565,13 +2565,13 @@ class StateManager extends EventEmitter {
     return true // { success: true, hasStateTableData }
   }
   // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
-  async tryApplyTransaction (acceptedTX:AcceptedTx, hasStateTableData:boolean, repairing:boolean, filter:AccountFilter, wrappedStates:WrappedStates, localCachedData:LocalCachedData ) {
+  async tryApplyTransaction (acceptedTX:AcceptedTx, hasStateTableData:boolean, repairing:boolean, filter:AccountFilter, wrappedStates:WrappedResponses, localCachedData:LocalCachedData ) {
     let ourLockID = -1
     let accountDataList
     let txTs = 0
     let accountKeys = []
     let ourAccountLocks = null
-    let applyResponse
+    let applyResponse: Shardus.ApplyResponse | null
     try {
       let tx = acceptedTX.data
       // let receipt = acceptedTX.receipt
@@ -2712,7 +2712,7 @@ class StateManager extends EventEmitter {
   //   await this.processAcceptedTxQueue(Date.now())
   // }
 
-  async applyAcceptedTransaction (acceptedTX:AcceptedTx, wrappedStates:WrappedStates, localCachedData:LocalCachedData, filter:AccountFilter) {
+  async applyAcceptedTransaction (acceptedTX:AcceptedTx, wrappedStates:WrappedResponses, localCachedData:LocalCachedData, filter:AccountFilter) {
     if (this.queueStopped) return
     let tx = acceptedTX.data
     let keysResponse = this.app.getKeyFromTransaction(tx)
@@ -3663,8 +3663,8 @@ class StateManager extends EventEmitter {
   // todo support metadata so we can serve up only a portion of the account
   // todo 2? communicate directly back to client... could have security issue.
   // todo 3? require a relatively stout client proof of work
-  async getLocalOrRemoteAccount (address:string) {
-    let wrappedAccount
+  async getLocalOrRemoteAccount (address:string) : Promise<Shardus.WrappedDataFromQueue> {
+    let wrappedAccount: Shardus.WrappedDataFromQueue
 
     if (this.currentCycleShardData == null) {
       await this.waitForShardData()
@@ -3714,24 +3714,31 @@ class StateManager extends EventEmitter {
     } else {
       // we are local!
       let accountData = await this.app.getAccountDataByList([address])
+      let wrappedAccount: Shardus.WrappedDataFromQueue
       if (accountData != null) {
-        for (let wrappedAccount of accountData) {
-          wrappedAccount.seenInQueue = false
+        for (let wrappedAccountEntry of accountData) {
+          // We are going to add in new data here, which upgrades the account wrapper to a new type.
+          let expandedRef = wrappedAccountEntry as Shardus.WrappedDataFromQueue
+          expandedRef.seenInQueue = false
 
           if (this.lastSeenAccountsMap != null) {
-            let queueEntry = this.lastSeenAccountsMap[wrappedAccount.accountId]
+            let queueEntry = this.lastSeenAccountsMap[expandedRef.accountId]
             if (queueEntry != null) {
-              wrappedAccount.seenInQueue = true
+              expandedRef.seenInQueue = true
             }
           }
+          wrappedAccount = expandedRef
         }
       } else {
         if (this.verboseLogs) this.getAccountFailDump(address, 'getAccountDataByList() returned null')
         return null
       }
-      wrappedAccount = accountData[0]
-      if (wrappedAccount == null) {
+      // there must have been an issue in the past, but for some reason we are checking the first element in the array now.
+      if (accountData[0] == null) {
         if (this.verboseLogs) this.getAccountFailDump(address, 'accountData[0] == null')
+      }
+      if(accountData.length > 1 || accountData.length == 0) {
+        if (this.verboseLogs) this.getAccountFailDump(address, `getAccountDataByList() returned wrong element count: ${accountData}`)
       }
       return wrappedAccount
     }
@@ -5503,13 +5510,13 @@ class StateManager extends EventEmitter {
 
             // Need to build up this data.
             let keysResponse = this.app.getKeyFromTransaction(tx.data)
-            let wrappedStates:WrappedStates = {}
+            let wrappedStates:WrappedResponses = {}
             let localCachedData:LocalCachedData = {}
             for (let key of keysResponse.allKeys) {
             // build wrapped states
             // let wrappedState = await this.app.getRelevantData(key, tx.data)
 
-              let wrappedState = accountValuesByKey[key] // need to init ths data. allAccountsToResetById[key]
+              let wrappedState:Shardus.WrappedResponse = accountValuesByKey[key] // need to init ths data. allAccountsToResetById[key]
               if (wrappedState == null) {
               // Theoretically could get this data from when we revert the data above..
                 wrappedState = await this.app.getRelevantData(key, tx.data)
@@ -5765,7 +5772,7 @@ class StateManager extends EventEmitter {
     let hasEffect = false
 
     // TSConversion WrappedStates issue
-    let accountValuesByKey:WrappedStates = {}
+    let accountValuesByKey:WrappedResponses = {}
 
     let seenTXs:StringBoolObjectMap = {}
     for (let tx of newTXList) {
@@ -5816,13 +5823,13 @@ class StateManager extends EventEmitter {
 
           // Need to build up this data.
           let keysResponse = this.app.getKeyFromTransaction(tx.data)
-          let wrappedStates:WrappedStates = {}
+          let wrappedStates:WrappedResponses = {}
           let localCachedData:LocalCachedData = {}
           for (let key of keysResponse.allKeys) {
             // build wrapped states
             // let wrappedState = await this.app.getRelevantData(key, tx.data)
 
-            let wrappedState = accountValuesByKey[key] // need to init ths data. allAccountsToResetById[key]
+            let wrappedState:Shardus.WrappedResponse = accountValuesByKey[key] // need to init ths data. allAccountsToResetById[key]
             if (wrappedState == null) {
               // Theoretically could get this data from when we revert the data above..
               wrappedState = await this.app.getRelevantData(key, tx.data)
@@ -6477,6 +6484,7 @@ class StateManager extends EventEmitter {
       }
     }
     // TSConversion need to sort out account types!!!
+    // @ts-ignore This has seemed fine in past so not going to sort out a type discrepencie here.  !== would detect and log it anyhow.
     if (accountDataList[0].timestamp !== txTimestamp) {
       if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable timestamps dot match txts:${txTimestamp} acc.ts:${accountDataList[0].timestamp} `)
     }
@@ -6697,7 +6705,21 @@ class StateManager extends EventEmitter {
           if (accountData.accountId === accountKey) {
             foundAccountIndex = index
           }
-          states.push(utils.makeShortHash(accountData.hash)) // TXSTATE_TODO need to get only certain state data!.. hash of local states?
+          //states.push(utils.makeShortHash(accountData.hash)) // TXSTATE_TODO need to get only certain state data!.. hash of local states?
+          // take a look at backup data?
+
+          //TSConversion some uncertainty with around hash being on the data or not.  added logggin.
+          // @ts-ignore
+          if(accountData.hash != null){
+            // @ts-ignore
+            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug( ` _repair recordTXByCycle:  how is this possible: ${utils.makeShortHash(accountData.accountId)} acc hash: ${utils.makeShortHash(accountData.hash)} acc stateID: ${utils.makeShortHash(accountData.stateId)}`)
+ 
+          }
+          if(accountData.stateId == null){
+            // @ts-ignore
+            throw new Error(`missing state id for ${utils.makeShortHash(accountData.accountId)} acc hash: ${utils.makeShortHash(accountData.hash)} acc stateID: ${utils.makeShortHash(accountData.stateId)} `)
+          }
+          states.push(utils.makeShortHash(accountData.stateId)) 
           index++
         }
         txList.states.push(states[foundAccountIndex]) // TXSTATE_TODO does this check out?

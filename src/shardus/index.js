@@ -494,6 +494,12 @@ class Shardus extends EventEmitter {
     return { accountId: accountId, accountCreated, isPartial: false, stateId: hash, timestamp: timestamp, data: fullData }
   }
 
+  /**
+   * setPartialData
+   * @param {Shardus.WrappedResponse} response
+   * @param {any} partialData
+   * @param {any} userTag
+   */
   setPartialData (response, partialData, userTag) {
     // if the account was just created we have to do something special and ignore partial data
     if (response.accountCreated) {

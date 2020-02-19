@@ -464,7 +464,7 @@ type RouteToHomeNodeReq = { txid: any; timestamp: any; acceptedTx: import("../sh
 type RequestStateForTxReq = { txid: string; timestamp: number; keys: any }
 type RequestStateForTxResp = { stateList: any[]; note: string }
 
-type GetAccountDataWithQueueHintsResp = { accountData: import("../shardus/shardus-types").AccountData[] | null}
+type GetAccountDataWithQueueHintsResp = { accountData: import("../shardus/shardus-types").WrappedDataFromQueue[] | null}
 
 // Sync related
 type StateHashResult = {stateHash:string}

@@ -134,7 +134,7 @@ declare namespace Shardus {
 
     updateAccountPartial: (wrappedState: WrappedResponse, localCache: any, applyResponse: Shardus.ApplyResponse) => void
 
-    getRelevantData: (accountId: string, tx: object) => WrappedResponses
+    getRelevantData: (accountId: string, tx: object) => WrappedResponse
 
     /**
      * A function that returns the Keys for the accounts involved in the transaction
@@ -149,9 +149,9 @@ declare namespace Shardus {
      */
     close: () => void
 
-    getAccountData: (accountStart: string, accountEnd: string, maxRecords: number) => any
+    getAccountData: (accountStart: string, accountEnd: string, maxRecords: number) => WrappedData[]
 
-    getAccountDataByRange: (accountStart: string, accountEnd: string, tsStart: number, tsEnd: number, maxRecords: number) => any
+    getAccountDataByRange: (accountStart: string, accountEnd: string, tsStart: number, tsEnd: number, maxRecords: number) => WrappedData[]
 
     calculateAccountHash: (account: any) => string
 
@@ -161,7 +161,7 @@ declare namespace Shardus {
 
     deleteAccountData: (addressList: string[]) => void
 
-    getAccountDataByList: (addressList: string[]) => any
+    getAccountDataByList: (addressList: string[]) => WrappedData[]
 
     deleteLocalAccountData: () => void
 
@@ -215,17 +215,10 @@ declare namespace Shardus {
     /**
      * Account data array
      */
-    accountData: AccountData2[]
+    accountData: WrappedResponse[]
   }
 
-  export interface WrappedResponse {
-    accountId: string,
-    accountCreated: boolean,
-    isPartial: boolean,
-    stateId: string,
-    timestamp: number,
-    data: any
-  }
+
 
   export interface AccountData {
     /** Account ID */
@@ -250,6 +243,25 @@ declare namespace Shardus {
     /** Timestamp */
     timestamp: number,
   }
+  export interface WrappedResponse extends WrappedData {
+    accountCreated: boolean,
+    isPartial: boolean,
+
+    //Set by setPartialData
+    userTag?: any,
+    localCache?: any,
+  }
+
+  // old version:
+  // export interface WrappedResponse {
+  //   accountId: string,
+  //   accountCreated: boolean,
+  //   isPartial: boolean,
+  //   stateId: string,
+  //   timestamp: number,
+  //   data: any
+  // }
+
   //seenInQueue
 
   export interface WrappedDataFromQueue extends WrappedData {
