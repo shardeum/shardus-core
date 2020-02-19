@@ -2,6 +2,7 @@ import P2P from '.';
 import { insertSorted } from '../utils';
 import { EventEmitter } from 'events';
 import * as Sequelize from 'sequelize';
+import { Logger } from 'log4js';
 
 /** TYPES */
 
@@ -34,13 +35,13 @@ let p2p: P2PType;
 let apoptosisProposals: { [publicKey: string]: ApoptosisProposal } = {};
 
 /** ROUTES */
+
 export const internalRoutes = [
   {
     name: 'apoptosis',
     handler: (payload, respond) => {
-      if (checkSignedApoptosisProposal(payload) === false) return;
-      addProposal(payload);
-      p2p.sendGossipIn('apoptosis', payload)
+      log(`Got proposal: ${JSON.stringify(payload)}`);
+      if (addProposal(payload)) p2p.sendGossipIn('apoptosis', payload);
       respond({ apoptosized: true });
     },
   },
@@ -50,23 +51,29 @@ export const gossipRoutes = [
   {
     name: 'apoptosis',
     handler: (payload, sender, tracker) => {
-      if (checkSignedApoptosisProposal(payload) === false) return
-      addProposal(payload)
-      p2p.sendGossipIn('apoptosis', payload, tracker, sender)
-    }
-  }
-]
+      log(`Got gossip: ${JSON.stringify(payload)}`);
+      if (addProposal(payload))
+        p2p.sendGossipIn('apoptosis', payload, tracker, sender);
+    },
+  },
+];
 
 /** FUNCTIONS */
 
 export function setContext(context: P2PType) {
   p2p = context;
+  log('Initialized p2p-apoptosis');
 }
 
 export async function apoptosizeSelf(activeNodes) {
   const proposal = createProposal();
   await p2p.tell(activeNodes, 'apoptosis', proposal);
+  log(`Sent apoptosize-self proposal: ${JSON.stringify(proposal)}`);
   addProposal(proposal);
+}
+
+function log(msg: string, level = 'info') {
+  p2p.mainLogger[level]('P2PApoptosis: ' + msg);
 }
 
 function createProposal(): SignedApoptosisProposal {
@@ -76,46 +83,38 @@ function createProposal(): SignedApoptosisProposal {
   return p2p.crypto.sign(proposal);
 }
 
-function addProposal(proposal: SignedApoptosisProposal) {
+function addProposal(proposal: SignedApoptosisProposal): boolean {
+  if (validateProposal(proposal) === false) return false;
   const publicKey = proposal.sign.owner;
+  if (apoptosisProposals[publicKey]) return false;
   apoptosisProposals[publicKey] = proposal;
+  log(`Marked ${proposal.id} for apoptosis`);
+  return true;
 }
 
 function clearProposals() {
   apoptosisProposals = {};
 }
 
-function checkSignedApoptosisProposal(payload: unknown): boolean {
-  // [TODO] Add validation
+function validateProposal(payload: unknown): boolean {
+  // [TODO] Type checking
+  if (!payload) return false;
+  if (!(payload as LooseObject).id) return false;
+  if (!(payload as SignedApoptosisProposal).sign) return false;
+  const proposal = payload as SignedApoptosisProposal;
+  const nodeId = proposal.id;
 
   // Check if node is in nodelist
-  /*
   let node;
   try {
-    node = this.getNode(nodeId);
+    node = p2p.state.getNode(nodeId);
   } catch (e) {
-    this.mainLogger.debug(
-      'Node not found in nodelist. Apoptosis message invalid.'
-    );
     return false;
   }
-  */
 
   // Check if signature is valid and signed by expected node
-  /*
-  const valid = this.crypto.verify(msg, node.publicKey);
-  if (!valid) {
-    this.mainLogger.debug(
-      'Apoptosis message signature invalid. Unable to add message.'
-    );
-    return false;
-  }
-  */
-
-  const proposal = payload as SignedApoptosisProposal
-
-  // If we already have this guy marked for apoptosis, return false
-  if (apoptosisProposals[proposal.sign.owner]) return false
+  const valid = p2p.crypto.verify(proposal, node.publicKey);
+  if (!valid) return false;
 
   return true;
 }
@@ -123,45 +122,49 @@ function checkSignedApoptosisProposal(payload: unknown): boolean {
 /** CYCLE HOOKS */
 
 /**
- * Called by p2p.state at the start of every new cycle to let submodules
- * reset their cycle fields (and internal state)
+ * Hook to let submodules reset their cycle updates and data fields
  */
-export function resetCycle(currentCycle) {
-  currentCycle.updates[cycleUpdatesName] = [];
-  currentCycle.data[cycleDataName] = [];
-  clearProposals();
+export function resetCycle(cycleUpdates, cycleData) {
+  cycleUpdates[cycleUpdatesName] = [];
+  cycleData[cycleDataName] = [];
 }
 
 /**
- * Called by p2p.state during cycle Q3 to let submodules
- * add their changes to the current cycle BEFORE comparing updates
+ * Hook to let submodule add collected proposals to cycle
  */
-export function addChangesToCycle(currentCycle) {
+export function proposalsToCycle(cycleUpdates, cycleData) {
   for (const publicKey of Object.keys(apoptosisProposals)) {
     const proposal = apoptosisProposals[publicKey];
-    insertSorted(currentCycle.updates[cycleUpdatesName], proposal);
-    insertSorted(currentCycle.data[cycleDataName], proposal.id);
+    insertSorted(cycleUpdates[cycleUpdatesName], proposal);
+    insertSorted(cycleData[cycleDataName], proposal.id);
   }
-}
-
-/**
- * Called by p2p.state during cycle Q3 AFTER comparing updates to let
- * submodules apply received updates to their changes for the current cycle
- */
-export function updateChangesToCycle(proposals) {
-  // [TODO] Validate updates
   clearProposals();
-  for (const proposal of proposals) addProposal(proposal);
 }
 
 /**
- * Called by p2p.state during cycle Q4 to let submodules
- * apply their changes in the current cycle to the actual p2p state
+ * Hook to let submodules apply received cycle updates to cycle
  */
-export async function applyCycleChangesToState(ids) {
-  // [TODO] Do some sanity checks here before actually applying the changes
-  p2p.state.removeNodes(ids);
-  return;
+export function updatesToCycle(cycleUpdates, cycleData): boolean {
+  const newCycleData = [];
+  for (const proposal of cycleUpdates[cycleUpdatesName]) {
+    if (validateProposal(proposal) === false) return false;
+    insertSorted(newCycleData, proposal.id);
+  }
+  cycleData[cycleDataName] = newCycleData;
+  return true;
+}
+
+/**
+ * Hook to let submodules apply cycle data to the actual p2p state
+ */
+export async function cycleToState(cycleData) {
+  const apoptosizedIds = cycleData[cycleDataName];
+  if (Array.isArray(apoptosizedIds) === false) return;
+  if (apoptosizedIds.length < 1) return;
+  p2p.state.removeNodes(apoptosizedIds.map(id => p2p.state.getNode(id)));
+  log(
+    `Removed apoptosized nodes from nodelist: ${JSON.stringify(apoptosizedIds)}`
+  );
 }
 
 /** STORAGE DATA */

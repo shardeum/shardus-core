@@ -583,20 +583,7 @@ class P2P extends EventEmitter {
     return signedMsg
   }
 
-  async initApoptosis (activeNodes) {
-    /*
-    const msg = this._createApoptosisMessage()
-    await this._submitWhenUpdatePhase('apoptosis', msg)
-    this.state.addApoptosisMessage(msg)
-    */
-    if (!activeNodes) {
-      if (this.id) {
-        activeNodes = this.state.getActiveNodes(this.id)
-      } else {
-        activeNodes = this.activeNodeInfos
-      }
-    }
-
+  async initApoptosis (activeNodes = this.id ? this.state.getActiveNodes(this.id) : this.activeNodeInfos) {
     P2PApoptosis.apoptosizeSelf(activeNodes)
   }
 

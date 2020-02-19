@@ -44,6 +44,7 @@
     "got": "9.6.0",
     "log4js": "3.0.6",
     "log4js-extend": "0.2.1",
+    "runtypes": "^4.1.0",
     "sequelize": "4.41.0",
     "shardus-crypto-utils": "gitlab:shardus/shardus-crypto-utils",
     "shardus-net": "gitlab:shardus/shardus-net",

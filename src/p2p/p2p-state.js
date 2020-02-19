@@ -515,11 +515,9 @@ class P2PState extends EventEmitter {
     }
 
     /**
-     * Call submodule cycle hooks to update their changes to the cycle data
-     * based off of received updates
+     * Call submodule hook to apply received cycle updates to cycle data
      */
-    P2PApoptosis.updateChangesToCycle(updates[P2PApoptosis.cycleUpdatesName])
-    P2PApoptosis.addChangesToCycle(this.currentCycle)
+    P2PApoptosis.updatesToCycle(updates, this.currentCycle.data)
 
     try {
       const cMarkerBefore = this.getCurrentCertificate().marker
@@ -1054,9 +1052,9 @@ class P2PState extends EventEmitter {
     this.currentCycle = utils.deepCopy(this.cleanCycle)
 
     /**
-     * Call submodule cycle hooks to reset their own cycle data 
+     * Call submodule hook to reset its cycle updates and data
      */
-    P2PApoptosis.resetCycle(this.currentCycle)
+    P2PApoptosis.resetCycle(this.currentCycle.updates, this.currentCycle.data)
   }
 
   // Kicks off the whole cycle and cycle marker creation system
@@ -1219,6 +1217,12 @@ class P2PState extends EventEmitter {
     if (this.shouldStop) return
     this.mainLogger.debug(`P2P State: Started C${this.getCycleCounter()} Q3`)
     this.mainLogger.debug('Starting cycle sync phase...')
+
+    /**
+     * Call submodule hook to add collected proposals to cycle updates and data
+     */
+    P2PApoptosis.proposalsToCycle(this.currentCycle.updates, this.currentCycle.data)
+
     this._createCycleMarker()
     const endTime = startTime + phaseLen
 
@@ -1265,11 +1269,6 @@ class P2PState extends EventEmitter {
     this.mainLogger.info('Creating new cycle marker...')
     this._addJoiningNodes()
     this._removeExcessNodes()
-
-    /**
-     * Call submodule cycle hooks to add their changes to cycle data/updates
-     */
-    P2PApoptosis.addChangesToCycle(this.currentCycle)
 
     this.mainLogger.debug('Getting cycle info to create cycle marker...')
     const cycleInfo = this.getCycleInfo(false)
@@ -1364,10 +1363,10 @@ class P2PState extends EventEmitter {
     const promises = [accepted, activated, removed, apoptosized, lost, cycleAdded]
 
     /**
-     * Call submodule cycle hooks to apply cycle changes to the actual p2p state
+     * Call submodule hook to apply cycle data to the actual p2p state
      */
     promises.concat([
-      P2PApoptosis.applyCycleChangesToState(cycleInfo[P2PApoptosis.cycleDataName])
+      P2PApoptosis.cycleToState(cycleInfo)
     ])
 
     try {
@@ -1419,7 +1418,7 @@ class P2PState extends EventEmitter {
     }
 
     /**
-     * Copy fields added by submodules from cycle data into cycleInfo
+     * Include submodule cycle data fields when asked for cycle info
      */
     for (const dataName of [
       P2PApoptosis.cycleDataName
