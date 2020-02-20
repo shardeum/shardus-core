@@ -85,7 +85,9 @@ class Network extends EventEmitter {
           }))
         }
       } catch (err) {
-        this.mainLogger.error('Network: _setupInternal: ' + err)
+        this.mainLogger.error('Network: _setupInternal: ', err)
+        this.mainLogger.error('DBG', 'Network: _setupInternal > sn.listen > callback > data', data)
+        this.mainLogger.error('DBG', 'Network: _setupInternal > sn.listen > callback > remote', remote)
       }
     })
     console.log(`Internal server running on port ${this.ipInfo.internalPort}...`)
