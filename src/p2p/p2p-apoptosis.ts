@@ -158,12 +158,26 @@ export function updatesToCycle(cycleUpdates, cycleData): boolean {
  * Hook to let submodules apply cycle data to the actual p2p state
  */
 export async function cycleToState(cycleData) {
-  const apoptosizedIds = cycleData[cycleDataName];
+  const apoptosizedIds: string[] = cycleData[cycleDataName];
   if (Array.isArray(apoptosizedIds) === false) return;
   if (apoptosizedIds.length < 1) return;
-  p2p.state.removeNodes(apoptosizedIds.map(id => p2p.state.getNode(id)));
+
+  const apoptosizedNodes = apoptosizedIds.reduce((arr: any[], id: string) => {
+    // [TODO] [HACK] Don't restart on being apoptosized, so that logs are preserved
+    if (id === p2p.id) {
+      log(`I have been apoptosized, exiting with code 1...`);
+      process.exit(1);
+    }
+    arr.push(p2p.state.getNode(id));
+    return arr;
+  }, []);
+
+  p2p.state.removeNodes(apoptosizedNodes);
+
   log(
-    `Removed apoptosized nodes from nodelist: ${JSON.stringify(apoptosizedIds)}`
+    `Removed apoptosized nodes from nodelist: ${JSON.stringify(
+      apoptosizedNodes
+    )}`
   );
 }
 
