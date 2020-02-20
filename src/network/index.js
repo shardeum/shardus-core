@@ -86,7 +86,6 @@ class Network extends EventEmitter {
         }
       } catch (err) {
         this.mainLogger.error('Network: _setupInternal: ' + err)
-        respond({ status: 'Internal route error: ' + err })
       }
     })
     console.log(`Internal server running on port ${this.ipInfo.internalPort}...`)
