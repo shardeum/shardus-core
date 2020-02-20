@@ -27,8 +27,8 @@ type SignedApoptosisProposal = ApoptosisProposal & SignedObject;
 
 /** STATE */
 
-export const cycleDataName = 'apoptosizedNodes';
-export const cycleUpdatesName = 'apoptosisNodes';
+export const cycleDataName = 'apoptosized';
+export const cycleUpdatesName = 'apoptosis';
 
 let p2p: P2PType;
 
@@ -38,7 +38,7 @@ let apoptosisProposals: { [publicKey: string]: ApoptosisProposal } = {};
 
 export const internalRoutes = [
   {
-    name: 'init_apoptosis',
+    name: 'apoptosize',
     handler: (payload, respond) => {
       log(`Got proposal: ${JSON.stringify(payload)}`);
       if (addProposal(payload)) p2p.sendGossipIn('apoptosis', payload);
