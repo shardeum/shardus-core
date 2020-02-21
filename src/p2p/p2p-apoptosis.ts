@@ -29,6 +29,8 @@ type SignedApoptosisProposal = ApoptosisProposal & SignedObject;
 
 export const cycleDataName = 'apoptosized';
 export const cycleUpdatesName = 'apoptosis';
+export const internalRouteName = 'apoptosize'
+export const gossipRouteName = 'apoptosis'
 
 let p2p: P2PType;
 
@@ -38,21 +40,21 @@ let apoptosisProposals: { [publicKey: string]: ApoptosisProposal } = {};
 
 export const internalRoutes = [
   {
-    name: 'apoptosize',
+    name: internalRouteName,
     handler: (payload, respond) => {
       log(`Got proposal: ${JSON.stringify(payload)}`);
-      if (addProposal(payload)) p2p.sendGossipIn('apoptosis', payload);
+      if (addProposal(payload)) p2p.sendGossipIn(gossipRouteName, payload);
     },
   },
 ];
 
 export const gossipRoutes = [
   {
-    name: 'apoptosis',
+    name: gossipRouteName,
     handler: (payload, sender, tracker) => {
       log(`Got gossip: ${JSON.stringify(payload)}`);
       if (addProposal(payload)) {
-        p2p.sendGossipIn('apoptosis', payload, tracker, sender);
+        p2p.sendGossipIn(gossipRouteName, payload, tracker, sender);
       }
     },
   },
@@ -67,7 +69,7 @@ export function setContext(context: P2PType) {
 
 export async function apoptosizeSelf(activeNodes) {
   const proposal = createProposal();
-  await p2p.tell(activeNodes, 'init_apoptosis', proposal);
+  await p2p.tell(activeNodes, internalRouteName, proposal);
   log(`Sent apoptosize-self proposal: ${JSON.stringify(proposal)}`);
   addProposal(proposal);
 }
