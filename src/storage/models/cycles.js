@@ -23,7 +23,6 @@ module.exports = [
     returned: { type: Sequelize.JSON, allowNull: false },
     lost: { type: Sequelize.JSON, allowNull: false },
     refuted: { type: Sequelize.JSON, allowNull: false },
-    apoptosized: { type: Sequelize.JSON, allowNull: false },
     ...P2PApoptosis.sequelizeCycleFieldModel
   }
 ]
