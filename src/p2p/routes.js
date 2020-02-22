@@ -77,27 +77,6 @@ function setupRoutes () {
     await respond({ nodelist })
   })
 
-  this.registerInternal('cyclechainhash', async (payload, respond) => {
-    if (!payload) {
-      this.mainLogger.debug('No payload provided with `cyclechainhash` request.')
-      await respond({ cycleChainHash: null, error: 'no payload; start and end cycle required' })
-      return
-    }
-    this.mainLogger.debug(`Payload of request on 'cyclechainhash': ${JSON.stringify(payload)}`)
-    if (payload.start === undefined || payload.end === undefined) {
-      this.mainLogger.debug('Start and end for the `cyclechainhash` request were not both provided.')
-      await respond({ cycleChainHash: null, error: 'start and end required' })
-      return
-    }
-    const cycleChainHash = this.getCycleChainHash(payload.start, payload.end)
-    this.mainLogger.debug(`Cycle chain hash to be sent: ${JSON.stringify(cycleChainHash)}`)
-    if (!cycleChainHash) {
-      await respond({ cycleChainHash, error: 'invalid indexes for cycle chain hash' })
-      return
-    }
-    await respond({ cycleChainHash })
-  })
-
   this.registerInternal('cyclechain', async (payload, respond) => {
     if (!payload) {
       this.mainLogger.debug('No payload provided with `cyclechain` request.')

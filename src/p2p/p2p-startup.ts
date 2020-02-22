@@ -3,6 +3,8 @@ import { EventEmitter } from 'events';
 import utils from '../utils';
 import * as http from '../http';
 
+/** TYPES */
+
 type P2PType = P2P & EventEmitter;
 
 export interface Node {
@@ -11,7 +13,85 @@ export interface Node {
   publicKey: string;
 }
 
+export enum NodeStatus {
+  ACTIVE = 'active',
+  SYNCING = 'syncing',
+}
+
+export interface NodeInfo {
+  curvePublicKey: string;
+  externalIp: string;
+  externalPort: number;
+  id: string;
+  internalIp: string;
+  internalPort: number;
+  publicKey: string;
+  status: NodeStatus;
+}
+
+/** STATE */
+
 let p2p: P2PType;
+
+/** ROUTES */
+
+export const internalRoutes = [
+  {
+    name: 'cyclechainhash',
+    handler: async (payload, respond) => {
+      if (!payload) {
+        p2p.mainLogger.debug(
+          'No payload provided with `cyclechainhash` request.'
+        );
+        await respond({
+          cycleChainHash: null,
+          error: 'no payload; start and end cycle required',
+        });
+        return;
+      }
+      p2p.mainLogger.debug(
+        `Payload of request on 'cyclechainhash': ${JSON.stringify(payload)}`
+      );
+      if (payload.start === undefined || payload.end === undefined) {
+        p2p.mainLogger.debug(
+          'Start and end for the `cyclechainhash` request were not both provided.'
+        );
+        await respond({
+          cycleChainHash: null,
+          error: 'start and end required',
+        });
+        return;
+      }
+      const cycleChainHash = getCycleChainHash(payload.start, payload.end);
+      p2p.mainLogger.debug(
+        `Cycle chain hash to be sent: ${JSON.stringify(cycleChainHash)}`
+      );
+      if (!cycleChainHash) {
+        await respond({
+          cycleChainHash,
+          error: 'invalid indexes for cycle chain hash',
+        });
+        return;
+      }
+      await respond({ cycleChainHash });
+    },
+  },
+];
+
+function getCycleChainHash (start, end) {
+  p2p.mainLogger.debug(`Requested hash of cycle chain from cycle ${start} to ${end}...`)
+  let cycleChain
+  try {
+    cycleChain = p2p.getCycleChain(start, end)
+  } catch (e) {
+    return null
+  }
+  const hash = p2p.crypto.hash({ cycleChain })
+  p2p.mainLogger.debug(`Hash of requested cycle chain: ${hash}`)
+  return hash
+}
+
+/** FUNCTIONS */
 
 export function setContext(context: P2PType) {
   p2p = context;
@@ -29,7 +109,7 @@ export async function startup(): Promise<boolean> {
   // outerJoinAttemps is set to a high number incase we want to build a large network and need the node to keep trying to join for awhile.
   let outerJoinAttemps = 100;
   while (!joined) {
-    activeNodes = await getActiveNodes();
+    activeNodes = await getOrInitNetwork();
     p2p.isFirstSeed = await discoverNetwork(activeNodes);
 
     // Remove yourself from seedNodes if you are present in them but not firstSeed
@@ -69,13 +149,13 @@ export async function startup(): Promise<boolean> {
   return true;
 }
 
-async function getActiveNodes() {
+async function getOrInitNetwork() {
   const archiver: Node = p2p.existingArchivers[0];
-  const seedListSigned = await p2p._getSeedListSigned();
-  if (!p2p.crypto.verify(seedListSigned, archiver.publicKey)) {
+  const activeNodesSigned = await getActiveNodesFromArchiver();
+  if (!p2p.crypto.verify(activeNodesSigned, archiver.publicKey)) {
     throw Error('Fatal: _getSeedNodes seed list was not signed by archiver!');
   }
-  const joinRequest = seedListSigned.joinRequest;
+  const joinRequest = activeNodesSigned.joinRequest;
   if (joinRequest) {
     if (p2p.archivers.addJoinRequest(joinRequest) === false) {
       throw Error(
@@ -83,11 +163,11 @@ async function getActiveNodes() {
       );
     }
   }
-  const dataRequest = seedListSigned.dataRequest;
+  const dataRequest = activeNodesSigned.dataRequest;
   if (dataRequest) {
     p2p.archivers.addDataRecipient(joinRequest.nodeInfo, dataRequest);
   }
-  return seedListSigned.nodeList;
+  return activeNodesSigned.nodeList;
 }
 
 async function discoverNetwork(seedNodes) {
@@ -162,22 +242,6 @@ async function joinNetwork(seedNodes) {
   return true;
 }
 
-export enum NodeStatus {
-  ACTIVE = 'active',
-  SYNCING = 'syncing',
-}
-
-export interface NodeInfo {
-  curvePublicKey: string;
-  externalIp: string;
-  externalPort: number;
-  id: string;
-  internalIp: string;
-  internalPort: number;
-  publicKey: string;
-  status: NodeStatus;
-}
-
 async function syncToNetwork(activeNodes: Node[]) {
   // If you are first node, there is nothing to sync to
   if (p2p.isFirstSeed) {
@@ -200,11 +264,11 @@ async function syncToNetwork(activeNodes: Node[]) {
       '_syncToNetwork > fetchNodeInfo failed. Apoptosis then restarting...'
     );
   }
-  p2p.activeNodeInfos = nodeInfoResults as NodeInfo[];
+  p2p.archiverActiveNodes = nodeInfoResults as NodeInfo[];
 
   // Get hash of nodelist
   p2p.mainLogger.debug('Fetching nodelist hash...');
-  const nodelistHashResult = await fetchNodelistHash(p2p.activeNodeInfos);
+  const nodelistHashResult = await fetchNodelistHash(p2p.archiverActiveNodes);
   p2p.mainLogger.debug(`Nodelist hash result is: ${nodelistHashResult}.`);
   if (checkNodelistHash(nodelistHashResult) === false) {
     await abort(
@@ -215,7 +279,10 @@ async function syncToNetwork(activeNodes: Node[]) {
 
   // Get and verify nodelist aganist hash
   p2p.mainLogger.debug('Fetching verified nodelist...');
-  const nodelistResult = await fetchNodelist(p2p.activeNodeInfos, nodelistHash);
+  const nodelistResult = await fetchNodelist(
+    p2p.archiverActiveNodes,
+    nodelistHash
+  );
   p2p.mainLogger.debug(`Nodelist result is: ${JSON.stringify(nodelistResult)}`);
   if (checkNodelist(nodelistResult) === false) {
     await abort(
@@ -233,8 +300,8 @@ async function syncToNetwork(activeNodes: Node[]) {
   // Get latest cycle chain
   p2p.mainLogger.debug('Fetching latest cycle chain...');
   const nodes = p2p.state.getActiveNodes();
-  const { cycleChain, cycleMarkerCerts } = await p2p._fetchLatestCycleChain(
-    p2p.activeNodeInfos,
+  const { cycleChain, cycleMarkerCerts } = await _fetchLatestCycleChain(
+    p2p.archiverActiveNodes,
     nodes
   );
   p2p.mainLogger.debug(`Retrieved cycle chain: ${JSON.stringify(cycleChain)}`);
@@ -261,7 +328,9 @@ async function syncToNetwork(activeNodes: Node[]) {
         'Unable to get cycle marker internally from active nodes. Falling back to seed nodes...'
       );
       try {
-        cycleMarker = await p2p._fetchCycleMarkerInternal(p2p.activeNodeInfos);
+        cycleMarker = await p2p._fetchCycleMarkerInternal(
+          p2p.archiverActiveNodes
+        );
       } catch (err) {
         p2p.mainLogger.error(
           '_syncToNetwork > getUnfinalized: Could not get cycle marker from seed nodes. Apoptosis then Exiting... ' +
@@ -287,7 +356,7 @@ async function syncToNetwork(activeNodes: Node[]) {
       p2p.mainLogger.warn(
         'Unable to get cycle marker internally from active nodes. Falling back to seed nodes...'
       );
-      unfinalized = await p2p._fetchUnfinalizedCycle(p2p.activeNodeInfos);
+      unfinalized = await p2p._fetchUnfinalizedCycle(p2p.archiverActiveNodes);
     }
     return unfinalized;
   };
@@ -307,81 +376,9 @@ async function syncToNetwork(activeNodes: Node[]) {
   return true;
 }
 
-async function fetchNodeInfo(activeNodes: Node[]) {
-  const getNodeinfo = async (node: Node) => {
-    const { nodeInfo }: { nodeInfo: NodeInfo } = await http.get(
-      `${node.ip}:${node.port}/nodeinfo`
-    );
-    return nodeInfo;
-  };
-  const promises = activeNodes.map(node => getNodeinfo(node));
-  return utils.robustPromiseAll(promises);
-}
-
-function checkNodeInfos(results: unknown): boolean {
-  // [TODO] Check type
-  if (exists(results)) {
-    if (Array.isArray(results)) {
-      if (results.length > 0) {
-        if (results.every(() => true)) {
-          // [TODO] Check range
-          return true;
-        }
-      }
-    }
-  }
-  return false;
-}
-
-async function fetchNodelistHash(nodes: NodeInfo[]) {
-  const queryFn = async (node: NodeInfo) => {
-    const { nodelistHash } = await p2p.ask(node, 'nodelisthash');
-    return { nodelistHash };
-  };
-  try {
-    const [response] = await p2p.robustQuery(nodes, queryFn);
-    const { nodelistHash } = response;
-    return nodelistHash;
-  } catch (err) {
-    p2p.mainLogger.error('fetchNodelistHash failed: ' + err);
-    return undefined;
-  }
-}
-
-function checkNodelistHash(results: unknown): boolean {
-  // [TODO] Check type and range
-  if (exists(results)) {
-    return true;
-  }
-  return false;
-}
-
-async function fetchNodelist(nodes, nodelistHash) {
-  const queryFn = async node => {
-    const { nodelist } = await p2p.ask(node, 'nodelist');
-    return { nodelist };
-  };
-  try {
-    const verifyFn = nodelist => p2p._verifyNodelist(nodelist, nodelistHash);
-    const { nodelist } = await p2p._sequentialQuery(nodes, queryFn, verifyFn);
-    return nodelist;
-  } catch (err) {
-    p2p.mainLogger.error('fetchNodelistHash failed: ' + err);
-    return undefined;
-  }
-}
-
-function checkNodelist(results: unknown): boolean {
-  // [TODO] Check type and range
-  if (exists(results)) {
-    return true;
-  }
-  return false;
-}
-
 async function syncUpChainAndNodelist() {
   const nodes = p2p.state.getActiveNodes(p2p.isActive() ? p2p.id : null);
-  const seedNodes = p2p.activeNodeInfos;
+  const seedNodes = p2p.archiverActiveNodes;
 
   p2p.mainLogger.info('Syncing up cycle chain and nodelist...');
 
@@ -542,6 +539,246 @@ async function syncUpChainAndNodelist() {
   }
   const synced = await syncUpChainAndNodelist();
   return synced;
+}
+
+/** HELPER FUNCTIONS */
+
+async function getActiveNodesFromArchiver() {
+  const archiver = p2p.existingArchivers[0];
+  const nodeListUrl = `http://${archiver.ip}:${archiver.port}/nodelist`;
+  const nodeInfo = p2p.getPublicNodeInfo();
+  const { nextCycleMarker: firstCycleMarker } = p2p.getCycleMarkerInfo();
+  let seedListSigned;
+  try {
+    seedListSigned = await http.post(nodeListUrl, {
+      nodeInfo,
+      firstCycleMarker,
+    });
+  } catch (e) {
+    throw Error(
+      `Fatal: Could not get seed list from seed node server ${nodeListUrl}: ` +
+        e.message
+    );
+  }
+  p2p.mainLogger.debug(
+    `Got signed seed list: ${JSON.stringify(seedListSigned)}`
+  );
+  return seedListSigned;
+}
+
+async function fetchNodeInfo(activeNodes: Node[]) {
+  const getNodeinfo = async (node: Node) => {
+    const { nodeInfo }: { nodeInfo: NodeInfo } = await http.get(
+      `${node.ip}:${node.port}/nodeinfo`
+    );
+    return nodeInfo;
+  };
+  const promises = activeNodes.map(node => getNodeinfo(node));
+  return utils.robustPromiseAll(promises);
+}
+function checkNodeInfos(results: unknown): boolean {
+  // [TODO] Check type
+  if (exists(results)) {
+    if (Array.isArray(results)) {
+      if (results.length > 0) {
+        if (results.every(() => true)) {
+          // [TODO] Check range
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+async function fetchNodelistHash(nodes: NodeInfo[]) {
+  const queryFn = async (node: NodeInfo) => {
+    const { nodelistHash } = await p2p.ask(node, 'nodelisthash');
+    return { nodelistHash };
+  };
+  try {
+    const [response] = await p2p.robustQuery(nodes, queryFn);
+    const { nodelistHash } = response;
+    return nodelistHash;
+  } catch (err) {
+    p2p.mainLogger.error('fetchNodelistHash failed: ' + err);
+    return undefined;
+  }
+}
+function checkNodelistHash(results: unknown): boolean {
+  // [TODO] Check type and range
+  if (exists(results)) {
+    return true;
+  }
+  return false;
+}
+
+async function fetchNodelist(nodes, nodelistHash) {
+  const queryFn = async node => {
+    const { nodelist } = await p2p.ask(node, 'nodelist');
+    return { nodelist };
+  };
+  try {
+    const verifyFn = nodelist => p2p._verifyNodelist(nodelist, nodelistHash);
+    const { nodelist } = await p2p._sequentialQuery(nodes, queryFn, verifyFn);
+    return nodelist;
+  } catch (err) {
+    p2p.mainLogger.error('fetchNodelistHash failed: ' + err);
+    return undefined;
+  }
+}
+function checkNodelist(results: unknown): boolean {
+  // [TODO] Check type and range
+  if (exists(results)) {
+    return true;
+  }
+  return false;
+}
+
+async function _fetchLatestCycleChain(activeNodes, nodes) {
+  // Remove archiver active nodes from nodes
+  nodes = nodes.filter(
+    node => !activeNodes.map(active => active.id).includes(node.id)
+  );
+
+  // Get current cycle counter
+  let cycleCounter;
+  try {
+    ({ cycleCounter } = await p2p._fetchCycleMarkerInternal(nodes));
+  } catch (e) {
+    p2p.mainLogger.warn(
+      'Could not get cycleMarker from nodes. Querying seedNodes for it...'
+    );
+    p2p.mainLogger.debug(e);
+    try {
+      ({ cycleCounter } = await p2p._fetchCycleMarkerInternal(activeNodes));
+    } catch (err) {
+      p2p.mainLogger.error(
+        '_syncToNetwork > _fetchLatestCycleChain: Could not get cycleMarker from seedNodes. Apoptosis then Exiting... ' +
+          err
+      );
+      await p2p.initApoptosis();
+      process.exit();
+    }
+  }
+
+  // Check for bad cycleCounter data
+  if (!cycleCounter || cycleCounter < 0) {
+    p2p.mainLogger.error(
+      '_syncToNetwork > _fetchLatestCycleChain: Got bad cycleCounter. Apoptosis and Exiting...'
+    );
+    await p2p.initApoptosis();
+    process.exit();
+  }
+
+  p2p.mainLogger.debug(`Fetched cycle counter: ${cycleCounter}`);
+
+  // Determine cycle counter numbers to get, at most, the last 1000 cycles
+  const chainEnd = cycleCounter;
+  const desiredCycles = 1000;
+  const chainStart =
+    chainEnd -
+    (cycleCounter < desiredCycles
+      ? cycleCounter
+      : cycleCounter - (desiredCycles - 1));
+
+  // Get cycle chain hash
+  let cycleChainHash;
+  try {
+    cycleChainHash = await _fetchCycleChainHash(nodes, chainStart, chainEnd);
+  } catch (e) {
+    p2p.mainLogger.warn(
+      'Could not get cycleChainHash from nodes. Querying seedNodes for it...'
+    );
+    p2p.mainLogger.debug(e);
+    try {
+      cycleChainHash = await _fetchCycleChainHash(
+        activeNodes,
+        chainStart,
+        chainEnd
+      );
+    } catch (err) {
+      p2p.mainLogger.error(
+        'syncToNetwork > _fetchLatestCycleChain: Could not get cycleChainHash from seed nodes. Apoptosis then Exiting... ' +
+          err
+      );
+      await p2p.initApoptosis();
+      process.exit();
+    }
+  }
+
+  // Check for bad cycleChainHash data
+  if (!cycleChainHash || cycleChainHash === '') {
+    p2p.mainLogger.error(
+      '_syncToNetwork > _fetchLatestCycleChain: Got bad cycleChainHash. Apoptosis and Exiting...'
+    );
+    await p2p.initApoptosis();
+    process.exit();
+  }
+
+  p2p.mainLogger.debug(`Fetched cycle chain hash: ${cycleChainHash}`);
+
+  // Get verified cycle chain
+  let chainAndCerts;
+  try {
+    chainAndCerts = await p2p._fetchVerifiedCycleChain(
+      nodes,
+      cycleChainHash,
+      chainStart,
+      chainEnd
+    );
+  } catch (e) {
+    p2p.mainLogger.warn(
+      '_fetchLatestCycleChain: Could not get verified cycleChain from nodes. Querying seedNodes for it...'
+    );
+    p2p.mainLogger.debug(e);
+    try {
+      chainAndCerts = await p2p._fetchVerifiedCycleChain(
+        activeNodes,
+        cycleChainHash,
+        chainStart,
+        chainEnd
+      );
+    } catch (err) {
+      p2p.mainLogger.error(
+        'syncToNetwork > _fetchVerifiedCycleChain: Could not get cycleChainHash from seed nodes. Apoptosis then Exiting... ' +
+          err
+      );
+      await p2p.initApoptosis();
+      process.exit();
+    }
+  }
+
+  // Check for bad chainAndCerts data
+  if (
+    !chainAndCerts ||
+    Array.isArray(chainAndCerts) ||
+    chainAndCerts.length < 1
+  ) {
+    p2p.mainLogger.error(
+      '_syncToNetwork > _fetchLatestCycleChain: Got bad chainAndCerts. Apoptosis and Exiting...'
+    );
+    await p2p.initApoptosis();
+    process.exit();
+  }
+
+  return chainAndCerts;
+}
+
+async function _fetchCycleChainHash(nodes, start, end) {
+  const queryFn = async node => {
+    const { cycleChainHash } = await p2p.ask(node, 'cyclechainhash', {
+      start,
+      end,
+    });
+    return { cycleChainHash };
+  };
+  const [response] = await p2p.robustQuery(nodes, queryFn);
+  const { cycleChainHash } = response;
+  p2p.mainLogger.debug(
+    `Result of robust query to fetch cycle chain hash: ${cycleChainHash}`
+  );
+  return cycleChainHash;
 }
 
 async function abort(message: string) {

@@ -30,7 +30,7 @@ class P2P extends EventEmitter {
     this.difficulty = config.difficulty
     this.queryDelay = config.queryDelay
     this.minNodesToAllowTxs = config.minNodesToAllowTxs
-    this.activeNodeInfos = null
+    this.archiverActiveNodes = null
     this.isFirstSeed = false
     this.acceptInternal = false
 
@@ -131,6 +131,7 @@ class P2P extends EventEmitter {
     routes.register(this)
     this.lostNodes.registerRoutes()
     this.archivers.registerRoutes()
+    for (const route of P2PStartup.internalRoutes) this.registerInternal(route.name, route.handler)
     for (const route of P2PApoptosis.internalRoutes) this.registerInternal(route.name, route.handler)
     for (const route of P2PApoptosis.gossipRoutes) this.registerGossipHandler(route.name, route.handler)
   }
@@ -187,21 +188,6 @@ class P2P extends EventEmitter {
       }
     }
     throw Error('Unable to check local time against time servers.')
-  }
-
-  async _getSeedListSigned () {
-    const archiver = this.existingArchivers[0]
-    const nodeListUrl = `http://${archiver.ip}:${archiver.port}/nodelist`
-    const nodeInfo = this.getPublicNodeInfo()
-    const { nextCycleMarker: firstCycleMarker } = this.getCycleMarkerInfo()
-    let seedListSigned
-    try {
-      seedListSigned = await http.post(nodeListUrl, { nodeInfo, firstCycleMarker })
-    } catch (e) {
-      throw Error(`Fatal: Could not get seed list from seed node server ${nodeListUrl}: ` + e.message)
-    }
-    this.mainLogger.debug(`Got signed seed list: ${JSON.stringify(seedListSigned)}`)
-    return seedListSigned
   }
 
   async _setNodeId (id, updateDb = true) {
@@ -275,19 +261,6 @@ class P2P extends EventEmitter {
     }
     this.mainLogger.debug(`Result of requested cycleChain: ${certs}`)
     return certs
-  }
-
-  getCycleChainHash (start, end) {
-    this.mainLogger.debug(`Requested hash of cycle chain from cycle ${start} to ${end}...`)
-    let cycleChain
-    try {
-      cycleChain = this.getCycleChain(start, end)
-    } catch (e) {
-      return null
-    }
-    const hash = this.crypto.hash({ cycleChain })
-    this.mainLogger.debug(`Hash of requested cycle chain: ${hash}`)
-    return hash
   }
 
   _getThisNodeInfo () {
@@ -485,7 +458,7 @@ class P2P extends EventEmitter {
     } catch (e) {
       this.mainLogger.warn('Could not get cycleMarker from nodes. Querying seedNodes for it...')
       try {
-        cycleMarker = await this._fetchCycleMarkerInternal(this.activeNodeInfos)
+        cycleMarker = await this._fetchCycleMarkerInternal(this.archiverActiveNodes)
       } catch (err) {
         this.mainLogger.error('_submitWhenUpdatePhase could not get cycleMarker from seedNodes. Exiting... ' + err)
         process.exit()
@@ -568,7 +541,7 @@ class P2P extends EventEmitter {
     return signedJoinReq
   }
 
-  async initApoptosis (activeNodes = this.id ? this.state.getActiveNodes(this.id) : this.activeNodeInfos) {
+  async initApoptosis (activeNodes = this.id ? this.state.getActiveNodes(this.id) : this.archiverActiveNodes) {
     P2PApoptosis.apoptosizeSelf(activeNodes)
   }
 
@@ -793,17 +766,6 @@ class P2P extends EventEmitter {
     return cycleMarkerInfo
   }
 
-  async _fetchCycleChainHash (nodes, start, end) {
-    let queryFn = async (node) => {
-      const { cycleChainHash } = await this.ask(node, 'cyclechainhash', { start, end })
-      return { cycleChainHash }
-    }
-    const [response] = await this.robustQuery(nodes, queryFn)
-    const { cycleChainHash } = response
-    this.mainLogger.debug(`Result of robust query to fetch cycle chain hash: ${cycleChainHash}`)
-    return cycleChainHash
-  }
-
   async _fetchVerifiedCycleChain (nodes, cycleChainHash, start, end) {
     let queryFn = async (node) => {
       const chainAndCerts = await this.ask(node, 'cyclechain', { start, end })
@@ -811,91 +773,6 @@ class P2P extends EventEmitter {
     }
     let verifyFn = ({ cycleChain }) => this._verifyCycleChain(cycleChain, cycleChainHash)
     const chainAndCerts = await this._sequentialQuery(nodes, queryFn, verifyFn)
-    return chainAndCerts
-  }
-
-  async _fetchLatestCycleChain (seedNodes, nodes) {
-    // Remove seedNodes from nodes
-    nodes = nodes.filter(n => !(seedNodes.map(s => s.id).includes(n.id)))
-
-    // Get current cycle counter
-    let cycleCounter
-    try {
-      ;({ cycleCounter } = await this._fetchCycleMarkerInternal(nodes))
-    } catch (e) {
-      this.mainLogger.warn('Could not get cycleMarker from nodes. Querying seedNodes for it...')
-      this.mainLogger.debug(e)
-      try {
-        ;({ cycleCounter } = await this._fetchCycleMarkerInternal(seedNodes))
-      } catch (err) {
-        this.mainLogger.error('_syncToNetwork > _fetchLatestCycleChain: Could not get cycleMarker from seedNodes. Apoptosis then Exiting... ' + err)
-        await this.initApoptosis()
-        process.exit()
-      }
-    }
-
-    // Check for bad cycleCounter data
-    if (!cycleCounter || cycleCounter < 0) {
-      this.mainLogger.error('_syncToNetwork > _fetchLatestCycleChain: Got bad cycleCounter. Apoptosis and Exiting...')
-      await this.initApoptosis()
-      process.exit()
-    }
-
-    this.mainLogger.debug(`Fetched cycle counter: ${cycleCounter}`)
-
-    // Determine cycle counter numbers to get, at most, the last 1000 cycles
-    let chainEnd = cycleCounter
-    let desiredCycles = 1000
-    let chainStart = chainEnd - (cycleCounter < desiredCycles ? cycleCounter : cycleCounter - (desiredCycles - 1))
-
-    // Get cycle chain hash
-    let cycleChainHash
-    try {
-      cycleChainHash = await this._fetchCycleChainHash(nodes, chainStart, chainEnd)
-    } catch (e) {
-      this.mainLogger.warn('Could not get cycleChainHash from nodes. Querying seedNodes for it...')
-      this.mainLogger.debug(e)
-      try {
-        cycleChainHash = await this._fetchCycleChainHash(seedNodes, chainStart, chainEnd)
-      } catch (err) {
-        this.mainLogger.error('syncToNetwork > _fetchLatestCycleChain: Could not get cycleChainHash from seed nodes. Apoptosis then Exiting... ' + err)
-        await this.initApoptosis()
-        process.exit()
-      }
-    }
-
-    // Check for bad cycleChainHash data
-    if (!cycleChainHash || cycleChainHash === '') {
-      this.mainLogger.error('_syncToNetwork > _fetchLatestCycleChain: Got bad cycleChainHash. Apoptosis and Exiting...')
-      await this.initApoptosis()
-      process.exit()
-    }
-
-    this.mainLogger.debug(`Fetched cycle chain hash: ${cycleChainHash}`)
-
-    // Get verified cycle chain
-    let chainAndCerts
-    try {
-      chainAndCerts = await this._fetchVerifiedCycleChain(nodes, cycleChainHash, chainStart, chainEnd)
-    } catch (e) {
-      this.mainLogger.warn('_fetchLatestCycleChain: Could not get verified cycleChain from nodes. Querying seedNodes for it...')
-      this.mainLogger.debug(e)
-      try {
-        chainAndCerts = await this._fetchVerifiedCycleChain(seedNodes, cycleChainHash, chainStart, chainEnd)
-      } catch (err) {
-        this.mainLogger.error('syncToNetwork > _fetchVerifiedCycleChain: Could not get cycleChainHash from seed nodes. Apoptosis then Exiting... ' + err)
-        await this.initApoptosis()
-        process.exit()
-      }
-    }
-
-    // Check for bad chainAndCerts data
-    if (!chainAndCerts || Array.isArray(chainAndCerts) || chainAndCerts.length < 1) {
-      this.mainLogger.error('_syncToNetwork > _fetchLatestCycleChain: Got bad chainAndCerts. Apoptosis and Exiting...')
-      await this.initApoptosis()
-      process.exit()
-    }
-
     return chainAndCerts
   }
 
