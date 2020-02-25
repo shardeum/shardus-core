@@ -1,12 +1,9 @@
-import P2P from '.';
-import { EventEmitter } from 'events';
 import utils from '../utils';
 import * as http from '../http';
+import { newSyncToNetwork } from './p2p-sync-nodes-cycles';
+import { P2PModuleContext } from './p2p-types';
 
 /** TYPES */
-
-type P2PType = P2P & EventEmitter;
-
 export interface Node {
   ip: string;
   port: number;
@@ -31,7 +28,7 @@ export interface NodeInfo {
 
 /** STATE */
 
-let p2p: P2PType;
+let p2p: P2PModuleContext;
 
 /** ROUTES */
 
@@ -78,22 +75,24 @@ export const internalRoutes = [
   },
 ];
 
-function getCycleChainHash (start, end) {
-  p2p.mainLogger.debug(`Requested hash of cycle chain from cycle ${start} to ${end}...`)
-  let cycleChain
+function getCycleChainHash(start, end) {
+  p2p.mainLogger.debug(
+    `Requested hash of cycle chain from cycle ${start} to ${end}...`
+  );
+  let cycleChain;
   try {
-    cycleChain = p2p.getCycleChain(start, end)
+    cycleChain = p2p.getCycleChain(start, end);
   } catch (e) {
-    return null
+    return null;
   }
-  const hash = p2p.crypto.hash({ cycleChain })
-  p2p.mainLogger.debug(`Hash of requested cycle chain: ${hash}`)
-  return hash
+  const hash = p2p.crypto.hash({ cycleChain });
+  p2p.mainLogger.debug(`Hash of requested cycle chain: ${hash}`);
+  return hash;
 }
 
 /** FUNCTIONS */
 
-export function setContext(context: P2PType) {
+export function setContext(context: P2PModuleContext) {
   p2p = context;
 }
 
@@ -108,12 +107,13 @@ export async function startup(): Promise<boolean> {
   let joined = false;
   // outerJoinAttemps is set to a high number incase we want to build a large network and need the node to keep trying to join for awhile.
   let outerJoinAttemps = 100;
+  let ourIpInfo;
   while (!joined) {
-    activeNodes = await getOrInitNetwork();
+    activeNodes = await contactArchiver();
     p2p.isFirstSeed = await discoverNetwork(activeNodes);
 
     // Remove yourself from seedNodes if you are present in them but not firstSeed
-    const ourIpInfo = p2p.getIpInfo();
+    ourIpInfo = p2p.getIpInfo();
     if (p2p.isFirstSeed === false) {
       const ourIdx = activeNodes.findIndex(
         (node: { ip: any; port: any }) =>
@@ -144,12 +144,18 @@ export async function startup(): Promise<boolean> {
   p2p.emit('joined', p2p.id, publicKey);
 
   // Once joined, sync to the network
-  await syncToNetwork(activeNodes);
+  // [AS] [TODO] [HACK] If you're node with port 9003, use the new sync
+  if (ourIpInfo.externalPort === 9003) {
+    await newSyncToNetwork(activeNodes);
+  } else {
+    await syncToNetwork(activeNodes);
+  }
+
   p2p.emit('initialized');
   return true;
 }
 
-async function getOrInitNetwork() {
+async function contactArchiver() {
   const archiver: Node = p2p.existingArchivers[0];
   const activeNodesSigned = await getActiveNodesFromArchiver();
   if (!p2p.crypto.verify(activeNodesSigned, archiver.publicKey)) {

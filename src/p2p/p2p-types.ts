@@ -1,5 +1,7 @@
 // tslint:disable: variable-name
 
+import P2P from '.';
+import { EventEmitter } from 'events';
 import {
   Static,
   Number,
@@ -7,8 +9,10 @@ import {
   Record,
   Dictionary,
   Unknown,
-  Union
+  Union,
 } from 'runtypes';
+
+export type P2PModuleContext = P2P & EventEmitter;
 
 export const JoinRequest = Record({
   cycleMarker: String,
@@ -25,13 +29,13 @@ export const JoinRequest = Record({
   proofOfWork: Record({
     compute: Record({
       hash: String,
-      nonce: String
-    })
+      nonce: String,
+    }),
   }),
   selectionNum: String,
   sign: Record({
     owner: String,
-    sig: String
+    sig: String,
   }),
 });
 export type JoinRequest = Static<typeof JoinRequest>;
@@ -41,6 +45,6 @@ export const InternalAsk = Record({
   payload: Union(Record({}), Dictionary(Unknown, 'string')),
   sender: String,
   tag: String,
-  tracker: String
-})
+  tracker: String,
+});
 export type InternalAsk = Static<typeof InternalAsk>;

@@ -1,13 +1,9 @@
-import P2P from '.';
 import { insertSorted } from '../utils';
-import { EventEmitter } from 'events';
 import * as Sequelize from 'sequelize';
 import { Logger } from 'log4js';
+import { P2PModuleContext } from './p2p-types';
 
 /** TYPES */
-
-type P2PType = P2P & EventEmitter;
-
 interface LooseObject {
   [index: string]: unknown;
 }
@@ -29,10 +25,10 @@ type SignedApoptosisProposal = ApoptosisProposal & SignedObject;
 
 export const cycleDataName = 'apoptosized';
 export const cycleUpdatesName = 'apoptosis';
-export const internalRouteName = 'apoptosize'
-export const gossipRouteName = 'apoptosis'
+export const internalRouteName = 'apoptosize';
+export const gossipRouteName = 'apoptosis';
 
-let p2p: P2PType;
+let p2p: P2PModuleContext;
 
 let apoptosisProposals: { [publicKey: string]: ApoptosisProposal } = {};
 
@@ -62,7 +58,7 @@ export const gossipRoutes = [
 
 /** FUNCTIONS */
 
-export function setContext(context: P2PType) {
+export function setContext(context: P2PModuleContext) {
   p2p = context;
   log('Initialized p2p-apoptosis');
 }

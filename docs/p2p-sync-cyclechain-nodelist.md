@@ -2,7 +2,7 @@
 
 ## Syncing Node
 
-1. `robustQuery /current_cycle_marker`
+1. `robustQuery /cycle_chain_end`
 
     a. response:
     ```
@@ -17,8 +17,8 @@
     a. request:
     ```
     {
-      from: current - 100
-      to: current
+      start: current - 100
+      end: current
     }
     ```
 

@@ -10,6 +10,7 @@ const routes = require('./routes')
 
 const P2PStartup = require('./p2p-startup')
 const P2PApoptosis = require('./p2p-apoptosis')
+const P2PSync = require('./p2p-sync-nodes-cycles')
 
 class P2P extends EventEmitter {
   constructor (config, logger, storage, crypto) {
@@ -99,6 +100,9 @@ class P2P extends EventEmitter {
 
     // Init context for apoptosis
     P2PApoptosis.setContext(this)
+
+    // Init context for sync
+    P2PSync.setContext(this)
 
     this.InternalRecvCounter = 0
     this.keyCounter = 0
