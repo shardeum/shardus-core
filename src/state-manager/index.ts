@@ -381,23 +381,25 @@ class StateManager extends EventEmitter {
     this.shardValuesByCycle.set(cycleNumber, cycleShardData)
 
     // calculate nodes that would just now start syncing edge data because the network shrank.
-
-    // calculate if there are any nearby nodes that are syncing right now.
-    cycleShardData.syncingNeighbors = this.p2p.state.getOrderedSyncingNeighbors(cycleShardData.ourNode)
-
-    if (cycleShardData.syncingNeighbors.length > 0) {
-      cycleShardData.syncingNeighborsTxGroup = [...cycleShardData.syncingNeighbors]
-      cycleShardData.syncingNeighborsTxGroup.push(cycleShardData.ourNode)
-      cycleShardData.hasSyncingNeighbors = true
-
-      this.logger.playbackLogNote('shrd_sync_neighbors', `${cycleShardData.cycleNumber}`, ` neighbors: ${utils.stringifyReduce(cycleShardData.syncingNeighbors.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
-    } else {
-      cycleShardData.hasSyncingNeighbors = false
-    }
-
-    console.log(`updateShardValues  cycle:${cycleShardData.cycleNumber} `)
-
     if (cycleShardData.ourNode.status === 'active') {
+
+      // calculate if there are any nearby nodes that are syncing right now.
+      if (this.verboseLogs) this.mainLogger.debug(`updateShardValues: getOrderedSyncingNeighbors`)
+      cycleShardData.syncingNeighbors = this.p2p.state.getOrderedSyncingNeighbors(cycleShardData.ourNode)
+
+      if (cycleShardData.syncingNeighbors.length > 0) {
+        cycleShardData.syncingNeighborsTxGroup = [...cycleShardData.syncingNeighbors]
+        cycleShardData.syncingNeighborsTxGroup.push(cycleShardData.ourNode)
+        cycleShardData.hasSyncingNeighbors = true
+
+        this.logger.playbackLogNote('shrd_sync_neighbors', `${cycleShardData.cycleNumber}`, ` neighbors: ${utils.stringifyReduce(cycleShardData.syncingNeighbors.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+      } else {
+        cycleShardData.hasSyncingNeighbors = false
+      }
+
+      console.log(`updateShardValues  cycle:${cycleShardData.cycleNumber} `)
+
+
       // if (this.preTXQueue.length > 0) {
       //   for (let tx of this.preTXQueue) {
       //     this.logger.playbackLogNote('shrd_sync_preTX', ` `, ` ${utils.stringifyReduce(tx)} `)
@@ -1992,6 +1994,11 @@ class StateManager extends EventEmitter {
           if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index results ${utils.stringifyReduce(acceptedTXs)} snippets ${utils.stringifyReduce(payload.debugSnippets)} `)
           if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index results2:${utils.stringifyReduce(acceptedTXs.map((x:Shardus.AcceptedTx) => x.id))} snippets:${utils.stringifyReduce(payload.debugSnippets)} txid:${utils.stringifyReduce(txIDList)} `)
 
+          let acceptedTXsBefore = 0
+          if (acceptedTXs != null) {
+            acceptedTXsBefore = acceptedTXs.length
+          }
+
           // find an log missing results:
           // for(let txid of txIDList)
           let received:StringBoolObjectMap = {}
@@ -2019,7 +2026,7 @@ class StateManager extends EventEmitter {
               }
             }
           }
-          if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send3 ${acceptedTXs.length} < ${expectedResults} findsFixed: ${finds}  missing: ${utils.stringifyReduce(missingTXs)} found: ${utils.stringifyReduce(found)}`)
+          if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send3 ${acceptedTXsBefore} < ${expectedResults} findsFixed: ${finds}  missing: ${utils.stringifyReduce(missingTXs)} found: ${utils.stringifyReduce(found)} acceptedTXs.length updated: ${acceptedTXs.length}`)
         } else {
 
         }
@@ -2913,6 +2920,7 @@ class StateManager extends EventEmitter {
             return 'out of range'// we are done, not involved!!!
           } else {
             // let tempList =  // can be returned by the function below
+            if (this.verboseLogs) this.mainLogger.debug(`queueAcceptedTransaction: getOrderedSyncingNeighbors`)
             this.p2p.state.getOrderedSyncingNeighbors(this.currentCycleShardData.ourNode)
 
             if (this.currentCycleShardData.hasSyncingNeighbors === true) {

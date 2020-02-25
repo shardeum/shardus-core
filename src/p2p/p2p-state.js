@@ -839,9 +839,9 @@ class P2PState extends EventEmitter {
           let orderedString = `---orderedNodes ${utils.stringifyReduce(ordered.map((a) => a.id))}`
           console.log(orderedString)
 
-          this.mainLogger.error(`getOrderedSyncingNeighbors failed to find ${utils.stringifyReduce(node.id)} nodeList:${orderedString}`)
+          this.mainLogger.error(`getOrderedSyncingNeighbors failed to find ${utils.stringifyReduce(node.id)} nodeList:${orderedString} stack: ${new Error().stack}`)
         } else {
-          this.mainLogger.error(`getOrderedSyncingNeighbors failed to find ${utils.stringifyReduce(node.id)} nodeList: not available`)
+          this.mainLogger.error(`getOrderedSyncingNeighbors failed to find ${utils.stringifyReduce(node.id)} nodeList: not available stack: ${new Error().stack}`)
         }
         return results
       }
@@ -1653,7 +1653,8 @@ class P2PState extends EventEmitter {
     if (!self) return Object.values(nodes)
     // Check if self in node list
     if (!nodes[self]) {
-      this.mainLogger.warn(`Invalid node ID in 'self' field. Given ID: ${self}`)
+      // stack
+      this.mainLogger.warn(`Invalid node ID in 'self' field. Given ID: ${self} : ${new Error().stack}`)
       return Object.values(nodes)
     }
     const nodesCopy = utils.deepCopy(nodes)
