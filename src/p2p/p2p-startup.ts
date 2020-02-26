@@ -1,30 +1,7 @@
-import utils from '../utils';
 import * as http from '../http';
+import utils from '../utils';
 import { newSyncToNetwork } from './p2p-sync-nodes-cycles';
-import { P2PModuleContext } from './p2p-types';
-
-/** TYPES */
-export interface Node {
-  ip: string;
-  port: number;
-  publicKey: string;
-}
-
-export enum NodeStatus {
-  ACTIVE = 'active',
-  SYNCING = 'syncing',
-}
-
-export interface NodeInfo {
-  curvePublicKey: string;
-  externalIp: string;
-  externalPort: number;
-  id: string;
-  internalIp: string;
-  internalPort: number;
-  publicKey: string;
-  status: NodeStatus;
-}
+import { Node, NodeInfo, P2PModuleContext } from './p2p-types';
 
 /** STATE */
 
@@ -572,7 +549,7 @@ async function getActiveNodesFromArchiver() {
   return seedListSigned;
 }
 
-async function fetchNodeInfo(activeNodes: Node[]) {
+export async function fetchNodeInfo(activeNodes: Node[]) {
   const getNodeinfo = async (node: Node) => {
     const { nodeInfo }: { nodeInfo: NodeInfo } = await http.get(
       `${node.ip}:${node.port}/nodeinfo`

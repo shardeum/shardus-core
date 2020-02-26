@@ -1,18 +1,18 @@
 // tslint:disable: variable-name
 
-import P2P from '.';
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'events'
 import {
-  Static,
-  Number,
-  String,
-  Record,
   Dictionary,
-  Unknown,
+  Number,
+  Record,
+  Static,
+  String,
   Union,
-} from 'runtypes';
+  Unknown,
+} from 'runtypes'
+import P2P from '.'
 
-export type P2PModuleContext = P2P & EventEmitter;
+export type P2PModuleContext = P2P & EventEmitter
 
 export const JoinRequest = Record({
   cycleMarker: String,
@@ -37,8 +37,8 @@ export const JoinRequest = Record({
     owner: String,
     sig: String,
   }),
-});
-export type JoinRequest = Static<typeof JoinRequest>;
+})
+export type JoinRequest = Static<typeof JoinRequest>
 
 // {"payload":{},"sender":"2365xdb640","tag":"1074xx1140f","tracker":"key_2365xdb640_1581448859447_0"}
 export const InternalAsk = Record({
@@ -46,5 +46,27 @@ export const InternalAsk = Record({
   sender: String,
   tag: String,
   tracker: String,
-});
-export type InternalAsk = Static<typeof InternalAsk>;
+})
+export type InternalAsk = Static<typeof InternalAsk>
+
+export interface Node {
+  ip: string
+  port: number
+  publicKey: string
+}
+
+export enum NodeStatus {
+  ACTIVE = 'active',
+  SYNCING = 'syncing',
+}
+
+export interface NodeInfo {
+  curvePublicKey: string
+  externalIp: string
+  externalPort: number
+  id: string
+  internalIp: string
+  internalPort: number
+  publicKey: string
+  status: NodeStatus
+}
