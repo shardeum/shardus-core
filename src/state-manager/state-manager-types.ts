@@ -29,6 +29,7 @@ type QueueEntry = {
     syncKeys: any[];
     logstate: string; // logging state
     requests: {[key:string]:import("../shardus/shardus-types").Node} // map of account keys to the node that we are requesting the account data from 
+    globalModification:boolean
     uniqueKeys?: string[];
     ourNodeInvolved?: boolean;
     transactionGroup?: import("../shardus/shardus-types").Node[];

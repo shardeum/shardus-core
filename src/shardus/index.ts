@@ -413,7 +413,7 @@ class Shardus extends EventEmitter {
    * }
    *
    */
-  put (tx, set = false) {
+  put (tx, set = false, global = false) {
     if (!this.appProvided) throw new Error('Please provide an App object to Shardus.setup before calling Shardus.put')
 
     if (this.verboseLogs) this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(tx)}`) // not reducing tx here so we can get the long hashes
@@ -479,7 +479,7 @@ class Shardus extends EventEmitter {
       this.logger.playbackLogNote('tx_injected', `${txId}`, `Transaction: ${utils.stringifyReduce(tx)}`)
       this.profiler.profileSectionStart('consensusInject')
 
-      this.consensus.inject(signedShardusTx)
+      this.consensus.inject(signedShardusTx, global)
         .then(txReceipt => {
           this.profiler.profileSectionEnd('consensusInject')
           if (this.verboseLogs) this.mainLogger.debug(`Received Consensus. Receipt: ${utils.stringifyReduce(txReceipt)}`)

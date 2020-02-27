@@ -88,6 +88,8 @@ class StateManager extends EventEmitter {
     /** Stores the partition responses that other nodes push to us.  Index by cycle key, then index by partition id */
     allPartitionResponsesByCycleByPartition:{[cycleKey:string]: {[partitionKey:string]: PartitionResult[]}}
 
+    globalAccountMap: Map<string, Shardus.WrappedDataFromQueue | null>
+
   constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage : Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     super()
     this.verboseLogs = verboseLogs
@@ -196,6 +198,8 @@ class StateManager extends EventEmitter {
     this.txByCycleByPartition = {}
     this.allPartitionResponsesByCycleByPartition = {}
     
+
+    this.globalAccountMap = new Map()
 
     // debug hack
     if (p2p == null) {
@@ -862,6 +866,13 @@ class StateManager extends EventEmitter {
     this.readyforTXs = true
 
     await utils.sleep(8000) // sleep to make sure we are listening to some txs before we sync them
+
+    //TODO how do we build a non range based sync tracker that instead has a list of accounts.
+    //If we could do that then we can sync the globals.
+    //That said we can't calculate what globals are needed so it may be better to just have new code that requests the list then syncs the accounts
+    //It may not be possible to have state table data wrapping our global sync
+    //if not need to figure out if that is safe.
+
 
     for (let syncTracker of this.syncTrackers) {
       // let partition = syncTracker.partition
@@ -1595,7 +1606,7 @@ class StateManager extends EventEmitter {
 
       this.p2p.sendGossipIn('acceptedTx', acceptedTX, tracker, sender)
 
-      this.queueAcceptedTransaction(acceptedTX, false, sender)
+      this.queueAcceptedTransaction(acceptedTX, false, sender, false)
       //Note await not needed so beware if you add code below this.
     })
 
@@ -2059,22 +2070,22 @@ class StateManager extends EventEmitter {
       await respond(result)
     })
 
-    // p2p TELL
-    this.p2p.registerInternal('route_to_home_node', async (payload: RouteToHomeNodeReq, respond: any) => {
-      // gossip 'spread_tx_to_group' to transaction group
-      // Place tx in queue (if younger than m)
+    // // p2p TELL
+    // this.p2p.registerInternal('route_to_home_node', async (payload: RouteToHomeNodeReq, respond: any) => {
+    //   // gossip 'spread_tx_to_group' to transaction group
+    //   // Place tx in queue (if younger than m)
 
-      // make sure we don't already have it
-      let queueEntry = this.getQueueEntrySafe(payload.txid)//, payload.timestamp)
-      if (queueEntry) {
-        return
-        // already have this in our queue
-      }
+    //   // make sure we don't already have it
+    //   let queueEntry = this.getQueueEntrySafe(payload.txid)//, payload.timestamp)
+    //   if (queueEntry) {
+    //     return
+    //     // already have this in our queue
+    //   }
 
-      this.queueAcceptedTransaction(payload.acceptedTx, true, null) // todo pass in sender?
+    //   this.queueAcceptedTransaction(payload.acceptedTx, true, null, false) // todo pass in sender?
 
-      // no response needed?
-    })
+    //   // no response needed?
+    // })
 
     // p2p ASK
     this.p2p.registerInternal('request_state_for_tx', async (payload: RequestStateForTxReq, respond: (arg0: RequestStateForTxResp) => any) => {
@@ -2132,7 +2143,7 @@ class StateManager extends EventEmitter {
         // already have this in our queue
       }
 
-      let added = this.queueAcceptedTransaction(payload, false, sender)
+      let added = this.queueAcceptedTransaction(payload, false, sender, false)
       if (added === 'lost') {
         return // we are faking that the message got lost so bail here
       }
@@ -2207,7 +2218,7 @@ class StateManager extends EventEmitter {
     this.p2p.unregisterInternal('get_transactions_by_partition_index')
     this.p2p.unregisterInternal('get_partition_txids')
     // new shard endpoints:
-    this.p2p.unregisterInternal('route_to_home_node')
+    // this.p2p.unregisterInternal('route_to_home_node')
     this.p2p.unregisterInternal('request_state_for_tx')
     this.p2p.unregisterInternal('broadcast_state')
     this.p2p.unregisterGossipHandler('spread_tx_to_group')
@@ -2830,7 +2841,7 @@ class StateManager extends EventEmitter {
   //         Q
   //          QQ
 
-  queueAcceptedTransaction (acceptedTx:AcceptedTx, sendGossip:boolean = true, sender: Shardus.Node  |  null) {
+  queueAcceptedTransaction (acceptedTx:AcceptedTx, sendGossip:boolean = true, sender: Shardus.Node  |  null, global:boolean) : string | boolean {
     // dropping these too early.. hmm  we finished syncing before we had the first shard data.
     // if (this.currentCycleShardData == null) {
     //   // this.preTXQueue.push(acceptedTX)
@@ -2848,7 +2859,7 @@ class StateManager extends EventEmitter {
     let txId = acceptedTx.receipt.txHash
 
     this.queueEntryCounter++
-    let txQueueEntry:QueueEntry = { acceptedTx: acceptedTx, txKeys: keysResponse, collectedData: {}, originalData: {}, homeNodes: {}, hasShardInfo: false, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [], logstate:'', requests:{} } // age comes from timestamp
+    let txQueueEntry:QueueEntry = { acceptedTx: acceptedTx, txKeys: keysResponse, collectedData: {}, originalData: {}, homeNodes: {}, hasShardInfo: false, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [], logstate:'', requests:{}, globalModification:global } // age comes from timestamp
     // partition data would store stuff like our list of nodes that store this ts
     // collected data is remote data we have recieved back
     // //tx keys ... need a sorted list (deterministic) of partition.. closest to a number?
@@ -2894,12 +2905,24 @@ class StateManager extends EventEmitter {
           syncTracker.queueEntries.push(txQueueEntry) // same tx may get pushed in multiple times. that's ok.
           txQueueEntry.syncKeys.push(key) // used later to instruct what local data we should JIT load
           txQueueEntry.localKeys[key] = true // used for the filter
+
+          if(this.globalAccountMap.has(key)){
+            // indicate that we will have global data in this transaction!
+            // I think we do not need to test that here afterall.
+          } else {
+            //this makes the code aware that this key is for a global account.
+            //is setting this here too soon?
+            //it should be that p2p has already checked the receipt before calling shardus.push with global=true
+            
+            this.globalAccountMap.set(key, null)
+          }
+
           this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, ` qId: ${txQueueEntry.entryID}`)
         }
       }
 
       if (txQueueEntry.hasShardInfo) {
-        if (sendGossip) {
+        if (sendGossip && txQueueEntry.globalModification === false) {
           try {
             let transactionGroup = this.queueEntryGetTransactionGroup(txQueueEntry)
             if (transactionGroup.length > 1) {
@@ -2914,15 +2937,17 @@ class StateManager extends EventEmitter {
         if (txQueueEntry.didSync === false) {
         // see if our node shard data covers any of the accounts?
           this.queueEntryGetTransactionGroup(txQueueEntry) // this will compute our involvment
-          if (txQueueEntry.ourNodeInvolved === false) {
+          if (txQueueEntry.ourNodeInvolved === false && txQueueEntry.globalModification === false) {
+            // if globalModification === true then every node is in the group
             this.logger.playbackLogNote('shrd_notInTxGroup', `${txId}`, ``)
-
             return 'out of range'// we are done, not involved!!!
           } else {
             // let tempList =  // can be returned by the function below
             if (this.verboseLogs) this.mainLogger.debug(`queueAcceptedTransaction: getOrderedSyncingNeighbors`)
             this.p2p.state.getOrderedSyncingNeighbors(this.currentCycleShardData.ourNode)
-
+            // globalModification  TODO pass on to syncing nodes.   (make it pass on the flag too)
+            // possibly need to send proof to the syncing node or there could be a huge security loophole.  should share the receipt as an extra parameter
+            // or data repair will detect and reject this if we get tricked.  could be an easy attack vector
             if (this.currentCycleShardData.hasSyncingNeighbors === true) {
               this.logger.playbackLogNote('shrd_sync_tx', `${txId}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighborsTxGroup.map(x => x.id))}`)
               this.p2p.sendGossipAll('spread_tx_to_group', acceptedTx, '', sender, this.currentCycleShardData.syncingNeighborsTxGroup)
@@ -3456,9 +3481,11 @@ class StateManager extends EventEmitter {
           if (accountSeen(queueEntry) === false) {
             markAccountsSeen(queueEntry)
             try {
-              await this.tellCorrespondingNodes(queueEntry)
-              if (this.verboseLogs) this.logger.playbackLogNote('shrd_processing', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  values: ${debugAccountData(queueEntry, app)}`)
-            } catch (ex) {
+              if(queueEntry.globalModification === false) {
+                await this.tellCorrespondingNodes(queueEntry)
+                if (this.verboseLogs) this.logger.playbackLogNote('shrd_processing', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  values: ${debugAccountData(queueEntry, app)}`)
+              }
+             } catch (ex) {
               this.mainLogger.debug('processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
               this.fatalLogger.fatal('processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
             } finally {
@@ -3469,6 +3496,10 @@ class StateManager extends EventEmitter {
         } else if (queueEntry.state === 'awaiting data') {
           markAccountsSeen(queueEntry)
 
+          if(queueEntry.globalModification === false){
+            // no data to await.
+            continue
+          }
           // check if we have all accounts
           if (queueEntry.hasAll === false && txAge > timeM2) {
             if (this.queueEntryHasAllData(queueEntry) === true) {
@@ -3700,6 +3731,20 @@ class StateManager extends EventEmitter {
     if (this.currentCycleShardData == null) {
       throw new Error('getLocalOrRemoteAccount: network not ready')
     }
+
+    let forceLocalGlobalLookup = false
+    let globalAccount = this.globalAccountMap.get(address);
+    if(globalAccount != null){
+      // nothing actually caches this yet.  caching it could be hard.
+      // even having  a null in that hash should be usefull though
+      if(globalAccount != null){
+        return globalAccount;
+      }
+
+      //else look up locally
+      forceLocalGlobalLookup = true
+    }
+
     // check if we have this account locally. (does it have to be consenus or just stored?)
     let accountIsRemote = true
 
@@ -3711,6 +3756,9 @@ class StateManager extends EventEmitter {
 
     // hack to say we have all the data
     if (this.currentCycleShardData.activeNodes.length <= this.currentCycleShardData.shardGlobals.consensusRadius) {
+      accountIsRemote = false
+    }
+    if(forceLocalGlobalLookup){
       accountIsRemote = false
     }
 
@@ -5809,7 +5857,7 @@ class StateManager extends EventEmitter {
 
     newTXList.sort(function (a, b) { return a.timestamp - b.timestamp })
 
-    /// ////////////////////////
+
 
     // build and sort a list of TXs that we need to apply
 
@@ -5916,6 +5964,9 @@ class StateManager extends EventEmitter {
             break
           }
 
+          // TODO this is where we go through the account state and just in time grab global accounts from the cache we made in the revert section from backup copies.
+
+
           let applied = await this.tryApplyTransaction(tx, hasStateTableData, true, acountsFilter, wrappedStates, localCachedData) // TODO app interface changes.. how to get and pass the state wrapped account state in, (maybe simple function right above this
           // accountValuesByKey = {} // clear this.  it forces more db work but avoids issue with some stale flags
           if (!applied) {
@@ -6016,6 +6067,18 @@ class StateManager extends EventEmitter {
             if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts reset: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
           }
         }
+
+        //this is where we need to no reset a global account, but instead grab the replacment data and cache it
+        /// ////////////////////////
+        // let globalAccounts = Object.keys(this.globalAccountMap)
+        // for (let globalAccountKey of globalAccounts){
+        //   if(allAccountsToResetById[globalAccountKey] != null){
+            
+        //   }
+
+        // }
+
+
         // tell the app to replace the account data
         await this.app.resetAccountData(replacmentAccounts)
         // update local state.
