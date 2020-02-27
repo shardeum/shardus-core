@@ -2628,8 +2628,17 @@ class StateManager extends EventEmitter {
       let { stateTableResults, accountData: _accountdata } = applyResponse
       accountDataList = _accountdata
 
+      //have to figure out if this is a global modifying tx, since that impacts if we will write to global account.
+      let isGlobalModifyingTX = false
+      let queueEntry = this.getQueueEntry(acceptedTX.id)
+      if(queueEntry != null){
+        if(queueEntry.globalModification){
+          isGlobalModifyingTX = true
+        }
+      }
+
       // wrappedStates are side effected for now
-      await this.setAccount(wrappedStates, localCachedData, applyResponse, filter)
+      await this.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter)
 
       this.applySoftLock = false
       // only write our state table data if we dont already have it in the db
@@ -3948,7 +3957,7 @@ class StateManager extends EventEmitter {
   }
 
   // TODO WrappedStates
-  async setAccount (wrappedStates:WrappedResponses, localCachedData:LocalCachedData, applyResponse: Shardus.ApplyResponse, accountFilter?:AccountFilter) {
+  async setAccount (wrappedStates:WrappedResponses, localCachedData:LocalCachedData, applyResponse: Shardus.ApplyResponse, isGlobalModifyingTX:boolean, accountFilter?:AccountFilter ) {
     // let sourceAddress = inTx.srcAct
     // let targetAddress = inTx.tgtAct
     // let amount = inTx.txnAmt
@@ -3968,6 +3977,14 @@ class StateManager extends EventEmitter {
       }
 
       if (canWriteToAccount(wrappedData.accountId) === false) {
+        continue
+      }
+
+      let isGlobalKey = false
+      //intercept that we have this data rather than requesting it.
+      // only if this tx is not a global modifying tx.   if it is a global set then it is ok to save out the global here.
+      if(this.globalAccountMap.has(key) && isGlobalModifyingTX === false){
+        //hasKey = true
         continue
       }
 
