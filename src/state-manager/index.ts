@@ -2913,7 +2913,7 @@ class StateManager extends EventEmitter {
             //this makes the code aware that this key is for a global account.
             //is setting this here too soon?
             //it should be that p2p has already checked the receipt before calling shardus.push with global=true
-            
+
             this.globalAccountMap.set(key, null)
           }
 
@@ -3235,11 +3235,23 @@ class StateManager extends EventEmitter {
         }
       }
 
+      let isGlobalKey = false
+      //intercept that we have this data rather than requesting it.
+      if(this.globalAccountMap.has(key)){
+        hasKey = true
+        isGlobalKey = true
+      }
+
       if (hasKey) { // todo Detect if our node covers this paritition..  need our partition data
         let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
-        datas[key] = data
-        dataKeysWeHave.push(key)
-        dataValuesWeHave.push(data)
+        //only queue this up to share if it is not a global account. global accounts dont need to be shared.
+        if(isGlobalKey === false)
+        {
+          datas[key] = data
+          dataKeysWeHave.push(key)
+          dataValuesWeHave.push(data)          
+        }
+
         queueEntry.localKeys[key] = true
         // add this data to our own queue entry!!
         this.queueEntryAddData(queueEntry, data)
