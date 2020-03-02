@@ -13,7 +13,7 @@ class Crypto {
   }
 
   async init () {
-    crypto(this.config.hashKey)
+    crypto.init(this.config.hashKey)
     let keypair = await this.storage.getProperty('keypair')
     if (!keypair) {
       this.mainLogger.info('Keypair unable to be loaded from database. Generating new keypair...')
