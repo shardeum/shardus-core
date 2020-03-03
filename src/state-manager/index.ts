@@ -90,6 +90,14 @@ class StateManager extends EventEmitter {
 
     globalAccountMap: Map<string, Shardus.WrappedDataFromQueue | null>
 
+    /** Need the ablity to get account copies and use them later when applying a transaction. how to use the right copy or even know when to use this at all? */
+    /** Could go by cycle number. if your cycle matches the one in is list use it? */
+    /** What if the global account is transformed several times durring that cycle. oof. */
+    /** ok best thing to do is to store the account every time it changes for a given period of time. */
+    /** how to handle reparing a global account... yikes that is hard. */
+    globalAccountRepairBank: Map<string, Shardus.AccountsCopy[]>
+
+
   constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage : Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     super()
     this.verboseLogs = verboseLogs
@@ -183,6 +191,7 @@ class StateManager extends EventEmitter {
     this.purgeArchiveData = false
     this.sentReceipts = new Map()
 
+    this.globalAccountRepairBank = new Map()
     //Fifo locks.
     this.fifoLocks = {}
 
@@ -341,6 +350,7 @@ class StateManager extends EventEmitter {
     cycleShardData.activeNodes = this.p2p.state.getActiveNodes(null)
     cycleShardData.activeNodes.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
     cycleShardData.cycleNumber = cycleNumber
+    
 
     try {
       cycleShardData.ourNode = this.p2p.state.getNode(this.p2p.id) // ugh, I bet there is a nicer way to get our node
@@ -356,6 +366,12 @@ class StateManager extends EventEmitter {
     if(this.config == null || this.config.sharding == null){
       throw new Error("this.config.sharding == null")
     }
+
+    let cycle = this.p2p.state.getLastCycle()
+    if(cycle != null){
+      cycleShardData.timestamp = cycle.start * 1000
+    }
+
 
     // save this per cycle?
     cycleShardData.shardGlobals = ShardFunctions.calculateShardGlobals(cycleShardData.activeNodes.length, this.config.sharding.nodesPerConsensusGroup as number)
@@ -1606,7 +1622,7 @@ class StateManager extends EventEmitter {
 
       this.p2p.sendGossipIn('acceptedTx', acceptedTX, tracker, sender)
 
-      this.queueAcceptedTransaction(acceptedTX, false, sender, false)
+      this.queueAcceptedTransaction(acceptedTX,/*sendGossip*/ false, sender, /*globalModification*/ false)
       //Note await not needed so beware if you add code below this.
     })
 
@@ -2143,7 +2159,7 @@ class StateManager extends EventEmitter {
         // already have this in our queue
       }
 
-      let added = this.queueAcceptedTransaction(payload, false, sender, false)
+      let added = this.queueAcceptedTransaction(payload, /*sendGossip*/ false, sender, /*globalModification*/ false)
       if (added === 'lost') {
         return // we are faking that the message got lost so bail here
       }
@@ -2850,7 +2866,7 @@ class StateManager extends EventEmitter {
   //         Q
   //          QQ
 
-  queueAcceptedTransaction (acceptedTx:AcceptedTx, sendGossip:boolean = true, sender: Shardus.Node  |  null, global:boolean) : string | boolean {
+  queueAcceptedTransaction (acceptedTx:AcceptedTx, sendGossip:boolean = true, sender: Shardus.Node  |  null, globalModification:boolean) : string | boolean {
     // dropping these too early.. hmm  we finished syncing before we had the first shard data.
     // if (this.currentCycleShardData == null) {
     //   // this.preTXQueue.push(acceptedTX)
@@ -2868,7 +2884,7 @@ class StateManager extends EventEmitter {
     let txId = acceptedTx.receipt.txHash
 
     this.queueEntryCounter++
-    let txQueueEntry:QueueEntry = { acceptedTx: acceptedTx, txKeys: keysResponse, collectedData: {}, originalData: {}, homeNodes: {}, hasShardInfo: false, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [], logstate:'', requests:{}, globalModification:global } // age comes from timestamp
+    let txQueueEntry:QueueEntry = { acceptedTx: acceptedTx, txKeys: keysResponse, collectedData: {}, originalData: {}, homeNodes: {}, hasShardInfo: false, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [], logstate:'', requests:{}, globalModification:globalModification } // age comes from timestamp
     // partition data would store stuff like our list of nodes that store this ts
     // collected data is remote data we have recieved back
     // //tx keys ... need a sorted list (deterministic) of partition.. closest to a number?
@@ -2915,6 +2931,8 @@ class StateManager extends EventEmitter {
           txQueueEntry.syncKeys.push(key) // used later to instruct what local data we should JIT load
           txQueueEntry.localKeys[key] = true // used for the filter
 
+
+          // TODO: globalaccounts 
           if(this.globalAccountMap.has(key)){
             // indicate that we will have global data in this transaction!
             // I think we do not need to test that here afterall.
@@ -2954,6 +2972,7 @@ class StateManager extends EventEmitter {
             // let tempList =  // can be returned by the function below
             if (this.verboseLogs) this.mainLogger.debug(`queueAcceptedTransaction: getOrderedSyncingNeighbors`)
             this.p2p.state.getOrderedSyncingNeighbors(this.currentCycleShardData.ourNode)
+            // TODO: globalaccounts 
             // globalModification  TODO pass on to syncing nodes.   (make it pass on the flag too)
             // possibly need to send proof to the syncing node or there could be a huge security loophole.  should share the receipt as an extra parameter
             // or data repair will detect and reject this if we get tricked.  could be an easy attack vector
@@ -5993,10 +6012,34 @@ class StateManager extends EventEmitter {
             break
           }
 
-          // TODO this is where we go through the account state and just in time grab global accounts from the cache we made in the revert section from backup copies.
+          // TODO: globalaccounts  this is where we go through the account state and just in time grab global accounts from the cache we made in the revert section from backup copies.
+          //  TODO Perf probably could prepare of this inforamation above more efficiently but for now this is most simple and self contained.
 
-
-          let applied = await this.tryApplyTransaction(tx, hasStateTableData, true, acountsFilter, wrappedStates, localCachedData) // TODO app interface changes.. how to get and pass the state wrapped account state in, (maybe simple function right above this
+          //TODO verify that we will even have wrapped states at this point in the repair without doing some extra steps.
+          let wrappedStateKeys = Object.keys( wrappedStates )
+          for(let wrappedStateKey of wrappedStateKeys){
+            let wrappedState = wrappedStates[wrappedStateKey]
+            //is it global. 
+            if(this.isGlobalAccount(wrappedState.accountId)){
+              if(wrappedState != null){
+                let globalValueSnapshot = this.getGlobalAccountValueAtTime(wrappedState.accountId, tx.timestamp)           
+                
+                if(globalValueSnapshot == null){
+                  //todo some error?
+                  continue
+                }
+                // build a new wrapped response to insert
+                let newWrappedResponse:Shardus.WrappedResponse = {accountCreated:wrappedState.accountCreated, isPartial:false, accountId:wrappedState.accountId, timestamp:wrappedState.timestamp,
+                                                                  stateId: globalValueSnapshot.hash, data: globalValueSnapshot.data }
+                //set this new value into our wrapped states.
+                wrappedStates[wrappedStateKey] = newWrappedResponse // update!!
+                // insert thes data into the wrapped states.
+                // yikes probably cant do local cached data at this point.
+              }
+            }
+          }
+          
+          let applied = await this.tryApplyTransaction(tx, hasStateTableData,/** repairing */ true, acountsFilter, wrappedStates, localCachedData) // TODO app interface changes.. how to get and pass the state wrapped account state in, (maybe simple function right above this
           // accountValuesByKey = {} // clear this.  it forces more db work but avoids issue with some stale flags
           if (!applied) {
             applyFailCount++
@@ -6062,6 +6105,12 @@ class StateManager extends EventEmitter {
     }
   }
 
+
+  // this.globalAccountRepairBank = {
+
+
+  // }
+
   /**
    * _revertAccounts
    * @param {string[]} accountIDs
@@ -6073,13 +6122,14 @@ class StateManager extends EventEmitter {
     let cycleStart = cycle.start * 1000
     cycleEnd -= this.syncSettleTime // adjust by sync settle time
     cycleStart -= this.syncSettleTime // adjust by sync settle time
-    let replacmentAccounts
+    let replacmentAccounts:Shardus.AccountsCopy[]
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts start  numAccounts: ${accountIDs.length} repairing cycle:${cycleNumber}`)
 
     try {
       // query our account copies that are less than or equal to this cycle!
       let prevCycle = cycleNumber - 1
-      replacmentAccounts = await this.storage.getAccountReplacmentCopies(accountIDs, prevCycle)
+      
+      replacmentAccounts = (await this.storage.getAccountReplacmentCopies(accountIDs, prevCycle)) as Shardus.AccountsCopy[]
 
       if (replacmentAccounts.length > 0) {
         for (let accountData of replacmentAccounts) {
@@ -6095,19 +6145,15 @@ class StateManager extends EventEmitter {
             // todo overkill
             if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts reset: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
           }
+          // TODO: globalaccounts 
+          //this is where we need to no reset a global account, but instead grab the replacment data and cache it
+          /// ////////////////////////
+          let isGlobalAccount = this.globalAccountMap.has(accountData.accountId )
+          
+
+
+
         }
-
-        //this is where we need to no reset a global account, but instead grab the replacment data and cache it
-        /// ////////////////////////
-        // let globalAccounts = Object.keys(this.globalAccountMap)
-        // for (let globalAccountKey of globalAccounts){
-        //   if(allAccountsToResetById[globalAccountKey] != null){
-            
-        //   }
-
-        // }
-
-
         // tell the app to replace the account data
         await this.app.resetAccountData(replacmentAccounts)
         // update local state.
@@ -6216,6 +6262,8 @@ class StateManager extends EventEmitter {
     // partitionObjectsByCycle
     // cycleReceiptsByCycleCounter
 
+    let oldestCycleTimestamp = 0
+
     this.mainLogger.debug('Clearing out old data Start')
 
     let removedrepairTrackingByCycleById = 0
@@ -6261,6 +6309,12 @@ class StateManager extends EventEmitter {
     for (let cycleKey of this.shardValuesByCycle.keys()) {
       let cycleNum = cycleKey
       if (cycleNum < oldestCycle) {
+
+        //since we are about to axe cycle shard data take a look at its timestamp so we can clean up other lists.
+        let shardValues:CycleShardData = this.shardValuesByCycle[cycleNum]
+        if(shardValues != null){
+          oldestCycleTimestamp = shardValues.timestamp
+        }
         // delete old cycle
         this.shardValuesByCycle.delete(cycleNum)
         removedshardValuesByCycle++
@@ -6362,6 +6416,13 @@ class StateManager extends EventEmitter {
         break
       }
     }
+
+    // sort and clean up our global account backups:
+    if(oldestCycleTimestamp > 0){
+      this.sortAndMaintainBackups(oldestCycleTimestamp)
+    }
+
+
 
     this.mainLogger.debug(`Clearing out old data Cleared: ${removedrepairTrackingByCycleById} ${removedallPartitionResponsesByCycleByPartition} ${removedourPartitionResultsByCycle} ${removedshardValuesByCycle} ${removedtxByCycleByPartition} ${removedrecentPartitionObjectsByCycleByHash} ${removedrepairUpdateDataByCycle} ${removedpartitionObjectsByCycle} ${removepartitionReceiptsByCycleCounter} ${removeourPartitionReceiptsByCycleCounter} archQ:${archivedEntriesRemoved}`)
 
@@ -6647,7 +6708,7 @@ class StateManager extends EventEmitter {
     for (let accountEntry of accountDataList) {
       let { accountId, data, timestamp, hash } = accountEntry
 
-      let backupObj = { accountId, data, timestamp, hash, cycleNumber }
+      let backupObj:Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber }
 
       if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
 
@@ -6655,9 +6716,91 @@ class StateManager extends EventEmitter {
       // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'updateAccountsCopyTableA ' + JSON.stringify(accountEntry))
       // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'updateAccountsCopyTableB ' + JSON.stringify(backupObj))
 
+      // how does this not stop previous results, is it because only the first request gets through.
+
+      // TODO: globalaccounts 
+      // intercept the account change here for global accounts and save it to our memory structure.
+      // this structure should have a list. and be sorted by timestamp. eventually we will remove older timestamp copies of the account data.
+
       // wrappedAccounts.push({ accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp })
+
+      //TODO Perf: / mem   should we only save if there is a hash change?
+      let globalBackupList:Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
+      if(globalBackupList != null){
+        globalBackupList.push(backupObj) // sort and cleanup later.
+      }
+
+      //Aha! Saves the last copy per given cycle! this way when you query cycle-1 you get the right data.
       await this.storage.createOrReplaceAccountCopy(backupObj)
     }
+  }
+
+  getGlobalAccountValueAtTime(accountId:string, oldestTimestamp:number): Shardus.AccountsCopy | null {
+    let result:Shardus.AccountsCopy | null = null
+    let globalBackupList:Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
+    if(globalBackupList == null || globalBackupList.length === 0){
+      return null
+    }
+
+    //else fine the closest time lower than our input time
+    //non binary search, just start at then end and go backwards.
+    //TODO PERF make this a binary search. realistically the lists should be pretty short most of the time
+    if(globalBackupList.length > 1){
+      for(let i=globalBackupList.length-1; i>=0; i--) {
+        let accountCopy = globalBackupList[i]
+        if(accountCopy.timestamp <= oldestTimestamp){
+          return accountCopy;
+        } 
+      }  
+    }
+  }
+
+  sortByTimestamp(a:any, b:any): number{
+    return utils.sortAscProp(a,b,"timestamp")
+  }
+
+  sortAndMaintainBackupList(globalBackupList:Shardus.AccountsCopy[], oldestTimestamp: number): void{
+    globalBackupList.sort(this.sortByTimestamp)
+    //remove old entries. then bail.
+    // note this loop only runs if there is more than one entry
+    // also it should always keep the last item in the list now matter what (since that is the most current backup)
+    // this means we only start if there are 2 items in the array and we start at index  len-2 (next to last element)
+    if(globalBackupList.length > 1){
+      for(let i=globalBackupList.length-2; i>=0; i--) {
+        let accountCopy = globalBackupList[i]
+        if(accountCopy.timestamp < oldestTimestamp){
+          globalBackupList.splice(i, 1)
+        } 
+      }  
+    }
+  }
+
+  // go through all account backups sort/ filter them
+  sortAndMaintainBackups(oldestTimestamp: number): void{
+    let keys = this.globalAccountRepairBank.keys()
+    for(let key of keys){
+      let globalBackupList = this.globalAccountRepairBank.get(key)
+      if(globalBackupList != null){
+        this.sortAndMaintainBackupList(globalBackupList, oldestTimestamp)
+      }
+    }
+  }
+
+  //maintian all lists
+  getGlobalAccountBackupList(accountID:string): Shardus.AccountsCopy[] {
+
+    let results:Shardus.AccountsCopy[] = []
+    if(this.globalAccountRepairBank.has(accountID) === false){
+
+      this.globalAccountRepairBank.set(accountID, results) //init list
+    } else {
+      results = this.globalAccountRepairBank.get(accountID)
+    }
+    return results
+  }
+
+  isGlobalAccount(accountID:string):boolean{
+    return this.globalAccountMap.has(accountID)
   }
 
   /**

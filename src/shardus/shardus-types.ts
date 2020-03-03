@@ -228,8 +228,17 @@ declare namespace Shardus {
     /** Transaction ID */
     txId: string,
     /** Timestamp */
-    timestamp: string,  // is it ok to use string here, how about data?
+    timestamp: number,  // is it ok to use string here, how about data?
     /** Account hash */
+    hash: string,
+  }
+
+  // similar to AccountData but comes from the accounts copy backup table.
+  export interface AccountsCopy {
+    accountId: string,
+    cycleNumber: number,
+    data: any,
+    timestamp: number,
     hash: string,
   }
 
@@ -663,6 +672,8 @@ declare namespace Shardus {
     stateId: string, //hash of the source account.  this should be phased out or modified to handle multiple sources
     targetStateId: string, //hash of the target account.  this should be phased out or modified to handle multiple targets
   }
+
+
 
   type ObjectAlias = object;
   /**
