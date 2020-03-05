@@ -97,6 +97,7 @@ class StateManager extends EventEmitter {
     /** how to handle reparing a global account... yikes that is hard. */
     globalAccountRepairBank: Map<string, Shardus.AccountsCopy[]>
 
+    //combinedAccountData:Shardus.WrappedData[]
 
   constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage : Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     super()
@@ -666,7 +667,7 @@ class StateManager extends EventEmitter {
   createSyncTrackerByRange (range: BasicAddressRange, cycle: number): SyncTracker {
     // let partition = -1
     let index = this.syncTrackerIndex++
-    let syncTracker = { range, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false } as SyncTracker// partition,
+    let syncTracker = { range, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false, isGlobalSyncTracker:false, globalAddressMap:{} } as SyncTracker// partition,
     syncTracker.syncStarted = false
     syncTracker.syncFinished = false
 
@@ -675,6 +676,19 @@ class StateManager extends EventEmitter {
     return syncTracker
   }
 
+  createSyncTrackerByForGlobals ( cycle: number): SyncTracker {
+    // let partition = -1
+    let index = this.syncTrackerIndex++
+    let syncTracker = { range:{}, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false, isGlobalSyncTracker:false, globalAddressMap:{} } as SyncTracker// partition,
+    syncTracker.syncStarted = false
+    syncTracker.syncFinished = false
+
+    this.syncTrackers.push(syncTracker) // we should maintain this order.
+
+    return syncTracker
+  }
+
+
   getSyncTracker (address: string): SyncTracker | null {
     // return the sync tracker.
     for (let i = 0; i < this.syncTrackers.length; i++) {
@@ -682,9 +696,15 @@ class StateManager extends EventEmitter {
 
       // need to see if address is in range. if so return the tracker.
       // if (ShardFunctions.testAddressInRange(address, syncTracker.range)) {
-      if (syncTracker.range.low <= address && address <= syncTracker.range.high) {
-        return syncTracker
-      }
+      //if(syncTracker.isGlobalSyncTracker){
+        if (syncTracker.range.low <= address && address <= syncTracker.range.high) {
+          return syncTracker
+        }
+      //}else{
+        if (syncTracker.isGlobalSyncTracker && syncTracker.globalAddressMap[address] == true) {
+          return syncTracker
+        }
+      //}
     }
     return null
   }
@@ -878,6 +898,8 @@ class StateManager extends EventEmitter {
       this.createSyncTrackerByRange(range, cycle)
     }
 
+    this.createSyncTrackerByForGlobals(cycle)
+
     // could potentially push this back a bit.
     this.readyforTXs = true
 
@@ -896,7 +918,12 @@ class StateManager extends EventEmitter {
       this.logger.playbackLogNote('shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
 
       syncTracker.syncStarted = true
-      await this.syncStateDataForRange(syncTracker.range)
+
+      if(syncTracker.isGlobalSyncTracker === false){
+        await this.syncStateDataForRange(syncTracker.range)
+      } else {
+        await this.syncStateDataGlobals(syncTracker)
+      }
       syncTracker.syncFinished = true
 
       // allow syncing queue entries to resume!
@@ -998,6 +1025,153 @@ class StateManager extends EventEmitter {
       }
     }
   }
+
+  async syncStateDataGlobals (syncTracker: SyncTracker) {
+    try {
+      let partition = 'globals!'
+      // this.currentRange = range
+      // this.addressRange = range // this.partitionToAddressRange(partition)
+
+      let globalAccounts = []
+      let remainingAccountsToSync = []
+      this.partitionStartTimeStamp = Date.now()
+
+      let lowAddress = this.addressRange.low
+      let highAddress = this.addressRange.high
+
+      this.mainLogger.debug(`DATASYNC:  partition: ${partition} low: ${lowAddress} high: ${highAddress} `)
+
+
+      this.readyforTXs = true // open the floodgates of queuing stuffs.
+
+      //Get globals list and hash.
+
+      let globalReport:GlobalAccountReportResp = await this.getRobustGlobalReport()
+      
+      let hasAllGlobalData = false
+
+      if(globalReport.accounts.length === 0){
+        this.mainLogger.debug(`DATASYNC:  syncStateDataGlobals no global accounts `)
+        return  // no global accounts
+      }
+
+      let accountReportsByID:{[id:string]:{id:string, hash:string, timestamp:number }} = {}
+      for(let report of globalReport.accounts){
+        remainingAccountsToSync.push(report.id)
+
+        accountReportsByID[report.id] = report
+      }
+      let accountData:Shardus.WrappedData[] = []
+      let accountDataById:{[id:string]:Shardus.WrappedData} = {}
+      let globalReport2:GlobalAccountReportResp = {combinedHash:"", accounts:[] }
+      while(hasAllGlobalData === false){
+
+        //Get accounts.
+        //this.combinedAccountData = []
+        
+        let message = { accountIds: remainingAccountsToSync }
+        let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
+        if (result === false) { this.mainLogger.error('ASK FAIL 4') }
+    
+        //{ accountData: Shardus.WrappedData[] | null }
+        //this.combinedAccountData = this.combinedAccountData.concat(result.accountData)
+        accountData = accountData.concat(result.accountData)
+
+        //Get globals list and hash (if changes then update said accounts and repeath)
+        //diff the list and update remainingAccountsToSync
+        // add any new accounts to globalAccounts
+
+        globalReport2 = await this.getRobustGlobalReport()
+        let accountReportsByID2:{[id:string]:{id:string, hash:string, timestamp:number }} = {}
+        for(let report of globalReport2.accounts){
+          accountReportsByID2[report.id] = report
+        }
+        
+        hasAllGlobalData = true
+        remainingAccountsToSync = []
+        for(let account of accountData){
+          accountDataById[account.accountId] = account
+          //newer copies will overwrite older ones in this map
+        }
+        //check the full report for any missing data
+        for(let report of globalReport2.accounts){
+          let data = accountDataById[report.id]
+          if(data == null){
+            //we dont have the data
+            hasAllGlobalData = false
+            remainingAccountsToSync.push(report.id)
+          } else if (data.stateId !== report.hash){
+            //we have the data but he hash is wrong
+            hasAllGlobalData = false
+            remainingAccountsToSync.push(report.id)
+          }
+        }
+        //set this report to the last report and continue.
+        accountReportsByID = accountReportsByID2
+      }
+
+      let dataToSet = []
+      //Write the data! and set global memory data!.  set accounts copy data too.
+      for(let report of globalReport2.accounts){
+        let accountData = accountDataById[report.id]
+        if(accountData != null){
+
+          dataToSet.push(accountData)
+        }
+      }
+   
+      let failedHashes = await this.checkAndSetAccountData(dataToSet)
+     
+      if(failedHashes && failedHashes.length > 0){
+        throw new Error("setting data falied no error handling for this yet")
+      }
+    } catch (error) {
+      if (error.message.includes('FailAndRestartPartition')) {
+        this.mainLogger.debug(`DATASYNC: syncStateDataGlobals Error Failed at: ${error.stack}`)
+        this.fatalLogger.fatal('DATASYNC: syncStateDataGlobals FailAndRestartPartition: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+        await this.failandRestart()
+      } else {
+        this.fatalLogger.fatal('syncStateDataGlobals failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+        this.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + error.name + ': ' + error.message + ' at ' + error.stack)
+        await this.failandRestart()
+      }
+    }
+  }
+
+  async getRobustGlobalReport(): Promise<GlobalAccountReportResp> {
+
+      // this.p2p.registerInternal('get_globalaccountreport', async (payload:any, respond: (arg0: GlobalAccountReportResp) => any) => {
+      //   let result = {combinedHash:"", accounts:[]} as GlobalAccountReportResp
+
+    let equalFn = (a:GlobalAccountReportResp, b:GlobalAccountReportResp) => {
+      return a.combinedHash === b.combinedHash
+    }
+    let queryFn = async (node: Shardus.Node) => {
+      let result = await this.p2p.ask(node, 'get_globalaccountreport', {})
+      if (result === false) { this.mainLogger.error('ASK FAIL 1') }
+      return result
+    }
+    //can ask any active nodes for global data.
+    let nodes:Shardus.Node[] = this.currentCycleShardData.activeNodes
+    // let nodes = this.getActiveNodesInRange(lowAddress, highAddress) // this.p2p.state.getActiveNodes(this.p2p.id)
+    if (nodes.length === 0) {
+      this.mainLogger.debug(`no nodes available`)
+      return // nothing to do
+    }
+    this.mainLogger.debug(`DATASYNC: robustQuery getRobustGlobalReport ${utils.stringifyReduce(nodes.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+    let result
+    let winners
+    try {
+      [result, winners] = await this.p2p.robustQuery(nodes, queryFn, equalFn, 3, false)
+    } catch (ex) {
+      this.mainLogger.debug('syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.fatalLogger.fatal('syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      throw new Error('FailAndRestartPartition0')
+    }
+
+    return result as GlobalAccountReportResp
+  }
+
 
   async syncStateTableData (lowAddress: string, highAddress: string, startTime: number, endTime: number) {
     let searchingForGoodData = true
@@ -2218,6 +2392,68 @@ class StateManager extends EventEmitter {
       result.accountData = accountData as Shardus.WrappedDataFromQueue[]
       await respond(result)
     })
+  
+
+    function _sortByIdAsc(a:any, b:any):number {
+       return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
+    }
+
+    this.p2p.registerInternal('get_globalaccountreport', async (payload:any, respond: (arg0: GlobalAccountReportResp) => any) => {
+      let result = {combinedHash:"", accounts:[]} as GlobalAccountReportResp
+
+      //type GlobalAccountReportResp = {combinedHash:string, accounts:{id:string, hash:string, timestamp:number }[]  }
+      //sort by account ids.
+
+      let globalAccountKeys = this.globalAccountMap.keys()
+      
+      let toQuery:string[] = []
+
+      //TODO: Perf  could do things faster by pulling from cache, but would need extra testing:
+      // let notInCache:string[]
+      // for(let key of globalAccountKeys){
+      //   let report 
+      //   if(this.globalAccountRepairBank.has(key)){
+      //     let accountCopyList = this.globalAccountRepairBank.get(key)
+      //     let newestCopy = accountCopyList[accountCopyList.length-1]
+      //     report = {id:key, hash:newestCopy.hash, timestamp:newestCopy.timestamp }
+      //   } else{
+      //     notInCache.push(key)
+      //   }
+      //   result.accounts.push(report)
+      // }
+      for(let key of globalAccountKeys){
+        toQuery.push(key)
+      }
+
+      let accountData:Shardus.WrappedData[]
+      let ourLockID = -1
+      try {
+        ourLockID = await this.fifoLock('accountModification')
+        accountData = await this.app.getAccountDataByList(toQuery)
+      } finally {
+        this.fifoUnlock('accountModification', ourLockID)
+      }
+      if (accountData != null) {
+        for (let wrappedAccount of accountData) {
+          // let wrappedAccountInQueueRef = wrappedAccount as Shardus.WrappedDataFromQueue
+          // wrappedAccountInQueueRef.seenInQueue = false
+          // if (this.lastSeenAccountsMap != null) {
+          //   let queueEntry = this.lastSeenAccountsMap[wrappedAccountInQueueRef.accountId]
+          //   if (queueEntry != null) {
+          //     wrappedAccountInQueueRef.seenInQueue = true
+          //   }
+          // }
+          let report= {id:wrappedAccount.accountId , hash:wrappedAccount.stateId, timestamp:wrappedAccount.timestamp }
+          result.accounts.push(report)
+        }
+      }   
+
+      result.accounts.sort(this._sortByIdAsc )
+      result.combinedHash = this.crypto.hash(result)
+      //this.globalAccountRepairBank
+
+      await respond(result)
+    })
   }
 
   _unregisterEndpoints () {
@@ -2239,6 +2475,7 @@ class StateManager extends EventEmitter {
     this.p2p.unregisterInternal('broadcast_state')
     this.p2p.unregisterGossipHandler('spread_tx_to_group')
     this.p2p.unregisterInternal('get_account_data_with_queue_hints')
+    this.p2p.unregisterInternal('get_globalaccountreport')
   }
 
   // ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -714,6 +714,20 @@ class Shardus extends EventEmitter {
     this.network.registerExternalGet('config', async (req, res) => {
       res.json({ config: this.config })
     })
+    
+    this.network.registerExternalPost('testGlobalAccountTX', async (req, res) => {
+      let tx = req.tx
+      this.put(tx, false, true)
+      res.json({ success: true })
+      await this.shutdown()
+    })
+
+    this.network.registerExternalPost('testGlobalAccountTXSet', async (req, res) => {
+      let tx = req.tx
+      this.put(tx, true, true)
+      res.json({ success: true })
+      await this.shutdown()
+    })
   }
 
   registerExceptionHandler () {

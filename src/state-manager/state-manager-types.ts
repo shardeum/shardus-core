@@ -44,7 +44,12 @@ type SyncTracker = {
     cycle: number;
     index: number;
     queueEntries: QueueEntry[];
+
+    isGlobalSyncTracker:boolean;
+    globalAddressMap: {[address:string]:boolean};
 };
+
+
 type CycleShardData = {
     shardGlobals: any;
     cycleNumber: number;
@@ -468,6 +473,9 @@ type RequestStateForTxReq = { txid: string; timestamp: number; keys: any }
 type RequestStateForTxResp = { stateList: any[]; note: string }
 
 type GetAccountDataWithQueueHintsResp = { accountData: import("../shardus/shardus-types").WrappedDataFromQueue[] | null}
+
+type GlobalAccountReportResp = {combinedHash:string, accounts:{id:string, hash:string, timestamp:number }[]  }
+
 
 // Sync related
 type StateHashResult = {stateHash:string}
