@@ -1,3 +1,5 @@
+import LoadDetection from "../load-detection"
+
 interface RateLimiting {
   loadDetection: LoadDetection
   limitRate: boolean
