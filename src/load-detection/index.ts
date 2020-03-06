@@ -1,4 +1,15 @@
+import Statistics from "../statistics"
+
 const EventEmitter = require('events')
+
+interface LoadDetection {
+  highThreshold: number
+  lowThreshold: number
+  desiredTxTime: number
+  queueLimit: number
+  statistics: Statistics
+  load: number
+}
 
 class LoadDetection extends EventEmitter {
   constructor (config, statistics) {
@@ -32,4 +43,4 @@ class LoadDetection extends EventEmitter {
   }
 }
 
-module.exports = LoadDetection
+export default LoadDetection

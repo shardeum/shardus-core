@@ -18,6 +18,12 @@ const path = require('path')
 const EventEmitter = require('events')
 const saveConsoleOutput = require('./saveConsoleOutput')
 
+import ShardusTypes = require('../shardus/shardus-types')
+type Profiler = import("../utils/profiler")
+
+/**
+ * The main module that is used by the app developer to interact with the shardus api
+ */
 class Shardus extends EventEmitter {
   constructor ({ server: config, logs: logsConfig, storage: storageConfig }) {
     super()
@@ -115,9 +121,9 @@ class Shardus extends EventEmitter {
   }
 
   /**
+   * This function is what the app developer uses to setup all the SDK functions used by shardus
    * @typedef {import('./index').App} App
    */
-
   setup (app) {
     if (app === null) {
       this.appProvided = false
@@ -131,6 +137,10 @@ class Shardus extends EventEmitter {
     return this
   }
 
+  /**
+   * Calling this function will start the network
+   * @param {*} exitProcOnFail Exit the process if an error occurs
+   */
   async start (exitProcOnFail = true) {
     if (this.appProvided === null) throw new Error('Please call Shardus.setup with an App object or null before calling Shardus.start.')
     await this.storage.init()
@@ -230,6 +240,12 @@ class Shardus extends EventEmitter {
     await this.p2p.startup()
   }
 
+  /**
+   * Function used to register event listeners
+   * @param {*} emitter Socket emitter to be called
+   * @param {*} event Event name to be registered
+   * @param {*} callback Callback function to be executed on event
+   */
   _registerListener (emitter, event, callback) {
     if (this._listeners[event]) {
       this.mainLogger.fatal('Shardus can only register one listener per event! EVENT: ', event)
@@ -239,6 +255,10 @@ class Shardus extends EventEmitter {
     this._listeners[event] = [emitter, callback]
   }
 
+  /**
+   * Function used to register event listeners
+   * @param {*} event Name of the event to be unregistered
+   */
   _unregisterListener (event) {
     if (!this._listeners[event]) {
       this.mainLogger.warn(`This event listener doesn't exist! Event: \`${event}\` in Shardus`)
@@ -250,12 +270,18 @@ class Shardus extends EventEmitter {
     delete this._listeners[event]
   }
 
+  /**
+   * Function to unregister all event listeners
+   */
   _cleanupListeners () {
     for (const event of Object.keys(this._listeners)) {
       this._unregisterListener(event)
     }
   }
 
+  /**
+   * Function used to register listeners for transaction related events
+   */
   _attemptCreateAppliedListener () {
     if (!this.statistics || !this.stateManager) return
     this._registerListener(this.stateManager, 'txQueued', txId => this.statistics.startTimer('txTimeInQueue', txId))
@@ -264,6 +290,9 @@ class Shardus extends EventEmitter {
     this._registerListener(this.stateManager, 'txProcessed', () => this.statistics.incrementCounter('txProcessed'))
   }
 
+  /**
+   * Function to unregister all transaction related events
+   */
   _attemptRemoveAppliedListener () {
     if (!this.statistics || !this.stateManager) return
     this._unregisterListener('txQueued')
@@ -272,10 +301,16 @@ class Shardus extends EventEmitter {
     this._unregisterListener('txProcessed')
   }
 
+  /**
+   * function to unregister listener for the "accepted" event
+   */
   _unlinkStateManager () {
     this._unregisterListener('accepted')
   }
 
+  /**
+   * Creates an instance of the StateManager module and registers the "accepted" event listener for queueing transactions
+   */
   _createAndLinkStateManager () {
     this.stateManager = new StateManager(this.verboseLogs, this.profiler, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto, this.config)
     this._registerListener(this.consensus, 'accepted', (...txArgs) => this.stateManager.queueAcceptedTransaction(...txArgs))
@@ -283,6 +318,9 @@ class Shardus extends EventEmitter {
     this.storage.stateManager = this.stateManager
   }
 
+  /**
+   * Function used to allow shardus to sync data specific to an app if it should be required
+   */
   async syncAppData () {
     if (this.stateManager) await this.stateManager.syncStateData(3)
 
@@ -310,17 +348,26 @@ class Shardus extends EventEmitter {
     }
   }
 
+  /**
+   * Calls the "put" function with the "set" boolean parameter set to true
+   * @param {*} tx The transaction data
+   */
   set (tx) {
     return this.put(tx, true)
   }
 
+  /**
+   * Allows the application to log specific data to an app.log file
+   * @param  {...any} data The data to be logged in app.log file
+   */
   log (...data) {
     this.appLogger.debug(...data)
   }
 
   /**
-   * Submit a transaction into the network
-   * Returns an object that tells whether a tx was successful or not and the reason why.
+   * Submits a transaction to the network
+   * Returns an object that tells whether a tx was successful or not and the reason why via the
+   * validateTxnFields application SDK function.
    * Throws an error if an application was not provided to shardus.
    *
    * {
@@ -380,7 +427,7 @@ class Shardus extends EventEmitter {
         return { success: false, reason: 'Transaction Expired' }
       }
 
-      const shardusTx = {}
+      const shardusTx:  = {}
       shardusTx.receivedTimestamp = Date.now()
       shardusTx.inTransaction = tx
       const txId = this.crypto.hash(tx)
@@ -413,16 +460,25 @@ class Shardus extends EventEmitter {
     return { success: true, reason: 'Transaction queued, poll for results.' }
   }
 
-  // Returns info about this node
+  /**
+   * Returns the nodeId for this node
+   */
   getNodeId () {
     return this.p2p.getNodeId()
   }
 
-  // Returns node info given a node id
+  /**
+   * Returns node info given a node id
+   * @param {*} id The nodeId of this node
+   */
   getNode (id) {
     return this.p2p.state.getNode(id)
   }
 
+  /**
+   * Returns an array of cycles in the cycleChain history starting from the current cycle
+   * @param {*} amount The number cycles to fetch from the recent cycle history
+   */
   getLatestCycles (amount = 1) {
     return this.p2p.getLatestCycles(amount)
   }
@@ -485,10 +541,22 @@ class Shardus extends EventEmitter {
     }
   }
 
+  /**
+   * This function is used to query data from an account that is guaranteed to be in a remote shard
+   * @param {*} address The address / publicKey of the account in which to query
+   */
   async getRemoteAccount (address) {
     return this.stateManager.getRemoteAccount(address)
   }
 
+  /**
+   * Creates a wrapped response for formatting required by shardus
+   * @param {*} accountId
+   * @param {*} accountCreated
+   * @param {*} hash
+   * @param {*} timestamp
+   * @param {*} fullData
+   */
   createWrappedResponse (accountId, accountCreated, hash, timestamp, fullData) {
     // create and return the response object, it will default to full data.
     return { accountId: accountId, accountCreated, isPartial: false, stateId: hash, timestamp: timestamp, data: fullData }
@@ -520,10 +588,17 @@ class Shardus extends EventEmitter {
     }
   }
 
+  /**
+   * Checks if this node is active in the network
+   */
   isActive () {
     return this.p2p.isActive()
   }
 
+  /**
+   * Shutdown this node in the network
+   * @param {boolean} exitProcess Exit the process when shutting down
+   */
   async shutdown (exitProcess = true) {
     try {
       await this.exitHandler.exitCleanly(exitProcess)
@@ -533,6 +608,7 @@ class Shardus extends EventEmitter {
   }
 
   /**
+   * Grab the SDK interface provided by the application for shardus
    * @param {App} application
    * @returns {App}
    */
@@ -701,6 +777,9 @@ class Shardus extends EventEmitter {
     // return applicationInterfaceImpl
   }
 
+  /**
+   * Register the exit and config routes
+   */
   _registerRoutes () {
     // DEBUG routes
     // TODO: Remove eventually, or at least route guard these
@@ -714,6 +793,9 @@ class Shardus extends EventEmitter {
     })
   }
 
+  /**
+   * Registers exception handlers for "uncaughtException" and "unhandledRejection"
+   */
   registerExceptionHandler () {
     const logFatalAndExit = (err) => {
       console.log('Encountered a fatal error. Check fatal log for details.')
@@ -728,22 +810,35 @@ class Shardus extends EventEmitter {
     })
   }
 
+  /**
+   * Records a timestamp in a heartbeat to the storage module
+   */
   async _writeHeartbeat () {
     const timestamp = utils.getTime('s')
     await this.storage.setProperty('heartbeat', timestamp)
   }
 
+  /**
+   * Sets up the heartbeat interval for keeping track of time alive
+   */
   _setupHeartbeat () {
     this.heartbeatTimer = setInterval(async () => {
       await this._writeHeartbeat()
     }, this.heartbeatInterval * 1000)
   }
 
+  /**
+   * Stops the heartbeat interval
+   */
   _stopHeartbeat () {
     this.mainLogger.info('Stopping heartbeat...')
     clearInterval(this.heartbeatTimer)
   }
 
+  /**
+   * Checks a transaction timestamp for expiration
+   * @param {number} timestamp
+   */
   _isTransactionTimestampExpired (timestamp) {
     // this.mainLogger.debug(`Start of _isTransactionTimestampExpired(${timestamp})`)
     let transactionExpired = false
@@ -764,4 +859,4 @@ class Shardus extends EventEmitter {
   }
 }
 
-module.exports = Shardus
+export default Shardus

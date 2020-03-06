@@ -1,3 +1,9 @@
+interface RateLimiting {
+  loadDetection: LoadDetection
+  limitRate: boolean
+  loadLimit: number
+}
+
 class RateLimiting {
   constructor (config, loadDetection) {
     this.loadDetection = loadDetection

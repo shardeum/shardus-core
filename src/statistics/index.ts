@@ -3,9 +3,26 @@ const fs = require('fs')
 const { Readable } = require('stream')
 const EventEmitter = require('events')
 const utils = require('../utils')
+import Shardus = require('../shardus/shardus-types')
+
+interface Statistics {
+  intervalDuration: number
+  context: any
+  counterDefs: any[]
+  watcherDefs: any
+  timerDefs: { [name: string]: TimerRing } | string[]
+  interval: NodeJS.Timeout | null
+  snapshotWriteFns: any[]
+  stream: NodeJS.ReadStream
+  streamIsPushable: boolean
+}
 
 class Statistics extends EventEmitter {
-  constructor (baseDir, config, { counters = [], watchers = {}, timers = [] }, context) {
+  constructor (baseDir: string, config, { counters = [], watchers = {}, timers = [] }: {
+    counters: number[]
+    watchers: any
+    timers: string[]
+  }, context) {
     super()
     this.intervalDuration = config.interval || 1
     this.intervalDuration = this.intervalDuration * 1000
@@ -128,7 +145,7 @@ class Statistics extends EventEmitter {
     return watchers
   }
 
-  _initializeTimers (timerDefs = []) {
+  _initializeTimers (timerDefs: any[] = []) {
     const timers = {}
     for (const name of timerDefs) {
       timers[name] = new TimerRing(60)
@@ -170,6 +187,11 @@ class Statistics extends EventEmitter {
   }
 }
 
+interface Ring {
+  elements: any[]
+  index: number
+}
+
 class Ring {
   constructor (length) {
     this.elements = new Array(length)
@@ -196,6 +218,12 @@ class Ring {
   }
 }
 
+interface CounterRing {
+  count: number
+  total: number
+  ring: Ring
+}
+
 class CounterRing {
   constructor (length) {
     this.count = 0
@@ -212,6 +240,11 @@ class CounterRing {
   }
 }
 
+interface WatcherRing {
+  watchFn: () => any
+  ring: Ring
+}
+
 class WatcherRing {
   constructor (length, watchFn, context) {
     this.watchFn = watchFn.bind(context)
@@ -223,17 +256,22 @@ class WatcherRing {
   }
 }
 
+interface TimerRing {
+  ids: any
+  ring: Ring
+}
+
 class TimerRing {
   constructor (length) {
     this.ids = {}
     this.ring = new Ring(length)
   }
-  start (id) {
+  start (id: string) {
     if (!this.ids[id]) {
       this.ids[id] = Date.now()
     }
   }
-  stop (id) {
+  stop (id: string) {
     const entry = this.ids[id]
     if (entry) {
       delete this.ids[id]
@@ -254,8 +292,12 @@ class TimerRing {
   }
 }
 
-function _exists (thing) {
+/**
+ * Check for a variable that is not undefined or null
+ * @param thing The parameter to check
+ */
+function _exists (thing: any) {
   return (typeof thing !== 'undefined' && thing !== null)
 }
 
-module.exports = Statistics
+export default Statistics
