@@ -1,0 +1,162 @@
+========
+PLANNING
+========
+
+C0 => ... C6 => C7 => C8 => C9 => C10 (in progress)
+
+          ^
+          |
+
+          syncPoint
+
+          need to get C6 - C9
+
+
+SYNC CYCLES AND NODE LIST
+  SYNC OLD CYCLES until nodeList.length === networkChainEnd.cycle.active
+  SYNC NEW CYCLES until ourChainEnd.cycle.counter === networkChainEnd.cycle.counter && networkChainEnd.unfinished_cycle is in Q < 4
+  START CREATING CYCLES
+
+
+SYNC TO CHAIN END
+1. chainEnd = getNetworkChainEnd
+2. Get cycles from syncPoint up till chainEnd.cycle_counter
+3. Process new cycles to update node list, update syncPoint to chainEnd.cycle_counter
+4. chainEnd = getNetworkChainEnd
+5. If syncPoint === chainEnd.cycle_counter && unfinished cycle is in Q < 4,
+     1. Wait till start of Q4
+     2. Get and process unfinished_cycle
+     3. Wait till end of Q4
+     4. Start participating in cycle creation
+   Else,
+     1. Wait till end of Q4
+     2. setImmediate(SYNC TO CHAIN END)
+
+
+getNetworkChainEnd => {
+  cycle_marker
+  cycle_counter
+  unfinished_cycle_start
+  unfinished_cycle_duration
+}
+
+getUnfinishedCycle => {
+  ...
+}
+
+==========
+PSEUDOCODE
+==========
+
+function sync(activeNodes) {
+  // Get the networks newest cycle as the anchor point for sync
+  const newestCycle = getNewestCycle(activeNodes)
+  cycleChain.append(newestCycle)
+
+  // Sync old cycles until your active nodes === network active nodes
+  const listBuilder = new CycleParser.NodeListBuilder()
+  do {
+    const prevCycles = getCycles(activeNodes, cycleChain.oldest.counter - 100, cycleChain.oldest.counter)
+    for (const prevCycle of prevCycles.reversed) {
+      cycleChain.validate(prevCycle, cycleChain.oldest)
+      cycleChain.prepend(prevCycle)
+      listBuilder.parse(prevCycle)
+      if (listBuilder.getActive().length >= newestCycle.active) {
+        break
+      }
+    }
+  }
+  while (listBuilder.getActive().length < newestCycle.active)
+  nodeList.addNodes(listBuilder.getNodes())
+
+
+  // Sync new cycles until you can get unfinished cycle data in time to start making cycles
+  await syncNewCycles(activeNodes)
+
+  let unfinishedCycle = getUnfinishedCycle(activeNodes)
+  while (cycleChain.newest.counter < (unfinishedCycle.counter - 1) || isInQuarter4(unfinishedCycle)) {
+    await waitUntilEnd(unfinishedCycle)
+    await syncNewCycles(activeNodes)
+    unfinishedCycle = getUnfinishedCycle(activeNodes)
+  }
+
+  // Add unfinished cycle data, start creating cycles, go active...
+}
+
+function syncNewCycles(activeNodes) {
+  let newestCycle = getNewestCycle(activeNodes)
+  while (cyleChain.newest.counter < newestCycle.counter) {
+    const nextCycles = getCycles(activeNodes, cycleChain.newest.counter, newestCycle.counter)
+    for (const nextCycle of nextCycles) {
+      cycleChain.validate(cycleChain.newest, nextCycle)
+      cycleChain.append(nextCycle)
+      nodeList.addNodes(CycleParser.parse(nextCycle))
+    }
+    newestCycle = getNewestCycle(activeNodes)
+  }
+}
+
+=============
+SAMPLE CYCLES
+=============
+
+{
+  "activated": [],
+  "activatedPublicKeys": [],
+  "active": 1,
+  "apoptosized": [],
+  "counter": 0,
+  "desired": 9,
+  "duration": 15,
+  "expired": 0,
+  "joined": [
+    "25c155d762d2c1d6aa5cb668baa0962aed3a31725f2b9598ff556628a0265000"
+  ],
+  "joinedArchivers": [
+    {
+      "curvePk": "363afebb8cca474bd4e3c29d0109ad068736b7802c34ed8b7038cd6a95bb1e24",
+      "ip": "localhost",
+      "port": 4000,
+      "publicKey": "758b1c119412298802cd28dbfa394cdfeecc4074492d60844cc192d632d84de3"
+    }
+  ],
+  "joinedConsensors": [
+    {
+      "ip": "127.0.0.1",
+      "port": 9001,
+      "publicKey": "25c155d762d2c1d6aa5cb668baa0962aed3a31725f2b9598ff556628a0265000"
+    }
+  ],
+  "lost": [],
+  "marker": "6c609f27e47f6efbe38082fb8a7d393a9cc9ebdf3ec36f622173d1813b2230d1",
+  "previous": "0000000000000000000000000000000000000000000000000000000000000000",
+  "refuted": [],
+  "removed": [],
+  "returned": [],
+  "start": 1583349458
+}
+
+{
+  "activated": [
+    "6d9f2135da46375277a9a9985585f8e1657dd51eeeaf6ca2c925a1bf183769f9"
+  ],
+  "activatedPublicKeys": [
+    "25c155d762d2c1d6aa5cb668baa0962aed3a31725f2b9598ff556628a0265000"
+  ],
+  "active": 1,
+  "apoptosized": [],
+  "counter": 1,
+  "desired": 9,
+  "duration": 15,
+  "expired": 0,
+  "joined": [],
+  "joinedArchivers": [],
+  "joinedConsensors": [],
+  "lost": [],
+  "marker": "8bb6ed8d35d2e9edd7149b04c7f670d3ebbaef52495d85c845abdadf86c72290",
+  "previous": "6c609f27e47f6efbe38082fb8a7d393a9cc9ebdf3ec36f622173d1813b2230d1",
+  "refuted": [],
+  "removed": [],
+  "returned": [],
+  "start": 1583349473
+}

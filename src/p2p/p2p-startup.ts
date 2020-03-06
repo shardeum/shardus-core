@@ -3,6 +3,7 @@ import * as http from '../http';
 import utils from '../utils';
 import { newSyncToNetwork } from './p2p-sync-nodes-cycles';
 import { Node, NodeInfo, P2PModuleContext } from './p2p-types';
+import { sync } from './Sync';
 
 /** STATE */
 
@@ -118,7 +119,7 @@ export async function startup(): Promise<boolean> {
   // Once joined, sync to the network
   // [AS] [TODO] [HACK] If you're node with port 9003, use the new sync
   if (ourIpInfo.externalPort === 9003) {
-    await newSyncToNetwork(activeNodes);
+    await sync(activeNodes)
   } else {
     await syncToNetwork(activeNodes);
   }
