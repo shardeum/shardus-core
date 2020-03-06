@@ -1,3 +1,4 @@
+import { p2p } from './P2PContext'
 import { insertSorted } from '../utils';
 import * as Sequelize from 'sequelize';
 import { Logger } from 'log4js';
@@ -28,8 +29,6 @@ export const cycleUpdatesName = 'apoptosis';
 export const internalRouteName = 'apoptosize';
 export const gossipRouteName = 'apoptosis';
 
-let p2p: P2PModuleContext;
-
 let apoptosisProposals: { [publicKey: string]: ApoptosisProposal } = {};
 
 /** ROUTES */
@@ -57,11 +56,6 @@ export const gossipRoutes = [
 ];
 
 /** FUNCTIONS */
-
-export function setContext(context: P2PModuleContext) {
-  p2p = context;
-  log('Initialized p2p-apoptosis');
-}
 
 export async function apoptosizeSelf(activeNodes) {
   const proposal = createProposal();

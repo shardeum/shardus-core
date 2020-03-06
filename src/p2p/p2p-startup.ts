@@ -1,11 +1,10 @@
+import { p2p } from './P2PContext'
 import * as http from '../http';
 import utils from '../utils';
 import { newSyncToNetwork } from './p2p-sync-nodes-cycles';
 import { Node, NodeInfo, P2PModuleContext } from './p2p-types';
 
 /** STATE */
-
-let p2p: P2PModuleContext;
 
 /** ROUTES */
 
@@ -68,10 +67,6 @@ function getCycleChainHash(start, end) {
 }
 
 /** FUNCTIONS */
-
-export function setContext(context: P2PModuleContext) {
-  p2p = context;
-}
 
 export async function startup(): Promise<boolean> {
   // Emit the 'joining' event before attempting to join

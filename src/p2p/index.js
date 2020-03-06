@@ -8,6 +8,7 @@ const P2PLostNodes = require('./p2p-lost-nodes')
 const P2PArchivers = require('./p2p-archivers')
 const routes = require('./routes')
 
+const P2PContext = require('./P2PContext')
 const P2PStartup = require('./p2p-startup')
 const P2PApoptosis = require('./p2p-apoptosis')
 const P2PSync = require('./p2p-sync-nodes-cycles')
@@ -95,17 +96,11 @@ class P2P extends EventEmitter {
       this.archivers.resetJoinRequests()
     })
 
-    // Init context for startup
-    P2PStartup.setContext(this)
-
-    // Init context for apoptosis
-    P2PApoptosis.setContext(this)
-
-    // Init context for sync
-    P2PSync.setContext(this)
-
     this.InternalRecvCounter = 0
     this.keyCounter = 0
+
+    // Pass this context to typescript modules
+    P2PContext.setContext(this)
   }
 
   async init (network) {
