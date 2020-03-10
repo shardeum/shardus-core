@@ -1,5 +1,23 @@
+import Profiler from '../utils/profiler'
+import Logger from '../logger'
+
 const EventEmitter = require('events')
 const utils = require('../utils')
+
+interface Consensus {
+  profiler: Profiler
+  app: any
+  config: any
+  logger: Logger
+  mainLogger: any
+  fatalLogger: any
+  crypto: any
+  p2p: any
+  storage: any
+  pendingTransactions: any
+  mainLogs: boolean
+  lastServed: number
+}
 
 class Consensus extends EventEmitter {
   constructor (app, config, logger, crypto, p2p, storage, profiler) {
@@ -13,7 +31,6 @@ class Consensus extends EventEmitter {
     this.crypto = crypto
     this.p2p = p2p
     this.storage = storage
-    this.app = app
 
     this.pendingTransactions = {}
 
@@ -93,4 +110,4 @@ class Consensus extends EventEmitter {
   }
 }
 
-module.exports = Consensus
+export default Consensus

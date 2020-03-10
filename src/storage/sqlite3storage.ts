@@ -2,11 +2,21 @@ const fs = require('fs')
 const path = require('path')
 const Sequelize = require('sequelize')
 const Op = Sequelize.Op
-var Sqlite3 = require('better-sqlite3')
+var sqlite3 = require('sqlite3').verbose()
 const stringify = require('fast-stable-stringify')
 const utils = require('../utils')
 
-class BetterSqlite3Storage {
+interface Sqlite3Storage {
+  baseDir: any
+  storageConfig: any
+  profiler: any
+  mainLogger: any
+  initialized: any
+  storageModels: any
+  db: any
+}
+
+class Sqlite3Storage {
   // note that old storage passed in logger, now we pass in the specific log for it to use.  This works for application use, but may need to rethink if we apply this to shardus core
   constructor (models, storageConfig, logger, baseDir, profiler) {
     this.baseDir = baseDir
@@ -14,12 +24,21 @@ class BetterSqlite3Storage {
     this.storageConfig.options.storage = path.join(this.baseDir, this.storageConfig.options.storage)
     this.profiler = profiler
     // Setup logger
-    this.mainLogger = logger.getLogger('main')
+    this.mainLogger = logger.getLogger('default')
     // Start Sequelize and load models
     // this.sequelize = new Sequelize(...Object.values(storageConfig))
     // for (let [modelName, modelAttributes] of models) this.sequelize.define(modelName, modelAttributes)
     // this.models = this.sequelize.models
     this.initialized = false
+
+    // [AS] Delete database if it already exists; fixes weirdness when restarting from a clean slate
+    try {
+      fs.unlinkSync(this.storageConfig.options.storage)
+      this.mainLogger.info('Storage: sqlite3storage: constructor: Deleted existing db file')
+    } catch (err) {
+      this.mainLogger.info('Storage: sqlite3storage: constructor: Failed to delete existing db file: ' + err)
+    }
+
     this.storageModels = {}
     for (let [modelName, modelAttributes] of models) {
       this.sqlite3Define(modelName, modelAttributes)
@@ -29,7 +48,7 @@ class BetterSqlite3Storage {
   sqlite3Define (modelName, modelAttributes) {
     let tableName = modelName
 
-    let modelData = { tableName }
+    let modelData: any = { tableName }
     modelData.columns = []
     modelData.columnsString = ''
     modelData.substitutionString = ''
@@ -71,7 +90,7 @@ class BetterSqlite3Storage {
 
     // console.log(`Create model data for table: ${tableName} => ${stringify(modelData)}`)
     // console.log()
-    this.storageModels[ tableName ] = modelData
+    this.storageModels[tableName] = modelData
 
     // todo base this off of models
   }
@@ -81,20 +100,23 @@ class BetterSqlite3Storage {
     let dbDir = path.parse(this.storageConfig.options.storage).dir
     await _ensureExists(dbDir)
     this.mainLogger.info('Created Database directory.')
+
     if (this.storageConfig.options.memoryFile) {
-      this.db = new Sqlite3(':memory:')
+      this.db = new sqlite3.Database(':memory:')
     } else {
-      this.db = new Sqlite3(this.storageConfig.options.storage)
+      this.db = new sqlite3.Database(this.storageConfig.options.storage)
     }
+
     // Create tables for models in DB if they don't exist
     // for (let model of Object.values(this.models)) {
     //   await model.sync()
     //   this._rawQuery(model, 'PRAGMA synchronous = OFF')
     //   this._rawQuery(model, 'PRAGMA journal_mode = MEMORY')
     // }
+
     // await this.run('CREATE TABLE if not exists `acceptedTxs` (`id` VARCHAR(255) NOT NULL PRIMARY KEY, `timestamp` BIGINT NOT NULL, `data` JSON NOT NULL, `status` VARCHAR(255) NOT NULL, `receipt` JSON NOT NULL)')
     // await this.run('CREATE TABLE if not exists `accountStates` ( `accountId` VARCHAR(255) NOT NULL, `txId` VARCHAR(255) NOT NULL, `txTimestamp` BIGINT NOT NULL, `stateBefore` VARCHAR(255) NOT NULL, `stateAfter` VARCHAR(255) NOT NULL,  PRIMARY KEY (`accountId`, `txTimestamp`))')
-    // await this.run('CREATE TABLE if not exists `cycles` (`counter` BIGINT NOT NULL UNIQUE PRIMARY KEY, `certificate` JSON NOT NULL, `previous` TEXT NOT NULL, `marker` TEXT NOT NULL, `start` BIGINT NOT NULL, `duration` BIGINT NOT NULL, `active` BIGINT NOT NULL, `desired` BIGINT NOT NULL, `expired` BIGINT NOT NULL, `joined` JSON NOT NULL, `activated` JSON NOT NULL, `removed` JSON NOT NULL, `returned` JSON NOT NULL, `lost` JSON NOT NULL, `refuted` JSON NOT NULL)')
+    // await this.run('CREATE TABLE if not exists `cycles` (`counter` BIGINT NOT NULL UNIQUE PRIMARY KEY, `certificate` JSON NOT NULL, `previous` TEXT NOT NULL, `marker` TEXT NOT NULL, `start` BIGINT NOT NULL, `duration` BIGINT NOT NULL, `active` BIGINT NOT NULL, `desired` BIGINT NOT NULL, `expired` BIGINT NOT NULL, `joined` JSON NOT NULL, `activated` JSON NOT NULL, `removed` JSON NOT NULL, `returned` JSON NOT NULL, `lost` JSON NOT NULL, `apoptosized` JSON NOT NULL)')
     // await this.run('CREATE TABLE if not exists `nodes` (`id` TEXT NOT NULL PRIMARY KEY, `publicKey` TEXT NOT NULL, `curvePublicKey` TEXT NOT NULL, `cycleJoined` TEXT NOT NULL, `internalIp` VARCHAR(255) NOT NULL, `externalIp` VARCHAR(255) NOT NULL, `internalPort` SMALLINT NOT NULL, `externalPort` SMALLINT NOT NULL, `joinRequestTimestamp` BIGINT NOT NULL, `address` VARCHAR(255) NOT NULL, `status` VARCHAR(255) NOT NULL)')
     // await this.run('CREATE TABLE if not exists `properties` (`key` VARCHAR(255) NOT NULL PRIMARY KEY, `value` JSON)')
     // await this.run('CREATE TABLE if not exists `accountsCopy` (`accountId` VARCHAR(255) NOT NULL, `cycleNumber` BIGINT NOT NULL, `data` JSON NOT NULL, `timestamp` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, PRIMARY KEY (`accountId`, `cycleNumber`))')
@@ -113,6 +135,7 @@ class BetterSqlite3Storage {
     // this.mainLogger.info('Closing Database connections.')
     await this.db.close()
   }
+
   async runCreate (createStatement) {
     await this.run(createStatement)
   }
@@ -238,7 +261,7 @@ class BetterSqlite3Storage {
     let paramsArray = []
     for (var key in paramsObj) {
       if (paramsObj.hasOwnProperty(key)) {
-        let paramEntry = { name: key }
+        let paramEntry: any = { name: key }
 
         let value = paramsObj[key]
         if (utils.isObject(value)) {
@@ -357,39 +380,42 @@ class BetterSqlite3Storage {
   // run/get/all promise wraps from this tutorial: https://stackabuse.com/a-sqlite-tutorial-with-node-js/
   run (sql, params = []) {
     return new Promise((resolve, reject) => {
-      try {
-        const { lastInsertRowid } = this.db.prepare(sql).run(params)
-        resolve({ id: lastInsertRowid })
-      } catch (err) {
-        console.log('Error running sql ' + sql)
-        console.log(err)
-        reject(err)
-      }
+      this.db.run(sql, params, function (err) {
+        if (err) {
+          console.log('Error running sql ' + sql)
+          console.log(err)
+          reject(err)
+        } else {
+          resolve({ id: this.lastID })
+        }
+      })
     })
   }
   get (sql, params = []) {
     return new Promise((resolve, reject) => {
-      try {
-        const result = this.db.prepare(sql).get(params)
-        resolve(result)
-      } catch (err) {
-        console.log('Error running sql: ' + sql)
-        console.log(err)
-        reject(err)
-      }
+      this.db.get(sql, params, (err, result) => {
+        if (err) {
+          console.log('Error running sql: ' + sql)
+          console.log(err)
+          reject(err)
+        } else {
+          resolve(result)
+        }
+      })
     })
   }
 
   all (sql, params = []) {
     return new Promise((resolve, reject) => {
-      try {
-        const rows = this.db.prepare(sql).all(params)
-        resolve(rows)
-      } catch (err) {
-        console.log('Error running sql: ' + sql)
-        console.log(err)
-        reject(err)
-      }
+      this.db.all(sql, params, (err, rows) => {
+        if (err) {
+          console.log('Error running sql: ' + sql)
+          console.log(err)
+          reject(err)
+        } else {
+          resolve(rows)
+        }
+      })
     })
   }
 }
@@ -411,4 +437,4 @@ async function _ensureExists (dir) {
   })
 }
 
-module.exports = BetterSqlite3Storage
+export default Sqlite3Storage

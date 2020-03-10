@@ -2,7 +2,7 @@ const Sequelize = require('sequelize')
 const P2PApoptosis = require('../../p2p/Apoptosis')
 
 // dont forget to add the certificate field as JSON
-module.exports = [
+export default [
   'cycles',
   {
     counter: { type: Sequelize.BIGINT, unique: true, primaryKey: true, allowNull: false },

@@ -3,6 +3,13 @@ const tar = require('tar-fs')
 const zlib = require('zlib')
 const Trie = require('trie-prefix-tree')
 
+interface Debug {
+  baseDir: string
+  network: any
+  archiveName: string
+  files: any
+}
+
 class Debug {
   constructor (baseDir, network) {
     this.baseDir = baseDir
@@ -59,4 +66,4 @@ class Debug {
   }
 }
 
-module.exports = Debug
+export default Debug

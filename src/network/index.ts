@@ -4,6 +4,23 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const cors = require('cors')
 
+interface Network {
+  app: any
+  sn: any
+  logger: any
+  mainLogger: any
+  netLogger: any
+  ipInfo: any
+  timeout: number
+  internalRoutes: any
+  externalRoutes: any
+  extServer: any
+  intServer: any
+  verboseLogsNet: boolean
+  InternalTellCounter: number
+  InternalAskCounter: number
+}
+
 class Network extends EventEmitter {
   constructor (config, logger) {
     super()
@@ -272,4 +289,4 @@ function closeServer (server) {
   })
 }
 
-module.exports = Network
+export default Network

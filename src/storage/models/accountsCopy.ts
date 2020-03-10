@@ -1,6 +1,6 @@
 const Sequelize = require('sequelize')
 
-module.exports = [
+export default [
   'accountsCopy',
   {
     accountId: { type: Sequelize.STRING, allowNull: false, unique: 'compositeIndex' },

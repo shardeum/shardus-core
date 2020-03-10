@@ -2,6 +2,17 @@ const fs = require('fs')
 const path = require('path')
 const Sequelize = require('sequelize')
 
+interface SequelizeStorage {
+  baseDir: string
+  models: any
+  storageConfig: any
+  profiler: any
+  mainLogger: any
+  sequelize: any
+  storageModels: any
+  initialized: boolean
+}
+
 class SequelizeStorage {
   // note that old storage passed in logger, now we pass in the specific log for it to use.  This works for application use, but may need to rethink if we apply this to shardus core
   constructor (models, storageConfig, logger, baseDir, profiler) {
@@ -25,7 +36,7 @@ class SequelizeStorage {
     this.storageModels = this.sequelize.models
     this.initialized = false
     // Create tables for models in DB if they don't exist
-    for (let model of Object.values(this.storageModels)) {
+    for (let model of Object.values(this.storageModels) as any) {
       await model.sync()
       this._rawQuery(model, 'PRAGMA synchronous = OFF')
       this._rawQuery(model, 'PRAGMA journal_mode = MEMORY')
@@ -85,4 +96,4 @@ async function _ensureExists (dir) {
   })
 }
 
-module.exports = SequelizeStorage
+export default SequelizeStorage

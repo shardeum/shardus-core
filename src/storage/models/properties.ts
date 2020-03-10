@@ -1,6 +1,6 @@
 const Sequelize = require('sequelize')
 
-module.exports = [
+export default [
   'properties',
   {
     key: { type: Sequelize.STRING, allowNull: false, primaryKey: true },

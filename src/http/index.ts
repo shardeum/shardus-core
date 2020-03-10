@@ -84,6 +84,4 @@ function setLogger (logger) {
   _logger = logger
 }
 
-exports.get = get
-exports.post = post
-exports.setLogger = setLogger
+export { get, post, setLogger }

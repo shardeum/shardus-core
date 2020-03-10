@@ -21,13 +21,13 @@ const cHashSetTXStepSize = 2
 const cHashSetDataStepSize = 2
 
 // not sure about this.
-type Consensus = import("../consensus")
+import Consensus from "../consensus"
 type Profiler = import("../utils/profiler")
 // type P2P = import("../p2p/")
 import { P2PModuleContext as P2P } from "../p2p/Context"
-type Storage = import("../storage")
-type Crypto = import("../crypto")
-type Logger = import("../logger")
+import Storage from "../storage"
+import Crypto from "../crypto"
+import Logger from "../logger"
 
 //let shardFunctions = import("./shardFunctions").
 //type foo = ShardFunctionTypes.BasicAddressRange
@@ -7871,4 +7871,4 @@ class StateManager extends EventEmitter {
   }
 }
 
-module.exports = StateManager
+export default StateManager

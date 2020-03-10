@@ -1,6 +1,18 @@
 const crypto = require('shardus-crypto-utils')
 const { fork } = require('child_process')
 
+import Shardus = require('../shardus/shardus-types')
+
+interface Crypto {
+  config: Shardus.ShardusConfiguration
+  mainLogger: any
+  storage: any
+  keypair: any
+  curveKeypair: any
+  powGenerators: any
+  sharedKeys: any
+}
+
 class Crypto {
   constructor (config, logger, storage) {
     this.config = config
@@ -13,7 +25,7 @@ class Crypto {
   }
 
   async init () {
-    crypto.init(this.config.hashKey)
+    crypto.init(this.config.crypto.hashKey)
     let keypair = await this.storage.getProperty('keypair')
     if (!keypair) {
       this.mainLogger.info('Keypair unable to be loaded from database. Generating new keypair...')
@@ -137,4 +149,4 @@ class Crypto {
   }
 }
 
-module.exports = Crypto
+export default Crypto

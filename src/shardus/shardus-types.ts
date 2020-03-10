@@ -243,6 +243,7 @@ declare namespace Shardus {
     /** Timestamp */
     timestamp: number,
   }
+
   export interface WrappedResponse extends WrappedData {
     accountCreated: boolean,
     isPartial: boolean,
@@ -510,6 +511,108 @@ declare namespace Shardus {
     sharding?: {
       /** The nodesPerConsensusGroup parameter defines how many nodes will be contained within a shard */
       nodesPerConsensusGroup?: number
+    }
+  }
+
+  export interface LogsConfiguration {
+    saveConsoleOutput?: boolean
+    dir?: string
+    files?: {
+      main?: string
+      fatal?: string
+      net?: string
+      app?: string
+    }
+    options?: {
+      appenders?: {
+        out?: {
+          type?: string
+        }
+        main?: {
+          type?: string
+          maxLogSize?: number
+          backups?: number
+        }
+        fatal?: {
+          type?: string
+          maxLogSize?: number
+          backups?: number
+        }
+        errorFile?: {
+          type?: string
+          maxLogSize?: number
+          backups?: number
+        }
+        errors?: {
+          type?: string
+          maxLogSize?: number
+          backups?: number
+        }
+        net?: {
+          type?: string
+          maxLogSize?: number
+          backups?: number
+        }
+        playback?: {
+          type?: string
+          maxLogSize?: number
+          backups?: number
+        }
+        shardDump?: {
+          type?: string
+          maxLogSize?: number
+          backups?: number
+        }
+      }
+    }
+    categories?: {
+      default?: {
+        appenders?: string[]
+        level?: string
+      }
+      main?: {
+        appenders?: string[]
+        level?: string
+      }
+      fatal?: {
+        appenders?: string[]
+        level?: string
+      }
+      net?: {
+        appenders?: string[]
+        level?: string
+      }
+      playback?: {
+        appenders?: string[]
+        level?: string
+      }
+      shardDump?: {
+        appenders?: string[]
+        level?: string
+      }
+    }
+  }
+
+  export interface StorageConfiguration {
+    database?: string
+    username?: string
+    password?: string
+    options?: {
+      logging?: false
+      host?: string
+      dialect?: string
+      operatorsAliases?: false
+      pool?: {
+        max?: number
+        min?: number
+        acquire?: number
+        idle?: number
+      }
+      storage?: string
+      sync?: {
+        force?: false
+      }
+      memoryFile?: false
     }
   }
 

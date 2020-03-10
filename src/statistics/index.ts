@@ -10,7 +10,7 @@ interface Statistics {
   context: any
   counterDefs: any[]
   watcherDefs: any
-  timerDefs: { [name: string]: TimerRing } | string[]
+  timerDefs: { [name: string]: TimerRing }
   interval: NodeJS.Timeout | null
   snapshotWriteFns: any[]
   stream: NodeJS.ReadStream
@@ -19,9 +19,9 @@ interface Statistics {
 
 class Statistics extends EventEmitter {
   constructor (baseDir: string, config, { counters = [], watchers = {}, timers = [] }: {
-    counters: number[]
+    counters: string[]
     watchers: any
-    timers: string[]
+    timers: any
   }, context) {
     super()
     this.intervalDuration = config.interval || 1
@@ -145,7 +145,7 @@ class Statistics extends EventEmitter {
     return watchers
   }
 
-  _initializeTimers (timerDefs: any[] = []) {
+  _initializeTimers (timerDefs: any = []): any {
     const timers = {}
     for (const name of timerDefs) {
       timers[name] = new TimerRing(60)

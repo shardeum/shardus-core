@@ -1,6 +1,6 @@
 const Sequelize = require('sequelize')
 
-module.exports = [
+export default [
   'nodes',
   {
     id: { type: Sequelize.TEXT, allowNull: false, primaryKey: true },

@@ -1,6 +1,6 @@
 const Sequelize = require('sequelize')
 
-module.exports = [
+export default [
   'acceptedTxs',
   {
     id: { type: Sequelize.STRING, allowNull: false, primaryKey: true },

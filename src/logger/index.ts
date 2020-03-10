@@ -6,6 +6,27 @@ const stringify = require('fast-stable-stringify')
 const os = require('os')
 const http = require('../http')
 
+import Shardus = require('../shardus/shardus-types')
+
+interface Logger {
+  baseDir: string
+  config: Shardus.LogsConfiguration
+  logs: any
+  logDir: string
+  log4Conf: any
+  playbackLogEnabled: boolean
+  _playbackLogger: any
+  _playbackTrace: boolean
+  _playbackDebug: boolean
+  _seenAddresses: any
+  _shortStrings: any
+  _playbackOwner_host: any
+  _playbackOwner: any
+  _playbackIPInfo: any
+  _nodeInfos: any
+  _playbackNodeID: string
+}
+
 class Logger {
   constructor (baseDir, config) {
     this.baseDir = baseDir
@@ -174,4 +195,4 @@ class Logger {
   }
 }
 
-module.exports = Logger
+export default Logger

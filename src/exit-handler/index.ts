@@ -1,3 +1,9 @@
+interface ExitHandler {
+  exited: boolean
+  syncFuncs: any
+  asyncFuncs: any
+}
+
 class ExitHandler {
   constructor () {
     this.exited = false
@@ -57,4 +63,4 @@ class ExitHandler {
   }
 }
 
-module.exports = ExitHandler
+export default ExitHandler

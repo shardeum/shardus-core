@@ -1,9 +1,31 @@
+import LoadDetection from '../load-detection'
+import Statistics from '../statistics'
+import StateManager from '../state-manager'
+import Profiler from '../utils/profiler'
+import Logger from '../logger'
 const http = require('../http')
 const allZeroes64 = '0'.repeat(64)
 
+// import Shardus = require('../shardus/shardus-types')
+
 /**
-   * @typedef {import('../state-manager/index').CycleShardData} CycleShardData
-   */
+ * @typedef {import('../state-manager/index').CycleShardData} CycleShardData
+ */
+
+interface Reporter {
+  config: any
+  mainLogger: any
+  p2p: any
+  statistics: Statistics
+  stateManager: StateManager
+  profiler: Profiler
+  loadDetection: LoadDetection
+  logger: Logger
+  reportTimer: NodeJS.Timeout
+  lastTime: number
+  doConsoleReport: boolean
+  hasRecipient: boolean
+}
 
 class Reporter {
   constructor (config, logger, p2p, statistics, stateManager, profiler, loadDetection) {
@@ -205,4 +227,4 @@ class Reporter {
   }
 }
 
-module.exports = Reporter
+export default Reporter

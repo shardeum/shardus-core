@@ -1,17 +1,17 @@
-const Logger = require('../logger')
-const ExitHandler = require('../exit-handler')
+import Logger from '../logger'
+import ExitHandler from '../exit-handler'
 const P2P = require('../p2p')
-const Crypto = require('../crypto')
-const Storage = require('../storage')
-const Network = require('../network')
+import Crypto from '../crypto'
+import Storage from '../storage'
+import Network from '../network'
 const utils = require('../utils')
-const Consensus = require('../consensus')
-const Reporter = require('../reporter')
-const Debug = require('../debug')
-const StateManager = require('../state-manager')
-const Statistics = require('../statistics')
-const LoadDetection = require('../load-detection')
-const RateLimiting = require('../rate-limiting')
+import Consensus from '../consensus'
+import Reporter from '../reporter'
+import Debug from '../debug'
+import StateManager from '../state-manager'
+import Statistics from '../statistics'
+import LoadDetection from '../load-detection'
+import RateLimiting from '../rate-limiting'
 const Profiler = require('../utils/profiler.js')
 const allZeroes64 = '0'.repeat(64)
 const path = require('path')
@@ -20,6 +20,38 @@ const saveConsoleOutput = require('./saveConsoleOutput')
 
 import ShardusTypes = require('../shardus/shardus-types')
 type Profiler = import("../utils/profiler")
+
+interface Shardus {
+  profiler: Profiler
+  config: ShardusTypes.ShardusConfiguration
+  verboseLogs: boolean
+  logger: Logger
+  mainLogger: any
+  fatalLogger: any
+  appLogger: any
+  exitHandler: any
+  storage: Storage
+  crypto: any
+  network: Network
+  p2p: any
+  debug: any
+  consensus: Consensus
+  appProvided: any
+  app: any
+  reporter: Reporter
+  stateManager: StateManager
+  statistics: Statistics
+  loadDetection: LoadDetection
+  rateLimiting: RateLimiting
+  heartbeatInterval: any
+  heartbeatTimer: any
+  registerExternalGet: any
+  registerExternalPost: any
+  registerExternalPut: any
+  registerExternalDelete: any
+  registerExternalPatch: any
+  _listeners: any
+}
 
 /**
  * The main module that is used by the app developer to interact with the shardus api
@@ -145,7 +177,7 @@ class Shardus extends EventEmitter {
     if (this.appProvided === null) throw new Error('Please call Shardus.setup with an App object or null before calling Shardus.start.')
     await this.storage.init()
     this._setupHeartbeat()
-    this.crypto = new Crypto(this.config.crypto, this.logger, this.storage)
+    this.crypto = new Crypto(this.config, this.logger, this.storage)
     await this.crypto.init()
 
     const ipInfo = this.config.ip
@@ -313,7 +345,7 @@ class Shardus extends EventEmitter {
    */
   _createAndLinkStateManager () {
     this.stateManager = new StateManager(this.verboseLogs, this.profiler, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto, this.config)
-    this._registerListener(this.consensus, 'accepted', (...txArgs) => this.stateManager.queueAcceptedTransaction(...txArgs))
+    this._registerListener(this.consensus, 'accepted', (...txArgs: [ShardusTypes.AcceptedTx, boolean, ShardusTypes.Node]) => this.stateManager.queueAcceptedTransaction(...txArgs))
 
     this.storage.stateManager = this.stateManager
   }
@@ -427,7 +459,7 @@ class Shardus extends EventEmitter {
         return { success: false, reason: 'Transaction Expired' }
       }
 
-      const shardusTx:  = {}
+      const shardusTx: any = {}
       shardusTx.receivedTimestamp = Date.now()
       shardusTx.inTransaction = tx
       const txId = this.crypto.hash(tx)
@@ -507,7 +539,8 @@ class Shardus extends EventEmitter {
    * @param {number} distance how far away can this node be to the home node of the hash
    * @returns {boolean} is the node in the distance to the target
    */
-  isNodeInDistance (hash, nodeId, distance) {
+  isNodeInDistance (hash: string, nodeId: string, distance: number) {
+    //@ts-ignore
     return this.stateManager.isNodeInDistance(hash, nodeId, distance)
   }
 
@@ -614,7 +647,7 @@ class Shardus extends EventEmitter {
    */
   _getApplicationInterface (application) {
     this.mainLogger.debug('Start of _getApplicationInterfaces()')
-    let applicationInterfaceImpl = {}
+    let applicationInterfaceImpl: any = {}
     try {
       if (application == null) {
         // throw new Error('Invalid Application Instance')

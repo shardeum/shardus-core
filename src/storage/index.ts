@@ -2,15 +2,29 @@
 // const path = require('path')
 const Sequelize = require('sequelize')
 const Op = Sequelize.Op
-const models = require('./models')
+import models from './models'
 // const stringify = require('fast-stable-stringify')
 // const utils = require('../utils')
 
 // const SequelizeStorage = require('./sequelizeStorage')
-const Sqlite3Storage = require('./sqlite3storage')
+import Sqlite3Storage from './sqlite3storage'
 // const BetterSqlite3Storage = require('./betterSqlite3storage')
 
 const P2PApoptosis = require('../p2p/Apoptosis')
+
+interface Storage {
+  profiler: any
+  mainLogger: any
+  storage: any
+  stateManager: any
+  storageModels: any
+  initialized: boolean
+  _create: any
+  _read: any
+  _update: any
+  _delete: any
+  _query: any
+}
 
 class Storage {
   constructor (baseDir, config, logger, profiler) {
@@ -749,4 +763,4 @@ class Storage {
 //     })
 //   })
 // }
-module.exports = Storage
+export default Storage
