@@ -1,19 +1,51 @@
-const util = require('util')
-const EventEmitter = require('events')
-const Sntp = require('@hapi/sntp')
-const utils = require('../utils')
-const http = require('../http')
-const P2PState = require('./p2p-state')
-const P2PLostNodes = require('./p2p-lost-nodes')
-const P2PArchivers = require('./p2p-archivers')
-const routes = require('./routes')
+import util from 'util'
+import { EventEmitter } from 'events'
+import Sntp from '@hapi/sntp'
+import utils from '../utils'
+import http from '../http'
+import P2PState = require('./p2p-state')
+import P2PLostNodes from './p2p-lost-nodes'
+import P2PArchivers from './p2p-archivers'
+import routes from './routes'
 
-const P2PContext = require('./P2PContext')
-const P2PStartup = require('./p2p-startup')
-const P2PApoptosis = require('./p2p-apoptosis')
-const P2PSync = require('./p2p-sync-nodes-cycles')
+import * as P2PContext from './P2PContext'
+import * as P2PStartup from './p2p-startup'
+import * as P2PApoptosis from './p2p-apoptosis'
+import * as Sync from './Sync'
 
 class P2P extends EventEmitter {
+  logger: any
+  mainLogger: any
+  fatalLogger: any
+  storage: any
+  crypto: any
+  network: any
+  ipInfo: any
+  id: any
+  ipServer: any
+  timeServers: any
+  existingArchivers: any
+  syncLimit: any
+  maxRejoinTime: any
+  difficulty: any
+  queryDelay: any
+  minNodesToAllowTxs: any
+  archiverActiveNodes: any
+  isFirstSeed: boolean
+  acceptInternal: boolean
+  scalingRequested: boolean
+  gossipHandlers: {}
+  gossipRecipients: any
+  gossipTimeout: number
+  gossipedHashes: Map<any, any>
+  gossipedHashesSent: Map<any, any>
+  joinRequestToggle: boolean
+  verboseLogs: boolean
+  state: P2PState & EventEmitter
+  lostNodes: P2PLostNodes
+  archivers: P2PArchivers
+  InternalRecvCounter: number
+  keyCounter: number
   constructor (config, logger, storage, crypto) {
     super()
     this.logger = logger
@@ -51,7 +83,7 @@ class P2P extends EventEmitter {
       this.verboseLogs = true
     }
 
-    this.state = new P2PState(config, this.logger, this.storage, this, this.crypto)
+    this.state = new P2PState(config, this.logger, this.storage, this, this.crypto) as P2PState & EventEmitter
 
     this.state.on('removed', () => {
       this.emit('removed')
@@ -556,7 +588,7 @@ class P2P extends EventEmitter {
     return true
   }
 
-  async robustQuery (nodes = [], queryFn, equalityFn, redundancy = 3, shuffleNodes = true) {
+  async robustQuery (nodes = [], queryFn, equalityFn?, redundancy = 3, shuffleNodes = true) {
     if (nodes.length === 0) throw new Error('No nodes given.')
     if (typeof queryFn !== 'function') throw new Error(`Provided queryFn ${queryFn} is not a valid function.`)
     if (typeof equalityFn !== 'function') equalityFn = util.isDeepStrictEqual
@@ -564,6 +596,9 @@ class P2P extends EventEmitter {
     if (redundancy > nodes.length) redundancy = nodes.length
 
     class Tally {
+      winCount: any
+      equalFn: any
+      items: any[]
       constructor (winCount, equalFn) {
         this.winCount = winCount
         this.equalFn = equalFn
@@ -1133,7 +1168,7 @@ class P2P extends EventEmitter {
   }
 
   // Our own P2P version of the network ask, with a sign added, and sign verified on other side
-  async ask (node, route, message = {}, logged = false, tracker = '') {
+  async ask (node, route: string, message = {}, logged = false, tracker = '') {
     if (tracker === '') {
       tracker = this.createMsgTracker()
     }
@@ -1461,5 +1496,8 @@ function getRandomGossipIn (nodeIdxs, fanOut, myIdx) {
   }
   return results
 }
+
+// tslint:disable-next-line: no-default-export
+export default P2P
 
 module.exports = P2P
