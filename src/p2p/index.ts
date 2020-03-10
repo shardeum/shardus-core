@@ -165,6 +165,7 @@ class P2P extends EventEmitter {
     for (const route of P2PStartup.internalRoutes) this.registerInternal(route.name, route.handler)
     for (const route of P2PApoptosis.internalRoutes) this.registerInternal(route.name, route.handler)
     for (const route of P2PApoptosis.gossipRoutes) this.registerGossipHandler(route.name, route.handler)
+    for (const route of Sync.externalRoutes) this.network._registerExternal(route.method, route.name, route.handler)
   }
 
   _verifyExternalInfo (ipInfo) {
@@ -865,12 +866,12 @@ class P2P extends EventEmitter {
     // Get cycle chain hash
     let cycleChainHash
     try {
-      cycleChainHash = await this._fetchCycleChainHash(nodes, chainStart, chainEnd)
+      cycleChainHash = await P2PStartup._fetchCycleChainHash(nodes, chainStart, chainEnd)
     } catch (e) {
       this.mainLogger.warn('Could not get cycleChainHash from nodes. Querying seedNodes for it...')
       this.mainLogger.debug(e)
       try {
-        cycleChainHash = await this._fetchCycleChainHash(seedNodes, chainStart, chainEnd)
+        cycleChainHash = await P2PStartup._fetchCycleChainHash(seedNodes, chainStart, chainEnd)
       } catch (err) {
         this.mainLogger.error('_syncUpChainAndNodelist > _fetchFinalizedChain: Could not get cycleChainHash from seedNodes. Apoptosis then Exiting... ' + err)
         await this.initApoptosis()
@@ -1024,7 +1025,8 @@ class P2P extends EventEmitter {
     const request = {
       node: this.id,
       timestamp: utils.getTime(),
-      cycleCounter: this.state.getCycleCounter() + 1
+      cycleCounter: this.state.getCycleCounter() + 1,
+      scale: undefined
     }
     switch (upOrDown) {
       case 'up':

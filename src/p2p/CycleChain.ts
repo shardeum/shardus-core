@@ -59,16 +59,21 @@ export function append(cycle: Cycle) {
   const marker = p2p.state._computeCycleMarker(cycle)
   cyclesByMarker[marker] = cycle
   newest = cycle
+  if (!oldest) oldest = cycle
 }
-
 export function prepend(cycle: Cycle) {
   cycles.unshift(cycle)
   const marker = p2p.state._computeCycleMarker(cycle)
   cyclesByMarker[marker] = cycle
   oldest = cycle
+  if (!newest) newest = cycle
 }
-
 export function validate(prev: Cycle, next: Cycle): boolean {
   // [TODO] actually validate
   return true
 }
+
+export function getNewest() {
+  return 
+}
+export function getOldest() {}

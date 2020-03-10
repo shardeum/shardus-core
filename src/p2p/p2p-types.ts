@@ -1,63 +1,14 @@
-// tslint:disable: variable-name
+import { Request, Response, Handler } from "express"
 
-import { EventEmitter } from 'events'
-import {
-  Dictionary,
-  Number,
-  Record,
-  Static,
-  String,
-  Union,
-  Unknown,
-} from 'runtypes'
-import P2P from '.'
-
-export type P2PModuleContext = P2P & EventEmitter
-
-export const JoinRequest = Record({
-  cycleMarker: String,
-  nodeInfo: Record({
-    activeTimestamp: Number,
-    address: String,
-    externalIp: String,
-    externalPort: Number,
-    internalIp: String,
-    internalPort: Number,
-    joinRequestTimestamp: Number,
-    publicKey: String,
-  }),
-  proofOfWork: Record({
-    compute: Record({
-      hash: String,
-      nonce: String,
-    }),
-  }),
-  selectionNum: String,
-  sign: Record({
-    owner: String,
-    sig: String,
-  }),
-})
-export type JoinRequest = Static<typeof JoinRequest>
-
-// {"payload":{},"sender":"2365xdb640","tag":"1074xx1140f","tracker":"key_2365xdb640_1581448859447_0"}
-export const InternalAsk = Record({
-  payload: Union(Record({}), Dictionary(Unknown, 'string')),
-  sender: String,
-  tag: String,
-  tracker: String,
-})
-export type InternalAsk = Static<typeof InternalAsk>
+export enum NodeStatus {
+  ACTIVE = 'active',
+  SYNCING = 'syncing',
+}
 
 export interface Node {
   ip: string
   port: number
   publicKey: string
-}
-
-export enum NodeStatus {
-  ACTIVE = 'active',
-  SYNCING = 'syncing',
 }
 
 export interface NodeInfo {
@@ -70,3 +21,26 @@ export interface NodeInfo {
   publicKey: string
   status: NodeStatus
 }
+
+export interface Route<T> {
+  method?: string,
+  name: string
+  handler: T
+}
+
+export type InternalHandler<
+  Payload = unknown,
+  Response = unknown,
+  Sender = unknown
+> = (
+  payload: Payload,
+  respond: (response?: Response) => void,
+  sender: Sender,
+  tracker: string
+) => void
+
+export type GossipHandler<Payload = unknown, Sender = unknown> = (
+  payload: Payload,
+  sender: Sender,
+  tracker: string
+) => void

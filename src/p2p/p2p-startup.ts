@@ -1,8 +1,7 @@
-import { p2p } from './P2PContext'
 import * as http from '../http';
 import utils from '../utils';
-import { newSyncToNetwork } from './p2p-sync-nodes-cycles';
-import { Node, NodeInfo, P2PModuleContext } from './p2p-types';
+import { Node, NodeInfo } from './p2p-types';
+import { p2p } from './P2PContext';
 import { sync } from './Sync';
 
 /** STATE */
@@ -744,7 +743,7 @@ async function _fetchLatestCycleChain(activeNodes, nodes) {
   return chainAndCerts;
 }
 
-async function _fetchCycleChainHash(nodes, start, end) {
+export async function _fetchCycleChainHash(nodes, start, end) {
   const queryFn = async node => {
     const { cycleChainHash } = await p2p.ask(node, 'cyclechainhash', {
       start,
