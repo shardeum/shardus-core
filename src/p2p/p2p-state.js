@@ -346,9 +346,7 @@ class P2PState extends EventEmitter {
     for (const node of joining) {
       utils.insertSorted(joined, node.publicKey)
       utils.insertSorted(joinedConsensors, {
-        ip: node.externalIp,
-        port: node.externalPort,
-        publicKey: node.publicKey
+        ...node
       })
     }
     this.mainLogger.debug(`Joined after update: ${JSON.stringify(joined)}`)
