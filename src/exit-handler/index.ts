@@ -1,7 +1,7 @@
 interface ExitHandler {
   exited: boolean
-  syncFuncs: any
-  asyncFuncs: any
+  syncFuncs: Map<string, Function>
+  asyncFuncs: Map<string, Function>
 }
 
 class ExitHandler {

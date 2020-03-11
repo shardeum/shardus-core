@@ -1,26 +1,30 @@
+import Log4js from 'log4js'
 import Profiler from '../utils/profiler'
 import Logger from '../logger'
-
-const EventEmitter = require('events')
-const utils = require('../utils')
+import Shardus from '../shardus/shardus-types'
+import Storage from '../storage'
+import Crypto from '../crypto'
+import * as utils from '../utils'
+import { EventEmitter } from 'events'
+type P2P = import("../p2p")
 
 interface Consensus {
   profiler: Profiler
-  app: any
-  config: any
+  app: Shardus.App
+  config: Shardus.ShardusConfiguration
   logger: Logger
-  mainLogger: any
-  fatalLogger: any
-  crypto: any
-  p2p: any
-  storage: any
+  mainLogger: Log4js.Logger
+  fatalLogger: Log4js.Logger
+  crypto: Crypto
+  p2p: P2P
+  storage: Storage
   pendingTransactions: any
   mainLogs: boolean
   lastServed: number
 }
 
 class Consensus extends EventEmitter {
-  constructor (app, config, logger, crypto, p2p, storage, profiler) {
+  constructor (app: Shardus.App, config: Shardus.ShardusConfiguration, logger: Logger, crypto: Crypto, p2p: P2P, storage: Storage, profiler: Profiler) {
     super()
     this.profiler = profiler
     this.app = app
@@ -35,7 +39,7 @@ class Consensus extends EventEmitter {
     this.pendingTransactions = {}
 
     this.mainLogs = false
-    if (this.mainLogger && ['TRACE', 'debug'].includes(this.mainLogger.level.levelStr)) {
+    if (this.mainLogger && ['TRACE', 'debug'].includes(this.mainLogger.level)) {
       this.mainLogs = true
     }
 

@@ -1,13 +1,13 @@
-const { readFileSync, readdirSync } = require('fs')
-const { join } = require('path')
+import { join } from 'path'
+import { readFileSync, readdirSync } from 'fs'
 
-const sleep = (ms) => {
+export const sleep = (ms) => {
   return new Promise(resolve => {
     setTimeout(resolve, ms)
   })
 }
 
-const getTime = (format = 'ms') => {
+export const getTime = (format = 'ms') => {
   let time
   switch (format) {
     case 'ms':
@@ -22,18 +22,18 @@ const getTime = (format = 'ms') => {
   return time
 }
 
-const deepCopy = (obj) => {
+export const deepCopy = (obj) => {
   if (typeof obj !== 'object') throw Error('Given element is not of type object.')
   return JSON.parse(JSON.stringify(obj))
 }
 
-const readJson = (filename) => {
-  const file = /** @type {string} */(/** @type {unknown} */(readFileSync(filename)))
+export const readJson = (filename) => {
+  const file = readFileSync(filename).toString()
   const config = JSON.parse(file)
   return config
 }
 
-const readJsonDir = (dir) => { // => filesObj
+export const readJsonDir = (dir) => { // => filesObj
   let filesObj = {}
   readdirSync(dir).forEach(fileName => {
     let name = fileName.split('.')[0]
@@ -42,7 +42,7 @@ const readJsonDir = (dir) => { // => filesObj
   return filesObj
 }
 
-const binarySearch = (arr, item, comparator) => {
+export const binarySearch = (arr, item, comparator) => {
   if (comparator == null) {
     // Emulate the default Array.sort() comparator
     comparator = (a, b) => {
@@ -70,7 +70,7 @@ const binarySearch = (arr, item, comparator) => {
   return false
 }
 
-const insertSorted = (arr, item, comparator) => {
+export const insertSorted = (arr, item, comparator?: any) => {
   if (comparator == null) {
     // Emulate the default Array.sort() comparator
     comparator = (a, b) => {
@@ -96,7 +96,7 @@ const insertSorted = (arr, item, comparator) => {
   arr.splice(index, 0, item)
 }
 
-const computeMedian = (arr = [], sort = true) => {
+export const computeMedian = (arr = [], sort = true) => {
   if (sort) {
     arr.sort((a, b) => a - b)
   }
@@ -119,13 +119,13 @@ const computeMedian = (arr = [], sort = true) => {
   }
 }
 
-const XOR = (hexString1, hexString2) => {
+export const XOR = (hexString1, hexString2) => {
   const num1 = parseInt(hexString1.substring(0, 8), 16)
   const num2 = parseInt(hexString2.substring(0, 8), 16)
   return (num1 ^ num2) >>> 0
 }
 
-const getClosestHash = (targetHash, hashes) => {
+export const getClosestHash = (targetHash, hashes) => {
   let closest = null
   let closestDist = 0
   for (const hash of hashes) {
@@ -140,7 +140,7 @@ const getClosestHash = (targetHash, hashes) => {
   return closest
 }
 
-const setAlarm = (callback, timestamp) => {
+export const setAlarm = (callback, timestamp) => {
   const now = Date.now()
   if (timestamp <= now) {
     callback()
@@ -150,22 +150,22 @@ const setAlarm = (callback, timestamp) => {
   setTimeout(callback, toWait)
 }
 
-const isObject = (val) => {
+export const isObject = (val) => {
   if (val === null) {
     return false
   }
   return ((typeof val === 'function') || (typeof val === 'object'))
 }
 
-const isString = (x) => {
+export const isString = (x) => {
   return Object.prototype.toString.call(x) === '[object String]'
 }
 
-const isNumeric = (x) => {
+export const isNumeric = (x) => {
   return isNaN(x) === false
 }
 
-const makeShortHash = (x, n = 4) => {
+export const makeShortHash = (x, n = 4) => {
   if (!x) {
     return x
   }
@@ -190,7 +190,7 @@ var objKeys = Object.keys || function (obj) {
   return keys
 }
 
-const stringifyReduce = (val, isArrayProp) => {
+export const stringifyReduce = (val, isArrayProp?: boolean) => {
   var i, max, str, keys, key, propVal, toStr
   if (val === true) {
     return 'true'
@@ -249,7 +249,7 @@ const stringifyReduce = (val, isArrayProp) => {
   }
 }
 
-const stringifyReduceLimit = (val, isArrayProp, limit = 100) => {
+export const stringifyReduceLimit = (val, limit = 100, isArrayProp?: boolean) => {
   var i, max, str, keys, key, propVal, toStr
 
   if (limit < 0) {
@@ -266,20 +266,20 @@ const stringifyReduceLimit = (val, isArrayProp, limit = 100) => {
       if (val === null) {
         return null
       } else if (val.toJSON && typeof val.toJSON === 'function') {
-        return stringifyReduceLimit(val.toJSON(), isArrayProp, limit)
+        return stringifyReduceLimit(val.toJSON(), limit, isArrayProp)
       } else {
         toStr = objToString.call(val)
         if (toStr === '[object Array]') {
           str = '['
           max = val.length - 1
           for (i = 0; i < max; i++) {
-            str += stringifyReduceLimit(val[i], true, limit - str.length) + ','
+            str += stringifyReduceLimit(val[i], limit - str.length, true) + ','
             if (str.length > limit) {
               return str + 'LIMIT'
             }
           }
           if (max > -1) {
-            str += stringifyReduceLimit(val[i], true, limit - str.length)
+            str += stringifyReduceLimit(val[i], limit - str.length, true)
           }
           return str + ']'
         } else if (toStr === '[object Object]') {
@@ -290,7 +290,7 @@ const stringifyReduceLimit = (val, isArrayProp, limit = 100) => {
           i = 0
           while (i < max) {
             key = keys[i]
-            propVal = stringifyReduceLimit(val[key], false, limit - str.length)
+            propVal = stringifyReduceLimit(val[key], limit - str.length, false)
             if (propVal !== undefined) {
               if (str) {
                 str += ','
@@ -320,7 +320,7 @@ const stringifyReduceLimit = (val, isArrayProp, limit = 100) => {
 }
 
 // Returns an array of two arrays, one will all resolved promises, and one with all rejected promises
-const robustPromiseAll = async (promises) => {
+export const robustPromiseAll = async (promises) => {
   // This is how we wrap a promise to prevent it from rejecting directing in the Promise.all and causing a short circuit
   const wrapPromise = async (promise) => {
     // We are trying to await the promise, and catching any rejections
@@ -357,50 +357,26 @@ const robustPromiseAll = async (promises) => {
   return [resolved, errors]
 }
 
-const sortAsc = (a, b) => {
+export const sortAsc = (a, b) => {
   return a === b ? 0 : a < b ? -1 : 1
 }
 
-const sortDec = (a, b) => {
+export const sortDec = (a, b) => {
   return a === b ? 0 : a > b ? -1 : 1
 }
 
-const sortHashAsc = (a, b) => {
+export const sortHashAsc = (a, b) => {
   return a === b ? 0 : a.hash < b.hash ? -1 : 1
 }
 
-const sortAscProp = (a, b, propName) => {
+export const sortAscProp = (a, b, propName) => {
   let aVal = a[propName]
   let bVal = b[propName]
   return aVal === bVal ? 0 : aVal < bVal ? -1 : 1
 }
 
-const sortDecProp = (a, b, propName) => {
+export const sortDecProp = (a, b, propName) => {
   let aVal = a[propName]
   let bVal = b[propName]
   return aVal === bVal ? 0 : aVal > bVal ? -1 : 1
 }
-
-exports.sleep = sleep
-exports.getTime = getTime
-exports.deepCopy = deepCopy
-exports.readJson = readJson
-exports.readJsonDir = readJsonDir
-exports.binarySearch = binarySearch
-exports.insertSorted = insertSorted
-exports.computeMedian = computeMedian
-exports.XOR = XOR
-exports.getClosestHash = getClosestHash
-exports.setAlarm = setAlarm
-exports.isObject = isObject
-exports.isString = isString
-exports.isNumeric = isNumeric
-exports.makeShortHash = makeShortHash
-exports.stringifyReduce = stringifyReduce
-exports.stringifyReduceLimit = stringifyReduceLimit
-exports.robustPromiseAll = robustPromiseAll
-exports.sortAsc = sortAsc
-exports.sortDec = sortDec
-exports.sortAscProp = sortAscProp
-exports.sortDecProp = sortDecProp
-exports.sortHashAsc = sortHashAsc

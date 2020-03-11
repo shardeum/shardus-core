@@ -1,17 +1,18 @@
-const path = require('path')
+import path from 'path'
+import Network from '../network'
+import zlib from 'zlib'
+import Trie from 'trie-prefix-tree'
 const tar = require('tar-fs')
-const zlib = require('zlib')
-const Trie = require('trie-prefix-tree')
 
 interface Debug {
   baseDir: string
-  network: any
+  network: Network
   archiveName: string
-  files: any
+  files: {[name: string]: string}
 }
 
 class Debug {
-  constructor (baseDir, network) {
+  constructor (baseDir: string, network: Network) {
     this.baseDir = baseDir
     this.network = network
     this.archiveName = `debug-${network.ipInfo.externalIp}-${network.ipInfo.externalPort}.tar.gz`

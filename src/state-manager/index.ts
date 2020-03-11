@@ -10,7 +10,7 @@ import {ShardGlobals,ShardInfo,StoredPartition,NodeShardData,AddressRange, HomeN
 import ShardFunctions from './shardFunctions.js'
 
 const EventEmitter = require('events')
-const utils = require('../utils')
+import * as utils from '../utils'
 
 const stringify = require('fast-stable-stringify')
 
@@ -22,8 +22,7 @@ const cHashSetDataStepSize = 2
 
 // not sure about this.
 import Consensus from "../consensus"
-type Profiler = import("../utils/profiler")
-// type P2P = import("../p2p/")
+import Profiler from "../utils/profiler"
 import { P2PModuleContext as P2P } from "../p2p/Context"
 import Storage from "../storage"
 import Crypto from "../crypto"

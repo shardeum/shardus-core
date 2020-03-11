@@ -1,16 +1,16 @@
-const parseUrl = require('url').parse
+import { parse as parseUrl } from 'url'
 const got = require('got')
 
 let _logger = null
 let getIndex = 1
 let postIndex = -1
 
-function _containsProtocol (url) {
+function _containsProtocol (url: string) {
   if (!url.match('https?://*')) return false
   return true
 }
 
-function _normalizeUrl (url) {
+function _normalizeUrl (url: string) {
   let normalized = url
   if (!_containsProtocol(url)) normalized = 'http://' + url
   return normalized
@@ -30,7 +30,7 @@ async function _get (url, getResponseObj = false) {
   Queries the given host for a JSON payload
   Returns a promise, resolves parsed JSON response
 */
-async function get (url, getResponseObj = false) {
+async function get (url: string, getResponseObj = false) {
   let normalized = _normalizeUrl(url)
   let host = parseUrl(normalized, true)
 

@@ -1,6 +1,5 @@
 import Statistics from "../statistics"
-
-const EventEmitter = require('events')
+import { EventEmitter } from 'events'
 
 interface LoadDetection {
   highThreshold: number

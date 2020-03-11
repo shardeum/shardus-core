@@ -2,6 +2,10 @@ const NS_PER_SEC = 1e9
 
 // process.hrtime.bigint()
 
+interface Profiler {
+  sectionTimes: any
+}
+
 class Profiler {
   constructor () {
     this.sectionTimes = {}
@@ -36,7 +40,7 @@ class Profiler {
     return x >= 0 ? Math.floor(x) : Math.ceil(x)
   }
 
-  printAndClearReport (delta) {
+  printAndClearReport (delta?: number) {
     let result = 'Profile Sections: '
     // let d1 = this.cleanInt(delta * NS_PER_SEC)
     let d1 = this.cleanInt(1e6) // will get us ms
@@ -53,4 +57,4 @@ class Profiler {
     console.log(result)
   }
 }
-module.exports = Profiler
+export default Profiler

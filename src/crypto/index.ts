@@ -1,20 +1,22 @@
-const crypto = require('shardus-crypto-utils')
-const { fork } = require('child_process')
-
+import * as crypto from 'shardus-crypto-utils'
+import Log4js from 'log4js'
+import { fork, ChildProcess } from 'child_process'
 import Shardus = require('../shardus/shardus-types')
+import Logger from '../logger'
+import Storage from '../storage'
 
 interface Crypto {
   config: Shardus.ShardusConfiguration
-  mainLogger: any
-  storage: any
+  mainLogger: Log4js.Logger
+  storage: Storage
   keypair: any
-  curveKeypair: any
-  powGenerators: any
-  sharedKeys: any
+  curveKeypair: { publicKey?: crypto.curvePublicKey, secretKey?: crypto.curveSecretKey}
+  powGenerators: {[name: string]: ChildProcess}
+  sharedKeys: {[name: string]: string}
 }
 
 class Crypto {
-  constructor (config, logger, storage) {
+  constructor (config: Shardus.ShardusConfiguration, logger: Logger, storage: Storage) {
     this.config = config
     this.mainLogger = logger.getLogger('main')
     this.storage = storage
@@ -48,7 +50,7 @@ class Crypto {
     return keypair
   }
 
-  convertPublicKeyToCurve (pk) {
+  convertPublicKeyToCurve (pk: crypto.publicKey) {
     return crypto.convertPkToCurve(pk)
   }
 
@@ -60,28 +62,28 @@ class Crypto {
     return this.curveKeypair.publicKey
   }
 
-  getSharedKey (curvePk) {
+  getSharedKey (curvePk: crypto.curvePublicKey) {
     let sharedKey = this.sharedKeys[curvePk]
     if (!sharedKey) {
-      sharedKey = crypto.generateSharedKey(this.curveKeypair.secretKey, curvePk)
+      sharedKey = crypto.generateSharedKey(this.curveKeypair.secretKey, curvePk).toString()
       this.sharedKeys[curvePk] = sharedKey
     }
     return sharedKey
   }
 
-  tag (obj, recipientCurvePk) {
+  tag (obj: any, recipientCurvePk: crypto.curvePublicKey) {
     const objCopy = JSON.parse(crypto.stringify(obj))
     const sharedKey = this.getSharedKey(recipientCurvePk)
     crypto.tagObj(objCopy, sharedKey)
     return objCopy
   }
 
-  authenticate (obj, senderCurvePk) {
+  authenticate (obj: any, senderCurvePk: crypto.curvePublicKey) {
     const sharedKey = this.getSharedKey(senderCurvePk)
     return crypto.authenticateObj(obj, sharedKey)
   }
 
-  sign (obj) {
+  sign (obj: any) {
     let objCopy = JSON.parse(crypto.stringify(obj))
     crypto.signObj(objCopy, this.keypair.secretKey, this.keypair.publicKey)
     return objCopy
@@ -116,7 +118,7 @@ class Crypto {
     this.powGenerators = {}
   }
 
-  _runProofOfWorkGenerator (generator, seed, difficulty) {
+  _runProofOfWorkGenerator (generator: string, seed, difficulty: number) {
     // Fork a child process to compute the PoW, if it doesn't exist
     // @ts-ignore for seems to have a funky definition so ignoring it for now.  could be good to go back and research this.
     if (!this.powGenerators[generator]) this.powGenerators[generator] = fork(generator, { cwd: __dirname })
@@ -134,7 +136,7 @@ class Crypto {
     return promise
   }
 
-  _stopProofOfWorkGenerator (generator) {
+  _stopProofOfWorkGenerator (generator: string) {
     if (!this.powGenerators[generator]) return Promise.resolve('not running')
     let promise = new Promise((resolve, reject) => {
       this.powGenerators[generator].on('close', (signal) => {

@@ -1,10 +1,11 @@
+import Log4js from 'log4js'
+import ShardusTypes = require('../shardus/shardus-types')
 import Logger from '../logger'
 import ExitHandler from '../exit-handler'
-const P2P = require('../p2p')
 import Crypto from '../crypto'
 import Storage from '../storage'
 import Network from '../network'
-const utils = require('../utils')
+import * as utils from '../utils'
 import Consensus from '../consensus'
 import Reporter from '../reporter'
 import Debug from '../debug'
@@ -12,39 +13,39 @@ import StateManager from '../state-manager'
 import Statistics from '../statistics'
 import LoadDetection from '../load-detection'
 import RateLimiting from '../rate-limiting'
-const Profiler = require('../utils/profiler.js')
+import Profiler from "../utils/profiler"
+type P2P = import("../p2p")
+const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
 const path = require('path')
 const EventEmitter = require('events')
 const saveConsoleOutput = require('./saveConsoleOutput')
 
-import ShardusTypes = require('../shardus/shardus-types')
-type Profiler = import("../utils/profiler")
 
 interface Shardus {
   profiler: Profiler
   config: ShardusTypes.ShardusConfiguration
   verboseLogs: boolean
   logger: Logger
-  mainLogger: any
-  fatalLogger: any
-  appLogger: any
+  mainLogger: Log4js.Logger
+  fatalLogger: Log4js.Logger
+  appLogger: Log4js.Logger
   exitHandler: any
   storage: Storage
-  crypto: any
+  crypto: Crypto
   network: Network
   p2p: any
-  debug: any
+  debug: Debug
   consensus: Consensus
-  appProvided: any
-  app: any
+  appProvided: boolean
+  app: ShardusTypes.App
   reporter: Reporter
   stateManager: StateManager
   statistics: Statistics
   loadDetection: LoadDetection
   rateLimiting: RateLimiting
-  heartbeatInterval: any
-  heartbeatTimer: any
+  heartbeatInterval: number
+  heartbeatTimer: NodeJS.Timeout
   registerExternalGet: any
   registerExternalPost: any
   registerExternalPut: any
@@ -57,7 +58,11 @@ interface Shardus {
  * The main module that is used by the app developer to interact with the shardus api
  */
 class Shardus extends EventEmitter {
-  constructor ({ server: config, logs: logsConfig, storage: storageConfig }) {
+  constructor ({ server: config, logs: logsConfig, storage: storageConfig }: {
+    server: ShardusTypes.ShardusConfiguration 
+    logs: ShardusTypes.LogsConfiguration
+    storage: ShardusTypes.StorageConfiguration
+  }) {
     super()
     this.profiler = new Profiler()
     this.config = config
@@ -384,7 +389,7 @@ class Shardus extends EventEmitter {
    * Calls the "put" function with the "set" boolean parameter set to true
    * @param {*} tx The transaction data
    */
-  set (tx) {
+  set (tx: any) {
     return this.put(tx, true)
   }
 
@@ -392,8 +397,8 @@ class Shardus extends EventEmitter {
    * Allows the application to log specific data to an app.log file
    * @param  {...any} data The data to be logged in app.log file
    */
-  log (...data) {
-    this.appLogger.debug(...data)
+  log (...data: any[]) {
+    this.appLogger.debug(new Date(), ...data)
   }
 
   /**
