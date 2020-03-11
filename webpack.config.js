@@ -3,7 +3,7 @@ const nodeExternals = require('webpack-node-externals')
 const BytenodeWebpackPlugin = require('bytenode-webpack-plugin')
 
 module.exports = {
-  entry: './build/src/index.js',
+  entry: './build/src/',
   output: {
     filename: 'shardus.js',
     path: path.resolve(__dirname, process.env.npm_package_config_dist),
