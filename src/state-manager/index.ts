@@ -679,7 +679,7 @@ class StateManager extends EventEmitter {
   createSyncTrackerByForGlobals ( cycle: number): SyncTracker {
     // let partition = -1
     let index = this.syncTrackerIndex++
-    let syncTracker = { range:{}, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false, isGlobalSyncTracker:false, globalAddressMap:{} } as SyncTracker// partition,
+    let syncTracker = { range:{}, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false, isGlobalSyncTracker:true, globalAddressMap:{} } as SyncTracker// partition,
     syncTracker.syncStarted = false
     syncTracker.syncFinished = false
 
@@ -701,7 +701,7 @@ class StateManager extends EventEmitter {
           return syncTracker
         }
       //}else{
-        if (syncTracker.isGlobalSyncTracker && syncTracker.globalAddressMap[address] == true) {
+        if (syncTracker.isGlobalSyncTracker === true && syncTracker.globalAddressMap[address] === true) {
           return syncTracker
         }
       //}
@@ -2885,7 +2885,7 @@ class StateManager extends EventEmitter {
       let isGlobalModifyingTX = false
       let queueEntry = this.getQueueEntry(acceptedTX.id)
       if(queueEntry != null){
-        if(queueEntry.globalModification){
+        if(queueEntry.globalModification === true){
           isGlobalModifyingTX = true
         }
       }
@@ -4014,18 +4014,12 @@ class StateManager extends EventEmitter {
     }
 
     let forceLocalGlobalLookup = false
-    let globalAccount = this.globalAccountMap.get(address);
-    if(globalAccount != null){
-      // nothing actually caches this yet.  caching it could be hard.
-      // even having  a null in that hash should be usefull though
-      //if(globalAccount != null){
-        return globalAccount;
-      //}
-
-      // //else look up locally
-      // forceLocalGlobalLookup = true
-    } else if (this.globalAccountMap.has(address)){
-      //else look up locally
+    let globalAccount = null
+    if(this.globalAccountMap.has(address)){
+      globalAccount = this.globalAccountMap.get(address);
+      if(globalAccount != null){
+        return globalAccount
+      }
       forceLocalGlobalLookup = true
     }
 
