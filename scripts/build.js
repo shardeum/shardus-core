@@ -1,11 +1,11 @@
 const fs = require('fs')
 const path = require('path')
 
-const rootDir = path.resolve(__dirname, '../')
-const distDir = path.resolve(rootDir, process.env.npm_package_config_dist)
+const rootDir = path.resolve(__dirname, '../build/src/')
+const distDir = path.resolve(__dirname, '../', process.env.npm_package_config_dist)
 
 // Load package.json, modify for distribution, and write into dist/
-const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), { encoding: 'utf8' }))
+const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '../', 'package.json'), { encoding: 'utf8' }))
 
 const packageJsonNew = Object.assign({}, packageJson)
 packageJsonNew.name = packageJson.name + '-dist'
@@ -24,7 +24,7 @@ copyFolderSync(path.join(rootDir, 'config'), path.join(distDir, 'config'))
 
 // Copy src/.../computePowGenerator.js and scripts/build-index.js into dist/
 fs.copyFileSync(path.join(rootDir, 'src/crypto/computePowGenerator.js'), path.join(distDir, 'computePowGenerator.js'))
-fs.copyFileSync(path.join(rootDir, 'scripts/build-index.js'), path.join(distDir, 'index.js'))
+fs.copyFileSync(path.join(__dirname, '../', 'scripts/build-index.js'), path.join(distDir, 'index.js'))
 
 // Modified from https://stackoverflow.com/a/52338335
 function copyFolderSync (from, to) {
@@ -44,5 +44,3 @@ function copyFolderSync (from, to) {
     }
   })
 }
-
-// Had to add this comment because git is acting weird and didn't update the file?
