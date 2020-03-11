@@ -3777,8 +3777,9 @@ class StateManager extends EventEmitter {
         } else if (queueEntry.state === 'awaiting data') {
           markAccountsSeen(queueEntry)
 
-          if(queueEntry.globalModification === false){
+          if(queueEntry.globalModification === true){
             // no data to await.
+            queueEntry.state = 'applying'
             continue
           }
           // check if we have all accounts
