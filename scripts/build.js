@@ -1,8 +1,8 @@
 const fs = require('fs')
 const path = require('path')
 
-const rootDir = path.resolve(__dirname, '../build/src/')
-const distDir = path.resolve(__dirname, '../', process.env.npm_package_config_dist)
+const rootDir = path.resolve(__dirname, '../build')
+const distDir = path.resolve(rootDir, '../', process.env.npm_package_config_dist)
 
 // Load package.json, modify for distribution, and write into dist/
 const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '../', 'package.json'), { encoding: 'utf8' }))
@@ -20,7 +20,7 @@ packageJsonNew.dependencies['bytenode'] = '1.1.1'
 fs.writeFileSync(path.join(distDir, 'package.json'), JSON.stringify(packageJsonNew, null, 2))
 
 // Copy config/, into dist/
-copyFolderSync(path.join(rootDir, 'config'), path.join(distDir, 'config'))
+copyFolderSync(path.join(rootDir, 'src/', 'config'), path.join(distDir, 'config'))
 
 // Copy src/.../computePowGenerator.js and scripts/build-index.js into dist/
 fs.copyFileSync(path.join(rootDir, 'src/crypto/computePowGenerator.js'), path.join(distDir, 'computePowGenerator.js'))
