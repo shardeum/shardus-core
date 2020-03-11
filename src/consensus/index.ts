@@ -57,7 +57,7 @@ class Consensus extends EventEmitter {
       timestamp = keysResponse.timestamp
       debugInfo = keysResponse.debugInfo
 
-      if (this.mainLogs) this.mainLogger.debug(`Start of inject(${timestamp}  ${debugInfo}  tx: ${utils.stringifyReduce(shardusTransaction)})`)
+      if (this.mainLogs) this.mainLogger.debug(`Start of inject(globalModification:${global}   ${timestamp}  ${debugInfo}  tx: ${utils.stringifyReduce(shardusTransaction)})`)
       let sourceAddress, targetAddress, stateId, targetStateId
 
       if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {

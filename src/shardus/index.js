@@ -288,14 +288,20 @@ class Shardus extends EventEmitter {
   async syncAppData () {
     if (this.stateManager) await this.stateManager.syncStateData(3)
 
+    console.log('syncAppData')
     if (this.p2p.isFirstSeed) {
       await this.p2p.goActive()
+      console.log('syncAppData - goActive')
       // await this.stateManager.startCatchUpQueue() // first node skips sync anyhow
       await this.app.sync()
+      console.log('syncAppData - sync')
     } else {
       await this.stateManager.startCatchUpQueue()
+      console.log('syncAppData - startCatchUpQueue')
       await this.app.sync()
+      console.log('syncAppData - sync')
       await this.p2p.goActive()
+      console.log('syncAppData - goActive')
     }
     // Set network joinable to true
     this.p2p.setJoinRequestToggle(true)
@@ -313,7 +319,7 @@ class Shardus extends EventEmitter {
   }
 
   set (tx) {
-    return this.put(tx, true)
+    return this.put(tx, true, false)
   }
 
   log (...data) {
@@ -714,7 +720,7 @@ class Shardus extends EventEmitter {
     this.network.registerExternalGet('config', async (req, res) => {
       res.json({ config: this.config })
     })
-    
+
     this.network.registerExternalPost('testGlobalAccountTX', async (req, res) => {
       let tx = req.tx
       this.put(tx, false, true)

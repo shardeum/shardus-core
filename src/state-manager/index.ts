@@ -898,7 +898,7 @@ class StateManager extends EventEmitter {
       this.createSyncTrackerByRange(range, cycle)
     }
 
-    this.createSyncTrackerByForGlobals(cycle)
+    //this.createSyncTrackerByForGlobals(cycle)
 
     // could potentially push this back a bit.
     this.readyforTXs = true
@@ -3109,6 +3109,7 @@ class StateManager extends EventEmitter {
     //   // this.preTXQueue.push(acceptedTX)
     //   return 'notReady' // it is too early to care about the tx
     // }
+    this.logger.playbackLogNote('queueAcceptedTransaction-debug', '', `sendGossip:${sendGossip} globalModification:${globalModification} this.readyforTXs:${this.readyforTXs} hasshardData:${(this.currentCycleShardData != null)} acceptedTx:${utils.stringifyReduce(acceptedTx)} `)
     if (this.readyforTXs === false) {
       return 'notReady' // it is too early to care about the tx
     }
@@ -3169,17 +3170,20 @@ class StateManager extends EventEmitter {
           txQueueEntry.localKeys[key] = true // used for the filter
 
 
-          // TODO: globalaccounts 
-          if(this.globalAccountMap.has(key)){
-            // indicate that we will have global data in this transaction!
-            // I think we do not need to test that here afterall.
-          } else {
-            //this makes the code aware that this key is for a global account.
-            //is setting this here too soon?
-            //it should be that p2p has already checked the receipt before calling shardus.push with global=true
+          if(globalModification === true){
+            // TODO: globalaccounts 
+            if(this.globalAccountMap.has(key)){
+              // indicate that we will have global data in this transaction!
+              // I think we do not need to test that here afterall.
+            } else {
+              //this makes the code aware that this key is for a global account.
+              //is setting this here too soon?
+              //it should be that p2p has already checked the receipt before calling shardus.push with global=true
 
-            this.globalAccountMap.set(key, null)
+              this.globalAccountMap.set(key, null)
+            }            
           }
+
 
           this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, ` qId: ${txQueueEntry.entryID}`)
         }
@@ -4014,10 +4018,13 @@ class StateManager extends EventEmitter {
     if(globalAccount != null){
       // nothing actually caches this yet.  caching it could be hard.
       // even having  a null in that hash should be usefull though
-      if(globalAccount != null){
+      //if(globalAccount != null){
         return globalAccount;
-      }
+      //}
 
+      // //else look up locally
+      // forceLocalGlobalLookup = true
+    } else if (this.globalAccountMap.has(address)){
       //else look up locally
       forceLocalGlobalLookup = true
     }
@@ -6385,9 +6392,9 @@ class StateManager extends EventEmitter {
           // TODO: globalaccounts 
           //this is where we need to no reset a global account, but instead grab the replacment data and cache it
           /// ////////////////////////
-          let isGlobalAccount = this.globalAccountMap.has(accountData.accountId )
+          //let isGlobalAccount = this.globalAccountMap.has(accountData.accountId )
           
-
+          // dont need to grab and cache data because that already gets done earlier as we apply normal transactions.
 
 
         }
