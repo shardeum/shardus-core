@@ -44,3 +44,5 @@ function copyFolderSync (from, to) {
     }
   })
 }
+
+// Had to add this comment because git is acting weird and didn't update the file?
