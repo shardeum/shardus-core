@@ -1105,7 +1105,9 @@ class P2PState extends EventEmitter {
     const bestNodes = []
     const bestJoinRequests = this._getBestJoinRequests()
     for (const joinRequest of bestJoinRequests) {
-      bestNodes.push(joinRequest.nodeInfo)
+      const prevMarker = this.getPreviousCycleMarker()
+      const id = this.computeNodeId(joinRequest.nodeInfo.publicKey, prevMarker)
+      bestNodes.push({ ...joinRequest.nodeInfo, id })
     }
     this.mainLogger.debug(`Best nodes for this cycle: ${JSON.stringify(bestNodes)}`)
     return bestNodes
@@ -1257,7 +1259,8 @@ class P2PState extends EventEmitter {
     cycleInfo.marker = this.getCurrentCertificate().marker
 
     const bestNodes = this._getBestNodes()
-    const accepted = this._acceptNodes(bestNodes, cycleInfo.marker)
+    const prevMarker = this.getPreviousCycleMarker()
+    const accepted = this._acceptNodes(bestNodes, prevMarker)
 
     this.mainLogger.debug(`Nodes to be activated this cycle: ${JSON.stringify(cycleInfo.activated)}`)
     const activated = this._setNodesToStatus(cycleInfo.activated, 'active')

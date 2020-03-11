@@ -195,12 +195,13 @@ async function joinNetwork(seedNodes) {
     await utils.sleep(
       Math.ceil(p2p.state.getCurrentCycleDuration() / 2) * 1000
     );
-    const { nextCycleMarker } = p2p.getCycleMarkerInfo();
+    // const { nextCycleMarker } = p2p.getCycleMarkerInfo();
+    const prevCycleMarker = p2p.state.getPreviousCycleMarker()
     p2p.mainLogger.debug(`Public key: ${joinRequest.nodeInfo.publicKey}`);
-    p2p.mainLogger.debug(`Next cycle marker: ${nextCycleMarker}`);
+    p2p.mainLogger.debug(`Prev cycle marker: ${prevCycleMarker}`);
     const nodeId = p2p.state.computeNodeId(
       joinRequest.nodeInfo.publicKey,
-      nextCycleMarker
+      prevCycleMarker
     );
     p2p.mainLogger.debug(
       `Computed node ID to be set for context node: ${nodeId}`
