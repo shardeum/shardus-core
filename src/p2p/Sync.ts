@@ -44,11 +44,9 @@ export const externalRoutes = [newestCycleRoute, cyclesRoute]
 /** FUNCTIONS */
 
 export async function sync(activeNodes: ActiveNode[]) {
-  console.log('DBG', 'Started Sync > sync...')
 
   // Get the networks newest cycle as the anchor point for sync
   const newestCycle = await getNewestCycle(activeNodes)
-  console.log('DBG', 'newestCycle', newestCycle)
   CycleChain.append(newestCycle)
 
   // Sync old cycles until your active nodes === network active nodes
@@ -59,19 +57,14 @@ export async function sync(activeNodes: ActiveNode[]) {
       CycleChain.oldest.counter - 100,
       CycleChain.oldest.counter
     )
-    console.log('DBG', 'prevCycles', JSON.stringify(prevCycles))
     for (const prevCycle of reversed(prevCycles)) {
       CycleChain.validate(prevCycle, CycleChain.oldest)
       CycleChain.prepend(prevCycle)
-      console.log('DBG', 'parse(prevCycle)', parse(prevCycle))
       squasher.addChange(parse(prevCycle))
       if (squasher.final.updated.length >= newestCycle.active) {
         break
       }
     }
-
-    console.log('DBG', 'squasher.final.updated.length', squasher.final.updated.length)
-
   } while (squasher.final.updated.length < newestCycle.active)
   NodeList.addNodes(
     squasher.final.added.map(joined => NodeList.createNode(joined))
