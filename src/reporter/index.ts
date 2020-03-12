@@ -1,3 +1,4 @@
+import Log4js from 'log4js'
 import LoadDetection from '../load-detection'
 import Statistics from '../statistics'
 import StateManager from '../state-manager'
@@ -14,7 +15,7 @@ const allZeroes64 = '0'.repeat(64)
 
 interface Reporter {
   config: any
-  mainLogger: any
+  mainLogger: Log4js.Logger
   p2p: any
   statistics: Statistics
   stateManager: StateManager

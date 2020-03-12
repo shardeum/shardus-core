@@ -1,4 +1,4 @@
-const EventEmitter = require('events')
+import { EventEmitter } from 'events'
 const Sn = require('shardus-net')
 const express = require('express')
 const bodyParser = require('body-parser')
@@ -19,6 +19,7 @@ interface Network {
   verboseLogsNet: boolean
   InternalTellCounter: number
   InternalAskCounter: number
+  externalCatchAll: any
 }
 
 class Network extends EventEmitter {

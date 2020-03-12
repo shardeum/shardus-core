@@ -1,5 +1,5 @@
-const { join, resolve } = require('path')
-const { readJsonDir } = require('./utils')
+import { join, resolve } from 'path'
+import { readJsonDir } from './utils'
 import Shardus from './shardus'
 
 const baseDirPath = resolve(process.argv[2] || './')

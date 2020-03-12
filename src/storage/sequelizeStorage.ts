@@ -1,3 +1,5 @@
+import Log4js from 'log4js'
+import Shardus from '../shardus/shardus-types'
 const fs = require('fs')
 const path = require('path')
 const Sequelize = require('sequelize')
@@ -5,9 +7,9 @@ const Sequelize = require('sequelize')
 interface SequelizeStorage {
   baseDir: string
   models: any
-  storageConfig: any
+  storageConfig: Shardus.StorageConfiguration
   profiler: any
-  mainLogger: any
+  mainLogger: Log4js.Logger
   sequelize: any
   storageModels: any
   initialized: boolean

@@ -1,3 +1,4 @@
+import Log4js from 'log4js'
 // const fs = require('fs')
 // const path = require('path')
 const Sequelize = require('sequelize')
@@ -8,15 +9,17 @@ import models from './models'
 
 // const SequelizeStorage = require('./sequelizeStorage')
 import Sqlite3Storage from './sqlite3storage'
+import StateManager from '../state-manager'
+import Profiler from '../utils/profiler'
 // const BetterSqlite3Storage = require('./betterSqlite3storage')
 
 const P2PApoptosis = require('../p2p/Apoptosis')
 
 interface Storage {
-  profiler: any
-  mainLogger: any
-  storage: any
-  stateManager: any
+  profiler: Profiler
+  mainLogger: Log4js.Logger
+  storage: Storage | any
+  stateManager: StateManager
   storageModels: any
   initialized: boolean
   _create: any

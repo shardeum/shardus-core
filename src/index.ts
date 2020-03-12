@@ -1,4 +1,4 @@
-const { join } = require('path')
+import { join } from 'path'
 const merge = require('deepmerge')
 const { readJsonDir } = require('./utils')
 import Shardus from './shardus'

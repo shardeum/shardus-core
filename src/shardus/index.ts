@@ -14,11 +14,11 @@ import Statistics from '../statistics'
 import LoadDetection from '../load-detection'
 import RateLimiting from '../rate-limiting'
 import Profiler from "../utils/profiler"
+import path from 'path'
 type P2P = import("../p2p")
 const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
-const path = require('path')
-const EventEmitter = require('events')
+import { EventEmitter } from 'events'
 const saveConsoleOutput = require('./saveConsoleOutput')
 
 
