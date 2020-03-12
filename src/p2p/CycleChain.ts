@@ -1,6 +1,6 @@
-import { p2p } from './P2PContext'
 import { Node } from './NodeList'
 import { LooseObject } from './p2p-types'
+import { p2p } from './P2PContext'
 
 /** TYPES */
 
@@ -16,14 +16,14 @@ export interface SignedMarker {
 export type Certificate = SignedMarker[]
 
 export interface JoinedArchiver {
-  curvePk: string,
-  ip: string,
-  port: number,
+  curvePk: string
+  ip: string
+  port: number
   publicKey: string
 }
 
 // Should eventually become Node type from NodeList
-export type JoinedConsensor = Omit<Node, 'status'|'curvePublicKey'>
+export type JoinedConsensor = Omit<Node, 'status' | 'curvePublicKey'>
 
 export interface Cycle {
   counter: number
@@ -43,6 +43,12 @@ export interface Cycle {
   lost: string[]
   refuted: string[]
   apoptosized: string[]
+}
+
+export interface UnfinshedCycle {
+  metadata: LooseObject
+  updates: LooseObject
+  data: Cycle
 }
 
 /** STATE */
@@ -75,6 +81,6 @@ export function validate(prev: Cycle, next: Cycle): boolean {
 }
 
 export function getNewest() {
-  return 
+  return
 }
 export function getOldest() {}
