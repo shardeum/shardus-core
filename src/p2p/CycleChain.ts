@@ -1,5 +1,6 @@
 import { p2p } from './P2PContext'
 import { Node } from './NodeList'
+import { LooseObject } from './p2p-types'
 
 /** TYPES */
 

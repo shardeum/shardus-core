@@ -1,5 +1,9 @@
 import { Request, Response, Handler } from "express"
 
+export interface LooseObject {
+  [index: string]: unknown;
+}
+
 export enum NodeStatus {
   ACTIVE = 'active',
   SYNCING = 'syncing',

@@ -1,12 +1,7 @@
 import * as Sequelize from 'sequelize'
 import { insertSorted } from '../utils'
-import { GossipHandler, InternalHandler, Route } from './p2p-types'
+import { LooseObject, GossipHandler, InternalHandler, Route } from './p2p-types'
 import { p2p } from './P2PContext'
-
-/** TYPES */
-interface LooseObject {
-  [index: string]: unknown
-}
 
 export interface SignedObject extends LooseObject {
   sign: {
