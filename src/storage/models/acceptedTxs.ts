@@ -1,6 +1,6 @@
-const Sequelize = require('sequelize')
+import { Sequelize } from 'sequelize'
 
-export default [
+const acceptedTx = [
   'acceptedTxs',
   {
     id: { type: Sequelize.STRING, allowNull: false, primaryKey: true },
@@ -10,6 +10,8 @@ export default [
     receipt: { type: Sequelize.JSON, allowNull: false }
   }
 ]
+
+export default acceptedTx
 
 // these are the values in the documentation. converted them to naming standards
 // Tx_id

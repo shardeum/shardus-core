@@ -1,8 +1,8 @@
-const Sequelize = require('sequelize')
-const P2PApoptosis = require('../../p2p/Apoptosis')
+import { Sequelize } from 'sequelize'
+import P2PApoptosis = require('../../p2p/Apoptosis')
 
 // dont forget to add the certificate field as JSON
-export default [
+const cycles = [
   'cycles',
   {
     counter: { type: Sequelize.BIGINT, unique: true, primaryKey: true, allowNull: false },
@@ -26,3 +26,5 @@ export default [
     ...P2PApoptosis.sequelizeCycleFieldModel
   }
 ]
+
+export default cycles

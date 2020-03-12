@@ -1,23 +1,25 @@
 import Log4js from 'log4js'
 import Shardus from '../shardus/shardus-types'
-const fs = require('fs')
-const path = require('path')
-const Sequelize = require('sequelize')
+import fs from 'fs'
+import path from 'path'
+import { Sequelize } from 'sequelize'
+import Profiler from '../utils/profiler'
+import Logger from '../logger'
 
 interface SequelizeStorage {
   baseDir: string
   models: any
   storageConfig: Shardus.StorageConfiguration
-  profiler: any
+  profiler: Profiler
   mainLogger: Log4js.Logger
-  sequelize: any
+  sequelize: Sequelize
   storageModels: any
   initialized: boolean
 }
 
 class SequelizeStorage {
   // note that old storage passed in logger, now we pass in the specific log for it to use.  This works for application use, but may need to rethink if we apply this to shardus core
-  constructor (models, storageConfig, logger, baseDir, profiler) {
+  constructor (models: any, storageConfig: Shardus.StorageConfiguration, logger: Logger, baseDir: string, profiler: Profiler) {
     this.baseDir = baseDir
     this.models = models
     this.storageConfig = storageConfig
@@ -33,6 +35,7 @@ class SequelizeStorage {
     await _ensureExists(dbDir)
     this.mainLogger.info('Created Database directory.')
     // Start Sequelize and load models
+    //@ts-ignore
     this.sequelize = new Sequelize(...Object.values(this.storageConfig))
     for (let [modelName, modelAttributes] of this.models) this.sequelize.define(modelName, modelAttributes)
     this.storageModels = this.sequelize.models

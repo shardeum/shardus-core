@@ -1,14 +1,15 @@
 import Log4js from 'log4js'
 import Shardus from "../shardus/shardus-types"
 import Profiler from "../utils/profiler"
+import fs from 'fs'
+import path from 'path'
+import { Sequelize } from 'sequelize'
+import * as utils from '../utils'
+import Logger from '../logger'
 
-const fs = require('fs')
-const path = require('path')
-const Sequelize = require('sequelize')
 const Op = Sequelize.Op
 var Sqlite3 = require('better-sqlite3')
 const stringify = require('fast-stable-stringify')
-const utils = require('../utils')
 
 interface BetterSqlite3Storage {
   baseDir: string
@@ -22,7 +23,7 @@ interface BetterSqlite3Storage {
 
 class BetterSqlite3Storage {
   // note that old storage passed in logger, now we pass in the specific log for it to use.  This works for application use, but may need to rethink if we apply this to shardus core
-  constructor (models, storageConfig, logger, baseDir, profiler) {
+  constructor (models: any, storageConfig: Shardus.StorageConfiguration, logger: Logger, baseDir: string, profiler: Profiler) {
     this.baseDir = baseDir
     this.storageConfig = storageConfig
     this.storageConfig.options.storage = path.join(this.baseDir, this.storageConfig.options.storage)

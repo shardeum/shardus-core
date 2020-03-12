@@ -1,7 +1,8 @@
+import ShardusTypes from './../shardus/shardus-types';
 import Log4js from 'log4js'
 // const fs = require('fs')
 // const path = require('path')
-const Sequelize = require('sequelize')
+import { Sequelize } from 'sequelize'
 const Op = Sequelize.Op
 import models from './models'
 // const stringify = require('fast-stable-stringify')
@@ -11,14 +12,16 @@ import models from './models'
 import Sqlite3Storage from './sqlite3storage'
 import StateManager from '../state-manager'
 import Profiler from '../utils/profiler'
+import Shardus from '../shardus'
+import Logger from '../logger';
 // const BetterSqlite3Storage = require('./betterSqlite3storage')
 
-const P2PApoptosis = require('../p2p/Apoptosis')
+import P2PApoptosis = require('../p2p/Apoptosis')
 
 interface Storage {
   profiler: Profiler
   mainLogger: Log4js.Logger
-  storage: Storage | any
+  storage: Sqlite3Storage
   stateManager: StateManager
   storageModels: any
   initialized: boolean
@@ -30,7 +33,7 @@ interface Storage {
 }
 
 class Storage {
-  constructor (baseDir, config, logger, profiler) {
+  constructor (baseDir: string, config: ShardusTypes.StorageConfiguration, logger: Logger, profiler: Profiler) {
     this.profiler = profiler
 
     this.mainLogger = logger.getLogger('main')

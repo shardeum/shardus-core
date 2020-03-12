@@ -1,6 +1,6 @@
-const Sequelize = require('sequelize')
+import { Sequelize } from 'sequelize'
 
-export default [
+const nodes = [
   'nodes',
   {
     id: { type: Sequelize.TEXT, allowNull: false, primaryKey: true },
@@ -17,3 +17,5 @@ export default [
     status: { type: Sequelize.STRING, allowNull: false }
   }
 ]
+
+export default nodes

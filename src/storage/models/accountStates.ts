@@ -1,6 +1,6 @@
-const Sequelize = require('sequelize')
+import { Sequelize } from 'sequelize'
 
-export default [
+const accountStates = [
   'accountStates',
   {
     accountId: { type: Sequelize.STRING, allowNull: false, unique: 'compositeIndex' },
@@ -10,6 +10,8 @@ export default [
     stateAfter: { type: Sequelize.STRING, allowNull: false }
   }
 ]
+
+export default accountStates
 
 // these are the values in the documentation. converted them to naming standards
 // Acc_id

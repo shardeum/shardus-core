@@ -1,14 +1,14 @@
 import Shardus from "../shardus/shardus-types"
 import Profiler from "../utils/profiler"
 import Log4js from "log4js"
+import { Sequelize } from 'sequelize'
+import fs from 'fs'
+import path from 'path'
+import * as utils from '../utils'
 
-const fs = require('fs')
-const path = require('path')
-const Sequelize = require('sequelize')
 const Op = Sequelize.Op
 var sqlite3 = require('sqlite3').verbose()
 const stringify = require('fast-stable-stringify')
-const utils = require('../utils')
 
 interface Sqlite3Storage {
   baseDir: string

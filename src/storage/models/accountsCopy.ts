@@ -1,6 +1,6 @@
-const Sequelize = require('sequelize')
+import { Sequelize } from 'sequelize'
 
-export default [
+const accountsCopy = [
   'accountsCopy',
   {
     accountId: { type: Sequelize.STRING, allowNull: false, unique: 'compositeIndex' },
@@ -10,3 +10,5 @@ export default [
     hash: { type: Sequelize.STRING, allowNull: false }
   }
 ]
+
+export default accountsCopy

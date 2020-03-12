@@ -1,21 +1,32 @@
+import Log4js from 'log4js'
 import { EventEmitter } from 'events'
+import { Express } from 'express'
+import express from 'express'
+import Logger from '../logger'
 const Sn = require('shardus-net')
-const express = require('express')
-const bodyParser = require('body-parser')
-const cors = require('cors')
+import bodyParser from 'body-parser'
+import cors from 'cors'
+import { Server } from 'http'
+
+interface IPInfo {
+  internalPort: number
+  internalIp: string
+  externalPort: number
+  externalIp: string
+}
 
 interface Network {
-  app: any
+  app: Express
   sn: any
-  logger: any
-  mainLogger: any
-  netLogger: any
-  ipInfo: any
+  logger: Logger
+  mainLogger: Log4js.Logger
+  netLogger: Log4js.Logger
+  ipInfo: IPInfo
   timeout: number
-  internalRoutes: any
-  externalRoutes: any
-  extServer: any
-  intServer: any
+  internalRoutes: {[route: string]: Function}
+  externalRoutes: Function[]
+  extServer: Server
+  intServer: Server
   verboseLogsNet: boolean
   InternalTellCounter: number
   InternalAskCounter: number
@@ -23,14 +34,13 @@ interface Network {
 }
 
 class Network extends EventEmitter {
-  constructor (config, logger) {
+  constructor (config, logger: Logger) {
     super()
     this.app = express()
     this.sn = null
     this.logger = logger
     this.mainLogger = logger.getLogger('main')
     this.netLogger = logger.getLogger('net')
-    this.ipInfo = {}
     this.timeout = config.timeout * 1000
     this.internalRoutes = {}
     this.externalRoutes = []
@@ -38,7 +48,7 @@ class Network extends EventEmitter {
     this.intServer = null
 
     this.verboseLogsNet = false
-    if (this.netLogger && ['TRACE'].includes(this.netLogger.level.levelStr)) {
+    if (this.netLogger && ['TRACE'].includes(this.netLogger.level)) {
       this.verboseLogsNet = true
     }
     // console.log('NETWORK LOGGING ' + this.verboseLogsNet + '  ' + this.netLogger.level.levelStr)
@@ -166,7 +176,7 @@ class Network extends EventEmitter {
     })
   }
 
-  async setup (ipInfo) {
+  async setup (ipInfo: IPInfo) {
     if (!ipInfo.externalIp) throw new Error('Fatal: network module requires externalIp')
     if (!ipInfo.externalPort) throw new Error('Fatal: network module requires externalPort')
     if (!ipInfo.internalIp) throw new Error('Fatal: network module requires internalIp')

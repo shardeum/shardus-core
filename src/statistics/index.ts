@@ -11,7 +11,7 @@ interface Statistics {
   counterDefs: any[]
   watcherDefs: any
   timerDefs: { [name: string]: TimerRing }
-  interval: NodeJS.Timeout | null
+  interval: NodeJS.Timeout
   snapshotWriteFns: any[]
   stream: NodeJS.ReadStream
   streamIsPushable: boolean

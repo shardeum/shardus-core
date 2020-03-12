@@ -1,9 +1,11 @@
-const Sequelize = require('sequelize')
+import { Sequelize } from 'sequelize'
 
-export default [
+const properties = [
   'properties',
   {
     key: { type: Sequelize.STRING, allowNull: false, primaryKey: true },
     value: Sequelize.JSON
   }
 ]
+
+export default properties
