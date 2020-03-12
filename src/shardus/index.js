@@ -534,7 +534,8 @@ class Shardus extends EventEmitter {
 
   async shutdown (exitProcess = true) {
     try {
-      await this.exitHandler.exitCleanly(exitProcess)
+      //await this.exitHandler.exitCleanly(exitProcess)
+      await this.exitHandler.exitUncleanly()
     } catch (e) {
       throw e
     }
@@ -722,17 +723,27 @@ class Shardus extends EventEmitter {
     })
 
     this.network.registerExternalPost('testGlobalAccountTX', async (req, res) => {
-      let tx = req.tx
-      this.put(tx, false, true)
-      res.json({ success: true })
-      await this.shutdown()
+      try {
+        this.mainLogger.debug(`testGlobalAccountTX: req:${utils.stringifyReduce(req.body)}`)
+        let tx = req.body.tx
+        this.put(tx, false, true)
+        res.json({ success: true })
+      } catch (ex) {
+        this.mainLogger.debug('testGlobalAccountTX:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        this.fatalLogger.fatal('testGlobalAccountTX:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      }
     })
 
     this.network.registerExternalPost('testGlobalAccountTXSet', async (req, res) => {
-      let tx = req.tx
-      this.put(tx, true, true)
-      res.json({ success: true })
-      await this.shutdown()
+      try {
+        this.mainLogger.debug(`testGlobalAccountTXSet: req:${utils.stringifyReduce(req.body)}`)
+        let tx = req.body.tx
+        this.put(tx, true, true)
+        res.json({ success: true })
+      } catch (ex) {
+        this.mainLogger.debug('testGlobalAccountTXSet:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        this.fatalLogger.fatal('testGlobalAccountTXSet:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      }
     })
   }
 
@@ -740,7 +751,8 @@ class Shardus extends EventEmitter {
     const logFatalAndExit = (err) => {
       console.log('Encountered a fatal error. Check fatal log for details.')
       this.fatalLogger.fatal('unhandledRejection: ' + err.stack)
-      this.exitHandler.exitCleanly()
+      //this.exitHandler.exitCleanly()
+      this.exitHandler.exitUncleanly()
     }
     process.on('uncaughtException', (err) => {
       logFatalAndExit(err)

@@ -48,16 +48,30 @@ class ExitHandler {
     if (exitProcess) process.exit()
   }
 
+  async exitUncleanly () {
+    if (this.exited) return
+    this.exited = true
+    this._cleanupSync()
+    try {
+      await this._cleanupAsync()
+    } catch (e) {
+      console.error(e)
+    }
+    process.exit(1)
+  }
+
   // Used for adding event listeners for the SIGINT and SIGTERM signals
   addSigListeners (sigint = true, sigterm = true) {
     if (sigint) {
       process.on('SIGINT', async () => {
-        await this.exitCleanly()
+        // await this.exitCleanly()
+        await this.exitUncleanly()
       })
     }
     if (sigterm) {
       process.on('SIGTERM', async () => {
-        await this.exitCleanly()
+        // await this.exitCleanly()
+        await this.exitUncleanly()
       })
     }
   }

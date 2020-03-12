@@ -3006,8 +3006,8 @@ class StateManager extends EventEmitter {
     let keysResponse = this.app.getKeyFromTransaction(tx)
     let { sourceKeys, targetKeys, timestamp, debugInfo } = keysResponse
 
-    if (this.verboseLogs) console.log('applyAcceptedTransaction ' + timestamp + ' ' + debugInfo)
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction ' + timestamp + ' ' + debugInfo)
+    if (this.verboseLogs) console.log('applyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
 
     let allkeys:string[] = []
     allkeys = allkeys.concat(sourceKeys)
@@ -3173,6 +3173,7 @@ class StateManager extends EventEmitter {
           if(globalModification === true){
             // TODO: globalaccounts 
             if(this.globalAccountMap.has(key)){
+              this.logger.playbackLogNote('globalAccountMap', `queueAcceptedTransaction - has`)
               // indicate that we will have global data in this transaction!
               // I think we do not need to test that here afterall.
             } else {
@@ -3181,6 +3182,7 @@ class StateManager extends EventEmitter {
               //it should be that p2p has already checked the receipt before calling shardus.push with global=true
 
               this.globalAccountMap.set(key, null)
+              this.logger.playbackLogNote('globalAccountMap', `queueAcceptedTransaction - set`)
             }            
           }
 
@@ -3509,6 +3511,7 @@ class StateManager extends EventEmitter {
       if(this.globalAccountMap.has(key)){
         hasKey = true
         isGlobalKey = true
+        this.logger.playbackLogNote('globalAccountMap', `tellCorrespondingNodes - has`)
       }
 
       if (hasKey) { // todo Detect if our node covers this paritition..  need our partition data
@@ -3527,6 +3530,10 @@ class StateManager extends EventEmitter {
       } else {
         remoteShardsByKey[key] = queueEntry.homeNodes[key]
       }
+    }
+    if(queueEntry.globalModification === true){
+      this.logger.playbackLogNote('tellCorrespondingNodes', `tellCorrespondingNodes - globalModification = true, not telling other nodes`)
+      return
     }
 
     let message
@@ -3762,10 +3769,10 @@ class StateManager extends EventEmitter {
           if (accountSeen(queueEntry) === false) {
             markAccountsSeen(queueEntry)
             try {
-              if(queueEntry.globalModification === false) {
+              //if(queueEntry.globalModification === false) {
                 await this.tellCorrespondingNodes(queueEntry)
                 if (this.verboseLogs) this.logger.playbackLogNote('shrd_processing', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  values: ${debugAccountData(queueEntry, app)}`)
-              }
+              //}
              } catch (ex) {
               this.mainLogger.debug('processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
               this.fatalLogger.fatal('processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -4017,7 +4024,8 @@ class StateManager extends EventEmitter {
     let forceLocalGlobalLookup = false
     let globalAccount = null
     if(this.globalAccountMap.has(address)){
-      globalAccount = this.globalAccountMap.get(address);
+      globalAccount = this.globalAccountMap.get(address)
+      this.logger.playbackLogNote('globalAccountMap', `getLocalOrRemoteAccount - has`)
       if(globalAccount != null){
         return globalAccount
       }
@@ -4243,6 +4251,7 @@ class StateManager extends EventEmitter {
       // only if this tx is not a global modifying tx.   if it is a global set then it is ok to save out the global here.
       if(this.globalAccountMap.has(key) && isGlobalModifyingTX === false){
         //hasKey = true
+        this.logger.playbackLogNote('globalAccountMap', `setAccount - has`)
         continue
       }
 
@@ -6260,6 +6269,7 @@ class StateManager extends EventEmitter {
             let wrappedState = wrappedStates[wrappedStateKey]
             //is it global. 
             if(this.isGlobalAccount(wrappedState.accountId)){
+              this.logger.playbackLogNote('globalAccountMap', `applyAllPreparedRepairs - has`)
               if(wrappedState != null){
                 let globalValueSnapshot = this.getGlobalAccountValueAtTime(wrappedState.accountId, tx.timestamp)           
                 

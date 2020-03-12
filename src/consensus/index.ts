@@ -97,7 +97,7 @@ class Consensus extends EventEmitter {
     this.emit('accepted', acceptedTX, true, null, global)
     this.logger.playbackLogNote('tx_accepted', `TransactionId: ${txId}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
 
-    if (this.mainLogs) this.mainLogger.debug(`End of inject(${timestamp}  ${debugInfo})`)
+    if (this.mainLogs) this.mainLogger.debug(`End of inject(${timestamp}  debugInfo: ${debugInfo})`)
 
     return transactionReceipt
   }
