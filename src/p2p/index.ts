@@ -8,9 +8,9 @@ import P2PLostNodes from './p2p-lost-nodes'
 import P2PArchivers from './p2p-archivers'
 import routes from './routes'
 
-import * as P2PContext from './P2PContext'
-import * as P2PStartup from './p2p-startup'
-import * as P2PApoptosis from './p2p-apoptosis'
+import * as P2PContext from './Context'
+import * as P2PStartup from './Startup'
+import * as P2PApoptosis from './Apoptosis'
 import * as Sync from './Sync'
 
 class P2P extends EventEmitter {

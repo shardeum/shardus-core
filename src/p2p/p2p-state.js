@@ -2,7 +2,7 @@ const EventEmitter = require('events')
 const utils = require('../utils')
 const Random = require('../random')
 
-const P2PApoptosis = require('./p2p-apoptosis')
+const P2PApoptosis = require('./Apoptosis')
 
 /**
  * @typedef {import('../shardus/index.js').Node} Node
@@ -630,7 +630,7 @@ class P2PState extends EventEmitter {
   }
 
   // For use for internal updates to status for this node
-  async directStatusUpdate (nodeId, status, updateDb = true) {
+  async directStatusUpdate (nodeId, status, updateDb = false) {
     // Check if we actually know about this node
     const node = this.getNode(nodeId)
     if (!node) {
@@ -646,7 +646,7 @@ class P2PState extends EventEmitter {
     return true
   }
 
-  async _updateNodeStatus (node, status, updateDb = true) {
+  async _updateNodeStatus (node, status, updateDb = false) {
     if (!this.validStatuses.includes(status)) throw new Error('Invalid node status.')
     if (node.status === status) return true
     const oldStatus = node.status
@@ -949,13 +949,13 @@ class P2PState extends EventEmitter {
   // This is for adding a node both in memory and to storage
   async addNode (node) {
     this._addNodeToNodelist(node)
-    await this.storage.addNodes(node)
+    // await this.storage.addNodes(node)
   }
 
   // This is for adding nodes both in memory and to storage
   async addNodes (nodes) {
     this._addNodesToNodelist(nodes)
-    await this.storage.addNodes(nodes)
+    // await this.storage.addNodes(nodes)
   }
 
   _computeCycleMarker (fields) {
@@ -1106,8 +1106,9 @@ class P2PState extends EventEmitter {
     const bestJoinRequests = this._getBestJoinRequests()
     for (const joinRequest of bestJoinRequests) {
       const prevMarker = this.getPreviousCycleMarker()
+      const cycleJoined = this.prevMarker
       const id = this.computeNodeId(joinRequest.nodeInfo.publicKey, prevMarker)
-      bestNodes.push({ ...joinRequest.nodeInfo, id })
+      bestNodes.push({ ...joinRequest.nodeInfo, cycleJoined, id })
     }
     this.mainLogger.debug(`Best nodes for this cycle: ${JSON.stringify(bestNodes)}`)
     return bestNodes
@@ -1224,7 +1225,7 @@ class P2PState extends EventEmitter {
     }, toWait)
   }
 
-  async addCycle (cycle, certificate = null, updateDb = true) {
+  async addCycle (cycle, certificate = null, updateDb = false) {
     if (certificate) {
       this.certificates.push(certificate)
       cycle.certificate = certificate
@@ -1235,8 +1236,8 @@ class P2PState extends EventEmitter {
     this.emit('newCycle', this.cycles)
   }
 
-  async addCycles (cycles, certificates = null, updateDb = true) {
-    if (certificates.length) {
+  async addCycles (cycles, certificates = null, updateDb = false) {
+    if (certificates && certificates.length) {
       for (let i = 0; i < cycles.length; i++) {
         const certificate = certificates[i]
         this.certificates.push(certificate)
@@ -1256,7 +1257,7 @@ class P2PState extends EventEmitter {
     this.mainLogger.info('Creating new cycle chain entry...')
     const cycleInfo = this.getCycleInfo()
     this.mainLogger.debug(`Cycle info for new cycle: ${JSON.stringify(cycleInfo)}`)
-    cycleInfo.marker = this.getCurrentCertificate().marker
+    // cycleInfo.marker = this.getCurrentCertificate().marker
 
     const bestNodes = this._getBestNodes()
     const prevMarker = this.getPreviousCycleMarker()
@@ -1267,9 +1268,10 @@ class P2PState extends EventEmitter {
     this._setNodesActiveTimestamp(cycleInfo.activated, cycleInfo.start)
 
     // Get certificate from cycleInfo and then remove it from the object
-    const certificate = cycleInfo.certificate
-    delete cycleInfo.certificate
-    const cycleAdded = this.addCycle(cycleInfo, certificate)
+    // const certificate = cycleInfo.certificate
+    // delete cycleInfo.certificate
+    // const cycleAdded = this.addCycle(cycleInfo, certificate)
+    const cycleAdded = this.addCycle(cycleInfo)
 
     const removedNodes = this._getRemovedNodes()
     const removed = this.removeNodes(removedNodes)

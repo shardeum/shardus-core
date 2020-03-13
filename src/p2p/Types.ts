@@ -1,12 +1,21 @@
-import { Request, Response, Handler } from "express"
-
 export interface LooseObject {
-  [index: string]: unknown;
+  [index: string]: unknown
 }
 
 export enum NodeStatus {
   ACTIVE = 'active',
   SYNCING = 'syncing',
+}
+
+export interface P2PNode {
+  publicKey: string
+  externalIp: string
+  externalPort: number
+  internalIp: string
+  internalPort: number
+  address: string
+  joinRequestTimestamp: number
+  activeTimestamp: number
 }
 
 export interface Node {
@@ -27,7 +36,7 @@ export interface NodeInfo {
 }
 
 export interface Route<T> {
-  method?: string,
+  method?: string
   name: string
   handler: T
 }

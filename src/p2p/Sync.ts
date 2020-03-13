@@ -5,9 +5,9 @@ import * as CycleChain from './CycleChain'
 import { Cycle, UnfinshedCycle } from './CycleChain'
 import { ChangeSquasher, parse } from './CycleParser'
 import * as NodeList from './NodeList'
-import { Route } from './p2p-types'
-import { reversed, robustQuery, sequentialQuery } from './p2p-utils'
-import { p2p } from './P2PContext'
+import { Route } from './Types'
+import { reversed, robustQuery, sequentialQuery } from './Utils'
+import { p2p } from './Context'
 
 /** TYPES */
 
@@ -55,9 +55,16 @@ export const externalRoutes = [
 /** FUNCTIONS */
 
 export async function sync(activeNodes: ActiveNode[]) {
+  // If you are the first node, return
+  if (p2p.isFirstSeed) {
+    log('First node, no syncing required')
+    p2p.acceptInternal = true;
+    return true
+  }
+
   // Get the networks newest cycle as the anchor point for sync
   const cycleToSyncTo = await getNewestCycle(activeNodes)
-  console.log(`DBG Syncing till cycle ${cycleToSyncTo.counter}...`)
+  log(`Syncing till cycle ${cycleToSyncTo.counter}...`)
   CycleChain.append(cycleToSyncTo)
 
   // Sync old cycles until your active nodes === network active nodes
@@ -81,40 +88,35 @@ export async function sync(activeNodes: ActiveNode[]) {
     squasher.final.added.map(joined => NodeList.createNode(joined))
   )
   NodeList.updateNodes(squasher.final.updated)
-  console.log('DBG Synced to cycle', cycleToSyncTo.counter)
+  log('Synced to cycle', cycleToSyncTo.counter)
 
-  // Add nodes to old p2p-state nodelist
-  // [TODO] Remove this once eveything is using new NodeList.ts
+  // Add synced cycles to old p2p-state cyclechain
+  // [TODO] Remove this once everything is using new CycleChain.ts
+  p2p.state.addCycles(CycleChain.cycles.slice(1))
 
   // Sync new cycles until you can get unfinished cycle data in time to start making cycles
   let unfinishedCycle: UnfinshedCycle
-  console.log(
-    `DBG Syncing cycles after ${cycleToSyncTo.counter} and unfinished cycle...`
-  )
+  log(`Syncing cycles after ${cycleToSyncTo.counter} and unfinished cycle...`)
   do {
     if (unfinishedCycle) {
-      console.log(
-        `DBG waiting till end of cycle ${unfinishedCycle.data.counter}`
-      )
+      log(`waiting till end of cycle ${unfinishedCycle.data.counter}`)
       await waitUntilEnd(unfinishedCycle.data)
     }
     await syncNewCycles(activeNodes)
-    console.log(`DBG got new cycles till ${CycleChain.newest.counter}`)
+    log(`got new cycles till ${CycleChain.newest.counter}`)
     unfinishedCycle = await getUnfinishedCycle(activeNodes)
-    console.log('DBG got unfinishedCycle', JSON.stringify(unfinishedCycle))
+    log('got unfinishedCycle', JSON.stringify(unfinishedCycle))
   } while (
     CycleChain.newest.counter < unfinishedCycle.data.counter - 1 ||
     isInQuarter4(unfinishedCycle.data)
   )
 
-  // Add cycle to old p2p-state cyclechain
-  // [TODO] Remove this once everything is using new CycleChain.ts
-
   // Add unfinished cycle data and go active
-  console.log('DBG Sync complete')
-  console.log('DBG Starting cycles...')
+  log('Sync complete')
+  log('Starting cycles...')
   await p2p.state.addUnfinalizedAndStart(unfinishedCycle)
-  console.log('DBG Cycles started')
+  log('Cycles started')
+  return true
 }
 
 async function syncNewCycles(activeNodes: ActiveNode[]) {
@@ -196,4 +198,7 @@ function isInQuarter4(cycle: Cycle): boolean {
   return Date.now() >= quarter4Start
 }
 
+function log(...msg) {
+  p2p.mainLogger.info(`Sync: ${msg.join(' ')}`)
+}
 const sleep = promisify(setTimeout)

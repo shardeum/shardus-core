@@ -1,6 +1,7 @@
 import { Cycle, JoinedConsensor } from './CycleChain'
 import { Node, Update } from './NodeList'
-import { reversed } from './p2p-utils'
+import { NodeStatus } from './Types'
+import { reversed } from './Utils'
 
 export interface Change {
   added: JoinedConsensor[] // order joinRequestTimestamp [OLD, ..., NEW]
@@ -22,7 +23,9 @@ export function parse(cycle: Cycle): Change {
   removed.push(...cycle.lost)
 
   // Nodes to be updated
-  updated.push(...cycle.activated.map(id => ({ id, status: 'active' })))
+  updated.push(
+    ...cycle.activated.map(id => ({ id, status: NodeStatus.ACTIVE }))
+  )
 
   return {
     added,

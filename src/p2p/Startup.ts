@@ -1,7 +1,7 @@
 import * as http from '../http';
 import utils from '../utils';
-import { Node, NodeInfo } from './p2p-types';
-import { p2p } from './P2PContext';
+import { Node, NodeInfo } from './Types';
+import { p2p } from './Context';
 import { sync } from './Sync';
 
 /** STATE */
@@ -116,12 +116,7 @@ export async function startup(): Promise<boolean> {
   p2p.emit('joined', p2p.id, publicKey);
 
   // Once joined, sync to the network
-  // [AS] [TODO] [HACK] If you're node with port 9003, use the new sync
-  if (ourIpInfo.externalPort === 9003) {
-    await sync(activeNodes)
-  } else {
-    await syncToNetwork(activeNodes);
-  }
+  await sync(activeNodes)
 
   p2p.emit('initialized');
   return true;

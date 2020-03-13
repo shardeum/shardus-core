@@ -1,7 +1,7 @@
-import { p2p } from './P2PContext'
-import deepmerge = require('deepmerge')
-import { notEqual } from 'assert'
 import { JoinedConsensor } from './CycleChain'
+import { NodeStatus } from './Types'
+import { p2p } from './Context'
+import deepmerge = require('deepmerge')
 
 /** TYPES */
 
@@ -16,24 +16,16 @@ type RequiredExceptFor<T, TOptional extends keyof T> = Pick<
 > &
   Partial<T>
 
-export interface Node {
-  externalIp: string
-  externalPort: number
-  internalIp: string
-  internalPort: number
-  publicKey: string
-  address: string
-  joinRequestTimestamp: number
-  status: string
+export interface Node extends JoinedConsensor {
   curvePublicKey: string
-  id: string
+  status: NodeStatus
 }
 
 export type Update = OptionalExceptFor<Node, 'id'>
 
 /** STATE */
 
-const nodeList: Map<Node['id'], Node> = new Map() // In order of joinRequestTimestamp [OLD, ..., NEW]
+export const nodes: Map<Node['id'], Node> = new Map() // In order of joinRequestTimestamp [OLD, ..., NEW]
 const publicKeyToId: { [publicKey: string]: string } = {}
 const externalIpPortToId: { [externalIpPort: string]: string } = {}
 const internalIpPortToId: { [internalIpPort: string]: string } = {}
@@ -64,11 +56,11 @@ export function idBy(type: string, publicKeyOrIp: string, port?: number) {
 }
 
 export function byId(id: Node['id']) {
-  return nodeList.get(id)
+  return nodes.get(id)
 }
 export function byPublicKey(publicKey: Node['id']) {
   const id = publicKeyToId[publicKey]
-  return nodeList.get(id)
+  return nodes.get(id)
 }
 export function byExternalIpPort(
   ip: Node['externalIp'],
@@ -76,7 +68,7 @@ export function byExternalIpPort(
 ) {
   const externalIpPort = ipPort(ip, port)
   const id = externalIpPortToId[externalIpPort]
-  return nodeList.get(id)
+  return nodes.get(id)
 }
 export function byInternalIpPort(
   ip: Node['internalIp'],
@@ -84,20 +76,24 @@ export function byInternalIpPort(
 ) {
   const internalIpPort = ipPort(ip, port)
   const publicKey = internalIpPortToId[internalIpPort]
-  return nodeList.get(publicKey)
+  return nodes.get(publicKey)
 }
 
-export function addNodes(nodes: Node[]) {
-  for (const node of nodes) {
-    nodeList.set(node.id, node)
+export function addNodes(newNodes: Node[]) {
+  for (const node of newNodes) {
+    nodes.set(node.id, node)
     publicKeyToId[node.id] = node.id
     externalIpPortToId[ipPort(node.externalIp, node.externalPort)] = node.id
     internalIpPortToId[ipPort(node.internalIp, node.internalPort)] = node.id
+
+    // Add nodes to old p2p-state nodelist
+    // [TODO] Remove this once eveything is using new NodeList.ts
+    p2p.state.addNode(node)
   }
 }
 export function removeNodes(ids: string[]) {
   for (const id of ids) {
-    const node = nodeList.get(id)
+    const node = nodes.get(id)
     if (node) {
       if (publicKeyToId[node.id]) delete publicKeyToId[node.id]
       const externalIpPort = ipPort(node.externalIp, node.externalPort)
@@ -108,30 +104,29 @@ export function removeNodes(ids: string[]) {
       if (internalIpPortToId[internalIpPort]) {
         delete internalIpPort[internalIpPort]
       }
-      nodeList.delete(id)
+      nodes.delete(id)
     }
   }
 }
 export function updateNodes(updates: Update[]) {
   for (const update of updates) {
-    const node = nodeList.get(update.id)
+    const node = nodes.get(update.id)
     if (node) {
-      nodeList.set(update.id, deepmerge<Node>(node, update))
+      nodes.set(update.id, deepmerge<Node>(node, update))
+
+      // Update nodes status in old p2p-state nodelist
+      // [TODO] Remove this once eveything is using new NodeList.ts
+      if (update.status) {
+        p2p.state._updateNodeStatus(node, update.status)
+      }
     }
   }
 }
 export function createNode(joined: JoinedConsensor) {
   const node: Node = {
-    externalIp: joined.externalIp,
-    externalPort: joined.externalPort,
-    internalIp: joined.internalIp,
-    internalPort: joined.internalPort,
-    publicKey: joined.publicKey,
-    address: joined.address,
-    joinRequestTimestamp: joined.joinRequestTimestamp,
-    status: 'syncing',
+    ...joined,
     curvePublicKey: p2p.crypto.convertPublicKeyToCurve(joined.publicKey),
-    id: joined.id,
+    status: NodeStatus.SYNCING,
   }
 
   return node

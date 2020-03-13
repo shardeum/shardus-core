@@ -1,6 +1,5 @@
 import util from 'util'
 import utils from '../utils'
-import { NodeInfo } from './p2p-types'
 
 export type QueryFunction<Node, Response> = (node: Node) => Promise<Response>
 

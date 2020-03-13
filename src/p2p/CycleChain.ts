@@ -1,6 +1,5 @@
-import { Node } from './NodeList'
-import { LooseObject } from './p2p-types'
-import { p2p } from './P2PContext'
+import { LooseObject, P2PNode } from './Types'
+import { p2p } from './Context'
 
 /** TYPES */
 
@@ -23,7 +22,10 @@ export interface JoinedArchiver {
 }
 
 // Should eventually become Node type from NodeList
-export type JoinedConsensor = Omit<Node, 'status' | 'curvePublicKey'>
+export interface JoinedConsensor extends P2PNode {
+  id: string
+  cycleJoined: string
+}
 
 export interface Cycle {
   counter: number
@@ -53,7 +55,7 @@ export interface UnfinshedCycle {
 
 /** STATE */
 
-const cycles: Cycle[] = [] // [OLD, ..., NEW]
+export const cycles: Cycle[] = [] // [OLD, ..., NEW]
 const cyclesByMarker: { [marker: string]: Cycle } = {}
 
 export let oldest: Cycle = null
@@ -67,6 +69,10 @@ export function append(cycle: Cycle) {
   cyclesByMarker[marker] = cycle
   newest = cycle
   if (!oldest) oldest = cycle
+
+  // Add cycle to old p2p-state cyclechain
+  // [TODO] Remove this once everything is using new CycleChain.ts
+  p2p.state.addCycle(cycle)
 }
 export function prepend(cycle: Cycle) {
   cycles.unshift(cycle)
@@ -79,8 +85,3 @@ export function validate(prev: Cycle, next: Cycle): boolean {
   // [TODO] actually validate
   return true
 }
-
-export function getNewest() {
-  return
-}
-export function getOldest() {}

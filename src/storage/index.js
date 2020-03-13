@@ -10,7 +10,7 @@ const models = require('./models')
 const Sqlite3Storage = require('./sqlite3storage')
 // const BetterSqlite3Storage = require('./betterSqlite3storage')
 
-const P2PApoptosis = require('../p2p/p2p-apoptosis')
+const P2PApoptosis = require('../p2p/Apoptosis')
 
 class Storage {
   constructor (baseDir, config, logger, profiler) {
