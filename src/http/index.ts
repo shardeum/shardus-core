@@ -1,5 +1,5 @@
 import { parse as parseUrl } from 'url'
-const got = require('got')
+import got from 'got'
 
 let _logger = null
 let getIndex = 1

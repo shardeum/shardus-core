@@ -1,9 +1,8 @@
-const path = require('path')
-const fs = require('fs')
-const { Readable } = require('stream')
-const EventEmitter = require('events')
-const utils = require('../utils')
-import Shardus = require('../shardus/shardus-types')
+import path from 'path'
+import fs from 'fs'
+import { Readable } from 'stream'
+import { EventEmitter } from 'events'
+import * as utils from '../utils'
 
 interface Statistics {
   intervalDuration: number
@@ -13,8 +12,11 @@ interface Statistics {
   timerDefs: { [name: string]: TimerRing }
   interval: NodeJS.Timeout
   snapshotWriteFns: any[]
-  stream: NodeJS.ReadStream
+  stream: Readable
   streamIsPushable: boolean
+  counters: any
+  watchers: any
+  timers: any
 }
 
 class Statistics extends EventEmitter {

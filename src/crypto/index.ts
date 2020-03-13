@@ -1,4 +1,4 @@
-import * as crypto from 'shardus-crypto-utils'
+import crypto from 'shardus-crypto-utils'
 import Log4js from 'log4js'
 import { fork, ChildProcess } from 'child_process'
 import Shardus = require('../shardus/shardus-types')

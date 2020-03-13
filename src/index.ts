@@ -1,6 +1,6 @@
 import { join } from 'path'
-const merge = require('deepmerge')
-const { readJsonDir } = require('./utils')
+import merge from 'deepmerge'
+import { readJsonDir } from './utils'
 import Shardus from './shardus'
 const defaultConfigs = readJsonDir(join(__dirname, 'config'))
 

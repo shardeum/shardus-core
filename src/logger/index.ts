@@ -10,7 +10,6 @@ const log4jsExtend = require('log4js-extend')
 interface Logger {
   baseDir: string
   config: Shardus.LogsConfiguration
-  logs: any
   logDir: string
   log4Conf: any
   playbackLogEnabled: boolean
@@ -30,7 +29,6 @@ class Logger {
   constructor (baseDir: string, config: Shardus.LogsConfiguration) {
     this.baseDir = baseDir
     this.config = config
-    this.logs = {}
     this.logDir = null
     this.log4Conf = null
     this._setupLogs()
