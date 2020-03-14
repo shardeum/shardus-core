@@ -24,7 +24,11 @@ export function parse(cycle: Cycle): Change {
 
   // Nodes to be updated
   updated.push(
-    ...cycle.activated.map(id => ({ id, status: NodeStatus.ACTIVE }))
+    ...cycle.activated.map(id => ({
+      id,
+      activeTimestamp: cycle.start,
+      status: NodeStatus.ACTIVE,
+    }))
   )
 
   return {

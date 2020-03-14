@@ -67,18 +67,18 @@ export async function sync(activeNodes: ActiveNode[]) {
   // Get the networks newest cycle as the anchor point for sync
   const cycleToSyncTo = await getNewestCycle(activeNodes)
   log(`Syncing till cycle ${cycleToSyncTo.counter}...`)
-  CycleChain.append(cycleToSyncTo)
 
   // Sync old cycles until your active nodes === network active nodes
   const squasher = new ChangeSquasher()
   do {
+    const oldestCycle = CycleChain.oldest || cycleToSyncTo
     const prevCycles = await getCycles(
       activeNodes,
-      CycleChain.oldest.counter - 100,
-      CycleChain.oldest.counter
+      oldestCycle.counter - 100,
+      oldestCycle.counter
     )
     for (const prevCycle of reversed(prevCycles)) {
-      CycleChain.validate(prevCycle, CycleChain.oldest)
+      CycleChain.validate(prevCycle, oldestCycle)
       CycleChain.prepend(prevCycle)
       squasher.addChange(parse(prevCycle))
       if (squasher.final.updated.length >= cycleToSyncTo.active) {
@@ -86,10 +86,10 @@ export async function sync(activeNodes: ActiveNode[]) {
       }
     }
   } while (squasher.final.updated.length < cycleToSyncTo.active)
-  NodeList.addNodes(
+  await NodeList.addNodes(
     squasher.final.added.map(joined => NodeList.createNode(joined))
   )
-  NodeList.updateNodes(squasher.final.updated)
+  await NodeList.updateNodes(squasher.final.updated)
   log('Synced to cycle', cycleToSyncTo.counter)
 
   // Add synced cycles to old p2p-state cyclechain
@@ -135,8 +135,8 @@ async function syncNewCycles(activeNodes: ActiveNode[]) {
       CycleChain.append(nextCycle)
       const changes = parse(nextCycle)
       NodeList.removeNodes(changes.removed)
-      NodeList.updateNodes(changes.updated)
-      NodeList.addNodes(
+      await NodeList.updateNodes(changes.updated)
+      await NodeList.addNodes(
         changes.added.map(joined => NodeList.createNode(joined))
       )
     }
@@ -193,19 +193,13 @@ async function getUnfinishedCycle(
 function isBeforeNextQuarter4(cycle: Cycle): boolean {
   const nextStart = cycle.start + cycle.duration
   const nextQuarter3Start = (nextStart + (3 / 4) * cycle.duration) * 1000
-  const now = Date.now()
-  console.log('DBG nextQuarter3Start', nextQuarter3Start)
-  console.log('DBG now', now)
-  return now <= nextQuarter3Start
+  return Date.now() <= nextQuarter3Start
 }
 async function waitUntilNextEnd(cycle: Cycle) {
   const cycleEnd = cycle.start + cycle.duration
   const nextEnd = (cycleEnd + cycle.duration) * 1000
   const now = Date.now()
   const toWait = nextEnd > now ? nextEnd - now : 0
-  console.log('DBG nextEnd', nextEnd)
-  console.log('DBG now', now)
-  console.log('DBG toWait', toWait)
   await sleep(toWait)
 }
 async function waitUntilNextQuarter4(cycle: Cycle) {
@@ -219,6 +213,5 @@ async function waitUntilNextQuarter4(cycle: Cycle) {
 function log(...msg) {
   const entry = `Sync: ${msg.join(' ')}`
   p2p.mainLogger.info(entry)
-  console.log(entry)
 }
 const sleep = promisify(setTimeout)

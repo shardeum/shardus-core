@@ -1,6 +1,6 @@
+import { p2p } from './Context'
 import { JoinedConsensor } from './CycleChain'
 import { NodeStatus } from './Types'
-import { p2p } from './Context'
 import deepmerge = require('deepmerge')
 
 /** TYPES */
@@ -79,7 +79,7 @@ export function byInternalIpPort(
   return nodes.get(publicKey)
 }
 
-export function addNodes(newNodes: Node[]) {
+export async function addNodes(newNodes: Node[]) {
   for (const node of newNodes) {
     nodes.set(node.id, node)
     publicKeyToId[node.id] = node.id
@@ -88,7 +88,7 @@ export function addNodes(newNodes: Node[]) {
 
     // Add nodes to old p2p-state nodelist
     // [TODO] Remove this once eveything is using new NodeList.ts
-    p2p.state.addNode(node)
+    await p2p.state.addNode(node)
   }
 }
 export function removeNodes(ids: string[]) {
@@ -108,16 +108,22 @@ export function removeNodes(ids: string[]) {
     }
   }
 }
-export function updateNodes(updates: Update[]) {
+export async function updateNodes(updates: Update[]) {
   for (const update of updates) {
     const node = nodes.get(update.id)
     if (node) {
       nodes.set(update.id, deepmerge<Node>(node, update))
 
-      // Update nodes status in old p2p-state nodelist
+      // Update nodes in old p2p-state nodelist
       // [TODO] Remove this once eveything is using new NodeList.ts
+      if (update.activeTimestamp) {
+        await p2p.state._setNodesActiveTimestamp(
+          [update.id],
+          update.activeTimestamp
+        )
+      }
       if (update.status) {
-        p2p.state._updateNodeStatus(node, update.status)
+        await p2p.state._updateNodeStatus(node, update.status)
       }
     }
   }

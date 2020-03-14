@@ -1106,7 +1106,7 @@ class P2PState extends EventEmitter {
     const bestJoinRequests = this._getBestJoinRequests()
     for (const joinRequest of bestJoinRequests) {
       const prevMarker = this.getPreviousCycleMarker()
-      const cycleJoined = this.prevMarker
+      const cycleJoined = prevMarker
       const id = this.computeNodeId(joinRequest.nodeInfo.publicKey, prevMarker)
       bestNodes.push({ ...joinRequest.nodeInfo, cycleJoined, id })
     }
