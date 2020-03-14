@@ -1257,7 +1257,7 @@ class P2PState extends EventEmitter {
     this.mainLogger.info('Creating new cycle chain entry...')
     const cycleInfo = this.getCycleInfo()
     this.mainLogger.debug(`Cycle info for new cycle: ${JSON.stringify(cycleInfo)}`)
-    // cycleInfo.marker = this.getCurrentCertificate().marker
+    cycleInfo.marker = this.getCurrentCertificate().marker
 
     const bestNodes = this._getBestNodes()
     const prevMarker = this.getPreviousCycleMarker()
@@ -1268,10 +1268,9 @@ class P2PState extends EventEmitter {
     this._setNodesActiveTimestamp(cycleInfo.activated, cycleInfo.start)
 
     // Get certificate from cycleInfo and then remove it from the object
-    // const certificate = cycleInfo.certificate
-    // delete cycleInfo.certificate
-    // const cycleAdded = this.addCycle(cycleInfo, certificate)
-    const cycleAdded = this.addCycle(cycleInfo)
+    const certificate = cycleInfo.certificate
+    delete cycleInfo.certificate
+    const cycleAdded = this.addCycle(cycleInfo, certificate)
 
     const removedNodes = this._getRemovedNodes()
     const removed = this.removeNodes(removedNodes)

@@ -1,13 +1,13 @@
 import { Handler } from 'express'
 import { promisify } from 'util'
 import * as http from '../http'
+import { p2p } from './Context'
 import * as CycleChain from './CycleChain'
 import { Cycle, UnfinshedCycle } from './CycleChain'
 import { ChangeSquasher, parse } from './CycleParser'
 import * as NodeList from './NodeList'
 import { Route } from './Types'
 import { reversed, robustQuery, sequentialQuery } from './Utils'
-import { p2p } from './Context'
 
 /** TYPES */
 
@@ -32,7 +32,9 @@ const unfinishedCycleRoute: Route<Handler> = {
   method: 'GET',
   name: 'sync-unfinished-cycle',
   handler: (_req, res) => {
-    const unfinishedCycle = p2p.state.currentCycle
+    const unfinishedCycle = p2p.state.unfinalizedReady
+      ? p2p.state.currentCycle
+      : null
     res.json(unfinishedCycle)
   },
 }
@@ -58,7 +60,7 @@ export async function sync(activeNodes: ActiveNode[]) {
   // If you are the first node, return
   if (p2p.isFirstSeed) {
     log('First node, no syncing required')
-    p2p.acceptInternal = true;
+    p2p.acceptInternal = true
     return true
   }
 
@@ -96,26 +98,27 @@ export async function sync(activeNodes: ActiveNode[]) {
 
   // Sync new cycles until you can get unfinished cycle data in time to start making cycles
   let unfinishedCycle: UnfinshedCycle
-  log(`Syncing cycles after ${cycleToSyncTo.counter} and unfinished cycle...`)
   do {
-    if (unfinishedCycle) {
-      log(`waiting till end of cycle ${unfinishedCycle.data.counter}`)
-      await waitUntilEnd(unfinishedCycle.data)
+    if (isBeforeNextQuarter4(CycleChain.newest)) {
+      log(
+        `is before quarter 4 of unfinished cycle ${CycleChain.newest.counter}. waiting until quarter 4...`
+      )
+      await waitUntilNextQuarter4(CycleChain.newest)
+      unfinishedCycle = await getUnfinishedCycle(activeNodes)
+      log(`got unfinishedCycle: ${JSON.stringify(unfinishedCycle)}`)
+    } else {
+      log(
+        `is after quarter 3 of next cycle ${CycleChain.newest.counter}. waiting until end...`
+      )
+      await waitUntilNextEnd(CycleChain.newest)
+      await syncNewCycles(activeNodes)
+      log(`synced new cycles till ${CycleChain.newest.counter}`)
     }
-    await syncNewCycles(activeNodes)
-    log(`got new cycles till ${CycleChain.newest.counter}`)
-    unfinishedCycle = await getUnfinishedCycle(activeNodes)
-    log('got unfinishedCycle', JSON.stringify(unfinishedCycle))
-  } while (
-    CycleChain.newest.counter < unfinishedCycle.data.counter - 1 ||
-    isInQuarter4(unfinishedCycle.data)
-  )
+  } while (!unfinishedCycle)
 
   // Add unfinished cycle data and go active
-  log('Sync complete')
-  log('Starting cycles...')
   await p2p.state.addUnfinalizedAndStart(unfinishedCycle)
-  log('Cycles started')
+  log('Sync complete')
   return true
 }
 
@@ -187,18 +190,35 @@ async function getUnfinishedCycle(
   return unfinishedCycle
 }
 
-async function waitUntilEnd(cycle: Cycle) {
-  const cycleEnd = (cycle.start + cycle.duration) * 1000
+function isBeforeNextQuarter4(cycle: Cycle): boolean {
+  const nextStart = cycle.start + cycle.duration
+  const nextQuarter3Start = (nextStart + (3 / 4) * cycle.duration) * 1000
   const now = Date.now()
-  const toWait = cycleEnd > now ? cycleEnd - now : 0
+  console.log('DBG nextQuarter3Start', nextQuarter3Start)
+  console.log('DBG now', now)
+  return now <= nextQuarter3Start
+}
+async function waitUntilNextEnd(cycle: Cycle) {
+  const cycleEnd = cycle.start + cycle.duration
+  const nextEnd = (cycleEnd + cycle.duration) * 1000
+  const now = Date.now()
+  const toWait = nextEnd > now ? nextEnd - now : 0
+  console.log('DBG nextEnd', nextEnd)
+  console.log('DBG now', now)
+  console.log('DBG toWait', toWait)
   await sleep(toWait)
 }
-function isInQuarter4(cycle: Cycle): boolean {
-  const quarter4Start = (cycle.start + (3 / 4) * cycle.duration) * 1000
-  return Date.now() >= quarter4Start
+async function waitUntilNextQuarter4(cycle: Cycle) {
+  const nextStart = cycle.start + cycle.duration
+  const nextQuarter3Start = (nextStart + (3 / 4) * cycle.duration) * 1000
+  const now = Date.now()
+  const toWait = nextQuarter3Start > now ? nextQuarter3Start - now : 0
+  await sleep(toWait)
 }
 
 function log(...msg) {
-  p2p.mainLogger.info(`Sync: ${msg.join(' ')}`)
+  const entry = `Sync: ${msg.join(' ')}`
+  p2p.mainLogger.info(entry)
+  console.log(entry)
 }
 const sleep = promisify(setTimeout)
