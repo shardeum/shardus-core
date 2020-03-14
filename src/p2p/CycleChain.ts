@@ -64,22 +64,26 @@ export let newest: Cycle = null
 /** FUNCTIONS */
 
 export function append(cycle: Cycle) {
-  cycles.push(cycle)
   const marker = p2p.state._computeCycleMarker(cycle)
-  cyclesByMarker[marker] = cycle
-  newest = cycle
-  if (!oldest) oldest = cycle
+  if (!cyclesByMarker[marker]) {
+    cycles.push(cycle)
+    cyclesByMarker[marker] = cycle
+    newest = cycle
+    if (!oldest) oldest = cycle
 
-  // Add cycle to old p2p-state cyclechain
-  // [TODO] Remove this once everything is using new CycleChain.ts
-  p2p.state.addCycle(cycle)
+    // Add cycle to old p2p-state cyclechain
+    // [TODO] Remove this once everything is using new CycleChain.ts
+    p2p.state.addCycle(cycle)
+  }
 }
 export function prepend(cycle: Cycle) {
-  cycles.unshift(cycle)
   const marker = p2p.state._computeCycleMarker(cycle)
-  cyclesByMarker[marker] = cycle
-  oldest = cycle
-  if (!newest) newest = cycle
+  if (!cyclesByMarker[marker]) {
+    cycles.unshift(cycle)
+    cyclesByMarker[marker] = cycle
+    oldest = cycle
+    if (!newest) newest = cycle
+  }
 }
 export function validate(prev: Cycle, next: Cycle): boolean {
   // [TODO] actually validate
