@@ -117,6 +117,7 @@ export async function sync(activeNodes: ActiveNode[]) {
   } while (!unfinishedCycle)
 
   // Add unfinished cycle data and go active
+  p2p.acceptInternal = true
   await p2p.state.addUnfinalizedAndStart(unfinishedCycle)
   log('Sync complete')
   return true
