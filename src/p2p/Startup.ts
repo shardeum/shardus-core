@@ -1,5 +1,5 @@
 import * as http from '../http'
-import utils from '../utils'
+import utils, { sleep } from '../utils'
 import { p2p } from './Context'
 import { sync } from './Sync'
 import { Node, NodeInfo } from './Types'
@@ -74,40 +74,40 @@ export async function startup(): Promise<boolean> {
   p2p.mainLogger.debug('Emitting `joining` event.')
   p2p.emit('joining', publicKey)
 
-  // Get new seednodes and attempt to join until you are successful
+  // Get new activeNodes and attempt to join until you are successful
   let activeNodes: Node[]
   let joined = false
   // outerJoinAttemps is set to a high number incase we want to build a large network and need the node to keep trying to join for awhile.
-  let outerJoinAttemps = 100
   let ourIpInfo
   while (!joined) {
-    activeNodes = await contactArchiver()
-    p2p.isFirstSeed = await discoverNetwork(activeNodes)
-
-    // Remove yourself from seedNodes if you are present in them but not firstSeed
-    ourIpInfo = p2p.getIpInfo()
-    if (p2p.isFirstSeed === false) {
-      const ourIdx = activeNodes.findIndex(
-        (node: { ip: any; port: any }) =>
-          node.ip === ourIpInfo.externalIp &&
-          node.port === ourIpInfo.externalPort
+    try {
+      p2p.mainLogger.info(
+        'Getting activeNodes from archiver to join network...'
       )
-      if (ourIdx > -1) {
-        activeNodes.splice(ourIdx, 1)
-      }
-    }
+      activeNodes = await contactArchiver()
+      p2p.mainLogger.info('Discovering if we are the first node...')
+      p2p.isFirstSeed = await discoverNetwork(activeNodes)
 
-    joined = await joinNetwork(activeNodes)
-    if (joined === false) {
-      p2p.mainLogger.debug(
-        'join failed. outer attemps left: ' + outerJoinAttemps
-      )
-      // if we failed to join exit the flow
-      outerJoinAttemps--
-      if (outerJoinAttemps <= 0) {
-        p2p.mainLogger.debug('join failed. no more outer join attempts left')
-        return false
+      // Remove yourself from seedNodes if you are present in them but not firstSeed
+      ourIpInfo = p2p.getIpInfo()
+      if (p2p.isFirstSeed === false) {
+        const ourIdx = activeNodes.findIndex(
+          (node: { ip: any; port: any }) =>
+            node.ip === ourIpInfo.externalIp &&
+            node.port === ourIpInfo.externalPort
+        )
+        if (ourIdx > -1) {
+          activeNodes.splice(ourIdx, 1)
+        }
       }
+
+      p2p.mainLogger.info('Attempting to join network...')
+      joined = await joinNetwork(activeNodes)
+    } catch (err) {
+      joined = false
+      p2p.mainLogger.error(err)
+      p2p.mainLogger.info('Trying again in 2 sec...')
+      await sleep(2000)
     }
   }
 
@@ -115,8 +115,38 @@ export async function startup(): Promise<boolean> {
   p2p.mainLogger.debug('Emitting `joined` event.')
   p2p.emit('joined', p2p.id, publicKey)
 
-  // Once joined, sync to the network
-  await sync(activeNodes)
+  // Get new activeNodes and attempt to sync until you are successful
+  let synced = false
+  while (!synced) {
+    // Once joined, sync to the network
+    try {
+      p2p.mainLogger.info(
+        'Getting activeNodes from archiver to sync to network...'
+      )
+      activeNodes = await contactArchiver()
+
+      // Remove yourself from seedNodes if you are present in them but not firstSeed
+      ourIpInfo = p2p.getIpInfo()
+      if (p2p.isFirstSeed === false) {
+        const ourIdx = activeNodes.findIndex(
+          (node: { ip: any; port: any }) =>
+            node.ip === ourIpInfo.externalIp &&
+            node.port === ourIpInfo.externalPort
+        )
+        if (ourIdx > -1) {
+          activeNodes.splice(ourIdx, 1)
+        }
+      }
+
+      p2p.mainLogger.info('Attempting to sync to network...')
+      synced = await sync(activeNodes)
+    } catch (err) {
+      synced = false
+      p2p.mainLogger.error(err)
+      p2p.mainLogger.info('Trying again in 2 sec...')
+      await sleep(2000)
+    }
+  }
 
   p2p.emit('initialized')
   return true

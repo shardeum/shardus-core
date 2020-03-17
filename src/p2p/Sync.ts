@@ -104,7 +104,11 @@ export async function sync(activeNodes: ActiveNode[]) {
         `is before quarter 4 of unfinished cycle ${CycleChain.newest.counter}. waiting until quarter 4...`
       )
       await waitUntilNextQuarter4(CycleChain.newest)
-      unfinishedCycle = await getUnfinishedCycle(activeNodes)
+      try {
+        unfinishedCycle = await getUnfinishedCycle(activeNodes)
+      } catch (err) {
+        log(`got different answers for unfinished cycle data, trying again...`)
+      }
       log(`got unfinishedCycle: ${JSON.stringify(unfinishedCycle)}`)
     } else {
       log(
