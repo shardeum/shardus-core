@@ -712,11 +712,11 @@ class P2PState extends EventEmitter {
     return utils.binarySearch(ordered, node, comparator)
   }
 
-  _getExpiredCountInternal () {
+  _getExpiredCountInternal (cycleStart) {
     // This line allows for a configuration in which nodes never expire
     if (this.nodeExpiryAge === 0) return 0
     const nodes = this.nodes.ordered
-    const expiredTime = utils.getTime('s') - this.nodeExpiryAge
+    const expiredTime = cycleStart - this.nodeExpiryAge
     const isExpired = (node) => {
       if (node.joinRequestTimestamp > expiredTime) {
         return false
@@ -996,8 +996,9 @@ class P2PState extends EventEmitter {
     this.currentCycle.data.counter = this.getLastCycleCounter() + 1
     this.currentCycle.data.previous = this.getCurrentCycleMarker()
     this.currentCycle.data.duration = lastCycleDuration
-    this.currentCycle.data.start = lastCycleStart ? lastCycleStart + lastCycleDuration : utils.getTime('s')
-    this.currentCycle.data.expired = this._getExpiredCountInternal()
+    const cycleStart = lastCycleStart ? lastCycleStart + lastCycleDuration : currentTime
+    this.currentCycle.data.start = cycleStart
+    this.currentCycle.data.expired = this._getExpiredCountInternal(cycleStart)
     this.currentCycle.data.desired = this.desiredNodes
     this.currentCycle.metadata.startingDesired = this.desiredNodes
     this._setJoinAcceptance()
