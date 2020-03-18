@@ -1414,16 +1414,58 @@ class P2PState extends EventEmitter {
     return [true]
   }
 
-  getCycles (start = 0, end = this.cycles.length) {
+  getCycles (start = 0, end = Infinity) {
+    if (this.cycles.length < 1) {
+      return []
+    }
+
     if (start < 0) start = 0
-    if (end > this.cycles.length) end = this.cycles.length
-    return this.cycles.slice(start, end + 1)
+    if (end < 0 ) end = Infinity
+    if (start > end) {
+      const temp = start
+      start = end
+      end = temp
+    }
+
+    const firstIdx = 0
+    const lastIdx = this.cycles.length - 1
+    const oldest = this.cycles[firstIdx].counter
+    const newest = this.cycles[lastIdx].counter
+
+    if (start < oldest) start = oldest
+    if (end > newest) end = newest
+
+    const startIdx = firstIdx + (start - oldest)
+    const endIdx = lastIdx - (newest - end) + 1
+
+    return this.cycles.slice(startIdx, endIdx)
   }
 
   getCertificates (start = 0, end = this.certificates.length) {
+    if (this.cycles.length < 1) {
+      return []
+    }
+
     if (start < 0) start = 0
-    if (end > this.cycles.length) end = this.cycles.length
-    return this.certificates.slice(start, end + 1)
+    if (end < 0 ) end = Infinity
+    if (start > end) {
+      const temp = start
+      start = end
+      end = temp
+    }
+
+    const firstIdx = 0
+    const lastIdx = this.cycles.length - 1
+    const oldest = this.cycles[firstIdx].counter
+    const newest = this.cycles[lastIdx].counter
+
+    if (start < oldest) start = oldest
+    if (end > newest) end = newest
+
+    const startIdx = firstIdx + (start - oldest)
+    const endIdx = lastIdx - (newest - end) + 1
+
+    return this.certificates.slice(startIdx, endIdx)
   }
 
   getCurrentCertificate () {

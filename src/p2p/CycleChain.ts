@@ -1,5 +1,5 @@
-import { LooseObject, P2PNode } from './Types'
 import { p2p } from './Context'
+import { LooseObject, P2PNode } from './Types'
 
 /** TYPES */
 
@@ -55,13 +55,25 @@ export interface UnfinshedCycle {
 
 /** STATE */
 
-export const cycles: Cycle[] = [] // [OLD, ..., NEW]
-const cyclesByMarker: { [marker: string]: Cycle } = {}
+export let cycles: Cycle[] // [OLD, ..., NEW]
+let cyclesByMarker: { [marker: string]: Cycle }
 
-export let oldest: Cycle = null
-export let newest: Cycle = null
+export let oldest: Cycle
+export let newest: Cycle
+
+function initialize() {
+  cycles = []
+  cyclesByMarker = {}
+  oldest = null
+  newest = null
+}
+initialize()
 
 /** FUNCTIONS */
+
+export function reset() {
+  initialize()
+}
 
 export function append(cycle: Cycle) {
   const marker = p2p.state._computeCycleMarker(cycle)
@@ -73,7 +85,7 @@ export function append(cycle: Cycle) {
 
     // Add cycle to old p2p-state cyclechain
     // [TODO] Remove this once everything is using new CycleChain.ts
-    p2p.state.addCycle(cycle)
+    p2p.state.addCycles([cycle])
   }
 }
 export function prepend(cycle: Cycle) {

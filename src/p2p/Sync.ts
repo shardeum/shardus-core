@@ -59,14 +59,20 @@ export const externalRoutes = [
 export async function sync(activeNodes: ActiveNode[]) {
   // If you are the first node, return
   if (p2p.isFirstSeed) {
-    log('First node, no syncing required')
+    info('First node, no syncing required')
     p2p.acceptInternal = true
     return true
   }
 
+  // Flush old cycles/nodes
+  p2p.state._resetState()
+  CycleChain.reset()
+  NodeList.reset()
+
   // Get the networks newest cycle as the anchor point for sync
+  info(`Getting newest cycle...`)
   const cycleToSyncTo = await getNewestCycle(activeNodes)
-  log(`Syncing till cycle ${cycleToSyncTo.counter}...`)
+  info(`Syncing till cycle ${cycleToSyncTo.counter}...`)
 
   // Sync old cycles until your active nodes === network active nodes
   const squasher = new ChangeSquasher()
@@ -90,40 +96,39 @@ export async function sync(activeNodes: ActiveNode[]) {
     squasher.final.added.map(joined => NodeList.createNode(joined))
   )
   await NodeList.updateNodes(squasher.final.updated)
-  log('Synced to cycle', cycleToSyncTo.counter)
+  info('Synced to cycle', cycleToSyncTo.counter)
 
   // Add synced cycles to old p2p-state cyclechain
   // [TODO] Remove this once everything is using new CycleChain.ts
-  p2p.state.addCycles(CycleChain.cycles.slice(1))
+  p2p.state.addCycles(CycleChain.cycles)
 
   // Sync new cycles until you can get unfinished cycle data in time to start making cycles
   let unfinishedCycle: UnfinshedCycle
   do {
+    const nextCounter = CycleChain.newest.counter + 1
     if (isBeforeNextQuarter4(CycleChain.newest)) {
-      log(
-        `is before quarter 4 of unfinished cycle ${CycleChain.newest.counter}. waiting until quarter 4...`
-      )
+      info(`waiting until quarter 4 of unfinished cycle ${nextCounter}...`)
       await waitUntilNextQuarter4(CycleChain.newest)
       try {
+        info(`getting unfinished cycle data...`)
         unfinishedCycle = await getUnfinishedCycle(activeNodes)
+        info(`got unfinishedCycle: ${JSON.stringify(unfinishedCycle)}`)
       } catch (err) {
-        log(`got different answers for unfinished cycle data, trying again...`)
+        error(err)
+        info(`trying again...`)
       }
-      log(`got unfinishedCycle: ${JSON.stringify(unfinishedCycle)}`)
     } else {
-      log(
-        `is after quarter 3 of next cycle ${CycleChain.newest.counter}. waiting until end...`
-      )
+      info(`waiting until end of unfinished cycle ${nextCounter}...`)
       await waitUntilNextEnd(CycleChain.newest)
+      info(`syncing new cycles...`)
       await syncNewCycles(activeNodes)
-      log(`synced new cycles till ${CycleChain.newest.counter}`)
     }
   } while (!unfinishedCycle)
 
   // Add unfinished cycle data and go active
   p2p.acceptInternal = true
   await p2p.state.addUnfinalizedAndStart(unfinishedCycle)
-  log('Sync complete')
+  info('Sync complete')
   return true
 }
 
@@ -215,8 +220,14 @@ async function waitUntilNextQuarter4(cycle: Cycle) {
   await sleep(toWait)
 }
 
-function log(...msg) {
+function info(...msg) {
   const entry = `Sync: ${msg.join(' ')}`
   p2p.mainLogger.info(entry)
 }
+
+function error(...msg) {
+  const entry = `Sync: ${msg.join(' ')}`
+  p2p.mainLogger.error(entry)
+}
+
 const sleep = promisify(setTimeout)

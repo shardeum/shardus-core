@@ -11,7 +11,7 @@ function setupRoutes () {
   })
 
   this.network.registerExternalGet('cyclechain', (req, res) => {
-    const cycleChain = this.getLatestCycles(10)
+    const cycleChain = this.state.cycles
     res.json({ cycleChain })
   })
 

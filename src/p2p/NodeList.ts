@@ -25,12 +25,24 @@ export type Update = OptionalExceptFor<Node, 'id'>
 
 /** STATE */
 
-export const nodes: Map<Node['id'], Node> = new Map() // In order of joinRequestTimestamp [OLD, ..., NEW]
-const publicKeyToId: { [publicKey: string]: string } = {}
-const externalIpPortToId: { [externalIpPort: string]: string } = {}
-const internalIpPortToId: { [internalIpPort: string]: string } = {}
+export let nodes: Map<Node['id'], Node> = new Map() // In order of joinRequestTimestamp [OLD, ..., NEW]
+let publicKeyToId: { [publicKey: string]: string } = {}
+let externalIpPortToId: { [externalIpPort: string]: string } = {}
+let internalIpPortToId: { [internalIpPort: string]: string } = {}
+
+function initialize() {
+  nodes = new Map()
+  publicKeyToId = {}
+  externalIpPortToId = {}
+  internalIpPortToId = {}
+}
+initialize()
 
 /** FUNCTIONS */
+
+export function reset() {
+  initialize()
+}
 
 export function idBy(type: string, publicKeyOrIp: string, port?: number) {
   switch (type) {
