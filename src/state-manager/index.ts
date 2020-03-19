@@ -898,7 +898,7 @@ class StateManager extends EventEmitter {
       this.createSyncTrackerByRange(range, cycle)
     }
 
-    //this.createSyncTrackerByForGlobals(cycle)
+    this.createSyncTrackerByForGlobals(cycle)
 
     // could potentially push this back a bit.
     this.readyforTXs = true
@@ -922,6 +922,7 @@ class StateManager extends EventEmitter {
       if(syncTracker.isGlobalSyncTracker === false){
         await this.syncStateDataForRange(syncTracker.range)
       } else {
+        console.log(`syncTracker syncStateDataGlobals start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
         await this.syncStateDataGlobals(syncTracker)
       }
       syncTracker.syncFinished = true
@@ -1036,10 +1037,10 @@ class StateManager extends EventEmitter {
       let remainingAccountsToSync = []
       this.partitionStartTimeStamp = Date.now()
 
-      let lowAddress = this.addressRange.low
-      let highAddress = this.addressRange.high
+      // let lowAddress = this.addressRange.low
+      // let highAddress = this.addressRange.high
 
-      this.mainLogger.debug(`DATASYNC:  partition: ${partition} low: ${lowAddress} high: ${highAddress} `)
+      this.mainLogger.debug(`DATASYNC: syncStateDataGlobals partition: ${partition} `)
 
 
       this.readyforTXs = true // open the floodgates of queuing stuffs.
@@ -1054,6 +1055,7 @@ class StateManager extends EventEmitter {
         this.mainLogger.debug(`DATASYNC:  syncStateDataGlobals no global accounts `)
         return  // no global accounts
       }
+      this.mainLogger.debug(`DATASYNC:  syncStateDataGlobals globalReport: ${utils.stringifyReduce(globalReport)} `)
 
       let accountReportsByID:{[id:string]:{id:string, hash:string, timestamp:number }} = {}
       for(let report of globalReport.accounts){
@@ -1065,7 +1067,7 @@ class StateManager extends EventEmitter {
       let accountDataById:{[id:string]:Shardus.WrappedData} = {}
       let globalReport2:GlobalAccountReportResp = {combinedHash:"", accounts:[] }
       while(hasAllGlobalData === false){
-
+        this.mainLogger.debug(`DATASYNC: syncStateDataGlobals hasAllGlobalData === false `)
         //Get accounts.
         //this.combinedAccountData = []
         
@@ -1080,6 +1082,7 @@ class StateManager extends EventEmitter {
         //Get globals list and hash (if changes then update said accounts and repeath)
         //diff the list and update remainingAccountsToSync
         // add any new accounts to globalAccounts
+        this.mainLogger.debug(`DATASYNC: syncStateDataGlobals get_account_data_by_list ${utils.stringifyReduce(result)} `)
 
         globalReport2 = await this.getRobustGlobalReport()
         let accountReportsByID2:{[id:string]:{id:string, hash:string, timestamp:number }} = {}
@@ -1100,10 +1103,12 @@ class StateManager extends EventEmitter {
             //we dont have the data
             hasAllGlobalData = false
             remainingAccountsToSync.push(report.id)
+            this.mainLogger.debug(`DATASYNC: syncStateDataGlobals remainingAccountsToSync data===null ${report.id} `)
           } else if (data.stateId !== report.hash){
             //we have the data but he hash is wrong
             hasAllGlobalData = false
             remainingAccountsToSync.push(report.id)
+            this.mainLogger.debug(`DATASYNC: syncStateDataGlobals remainingAccountsToSync data.stateId !== report.hash ${report.id} `)
           }
         }
         //set this report to the last report and continue.
@@ -1125,6 +1130,7 @@ class StateManager extends EventEmitter {
       if(failedHashes && failedHashes.length > 0){
         throw new Error("setting data falied no error handling for this yet")
       }
+      this.mainLogger.debug(`DATASYNC: syncStateDataGlobals complete synced ${dataToSet.length} accounts `)
     } catch (error) {
       if (error.message.includes('FailAndRestartPartition')) {
         this.mainLogger.debug(`DATASYNC: syncStateDataGlobals Error Failed at: ${error.stack}`)
@@ -1164,10 +1170,17 @@ class StateManager extends EventEmitter {
     try {
       [result, winners] = await this.p2p.robustQuery(nodes, queryFn, equalFn, 3, false)
     } catch (ex) {
-      this.mainLogger.debug('syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      this.fatalLogger.fatal('syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.mainLogger.debug('getRobustGlobalReport: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.fatalLogger.fatal('getRobustGlobalReport: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       throw new Error('FailAndRestartPartition0')
     }
+    if (!winners || winners.length === 0) {
+      this.mainLogger.debug(`DATASYNC: getRobustGlobalReport no winners, going to throw fail and restart`)
+      this.fatalLogger.fatal(`DATASYNC: getRobustGlobalReport no winners, going to throw fail and restart`) // todo: consider if this is just an error
+      throw new Error('FailAndRestartPartition1')
+    }
+    this.mainLogger.debug(`DATASYNC: getRobustGlobalReport found a winner.  results: ${utils.stringifyReduce(result)}`)
+    this.dataSourceNode = winners[0] // Todo random index
 
     return result as GlobalAccountReportResp
   }
@@ -3158,6 +3171,26 @@ class StateManager extends EventEmitter {
 
       this.updateHomeInformation(txQueueEntry)
 
+      // Global account keys.
+      for (let key of txQueueEntry.uniqueKeys) {
+        if(globalModification === true){
+          // TODO: globalaccounts 
+          if(this.globalAccountMap.has(key)){
+            this.logger.playbackLogNote('globalAccountMap', `queueAcceptedTransaction - has`)
+            // indicate that we will have global data in this transaction!
+            // I think we do not need to test that here afterall.
+          } else {
+            //this makes the code aware that this key is for a global account.
+            //is setting this here too soon?
+            //it should be that p2p has already checked the receipt before calling shardus.push with global=true
+
+            this.globalAccountMap.set(key, null)
+            this.logger.playbackLogNote('globalAccountMap', `queueAcceptedTransaction - set`)
+
+          }            
+        }
+      }
+
       // if we are syncing this area mark it as good.
       for (let key of txQueueEntry.uniqueKeys) {
         let syncTracker = this.getSyncTracker(key)
@@ -3168,24 +3201,6 @@ class StateManager extends EventEmitter {
           syncTracker.queueEntries.push(txQueueEntry) // same tx may get pushed in multiple times. that's ok.
           txQueueEntry.syncKeys.push(key) // used later to instruct what local data we should JIT load
           txQueueEntry.localKeys[key] = true // used for the filter
-
-
-          if(globalModification === true){
-            // TODO: globalaccounts 
-            if(this.globalAccountMap.has(key)){
-              this.logger.playbackLogNote('globalAccountMap', `queueAcceptedTransaction - has`)
-              // indicate that we will have global data in this transaction!
-              // I think we do not need to test that here afterall.
-            } else {
-              //this makes the code aware that this key is for a global account.
-              //is setting this here too soon?
-              //it should be that p2p has already checked the receipt before calling shardus.push with global=true
-
-              this.globalAccountMap.set(key, null)
-              this.logger.playbackLogNote('globalAccountMap', `queueAcceptedTransaction - set`)
-            }            
-          }
-
 
           this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, ` qId: ${txQueueEntry.entryID}`)
         }
@@ -6238,6 +6253,7 @@ class StateManager extends EventEmitter {
             if (wrappedState == null) {
               // Theoretically could get this data from when we revert the data above..
               wrappedState = await this.app.getRelevantData(key, tx.data)
+              // what to do in failure case.
               accountValuesByKey[key] = wrappedState
             } else {
               wrappedState.accountCreated = false // kinda crazy assumption
