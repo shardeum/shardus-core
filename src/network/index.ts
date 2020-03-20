@@ -3,7 +3,7 @@ import { EventEmitter } from 'events'
 import { Express } from 'express'
 import express from 'express'
 import Logger from '../logger'
-const Sn = require('shardus-net')
+import {Sn} from 'shardus-net'
 import bodyParser from 'body-parser'
 import cors from 'cors'
 import { Server } from 'http'
