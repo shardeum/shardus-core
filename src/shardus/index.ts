@@ -15,7 +15,6 @@ import LoadDetection from '../load-detection'
 import RateLimiting from '../rate-limiting'
 import Profiler from "../utils/profiler"
 import path from 'path'
-type P2P = import("../p2p")
 const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
 import { EventEmitter } from 'events'
@@ -551,18 +550,18 @@ class Shardus extends EventEmitter {
 
   // USED BY SIMPLECOINAPP
   createApplyResponse (txId, txTimestamp) {
-    let replyObject = { stateTableResults: [], txId, txTimestamp, accountData: [] }
+    const replyObject = { stateTableResults: [], txId, txTimestamp, accountData: [] }
     return replyObject
   }
 
   // USED BY SIMPLECOINAPP
   applyResponseAddState (resultObject, accountData, localCache, accountId, txId, txTimestamp, stateBefore, stateAfter, accountCreated) {
-    let state = { accountId, txId, txTimestamp, stateBefore, stateAfter }
+    const state = { accountId, txId, txTimestamp, stateBefore, stateAfter }
     if (accountCreated) {
       state.stateBefore = allZeroes64
     }
     resultObject.stateTableResults.push(state)
-    resultObject.accountData.push({ accountId, data: accountData, txId, timestamp: txTimestamp, hash: stateAfter, localCache: localCache })
+    resultObject.accountData.push({ accountId, data: accountData, txId, timestamp: txTimestamp, hash: stateAfter, localCache })
   }
 
   // USED BY SIMPLECOINAPP
@@ -597,7 +596,7 @@ class Shardus extends EventEmitter {
    */
   createWrappedResponse (accountId, accountCreated, hash, timestamp, fullData) {
     // create and return the response object, it will default to full data.
-    return { accountId: accountId, accountCreated, isPartial: false, stateId: hash, timestamp: timestamp, data: fullData }
+    return { accountId, accountCreated, isPartial: false, stateId: hash, timestamp, data: fullData }
   }
 
   /**
@@ -620,8 +619,8 @@ class Shardus extends EventEmitter {
   }
 
   genericApplyPartialUpate (fullObject, updatedPartialObject) {
-    let dataKeys = Object.keys(updatedPartialObject)
-    for (let key of dataKeys) {
+    const dataKeys = Object.keys(updatedPartialObject)
+    for (const key of dataKeys) {
       fullObject[key] = updatedPartialObject[key]
     }
   }
@@ -652,7 +651,7 @@ class Shardus extends EventEmitter {
    */
   _getApplicationInterface (application) {
     this.mainLogger.debug('Start of _getApplicationInterfaces()')
-    let applicationInterfaceImpl: any = {}
+    const applicationInterfaceImpl: any = {}
     try {
       if (application == null) {
         // throw new Error('Invalid Application Instance')
@@ -800,7 +799,7 @@ class Shardus extends EventEmitter {
       if (typeof (application.sync) === 'function') {
         applicationInterfaceImpl.sync = async () => application.sync()
       } else {
-        let thisPtr = this
+        const thisPtr = this
         applicationInterfaceImpl.sync = async function () { thisPtr.mainLogger.debug('no app.sync() function defined') }
       }
     } catch (ex) {
@@ -897,4 +896,5 @@ class Shardus extends EventEmitter {
   }
 }
 
+// tslint:disable-next-line: no-default-export
 export default Shardus

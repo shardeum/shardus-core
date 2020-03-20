@@ -6,7 +6,7 @@ import Storage from '../storage'
 import Crypto from '../crypto'
 import * as utils from '../utils'
 import { EventEmitter } from 'events'
-type P2P = import("../p2p")
+type P2P = typeof import("../p2p")
 
 interface Consensus {
   profiler: Profiler

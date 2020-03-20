@@ -1,8 +1,8 @@
 import util from 'util'
 import { EventEmitter } from 'events'
 import Sntp from '@hapi/sntp'
-import utils from '../utils'
-import http from '../http'
+import * as utils from '../utils'
+import * as http from '../http'
 import P2PState = require('./p2p-state')
 import P2PLostNodes from './p2p-lost-nodes'
 import P2PArchivers from './p2p-archivers'
@@ -200,7 +200,7 @@ class P2P extends EventEmitter {
   }
 
   _checkWithinSyncLimit (time1, time2) {
-    let timeDif = Math.abs(time1 - time2)
+    const timeDif = Math.abs(time1 - time2)
     if (timeDif > this.syncLimit) {
       return false
     }
@@ -558,11 +558,11 @@ class P2P extends EventEmitter {
 
   async _createJoinRequest (cycleMarker) {
     // Build and return a join request
-    let nodeInfo = this._getThisNodeInfo()
-    let selectionNum = this.crypto.hash({ cycleMarker, address: nodeInfo.address })
+    const nodeInfo = this._getThisNodeInfo()
+    const selectionNum = this.crypto.hash({ cycleMarker, address: nodeInfo.address })
     // TO-DO: Think about if the selection number still needs to be signed
     // let signedSelectionNum = this.crypto.sign({ selectionNum })
-    let proofOfWork = {
+    const proofOfWork = {
       compute: await this.crypto.getComputeProofOfWork(cycleMarker, this.difficulty)
     }
     // TODO: add a version number at some point
@@ -607,7 +607,7 @@ class P2P extends EventEmitter {
       }
       add (newItem, node) {
         // We search to see if we've already seen this item before
-        for (let item of this.items) {
+        for (const item of this.items) {
           // If the value of the new item is not equal to the current item, we continue searching
           if (!this.equalFn(newItem, item.value)) continue
           // If the new item is equal to the current item in the list,
@@ -634,7 +634,7 @@ class P2P extends EventEmitter {
       getHighestCount () {
         if (!this.items.length) return 0
         let highestCount = 0
-        for (let item of this.items) {
+        for (const item of this.items) {
           if (item.count > highestCount) {
             highestCount = item.count
           }
@@ -642,7 +642,7 @@ class P2P extends EventEmitter {
         return highestCount
       }
     }
-    let responses = new Tally(redundancy, equalityFn)
+    const responses = new Tally(redundancy, equalityFn)
     let errors = 0
 
     nodes = [...nodes]
@@ -654,14 +654,14 @@ class P2P extends EventEmitter {
     const queryNodes = async (nodes) => {
       // Wrap the query so that we know which node it's coming from
       const wrappedQuery = async (node) => {
-        let response = await queryFn(node)
+        const response = await queryFn(node)
         return { response, node }
       }
 
       // We create a promise for each of the first `redundancy` nodes in the shuffled array
       const queries = []
-      for (var i = 0; i < nodes.length; i++) {
-        let node = nodes[i]
+      for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i]
         queries.push(wrappedQuery(node))
       }
       const [results, errs] = await utils.robustPromiseAll(queries)
@@ -684,9 +684,9 @@ class P2P extends EventEmitter {
 
     let finalResult = null
     while (!finalResult) {
-      let toQuery = redundancy - responses.getHighestCount()
+      const toQuery = redundancy - responses.getHighestCount()
       if (nodes.length < toQuery) break
-      let nodesToQuery = nodes.splice(0, toQuery)
+      const nodesToQuery = nodes.splice(0, toQuery)
       finalResult = await queryNodes(nodesToQuery)
     }
     if (finalResult) {
@@ -708,12 +708,12 @@ class P2P extends EventEmitter {
     nodes = [...nodes]
     shuffleArray(nodes)
 
-    for (let node of nodes) {
+    for (const node of nodes) {
       try {
-        let result = await queryFn(node)
+        const result = await queryFn(node)
         if (!result) throw new Error('Unable to get result from query.')
         this.mainLogger.debug(`Sequential query result: ${JSON.stringify(result)}`)
-        let verified = verifyFn(result)
+        const verified = verifyFn(result)
         if (!verified) {
           this.mainLogger.debug(`Query result failed verification.`)
           invalid += 1
@@ -793,7 +793,7 @@ class P2P extends EventEmitter {
   }
 
   async _fetchCycleMarkerInternal (nodes) {
-    let queryFn = async (node) => {
+    const queryFn = async (node) => {
       const cycleMarkerInfo = await this.ask(node, 'cyclemarker')
       return cycleMarkerInfo
     }
@@ -802,21 +802,21 @@ class P2P extends EventEmitter {
   }
 
   async _fetchVerifiedCycleChain (nodes, cycleChainHash, start, end) {
-    let queryFn = async (node) => {
+    const queryFn = async (node) => {
       const chainAndCerts = await this.ask(node, 'cyclechain', { start, end })
       return chainAndCerts
     }
-    let verifyFn = ({ cycleChain }) => this._verifyCycleChain(cycleChain, cycleChainHash)
+    const verifyFn = ({ cycleChain }) => this._verifyCycleChain(cycleChain, cycleChainHash)
     const chainAndCerts = await this._sequentialQuery(nodes, queryFn, verifyFn)
     return chainAndCerts
   }
 
   async _fetchUnfinalizedCycle (nodes) {
-    let queryFn = async (node) => {
+    const queryFn = async (node) => {
       const { unfinalizedCycle } = await this.ask(node, 'unfinalized')
       return { unfinalizedCycle }
     }
-    let equalFn = (payload1, payload2) => {
+    const equalFn = (payload1, payload2) => {
       // Make a copy of the cycle payload and delete the metadata for the hash comparison,
       // so that we get more consistent results
       const cycle1 = payload1.unfinalizedCycle.data
@@ -837,7 +837,7 @@ class P2P extends EventEmitter {
   }
 
   async _fetchNodeByPublicKey (nodes, publicKey) {
-    let queryFn = async (target) => {
+    const queryFn = async (target) => {
       const payload = {
         getBy: 'publicKey',
         publicKey
@@ -845,7 +845,7 @@ class P2P extends EventEmitter {
       const { node } = await this.ask(target, 'node', payload)
       return node
     }
-    let equalFn = (payload1, payload2) => {
+    const equalFn = (payload1, payload2) => {
       const hash1 = this.crypto.hash(payload1)
       const hash2 = this.crypto.hash(payload2)
       return hash1 === hash2
@@ -1139,7 +1139,7 @@ class P2P extends EventEmitter {
     const wrapped = {
       payload: msg,
       sender: this.id,
-      tracker: tracker
+      tracker
     }
     const tagged = this.crypto.tag(wrapped, recipientNode.curvePublicKey)
     return tagged
@@ -1216,7 +1216,7 @@ class P2P extends EventEmitter {
         await respond(signedResponse)
       }
       // Checks to see if we can extract the actual payload from the wrapped message
-      let payloadArray = this._extractPayload(wrappedPayload, this.state.getAllNodes(this.id))
+      const payloadArray = this._extractPayload(wrappedPayload, this.state.getAllNodes(this.id))
       const [payload, sender] = payloadArray
       tracker = payloadArray[2] || ''
       if (!payload) {
@@ -1247,7 +1247,7 @@ class P2P extends EventEmitter {
     }
 
     if (this.verboseLogs) this.mainLogger.debug(`Start of sendGossip(${utils.stringifyReduce(payload)})`)
-    const gossipPayload = { type: type, data: payload }
+    const gossipPayload = { type, data: payload }
 
     const gossipHash = this.crypto.hash(gossipPayload)
     if (this.gossipedHashesSent.has(gossipHash)) {
@@ -1289,7 +1289,7 @@ class P2P extends EventEmitter {
     }
 
     if (this.verboseLogs) this.mainLogger.debug(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
-    const gossipPayload = { type: type, data: payload }
+    const gossipPayload = { type, data: payload }
 
     const gossipHash = this.crypto.hash(gossipPayload)
     if (this.gossipedHashesSent.has(gossipHash)) {
@@ -1333,7 +1333,7 @@ class P2P extends EventEmitter {
     }
 
     if (this.verboseLogs) this.mainLogger.debug(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
-    const gossipPayload = { type: type, data: payload }
+    const gossipPayload = { type, data: payload }
 
     const gossipHash = this.crypto.hash(gossipPayload)
     if (this.gossipedHashesSent.has(gossipHash)) {
@@ -1472,7 +1472,7 @@ function getRandom (arr, n) {
   }
   const result = new Array(n)
   while (n--) {
-    var x = Math.floor(Math.random() * len)
+    const x = Math.floor(Math.random() * len)
     result[n] = arr[x in taken ? taken[x] : x]
     taken[x] = --len in taken ? taken[len] : len
   }
@@ -1480,15 +1480,15 @@ function getRandom (arr, n) {
 }
 
 function getRandomGossipIn (nodeIdxs, fanOut, myIdx) {
-  let nn = nodeIdxs.length
+  const nn = nodeIdxs.length
   if (fanOut >= nn) { fanOut = nn - 1 }
   if (fanOut < 1) { return [] }
-  let results = [(myIdx + 1) % nn]
+  const results = [(myIdx + 1) % nn]
   if (fanOut < 2) { return results }
   results.push((myIdx + nn - 1) % nn)
   if (fanOut < 3) { return results }
   while (results.length < fanOut) {
-    let r = Math.floor(Math.random() * nn)
+    const r = Math.floor(Math.random() * nn)
     if (r === myIdx) { continue }
     let k = 0
     for (; k < results.length; k++) {

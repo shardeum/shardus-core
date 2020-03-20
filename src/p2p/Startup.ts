@@ -1,5 +1,5 @@
 import * as http from '../http'
-import utils, { sleep } from '../utils'
+import * as utils from '../utils'
 import { p2p } from './Context'
 import { sync } from './Sync'
 import { Node, NodeInfo } from './Types'
@@ -107,7 +107,7 @@ export async function startup(): Promise<boolean> {
       joined = false
       p2p.mainLogger.error(err)
       p2p.mainLogger.info('Trying again in 2 sec...')
-      await sleep(2000)
+      await utils.sleep(2000)
     }
   }
 
@@ -144,7 +144,7 @@ export async function startup(): Promise<boolean> {
       synced = false
       p2p.mainLogger.error(err)
       p2p.mainLogger.info('Trying again in 2 sec...')
-      await sleep(2000)
+      await utils.sleep(2000)
     }
   }
 

@@ -1,5 +1,5 @@
 import util from 'util'
-import utils from '../utils'
+import * as utils from '../utils'
 
 export type QueryFunction<Node, Response> = (node: Node) => Promise<Response>
 
