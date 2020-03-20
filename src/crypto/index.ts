@@ -12,7 +12,7 @@ interface Crypto {
   keypair: any
   curveKeypair: { publicKey?: crypto.curvePublicKey, secretKey?: crypto.curveSecretKey}
   powGenerators: {[name: string]: ChildProcess}
-  sharedKeys: {[name: string]: string}
+  sharedKeys: {[name: string]: Buffer}
 }
 
 class Crypto {
@@ -28,7 +28,7 @@ class Crypto {
 
   async init () {
     crypto.init(this.config.crypto.hashKey)
-    let keypair = await this.storage.getProperty('keypair')
+    const keypair = await this.storage.getProperty('keypair')
     if (!keypair) {
       this.mainLogger.info('Keypair unable to be loaded from database. Generating new keypair...')
       this.keypair = this._generateKeypair()
@@ -45,7 +45,7 @@ class Crypto {
   }
 
   _generateKeypair () {
-    let keypair = crypto.generateKeypair()
+    const keypair = crypto.generateKeypair()
     this.mainLogger.info('New keypair generated.')
     return keypair
   }
@@ -65,7 +65,7 @@ class Crypto {
   getSharedKey (curvePk: crypto.curvePublicKey) {
     let sharedKey = this.sharedKeys[curvePk]
     if (!sharedKey) {
-      sharedKey = crypto.generateSharedKey(this.curveKeypair.secretKey, curvePk).toString()
+      sharedKey = crypto.generateSharedKey(this.curveKeypair.secretKey, curvePk)
       this.sharedKeys[curvePk] = sharedKey
     }
     return sharedKey
@@ -84,7 +84,7 @@ class Crypto {
   }
 
   sign (obj: any) {
-    let objCopy = JSON.parse(crypto.stringify(obj))
+    const objCopy = JSON.parse(crypto.stringify(obj))
     crypto.signObj(objCopy, this.keypair.secretKey, this.keypair.publicKey)
     return objCopy
   }
@@ -122,7 +122,7 @@ class Crypto {
     // Fork a child process to compute the PoW, if it doesn't exist
     // @ts-ignore for seems to have a funky definition so ignoring it for now.  could be good to go back and research this.
     if (!this.powGenerators[generator]) this.powGenerators[generator] = fork(generator, { cwd: __dirname })
-    let promise = new Promise((resolve, reject) => {
+    const promise = new Promise((resolve, reject) => {
       this.powGenerators[generator].on('message', (powObj) => {
         this._stopProofOfWorkGenerator(generator)
         resolve(powObj)
@@ -138,7 +138,7 @@ class Crypto {
 
   _stopProofOfWorkGenerator (generator: string) {
     if (!this.powGenerators[generator]) return Promise.resolve('not running')
-    let promise = new Promise((resolve, reject) => {
+    const promise = new Promise((resolve, reject) => {
       this.powGenerators[generator].on('close', (signal) => {
         delete this.powGenerators[generator]
         resolve(signal)
@@ -151,4 +151,5 @@ class Crypto {
   }
 }
 
+// tslint:disable-next-line: no-default-export
 export default Crypto
