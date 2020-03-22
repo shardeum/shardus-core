@@ -93,6 +93,11 @@ export function byInternalIpPort(
 
 export async function addNodes(newNodes: Node[]) {
   for (const node of newNodes) {
+    if (nodes.has(node.id)) {
+      console.log(`NodeList WARNING: addNodes: Tried to add an existing node: ${node.id}`)
+      continue
+    }
+
     nodes.set(node.id, node)
     publicKeyToId[node.id] = node.id
     externalIpPortToId[ipPort(node.externalIp, node.externalPort)] = node.id

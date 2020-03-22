@@ -918,6 +918,10 @@ class P2PState extends EventEmitter {
   }
 
   _addNodeToNodelist (node) {
+    if (this.nodes.current[node.id]) {
+      console.log(`P2P WARNING: _addNodeToNodelist: Tried to add an existing node: ${node.id}`)
+      return
+    }
     const status = node.status
     if (!this.validStatuses.includes(status)) throw new Error('Invalid node status.')
     this.nodes[status][node.id] = node

@@ -87,11 +87,17 @@ export async function sync(activeNodes: ActiveNode[]) {
       CycleChain.validate(prevCycle, oldestCycle)
       CycleChain.prepend(prevCycle)
       squasher.addChange(parse(prevCycle))
-      if (squasher.final.updated.length >= cycleToSyncTo.active) {
+      if (
+        squasher.final.updated.length >=
+        cycleToSyncTo.active + cycleToSyncTo.activated.length
+      ) {
         break
       }
     }
-  } while (squasher.final.updated.length < cycleToSyncTo.active)
+  } while (
+    squasher.final.updated.length <
+    cycleToSyncTo.active + cycleToSyncTo.activated.length
+  )
   await NodeList.addNodes(
     squasher.final.added.map(joined => NodeList.createNode(joined))
   )
@@ -141,17 +147,21 @@ async function syncNewCycles(activeNodes: ActiveNode[]) {
       newestCycle.counter
     )
     for (const nextCycle of nextCycles) {
-      CycleChain.validate(CycleChain.newest, nextCycle)
-      CycleChain.append(nextCycle)
-      const changes = parse(nextCycle)
-      NodeList.removeNodes(changes.removed)
-      await NodeList.updateNodes(changes.updated)
-      await NodeList.addNodes(
-        changes.added.map(joined => NodeList.createNode(joined))
-      )
+      CycleChain.validate(CycleChain.newest, newestCycle)
+      CycleChain.append(newestCycle)
+      await digestCycle(nextCycle)
     }
     newestCycle = await getNewestCycle(activeNodes)
   }
+}
+
+async function digestCycle(cycle: Cycle) {
+  const changes = parse(cycle)
+  NodeList.removeNodes(changes.removed)
+  await NodeList.updateNodes(changes.updated)
+  await NodeList.addNodes(
+    changes.added.map(joined => NodeList.createNode(joined))
+  )
 }
 
 async function getNewestCycle(activeNodes: ActiveNode[]): Promise<Cycle> {
