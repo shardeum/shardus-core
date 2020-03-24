@@ -19,8 +19,9 @@ const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
 import { EventEmitter } from 'events'
 import { p2p } from '../p2p/Context'
-import { SetGlobalTx, SignedSetGlobalTx, makeReceipt } from '../p2p/GlobalAccounts'
+import * as GlobalAccounts from '../p2p/GlobalAccounts'
 import { sign } from 'crypto'
+import ShardFunctions from '../state-manager/shardFunctions'
 const saveConsoleOutput = require('./saveConsoleOutput')
 
 
@@ -277,6 +278,8 @@ class Shardus extends EventEmitter {
       await this.p2p.restart()
     })
 
+    GlobalAccounts.setShardusContext(this)
+
     await this.p2p.startup()
   }
 
@@ -353,12 +356,11 @@ class Shardus extends EventEmitter {
    */
   _createAndLinkStateManager () {
     this.stateManager = new StateManager(this.verboseLogs, this.profiler, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto, this.config)
-    this._registerListener(this.consensus, 'accepted', (...txArgs: [ShardusTypes.AcceptedTx, boolean, ShardusTypes.Node,boolean]) => this.stateManager.queueAcceptedTransaction(...txArgs))
    // manually spelling out parameters here for readablity
-    // this._registerListener(this.consensus, 'accepted', (...txArgs) => this.stateManager.queueAcceptedTransaction(...txArgs))
-    //this._registerListener(this.consensus, 'accepted', (acceptedTx, sendGossip, sender, globalModification) => this.stateManager.queueAcceptedTransaction(acceptedTx, sendGossip, sender, globalModification))
+    this._registerListener(this.consensus, 'accepted', (...txArgs: [ShardusTypes.AcceptedTx, boolean, ShardusTypes.Node, boolean]) => this.stateManager.queueAcceptedTransaction(...txArgs))
 
     this.storage.stateManager = this.stateManager
+    GlobalAccounts.setStateManagerContext(this.stateManager)
   }
 
   /**
@@ -936,19 +938,22 @@ class Shardus extends EventEmitter {
   }
 
   setGlobal(address, value, when, source) {
+    console.log(`SETGLOBAL: WE ARE: ${this.p2p.id.substring(0, 5)}`)
+
     // Only do this if you're active
     if (!this.p2p.isActive) return
 
     // Create a tx for setting a global account
-    const tx: SetGlobalTx = {address, value, when, source}
+    const tx: GlobalAccounts.SetGlobalTx = {address, value, when, source}
     const txHash = this.crypto.hash(tx)
 
     // Sign tx
-    this.crypto.sign(tx)
-    const signedTx = tx as SignedSetGlobalTx
+    const signedTx: GlobalAccounts.SignedSetGlobalTx = this.crypto.sign(tx)
 
     // Get the nodes that tx will be broadcasted to
-    const consensusGroup = this.stateManager.getClosestNodesGlobal(source, this.config.sharding.nodesPerConsensusGroup).map(id => this.p2p.state.getNode(id))
+    const homeNode = ShardFunctions.findHomeNode(this.stateManager.currentCycleShardData.shardGlobals, source, this.stateManager.currentCycleShardData.parititionShardDataMap)
+    const consensusGroup = [...homeNode.consensusNodeForOurNodeFull]
+    console.log(`SETGLOBAL: CONSENSUS_GROUP: ${consensusGroup.map(n => n.id.substring(0, 5))}`)
     const ourIdx = consensusGroup.findIndex(node => node.id === this.p2p.id)
     if (ourIdx === -1) return // Return if we're not in the consensusGroup
     consensusGroup.splice(ourIdx, 1) // Remove ourself from consensusGroup
@@ -957,25 +962,27 @@ class Shardus extends EventEmitter {
 
     // Get ready to process receipts into a receiptCollection, or to timeout
     const timeout = 10000 // [TODO] adjust this to stop early timeouts
-    const handle = `receipt-${txHash}`
-
-    const onReceipt = (receipt) => {
-      // [TODO] Collects receipts in p2p or something
-      console.log(`SETGLOBAL: GOT RECEIPT: ${txHash} ${JSON.stringify(receipt)}`)
-    }
-    p2p.on(handle, onReceipt)
+    const handle = GlobalAccounts.createMakeReceiptHandle(txHash)
 
     const onTimeout = () => {
       console.log(`SETGLOBAL: TIMED OUT: ${txHash}`)
       p2p.removeListener(handle, onReceipt)
-      // [TODO] Do other clean up
+      GlobalAccounts.attemptCleanup()
     }
-    setTimeout(onTimeout, timeout)
+    const timer = setTimeout(onTimeout, timeout)
+
+    const onReceipt = (receipt) => {
+      console.log(`SETGLOBAL: GOT RECEIPT: ${txHash} ${JSON.stringify(receipt)}`)
+      clearTimeout(timer)
+      // Gossip receipt to every node in network to apply to global account
+      if (GlobalAccounts.processReceipt(receipt) === false) return
+      p2p.sendGossipIn('set-global', receipt)
+    }
+    p2p.on(handle, onReceipt)
+
 
     // Broadcast tx to /makeReceipt of all nodes in source consensus group to trigger creation of receiptCollection 
-    console.log(`SETGLOBAL: WE ARE: ${this.p2p.id.substring(0, 5)}`)
-    console.log(`SETGLOBAL: CONSENSUS_GROUP: ${consensusGroup.map(n => n.id.substring(0, 5))}`)
-    makeReceipt(signedTx, this.p2p.id) // Need this because internalRoute handler ignores messages from ourselves
+    GlobalAccounts.makeReceipt(signedTx, this.p2p.id) // Need this because internalRoute handler ignores messages from ourselves
     p2p.tell(consensusGroup, 'make-receipt', signedTx)
   }
 }

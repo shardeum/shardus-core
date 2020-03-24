@@ -2,11 +2,13 @@ export interface LooseObject {
   [index: string]: unknown
 }
 
+export interface Signature {
+  owner: string;
+  sig: string;
+}
+
 export interface SignedObject extends LooseObject {
-  sign: {
-    owner: string;
-    sig: string;
-  };
+  sign: Signature
 }
 
 export enum NodeStatus {

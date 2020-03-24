@@ -168,6 +168,7 @@ class P2P extends EventEmitter {
     for (const route of P2PApoptosis.gossipRoutes) this.registerGossipHandler(route.name, route.handler)
     for (const route of Sync.externalRoutes) this.network._registerExternal(route.method, route.name, route.handler)
     for (const route of GlobalAccounts.internalRoutes) this.registerInternal(route.name, route.handler)
+    for (const route of GlobalAccounts.gossipRoutes) this.registerGossipHandler(route.name, route.handler)
   }
 
   _verifyExternalInfo (ipInfo) {
