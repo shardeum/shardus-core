@@ -2,13 +2,7 @@ import * as Sequelize from 'sequelize'
 import { insertSorted } from '../utils'
 import { GossipHandler, InternalHandler, LooseObject, Route } from './Types'
 import { p2p } from './Context'
-
-export interface SignedObject extends LooseObject {
-  sign: {
-    owner: string
-    sig: string
-  }
-}
+import { SignedObject } from './Types'
 
 interface ApoptosisProposal {
   id: string

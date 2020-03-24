@@ -2,6 +2,13 @@ export interface LooseObject {
   [index: string]: unknown
 }
 
+export interface SignedObject extends LooseObject {
+  sign: {
+    owner: string;
+    sig: string;
+  };
+}
+
 export enum NodeStatus {
   ACTIVE = 'active',
   SYNCING = 'syncing',
