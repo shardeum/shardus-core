@@ -18,6 +18,9 @@ import path from 'path'
 const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
 import { EventEmitter } from 'events'
+import { p2p } from '../p2p/Context'
+import { SetGlobalTx, SignedSetGlobalTx, makeReceipt } from '../p2p/GlobalAccounts'
+import { sign } from 'crypto'
 const saveConsoleOutput = require('./saveConsoleOutput')
 
 
@@ -930,6 +933,50 @@ class Shardus extends EventEmitter {
     }
     // this.mainLogger.debug(`End of _isTransactionTimestampExpired(${timestamp})`)
     return transactionExpired
+  }
+
+  setGlobal(address, value, when, source) {
+    // Only do this if you're active
+    if (!this.p2p.isActive) return
+
+    // Create a tx for setting a global account
+    const tx: SetGlobalTx = {address, value, when, source}
+    const txHash = this.crypto.hash(tx)
+
+    // Sign tx
+    this.crypto.sign(tx)
+    const signedTx = tx as SignedSetGlobalTx
+
+    // Get the nodes that tx will be broadcasted to
+    const consensusGroup = this.stateManager.getClosestNodesGlobal(source, this.config.sharding.nodesPerConsensusGroup).map(id => this.p2p.state.getNode(id))
+    const ourIdx = consensusGroup.findIndex(node => node.id === this.p2p.id)
+    if (ourIdx === -1) return // Return if we're not in the consensusGroup
+    consensusGroup.splice(ourIdx, 1) // Remove ourself from consensusGroup
+
+    // Using makeReceipt API
+
+    // Get ready to process receipts into a receiptCollection, or to timeout
+    const timeout = 10000 // [TODO] adjust this to stop early timeouts
+    const handle = `receipt-${txHash}`
+
+    const onReceipt = (receipt) => {
+      // [TODO] Collects receipts in p2p or something
+      console.log(`SETGLOBAL: GOT RECEIPT: ${txHash} ${JSON.stringify(receipt)}`)
+    }
+    p2p.on(handle, onReceipt)
+
+    const onTimeout = () => {
+      console.log(`SETGLOBAL: TIMED OUT: ${txHash}`)
+      p2p.removeListener(handle, onReceipt)
+      // [TODO] Do other clean up
+    }
+    setTimeout(onTimeout, timeout)
+
+    // Broadcast tx to /makeReceipt of all nodes in source consensus group to trigger creation of receiptCollection 
+    console.log(`SETGLOBAL: WE ARE: ${this.p2p.id.substring(0, 5)}`)
+    console.log(`SETGLOBAL: CONSENSUS_GROUP: ${consensusGroup.map(n => n.id.substring(0, 5))}`)
+    makeReceipt(signedTx, this.p2p.id) // Need this because internalRoute handler ignores messages from ourselves
+    p2p.tell(consensusGroup, 'make-receipt', signedTx)
   }
 }
 
