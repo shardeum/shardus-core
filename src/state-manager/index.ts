@@ -3084,6 +3084,9 @@ class StateManager extends EventEmitter {
       let txId = txQueueEntry.acceptedTx.receipt.txHash
       // Init home nodes!
       for (let key of txQueueEntry.txKeys.allKeys) {
+        if(key == null){
+          throw new Error(`updateHomeInformation key == null ${key}`)
+        }
         let homeNode = ShardFunctions.findHomeNode(this.currentCycleShardData.shardGlobals, key, this.currentCycleShardData.parititionShardDataMap)
         if(homeNode == null){
           throw new Error(`updateHomeInformation homeNode == null ${key}`)
@@ -3165,6 +3168,12 @@ class StateManager extends EventEmitter {
       }
       let keyHash:StringBoolObjectMap = {}
       for (let key of txQueueEntry.txKeys.allKeys) {
+        if(key == null){
+         // throw new Error(`queueAcceptedTransaction key == null ${key}`)
+         if (this.verboseLogs) this.mainLogger.error(`queueAcceptedTransaction key == null ${timestamp} not putting tx in queue.`)
+         return false
+        }
+
         keyHash[key] = true
       }
       txQueueEntry.uniqueKeys = Object.keys(keyHash)
@@ -6283,14 +6292,21 @@ class StateManager extends EventEmitter {
           let wrappedStateKeys = Object.keys( wrappedStates )
           for(let wrappedStateKey of wrappedStateKeys){
             let wrappedState = wrappedStates[wrappedStateKey]
+      
+            if(wrappedState != null) {
+              if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair applyAllPreparedRepairs wrappedState == null`)
+              //could continue but want to see if there is more we can log.
+            }
             //is it global. 
-            if(this.isGlobalAccount(wrappedState.accountId)){
+            if(this.isGlobalAccount(wrappedStateKey)){ // wrappedState.accountId)){
               this.logger.playbackLogNote('globalAccountMap', `applyAllPreparedRepairs - has`)
               if(wrappedState != null){
                 let globalValueSnapshot = this.getGlobalAccountValueAtTime(wrappedState.accountId, tx.timestamp)           
                 
                 if(globalValueSnapshot == null){
                   //todo some error?
+                  let globalAccountBackupList = this.getGlobalAccountBackupList(wrappedStateKey)
+                  if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair applyAllPreparedRepairs has global key but no snapshot at time ${tx.timestamp} entries:${globalAccountBackupList.length} ${utils.stringifyReduce(globalAccountBackupList.map(a => `${a.timestamp}  ${ utils.makeShortHash( a.accountId )} `    ))}  `)
                   continue
                 }
                 // build a new wrapped response to insert
@@ -6300,7 +6316,10 @@ class StateManager extends EventEmitter {
                 wrappedStates[wrappedStateKey] = newWrappedResponse // update!!
                 // insert thes data into the wrapped states.
                 // yikes probably cant do local cached data at this point.
-              }
+                if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs got global account to repair from: ${utils.stringifyReduce(newWrappedResponse)}`)
+              } 
+            } else {
+              if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair applyAllPreparedRepairs is global account but wrapped state == null`)
             }
           }
           
@@ -6993,6 +7012,9 @@ class StateManager extends EventEmitter {
       let globalBackupList:Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
       if(globalBackupList != null){
         globalBackupList.push(backupObj) // sort and cleanup later.
+
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+
       }
 
       //Aha! Saves the last copy per given cycle! this way when you query cycle-1 you get the right data.
