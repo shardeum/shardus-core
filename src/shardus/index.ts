@@ -350,7 +350,10 @@ class Shardus extends EventEmitter {
    */
   _createAndLinkStateManager () {
     this.stateManager = new StateManager(this.verboseLogs, this.profiler, this.app, this.consensus, this.logger, this.storage, this.p2p, this.crypto, this.config)
-    this._registerListener(this.consensus, 'accepted', (...txArgs: [ShardusTypes.AcceptedTx, boolean, ShardusTypes.Node]) => this.stateManager.queueAcceptedTransaction(...txArgs))
+    this._registerListener(this.consensus, 'accepted', (...txArgs: [ShardusTypes.AcceptedTx, boolean, ShardusTypes.Node,boolean]) => this.stateManager.queueAcceptedTransaction(...txArgs))
+   // manually spelling out parameters here for readablity
+    // this._registerListener(this.consensus, 'accepted', (...txArgs) => this.stateManager.queueAcceptedTransaction(...txArgs))
+    //this._registerListener(this.consensus, 'accepted', (acceptedTx, sendGossip, sender, globalModification) => this.stateManager.queueAcceptedTransaction(acceptedTx, sendGossip, sender, globalModification))
 
     this.storage.stateManager = this.stateManager
   }
@@ -360,15 +363,20 @@ class Shardus extends EventEmitter {
    */
   async syncAppData () {
     if (this.stateManager) await this.stateManager.syncStateData(3)
-
+    console.log('syncAppData')
     if (this.p2p.isFirstSeed) {
       await this.p2p.goActive()
+      console.log('syncAppData - goActive')
       // await this.stateManager.startCatchUpQueue() // first node skips sync anyhow
       await this.app.sync()
+      console.log('syncAppData - sync')
     } else {
       await this.stateManager.startCatchUpQueue()
+      console.log('syncAppData - startCatchUpQueue')
       await this.app.sync()
+      console.log('syncAppData - sync')
       await this.p2p.goActive()
+      console.log('syncAppData - goActive')
     }
     // Set network joinable to true
     this.p2p.setJoinRequestToggle(true)
@@ -390,7 +398,7 @@ class Shardus extends EventEmitter {
    * @param {*} tx The transaction data
    */
   set (tx: any) {
-    return this.put(tx, true)
+    return this.put(tx, true, false)
   }
 
   /**
@@ -640,6 +648,8 @@ class Shardus extends EventEmitter {
   async shutdown (exitProcess = true) {
     try {
       await this.exitHandler.exitCleanly(exitProcess)
+      // consider if we want this.  it can help for debugging:
+      // await this.exitHandler.exitUncleanly()
     } catch (e) {
       throw e
     }
@@ -829,6 +839,30 @@ class Shardus extends EventEmitter {
     this.network.registerExternalGet('config', async (req, res) => {
       res.json({ config: this.config })
     })
+    // FOR internal testing. NEEDS to be removed for security purposes
+    this.network.registerExternalPost('testGlobalAccountTX', async (req, res) => {
+      try {
+        this.mainLogger.debug(`testGlobalAccountTX: req:${utils.stringifyReduce(req.body)}`)
+        let tx = req.body.tx
+        this.put(tx, false, true)
+        res.json({ success: true })
+      } catch (ex) {
+        this.mainLogger.debug('testGlobalAccountTX:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        this.fatalLogger.fatal('testGlobalAccountTX:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      }
+    })
+
+    this.network.registerExternalPost('testGlobalAccountTXSet', async (req, res) => {
+      try {
+        this.mainLogger.debug(`testGlobalAccountTXSet: req:${utils.stringifyReduce(req.body)}`)
+        let tx = req.body.tx
+        this.put(tx, true, true)
+        res.json({ success: true })
+      } catch (ex) {
+        this.mainLogger.debug('testGlobalAccountTXSet:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        this.fatalLogger.fatal('testGlobalAccountTXSet:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      }
+    })
   }
 
   /**
@@ -838,7 +872,9 @@ class Shardus extends EventEmitter {
     const logFatalAndExit = (err) => {
       console.log('Encountered a fatal error. Check fatal log for details.')
       this.fatalLogger.fatal('unhandledRejection: ' + err.stack)
-      this.exitHandler.exitCleanly()
+      // this.exitHandler.exitCleanly()
+
+      this.exitHandler.exitUncleanly()
     }
     process.on('uncaughtException', (err) => {
       logFatalAndExit(err)
