@@ -123,7 +123,7 @@ export function processReceipt (receipt: Receipt) {
   const tracker = trackers.get(txHash) || createTracker(txHash)
   tracker.timestamp = receipt.tx.when
   if (tracker.gossiped) return false
-  // shardus.put(receipt.tx.value, false, true)
+  shardus.put(receipt.tx.value, false, true)
   console.log(`Processed set-global receipt: ${JSON.stringify(receipt)}`)
   tracker.gossiped = true
   attemptCleanup()
