@@ -6983,10 +6983,13 @@ class StateManager extends EventEmitter {
     }
     // TSConversion need to sort out account types!!!
     // @ts-ignore This has seemed fine in past so not going to sort out a type discrepencie here.  !== would detect and log it anyhow.
-    if (accountDataList[0].timestamp !== txTimestamp) {
+    if (accountDataList.length > 0 && accountDataList[0].timestamp !== txTimestamp) {
       if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable timestamps dot match txts:${txTimestamp} acc.ts:${accountDataList[0].timestamp} `)
     }
+    if(accountDataList.length === 0){
+      if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable empty txts:${txTimestamp}  `)
 
+    }
     // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable acc.timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle computed:${cycleNumber} `)
 
     for (let accountEntry of accountDataList) {
