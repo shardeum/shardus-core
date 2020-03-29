@@ -1,4 +1,4 @@
-import { Cycle, JoinedConsensor } from './CycleChain'
+import { CycleRecord, JoinedConsensor } from './CycleChain'
 import { Node, Update } from './NodeList'
 import { NodeStatus } from './Types'
 import { reversed } from './Utils'
@@ -9,7 +9,7 @@ export interface Change {
   updated: Update[] // order doesn't matter
 }
 
-export function parse(cycle: Cycle): Change {
+export function parse(cycle: CycleRecord): Change {
   const added: Change['added'] = []
   const removed: Change['removed'] = []
   const updated: Change['updated'] = []

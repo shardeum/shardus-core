@@ -1,65 +1,22 @@
 import { p2p } from './Context'
 import { LooseObject, P2PNode } from './Types'
+import { CycleRecord } from './CycleCreator'
 
 /** TYPES */
-
-export interface SignedMarker {
-  id: string
-  marker: string
-  sign: {
-    owner: string
-    sig: string
-  }
-}
-
-export type Certificate = SignedMarker[]
-
-export interface JoinedArchiver {
-  curvePk: string
-  ip: string
-  port: number
-  publicKey: string
-}
-
-// Should eventually become Node type from NodeList
-export interface JoinedConsensor extends P2PNode {
-  id: string
-  cycleJoined: string
-}
-
-export interface Cycle {
-  counter: number
-  previous: string
-  start: number
-  duration: number
-  active: number
-  desired: number
-  expired: number
-  joined: string[]
-  joinedArchivers: JoinedArchiver[]
-  joinedConsensors: JoinedConsensor[]
-  activated: string[]
-  activatedPublicKeys: string[]
-  removed: string[]
-  returned: string[]
-  lost: string[]
-  refuted: string[]
-  apoptosized: string[]
-}
 
 export interface UnfinshedCycle {
   metadata: LooseObject
   updates: LooseObject
-  data: Cycle
+  data: CycleRecord
 }
 
 /** STATE */
 
-export let cycles: Cycle[] // [OLD, ..., NEW]
-let cyclesByMarker: { [marker: string]: Cycle }
+export let cycles: CycleRecord[] // [OLD, ..., NEW]
+let cyclesByMarker: { [marker: string]: CycleRecord }
 
-export let oldest: Cycle
-export let newest: Cycle
+export let oldest: CycleRecord
+export let newest: CycleRecord
 
 function initialize() {
   cycles = []
@@ -75,7 +32,7 @@ export function reset() {
   initialize()
 }
 
-export function append(cycle: Cycle) {
+export function append(cycle: CycleRecord) {
   const marker = p2p.state._computeCycleMarker(cycle)
   if (!cyclesByMarker[marker]) {
     cycles.push(cycle)
@@ -88,7 +45,7 @@ export function append(cycle: Cycle) {
     p2p.state.addCycles([cycle])
   }
 }
-export function prepend(cycle: Cycle) {
+export function prepend(cycle: CycleRecord) {
   const marker = p2p.state._computeCycleMarker(cycle)
   if (!cyclesByMarker[marker]) {
     cycles.unshift(cycle)
@@ -97,7 +54,7 @@ export function prepend(cycle: Cycle) {
     if (!newest) newest = cycle
   }
 }
-export function validate(prev: Cycle, next: Cycle): boolean {
+export function validate(prev: CycleRecord, next: CycleRecord): boolean {
   // [TODO] actually validate
   return true
 }

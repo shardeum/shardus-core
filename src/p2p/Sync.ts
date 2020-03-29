@@ -3,12 +3,13 @@ import { promisify } from 'util'
 import * as http from '../http'
 import { p2p } from './Context'
 import * as CycleChain from './CycleChain'
-import { Cycle, UnfinshedCycle } from './CycleChain'
+import { UnfinshedCycle } from './CycleChain'
 import { ChangeSquasher, parse } from './CycleParser'
 import * as NodeList from './NodeList'
 import { Route } from './Types'
 import { reversed, robustQuery, sequentialQuery } from './Utils'
-
+import { Node } from './p2p-state' 
+import { CycleRecord } from "./CycleCreator";
 /** TYPES */
 
 export interface ActiveNode {
@@ -88,15 +89,13 @@ export async function sync(activeNodes: ActiveNode[]) {
       CycleChain.prepend(prevCycle)
       squasher.addChange(parse(prevCycle))
       if (
-        squasher.final.updated.length >=
-        cycleToSyncTo.active + cycleToSyncTo.activated.length
+        squasher.final.updated.length >= activeNodeCount(cycleToSyncTo)
       ) {
         break
       }
     }
   } while (
-    squasher.final.updated.length <
-    cycleToSyncTo.active + cycleToSyncTo.activated.length
+    squasher.final.updated.length < activeNodeCount(cycleToSyncTo)
   )
   await NodeList.addNodes(
     squasher.final.added.map(joined => NodeList.createNode(joined))
@@ -138,7 +137,9 @@ export async function sync(activeNodes: ActiveNode[]) {
   return true
 }
 
-async function syncNewCycles(activeNodes: ActiveNode[]) {
+type SyncNode = Partial<Pick<ActiveNode, 'ip'|'port'> & Pick<NodeList.Node, 'externalIp'|'externalPort'>>
+
+export async function syncNewCycles(activeNodes: SyncNode[]) {
   let newestCycle = await getNewestCycle(activeNodes)
   while (CycleChain.newest.counter < newestCycle.counter) {
     const nextCycles = await getCycles(
@@ -155,7 +156,7 @@ async function syncNewCycles(activeNodes: ActiveNode[]) {
   }
 }
 
-async function digestCycle(cycle: Cycle) {
+export async function digestCycle(cycle: CycleRecord) {
   const changes = parse(cycle)
   NodeList.removeNodes(changes.removed)
   await NodeList.updateNodes(changes.updated)
@@ -164,35 +165,39 @@ async function digestCycle(cycle: Cycle) {
   )
 }
 
-async function getNewestCycle(activeNodes: ActiveNode[]): Promise<Cycle> {
-  const queryFn = async (node: ActiveNode) => {
-    const resp = await http.get(`${node.ip}:${node.port}/sync-newest-cycle`)
+async function getNewestCycle(activeNodes: SyncNode[]): Promise<CycleRecord> {
+  const queryFn = async (node: SyncNode) => {
+    const ip = node.ip ? node.ip : node.externalIp
+    const port = node.ip ? node.ip : node.externalIp
+    const resp = await http.get(`${ip}:${port}/sync-newest-cycle`)
     return resp
   }
-  const [response, _responders] = await robustQuery<ActiveNode>(
+  const [response, _responders] = await robustQuery(
     activeNodes,
     queryFn
   )
-  const newestCycle = response as Cycle
+  const newestCycle = response as CycleRecord
   return newestCycle
 }
 async function getCycles(
-  activeNodes: ActiveNode[],
+  activeNodes: SyncNode[],
   start: number,
   end: number
-): Promise<Cycle[]> {
+): Promise<CycleRecord[]> {
   if (start < 0) start = 0
   if (end < 0) end = 0
   if (start > end) start = end
-  const queryFn = async (node: ActiveNode) => {
-    const resp = await http.post(`${node.ip}:${node.port}/sync-cycles`, {
+  const queryFn = async (node: SyncNode) => {
+    const ip = node.ip ? node.ip : node.externalIp
+    const port = node.ip ? node.ip : node.externalIp
+    const resp = await http.post(`${ip}:${port}/sync-cycles`, {
       start,
       end,
     })
     return resp
   }
   const { result } = await sequentialQuery(activeNodes, queryFn)
-  const cycles = result as Cycle[]
+  const cycles = result as CycleRecord[]
   return cycles
 }
 async function getUnfinishedCycle(
@@ -210,24 +215,28 @@ async function getUnfinishedCycle(
   return unfinishedCycle
 }
 
-function isBeforeNextQuarter4(cycle: Cycle): boolean {
+function isBeforeNextQuarter4(cycle: CycleRecord): boolean {
   const nextStart = cycle.start + cycle.duration
   const nextQuarter3Start = (nextStart + (3 / 4) * cycle.duration) * 1000
   return Date.now() <= nextQuarter3Start
 }
-async function waitUntilNextEnd(cycle: Cycle) {
+async function waitUntilNextEnd(cycle: CycleRecord) {
   const cycleEnd = cycle.start + cycle.duration
   const nextEnd = (cycleEnd + cycle.duration) * 1000
   const now = Date.now()
   const toWait = nextEnd > now ? nextEnd - now : 0
   await sleep(toWait)
 }
-async function waitUntilNextQuarter4(cycle: Cycle) {
+async function waitUntilNextQuarter4(cycle: CycleRecord) {
   const nextStart = cycle.start + cycle.duration
   const nextQuarter3Start = (nextStart + (3 / 4) * cycle.duration) * 1000
   const now = Date.now()
   const toWait = nextQuarter3Start > now ? nextQuarter3Start - now : 0
   await sleep(toWait)
+}
+
+function activeNodeCount(cycle: CycleRecord) {
+  return cycle.active + cycle.activated.length - cycle.apoptosized.length - cycle.removed.length - cycle.lost.length
 }
 
 function info(...msg) {

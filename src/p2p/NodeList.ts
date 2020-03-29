@@ -1,5 +1,6 @@
+import { insertSorted } from '../utils'
 import { p2p } from './Context'
-import { JoinedConsensor } from './CycleChain'
+import { JoinedConsensor } from './Joining'
 import { NodeStatus } from './Types'
 import deepmerge = require('deepmerge')
 
@@ -25,16 +26,20 @@ export type Update = OptionalExceptFor<Node, 'id'>
 
 /** STATE */
 
-export let nodes: Map<Node['id'], Node> = new Map() // In order of joinRequestTimestamp [OLD, ..., NEW]
-let publicKeyToId: { [publicKey: string]: string } = {}
-let externalIpPortToId: { [externalIpPort: string]: string } = {}
-let internalIpPortToId: { [internalIpPort: string]: string } = {}
+export let nodes: Map<Node['id'], Node> // In order of joinRequestTimestamp [OLD, ..., NEW]
+export let byPubKey: Map<Node['publicKey'], Node>
+export let byIpPort: Map<string, Node>
+export let byJoinOrder: Node[]
+export let byIdOrder: Node[]
+export let activeByIdOrder: Node[]
 
 function initialize() {
   nodes = new Map()
-  publicKeyToId = {}
-  externalIpPortToId = {}
-  internalIpPortToId = {}
+  byPubKey = new Map()
+  byIpPort = new Map()
+  byJoinOrder = []
+  byIdOrder = []
+  activeByIdOrder = []
 }
 initialize()
 
@@ -44,107 +49,61 @@ export function reset() {
   initialize()
 }
 
-export function idBy(type: string, publicKeyOrIp: string, port?: number) {
-  switch (type) {
-    case 'publicKey': {
-      return publicKeyToId[publicKeyOrIp]
+export async function addNode(node: Node) {
+  nodes.set(node.id, node)
+  byPubKey.set(node.publicKey, node)
+  byIpPort.set(ipPort(node.internalIp, node.internalPort), node)
+  // Insert sorted by joinRequestTimstamp into byJoinOrder
+  insertSorted(byJoinOrder, node, (a, b) => {
+    if (a.joinRequestTimestamp === b.joinRequestTimestamp) {
+      return this.crypto.isGreaterHash(a.id, b.id) ? 1 : -1
     }
-    case 'externalIpPort': {
-      if (port) {
-        return externalIpPortToId[ipPort(publicKeyOrIp, port)]
-      }
-      break
-    }
-    case 'internalIpPort': {
-      if (port) {
-        return internalIpPortToId[ipPort(publicKeyOrIp, port)]
-      }
-      break
-    }
-    default: {
-      break
-    }
+    return a.joinRequestTimestamp > b.joinRequestTimestamp ? 1 : -1
+  })
+  // Insert sorted by id into byIdOrder
+  insertSorted(byIdOrder, node, (a, b) => {
+    return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
+  })
+  // If active, insert sorted by id into activeByIdOrder
+  if (node.status === NodeStatus.ACTIVE) {
+    insertSorted(activeByIdOrder, node, (a, b) => {
+      return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
+    })
   }
 }
-
-export function byId(id: Node['id']) {
-  return nodes.get(id)
-}
-export function byPublicKey(publicKey: Node['id']) {
-  const id = publicKeyToId[publicKey]
-  return nodes.get(id)
-}
-export function byExternalIpPort(
-  ip: Node['externalIp'],
-  port: Node['externalPort']
-) {
-  const externalIpPort = ipPort(ip, port)
-  const id = externalIpPortToId[externalIpPort]
-  return nodes.get(id)
-}
-export function byInternalIpPort(
-  ip: Node['internalIp'],
-  port: Node['internalPort']
-) {
-  const internalIpPort = ipPort(ip, port)
-  const publicKey = internalIpPortToId[internalIpPort]
-  return nodes.get(publicKey)
-}
-
 export async function addNodes(newNodes: Node[]) {
-  for (const node of newNodes) {
-    if (nodes.has(node.id)) {
-      console.log(`NodeList WARNING: addNodes: Tried to add an existing node: ${node.id}`)
-      continue
-    }
+  for (const node of newNodes) addNode(node)
+}
 
-    nodes.set(node.id, node)
-    publicKeyToId[node.id] = node.id
-    externalIpPortToId[ipPort(node.externalIp, node.externalPort)] = node.id
-    internalIpPortToId[ipPort(node.internalIp, node.internalPort)] = node.id
-
-    // Add nodes to old p2p-state nodelist
-    // [TODO] Remove this once eveything is using new NodeList.ts
-    await p2p.state.addNode(node)
-  }
+export function removeNode(id) {
+  // In reverse
+  let idx
+  idx = binarySearch(activeByIdOrder, { id })
+  if (idx >= 0) activeByIdOrder.splice(idx, 1)
+  idx = binarySearch(byIdOrder, { id })
+  if (idx >= 0) byIdOrder.splice(idx, 1)
+  idx = binarySearch(byJoinOrder, { id })
+  if (idx >= 0) byJoinOrder.splice(idx, 1)
+  byIpPort.delete(id)
+  byPubKey.delete(id)
+  nodes.delete(id)
 }
 export function removeNodes(ids: string[]) {
-  for (const id of ids) {
-    const node = nodes.get(id)
-    if (node) {
-      if (publicKeyToId[node.id]) delete publicKeyToId[node.id]
-      const externalIpPort = ipPort(node.externalIp, node.externalPort)
-      if (externalIpPortToId[externalIpPort]) {
-        delete externalIpPortToId[externalIpPort]
-      }
-      const internalIpPort = ipPort(node.internalIp, node.internalPort)
-      if (internalIpPortToId[internalIpPort]) {
-        delete internalIpPort[internalIpPort]
-      }
-      nodes.delete(id)
-    }
+  for (const id of ids) removeNode(id)
+}
+
+export async function updateNode(update: Update) {
+  // [TODO] Make this mutate the existing object
+  const node = nodes.get(update.id)
+  if (node) {
+    removeNode(update.id)
+    addNode(deepmerge<Node>(node, update))
   }
 }
 export async function updateNodes(updates: Update[]) {
-  for (const update of updates) {
-    const node = nodes.get(update.id)
-    if (node) {
-      nodes.set(update.id, deepmerge<Node>(node, update))
-
-      // Update nodes in old p2p-state nodelist
-      // [TODO] Remove this once eveything is using new NodeList.ts
-      if (update.activeTimestamp) {
-        await p2p.state._setNodesActiveTimestamp(
-          [update.id],
-          update.activeTimestamp
-        )
-      }
-      if (update.status) {
-        await p2p.state._updateNodeStatus(node, update.status)
-      }
-    }
-  }
+  for (const update of updates) updateNode(update)
 }
+
 export function createNode(joined: JoinedConsensor) {
   const node: Node = {
     ...joined,
@@ -157,4 +116,12 @@ export function createNode(joined: JoinedConsensor) {
 
 function ipPort(ip: string, port: number) {
   return ip + ':' + port
+}
+
+function binarySearch<T>(array: T[], obj: Partial<T>): number {
+  let idx = -1
+  const [key, value] = Object.entries(obj)[0]
+  // [TODO] Implement a binary search
+  idx = array.findIndex(item => item[key] === value)
+  return idx
 }

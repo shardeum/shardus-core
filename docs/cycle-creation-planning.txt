@@ -1,0 +1,164 @@
+/*
+currentCycle = 0
+currentQuarter = 0
+cycleTxs = []  // array of objects
+cycleRecord = {}  // object
+cycleMarker = ""
+cycleCert = {}   // object: {cycleMarker, {owner, sig}} // the nodeid and score can be computed from owner and cycleMarker
+bestCycleCert = {}[]  // map of array of objects
+madeCycle = false
+
+BEST_CERTS_WANTED = 3
+COMPARE_CYCLE_MARKER = 3
+COMPARE_BEST_CERT = 3
+
+// this function is called after the nodeList has been built; prevRecord is same as other nodes
+startCycles
+    acceptInternal = true
+    cycleCreator()
+
+
+// syncing nodes receive cycle transactions, but only regossip it to one other node until node list is complete
+cycleCreator
+    currentQuarter = 0     // so that gossip received is regossiped to just one other random node
+    if madeCycle == null
+        prevRecord = syncPrevCycle()  // this is async function in CycleChain which returns the prevRecord from memory or robust query
+    else
+        prevRecord = getMadeCycleRecord()
+        applyCycleRecord(prevRecord)   // changes the node list
+    [currentCycle, currentQuarter] = calcCurrentCycle(prevRecord)
+    [timeQ1, timeQ2, timeQ3, timeQ4, timeNextCycle] = calcQuarterTimes(prevRecord)
+    if (timeQ2 >= 1*SECOND) setTimeout(runQ1, 0)  // if there at least one sec before Q2 starts, we can start Q1 now
+    if (timeQ2 >=0) setTimeout(runQ2, timeQ2)
+    if (timeQ3 >=0) setTimeout(runQ3, timeQ3)
+    if (timeQ4 >=0) setTimeout(runQ4, timeQ4)
+    setTimeout(cycleCreator, timeNextCycle)
+    madeCycle = null
+    cycleCert = null
+
+runQ1
+    currentQuarter = 1
+    myQ = currentQuarter
+    myC = currentCycle
+
+runQ2
+    currentQuarter = 2
+    myQ = currentQuarter
+    myC = currentCycle
+
+runQ3
+    currentQuarter = 3
+    myQ = currentQuarter
+    myC = currentCycle
+    collectCycleTxs()  // cycle transaction modules are expected to provide a getCycleTxs() function
+    makeCycleRecord()
+    makeCycleMarker()
+    async compareCycleMarkers()
+    if notSameQuarter(myC, myQ) return
+    cycleCert = makeCycleCert()
+    async gossipCycleCert()
+
+runQ4
+    currentQuarter = 4
+    myQ = currentQuarter
+    myC = currentCycle
+    if cyclecCert == null return
+    async compareCycleCert()
+    if notSameQuarter(myC, myQ) return
+    finalCycleCert()
+    finalCycleRecord()
+    saveCycleRecord()
+    madeCycle = true
+
+
+processTxGossip()
+    return acceptInternal && currentQuarter in [1, 2]
+
+processTxGossipOrig()
+    return acceptInternal && currentQuarter === 1
+
+
+collectCycleTxs()
+    cycleTxMods = [mod1, mod2]
+    loop through list of cycleTxMods
+        get txs from modules; mod.getCycleTxs()
+        add txs to cycleTxs
+
+makeCycleRecord(prevRecord)    
+    txToMod = {'tx1':mod1, 'tx2':mod2}
+    initialize cycleRecord based on prevRecord
+    for tx in cycleTxs
+        determine which module to call based on tx type
+        mod.updateCycleRecord(tx, cycleRecord, prevRecord)
+        
+makeCycleMarker()
+    cycleMarker = hash(cycleRecord)
+
+makeCycleCert()
+    cycleCert = sign(cycleMarker)
+
+unseenTxs(txs1, txs2)
+    result = []
+    for tx in txs1
+        if tx not in txs2 then result.push(tx)
+    return result
+
+dropInvalidTxs(txs)
+    txToMod = {'tx1':mod1, 'tx2':mod2}
+    result = []
+    for tx in txs
+        determine which module to call based on tx type
+        valid = mod.validateTx(tx)
+        if valid then result.push(tx)
+    return result
+
+async compareCycleMarkers(matches, prevRecord)
+    match = 0
+    tries = 2*matches
+    activeNodes = getRandomNodes(Nodes.activeIdOrder, tries)
+    for node in activeNodes
+        response = ask node for cycleMarker with our {cycleMarker, cycleTxs}
+        if response.cycleMarker === cycleMarker 
+            match += 1
+            if match >= matches return true
+        else
+            txs = unseenTxs(response.missedTxs, cycleTxs)
+            txs = dropInvalidTxs(txs)
+            cycleTxs.append(tx)
+            makeCycleRecord(prevRecord)
+            makeCycleMarker()
+    return false
+
+
+Internal Endpoint /compareCycleMarkers 
+    inp = {cycleMarker, cycleTxs}
+    if (inp.cycleMarker === cycleMarker) respond {cycleMarker}; return
+    
+
+
+
+
+// ======= Example Cycle Transaction Module =======
+
+getCycleTxs()
+
+updateCycleRecord(tx, record, prevRecord)
+
+gossipHandler()
+  if processTxGoggip()
+    if isTxOrig(tx) && processTxGossipOrig()
+  else
+    gossip to 
+
+routeHandler()
+
+
+*/
+
+
+
+
+
+
+
+    
