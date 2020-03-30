@@ -51,11 +51,10 @@ runQ3
     myQ = currentQuarter
     myC = currentCycle
     collectCycleTxs()  // cycle transaction modules are expected to provide a getCycleTxs() function
-    makeCycleRecord()
-    makeCycleMarker()
+    makeCycleData()
     async compareCycleMarkers()
     if notSameQuarter(myC, myQ) return
-    cycleCert = makeCycleCert()
+    cycleCert = makeCycleCert()   // dont need to do it here since compareCycleMarkers and makeCycleData already do it
     async gossipCycleCert()
 
 runQ4
@@ -84,7 +83,8 @@ collectCycleTxs()
         get txs from modules; mod.getCycleTxs()
         add txs to cycleTxs
 
-makeCycleRecord(prevRecord)    
+makeCycleRecord()    
+    prevRecord = CycleChain.newest
     txToMod = {'tx1':mod1, 'tx2':mod2}
     initialize cycleRecord based on prevRecord
     for tx in cycleTxs
@@ -96,6 +96,11 @@ makeCycleMarker()
 
 makeCycleCert()
     cycleCert = sign(cycleMarker)
+
+makeCycleData()
+    makeCycleRecord()
+    makeCycleMarker()
+    makeCycleCert()
 
 unseenTxs(txs1, txs2)
     result = []
@@ -112,12 +117,13 @@ dropInvalidTxs(txs)
         if valid then result.push(tx)
     return result
 
-async compareCycleMarkers(matches, prevRecord)
+async compareCycleMarkers(matches)
+    prevRecord = CycleChain.newest
     match = 0
     tries = 2*matches
-    activeNodes = getRandomNodes(Nodes.activeIdOrder, tries)
-    for node in activeNodes
-        response = ask node for cycleMarker with our {cycleMarker, cycleTxs}
+    nodes = getRandomNodes(Nodes.activeIdOrder, tries)
+    for node in nodes
+        response = ask node internal endpoint /compareCycleMarkers with {cycleMarker, cycleTxs}
         if response.cycleMarker === cycleMarker 
             match += 1
             if match >= matches return true
@@ -125,17 +131,105 @@ async compareCycleMarkers(matches, prevRecord)
             txs = unseenTxs(response.missedTxs, cycleTxs)
             txs = dropInvalidTxs(txs)
             cycleTxs.append(tx)
-            makeCycleRecord(prevRecord)
-            makeCycleMarker()
+            makeCycleData()
     return false
 
 
 Internal Endpoint /compareCycleMarkers 
     inp = {cycleMarker, cycleTxs}
     if (inp.cycleMarker === cycleMarker) respond {cycleMarker}; return
-    
+    txs = unseenTxs(inp.cycleTxs, cycleTxs)
+    txs = dropInvalidTxs(txs)
+    if txs.length <= 0 respond {cycleMarker, cycleTxs}
+    cycleTxs.append(txs)
+    makeCycleData()
+    if (inp.cycleMarker === cycleMarker) respond {cycleMarker}; return
+    txs = unseenTxs(cycleTxs, inp.cycleTxs)
+    respond {cycleMarker, txs}
 
+validateCertSign(certs[])
+    result = []
+    for cert in certs
+        if sig is not valid then return false
+    return true
 
+scoreCert(cert)
+    id = Nodes.byPubKey(cert.sign.owner)
+    s = xor(cert.marker, id)
+    s = unsignedIntFromFirstFourBytes(s)
+    return s
+
+improveBestCert(certs)
+    if (certs.length <= 0) return
+    mycert = bes
+    for cert in certs
+        cert.score = scoreCert(cert)
+        if ! bestCycleCert[cert.marker] then bestCycleCert[cert.marker] = [cert]
+        else
+            // added sorted into array and limit size of array to BEST_CERTS_WANTED ad the end; scan the array linearly since the size will always be small
+            for [ind, bc] in bestCycleCert[cert.marker]
+                if bc.score < cert.score then bestCycleCert[cert.marker].splice(ind, 0, bc) 
+    bestCycleCert[cert.marker].splice(BEST_CERTS_WANTED)
+    score = 0
+    for bc in bestCycleCert[cert.marker]
+        score += 1
+    bestCertScore[cert.marker] = score   // need to add this to STATE section: bestCertScore: Map<cycleMarker, number>
+
+validateCerts(inp{})
+    inp = {cycleCerts[], cycleRecord}
+    if cycleCerts.length <= 0 then return false
+    // make sure all the certs are for the same cycle marker
+    marker = cycleCerts[0].marker   
+    for cert in certs
+        if cert.marker != marker then return false
+    // remove invalid certs; checks signatures; more expensive
+    if (validateCertSign(inp.cycleCerts) === false) then return false
+    return true
+
+async compareCycleCert(matches)
+    match = 0
+    tries = 2*matches
+    nodes = getRandomNodes(Node.activeIdOrder, tries)
+    for node in nodes
+        response = ask node internal endpoint /compareCycleCert with {cycleCerts: bestCycleCert[cycleMarker], cycleRecord }
+        if validateCerts(response) === false then continue
+        if response.cycleCerts[0].marker === cycleMarker then match += 1
+        improveBestCert(response.cycleCerts)
+        marker = response.cycleCerts[0].marker
+        if (bestCertScore[cycleMarker] < bestCertScore[marker]) 
+            cycleRecord = response.cycleRecord
+            cycleMarker = marker
+        if match >= matches then return true
+    return false
+
+Internal Endpoint /compareCycleCert
+    inp = {cycleCerts[], cycleRecord}
+    if validateCerts(inp) === false then respond {cycleCerts: bestCycleCert[cycleMarker], cycleRecord}; return
+    improveBestCert(inp.cycleCerts)
+    marker = inp.cycleCerts[0].marker
+    if (bestCertScore[cycleMarker] < bestCertScore[marker]) 
+        cycleRecord = inp.cycleRecord
+        cycleMarker = marker
+    respond {cycleCerts: bestCycleCert[cycleMarker], cycleRecord}
+
+gossipCycleCert()
+    score = bestCertScore[cycleMarker]
+    if score === null then score = 0
+    improveBestCert([cyclecCert])
+    if bestCertScore[cycleMarker] > score
+        gossip to active nodes {type:"cycleCert", cycleCerts:bestCycleCert[cycleMarker], cycleRecord}
+
+Internal Gossip Handler for type:"cycleCert"
+    inp = {cycleCerts[], cycleRecord}
+    if validateCerts(inp) === false then return 
+    score = bestCertScore[cycleMarker]
+    if score === null then score = 0
+    improveBestCert(inp.cycleCerts)
+    marker = inp.cycleCerts[0].marker
+    if (score < bestCertScore[marker]) 
+        cycleRecord = inp.cycleRecord
+        cycleMarker = marker
+        gossip to active nodes {type:"cycleCert", cycleCerts:bestCycleCert[cycleMarker], cycleRecord}
 
 
 // ======= Example Cycle Transaction Module =======
