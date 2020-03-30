@@ -52,7 +52,8 @@ runQ3
     myC = currentCycle
     collectCycleTxs()  // cycle transaction modules are expected to provide a getCycleTxs() function
     makeCycleData()
-    async compareCycleMarkers()
+    matched = async compareCycleMarkers()
+    if (matched === false) return
     if notSameQuarter(myC, myQ) return
     cycleCert = makeCycleCert()   // dont need to do it here since compareCycleMarkers and makeCycleData already do it
     async gossipCycleCert()
@@ -62,10 +63,11 @@ runQ4
     myQ = currentQuarter
     myC = currentCycle
     if cyclecCert == null return
-    async compareCycleCert()
+    matched = async compareCycleCert()
+    if (matched === false) return
     if notSameQuarter(myC, myQ) return
-    finalCycleCert()
-    finalCycleRecord()
+ //   finalCycleCert()
+ //   finalCycleRecord()
     saveCycleRecord()
     madeCycle = true
 
@@ -76,6 +78,12 @@ processTxGossip()
 processTxGossipOrig()
     return acceptInternal && currentQuarter === 1
 
+getMadeCycleRecord()
+    return CycleChain.newest
+
+saveCycleRecord()
+    // TODO add cyclecCert to the cycleRecord, before saving
+    CycleChain.append(cycleRecord)
 
 collectCycleTxs()
     cycleTxMods = [mod1, mod2]
@@ -172,7 +180,7 @@ improveBestCert(certs)
     bestCycleCert[cert.marker].splice(BEST_CERTS_WANTED)
     score = 0
     for bc in bestCycleCert[cert.marker]
-        score += 1
+        score += bc.score
     bestCertScore[cert.marker] = score   // need to add this to STATE section: bestCertScore: Map<cycleMarker, number>
 
 validateCerts(inp{})
