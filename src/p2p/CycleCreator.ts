@@ -1,12 +1,9 @@
+import { sleep } from '../utils'
 import * as CycleChain from './CycleChain'
-import * as NodeList from './NodeList'
-import { Route, GossipHandler, LooseObject } from './Types'
-import { log } from 'console'
-import { p2p } from './Context'
-import { gossipRouteName } from './Apoptosis'
-import Logger from '../logger'
 import { JoinedArchiver, JoinedConsensor } from './Joining'
-import { syncNewCycles, digestCycle } from './Sync'
+import * as NodeList from './NodeList'
+import * as Sync from './Sync'
+import { LooseObject } from './Types'
 
 /** TYPES */
 
@@ -38,134 +35,177 @@ export interface CycleRecord {
   apoptosized: string[]
 }
 
-/** STATE */
-
-let currentCycle = 0
-let currentQuarter = 0
-let cycleTxs: CycleTx[] = [] // array of objects
-let cycleRecord: CycleRecord = {} // object
-let cycleMarker: CycleMarker = ''
-let cycleCert: CycleCert = {} // object: {cycleMarker, {owner, sig}} // the nodeid and score can be computed from owner and cycleMarker
-let bestCycleCert: Map<CycleMarker, CycleRecord[]> = new Map() // map of array of objects
-let madeCycle = false
+/** CONSTANTS */
 
 const SECOND = 1000
-const BEST_CERTS_WANTED = 3
-const COMPARE_CYCLE_MARKER = 3
-const COMPARE_BEST_CERT = 3
+
+/** STATE */
+
+let currentQuarter = 0
+let currentCycle = 0
+let madeCycle = false // True if we successfully created the last cycle record, otherwise false
 
 /** ROUTES */
 
-/** FUNCTIONS */
+/** CONTROL FUNCTIONS */
 
+/**
+ * Entrypoint for cycle record creation. Sets things up then kicks off the
+ * scheduler (cycleCreator) to start scheduling the callbacks for cycle record
+ * creation.
+ */
 function startCycles() {
-  p2p.acceptInternal = true
+  // start
   cycleCreator()
 }
 
-function cycleCreator() {
-  currentQuarter = 0 // so that gossip received is regossiped to just one other random node
-  const prevRecord = madeCycle ? CycleChain.newest : catchUpCycles(CycleChain.newest)
-  if (madeCycle) { applyCycleRecord(prevRecord) }
-  [currentCycle, currentQuarter] = calcNextCycleAndQuarter(prevRecord)
-  const [timeQ1, timeQ2, timeQ3, timeQ4, timeNextCycle] = calcQuarterTimes(prevRecord)
-  if (timeQ2 >= 1 * SECOND) setTimeout(runQ1, 0) // if there at least one sec before Q2 starts, we can start Q1 now
-  if (timeQ2 >= 0) setTimeout(runQ2, timeQ2)
-  if (timeQ3 >= 0) setTimeout(runQ3, timeQ3)
-  if (timeQ4 >= 0) setTimeout(runQ4, timeQ4)
-  setTimeout(cycleCreator, timeNextCycle)
+/**
+ * Schedules itself to run at the start of each cycle, and schedules callbacks
+ * to run for every quarter of the cycle.
+ */
+async function cycleCreator() {
+  let prevRecord = madeCycle ? CycleChain.newest : await fetchLatestRecord()
+  while (!prevRecord) {
+    console.log(
+      'CycleCreator: cycleCreator: Could not get prevRecord. Trying again in 1 sec...'
+    )
+    await sleep(1 * SECOND)
+    prevRecord = await fetchLatestRecord()
+  }
+
+  ;({
+    cycle: currentCycle,
+    quarter: currentQuarter,
+  } = currentCycleQuarterByTime(prevRecord))
+
+  const {
+    quarterDuration,
+    startQ1,
+    startQ2,
+    startQ3,
+    startQ4,
+    end,
+  } = calcIncomingTimes(prevRecord)
+
+  schedule(runQ1, startQ1, { runEvenIfLateBy: quarterDuration - 1 * SECOND }) // if there's at least one sec before Q2 starts, we can start Q1 now
+  schedule(runQ2, startQ2)
+  schedule(runQ3, startQ3)
+  schedule(runQ4, startQ4)
+  schedule(cycleCreator, end, { runEvenIfLateBy: Infinity })
+
   madeCycle = false
-  cycleCert = null
 }
 
+/**
+ * Handles cycle record creation tasks for quarter 1
+ */
 function runQ1() {
   currentQuarter = 1
-  // myQ = currentQuarter
-  // myC = currentCycle
+  console.log(`CycleCreator: C${currentCycle} Q${currentQuarter}`)
 }
+
+/**
+ * Handles cycle record creation tasks for quarter 2
+ */
 function runQ2() {
   currentQuarter = 2
-  // myQ = currentQuarter
-  // myC = currentCycle
+  console.log(`CycleCreator: C${currentCycle} Q${currentQuarter}`)
 }
-async function runQ3() {
+
+/**
+ * Handles cycle record creation tasks for quarter 3
+ */
+function runQ3() {
   currentQuarter = 3
-  const myQ = currentQuarter
-  const myC = currentCycle
-  collectCycleTxs() // cycle transaction modules are expected to provide a getCycleTxs() function
-  makeCycleRecord()
-  makeCycleMarker()
-  await compareCycleMarkers()
-  if (! sameQuarter(myC, myQ)) return
-  cycleCert = makeCycleCert()
-  await gossipCycleCert()
+  console.log(`CycleCreator: C${currentCycle} Q${currentQuarter}`)
 }
-async function runQ4() {
+
+/**
+ * Handles cycle record creation tasks for quarter 4
+ */
+function runQ4() {
   currentQuarter = 4
-  const myQ = currentQuarter
-  const myC = currentCycle
-  if (cycleCert === null) return
-  await compareCycleCert()
-  if (! sameQuarter(myC, myQ)) return
-/* these might not be neded
-  finalCycleCert()
-  finalCycleRecord()
-  saveCycleRecord()
-*/  
+  console.log(`CycleCreator: C${currentCycle} Q${currentQuarter}`)
   madeCycle = true
 }
 
-/** Queries the latest cycle records, applys them to the node list, and saves them to the cycle chain */
-async function catchUpCycles() {
-  syncNewCycles(NodeList.activeByIdOrder)
-}
+/** HELPER FUNCTIONS */
 
-/** Applys the newest cycle record to the node list */
-function applyCycleRecord(record: CycleRecord) {
-  digestCycle(record)
-}
-
-/** Calculates the which cycle and quarter the given cycle record is in as of now */
-function calcNextCycleAndQuarter(record: CycleRecord) {
-  const duration = record.duration*SECOND
-  const end = record.start*SECOND + duration
-  const now = Date.now() // this is in milliseconds, but duration and start are in seconds
-  const quarter = (Math.floor((now - end) / (duration / 4)) % 4) + 1
-  const cycle = record.counter + Math.floor((now - end) / duration) + 1
-  // console.log(cycle, quarter)
-  return [cycle, quarter]
-}
-
-function calcQuarterTimes(record: CycleRecord) {
-  const duration = record.duration*SECOND 
-  const quarter = duration / 4
-  const end = record.start*SECOND + duration
-  const now = Date.now()
-  const q1 = end + 0*quarter - now
-  const q2 = end + 1*quarter - now
-  const q3 = end + 2*quarter - now
-  const q4 = end + 3*quarter - now
-  const next = end + 4*quarter - now
-  return [q1, q2, q3, q4, next]
-}
-
-function sameQuarter(myC, myQ) {
-  return (myC===currentCycle) && (myQ===currentQuarter)
-}
-
-function collectCycleTxs() {}
-function makeCycleRecord() {}
-function makeCycleMarker() {}
-function compareCycleMarkers() {}
-function makeCycleCert() {
-function gossipCycleCert() {}
-
-
-function compareCycleCert() {}
-function finalCycleCert() {}
-function finalCycleRecord() {}
-function saveCycleRecord() {}
-function getMadeCycleRecord() {}
+/**
+ * Syncs the CycleChain to the newest cycle record of the network, and returns
+ * the newest cycle record.
+ */
+async function fetchLatestRecord(): Promise<CycleRecord> {
+  try {
+    await Sync.syncNewCycles(NodeList.activeByIdOrder)
+  } catch (err) {
+    console.log('CycleCreator: syncPrevRecord: syncNewCycles failed:', err)
+    return null
+  }
   return CycleChain.newest
 }
 
+/**
+ * Returns what the current cycle counter and quarter would be from the given
+ * cycle record.
+ *
+ * @param record CycleRecord
+ */
+function currentCycleQuarterByTime(record: CycleRecord) {
+  const SECOND = 1000
+  const cycleDuration = record.duration * SECOND
+  const quarterDuration = cycleDuration / 4
+  const start = record.start * SECOND + cycleDuration
+
+  const now = Date.now()
+  const elapsed = now - start
+  const elapsedQuarters = elapsed / quarterDuration
+
+  const cycle = record.counter + 1 + Math.trunc(elapsedQuarters / 4)
+  const quarter = Math.abs(Math.ceil(elapsedQuarters % 4))
+  return { cycle, quarter }
+}
+
+/**
+ * Returns the timestamp of each quarter and the timestamp of the end of the
+ * cycle record AFTER the given cycle record.
+ *
+ * @param record CycleRecord
+ */
+function calcIncomingTimes(record: CycleRecord) {
+  const cycleDuration = record.duration * SECOND
+  const quarterDuration = cycleDuration / 4
+  const start = record.start * SECOND + cycleDuration
+
+  const startQ1 = start
+  const startQ2 = start + 1 * quarterDuration
+  const startQ3 = start + 2 * quarterDuration
+  const startQ4 = start + 3 * quarterDuration
+  const end = start + cycleDuration
+
+  return { quarterDuration, startQ1, startQ2, startQ3, startQ4, end }
+}
+
+/**
+ * Schedules a callback to run at a certain time. It will run the callback even
+ * if its time has passed, as long as it has not gone past runEvenIfLateBy ms.
+ *
+ * @param callback
+ * @param time
+ * @param opts
+ * @param args
+ */
+function schedule<T, U extends unknown[]>(
+  callback: (...args: U) => T,
+  time: number,
+  { runEvenIfLateBy = 0 } = {},
+  ...args: U
+) {
+  const now = Date.now()
+  if (now >= time) {
+    if (now - time <= runEvenIfLateBy) callback(...args)
+    return
+  }
+  const toWait = time - now
+  setTimeout(callback, toWait)
+}
