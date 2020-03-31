@@ -137,9 +137,6 @@ class P2P extends EventEmitter {
   }
 
   async init (network) {
-    // Initialize our p2p state
-    await this.state.init()
-
     // Make sure we know our external IP
     await this._ensureIpKnown()
 
