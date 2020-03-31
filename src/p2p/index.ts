@@ -160,7 +160,6 @@ class P2P extends EventEmitter {
     routes.register(this)
     this.lostNodes.registerRoutes()
     this.archivers.registerRoutes()
-    for (const route of P2PStartup.internalRoutes) this.registerInternal(route.name, route.handler)
     for (const route of P2PApoptosis.internalRoutes) this.registerInternal(route.name, route.handler)
     for (const route of P2PApoptosis.gossipRoutes) this.registerGossipHandler(route.name, route.handler)
     for (const route of Sync.externalRoutes) this.network._registerExternal(route.method, route.name, route.handler)
@@ -860,45 +859,6 @@ class P2P extends EventEmitter {
     return node
   }
 
-  async _fetchFinalizedChain (seedNodes, nodes, chainStart, chainEnd) {
-    nodes = nodes.filter(n => !(seedNodes.map(s => s.id).includes(n.id)))
-
-    // Get cycle chain hash
-    let cycleChainHash
-    try {
-      cycleChainHash = await P2PStartup._fetchCycleChainHash(nodes, chainStart, chainEnd)
-    } catch (e) {
-      this.mainLogger.warn('Could not get cycleChainHash from nodes. Querying seedNodes for it...')
-      this.mainLogger.debug(e)
-      try {
-        cycleChainHash = await P2PStartup._fetchCycleChainHash(seedNodes, chainStart, chainEnd)
-      } catch (err) {
-        this.mainLogger.error('_syncUpChainAndNodelist > _fetchFinalizedChain: Could not get cycleChainHash from seedNodes. Apoptosis then Exiting... ' + err)
-        await this.initApoptosis()
-        process.exit()
-      }
-    }
-
-    this.mainLogger.debug(`Fetched cycle chain hash: ${cycleChainHash}`)
-
-    // Get verified cycle chain
-    let chainAndCerts
-    try {
-      chainAndCerts = await this._fetchVerifiedCycleChain(nodes, cycleChainHash, chainStart, chainEnd)
-    } catch (e) {
-      this.mainLogger.warn('_fetchFinalizedChain: Could not get verified cycleChain from nodes. Querying seedNodes for it...')
-      this.mainLogger.debug(e)
-      try {
-        chainAndCerts = await this._fetchVerifiedCycleChain(seedNodes, cycleChainHash, chainStart, chainEnd)
-      } catch (err) {
-        this.mainLogger.error('syncUpChainAndNodelist > _fetchFinalizedChain: Could get verified cycleChain from seedNodes. Apoptosis then Exiting... ' + err)
-        await this.initApoptosis()
-        process.exit()
-      }
-    }
-    return chainAndCerts
-  }
-
   async _requestCycleUpdates (nodeId) {
     let node
     try {
@@ -1418,10 +1378,6 @@ class P2P extends EventEmitter {
     if (this.gossipHandlers[type]) {
       delete this.gossipHandlers[type]
     }
-  }
-
-  startup () {
-    return P2PStartup.startup()
   }
 
   cleanupSync () {

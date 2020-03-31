@@ -22,6 +22,7 @@ import { p2p } from '../p2p/Context'
 import * as GlobalAccounts from '../p2p/GlobalAccounts'
 import { sign } from 'crypto'
 import ShardFunctions from '../state-manager/shardFunctions'
+import * as Startup from '../p2p/Startup'
 const saveConsoleOutput = require('./saveConsoleOutput')
 
 
@@ -280,7 +281,7 @@ class Shardus extends EventEmitter {
 
     GlobalAccounts.setShardusContext(this)
 
-    await this.p2p.startup()
+    await Startup.startup()
   }
 
   /**
