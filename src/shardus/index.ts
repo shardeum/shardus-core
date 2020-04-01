@@ -197,29 +197,30 @@ class Shardus extends EventEmitter {
     this.debug.addToArchive(this.logger.logDir, './logs')
     this.debug.addToArchive(path.parse(this.storage.storage.storageConfig.options.storage).dir, './db')
 
+    this.statistics = new Statistics(this.config.baseDir, this.config.statistics, {
+      counters: ['txInjected', 'txApplied', 'txRejected', 'txExpired', 'txProcessed'],
+      watchers: {
+        queueLength: () => this.stateManager ? this.stateManager.newAcceptedTxQueue.length : 0,
+        serverLoad: () => this.loadDetection ? this.loadDetection.getCurrentLoad() : 0
+      },
+      timers: ['txTimeInQueue']
+    }, this)
+    this.debug.addToArchive('./statistics.tsv', './statistics.tsv')
+
+    this.loadDetection = new LoadDetection(this.config.loadDetection, this.statistics)
+    this.statistics.on('snapshot', () => this.loadDetection.updateLoad())
+    this.loadDetection.on('highLoad', async () => {
+      await this.p2p.requestNetworkUpsize()
+    })
+    this.loadDetection.on('lowLoad', async () => {
+      await this.p2p.requestNetworkDownsize()
+    })
+
+    this.rateLimiting = new RateLimiting(this.config.rateLimiting, this.loadDetection)
+
+    this.consensus = new Consensus(this.app, this.config, this.logger, this.crypto, this.p2p, this.storage, this.profiler)
+
     if (this.app) {
-      this.statistics = new Statistics(this.config.baseDir, this.config.statistics, {
-        counters: ['txInjected', 'txApplied', 'txRejected', 'txExpired', 'txProcessed'],
-        watchers: {
-          queueLength: () => this.stateManager ? this.stateManager.newAcceptedTxQueue.length : 0,
-          serverLoad: () => this.loadDetection ? this.loadDetection.getCurrentLoad() : 0
-        },
-        timers: ['txTimeInQueue']
-      }, this)
-      this.debug.addToArchive('./statistics.tsv', './statistics.tsv')
-
-      this.loadDetection = new LoadDetection(this.config.loadDetection, this.statistics)
-      this.statistics.on('snapshot', () => this.loadDetection.updateLoad())
-      this.loadDetection.on('highLoad', async () => {
-        await this.p2p.requestNetworkUpsize()
-      })
-      this.loadDetection.on('lowLoad', async () => {
-        await this.p2p.requestNetworkDownsize()
-      })
-
-      this.rateLimiting = new RateLimiting(this.config.rateLimiting, this.loadDetection)
-
-      this.consensus = new Consensus(this.app, this.config, this.logger, this.crypto, this.p2p, this.storage, this.profiler)
       this._createAndLinkStateManager()
       this._attemptCreateAppliedListener()
     }
@@ -236,6 +237,10 @@ class Shardus extends EventEmitter {
       this.logger.playbackLogState('joined', nodeId, publicKey)
       this.logger.setPlaybackID(nodeId)
       if (this.reporter) this.reporter.reportJoined(nodeId, publicKey)
+    })
+    this.p2p.on('initialized', async () => {
+      await this.syncAppData()
+      this.p2p.goActive()
     })
     this.p2p.on('active', (nodeId) => {
       this.logger.playbackLogState('active', nodeId, '')
@@ -254,9 +259,6 @@ class Shardus extends EventEmitter {
       this.mainLogger.debug('shardus.start() ' + e.message + ' at ' + e.stack)
       this.fatalLogger.fatal('shardus.start() ' + e.message + ' at ' + e.stack)
       throw new Error(e)
-    })
-    this.p2p.on('initialized', async () => {
-      await this.syncAppData()
     })
     this.p2p.on('removed', async () => {
       if (this.statistics) {
@@ -368,6 +370,7 @@ class Shardus extends EventEmitter {
    * Function used to allow shardus to sync data specific to an app if it should be required
    */
   async syncAppData () {
+    if (!this.app) return
     if (this.stateManager) await this.stateManager.syncStateData(3)
     console.log('syncAppData')
     if (this.p2p.isFirstSeed) {
