@@ -134,6 +134,7 @@ export async function sync(activeNodes: ActiveNode[]) {
   p2p.acceptInternal = true
   await p2p.state.addUnfinalizedAndStart(unfinishedCycle)
   info('Sync complete')
+  info(`NodeList after sync: ${JSON.stringify(p2p.state.nodes)}`)
   return true
 }
 
@@ -168,7 +169,7 @@ export async function digestCycle(cycle: CycleRecord) {
 async function getNewestCycle(activeNodes: SyncNode[]): Promise<CycleRecord> {
   const queryFn = async (node: SyncNode) => {
     const ip = node.ip ? node.ip : node.externalIp
-    const port = node.ip ? node.ip : node.externalIp
+    const port = node.port ? node.port : node.externalPort
     const resp = await http.get(`${ip}:${port}/sync-newest-cycle`)
     return resp
   }
@@ -189,7 +190,7 @@ async function getCycles(
   if (start > end) start = end
   const queryFn = async (node: SyncNode) => {
     const ip = node.ip ? node.ip : node.externalIp
-    const port = node.ip ? node.ip : node.externalIp
+    const port = node.port ? node.port : node.externalPort
     const resp = await http.post(`${ip}:${port}/sync-cycles`, {
       start,
       end,

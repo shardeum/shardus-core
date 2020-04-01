@@ -151,7 +151,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     }
 
     for (const err of errs) {
-      this.mainLogger.debug(err)
+      console.log('p2p/Utils:robustQuery:queryNodes:', err)
       errors += 1
     }
 

@@ -70,6 +70,10 @@ export async function addNode(node: Node) {
       return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
     })
   }
+
+  // Add nodes to old p2p-state nodelist
+  // [TODO] Remove this once eveything is using new NodeList.ts
+  await p2p.state.addNode(node)
 }
 export async function addNodes(newNodes: Node[]) {
   for (const node of newNodes) addNode(node)
@@ -98,6 +102,18 @@ export async function updateNode(update: Update) {
   if (node) {
     removeNode(update.id)
     addNode(deepmerge<Node>(node, update))
+  }
+
+  // Update nodes in old p2p-state nodelist
+  // [TODO] Remove this once eveything is using new NodeList.ts
+  if (update.activeTimestamp) {
+    await p2p.state._setNodesActiveTimestamp(
+      [update.id],
+      update.activeTimestamp
+    )
+  }
+  if (update.status) {
+    await p2p.state._updateNodeStatus(node, update.status)
   }
 }
 export async function updateNodes(updates: Update[]) {

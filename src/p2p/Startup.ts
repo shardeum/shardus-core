@@ -236,7 +236,7 @@ async function joinNetwork(seedNodes) {
 
   const nodeId = await p2p._join(seedNodes)
   if (!nodeId) {
-    p2p.mainLogger.info('Unable to join network. Shutting down...')
+    p2p.mainLogger.info('Unable to join network')
     return false
   }
   p2p.mainLogger.info('Successfully joined the network!')
