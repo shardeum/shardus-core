@@ -1,28 +1,26 @@
+import { EventEmitter } from 'events'
 import Log4js from 'log4js'
-import ShardusTypes = require('../shardus/shardus-types')
-import Logger from '../logger'
-import ExitHandler from '../exit-handler'
-import Crypto from '../crypto'
-import Storage from '../storage'
-import Network from '../network'
-import * as utils from '../utils'
+import path from 'path'
 import Consensus from '../consensus'
-import Reporter from '../reporter'
+import Crypto from '../crypto'
 import Debug from '../debug'
+import ExitHandler from '../exit-handler'
+import LoadDetection from '../load-detection'
+import Logger from '../logger'
+import Network from '../network'
+import { setCryptoContext, setNetworkContext, setP2pContext, setShardusContext, setStateManagerContext, setLoggerContext } from '../p2p/Context'
+import * as GlobalAccounts from '../p2p/GlobalAccounts'
+import * as Self from '../p2p/Self'
+import RateLimiting from '../rate-limiting'
+import Reporter from '../reporter'
 import StateManager from '../state-manager'
 import Statistics from '../statistics'
-import LoadDetection from '../load-detection'
-import RateLimiting from '../rate-limiting'
+import Storage from '../storage'
+import * as utils from '../utils'
 import Profiler from "../utils/profiler"
-import path from 'path'
+import ShardusTypes = require('../shardus/shardus-types')
 const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
-import { EventEmitter } from 'events'
-import { p2p } from '../p2p/Context'
-import * as GlobalAccounts from '../p2p/GlobalAccounts'
-import { sign } from 'crypto'
-import ShardFunctions from '../state-manager/shardFunctions'
-import * as Startup from '../p2p/Startup'
 const saveConsoleOutput = require('./saveConsoleOutput')
 
 
@@ -72,6 +70,7 @@ class Shardus extends EventEmitter {
     this.config = config
     this.verboseLogs = false
     this.logger = new Logger(config.baseDir, logsConfig)
+    setLoggerContext(this.logger)
 
     if (logsConfig.saveConsoleOutput) {
       saveConsoleOutput.startSaving(path.join(config.baseDir, logsConfig.dir))
@@ -84,6 +83,7 @@ class Shardus extends EventEmitter {
     this.storage = new Storage(config.baseDir, storageConfig, this.logger, this.profiler)
     this.crypto = null
     this.network = new Network(config.network, this.logger)
+    setNetworkContext(this.network)
     this.p2p = null
     this.debug = null
     this.consensus = null
@@ -187,11 +187,13 @@ class Shardus extends EventEmitter {
     await this.storage.init()
     this._setupHeartbeat()
     this.crypto = new Crypto(this.config, this.logger, this.storage)
+    setCryptoContext(this.crypto)
     await this.crypto.init()
 
     const ipInfo = this.config.ip
     const p2pConf = Object.assign({ ipInfo }, this.config.p2p)
     this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto)
+    setP2pContext(this.p2p)
     await this.p2p.init(this.network)
     this.debug = new Debug(this.config.baseDir, this.network)
     this.debug.addToArchive(this.logger.logDir, './logs')
@@ -281,9 +283,10 @@ class Shardus extends EventEmitter {
       await this.p2p.restart()
     })
 
-    GlobalAccounts.setShardusContext(this)
+    setShardusContext(this)
 
-    await Startup.startup()
+    Self.init(this.config)
+    await Self.startup()
   }
 
   /**
@@ -363,7 +366,7 @@ class Shardus extends EventEmitter {
     this._registerListener(this.consensus, 'accepted', (...txArgs: [ShardusTypes.AcceptedTx, boolean, ShardusTypes.Node, boolean]) => this.stateManager.queueAcceptedTransaction(...txArgs))
 
     this.storage.stateManager = this.stateManager
-    GlobalAccounts.setStateManagerContext(this.stateManager)
+    setStateManagerContext(this.stateManager)
   }
 
   /**

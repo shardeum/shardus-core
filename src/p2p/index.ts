@@ -9,7 +9,6 @@ import P2PArchivers from './p2p-archivers'
 import routes from './routes'
 
 import * as P2PContext from './Context'
-import * as P2PStartup from './Startup'
 import * as P2PApoptosis from './Apoptosis'
 import * as Sync from './Sync'
 import * as GlobalAccounts from './GlobalAccounts'
@@ -132,8 +131,6 @@ class P2P extends EventEmitter {
     this.InternalRecvCounter = 0
     this.keyCounter = 0
 
-    // Pass this context to typescript modules
-    P2PContext.setContext(this)
   }
 
   async init (network) {

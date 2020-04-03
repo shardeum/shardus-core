@@ -1,10 +1,16 @@
+import Sntp from '@hapi/sntp'
 import * as http from '../http'
 import * as utils from '../utils'
-import { p2p } from './Context'
+import { crypto, logger, p2p } from './Context'
 import { sync } from './Sync'
 import { Node, NodeInfo } from './Types'
+import { ShardusConfiguration } from '../shardus/shardus-types'
+import { Logger } from 'log4js'
 
 /** STATE */
+
+let mainLogger: Logger
+let config: ShardusConfiguration
 
 /** ROUTES */
 
@@ -13,20 +19,18 @@ export const internalRoutes = [
     name: 'cyclechainhash',
     handler: async (payload, respond) => {
       if (!payload) {
-        p2p.mainLogger.debug(
-          'No payload provided with `cyclechainhash` request.'
-        )
+        mainLogger.debug('No payload provided with `cyclechainhash` request.')
         await respond({
           cycleChainHash: null,
           error: 'no payload; start and end cycle required',
         })
         return
       }
-      p2p.mainLogger.debug(
+      mainLogger.debug(
         `Payload of request on 'cyclechainhash': ${JSON.stringify(payload)}`
       )
       if (payload.start === undefined || payload.end === undefined) {
-        p2p.mainLogger.debug(
+        mainLogger.debug(
           'Start and end for the `cyclechainhash` request were not both provided.'
         )
         await respond({
@@ -36,7 +40,7 @@ export const internalRoutes = [
         return
       }
       const cycleChainHash = getCycleChainHash(payload.start, payload.end)
-      p2p.mainLogger.debug(
+      mainLogger.debug(
         `Cycle chain hash to be sent: ${JSON.stringify(cycleChainHash)}`
       )
       if (!cycleChainHash) {
@@ -52,7 +56,7 @@ export const internalRoutes = [
 ]
 
 function getCycleChainHash(start, end) {
-  p2p.mainLogger.debug(
+  mainLogger.debug(
     `Requested hash of cycle chain from cycle ${start} to ${end}...`
   )
   let cycleChain
@@ -61,17 +65,22 @@ function getCycleChainHash(start, end) {
   } catch (e) {
     return null
   }
-  const hash = p2p.crypto.hash({ cycleChain })
-  p2p.mainLogger.debug(`Hash of requested cycle chain: ${hash}`)
+  const hash = crypto.hash({ cycleChain })
+  mainLogger.debug(`Hash of requested cycle chain: ${hash}`)
   return hash
 }
 
 /** FUNCTIONS */
 
+export function init(conf: ShardusConfiguration) {
+  config = conf
+  mainLogger = logger.getLogger('main')
+}
+
 export async function startup(): Promise<boolean> {
   // Emit the 'joining' event before attempting to join
-  const publicKey = p2p.crypto.getPublicKey()
-  p2p.mainLogger.debug('Emitting `joining` event.')
+  const publicKey = crypto.getPublicKey()
+  mainLogger.debug('Emitting `joining` event.')
   p2p.emit('joining', publicKey)
 
   // Get new activeNodes and attempt to join until you are successful
@@ -81,11 +90,9 @@ export async function startup(): Promise<boolean> {
   let ourIpInfo
   while (!joined) {
     try {
-      p2p.mainLogger.info(
-        'Getting activeNodes from archiver to join network...'
-      )
+      mainLogger.info('Getting activeNodes from archiver to join network...')
       activeNodes = await contactArchiver()
-      p2p.mainLogger.info('Discovering if we are the first node...')
+      mainLogger.info('Discovering if we are the first node...')
       p2p.isFirstSeed = await discoverNetwork(activeNodes)
 
       // Remove yourself from seedNodes if you are present in them but not firstSeed
@@ -101,18 +108,18 @@ export async function startup(): Promise<boolean> {
         }
       }
 
-      p2p.mainLogger.info('Attempting to join network...')
+      mainLogger.info('Attempting to join network...')
       joined = await joinNetwork(activeNodes)
     } catch (err) {
       joined = false
-      p2p.mainLogger.error(err)
-      p2p.mainLogger.info('Trying again in 2 sec...')
+      mainLogger.error(err)
+      mainLogger.info('Trying again in 2 sec...')
       await utils.sleep(2000)
     }
   }
 
   // Emit the 'joined' event before attempting to sync to the network
-  p2p.mainLogger.debug('Emitting `joined` event.')
+  mainLogger.debug('Emitting `joined` event.')
   p2p.emit('joined', p2p.id, publicKey)
 
   // Get new activeNodes and attempt to sync until you are successful
@@ -120,9 +127,7 @@ export async function startup(): Promise<boolean> {
   while (!synced) {
     // Once joined, sync to the network
     try {
-      p2p.mainLogger.info(
-        'Getting activeNodes from archiver to sync to network...'
-      )
+      mainLogger.info('Getting activeNodes from archiver to sync to network...')
       activeNodes = await contactArchiver()
 
       // Remove yourself from seedNodes if you are present in them but not firstSeed
@@ -138,12 +143,12 @@ export async function startup(): Promise<boolean> {
         }
       }
 
-      p2p.mainLogger.info('Attempting to sync to network...')
+      mainLogger.info('Attempting to sync to network...')
       synced = await sync(activeNodes)
     } catch (err) {
       synced = false
-      p2p.mainLogger.error(err)
-      p2p.mainLogger.info('Trying again in 2 sec...')
+      mainLogger.error(err)
+      mainLogger.info('Trying again in 2 sec...')
       await utils.sleep(2000)
     }
   }
@@ -155,7 +160,7 @@ export async function startup(): Promise<boolean> {
 async function contactArchiver() {
   const archiver: Node = p2p.existingArchivers[0]
   const activeNodesSigned = await getActiveNodesFromArchiver()
-  if (!p2p.crypto.verify(activeNodesSigned, archiver.publicKey)) {
+  if (!crypto.verify(activeNodesSigned, archiver.publicKey)) {
     throw Error('Fatal: _getSeedNodes seed list was not signed by archiver!')
   }
   const joinRequest = activeNodesSigned.joinRequest
@@ -176,26 +181,26 @@ async function contactArchiver() {
 async function discoverNetwork(seedNodes) {
   // Check if our time is synced to network time server
   try {
-    const timeSynced = await p2p._checkTimeSynced(p2p.timeServers)
+    const timeSynced = await checkTimeSynced(config.p2p.timeServers)
     if (!timeSynced) {
-      p2p.mainLogger.warn('Local time out of sync with time server.')
+      mainLogger.warn('Local time out of sync with time server.')
     }
   } catch (e) {
-    p2p.mainLogger.warn(e.message)
+    mainLogger.warn(e.message)
   }
 
   // Check if we are first seed node
-  const isFirstSeed = p2p._checkIfFirstSeedNode(seedNodes)
+  const isFirstSeed = checkIfFirstSeedNode(seedNodes)
   if (!isFirstSeed) {
-    p2p.mainLogger.info('You are not the first seed node...')
+    mainLogger.info('You are not the first seed node...')
     return false
   }
-  p2p.mainLogger.info('You are the first seed node!')
+  mainLogger.info('You are the first seed node!')
   return true
 }
 
 async function joinNetwork(seedNodes) {
-  p2p.mainLogger.debug('Clearing P2P state...')
+  mainLogger.debug('Clearing P2P state...')
   await p2p.state.clear()
 
   // Sets our IPs and ports for internal and external network in the database
@@ -205,7 +210,7 @@ async function joinNetwork(seedNodes) {
   await p2p.storage.setProperty('internalPort', p2p.getIpInfo().internalPort)
 
   if (p2p.isFirstSeed) {
-    p2p.mainLogger.debug('Joining network...')
+    mainLogger.debug('Joining network...')
 
     // context is for testing purposes
     console.log('Doing initial setup for server...')
@@ -220,15 +225,13 @@ async function joinNetwork(seedNodes) {
     await utils.sleep(Math.ceil(p2p.state.getCurrentCycleDuration() / 2) * 1000)
     // const { nextCycleMarker } = p2p.getCycleMarkerInfo();
     const prevCycleMarker = p2p.state.getPreviousCycleMarker()
-    p2p.mainLogger.debug(`Public key: ${joinRequest.nodeInfo.publicKey}`)
-    p2p.mainLogger.debug(`Prev cycle marker: ${prevCycleMarker}`)
+    mainLogger.debug(`Public key: ${joinRequest.nodeInfo.publicKey}`)
+    mainLogger.debug(`Prev cycle marker: ${prevCycleMarker}`)
     const nodeId = p2p.state.computeNodeId(
       joinRequest.nodeInfo.publicKey,
       prevCycleMarker
     )
-    p2p.mainLogger.debug(
-      `Computed node ID to be set for context node: ${nodeId}`
-    )
+    mainLogger.debug(`Computed node ID to be set for context node: ${nodeId}`)
     await p2p._setNodeId(nodeId)
 
     return true
@@ -236,15 +239,41 @@ async function joinNetwork(seedNodes) {
 
   const nodeId = await p2p._join(seedNodes)
   if (!nodeId) {
-    p2p.mainLogger.info('Unable to join network')
+    mainLogger.info('Unable to join network')
     return false
   }
-  p2p.mainLogger.info('Successfully joined the network!')
+  mainLogger.info('Successfully joined the network!')
   await p2p._setNodeId(nodeId)
   return true
 }
 
 /** HELPER FUNCTIONS */
+
+async function checkTimeSynced(timeServers) {
+  for (const host of timeServers) {
+    try {
+      const time = await Sntp.time({
+        host,
+        timeout: 10000,
+      })
+      return time.t <= this.syncLimit
+    } catch (e) {
+      this.mainLogger.warn(`Couldn't fetch ntp time from server at ${host}`)
+    }
+  }
+  throw Error('Unable to check local time against time servers.')
+}
+
+function checkIfFirstSeedNode (seedNodes) {
+  if (!seedNodes.length) throw new Error('Fatal: No seed nodes in seed list!')
+  if (seedNodes.length > 1) return false
+  const seed = seedNodes[0]
+  const { externalIp, externalPort } = p2p.getIpInfo()
+  if (externalIp === seed.ip && externalPort === seed.port) {
+    return true
+  }
+  return false
+}
 
 async function getActiveNodesFromArchiver() {
   const archiver = p2p.existingArchivers[0]
@@ -263,9 +292,7 @@ async function getActiveNodesFromArchiver() {
         e.message
     )
   }
-  p2p.mainLogger.debug(
-    `Got signed seed list: ${JSON.stringify(seedListSigned)}`
-  )
+  mainLogger.debug(`Got signed seed list: ${JSON.stringify(seedListSigned)}`)
   return seedListSigned
 }
 
@@ -276,6 +303,6 @@ export async function fetchNodeInfo(activeNodes: Node[]) {
     )
     return nodeInfo
   }
-  const promises = activeNodes.map(node => getNodeinfo(node))
+  const promises = activeNodes.map((node) => getNodeinfo(node))
   return utils.robustPromiseAll(promises)
 }

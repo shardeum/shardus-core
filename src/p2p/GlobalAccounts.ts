@@ -1,6 +1,6 @@
 import { Signature, SignedObject, Route, InternalHandler, Node, NodeInfo, LooseObject, GossipHandler } from './Types'
 import { Handler } from 'express'
-import { p2p } from './Context'
+import { p2p, shardus, stateManager } from './Context'
 import StateManager from '../state-manager'
 import ShardFunctions from '../state-manager/shardFunctions'
 import Shardus from '../shardus'
@@ -53,8 +53,6 @@ export const gossipRoutes = [setGlobalGossipRoute]
 
 /** STATE */
 
-let shardus: Shardus = null
-let stateManager: StateManager = null
 
 let lastClean = 0
 
@@ -177,13 +175,6 @@ export function processReceipt (receipt: Receipt) {
   tracker.gossiped = true
   attemptCleanup()
   return true
-}
-
-export function setStateManagerContext (context: StateManager) {
-  stateManager = context
-}
-export function setShardusContext (context: Shardus) {
-  shardus = context
 }
 
 export function attemptCleanup () {

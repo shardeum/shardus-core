@@ -1,7 +1,8 @@
-import { CycleRecord, JoinedConsensor } from './CycleChain'
 import { Node, Update } from './NodeList'
 import { NodeStatus } from './Types'
 import { reversed } from './Utils'
+import { JoinedConsensor } from './Joining'
+import { CycleRecord } from './CycleCreator'
 
 export interface Change {
   added: JoinedConsensor[] // order joinRequestTimestamp [OLD, ..., NEW]
