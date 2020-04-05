@@ -285,7 +285,7 @@ class Shardus extends EventEmitter {
 
     setShardusContext(this)
 
-    Self.init(this.config)
+    await Self.init(this.config)
     await Self.startup()
   }
 
