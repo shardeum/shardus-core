@@ -2052,7 +2052,7 @@ class StateManager extends EventEmitter {
 
             let responsesRequired = 3
             if (this.useHashSets) {
-              responsesRequired = 1 + Math.ceil(repairTracker.numNodes * 0.9) // get responses from 90% of the node we have sent to
+              responsesRequired = Math.min(  1 + Math.ceil(repairTracker.numNodes * 0.9), repairTracker.numNodes - 1) // get responses from 90% of the node we have sent to  
             }
             // are there enough responses to try generating a receipt?
             if (responses.length >= responsesRequired && (repairTracker.evaluationStarted === false || repairTracker.awaitWinningHash)) {
@@ -2877,7 +2877,7 @@ class StateManager extends EventEmitter {
         }
         if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
         ourAccountLocks = await this.bulkFifoLockAccounts(accountKeys)
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} `)
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
       }
 
       ourLockID = await this.fifoLock('accountModification')
@@ -2938,7 +2938,7 @@ class StateManager extends EventEmitter {
         if(ourAccountLocks != null){
           this.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
         }
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} `)
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
       }
     }
 
@@ -4289,6 +4289,11 @@ class StateManager extends EventEmitter {
 
   /// /////////////////////////////////////////////////////////
   async fifoLock (fifoName:string): Promise<number> {
+
+
+    var stack = new Error().stack
+    this.mainLogger.debug(`fifoLock: ${fifoName} ${stack}`)
+
     let thisFifo = this.fifoLocks[fifoName]
     if (thisFifo == null) {
       thisFifo = { fifoName, queueCounter: 0, waitingList: [], lastServed: 0, queueLocked: false, lockOwner: 1 }
@@ -4322,6 +4327,9 @@ class StateManager extends EventEmitter {
   }
 
   fifoUnlock (fifoName:string, id: number) {
+    var stack = new Error().stack
+    this.mainLogger.debug(`fifoUnlock: ${fifoName} ${stack}`)
+
     let thisFifo = this.fifoLocks[fifoName]
     if (id === -1 || !thisFifo) {
       return // nothing to do
@@ -6360,6 +6368,7 @@ class StateManager extends EventEmitter {
     let seen:StringBoolObjectMap = {}
     for (let accountKey of accountIDs) {
       if (seen[accountKey] === true) {
+        ourLocks.push(-1) //lock skipped, so add a placeholder
         continue
       }
       seen[accountKey] = true
@@ -6385,6 +6394,10 @@ class StateManager extends EventEmitter {
       }
       seen[accountID] = true
       let ourLockID = ourLocks[i]
+      if(ourLockID == -1){
+        this.fatalLogger.fatal(`bulkFifoUnlockAccounts hit placeholder i:${i} ${utils.stringifyReduce({accountIDs, ourLocks})} ` )
+      }
+
       this.fifoUnlock(accountID, ourLockID)
     }
   }
