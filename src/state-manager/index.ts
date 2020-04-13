@@ -1779,13 +1779,17 @@ class StateManager extends EventEmitter {
         // if (recordData.txs) recordData.txs = JSON.parse(recordData.txs) // dont parse this, since it is already the string form we need to write it.
         accountsToAdd.push(recordData)
         this.mainLogger.debug('setAccountData: ' + hash + ' txs: ' + recordData.txs)
+        console.log('setAccountData: ' + hash + ' txs: ' + recordData.txs)
       } else {
         this.mainLogger.debug(`setAccountData hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
         this.mainLogger.debug('setAccountData hash test failed: details: ' + utils.stringifyReduce(recordData))
+        console.log(`setAccountData hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
+        console.log('setAccountData hash test failed: details: ' + utils.stringifyReduce(recordData))
         failedHashes.push(accountId)
       }
     }
     this.mainLogger.debug(`setAccountData toAdd:${accountsToAdd.length}  failed:${failedHashes.length}`)
+    console.log(`setAccountData toAdd:${accountsToAdd.length}  failed:${failedHashes.length}`)
     await this.app.setAccountData(accountsToAdd)
     return failedHashes
   }
