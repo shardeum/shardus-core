@@ -1103,12 +1103,12 @@ class StateManager extends EventEmitter {
             //we dont have the data
             hasAllGlobalData = false
             remainingAccountsToSync.push(report.id)
-            this.mainLogger.debug(`DATASYNC: syncStateDataGlobals remainingAccountsToSync data===null ${report.id} `)
+            this.mainLogger.debug(`DATASYNC: syncStateDataGlobals remainingAccountsToSync data===null ${utils.makeShortHash(report.id)} `)
           } else if (data.stateId !== report.hash){
             //we have the data but he hash is wrong
             hasAllGlobalData = false
             remainingAccountsToSync.push(report.id)
-            this.mainLogger.debug(`DATASYNC: syncStateDataGlobals remainingAccountsToSync data.stateId !== report.hash ${report.id} `)
+            this.mainLogger.debug(`DATASYNC: syncStateDataGlobals remainingAccountsToSync data.stateId !== report.hash ${utils.makeShortHash(report.id)} `)
           }
         }
         //set this report to the last report and continue.
@@ -1116,12 +1116,34 @@ class StateManager extends EventEmitter {
       }
 
       let dataToSet = []
+
+      let cycleNumber = this.currentCycleShardData.cycleNumber // Math.max(1, this.currentCycleShardData.cycleNumber-1 ) //kinda hacky?
       //Write the data! and set global memory data!.  set accounts copy data too.
       for(let report of globalReport2.accounts){
         let accountData = accountDataById[report.id]
         if(accountData != null){
 
           dataToSet.push(accountData)
+
+          if(this.globalAccountMap.has(report.id)){
+            this.mainLogger.debug(`DATASYNC: syncStateDataGlobals has ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
+          } else {
+            this.mainLogger.debug(`DATASYNC: syncStateDataGlobals setting ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
+            // set the account in our table
+            this.globalAccountMap.set(report.id, null)
+            // push the time based backup count
+            let accountId = report.id
+            let data = accountData.data
+            let timestamp = accountData.timestamp
+            let hash = accountData.stateId
+            let backupObj:Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber }
+            //if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+            let globalBackupList:Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
+            if(globalBackupList != null){
+              globalBackupList.push(backupObj) // sort and cleanup later.
+              this.mainLogger.debug(`DATASYNC: syncStateDataGlobals push backup entry ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
+            }
+          } 
         }
       }
    
