@@ -1789,6 +1789,22 @@ class StateManager extends EventEmitter {
     return { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs }
   }
 
+  testAccountDataWrapped(accountDataList:Shardus.WrappedData[]){
+    if(accountDataList == null){
+      return;      
+    }
+    for (let { accountId, stateId, data: recordData } of accountDataList) {
+      let hash = this.app.calculateAccountHash(recordData)
+      if (stateId !== hash) {
+        this.mainLogger.error(`testAccountDataWrapped hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
+        this.mainLogger.error('testAccountDataWrapped hash test failed: details: ' + utils.stringifyReduce(recordData))
+        var stack = new Error().stack
+        this.mainLogger.error(`stack: ${stack}`)
+      } 
+    }
+  }
+
+
   // TSConversion TODO need to fix some any types
   async checkAndSetAccountData (accountRecords: any[]): Promise<string[]> {
     let accountsToAdd:any[] = []
@@ -1803,8 +1819,8 @@ class StateManager extends EventEmitter {
         this.mainLogger.debug('setAccountData: ' + hash + ' txs: ' + recordData.txs)
         console.log('setAccountData: ' + hash + ' txs: ' + recordData.txs)
       } else {
-        this.mainLogger.debug(`setAccountData hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
-        this.mainLogger.debug('setAccountData hash test failed: details: ' + utils.stringifyReduce(recordData))
+        this.mainLogger.error(`setAccountData hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
+        this.mainLogger.error('setAccountData hash test failed: details: ' + utils.stringifyReduce(recordData))
         console.log(`setAccountData hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
         console.log('setAccountData hash test failed: details: ' + utils.stringifyReduce(recordData))
         failedHashes.push(accountId)
@@ -1910,6 +1926,8 @@ class StateManager extends EventEmitter {
       } finally {
         this.fifoUnlock('accountModification', ourLockID)
       }
+      //PERF Disiable this in production or performance testing.
+      this.testAccountDataWrapped(accountData)      
       result.accountData = accountData
       await respond(result)
     })
@@ -1924,6 +1942,8 @@ class StateManager extends EventEmitter {
       } finally {
         this.fifoUnlock('accountModification', ourLockID)
       }
+      //PERF Disiable this in production or performance testing.
+      this.testAccountDataWrapped(accountData)
       result.accountData = accountData
       await respond(result)
     })
@@ -1940,6 +1960,12 @@ class StateManager extends EventEmitter {
       } finally {
         this.fifoUnlock('accountModification', ourLockID)
       }
+
+      //PERF Disiable this in production or performance testing.
+      this.testAccountDataWrapped(accountData.wrappedAccounts)
+      //PERF Disiable this in production or performance testing.
+      this.testAccountDataWrapped(accountData.wrappedAccounts2)
+
       result.data = accountData
       await respond(result)
     })
@@ -1960,6 +1986,8 @@ class StateManager extends EventEmitter {
       } finally {
         this.fifoUnlock('accountModification', ourLockID)
       }
+      //PERF Disiable this in production or performance testing.
+      this.testAccountDataWrapped(accountData)      
       result.accountData = accountData
       await respond(result)
     })
@@ -2427,6 +2455,8 @@ class StateManager extends EventEmitter {
           }
         }
       }
+      //PERF Disiable this in production or performance testing. / this works due to inheritance
+      this.testAccountDataWrapped(accountData)
       // we cast up the array return type because we have attached the seenInQueue memeber to the data.
       result.accountData = accountData as Shardus.WrappedDataFromQueue[]
       await respond(result)
@@ -2486,7 +2516,8 @@ class StateManager extends EventEmitter {
           result.accounts.push(report)
         }
       }   
-
+      //PERF Disiable this in production or performance testing.
+      this.testAccountDataWrapped(accountData)
       result.accounts.sort(this._sortByIdAsc )
       result.combinedHash = this.crypto.hash(result)
       //this.globalAccountRepairBank
@@ -2890,7 +2921,21 @@ class StateManager extends EventEmitter {
       let keysResponse = this.app.getKeyFromTransaction(tx)
       let { timestamp, debugInfo } = keysResponse
       txTs = timestamp
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  ts:${timestamp} repairing:${repairing}  Applying! ` + debugInfo)
+
+      //have to figure out if this is a global modifying tx, since that impacts if we will write to global account.
+      let isGlobalModifyingTX = false
+      let queueEntry = this.getQueueEntry(acceptedTX.id)
+      if(queueEntry != null){
+        if(queueEntry.globalModification === true){
+          isGlobalModifyingTX = true
+        }
+      }
+
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
 
       if (repairing !== true) {
         // get a list of modified account keys that we will lock
@@ -2920,17 +2965,13 @@ class StateManager extends EventEmitter {
       let { stateTableResults, accountData: _accountdata } = applyResponse
       accountDataList = _accountdata
 
-      //have to figure out if this is a global modifying tx, since that impacts if we will write to global account.
-      let isGlobalModifyingTX = false
-      let queueEntry = this.getQueueEntry(acceptedTX.id)
-      if(queueEntry != null){
-        if(queueEntry.globalModification === true){
-          isGlobalModifyingTX = true
-        }
-      }
 
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
       // wrappedStates are side effected for now
       await this.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter)
+
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
 
       this.applySoftLock = false
       // only write our state table data if we dont already have it in the db
@@ -3974,7 +4015,7 @@ class StateManager extends EventEmitter {
 
     let ourNodeShardData = this.currentCycleShardData.nodeShardData
     // partittions:
-    let partitionDump:DebugDumpPartitions = { partitions: [], cycle:0, rangesCovered:{} as DebugDumpRangesCovered,nodesCovered:{} as DebugDumpNodesCovered,allNodeIds:[]  }
+    let partitionDump:DebugDumpPartitions = { partitions: [], cycle:0, rangesCovered:{} as DebugDumpRangesCovered,nodesCovered:{} as DebugDumpNodesCovered,allNodeIds:[], globalAccountIDs:[]  }
     partitionDump.cycle = this.currentCycleShardData.cycleNumber
 
     // todo port this to a static stard function!
@@ -4040,6 +4081,9 @@ class StateManager extends EventEmitter {
     for (let node of this.currentCycleShardData.activeNodes) {
       partitionDump.allNodeIds.push(utils.makeShortHash(node.id))
     }
+
+    partitionDump.globalAccountIDs = Array.from(this.globalAccountMap.keys())
+
     // dump information about consensus group and edge nodes for each partition
     // for (var [key, value] of this.currentCycleShardData.parititionShardDataMap){
 
@@ -4301,10 +4345,12 @@ class StateManager extends EventEmitter {
       // only if this tx is not a global modifying tx.   if it is a global set then it is ok to save out the global here.
       if(this.globalAccountMap.has(key) && isGlobalModifyingTX === false){
         //hasKey = true
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `setAccount skipGlobal:${utils.makeShortHash(key)}`)
         this.logger.playbackLogNote('globalAccountMap', `setAccount - has`)
         continue
       }
 
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `setAccount partial:${wrappedData.isPartial}`)
       if (wrappedData.isPartial) {
         await this.app.updateAccountPartial(wrappedData, localCachedData[key], applyResponse)
       } else {
