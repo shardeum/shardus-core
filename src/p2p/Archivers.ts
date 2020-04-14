@@ -1,5 +1,7 @@
-import { p2p, crypto, logger } from './Context'
 import * as http from '../http'
+import * as Comms from './Comms'
+import { crypto, logger, network } from './Context'
+import * as CycleChain from './CycleChain'
 
 /** TYPES */
 
@@ -11,16 +13,18 @@ interface DataResponse {
 
 /** STATE */
 
-const mainLogger = logger.getLogger('main')
-
+let mainLogger 
 let joinRequests
 let archiversList
 let dataRecipients
 let recipientTypes
 
-reset()
-
 /** FUNCTIONS */
+
+export function init() {
+  mainLogger = logger.getLogger('main')
+  reset()
+}
 
 function logDebug (...msgs) {
   mainLogger.debug('P2PArchivers: ' + msgs.map(msg => JSON.stringify(msg)).join(', '))
@@ -41,15 +45,12 @@ export function resetJoinRequests () {
   joinRequests = []
 }
 
-function addJoinRequest (joinRequest, tracker?, gossip = true) {
+export function addJoinRequest (joinRequest, tracker?, gossip = true) {
   // [TODO] Verify signature
 
-  if (p2p.state.acceptJoinRequests === false) {
-    return false
-  }
   joinRequests.push(joinRequest)
   if (gossip === true) {
-    p2p.sendGossipIn('joinarchiver', joinRequest, tracker)
+    Comms.sendGossipIn('joinarchiver', joinRequest, tracker)
   }
   return true
 }
@@ -65,7 +66,7 @@ export function updateArchivers (joinedArchivers) {
   }
 }
 
-function addDataRecipient (nodeInfo, dataRequest) {
+export function addDataRecipient (nodeInfo, dataRequest) {
   const recipient = {
     nodeInfo,
     type: dataRequest.type,
@@ -86,9 +87,8 @@ function addDataRecipient (nodeInfo, dataRequest) {
     case 'CYCLE' : {
       // Get an array of cycles since counter = dataRequest.lastData
       const start = dataRequest.lastData
-      const end = p2p.state.getLastCycleCounter()
-      dataResponse.data = p2p.getCycleChain(start, end) || []
-      logDebug(`Responding to cycle dataRequest [${start}-${end}] with ${JSON.stringify(dataResponse)}`)
+      dataResponse.data = CycleChain.getCycleChain(start)
+      logDebug(`Responding to cycle dataRequest [${start}-latest] with ${JSON.stringify(dataResponse)}`)
       break
     }
     case 'TRANSACTION' : {
@@ -188,11 +188,7 @@ export function sendTransactionData (partitionNumber, cycleNumber, transactions)
 }
 
 export function registerRoutes () {
-  p2p.network.registerExternalPost('joinarchiver', async (req, res) => {
-    if (!p2p.state.acceptJoinRequests) {
-      return res.json({ success: false, error: 'not accepting archiver join requests' })
-    }
-
+  network.registerExternalPost('joinarchiver', async (req, res) => {
     const invalidJoinReqErr = 'Invalid archiver join request'
     if (!req.body) {
       logError(invalidJoinReqErr)
@@ -208,14 +204,14 @@ export function registerRoutes () {
     logDebug('Archiver join request accepted!')
   })
 
-  p2p.registerGossipHandler('joinarchiver', async (payload, sender, tracker) => {
-    if (!p2p.state.acceptJoinRequests) return logDebug('Archiver join request not accepted. Not accepting join requests currently.')
+
+  Comms.registerGossipHandler('joinarchiver', async (payload, sender, tracker) => {
     const accepted = await addJoinRequest(payload, tracker, false)
     if (!accepted) return logDebug('Archiver join request not accepted.')
     logDebug('Archiver join request accepted!')
   })
 
-  p2p.network.registerExternalPost('requestdata', (req, res) => {
+  network.registerExternalPost('requestdata', (req, res) => {
     const invalidDataReqErr = 'Invalid data request'
     if (!req.body) {
       logError(invalidDataReqErr)
@@ -247,11 +243,11 @@ export function registerRoutes () {
     addDataRecipient(nodeInfo, dataRequest)
   })
 
-  p2p.network.registerExternalGet('archivers', (req, res) => {
+  network.registerExternalGet('archivers', (req, res) => {
     res.json({ archivers: archiversList })
   })
 
-  p2p.network.registerExternalGet('datarecipients', (req, res) => {
+  network.registerExternalGet('datarecipients', (req, res) => {
     res.json({ dataRecipients })
   })
 }

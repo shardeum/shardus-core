@@ -1,39 +1,47 @@
-import Log4js from 'log4js'
-import { EventEmitter } from 'events'
-import { Express } from 'express'
-import express from 'express'
-import Logger from '../logger'
-import {Sn} from 'shardus-net'
 import bodyParser from 'body-parser'
 import cors from 'cors'
-import { Server } from 'http'
+import { EventEmitter } from 'events'
+import express from 'express'
+import Log4js from 'log4js'
+import { Sn } from 'shardus-net'
+import * as http from '../http'
+import Logger from '../logger'
+import { ShardusConfiguration } from '../shardus/shardus-types'
+import Sntp from '@hapi/sntp'
+import { config, logger } from '../p2p/Context'
 
-interface IPInfo {
+/** TYPES */
+export interface IPInfo {
   internalPort: number
   internalIp: string
   externalPort: number
   externalIp: string
 }
 
-interface Network {
-  app: Express
+/** STATE */
+
+let mainLogger: Log4js.Logger
+
+export let ipInfo: IPInfo
+
+/** CLASS */
+
+export class NetworkClass extends EventEmitter {
+  app: any
   sn: any
   logger: Logger
   mainLogger: Log4js.Logger
   netLogger: Log4js.Logger
-  ipInfo: IPInfo
   timeout: number
-  internalRoutes: {[route: string]: Function}
-  externalRoutes: Function[]
-  extServer: Server
-  intServer: Server
+  internalRoutes: {}
+  externalRoutes: any[]
+  extServer: any
+  intServer: any
   verboseLogsNet: boolean
   InternalTellCounter: number
   InternalAskCounter: number
+  ipInfo: any
   externalCatchAll: any
-}
-
-class Network extends EventEmitter {
   constructor (config, logger: Logger) {
     super()
     this.app = express()
@@ -292,6 +300,47 @@ class Network extends EventEmitter {
   }
 }
 
+/** FUNCTIONS */
+
+export async function init() {
+  mainLogger = logger.getLogger('main')
+
+  // Make sure we know our IP configuration
+  ipInfo = {
+    externalIp: config.ip.externalIp || (await discoverExternalIp(config.p2p.ipServer)),
+    externalPort: config.ip.externalPort,
+    internalIp: config.ip.internalIp,
+    internalPort: config.ip.internalPort 
+  }
+}
+
+export async function checkTimeSynced(timeServers) {
+  for (const host of timeServers) {
+    try {
+      const time = await Sntp.time({
+        host,
+        timeout: 10000,
+      })
+      return time.t <= config.p2p.syncLimit
+    } catch (e) {
+      mainLogger.warn(`Couldn't fetch ntp time from server at ${host}`)
+    }
+  }
+  throw Error('Unable to check local time against time servers.')
+}
+
+async function discoverExternalIp(server: string) {
+  try {
+    const { ip }: { ip: string } = await http.get(server)
+    return ip
+  } catch (err) {
+    throw Error(
+      `p2p/Self:discoverExternalIp: Could not discover IP from external IP server ${server}: ` +
+        err.message
+    )
+  }
+}
+
 function closeServer (server) {
   return new Promise((resolve) => {
     server.close()
@@ -299,5 +348,3 @@ function closeServer (server) {
     resolve()
   })
 }
-
-export default Network

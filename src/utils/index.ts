@@ -380,3 +380,68 @@ export const sortDecProp = (a, b, propName) => {
   let bVal = b[propName]
   return aVal === bVal ? 0 : aVal > bVal ? -1 : 1
 }
+
+// From: https://stackoverflow.com/a/12646864
+export function shuffleArray(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[array[i], array[j]] = [array[j], array[i]]
+  }
+}
+
+export function removeNodesByID(nodes, ids) {
+  if (!Array.isArray(ids)) {
+    return nodes
+  }
+  return nodes.filter(node => ids.indexOf(node.id) === -1)
+}
+
+// From: https://stackoverflow.com/a/19270021
+export function getRandom(arr, n) {
+  let len = arr.length
+  const taken = new Array(len)
+  if (n > len) {
+    n = len
+  }
+  const result = new Array(n)
+  while (n--) {
+    const x = Math.floor(Math.random() * len)
+    result[n] = arr[x in taken ? taken[x] : x]
+    taken[x] = --len in taken ? taken[len] : len
+  }
+  return result
+}
+
+export function getRandomGossipIn(nodeIdxs, fanOut, myIdx) {
+  const nn = nodeIdxs.length
+  if (fanOut >= nn) {
+    fanOut = nn - 1
+  }
+  if (fanOut < 1) {
+    return []
+  }
+  const results = [(myIdx + 1) % nn]
+  if (fanOut < 2) {
+    return results
+  }
+  results.push((myIdx + nn - 1) % nn)
+  if (fanOut < 3) {
+    return results
+  }
+  while (results.length < fanOut) {
+    const r = Math.floor(Math.random() * nn)
+    if (r === myIdx) {
+      continue
+    }
+    let k = 0
+    for (; k < results.length; k++) {
+      if (r === results[k]) {
+        break
+      }
+    }
+    if (k === results.length) {
+      results.push(r)
+    }
+  }
+  return results
+}

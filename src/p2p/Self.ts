@@ -1,50 +1,48 @@
 import Sntp from '@hapi/sntp'
+import { EventEmitter } from 'events'
 import { Logger } from 'log4js'
-import * as http from '../http'
-import { ShardusConfiguration } from '../shardus/shardus-types'
-import * as utils from '../utils'
-import { crypto, logger, p2p } from './Context'
-import { sync } from './Sync'
-import { Node, NodeInfo } from './Types'
-import * as NodeList from './NodeList'
-import { robustQuery } from './Utils'
 import { isDeepStrictEqual } from 'util'
+import * as http from '../http'
+import { ipInfo } from '../network'
+import * as utils from '../utils'
 import * as Archivers from './Archivers'
+import * as Comms from './Comms'
+import { config, crypto, logger, p2p } from './Context'
+import * as NodeList from './NodeList'
+import { sync } from './Sync'
+import { Node } from './Types'
+import { robustQuery } from './Utils'
+import * as CycleCreator from './CycleCreator'
+import * as Join from './Join'
+import * as CycleChain from './CycleChain'
+import * as Sync from './Sync'
+import * as Active from './Active'
 
 /** STATE */
 
+export const emitter = new EventEmitter()
+
 let mainLogger: Logger
-let config: ShardusConfiguration
 
-export let id
-
-export let externalIp: string
-export let externalPort: number
-export let internalIp: string
-export let internalPort: number
+export let id: string
+export let isFirst: boolean
 
 /** ROUTES */
 
 /** FUNCTIONS */
 
-export async function init(conf: ShardusConfiguration) {
-  config = conf
+export function init() {
+  // Create a logger for yourself
   mainLogger = logger.getLogger('main')
 
-  // Make sure we know our IP configuration
-  externalIp =
-    config.ip.externalIp || (await discoverExternalIp(config.p2p.ipServer))
-  externalPort = config.ip.externalPort
-  internalIp = config.ip.internalIp
-  internalPort = config.ip.internalPort
-
-  if (!externalIp || !externalPort || !internalIp || !internalPort) {
-    throw new Error(`p2p/Self:init: Bad IP configuration:
-    externalIp: ${externalIp}
-    externalPort: ${externalPort}
-    internalIp: ${internalIp}
-    internalPort: ${internalPort}
-    `)
+  // Init submodules
+  CycleChain.init()
+  Comms.init()
+  CycleCreator.init()
+  Sync.init()
+  Archivers.init()
+  for (const submodule of CycleCreator.submodules) {
+    if (submodule.init) submodule.init()
   }
 }
 
@@ -52,24 +50,30 @@ export async function startup(): Promise<boolean> {
   // Emit the 'joining' event before attempting to join
   const publicKey = crypto.getPublicKey()
   mainLogger.debug('Emitting `joining` event.')
-  p2p.emit('joining', publicKey)
+  emitter.emit('joining', publicKey)
 
   // Get new activeNodes and attempt to join until you are successful
   let activeNodes: Node[]
   let joined = false
-  // outerJoinAttemps is set to a high number incase we want to build a large network and need the node to keep trying to join for awhile.
+
+  const retryWait = async () => {
+      const wait = config.p2p.cycleDuration / 2 
+      mainLogger.info(`Trying again in ${wait} sec...`)
+      await utils.sleep(wait * 1000)
+  }
+
   while (!joined) {
     try {
       mainLogger.info('Getting activeNodes from archiver to join network...')
       activeNodes = await contactArchiver()
       mainLogger.info('Discovering if we are the first node...')
-      p2p.isFirstSeed = await discoverNetwork(activeNodes)
+      isFirst = await discoverNetwork(activeNodes)
 
-      // Remove yourself from seedNodes if you are present in them but not firstSeed
-      if (p2p.isFirstSeed === false) {
+      // Remove yourself from activeNodes if you are present in them but not firstSeed
+      if (isFirst === false) {
         const ourIdx = activeNodes.findIndex(
           (node: { ip: any; port: any }) =>
-            node.ip === externalIp && node.port === externalPort
+            node.ip === ipInfo.externalIp && node.port === ipInfo.externalPort
         )
         if (ourIdx > -1) {
           activeNodes.splice(ourIdx, 1)
@@ -78,48 +82,63 @@ export async function startup(): Promise<boolean> {
 
       mainLogger.info('Attempting to join network...')
       joined = await joinNetwork(activeNodes)
+      if (!joined) {
+        mainLogger.info('Join request not accepted')
+        await retryWait()
+      }
     } catch (err) {
       joined = false
       mainLogger.error(err)
-      mainLogger.info('Trying again in 2 sec...')
-      await utils.sleep(2000)
+      await retryWait()
     }
   }
 
   // Emit the 'joined' event before attempting to sync to the network
   mainLogger.debug('Emitting `joined` event.')
-  p2p.emit('joined', p2p.id, publicKey)
+  emitter.emit('joined', id, publicKey)
 
-  // Get new activeNodes and attempt to sync until you are successful
-  let synced = false
-  while (!synced) {
-    // Once joined, sync to the network
-    try {
-      mainLogger.info('Getting activeNodes from archiver to sync to network...')
-      activeNodes = await contactArchiver()
+  // Enable internal routes
+  Comms.setAcceptInternal(true)
 
-      // Remove yourself from seedNodes if you are present in them but not firstSeed
-      if (p2p.isFirstSeed === false) {
+  if (isFirst) {
+    // If first node, create cycle record 0
+    const recordZero = CycleCreator.makeRecordZero()
+    CycleChain.append(recordZero)
+  } else {
+    // If not first, get new activeNodes and attempt to sync until you are successful
+    let synced = false
+    while (!synced) {
+      // Once joined, sync to the network
+      try {
+        mainLogger.info('Getting activeNodes from archiver to sync to network...')
+        activeNodes = await contactArchiver()
+
+        // Remove yourself from activeNodes if you are present in them
         const ourIdx = activeNodes.findIndex(
           (node: { ip: any; port: any }) =>
-            node.ip === externalIp && node.port === externalPort
+            node.ip === ipInfo.externalIp && node.port === ipInfo.externalPort
         )
         if (ourIdx > -1) {
           activeNodes.splice(ourIdx, 1)
         }
-      }
 
-      mainLogger.info('Attempting to sync to network...')
-      synced = await sync(activeNodes)
-    } catch (err) {
-      synced = false
-      mainLogger.error(err)
-      mainLogger.info('Trying again in 2 sec...')
-      await utils.sleep(2000)
+        mainLogger.info('Attempting to sync to network...')
+        synced = await sync(activeNodes)
+      } catch (err) {
+        synced = false
+        mainLogger.error(err)
+        mainLogger.info('Trying again in 2 sec...')
+        await utils.sleep(2000)
+      }
     }
   }
 
-  p2p.emit('initialized')
+  // Start creating cycle records
+  CycleCreator.startCycles()
+
+  emitter.emit('initialized')
+  Active.goActive()
+
   return true
 }
 
@@ -165,63 +184,34 @@ async function discoverNetwork(seedNodes) {
   return true
 }
 
-async function joinNetwork(seedNodes) {
-  mainLogger.debug('Clearing P2P state...')
-  await p2p.state.clear()
+async function joinNetwork(activeNodes) {
+  mainLogger.debug('Joining network...')
 
-  if (p2p.isFirstSeed) {
-    mainLogger.debug('Joining network...')
+  if (isFirst) {
+    // Create the first join request and set our node id
+    id = await Join.firstJoin()
+  } else {
+    // Create join request from network cycle marker
+    const netMarker = await Join.fetchCycleMarker(activeNodes)
+    const request = await Join.createJoinRequest(netMarker)
 
-    // context is for testing purposes
-    console.log('Doing initial setup for server...')
+    // Send join request to active nodes
+    await Join.submitJoin(activeNodes, request)
 
-    const cycleMarker = p2p.state.getCurrentCycleMarker()
-    const joinRequest = await _createJoinRequest(cycleMarker)
-    p2p.state.startCycles()
-    p2p.state.addNewJoinRequest(joinRequest)
+    // Wait 1 cycle
+    utils.sleep(config.p2p.cycleDuration * 1000)
 
-    // Sleep for cycle duration before updating status
-    // TODO: Make context more deterministic
-    await utils.sleep(Math.ceil(p2p.state.getCurrentCycleDuration() / 2) * 1000)
-    const prevCycleMarker = p2p.state.getPreviousCycleMarker()
-    mainLogger.debug(`Public key: ${joinRequest.nodeInfo.publicKey}`)
-    mainLogger.debug(`Prev cycle marker: ${prevCycleMarker}`)
-    const nodeId = p2p.state.computeNodeId(
-      joinRequest.nodeInfo.publicKey,
-      prevCycleMarker
-    )
-    mainLogger.debug(`Computed node ID to be set for context node: ${nodeId}`)
-    await _setNodeId(nodeId)
-
-    return true
+    // Check if accepted and set our node ID
+    id = await Join.fetchJoined(activeNodes)
+    if (!id) return false
   }
 
-  const nodeId = await _join(seedNodes)
-  if (!nodeId) {
-    mainLogger.info('Unable to join network')
-    return false
-  }
-  mainLogger.info('Successfully joined the network!')
-  id = nodeId
-  await _setNodeId(nodeId)
   return true
 }
 
 /** HELPER FUNCTIONS */
 
-async function discoverExternalIp(server: string) {
-  try {
-    const { ip }: { ip: string } = await http.get(server)
-    return ip
-  } catch (err) {
-    throw Error(
-      `p2p/Self:discoverExternalIp: Could not discover IP from external IP server ${server}: ` +
-        err.message
-    )
-  }
-}
-
-async function checkTimeSynced(timeServers) {
+export async function checkTimeSynced(timeServers) {
   for (const host of timeServers) {
     try {
       const time = await Sntp.time({
@@ -240,7 +230,7 @@ function checkIfFirstSeedNode(seedNodes) {
   if (!seedNodes.length) throw new Error('Fatal: No seed nodes in seed list!')
   if (seedNodes.length > 1) return false
   const seed = seedNodes[0]
-  if (externalIp === seed.ip && externalPort === seed.port) {
+  if (ipInfo.externalIp === seed.ip && ipInfo.externalPort === seed.port) {
     return true
   }
   return false
@@ -265,19 +255,9 @@ async function getActiveNodesFromArchiver() {
   return seedListSigned
 }
 
-function getIpInfo() {
-  return {
-    externalIp,
-    externalPort,
-    internalIp,
-    internalPort,
-  }
-}
-
 function getPublicNodeInfo() {
   const publicKey = crypto.getPublicKey()
   const curvePublicKey = crypto.convertPublicKeyToCurve(publicKey)
-  const ipInfo = getIpInfo()
   const status = { status: getNodeStatus(id) }
   const nodeInfo = Object.assign(
     { id, publicKey, curvePublicKey },
@@ -293,29 +273,8 @@ function getNodeStatus(nodeId) {
   return current[nodeId].status
 }
 
-async function _createJoinRequest(cycleMarker) {
-  // Build and return a join request
-  const nodeInfo = _getThisNodeInfo()
-  const selectionNum = crypto.hash({ cycleMarker, address: nodeInfo.address })
-  // TO-DO: Think about if the selection number still needs to be signed
-  const proofOfWork = {
-    compute: await crypto.getComputeProofOfWork(
-      cycleMarker,
-      config.p2p.difficulty
-    ),
-  }
-  // TODO: add a version number at some point
-  // version: '0.0.0'
-  const joinReq = { nodeInfo, cycleMarker, proofOfWork, selectionNum }
-  const signedJoinReq = crypto.sign(joinReq)
-  mainLogger.debug(
-    `Join request created... Join request: ${JSON.stringify(signedJoinReq)}`
-  )
-  return signedJoinReq
-}
-
-function _getThisNodeInfo() {
-  const { externalIp, externalPort, internalIp, internalPort } = getIpInfo()
+export function _getThisNodeInfo() {
+  const { externalIp, externalPort, internalIp, internalPort } = ipInfo
   const publicKey = crypto.getPublicKey()
   // TODO: Change this to actual selectable address
   const address = publicKey
@@ -333,154 +292,4 @@ function _getThisNodeInfo() {
   }
   mainLogger.debug(`Node info of this node: ${JSON.stringify(nodeInfo)}`)
   return nodeInfo
-}
-
-async function _setNodeId(newId, _updateDb = true) {
-  id = newId
-  mainLogger.info(`Your node's ID is ${id}`)
-}
-
-async function _join (seedNodes) {
-  const localTime = utils.getTime('s')
-  const { currentTime } = await _fetchCycleMarker(seedNodes)
-  if (!_checkWithinSyncLimit(localTime, currentTime)) throw Error('Local time out of sync with network.')
-  const timeOffset = currentTime - localTime
-  mainLogger.debug(`Time offset with selected node: ${timeOffset}`)
-  let nodeId = null
-  let attempts = 2
-  while (!nodeId && attempts > 0) {
-    const { currentCycleMarker, nextCycleMarker, cycleStart, cycleDuration } = await _fetchCycleMarker(seedNodes)
-    if (nextCycleMarker) {
-      // Use next cycle marker
-      const joinRequest = await _createJoinRequest(nextCycleMarker)
-      nodeId = await _attemptJoin(seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration)
-      if (!nodeId) {
-        const { cycleStart, cycleDuration } = await _fetchCycleMarker(seedNodes)
-        nodeId = await _attemptJoin(seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration)
-      }
-    } else {
-      const joinRequest = await _createJoinRequest(currentCycleMarker)
-      nodeId = await _attemptJoin(seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration)
-    }
-    attempts--
-  }
-  return nodeId
-}
-
-async function _fetchCycleMarker (nodes) {
-  const queryFn = async (node) => {
-    const cycleMarkerInfo = await http.get(`${node.ip}:${node.port}/cyclemarker`)
-    return cycleMarkerInfo
-  }
-  const [cycleMarkerInfo] = await robustQuery(nodes, queryFn, _isSameCycleMarkerInfo.bind(this))
-  return cycleMarkerInfo
-}
-
-function _isSameCycleMarkerInfo (info1, info2) {
-  const cm1 = utils.deepCopy(info1)
-  const cm2 = utils.deepCopy(info2)
-  delete cm1.currentTime
-  delete cm2.currentTime
-  const equivalent = isDeepStrictEqual(cm1, cm2)
-  mainLogger.debug(`Equivalence of the two compared cycle marker infos: ${equivalent}`)
-  return equivalent
-}
-
-function _checkWithinSyncLimit (time1, time2) {
-  const timeDif = Math.abs(time1 - time2)
-  if (timeDif > config.p2p.syncLimit) {
-    return false
-  }
-  return true
-}
-
-async function _attemptJoin (seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration) {
-  // TODO: check if we missed join phase
-  const currTime1 = utils.getTime('s') + timeOffset
-  await _waitUntilUpdatePhase(currTime1, cycleStart, cycleDuration)
-  await _submitJoin(seedNodes, joinRequest)
-  const currTime2 = utils.getTime('s') + timeOffset
-  // This time we use cycleStart + cycleDuration because we are in the next cycle
-  await _waitUntilEndOfCycle(currTime2, cycleStart + cycleDuration, cycleDuration)
-  const nodeId = await _fetchNodeId(seedNodes)
-  return nodeId
-}
-
-async function _waitUntilEndOfCycle (currentTime = utils.getTime('s'), cycleStart = p2p.state.getCurrentCycleStart(), cycleDuration = p2p.state.getCurrentCycleDuration()) {
-  mainLogger.debug(`Current time is: ${currentTime}`)
-  mainLogger.debug(`Current cycle started at: ${cycleStart}`)
-  mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
-  const endOfCycle = cycleStart + cycleDuration
-  mainLogger.debug(`End of cycle at: ${endOfCycle}`)
-  let timeToWait
-  if (currentTime < endOfCycle) {
-    timeToWait = (endOfCycle - currentTime + config.p2p.queryDelay) * 1000
-  } else {
-    timeToWait = 0
-  }
-  mainLogger.debug(`Waiting for ${timeToWait} ms before next cycle marker creation...`)
-  await utils.sleep(timeToWait)
-}
-
-async function _waitUntilUpdatePhase (currentTime = utils.getTime('s'), cycleStart = p2p.state.getCurrentCycleStart(), cycleDuration = p2p.state.getCurrentCycleDuration()) {
-  // If we are already in the update phase, return
-  if (_isInUpdatePhase(currentTime, cycleStart, cycleDuration)) return
-  mainLogger.debug(`Current time is: ${currentTime}`)
-  mainLogger.debug(`Current cycle started at: ${cycleStart}`)
-  mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
-  const nextJoinStart = cycleStart + cycleDuration
-  mainLogger.debug(`Next join cycle starts at: ${nextJoinStart}`)
-  const timeToWait = (nextJoinStart - currentTime + config.p2p.queryDelay) * 1000
-  mainLogger.debug(`Waiting for ${timeToWait} ms before next update phase...`)
-  await utils.sleep(timeToWait)
-}
-
-function _isInUpdatePhase (currentTime = utils.getTime('s'), cycleStart = p2p.state.getCurrentCycleStart(), cycleDuration = p2p.state.getCurrentCycleDuration()) {
-  mainLogger.debug(`Current time is: ${currentTime}`)
-  mainLogger.debug(`Current cycle started at: ${cycleStart}`)
-  mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
-  const startOfUpdatePhase = cycleStart
-  mainLogger.debug(`Start of first quarter: ${startOfUpdatePhase}`)
-  const endOfUpdatePhase = cycleStart + Math.ceil(0.25 * cycleDuration)
-  mainLogger.debug(`End of first quarter: ${endOfUpdatePhase}`)
-  if (currentTime < startOfUpdatePhase || currentTime > endOfUpdatePhase) {
-    return false
-  }
-  return true
-}
-
-async function _submitJoin (nodes, joinRequest) {
-  for (const node of nodes) {
-    mainLogger.debug(`Sending join request to ${node.ip}:${node.port}`)
-    await http.post(`${node.ip}:${node.port}/join`, joinRequest)
-  }
-}
-
-async function _fetchNodeId (seedNodes) {
-  const { publicKey } = _getThisNodeInfo()
-  const queryFn = async (node) => {
-    const { cycleJoined } = await http.get(`${node.ip}:${node.port}/joined/${publicKey}`)
-    return { cycleJoined }
-  }
-  let query
-  let attempts = 2
-  while ((!query || !query[0]) && attempts > 0) {
-    try {
-      query = await robustQuery(seedNodes, queryFn)
-    } catch (e) {
-      mainLogger.error(e)
-    }
-    attempts--
-  }
-  if (attempts <= 0) {
-    mainLogger.info('Unable to get consistent cycle marker from seednodes.')
-    return null
-  }
-  const { cycleJoined } = query[0]
-  if (!cycleJoined) {
-    mainLogger.info('Unable to get cycle marker, likely this node\'s join request was not accepted.')
-    return null
-  }
-  const nodeId = p2p.state.computeNodeId(publicKey, cycleJoined)
-  return nodeId
 }

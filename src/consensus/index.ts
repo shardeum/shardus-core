@@ -24,7 +24,7 @@ interface Consensus {
 }
 
 class Consensus extends EventEmitter {
-  constructor (app: Shardus.App, config: Shardus.ShardusConfiguration, logger: Logger, crypto: Crypto, p2p: P2P, storage: Storage, profiler: Profiler) {
+  constructor (app: Shardus.App, config: Shardus.ShardusConfiguration, logger: Logger, crypto: Crypto, storage: Storage, profiler: Profiler) {
     super()
     this.profiler = profiler
     this.app = app
@@ -33,7 +33,6 @@ class Consensus extends EventEmitter {
     this.mainLogger = this.logger.getLogger('main')
     this.fatalLogger = this.logger.getLogger('fatal')
     this.crypto = crypto
-    this.p2p = p2p
     this.storage = storage
 
     this.pendingTransactions = {}

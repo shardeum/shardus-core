@@ -1,6 +1,6 @@
 import { insertSorted } from '../utils'
-import { p2p } from './Context'
-import { JoinedConsensor } from './Joining'
+import { crypto } from './Context'
+import { JoinedConsensor } from './Join'
 import { NodeStatus } from './Types'
 import deepmerge = require('deepmerge')
 
@@ -56,7 +56,7 @@ export async function addNode(node: Node) {
   // Insert sorted by joinRequestTimstamp into byJoinOrder
   insertSorted(byJoinOrder, node, (a, b) => {
     if (a.joinRequestTimestamp === b.joinRequestTimestamp) {
-      return this.crypto.isGreaterHash(a.id, b.id) ? 1 : -1
+      return crypto.isGreaterHash(a.id, b.id) ? 1 : -1
     }
     return a.joinRequestTimestamp > b.joinRequestTimestamp ? 1 : -1
   })
@@ -73,7 +73,7 @@ export async function addNode(node: Node) {
 
   // Add nodes to old p2p-state nodelist
   // [TODO] Remove this once eveything is using new NodeList.ts
-  await p2p.state.addNode(node)
+  // await p2p.state.addNode(node)
 }
 export async function addNodes(newNodes: Node[]) {
   for (const node of newNodes) addNode(node)
@@ -106,6 +106,7 @@ export async function updateNode(update: Update) {
 
   // Update nodes in old p2p-state nodelist
   // [TODO] Remove this once eveything is using new NodeList.ts
+  /*
   if (update.activeTimestamp) {
     await p2p.state._setNodesActiveTimestamp(
       [update.id],
@@ -115,6 +116,7 @@ export async function updateNode(update: Update) {
   if (update.status) {
     await p2p.state._updateNodeStatus(node, update.status)
   }
+  */
 }
 export async function updateNodes(updates: Update[]) {
   for (const update of updates) updateNode(update)
@@ -123,14 +125,14 @@ export async function updateNodes(updates: Update[]) {
 export function createNode(joined: JoinedConsensor) {
   const node: Node = {
     ...joined,
-    curvePublicKey: p2p.crypto.convertPublicKeyToCurve(joined.publicKey),
+    curvePublicKey: crypto.convertPublicKeyToCurve(joined.publicKey),
     status: NodeStatus.SYNCING,
   }
 
   return node
 }
 
-function ipPort(ip: string, port: number) {
+export function ipPort(ip: string, port: number) {
   return ip + ':' + port
 }
 

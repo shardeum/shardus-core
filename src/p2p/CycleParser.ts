@@ -1,7 +1,7 @@
 import { Node, Update } from './NodeList'
 import { NodeStatus } from './Types'
 import { reversed } from './Utils'
-import { JoinedConsensor } from './Joining'
+import { JoinedConsensor } from './Join'
 import { CycleRecord } from './CycleCreator'
 
 export interface Change {

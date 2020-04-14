@@ -7,8 +7,9 @@ import Debug from '../debug'
 import ExitHandler from '../exit-handler'
 import LoadDetection from '../load-detection'
 import Logger from '../logger'
-import Network from '../network'
-import { setCryptoContext, setNetworkContext, setP2pContext, setShardusContext, setStateManagerContext, setLoggerContext } from '../p2p/Context'
+import * as Network from '../network'
+import * as Active from '../p2p/Active'
+import * as Context from '../p2p/Context'
 import * as GlobalAccounts from '../p2p/GlobalAccounts'
 import * as Self from '../p2p/Self'
 import RateLimiting from '../rate-limiting'
@@ -35,7 +36,7 @@ interface Shardus {
   exitHandler: any
   storage: Storage
   crypto: Crypto
-  network: Network
+  network: Network.NetworkClass
   p2p: any
   debug: Debug
   consensus: Consensus
@@ -68,9 +69,10 @@ class Shardus extends EventEmitter {
     super()
     this.profiler = new Profiler()
     this.config = config
+    Context.setConfig(this.config)
     this.verboseLogs = false
     this.logger = new Logger(config.baseDir, logsConfig)
-    setLoggerContext(this.logger)
+    Context.setLoggerContext(this.logger)
 
     if (logsConfig.saveConsoleOutput) {
       saveConsoleOutput.startSaving(path.join(config.baseDir, logsConfig.dir))
@@ -81,9 +83,10 @@ class Shardus extends EventEmitter {
     this.appLogger = this.logger.getLogger('app')
     this.exitHandler = new ExitHandler()
     this.storage = new Storage(config.baseDir, storageConfig, this.logger, this.profiler)
-    this.crypto = null
-    this.network = new Network(config.network, this.logger)
-    setNetworkContext(this.network)
+    this.crypto = new Crypto(this.config, this.logger, this.storage)
+    Context.setCryptoContext(this.crypto)
+    this.network = new Network.NetworkClass(config.network, this.logger)
+    Context.setNetworkContext(this.network)
     this.p2p = null
     this.debug = null
     this.consensus = null
@@ -95,10 +98,10 @@ class Shardus extends EventEmitter {
     this.loadDetection = null
     this.rateLimiting = null
 
-    this.mainLogger.log(`Server started with pid: ${process.pid}`)
+    this.mainLogger.info(`Server started with pid: ${process.pid}`)
 
-    this.mainLogger.log(`===== Server config: =====`)
-    this.mainLogger.log(JSON.stringify(config, null, 2))
+    this.mainLogger.info(`===== Server config: =====`)
+    this.mainLogger.info(JSON.stringify(config, null, 2))
 
     this._listeners = {}
 
@@ -124,24 +127,12 @@ class Shardus extends EventEmitter {
         this.reporter.stopReporting()
       }
     })
-    this.exitHandler.registerSync('p2p', () => {
-      if (this.p2p) {
-        this.p2p.cleanupSync()
-      }
-    })
-    this.exitHandler.registerSync('shardus', () => {
-      this._stopHeartbeat()
-    })
     this.exitHandler.registerSync('crypto', () => {
       this.crypto.stopAllGenerators()
     })
     this.exitHandler.registerAsync('network', async () => {
       this.mainLogger.info('Shutting down networking...')
       await this.network.shutdown()
-    })
-    this.exitHandler.registerAsync('shardus', async () => {
-      this.mainLogger.info('Writing heartbeat to database before exiting...')
-      await this._writeHeartbeat()
     })
     this.exitHandler.registerAsync('storage', async () => {
       this.mainLogger.info('Closing Database connections...')
@@ -160,6 +151,107 @@ class Shardus extends EventEmitter {
 
     this.logger.playbackLogState('constructed', '', '')
   }
+
+  // constructor ({ server: config, logs: logsConfig, storage: storageConfig }: {
+  //   server: ShardusTypes.ShardusConfiguration 
+  //   logs: ShardusTypes.LogsConfiguration
+  //   storage: ShardusTypes.StorageConfiguration
+  // }) {
+  //   super()
+  //   this.profiler = new Profiler()
+  //   this.config = config
+  //   this.verboseLogs = false
+  //   this.logger = new Logger(config.baseDir, logsConfig)
+  //   setLoggerContext(this.logger)
+
+  //   if (logsConfig.saveConsoleOutput) {
+  //     saveConsoleOutput.startSaving(path.join(config.baseDir, logsConfig.dir))
+  //   }
+
+  //   this.mainLogger = this.logger.getLogger('main')
+  //   this.fatalLogger = this.logger.getLogger('fatal')
+  //   this.appLogger = this.logger.getLogger('app')
+  //   this.exitHandler = new ExitHandler()
+  //   this.storage = new Storage(config.baseDir, storageConfig, this.logger, this.profiler)
+  //   this.crypto = null
+  //   this.network = new Network(config.network, this.logger)
+  //   setNetworkContext(this.network)
+  //   this.p2p = null
+  //   this.debug = null
+  //   this.consensus = null
+  //   this.appProvided = null
+  //   this.app = null
+  //   this.reporter = null
+  //   this.stateManager = null
+  //   this.statistics = null
+  //   this.loadDetection = null
+  //   this.rateLimiting = null
+
+  //   this.mainLogger.info(`Server started with pid: ${process.pid}`)
+
+  //   this.mainLogger.info(`===== Server config: =====`)
+  //   this.mainLogger.info(JSON.stringify(config, null, 2))
+
+  //   this._listeners = {}
+
+  //   this.heartbeatInterval = config.heartbeatInterval
+  //   this.heartbeatTimer = null
+
+  //   // levelStr not correctly defined in logger type definition, so ignore it
+  //   // @ts-ignore
+  //   if (this.mainLogger && ['TRACE'].includes(this.mainLogger.level.levelStr)) {
+  //     this.verboseLogs = true
+  //   }
+
+  //   // alias the network register calls so that an app can get to them
+  //   this.registerExternalGet = (route, handler) => this.network.registerExternalGet(route, handler)
+  //   this.registerExternalPost = (route, handler) => this.network.registerExternalPost(route, handler)
+  //   this.registerExternalPut = (route, handler) => this.network.registerExternalPut(route, handler)
+  //   this.registerExternalDelete = (route, handler) => this.network.registerExternalDelete(route, handler)
+  //   this.registerExternalPatch = (route, handler) => this.network.registerExternalPatch(route, handler)
+
+  //   this.exitHandler.addSigListeners()
+  //   this.exitHandler.registerSync('reporter', () => {
+  //     if (this.reporter) {
+  //       this.reporter.stopReporting()
+  //     }
+  //   })
+  //   this.exitHandler.registerSync('p2p', () => {
+  //     if (this.p2p) {
+  //       this.p2p.cleanupSync()
+  //     }
+  //   })
+  //   this.exitHandler.registerSync('shardus', () => {
+  //     this._stopHeartbeat()
+  //   })
+  //   this.exitHandler.registerSync('crypto', () => {
+  //     this.crypto.stopAllGenerators()
+  //   })
+  //   this.exitHandler.registerAsync('network', async () => {
+  //     this.mainLogger.info('Shutting down networking...')
+  //     await this.network.shutdown()
+  //   })
+  //   this.exitHandler.registerAsync('shardus', async () => {
+  //     this.mainLogger.info('Writing heartbeat to database before exiting...')
+  //     await this._writeHeartbeat()
+  //   })
+  //   this.exitHandler.registerAsync('storage', async () => {
+  //     this.mainLogger.info('Closing Database connections...')
+  //     await this.storage.close()
+  //   })
+  //   this.exitHandler.registerAsync('application', async () => {
+  //     if (this.app && this.app.close) {
+  //       this.mainLogger.info('Shutting down the application...')
+  //       await this.app.close()
+  //     }
+  //   })
+  //   this.exitHandler.registerAsync('logger', async () => {
+  //     this.mainLogger.info('Shutting down logs...')
+  //     await this.logger.shutdown()
+  //   })
+
+  //   this.logger.playbackLogState('constructed', '', '')
+  // }
 
   /**
    * This function is what the app developer uses to setup all the SDK functions used by shardus
@@ -182,19 +274,130 @@ class Shardus extends EventEmitter {
    * Calling this function will start the network
    * @param {*} exitProcOnFail Exit the process if an error occurs
    */
-  async start (exitProcOnFail = true) {
-    if (this.appProvided === null) throw new Error('Please call Shardus.setup with an App object or null before calling Shardus.start.')
+  // async start_OLD (exitProcOnFail = true) {
+  //   if (this.appProvided === null) throw new Error('Please call Shardus.setup with an App object or null before calling Shardus.start.')
+  //   await this.storage.init()
+  //   this._setupHeartbeat()
+  //   this.crypto = new Crypto(this.config, this.logger, this.storage)
+  //   Context.setCryptoContext(this.crypto)
+  //   await this.crypto.init()
+
+  //   const ipInfo = this.config.ip
+  //   const p2pConf = Object.assign({ ipInfo }, this.config.p2p)
+  //   this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto)
+  //   Context.setP2pContext(this.p2p)
+  //   await this.p2p.init(this.network)
+  //   this.debug = new Debug(this.config.baseDir, this.network)
+  //   this.debug.addToArchive(this.logger.logDir, './logs')
+  //   this.debug.addToArchive(path.parse(this.storage.storage.storageConfig.options.storage).dir, './db')
+
+  //   this.statistics = new Statistics(this.config.baseDir, this.config.statistics, {
+  //     counters: ['txInjected', 'txApplied', 'txRejected', 'txExpired', 'txProcessed'],
+  //     watchers: {
+  //       queueLength: () => this.stateManager ? this.stateManager.newAcceptedTxQueue.length : 0,
+  //       serverLoad: () => this.loadDetection ? this.loadDetection.getCurrentLoad() : 0
+  //     },
+  //     timers: ['txTimeInQueue']
+  //   }, this)
+  //   this.debug.addToArchive('./statistics.tsv', './statistics.tsv')
+
+  //   this.loadDetection = new LoadDetection(this.config.loadDetection, this.statistics)
+  //   this.statistics.on('snapshot', () => this.loadDetection.updateLoad())
+  //   this.loadDetection.on('highLoad', async () => {
+  //     await this.p2p.requestNetworkUpsize()
+  //   })
+  //   this.loadDetection.on('lowLoad', async () => {
+  //     await this.p2p.requestNetworkDownsize()
+  //   })
+
+  //   this.rateLimiting = new RateLimiting(this.config.rateLimiting, this.loadDetection)
+
+  //   this.consensus = new Consensus(this.app, this.config, this.logger, this.crypto, this.p2p, this.storage, this.profiler)
+
+  //   if (this.app) {
+  //     this._createAndLinkStateManager()
+  //     this._attemptCreateAppliedListener()
+  //   }
+
+  //   this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this.statistics, this.stateManager, this.profiler, this.loadDetection) : null
+
+  //   this._registerRoutes()
+
+  //   this.p2p.on('joining', (publicKey) => {
+  //     this.logger.playbackLogState('joining', '', publicKey)
+  //     if (this.reporter) this.reporter.reportJoining(publicKey)
+  //   })
+  //   this.p2p.on('joined', (nodeId, publicKey) => {
+  //     this.logger.playbackLogState('joined', nodeId, publicKey)
+  //     this.logger.setPlaybackID(nodeId)
+  //     if (this.reporter) this.reporter.reportJoined(nodeId, publicKey)
+  //   })
+  //   this.p2p.on('initialized', async () => {
+  //     await this.syncAppData()
+  //     this.p2p.goActive()
+  //   })
+  //   this.p2p.on('active', (nodeId) => {
+  //     this.logger.playbackLogState('active', nodeId, '')
+  //     if (this.reporter) {
+  //       this.reporter.reportActive(nodeId)
+  //       this.reporter.startReporting()
+  //     }
+  //     if (this.statistics) this.statistics.startSnapshots()
+  //     this.emit('active', nodeId)
+  //   })
+  //   this.p2p.on('failed', () => {
+  //     this.shutdown(exitProcOnFail)
+  //   })
+  //   this.p2p.on('error', (e) => {
+  //     console.log(e.message + ' at ' + e.stack)
+  //     this.mainLogger.debug('shardus.start() ' + e.message + ' at ' + e.stack)
+  //     this.fatalLogger.fatal('shardus.start() ' + e.message + ' at ' + e.stack)
+  //     throw new Error(e)
+  //   })
+  //   this.p2p.on('removed', async () => {
+  //     if (this.statistics) {
+  //       this.statistics.stopSnapshots()
+  //       this.statistics.initialize()
+  //     }
+  //     if (this.reporter) {
+  //       this.reporter.stopReporting()
+  //       await this.reporter.reportRemoved(this.p2p.id)
+  //     }
+  //     if (this.app) {
+  //       await this.app.deleteLocalAccountData()
+  //       this._attemptRemoveAppliedListener()
+  //       this._unlinkStateManager()
+  //       await this.stateManager.cleanup()
+  //       // Dont start a new state manager. pm2 will do a full restart if needed.
+  //       // this._createAndLinkStateManager()
+  //       // this._attemptCreateAppliedListener()
+  //     }
+  //     await this.p2p.restart()
+  //   })
+
+  //   Context.setShardusContext(this)
+
+  //   await Self.init(this.config)
+  //   await Self.startup()
+  // }
+
+  async start () {
+    // Check network up & time synced
+    await Network.init()
+    await Network.checkTimeSynced(this.config.p2p.timeServers)
+
+    // Setup network
+    await this.network.setup(Network.ipInfo)
+    this.network.on('timeout', () => { /** [TODO] Report lost */ })
+    this.network.on('error', () => { /** [TODO] Report lost */ })
+
+    // Setup storage
     await this.storage.init()
-    this._setupHeartbeat()
-    this.crypto = new Crypto(this.config, this.logger, this.storage)
-    setCryptoContext(this.crypto)
+
+    // Setup crypto
     await this.crypto.init()
 
-    const ipInfo = this.config.ip
-    const p2pConf = Object.assign({ ipInfo }, this.config.p2p)
-    this.p2p = new P2P(p2pConf, this.logger, this.storage, this.crypto)
-    setP2pContext(this.p2p)
-    await this.p2p.init(this.network)
+    // Setup other modules
     this.debug = new Debug(this.config.baseDir, this.network)
     this.debug.addToArchive(this.logger.logDir, './logs')
     this.debug.addToArchive(path.parse(this.storage.storage.storageConfig.options.storage).dir, './db')
@@ -210,41 +413,40 @@ class Shardus extends EventEmitter {
     this.debug.addToArchive('./statistics.tsv', './statistics.tsv')
 
     this.loadDetection = new LoadDetection(this.config.loadDetection, this.statistics)
+    this.loadDetection.on('highLoad', async () => { /** [TODO] Autoscaling scale up */ })
+    this.loadDetection.on('lowLoad', async () => { /** [TODO] Autoscaling scale down */ }) 
+
     this.statistics.on('snapshot', () => this.loadDetection.updateLoad())
-    this.loadDetection.on('highLoad', async () => {
-      await this.p2p.requestNetworkUpsize()
-    })
-    this.loadDetection.on('lowLoad', async () => {
-      await this.p2p.requestNetworkDownsize()
-    })
 
     this.rateLimiting = new RateLimiting(this.config.rateLimiting, this.loadDetection)
 
-    this.consensus = new Consensus(this.app, this.config, this.logger, this.crypto, this.p2p, this.storage, this.profiler)
+    this.consensus = new Consensus(this.app, this.config, this.logger, this.crypto, this.storage, this.profiler)
 
     if (this.app) {
       this._createAndLinkStateManager()
       this._attemptCreateAppliedListener()
     }
 
-    this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.p2p, this.statistics, this.stateManager, this.profiler, this.loadDetection) : null
+    this.reporter = this.config.reporting.report ? new Reporter(this.config.reporting, this.logger, this.statistics, this.stateManager, this.profiler, this.loadDetection) : null
 
     this._registerRoutes()
 
-    this.p2p.on('joining', (publicKey) => {
+    // Register listeners for P2P events
+    Self.emitter.on('joining', (publicKey) => {
       this.logger.playbackLogState('joining', '', publicKey)
       if (this.reporter) this.reporter.reportJoining(publicKey)
     })
-    this.p2p.on('joined', (nodeId, publicKey) => {
+    Self.emitter.on('joined', (nodeId, publicKey) => {
       this.logger.playbackLogState('joined', nodeId, publicKey)
       this.logger.setPlaybackID(nodeId)
       if (this.reporter) this.reporter.reportJoined(nodeId, publicKey)
     })
-    this.p2p.on('initialized', async () => {
-      await this.syncAppData()
-      this.p2p.goActive()
+    Self.emitter.on('initialized', async () => {
+      // [TODO] Enable once CycleCreator is fully operational
+      // await this.syncAppData()
+      // this.p2p.goActive()
     })
-    this.p2p.on('active', (nodeId) => {
+    Self.emitter.on('active', (nodeId) => {
       this.logger.playbackLogState('active', nodeId, '')
       if (this.reporter) {
         this.reporter.reportActive(nodeId)
@@ -253,23 +455,23 @@ class Shardus extends EventEmitter {
       if (this.statistics) this.statistics.startSnapshots()
       this.emit('active', nodeId)
     })
-    this.p2p.on('failed', () => {
-      this.shutdown(exitProcOnFail)
+    Self.emitter.on('failed', () => {
+      this.shutdown(true)
     })
-    this.p2p.on('error', (e) => {
+    Self.emitter.on('error', (e) => {
       console.log(e.message + ' at ' + e.stack)
       this.mainLogger.debug('shardus.start() ' + e.message + ' at ' + e.stack)
       this.fatalLogger.fatal('shardus.start() ' + e.message + ' at ' + e.stack)
       throw new Error(e)
     })
-    this.p2p.on('removed', async () => {
+    Self.emitter.on('removed', async () => {
       if (this.statistics) {
         this.statistics.stopSnapshots()
         this.statistics.initialize()
       }
       if (this.reporter) {
         this.reporter.stopReporting()
-        await this.reporter.reportRemoved(this.p2p.id)
+        await this.reporter.reportRemoved(Self.id)
       }
       if (this.app) {
         await this.app.deleteLocalAccountData()
@@ -280,12 +482,14 @@ class Shardus extends EventEmitter {
         // this._createAndLinkStateManager()
         // this._attemptCreateAppliedListener()
       }
-      await this.p2p.restart()
+      // await this.p2p.restart()
+      // [TODO] replace with cycle creator
     })
 
-    setShardusContext(this)
+    Context.setShardusContext(this)
 
-    await Self.init(this.config)
+    // Start P2P
+    await Self.init()
     await Self.startup()
   }
 
@@ -366,7 +570,7 @@ class Shardus extends EventEmitter {
     this._registerListener(this.consensus, 'accepted', (...txArgs: [ShardusTypes.AcceptedTx, boolean, ShardusTypes.Node, boolean]) => this.stateManager.queueAcceptedTransaction(...txArgs))
 
     this.storage.stateManager = this.stateManager
-    setStateManagerContext(this.stateManager)
+    Context.setStateManagerContext(this.stateManager)
   }
 
   /**

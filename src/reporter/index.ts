@@ -4,6 +4,8 @@ import Statistics from '../statistics'
 import StateManager from '../state-manager'
 import Profiler from '../utils/profiler'
 import Logger from '../logger'
+import { ipInfo } from '../network'
+import { id } from '../p2p/Self'
 const http = require('../http')
 const allZeroes64 = '0'.repeat(64)
 
@@ -29,10 +31,9 @@ interface Reporter {
 }
 
 class Reporter {
-  constructor (config, logger, p2p, statistics, stateManager, profiler, loadDetection) {
+  constructor (config, logger, statistics, stateManager, profiler, loadDetection) {
     this.config = config
     this.mainLogger = logger.getLogger('main')
-    this.p2p = p2p
     this.statistics = statistics
     this.stateManager = stateManager
     this.profiler = profiler
@@ -59,7 +60,7 @@ class Reporter {
       return
     }
     try {
-      const nodeIpInfo = this.p2p.getIpInfo()
+      const nodeIpInfo = ipInfo
       await http.post(`${this.config.recipient}/joining`, { publicKey, nodeIpInfo })
     } catch (e) {
       this.mainLogger.error('reportJoining: ' + e.name + ': ' + e.message + ' at ' + e.stack)
@@ -72,7 +73,7 @@ class Reporter {
       return
     }
     try {
-      const nodeIpInfo = this.p2p.getIpInfo()
+      const nodeIpInfo = ipInfo
       await http.post(`${this.config.recipient}/joined`, { publicKey, nodeId, nodeIpInfo })
     } catch (e) {
       this.mainLogger.error('reportJoined: ' + e.name + ': ' + e.message + ' at ' + e.stack)
@@ -109,7 +110,7 @@ class Reporter {
     if (!this.hasRecipient) {
       return
     }
-    const nodeId = this.p2p.getNodeId()
+    const nodeId = id
     if (!nodeId) throw new Error('No node ID available to the Reporter module.')
     const report = {
       nodeId,
@@ -127,17 +128,21 @@ class Reporter {
     // Creates and sends a report every `interval` seconds
     this.reportTimer = setInterval(async () => {
       let appState = this.stateManager ? await this.stateManager.getAccountsStateHash() : allZeroes64
-      const cycleMarker = this.p2p.getCycleMarker()
-      const cycleCounter = this.p2p.state.getCycleCounter()
-      const nodelistHash = this.p2p.getNodelistHash()
-      const desiredNodes = this.p2p.state.getDesiredCount()
+      // const cycleMarker = this.  p2p.getCycleMarker()
+      const cycleMarker = {} // [TODO] Replace with cycle creator
+      // const cycleCounter = this.  p2p.state.getCycleCounter()
+      const cycleCounter = -1 // [TODO] Replace with cycle creator
+      // const nodelistHash = this.  p2p.getNodelistHash()
+      const nodelistHash = 'abc' // Not needed anymore
+      // const desiredNodes = this.  p2p.state.getDesiredCount()
+      const desiredNodes = -1 // [TODO] Replace with cycle creator
       const txInjected = this.statistics ? this.statistics.getPreviousElement('txInjected') : 0
       const txApplied = this.statistics ? this.statistics.getPreviousElement('txApplied') : 0
       const txRejected = this.statistics ? this.statistics.getPreviousElement('txRejected') : 0
       const txExpired = this.statistics ? this.statistics.getPreviousElement('txExpired') : 0
       const txProcessed = this.statistics ? this.statistics.getPreviousElement('txProcessed') : 0
       const reportInterval = this.config.interval
-      const nodeIpInfo = this.p2p.getIpInfo()
+      const nodeIpInfo = ipInfo
 
       let repairsStarted = 0
       let repairsFinished = 0
