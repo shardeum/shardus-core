@@ -623,8 +623,8 @@ function compareCycleCertEndpoint(inp: CompareCertReq) {
 
 async function compareCycleCert(matches: number) {
   let match = 0
+  let tries = 0
   while (true) {
-    let tries = 0
 
     // Make sure matches makes sense
     const numActive = NodeList.activeByIdOrder.length - 1
@@ -667,20 +667,17 @@ async function compareCycleCert(matches: number) {
       }
     }
 
-    console.log(
-      'DBG matches',
-      `
-        matches: ${matches}
-        match: ${match}
-      `
-    )
+    console.log( 'DBG matches', ` matches: ${matches} match: ${match} tries: ${tries} `)
     // We got desired matches
     if (match >= matches) return true
 
     tries += 1
 
-    // Gone through all nodes and didn't get enough matches
-    if (tries >= nodes.length) return false
+    // Looped through all nodes and didn't get enough matches
+    if (tries >= nodes.length){
+      console.log(`Looped through all nodes but did not get enough matches. desired_matches: ${matches}  matched: ${match}  tries: ${tries}`)
+      return false
+    } 
   }
 }
 
