@@ -1,5 +1,6 @@
 import util from 'util'
 import * as utils from '../utils'
+import * as Network from '../network'
 
 export type QueryFunction<Node, Response> = (node: Node) => Promise<Response>
 
@@ -135,10 +136,43 @@ export async function robustQuery<Node = unknown, Response = unknown>(
       return { response, node }
     }
 
+    const rejectQuery = async node => {
+      const response = 'Tried to query self'
+      return { response, node }
+    }
+
     // We create a promise for each of the first `redundancy` nodes in the shuffled array
     const queries = []
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i]
+
+      // Return a bogus response if you tried to query yourself
+      const ourExternalIp = Network.ipInfo.externalIp
+      const ourExternalPort = Network.ipInfo.externalPort
+      const ourInternalIp = Network.ipInfo.externalIp
+      const outInternalPort = Network.ipInfo.externalPort
+      if (node && node['ip'] && node['port']) {
+        if (node['ip'] === ourExternalIp && node['port'] === ourExternalIp) {
+          console.log('DBG', 'TRIED TO ROBUSTQUERY SELF', node)
+          queries.push(rejectQuery(node))
+          continue
+        }
+      }
+      if (node && node['externalIp'] && node['externalPort']) {
+        if (node['externalIp'] === ourExternalIp && node['externalPort'] === ourExternalPort) {
+          console.log('DBG', 'TRIED TO ROBUSTQUERY SELF', node)
+          queries.push(rejectQuery(node))
+          continue
+        }
+      }
+      if (node && node['internalIp'] && node['internalPort']) {
+        if (node['internalIp'] === ourInternalIp && node['internalPort'] === outInternalPort) {
+          console.log('DBG', 'TRIED TO ROBUSTQUERY SELF', node)
+          queries.push(rejectQuery(node))
+          continue
+        }
+      }
+
       queries.push(wrappedQuery(node))
     }
     const [results, errs] = await utils.robustPromiseAll(queries)
