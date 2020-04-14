@@ -190,8 +190,8 @@ async function getNewestCycle(activeNodes: SyncNode[]): Promise<CycleRecord> {
   const [response, _responders] = await robustQuery(activeNodes, queryFn)
 
   // [TODO] Validate response
-  if (!response) return
-  if (!response.newestCycle) return
+  if (!response) throw new Error('Bad response')
+  if (!response.newestCycle) throw new Error('Bad response')
 
   const newestCycle = response.newestCycle as CycleRecord
   return newestCycle
