@@ -89,7 +89,7 @@ class Crypto {
     return objCopy
   }
 
-  verify (obj, expectedPk) {
+  verify (obj, expectedPk?) {
     if (expectedPk) {
       if (obj.sign.owner !== expectedPk) return false
     }

@@ -1,20 +1,18 @@
 import deepmerge from 'deepmerge'
 import { Logger } from 'log4js'
 import * as utils from '../utils'
+import * as Active from './Active'
 import * as Comms from './Comms'
 import { config, crypto, logger } from './Context'
 import * as CycleChain from './CycleChain'
 import * as Join from './Join'
-import * as Active from './Active'
 import { JoinedArchiver } from './Join'
 import * as NodeList from './NodeList'
 import * as Sync from './Sync'
-import {
-  GossipHandler,
-  InternalHandler,
-  SignedObject,
-  LooseObject,
-} from './Types'
+import { GossipHandler, InternalHandler, SignedObject } from './Types'
+import { compareQuery, Comparison } from './Utils'
+import { Node } from './p2p-state'
+import { send } from 'shardus-net/build/src/net'
 
 /** TYPES */
 
@@ -22,7 +20,7 @@ export type CycleMarker = string
 
 export interface CycleCert extends SignedObject {
   marker: CycleMarker
-  score: number
+  score?: number
 }
 
 interface BaseRecord {
@@ -58,6 +56,7 @@ const DESIRED_MARKER_MATCHES = 2
 /** STATE */
 
 let mainLogger: Logger
+let cycleLogger: Logger
 
 export const submodules = [Join, Active]
 
@@ -87,11 +86,11 @@ interface CompareMarkerRes {
 }
 
 interface CompareCertReq {
-  cert: CycleCert[]
+  certs: CycleCert[]
   record: CycleRecord
 }
 interface CompareCertRes {
-  cert: CycleCert[]
+  certs: CycleCert[]
   record: CycleRecord
 }
 
@@ -132,18 +131,17 @@ const compareMarkerRoute: InternalHandler<
   respond({ marker, txs })
 }
 
-const compareCertRoute: InternalHandler<CompareCertReq, CompareCertRes> = (
+const compareCertRoute: InternalHandler<CompareCertReq, CompareCertRes, NodeList.Node['id']> = (
   payload,
   respond,
   sender
 ) => {
   // [TODO] Validate payload
-  console.log('payload is', JSON.stringify(payload, null, 2))
-  respond(compareCycleCertEndpoint(payload))
+  respond(compareCycleCertEndpoint(payload, sender))
 }
 
-const gossipCertRoute: GossipHandler<CompareCertReq> = payload => {
-  gossipHandlerCycleCert(payload)
+const gossipCertRoute: GossipHandler<CompareCertReq, NodeList.Node['id']> = (payload, sender) => {
+  gossipHandlerCycleCert(payload, sender)
 }
 
 const routes = {
@@ -161,6 +159,7 @@ const routes = {
 export function init() {
   // Get a handle to write to main.log
   mainLogger = logger.getLogger('main')
+  cycleLogger = logger.getLogger('cycle')
 
   // Register routes
   for (const [name, handler] of Object.entries(routes.internal)) {
@@ -206,7 +205,7 @@ async function cycleCreator() {
   // Get the previous record
   let prevRecord = madeCycle ? CycleChain.newest : await fetchLatestRecord()
   while (!prevRecord) {
-    console.log(
+    warn(
       'CycleCreator: cycleCreator: Could not get prevRecord. Trying again in 1 sec...'
     )
     await utils.sleep(1 * SECOND)
@@ -249,7 +248,7 @@ async function cycleCreator() {
  */
 function runQ1() {
   currentQuarter = 1
-  console.log(`CycleCreator: C${currentCycle} Q${currentQuarter}`)
+  info(`C${currentCycle} Q${currentQuarter}`)
 }
 
 /**
@@ -257,7 +256,7 @@ function runQ1() {
  */
 function runQ2() {
   currentQuarter = 2
-  console.log(`CycleCreator: C${currentCycle} Q${currentQuarter}`)
+  info(`C${currentCycle} Q${currentQuarter}`)
 }
 
 /**
@@ -265,11 +264,15 @@ function runQ2() {
  */
 async function runQ3() {
   currentQuarter = 3
-  console.log(`CycleCreator: C${currentCycle} Q${currentQuarter}`)
+  info(`C${currentCycle} Q${currentQuarter}`)
 
   // Get txs and create this cycle's record, marker, and cert
   txs = collectCycleTxs()
   ;({ record, marker, cert } = makeCycleData(CycleChain.newest))
+
+  info(`Created cycle record: ${JSON.stringify(record)}`)
+  info(`Created cycle marker: ${JSON.stringify(marker)}`)
+  info(`Created cycle cert: ${JSON.stringify(cert)}`)
 
   // Compare this cycle's marker with the network
   const myC = currentCycle
@@ -287,13 +290,21 @@ async function runQ3() {
  */
 async function runQ4() {
   currentQuarter = 4
-  console.log(`CycleCreator: C${currentCycle} Q${currentQuarter}`)
+  info(`C${currentCycle} Q${currentQuarter}`)
 
   // Compare your cert for this cycle with the network
   const myC = currentCycle
   const myQ = currentQuarter
-  const matched = await compareCycleCert(DESIRED_CERT_MATCHES)
-  if (!matched) return
+
+  let matched
+  do {
+    matched = await compareCycleCert(DESIRED_CERT_MATCHES)
+    if (!matched) {
+      if (cycleQuarterChanged(myC, myQ)) return
+      await utils.sleep(100)
+    }
+  } while (!matched)
+
   if (cycleQuarterChanged(myC, myQ)) return
 
   // Save this cycle's record to the CycleChain
@@ -347,15 +358,9 @@ function makeCycleRecord(
     apoptosized: [],
   }) as CycleRecord
 
-  console.log('DBG cycleRecord', cycleRecord)
-  console.log('DBG cycleTxs', cycleTxs)
-  console.log('DBG prevRecord', prevRecord)
-
   submodules.map(submodule =>
     submodule.updateCycleRecord(cycleTxs, cycleRecord, prevRecord)
   )
-
-  console.log('DBG updated cycleRecord', cycleRecord)
 
   return cycleRecord
 }
@@ -373,25 +378,27 @@ async function compareCycleMarkers(desired) {
   let matches = 0
 
   // Get random nodes
-  const nodes = utils.getRandom(NodeList.activeByIdOrder, 2 * desired)
+  const nodes = utils.getRandom(NodeList.activeOthersByIdOrder, 2 * desired)
   if (nodes.length < 2) return true
 
   for (const node of nodes) {
     // Send marker, txs to /compare-marker endpoint of another node
     const req: CompareMarkerReq = { marker, txs }
     const resp: CompareMarkerRes = await Comms.ask(node, 'compare-marker', req)
-    if (resp.marker === marker) {
-      // Increment our matches if they computed the same marker
-      matches++
-      if (matches >= desired) return true
-    } else if (resp.txs) {
-      // Otherwise, Get missed CycleTxs
-      const unseen = unseenTxs(resp.txs, txs)
-      const validUnseen = dropInvalidTxs(unseen)
+    if (resp) {
+      if (resp.marker === marker) {
+        // Increment our matches if they computed the same marker
+        matches++
+        if (matches >= desired) return true
+      } else if (resp.txs) {
+        // Otherwise, Get missed CycleTxs
+        const unseen = unseenTxs(resp.txs, txs)
+        const validUnseen = dropInvalidTxs(unseen)
 
-      // Update this cycle's txs, record, marker, and cert
-      txs = deepmerge(txs, validUnseen)
-      ;({ record, marker, cert } = makeCycleData(CycleChain.newest))
+        // Update this cycle's txs, record, marker, and cert
+        txs = deepmerge(txs, validUnseen)
+        ;({ record, marker, cert } = makeCycleData(CycleChain.newest))
+      }
     }
   }
 
@@ -434,9 +441,15 @@ function dropInvalidTxs(txs: Partial<CycleTxs>) {
  */
 async function fetchLatestRecord(): Promise<CycleRecord> {
   try {
-    await Sync.syncNewCycles(NodeList.activeByIdOrder)
+    const oldCounter = CycleChain.newest.counter
+    await Sync.syncNewCycles(NodeList.activeOthersByIdOrder)
+    if (CycleChain.newest.counter <= oldCounter) {
+      // We didn't actually sync
+      info('CycleCreator: fetchLatestRecord: synced record not newer')
+      return null
+    }
   } catch (err) {
-    console.log('CycleCreator: syncPrevRecord: syncNewCycles failed:', err)
+    info('CycleCreator: fetchLatestRecord: syncNewCycles failed:', err)
     return null
   }
   return CycleChain.newest
@@ -519,34 +532,45 @@ function scoreCert(cert: CycleCert): number {
     const out = utils.XOR(cert.marker, id)
     return out
   } catch (err) {
-    console.log('scoreCert err:', err)
     return 0
   }
 }
 
-function validateCertSign(certs: CycleCert[]) {
+function validateCertSign(certs: CycleCert[], sender: NodeList.Node['id']) {
   for (const cert of certs) {
-    if (!crypto.verify(cert, cert.sign.owner)) {
+    const cleanCert: CycleCert = {
+      marker: cert.marker,
+      sign: cert.sign
+    }
+    if (NodeList.byPubKey.has(cleanCert.sign.owner) === false) {
+      console.log('DBG', 'bad owner')
+      return false
+    }
+    if (!crypto.verify(cleanCert)) {
+      console.log('DBG', 'bad sig')
       return false
     }
   }
   return true
 }
 
-function validateCerts(certs: CycleCert[]) {
-  console.log('validateCerts certs is', certs)
-  if (certs.length <= 0) {
+function validateCerts(certs: CycleCert[], record, sender) {
+  if (!certs || !Array.isArray(certs) || certs.length <= 0) {
+    console.log('bad certificate format')
     return false
   }
   // make sure all the certs are for the same cycle marker
-  const inpMarker = certs[0].marker
+  if (!record || !(typeof record === 'object' && record !== null)) return false
+  const inpMarker = crypto.hash(record)
   for (let i = 1; i < certs.length; i++) {
     if (inpMarker !== certs[i].marker) {
+      console.log('certificates marker does not match hash of record')
       return false
     }
   }
   //  checks signatures; more expensive
-  if (!validateCertSign(certs)) {
+  if (!validateCertSign(certs, sender)) {
+    console.log('certificate has bad sign')
     return false
   }
   return true
@@ -554,8 +578,7 @@ function validateCerts(certs: CycleCert[]) {
 
 // Given an array of cycle certs, go through them and see if we can improve our best cert
 // return true if we improved it
-function improveBestCert(certs: CycleCert[]) {
-  console.log('in improveBestCert certs is', JSON.stringify(certs))
+function improveBestCert(certs: CycleCert[], record) {
   let improved = false
   if (certs.length <= 0) {
     return false
@@ -566,10 +589,8 @@ function improveBestCert(certs: CycleCert[]) {
       bscore = bestCertScore.get(bestMarker)
     }
   }
-  console.log('in improveBestCert bscore is', JSON.stringify(bscore))
   for (const cert of certs) {
     cert.score = scoreCert(cert)
-    console.log('in improveBestCert cert.score is', JSON.stringify(cert.score))
     if (!bestCycleCert.get(cert.marker)) {
       bestCycleCert.set(cert.marker, [cert])
     } else {
@@ -578,10 +599,12 @@ function improveBestCert(certs: CycleCert[]) {
       let i = 0
       for (; i < bcerts.length; i++) {
         if (bcerts[i].score < cert.score) {
-          bcerts.splice(i, 0, cert)
-          bcerts.splice(BEST_CERTS_WANTED)
-          added = true
-          break
+          if (bcerts[i].sign.owner !== cert.sign.owner){ // make sure we don't store more than one cert from the same owner with the same marker
+            bcerts.splice(i, 0, cert)
+            bcerts.splice(BEST_CERTS_WANTED)
+            added = true
+            break
+          }
         }
       }
       if (!added && i < BEST_CERTS_WANTED) {
@@ -598,118 +621,188 @@ function improveBestCert(certs: CycleCert[]) {
     bestCertScore.set(cert.marker, score)
     if (score > bscore) {
       bestMarker = cert.marker
+      bestRecord = record
       improved = true
     }
   }
-  console.log('in improveBestCert improved is', JSON.stringify(improved))
   return improved
 }
 
-function compareCycleCertEndpoint(inp: CompareCertReq) {
+function compareCycleCertEndpoint(inp: CompareCertReq, sender) {
   // TODO - need to validate the external input; can be done before calling this function
-  const { cert: inpCerts, record: inpRecord } = inp
-  if (!validateCerts(inpCerts)) {
-    return { cert: bestCycleCert.get(marker), record }
+  const { certs: inpCerts, record: inpRecord } = inp
+  if (!validateCerts(inpCerts, inpRecord, sender)) {
+    return { certs: bestCycleCert.get(marker), record }
   }
   const inpMarker = inpCerts[0].marker
   if (inpMarker !== makeCycleMarker(inpRecord)) {
-    return { cert: bestCycleCert.get(marker), record }
+    return { certs: bestCycleCert.get(marker), record }
   }
-  if (improveBestCert(inpCerts)) {
-    bestRecord = inpRecord
+  if (improveBestCert(inpCerts, inpRecord)) {
+    // don't need the following line anymore since improveBestCert sets bestRecord if it improved
+    // bestRecord = inpRecord
   }
-  return { cert: bestCycleCert.get(marker), record }
+  return { certs: bestCycleCert.get(marker), record }
 }
 
 async function compareCycleCert(matches: number) {
-  let match = 0
-  let tries = 0
-  while (true) {
-
-    // Make sure matches makes sense
-    const numActive = NodeList.activeByIdOrder.length - 1
-    if (numActive < 1) return true
-    if (matches > numActive) matches = numActive
-
-    // Get random nodes
-    const nodes = utils.getRandom(NodeList.activeByIdOrder, 2 * matches)
-    if (nodes.length < 2) return true
-
-    console.log('DBG matches', matches)
-
-    for (const node of nodes) {
-      const req: CompareCertReq = {
-        cert: bestCycleCert.get(bestMarker),
-        record: bestRecord,
-      }
-      req.cert = bestCycleCert.get(bestMarker)
-      req.record = bestRecord
-      console.log('req is ', JSON.stringify(req, null, 2))
-      console.log('bestRecord is ', JSON.stringify(bestRecord, null, 2))
-      const resp: CompareCertRes = await Comms.ask(node, 'compare-cert', req) // NEED to set the route string
-      if (!resp) continue
-      // TODO - validate resp
-      const { cert: inpCerts, record: inpRecord } = resp
-      if (!validateCerts(inpCerts)) continue
-
-      // Our markers match
-      const inpMarker = inpCerts[0].marker
-      if (inpMarker === bestMarker) match += 1
-
-      const bestMarkerPrev = bestMarker
-      if (improveBestCert(inpCerts)) {
-        bestRecord = inpRecord
-        // Their marker is better, change to it, and start over
-        if (bestCertScore.get(bestMarkerPrev) < bestCertScore.get(bestMarker)) {
-          match = 1
-          break
-        }
-      }
+  const queryFn = async (node: NodeList.Node): Promise<[CompareCertRes, NodeList.Node]> => {
+    const req: CompareCertReq = {
+      certs: bestCycleCert.get(bestMarker),
+      record: bestRecord,
     }
-
-    console.log( 'DBG matches', ` matches: ${matches} match: ${match} tries: ${tries} `)
-    // We got desired matches
-    if (match >= matches) return true
-
-    tries += 1
-
-    // Looped through all nodes and didn't get enough matches
-    if (tries >= nodes.length){
-      console.log(`Looped through all nodes but did not get enough matches. desired_matches: ${matches}  matched: ${match}  tries: ${tries}`)
-      return false
-    } 
+    const resp: CompareCertRes = await Comms.ask(node, 'compare-cert', req) // NEED to set the route string
+    // [TODO] Validate resp
+    if (!resp || !resp.certs || !resp.certs[0].marker || !resp.record) {
+      throw new Error('compareCycleCert: Invalid query response')
+    }
+    return [resp, node]
   }
+
+  const compareFn = respArr => {
+    const [resp, node] = respArr
+    if (resp.certs[0].marker === bestMarker) {
+      // Our markers match
+      return Comparison.EQUAL
+    } else if (!validateCerts(resp.certs, resp.record, node.id)) {
+      return Comparison.WORSE
+    } else if (improveBestCert(resp.certs, resp.record)) {
+      // Their marker is better, change to it and their record
+      // don't need the following line anymore since improveBestCert sets bestRecord if it improved
+      // bestRecord = resp.record
+      return Comparison.BETTER
+    } else {
+      // Their marker was worse
+      return Comparison.WORSE
+    }
+  }
+
+  // Make sure matches makes sense
+  if (matches > NodeList.activeOthersByIdOrder.length) {
+    matches = NodeList.activeOthersByIdOrder.length
+  }
+
+  // If anything compares better than us, compareQuery starts over
+  const errors = await compareQuery<NodeList.Node, [CompareCertRes, NodeList.Node]>(
+    NodeList.activeOthersByIdOrder,
+    queryFn,
+    compareFn,
+    matches
+  )
+
+  warn(`compareCycleCertEndpoint: errors: ${JSON.stringify(errors)}`)
+
+  // Anything that's not an error, either matched us or compared worse than us
+  info(`
+    NodeList.activeOthersByIdOrder.length - errors.length >= matches
+    ${NodeList.activeOthersByIdOrder.length} - ${errors.length} >= ${matches}
+  `)
+  return NodeList.activeOthersByIdOrder.length - errors.length >= matches
 }
+
+// async function compareCycleCert_ORIG(matches: number) {
+//   let match = 0
+//   let tries = 0
+//   if (NodeList.activeOthersByIdOrder.length < matches) {
+//     matches = NodeList.activeOthersByIdOrder.length
+//   }
+//   while (true) {
+//     // Make sure matches makes sense
+//     const numActive = NodeList.activeOthersByIdOrder.length
+//     if (numActive < 1) return true
+//     if (matches > numActive) matches = numActive
+
+//     // Get random nodes
+//     const nodes = utils.getRandom(NodeList.activeOthersByIdOrder, 2 * matches)
+//     if (nodes.length < 2) return true
+
+//     for (const node of nodes) {
+//       const req: CompareCertReq = {
+//         certs: bestCycleCert.get(bestMarker),
+//         record: bestRecord,
+//       }
+//       const resp: CompareCertRes = await Comms.ask(node, 'compare-cert', req) // NEED to set the route string
+//       if (!resp) continue
+//       // TODO - validate resp
+//       const { certs: inpCerts, record: inpRecord } = resp
+//       if (!validateCerts(inpCerts)) continue
+
+//       // Our markers match
+//       const inpMarker = inpCerts[0].marker
+//       if (inpMarker === bestMarker) match += 1
+
+//       const bestMarkerPrev = bestMarker
+//       if (improveBestCert(inpCerts)) {
+//         bestRecord = inpRecord
+//         // Their marker is better, change to it, and start over
+//         if (bestCertScore.get(bestMarkerPrev) < bestCertScore.get(bestMarker)) {
+//           match = 1
+//           break
+//         }
+//       }
+//     }
+
+//     // We got desired matches
+//     if (match >= matches) return true
+
+//     tries += 1
+
+//     // Looped through all nodes and didn't get enough matches
+//     if (tries >= nodes.length) {
+//       return false
+//     }
+//   }
+// }
 
 async function gossipMyCycleCert() {
   // We may have already received certs from other other nodes so gossip only if our cert improves it
-  console.log('in gossipMyCycleCert record is ', JSON.stringify(record))
-  console.log('in gossipMyCycleCert cert is ', JSON.stringify(cert))
   madeCert = true
-  if (improveBestCert([cert])) {
-    bestRecord = record
-    console.log(
-      'in gossipMyCycleCert bestRecord is ',
-      JSON.stringify(bestRecord)
-    )
+  if (improveBestCert([cert], record)) {
+    // don't need the following line anymore since improveBestCert sets bestRecord if it improved
+    // bestRecord = record
     await gossipCycleCert()
   }
 }
 
-function gossipHandlerCycleCert(inp: CompareCertReq) {
+function gossipHandlerCycleCert(inp: CompareCertReq, sender: NodeList.Node['id']) {
   // TODO - need to validate the external input; can be done before calling this function
-  const { cert: inpCerts, record: inpRecord } = inp
-  if (!validateCerts(inpCerts)) {
+  const { certs: inpCerts, record: inpRecord } = inp
+  if (!validateCerts(inpCerts, inpRecord, sender)) {
     return
   }
-  if (improveBestCert(inpCerts)) {
-    bestRecord = inpRecord
+  if (improveBestCert(inpCerts, inpRecord)) {
+    // don't need the following line anymore since improveBestCert sets bestRecord if it improved
+    // bestRecord = inpRecord
     gossipCycleCert()
   }
 }
 
 // This gossips the best cert we have
 async function gossipCycleCert() {
-  const certGossip: CompareCertReq = { cert: bestCycleCert.get(marker), record }
+  const certGossip: CompareCertReq = {
+    certs: bestCycleCert.get(marker),
+    record,
+  }
   Comms.sendGossipIn('gossip-cert', certGossip)
+}
+
+function info(...msg) {
+  const entry = `CycleCreator: ${msg.join(' ')}`
+  // mainLogger.info(entry)
+  // cycleLogger.info(entry)
+  console.log('INFO: ' + entry)
+}
+
+function warn(...msg) {
+  const entry = `CycleCreator: ${msg.join(' ')}`
+  // mainLogger.warn(entry)
+  // cycleLogger.info('WARN: ' + entry)
+  console.log('WARN: ' + entry)
+}
+
+function error(...msg) {
+  const entry = `CycleCreator: ${msg.join(' ')}`
+  // mainLogger.error(entry)
+  // cycleLogger.info('ERROR: ' + entry)
+  console.log('ERROR: ' + entry)
 }

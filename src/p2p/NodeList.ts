@@ -3,6 +3,7 @@ import { crypto } from './Context'
 import { JoinedConsensor } from './Join'
 import { NodeStatus } from './Types'
 import deepmerge = require('deepmerge')
+import { id } from './Self'
 
 /** TYPES */
 
@@ -32,6 +33,7 @@ export let byIpPort: Map<string, Node>
 export let byJoinOrder: Node[]
 export let byIdOrder: Node[]
 export let activeByIdOrder: Node[]
+export let activeOthersByIdOrder: Node[]
 
 function initialize() {
   nodes = new Map()
@@ -40,6 +42,7 @@ function initialize() {
   byJoinOrder = []
   byIdOrder = []
   activeByIdOrder = []
+  activeOthersByIdOrder = []
 }
 initialize()
 
@@ -69,6 +72,12 @@ export async function addNode(node: Node) {
     insertSorted(activeByIdOrder, node, (a, b) => {
       return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
     })
+    // Dont insert yourself into activeOthersByIdOrder
+    if (node.id !== id) {
+      insertSorted(activeOthersByIdOrder, node, (a, b) => {
+        return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
+      })
+    }
   }
 
   // Add nodes to old p2p-state nodelist
@@ -82,6 +91,8 @@ export async function addNodes(newNodes: Node[]) {
 export function removeNode(id) {
   // In reverse
   let idx
+  idx = binarySearch(activeOthersByIdOrder, { id })
+  if (idx >= 0) activeOthersByIdOrder.splice(idx, 1)
   idx = binarySearch(activeByIdOrder, { id })
   if (idx >= 0) activeByIdOrder.splice(idx, 1)
   idx = binarySearch(byIdOrder, { id })

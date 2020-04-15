@@ -8,6 +8,21 @@ export type VerifyFunction<Result> = (result: Result) => boolean
 
 export type EqualityFunction<Value> = (val1: Value, val2: Value) => boolean
 
+export type CompareFunction<Result> = (result: Result) => Comparison
+
+export enum Comparison {
+  BETTER = 1,
+  EQUAL = 0,
+  WORSE = -1,
+}
+
+export interface CompareQueryError<Node> {
+  node: Node
+  error: string
+}
+
+export type CompareFunctionResult<Node> = Array<CompareQueryError<Node>>
+
 export interface SequentialQueryError<Node> {
   node: Node
   error: Error
@@ -17,6 +32,54 @@ export interface SequentialQueryError<Node> {
 export interface SequentialQueryResult<Node> {
   result: unknown
   errors: Array<SequentialQueryError<Node>>
+}
+
+export async function compareQuery<Node = unknown, Response = unknown>(
+  nodes: Node[],
+  queryFn: QueryFunction<Node, Response>,
+  compareFn: CompareFunction<Response>,
+  matches: number
+): Promise<CompareFunctionResult<Node>> {
+  let startOver: boolean
+  let errors: Array<CompareQueryError<Node>>
+  let matched: number
+
+  do{
+    startOver = false
+    errors = []
+    matched = 0
+
+    for (const node of nodes) {
+      try {
+        const response = await queryFn(node)
+
+        switch (compareFn(response)) {
+          case Comparison.BETTER:
+            // We start over
+            startOver = true
+            break
+          case Comparison.EQUAL:
+            matched++
+            if (matched >= matches) return errors
+            break
+          case Comparison.WORSE:
+            // Try the next one
+            break
+          default:
+        }
+
+        if (startOver) break
+      } catch (error) {
+        errors.push({
+          node,
+          error: JSON.stringify(error, Object.getOwnPropertyNames(error)),
+        })
+      }
+    }
+  }
+  while (startOver)
+
+  return errors
 }
 
 export async function sequentialQuery<Node = unknown, Response = unknown>(
@@ -56,6 +119,16 @@ export async function sequentialQuery<Node = unknown, Response = unknown>(
   }
 }
 
+/**
+ * [TODO] robustQuery should handle being given an enourmous node list (Dont copy and shuffle it)
+ * robustQuery should NOT be given a node list that includes yourself (Use NodeList.activeOthersByIdOrder).
+ *
+ * @param nodes
+ * @param queryFn
+ * @param equalityFn
+ * @param redundancy
+ * @param shuffleNodes
+ */
 export async function robustQuery<Node = unknown, Response = unknown>(
   nodes: Node[] = [],
   queryFn: QueryFunction<Node, Response>,
@@ -136,43 +209,10 @@ export async function robustQuery<Node = unknown, Response = unknown>(
       return { response, node }
     }
 
-    const rejectQuery = async node => {
-      const response = 'Tried to query self'
-      return { response, node }
-    }
-
     // We create a promise for each of the first `redundancy` nodes in the shuffled array
     const queries = []
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i]
-
-      // Return a bogus response if you tried to query yourself
-      const ourExternalIp = Network.ipInfo.externalIp
-      const ourExternalPort = Network.ipInfo.externalPort
-      const ourInternalIp = Network.ipInfo.externalIp
-      const outInternalPort = Network.ipInfo.externalPort
-      if (node && node['ip'] && node['port']) {
-        if (node['ip'] === ourExternalIp && node['port'] === ourExternalIp) {
-          console.log('DBG', 'TRIED TO ROBUSTQUERY SELF', node)
-          queries.push(rejectQuery(node))
-          continue
-        }
-      }
-      if (node && node['externalIp'] && node['externalPort']) {
-        if (node['externalIp'] === ourExternalIp && node['externalPort'] === ourExternalPort) {
-          console.log('DBG', 'TRIED TO ROBUSTQUERY SELF', node)
-          queries.push(rejectQuery(node))
-          continue
-        }
-      }
-      if (node && node['internalIp'] && node['internalPort']) {
-        if (node['internalIp'] === ourInternalIp && node['internalPort'] === outInternalPort) {
-          console.log('DBG', 'TRIED TO ROBUSTQUERY SELF', node)
-          queries.push(rejectQuery(node))
-          continue
-        }
-      }
-
       queries.push(wrappedQuery(node))
     }
     const [results, errs] = await utils.robustPromiseAll(queries)

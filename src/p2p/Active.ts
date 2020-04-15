@@ -123,9 +123,6 @@ function addActiveRequest(request: SignedActiveRequest) {
   if (!request) return false
 
   activeRequests.push(request)
-
-  console.log('DBG added activeRequest', request)
-
   return true
 }
 
