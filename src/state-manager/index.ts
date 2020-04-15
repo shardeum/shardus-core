@@ -349,7 +349,7 @@ class StateManager extends EventEmitter {
     cycleShardData.nodeShardDataMap = new Map()
     cycleShardData.parititionShardDataMap = new Map()
     cycleShardData.activeNodes = this.p2p.state.getActiveNodes(null)
-    cycleShardData.activeNodes.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
+    cycleShardData.activeNodes.sort(utils.sort_id_Asc) // function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
     cycleShardData.cycleNumber = cycleNumber
     
 
@@ -1464,7 +1464,7 @@ class StateManager extends EventEmitter {
           this.combinedAccountData = this.combinedAccountData.concat(accountData2)
         }
       } else {
-        this.mainLogger.debug(`DATASYNC: syncAccountData3 got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lowTimeQuery} highestTS1: ${result.data.highestTs}`)
+        this.mainLogger.debug(`DATASYNC: syncAccountData3b got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lowTimeQuery} highestTS1: ${result.data.highestTs}`)
         this.combinedAccountData = this.combinedAccountData.concat(accountData)
         loopCount++
         // await utils.sleep(500)
@@ -1917,19 +1917,22 @@ class StateManager extends EventEmitter {
     // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
     // Updated names:  accountStart , accountEnd
     this.p2p.registerInternal('get_account_data', async (payload:GetAccountDataReq, respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => any) => {
-      let result = {} as {accountData: Shardus.WrappedData[] | null}//TSConversion  This is complicated !! check app for details.
-      let accountData = null
-      let ourLockID = -1
-      try {
-        ourLockID = await this.fifoLock('accountModification')
-        accountData = await this.app.getAccountData(payload.accountStart, payload.accountEnd, payload.maxRecords)
-      } finally {
-        this.fifoUnlock('accountModification', ourLockID)
-      }
-      //PERF Disiable this in production or performance testing.
-      this.testAccountDataWrapped(accountData)      
-      result.accountData = accountData
-      await respond(result)
+      
+      throw new Error('get_account_data endpoint retired')
+      
+      // let result = {} as {accountData: Shardus.WrappedData[] | null}//TSConversion  This is complicated !! check app for details.
+      // let accountData = null
+      // let ourLockID = -1
+      // try {
+      //   ourLockID = await this.fifoLock('accountModification')
+      //   accountData = await this.app.getAccountData(payload.accountStart, payload.accountEnd, payload.maxRecords)
+      // } finally {
+      //   this.fifoUnlock('accountModification', ourLockID)
+      // }
+      // //PERF Disiable this in production or performance testing.
+      // this.testAccountDataWrapped(accountData)      
+      // result.accountData = accountData
+      // await respond(result)
     })
 
     this.p2p.registerInternal('get_account_data2', async (payload:GetAccountData2Req, respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => any) => {
@@ -2462,11 +2465,6 @@ class StateManager extends EventEmitter {
       await respond(result)
     })
   
-
-    function _sortByIdAsc(a:any, b:any):number {
-       return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
-    }
-
     this.p2p.registerInternal('get_globalaccountreport', async (payload:any, respond: (arg0: GlobalAccountReportResp) => any) => {
       let result = {combinedHash:"", accounts:[]} as GlobalAccountReportResp
 
@@ -2518,7 +2516,7 @@ class StateManager extends EventEmitter {
       }   
       //PERF Disiable this in production or performance testing.
       this.testAccountDataWrapped(accountData)
-      result.accounts.sort(this._sortByIdAsc )
+      result.accounts.sort(utils.sort_id_Asc )
       result.combinedHash = this.crypto.hash(result)
       //this.globalAccountRepairBank
 
@@ -4251,7 +4249,7 @@ class StateManager extends EventEmitter {
     return results
   }
 
-  _distanceSort(a:SimpleDistanceObject, b:SimpleDistanceObject){
+  _distanceSortAsc(a:SimpleDistanceObject, b:SimpleDistanceObject){
     if(a.distance === b.distance){
       return 0
     }
@@ -4265,7 +4263,7 @@ class StateManager extends EventEmitter {
     let hashNumber = parseInt(hash.slice(0, 7), 16)
     let nodes = this.p2p.state.getActiveNodes()
     let nodeDistMap:{id:string, distance:number}[] = nodes.map(node => ({ id: node.id, distance: Math.abs(hashNumber - parseInt(node.id.slice(0, 7), 16)) }))
-    nodeDistMap.sort(this._distanceSort)////(a, b) => a.distance < b.distance)
+    nodeDistMap.sort(this._distanceSortAsc)////(a, b) => a.distance < b.distance)
     console.log('SORTED NODES BY DISTANCE', nodes)
     return nodeDistMap.slice(0, count).map(node => node.id)
   }
@@ -5278,13 +5276,6 @@ class StateManager extends EventEmitter {
   //  this works with syncTXsFromHashSetStrings to correct our partition object data. unlike the other version of this function this just creates entries on a
   //  temp member newTxList that will be used for the next partition object calculation
 
-  // Todo , made this quick, maybe reorganize them into a group.
-  _sortNumberI (a:{i:number}, b:{i:number}) { 
-    return a.i - b.i 
-  }
-  _sortNumber (a:number, b:number) { 
-    return a - b
-  }
   /**
    * _mergeRepairDataIntoLocalState2
    * used by syncTXsFromHashSetStrings in the complex case where we had to run consensus on individual transactions and request transactions from possibly multiple nodes
@@ -5324,14 +5315,14 @@ class StateManager extends EventEmitter {
     // let newTxList = { hashes: [...txList.hashes], passed: [...txList.passed], txs: [...txList.txs] }  forced to add processed here.
     let newTxList:NewTXList = { hashes: [], passed: [], txs: [], thashes: [], tpassed: [], ttxs: [], tstates: [], states: [], processed:false }
     txList.newTxList = newTxList // append it to tx list for now.
-    repairTracker.solutionDeltas.sort(this._sortNumberI) // function (a, b) { return a.i - b.i }) // why did b - a help us once??
+    repairTracker.solutionDeltas.sort(utils.sort_i_Asc) // function (a, b) { return a.i - b.i }) // why did b - a help us once??
 
     let debugSol = []
     for (let solution of repairTracker.solutionDeltas) {
       debugSol.push({ i: solution.i, tx: solution.tx.id.slice(0, 4), st: solution.state }) // TXSTATE_TODO
     }
 
-    ourHashSet.extraMap.sort(this._sortNumber) // function (a, b) { return a - b })
+    ourHashSet.extraMap.sort(utils.sortAsc) // function (a, b) { return a - b })
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 z  ${debugKey} ourHashSet.extraMap: ${utils.stringifyReduce(ourHashSet.extraMap)} debugSol: ${utils.stringifyReduce(debugSol)}`)
 
     // build up a working list for the solution but leave out the extra entries.
@@ -5491,7 +5482,7 @@ class StateManager extends EventEmitter {
 
     // This will create an set of input to send to the general purpose solver
     let hashSetList = /** @type {HashSetEntryPartitions[]} */(this.solveHashSetsPrep(cycleCounter, partitionId, this.crypto.getPublicKey()))
-    // hashSetList.sort(function (a, b) { return a.hash > b.hash }) // sort so that solution will be deterministic
+    // sort so that solution will be deterministic
     hashSetList.sort(utils.sortHashAsc)
     // This runs the general purose solver
     let output = StateManager.solveHashSets2(hashSetList)
@@ -5509,7 +5500,7 @@ class StateManager extends EventEmitter {
     // REFLOW HACK.  when we randomize host selection should make sure not to pick this forced solution as an answer (edit: not sure what this means any more.)
     // TODO perf:  if we fixed the algorith we could probably do this in one pass instead
     let hashSetList2 = /** @type {HashSetEntryPartitions[]} */(this.solveHashSetsPrep(cycleCounter, partitionId, this.crypto.getPublicKey()))
-    // hashSetList2.sort(function (a, b) { return a.hash > b.hash }) // sort so that solution will be deterministic
+    // sort so that solution will be deterministic
     hashSetList2.sort(utils.sortHashAsc) // sort so that solution will be deterministic
     /** @type {HashSetEntryPartitions} */
     let hashSet = { hash: 'FORCED', votePower: 1000, hashSet: outputHashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [], ourRow: false, indexMap: [], extraMap: [], waitForIndex: -1, ownVotes: [] }
@@ -5607,7 +5598,7 @@ class StateManager extends EventEmitter {
     for (let i = 0; i < requestsByHost.length; i++) {
       if (requestsByHost[i] != null) {
         // I think we don't need this anymore:
-        // requestsByHost[i].requests.sort(function (a, b) { return a - b }) // sort these since the reponse for the host will also sort by timestamp
+        // requestsByHost[i].requests.sort(BAD SORT function (a, b) { return a - b }) // sort these since the reponse for the host will also sort by timestamp
 
         let payload = { partitionId: partitionId, cycle: cycleNumber, tx_indicies: requestsByHost[i].hostIndex, hash: requestsByHost[i].hash, debugSnippets: requestsByHost[i].txSnippets }
         if (this.extendedRepairLogging) console.log(`get_transactions_by_partition_index ok! ${debugKey} payload: ${utils.stringifyReduce(payload)}`)
@@ -5955,7 +5946,7 @@ class StateManager extends EventEmitter {
       }
 
       // sort the list by ascending timestamp
-      newTXList.sort(function (a, b) { return a.timestamp - b.timestamp })
+      newTXList.sort(utils.sortTimestampAsc) // (function (a, b) { return a.timestamp - b.timestamp })
 
       if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
       if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs newTXList.length: ${newTXList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
@@ -6200,7 +6191,7 @@ class StateManager extends EventEmitter {
       }
 
       // sort the list by ascending timestamp
-      newTXList.sort(function (a, b) { return a.timestamp - b.timestamp })
+      newTXList.sort(utils.sortTimestampAsc) // function (a, b) { return a.timestamp - b.timestamp })
 
       if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair updateTrackingAndPrepareRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
       if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair updateTrackingAndPrepareRepairs newTXList.length: ${newTXList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
@@ -6255,7 +6246,7 @@ class StateManager extends EventEmitter {
     }
     this.mainLogger.debug(`applyAllPreparedRepairs total reset:${Object.keys(allAccountsToResetById).length} txIDToAcc:${Object.keys(txIDToAcc).length}`)
 
-    newTXList.sort(function (a, b) { return a.timestamp - b.timestamp })
+    newTXList.sort(utils.sortTimestampAsc) // function (a, b) { return a.timestamp - b.timestamp })
 
 
 
@@ -7135,7 +7126,7 @@ class StateManager extends EventEmitter {
   }
 
   sortAndMaintainBackupList(globalBackupList:Shardus.AccountsCopy[], oldestTimestamp: number): void{
-    globalBackupList.sort(this.sortByTimestamp)
+    globalBackupList.sort(utils.sortTimestampAsc) // this.sortByTimestamp)
     //remove old entries. then bail.
     // note this loop only runs if there is more than one entry
     // also it should always keep the last item in the list now matter what (since that is the most current backup)
@@ -7200,7 +7191,8 @@ class StateManager extends EventEmitter {
     if (a.acceptedTx.timestamp === b.acceptedTx.timestamp) {
       return utils.sortAsc(a.acceptedTx.id, b.acceptedTx.id)
     }
-    return a.acceptedTx.timestamp - b.acceptedTx.timestamp
+    //return a.acceptedTx.timestamp - b.acceptedTx.timestamp
+    return (a.acceptedTx.timestamp > b.acceptedTx.timestamp) ? -1 : 1
   }
 
   /**
@@ -7799,7 +7791,11 @@ class StateManager extends EventEmitter {
     if (strict && agtb > 0) {
       return 1
     }
-    return agtb - bgta
+
+    //return agtb - bgta
+
+    return utils.sortAsc( agtb , bgta)
+
     // what to return?
   }
 
@@ -8019,7 +8015,7 @@ class StateManager extends EventEmitter {
       }
 
       // not so sure about this sort  local vs. global index space.
-      hashListEntry.corrections.sort((a, b) => a.i - b.i)
+      hashListEntry.corrections.sort( utils.sort_i_Asc ) // (a, b) => a.i - b.i)
       winningVoteIndex = 0
 
       // hashListEntry.allWinningVotes = allWinningVotes
@@ -8197,7 +8193,7 @@ class StateManager extends EventEmitter {
     //   txSourceList = txList.newTxList
     // }
 
-    // solutionDeltas.sort(function (a, b) { return a.i - b.i }) // why did b - a help us once??
+    // solutionDeltas.sort(function (a, b) {BAD SORT return a.i - b.i }) // why did b - a help us once??
 
     // let debugSol = []
     // for (let solution of repairTracker.solutionDeltas) {
@@ -8254,8 +8250,8 @@ class StateManager extends EventEmitter {
       if (log) console.log(`testHashsetSolution: ourHashSet.indexMap missing`)
       return false
     }
-    ourHashSet.extraMap.sort(function (a, b) { return a - b })
-    solutionList.sort(function (a, b) { return a.i - b.i })
+    ourHashSet.extraMap.sort( utils.sortAsc )  // function (a, b) { return a - b })
+    solutionList.sort( utils.sort_i_Asc )   // function (a, b) { return a.i - b.i })
 
     let extraIndex = 0
     for (let i = 0; i < txSourceList.hashes.length; i++) {

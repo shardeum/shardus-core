@@ -356,7 +356,7 @@ class ShardFunctions {
 
     nodeShardData.consensusNodeForOurNodeFull = Object.values(shardPartitionData.coveredBy)
     nodeShardData.needsUpdateToFullConsensusGroup = false
-    nodeShardData.consensusNodeForOurNodeFull.sort(ShardFunctions.nodeSort)
+    nodeShardData.consensusNodeForOurNodeFull.sort(ShardFunctions.nodeSortAsc)
 
     // merge into our full list for sake of TX calcs.  todo could try to be smart an only do this in some cases.
     // let [results] = ShardFunctions.mergeNodeLists(nodeShardData.nodeThatStoreOurParition, nodeShardData.consensusNodeForOurNodeFull)
@@ -369,7 +369,7 @@ class ShardFunctions {
     // }
 
     nodeShardData.nodeThatStoreOurParitionFull = results
-    nodeShardData.nodeThatStoreOurParitionFull.sort(ShardFunctions.nodeSort)
+    nodeShardData.nodeThatStoreOurParitionFull.sort(ShardFunctions.nodeSortAsc)
   }
 
 
@@ -634,9 +634,9 @@ class ShardFunctions {
       if (extras.length > 0) {
         ShardFunctions.dilateNeighborCoverage(shardGlobals, nodeShardDataMap, parititionShardDataMap, activeNodes, nodeShardData, extras)
       }
-      nodeShardData.edgeNodes.sort(ShardFunctions.nodeSort)
-      nodeShardData.consensusNodeForOurNodeFull.sort(ShardFunctions.nodeSort)
-      nodeShardData.nodeThatStoreOurParitionFull.sort(ShardFunctions.nodeSort)
+      nodeShardData.edgeNodes.sort(ShardFunctions.nodeSortAsc)
+      nodeShardData.consensusNodeForOurNodeFull.sort(ShardFunctions.nodeSortAsc)
+      nodeShardData.nodeThatStoreOurParitionFull.sort(ShardFunctions.nodeSortAsc)
     } else {
       nodeShardData.consensusNodeForOurNode = []
       nodeShardData.consensusNodeForOurNodeFull = []
@@ -647,9 +647,9 @@ class ShardFunctions {
       nodeShardData.edgeNodes = nodeShardData.nodeThatStoreOurParitionFull.slice(0) // just dupe the stored list.
       nodeShardData.edgeNodes = ShardFunctions.subtractNodeLists(nodeShardData.edgeNodes, excludeNodeArray) // remove ourself!
 
-      nodeShardData.edgeNodes.sort(ShardFunctions.nodeSort)
-      nodeShardData.consensusNodeForOurNodeFull.sort(ShardFunctions.nodeSort)
-      nodeShardData.nodeThatStoreOurParitionFull.sort(ShardFunctions.nodeSort)
+      nodeShardData.edgeNodes.sort(ShardFunctions.nodeSortAsc)
+      nodeShardData.consensusNodeForOurNodeFull.sort(ShardFunctions.nodeSortAsc)
+      nodeShardData.nodeThatStoreOurParitionFull.sort(ShardFunctions.nodeSortAsc)
     }
 
     // storedBy
@@ -693,7 +693,7 @@ class ShardFunctions {
     // nodeShardData.nodeThatStoreOurParitionFull.sort(ShardFunctions.nodeSort)
   }
 
-  static nodeSort (a:Shardus.Node, b: Shardus.Node) {
+  static nodeSortAsc (a:Shardus.Node, b: Shardus.Node) {
     return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
   }
 

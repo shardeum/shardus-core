@@ -459,8 +459,20 @@ export const sortDec = (a, b) => {
   return a === b ? 0 : a > b ? -1 : 1
 }
 
+export const sort_i_Asc = (a, b) => {
+  return a.i === b.i ? 0 : a.i < b.i ? -1 : 1
+}
+
+export const sort_id_Asc = (a, b) => {
+  return a.id === b.id ? 0 : a.id < b.id ? -1 : 1
+}
+
 export const sortHashAsc = (a, b) => {
-  return a === b ? 0 : a.hash < b.hash ? -1 : 1
+  return a.hash === b.hash ? 0 : a.hash < b.hash ? -1 : 1
+}
+
+export const sortTimestampAsc = (a, b) => {
+  return a.timestamp === b.timestamp ? 0 : a.timestamp < b.timestamp ? -1 : 1
 }
 
 export const sortAscProp = (a, b, propName) => {
