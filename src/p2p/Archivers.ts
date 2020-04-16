@@ -50,7 +50,7 @@ export function addJoinRequest (joinRequest, tracker?, gossip = true) {
 
   joinRequests.push(joinRequest)
   if (gossip === true) {
-    Comms.sendGossipIn('joinarchiver', joinRequest, tracker)
+    Comms.sendGossip('joinarchiver', joinRequest, tracker)
   }
   return true
 }

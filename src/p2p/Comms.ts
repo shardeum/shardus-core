@@ -265,7 +265,7 @@ export function registerInternal(route, handler) {
     // Checks to see if we can extract the actual payload from the wrapped message
     const payloadArray = _extractPayload(
       wrappedPayload,
-      NodeList.byJoinOrder
+      NodeList.byIdOrder // [TODO] Maybe this should be othersByIdOrder
     )
     const [payload, sender] = payloadArray
     tracker = payloadArray[2] || ''
@@ -295,85 +295,6 @@ export function unregisterInternal(route) {
   network.unregisterInternal(route)
 }
 
-/**
- * Send Gossip to all nodes
- */
-export async function sendGossip(
-  type,
-  payload,
-  tracker = '',
-  sender = null,
-  nodes = NodeList.byJoinOrder
-) {
-  if (nodes.length === 0) return
-
-  if (tracker === '') {
-    tracker = createGossipTracker()
-  }
-
-  if (verboseLogs) {
-    mainLogger.debug(
-      `Start of sendGossip(${utils.stringifyReduce(payload)})`
-    )
-  }
-  const gossipPayload = { type, data: payload }
-
-  const gossipHash = crypto.hash(gossipPayload)
-  if (gossipedHashesSent.has(gossipHash)) {
-    if (verboseLogs) {
-      mainLogger.debug(
-        `Gossip already sent: ${gossipHash.substring(0, 5)}`
-      )
-    }
-    return
-  }
-
-  // [TODO] pass getRandomGossipIn hash of payload
-  let recipients = utils.getRandom(nodes, config.p2p.gossipRecipients)
-  if (sender != null) {
-    recipients = utils.removeNodesByID(recipients, [sender])
-  }
-  try {
-    if (verboseLogs) {
-      mainLogger.debug(
-        `Gossiping ${type} request to these nodes: ${utils.stringifyReduce(
-          recipients.map(
-            node => utils.makeShortHash(node.id) + ':' + node.externalPort
-          )
-        )}`
-      )
-    }
-    for (const node of recipients) {
-      logger.playbackLog(
-        'self',
-        node,
-        'GossipSend',
-        type,
-        tracker,
-        gossipPayload
-      )
-    }
-    await tell(recipients, 'gossip', gossipPayload, true, tracker)
-  } catch (ex) {
-    if (verboseLogs) {
-      mainLogger.error(
-        `Failed to sendGossip(${utils.stringifyReduce(
-          payload
-        )}) Exception => ${ex}`
-      )
-    }
-    fatalLogger.fatal(
-      'sendGossip: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
-    )
-  }
-  gossipedHashesSent.set(gossipHash, false)
-  if (verboseLogs) {
-    mainLogger.debug(
-      `End of sendGossip(${utils.stringifyReduce(payload)})`
-    )
-  }
-}
-
 function sortByID(first, second) {
   return utils.sortAscProp(first, second, 'id')
 }
@@ -381,13 +302,17 @@ function sortByID(first, second) {
 /**
  * Send Gossip to all nodes, using gossip in
  */
-export async function sendGossipIn(
+// [TODO] This function should not sort nodes; they should be pre-sorted
+export async function sendGossip(
   type,
   payload,
   tracker = '',
   sender = null,
-  nodes = NodeList.byJoinOrder
+  inpNodes = NodeList.byIdOrder // Joining nodes need gossip too; we don't send to ourself
 ) {
+  // [TODO] Don't copy the node list once sorted lists are passed in
+  const nodes = [...inpNodes]
+
   if (nodes.length === 0) return
 
   if (tracker === '') {
@@ -441,87 +366,6 @@ export async function sendGossipIn(
         'self',
         node.id,
         'GossipInSend',
-        type,
-        tracker,
-        gossipPayload
-      )
-    }
-    await tell(recipients, 'gossip', gossipPayload, true, tracker)
-  } catch (ex) {
-    if (verboseLogs) {
-      mainLogger.error(
-        `Failed to sendGossip(${utils.stringifyReduce(
-          payload
-        )}) Exception => ${ex}`
-      )
-    }
-    fatalLogger.fatal(
-      'sendGossipIn: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
-    )
-  }
-  gossipedHashesSent.set(gossipHash, false)
-  if (verboseLogs) {
-    mainLogger.debug(
-      `End of sendGossipIn(${utils.stringifyReduce(payload)})`
-    )
-  }
-}
-
-/**
- * Send Gossip to all nodes in this list, special case broadcast, never use this for regular gossip.
- */
-export async function sendGossipAll(
-  type,
-  payload,
-  tracker = '',
-  sender = null,
-  nodes = NodeList.byJoinOrder
-) {
-  if (nodes.length === 0) return
-
-  if (tracker === '') {
-    tracker = createGossipTracker()
-  }
-
-  if (verboseLogs) {
-    mainLogger.debug(
-      `Start of sendGossipIn(${utils.stringifyReduce(payload)})`
-    )
-  }
-  const gossipPayload = { type, data: payload }
-
-  const gossipHash = crypto.hash(gossipPayload)
-  if (gossipedHashesSent.has(gossipHash)) {
-    if (verboseLogs) {
-      mainLogger.debug(
-        `Gossip already sent: ${gossipHash.substring(0, 5)}`
-      )
-    }
-    return
-  }
-  // Find out your own index in the nodes array
-  const myIdx = nodes.findIndex(node => node.id === Self.id)
-  if (myIdx < 0) throw new Error('Could not find self in nodes array')
-  // Map back recipient idxs to node objects
-  let recipients = nodes
-  if (sender != null) {
-    recipients = utils.removeNodesByID(recipients, [sender])
-  }
-  try {
-    if (verboseLogs) {
-      mainLogger.debug(
-        `GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(
-          recipients.map(
-            node => utils.makeShortHash(node.id) + ':' + node.externalPort
-          )
-        )}`
-      )
-    }
-    for (const node of recipients) {
-      logger.playbackLog(
-        'self',
-        node.id,
-        'GossipInSendAll',
         type,
         tracker,
         gossipPayload

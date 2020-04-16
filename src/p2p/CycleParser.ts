@@ -3,6 +3,7 @@ import { NodeStatus } from './Types'
 import { reversed } from './Utils'
 import { JoinedConsensor } from './Join'
 import { CycleRecord } from './CycleCreator'
+import * as Active from './Active'
 
 export interface Change {
   added: JoinedConsensor[] // order joinRequestTimestamp [OLD, ..., NEW]
@@ -24,13 +25,17 @@ export function parse(cycle: CycleRecord): Change {
   removed.push(...cycle.lost)
 
   // Nodes to be updated
-  updated.push(
-    ...cycle.activated.map(id => ({
-      id,
-      activeTimestamp: cycle.start,
-      status: NodeStatus.ACTIVE,
-    }))
-  )
+  const activeChanges = Active.parse(cycle)
+
+  updated.push(...activeChanges.updated)
+
+  // updated.push(
+  //   ...cycle.activated.map(id => ({
+  //     id,
+  //     activeTimestamp: cycle.start,
+  //     status: NodeStatus.ACTIVE,
+  //   }))
+  // )
 
   return {
     added,

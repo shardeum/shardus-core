@@ -3,13 +3,12 @@ import { promisify } from 'util'
 import * as http from '../http'
 import { p2p, logger, network } from './Context'
 import * as CycleChain from './CycleChain'
-import { UnfinshedCycle } from './CycleChain'
-import { ChangeSquasher, parse } from './CycleParser'
+import { ChangeSquasher, parse, Change } from './CycleParser'
 import * as NodeList from './NodeList'
 import { Route } from './Types'
 import { reversed, robustQuery, sequentialQuery } from './Utils'
 import { Node } from './p2p-state'
-import { CycleRecord } from './CycleCreator'
+import * as CycleCreator from './CycleCreator'
 import { Logger } from 'log4js'
 
 /** TYPES */
@@ -34,16 +33,7 @@ const newestCycleRoute: Route<Handler> = {
     res.json({ newestCycle })
   },
 }
-// const unfinishedCycleRoute: Route<Handler> = {
-//   method: 'GET',
-//   name: 'sync-unfinished-cycle',
-//   handler: (_req, res) => {
-//     const unfinishedCycle = p2p.state.unfinalizedReady
-//       ? p2p.state.currentCycle
-//       : null
-//     res.json(unfinishedCycle)
-//   },
-// }
+
 const cyclesRoute: Route<Handler> = {
   method: 'POST',
   name: 'sync-cycles',
@@ -104,10 +94,7 @@ export async function sync(activeNodes: ActiveNode[]) {
       }
     }
   } while (squasher.final.updated.length < activeNodeCount(cycleToSyncTo))
-  await NodeList.addNodes(
-    squasher.final.added.map(joined => NodeList.createNode(joined))
-  )
-  await NodeList.updateNodes(squasher.final.updated)
+  applyNodeListChange(squasher.final)
   info('Synced to cycle', cycleToSyncTo.counter)
 
   /*
@@ -145,7 +132,7 @@ export async function sync(activeNodes: ActiveNode[]) {
 
   info('Sync complete')
   // info(`NodeList after sync: ${JSON.stringify(p2p.state.nodes)}`)
-  info(`NodeList after sync: ${JSON.stringify(NodeList.nodes)}`)
+  info(`NodeList after sync: ${JSON.stringify([...NodeList.nodes.entries()])}`)
   return true
 }
 
@@ -164,23 +151,39 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
     )
     for (const nextCycle of nextCycles) {
       CycleChain.validate(CycleChain.newest, newestCycle)
-      CycleChain.append(newestCycle)
       await digestCycle(nextCycle)
     }
     newestCycle = await getNewestCycle(activeNodes)
   }
 }
 
-export async function digestCycle(cycle: CycleRecord) {
-  const changes = parse(cycle)
-  NodeList.removeNodes(changes.removed)
-  await NodeList.updateNodes(changes.updated)
-  await NodeList.addNodes(
-    changes.added.map(joined => NodeList.createNode(joined))
-  )
+export function digestCycle(cycle: CycleCreator.CycleRecord) {
+  const marker = CycleCreator.makeCycleMarker(cycle)
+  if (CycleChain.cyclesByMarker[marker]) {
+    error(`Tried to digest cycle record twice: ${JSON.stringify(cycle)}`)
+    return
+  }
+
+  console.log(`
+    Digested C${cycle.counter}
+      cycle record: ${JSON.stringify(cycle)}
+      node list: ${JSON.stringify([...NodeList.nodes.values()])}
+      active others: ${JSON.stringify(NodeList.activeOthersByIdOrder)}
+  `)
+
+  applyNodeListChange(parse(cycle))
+  CycleChain.append(cycle)
 }
 
-async function getNewestCycle(activeNodes: SyncNode[]): Promise<CycleRecord> {
+function applyNodeListChange(change: Change) {
+  NodeList.addNodes(
+    change.added.map(joined => NodeList.createNode(joined))
+  )
+  NodeList.updateNodes(change.updated)
+  NodeList.removeNodes(change.removed)
+}
+
+async function getNewestCycle(activeNodes: SyncNode[]): Promise<CycleCreator.CycleRecord> {
   const queryFn = async (node: SyncNode) => {
     const ip = node.ip ? node.ip : node.externalIp
     const port = node.port ? node.port : node.externalPort
@@ -193,14 +196,14 @@ async function getNewestCycle(activeNodes: SyncNode[]): Promise<CycleRecord> {
   if (!response) throw new Error('Bad response')
   if (!response.newestCycle) throw new Error('Bad response')
 
-  const newestCycle = response.newestCycle as CycleRecord
+  const newestCycle = response.newestCycle as CycleCreator.CycleRecord
   return newestCycle
 }
 async function getCycles(
   activeNodes: SyncNode[],
   start: number,
   end: number
-): Promise<CycleRecord[]> {
+): Promise<CycleCreator.CycleRecord[]> {
   if (start < 0) start = 0
   if (end < 0) end = 0
   if (start > end) start = end
@@ -214,45 +217,11 @@ async function getCycles(
     return resp
   }
   const { result } = await sequentialQuery(activeNodes, queryFn)
-  const cycles = result as CycleRecord[]
+  const cycles = result as CycleCreator.CycleRecord[]
   return cycles
 }
-// async function getUnfinishedCycle(
-//   activeNodes: ActiveNode[]
-// ): Promise<UnfinshedCycle> {
-//   const queryFn = async (node: ActiveNode) => {
-//     const resp = await http.get(`${node.ip}:${node.port}/sync-unfinished-cycle`)
-//     return resp
-//   }
-//   const [response, _responders] = await robustQuery<ActiveNode>(
-//     activeNodes,
-//     queryFn
-//   )
-//   const unfinishedCycle = response as UnfinshedCycle
-//   return unfinishedCycle
-// }
 
-// function isBeforeNextQuarter4(cycle: CycleRecord): boolean {
-//   const nextStart = cycle.start + cycle.duration
-//   const nextQuarter3Start = (nextStart + (3 / 4) * cycle.duration) * 1000
-//   return Date.now() <= nextQuarter3Start
-// }
-// async function waitUntilNextEnd(cycle: CycleRecord) {
-//   const cycleEnd = cycle.start + cycle.duration
-//   const nextEnd = (cycleEnd + cycle.duration) * 1000
-//   const now = Date.now()
-//   const toWait = nextEnd > now ? nextEnd - now : 0
-//   await sleep(toWait)
-// }
-// async function waitUntilNextQuarter4(cycle: CycleRecord) {
-//   const nextStart = cycle.start + cycle.duration
-//   const nextQuarter3Start = (nextStart + (3 / 4) * cycle.duration) * 1000
-//   const now = Date.now()
-//   const toWait = nextQuarter3Start > now ? nextQuarter3Start - now : 0
-//   await sleep(toWait)
-// }
-
-function activeNodeCount(cycle: CycleRecord) {
+function activeNodeCount(cycle: CycleCreator.CycleRecord) {
   return (
     cycle.active +
     cycle.activated.length -

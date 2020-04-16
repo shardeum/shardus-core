@@ -6,6 +6,8 @@ import Profiler from '../utils/profiler'
 import Logger from '../logger'
 import { ipInfo } from '../network'
 import { id } from '../p2p/Self'
+import * as CycleChain from '../p2p/CycleChain'
+
 const http = require('../http')
 const allZeroes64 = '0'.repeat(64)
 
@@ -129,7 +131,7 @@ class Reporter {
     this.reportTimer = setInterval(async () => {
       let appState = this.stateManager ? await this.stateManager.getAccountsStateHash() : allZeroes64
       // const cycleMarker = this.  p2p.getCycleMarker()
-      const cycleMarker = {} // [TODO] Replace with cycle creator
+      const cycleMarker = CycleChain.newest.previous || '' // [TODO] Replace with cycle creator
       // const cycleCounter = this.  p2p.state.getCycleCounter()
       const cycleCounter = -1 // [TODO] Replace with cycle creator
       // const nodelistHash = this.  p2p.getNodelistHash()
@@ -164,7 +166,7 @@ class Reporter {
       let partitionsCovered = 0
       if (this.stateManager != null) {
         /** @type {CycleShardData} */
-        let shardData = this.stateManager.currentCycleShardData //   getShardDataForCycle(cycleCounter)
+        const shardData = this.stateManager.currentCycleShardData //   getShardDataForCycle(cycleCounter)
         if (shardData != null) {
           partitions = shardData.shardGlobals.numPartitions
           partitionsCovered = shardData.nodeShardData.storedPartitions.partitionsCovered
@@ -212,12 +214,12 @@ class Reporter {
   }
 
   consoleReport () {
-    let time = Date.now()
+    const time = Date.now()
     let delta = time - this.lastTime
     delta = delta * 0.001
     const txInjected = this.statistics ? this.statistics.getPreviousElement('txInjected') : 0
     const txApplied = this.statistics ? this.statistics.getPreviousElement('txApplied') : 0
-    let report = `Perf inteval ${delta}    ${txInjected} Injected @${txInjected / delta} per second.    ${txApplied} Applied @${txApplied / delta} per second`
+    const report = `Perf inteval ${delta}    ${txInjected} Injected @${txInjected / delta} per second.    ${txApplied} Applied @${txApplied / delta} per second`
     this.lastTime = time
 
     console.log(report)

@@ -16,7 +16,7 @@ export interface UnfinshedCycle {
 let mainLogger: Logger
 
 export let cycles: CycleRecord[] // [OLD, ..., NEW]
-let cyclesByMarker: { [marker: string]: CycleRecord }
+export let cyclesByMarker: { [marker: string]: CycleRecord }
 
 export let oldest: CycleRecord
 export let newest: CycleRecord

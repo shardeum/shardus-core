@@ -6,6 +6,7 @@ import { CycleRecord } from './CycleCreator'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import * as Types from './Types'
+import { Change } from './CycleParser'
 
 /** TYPES */
 
@@ -30,8 +31,9 @@ export interface Record {
 /** ROUTES */
 
 const gossipActiveRoute: Types.GossipHandler<SignedActiveRequest> = payload => {
+  info(`Got active request: ${JSON.stringify(payload)}`)
   // [TODO] Validate input
-  if (addActiveRequest(payload)) Comms.sendGossipIn('gossip-active', payload)
+  if (addActiveRequest(payload)) Comms.sendGossip('gossip-active', payload)
 }
 
 const routes = {
@@ -44,14 +46,19 @@ const routes = {
 /** STATE */
 
 let mainLogger: Logger
+let activeLogger: Logger
 
-let activeRequests: SignedActiveRequest[] = []
+let activeRequests: SignedActiveRequest[]
 
 /** FUNCTIONS */
 
 export function init() {
   // Init logger
   mainLogger = logger.getLogger('main')
+  activeLogger = logger.getLogger('active')
+
+  // Init state
+  reset()
 
   // Register routes
   for (const [name, handler] of Object.entries(routes.internal)) {
@@ -96,15 +103,47 @@ export function updateCycleRecord(
   record.activatedPublicKeys = activatedPublicKeys
 }
 
+export function sortCycleRecord(record: CycleRecord) {
+  record.activated.sort()
+  record.activatedPublicKeys.sort()
+}
+
 export function dropInvalidTxs(txs: Txs): Txs {
   const active = txs.active.filter(request => validateActiveRequest(request))
   return { active }
 }
 
-export function goActive() {
+export function requestActive() {
   const activeRequest = createActiveRequest()
   addActiveRequest(activeRequest)
-  Comms.sendGossipIn('gossip-active', activeRequest)
+  info(`Gossiping active request: ${JSON.stringify(activeRequest)}`)
+  Comms.sendGossip('gossip-active', activeRequest)
+  // [TODO] Make this actully check if it went active and try again if it didn't
+}
+
+export function parse(record: CycleRecord): Change {
+  // Look at the activated id's and make Self emit 'active' if your own id is there
+  // Omar - why is the node setting it self to active as soon as it 
+  //    parse is called; should be doing this if we find ourself in
+  //    the actived list.
+  //    This might be messing up the check for isActive in CycleCreator
+  if (record.activated.includes(Self.id)){
+    Self.setActive()
+    Self.emitter.emit('active', Self.id)
+  }
+
+  // For all nodes described by activated, make an update to change their status to active
+  const updated = record.activated.map(id => ({
+    id,
+    activeTimestamp: record.start,
+    status: Types.NodeStatus.ACTIVE,
+  }))
+
+  return {
+    added: [],
+    removed: [],
+    updated,
+  }
 }
 
 /** HELPER FUNCTIONS */
@@ -129,4 +168,25 @@ function addActiveRequest(request: SignedActiveRequest) {
 function validateActiveRequest(request: SignedActiveRequest) {
   // [TODO] Validate active request
   return true
+}
+
+function info(...msg) {
+  const entry = `Active: ${msg.join(' ')}`
+  // mainLogger.info(entry)
+  // cycleLogger.info(entry)
+  console.log('INFO: ' + entry)
+}
+
+function warn(...msg) {
+  const entry = `Active: ${msg.join(' ')}`
+  // mainLogger.warn(entry)
+  // cycleLogger.info('WARN: ' + entry)
+  console.log('WARN: ' + entry)
+}
+
+function error(...msg) {
+  const entry = `Active: ${msg.join(' ')}`
+  // mainLogger.error(entry)
+  // cycleLogger.info('ERROR: ' + entry)
+  console.log('ERROR: ' + entry)
 }

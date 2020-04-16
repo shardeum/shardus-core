@@ -26,6 +26,7 @@ let mainLogger: Logger
 
 export let id: string
 export let isFirst: boolean
+export let isActive = false
 
 /** ROUTES */
 
@@ -100,12 +101,8 @@ export async function startup(): Promise<boolean> {
   // Enable internal routes
   Comms.setAcceptInternal(true)
 
-  if (isFirst) {
-    // If first node, create cycle record 0
-    const recordZero = CycleCreator.makeRecordZero()
-    CycleChain.append(recordZero)
-  } else {
     // If not first, get new activeNodes and attempt to sync until you are successful
+  if (!isFirst) {
     let synced = false
     while (!synced) {
       // Once joined, sync to the network
@@ -134,11 +131,8 @@ export async function startup(): Promise<boolean> {
   }
 
   // Start creating cycle records
-  CycleCreator.startCycles()
-
+  await CycleCreator.startCycles()
   emitter.emit('initialized')
-  Active.goActive()
-
   return true
 }
 
@@ -292,4 +286,8 @@ export function _getThisNodeInfo() {
   }
   mainLogger.debug(`Node info of this node: ${JSON.stringify(nodeInfo)}`)
   return nodeInfo
+}
+
+export function setActive() {
+  isActive = true
 }

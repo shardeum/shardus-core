@@ -15,6 +15,11 @@
         "maxLogSize": 10000000,
         "backups": 10
       },
+      "active": {
+        "type": "file",
+        "maxLogSize": 10000000,
+        "backups": 10
+      },
       "fatal": {
         "type": "file",
         "maxLogSize": 10000000,
@@ -50,6 +55,7 @@
       "default": { "appenders": [ "out" ], "level": "trace" },
       "main": { "appenders": [ "main", "errors"  ], "level": "trace" },
       "cycle": { "appenders": [ "cycle" ], "level": "trace" },
+      "active": { "appenders": [ "active" ], "level": "trace" },
       "fatal": { "appenders": [ "fatal" ], "level": "fatal" },
       "net": { "appenders": [ "net" ], "level": "trace" },
       "playback": { "appenders": [ "playback" ], "level": "trace" },

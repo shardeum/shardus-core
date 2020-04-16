@@ -34,9 +34,9 @@ export const readJson = (filename) => {
 }
 
 export const readJsonDir = (dir) => { // => filesObj
-  let filesObj = {}
+  const filesObj = {}
   readdirSync(dir).forEach(fileName => {
-    let name = fileName.split('.')[0]
+    const name = fileName.split('.')[0]
     filesObj[name] = readJson(join(dir, fileName))
   })
   return filesObj
@@ -181,17 +181,17 @@ export const makeShortHash = (x, n = 4) => {
   return x
 }
 
-var objToString = Object.prototype.toString
-var objKeys = Object.keys || function (obj) {
-  var keys = []
-  for (var name in obj) {
+let objToString = Object.prototype.toString
+let objKeys = Object.keys || function (obj) {
+  let keys = []
+  for (let name in obj) {
     keys.push(name)
   }
   return keys
 }
 
 export const stringifyReduce = (val, isArrayProp?: boolean) => {
-  var i, max, str, keys, key, propVal, toStr
+  let i, max, str, keys, key, propVal, toStr
   if (val === true) {
     return 'true'
   }
@@ -242,7 +242,7 @@ export const stringifyReduce = (val, isArrayProp?: boolean) => {
     case 'undefined':
       return isArrayProp ? null : undefined
     case 'string':
-      let reduced = makeShortHash(val)
+      const reduced = makeShortHash(val)
       return JSON.stringify(reduced)
     default:
       return isFinite(val) ? val : null
@@ -250,7 +250,7 @@ export const stringifyReduce = (val, isArrayProp?: boolean) => {
 }
 
 export const stringifyReduceLimit = (val, limit = 100, isArrayProp?: boolean) => {
-  var i, max, str, keys, key, propVal, toStr
+  let i, max, str, keys, key, propVal, toStr
 
   if (limit < 0) {
     return str + 'LIMIT'
@@ -312,7 +312,7 @@ export const stringifyReduceLimit = (val, limit = 100, isArrayProp?: boolean) =>
     case 'undefined':
       return isArrayProp ? null : undefined
     case 'string':
-      let reduced = makeShortHash(val)
+      const reduced = makeShortHash(val)
       return JSON.stringify(reduced)
     default:
       return isFinite(val) ? val : null
@@ -370,14 +370,14 @@ export const sortHashAsc = (a, b) => {
 }
 
 export const sortAscProp = (a, b, propName) => {
-  let aVal = a[propName]
-  let bVal = b[propName]
+  const aVal = a[propName]
+  const bVal = b[propName]
   return aVal === bVal ? 0 : aVal < bVal ? -1 : 1
 }
 
 export const sortDecProp = (a, b, propName) => {
-  let aVal = a[propName]
-  let bVal = b[propName]
+  const aVal = a[propName]
+  const bVal = b[propName]
   return aVal === bVal ? 0 : aVal > bVal ? -1 : 1
 }
 
@@ -397,7 +397,7 @@ export function removeNodesByID(nodes, ids) {
 }
 
 // From: https://stackoverflow.com/a/19270021
-export function getRandom(arr, n) {
+export function getRandom<T>(arr: T[], n: number): T[] {
   let len = arr.length
   const taken = new Array(len)
   if (n > len) {

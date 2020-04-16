@@ -44,8 +44,8 @@ export interface Record {
 let mainLogger
 
 let toAccept
-let bestJoinRequests: JoinRequest[] = []
-let updateSeen: Set<Types.Node['publicKey']> = new Set()
+let bestJoinRequests: JoinRequest[]
+let updateSeen: Set<Types.Node['publicKey']>
 
 /** ROUTES */
 
@@ -62,6 +62,10 @@ const joinRoute: Types.Route<Handler> = {
   method: 'POST',
   name: 'join',
   handler: (req, res) => {
+    // Dont accept join requests if you're not active
+    if (Self.isActive === false) res.end()
+    // [TODO] Tell how long to wait before trying again
+
     const joinRequest = req.body
     addJoinRequest(joinRequest)
     res.end()
@@ -96,8 +100,10 @@ const routes = {
 export function init() {
   mainLogger = logger.getLogger('main')
 
-  toAccept = config.p2p.maxNodesPerCycle
+  // Init state
+  reset()
 
+  // Register routes
   for (const route of routes.external) network._registerExternal(route.method, route.name, route.handler)
 }
 
@@ -122,6 +128,10 @@ export function updateCycleRecord(txs: Txs, record: CycleRecord, _prev: CycleRec
   })
 
   record.joinedConsensors = joinedConsensors
+}
+
+export function sortCycleRecord(record: CycleRecord) {
+  record.joinedConsensors.sort()
 }
 
 export async function createJoinRequest(

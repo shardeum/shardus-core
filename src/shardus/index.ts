@@ -445,6 +445,7 @@ class Shardus extends EventEmitter {
       // [TODO] Enable once CycleCreator is fully operational
       // await this.syncAppData()
       // this.p2p.goActive()
+      Active.requestActive()
     })
     Self.emitter.on('active', (nodeId) => {
       this.logger.playbackLogState('active', nodeId, '')
