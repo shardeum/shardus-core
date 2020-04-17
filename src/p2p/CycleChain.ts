@@ -1,7 +1,7 @@
-import { p2p, network, crypto, logger } from './Context'
-import { LooseObject, P2PNode } from './Types'
-import { CycleRecord } from './CycleCreator'
 import { Logger } from 'log4js'
+import { crypto, logger } from './Context'
+import { CycleRecord } from './CycleCreator'
+import { LooseObject } from './Types'
 
 /** TYPES */
 
@@ -78,8 +78,10 @@ export function getCycleChain(start, end = Infinity) {
 
 /** HELPER FUNCTIONS */
 
-function computeCycleMarker (fields) {
-  mainLogger.debug(`Computing cycle marker... Cycle marker fields: ${JSON.stringify(fields)}`)
+function computeCycleMarker(fields) {
+  mainLogger.debug(
+    `Computing cycle marker... Cycle marker fields: ${JSON.stringify(fields)}`
+  )
   const cycleMarker = crypto.hash(fields)
   mainLogger.debug(`Created cycle marker: ${cycleMarker}`)
   return cycleMarker

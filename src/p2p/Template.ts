@@ -1,12 +1,13 @@
 import { Logger } from 'log4js'
-import { logger } from './Context'
 import * as Comms from './Comms'
+import { logger } from './Context'
+import { CycleRecord } from './CycleCreator'
 import * as Types from './Types'
 
 /** TYPES */
 
-export interface Txs {
-  txField: string
+export interface Txs extends SignedObject {
+  timestamp: number
 }
 
 export interface Record {
@@ -20,7 +21,7 @@ const gossipRoute: Types.GossipHandler = payload => {}
 const routes = {
   internal: {},
   gossip: {
-    'gossip': gossipRoute
+    gossip: gossipRoute,
   },
 }
 
@@ -30,6 +31,11 @@ let mainLogger: Logger
 
 /** FUNCTIONS */
 
+/** EXPORTED FUNCTIONS */
+/* These functions must be defined by all modules that implement a 
+     network action like going active, lost node detection, etc.
+     These functions are called by CycleCreator
+*/
 export function init() {
   // Init logger
   mainLogger = logger.getLogger('main')
@@ -43,10 +49,27 @@ export function init() {
   }
 }
 
-export function getCycleTxs(): Txs {
+export function reset() {}
+
+export function getTxs(): Txs {
   return
 }
 
-export function getCycleRecord(txs: Txs): Record {
+export function dropInvalidTxs(txs: Txs): Txs {
   return
 }
+
+/*
+Given the txs and prev cycle record mutate the referenced record
+*/
+export function updateRecord(
+  txs: Txs,
+  record: CycleRecord,
+  prev: CycleRecord
+) {}
+
+export function parseRecord(record: CycleRecord) {}
+
+export function queueRequest(request) {}
+
+export function sendRequests() {}

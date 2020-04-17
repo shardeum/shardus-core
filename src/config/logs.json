@@ -10,12 +10,7 @@
         "maxLogSize": 10000000,
         "backups": 10
       },
-      "cycle": {
-        "type": "file",
-        "maxLogSize": 10000000,
-        "backups": 10
-      },
-      "active": {
+      "p2p": {
         "type": "file",
         "maxLogSize": 10000000,
         "backups": 10
@@ -54,8 +49,7 @@
     "categories": {
       "default": { "appenders": [ "out" ], "level": "trace" },
       "main": { "appenders": [ "main", "errors"  ], "level": "trace" },
-      "cycle": { "appenders": [ "cycle" ], "level": "trace" },
-      "active": { "appenders": [ "active" ], "level": "trace" },
+      "p2p": { "appenders": [ "p2p" ], "level": "trace" },
       "fatal": { "appenders": [ "fatal" ], "level": "fatal" },
       "net": { "appenders": [ "net" ], "level": "trace" },
       "playback": { "appenders": [ "playback" ], "level": "trace" },

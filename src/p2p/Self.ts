@@ -1,22 +1,19 @@
 import Sntp from '@hapi/sntp'
 import { EventEmitter } from 'events'
 import { Logger } from 'log4js'
-import { isDeepStrictEqual } from 'util'
 import * as http from '../http'
 import { ipInfo } from '../network'
 import * as utils from '../utils'
 import * as Archivers from './Archivers'
 import * as Comms from './Comms'
-import { config, crypto, logger, p2p } from './Context'
-import * as NodeList from './NodeList'
-import { sync } from './Sync'
-import { Node } from './Types'
-import { robustQuery } from './Utils'
+import { config, crypto, logger } from './Context'
+import * as CycleChain from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import * as Join from './Join'
-import * as CycleChain from './CycleChain'
+import * as NodeList from './NodeList'
 import * as Sync from './Sync'
-import * as Active from './Active'
+import { sync } from './Sync'
+import { Node } from './Types'
 
 /** STATE */
 
@@ -33,18 +30,15 @@ export let isActive = false
 /** FUNCTIONS */
 
 export function init() {
+  // Init submodules
+  Comms.init()
+  CycleChain.init()
+  Archivers.init()
+  Sync.init()
+  CycleCreator.init()
+
   // Create a logger for yourself
   mainLogger = logger.getLogger('main')
-
-  // Init submodules
-  CycleChain.init()
-  Comms.init()
-  CycleCreator.init()
-  Sync.init()
-  Archivers.init()
-  for (const submodule of CycleCreator.submodules) {
-    if (submodule.init) submodule.init()
-  }
 }
 
 export async function startup(): Promise<boolean> {
@@ -57,10 +51,13 @@ export async function startup(): Promise<boolean> {
   let activeNodes: Node[]
   let joined = false
 
-  const retryWait = async () => {
-      const wait = config.p2p.cycleDuration / 2 
-      mainLogger.info(`Trying again in ${wait} sec...`)
-      await utils.sleep(wait * 1000)
+  const retryWait = async (time = 0) => {
+    let wait = time - Date.now()
+    if (wait <= 0 || wait > config.p2p.cycleDuration * 1000 * 2) {
+      wait = (config.p2p.cycleDuration * 1000) / 2
+    }
+    mainLogger.info(`Trying again in ${wait / 1000} sec...`)
+    await utils.sleep(wait)
   }
 
   while (!joined) {
@@ -82,10 +79,12 @@ export async function startup(): Promise<boolean> {
       }
 
       mainLogger.info('Attempting to join network...')
-      joined = await joinNetwork(activeNodes)
+      const joinRes = await joinNetwork(activeNodes)
+      joined = joinRes[0]
+      const tryAgain = joinRes[1]
       if (!joined) {
         mainLogger.info('Join request not accepted')
-        await retryWait()
+        await retryWait(tryAgain)
       }
     } catch (err) {
       joined = false
@@ -101,13 +100,15 @@ export async function startup(): Promise<boolean> {
   // Enable internal routes
   Comms.setAcceptInternal(true)
 
-    // If not first, get new activeNodes and attempt to sync until you are successful
+  // If not first, get new activeNodes and attempt to sync until you are successful
   if (!isFirst) {
     let synced = false
     while (!synced) {
       // Once joined, sync to the network
       try {
-        mainLogger.info('Getting activeNodes from archiver to sync to network...')
+        mainLogger.info(
+          'Getting activeNodes from archiver to sync to network...'
+        )
         activeNodes = await contactArchiver()
 
         // Remove yourself from activeNodes if you are present in them
@@ -178,29 +179,39 @@ async function discoverNetwork(seedNodes) {
   return true
 }
 
-async function joinNetwork(activeNodes) {
+async function joinNetwork(activeNodes): Promise<[boolean, number]> {
   mainLogger.debug('Joining network...')
 
   if (isFirst) {
     // Create the first join request and set our node id
     id = await Join.firstJoin()
+    return [true, 0]
   } else {
     // Create join request from network cycle marker
     const netMarker = await Join.fetchCycleMarker(activeNodes)
     const request = await Join.createJoinRequest(netMarker)
 
-    // Send join request to active nodes
-    await Join.submitJoin(activeNodes, request)
+    // Submit join request to active nodes
+    // [TODO] validate tryAgain
+    const tryAgain = await Join.submitJoin(activeNodes, request)
 
-    // Wait 1 cycle
-    utils.sleep(config.p2p.cycleDuration * 1000)
+    if (tryAgain) {
+      mainLogger.debug(`Told to wait until ${tryAgain}`)
+      return [false, tryAgain]
+    } else {
+      // Wait 1 cycle duration
+      await utils.sleep(config.p2p.cycleDuration * 1000 + 500)
 
-    // Check if accepted and set our node ID
-    id = await Join.fetchJoined(activeNodes)
-    if (!id) return false
+      // Check if accepted and set our node ID
+      id = await Join.fetchJoined(activeNodes)
+
+      if (!id) {
+        return [false, 0]
+      } else {
+        return [true, 0]
+      }
+    }
   }
-
-  return true
 }
 
 /** HELPER FUNCTIONS */

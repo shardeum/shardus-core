@@ -54,13 +54,14 @@ const DESIRED_MARKER_MATCHES = 2
 
 /** STATE */
 
-let mainLogger: Logger
-let cycleLogger: Logger
+let p2pLogger: Logger
 
 export const submodules = [Join, Active]
 
-let currentQuarter = 0
-let currentCycle = 0
+export let currentQuarter = 0
+export let currentCycle = 0
+export let nextQ1Start = 0
+
 let madeCycle = false // True if we successfully created the last cycle record, otherwise false
 let madeCert = false // set to True after we make our own cert and try to gossip it
 
@@ -132,9 +133,13 @@ const routes = {
 /** CONTROL FUNCTIONS */
 
 export function init() {
+  // Init submodules
+  for (const submodule of submodules) {
+    if (submodule.init) submodule.init()
+  }
+
   // Get a handle to write to main.log
-  mainLogger = logger.getLogger('main')
-  cycleLogger = logger.getLogger('cycle')
+  p2pLogger = logger.getLogger('p2p')
 
   // Init state
   reset()
@@ -219,6 +224,8 @@ async function cycleCreator() {
     end,
   } = calcIncomingTimes(prevRecord)
 
+  nextQ1Start = end
+
   // Reset cycle marker and cycle certificate creation state
   reset()
 
@@ -237,6 +244,10 @@ async function cycleCreator() {
 function runQ1() {
   currentQuarter = 1
   info(`C${currentCycle} Q${currentQuarter}`)
+
+  // Tell submodules to sign and send their requests
+  info('Triggering submodules to send requests...')
+  for (const submodule of submodules) submodule.sendRequests()
 }
 
 /**
@@ -333,7 +344,7 @@ function makeCycleData(txs: CycleTxs, prevRecord?: CycleRecord) {
 
 function collectCycleTxs(): CycleTxs {
   // Collect cycle txs from all submodules
-  const txs = submodules.map(submodule => submodule.getCycleTxs())
+  const txs = submodules.map(submodule => submodule.getTxs())
   return Object.assign({}, ...txs)
 }
 
@@ -363,15 +374,13 @@ function makeCycleRecord(
   }) as CycleRecord
 
   submodules.map(submodule =>
-    submodule.updateCycleRecord(cycleTxs, cycleRecord, prevRecord)
+    submodule.updateRecord(cycleTxs, cycleRecord, prevRecord)
   )
 
   return cycleRecord
 }
 
 export function makeCycleMarker(record: CycleRecord) {
-  // Let submodules sort their array record fields before hashing
-  for (const submodule of submodules) submodule.sortCycleRecord(record)
   return crypto.hash(record)
 }
 
@@ -555,7 +564,7 @@ function calcIncomingTimes(record: CycleRecord) {
  * @param opts
  * @param args
  */
-function schedule<T, U extends unknown[]>(
+export function schedule<T, U extends unknown[]>(
   callback: (...args: U) => T,
   time: number,
   { runEvenIfLateBy = 0 } = {},
@@ -593,11 +602,11 @@ function validateCertSign(certs: CycleCert[], sender: NodeList.Node['id']) {
       sign: cert.sign,
     }
     if (NodeList.byPubKey.has(cleanCert.sign.owner) === false) {
-      console.log('DBG', 'bad owner')
+      warn('validateCertSign: bad owner')
       return false
     }
     if (!crypto.verify(cleanCert)) {
-      console.log('DBG', 'bad sig')
+      warn('validateCertSign: bad sig')
       return false
     }
   }
@@ -606,7 +615,7 @@ function validateCertSign(certs: CycleCert[], sender: NodeList.Node['id']) {
 
 function validateCerts(certs: CycleCert[], record, sender) {
   if (!certs || !Array.isArray(certs) || certs.length <= 0) {
-    console.log('bad certificate format')
+    warn('validateCerts: bad certificate format')
     return false
   }
   // make sure all the certs are for the same cycle marker
@@ -614,13 +623,13 @@ function validateCerts(certs: CycleCert[], record, sender) {
   const inpMarker = crypto.hash(record)
   for (let i = 1; i < certs.length; i++) {
     if (inpMarker !== certs[i].marker) {
-      console.log('certificates marker does not match hash of record')
+      warn('validateCerts: certificates marker does not match hash of record')
       return false
     }
   }
   //  checks signatures; more expensive
   if (!validateCertSign(certs, sender)) {
-    console.log('certificate has bad sign')
+    warn('validateCerts: certificate has bad sign')
     return false
   }
   return true
@@ -670,7 +679,6 @@ function improveBestCert(certs: CycleCert[], record) {
       score += bcert.score
     }
     bestCertScore.set(cert.marker, score)
-    console.log(`score: ${score}, bscore: ${bscore}`)
     if (score > bscore) {
       bestMarker = cert.marker
       bestRecord = record
@@ -747,10 +755,6 @@ async function compareCycleCert(matches: number) {
   }
 
   // Anything that's not an error, either matched us or compared worse than us
-  info(`
-    NodeList.activeOthersByIdOrder.length - errors.length >= matches
-    ${NodeList.activeOthersByIdOrder.length} - ${errors.length} >= ${matches}
-  `)
   return NodeList.activeOthersByIdOrder.length - errors.length >= matches
 }
 
@@ -796,21 +800,15 @@ async function gossipCycleCert() {
 
 function info(...msg) {
   const entry = `CycleCreator: ${msg.join(' ')}`
-  // mainLogger.info(entry)
-  // cycleLogger.info(entry)
-  console.log('INFO: ' + entry)
+  p2pLogger.info(entry)
 }
 
 function warn(...msg) {
   const entry = `CycleCreator: ${msg.join(' ')}`
-  // mainLogger.warn(entry)
-  // cycleLogger.info('WARN: ' + entry)
-  console.log('WARN: ' + entry)
+  p2pLogger.warn(entry)
 }
 
 function error(...msg) {
   const entry = `CycleCreator: ${msg.join(' ')}`
-  // mainLogger.error(entry)
-  // cycleLogger.info('ERROR: ' + entry)
-  console.log('ERROR: ' + entry)
+  p2pLogger.error(entry)
 }

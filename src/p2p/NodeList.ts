@@ -1,9 +1,9 @@
 import { insertSorted } from '../utils'
 import { crypto } from './Context'
 import { JoinedConsensor } from './Join'
+import { id } from './Self'
 import { NodeStatus } from './Types'
 import deepmerge = require('deepmerge')
-import { id } from './Self'
 
 /** TYPES */
 

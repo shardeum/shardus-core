@@ -1,14 +1,16 @@
+import { Handler } from 'express'
+import { isDeepStrictEqual } from 'util'
+import * as http from '../http'
 import * as utils from '../utils'
-import { logger, crypto, config, network } from './Context'
+import * as Comms from './Comms'
+import { config, crypto, logger, network } from './Context'
+import * as CycleChain from './CycleChain'
+import * as CycleCreator from './CycleCreator'
+import { Change } from './CycleParser'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import * as Types from './Types'
-import * as CycleChain from './CycleChain'
-import { Handler } from 'express'
 import { robustQuery } from './Utils'
-import * as http from '../http'
-import { isDeepStrictEqual } from 'util'
-import { CycleRecord } from './CycleCreator'
 
 /** TYPES */
 
@@ -41,9 +43,9 @@ export interface Record {
 
 /** STATE */
 
-let mainLogger
+let p2pLogger
 
-let toAccept
+let toAccept: number
 let bestJoinRequests: JoinRequest[]
 let updateSeen: Set<Types.Node['publicKey']>
 
@@ -53,23 +55,38 @@ const cycleMarkerRoute: Types.Route<Handler> = {
   method: 'GET',
   name: 'cyclemarker',
   handler: (_req, res) => {
-    const marker = CycleChain.newest ? CycleChain.newest.previous : '0'.repeat(64)
+    const marker = CycleChain.newest
+      ? CycleChain.newest.previous
+      : '0'.repeat(64)
     res.json(marker)
-  }
+  },
 }
 
 const joinRoute: Types.Route<Handler> = {
   method: 'POST',
   name: 'join',
   handler: (req, res) => {
+    // [TODO] Validate joinReq
+
     // Dont accept join requests if you're not active
-    if (Self.isActive === false) res.end()
-    // [TODO] Tell how long to wait before trying again
+    if (Self.isActive === false) {
+      res.end()
+      return
+    }
+
+    // If not in quarter 1 of cycle, reply with resubmit time
+    if (CycleCreator.currentQuarter !== 1) {
+      const resubmit = CycleCreator.nextQ1Start
+      res.json(resubmit)
+      return
+    }
 
     const joinRequest = req.body
-    addJoinRequest(joinRequest)
+    if (addJoinRequest(joinRequest)) {
+      Comms.sendGossip('gossip-join', joinRequest)
+    }
     res.end()
-  }
+  },
 }
 
 const joinedRoute: Types.Route<Handler> = {
@@ -81,30 +98,45 @@ const joinedRoute: Types.Route<Handler> = {
     // [TODO] Validate input
     const node = NodeList.byPubKey.get(publicKey)
     res.json({ node })
-  }
+  },
 }
 
-const gossipJoinedRoute: Types.GossipHandler<JoinRequest> = payload => {
-  // [TODO] Need to gossip received joinRequests to network
+const gossipJoinRoute: Types.GossipHandler<JoinRequest, NodeList.Node['id']> = (
+  payload,
+  _sender
+) => {
+  // [TODO] Validate joinReq
+
+  // Do not forward gossip after quarter 2
+  if (CycleCreator.currentQuarter >= 3) return
+
+  if (addJoinRequest(payload)) Comms.sendGossip('gossip-join', payload)
 }
 
 const routes = {
   external: [cycleMarkerRoute, joinRoute, joinedRoute],
   gossip: {
-    'gossip-joined': gossipJoinedRoute
-  }
+    'gossip-join': gossipJoinRoute,
+  },
 }
 
 /** FUNCTIONS */
 
+/** CycleCreator Functions */
+
 export function init() {
-  mainLogger = logger.getLogger('main')
+  p2pLogger = logger.getLogger('p2p')
 
   // Init state
   reset()
 
   // Register routes
-  for (const route of routes.external) network._registerExternal(route.method, route.name, route.handler)
+  for (const route of routes.external) {
+    network._registerExternal(route.method, route.name, route.handler)
+  }
+  for (const [name, handler] of Object.entries(routes.gossip)) {
+    Comms.registerGossipHandler(name, handler)
+  }
 }
 
 export function reset() {
@@ -113,13 +145,22 @@ export function reset() {
   updateSeen = new Set()
 }
 
-export function getCycleTxs(): Txs {
+export function getTxs(): Txs {
   return {
     join: bestJoinRequests,
   }
 }
 
-export function updateCycleRecord(txs: Txs, record: CycleRecord, _prev: CycleRecord) {
+export function dropInvalidTxs(txs: Txs): Txs {
+  const join = txs.join.filter(request => validateJoinRequest(request))
+  return { join }
+}
+
+export function updateRecord(
+  txs: Txs,
+  record: CycleCreator.CycleRecord,
+  _prev: CycleCreator.CycleRecord
+) {
   const joinedConsensors = txs.join.map(joinRequest => {
     const nodeInfo = joinRequest.nodeInfo
     const cycleJoined = joinRequest.cycleMarker
@@ -127,12 +168,25 @@ export function updateCycleRecord(txs: Txs, record: CycleRecord, _prev: CycleRec
     return { ...nodeInfo, cycleJoined, id }
   })
 
-  record.joinedConsensors = joinedConsensors
+  record.joinedConsensors = joinedConsensors.sort()
 }
 
-export function sortCycleRecord(record: CycleRecord) {
-  record.joinedConsensors.sort()
+export function parseRecord(record: CycleCreator.CycleRecord): Change {
+  const added = record.joinedConsensors
+  return {
+    added,
+    removed: [],
+    updated: [],
+  }
 }
+
+/** Not used by Join */
+export function sendRequests() {}
+
+/** Not used by Join */
+export function queueRequest(request) {}
+
+/** Module Functions */
 
 export async function createJoinRequest(
   cycleMarker
@@ -151,9 +205,7 @@ export async function createJoinRequest(
   // version: '0.0.0'
   const joinReq = { nodeInfo, cycleMarker, proofOfWork, selectionNum }
   const signedJoinReq = crypto.sign(joinReq)
-  mainLogger.debug(
-    `Join request created... Join request: ${JSON.stringify(signedJoinReq)}`
-  )
+  info(`Join request created... Join request: ${JSON.stringify(signedJoinReq)}`)
   return signedJoinReq
 }
 
@@ -162,9 +214,7 @@ export function addJoinRequest(joinRequest) {
 
   // Check if this node has already been seen this cycle
   if (wasSeenThisCycle(nodeInfo.publicKey)) {
-    mainLogger.debug(
-      'Node has already been seen this cycle. Unable to add join request.'
-    )
+    warn('Node has already been seen this cycle. Unable to add join request.')
     return false
   }
 
@@ -173,9 +223,7 @@ export function addJoinRequest(joinRequest) {
 
   // Return if we already know about this node
   if (isKnownNode(nodeInfo)) {
-    mainLogger.info(
-      'Cannot add join request for this node, already a known node.'
-    )
+    warn('Cannot add join request for this node, already a known node.')
     return false
   }
 
@@ -196,7 +244,7 @@ export function addJoinRequest(joinRequest) {
 
     // Check if we are better than the lowest best
     if (!isBetterThanLowestBest(joinRequest, lowest)) {
-      mainLogger.debug(
+      warn(
         `${joinRequest.selectionNum} is not better than ${lowest.selectionNum}. Node ${joinRequest.nodeInfo.publicKey} not added to this cycle.`
       )
       return false
@@ -216,7 +264,7 @@ export function addJoinRequest(joinRequest) {
   if (competing) {
     const removedRequest = bestRequests.pop()
     const removedNode = removedRequest.nodeInfo
-    mainLogger.debug(
+    warn(
       `Removing the following node from this cycle's join requests: ${JSON.stringify(
         removedNode
       )}`
@@ -235,35 +283,43 @@ export async function firstJoin() {
   return computeNodeId(crypto.keypair.publicKey, zeroMarker)
 }
 
-export async function fetchCycleMarker (nodes) {
-  const queryFn = async (node) => {
+export async function fetchCycleMarker(nodes) {
+  const queryFn = async node => {
     const marker = await http.get(`${node.ip}:${node.port}/cyclemarker`)
     return marker
   }
 
-  function _isSameCycleMarkerInfo (info1, info2) {
+  function _isSameCycleMarkerInfo(info1, info2) {
     const cm1 = utils.deepCopy(info1)
     const cm2 = utils.deepCopy(info2)
     delete cm1.currentTime
     delete cm2.currentTime
     const equivalent = isDeepStrictEqual(cm1, cm2)
-    mainLogger.debug(`Equivalence of the two compared cycle marker infos: ${equivalent}`)
+    info(`Equivalence of the two compared cycle marker infos: ${equivalent}`)
     return equivalent
   }
 
-  const [marker] = await robustQuery(nodes, queryFn, _isSameCycleMarkerInfo.bind(this))
+  const [marker] = await robustQuery(
+    nodes,
+    queryFn,
+    _isSameCycleMarkerInfo.bind(this)
+  )
   return marker
 }
 
-export async function submitJoin (nodes, joinRequest) {
+export async function submitJoin(nodes, joinRequest) {
   for (const node of nodes) {
-    mainLogger.debug(`Sending join request to ${node.ip}:${node.port}`)
-    await http.post(`${node.ip}:${node.port}/join`, joinRequest)
+    info(`Sending join request to ${node.ip}:${node.port}`)
+    const resubmit = await http.post(
+      `${node.ip}:${node.port}/join`,
+      joinRequest
+    )
+    if (resubmit) return resubmit
   }
 }
 
-export async function fetchJoined (activeNodes) {
-  const queryFn = async (node) => {
+export async function fetchJoined(activeNodes) {
+  const queryFn = async node => {
     const publicKey = crypto.keypair.publicKey
     const res = await http.get(`${node.ip}:${node.port}/joined/${publicKey}`)
     return res
@@ -276,8 +332,13 @@ export async function fetchJoined (activeNodes) {
     const node = response.node as NodeList.Node
     return node.id
   } catch (err) {
-    mainLogger.error(`Self: fetchNodeId: robustQuery failed: `, err)
+    warn(`Self: fetchNodeId: robustQuery failed: `, err)
   }
+}
+
+function validateJoinRequest(request: JoinRequest) {
+  // [TODO] Implement this
+  return true
 }
 
 function getBestJoinRequests() {
@@ -303,9 +364,24 @@ function isBetterThanLowestBest(request, lowest) {
 
 export function computeNodeId(publicKey, cycleMarker) {
   const nodeId = crypto.hash({ publicKey, cycleMarker })
-  mainLogger.debug(
+  info(
     `Node ID computation: publicKey: ${publicKey}, cycleMarker: ${cycleMarker}`
   )
-  mainLogger.debug(`Node ID is: ${nodeId}`)
+  info(`Node ID is: ${nodeId}`)
   return nodeId
+}
+
+function info(...msg) {
+  const entry = `Join: ${msg.join(' ')}`
+  p2pLogger.info(entry)
+}
+
+function warn(...msg) {
+  const entry = `Join: ${msg.join(' ')}`
+  p2pLogger.warn(entry)
+}
+
+function error(...msg) {
+  const entry = `Join: ${msg.join(' ')}`
+  p2pLogger.error(entry)
 }

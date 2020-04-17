@@ -1,15 +1,14 @@
 import { Handler } from 'express'
+import { Logger } from 'log4js'
 import { promisify } from 'util'
 import * as http from '../http'
-import { p2p, logger, network } from './Context'
+import { logger, network } from './Context'
 import * as CycleChain from './CycleChain'
-import { ChangeSquasher, parse, Change } from './CycleParser'
+import * as CycleCreator from './CycleCreator'
+import { Change, ChangeSquasher, parse } from './CycleParser'
 import * as NodeList from './NodeList'
 import { Route } from './Types'
 import { reversed, robustQuery, sequentialQuery } from './Utils'
-import { Node } from './p2p-state'
-import * as CycleCreator from './CycleCreator'
-import { Logger } from 'log4js'
 
 /** TYPES */
 
@@ -55,7 +54,8 @@ const routes = {
 export function init() {
   mainLogger = logger.getLogger('main')
 
-  for (const route of routes.external) network._registerExternal(route.method, route.name, route.handler)
+  for (const route of routes.external)
+    network._registerExternal(route.method, route.name, route.handler)
 }
 
 export async function sync(activeNodes: ActiveNode[]) {
@@ -176,14 +176,14 @@ export function digestCycle(cycle: CycleCreator.CycleRecord) {
 }
 
 function applyNodeListChange(change: Change) {
-  NodeList.addNodes(
-    change.added.map(joined => NodeList.createNode(joined))
-  )
+  NodeList.addNodes(change.added.map(joined => NodeList.createNode(joined)))
   NodeList.updateNodes(change.updated)
   NodeList.removeNodes(change.removed)
 }
 
-async function getNewestCycle(activeNodes: SyncNode[]): Promise<CycleCreator.CycleRecord> {
+async function getNewestCycle(
+  activeNodes: SyncNode[]
+): Promise<CycleCreator.CycleRecord> {
   const queryFn = async (node: SyncNode) => {
     const ip = node.ip ? node.ip : node.externalIp
     const port = node.port ? node.port : node.externalPort

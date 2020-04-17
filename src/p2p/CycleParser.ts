@@ -1,9 +1,9 @@
-import { Node, Update } from './NodeList'
-import { NodeStatus } from './Types'
-import { reversed } from './Utils'
-import { JoinedConsensor } from './Join'
+import deepmerge from 'deepmerge'
+import * as CycleCreator from './CycleCreator'
 import { CycleRecord } from './CycleCreator'
-import * as Active from './Active'
+import { JoinedConsensor } from './Join'
+import { Node, Update } from './NodeList'
+import { reversed } from './Utils'
 
 export interface Change {
   added: JoinedConsensor[] // order joinRequestTimestamp [OLD, ..., NEW]
@@ -11,37 +11,12 @@ export interface Change {
   updated: Update[] // order doesn't matter
 }
 
-export function parse(cycle: CycleRecord): Change {
-  const added: Change['added'] = []
-  const removed: Change['removed'] = []
-  const updated: Change['updated'] = []
-
-  // Nodes to be added
-  added.push(...cycle.joinedConsensors) // order joinRequestTimestamp [OLD, ..., NEW]
-
-  // Nodes to be removed
-  removed.push(...cycle.removed)
-  removed.push(...cycle.apoptosized)
-  removed.push(...cycle.lost)
-
-  // Nodes to be updated
-  const activeChanges = Active.parse(cycle)
-
-  updated.push(...activeChanges.updated)
-
-  // updated.push(
-  //   ...cycle.activated.map(id => ({
-  //     id,
-  //     activeTimestamp: cycle.start,
-  //     status: NodeStatus.ACTIVE,
-  //   }))
-  // )
-
-  return {
-    added,
-    removed,
-    updated,
-  }
+export function parse(record: CycleRecord): Change {
+  const changes = CycleCreator.submodules.map(submodule =>
+    submodule.parseRecord(record)
+  )
+  const mergedChange = deepmerge.all<Change>(changes)
+  return mergedChange
 }
 
 export class ChangeSquasher {

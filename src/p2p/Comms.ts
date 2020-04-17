@@ -1,25 +1,28 @@
-import * as utils from '../utils'
-import { crypto, logger, network, config } from './Context'
 import { Logger } from 'log4js'
-import * as Self from './Self'
+import * as utils from '../utils'
+import { config, crypto, logger, network } from './Context'
 import * as NodeList from './NodeList'
-import * as Sync from './Sync'
+import * as Self from './Self'
 import { InternalHandler, LooseObject } from './Types'
 
 /** TYPES */
-
 
 /** ROUTES */
 
 type GossipReq = LooseObject
 
-const gossipInternalRoute: InternalHandler<GossipReq> = async (payload, _respond, sender, tracker) => {
+const gossipInternalRoute: InternalHandler<GossipReq> = async (
+  payload,
+  _respond,
+  sender,
+  tracker
+) => {
   await handleGossip(payload, sender, tracker)
 }
 
 const routes = {
   internal: {
-    'gossip': gossipInternalRoute
+    gossip: gossipInternalRoute,
   },
 }
 /** STATE */
@@ -165,7 +168,13 @@ function createGossipTracker() {
 }
 
 // Our own P2P version of the network tell, with a sign added
-export async function tell(nodes, route, message, logged = false, tracker = '') {
+export async function tell(
+  nodes,
+  route,
+  message,
+  logged = false,
+  tracker = ''
+) {
   if (tracker === '') {
     tracker = createMsgTracker()
   }
@@ -233,9 +242,7 @@ export function registerInternal(route, handler) {
     internalRecvCounter++
     // We have internal requests turned off until we have a node id
     if (!acceptInternal) {
-      mainLogger.debug(
-        'We are not currently accepting internal requests...'
-      )
+      mainLogger.debug('We are not currently accepting internal requests...')
       return
     }
     let tracker = ''
@@ -320,18 +327,14 @@ export async function sendGossip(
   }
 
   if (verboseLogs) {
-    mainLogger.debug(
-      `Start of sendGossipIn(${utils.stringifyReduce(payload)})`
-    )
+    mainLogger.debug(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
   }
   const gossipPayload = { type, data: payload }
 
   const gossipHash = crypto.hash(gossipPayload)
   if (gossipedHashesSent.has(gossipHash)) {
     if (verboseLogs) {
-      mainLogger.debug(
-        `Gossip already sent: ${gossipHash.substring(0, 5)}`
-      )
+      mainLogger.debug(`Gossip already sent: ${gossipHash.substring(0, 5)}`)
     }
     return
   }
@@ -386,9 +389,7 @@ export async function sendGossip(
   }
   gossipedHashesSent.set(gossipHash, false)
   if (verboseLogs) {
-    mainLogger.debug(
-      `End of sendGossipIn(${utils.stringifyReduce(payload)})`
-    )
+    mainLogger.debug(`End of sendGossipIn(${utils.stringifyReduce(payload)})`)
   }
 }
 
@@ -398,16 +399,16 @@ export async function sendGossip(
  */
 export async function handleGossip(payload, sender, tracker = '') {
   if (verboseLogs) {
-    mainLogger.debug(
-      `Start of handleGossip(${utils.stringifyReduce(payload)})`
-    )
+    mainLogger.debug(`Start of handleGossip(${utils.stringifyReduce(payload)})`)
   }
   const type = payload.type
   const data = payload.data
 
   const gossipHandler = gossipHandlers[type]
   if (!gossipHandler) {
-    mainLogger.debug(`Gossip Handler not found: type ${type}, data: ${JSON.stringify(data)}`)
+    mainLogger.debug(
+      `Gossip Handler not found: type ${type}, data: ${JSON.stringify(data)}`
+    )
     return
   }
 
@@ -440,9 +441,7 @@ export async function handleGossip(payload, sender, tracker = '') {
   logger.playbackLog(sender, 'self', 'GossipRcv', type, tracker, data)
   await gossipHandler(data, sender, tracker)
   if (verboseLogs) {
-    mainLogger.debug(
-      `End of handleGossip(${utils.stringifyReduce(payload)})`
-    )
+    mainLogger.debug(`End of handleGossip(${utils.stringifyReduce(payload)})`)
   }
 }
 
