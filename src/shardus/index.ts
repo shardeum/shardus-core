@@ -583,7 +583,10 @@ class Shardus extends EventEmitter {
    * Function used to allow shardus to sync data specific to an app if it should be required
    */
   async syncAppData () {
-    if (!this.app) return
+    if (!this.app) {
+      await this.p2p.goActive()
+      return
+    }
     if (this.stateManager) await this.stateManager.syncStateData(3)
     console.log('syncAppData')
     if (this.p2p.isFirstSeed) {

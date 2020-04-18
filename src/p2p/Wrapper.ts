@@ -86,6 +86,13 @@ class P2P extends EventEmitter {
     Active.requestActive()
     return activePromise
   }
+
+  getLatestCycles(amount) {
+    if (CycleChain.cycles.length < amount) {
+      return CycleChain.cycles
+    }
+    return CycleChain.cycles.slice(0 - amount)
+  }
 }
 
 export const p2p = new P2P()
