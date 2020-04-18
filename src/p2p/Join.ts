@@ -46,8 +46,8 @@ export interface Record {
 let p2pLogger
 
 let toAccept: number
-let bestJoinRequests: JoinRequest[]
-let updateSeen: Set<Types.Node['publicKey']>
+let requests: JoinRequest[]
+let seen: Set<Types.Node['publicKey']>
 
 /** ROUTES */
 
@@ -141,13 +141,13 @@ export function init() {
 
 export function reset() {
   toAccept = config.p2p.maxNodesPerCycle
-  bestJoinRequests = []
-  updateSeen = new Set()
+  requests = []
+  seen = new Set()
 }
 
 export function getTxs(): Txs {
   return {
-    join: bestJoinRequests,
+    join: requests,
   }
 }
 
@@ -162,7 +162,7 @@ export function updateRecord(
   _prev: CycleCreator.CycleRecord
 ) {
   const joinedConsensors = txs.join.map(joinRequest => {
-    const nodeInfo = joinRequest.nodeInfo
+    const nodeInfo = node
     const cycleJoined = joinRequest.cycleMarker
     const id = computeNodeId(nodeInfo.publicKey, cycleJoined)
     return { ...nodeInfo, cycleJoined, id }
@@ -192,7 +192,7 @@ export async function createJoinRequest(
   cycleMarker
 ): Promise<JoinRequest & Types.SignedObject> {
   // Build and return a join request
-  const nodeInfo = Self._getThisNodeInfo()
+  const nodeInfo = Self.getThisNodeInfo()
   const selectionNum = crypto.hash({ cycleMarker, address: nodeInfo.address })
   // TO-DO: Think about if the selection number still needs to be signed
   const proofOfWork = {
@@ -210,49 +210,41 @@ export async function createJoinRequest(
 }
 
 export function addJoinRequest(joinRequest) {
-  const { nodeInfo } = joinRequest
+  const node = joinRequest.nodeInfo
 
   // Check if this node has already been seen this cycle
-  if (wasSeenThisCycle(nodeInfo.publicKey)) {
+  if (seen.has(node.publicKey)) {
     warn('Node has already been seen this cycle. Unable to add join request.')
     return false
   }
 
   // Mark node as seen for this cycle
-  markNodeAsSeen(nodeInfo.publicKey)
+  seen.add(node.publicKey)
 
   // Return if we already know about this node
-  if (isKnownNode(nodeInfo)) {
+  const ipPort = NodeList.ipPort(node.internalIp, node.internalPort)
+  if (NodeList.byIpPort.has(ipPort)) {
     warn('Cannot add join request for this node, already a known node.')
     return false
   }
 
-  // Get the list of best requests
-  const bestRequests = getBestJoinRequests()
-
-  // If length of array is bigger, do this precheck
-  const competing = toAccept > 0 && bestRequests.length >= toAccept
-  if (competing) {
-    const lastIndex = bestRequests.length - 1
-    const lowest = bestRequests[lastIndex]
-
-    // TODO: call into application
-    // ----- application should decide the ranking order of the join requests
-    // ----- if hook doesn't exist, then we go with default order based on selection number
-    // ----- hook signature = (currentList, newJoinRequest, numDesired) returns [newOrder, added]
-    // ----- should create preconfigured hooks for adding POW, allowing join based on netadmin sig, etc.
-
-    // Check if we are better than the lowest best
-    if (!isBetterThanLowestBest(joinRequest, lowest)) {
-      warn(
-        `${joinRequest.selectionNum} is not better than ${lowest.selectionNum}. Node ${joinRequest.nodeInfo.publicKey} not added to this cycle.`
-      )
-      return false
-    }
+  // Check if we are better than the lowest selectionNum
+  const last = requests.length - 1
+  if (
+    !crypto.isGreaterHash(joinRequest.selectionNum, requests[last].selectionNum)
+  ) {
+    warn('Join request not better than lowest, not added.')
+    return false
   }
 
+  // TODO: call into application
+  // ----- application should decide the ranking order of the join requests
+  // ----- if hook doesn't exist, then we go with default order based on selection number
+  // ----- hook signature = (currentList, newJoinRequest, numDesired) returns [newOrder, added]
+  // ----- should create preconfigured hooks for adding POW, allowing join based on netadmin sig, etc.
+
   // Insert sorted into best list if we made it this far
-  utils.insertSorted(bestRequests, joinRequest, (a, b) =>
+  utils.insertSorted(requests, joinRequest, (a, b) =>
     a.selectionNum < b.selectionNum
       ? 1
       : a.selectionNum > b.selectionNum
@@ -260,16 +252,13 @@ export function addJoinRequest(joinRequest) {
       : 0
   )
 
-  // If we were competing for a spot, we have to get rid of the weakest link
-  if (competing) {
-    const removedRequest = bestRequests.pop()
-    const removedNode = removedRequest.nodeInfo
-    warn(
-      `Removing the following node from this cycle's join requests: ${JSON.stringify(
-        removedNode
-      )}`
-    )
+  // If we have > maxNodesPerCycle requests, trim them down
+  if (requests.length > config.p2p.maxNodesPerCycle) {
+    const over = requests.length - config.p2p.maxNodesPerCycle
+    requests.splice(-over)
+    info(`Over maxNodesPerCycle; removed ${over} requests from join requests`)
   }
+
   return true
 }
 
@@ -339,27 +328,6 @@ export async function fetchJoined(activeNodes) {
 function validateJoinRequest(request: JoinRequest) {
   // [TODO] Implement this
   return true
-}
-
-function getBestJoinRequests() {
-  return bestJoinRequests
-}
-
-function wasSeenThisCycle(key) {
-  return updateSeen.has(key)
-}
-
-function markNodeAsSeen(key) {
-  updateSeen.add(key)
-}
-
-function isKnownNode(node) {
-  const ipPort = NodeList.ipPort(node.internalIp, node.internalPort)
-  return NodeList.byIpPort.has(ipPort)
-}
-
-function isBetterThanLowestBest(request, lowest) {
-  return crypto.isGreaterHash(request.selectionNum, lowest.selectionNum)
 }
 
 export function computeNodeId(publicKey, cycleMarker) {

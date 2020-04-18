@@ -104,7 +104,7 @@ export function dropInvalidTxs(txs: Txs): Txs {
 export function updateRecord(
   txs: Txs,
   record: CycleCreator.CycleRecord,
-  prev: CycleCreator.CycleRecord
+  _prev: CycleCreator.CycleRecord
 ) {
   const active = NodeList.activeByIdOrder.length
   const activated = []
@@ -119,7 +119,6 @@ export function updateRecord(
     }
   }
 
-  if (!record.active) record.active = prev ? prev.active : 0
   record.active = active
   record.activated = activated.sort()
   record.activatedPublicKeys = activatedPublicKeys.sort()

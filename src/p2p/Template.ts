@@ -2,12 +2,13 @@ import { Logger } from 'log4js'
 import * as Comms from './Comms'
 import { logger } from './Context'
 import { CycleRecord } from './CycleCreator'
+import { Change } from './CycleParser'
 import * as Types from './Types'
 
 /** TYPES */
 
-export interface Txs extends SignedObject {
-  timestamp: number
+export interface Txs {
+  field: []
 }
 
 export interface Record {
@@ -27,18 +28,23 @@ const routes = {
 
 /** STATE */
 
-let mainLogger: Logger
+let p2pLogger: Logger
 
 /** FUNCTIONS */
 
-/** EXPORTED FUNCTIONS */
+/** CycleCreator Functions */
+
 /* These functions must be defined by all modules that implement a 
      network action like going active, lost node detection, etc.
      These functions are called by CycleCreator
 */
+
 export function init() {
   // Init logger
-  mainLogger = logger.getLogger('main')
+  p2pLogger = logger.getLogger('p2p')
+
+  // Init state
+  reset()
 
   // Register routes
   for (const [name, handler] of Object.entries(routes.internal)) {
@@ -68,8 +74,27 @@ export function updateRecord(
   prev: CycleRecord
 ) {}
 
-export function parseRecord(record: CycleRecord) {}
+export function parseRecord(record: CycleRecord): Change {
+  return
+}
 
 export function queueRequest(request) {}
 
 export function sendRequests() {}
+
+/** Module Functions */
+
+function info(...msg) {
+  const entry = `Active: ${msg.join(' ')}`
+  p2pLogger.info(entry)
+}
+
+function warn(...msg) {
+  const entry = `Active: ${msg.join(' ')}`
+  p2pLogger.warn(entry)
+}
+
+function error(...msg) {
+  const entry = `Active: ${msg.join(' ')}`
+  p2pLogger.error(entry)
+}

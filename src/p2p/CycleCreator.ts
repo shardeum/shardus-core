@@ -8,6 +8,7 @@ import * as CycleChain from './CycleChain'
 import * as Join from './Join'
 import { JoinedArchiver } from './Join'
 import * as NodeList from './NodeList'
+import * as Rotation from './Rotation'
 import * as Self from './Self'
 import * as Sync from './Sync'
 import { GossipHandler, InternalHandler, SignedObject } from './Types'
@@ -33,12 +34,10 @@ export type CycleTxs = Join.Txs & Active.Txs
 
 export type CycleRecord = BaseRecord &
   Join.Record &
-  Active.Record & {
-    desired: number
-    expired: number
+  Active.Record &
+  Rotation.Record & {
     joined: string[]
     joinedArchivers: JoinedArchiver[]
-    removed: string[]
     returned: string[]
     lost: string[]
     refuted: string[]
@@ -400,27 +399,20 @@ async function compareCycleMarkers(desired: number) {
   // Get random nodes
   const nodes = utils.getRandom(NodeList.activeOthersByIdOrder, 2 * desired)
 
-  process.stdout.write('with...\n')
   for (const node of nodes) {
-    process.stdout.write(`  ${node.externalPort}...`)
     // Send marker, txs to /compare-marker endpoint of another node
     const req: CompareMarkerReq = { marker, txs }
     const resp: CompareMarkerRes = await Comms.ask(node, 'compare-marker', req)
     if (resp) {
       if (resp.marker === marker) {
-        process.stdout.write('matched!\n')
-
         // Increment our matches if they computed the same marker
         matches++
 
         // Done if desired matches reached
         if (matches >= desired) {
-          process.stdout.write('Compare complete: got desired matches!\n')
           return true
         }
       } else if (resp.txs) {
-        process.stdout.write('got cycle txs:\n')
-
         // Otherwise, Get missed CycleTxs
         const unseen = unseenTxs(txs, resp.txs)
         const validUnseen = dropInvalidTxs(unseen)
@@ -430,7 +422,6 @@ async function compareCycleMarkers(desired: number) {
 
         // Update this cycle's txs, record, marker, and cert
         txs = deepmerge(txs, validUnseen)
-        process.stdout.write(`    updated txs: ${JSON.stringify(txs)}\n`)
         ;({ record, marker, cert } = makeCycleData(txs, CycleChain.newest))
       }
     }

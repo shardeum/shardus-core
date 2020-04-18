@@ -482,12 +482,10 @@ class Shardus extends EventEmitter {
         this._attemptRemoveAppliedListener()
         this._unlinkStateManager()
         await this.stateManager.cleanup()
-        // Dont start a new state manager. pm2 will do a full restart if needed.
-        // this._createAndLinkStateManager()
-        // this._attemptCreateAppliedListener()
       }
-      // await this.p2p.restart()
-      // [TODO] replace with cycle creator
+
+      // Shutdown cleanly
+      this.shutdown(true)
     })
 
     Context.setShardusContext(this)

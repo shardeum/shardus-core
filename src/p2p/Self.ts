@@ -278,7 +278,7 @@ function getNodeStatus(nodeId) {
   return current[nodeId].status
 }
 
-export function _getThisNodeInfo() {
+export function getThisNodeInfo() {
   const { externalIp, externalPort, internalIp, internalPort } = ipInfo
   const publicKey = crypto.getPublicKey()
   // TODO: Change this to actual selectable address
