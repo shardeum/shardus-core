@@ -243,6 +243,7 @@ async function cycleCreator() {
  */
 function runQ1() {
   currentQuarter = 1
+  Self.emitter.emit('cycle_q1_start')
   info(`C${currentCycle} Q${currentQuarter}`)
 
   // Tell submodules to sign and send their requests
@@ -255,6 +256,7 @@ function runQ1() {
  */
 function runQ2() {
   currentQuarter = 2
+  Self.emitter.emit('cycle_q2_start')
   info(`C${currentCycle} Q${currentQuarter}`)
 }
 
@@ -263,6 +265,7 @@ function runQ2() {
  */
 async function runQ3() {
   currentQuarter = 3
+  Self.emitter.emit('cycle_q3_start')
   info(`C${currentCycle} Q${currentQuarter}`)
 
   // Get txs and create this cycle's record, marker, and cert

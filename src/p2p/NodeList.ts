@@ -114,6 +114,7 @@ export function removeNode(id) {
   // In reverse
   let idx
 
+  // Omar - not sure if this will work, we should be providing our own compare function
   idx = binarySearch(activeOthersByIdOrder, { id })
   if (idx >= 0) activeOthersByIdOrder.splice(idx, 1)
 
@@ -163,6 +164,7 @@ export function ipPort(ip: string, port: number) {
   return ip + ':' + port
 }
 
+// Omar - we can use the binary search in utils with a custom compare function
 function binarySearch<T>(array: T[], obj: Partial<T>): number {
   let idx = -1
   const [key, value] = Object.entries(obj)[0]

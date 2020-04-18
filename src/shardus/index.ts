@@ -17,6 +17,7 @@ import Reporter from '../reporter'
 import StateManager from '../state-manager'
 import Statistics from '../statistics'
 import Storage from '../storage'
+import * as Wrapper from '../p2p/Wrapper'
 import * as utils from '../utils'
 import Profiler from "../utils/profiler"
 import ShardusTypes = require('../shardus/shardus-types')
@@ -87,7 +88,11 @@ class Shardus extends EventEmitter {
     Context.setCryptoContext(this.crypto)
     this.network = new Network.NetworkClass(config.network, this.logger)
     Context.setNetworkContext(this.network)
-    this.p2p = null
+
+    // Set the old P2P to a Wrapper into the new P2P
+    // [TODO] Remove this once everything calls p2p/* modules directly
+    this.p2p = Wrapper.p2p
+
     this.debug = null
     this.consensus = null
     this.appProvided = null
@@ -443,9 +448,7 @@ class Shardus extends EventEmitter {
     })
     Self.emitter.on('initialized', async () => {
       // [TODO] Enable once CycleCreator is fully operational
-      // await this.syncAppData()
-      // this.p2p.goActive()
-      Active.requestActive()
+      await this.syncAppData()
     })
     Self.emitter.on('active', (nodeId) => {
       this.logger.playbackLogState('active', nodeId, '')
@@ -489,8 +492,10 @@ class Shardus extends EventEmitter {
 
     Context.setShardusContext(this)
 
-    // Start P2P
+    // Init new P2P
     await Self.init()
+
+    // Start P2P
     await Self.startup()
   }
 

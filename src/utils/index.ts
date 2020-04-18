@@ -42,7 +42,84 @@ export const readJsonDir = (dir) => { // => filesObj
   return filesObj
 }
 
-export const binarySearch = (arr, item, comparator) => {
+/*
+ * Binary search in JavaScript.
+ * Returns the index of of the element in a sorted array or (-n-1) where n is the insertion point for the new element.
+ *    If the return value is negative use 1-returned as the insertion point for the element
+ * Parameters:
+ *     ar - A sorted array
+ *     el - An element to search for
+ *     compare_fn - A comparator function. The function takes two arguments: (el, ae) and returns:
+ *        a negative number  if el is less than ae;
+ *        a positive number if el is greater than ae.
+ *        0 if el is equal to ae;
+ *        note that el is the element we are searching for and ae is an array element from the sorted array
+ * The array may contain duplicate elements. If there are more than one equal elements in the array, 
+ * the returned value can be the index of any one of the equal elements.
+ */
+export function binarySearch(ar, el, compare_fn?: any) {
+  if (compare_fn == null) {
+    // Emulate the default Array.sort() comparator
+    compare_fn = (a, b) => {
+// No need to do this JS, why convert numbers to strings before comparing them
+        if ((typeof a !== 'string') || (typeof b !== 'string')){ console.log('compare function in binarySearch was changed, if nothing is broken remove this')}
+//      if (typeof a !== 'string') a = String(a)
+//      if (typeof b !== 'string') b = String(b)
+      return (a > b ? 1 : (a < b ? -1 : 0))
+    }
+  }
+  var m = 0;
+  var n = ar.length - 1;
+  while (m <= n) {
+    var k = (n + m) >> 1;
+    var cmp = compare_fn(el, ar[k]);
+    if (cmp > 0) {
+      m = k + 1;
+    } else if(cmp < 0) {
+      n = k - 1;
+    } else {
+      return k;
+    }
+  }
+  return -m - 1;
+}
+
+export const insertSorted = (arr, item, comparator?: any) => {
+  let i = binarySearch(arr, item, comparator)
+  if (i < 0){ i = 1 - i }
+  arr.splice(i, 0, item)
+
+  /*  We should use our  binary search function instead of recoding it again */
+
+  /*
+  if (comparator == null) {
+    // Emulate the default Array.sort() comparator
+    comparator = (a, b) => {
+      if (typeof a !== 'string') a = String(a)
+      if (typeof b !== 'string') b = String(b)
+      return (a > b ? 1 : (a < b ? -1 : 0))
+    }
+  }
+
+  // Get the index we need to insert the item at
+  let min = 0
+  let max = arr.length
+  let index = Math.floor((min + max) / 2)
+  while (max > min) {
+    if (comparator(item, arr[index]) < 0) {
+      max = index
+    } else {
+      min = index + 1
+    }
+    index = Math.floor((min + max) / 2)
+  }
+  // Insert the item
+  arr.splice(index, 0, item)
+  */
+}
+
+
+export const binarySearch_old = (arr, item, comparator) => {
   if (comparator == null) {
     // Emulate the default Array.sort() comparator
     comparator = (a, b) => {
@@ -70,7 +147,7 @@ export const binarySearch = (arr, item, comparator) => {
   return false
 }
 
-export const insertSorted = (arr, item, comparator?: any) => {
+export const insertSorted_old = (arr, item, comparator?: any) => {
   if (comparator == null) {
     // Emulate the default Array.sort() comparator
     comparator = (a, b) => {

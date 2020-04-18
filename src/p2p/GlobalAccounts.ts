@@ -1,9 +1,10 @@
 import { Signature, SignedObject, Route, InternalHandler, Node, NodeInfo, LooseObject, GossipHandler } from './Types'
 import { Handler } from 'express'
-import { p2p, shardus, stateManager } from './Context'
+import { shardus, stateManager, crypto } from './Context'
 import StateManager from '../state-manager'
 import ShardFunctions from '../state-manager/shardFunctions'
 import Shardus from '../shardus'
+import { p2p } from './Wrapper'
 
 /** TYPES */
 
@@ -69,13 +70,14 @@ export function setGlobal(address, value, when, source) {
 
   // Create a tx for setting a global account
   const tx: SetGlobalTx = {address, value, when, source}
-  const txHash = this.crypto.hash(tx)
+  const txHash = crypto.hash(tx)
 
   // Sign tx
-  const signedTx: SignedSetGlobalTx = this.crypto.sign(tx)
+  const signedTx: SignedSetGlobalTx = crypto.sign(tx)
 
   // Get the nodes that tx will be broadcasted to
-  const homeNode = ShardFunctions.findHomeNode(this.stateManager.currentCycleShardData.shardGlobals, source, this.stateManager.currentCycleShardData.parititionShardDataMap)
+  if (!stateManager.currentCycleShardData) return
+  const homeNode = ShardFunctions.findHomeNode(stateManager.currentCycleShardData.shardGlobals, source, stateManager.currentCycleShardData.parititionShardDataMap)
   const consensusGroup = [...homeNode.consensusNodeForOurNodeFull]
   console.log(`SETGLOBAL: CONSENSUS_GROUP: ${consensusGroup.map(n => n.id.substring(0, 5))}`)
   const ourIdx = consensusGroup.findIndex(node => node.id === p2p.id)
@@ -125,7 +127,7 @@ export function makeReceipt (signedTx: SignedSetGlobalTx, sender: NodeInfo['id']
   const tx = {...signedTx}
   delete tx.sign
 
-  const txHash = p2p.crypto.hash(tx)
+  const txHash = crypto.hash(tx)
 
   // Put into correct Receipt and Tracker
   let receipt: Receipt = receipts.get(txHash)
@@ -166,7 +168,7 @@ export function makeReceipt (signedTx: SignedSetGlobalTx, sender: NodeInfo['id']
 }
 
 export function processReceipt (receipt: Receipt) {
-  const txHash  = p2p.crypto.hash(receipt.tx)
+  const txHash  = crypto.hash(receipt.tx)
   const tracker = trackers.get(txHash) || createTracker(txHash)
   tracker.timestamp = receipt.tx.when
   if (tracker.gossiped) return false
@@ -214,7 +216,7 @@ function validateReceipt(receipt: Receipt) {
   let verified = 0
   for (const sign of signsInConsensusGroup) {
     const signedTx = { ...receipt.tx, sign }
-    if (p2p.crypto.verify(signedTx)) verified++
+    if (crypto.verify(signedTx)) verified++
   }
   if ((verified / consensusGroup.size) * 100 < 60) {
     console.log('Receipt does not have enough valid signatures')
