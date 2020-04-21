@@ -1,7 +1,7 @@
 import { join } from 'path'
 import { readFileSync, readdirSync } from 'fs'
 
-export const sleep = (ms) => {
+export const sleep = ms => {
   return new Promise(resolve => {
     setTimeout(resolve, ms)
   })
@@ -22,18 +22,20 @@ export const getTime = (format = 'ms') => {
   return time
 }
 
-export const deepCopy = (obj) => {
-  if (typeof obj !== 'object') throw Error('Given element is not of type object.')
+export const deepCopy = obj => {
+  if (typeof obj !== 'object')
+    throw Error('Given element is not of type object.')
   return JSON.parse(JSON.stringify(obj))
 }
 
-export const readJson = (filename) => {
+export const readJson = filename => {
   const file = readFileSync(filename).toString()
   const config = JSON.parse(file)
   return config
 }
 
-export const readJsonDir = (dir) => { // => filesObj
+export const readJsonDir = dir => {
+  // => filesObj
   const filesObj = {}
   readdirSync(dir).forEach(fileName => {
     const name = fileName.split('.')[0]
@@ -54,39 +56,45 @@ export const readJsonDir = (dir) => { // => filesObj
  *        a positive number if el is greater than ae.
  *        0 if el is equal to ae;
  *        note that el is the element we are searching for and ae is an array element from the sorted array
- * The array may contain duplicate elements. If there are more than one equal elements in the array, 
+ * The array may contain duplicate elements. If there are more than one equal elements in the array,
  * the returned value can be the index of any one of the equal elements.
  */
 export function binarySearch(ar, el, compare_fn?: any) {
   if (compare_fn == null) {
     // Emulate the default Array.sort() comparator
     compare_fn = (a, b) => {
-// No need to do this JS, why convert numbers to strings before comparing them
-        if ((typeof a !== 'string') || (typeof b !== 'string')){ console.log('compare function in binarySearch was changed, if nothing is broken remove this')}
-//      if (typeof a !== 'string') a = String(a)
-//      if (typeof b !== 'string') b = String(b)
-      return (a > b ? 1 : (a < b ? -1 : 0))
+      // No need to do this JS, why convert numbers to strings before comparing them
+      if (typeof a !== 'string' || typeof b !== 'string') {
+        console.log(
+          'compare function in binarySearch was changed, if nothing is broken remove this'
+        )
+      }
+      //      if (typeof a !== 'string') a = String(a)
+      //      if (typeof b !== 'string') b = String(b)
+      return a > b ? 1 : a < b ? -1 : 0
     }
   }
-  var m = 0;
-  var n = ar.length - 1;
+  var m = 0
+  var n = ar.length - 1
   while (m <= n) {
-    var k = (n + m) >> 1;
-    var cmp = compare_fn(el, ar[k]);
+    var k = (n + m) >> 1
+    var cmp = compare_fn(el, ar[k])
     if (cmp > 0) {
-      m = k + 1;
-    } else if(cmp < 0) {
-      n = k - 1;
+      m = k + 1
+    } else if (cmp < 0) {
+      n = k - 1
     } else {
-      return k;
+      return k
     }
   }
-  return -m - 1;
+  return -m - 1
 }
 
 export const insertSorted = (arr, item, comparator?: any) => {
   let i = binarySearch(arr, item, comparator)
-  if (i < 0){ i = 1 - i }
+  if (i < 0) {
+    i = 1 - i
+  }
   arr.splice(i, 0, item)
 
   /*  We should use our  binary search function instead of recoding it again */
@@ -118,14 +126,13 @@ export const insertSorted = (arr, item, comparator?: any) => {
   */
 }
 
-
 export const binarySearch_old = (arr, item, comparator) => {
   if (comparator == null) {
     // Emulate the default Array.sort() comparator
     comparator = (a, b) => {
       if (typeof a !== 'string') a = String(a)
       if (typeof b !== 'string') b = String(b)
-      return (a > b ? 1 : (a < b ? -1 : 0))
+      return a > b ? 1 : a < b ? -1 : 0
     }
   }
 
@@ -153,7 +160,7 @@ export const insertSorted_old = (arr, item, comparator?: any) => {
     comparator = (a, b) => {
       if (typeof a !== 'string') a = String(a)
       if (typeof b !== 'string') b = String(b)
-      return (a > b ? 1 : (a < b ? -1 : 0))
+      return a > b ? 1 : a < b ? -1 : 0
     }
   }
 
@@ -208,7 +215,11 @@ export const getClosestHash = (targetHash, hashes) => {
   for (const hash of hashes) {
     const dist = XOR(targetHash, hash)
     if (dist === closestDist) {
-      console.error(new Error(`Two hashes came out to the same distance from target hash!\n 1st hash: ${closest}\n 2nd hash: ${hash}\n Target hash: ${targetHash}`))
+      console.error(
+        new Error(
+          `Two hashes came out to the same distance from target hash!\n 1st hash: ${closest}\n 2nd hash: ${hash}\n Target hash: ${targetHash}`
+        )
+      )
       return null
     }
     if (dist > closestDist) closest = hash
@@ -227,18 +238,18 @@ export const setAlarm = (callback, timestamp) => {
   setTimeout(callback, toWait)
 }
 
-export const isObject = (val) => {
+export const isObject = val => {
   if (val === null) {
     return false
   }
-  return ((typeof val === 'function') || (typeof val === 'object'))
+  return typeof val === 'function' || typeof val === 'object'
 }
 
-export const isString = (x) => {
+export const isString = x => {
   return Object.prototype.toString.call(x) === '[object String]'
 }
 
-export const isNumeric = (x) => {
+export const isNumeric = x => {
   return isNaN(x) === false
 }
 
@@ -259,13 +270,15 @@ export const makeShortHash = (x, n = 4) => {
 }
 
 let objToString = Object.prototype.toString
-let objKeys = Object.keys || function (obj) {
-  let keys = []
-  for (let name in obj) {
-    keys.push(name)
+let objKeys =
+  Object.keys ||
+  function(obj) {
+    let keys = []
+    for (let name in obj) {
+      keys.push(name)
+    }
+    return keys
   }
-  return keys
-}
 
 export const stringifyReduce = (val, isArrayProp?: boolean) => {
   let i, max, str, keys, key, propVal, toStr
@@ -326,7 +339,11 @@ export const stringifyReduce = (val, isArrayProp?: boolean) => {
   }
 }
 
-export const stringifyReduceLimit = (val, limit = 100, isArrayProp?: boolean) => {
+export const stringifyReduceLimit = (
+  val,
+  limit = 100,
+  isArrayProp?: boolean
+) => {
   let i, max, str, keys, key, propVal, toStr
 
   if (limit < 0) {
@@ -397,9 +414,9 @@ export const stringifyReduceLimit = (val, limit = 100, isArrayProp?: boolean) =>
 }
 
 // Returns an array of two arrays, one will all resolved promises, and one with all rejected promises
-export const robustPromiseAll = async (promises) => {
+export const robustPromiseAll = async promises => {
   // This is how we wrap a promise to prevent it from rejecting directing in the Promise.all and causing a short circuit
-  const wrapPromise = async (promise) => {
+  const wrapPromise = async promise => {
     // We are trying to await the promise, and catching any rejections
     // We return an array, the first index being resolve, and the second being an error
     try {

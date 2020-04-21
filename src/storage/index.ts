@@ -1,4 +1,4 @@
-import ShardusTypes from './../shardus/shardus-types';
+import ShardusTypes from './../shardus/shardus-types'
 import Log4js from 'log4js'
 // const fs = require('fs')
 // const path = require('path')
@@ -13,7 +13,7 @@ import Sqlite3Storage from './sqlite3storage'
 import StateManager from '../state-manager'
 import Profiler from '../utils/profiler'
 import Shardus from '../shardus'
-import Logger from '../logger';
+import Logger from '../logger'
 // const BetterSqlite3Storage = require('./betterSqlite3storage')
 
 import P2PApoptosis = require('../p2p/Apoptosis')
@@ -33,45 +33,73 @@ interface Storage {
 }
 
 class Storage {
-  constructor (baseDir: string, config: ShardusTypes.StorageConfiguration, logger: Logger, profiler: Profiler) {
+  constructor(
+    baseDir: string,
+    config: ShardusTypes.StorageConfiguration,
+    logger: Logger,
+    profiler: Profiler
+  ) {
     this.profiler = profiler
 
     this.mainLogger = logger.getLogger('main')
     // this.storage = new SequelizeStorage(models, config, logger, baseDir, this.profiler)
 
     // this.storage = new BetterSqlite3Storage(models, config, logger, baseDir, this.profiler)
-    this.storage = new Sqlite3Storage(models, config, logger, baseDir, this.profiler)
+    this.storage = new Sqlite3Storage(
+      models,
+      config,
+      logger,
+      baseDir,
+      this.profiler
+    )
     this.stateManager = null
   }
 
-  async init () {
+  async init() {
     await this.storage.init()
 
-    await this.storage.runCreate('CREATE TABLE if not exists `acceptedTxs` (`id` VARCHAR(255) NOT NULL PRIMARY KEY, `timestamp` BIGINT NOT NULL, `data` JSON NOT NULL, `status` VARCHAR(255) NOT NULL, `receipt` JSON NOT NULL)')
-    await this.storage.runCreate('CREATE TABLE if not exists `accountStates` ( `accountId` VARCHAR(255) NOT NULL, `txId` VARCHAR(255) NOT NULL, `txTimestamp` BIGINT NOT NULL, `stateBefore` VARCHAR(255) NOT NULL, `stateAfter` VARCHAR(255) NOT NULL,  PRIMARY KEY (`accountId`, `txTimestamp`))')
-    await this.storage.runCreate('CREATE TABLE if not exists `cycles` (`counter` BIGINT NOT NULL UNIQUE PRIMARY KEY, `certificate` JSON NOT NULL, `previous` TEXT NOT NULL, `marker` TEXT NOT NULL, `start` BIGINT NOT NULL, `duration` BIGINT NOT NULL, `active` BIGINT NOT NULL, `desired` BIGINT NOT NULL, `expired` BIGINT NOT NULL, `joined` JSON NOT NULL, `joinedArchivers` JSON NOT NULL, `joinedConsensors` JSON NOT NULL, `activated` JSON NOT NULL, `activatedPublicKeys` JSON NOT NULL, `removed` JSON NOT NULL, `returned` JSON NOT NULL, `lost` JSON NOT NULL, `refuted` JSON NOT NULL)')
-    await this.storage.runCreate('CREATE TABLE if not exists `nodes` (`id` TEXT NOT NULL PRIMARY KEY, `publicKey` TEXT NOT NULL, `curvePublicKey` TEXT NOT NULL, `cycleJoined` TEXT NOT NULL, `internalIp` VARCHAR(255) NOT NULL, `externalIp` VARCHAR(255) NOT NULL, `internalPort` SMALLINT NOT NULL, `externalPort` SMALLINT NOT NULL, `joinRequestTimestamp` BIGINT NOT NULL, `activeTimestamp` BIGINT NOT NULL, `address` VARCHAR(255) NOT NULL, `status` VARCHAR(255) NOT NULL)')
-    await this.storage.runCreate('CREATE TABLE if not exists `properties` (`key` VARCHAR(255) NOT NULL PRIMARY KEY, `value` JSON)')
-    await this.storage.runCreate('CREATE TABLE if not exists `accountsCopy` (`accountId` VARCHAR(255) NOT NULL, `cycleNumber` BIGINT NOT NULL, `data` JSON NOT NULL, `timestamp` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, PRIMARY KEY (`accountId`, `cycleNumber`))')
+    await this.storage.runCreate(
+      'CREATE TABLE if not exists `acceptedTxs` (`id` VARCHAR(255) NOT NULL PRIMARY KEY, `timestamp` BIGINT NOT NULL, `data` JSON NOT NULL, `status` VARCHAR(255) NOT NULL, `receipt` JSON NOT NULL)'
+    )
+    await this.storage.runCreate(
+      'CREATE TABLE if not exists `accountStates` ( `accountId` VARCHAR(255) NOT NULL, `txId` VARCHAR(255) NOT NULL, `txTimestamp` BIGINT NOT NULL, `stateBefore` VARCHAR(255) NOT NULL, `stateAfter` VARCHAR(255) NOT NULL,  PRIMARY KEY (`accountId`, `txTimestamp`))'
+    )
+    await this.storage.runCreate(
+      'CREATE TABLE if not exists `cycles` (`counter` BIGINT NOT NULL UNIQUE PRIMARY KEY, `certificate` JSON NOT NULL, `previous` TEXT NOT NULL, `marker` TEXT NOT NULL, `start` BIGINT NOT NULL, `duration` BIGINT NOT NULL, `active` BIGINT NOT NULL, `desired` BIGINT NOT NULL, `expired` BIGINT NOT NULL, `joined` JSON NOT NULL, `joinedArchivers` JSON NOT NULL, `joinedConsensors` JSON NOT NULL, `activated` JSON NOT NULL, `activatedPublicKeys` JSON NOT NULL, `removed` JSON NOT NULL, `returned` JSON NOT NULL, `lost` JSON NOT NULL, `refuted` JSON NOT NULL)'
+    )
+    await this.storage.runCreate(
+      'CREATE TABLE if not exists `nodes` (`id` TEXT NOT NULL PRIMARY KEY, `publicKey` TEXT NOT NULL, `curvePublicKey` TEXT NOT NULL, `cycleJoined` TEXT NOT NULL, `internalIp` VARCHAR(255) NOT NULL, `externalIp` VARCHAR(255) NOT NULL, `internalPort` SMALLINT NOT NULL, `externalPort` SMALLINT NOT NULL, `joinRequestTimestamp` BIGINT NOT NULL, `activeTimestamp` BIGINT NOT NULL, `address` VARCHAR(255) NOT NULL, `status` VARCHAR(255) NOT NULL)'
+    )
+    await this.storage.runCreate(
+      'CREATE TABLE if not exists `properties` (`key` VARCHAR(255) NOT NULL PRIMARY KEY, `value` JSON)'
+    )
+    await this.storage.runCreate(
+      'CREATE TABLE if not exists `accountsCopy` (`accountId` VARCHAR(255) NOT NULL, `cycleNumber` BIGINT NOT NULL, `data` JSON NOT NULL, `timestamp` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, PRIMARY KEY (`accountId`, `cycleNumber`))'
+    )
 
     await this.storage.run(P2PApoptosis.addCycleFieldQuery)
 
     // get models and helper methods from the storage class we just initializaed.
     this.storageModels = this.storage.storageModels
 
-    this._create = async (table, values, opts) => this.storage._create(table, values, opts)
-    this._read = async (table, where, opts) => this.storage._read(table, where, opts)
-    this._update = async (table, values, where, opts) => this.storage._update(table, values, where, opts)
-    this._delete = async (table, where, opts) => this.storage._delete(table, where, opts)
-    this._query = async (query, tableModel) => this.storage._rawQuery(query, tableModel) // or queryString, valueArray for non-sequelize
+    this._create = async (table, values, opts) =>
+      this.storage._create(table, values, opts)
+    this._read = async (table, where, opts) =>
+      this.storage._read(table, where, opts)
+    this._update = async (table, values, where, opts) =>
+      this.storage._update(table, values, where, opts)
+    this._delete = async (table, where, opts) =>
+      this.storage._delete(table, where, opts)
+    this._query = async (query, tableModel) =>
+      this.storage._rawQuery(query, tableModel) // or queryString, valueArray for non-sequelize
 
     this.initialized = true
   }
-  async close () {
+  async close() {
     await this.storage.close()
   }
 
-  _checkInit () {
+  _checkInit() {
     if (!this.initialized) throw new Error('Storage not initialized.')
   }
 
@@ -137,7 +165,7 @@ class Storage {
   //   await model.sync({ force: true })
   // }
 
-  async addCycles (cycles) {
+  async addCycles(cycles) {
     this._checkInit()
     try {
       await this._create(this.storageModels.cycles, cycles)
@@ -145,10 +173,14 @@ class Storage {
       throw new Error(e)
     }
   }
-  async getCycleByCounter (counter) {
+  async getCycleByCounter(counter) {
     this._checkInit()
     try {
-      var [ cycle ] = await this._read(this.storageModels.cycles, { counter }, { attributes: { exclude: ['createdAt', 'updatedAt'] } })
+      var [cycle] = await this._read(
+        this.storageModels.cycles,
+        { counter },
+        { attributes: { exclude: ['createdAt', 'updatedAt'] } }
+      )
     } catch (e) {
       throw new Error(e)
     }
@@ -157,10 +189,14 @@ class Storage {
     }
     return null
   }
-  async getCycleByMarker (marker) {
+  async getCycleByMarker(marker) {
     this._checkInit()
     try {
-      var [ cycle ] = await this._read(this.storageModels.cycles, { marker }, { attributes: { exclude: ['createdAt', 'updatedAt'] } })
+      var [cycle] = await this._read(
+        this.storageModels.cycles,
+        { marker },
+        { attributes: { exclude: ['createdAt', 'updatedAt'] } }
+      )
     } catch (e) {
       throw new Error(e)
     }
@@ -169,7 +205,7 @@ class Storage {
     }
     return null
   }
-  async deleteCycleByCounter (counter) {
+  async deleteCycleByCounter(counter) {
     this._checkInit()
     try {
       await this._delete(this.storageModels.cycles, { counter })
@@ -177,7 +213,7 @@ class Storage {
       throw new Error(e)
     }
   }
-  async deleteCycleByMarker (marker) {
+  async deleteCycleByMarker(marker) {
     this._checkInit()
     try {
       await this._delete(this.storageModels.cycles, { marker })
@@ -185,17 +221,19 @@ class Storage {
       throw new Error(e)
     }
   }
-  async listCycles () {
+  async listCycles() {
     this._checkInit()
     try {
-      var cycles = await this._read(this.storageModels.cycles, null, { attributes: { exclude: ['createdAt', 'updatedAt'] } })
+      var cycles = await this._read(this.storageModels.cycles, null, {
+        attributes: { exclude: ['createdAt', 'updatedAt'] },
+      })
     } catch (e) {
       throw new Error(e)
     }
     return cycles.map(c => c.dataValues)
   }
 
-  async addNodes (nodes) {
+  async addNodes(nodes) {
     this._checkInit()
     try {
       await this._create(this.storageModels.nodes, nodes)
@@ -203,16 +241,19 @@ class Storage {
       throw new Error(e)
     }
   }
-  async getNodes (node) {
+  async getNodes(node) {
     this._checkInit()
     try {
-      var nodes = await this._read(this.storageModels.nodes, node, { attributes: { exclude: ['createdAt', 'updatedAt'] }, raw: true })
+      var nodes = await this._read(this.storageModels.nodes, node, {
+        attributes: { exclude: ['createdAt', 'updatedAt'] },
+        raw: true,
+      })
     } catch (e) {
       throw new Error(e)
     }
     return nodes
   }
-  async updateNodes (node, newNode) {
+  async updateNodes(node, newNode) {
     this._checkInit()
     try {
       await this._update(this.storageModels.nodes, newNode, node)
@@ -220,13 +261,15 @@ class Storage {
       throw new Error(e)
     }
   }
-  async deleteNodes (nodes) {
+  async deleteNodes(nodes) {
     this._checkInit()
     const nodeIds = []
     // Attempt to add node to the nodeIds list
-    const addNodeToList = (node) => {
+    const addNodeToList = node => {
       if (!node.id) {
-        this.mainLogger.error(`Node attempted to be deleted without ID: ${JSON.stringify(node)}`)
+        this.mainLogger.error(
+          `Node attempted to be deleted without ID: ${JSON.stringify(node)}`
+        )
         return
       }
       nodeIds.push(node.id)
@@ -244,39 +287,46 @@ class Storage {
       throw new Error(e)
     }
   }
-  async listNodes () {
+  async listNodes() {
     this._checkInit()
     try {
-      var nodes = await this._read(this.storageModels.nodes, null, { attributes: { exclude: ['createdAt', 'updatedAt'] }, raw: true })
+      var nodes = await this._read(this.storageModels.nodes, null, {
+        attributes: { exclude: ['createdAt', 'updatedAt'] },
+        raw: true,
+      })
     } catch (e) {
       throw new Error(e)
     }
     return nodes
   }
 
-  async setProperty (key, value) {
+  async setProperty(key, value) {
     this._checkInit()
     try {
-      let [ prop ] = await this._read(this.storageModels.properties, { key })
+      let [prop] = await this._read(this.storageModels.properties, { key })
       if (!prop) {
         await this._create(this.storageModels.properties, {
           key,
-          value
+          value,
         })
       } else {
-        await this._update(this.storageModels.properties, {
-          key,
-          value
-        }, { key })
+        await this._update(
+          this.storageModels.properties,
+          {
+            key,
+            value,
+          },
+          { key }
+        )
       }
     } catch (e) {
       throw new Error(e)
     }
   }
-  async getProperty (key) {
+  async getProperty(key) {
     this._checkInit()
     try {
-      var [ prop ] = await this._read(this.storageModels.properties, { key })
+      var [prop] = await this._read(this.storageModels.properties, { key })
     } catch (e) {
       throw new Error(e)
     }
@@ -285,7 +335,7 @@ class Storage {
     }
     return null
   }
-  async deleteProperty (key) {
+  async deleteProperty(key) {
     this._checkInit()
     try {
       await this._delete(this.storageModels.properties, { key })
@@ -293,17 +343,20 @@ class Storage {
       throw new Error(e)
     }
   }
-  async listProperties () {
+  async listProperties() {
     this._checkInit()
     try {
-      var keys = await this._read(this.storageModels.properties, null, { attributes: ['key'], raw: true })
+      var keys = await this._read(this.storageModels.properties, null, {
+        attributes: ['key'],
+        raw: true,
+      })
     } catch (e) {
       throw new Error(e)
     }
     return keys.map(k => k.key)
   }
 
-  async clearP2pState () {
+  async clearP2pState() {
     this._checkInit()
     try {
       await this._delete(this.storageModels.cycles, null, { truncate: true })
@@ -312,38 +365,50 @@ class Storage {
       throw new Error(e)
     }
   }
-  async clearAppRelatedState () {
+  async clearAppRelatedState() {
     this._checkInit()
     try {
-      await this._delete(this.storageModels.accountStates, null, { truncate: true })
-      await this._delete(this.storageModels.acceptedTxs, null, { truncate: true })
-      await this._delete(this.storageModels.accountsCopy, null, { truncate: true })
+      await this._delete(this.storageModels.accountStates, null, {
+        truncate: true,
+      })
+      await this._delete(this.storageModels.acceptedTxs, null, {
+        truncate: true,
+      })
+      await this._delete(this.storageModels.accountsCopy, null, {
+        truncate: true,
+      })
     } catch (e) {
       throw new Error(e)
     }
   }
 
-  async addAcceptedTransactions (acceptedTransactions) {
+  async addAcceptedTransactions(acceptedTransactions) {
     this._checkInit()
     try {
-      await this._create(this.storageModels.acceptedTxs, acceptedTransactions, { createOrReplace: true })
+      await this._create(this.storageModels.acceptedTxs, acceptedTransactions, {
+        createOrReplace: true,
+      })
     } catch (e) {
       throw new Error(e)
     }
   }
 
-  async addAccountStates (accountStates) {
+  async addAccountStates(accountStates) {
     this._checkInit()
     try {
       // Adding { createOrReplace: true }  helps fix some issues we were having, but may make it hard to catch certain types of mistakes. (since it will suppress duped key issue)
-      await this._create(this.storageModels.accountStates, accountStates, { createOrReplace: true })
+      await this._create(this.storageModels.accountStates, accountStates, {
+        createOrReplace: true,
+      })
 
       // throw new Error('test failue. fake')
     } catch (e) {
       // this.mainLogger.fatal('addAccountStates error ' + JSON.stringify(e))
       // throw new Error(e)
 
-      this.mainLogger.fatal('addAccountStates db failure.  start apoptosis ' + JSON.stringify(e))
+      this.mainLogger.fatal(
+        'addAccountStates db failure.  start apoptosis ' + JSON.stringify(e)
+      )
       // stop state manager from syncing?
 
       this.stateManager.initApoptosisAndQuitSyncing()
@@ -390,7 +455,7 @@ class Storage {
   //   }
   // }
 
-  async queryAcceptedTransactions (tsStart, tsEnd, limit) {
+  async queryAcceptedTransactions(tsStart, tsEnd, limit) {
     this._checkInit()
     try {
       let result = await this._read(
@@ -398,9 +463,9 @@ class Storage {
         { timestamp: { [Op.between]: [tsStart, tsEnd] } },
         {
           limit: limit,
-          order: [ ['timestamp', 'ASC'] ],
+          order: [['timestamp', 'ASC']],
           attributes: { exclude: ['createdAt', 'updatedAt', 'id'] },
-          raw: true
+          raw: true,
         }
       )
       return result
@@ -409,7 +474,7 @@ class Storage {
     }
   }
 
-  async queryAcceptedTransactionsByIds (ids) {
+  async queryAcceptedTransactionsByIds(ids) {
     this._checkInit()
     try {
       let result = await this._read(
@@ -417,9 +482,9 @@ class Storage {
         { id: { [Op.in]: ids } },
         {
           // limit: limit,
-          order: [ ['timestamp', 'ASC'] ],
+          order: [['timestamp', 'ASC']],
           attributes: { exclude: ['createdAt', 'updatedAt', 'id'] },
-          raw: true
+          raw: true,
         }
       )
       return result
@@ -428,17 +493,29 @@ class Storage {
     }
   }
 
-  async queryAccountStateTable (accountStart, accountEnd, tsStart, tsEnd, limit) {
+  async queryAccountStateTable(
+    accountStart,
+    accountEnd,
+    tsStart,
+    tsEnd,
+    limit
+  ) {
     this._checkInit()
     try {
       let result = await this._read(
         this.storageModels.accountStates,
-        { accountId: { [Op.between]: [accountStart, accountEnd] }, txTimestamp: { [Op.between]: [tsStart, tsEnd] } },
+        {
+          accountId: { [Op.between]: [accountStart, accountEnd] },
+          txTimestamp: { [Op.between]: [tsStart, tsEnd] },
+        },
         {
           limit: limit,
-          order: [ ['txTimestamp', 'ASC'], ['accountId', 'ASC'] ],
+          order: [
+            ['txTimestamp', 'ASC'],
+            ['accountId', 'ASC'],
+          ],
           attributes: { exclude: ['createdAt', 'updatedAt', 'id'] },
-          raw: true
+          raw: true,
         }
       )
       return result
@@ -448,16 +525,19 @@ class Storage {
   }
 
   // todo also sync accepted tx? idk.
-  async queryAccountStateTableByList (addressList, tsStart, tsEnd) {
+  async queryAccountStateTableByList(addressList, tsStart, tsEnd) {
     this._checkInit()
     try {
       let result = await this._read(
         this.storageModels.accountStates,
-        { txTimestamp: { [Op.between]: [tsStart, tsEnd] }, accountId: { [Op.in]: addressList } },
         {
-          order: [ ['address', 'ASC'] ],
+          txTimestamp: { [Op.between]: [tsStart, tsEnd] },
+          accountId: { [Op.in]: addressList },
+        },
+        {
+          order: [['address', 'ASC']],
           attributes: { exclude: ['createdAt', 'updatedAt', 'id'] },
-          raw: true
+          raw: true,
         }
       )
       return result
@@ -469,15 +549,18 @@ class Storage {
   // First pass would be to get timestamp for N accounts
   // Then can batch these into delete statements that will be sure not to delete accounts that are to old.
   //
-  async clearAccountStateTableByList (addressList, tsStart, tsEnd) {
+  async clearAccountStateTableByList(addressList, tsStart, tsEnd) {
     this._checkInit()
     try {
       await this._delete(
         this.storageModels.accountStates,
-        { txTimestamp: { [Op.between]: [tsStart, tsEnd] }, accountId: { [Op.in]: addressList } },
+        {
+          txTimestamp: { [Op.between]: [tsStart, tsEnd] },
+          accountId: { [Op.in]: addressList },
+        },
         {
           attributes: { exclude: ['createdAt', 'updatedAt', 'id'] },
-          raw: true
+          raw: true,
         }
       )
     } catch (e) {
@@ -485,10 +568,11 @@ class Storage {
     }
   }
 
-  async clearAccountStateTableOlderThan (tsEnd) {
+  async clearAccountStateTableOlderThan(tsEnd) {
     this._checkInit()
     try {
-      await this._query('Delete from accountStates where txTimestamp < ? and txTimestamp not in (SELECT min(txTimestamp)  from accountStates group by accountId)',
+      await this._query(
+        'Delete from accountStates where txTimestamp < ? and txTimestamp not in (SELECT min(txTimestamp)  from accountStates group by accountId)',
         `${tsEnd}`
       )
     } catch (e) {
@@ -505,7 +589,7 @@ class Storage {
   // Delete from accountStates where txTimestamp < 1577915740875 and txTimestamp not in (SELECT min(txTimestamp)  from accountStates group by accountId)
 
   // use this to clear out older accepted TXs
-  async clearAcceptedTX (tsStart, tsEnd) {
+  async clearAcceptedTX(tsStart, tsEnd) {
     this._checkInit()
     try {
       await this._delete(
@@ -513,7 +597,7 @@ class Storage {
         { timestamp: { [Op.between]: [tsStart, tsEnd] } },
         {
           attributes: { exclude: ['createdAt', 'updatedAt', 'id'] },
-          raw: true
+          raw: true,
         }
       )
     } catch (e) {
@@ -540,7 +624,7 @@ class Storage {
   //   }
   // }
 
-  async searchAccountStateTable (accountId, txTimestamp) {
+  async searchAccountStateTable(accountId, txTimestamp) {
     this._checkInit()
     try {
       let result = await this._read(
@@ -548,7 +632,7 @@ class Storage {
         { accountId, txTimestamp },
         {
           attributes: { exclude: ['createdAt', 'updatedAt', 'id'] },
-          raw: true
+          raw: true,
         }
       )
       return result
@@ -557,7 +641,7 @@ class Storage {
     }
   }
 
-  async createAccountCopies (accountCopies) {
+  async createAccountCopies(accountCopies) {
     this._checkInit()
     try {
       // console.log('createAccountCopies write: ' + JSON.stringify(accountCopies))
@@ -567,11 +651,13 @@ class Storage {
     }
   }
 
-  async createOrReplaceAccountCopy (accountCopy) {
+  async createOrReplaceAccountCopy(accountCopy) {
     this._checkInit()
     try {
       // console.log('createOrReplaceAccountCopy write: ' + JSON.stringify(accountCopy))
-      await this._create(this.storageModels.accountsCopy, accountCopy, { createOrReplace: true })
+      await this._create(this.storageModels.accountsCopy, accountCopy, {
+        createOrReplace: true,
+      })
     } catch (e) {
       throw new Error(e)
     }
@@ -583,17 +669,20 @@ class Storage {
   // timestamp: { type: Sequelize.BIGINT, allowNull: false },
   // hash: { type: Sequelize.STRING, allowNull: false }
 
-  async getAccountReplacmentCopies1 (accountIDs, cycleNumber) {
+  async getAccountReplacmentCopies1(accountIDs, cycleNumber) {
     this._checkInit()
     try {
       let result = await this._read(
         this.storageModels.accountsCopy,
-        { cycleNumber: { [Op.lte]: cycleNumber }, accountId: { [Op.in]: accountIDs } },
+        {
+          cycleNumber: { [Op.lte]: cycleNumber },
+          accountId: { [Op.in]: accountIDs },
+        },
         {
           // limit: limit,
           // order: [ ['timestamp', 'ASC'] ],
           attributes: { exclude: ['createdAt', 'updatedAt'] },
-          raw: true
+          raw: true,
         }
       )
       return result
@@ -602,7 +691,7 @@ class Storage {
     }
   }
 
-  async getAccountReplacmentCopies (accountIDs, cycleNumber) {
+  async getAccountReplacmentCopies(accountIDs, cycleNumber) {
     this._checkInit()
     try {
       let expandQ = ''
@@ -621,17 +710,20 @@ class Storage {
     }
   }
 
-  async clearAccountReplacmentCopies (accountIDs, cycleNumber) {
+  async clearAccountReplacmentCopies(accountIDs, cycleNumber) {
     this._checkInit()
     try {
       await this._delete(
         this.storageModels.accountsCopy,
-        { cycleNumber: { [Op.gte]: cycleNumber }, accountId: { [Op.in]: accountIDs } },
+        {
+          cycleNumber: { [Op.gte]: cycleNumber },
+          accountId: { [Op.in]: accountIDs },
+        },
         {
           // limit: limit,
           // order: [ ['timestamp', 'ASC'] ],
           attributes: { exclude: ['createdAt', 'updatedAt'] },
-          raw: true
+          raw: true,
         }
       )
     } catch (e) {

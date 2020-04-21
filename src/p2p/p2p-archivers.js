@@ -1,7 +1,7 @@
 const http = require('../http')
 
 class P2PArchivers {
-  constructor (logger, p2p, state, crypto) {
+  constructor(logger, p2p, state, crypto) {
     this.mainLogger = logger.getLogger('main')
     this.p2p = p2p
     this.state = state
@@ -12,26 +12,26 @@ class P2PArchivers {
     this.recipientTypes = {}
   }
 
-  logDebug (msg) {
+  logDebug(msg) {
     this.mainLogger.debug('P2PArchivers: ' + msg)
   }
 
-  logError (msg) {
+  logError(msg) {
     this.mainLogger.error('P2PArchivers: ', msg)
   }
 
-  reset () {
+  reset() {
     this.joinRequests = []
     this.archiversList = []
     this.dataRecipients = []
     this.recipientTypes = {}
   }
 
-  resetJoinRequests () {
+  resetJoinRequests() {
     this.joinRequests = []
   }
 
-  addJoinRequest (joinRequest, tracker, gossip = true) {
+  addJoinRequest(joinRequest, tracker, gossip = true) {
     // [TODO] Verify signature
 
     if (this.state.acceptJoinRequests === false) {
@@ -44,18 +44,18 @@ class P2PArchivers {
     return true
   }
 
-  getArchiverUpdates () {
+  getArchiverUpdates() {
     return this.joinRequests
   }
 
-  updateArchivers (joinedArchivers) {
+  updateArchivers(joinedArchivers) {
     // Update archiversList
     for (const nodeInfo of joinedArchivers) {
       this.archiversList.push(nodeInfo)
     }
   }
 
-  addDataRecipient (nodeInfo, dataRequest) {
+  addDataRecipient(nodeInfo, dataRequest) {
     const recipient = {
       nodeInfo,
       type: dataRequest.type,
@@ -69,7 +69,7 @@ class P2PArchivers {
     dataResponse.data = []
 
     switch (recipient.type) {
-      case 'CYCLE' : {
+      case 'CYCLE': {
         // Get an array of cycles since counter = dataRequest.lastData
         const start = dataRequest.lastData
         const end = this.state.getLastCycleCounter()
@@ -77,11 +77,11 @@ class P2PArchivers {
         this.logDebug(`Responding to cycle dataRequest [${start}-${end}] with ${JSON.stringify(dataResponse)}`)
         break
       }
-      case 'TRANSACTION' : {
+      case 'TRANSACTION': {
         // [TODO] Get an array of txs since tx id = dataRequest.lastData
         break
       }
-      case 'PARTITION' : {
+      case 'PARTITION': {
         // [TODO] Get an array of txs since partition hash = dataRequest.lastData
         break
       }
@@ -97,7 +97,7 @@ class P2PArchivers {
       })
   }
 
-  removeDataRecipient (publicKey) {
+  removeDataRecipient(publicKey) {
     let recipient
     for (let i = this.dataRecipients.length - 1; i >= 0; i--) {
       recipient = this.dataRecipients[i]
@@ -107,7 +107,7 @@ class P2PArchivers {
     }
   }
 
-  sendData (cycle) {
+  sendData(cycle) {
     for (const recipient of this.dataRecipients) {
       const recipientUrl = `http://${recipient.nodeInfo.ip}:${recipient.nodeInfo.port}/newdata`
 
@@ -117,16 +117,16 @@ class P2PArchivers {
       dataResponse.data = []
 
       switch (recipient.type) {
-        case 'CYCLE' : {
+        case 'CYCLE': {
           // Send latest cycle
           dataResponse.data.push(cycle)
           break
         }
-        case 'TRANSACTION' : {
+        case 'TRANSACTION': {
           // [TODO] Send latest txs
           break
         }
-        case 'PARTITION' : {
+        case 'PARTITION': {
           // [TODO] Send latest partitions
           break
         }
@@ -150,7 +150,7 @@ class P2PArchivers {
     }
   }
 
-  sendPartitionData (partitionReceipt, paritionObject) {
+  sendPartitionData(partitionReceipt, paritionObject) {
     for (const nodeInfo of this.cycleRecipients) {
       const nodeUrl = `http://${nodeInfo.ip}:${nodeInfo.port}/post_partition`
       http.post(nodeUrl, { partitionReceipt, paritionObject })
@@ -160,7 +160,7 @@ class P2PArchivers {
     }
   }
 
-  sendTransactionData (partitionNumber, cycleNumber, transactions) {
+  sendTransactionData(partitionNumber, cycleNumber, transactions) {
     for (const nodeInfo of this.cycleRecipients) {
       const nodeUrl = `http://${nodeInfo.ip}:${nodeInfo.port}/post_transactions`
       http.post(nodeUrl, { partitionNumber, cycleNumber, transactions })
@@ -170,7 +170,7 @@ class P2PArchivers {
     }
   }
 
-  registerRoutes () {
+  registerRoutes() {
     this.p2p.network.registerExternalPost('joinarchiver', async (req, res) => {
       if (!this.state.acceptJoinRequests) {
         return res.json({ success: false, error: 'not accepting archiver join requests' })

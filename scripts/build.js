@@ -27,7 +27,7 @@ fs.copyFileSync(path.join(rootDir, 'src/crypto/computePowGenerator.js'), path.jo
 fs.copyFileSync(path.join(__dirname, '../', 'scripts/build-index.js'), path.join(distDir, 'index.js'))
 
 // Modified from https://stackoverflow.com/a/52338335
-function copyFolderSync (from, to) {
+function copyFolderSync(from, to) {
   try {
     fs.mkdirSync(to)
   } catch (e) {

@@ -1,8 +1,8 @@
-import { start } from "repl";
-import { Certificate } from "crypto";
+import { start } from 'repl'
+import { Certificate } from 'crypto'
 //import { RequestHandler } from "express"; //express was causing problems.
 
-type RequestHandler = any 
+type RequestHandler = any
 
 // Type definitions for Shardus
 // Project: Shardus Enterprise Server
@@ -18,7 +18,7 @@ declare class Shardus {
   /**
    * Starts the shardus enterprise server instace
    * @param exitProcOnFail Sets if the process should terminate on any error
-   * 
+   *
    */
   start(exitProcOnFail?: boolean): void
   /**
@@ -33,25 +33,29 @@ declare class Shardus {
    * https://shardus.gitlab.io/docs/developer/main-concepts/building-a-poc-app/shardus-app-interface/register-external-get.html
    * @param route The route to register an external POST endpoint
    * @param handler An express.js standard route handler function
-   */  
+   */
+
   registerExternalPost(route: string, handler: RequestHandler): void
   /**
    * Register an external endpoint to shardus enterprise server
    * @param route The route to register an external PUT endpoint
    * @param handler An express.js standard route handler function
-   */  
+   */
+
   registerExternalPut(route: string, handler: RequestHandler): void
   /**
    * Register an external endpoint to shardus enterprise server
    * @param route The route to register an external DELETE endpoint
    * @param handler An express.js standard route handler function
-   */  
+   */
+
   registerExternalDelete(route: string, handler: RequestHandler): void
   /**
    * Register an external endpoint to shardus enterprise server
    * @param route The route to register an external PATCH endpoint
    * @param handler An express.js standard route handler function
-   */  
+   */
+
   registerExternalPatch(route: string, handler: RequestHandler): void
   /**
    * Register handler for caught exceptions on http requests
@@ -59,14 +63,14 @@ declare class Shardus {
   registerExceptionHandler(): void
   /**
    * Handle incoming transaction requests
-   * 
+   *
    * @param tx the transaction
-   * @param set? 
+   * @param set?
    */
   put(tx: object, set?: boolean): Shardus.IncomingTransactionResult
   /**
    * Handle incoming set requests
-   * 
+   *
    * @param tx the set tx
    */
   set(tx: object): Shardus.IncomingTransactionResult
@@ -88,20 +92,42 @@ declare class Shardus {
   /**
    * Returns the application associated with the shardus module
    * @param Application The configured application
-   */  
+   */
+
   _getApplicationInterface(Application: Shardus.App): Shardus.App
 
   createApplyResponse(txId: string, txTimestamp: number): Shardus.ApplyResponse
 
-  createWrappedResponse(accountId: string, accountCreated: boolean, hash: string, timestamp: number, fullData: any): Shardus.WrappedResponse
+  createWrappedResponse(
+    accountId: string,
+    accountCreated: boolean,
+    hash: string,
+    timestamp: number,
+    fullData: any
+  ): Shardus.WrappedResponse
 
   setPartialData(response: any, partialData: any, userTag: any): void
 
-  genericApplyPartialUpate(fullAccountData: any, updatedPartialAccount: any): void
+  genericApplyPartialUpate(
+    fullAccountData: any,
+    updatedPartialAccount: any
+  ): void
 
-  applyResponseAddState(applyResponse: any, fullAccountData: any, localCache: any, accountId: string, txId: string, txTimestamp: number, accountStateBefore: string, accountStateAfter: string, accountCreated: boolean): void
+  applyResponseAddState(
+    applyResponse: any,
+    fullAccountData: any,
+    localCache: any,
+    accountId: string,
+    txId: string,
+    txTimestamp: number,
+    accountStateBefore: string,
+    accountStateAfter: string,
+    accountCreated: boolean
+  ): void
 
-  getLocalOrRemoteAccount(address: string): Promise<Shardus.WrappedDataFromQueue>
+  getLocalOrRemoteAccount(
+    address: string
+  ): Promise<Shardus.WrappedDataFromQueue>
 
   getRemoteAccount(address: string): Promise<Shardus.WrappedDataFromQueue>
 
@@ -123,16 +149,28 @@ declare namespace Shardus {
     /**
      * A function responsible for validation the incoming transaction fields
      */
-    validateTxnFields: (inTx: Shardus.IncomingTransaction) => Shardus.IncomingTransactionResult
+    validateTxnFields: (
+      inTx: Shardus.IncomingTransaction
+    ) => Shardus.IncomingTransactionResult
     /**
      * A function responsible for applying an accepted transaction
      */
-    apply: (inTx: Shardus.IncomingTransaction, wrappedStates: any) => Shardus.ApplyResponse
+    apply: (
+      inTx: Shardus.IncomingTransaction,
+      wrappedStates: any
+    ) => Shardus.ApplyResponse
 
+    updateAccountFull: (
+      wrappedState: WrappedResponse,
+      localCache: any,
+      applyResponse: Shardus.ApplyResponse
+    ) => void
 
-    updateAccountFull: (wrappedState: WrappedResponse, localCache: any, applyResponse: Shardus.ApplyResponse) => void
-
-    updateAccountPartial: (wrappedState: WrappedResponse, localCache: any, applyResponse: Shardus.ApplyResponse) => void
+    updateAccountPartial: (
+      wrappedState: WrappedResponse,
+      localCache: any,
+      applyResponse: Shardus.ApplyResponse
+    ) => void
 
     getRelevantData: (accountId: string, tx: object) => WrappedResponse
 
@@ -149,9 +187,19 @@ declare namespace Shardus {
      */
     close: () => void
 
-    getAccountData: (accountStart: string, accountEnd: string, maxRecords: number) => WrappedData[]
+    getAccountData: (
+      accountStart: string,
+      accountEnd: string,
+      maxRecords: number
+    ) => WrappedData[]
 
-    getAccountDataByRange: (accountStart: string, accountEnd: string, tsStart: number, tsEnd: number, maxRecords: number) => WrappedData[]
+    getAccountDataByRange: (
+      accountStart: string,
+      accountEnd: string,
+      tsStart: number,
+      tsEnd: number,
+      maxRecords: number
+    ) => WrappedData[]
 
     calculateAccountHash: (account: any) => string
 
@@ -168,7 +216,7 @@ declare namespace Shardus {
     getAccountDebugValue: (wrappedAccount: any) => string
 
     canDebugDropTx: (tx: any) => boolean
-    
+
     /**
      * This gives the application a chance to sync or load initial data before going active.
      * If it is the first node it can use .set() to set data
@@ -176,19 +224,21 @@ declare namespace Shardus {
      */
     sync: () => any
   }
-  
+
   export interface TransactionKeys {
     /**
      * An array of the source keys
      */
-    sourceKeys: string[],
+    sourceKeys: string[]
     /**
      * An array of the target keys
-     */    
+     */
+
     targetKeys: string[]
     /**
      * all keys
-     */ 
+     */
+
     allKeys: string[]
     /**
      * Timestamp for the transaction
@@ -203,63 +253,61 @@ declare namespace Shardus {
     /**
      * The statle table results array
      */
-    stateTableResults: StateTableObject[],
+    stateTableResults: StateTableObject[]
     /**
      * Transaction ID
      */
-    txId: string,
+    txId: string
     /**
      * Transaction timestamp
      */
-    txTimestamp: number,
+    txTimestamp: number
     /**
      * Account data array
      */
     accountData: WrappedResponse[]
   }
 
-
-
   export interface AccountData {
     /** Account ID */
-    accountId: string,
+    accountId: string
     /** Account Data */
-    data: string,
+    data: string
     /** Transaction ID */
-    txId: string,
+    txId: string
     /** Timestamp */
-    timestamp: number,  // is it ok to use string here, how about data?
+    timestamp: number // is it ok to use string here, how about data?
     /** Account hash */
-    hash: string,
+    hash: string
   }
 
   // similar to AccountData but comes from the accounts copy backup table.
   export interface AccountsCopy {
-    accountId: string,
-    cycleNumber: number,
-    data: any,
-    timestamp: number,
-    hash: string,
+    accountId: string
+    cycleNumber: number
+    data: any
+    timestamp: number
+    hash: string
   }
 
   export interface WrappedData {
     /** Account ID */
-    accountId: string,
+    accountId: string
     /** hash of the data blob */
-    stateId: string,
+    stateId: string
     /** data blob opaqe */
-    data: any,
+    data: any
     /** Timestamp */
-    timestamp: number,
+    timestamp: number
   }
 
   export interface WrappedResponse extends WrappedData {
-    accountCreated: boolean,
-    isPartial: boolean,
+    accountCreated: boolean
+    isPartial: boolean
 
     //Set by setPartialData
-    userTag?: any,
-    localCache?: any,
+    userTag?: any
+    localCache?: any
   }
 
   // old version:
@@ -276,24 +324,24 @@ declare namespace Shardus {
 
   export interface WrappedDataFromQueue extends WrappedData {
     /** is this account still in the queue */
-    seenInQueue: boolean,
+    seenInQueue: boolean
   }
 
   export interface AccountData2 {
     /** Account ID */
-    accountId: string,
+    accountId: string
     /** Account Data */
-    data: string,
+    data: string
     /** Transaction ID */
-    txId: string,
+    txId: string
     /** Timestamp */
-    txTimestamp: string,
+    txTimestamp: string
     /** Account hash */
-    hash: string,
+    hash: string
     /** Account data */
-    accountData: any,
+    accountData: any
     /** localCache */
-    localCache: any,
+    localCache: any
   }
 
   // createWrappedResponse (accountId, accountCreated, hash, timestamp, fullData) {
@@ -316,18 +364,15 @@ declare namespace Shardus {
   //   resultObject.accountData.push({ accountId, data: accountData, txId, timestamp: txTimestamp, hash: stateAfter, localCache: localCache })
   // }
 
-
-
-
   export interface StateTableObject {
     /** Account ID */
-    accountId: string,
+    accountId: string
     /** Transaction ID */
-    txId: string,
+    txId: string
     /** Transaction Timestamp */
-    txTimestamp: string,
+    txTimestamp: string
     /** The hash of the state before applying the transaction */
-    stateBefore: string,
+    stateBefore: string
     /** The hash of the state after applying the transaction */
     stateAfter: string
   }
@@ -335,59 +380,62 @@ declare namespace Shardus {
   // NEED to loosen this defination..  shardus should not know this much!!!  maybe just move it to the app side
   export interface IncomingTransaction {
     /** Source account address for the transaction */
-    srcAct: string,
+    srcAct: string
     /** Target account address for the transaction */
-    tgtActs?: string,
+    tgtActs?: string
     /** Target account addresses for the transaction */
-    tgtAct?: string,    
+    tgtAct?: string
     /** The transaction type */
-    txnType: string,
+    txnType: string
     /** The transaction amount */
-    txnAmt: number,
+    txnAmt: number
     /** The transaction Sequence Number */
-    seqNum: number,
+    seqNum: number
     /** The transaction signature */
-    sign: Shardus.Sign,
+    sign: Shardus.Sign
     /** The transaction timestamp */
     txnTimestamp?: string
   }
 
   export interface Sign {
     /** The key of the owner */
-    owner: string,
+    owner: string
     /** The hash of the object's signature signed by the owner */
     sig: string
   }
 
   export interface IncomingTransactionResult {
     /** The result for the incoming transaction */
-    success: boolean,    //was Results before.. but having trouble with that
+    success: boolean //was Results before.. but having trouble with that
     /** The reason for the transaction result */
-    reason: string,
+    reason: string
     /** The timestamp for the result */
     txnTimestamp?: number
   }
 
-  enum Results { pass, fail }
+  enum Results {
+    pass,
+    fail,
+  }
 
   export interface ShardusConfiguration {
     /** The heartbeatInterval parameter is an Integer that defines the number of seconds between each heartbeat logged within shardus */
-    heartbeatInterval?: number,
+    heartbeatInterval?: number
     /** The baseDir parameter is a String that defines the relative base directory for this running instance of shardus */
-    baseDir?: string,
+    baseDir?: string
     /** The transactionExpireTime parameter is an Integer that defines the amount of time (in seconds) allowed to pass before a transaction will expire and be rejected by the network. */
-    transactionExpireTime?: number,
+    transactionExpireTime?: number
     /** Crypto module configuration */
     crypto?: {
       /** The hashkey parameter is a String that is used to initialize the crypto module, which is used for the cryptographic functions within shardus */
       hashKey?: string
-    },
+    }
     /** P2P module configuration */
     p2p?: {
       /** The ipServer parameter is a String that specifies a the url for the ipServer. */
-      ipServer?: string,
+      ipServer?: string
       /** The timeServers parameter is an Array of String that specifies where to get time critical data. */
-      timeServers?: string[],
+      timeServers?: string[]
       /**  */
       existingArchivers?: Array<{
         ip: string
@@ -395,126 +443,126 @@ declare namespace Shardus {
         publicKey: string
       }>
       /** The syncLimit parameter is an Integer that specifies the amount of time (in seconds) a node’s local time can differ from the network’s time. */
-      syncLimit?: number,
+      syncLimit?: number
       /** The cycleDuration parameter is an Integer specifying the amount of time (in seconds) it takes for a shardus network cycle to complete. */
-      cycleDuration?: number,
+      cycleDuration?: number
       /** The maxRejoinTime parameter is an Integer specifying the amount of time (in seconds) between network heartbeats before a node must ask to rejoin. */
-      maxRejoinTime?: number,
+      maxRejoinTime?: number
       /** The seedList parameter is a String specifying the url for the seedNode server that the application will communicate with. */
-      seedList?: string,
+      seedList?: string
       /** The difficulty parameter is an Integer specifying the proof of work difficulty to prevent network spam. */
-      difficulty?: number,
+      difficulty?: number
       /** The queryDelay parameter is an Integer specifying the amount of time (in seconds) to delay between cycle phase. */
-      queryDelay?: number,
+      queryDelay?: number
       /** The netadmin parameter is a String specifying the public key of the network admin for emergency network alerts, updates, or broadcasts. */
-      netadmin?: string,
-      /** The gossipRecipients parameter is an Integer specifying the number of nodes to send gossip to in the network after receiving a message. 
-       * Shardus groups nodes with neighbors, who they can gossip the message to, so you can set this pretty low and still expect it to be 
-       * propogated through the entire network. (It’s recommended to set this to AT LEAST 3, 4 is recommended, and 5 would be even safer, 
-       * but maybe overkill). Shardus will send 2 gossips to neighboring nodes, and send the remaining number left over in the parameter to 
-       * random nodes in the network, so messages will be propagated very quickly. 
+      netadmin?: string
+      /** The gossipRecipients parameter is an Integer specifying the number of nodes to send gossip to in the network after receiving a message.
+       * Shardus groups nodes with neighbors, who they can gossip the message to, so you can set this pretty low and still expect it to be
+       * propogated through the entire network. (It’s recommended to set this to AT LEAST 3, 4 is recommended, and 5 would be even safer,
+       * but maybe overkill). Shardus will send 2 gossips to neighboring nodes, and send the remaining number left over in the parameter to
+       * random nodes in the network, so messages will be propagated very quickly.
        **/
-      gossipRecipients?: number,
+      gossipRecipients?: number
       /** The gossipTimeout parameter is an Integer specifying the amount of time (in seconds) before an old gossip is deleted from a node. */
-      gossipTimeout?: number,
+      gossipTimeout?: number
       /** The maxSeedNodes parameter is an Integer specifying the maximum number of seedNodes used to be used. */
-      maxSeedNodes?: number,
+      maxSeedNodes?: number
       /** The minNodesToAllowTxs parameter is an Integer specifying the minimum number of active nodes needed in the network to process txs. */
       minNodesToAllowTxs?: number
       /** The minNodes parameter is an Integer specifying the minimum number of nodes that need to be active in the network in order to process transactions. */
-      minNodes?: number,
+      minNodes?: number
       /** The maxNodes parameter is an Integer specifying the maximum number of nodes that can be active in the network at once. */
-      maxNodes?: number,
+      maxNodes?: number
       /** The seedNodeOffset parameter is an Integer specifying the number of seedNodes to remove when producing the seedList */
-      seedNodeOffset?: number,
+      seedNodeOffset?: number
       /** The nodeExpiryAge parameter is an Integer specifying the amount of time (in seconds) before a node can be in the network before getting rotated out. */
-      nodeExpiryAge?: number,
+      nodeExpiryAge?: number
       /** The maxNodesToRotate parameter is an Integer specifying the maximum number of nodes that can be rotated out of the network. */
-      maxNodesToRotate?: number,
+      maxNodesToRotate?: number
       /** The maxNodesPerCycle parameter is an Integer specifying the maximum number of nodes that can join the syncing phase each cycle. */
-      maxNodesPerCycle?: number,
+      maxNodesPerCycle?: number
       /** The maxPercentOfDelta parameter is an Integer specifying the percent out of 100 that additional nodes can be accepted to the network. */
-      maxPercentOfDelta?: number,
+      maxPercentOfDelta?: number
       /** The scaleReqsNeeded parameter is an Integer specyifying the number of internal scaling requests shardus needs to receive before scaling up or down the number of desired nodes in the network. */
-      scaleReqsNeeded?: number,
+      scaleReqsNeeded?: number
       /** The maxScaleReqs parameter is an Integer specifying the maximum number of scaling requests the network will process before scaling up or down. */
-      maxScaleReqs?: number,
+      maxScaleReqs?: number
       /** The amountToScale parameter is an Integer specifying the amount of nodes to add or remove from the number of desired nodes the network wants. */
       amountToScale?: number
-    },
-     /** Server IP configuration */
+    }
+    /** Server IP configuration */
     ip?: {
       /** The IP address the server will run the external API */
-      externalIp?: string,
+      externalIp?: string
       /** The port the server will run the external API */
-      externalPort?: number,
+      externalPort?: number
       /** The IP address the server will run the internal comunication API */
-      internalIp?: string,
+      internalIp?: string
       /** The port the server will run the internal comunication API  */
       internalPort?: number
-    },
+    }
     /** Server Network module configuration */
     network?: {
       /** The timeout parameter is an Integer specifying the amount of time (in seconds) given to an internal network request made by the node until it gets timed out. */
       timeout?: number
-    },
+    }
     /** Server Report module configuration */
     reporting?: {
       /** The report parameter is an Boolean specifying whether or not to report data to a monitor server / client. */
-      report?: boolean,
+      report?: boolean
       /** The recipient parameter is an String specifying the url of the recipient of the data that will be reported if report is set to true. */
-      recipient?: string,
+      recipient?: string
       /** The interval paramter is an Integer specifying the amount of time (in seconds) between the reported data updates. */
-      interval?: number,
+      interval?: number
       /** The console parameter is an Boolean specifying whether or not to report data updates to the console. */
       console?: boolean
-    },
+    }
     /** Server Debug module configuration */
     debug?: {
       /** The loseReceiptChance parameter is a Float specifying a percentage chance to randomly drop a receipt (currently doesn’t do anything) */
-      loseReceiptChance?: number,
+      loseReceiptChance?: number
       /** The loseTxChance parameter is a Float specifying a percentage chance to randomly drop a transaction. */
       loseTxChance?: number
       /** The canDataRepair parameter is a boolean that allows dataRepair to be turned on/off by the application (true = on | false = off) */
       canDataRepair?: boolean
-    },
+    }
     /** Options for the statistics module */
     statistics?: {
       /** The save parameter is a Boolean specifying whether or not statistics will be gathered and saved when running the network. */
-      save?: boolean,
+      save?: boolean
       /** The interval parameter is a Integer specifying the amount of time (in seconds) between each generated stats data. */
       interval?: number
     }
     /**  */
     loadDetection?: {
-      /** 
-       * The queueLimit parameter is an Integer which specifies one of the two possible limits to check whether the network is under heavy load. 
-       * It does this by checking it’s set value against the current transaction queue. The threshold will be equal to the number of transactions 
-       * in the queue / the queueLimit. 
+      /**
+       * The queueLimit parameter is an Integer which specifies one of the two possible limits to check whether the network is under heavy load.
+       * It does this by checking it’s set value against the current transaction queue. The threshold will be equal to the number of transactions
+       * in the queue / the queueLimit.
        **/
-      queueLimit?: number,
+      queueLimit?: number
       /** The desiredTxTime parameter is an Integer which specifies the other condition to check whether the network is under heavy load. */
-      desiredTxTime?: number,
+      desiredTxTime?: number
       /** The highThreshold parameter is an Integer which specifies the high end of the load the network can take. Reaching this threshold will cause the network to increase the desired nodes. */
-      highThreshold?: number,
+      highThreshold?: number
       /** The lowThreshold parameter is an Integer which specifies the low end of the load the network can take. Reaching this threshold will cause the network to decrease the desired nodes. */
       lowThreshold?: number
     }
     /** Options for rate limiting */
     rateLimiting?: {
       /** The limitRate parameter is a Boolean indicating whether or not the network should rate limit in any way. */
-      limitRate?: boolean,
-      /** 
-       * The loadLimit parameter is a Float (between 0 and 1) indicating the maximum level of load the network can handle before starting to drop transactions. 
-       * With loadLimit set to 0.5, at 75% or 0.75 load, the network would drop 50% of incoming transactions. 
-       * (The percentage of chance to drop a transaction scales linearly as the load increases past the threshold). 
+      limitRate?: boolean
+      /**
+       * The loadLimit parameter is a Float (between 0 and 1) indicating the maximum level of load the network can handle before starting to drop transactions.
+       * With loadLimit set to 0.5, at 75% or 0.75 load, the network would drop 50% of incoming transactions.
+       * (The percentage of chance to drop a transaction scales linearly as the load increases past the threshold).
        **/
       loadLimit?: number
     }
     /** Server State manager module configuration */
     stateManager?: {
       /** The stateTableBucketSize parameter is an Integer which defines the max number of accountRecords that the p2p module will ask for in it’s get_account_state call. */
-      stateTableBucketSize?: number,
+      stateTableBucketSize?: number
       /** The accountBucketSize This is also currently used as input to a p2p ask method for the max number of account records */
       accountBucketSize?: number
     }
@@ -628,60 +676,56 @@ declare namespace Shardus {
   }
 
   export interface Node {
-    id: string,
-    publicKey: string,
-    cycleJoined: number,
-    internalIp: string,
-    externalIp: string,
-    internalPort: number,
-    externalPort: number,
-    joinRequestTimestamp: number,
-    address: string,
-    status: string,
+    id: string
+    publicKey: string
+    cycleJoined: number
+    internalIp: string
+    externalIp: string
+    internalPort: number
+    externalPort: number
+    joinRequestTimestamp: number
+    address: string
+    status: string
   }
 
   export interface Cycle {
-    counter: number,
-    certificate: any, // todo proper definition of certificate!
-    previous: string,
-    marker: string,
-    start: number,
-    duration: number,
-    active: number,
-    desired: number,
-    expired: number,
-    joined: string[],
-    activated: string[],
-    removed: string[],
-    returned: string[],
-    lost: string[],
-    refuted: string[],
-    apoptosized: string[],
+    counter: number
+    certificate: any // todo proper definition of certificate!
+    previous: string
+    marker: string
+    start: number
+    duration: number
+    active: number
+    desired: number
+    expired: number
+    joined: string[]
+    activated: string[]
+    removed: string[]
+    returned: string[]
+    lost: string[]
+    refuted: string[]
+    apoptosized: string[]
   }
 
   export interface AcceptedTx {
-    id: string,
-    timestamp: number,
-    data: OpaqueTransaction,
-    status: string,
-    receipt: TxReceipt,
+    id: string
+    timestamp: number
+    data: OpaqueTransaction
+    status: string
+    receipt: TxReceipt
   }
 
   export interface TxReceipt {
-    txHash: string,
-    sign?: Shardus.Sign,    
-    time: number, //transaction timestamp    
-    stateId: string, //hash of the source account.  this should be phased out or modified to handle multiple sources
-    targetStateId: string, //hash of the target account.  this should be phased out or modified to handle multiple targets
+    txHash: string
+    sign?: Shardus.Sign
+    time: number //transaction timestamp
+    stateId: string //hash of the source account.  this should be phased out or modified to handle multiple sources
+    targetStateId: string //hash of the target account.  this should be phased out or modified to handle multiple targets
   }
 
-
-
-  type ObjectAlias = object;
+  type ObjectAlias = object
   /**
    * OpaqueTransaction is the way shardus should see transactions internally. it should not be able to mess with parameters individually
    */
-  export interface OpaqueTransaction extends ObjectAlias {
-  }
-
+  export interface OpaqueTransaction extends ObjectAlias {}
 }

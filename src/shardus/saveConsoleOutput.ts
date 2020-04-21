@@ -3,7 +3,7 @@ const { Console } = require('console')
 const { PassThrough } = require('stream')
 const { join } = require('path')
 
-function startSaving (baseDir) {
+function startSaving(baseDir) {
   // Create a file to save combined stdout and stderr output
   const outFileName = `out.log`
   const outFile = createWriteStream(join(baseDir, outFileName), { flags: 'a' })

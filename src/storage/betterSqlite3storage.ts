@@ -1,6 +1,6 @@
 import Log4js from 'log4js'
-import Shardus from "../shardus/shardus-types"
-import Profiler from "../utils/profiler"
+import Shardus from '../shardus/shardus-types'
+import Profiler from '../utils/profiler'
 import fs from 'fs'
 import path from 'path'
 import { Sequelize } from 'sequelize'
@@ -23,10 +23,19 @@ interface BetterSqlite3Storage {
 
 class BetterSqlite3Storage {
   // note that old storage passed in logger, now we pass in the specific log for it to use.  This works for application use, but may need to rethink if we apply this to shardus core
-  constructor (models: any, storageConfig: Shardus.StorageConfiguration, logger: Logger, baseDir: string, profiler: Profiler) {
+  constructor(
+    models: any,
+    storageConfig: Shardus.StorageConfiguration,
+    logger: Logger,
+    baseDir: string,
+    profiler: Profiler
+  ) {
     this.baseDir = baseDir
     this.storageConfig = storageConfig
-    this.storageConfig.options.storage = path.join(this.baseDir, this.storageConfig.options.storage)
+    this.storageConfig.options.storage = path.join(
+      this.baseDir,
+      this.storageConfig.options.storage
+    )
     this.profiler = profiler
     // Setup logger
     this.mainLogger = logger.getLogger('main')
@@ -41,7 +50,7 @@ class BetterSqlite3Storage {
     }
   }
 
-  sqlite3Define (modelName, modelAttributes) {
+  sqlite3Define(modelName, modelAttributes) {
     let tableName = modelName
 
     let modelData: any = { tableName }
@@ -91,7 +100,7 @@ class BetterSqlite3Storage {
     // todo base this off of models
   }
 
-  async init () {
+  async init() {
     // Create dbDir if it doesn't exist
     let dbDir = path.parse(this.storageConfig.options.storage).dir
     await _ensureExists(dbDir)
@@ -124,23 +133,23 @@ class BetterSqlite3Storage {
     this.initialized = true
     this.mainLogger.info('Database initialized.')
   }
-  async close () {
+  async close() {
     // this.mainLogger.info('Closing Database connections.')
     await this.db.close()
   }
-  async runCreate (createStatement) {
+  async runCreate(createStatement) {
     await this.run(createStatement)
   }
 
-  async dropAndCreateModel (model) {
+  async dropAndCreateModel(model) {
     // await model.sync({ force: true })
   }
 
-  _checkInit () {
+  _checkInit() {
     if (!this.initialized) throw new Error('Storage not initialized.')
   }
 
-  _create (table, object, opts) {
+  _create(table, object, opts) {
     // console.log('_create2: ' + stringify(object))
     if (Array.isArray(object)) {
       // return table.bulkCreate(values, opts)
@@ -173,7 +182,7 @@ class BetterSqlite3Storage {
     return this.run(queryString, inputs)
   }
 
-  async _read (table, params, opts) {
+  async _read(table, params, opts) {
     // return table.findAll({ where, ...opts })
     let queryString = table.selectString
 
@@ -181,7 +190,9 @@ class BetterSqlite3Storage {
 
     let paramsArray = this.params2Array(params, table)
 
-    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(paramsArray)
+    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
+      paramsArray
+    )
 
     let valueArray = whereValueArray
     queryString += whereString
@@ -202,17 +213,21 @@ class BetterSqlite3Storage {
     return results
   }
 
-  _update (table, values, where, opts) {
+  _update(table, values, where, opts) {
     // return table.update(values, { where, ...opts })
     let queryString = table.updateString
 
     let valueParams = this.params2Array(values, table)
-    let { resultString, valueArray } = this.paramsToAssignmentStringAndValues(valueParams)
+    let { resultString, valueArray } = this.paramsToAssignmentStringAndValues(
+      valueParams
+    )
 
     queryString += resultString
 
     let whereParams = this.params2Array(where, table)
-    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(whereParams)
+    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
+      whereParams
+    )
     queryString += whereString
 
     valueArray = valueArray.concat(whereValueArray)
@@ -222,7 +237,7 @@ class BetterSqlite3Storage {
     // console.log(queryString + '  VALUES: ' + stringify(valueArray))
     return this.run(queryString, valueArray)
   }
-  _delete (table, where, opts) {
+  _delete(table, where, opts) {
     // if (!where) {
     //   return table.destroy({ ...opts })
     // }
@@ -231,7 +246,9 @@ class BetterSqlite3Storage {
     let queryString = table.deleteString
 
     let whereParams = this.params2Array(where, table)
-    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(whereParams)
+    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
+      whereParams
+    )
     let valueArray = whereValueArray
     queryString += whereString
     queryString += this.options2string(opts)
@@ -240,13 +257,13 @@ class BetterSqlite3Storage {
     return this.run(queryString, valueArray)
   }
 
-  _rawQuery (queryString, valueArray) {
+  _rawQuery(queryString, valueArray) {
     // return this.sequelize.query(query, { model: table })
 
     return this.all(queryString, valueArray)
   }
 
-  params2Array (paramsObj, table) {
+  params2Array(paramsObj, table) {
     if (paramsObj == null) {
       return []
     }
@@ -316,7 +333,7 @@ class BetterSqlite3Storage {
     return paramsArray
   }
 
-  paramsToWhereStringAndValues (paramsArray) {
+  paramsToWhereStringAndValues(paramsArray) {
     let whereValueArray = []
     let whereString = ''
     for (let i = 0; i < paramsArray.length; i++) {
@@ -333,7 +350,7 @@ class BetterSqlite3Storage {
     return { whereString, whereValueArray }
   }
 
-  paramsToAssignmentStringAndValues (paramsArray) {
+  paramsToAssignmentStringAndValues(paramsArray) {
     let valueArray = []
     let resultString = ''
     for (let i = 0; i < paramsArray.length; i++) {
@@ -347,7 +364,7 @@ class BetterSqlite3Storage {
     return { resultString, valueArray }
   }
 
-  options2string (optionsObj) {
+  options2string(optionsObj) {
     if (optionsObj == null) {
       return ''
     }
@@ -370,7 +387,7 @@ class BetterSqlite3Storage {
   }
 
   // run/get/all promise wraps from this tutorial: https://stackabuse.com/a-sqlite-tutorial-with-node-js/
-  run (sql, params = []) {
+  run(sql, params = []) {
     return new Promise((resolve, reject) => {
       try {
         const { lastInsertRowid } = this.db.prepare(sql).run(params)
@@ -382,7 +399,7 @@ class BetterSqlite3Storage {
       }
     })
   }
-  get (sql, params = []) {
+  get(sql, params = []) {
     return new Promise((resolve, reject) => {
       try {
         const result = this.db.prepare(sql).get(params)
@@ -395,7 +412,7 @@ class BetterSqlite3Storage {
     })
   }
 
-  all (sql, params = []) {
+  all(sql, params = []) {
     return new Promise((resolve, reject) => {
       try {
         const rows = this.db.prepare(sql).all(params)
@@ -410,9 +427,9 @@ class BetterSqlite3Storage {
 }
 
 // From: https://stackoverflow.com/a/21196961
-async function _ensureExists (dir) {
+async function _ensureExists(dir) {
   return new Promise((resolve, reject) => {
-    fs.mkdir(dir, { recursive: true }, (err) => {
+    fs.mkdir(dir, { recursive: true }, err => {
       if (err) {
         // Ignore err if folder exists
         if (err.code === 'EEXIST') resolve()

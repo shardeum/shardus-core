@@ -26,7 +26,7 @@ interface Logger {
 }
 
 class Logger {
-  constructor (baseDir: string, config: Shardus.LogsConfiguration) {
+  constructor(baseDir: string, config: Shardus.LogsConfiguration) {
     this.baseDir = baseDir
     this.config = config
     this.logDir = null
@@ -35,14 +35,15 @@ class Logger {
   }
 
   // Checks if the configuration has the required components
-  _checkValidConfig () {
+  _checkValidConfig() {
     const config = this.config
     if (!config.dir) throw Error('Fatal Error: Log directory not defined.')
-    if (!config.files || typeof config.files !== 'object') throw Error('Fatal Error: Valid log file locations not provided.')
+    if (!config.files || typeof config.files !== 'object')
+      throw Error('Fatal Error: Valid log file locations not provided.')
   }
 
   // Add filenames to each appender of type 'file'
-  _addFileNamesToAppenders () {
+  _addFileNamesToAppenders() {
     const conf = this.log4Conf
     for (const key in conf.appenders) {
       const appender = conf.appenders[key]
@@ -51,17 +52,17 @@ class Logger {
     }
   }
 
-  _configureLogs () {
+  _configureLogs() {
     return log4js.configure(this.log4Conf)
   }
 
   // Get the specified logger
-  getLogger (logger: string) {
+  getLogger(logger: string) {
     return log4js.getLogger(logger)
   }
 
   // Setup the logs with the provided configuration using the base directory provided for relative paths
-  _setupLogs () {
+  _setupLogs() {
     const baseDir = this.baseDir
     const config = this.config
 
@@ -83,9 +84,13 @@ class Logger {
     this.playbackLogEnabled = false
     this._playbackLogger = this.getLogger('playback')
     // @ts-ignore
-    this._playbackTrace = ['TRACE'].includes(this._playbackLogger.level.levelStr)
+    this._playbackTrace = ['TRACE'].includes(
+      this._playbackLogger.level.levelStr
+    )
     // @ts-ignore
-    this._playbackDebug = ['DEBUG'].includes(this._playbackLogger.level.levelStr)
+    this._playbackDebug = ['DEBUG'].includes(
+      this._playbackLogger.level.levelStr
+    )
     if (this._playbackTrace || this._playbackDebug) {
       this.playbackLogEnabled = true
     }
@@ -99,29 +104,39 @@ class Logger {
   }
 
   // Tells this module that the server is shutting down, returns a Promise that resolves when all logs have been written to file, sockets are closed, etc.
-  shutdown () {
-    return new Promise((resolve) => {
+  shutdown() {
+    return new Promise(resolve => {
       log4js.shutdown(() => {
         resolve('done')
       })
     })
   }
 
-  setPlaybackIPInfo (ipInfo) {
+  setPlaybackIPInfo(ipInfo) {
     this._playbackIPInfo = ipInfo
-    let newName = 'temp_' + this._playbackOwner_host + ':' + this._playbackIPInfo.externalPort
+    let newName =
+      'temp_' +
+      this._playbackOwner_host +
+      ':' +
+      this._playbackIPInfo.externalPort
     this.playbackLogNote('logHostNameUpdate', '', { newName })
     this._playbackOwner = newName
   }
 
-  setPlaybackID (nodeID) {
+  setPlaybackID(nodeID) {
     this._playbackNodeID = nodeID
-    let newName = utils.makeShortHash(this._playbackNodeID) + ':' + this._playbackIPInfo.externalPort
-    this.playbackLogNote('logHostNameUpdate', '', { newName, nodeID: nodeID + ' ' })
+    let newName =
+      utils.makeShortHash(this._playbackNodeID) +
+      ':' +
+      this._playbackIPInfo.externalPort
+    this.playbackLogNote('logHostNameUpdate', '', {
+      newName,
+      nodeID: nodeID + ' ',
+    })
     this._playbackOwner = newName
   }
 
-  identifyNode (input) {
+  identifyNode(input) {
     if (utils.isString(input)) {
       if (input.length === 64) {
         let seenNode = this._nodeInfos[input]
@@ -149,7 +164,7 @@ class Logger {
     }
   }
 
-  processDesc (desc) {
+  processDesc(desc) {
     if (utils.isObject(desc)) {
       desc = utils.stringifyReduce(desc)
     }
@@ -157,7 +172,7 @@ class Logger {
     return desc
   }
 
-  playbackLog (from, to, type, endpoint, id, desc) {
+  playbackLog(from, to, type, endpoint, id, desc) {
     // only log desc if trace..
     // dont log it if debug
     if (!this._playbackTrace && !this._playbackDebug) {
@@ -177,17 +192,21 @@ class Logger {
 
     if (this._playbackTrace) {
       desc = this.processDesc(desc)
-      this._playbackLogger.trace(`\t${ts}\t${this._playbackOwner}\t${from}\t${to}\t${type}\t${endpoint}\t${id}\t${desc}`)
+      this._playbackLogger.trace(
+        `\t${ts}\t${this._playbackOwner}\t${from}\t${to}\t${type}\t${endpoint}\t${id}\t${desc}`
+      )
     }
     if (this._playbackDebug) {
-      this._playbackLogger.debug(`\t${ts}\t${this._playbackOwner}\t${from}\t${to}\t${type}\t${endpoint}\t${id}`)
+      this._playbackLogger.debug(
+        `\t${ts}\t${this._playbackOwner}\t${from}\t${to}\t${type}\t${endpoint}\t${id}`
+      )
     }
   }
-  playbackLogState (newState, id, desc) {
+  playbackLogState(newState, id, desc) {
     this.playbackLog('', '', 'StateChange', newState, id, desc)
   }
 
-  playbackLogNote (noteCategory, id, desc) {
+  playbackLogNote(noteCategory, id, desc) {
     this.playbackLog('', '', 'Note', noteCategory, id, desc)
   }
 }

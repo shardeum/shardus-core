@@ -44,7 +44,7 @@ export async function compareQuery<Node = unknown, Response = unknown>(
   let errors: Array<CompareQueryError<Node>>
   let matched: number
 
-  do{
+  do {
     startOver = false
     errors = []
     matched = 0
@@ -76,8 +76,7 @@ export async function compareQuery<Node = unknown, Response = unknown>(
         })
       }
     }
-  }
-  while (startOver)
+  } while (startOver)
 
   return errors
 }

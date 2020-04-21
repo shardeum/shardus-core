@@ -42,7 +42,7 @@ export class NetworkClass extends EventEmitter {
   InternalAskCounter: number
   ipInfo: any
   externalCatchAll: any
-  constructor (config, logger: Logger) {
+  constructor(config, logger: Logger) {
     super()
     this.app = express()
     this.sn = null
@@ -66,17 +66,20 @@ export class NetworkClass extends EventEmitter {
   }
 
   // TODO: Allow for binding to a specified network interface
-  _setupExternal () {
+  _setupExternal() {
     return new Promise((resolve, reject) => {
       const self = this
-      const storeRequests = function (req, res, next) {
+      const storeRequests = function(req, res, next) {
         if (req.url !== '/test') {
           if (self.verboseLogsNet) {
-            self.netLogger.debug('External\t' + JSON.stringify({
-              url: req.url,
-              method: req.method,
-              body: req.body
-            }))
+            self.netLogger.debug(
+              'External\t' +
+                JSON.stringify({
+                  url: req.url,
+                  method: req.method,
+                  body: req.body,
+                })
+            )
           }
         }
         next()
@@ -95,19 +98,25 @@ export class NetworkClass extends EventEmitter {
   }
 
   // TODO: Allow for binding to a specified network interface
-  async _setupInternal () {
+  async _setupInternal() {
     this.sn = Sn({
-      port: this.ipInfo.internalPort
+      port: this.ipInfo.internalPort,
     })
     this.intServer = await this.sn.listen(async (data, remote, respond) => {
       try {
         if (!data) throw new Error('No data provided in request...')
         const { route, payload } = data
         if (!route) {
-          this.mainLogger.debug('Network: ' + `Unable to read request, payload of received message: ${JSON.stringify(data)}`)
+          this.mainLogger.debug(
+            'Network: ' +
+              `Unable to read request, payload of received message: ${JSON.stringify(
+                data
+              )}`
+          )
           throw new Error('Unable to read request, no route specified.')
         }
-        if (!this.internalRoutes[route]) throw new Error('Unable to handle request, invalid route.')
+        if (!this.internalRoutes[route])
+          throw new Error('Unable to handle request, invalid route.')
         const handler = this.internalRoutes[route]
         if (!payload) {
           await handler(null, respond)
@@ -115,21 +124,34 @@ export class NetworkClass extends EventEmitter {
         }
         await handler(payload, respond)
         if (this.verboseLogsNet) {
-          this.netLogger.debug('Internal\t' + JSON.stringify({
-            url: route,
-            body: payload
-          }))
+          this.netLogger.debug(
+            'Internal\t' +
+              JSON.stringify({
+                url: route,
+                body: payload,
+              })
+          )
         }
       } catch (err) {
         this.mainLogger.error('Network: _setupInternal: ', err)
-        this.mainLogger.error('DBG', 'Network: _setupInternal > sn.listen > callback > data', data)
-        this.mainLogger.error('DBG', 'Network: _setupInternal > sn.listen > callback > remote', remote)
+        this.mainLogger.error(
+          'DBG',
+          'Network: _setupInternal > sn.listen > callback > data',
+          data
+        )
+        this.mainLogger.error(
+          'DBG',
+          'Network: _setupInternal > sn.listen > callback > remote',
+          remote
+        )
       }
     })
-    console.log(`Internal server running on port ${this.ipInfo.internalPort}...`)
+    console.log(
+      `Internal server running on port ${this.ipInfo.internalPort}...`
+    )
   }
 
-  async tell (nodes, route, message, logged = false) {
+  async tell(nodes, route, message, logged = false) {
     const data = { route, payload: message }
     const promises = []
     let id = ''
@@ -137,7 +159,15 @@ export class NetworkClass extends EventEmitter {
       id = message.tracker
     }
     for (const node of nodes) {
-      if (!logged) this.logger.playbackLog('self', node, 'InternalTell', route, id, message)
+      if (!logged)
+        this.logger.playbackLog(
+          'self',
+          node,
+          'InternalTell',
+          route,
+          id,
+          message
+        )
       this.InternalTellCounter++
       const promise = this.sn.send(node.internalPort, node.internalIp, data)
       promise.catch(err => {
@@ -154,7 +184,7 @@ export class NetworkClass extends EventEmitter {
     }
   }
 
-  ask (node, route, message, logged = false) {
+  ask(node, route, message, logged = false) {
     return new Promise(async (resolve, reject) => {
       this.InternalAskCounter++
       let id = ''
@@ -163,8 +193,16 @@ export class NetworkClass extends EventEmitter {
       }
 
       const data = { route, payload: message }
-      const onRes = (res) => {
-        if (!logged) this.logger.playbackLog('self', node, 'InternalAskResp', route, id, res)
+      const onRes = res => {
+        if (!logged)
+          this.logger.playbackLog(
+            'self',
+            node,
+            'InternalAskResp',
+            route,
+            id,
+            res
+          )
         resolve(res)
       }
       const onTimeout = () => {
@@ -174,9 +212,17 @@ export class NetworkClass extends EventEmitter {
         this.emit('timeout', node)
         reject(err)
       }
-      if (!logged) this.logger.playbackLog('self', node, 'InternalAsk', route, id, message)
+      if (!logged)
+        this.logger.playbackLog('self', node, 'InternalAsk', route, id, message)
       try {
-        await this.sn.send(node.internalPort, node.internalIp, data, this.timeout, onRes, onTimeout)
+        await this.sn.send(
+          node.internalPort,
+          node.internalIp,
+          data,
+          this.timeout,
+          onRes,
+          onTimeout
+        )
       } catch (err) {
         this.mainLogger.error('Network: ' + err)
         this.emit('error', node)
@@ -184,11 +230,15 @@ export class NetworkClass extends EventEmitter {
     })
   }
 
-  async setup (ipInfo: IPInfo) {
-    if (!ipInfo.externalIp) throw new Error('Fatal: network module requires externalIp')
-    if (!ipInfo.externalPort) throw new Error('Fatal: network module requires externalPort')
-    if (!ipInfo.internalIp) throw new Error('Fatal: network module requires internalIp')
-    if (!ipInfo.internalPort) throw new Error('Fatal: network module requires internalPort')
+  async setup(ipInfo: IPInfo) {
+    if (!ipInfo.externalIp)
+      throw new Error('Fatal: network module requires externalIp')
+    if (!ipInfo.externalPort)
+      throw new Error('Fatal: network module requires externalPort')
+    if (!ipInfo.internalIp)
+      throw new Error('Fatal: network module requires internalIp')
+    if (!ipInfo.internalPort)
+      throw new Error('Fatal: network module requires internalPort')
 
     this.ipInfo = ipInfo
 
@@ -198,7 +248,7 @@ export class NetworkClass extends EventEmitter {
     this._setupInternal()
   }
 
-  async shutdown () {
+  async shutdown() {
     try {
       const promises = []
       if (this.extServer) promises.push(closeServer(this.extServer))
@@ -209,14 +259,21 @@ export class NetworkClass extends EventEmitter {
     }
   }
 
-  _registerExternal (method, route, handler) {
+  _registerExternal(method, route, handler) {
     const formattedRoute = `/${route}`
 
     let self = this
     let wrappedHandler = handler
     if (this.logger.playbackLogEnabled) {
-      wrappedHandler = function (req, res) {
-        self.logger.playbackLog(req.hostname, 'self', 'ExternalHttpReq', formattedRoute, '', { params: req.params, body: req.body })
+      wrappedHandler = function(req, res) {
+        self.logger.playbackLog(
+          req.hostname,
+          'self',
+          'ExternalHttpReq',
+          formattedRoute,
+          '',
+          { params: req.params, body: req.body }
+        )
         return handler(req, res)
       }
       // handler = wrappedHandler
@@ -257,43 +314,44 @@ export class NetworkClass extends EventEmitter {
     }
   }
 
-  _applyExternal () {
+  _applyExternal() {
     while (this.externalRoutes.length > 0) {
       const routeFn = this.externalRoutes.pop()
       routeFn(this.app)
     }
   }
 
-  setExternalCatchAll (handler) {
+  setExternalCatchAll(handler) {
     this.externalCatchAll = handler
   }
 
-  registerExternalGet (route, handler) {
+  registerExternalGet(route, handler) {
     this._registerExternal('GET', route, handler)
   }
 
-  registerExternalPost (route, handler) {
+  registerExternalPost(route, handler) {
     this._registerExternal('POST', route, handler)
   }
 
-  registerExternalPut (route, handler) {
+  registerExternalPut(route, handler) {
     this._registerExternal('PUT', route, handler)
   }
 
-  registerExternalDelete (route, handler) {
+  registerExternalDelete(route, handler) {
     this._registerExternal('DELETE', route, handler)
   }
 
-  registerExternalPatch (route, handler) {
+  registerExternalPatch(route, handler) {
     this._registerExternal('PATCH', route, handler)
   }
 
-  registerInternal (route, handler) {
-    if (this.internalRoutes[route]) throw Error('Handler already exists for specified internal route.')
+  registerInternal(route, handler) {
+    if (this.internalRoutes[route])
+      throw Error('Handler already exists for specified internal route.')
     this.internalRoutes[route] = handler
   }
 
-  unregisterInternal (route) {
+  unregisterInternal(route) {
     if (this.internalRoutes[route]) {
       delete this.internalRoutes[route]
     }
@@ -307,10 +365,11 @@ export async function init() {
 
   // Make sure we know our IP configuration
   ipInfo = {
-    externalIp: config.ip.externalIp || (await discoverExternalIp(config.p2p.ipServer)),
+    externalIp:
+      config.ip.externalIp || (await discoverExternalIp(config.p2p.ipServer)),
     externalPort: config.ip.externalPort,
     internalIp: config.ip.internalIp,
-    internalPort: config.ip.internalPort 
+    internalPort: config.ip.internalPort,
   }
 }
 
@@ -341,8 +400,8 @@ async function discoverExternalIp(server: string) {
   }
 }
 
-function closeServer (server) {
-  return new Promise((resolve) => {
+function closeServer(server) {
+  return new Promise(resolve => {
     server.close()
     server.unref()
     resolve()

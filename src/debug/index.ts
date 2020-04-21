@@ -8,11 +8,11 @@ interface Debug {
   baseDir: string
   network: NetworkClass
   archiveName: string
-  files: {[name: string]: string}
+  files: { [name: string]: string }
 }
 
 class Debug {
-  constructor (baseDir: string, network: NetworkClass) {
+  constructor(baseDir: string, network: NetworkClass) {
     this.baseDir = baseDir
     this.network = network
     this.archiveName = `debug-${network.ipInfo.externalIp}-${network.ipInfo.externalPort}.tar.gz`
@@ -20,13 +20,16 @@ class Debug {
     this._registerRoutes()
   }
 
-  addToArchive (src, dest) {
-    if (path.isAbsolute(dest)) throw new Error('"dest" must be a relative path.')
-    src = path.isAbsolute(src) ? src : path.resolve(path.join(this.baseDir, src))
+  addToArchive(src, dest) {
+    if (path.isAbsolute(dest))
+      throw new Error('"dest" must be a relative path.')
+    src = path.isAbsolute(src)
+      ? src
+      : path.resolve(path.join(this.baseDir, src))
     this.files[src] = dest
   }
 
-  createArchiveStream () {
+  createArchiveStream() {
     const cwd = process.cwd()
     const filesRel = {}
     for (const src in this.files) {
@@ -38,7 +41,7 @@ class Debug {
     const trie = Trie(entries)
     const pack = tar.pack(cwd, {
       entries,
-      map: function (header) {
+      map: function(header) {
         // Find the closest entry for this item
         let entry = header.name
         while (!trie.isPrefix(entry)) {
@@ -50,17 +53,20 @@ class Debug {
         const dest = filesRel[entry]
         header.name = path.normalize(path.join(dest, header.name))
         return header
-      }
+      },
     })
 
     return pack
   }
 
-  _registerRoutes () {
+  _registerRoutes() {
     this.network.registerExternalGet('debug', (req, res) => {
       const archive = this.createArchiveStream()
       const gzip = zlib.createGzip()
-      res.set('content-disposition', `attachment; filename="${this.archiveName}"`)
+      res.set(
+        'content-disposition',
+        `attachment; filename="${this.archiveName}"`
+      )
       res.set('content-type', 'application/gzip')
       archive.pipe(gzip).pipe(res)
     })

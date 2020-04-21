@@ -4,28 +4,31 @@
 
 1. `robustQuery /cycle_chain_end`
 
-    a. response:
-    ```
-    {
-      cycle_marker: '...',
-      cycle_number: 42
-    }
-    ```
+   a. response:
+
+   ```
+   {
+     cycle_marker: '...',
+     cycle_number: 42
+   }
+   ```
 
 2. `ask /cycle_data`
 
-    a. request:
-    ```
-    {
-      start: current - 100
-      end: current
-    }
-    ```
+   a. request:
 
-    b. response:
-    ```
-    [cycle N, cycle N+1, ...]
-    ```
+   ```
+   {
+     start: current - 100
+     end: current
+   }
+   ```
+
+   b. response:
+
+   ```
+   [cycle N, cycle N+1, ...]
+   ```
 
 3. Verify valid cycle data from current to previous
 
@@ -34,4 +37,4 @@
 5. Use cycle data to build node list
 
 6. If node list size is < cycle.active_nodes:  
-    a. Ask for older cycle data
+   a. Ask for older cycle data

@@ -41,6 +41,6 @@ export function setStateManagerContext(context) {
   stateManager = context
 }
 
-export function setConfig (conf) {
+export function setConfig(conf) {
   config = conf
 }

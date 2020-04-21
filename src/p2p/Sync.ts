@@ -54,8 +54,9 @@ const routes = {
 export function init() {
   mainLogger = logger.getLogger('main')
 
-  for (const route of routes.external)
+  for (const route of routes.external) {
     network._registerExternal(route.method, route.name, route.handler)
+  }
 }
 
 export async function sync(activeNodes: ActiveNode[]) {

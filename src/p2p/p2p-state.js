@@ -9,7 +9,7 @@ const P2PApoptosis = require('./Apoptosis')
  */
 
 class P2PState extends EventEmitter {
-  constructor (config, logger, storage, p2p, crypto) {
+  constructor(config, logger, storage, p2p, crypto) {
     super()
     this.mainLogger = logger.getLogger('main')
     this.p2p = p2p
@@ -115,35 +115,35 @@ class P2PState extends EventEmitter {
     this.lostNodes = null
   }
 
-  initLost (p2plostnodes) {
+  initLost(p2plostnodes) {
     this.lostNodes = p2plostnodes
   }
 
-  _resetNodelist () {
+  _resetNodelist() {
     this.nodes = utils.deepCopy(this.cleanNodelist)
   }
 
-  _resetCycles () {
+  _resetCycles() {
     this.cycles.length = 0
     this.certificates.length = 0
   }
 
   // We leave out shouldStop in case we have recently stopped the cycles
-  _resetControlVars () {
+  _resetControlVars() {
     this.acceptChainUpdates = false
     this.acceptJoinRequests = true
     this.unfinalizedReady = false
     this.cyclesStarted = false
   }
 
-  _resetState () {
+  _resetState() {
     this._resetCurrentCycle()
     this._resetNodelist()
     this._resetCycles()
     this._resetControlVars()
   }
 
-  async clear () {
+  async clear() {
     this.mainLogger.info('Clearing P2P state in memory and in database...')
     await this.storage.clearP2pState()
     await this.storage.deleteProperty('id')
@@ -151,7 +151,7 @@ class P2PState extends EventEmitter {
     this._resetState()
   }
 
-  _addJoinRequest (joinRequest) {
+  _addJoinRequest(joinRequest) {
     if (!this.cyclesStarted) return false
     if (!this._addToBestJoinRequests(joinRequest)) {
       this.mainLogger.debug('Join request not added: Was not best request for this cycle.')
@@ -160,7 +160,7 @@ class P2PState extends EventEmitter {
     return true
   }
 
-  addNewJoinRequest (joinRequest) {
+  addNewJoinRequest(joinRequest) {
     if (!this.acceptChainUpdates) {
       this.mainLogger.debug('Join request not added: Not accepting chain updates right now.')
       return false
@@ -168,7 +168,7 @@ class P2PState extends EventEmitter {
     return this._addJoinRequest(joinRequest)
   }
 
-  async addExtScalingRequest (scalingRequest) {
+  async addExtScalingRequest(scalingRequest) {
     if (!this.acceptChainUpdates) {
       this.mainLogger.debug('Join request not added: Not accepting chain updates right now.')
       return false
@@ -177,7 +177,7 @@ class P2PState extends EventEmitter {
     return added
   }
 
-  validateScalingRequest (scalingRequest) {
+  validateScalingRequest(scalingRequest) {
     // Check existence of fields
     if (!scalingRequest.node || !scalingRequest.timestamp || !scalingRequest.cycleCounter || !scalingRequest.scale || !scalingRequest.sign) {
       this.mainLogger.debug(`Invalid scaling request, missing fields. Request: ${JSON.stringify(scalingRequest)}`)
@@ -210,7 +210,7 @@ class P2PState extends EventEmitter {
     return true
   }
 
-  async _checkScaling () {
+  async _checkScaling() {
     const metadata = this.currentCycle.metadata
     const scalingUpdates = this.currentCycle.updates.scaling
 
@@ -266,7 +266,7 @@ class P2PState extends EventEmitter {
     this._createCycleMarker()
   }
 
-  async _addToScalingRequests (scalingRequest) {
+  async _addToScalingRequests(scalingRequest) {
     const scalingUpdates = this.currentCycle.updates.scaling
     switch (scalingRequest.scale) {
       case 'up':
@@ -298,7 +298,7 @@ class P2PState extends EventEmitter {
     }
   }
 
-  async _addScalingRequest (scalingRequest) {
+  async _addScalingRequest(scalingRequest) {
     // Check existence of node
     if (!scalingRequest.node) return
     // Check scaling seen for this node
@@ -315,11 +315,11 @@ class P2PState extends EventEmitter {
     return added
   }
 
-  addGossipedJoinRequest (joinRequest) {
+  addGossipedJoinRequest(joinRequest) {
     return this._addJoinRequest(joinRequest)
   }
 
-  _addJoiningNodes () {
+  _addJoiningNodes() {
     const joining = this._getBestNodes()
     this.mainLogger.debug(`Joining nodes: ${JSON.stringify(joining)}`)
     const joined = this.currentCycle.data.joined
@@ -337,7 +337,7 @@ class P2PState extends EventEmitter {
   }
 
   // Checks if a given timestamp is during the current cycle
-  isDuringThisCycle (timestamp) {
+  isDuringThisCycle(timestamp) {
     const start = this.getCurrentCycleStart() * 1000
     const duration = this.getCurrentCycleDuration() * 1000
     const end = start + duration
@@ -352,21 +352,21 @@ class P2PState extends EventEmitter {
     return true
   }
 
-  computeNodeId (publicKey, cycleMarker) {
+  computeNodeId(publicKey, cycleMarker) {
     const nodeId = this.crypto.hash({ publicKey, cycleMarker })
     this.mainLogger.debug(`Node ID computation: publicKey: ${publicKey}, cycleMarker: ${cycleMarker}`)
     this.mainLogger.debug(`Node ID is: ${nodeId}`)
     return nodeId
   }
 
-  getNodeStatus (nodeId) {
+  getNodeStatus(nodeId) {
     const current = this.nodes.current
     if (!current[nodeId]) return null
     return current[nodeId].status
   }
 
   // Can check if a node ID or public key has been seen for an update already this cycle
-  _wasSeenThisCycle (key) {
+  _wasSeenThisCycle(key) {
     if (!this.currentCycle.metadata.updateSeen[key]) {
       return false
     }
@@ -374,11 +374,11 @@ class P2PState extends EventEmitter {
   }
 
   // Marks a node as seen for an update this cycle
-  _markNodeAsSeen (key) {
+  _markNodeAsSeen(key) {
     this.currentCycle.metadata.updateSeen[key] = true
   }
 
-  addStatusUpdate (update) {
+  addStatusUpdate(update) {
     if (!this.cyclesStarted) return false
     const { nodeId, status, timestamp, sign } = update
 
@@ -434,7 +434,7 @@ class P2PState extends EventEmitter {
     // Try to get the public key associated with given node ID
     let publicKey
     try {
-      ;({ publicKey } = this.getNode(nodeId))
+      ; ({ publicKey } = this.getNode(nodeId))
     } catch (e) {
       this.mainLogger.debug(e)
       publicKey = null
@@ -465,7 +465,7 @@ class P2PState extends EventEmitter {
   }
 
   // TODO: Update this to go through entire update types
-  async addCycleUpdates (updates) {
+  async addCycleUpdates(updates) {
     if (!this.cyclesStarted) return false
     const { bestJoinRequests, archiverJoinRequests, active, scaling, lost } = updates
     for (const joinRequest of bestJoinRequests) {
@@ -507,7 +507,7 @@ class P2PState extends EventEmitter {
     return true
   }
 
-  addLostMessage (msg, validate = false) {
+  addLostMessage(msg, validate = false) {
     if (msg.lostMessage) { // Is DownMessage
       // Validate, if requested
       if (validate) {
@@ -568,14 +568,14 @@ class P2PState extends EventEmitter {
     return true
   }
 
-  addArchiverUpdate (joinRequest) {
+  addArchiverUpdate(joinRequest) {
     // Add to cycle updates in archiverJoinRequests
     utils.insertSorted(this.currentCycle.updates.archiverJoinRequests, joinRequest)
     // Add to cycle data in joinedArchivers
     utils.insertSorted(this.currentCycle.data.joinedArchivers, joinRequest.nodeInfo)
   }
 
-  async _setNodeStatus (nodeId, status) {
+  async _setNodeStatus(nodeId, status) {
     // Get node by ID
     let node
     try {
@@ -596,7 +596,7 @@ class P2PState extends EventEmitter {
   }
 
   // Sets a group of nodes to a particular status
-  async _setNodesToStatus (nodeIds, status) {
+  async _setNodesToStatus(nodeIds, status) {
     this.mainLogger.debug(`Node IDs to be updated to ${status} status: ${JSON.stringify(nodeIds)}`)
     const promises = []
     for (const nodeId of nodeIds) {
@@ -605,7 +605,7 @@ class P2PState extends EventEmitter {
     await Promise.all(promises)
   }
 
-  async _setNodesActiveTimestamp (nodeIds, timestamp) {
+  async _setNodesActiveTimestamp(nodeIds, timestamp) {
     for (const id of nodeIds) {
       const node = this.getNode(id)
       node.activeTimestamp = timestamp
@@ -614,7 +614,7 @@ class P2PState extends EventEmitter {
   }
 
   // For use for internal updates to status for this node
-  async directStatusUpdate (nodeId, status, updateDb = false) {
+  async directStatusUpdate(nodeId, status, updateDb = false) {
     // Check if we actually know about this node
     const node = this.getNode(nodeId)
     if (!node) {
@@ -630,7 +630,7 @@ class P2PState extends EventEmitter {
     return true
   }
 
-  async _updateNodeStatus (node, status, updateDb = false) {
+  async _updateNodeStatus(node, status, updateDb = false) {
     if (!this.validStatuses.includes(status)) throw new Error('Invalid node status.')
     if (node.status === status) return true
     const oldStatus = node.status
@@ -646,7 +646,7 @@ class P2PState extends EventEmitter {
     return true
   }
 
-  async _acceptNode (node, cycleMarker) {
+  async _acceptNode(node, cycleMarker) {
     node.curvePublicKey = this.crypto.convertPublicKeyToCurve(node.publicKey)
     let nodeId = this.computeNodeId(node.publicKey, cycleMarker)
     node.id = nodeId
@@ -657,7 +657,7 @@ class P2PState extends EventEmitter {
     this.mainLogger.debug(`Ordered nodelist after adding this node: ${JSON.stringify(this.nodes.ordered)}`)
   }
 
-  async _acceptNodes (nodes, cycleMarker) {
+  async _acceptNodes(nodes, cycleMarker) {
     const promises = []
     for (const node of nodes) {
       promises.push(this._acceptNode(node, cycleMarker))
@@ -665,7 +665,7 @@ class P2PState extends EventEmitter {
     await Promise.all(promises)
   }
 
-  _getNodeOrderedIndex (node) {
+  _getNodeOrderedIndex(node) {
     const ordered = this.nodes.ordered
     // First check the first index of the ordered list, as this is most likely when removing nodes
     if (ordered[0].id === node.id) return 0
@@ -685,7 +685,7 @@ class P2PState extends EventEmitter {
    * @param {Node} node
    * @returns {number|boolean} tricky because binary search can also return false
    */
-  _getNodeAddressOrderedIndex (node) {
+  _getNodeAddressOrderedIndex(node) {
     const ordered = this.nodes.addressOrdered
     // First check the first index of the ordered list, as this is most likely when removing nodes
     if (ordered[0].id === node.id) return 0
@@ -696,7 +696,7 @@ class P2PState extends EventEmitter {
     return utils.binarySearch(ordered, node, comparator)
   }
 
-  _getExpiredCountInternal (cycleStart) {
+  _getExpiredCountInternal(cycleStart) {
     // This line allows for a configuration in which nodes never expire
     if (this.nodeExpiryAge === 0) return 0
     const nodes = this.nodes.ordered
@@ -718,13 +718,13 @@ class P2PState extends EventEmitter {
   }
 
   // Checks if we are at max nodes already
-  getNodesNeeded () {
+  getNodesNeeded() {
     const desired = this.getDesiredCount()
     const active = this.getActiveCount()
     return desired - active
   }
 
-  _setJoinAcceptance () {
+  _setJoinAcceptance() {
     const needed = this.getNodesNeeded()
     if (needed < 0) {
       this.acceptJoinRequests = false
@@ -738,7 +738,7 @@ class P2PState extends EventEmitter {
     this.acceptJoinRequests = true
   }
 
-  _getOpenSlots () {
+  _getOpenSlots() {
     let toAccept = 0
     const needed = this.getNodesNeeded()
     // If we're over max nodes, we don't want to open any slots
@@ -766,7 +766,7 @@ class P2PState extends EventEmitter {
     return toAccept
   }
 
-  _markNodesForRemoval (n) {
+  _markNodesForRemoval(n) {
     const nodes = this.nodes.ordered.slice(0, n)
     const removed = this.currentCycle.data.removed
     removed.length = 0
@@ -775,7 +775,7 @@ class P2PState extends EventEmitter {
     }
   }
 
-  _removeExcessNodes () {
+  _removeExcessNodes() {
     const expired = this.getExpiredCount()
     if (expired === 0) return
     const desired = this.getDesiredCount()
@@ -788,7 +788,7 @@ class P2PState extends EventEmitter {
     this._markNodesForRemoval(toRemove)
   }
 
-  _removeNodeFromNodelist (node) {
+  _removeNodeFromNodelist(node) {
     if (node.id === this.p2p.id) {
       this.mainLogger.info(`We have been marked for removal from the network. Commencing restart process. Current cycle marker: ${this.getCurrentCycleMarker()}`)
       // [TODO] We need to make the removal process strictly ordered to prevent undeterministic behavior
@@ -810,7 +810,7 @@ class P2PState extends EventEmitter {
   /**
    * @param {import("../shardus").Node} node
    */
-  getOrderedSyncingNeighbors (node) {
+  getOrderedSyncingNeighbors(node) {
     let index = this._getNodeAddressOrderedIndex(node)
     let results = []
 
@@ -884,24 +884,24 @@ class P2PState extends EventEmitter {
     return results
   }
 
-  _removeNodesFromNodelist (nodes) {
+  _removeNodesFromNodelist(nodes) {
     for (const node of nodes) {
       this._removeNodeFromNodelist(node)
     }
   }
 
-  async removeNode (node) {
+  async removeNode(node) {
     await this.storage.deleteNodes(node)
     this._removeNodeFromNodelist(node)
   }
 
-  async removeNodes (nodes) {
+  async removeNodes(nodes) {
     if (!nodes.length) return
     await this.storage.deleteNodes(nodes)
     this._removeNodesFromNodelist(nodes)
   }
 
-  _addNodeToNodelist (node) {
+  _addNodeToNodelist(node) {
     if (this.nodes.current[node.id]) {
       console.log(`P2P WARNING: _addNodeToNodelist: Tried to add an existing node: ${node.id}`)
       return
@@ -927,7 +927,7 @@ class P2PState extends EventEmitter {
     })
   }
 
-  _addNodesToNodelist (nodes) {
+  _addNodesToNodelist(nodes) {
     for (const node of nodes) {
       if (node.status) this._addNodeToNodelist(node)
       else throw new Error('Node does not have status property')
@@ -935,25 +935,25 @@ class P2PState extends EventEmitter {
   }
 
   // This is for adding a node both in memory and to storage
-  async addNode (node) {
+  async addNode(node) {
     this._addNodeToNodelist(node)
     // await this.storage.addNodes(node)
   }
 
   // This is for adding nodes both in memory and to storage
-  async addNodes (nodes) {
+  async addNodes(nodes) {
     this._addNodesToNodelist(nodes)
     // await this.storage.addNodes(nodes)
   }
 
-  _computeCycleMarker (fields) {
+  _computeCycleMarker(fields) {
     this.mainLogger.debug(`Computing cycle marker... Cycle marker fields: ${JSON.stringify(fields)}`)
     const cycleMarker = this.crypto.hash(fields)
     this.mainLogger.debug(`Created cycle marker: ${cycleMarker}`)
     return cycleMarker
   }
 
-  _resetCurrentCycle () {
+  _resetCurrentCycle() {
     this.currentCycle = utils.deepCopy(this.cleanCycle)
 
     /**
@@ -963,19 +963,19 @@ class P2PState extends EventEmitter {
   }
 
   // Kicks off the whole cycle and cycle marker creation system
-  startCycles () {
+  startCycles() {
     this.cyclesStarted = true
     this.shouldStop = false
     this.mainLogger.info('Starting first cycle...')
     this._startNewCycle()
   }
 
-  stopCycles () {
+  stopCycles() {
     this.shouldStop = true
     this.cyclesStarted = false
   }
 
-  _startNewCycle () {
+  _startNewCycle() {
     if (this.shouldStop) return
     this._resetCurrentCycle()
     const lastCycleDuration = this.getLastCycleDuration()
@@ -1000,7 +1000,7 @@ class P2PState extends EventEmitter {
   }
 
   // Q1
-  _startUpdatePhase (startTime, phaseLen) {
+  _startUpdatePhase(startTime, phaseLen) {
     if (this.shouldStop) return
     this.mainLogger.debug(`P2P State: Started C${this.getCycleCounter()} Q1`)
     this.mainLogger.debug('Starting update phase...')
@@ -1017,24 +1017,24 @@ class P2PState extends EventEmitter {
     }, endTime)
   }
 
-  _getBestJoinRequests () {
+  _getBestJoinRequests() {
     return this.currentCycle.updates.bestJoinRequests
   }
 
-  _isKnownNode (node) {
+  _isKnownNode(node) {
     const internalHost = `${node.internalIp}:${node.internalPort}`
     if (!this.nodes.byIp[internalHost]) return false
     return true
   }
 
-  _isBetterThanLowestBest (request, lowest) {
+  _isBetterThanLowestBest(request, lowest) {
     if (!this.crypto.isGreaterHash(request.selectionNum, lowest.selectionNum)) {
       return false
     }
     return true
   }
 
-  _addToBestJoinRequests (joinRequest) {
+  _addToBestJoinRequests(joinRequest) {
     const { nodeInfo } = joinRequest
 
     // Check if this node has already been seen this cycle
@@ -1090,7 +1090,7 @@ class P2PState extends EventEmitter {
 
   // TODO: implement this to get best nodes based on POW, selection number,
   // ---   and number of desired nodes
-  _getBestNodes () {
+  _getBestNodes() {
     const bestNodes = []
     const bestJoinRequests = this._getBestJoinRequests()
     for (const joinRequest of bestJoinRequests) {
@@ -1104,7 +1104,7 @@ class P2PState extends EventEmitter {
   }
 
   // Q2
-  _endUpdatePhase (startTime, phaseLen) {
+  _endUpdatePhase(startTime, phaseLen) {
     if (this.shouldStop) return
     this.mainLogger.debug(`P2P State: Started C${this.getCycleCounter()} Q2`)
     this.mainLogger.debug('Ending update phase...')
@@ -1122,7 +1122,7 @@ class P2PState extends EventEmitter {
   }
 
   // Q3
-  async _startCycleSync (startTime, phaseLen) {
+  async _startCycleSync(startTime, phaseLen) {
     if (this.shouldStop) return
     this.mainLogger.debug(`P2P State: Started C${this.getCycleCounter()} Q3`)
     this.mainLogger.debug('Starting cycle sync phase...')
@@ -1146,7 +1146,7 @@ class P2PState extends EventEmitter {
   }
 
   // Q4
-  async _finalizeCycle (startTime, phaseLen) {
+  async _finalizeCycle(startTime, phaseLen) {
     if (this.shouldStop) return
     this.mainLogger.debug(`P2P State: Started C${this.getCycleCounter()} Q4`)
     this.mainLogger.debug('Starting cycle finalization phase...')
@@ -1174,7 +1174,7 @@ class P2PState extends EventEmitter {
     this.unfinalizedReady = true
   }
 
-  _createCycleMarker (gossip = true) {
+  _createCycleMarker(gossip = true) {
     this.mainLogger.info('Creating new cycle marker...')
     this._addJoiningNodes()
     this._removeExcessNodes()
@@ -1197,7 +1197,7 @@ class P2PState extends EventEmitter {
     this.p2p.sendGossipIn('certificate', certificate)
   }
 
-  async addUnfinalizedAndStart (cycle) {
+  async addUnfinalizedAndStart(cycle) {
     if (!cycle) {
       this.mainLogger.info('Unable to add unfinalized cycle. Cycle not given.')
       return false
@@ -1214,7 +1214,7 @@ class P2PState extends EventEmitter {
     }, toWait)
   }
 
-  async addCycle (cycle, certificate = null, updateDb = false) {
+  async addCycle(cycle, certificate = null, updateDb = false) {
     if (certificate) {
       this.certificates.push(certificate)
       cycle.certificate = certificate
@@ -1225,7 +1225,7 @@ class P2PState extends EventEmitter {
     this.emit('newCycle', this.cycles)
   }
 
-  async addCycles (cycles, certificates = null, updateDb = false) {
+  async addCycles(cycles, certificates = null, updateDb = false) {
     if (certificates && certificates.length) {
       for (let i = 0; i < cycles.length; i++) {
         const certificate = certificates[i]
@@ -1242,7 +1242,7 @@ class P2PState extends EventEmitter {
     this.mainLogger.debug(`All cycles after adding given cycles: ${JSON.stringify(this.cycles)}`)
   }
 
-  async _createCycle () {
+  async _createCycle() {
     this.mainLogger.info('Creating new cycle chain entry...')
     const cycleInfo = this.getCycleInfo()
     this.mainLogger.debug(`Cycle info for new cycle: ${JSON.stringify(cycleInfo)}`)
@@ -1285,7 +1285,7 @@ class P2PState extends EventEmitter {
     this.desiredNodes = this.currentCycle.data.desired
   }
 
-  getCycleInfo (withCert = true) {
+  getCycleInfo(withCert = true) {
     const previous = this.getPreviousCycleMarker()
     const counter = this.getCycleCounter()
     const start = this.getCurrentCycleStart()
@@ -1338,14 +1338,14 @@ class P2PState extends EventEmitter {
     return cycleInfo
   }
 
-  _createCertificate (cycleMarker) {
+  _createCertificate(cycleMarker) {
     this.mainLogger.info(`Creating certificate for cycle marker ${cycleMarker}...`)
     const signer = this.p2p.id
     const cert = this.crypto.sign({ marker: cycleMarker, signer })
     return cert
   }
 
-  addCertificate (certificate, fromNetwork = false) {
+  addCertificate(certificate, fromNetwork = false) {
     const addCert = (cert, dist) => {
       this.currentCycle.data.certificate = cert
       this.currentCycle.metadata.bestCertDist = dist
@@ -1403,13 +1403,13 @@ class P2PState extends EventEmitter {
     return [true]
   }
 
-  getCycles (start = 0, end = Infinity) {
+  getCycles(start = 0, end = Infinity) {
     if (this.cycles.length < 1) {
       return []
     }
 
     if (start < 0) start = 0
-    if (end < 0 ) end = Infinity
+    if (end < 0) end = Infinity
     if (start > end) {
       const temp = start
       start = end
@@ -1430,13 +1430,13 @@ class P2PState extends EventEmitter {
     return this.cycles.slice(startIdx, endIdx)
   }
 
-  getCertificates (start = 0, end = this.certificates.length) {
+  getCertificates(start = 0, end = this.certificates.length) {
     if (this.cycles.length < 1) {
       return []
     }
 
     if (start < 0) start = 0
-    if (end < 0 ) end = Infinity
+    if (end < 0) end = Infinity
     if (start > end) {
       const temp = start
       start = end
@@ -1457,81 +1457,81 @@ class P2PState extends EventEmitter {
     return this.certificates.slice(startIdx, endIdx)
   }
 
-  getCurrentCertificate () {
+  getCurrentCertificate() {
     const cert = this.currentCycle.data.certificate
     if (!Object.keys(cert).length) return null
     return cert
   }
 
-  getActiveCount () {
+  getActiveCount() {
     const activeNodes = Object.values(this.nodes.active)
     if (!activeNodes.length) return 1
     return activeNodes.length
   }
 
-  getDesiredCount () {
+  getDesiredCount() {
     return this.desiredNodes
   }
 
-  getNextDesiredCount () {
+  getNextDesiredCount() {
     return this.currentCycle.data.desired
   }
 
-  getExpiredCount () {
+  getExpiredCount() {
     return this.currentCycle.data.expired
   }
 
-  getLastCycles (amount) {
+  getLastCycles(amount) {
     if (this.cycles.length < amount) {
       return this.cycles
     }
     return this.cycles.slice(0 - amount)
   }
 
-  getJoined () {
+  getJoined() {
     return this.currentCycle.data.joined
   }
 
-  getJoinedArchivers () {
+  getJoinedArchivers() {
     return this.currentCycle.data.joinedArchivers
   }
 
-  getJoinedConsensors () {
+  getJoinedConsensors() {
     return this.currentCycle.data.joinedConsensors
   }
 
-  getRemoved () {
+  getRemoved() {
     return this.currentCycle.data.removed
   }
 
-  getLost () {
+  getLost() {
     return this.currentCycle.data.lost
   }
 
-  getRefuted () {
+  getRefuted() {
     return this.currentCycle.data.refuted
   }
 
-  getReturned () {
+  getReturned() {
     return this.currentCycle.data.returned
   }
 
-  getActivated () {
+  getActivated() {
     const activated = this.currentCycle.data.activated
     this.mainLogger.debug(`Result of getActivated: ${JSON.stringify(activated)}`)
     return activated
   }
 
-  getActivatedPublicKeys () {
+  getActivatedPublicKeys() {
     return this.currentCycle.data.activatedPublicKeys
   }
 
-  getLastCycle () {
+  getLastCycle() {
     if (!this.cycles.length) return null
     return this.cycles[this.cycles.length - 1]
   }
 
-  getCycleByTimestamp (timestamp) {
+  getCycleByTimestamp(timestamp) {
     let secondsTs = Math.floor(timestamp * 0.001)
     // search from end, to improve normal case perf
     for (let i = this.cycles.length - 1; i >= 0; i--) {
@@ -1543,7 +1543,7 @@ class P2PState extends EventEmitter {
     return null
   }
 
-  getCycleByCounter (counter) {
+  getCycleByCounter(counter) {
     for (let i = this.cycles.length - 1; i >= 0; i--) {
       let cycle = this.cycles[i]
       if (cycle.counter === counter) {
@@ -1553,62 +1553,62 @@ class P2PState extends EventEmitter {
     return null
   }
 
-  getCycleCounter () {
+  getCycleCounter() {
     const counter = this.currentCycle.data.counter
     if (counter === undefined || counter === null) return null
     return this.currentCycle.data.counter
   }
 
-  getLastCycleStart () {
+  getLastCycleStart() {
     const lastCycle = this.getLastCycle()
     if (!lastCycle) return null
     return lastCycle.start
   }
 
-  getLastCycleCounter () {
+  getLastCycleCounter() {
     const lastCycle = this.getLastCycle()
     if (!lastCycle) return -1
     return lastCycle.counter
   }
 
-  getCurrentCycleStart () {
+  getCurrentCycleStart() {
     return this.currentCycle.data.start || null
   }
 
-  getLastCycleDuration () {
+  getLastCycleDuration() {
     const lastCycle = this.getLastCycle()
     if (!lastCycle) return this.defaultCycleDuration
     return lastCycle.duration
   }
 
-  getCurrentCycleDuration () {
+  getCurrentCycleDuration() {
     return this.currentCycle.data.duration
   }
 
-  getCurrentCycleMarker () {
+  getCurrentCycleMarker() {
     const lastCycle = this.getLastCycle()
     if (!lastCycle) return '0'.repeat(64)
     return lastCycle.marker
   }
 
-  getPreviousCycleMarker () {
+  getPreviousCycleMarker() {
     return this.currentCycle.data.previous || '0'.repeat(64)
   }
 
-  getNextCycleMarker () {
+  getNextCycleMarker() {
     const currentCert = this.getCurrentCertificate()
     if (!currentCert) return null
     const nextCycleMarker = currentCert.marker
     return nextCycleMarker
   }
 
-  getLastJoined () {
+  getLastJoined() {
     const lastCycle = this.getLastCycle()
     if (!lastCycle) return []
     return lastCycle.joined
   }
 
-  _areEquivalentNodes (node1, node2) {
+  _areEquivalentNodes(node1, node2) {
     const properties = ['externalIp', 'internalIp', 'externalPort', 'internalPort']
     for (const property of properties) {
       if (!node1[property] || !node2[property]) return false
@@ -1617,13 +1617,13 @@ class P2PState extends EventEmitter {
     return true
   }
 
-  getNode (id) {
+  getNode(id) {
     const current = this.nodes.current
     if (!current[id]) throw new Error('Invalid node ID.')
     return current[id]
   }
 
-  getNodeByPubKey (publicKey) {
+  getNodeByPubKey(publicKey) {
     const byPubKey = this.nodes.byPubKey
     const node = byPubKey[publicKey]
     if (!node) {
@@ -1633,7 +1633,7 @@ class P2PState extends EventEmitter {
     return node
   }
 
-  _getSubsetOfNodelist (nodes, self = null) {
+  _getSubsetOfNodelist(nodes, self = null) {
     if (!self) return Object.values(nodes)
     // Check if self in node list
     if (!nodes[self]) {
@@ -1646,19 +1646,19 @@ class P2PState extends EventEmitter {
     return Object.values(nodesCopy)
   }
 
-  getAllNodes (self) {
+  getAllNodes(self) {
     return this._getSubsetOfNodelist(this.nodes.current, self)
   }
 
-  getActiveNodes (self) {
+  getActiveNodes(self) {
     return this._getSubsetOfNodelist(this.nodes.active, self)
   }
 
-  getNodesOrdered () {
+  getNodesOrdered() {
     return this.nodes.ordered
   }
 
-  _getRemovedNodes () {
+  _getRemovedNodes() {
     const nodes = []
     const removedIds = this.getRemoved()
     for (const id of removedIds) {
@@ -1668,7 +1668,7 @@ class P2PState extends EventEmitter {
     return nodes
   }
 
-  _getLostNodes () {
+  _getLostNodes() {
     const nodes = []
     const lostIds = this.getLost()
     for (const id of lostIds) {
@@ -1678,7 +1678,7 @@ class P2PState extends EventEmitter {
     return nodes
   }
 
-  _getRefutedNodes () {
+  _getRefutedNodes() {
     const nodes = []
     const refutedIds = this.getRefuted()
     for (const id of refutedIds) {
@@ -1688,7 +1688,7 @@ class P2PState extends EventEmitter {
     return nodes
   }
 
-  getSeedNodes (forSeedList = true) {
+  getSeedNodes(forSeedList = true) {
     // A helper function we use to produce a seed node list of the expected format
     const produceSeedList = (nodes) => {
       // We use this flag to get back the raw nodes instead of the node objects for the seed list format
@@ -1721,7 +1721,7 @@ class P2PState extends EventEmitter {
     return produceSeedList(filteredNodes)
   }
 
-  getRandomActiveNode () {
+  getRandomActiveNode() {
     const nodes = this.getActiveNodes(this.p2p.id)
     const random = Random()
     // @ts-ignore todo test that it is really ok to ignore this.

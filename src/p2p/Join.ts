@@ -14,13 +14,6 @@ import { robustQuery } from './Utils'
 
 /** TYPES */
 
-export interface JoinedArchiver {
-  curvePk: string
-  ip: string
-  port: number
-  publicKey: string
-}
-
 export interface JoinedConsensor extends Types.P2PNode {
   cycleJoined: string
   id: string
@@ -45,7 +38,6 @@ export interface Record {
 
 let p2pLogger
 
-let toAccept: number
 let requests: JoinRequest[]
 let seen: Set<Types.Node['publicKey']>
 
@@ -70,6 +62,14 @@ const joinRoute: Types.Route<Handler> = {
 
     // Dont accept join requests if you're not active
     if (Self.isActive === false) {
+      res.end()
+      return
+    }
+
+    // Omar - [TODO] - if currentQuater <= 0 then we are not ready
+    //        just gossip this request to one other node
+    if (CycleCreator.currentQuarter < 1) {
+      //      Comms.sendGossipOne('gossip-join', joinRequest)
       res.end()
       return
     }
@@ -140,9 +140,54 @@ export function init() {
 }
 
 export function reset() {
-  toAccept = config.p2p.maxNodesPerCycle
   requests = []
   seen = new Set()
+}
+
+function calculateToAccept() {
+  /*
+fn toAccept:
+  if (active < desired)
+    needed = desired - active
+    if (needed > maxNodesPerCycle - syncing) needed = maxNodesPerCycle - syncing
+    if (needed < 0) needed = 0
+  else
+    needed = expired
+    if (needed > expired) needed = expired
+    if (needed > maxNodesPerCycle - syncing) needed = maxNodesPerCycle - syncing
+    if (needed < 0) needed = 0
+  return needed
+*/
+  const desired = CycleChain.newest.desired
+  const active = CycleChain.newest.active
+  const max = config.p2p.maxNodesPerCycle // [TODO] allow autoscaling to change this
+  const syncing = NodeList.byJoinOrder.length - active
+  const expired = CycleChain.newest.expired
+  const syncMax = max // we dont want more than this many nodes to sync at the same stime
+  const canSync = syncMax - syncing
+  let needed = 0
+  if (active < desired) {
+    needed = desired - active
+  } else {
+    needed = expired
+  }
+  if (needed > canSync) {
+    needed = canSync
+  }
+  if (needed < 0) {
+    needed = 0
+  }
+  console.log(
+    'calculateToAccept',
+    desired,
+    active,
+    max,
+    syncing,
+    expired,
+    canSync,
+    needed
+  )
+  return needed
 }
 
 export function getTxs(): Txs {
@@ -162,8 +207,7 @@ export function updateRecord(
   _prev: CycleCreator.CycleRecord
 ) {
   const joinedConsensors = txs.join.map(joinRequest => {
-    const nodeInfo = node
-    const cycleJoined = joinRequest.cycleMarker
+    const { nodeInfo, cycleMarker: cycleJoined } = joinRequest
     const id = computeNodeId(nodeInfo.publicKey, cycleJoined)
     return { ...nodeInfo, cycleJoined, id }
   })
@@ -193,6 +237,8 @@ export async function createJoinRequest(
 ): Promise<JoinRequest & Types.SignedObject> {
   // Build and return a join request
   const nodeInfo = Self.getThisNodeInfo()
+  // Omar - [TODO] the join request should not have the selectionNum
+  //        in it. It is calculated on the server.
   const selectionNum = crypto.hash({ cycleMarker, address: nodeInfo.address })
   // TO-DO: Think about if the selection number still needs to be signed
   const proofOfWork = {
@@ -229,9 +275,21 @@ export function addJoinRequest(joinRequest) {
   }
 
   // Check if we are better than the lowest selectionNum
-  const last = requests.length - 1
+  const last = requests.length > 0 ? requests[requests.length - 1] : undefined
+  // Omar - [TODO] we need to calculate the selection based on the join
+  //        request info and don't allow joining node to specify it.
+  //        for now we can use the hash of node public key and cycle number
+  //        but in the future the application will provide what to use
+  //        and we can hash that with the cycle number. For example the
+  //        application may want to use the steaking address or the POW.
+  //        It should be something that the node cannot easily change to
+  //        guess a high selection number. If we generate a network
+  //        random number we have to be careful that a node inside the network
+  //        does not have an advantage by having access to this info and
+  //        is able to create a stronger selectionNum.
   if (
-    !crypto.isGreaterHash(joinRequest.selectionNum, requests[last].selectionNum)
+    last &&
+    !crypto.isGreaterHash(joinRequest.selectionNum, last.selectionNum)
   ) {
     warn('Join request not better than lowest, not added.')
     return false
@@ -253,8 +311,9 @@ export function addJoinRequest(joinRequest) {
   )
 
   // If we have > maxNodesPerCycle requests, trim them down
-  if (requests.length > config.p2p.maxNodesPerCycle) {
-    const over = requests.length - config.p2p.maxNodesPerCycle
+  const toAccept = calculateToAccept()
+  if (requests.length > toAccept) {
+    const over = requests.length - toAccept
     requests.splice(-over)
     info(`Over maxNodesPerCycle; removed ${over} requests from join requests`)
   }
@@ -267,7 +326,7 @@ export async function firstJoin() {
   const zeroMarker = '0'.repeat(64)
   const request = await createJoinRequest(zeroMarker)
   // Add own join request
-  addJoinRequest(request)
+  utils.insertSorted(requests, request)
   // Return node ID
   return computeNodeId(crypto.keypair.publicKey, zeroMarker)
 }
@@ -288,11 +347,7 @@ export async function fetchCycleMarker(nodes) {
     return equivalent
   }
 
-  const [marker] = await robustQuery(
-    nodes,
-    queryFn,
-    _isSameCycleMarkerInfo.bind(this)
-  )
+  const [marker] = await robustQuery(nodes, queryFn)
   return marker
 }
 

@@ -3,8 +3,8 @@ export interface LooseObject {
 }
 
 export interface Signature {
-  owner: string;
-  sig: string;
+  owner: string
+  sig: string
 }
 
 export interface SignedObject extends LooseObject {

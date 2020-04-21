@@ -2,7 +2,7 @@ exports.register = function (context) {
   setupRoutes.call(context)
 }
 
-function setupRoutes () {
+function setupRoutes() {
   // -------- EXTERNAL Routes ----------
 
   this.network.registerExternalGet('cyclemarker', (req, res) => {

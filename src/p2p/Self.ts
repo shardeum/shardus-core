@@ -7,7 +7,6 @@ import * as utils from '../utils'
 import * as Archivers from './Archivers'
 import * as Comms from './Comms'
 import { config, crypto, logger } from './Context'
-import * as CycleChain from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import * as Join from './Join'
 import * as NodeList from './NodeList'
@@ -32,7 +31,6 @@ export let isActive = false
 export function init() {
   // Init submodules
   Comms.init()
-  CycleChain.init()
   Archivers.init()
   Sync.init()
   CycleCreator.init()
@@ -70,7 +68,7 @@ export async function startup(): Promise<boolean> {
       // Remove yourself from activeNodes if you are present in them but not firstSeed
       if (isFirst === false) {
         const ourIdx = activeNodes.findIndex(
-          (node: { ip: any; port: any }) =>
+          node =>
             node.ip === ipInfo.externalIp && node.port === ipInfo.externalPort
         )
         if (ourIdx > -1) {
@@ -113,7 +111,7 @@ export async function startup(): Promise<boolean> {
 
         // Remove yourself from activeNodes if you are present in them
         const ourIdx = activeNodes.findIndex(
-          (node: { ip: any; port: any }) =>
+          node =>
             node.ip === ipInfo.externalIp && node.port === ipInfo.externalPort
         )
         if (ourIdx > -1) {

@@ -2,11 +2,11 @@ import deepmerge from 'deepmerge'
 import { Logger } from 'log4js'
 import * as utils from '../utils'
 import * as Active from './Active'
+import * as Archivers from './Archivers'
 import * as Comms from './Comms'
 import { config, crypto, logger } from './Context'
 import * as CycleChain from './CycleChain'
 import * as Join from './Join'
-import { JoinedArchiver } from './Join'
 import * as NodeList from './NodeList'
 import * as Rotation from './Rotation'
 import * as Self from './Self'
@@ -30,14 +30,14 @@ interface BaseRecord {
   duration: number
 }
 
-export type CycleTxs = Join.Txs & Active.Txs
+export type CycleTxs = Archivers.Txs & Join.Txs & Active.Txs & Rotation.Txs
 
 export type CycleRecord = BaseRecord &
+  Archivers.Record &
   Join.Record &
   Active.Record &
   Rotation.Record & {
     joined: string[]
-    joinedArchivers: JoinedArchiver[]
     returned: string[]
     lost: string[]
     refuted: string[]
@@ -55,9 +55,9 @@ const DESIRED_MARKER_MATCHES = 2
 
 let p2pLogger: Logger
 
-export const submodules = [Join, Active]
+export const submodules = [Archivers, Join, Active, Rotation]
 
-export let currentQuarter = 0
+export let currentQuarter = -1 // means we have not started creating cycles
 export let currentCycle = 0
 export let nextQ1Start = 0
 
@@ -180,10 +180,18 @@ export async function startCycles() {
     // If first node, create cycle record 0, set bestRecord to it
     const recordZero = makeRecordZero()
     bestRecord = recordZero
-  } else {
-    // Otherwise, set bestRecord to newest record in cycle chain
-    bestRecord = CycleChain.newest
+    madeCycle = true
+
+    // Wait for the real cycle zero start
+    const { startQ1 } = calcIncomingTimes(recordZero)
+    schedule(cycleCreator, startQ1)
+
+    // Start creating cycles
+    return
   }
+
+  // Otherwise, set bestRecord to newest record in cycle chain
+  bestRecord = CycleChain.newest
   madeCycle = true
 
   await cycleCreator()
@@ -194,6 +202,9 @@ export async function startCycles() {
  * to run for every quarter of the cycle.
  */
 async function cycleCreator() {
+  // Set current quater to 0 while we are setting up the previous record
+  //   Routes should use this to not process and just single-forward gossip
+  currentQuarter = 0
   // Get the previous record
   let prevRecord = madeCycle ? bestRecord : await fetchLatestRecord()
   while (!prevRecord) {
@@ -209,6 +220,9 @@ async function cycleCreator() {
     Sync.digestCycle(prevRecord)
   }
 
+  // Send last record to any subscribed archivers
+  console.log('DBG', `SENDING ARCHIVER DATA ${prevRecord.counter}`, Date.now())
+  Archivers.sendData()
   ;({
     cycle: currentCycle,
     quarter: currentQuarter,
@@ -233,6 +247,7 @@ async function cycleCreator() {
   schedule(runQ3, startQ3)
   schedule(runQ4, startQ4)
   schedule(cycleCreator, end, { runEvenIfLateBy: Infinity })
+  console.log('DBG', `Scheduled cycleCreator in ${end - Date.now()} ms...`)
 
   madeCycle = false
 }
@@ -364,11 +379,7 @@ function makeCycleRecord(
   }
 
   const cycleRecord = Object.assign(baseRecord, {
-    desired: 0,
-    expired: 0,
     joined: [],
-    joinedArchivers: [],
-    removed: [],
     returned: [],
     lost: [],
     refuted: [],
@@ -582,9 +593,11 @@ function cycleQuarterChanged(cycle: number, quarter: number) {
 function scoreCert(cert: CycleCert): number {
   try {
     const id = NodeList.byPubKey.get(cert.sign.owner).id // get node id from cert pub key
-    const out = utils.XOR(cert.marker, id)
+    const hid = crypto.hash({ id }) // Omar - use hash of id so the cert is not made by nodes that are near based on node id
+    const out = utils.XOR(cert.marker, hid)
     return out
   } catch (err) {
+    error('scoreCert ERR:', err)
     return 0
   }
 }

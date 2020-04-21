@@ -1,7 +1,7 @@
 const utils = require('../utils')
 
 class P2PLostNodes {
-  constructor (logger, p2p, state, crypto) {
+  constructor(logger, p2p, state, crypto) {
     this.mainLogger = logger.getLogger('main')
     this.p2p = p2p
     this.state = state
@@ -23,7 +23,7 @@ class P2PLostNodes {
    * in the next cycles Q1 phase.
    * @param {Node} node
    */
-  reportLost (node) {
+  reportLost(node) {
     // Don't report yourself
     if (node.id === this.p2p.id) return false
     // Flag the node, if not already flagged
@@ -41,7 +41,7 @@ class P2PLostNodes {
    * every flagged node in lostNodesMeta. If the LostMessage is invalid, trys
    * again next cycle.
    */
-  proposeLost () {
+  proposeLost() {
     const currentCycleCounter = this.state.getCycleCounter() || 0
     const activeNodesById = this.state.getActiveNodes(this.p2p.id).reduce((obj, node) => {
       obj[node.id] = node
@@ -114,7 +114,7 @@ class P2PLostNodes {
    * Called at the start of every cycles Q3 phase. Trys to apply lostNodesMeta
    * data to the current cycle data.
    */
-  applyLost () {
+  applyLost() {
     const currentCycleCounter = this.state.getCycleCounter() || 0
 
     for (const target in this.lostNodesMeta) {
@@ -150,7 +150,7 @@ class P2PLostNodes {
     }
   }
 
-  registerRoutes () {
+  registerRoutes() {
     this.p2p.registerInternal('reportlost', (payload) => {
       this._investigateLostNode(payload)
     })
@@ -204,7 +204,7 @@ class P2PLostNodes {
     })
   }
 
-  _investigateLostNode (lostMsg) {
+  _investigateLostNode(lostMsg) {
     // Validate lostMsg and add target to lostNodesMeta
     const [added, reason] = this._addLostMessage(lostMsg)
     if (!added) {
@@ -232,7 +232,7 @@ class P2PLostNodes {
     this.mainLogger.debug(`Lost Detection: Marked target ${target} as lost. Pinged target. Waiting 1 cycle for target to respond...`)
   }
 
-  _flagLostNode (node) {
+  _flagLostNode(node) {
     const target = node.id
     if (this.lostNodesMeta[target]) return false
     const meta = this._createLostNodeMeta(node)
@@ -240,13 +240,13 @@ class P2PLostNodes {
     return true
   }
 
-  _unflagLostNode (target) {
+  _unflagLostNode(target) {
     if (!this.lostNodesMeta[target]) return false
     delete this.lostNodesMeta[target]
     return true
   }
 
-  _addLostMessage (lostMsg, { verify = true } = {}) {
+  _addLostMessage(lostMsg, { verify = true } = {}) {
     const [validated, reason] = this._validateLostMessage(lostMsg, verify)
     if (!validated) {
       return [false, reason]
@@ -265,11 +265,11 @@ class P2PLostNodes {
     return [true, 'All good']
   }
 
-  _validateLostMessage (lostMsg, verify = true) {
+  _validateLostMessage(lostMsg, verify = true) {
     // Ensure all fields are present
     let source, target, investigator, lastCycleMarker, cycleCounter
     try {
-      ;({ source, target, investigator, lastCycleMarker, cycleCounter } = lostMsg)
+      ; ({ source, target, investigator, lastCycleMarker, cycleCounter } = lostMsg)
     } catch (err) {
       return [false, 'Missing required fields: ' + err.message]
     }
@@ -308,7 +308,7 @@ class P2PLostNodes {
     return [true, 'All good']
   }
 
-  _addDownMessage (downMsg) {
+  _addDownMessage(downMsg) {
     // Validate downMsg
     const [validated, reason] = this.validateDownMessage(downMsg)
     if (!validated) return [false, reason]
@@ -327,7 +327,7 @@ class P2PLostNodes {
     return [true, 'All good']
   }
 
-  validateDownMessage (downMsg) {
+  validateDownMessage(downMsg) {
     // Validate downMsg
     const lostMsg = downMsg.lostMessage
     if (!lostMsg) return [false, '"lostMessage" field is missing']
@@ -338,7 +338,7 @@ class P2PLostNodes {
     return [true, 'All good']
   }
 
-  _addUpMessage (upMsg) {
+  _addUpMessage(upMsg) {
     const [validated, reason] = this.validateUpMessage(upMsg)
     if (!validated) return [false, reason]
     // Add upMsg to lostNodesMeta
@@ -357,7 +357,7 @@ class P2PLostNodes {
     return [true, 'All good']
   }
 
-  validateUpMessage (upMsg) {
+  validateUpMessage(upMsg) {
     // Validate upMsg
     const downMsg = upMsg.downMessage
     if (!downMsg) return [false, '"downMessage" field is missing']
@@ -370,7 +370,7 @@ class P2PLostNodes {
     return [true, 'All good']
   }
 
-  _createLostNodeMeta (node) {
+  _createLostNodeMeta(node) {
     return {
       id: node.id,
       status: this.statuses.flagged,
@@ -382,7 +382,7 @@ class P2PLostNodes {
     }
   }
 
-  _createLostMessage (target) {
+  _createLostMessage(target) {
     const lastCycleMarker = this.state.getCurrentCycleMarker()
     const cycleCounter = this.state.getCycleCounter() || 0
     const investigator = this._findLostNodeInvestigator(target, lastCycleMarker)
@@ -398,7 +398,7 @@ class P2PLostNodes {
     return signedMsg
   }
 
-  _createDownMsg (lostMsg) {
+  _createDownMsg(lostMsg) {
     const msg = {
       lostMessage: lostMsg
     }
@@ -406,7 +406,7 @@ class P2PLostNodes {
     return signedMsg
   }
 
-  _createUpMsg (downMsg) {
+  _createUpMsg(downMsg) {
     const msg = {
       downMessage: downMsg
     }
@@ -414,7 +414,7 @@ class P2PLostNodes {
     return signedMsg
   }
 
-  _findLostNodeInvestigator (target, cycleMarker) {
+  _findLostNodeInvestigator(target, cycleMarker) {
     const toHash = {
       target,
       cycleMarker

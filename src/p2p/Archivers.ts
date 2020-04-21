@@ -1,148 +1,237 @@
 import * as http from '../http'
 import * as Comms from './Comms'
 import { crypto, logger, network } from './Context'
-import * as CycleChain from './CycleChain'
+import * as CycleCreator from './CycleCreator'
+import { CycleRecord as Cycle } from './CycleCreator'
+import * as CycleParser from './CycleParser'
+import { getCycleChain } from './CycleChain'
+import { DefaultDeserializer } from 'v8'
+import { Receipt } from './GlobalAccounts'
 
 /** TYPES */
 
-interface DataResponse {
+export interface Transaction {
+  id: string
+}
+
+export interface Partition {
+  hash: string
+}
+
+export type ValidTypes = Cycle | Transaction | Partition
+
+export enum TypeNames {
+  CYCLE = 'CYCLE',
+  TRANSACTION = 'TRANSACTION',
+  PARTITION = 'PARTITION',
+}
+
+export type TypeName<T extends ValidTypes> = T extends Cycle
+  ? TypeNames.CYCLE
+  : T extends Transaction
+  ? TypeNames.TRANSACTION
+  : TypeNames.PARTITION
+
+export type TypeIndex<T extends ValidTypes> = T extends Cycle
+  ? Cycle['counter']
+  : T extends Transaction
+  ? Transaction['id']
+  : Partition['hash']
+export interface DataRequest<T extends ValidTypes> {
+  type: TypeName<T>
+  lastData: TypeIndex<T>
+}
+
+interface DataResponse<T extends ValidTypes> {
   publicKey: string
   type: string
-  data: unknown[]
+  data: T[]
+}
+
+interface DataRecipient<T extends ValidTypes> {
+  nodeInfo: JoinedArchiver
+  type: DataRequest<T>['type']
+  lastData: DataRequest<T>['lastData']
+  curvePk: string
+}
+
+export interface JoinedArchiver {
+  publicKey: string
+  ip: string
+  port: number
+  curvePk: string
+}
+
+export interface JoinRequest extends SignedObject {
+  nodeInfo: JoinedArchiver
+}
+
+export interface Txs {
+  archivers: JoinRequest[]
+}
+
+export interface Record {
+  joinedArchivers: JoinedArchiver[]
 }
 
 /** STATE */
 
-let mainLogger 
-let joinRequests
-let archiversList
-let dataRecipients
-let recipientTypes
+let mainLogger
+
+let archivers: JoinedArchiver[]
+let recipients: Array<DataRecipient<Cycle | Transaction | Partition>>
+
+let requests: JoinRequest[]
 
 /** FUNCTIONS */
 
+/** CycleCreator Functions */
+
 export function init() {
   mainLogger = logger.getLogger('main')
+
+  archivers = []
+  recipients = []
+
   reset()
+
+  registerRoutes()
 }
 
-function logDebug (...msgs) {
-  mainLogger.debug('P2PArchivers: ' + msgs.map(msg => JSON.stringify(msg)).join(', '))
+export function reset() {
+  resetJoinRequests()
 }
 
-function logError (...msgs) {
-  mainLogger.error('P2PArchivers: ' + msgs.map(msg => JSON.stringify(msg)).join(', '))
+export function getTxs(): Txs {
+  return {
+    archivers: requests,
+  }
 }
 
-export function reset () {
-  joinRequests = []
-  archiversList = []
-  dataRecipients = []
-  recipientTypes = {}
+export function updateRecord(
+  txs: Txs,
+  record: CycleCreator.CycleRecord,
+  _prev: CycleCreator.CycleRecord
+) {
+  // Add join requests to the cycle record
+  const joinedArchivers = txs.archivers.map(joinRequest => joinRequest.nodeInfo)
+  record.joinedArchivers = joinedArchivers.sort()
 }
 
-export function resetJoinRequests () {
-  joinRequests = []
+export function parseRecord(
+  record: CycleCreator.CycleRecord
+): CycleParser.Change {
+  // Update our archivers list
+  updateArchivers(record.joinedArchivers)
+
+  // Since we don't touch the NodeList, return an empty Change
+  return {
+    added: [],
+    removed: [],
+    updated: [],
+  }
 }
 
-export function addJoinRequest (joinRequest, tracker?, gossip = true) {
+/** Not used by Archivers */
+export function sendRequests() {}
+
+/** Not used by Archivers */
+export function queueRequest(request) {}
+
+/** Original Functions */
+
+function logDebug(...msgs) {
+  mainLogger.debug(
+    'P2PArchivers: ' + msgs.map(msg => JSON.stringify(msg)).join(', ')
+  )
+}
+
+function logError(...msgs) {
+  mainLogger.error(
+    'P2PArchivers: ' + msgs.map(msg => JSON.stringify(msg)).join(', ')
+  )
+}
+
+export function resetJoinRequests() {
+  requests = []
+}
+
+export function addJoinRequest(joinRequest, tracker?, gossip = true) {
   // [TODO] Verify signature
 
-  joinRequests.push(joinRequest)
+  requests.push(joinRequest)
   if (gossip === true) {
     Comms.sendGossip('joinarchiver', joinRequest, tracker)
   }
   return true
 }
 
-export function getArchiverUpdates () {
-  return joinRequests
+export function getArchiverUpdates() {
+  return requests
 }
 
-export function updateArchivers (joinedArchivers) {
+export function updateArchivers(joinedArchivers) {
   // Update archiversList
   for (const nodeInfo of joinedArchivers) {
-    archiversList.push(nodeInfo)
+    archivers.push(nodeInfo)
   }
 }
 
-export function addDataRecipient (nodeInfo, dataRequest) {
+export function addDataRecipient(
+  nodeInfo: JoinedArchiver,
+  dataRequest: DataRequest<Cycle | Transaction | Partition>
+) {
   const recipient = {
     nodeInfo,
     type: dataRequest.type,
-    curvePk: crypto.convertPublicKeyToCurve(nodeInfo.publicKey)
+    lastData: dataRequest.lastData,
+    curvePk: crypto.convertPublicKeyToCurve(nodeInfo.publicKey),
   }
-  dataRecipients.push(recipient)
-
-  const dataResponse: DataResponse = {
-    publicKey: crypto.getPublicKey(),
-    type: recipient.type,
-    data: []
-  }
-  
-  
-  
-
-  switch (recipient.type) {
-    case 'CYCLE' : {
-      // Get an array of cycles since counter = dataRequest.lastData
-      const start = dataRequest.lastData
-      dataResponse.data = CycleChain.getCycleChain(start)
-      logDebug(`Responding to cycle dataRequest [${start}-latest] with ${JSON.stringify(dataResponse)}`)
-      break
-    }
-    case 'TRANSACTION' : {
-      // [TODO] Get an array of txs since tx id = dataRequest.lastData
-      break
-    }
-    case 'PARTITION' : {
-      // [TODO] Get an array of txs since partition hash = dataRequest.lastData
-      break
-    }
-    default:
-  }
-
-  // Tag dataResponse
-  const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
-
-  const recipientUrl = `http://${recipient.nodeInfo.ip}:${recipient.nodeInfo.port}/newdata`
-  http.post(recipientUrl, taggedDataResponse)
-    .catch(err => {
-      logError(`addDataRecipient: Failed to post to ${recipientUrl} ` + err)
-    })
+  recipients.push(recipient)
 }
 
-function removeDataRecipient (publicKey) {
+function removeDataRecipient(publicKey) {
   let recipient
-  for (let i = dataRecipients.length - 1; i >= 0; i--) {
-    recipient = dataRecipients[i]
+  for (let i = recipients.length - 1; i >= 0; i--) {
+    recipient = recipients[i]
     if (recipient.nodeInfo.publicKey === publicKey) {
-      dataRecipients.splice(i, 1)
+      recipients.splice(i, 1)
     }
   }
 }
 
-export function sendData (cycle) {
-  for (const recipient of dataRecipients) {
+export function sendData() {
+  for (const recipient of recipients) {
     const recipientUrl = `http://${recipient.nodeInfo.ip}:${recipient.nodeInfo.port}/newdata`
 
-    const dataResponse: DataResponse = {
-      publicKey:crypto.getPublicKey(),
-      type:recipient.type,
-      data:[]
+    const baseDataResponse = {
+      publicKey: crypto.getPublicKey(),
+      type: recipient.type,
     }
 
+    let dataResponse
+
     switch (recipient.type) {
-      case 'CYCLE' : {
-        // Send latest cycle
-        dataResponse.data.push(cycle)
+      case 'CYCLE': {
+        // Identify recipients type
+        const typedRecipient = recipient as DataRecipient<Cycle>
+        // Get latest cycles since recipients lastData
+        const data = getCycleChain(typedRecipient.lastData + 1)
+        // Update lastData
+        if (data.length > 0) {
+          typedRecipient.lastData = data[data.length - 1].counter
+        }
+        // Make dataResponse
+        dataResponse = Object.assign(baseDataResponse, {
+          data,
+        })
         break
       }
-      case 'TRANSACTION' : {
+      case 'TRANSACTION': {
         // [TODO] Send latest txs
         break
       }
-      case 'PARTITION' : {
+      case 'PARTITION': {
         // [TODO] Send latest partitions
         break
       }
@@ -152,7 +241,8 @@ export function sendData (cycle) {
     // Tag dataResponse
     const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
 
-    http.post(recipientUrl, taggedDataResponse)
+    http
+      .post(recipientUrl, taggedDataResponse)
       .then(dataKeepAlive => {
         if (dataKeepAlive.keepAlive === false) {
           // Remove recipient from dataRecipients
@@ -167,7 +257,7 @@ export function sendData (cycle) {
   }
 }
 
-export function sendPartitionData (partitionReceipt, paritionObject) {
+export function sendPartitionData(partitionReceipt, paritionObject) {
   // for (const nodeInfo of cycleRecipients) {
   //   const nodeUrl = `http://${nodeInfo.ip}:${nodeInfo.port}/post_partition`
   //   http.post(nodeUrl, { partitionReceipt, paritionObject })
@@ -177,7 +267,11 @@ export function sendPartitionData (partitionReceipt, paritionObject) {
   // }
 }
 
-export function sendTransactionData (partitionNumber, cycleNumber, transactions) {
+export function sendTransactionData(
+  partitionNumber,
+  cycleNumber,
+  transactions
+) {
   // for (const nodeInfo of cycleRecipients) {
   //   const nodeUrl = `http://${nodeInfo.ip}:${nodeInfo.port}/post_transactions`
   //   http.post(nodeUrl, { partitionNumber, cycleNumber, transactions })
@@ -187,7 +281,7 @@ export function sendTransactionData (partitionNumber, cycleNumber, transactions)
   // }
 }
 
-export function registerRoutes () {
+export function registerRoutes() {
   network.registerExternalPost('joinarchiver', async (req, res) => {
     const invalidJoinReqErr = 'Invalid archiver join request'
     if (!req.body) {
@@ -204,16 +298,23 @@ export function registerRoutes () {
     logDebug('Archiver join request accepted!')
   })
 
-
-  Comms.registerGossipHandler('joinarchiver', async (payload, sender, tracker) => {
-    const accepted = await addJoinRequest(payload, tracker, false)
-    if (!accepted) return logDebug('Archiver join request not accepted.')
-    logDebug('Archiver join request accepted!')
-  })
+  Comms.registerGossipHandler(
+    'joinarchiver',
+    async (payload, sender, tracker) => {
+      const accepted = await addJoinRequest(payload, tracker, false)
+      if (!accepted) return logDebug('Archiver join request not accepted.')
+      logDebug('Archiver join request accepted!')
+    }
+  )
 
   network.registerExternalPost('requestdata', (req, res) => {
-    const invalidDataReqErr = 'Invalid data request'
+    console.log(
+      'DBG',
+      `Archivers: requestdata: Got Request ${JSON.stringify(req.body)}`
+    )
+
     if (!req.body) {
+      const invalidDataReqErr = 'Invalid data request'
       logError(invalidDataReqErr)
       return res.json({ success: false, error: invalidDataReqErr })
     }
@@ -229,10 +330,12 @@ export function registerRoutes () {
     }
     */
 
-    const nodeInfo = archiversList.find(archiver => archiver.publicKey === dataRequest.publicKey)
+    const nodeInfo = archivers.find(
+      archiver => archiver.publicKey === dataRequest.publicKey
+    )
 
-    const archiverNotFoundErr = 'Archiver not found in list'
     if (!nodeInfo) {
+      const archiverNotFoundErr = 'Archiver not found in list'
       logError(archiverNotFoundErr)
       return res.json({ success: false, error: archiverNotFoundErr })
     }
@@ -244,10 +347,10 @@ export function registerRoutes () {
   })
 
   network.registerExternalGet('archivers', (req, res) => {
-    res.json({ archivers: archiversList })
+    res.json({ archivers })
   })
 
   network.registerExternalGet('datarecipients', (req, res) => {
-    res.json({ dataRecipients })
+    res.json({ dataRecipients: recipients })
   })
 }

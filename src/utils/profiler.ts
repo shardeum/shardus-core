@@ -7,11 +7,11 @@ interface Profiler {
 }
 
 class Profiler {
-  constructor () {
+  constructor() {
     this.sectionTimes = {}
   }
 
-  profileSectionStart (sectionName) {
+  profileSectionStart(sectionName) {
     let section = this.sectionTimes[sectionName]
     if (section == null) {
       let t = BigInt(0)
@@ -23,7 +23,7 @@ class Profiler {
     section.c++
   }
 
-  profileSectionEnd (sectionName) {
+  profileSectionEnd(sectionName) {
     let section = this.sectionTimes[sectionName]
     if (section == null || section.started === false) {
       return
@@ -31,16 +31,16 @@ class Profiler {
 
     section.end = process.hrtime.bigint()
 
-    section.total += (section.end - section.start)
+    section.total += section.end - section.start
     section.started = false
   }
 
-  cleanInt (x) {
+  cleanInt(x) {
     x = Number(x)
     return x >= 0 ? Math.floor(x) : Math.ceil(x)
   }
 
-  printAndClearReport (delta?: number) {
+  printAndClearReport(delta?: number) {
     let result = 'Profile Sections: '
     // let d1 = this.cleanInt(delta * NS_PER_SEC)
     let d1 = this.cleanInt(1e6) // will get us ms
@@ -49,7 +49,8 @@ class Profiler {
     for (let key in this.sectionTimes) {
       if (this.sectionTimes.hasOwnProperty(key)) {
         let section = this.sectionTimes[key]
-        result += `${section.name}: total ${(section.total / divider)} avg:${section.total / (divider * BigInt(section.c))} ,  ` // ${section.total} :
+        result += `${section.name}: total ${section.total /
+          divider} avg:${section.total / (divider * BigInt(section.c))} ,  ` // ${section.total} :
         section.total = BigInt(0)
       }
     }

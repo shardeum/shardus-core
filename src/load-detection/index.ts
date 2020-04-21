@@ -1,4 +1,4 @@
-import Statistics from "../statistics"
+import Statistics from '../statistics'
 import { EventEmitter } from 'events'
 
 interface LoadDetection {
@@ -11,7 +11,7 @@ interface LoadDetection {
 }
 
 class LoadDetection extends EventEmitter {
-  constructor (config, statistics) {
+  constructor(config, statistics) {
     super()
     this.highThreshold = config.highThreshold
     this.lowThreshold = config.lowThreshold
@@ -24,12 +24,16 @@ class LoadDetection extends EventEmitter {
   /**
    * Returns a number between 0 and 1 indicating the current load.
    */
-  updateLoad () {
+  updateLoad() {
     const txTimeInQueue = this.statistics.getAverage('txTimeInQueue') / 1000
-    const scaledTxTimeInQueue = txTimeInQueue >= this.desiredTxTime ? 1 : txTimeInQueue / this.desiredTxTime
+    const scaledTxTimeInQueue =
+      txTimeInQueue >= this.desiredTxTime
+        ? 1
+        : txTimeInQueue / this.desiredTxTime
 
     const queueLength = this.statistics.getWatcherValue('queueLength')
-    const scaledQueueLength = queueLength >= this.queueLimit ? 1 : queueLength / this.queueLimit
+    const scaledQueueLength =
+      queueLength >= this.queueLimit ? 1 : queueLength / this.queueLimit
 
     const load = Math.max(scaledTxTimeInQueue, scaledQueueLength)
     if (load > this.highThreshold) this.emit('highLoad')
@@ -37,7 +41,7 @@ class LoadDetection extends EventEmitter {
     this.load = load
   }
 
-  getCurrentLoad () {
+  getCurrentLoad() {
     return this.load
   }
 }

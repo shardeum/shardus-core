@@ -2,27 +2,27 @@
 
 In order to implement core network mechanisms, a Shardus network needs:
 
-* Every node to keep a list of every other node in the network. (__node list__)
-* A way for nodes to suggest changes to the node list. (__updates__)
-* A way for nodes to agree upon and apply changes to their node lists at the
-  same time. (__cycles__)
-* A history of all the changes that were made to the node list.
-  (__cycle chain__)
+- Every node to keep a list of every other node in the network. (**node list**)
+- A way for nodes to suggest changes to the node list. (**updates**)
+- A way for nodes to agree upon and apply changes to their node lists at the
+  same time. (**cycles**)
+- A history of all the changes that were made to the node list.
+  (**cycle chain**)
 
-Every node keeps a copy of the __node list__, which has the information and
+Every node keeps a copy of the **node list**, which has the information and
 status of every node in the network.
 
 Nodes can suggest changes to the node list with signed messages, called
-__updates__, which are passed around to every node in the network.
+**updates**, which are passed around to every node in the network.
 
 Nodes gather all the updates they see in a certain amount of time and put the
-changes described by the updates into structures called __cycles__. Once the
+changes described by the updates into structures called **cycles**. Once the
 time to gather updates has passed, nodes compare their cycles to make sure they
 have the same changes. After applying the changes to their node lists, the nodes
 will start gathering updates for the next cycle. Cycles are created on a regular
 interval from the start of the network, for as long as the network runs.
 
-The __cycle chain__ is the ordered list of all the cycles created by the
+The **cycle chain** is the ordered list of all the cycles created by the
 network, going back to the first cycle it created.
 
 To join a Shardus network, a node must sync up with the networks node list and
@@ -35,18 +35,18 @@ Cycles are created on a regular interval and contain the following data:
 
 ```typescript
 interface Cycle {
-  start: number, // cycle start time (epoch)
-  duration: number, // cycle duration (ms)
-  counter: number, // cycle index number (starting from 0)
-  previous: string, // hash of the previous cycle
-  joined: [], // array of collected join requests
-  removed: [], // 
-  lost: [],
-  apoptosized: [],
-  returned: [],
-  activated: [],
-  certificate: {},
-  expired: number,
+  start: number // cycle start time (epoch)
+  duration: number // cycle duration (ms)
+  counter: number // cycle index number (starting from 0)
+  previous: string // hash of the previous cycle
+  joined: [] // array of collected join requests
+  removed: [] //
+  lost: []
+  apoptosized: []
+  returned: []
+  activated: []
+  certificate: {}
+  expired: number
   desired: number
 }
 ```

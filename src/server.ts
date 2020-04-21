@@ -9,7 +9,8 @@ const baseDirPath = resolve(process.argv[2] || './')
 let config
 try {
   config = readJsonDir(join(baseDirPath, 'config'))
-  if (Object.keys(config).length === 0 && config.constructor === Object) throw new Error('Empty configs')
+  if (Object.keys(config).length === 0 && config.constructor === Object)
+    throw new Error('Empty configs')
 } catch (e) {
   config = readJsonDir(join(__dirname, 'config'))
 }
@@ -17,7 +18,7 @@ config.server.baseDir = baseDirPath
 
 const shardus = new Shardus(config)
 
-async function init () {
+async function init() {
   shardus.setup(null)
   await shardus.start()
   shardus.registerExceptionHandler()

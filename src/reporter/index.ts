@@ -1,12 +1,13 @@
 import Log4js from 'log4js'
 import LoadDetection from '../load-detection'
-import Statistics from '../statistics'
-import StateManager from '../state-manager'
-import Profiler from '../utils/profiler'
 import Logger from '../logger'
 import { ipInfo } from '../network'
-import { id } from '../p2p/Self'
 import * as CycleChain from '../p2p/CycleChain'
+import * as Rotation from '../p2p/Rotation'
+import { id } from '../p2p/Self'
+import StateManager from '../state-manager'
+import Statistics from '../statistics'
+import Profiler from '../utils/profiler'
 
 const http = require('../http')
 const allZeroes64 = '0'.repeat(64)
@@ -33,7 +34,14 @@ interface Reporter {
 }
 
 class Reporter {
-  constructor (config, logger, statistics, stateManager, profiler, loadDetection) {
+  constructor(
+    config,
+    logger,
+    statistics,
+    stateManager,
+    profiler,
+    loadDetection
+  ) {
     this.config = config
     this.mainLogger = logger.getLogger('main')
     this.statistics = statistics
@@ -53,62 +61,77 @@ class Reporter {
     this.hasRecipient = this.config.recipient != null
   }
 
-  _calculateAverageTps (txs) {
+  _calculateAverageTps(txs) {
     return Math.round(txs / this.config.interval)
   }
 
-  async reportJoining (publicKey) {
+  async reportJoining(publicKey) {
     if (!this.hasRecipient) {
       return
     }
     try {
       const nodeIpInfo = ipInfo
-      await http.post(`${this.config.recipient}/joining`, { publicKey, nodeIpInfo })
+      await http.post(`${this.config.recipient}/joining`, {
+        publicKey,
+        nodeIpInfo,
+      })
     } catch (e) {
-      this.mainLogger.error('reportJoining: ' + e.name + ': ' + e.message + ' at ' + e.stack)
+      this.mainLogger.error(
+        'reportJoining: ' + e.name + ': ' + e.message + ' at ' + e.stack
+      )
       console.error(e)
     }
   }
 
-  async reportJoined (nodeId, publicKey) {
+  async reportJoined(nodeId, publicKey) {
     if (!this.hasRecipient) {
       return
     }
     try {
       const nodeIpInfo = ipInfo
-      await http.post(`${this.config.recipient}/joined`, { publicKey, nodeId, nodeIpInfo })
+      await http.post(`${this.config.recipient}/joined`, {
+        publicKey,
+        nodeId,
+        nodeIpInfo,
+      })
     } catch (e) {
-      this.mainLogger.error('reportJoined: ' + e.name + ': ' + e.message + ' at ' + e.stack)
+      this.mainLogger.error(
+        'reportJoined: ' + e.name + ': ' + e.message + ' at ' + e.stack
+      )
       console.error(e)
     }
   }
 
-  async reportActive (nodeId) {
+  async reportActive(nodeId) {
     if (!this.hasRecipient) {
       return
     }
     try {
       await http.post(`${this.config.recipient}/active`, { nodeId })
     } catch (e) {
-      this.mainLogger.error('reportActive: ' + e.name + ': ' + e.message + ' at ' + e.stack)
+      this.mainLogger.error(
+        'reportActive: ' + e.name + ': ' + e.message + ' at ' + e.stack
+      )
       console.error(e)
     }
   }
 
-  async reportRemoved (nodeId) {
+  async reportRemoved(nodeId) {
     if (!this.hasRecipient) {
       return
     }
     try {
       await http.post(`${this.config.recipient}/removed`, { nodeId })
     } catch (e) {
-      this.mainLogger.error('reportRemoved: ' + e.name + ': ' + e.message + ' at ' + e.stack)
+      this.mainLogger.error(
+        'reportRemoved: ' + e.name + ': ' + e.message + ' at ' + e.stack
+      )
       console.error(e)
     }
   }
 
   // Sends a report
-  async _sendReport (data) {
+  async _sendReport(data) {
     if (!this.hasRecipient) {
       return
     }
@@ -116,33 +139,43 @@ class Reporter {
     if (!nodeId) throw new Error('No node ID available to the Reporter module.')
     const report = {
       nodeId,
-      data
+      data,
     }
     try {
       await http.post(`${this.config.recipient}/heartbeat`, report)
     } catch (e) {
-      this.mainLogger.error('_sendReport: ' + e.name + ': ' + e.message + ' at ' + e.stack)
+      this.mainLogger.error(
+        '_sendReport: ' + e.name + ': ' + e.message + ' at ' + e.stack
+      )
       console.error(e)
     }
   }
 
-  startReporting () {
+  startReporting() {
     // Creates and sends a report every `interval` seconds
     this.reportTimer = setInterval(async () => {
-      let appState = this.stateManager ? await this.stateManager.getAccountsStateHash() : allZeroes64
-      // const cycleMarker = this.  p2p.getCycleMarker()
+      let appState = this.stateManager
+        ? await this.stateManager.getAccountsStateHash()
+        : allZeroes64
       const cycleMarker = CycleChain.newest.previous || '' // [TODO] Replace with cycle creator
-      // const cycleCounter = this.  p2p.state.getCycleCounter()
-      const cycleCounter = -1 // [TODO] Replace with cycle creator
-      // const nodelistHash = this.  p2p.getNodelistHash()
+      const cycleCounter = CycleChain.newest.counter
       const nodelistHash = 'abc' // Not needed anymore
-      // const desiredNodes = this.  p2p.state.getDesiredCount()
-      const desiredNodes = -1 // [TODO] Replace with cycle creator
-      const txInjected = this.statistics ? this.statistics.getPreviousElement('txInjected') : 0
-      const txApplied = this.statistics ? this.statistics.getPreviousElement('txApplied') : 0
-      const txRejected = this.statistics ? this.statistics.getPreviousElement('txRejected') : 0
-      const txExpired = this.statistics ? this.statistics.getPreviousElement('txExpired') : 0
-      const txProcessed = this.statistics ? this.statistics.getPreviousElement('txProcessed') : 0
+      const desiredNodes = Rotation.getDesiredCount()
+      const txInjected = this.statistics
+        ? this.statistics.getPreviousElement('txInjected')
+        : 0
+      const txApplied = this.statistics
+        ? this.statistics.getPreviousElement('txApplied')
+        : 0
+      const txRejected = this.statistics
+        ? this.statistics.getPreviousElement('txRejected')
+        : 0
+      const txExpired = this.statistics
+        ? this.statistics.getPreviousElement('txExpired')
+        : 0
+      const txProcessed = this.statistics
+        ? this.statistics.getPreviousElement('txProcessed')
+        : 0
       const reportInterval = this.config.interval
       const nodeIpInfo = ipInfo
 
@@ -169,14 +202,16 @@ class Reporter {
         const shardData = this.stateManager.currentCycleShardData //   getShardDataForCycle(cycleCounter)
         if (shardData != null) {
           partitions = shardData.shardGlobals.numPartitions
-          partitionsCovered = shardData.nodeShardData.storedPartitions.partitionsCovered
+          partitionsCovered =
+            shardData.nodeShardData.storedPartitions.partitionsCovered
         }
       }
 
       // Server load
       const currentLoad = this.loadDetection.getCurrentLoad()
       const queueLength = this.statistics.getPreviousElement('queueLength')
-      const txTimeInQueue = this.statistics.getPreviousElement('txTimeInQueue') / 1000 // ms to sec
+      const txTimeInQueue =
+        this.statistics.getPreviousElement('txTimeInQueue') / 1000 // ms to sec
 
       try {
         await this._sendReport({
@@ -200,10 +235,12 @@ class Reporter {
           partitionsCovered,
           currentLoad,
           queueLength,
-          txTimeInQueue
+          txTimeInQueue,
         })
       } catch (e) {
-        this.mainLogger.error('startReporting: ' + e.name + ': ' + e.message + ' at ' + e.stack)
+        this.mainLogger.error(
+          'startReporting: ' + e.name + ': ' + e.message + ' at ' + e.stack
+        )
         console.error(e)
       }
 
@@ -213,13 +250,19 @@ class Reporter {
     }, this.config.interval * 1000)
   }
 
-  consoleReport () {
+  consoleReport() {
     const time = Date.now()
     let delta = time - this.lastTime
     delta = delta * 0.001
-    const txInjected = this.statistics ? this.statistics.getPreviousElement('txInjected') : 0
-    const txApplied = this.statistics ? this.statistics.getPreviousElement('txApplied') : 0
-    const report = `Perf inteval ${delta}    ${txInjected} Injected @${txInjected / delta} per second.    ${txApplied} Applied @${txApplied / delta} per second`
+    const txInjected = this.statistics
+      ? this.statistics.getPreviousElement('txInjected')
+      : 0
+    const txApplied = this.statistics
+      ? this.statistics.getPreviousElement('txApplied')
+      : 0
+    const report = `Perf inteval ${delta}    ${txInjected} Injected @${txInjected /
+      delta} per second.    ${txApplied} Applied @${txApplied /
+      delta} per second`
     this.lastTime = time
 
     console.log(report)
@@ -229,7 +272,7 @@ class Reporter {
     }
   }
 
-  stopReporting () {
+  stopReporting() {
     this.mainLogger.info('Stopping statistics reporting...')
     clearInterval(this.reportTimer)
   }

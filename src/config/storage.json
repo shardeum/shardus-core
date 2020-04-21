@@ -14,7 +14,7 @@
       "idle": 10000
     },
     "storage": "db/db.sqlite",
-    "sync": {"force":false},
+    "sync": { "force": false },
     "memoryFile": false
   }
 }

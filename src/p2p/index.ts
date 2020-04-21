@@ -46,7 +46,7 @@ class P2P extends EventEmitter {
   archivers: P2PArchivers
   InternalRecvCounter: number
   keyCounter: number
-  constructor (config, logger, storage, crypto) {
+  constructor(config, logger, storage, crypto) {
     super()
     this.logger = logger
     this.mainLogger = logger.getLogger('main')
@@ -83,7 +83,13 @@ class P2P extends EventEmitter {
       this.verboseLogs = true
     }
 
-    this.state = new P2PState(config, this.logger, this.storage, this, this.crypto) as P2PState & EventEmitter
+    this.state = new P2PState(
+      config,
+      this.logger,
+      this.storage,
+      this,
+      this.crypto
+    ) as P2PState & EventEmitter
 
     this.state.on('removed', () => {
       this.emit('removed')
@@ -93,7 +99,12 @@ class P2P extends EventEmitter {
     })
 
     // Init lost node detection
-    this.lostNodes = new P2PLostNodes(this.logger, this, this.state, this.crypto)
+    this.lostNodes = new P2PLostNodes(
+      this.logger,
+      this,
+      this.state,
+      this.crypto
+    )
     this.state.initLost(this.lostNodes)
 
     this.state.on('cycle_q1_start', () => {
@@ -104,7 +115,12 @@ class P2P extends EventEmitter {
     })
 
     // Init saving archiver nodes into cycles
-    this.archivers = new P2PArchivers(this.logger, this, this.state, this.crypto)
+    this.archivers = new P2PArchivers(
+      this.logger,
+      this,
+      this.state,
+      this.crypto
+    )
 
     this.state.on('removed', () => {
       this.archivers.reset()
@@ -117,11 +133,11 @@ class P2P extends EventEmitter {
       }
     })
 
-    this.state.on('syncedCycle', (cycle) => {
+    this.state.on('syncedCycle', cycle => {
       this.archivers.updateArchivers(cycle.joinedArchivers)
     })
 
-    this.state.on('newCycle', (cycles) => {
+    this.state.on('newCycle', cycles => {
       const cycle = cycles[cycles.length - 1]
       this.archivers.updateArchivers(cycle.joinedArchivers)
       this.archivers.sendData(cycle)
@@ -130,10 +146,9 @@ class P2P extends EventEmitter {
 
     this.InternalRecvCounter = 0
     this.keyCounter = 0
-
   }
 
-  async init (network) {
+  async init(network) {
     // Make sure we know our external IP
     await this._ensureIpKnown()
 
@@ -153,18 +168,23 @@ class P2P extends EventEmitter {
     this._registerRoutes()
   }
 
-  _registerRoutes () {
+  _registerRoutes() {
     routes.register(this)
     this.lostNodes.registerRoutes()
     this.archivers.registerRoutes()
-    for (const route of P2PApoptosis.internalRoutes) this.registerInternal(route.name, route.handler)
-    for (const route of P2PApoptosis.gossipRoutes) this.registerGossipHandler(route.name, route.handler)
-    for (const route of Sync.externalRoutes) this.network._registerExternal(route.method, route.name, route.handler)
-    for (const route of GlobalAccounts.internalRoutes) this.registerInternal(route.name, route.handler)
-    for (const route of GlobalAccounts.gossipRoutes) this.registerGossipHandler(route.name, route.handler)
+    for (const route of P2PApoptosis.internalRoutes)
+      this.registerInternal(route.name, route.handler)
+    for (const route of P2PApoptosis.gossipRoutes)
+      this.registerGossipHandler(route.name, route.handler)
+    for (const route of Sync.externalRoutes)
+      this.network._registerExternal(route.method, route.name, route.handler)
+    for (const route of GlobalAccounts.internalRoutes)
+      this.registerInternal(route.name, route.handler)
+    for (const route of GlobalAccounts.gossipRoutes)
+      this.registerGossipHandler(route.name, route.handler)
   }
 
-  _verifyExternalInfo (ipInfo) {
+  _verifyExternalInfo(ipInfo) {
     if (!ipInfo.externalIp) {
       return false
     }
@@ -174,7 +194,7 @@ class P2P extends EventEmitter {
     return true
   }
 
-  _verifyInternalInfo (ipInfo) {
+  _verifyInternalInfo(ipInfo) {
     if (!ipInfo.internalIp) {
       return false
     }
@@ -184,18 +204,21 @@ class P2P extends EventEmitter {
     return true
   }
 
-  async _discoverIp (ipServer) {
+  async _discoverIp(ipServer) {
     let ip
     try {
-      ({ ip } = await http.get(ipServer))
+      ;({ ip } = await http.get(ipServer))
     } catch (e) {
-      throw Error(`Fatal: Could not discover IP from external IP server ${ipServer}: ` + e.message)
+      throw Error(
+        `Fatal: Could not discover IP from external IP server ${ipServer}: ` +
+          e.message
+      )
     }
     this.mainLogger.debug(`Discovered IP: ${ip}`)
     return ip
   }
 
-  _checkWithinSyncLimit (time1, time2) {
+  _checkWithinSyncLimit(time1, time2) {
     const timeDif = Math.abs(time1 - time2)
     if (timeDif > this.syncLimit) {
       return false
@@ -203,12 +226,12 @@ class P2P extends EventEmitter {
     return true
   }
 
-  async _checkTimeSynced (timeServers) {
+  async _checkTimeSynced(timeServers) {
     for (const host of timeServers) {
       try {
         const time = await Sntp.time({
           host,
-          timeout: 10000
+          timeout: 10000,
         })
         return time.t <= this.syncLimit
       } catch (e) {
@@ -218,36 +241,40 @@ class P2P extends EventEmitter {
     throw Error('Unable to check local time against time servers.')
   }
 
-  async _setNodeId (id, updateDb = true) {
+  async _setNodeId(id, updateDb = true) {
     this.id = id
     this.mainLogger.info(`Your node's ID is ${this.id}`)
     if (!updateDb) return
     await this.storage.setProperty('id', id)
   }
 
-  getNodeId () {
+  getNodeId() {
     return this.id
   }
 
-  getCycleMarker () {
+  getCycleMarker() {
     return this.state.getCurrentCycleMarker()
   }
 
-  getIpInfo () {
+  getIpInfo() {
     return this.ipInfo
   }
 
-  getPublicNodeInfo () {
+  getPublicNodeInfo() {
     const id = this.id
     const publicKey = this.crypto.getPublicKey()
     const curvePublicKey = this.crypto.convertPublicKeyToCurve(publicKey)
     const ipInfo = this.getIpInfo()
     const status = { status: this.state.getNodeStatus(this.id) }
-    const nodeInfo = Object.assign({ id, publicKey, curvePublicKey }, ipInfo, status)
+    const nodeInfo = Object.assign(
+      { id, publicKey, curvePublicKey },
+      ipInfo,
+      status
+    )
     return nodeInfo
   }
 
-  getCycleMarkerInfo () {
+  getCycleMarkerInfo() {
     const currentCycleMarker = this.state.getCurrentCycleMarker()
     const nextCycleMarker = this.state.getNextCycleMarker()
     const cycleCounter = this.state.getCycleCounter()
@@ -255,18 +282,30 @@ class P2P extends EventEmitter {
     const cycleDuration = this.state.getCurrentCycleDuration()
     const nodesJoined = this.state.getLastJoined()
     const currentTime = utils.getTime('s')
-    const info = { currentCycleMarker, nextCycleMarker, cycleCounter, cycleStart, cycleDuration, nodesJoined, currentTime }
-    this.mainLogger.debug(`Requested cycle marker info: ${JSON.stringify(info)}`)
+    const info = {
+      currentCycleMarker,
+      nextCycleMarker,
+      cycleCounter,
+      cycleStart,
+      cycleDuration,
+      nodesJoined,
+      currentTime,
+    }
+    this.mainLogger.debug(
+      `Requested cycle marker info: ${JSON.stringify(info)}`
+    )
     return info
   }
 
-  getLatestCycles (amount) {
+  getLatestCycles(amount) {
     const cycles = this.state.getLastCycles(amount)
     return cycles
   }
 
-  getCycleChain (start, end) {
-    this.mainLogger.debug(`Requested cycle chain from cycle ${start} to ${end}...`)
+  getCycleChain(start, end) {
+    this.mainLogger.debug(
+      `Requested cycle chain from cycle ${start} to ${end}...`
+    )
     let cycles
     try {
       cycles = this.state.getCycles(start, end)
@@ -278,8 +317,10 @@ class P2P extends EventEmitter {
     return cycles
   }
 
-  getCycleMarkerCerts (start, end) {
-    this.mainLogger.debug(`Requested cycle marker certificates from cycle ${start} to ${end}...`)
+  getCycleMarkerCerts(start, end) {
+    this.mainLogger.debug(
+      `Requested cycle marker certificates from cycle ${start} to ${end}...`
+    )
     let certs
     try {
       certs = this.state.getCertificates(start, end)
@@ -291,19 +332,33 @@ class P2P extends EventEmitter {
     return certs
   }
 
-  _getThisNodeInfo () {
-    const { externalIp, externalPort, internalIp, internalPort } = this.getIpInfo()
+  _getThisNodeInfo() {
+    const {
+      externalIp,
+      externalPort,
+      internalIp,
+      internalPort,
+    } = this.getIpInfo()
     const publicKey = this.crypto.getPublicKey()
     // TODO: Change this to actual selectable address
     const address = publicKey
     const joinRequestTimestamp = utils.getTime('s')
     const activeTimestamp = 0
-    const nodeInfo = { publicKey, externalIp, externalPort, internalIp, internalPort, address, joinRequestTimestamp, activeTimestamp }
+    const nodeInfo = {
+      publicKey,
+      externalIp,
+      externalPort,
+      internalIp,
+      internalPort,
+      address,
+      joinRequestTimestamp,
+      activeTimestamp,
+    }
     this.mainLogger.debug(`Node info of this node: ${JSON.stringify(nodeInfo)}`)
     return nodeInfo
   }
 
-  async _ensureIpKnown () {
+  async _ensureIpKnown() {
     let needsExternal = false
     let needsInternal = false
 
@@ -324,7 +379,7 @@ class P2P extends EventEmitter {
     }
   }
 
-  async _checkIfNeedJoin () {
+  async _checkIfNeedJoin() {
     const id = await this.storage.getProperty('id')
     if (!id) {
       this.mainLogger.debug('Node needs to join, no node ID found in database.')
@@ -337,14 +392,15 @@ class P2P extends EventEmitter {
     const dbExternPort = await this.storage.getProperty('externalPort')
 
     // Check if our external network info matches what's in the database, otherwise we need to rejoin
-    if (currExternIp !== dbExternIp || currExternPort !== dbExternPort) return true
+    if (currExternIp !== dbExternIp || currExternPort !== dbExternPort)
+      return true
 
     // TODO: Remove this and replace with robust way of seeing if no nodes
     // ----- are currently active before returning true
     if (this.isFirstSeed) return true
 
     const currentTime = utils.getTime('s')
-    const lastHeartbeat = await this.storage.getProperty('heartbeat') || 0
+    const lastHeartbeat = (await this.storage.getProperty('heartbeat')) || 0
     // If time since last heartbeat is greater than the max rejoin time, we have to rejoin
     if (currentTime - lastHeartbeat > this.maxRejoinTime) {
       return true
@@ -353,14 +409,14 @@ class P2P extends EventEmitter {
     return false
   }
 
-  getNodelistHash () {
+  getNodelistHash() {
     const nodelist = this.state.getAllNodes()
     const nodelistHash = this.crypto.hash({ nodelist })
     this.mainLogger.debug(`Hash of current nodelist: ${nodelistHash}`)
     return nodelistHash
   }
 
-  async _submitJoin (nodes, joinRequest) {
+  async _submitJoin(nodes, joinRequest) {
     for (const node of nodes) {
       this.mainLogger.debug(`Sending join request to ${node.ip}:${node.port}`)
       await http.post(`${node.ip}:${node.port}/join`, joinRequest)
@@ -368,7 +424,11 @@ class P2P extends EventEmitter {
   }
 
   // Check if we are in the update phase
-  _isInUpdatePhase (currentTime = utils.getTime('s'), cycleStart = this.state.getCurrentCycleStart(), cycleDuration = this.state.getCurrentCycleDuration()) {
+  _isInUpdatePhase(
+    currentTime = utils.getTime('s'),
+    cycleStart = this.state.getCurrentCycleStart(),
+    cycleDuration = this.state.getCurrentCycleDuration()
+  ) {
     this.mainLogger.debug(`Current time is: ${currentTime}`)
     this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
     this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
@@ -382,7 +442,7 @@ class P2P extends EventEmitter {
     return true
   }
 
-  _isInLastPhase (currentTime, cycleStart, cycleDuration) {
+  _isInLastPhase(currentTime, cycleStart, cycleDuration) {
     this.mainLogger.debug(`Current time is: ${currentTime}`)
     this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
     this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
@@ -397,7 +457,11 @@ class P2P extends EventEmitter {
   }
 
   // Wait until the chain update phase
-  async _waitUntilUpdatePhase (currentTime = utils.getTime('s'), cycleStart = this.state.getCurrentCycleStart(), cycleDuration = this.state.getCurrentCycleDuration()) {
+  async _waitUntilUpdatePhase(
+    currentTime = utils.getTime('s'),
+    cycleStart = this.state.getCurrentCycleStart(),
+    cycleDuration = this.state.getCurrentCycleDuration()
+  ) {
     // If we are already in the update phase, return
     if (this._isInUpdatePhase(currentTime, cycleStart, cycleDuration)) return
     this.mainLogger.debug(`Current time is: ${currentTime}`)
@@ -406,12 +470,14 @@ class P2P extends EventEmitter {
     const nextJoinStart = cycleStart + cycleDuration
     this.mainLogger.debug(`Next join cycle starts at: ${nextJoinStart}`)
     const timeToWait = (nextJoinStart - currentTime + this.queryDelay) * 1000
-    this.mainLogger.debug(`Waiting for ${timeToWait} ms before next update phase...`)
+    this.mainLogger.debug(
+      `Waiting for ${timeToWait} ms before next update phase...`
+    )
     await utils.sleep(timeToWait)
   }
 
   // Wait until middle phase of cycle
-  async _waitUntilSecondPhase (currentTime, cycleStart, cycleDuration) {
+  async _waitUntilSecondPhase(currentTime, cycleStart, cycleDuration) {
     this.mainLogger.debug(`Current time is: ${currentTime}`)
     this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
     this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
@@ -423,12 +489,14 @@ class P2P extends EventEmitter {
     } else {
       timeToWait = 0
     }
-    this.mainLogger.debug(`Waiting for ${timeToWait} ms before the second phase...`)
+    this.mainLogger.debug(
+      `Waiting for ${timeToWait} ms before the second phase...`
+    )
     await utils.sleep(timeToWait)
   }
 
   // Wait until middle phase of cycle
-  async _waitUntilThirdPhase (currentTime, cycleStart, cycleDuration) {
+  async _waitUntilThirdPhase(currentTime, cycleStart, cycleDuration) {
     this.mainLogger.debug(`Current time is: ${currentTime}`)
     this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
     this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
@@ -440,12 +508,18 @@ class P2P extends EventEmitter {
     } else {
       timeToWait = 0
     }
-    this.mainLogger.debug(`Waiting for ${timeToWait} ms before the middle phase...`)
+    this.mainLogger.debug(
+      `Waiting for ${timeToWait} ms before the middle phase...`
+    )
     await utils.sleep(timeToWait)
   }
 
   // Wait until last phase of cycle
-  async _waitUntilLastPhase (currentTime = utils.getTime('s'), cycleStart = this.state.getCurrentCycleStart(), cycleDuration = this.state.getCurrentCycleDuration()) {
+  async _waitUntilLastPhase(
+    currentTime = utils.getTime('s'),
+    cycleStart = this.state.getCurrentCycleStart(),
+    cycleDuration = this.state.getCurrentCycleDuration()
+  ) {
     this.mainLogger.debug(`Current time is: ${currentTime}`)
     this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
     this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
@@ -457,12 +531,18 @@ class P2P extends EventEmitter {
     } else {
       timeToWait = 0
     }
-    this.mainLogger.debug(`Waiting for ${timeToWait} ms before the last phase...`)
+    this.mainLogger.debug(
+      `Waiting for ${timeToWait} ms before the last phase...`
+    )
     await utils.sleep(timeToWait)
   }
 
   // Wait until the end of the cycle
-  async _waitUntilEndOfCycle (currentTime = utils.getTime('s'), cycleStart = this.state.getCurrentCycleStart(), cycleDuration = this.state.getCurrentCycleDuration()) {
+  async _waitUntilEndOfCycle(
+    currentTime = utils.getTime('s'),
+    cycleStart = this.state.getCurrentCycleStart(),
+    cycleDuration = this.state.getCurrentCycleDuration()
+  ) {
     this.mainLogger.debug(`Current time is: ${currentTime}`)
     this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
     this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
@@ -474,21 +554,36 @@ class P2P extends EventEmitter {
     } else {
       timeToWait = 0
     }
-    this.mainLogger.debug(`Waiting for ${timeToWait} ms before next cycle marker creation...`)
+    this.mainLogger.debug(
+      `Waiting for ${timeToWait} ms before next cycle marker creation...`
+    )
     await utils.sleep(timeToWait)
   }
 
-  async _submitWhenUpdatePhase (route, message) {
-    this.mainLogger.debug(`Submitting message: ${JSON.stringify(message)} on route: ${route} whenever it's not the second quarter of cycle...`)
+  async _submitWhenUpdatePhase(route, message) {
+    this.mainLogger.debug(
+      `Submitting message: ${JSON.stringify(
+        message
+      )} on route: ${route} whenever it's not the second quarter of cycle...`
+    )
     let cycleMarker
     try {
-      cycleMarker = await this._fetchCycleMarkerInternal(this.state.getActiveNodes())
+      cycleMarker = await this._fetchCycleMarkerInternal(
+        this.state.getActiveNodes()
+      )
     } catch (e) {
-      this.mainLogger.warn('Could not get cycleMarker from nodes. Querying seedNodes for it...')
+      this.mainLogger.warn(
+        'Could not get cycleMarker from nodes. Querying seedNodes for it...'
+      )
       try {
-        cycleMarker = await this._fetchCycleMarkerInternal(this.archiverActiveNodes)
+        cycleMarker = await this._fetchCycleMarkerInternal(
+          this.archiverActiveNodes
+        )
       } catch (err) {
-        this.mainLogger.error('_submitWhenUpdatePhase could not get cycleMarker from seedNodes. Exiting... ' + err)
+        this.mainLogger.error(
+          '_submitWhenUpdatePhase could not get cycleMarker from seedNodes. Exiting... ' +
+            err
+        )
         process.exit()
       }
     }
@@ -498,50 +593,89 @@ class P2P extends EventEmitter {
     if (!this._isInUpdatePhase(currentTime, cycleStart, cycleDuration)) {
       await this._waitUntilUpdatePhase(currentTime, cycleStart, cycleDuration)
     }
-    if (this.verboseLogs) this.mainLogger.debug(`Gossiping message: ${JSON.stringify(message)} on '${route}'.`)
+    if (this.verboseLogs)
+      this.mainLogger.debug(
+        `Gossiping message: ${JSON.stringify(message)} on '${route}'.`
+      )
     this.sendGossipIn(route, message)
   }
 
-  async _attemptJoin (seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration) {
+  async _attemptJoin(
+    seedNodes,
+    joinRequest,
+    timeOffset,
+    cycleStart,
+    cycleDuration
+  ) {
     // TODO: check if we missed join phase
     const currTime1 = utils.getTime('s') + timeOffset
     await this._waitUntilUpdatePhase(currTime1, cycleStart, cycleDuration)
     await this._submitJoin(seedNodes, joinRequest)
     const currTime2 = utils.getTime('s') + timeOffset
     // This time we use cycleStart + cycleDuration because we are in the next cycle
-    await this._waitUntilEndOfCycle(currTime2, cycleStart + cycleDuration, cycleDuration)
+    await this._waitUntilEndOfCycle(
+      currTime2,
+      cycleStart + cycleDuration,
+      cycleDuration
+    )
     const nodeId = await this._fetchNodeId(seedNodes)
     return nodeId
   }
 
-  async _join (seedNodes) {
+  async _join(seedNodes) {
     const localTime = utils.getTime('s')
     const { currentTime } = await this._fetchCycleMarker(seedNodes)
-    if (!this._checkWithinSyncLimit(localTime, currentTime)) throw Error('Local time out of sync with network.')
+    if (!this._checkWithinSyncLimit(localTime, currentTime))
+      throw Error('Local time out of sync with network.')
     const timeOffset = currentTime - localTime
     this.mainLogger.debug(`Time offset with selected node: ${timeOffset}`)
     let nodeId = null
     let attempts = 2
     while (!nodeId && attempts > 0) {
-      const { currentCycleMarker, nextCycleMarker, cycleStart, cycleDuration } = await this._fetchCycleMarker(seedNodes)
+      const {
+        currentCycleMarker,
+        nextCycleMarker,
+        cycleStart,
+        cycleDuration,
+      } = await this._fetchCycleMarker(seedNodes)
       if (nextCycleMarker) {
         // Use next cycle marker
         const joinRequest = await this._createJoinRequest(nextCycleMarker)
-        nodeId = await this._attemptJoin(seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration)
+        nodeId = await this._attemptJoin(
+          seedNodes,
+          joinRequest,
+          timeOffset,
+          cycleStart,
+          cycleDuration
+        )
         if (!nodeId) {
-          const { cycleStart, cycleDuration } = await this._fetchCycleMarker(seedNodes)
-          nodeId = await this._attemptJoin(seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration)
+          const { cycleStart, cycleDuration } = await this._fetchCycleMarker(
+            seedNodes
+          )
+          nodeId = await this._attemptJoin(
+            seedNodes,
+            joinRequest,
+            timeOffset,
+            cycleStart,
+            cycleDuration
+          )
         }
       } else {
         const joinRequest = await this._createJoinRequest(currentCycleMarker)
-        nodeId = await this._attemptJoin(seedNodes, joinRequest, timeOffset, cycleStart, cycleDuration)
+        nodeId = await this._attemptJoin(
+          seedNodes,
+          joinRequest,
+          timeOffset,
+          cycleStart,
+          cycleDuration
+        )
       }
       attempts--
     }
     return nodeId
   }
 
-  _checkIfFirstSeedNode (seedNodes) {
+  _checkIfFirstSeedNode(seedNodes) {
     if (!seedNodes.length) throw new Error('Fatal: No seed nodes in seed list!')
     if (seedNodes.length > 1) return false
     const seed = seedNodes[0]
@@ -552,42 +686,63 @@ class P2P extends EventEmitter {
     return false
   }
 
-  async _createJoinRequest (cycleMarker) {
+  async _createJoinRequest(cycleMarker) {
     // Build and return a join request
     const nodeInfo = this._getThisNodeInfo()
-    const selectionNum = this.crypto.hash({ cycleMarker, address: nodeInfo.address })
+    const selectionNum = this.crypto.hash({
+      cycleMarker,
+      address: nodeInfo.address,
+    })
     // TO-DO: Think about if the selection number still needs to be signed
     // let signedSelectionNum = this.crypto.sign({ selectionNum })
     const proofOfWork = {
-      compute: await this.crypto.getComputeProofOfWork(cycleMarker, this.difficulty)
+      compute: await this.crypto.getComputeProofOfWork(
+        cycleMarker,
+        this.difficulty
+      ),
     }
     // TODO: add a version number at some point
     // version: '0.0.0'
     const joinReq = { nodeInfo, cycleMarker, proofOfWork, selectionNum }
     const signedJoinReq = this.crypto.sign(joinReq)
-    this.mainLogger.debug(`Join request created... Join request: ${JSON.stringify(signedJoinReq)}`)
+    this.mainLogger.debug(
+      `Join request created... Join request: ${JSON.stringify(signedJoinReq)}`
+    )
     return signedJoinReq
   }
 
-  async initApoptosis (activeNodes = this.id ? this.state.getActiveNodes(this.id) : this.archiverActiveNodes) {
+  async initApoptosis(
+    activeNodes = this.id
+      ? this.state.getActiveNodes(this.id)
+      : this.archiverActiveNodes
+  ) {
     P2PApoptosis.apoptosizeSelf(activeNodes)
   }
 
-  isActive () {
+  isActive() {
     this.mainLogger.debug('Checking if active...')
     const status = this.state.getNodeStatus(this.id)
     const active = status === 'active'
     if (!active) {
-      this.mainLogger.debug(`This node is not currently active... Current status: ${status}`)
+      this.mainLogger.debug(
+        `This node is not currently active... Current status: ${status}`
+      )
       return false
     }
     this.mainLogger.debug('This node is active!')
     return true
   }
 
-  async robustQuery (nodes = [], queryFn, equalityFn?, redundancy = 3, shuffleNodes = true) {
+  async robustQuery(
+    nodes = [],
+    queryFn,
+    equalityFn?,
+    redundancy = 3,
+    shuffleNodes = true
+  ) {
     if (nodes.length === 0) throw new Error('No nodes given.')
-    if (typeof queryFn !== 'function') throw new Error(`Provided queryFn ${queryFn} is not a valid function.`)
+    if (typeof queryFn !== 'function')
+      throw new Error(`Provided queryFn ${queryFn} is not a valid function.`)
     if (typeof equalityFn !== 'function') equalityFn = util.isDeepStrictEqual
     if (redundancy < 1) redundancy = 3
     if (redundancy > nodes.length) redundancy = nodes.length
@@ -596,12 +751,12 @@ class P2P extends EventEmitter {
       winCount: any
       equalFn: any
       items: any[]
-      constructor (winCount, equalFn) {
+      constructor(winCount, equalFn) {
         this.winCount = winCount
         this.equalFn = equalFn
         this.items = []
       }
-      add (newItem, node) {
+      add(newItem, node) {
         // We search to see if we've already seen this item before
         for (const item of this.items) {
           // If the value of the new item is not equal to the current item, we continue searching
@@ -627,7 +782,7 @@ class P2P extends EventEmitter {
         // and return the item we just created if that is the case
         if (this.winCount === 1) return [newItem, [node]]
       }
-      getHighestCount () {
+      getHighestCount() {
         if (!this.items.length) return 0
         let highestCount = 0
         for (const item of this.items) {
@@ -647,9 +802,9 @@ class P2P extends EventEmitter {
     }
     const nodeCount = nodes.length
 
-    const queryNodes = async (nodes) => {
+    const queryNodes = async nodes => {
       // Wrap the query so that we know which node it's coming from
-      const wrappedQuery = async (node) => {
+      const wrappedQuery = async node => {
         const response = await queryFn(node)
         return { response, node }
       }
@@ -690,12 +845,18 @@ class P2P extends EventEmitter {
     }
 
     // TODO: Don't throw an error, should just return what had the most
-    throw new Error(`Could not get ${redundancy} ${redundancy > 1 ? 'redundant responses' : 'response'} from ${nodeCount} ${nodeCount !== 1 ? 'nodes' : 'node'}. Encountered ${errors} query errors.`)
+    throw new Error(
+      `Could not get ${redundancy} ${
+        redundancy > 1 ? 'redundant responses' : 'response'
+      } from ${nodeCount} ${
+        nodeCount !== 1 ? 'nodes' : 'node'
+      }. Encountered ${errors} query errors.`
+    )
   }
 
-  async _sequentialQuery (nodes, queryFn, verifyFn) {
+  async _sequentialQuery(nodes, queryFn, verifyFn) {
     if (typeof verifyFn !== 'function') {
-      verifyFn = (result) => true
+      verifyFn = result => true
     }
 
     let errors = 0
@@ -708,7 +869,9 @@ class P2P extends EventEmitter {
       try {
         const result = await queryFn(node)
         if (!result) throw new Error('Unable to get result from query.')
-        this.mainLogger.debug(`Sequential query result: ${JSON.stringify(result)}`)
+        this.mainLogger.debug(
+          `Sequential query result: ${JSON.stringify(result)}`
+        )
         const verified = verifyFn(result)
         if (!verified) {
           this.mainLogger.debug(`Query result failed verification.`)
@@ -721,10 +884,12 @@ class P2P extends EventEmitter {
       }
     }
 
-    throw new Error(`Could not get a responses from ${nodes.length} nodes. Encountered ${errors} errors and there were ${invalid} invalid queries.`)
+    throw new Error(
+      `Could not get a responses from ${nodes.length} nodes. Encountered ${errors} errors and there were ${invalid} invalid queries.`
+    )
   }
 
-  _verifyNodelist (nodelist, nodelistHash) {
+  _verifyNodelist(nodelist, nodelistHash) {
     this.mainLogger.debug(`Given nodelist: ${JSON.stringify(nodelist)}`)
     const ourHash = this.crypto.hash(nodelist)
     this.mainLogger.debug(`Our nodelist hash: ${ourHash}`)
@@ -732,7 +897,7 @@ class P2P extends EventEmitter {
     return ourHash === nodelistHash
   }
 
-  _verifyCycleChain (cycleChain, cycleChainHash) {
+  _verifyCycleChain(cycleChain, cycleChainHash) {
     this.mainLogger.debug(`Given cycle chain: ${JSON.stringify(cycleChain)}`)
     const ourHash = this.crypto.hash({ cycleChain })
     this.mainLogger.debug(`Our cycle chain hash: ${ourHash}`)
@@ -740,29 +905,39 @@ class P2P extends EventEmitter {
     return ourHash === cycleChainHash
   }
 
-  _isSameCycleMarkerInfo (info1, info2) {
+  _isSameCycleMarkerInfo(info1, info2) {
     const cm1 = utils.deepCopy(info1)
     const cm2 = utils.deepCopy(info2)
     delete cm1.currentTime
     delete cm2.currentTime
     const equivalent = util.isDeepStrictEqual(cm1, cm2)
-    this.mainLogger.debug(`Equivalence of the two compared cycle marker infos: ${equivalent}`)
+    this.mainLogger.debug(
+      `Equivalence of the two compared cycle marker infos: ${equivalent}`
+    )
     return equivalent
   }
 
-  async _fetchCycleMarker (nodes) {
-    const queryFn = async (node) => {
-      const cycleMarkerInfo = await http.get(`${node.ip}:${node.port}/cyclemarker`)
+  async _fetchCycleMarker(nodes) {
+    const queryFn = async node => {
+      const cycleMarkerInfo = await http.get(
+        `${node.ip}:${node.port}/cyclemarker`
+      )
       return cycleMarkerInfo
     }
-    const [cycleMarkerInfo] = await this.robustQuery(nodes, queryFn, this._isSameCycleMarkerInfo.bind(this))
+    const [cycleMarkerInfo] = await this.robustQuery(
+      nodes,
+      queryFn,
+      this._isSameCycleMarkerInfo.bind(this)
+    )
     return cycleMarkerInfo
   }
 
-  async _fetchNodeId (seedNodes) {
+  async _fetchNodeId(seedNodes) {
     const { publicKey } = this._getThisNodeInfo()
-    const queryFn = async (node) => {
-      const { cycleJoined } = await http.get(`${node.ip}:${node.port}/joined/${publicKey}`)
+    const queryFn = async node => {
+      const { cycleJoined } = await http.get(
+        `${node.ip}:${node.port}/joined/${publicKey}`
+      )
       return { cycleJoined }
     }
     let query
@@ -776,39 +951,48 @@ class P2P extends EventEmitter {
       attempts--
     }
     if (attempts <= 0) {
-      this.mainLogger.info('Unable to get consistent cycle marker from seednodes.')
+      this.mainLogger.info(
+        'Unable to get consistent cycle marker from seednodes.'
+      )
       return null
     }
     const { cycleJoined } = query[0]
     if (!cycleJoined) {
-      this.mainLogger.info('Unable to get cycle marker, likely this node\'s join request was not accepted.')
+      this.mainLogger.info(
+        "Unable to get cycle marker, likely this node's join request was not accepted."
+      )
       return null
     }
     const nodeId = this.state.computeNodeId(publicKey, cycleJoined)
     return nodeId
   }
 
-  async _fetchCycleMarkerInternal (nodes) {
-    const queryFn = async (node) => {
+  async _fetchCycleMarkerInternal(nodes) {
+    const queryFn = async node => {
       const cycleMarkerInfo = await this.ask(node, 'cyclemarker')
       return cycleMarkerInfo
     }
-    const [cycleMarkerInfo] = await this.robustQuery(nodes, queryFn, this._isSameCycleMarkerInfo.bind(this))
+    const [cycleMarkerInfo] = await this.robustQuery(
+      nodes,
+      queryFn,
+      this._isSameCycleMarkerInfo.bind(this)
+    )
     return cycleMarkerInfo
   }
 
-  async _fetchVerifiedCycleChain (nodes, cycleChainHash, start, end) {
-    const queryFn = async (node) => {
+  async _fetchVerifiedCycleChain(nodes, cycleChainHash, start, end) {
+    const queryFn = async node => {
       const chainAndCerts = await this.ask(node, 'cyclechain', { start, end })
       return chainAndCerts
     }
-    const verifyFn = ({ cycleChain }) => this._verifyCycleChain(cycleChain, cycleChainHash)
+    const verifyFn = ({ cycleChain }) =>
+      this._verifyCycleChain(cycleChain, cycleChainHash)
     const chainAndCerts = await this._sequentialQuery(nodes, queryFn, verifyFn)
     return chainAndCerts
   }
 
-  async _fetchUnfinalizedCycle (nodes) {
-    const queryFn = async (node) => {
+  async _fetchUnfinalizedCycle(nodes) {
+    const queryFn = async node => {
       const { unfinalizedCycle } = await this.ask(node, 'unfinalized')
       return { unfinalizedCycle }
     }
@@ -826,17 +1010,19 @@ class P2P extends EventEmitter {
       const [response] = await this.robustQuery(nodes, queryFn, equalFn)
       ;({ unfinalizedCycle } = response)
     } catch (e) {
-      this.mainLogger.debug(`Unable to get unfinalized cycle: ${e}. Need to resync cycle chain and try again.`)
+      this.mainLogger.debug(
+        `Unable to get unfinalized cycle: ${e}. Need to resync cycle chain and try again.`
+      )
       unfinalizedCycle = null
     }
     return unfinalizedCycle
   }
 
-  async _fetchNodeByPublicKey (nodes, publicKey) {
-    const queryFn = async (target) => {
+  async _fetchNodeByPublicKey(nodes, publicKey) {
+    const queryFn = async target => {
       const payload = {
         getBy: 'publicKey',
-        publicKey
+        publicKey,
       }
       const { node } = await this.ask(target, 'node', payload)
       return node
@@ -848,15 +1034,17 @@ class P2P extends EventEmitter {
     }
     let node
     try {
-      [node] = await this.robustQuery(nodes, queryFn, equalFn)
+      ;[node] = await this.robustQuery(nodes, queryFn, equalFn)
     } catch (e) {
-      this.mainLogger.debug(`Unable to get node: $(e.message). Unable to get consistent response from nodes.`)
+      this.mainLogger.debug(
+        `Unable to get node: $(e.message). Unable to get consistent response from nodes.`
+      )
       node = null
     }
     return node
   }
 
-  async _requestCycleUpdates (nodeId) {
+  async _requestCycleUpdates(nodeId) {
     let node
     try {
       node = this.state.getNode(nodeId)
@@ -867,26 +1055,31 @@ class P2P extends EventEmitter {
     }
     const myCycleUpdates = this.state.currentCycle.updates
     const myCertificate = this.state.getCurrentCertificate()
-    const { cycleUpdates } = await this.ask(node, 'cycleupdates', { myCycleUpdates, myCertificate })
+    const { cycleUpdates } = await this.ask(node, 'cycleupdates', {
+      myCycleUpdates,
+      myCertificate,
+    })
     return cycleUpdates
   }
 
-  async _requestUpdatesAndAdd (nodeId) {
+  async _requestUpdatesAndAdd(nodeId) {
     const updates = await this._requestCycleUpdates(nodeId)
     if (!updates) {
-      this.mainLogger.error('Unable to add updates, no updates were able to be retrieved.')
+      this.mainLogger.error(
+        'Unable to add updates, no updates were able to be retrieved.'
+      )
       return
     }
     await this.state.addCycleUpdates(updates)
   }
 
-  async requestUpdatesFromRandom () {
+  async requestUpdatesFromRandom() {
     const [randomNode] = getRandom(this.state.getActiveNodes(this.id), 1)
     const randNodeId = randomNode.id
     await this._requestUpdatesAndAdd(randNodeId)
   }
 
-  _validateJoinRequest (joinRequest) {
+  _validateJoinRequest(joinRequest) {
     // Reject join requests from nodes who's ip and port are already in the network
     const intIp = joinRequest.nodeInfo.internalIp
     const intPort = joinRequest.nodeInfo.internalPort
@@ -899,7 +1092,7 @@ class P2P extends EventEmitter {
     return true
   }
 
-  async addJoinRequest (joinRequest, tracker, fromExternal = true) {
+  async addJoinRequest(joinRequest, tracker, fromExternal = true) {
     const valid = this._validateJoinRequest(joinRequest)
     if (!valid) {
       this.mainLogger.debug(`Join request rejected: Failed validation.`)
@@ -913,7 +1106,9 @@ class P2P extends EventEmitter {
       added = this.state.addNewJoinRequest(joinRequest)
     }
     if (!added) {
-      this.mainLogger.debug(`Join request rejected: Was not added. TODO: Have this fn return reason.`)
+      this.mainLogger.debug(
+        `Join request rejected: Was not added. TODO: Have this fn return reason.`
+      )
       return false
     }
     if (!active) return true
@@ -921,25 +1116,29 @@ class P2P extends EventEmitter {
     return true
   }
 
-  _createStatusUpdate (type) {
+  _createStatusUpdate(type) {
     const update = {
       nodeId: this.id,
       status: type,
-      timestamp: utils.getTime()
+      timestamp: utils.getTime(),
     }
     const signedUpdate = this.crypto.sign(update)
     return signedUpdate
   }
 
-  async _submitStatusUpdate (type) {
+  async _submitStatusUpdate(type) {
     const update = this._createStatusUpdate(type)
     await this._submitWhenUpdatePhase(type, update)
     this.state.addStatusUpdate(update)
   }
 
-  async goActive () {
+  async goActive() {
     if (this.isFirstSeed) {
-      const { currentTime, cycleStart, cycleDuration } = this.getCycleMarkerInfo()
+      const {
+        currentTime,
+        cycleStart,
+        cycleDuration,
+      } = this.getCycleMarkerInfo()
       if (!this._isInUpdatePhase(currentTime, cycleStart, cycleDuration)) {
         await this._waitUntilUpdatePhase(currentTime, cycleStart, cycleDuration)
       }
@@ -956,7 +1155,9 @@ class P2P extends EventEmitter {
         this.mainLogger.debug('Not active yet, submitting an active request.')
         await this._submitStatusUpdate('active')
         const toWait = cycleDuration * 1000
-        this.mainLogger.debug(`Waiting before checking if active, waiting ${toWait} ms...`)
+        this.mainLogger.debug(
+          `Waiting before checking if active, waiting ${toWait} ms...`
+        )
         setTimeout(async () => {
           await ensureActive()
         }, toWait)
@@ -972,7 +1173,7 @@ class P2P extends EventEmitter {
     return true
   }
 
-  _constructScalingRequest (upOrDown) {
+  _constructScalingRequest(upOrDown) {
     // Scaling request structure:
     // Node
     // Timestamp
@@ -983,7 +1184,7 @@ class P2P extends EventEmitter {
       node: this.id,
       timestamp: utils.getTime(),
       cycleCounter: this.state.getCycleCounter() + 1,
-      scale: undefined
+      scale: undefined,
     }
     switch (upOrDown) {
       case 'up':
@@ -1001,7 +1202,7 @@ class P2P extends EventEmitter {
     return signedReq
   }
 
-  async _requestNetworkScaling (upOrDown) {
+  async _requestNetworkScaling(upOrDown) {
     if (!this.isActive() || this.scalingRequested) return
     const request = this._constructScalingRequest(upOrDown)
     await this._waitUntilEndOfCycle()
@@ -1010,7 +1211,7 @@ class P2P extends EventEmitter {
     this.scalingRequested = true
   }
 
-  async requestNetworkUpsize () {
+  async requestNetworkUpsize() {
     if (this.state.getDesiredCount() >= this.state.maxNodes) {
       return
     }
@@ -1018,7 +1219,7 @@ class P2P extends EventEmitter {
     await this._requestNetworkScaling('up')
   }
 
-  async requestNetworkDownsize () {
+  async requestNetworkDownsize() {
     if (this.state.getDesiredCount() <= this.state.minNodes) {
       return
     }
@@ -1026,16 +1227,16 @@ class P2P extends EventEmitter {
     await this._requestNetworkScaling('down')
   }
 
-  allowTransactions () {
+  allowTransactions() {
     return this.state.getActiveCount() >= this.minNodesToAllowTxs
   }
 
-  allowSet () {
+  allowSet() {
     return this.state.getActiveCount() === 1
   }
 
   // Finds a node either in nodelist or in seedNodes listhis.mainLogger.debug(`Node ID to look up: ${nodeId}`)t if told to
-  _findNodeInGroup (nodeId, group) {
+  _findNodeInGroup(nodeId, group) {
     if (!group) {
       const errMsg = 'No group given for _findNodeInGroup()'
       this.mainLogger.debug(errMsg)
@@ -1049,38 +1250,52 @@ class P2P extends EventEmitter {
   }
 
   // Verifies that the received internal message was signed by the stated node
-  _authenticateByNode (message, node) {
+  _authenticateByNode(message, node) {
     let result
     try {
       if (!node.curvePublicKey) {
-        this.mainLogger.debug('Node object did not contain curve public key for authenticateByNode()!')
+        this.mainLogger.debug(
+          'Node object did not contain curve public key for authenticateByNode()!'
+        )
         return false
       }
       this.mainLogger.debug(`Expected publicKey: ${node.curvePublicKey}`)
       result = this.crypto.authenticate(message, node.curvePublicKey)
     } catch (e) {
-      this.mainLogger.debug(`Invalid or missing authentication tag on message: ${JSON.stringify(message)}`)
+      this.mainLogger.debug(
+        `Invalid or missing authentication tag on message: ${JSON.stringify(
+          message
+        )}`
+      )
       return false
     }
     return result
   }
 
-  _extractPayload (wrappedPayload, nodeGroup) {
+  _extractPayload(wrappedPayload, nodeGroup) {
     if (wrappedPayload.error) {
       const error = wrappedPayload.error
-      this.mainLogger.debug(`_extractPayload Failed to extract payload. Error: ${error}`)
+      this.mainLogger.debug(
+        `_extractPayload Failed to extract payload. Error: ${error}`
+      )
       return [null]
     }
     // Check to see if node is in expected node group
     const node = this._findNodeInGroup(wrappedPayload.sender, nodeGroup)
     if (!node) {
-      this.mainLogger.debug(`_extractPayload Invalid sender on internal payload. sender: ${wrappedPayload.sender} payload: ${utils.stringifyReduceLimit(wrappedPayload)}`)
+      this.mainLogger.debug(
+        `_extractPayload Invalid sender on internal payload. sender: ${
+          wrappedPayload.sender
+        } payload: ${utils.stringifyReduceLimit(wrappedPayload)}`
+      )
       return [null]
     }
     const authenticatedByNode = this._authenticateByNode(wrappedPayload, node)
     // Check if actually signed by that node
     if (!authenticatedByNode) {
-      this.mainLogger.debug('_extractPayload Internal payload not authenticated by an expected node.')
+      this.mainLogger.debug(
+        '_extractPayload Internal payload not authenticated by an expected node.'
+      )
       return [null]
     }
     const payload = wrappedPayload.payload
@@ -1090,27 +1305,46 @@ class P2P extends EventEmitter {
     return [payload, sender, tracker]
   }
 
-  _wrapAndTagMessage (msg, tracker = '', recipientNode) {
+  _wrapAndTagMessage(msg, tracker = '', recipientNode) {
     if (!msg) throw new Error('No message given to wrap and tag!')
-    if (this.verboseLogs) this.mainLogger.debug(`Attaching sender ${this.id} to the message: ${utils.stringifyReduceLimit(msg)}`)
+    if (this.verboseLogs)
+      this.mainLogger.debug(
+        `Attaching sender ${
+          this.id
+        } to the message: ${utils.stringifyReduceLimit(msg)}`
+      )
     const wrapped = {
       payload: msg,
       sender: this.id,
-      tracker
+      tracker,
     }
     const tagged = this.crypto.tag(wrapped, recipientNode.curvePublicKey)
     return tagged
   }
 
-  createMsgTracker () {
-    return 'key_' + utils.makeShortHash(this.id) + '_' + Date.now() + '_' + this.keyCounter++
+  createMsgTracker() {
+    return (
+      'key_' +
+      utils.makeShortHash(this.id) +
+      '_' +
+      Date.now() +
+      '_' +
+      this.keyCounter++
+    )
   }
-  createGossipTracker () {
-    return 'gkey_' + utils.makeShortHash(this.id) + '_' + Date.now() + '_' + this.keyCounter++
+  createGossipTracker() {
+    return (
+      'gkey_' +
+      utils.makeShortHash(this.id) +
+      '_' +
+      Date.now() +
+      '_' +
+      this.keyCounter++
+    )
   }
 
   // Our own P2P version of the network tell, with a sign added
-  async tell (nodes, route, message, logged = false, tracker = '') {
+  async tell(nodes, route, message, logged = false, tracker = '') {
     if (tracker === '') {
       tracker = this.createMsgTracker()
     }
@@ -1127,23 +1361,34 @@ class P2P extends EventEmitter {
   }
 
   // Our own P2P version of the network ask, with a sign added, and sign verified on other side
-  async ask (node, route: string, message = {}, logged = false, tracker = '') {
+  async ask(node, route: string, message = {}, logged = false, tracker = '') {
     if (tracker === '') {
       tracker = this.createMsgTracker()
     }
     const signedMessage = this._wrapAndTagMessage(message, tracker, node)
     let signedResponse
     try {
-      signedResponse = await this.network.ask(node, route, signedMessage, logged)
+      signedResponse = await this.network.ask(
+        node,
+        route,
+        signedMessage,
+        logged
+      )
     } catch (err) {
       this.mainLogger.error('P2P: ask: network.ask: ' + err)
       return false
     }
-    this.mainLogger.debug(`Result of network-level ask: ${JSON.stringify(signedResponse)}`)
+    this.mainLogger.debug(
+      `Result of network-level ask: ${JSON.stringify(signedResponse)}`
+    )
     try {
       const [response] = this._extractPayload(signedResponse, [node])
       if (!response) {
-        throw new Error(`Unable to verify response to ask request: ${route} -- ${JSON.stringify(message)} from node: ${node.id}`)
+        throw new Error(
+          `Unable to verify response to ask request: ${route} -- ${JSON.stringify(
+            message
+          )} from node: ${node.id}`
+        )
       }
       return response
     } catch (err) {
@@ -1152,36 +1397,62 @@ class P2P extends EventEmitter {
     }
   }
 
-  registerInternal (route, handler) {
+  registerInternal(route, handler) {
     // Create function that wraps handler function
     const wrappedHandler = async (wrappedPayload, respond) => {
       this.InternalRecvCounter++
       // We have internal requests turned off until we have the node list
       if (!this.acceptInternal) {
-        this.mainLogger.debug('We are not currently accepting internal requests...')
+        this.mainLogger.debug(
+          'We are not currently accepting internal requests...'
+        )
         return
       }
       let tracker = ''
       // Create wrapped respond function for sending back signed data
-      const respondWrapped = async (response) => {
+      const respondWrapped = async response => {
         const node = this.state.getNode(sender)
         const signedResponse = this._wrapAndTagMessage(response, tracker, node)
-        if (this.verboseLogs) this.mainLogger.debug(`The signed wrapped response to send back: ${utils.stringifyReduceLimit(signedResponse)}`)
+        if (this.verboseLogs)
+          this.mainLogger.debug(
+            `The signed wrapped response to send back: ${utils.stringifyReduceLimit(
+              signedResponse
+            )}`
+          )
         if (route !== 'gossip') {
-          this.logger.playbackLog(sender, 'self', 'InternalRecvResp', route, tracker, response)
+          this.logger.playbackLog(
+            sender,
+            'self',
+            'InternalRecvResp',
+            route,
+            tracker,
+            response
+          )
         }
         await respond(signedResponse)
       }
       // Checks to see if we can extract the actual payload from the wrapped message
-      const payloadArray = this._extractPayload(wrappedPayload, this.state.getAllNodes(this.id))
+      const payloadArray = this._extractPayload(
+        wrappedPayload,
+        this.state.getAllNodes(this.id)
+      )
       const [payload, sender] = payloadArray
       tracker = payloadArray[2] || ''
       if (!payload) {
-        this.mainLogger.debug('Payload unable to be extracted, possible missing signature...')
+        this.mainLogger.debug(
+          'Payload unable to be extracted, possible missing signature...'
+        )
         return
       }
       if (route !== 'gossip') {
-        this.logger.playbackLog(sender, 'self', 'InternalRecv', route, tracker, payload)
+        this.logger.playbackLog(
+          sender,
+          'self',
+          'InternalRecv',
+          route,
+          tracker,
+          payload
+        )
       }
       await handler(payload, respondWrapped, sender, tracker)
     }
@@ -1189,26 +1460,38 @@ class P2P extends EventEmitter {
     this.network.registerInternal(route, wrappedHandler)
   }
 
-  unregisterInternal (route) {
+  unregisterInternal(route) {
     this.network.unregisterInternal(route)
   }
 
   /**
    * Send Gossip to all nodes
    */
-  async sendGossip (type, payload, tracker = '', sender = null, nodes = this.state.getAllNodes(this.id)) {
+  async sendGossip(
+    type,
+    payload,
+    tracker = '',
+    sender = null,
+    nodes = this.state.getAllNodes(this.id)
+  ) {
     if (nodes.length === 0) return
 
     if (tracker === '') {
       tracker = this.createGossipTracker()
     }
 
-    if (this.verboseLogs) this.mainLogger.debug(`Start of sendGossip(${utils.stringifyReduce(payload)})`)
+    if (this.verboseLogs)
+      this.mainLogger.debug(
+        `Start of sendGossip(${utils.stringifyReduce(payload)})`
+      )
     const gossipPayload = { type, data: payload }
 
     const gossipHash = this.crypto.hash(gossipPayload)
     if (this.gossipedHashesSent.has(gossipHash)) {
-      if (this.verboseLogs) this.mainLogger.debug(`Gossip already sent: ${gossipHash.substring(0, 5)}`)
+      if (this.verboseLogs)
+        this.mainLogger.debug(
+          `Gossip already sent: ${gossipHash.substring(0, 5)}`
+        )
       return
     }
 
@@ -1218,39 +1501,75 @@ class P2P extends EventEmitter {
       recipients = removeNodesByID(recipients, [sender])
     }
     try {
-      if (this.verboseLogs) this.mainLogger.debug(`Gossiping ${type} request to these nodes: ${utils.stringifyReduce(recipients.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+      if (this.verboseLogs)
+        this.mainLogger.debug(
+          `Gossiping ${type} request to these nodes: ${utils.stringifyReduce(
+            recipients.map(
+              node => utils.makeShortHash(node.id) + ':' + node.externalPort
+            )
+          )}`
+        )
       for (const node of recipients) {
-        this.logger.playbackLog('self', node, 'GossipSend', type, tracker, gossipPayload)
+        this.logger.playbackLog(
+          'self',
+          node,
+          'GossipSend',
+          type,
+          tracker,
+          gossipPayload
+        )
       }
       await this.tell(recipients, 'gossip', gossipPayload, true, tracker)
     } catch (ex) {
-      if (this.verboseLogs) this.mainLogger.error(`Failed to sendGossip(${utils.stringifyReduce(payload)}) Exception => ${ex}`)
-      this.fatalLogger.fatal('sendGossip: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      if (this.verboseLogs)
+        this.mainLogger.error(
+          `Failed to sendGossip(${utils.stringifyReduce(
+            payload
+          )}) Exception => ${ex}`
+        )
+      this.fatalLogger.fatal(
+        'sendGossip: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
+      )
     }
     this.gossipedHashesSent.set(gossipHash, false)
-    if (this.verboseLogs) this.mainLogger.debug(`End of sendGossip(${utils.stringifyReduce(payload)})`)
+    if (this.verboseLogs)
+      this.mainLogger.debug(
+        `End of sendGossip(${utils.stringifyReduce(payload)})`
+      )
   }
 
-  sortByID (first, second) {
+  sortByID(first, second) {
     return utils.sortAscProp(first, second, 'id')
   }
 
   /**
    * Send Gossip to all nodes, using gossip in
    */
-  async sendGossipIn (type, payload, tracker = '', sender = null, nodes = this.state.getAllNodes()) {
+  async sendGossipIn(
+    type,
+    payload,
+    tracker = '',
+    sender = null,
+    nodes = this.state.getAllNodes()
+  ) {
     if (nodes.length === 0) return
 
     if (tracker === '') {
       tracker = this.createGossipTracker()
     }
 
-    if (this.verboseLogs) this.mainLogger.debug(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
+    if (this.verboseLogs)
+      this.mainLogger.debug(
+        `Start of sendGossipIn(${utils.stringifyReduce(payload)})`
+      )
     const gossipPayload = { type, data: payload }
 
     const gossipHash = this.crypto.hash(gossipPayload)
     if (this.gossipedHashesSent.has(gossipHash)) {
-      if (this.verboseLogs) this.mainLogger.debug(`Gossip already sent: ${gossipHash.substring(0, 5)}`)
+      if (this.verboseLogs)
+        this.mainLogger.debug(
+          `Gossip already sent: ${gossipHash.substring(0, 5)}`
+        )
       return
     }
     // nodes.sort((first, second) => first.id.localeCompare(second.id, 'en', { sensitivity: 'variant' }))
@@ -1260,41 +1579,81 @@ class P2P extends EventEmitter {
     const myIdx = nodes.findIndex(node => node.id === this.id)
     if (myIdx < 0) throw new Error('Could not find self in nodes array')
     // Map back recipient idxs to node objects
-    const recipientIdxs = getRandomGossipIn(nodeIdxs, this.gossipRecipients, myIdx)
+    const recipientIdxs = getRandomGossipIn(
+      nodeIdxs,
+      this.gossipRecipients,
+      myIdx
+    )
     let recipients = recipientIdxs.map(idx => nodes[idx])
     if (sender != null) {
       recipients = removeNodesByID(recipients, [sender])
     }
     try {
-      if (this.verboseLogs) this.mainLogger.debug(`GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(recipients.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+      if (this.verboseLogs)
+        this.mainLogger.debug(
+          `GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(
+            recipients.map(
+              node => utils.makeShortHash(node.id) + ':' + node.externalPort
+            )
+          )}`
+        )
       for (const node of recipients) {
-        this.logger.playbackLog('self', node.id, 'GossipInSend', type, tracker, gossipPayload)
+        this.logger.playbackLog(
+          'self',
+          node.id,
+          'GossipInSend',
+          type,
+          tracker,
+          gossipPayload
+        )
       }
       await this.tell(recipients, 'gossip', gossipPayload, true, tracker)
     } catch (ex) {
-      if (this.verboseLogs) this.mainLogger.error(`Failed to sendGossip(${utils.stringifyReduce(payload)}) Exception => ${ex}`)
-      this.fatalLogger.fatal('sendGossipIn: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      if (this.verboseLogs)
+        this.mainLogger.error(
+          `Failed to sendGossip(${utils.stringifyReduce(
+            payload
+          )}) Exception => ${ex}`
+        )
+      this.fatalLogger.fatal(
+        'sendGossipIn: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
+      )
     }
     this.gossipedHashesSent.set(gossipHash, false)
-    if (this.verboseLogs) this.mainLogger.debug(`End of sendGossipIn(${utils.stringifyReduce(payload)})`)
+    if (this.verboseLogs)
+      this.mainLogger.debug(
+        `End of sendGossipIn(${utils.stringifyReduce(payload)})`
+      )
   }
 
   /**
    * Send Gossip to all nodes in this list, special case broadcast, never use this for regular gossip.
    */
-  async sendGossipAll (type, payload, tracker = '', sender = null, nodes = this.state.getAllNodes()) {
+  async sendGossipAll(
+    type,
+    payload,
+    tracker = '',
+    sender = null,
+    nodes = this.state.getAllNodes()
+  ) {
     if (nodes.length === 0) return
 
     if (tracker === '') {
       tracker = this.createGossipTracker()
     }
 
-    if (this.verboseLogs) this.mainLogger.debug(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
+    if (this.verboseLogs)
+      this.mainLogger.debug(
+        `Start of sendGossipIn(${utils.stringifyReduce(payload)})`
+      )
     const gossipPayload = { type, data: payload }
 
     const gossipHash = this.crypto.hash(gossipPayload)
     if (this.gossipedHashesSent.has(gossipHash)) {
-      if (this.verboseLogs) this.mainLogger.debug(`Gossip already sent: ${gossipHash.substring(0, 5)}`)
+      if (this.verboseLogs)
+        this.mainLogger.debug(
+          `Gossip already sent: ${gossipHash.substring(0, 5)}`
+        )
       return
     }
     // Find out your own index in the nodes array
@@ -1306,25 +1665,52 @@ class P2P extends EventEmitter {
       recipients = removeNodesByID(recipients, [sender])
     }
     try {
-      if (this.verboseLogs) this.mainLogger.debug(`GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(recipients.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+      if (this.verboseLogs)
+        this.mainLogger.debug(
+          `GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(
+            recipients.map(
+              node => utils.makeShortHash(node.id) + ':' + node.externalPort
+            )
+          )}`
+        )
       for (const node of recipients) {
-        this.logger.playbackLog('self', node.id, 'GossipInSendAll', type, tracker, gossipPayload)
+        this.logger.playbackLog(
+          'self',
+          node.id,
+          'GossipInSendAll',
+          type,
+          tracker,
+          gossipPayload
+        )
       }
       await this.tell(recipients, 'gossip', gossipPayload, true, tracker)
     } catch (ex) {
-      if (this.verboseLogs) this.mainLogger.error(`Failed to sendGossip(${utils.stringifyReduce(payload)}) Exception => ${ex}`)
-      this.fatalLogger.fatal('sendGossipIn: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      if (this.verboseLogs)
+        this.mainLogger.error(
+          `Failed to sendGossip(${utils.stringifyReduce(
+            payload
+          )}) Exception => ${ex}`
+        )
+      this.fatalLogger.fatal(
+        'sendGossipIn: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
+      )
     }
     this.gossipedHashesSent.set(gossipHash, false)
-    if (this.verboseLogs) this.mainLogger.debug(`End of sendGossipIn(${utils.stringifyReduce(payload)})`)
+    if (this.verboseLogs)
+      this.mainLogger.debug(
+        `End of sendGossipIn(${utils.stringifyReduce(payload)})`
+      )
   }
 
   /**
- * Handle Goosip Transactions
- * Payload: {type: ['receipt', 'trustedTransaction'], data: {}}
- */
-  async handleGossip (payload, sender, tracker = '') {
-    if (this.verboseLogs) this.mainLogger.debug(`Start of handleGossip(${utils.stringifyReduce(payload)})`)
+   * Handle Goosip Transactions
+   * Payload: {type: ['receipt', 'trustedTransaction'], data: {}}
+   */
+  async handleGossip(payload, sender, tracker = '') {
+    if (this.verboseLogs)
+      this.mainLogger.debug(
+        `Start of handleGossip(${utils.stringifyReduce(payload)})`
+      )
     const type = payload.type
     const data = payload.data
 
@@ -1340,50 +1726,62 @@ class P2P extends EventEmitter {
     }
 
     if (this.gossipedHashes.has(gossipHash)) {
-      if (this.verboseLogs) this.mainLogger.debug(`Got old gossip: ${gossipHash.substring(0, 5)}`)
+      if (this.verboseLogs)
+        this.mainLogger.debug(`Got old gossip: ${gossipHash.substring(0, 5)}`)
       if (!this.gossipedHashes.get(gossipHash)) {
-        setTimeout(() => this.gossipedHashes.delete(gossipHash), this.gossipTimeout)
+        setTimeout(
+          () => this.gossipedHashes.delete(gossipHash),
+          this.gossipTimeout
+        )
         this.gossipedHashes.set(gossipHash, true)
-        if (this.verboseLogs) this.mainLogger.debug(`Marked old gossip for deletion: ${gossipHash.substring(0, 5)} in ${this.gossipTimeout} ms`)
+        if (this.verboseLogs)
+          this.mainLogger.debug(
+            `Marked old gossip for deletion: ${gossipHash.substring(0, 5)} in ${
+              this.gossipTimeout
+            } ms`
+          )
       }
       return
     }
     this.gossipedHashes.set(gossipHash, false)
     this.logger.playbackLog(sender, 'self', 'GossipRcv', type, tracker, data)
     await gossipHandler(data, sender, tracker)
-    if (this.verboseLogs) this.mainLogger.debug(`End of handleGossip(${utils.stringifyReduce(payload)})`)
+    if (this.verboseLogs)
+      this.mainLogger.debug(
+        `End of handleGossip(${utils.stringifyReduce(payload)})`
+      )
   }
 
   /**
- * Callback for handling gossip.
- *
- * @callback handleGossipCallback
- * @param {any} data the data response of the callback
- * @param {Node} sender
- * @param {string} tracker the tracking string
- */
+   * Callback for handling gossip.
+   *
+   * @callback handleGossipCallback
+   * @param {any} data the data response of the callback
+   * @param {Node} sender
+   * @param {string} tracker the tracking string
+   */
 
   /**
    * @param {string} type
    * @param {handleGossipCallback} handler
    */
-  registerGossipHandler (type, handler) {
+  registerGossipHandler(type, handler) {
     this.gossipHandlers[type] = handler
   }
 
-  unregisterGossipHandler (type) {
+  unregisterGossipHandler(type) {
     if (this.gossipHandlers[type]) {
       delete this.gossipHandlers[type]
     }
   }
 
-  cleanupSync () {
+  cleanupSync() {
     if (this.state) {
       this.state.stopCycles()
     }
   }
 
-  async restart () {
+  async restart() {
     console.log('Restarting, then rejoining network...')
     this.acceptInternal = false
 
@@ -1393,31 +1791,31 @@ class P2P extends EventEmitter {
     process.exit()
   }
 
-  async _reportLostNode (node) {
+  async _reportLostNode(node) {
     return this.lostNodes.reportLost(node)
   }
 
-  setJoinRequestToggle (bool) {
+  setJoinRequestToggle(bool) {
     this.joinRequestToggle = bool
   }
 }
 
 // From: https://stackoverflow.com/a/12646864
-function shuffleArray (array) {
+function shuffleArray(array) {
   for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]]
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[array[i], array[j]] = [array[j], array[i]]
   }
 }
 
-function removeNodesByID (nodes, ids) {
+function removeNodesByID(nodes, ids) {
   if (!Array.isArray(ids)) {
     return nodes
   }
   return nodes.filter(node => ids.indexOf(node.id) === -1)
 }
 // From: https://stackoverflow.com/a/19270021
-function getRandom (arr, n) {
+function getRandom(arr, n) {
   let len = arr.length
   const taken = new Array(len)
   if (n > len) {
@@ -1432,22 +1830,36 @@ function getRandom (arr, n) {
   return result
 }
 
-function getRandomGossipIn (nodeIdxs, fanOut, myIdx) {
+function getRandomGossipIn(nodeIdxs, fanOut, myIdx) {
   const nn = nodeIdxs.length
-  if (fanOut >= nn) { fanOut = nn - 1 }
-  if (fanOut < 1) { return [] }
+  if (fanOut >= nn) {
+    fanOut = nn - 1
+  }
+  if (fanOut < 1) {
+    return []
+  }
   const results = [(myIdx + 1) % nn]
-  if (fanOut < 2) { return results }
+  if (fanOut < 2) {
+    return results
+  }
   results.push((myIdx + nn - 1) % nn)
-  if (fanOut < 3) { return results }
+  if (fanOut < 3) {
+    return results
+  }
   while (results.length < fanOut) {
     const r = Math.floor(Math.random() * nn)
-    if (r === myIdx) { continue }
+    if (r === myIdx) {
+      continue
+    }
     let k = 0
     for (; k < results.length; k++) {
-      if (r === results[k]) { break }
+      if (r === results[k]) {
+        break
+      }
     }
-    if (k === results.length) { results.push(r) }
+    if (k === results.length) {
+      results.push(r)
+    }
   }
   return results
 }

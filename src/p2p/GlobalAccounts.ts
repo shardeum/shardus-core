@@ -1,4 +1,13 @@
-import { Signature, SignedObject, Route, InternalHandler, Node, NodeInfo, LooseObject, GossipHandler } from './Types'
+import {
+  Signature,
+  SignedObject,
+  Route,
+  InternalHandler,
+  Node,
+  NodeInfo,
+  LooseObject,
+  GossipHandler,
+} from './Types'
 import { Handler } from 'express'
 import { shardus, stateManager, crypto } from './Context'
 import StateManager from '../state-manager'
@@ -33,7 +42,11 @@ export type SignedSetGlobalTx = SetGlobalTx & SignedObject
 
 /** ROUTES */
 
-const makeReceiptRoute: Route<InternalHandler<SignedSetGlobalTx, unknown, string>> = {
+const makeReceiptRoute: Route<InternalHandler<
+  SignedSetGlobalTx,
+  unknown,
+  string
+>> = {
   name: 'make-receipt',
   handler: (payload, respond, sender) => {
     makeReceipt(payload, sender)
@@ -42,18 +55,17 @@ const makeReceiptRoute: Route<InternalHandler<SignedSetGlobalTx, unknown, string
 
 const setGlobalGossipRoute: Route<GossipHandler<Receipt>> = {
   name: 'set-global',
-  handler: (payload) => {
+  handler: payload => {
     if (validateReceipt(payload) === false) return
-    if (processReceipt(payload) === false ) return
+    if (processReceipt(payload) === false) return
     p2p.sendGossipIn('set-global', payload)
-  }
+  },
 }
 
 export const internalRoutes = [makeReceiptRoute]
 export const gossipRoutes = [setGlobalGossipRoute]
 
 /** STATE */
-
 
 let lastClean = 0
 
@@ -69,7 +81,7 @@ export function setGlobal(address, value, when, source) {
   if (!p2p.isActive) return
 
   // Create a tx for setting a global account
-  const tx: SetGlobalTx = {address, value, when, source}
+  const tx: SetGlobalTx = { address, value, when, source }
   const txHash = crypto.hash(tx)
 
   // Sign tx
@@ -77,9 +89,17 @@ export function setGlobal(address, value, when, source) {
 
   // Get the nodes that tx will be broadcasted to
   if (!stateManager.currentCycleShardData) return
-  const homeNode = ShardFunctions.findHomeNode(stateManager.currentCycleShardData.shardGlobals, source, stateManager.currentCycleShardData.parititionShardDataMap)
+  const homeNode = ShardFunctions.findHomeNode(
+    stateManager.currentCycleShardData.shardGlobals,
+    source,
+    stateManager.currentCycleShardData.parititionShardDataMap
+  )
   const consensusGroup = [...homeNode.consensusNodeForOurNodeFull]
-  console.log(`SETGLOBAL: CONSENSUS_GROUP: ${consensusGroup.map(n => n.id.substring(0, 5))}`)
+  console.log(
+    `SETGLOBAL: CONSENSUS_GROUP: ${consensusGroup.map(n =>
+      n.id.substring(0, 5)
+    )}`
+  )
   const ourIdx = consensusGroup.findIndex(node => node.id === p2p.id)
   if (ourIdx === -1) return // Return if we're not in the consensusGroup
   consensusGroup.splice(ourIdx, 1) // Remove ourself from consensusGroup
@@ -97,7 +117,7 @@ export function setGlobal(address, value, when, source) {
   }
   const timer = setTimeout(onTimeout, timeout)
 
-  const onReceipt = (receipt) => {
+  const onReceipt = receipt => {
     console.log(`SETGLOBAL: GOT RECEIPT: ${txHash} ${JSON.stringify(receipt)}`)
     clearTimeout(timer)
     // Gossip receipt to every node in network to apply to global account
@@ -106,8 +126,7 @@ export function setGlobal(address, value, when, source) {
   }
   p2p.on(handle, onReceipt)
 
-
-  // Broadcast tx to /makeReceipt of all nodes in source consensus group to trigger creation of receiptCollection 
+  // Broadcast tx to /makeReceipt of all nodes in source consensus group to trigger creation of receiptCollection
   makeReceipt(signedTx, p2p.id) // Need this because internalRoute handler ignores messages from ourselves
   p2p.tell(consensusGroup, 'make-receipt', signedTx)
 }
@@ -116,7 +135,10 @@ export function createMakeReceiptHandle(txHash: string) {
   return `receipt-${txHash}`
 }
 
-export function makeReceipt (signedTx: SignedSetGlobalTx, sender: NodeInfo['id']) {
+export function makeReceipt(
+  signedTx: SignedSetGlobalTx,
+  sender: NodeInfo['id']
+) {
   if (!stateManager) {
     console.log('GlobalAccounts: makeReceipt: stateManager not ready')
     return
@@ -124,7 +146,7 @@ export function makeReceipt (signedTx: SignedSetGlobalTx, sender: NodeInfo['id']
 
   const sign = signedTx.sign
 
-  const tx = {...signedTx}
+  const tx = { ...signedTx }
   delete tx.sign
 
   const txHash = crypto.hash(tx)
@@ -136,10 +158,17 @@ export function makeReceipt (signedTx: SignedSetGlobalTx, sender: NodeInfo['id']
     receipt = {
       signs: [],
       tx: null,
-      consensusGroup
+      consensusGroup,
     }
     receipts.set(txHash, receipt)
-    console.log(`SETGLOBAL: MAKERECEIPT CONSENSUS GROUP FOR ${txHash.substring(0, 5)}: ${JSON.stringify([...receipt.consensusGroup].map(id => id.substring(0, 5)))}`)
+    console.log(
+      `SETGLOBAL: MAKERECEIPT CONSENSUS GROUP FOR ${txHash.substring(
+        0,
+        5
+      )}: ${JSON.stringify(
+        [...receipt.consensusGroup].map(id => id.substring(0, 5))
+      )}`
+    )
   }
 
   let tracker: Tracker = trackers.get(txHash)
@@ -159,16 +188,23 @@ export function makeReceipt (signedTx: SignedSetGlobalTx, sender: NodeInfo['id']
   tracker.timestamp = tx.when
 
   // When a majority (%60) is reached, emit the completion event for this txHash
-  console.log(`SETGLOBAL: GOT SIGNED_SET_GLOBAL_TX FROM ${sender.substring(0, 5)}: ${txHash} ${JSON.stringify(signedTx)}`)
-  console.log(`SETGLOBAL: ${receipt.signs.length} RECEIPTS / ${receipt.consensusGroup.size} CONSENSUS_GROUP`)
+  console.log(
+    `SETGLOBAL: GOT SIGNED_SET_GLOBAL_TX FROM ${sender.substring(
+      0,
+      5
+    )}: ${txHash} ${JSON.stringify(signedTx)}`
+  )
+  console.log(
+    `SETGLOBAL: ${receipt.signs.length} RECEIPTS / ${receipt.consensusGroup.size} CONSENSUS_GROUP`
+  )
   if (isReceiptMajority(receipt, receipt.consensusGroup)) {
     const handle = createMakeReceiptHandle(txHash)
     p2p.emit(handle, receipt)
   }
 }
 
-export function processReceipt (receipt: Receipt) {
-  const txHash  = crypto.hash(receipt.tx)
+export function processReceipt(receipt: Receipt) {
+  const txHash = crypto.hash(receipt.tx)
   const tracker = trackers.get(txHash) || createTracker(txHash)
   tracker.timestamp = receipt.tx.when
   if (tracker.gossiped) return false
@@ -179,7 +215,7 @@ export function processReceipt (receipt: Receipt) {
   return true
 }
 
-export function attemptCleanup () {
+export function attemptCleanup() {
   const now = Date.now()
   if (now - lastClean < 60000) return
   lastClean = now
@@ -207,9 +243,11 @@ function validateReceipt(receipt: Receipt) {
       signsInConsensusGroup.push(sign)
     }
   }
-  // Make sure signs and consensusGroup overlap >= %60 
-  if (((signsInConsensusGroup.length / consensusGroup.size) * 100) < 60) {
-    console.log('Receipt signature owners and consensus group did not overlap enough')
+  // Make sure signs and consensusGroup overlap >= %60
+  if ((signsInConsensusGroup.length / consensusGroup.size) * 100 < 60) {
+    console.log(
+      'Receipt signature owners and consensus group did not overlap enough'
+    )
     return false
   }
   // Verify the signs that overlap with consensusGroup are a majority
@@ -225,23 +263,27 @@ function validateReceipt(receipt: Receipt) {
   return true
 }
 
-function createTracker (txHash) {
+function createTracker(txHash) {
   const tracker = {
-    seen: new Set<NodeInfo["id"]>(),
+    seen: new Set<NodeInfo['id']>(),
     timestamp: 0,
-    gossiped: false
+    gossiped: false,
   }
   trackers.set(txHash, tracker)
   return tracker
 }
 
-function getConsensusGroupIds (address) {
-  const homeNode = ShardFunctions.findHomeNode(stateManager.currentCycleShardData.shardGlobals, address, stateManager.currentCycleShardData.parititionShardDataMap)
+function getConsensusGroupIds(address) {
+  const homeNode = ShardFunctions.findHomeNode(
+    stateManager.currentCycleShardData.shardGlobals,
+    address,
+    stateManager.currentCycleShardData.parititionShardDataMap
+  )
   return homeNode.consensusNodeForOurNodeFull.map(node => node.id)
 }
 
-function isReceiptMajority (receipt, consensusGroup) {
-  return ((receipt.signs.length / consensusGroup.size) * 100 >= 60)
+function isReceiptMajority(receipt, consensusGroup) {
+  return (receipt.signs.length / consensusGroup.size) * 100 >= 60
 }
 
 function intersect(a, b) {

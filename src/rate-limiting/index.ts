@@ -1,4 +1,4 @@
-import LoadDetection from "../load-detection"
+import LoadDetection from '../load-detection'
 
 interface RateLimiting {
   loadDetection: LoadDetection
@@ -7,13 +7,13 @@ interface RateLimiting {
 }
 
 class RateLimiting {
-  constructor (config, loadDetection) {
+  constructor(config, loadDetection) {
     this.loadDetection = loadDetection
     this.limitRate = config.limitRate
     this.loadLimit = config.loadLimit
   }
 
-  isOverloaded () {
+  isOverloaded() {
     if (!this.limitRate) return false
     const load = this.loadDetection.getCurrentLoad()
     if (load < this.loadLimit) return false

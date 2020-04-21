@@ -30,13 +30,13 @@ export type Update = OptionalExceptFor<Node, 'id'>
 export let nodes: Map<Node['id'], Node> // In order of joinRequestTimestamp [OLD, ..., NEW]
 export let byPubKey: Map<Node['publicKey'], Node>
 export let byIpPort: Map<string, Node>
-export let byJoinOrder: Node[]
+export let byJoinOrder: Node[] // In order of joinRequestTimestamp [OLD, ..., NEW]
 export let byIdOrder: Node[]
 export let othersByIdOrder: Node[] // used by sendGossipIn
 export let activeByIdOrder: Node[]
 export let activeOthersByIdOrder: Node[]
 
-function initialize() {
+function init() {
   nodes = new Map()
   byPubKey = new Map()
   byIpPort = new Map()
@@ -46,12 +46,12 @@ function initialize() {
   activeByIdOrder = []
   activeOthersByIdOrder = []
 }
-initialize()
+init()
 
 /** FUNCTIONS */
 
 export function reset() {
-  initialize()
+  init()
 }
 
 export async function addNode(node: Node) {
@@ -111,9 +111,9 @@ export async function addNodes(newNodes: Node[]) {
 }
 
 export function removeNode(id) {
-  // In reverse
   let idx
 
+  // Remove from arrays
   // Omar - not sure if this will work, we should be providing our own compare function
   idx = binarySearch(activeOthersByIdOrder, { id })
   if (idx >= 0) activeOthersByIdOrder.splice(idx, 1)
@@ -130,8 +130,10 @@ export function removeNode(id) {
   idx = binarySearch(byJoinOrder, { id })
   if (idx >= 0) byJoinOrder.splice(idx, 1)
 
-  byIpPort.delete(id)
-  byPubKey.delete(id)
+  // Remove from maps
+  const node = nodes.get(id)
+  byIpPort.delete(ipPort(node.internalIp, node.internalPort))
+  byPubKey.delete(node.publicKey)
   nodes.delete(id)
 }
 export function removeNodes(ids: string[]) {

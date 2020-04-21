@@ -10,14 +10,14 @@ const generateSeed = () => {
   return bytes.toString('hex')
 }
 
-const parseSeed = (seed) => {
+const parseSeed = seed => {
   if (typeof seed !== 'string' || seed.length !== 32) {
     return false
   }
   const parsed = []
   let processed = 0
   for (let i = 0; i < 4; i++) {
-    const start = 0 + (processed * 8)
+    const start = 0 + processed * 8
     const end = start + 8
     const hex = seed.slice(start, end)
     parsed[i] = parseInt(hex, 16)
@@ -29,19 +29,22 @@ const parseSeed = (seed) => {
 // From StackOverflow: https://stackoverflow.com/a/47593316
 const sfc32 = (a, b, c, d) => {
   return () => {
-    a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0
+    a >>>= 0
+    b >>>= 0
+    c >>>= 0
+    d >>>= 0
     let t = (a + b) | 0
-    a = b ^ b >>> 9
-    b = c + (c << 3) | 0
-    c = (c << 21 | c >>> 11)
-    d = d + 1 | 0
-    t = t + d | 0
-    c = c + t | 0
+    a = b ^ (b >>> 9)
+    b = (c + (c << 3)) | 0
+    c = (c << 21) | (c >>> 11)
+    d = (d + 1) | 0
+    t = (t + d) | 0
+    c = (c + t) | 0
     return (t >>> 0) / 4294967296
   }
 }
 
-const generateContext = (seed) => {
+const generateContext = seed => {
   if (!seed) {
     seed = generateSeed()
   }

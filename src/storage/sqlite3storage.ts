@@ -1,6 +1,6 @@
-import Shardus from "../shardus/shardus-types"
-import Profiler from "../utils/profiler"
-import Log4js from "log4js"
+import Shardus from '../shardus/shardus-types'
+import Profiler from '../utils/profiler'
+import Log4js from 'log4js'
 import { Sequelize } from 'sequelize'
 import fs from 'fs'
 import path from 'path'
@@ -22,10 +22,13 @@ interface Sqlite3Storage {
 
 class Sqlite3Storage {
   // note that old storage passed in logger, now we pass in the specific log for it to use.  This works for application use, but may need to rethink if we apply this to shardus core
-  constructor (models, storageConfig, logger, baseDir, profiler) {
+  constructor(models, storageConfig, logger, baseDir, profiler) {
     this.baseDir = baseDir
     this.storageConfig = storageConfig
-    this.storageConfig.options.storage = path.join(this.baseDir, this.storageConfig.options.storage)
+    this.storageConfig.options.storage = path.join(
+      this.baseDir,
+      this.storageConfig.options.storage
+    )
     this.profiler = profiler
     // Setup logger
     this.mainLogger = logger.getLogger('default')
@@ -38,9 +41,14 @@ class Sqlite3Storage {
     // [AS] Delete database if it already exists; fixes weirdness when restarting from a clean slate
     try {
       fs.unlinkSync(this.storageConfig.options.storage)
-      this.mainLogger.info('Storage: sqlite3storage: constructor: Deleted existing db file')
+      this.mainLogger.info(
+        'Storage: sqlite3storage: constructor: Deleted existing db file'
+      )
     } catch (err) {
-      this.mainLogger.info('Storage: sqlite3storage: constructor: Failed to delete existing db file: ' + err)
+      this.mainLogger.info(
+        'Storage: sqlite3storage: constructor: Failed to delete existing db file: ' +
+          err
+      )
     }
 
     this.storageModels = {}
@@ -49,7 +57,7 @@ class Sqlite3Storage {
     }
   }
 
-  sqlite3Define (modelName, modelAttributes) {
+  sqlite3Define(modelName, modelAttributes) {
     let tableName = modelName
 
     let modelData: any = { tableName }
@@ -99,7 +107,7 @@ class Sqlite3Storage {
     // todo base this off of models
   }
 
-  async init () {
+  async init() {
     // Create dbDir if it doesn't exist
     let dbDir = path.parse(this.storageConfig.options.storage).dir
     await _ensureExists(dbDir)
@@ -135,24 +143,24 @@ class Sqlite3Storage {
     this.initialized = true
     this.mainLogger.info('Database initialized.')
   }
-  async close () {
+  async close() {
     // this.mainLogger.info('Closing Database connections.')
     await this.db.close()
   }
 
-  async runCreate (createStatement) {
+  async runCreate(createStatement) {
     await this.run(createStatement)
   }
 
-  async dropAndCreateModel (model) {
+  async dropAndCreateModel(model) {
     // await model.sync({ force: true })
   }
 
-  _checkInit () {
+  _checkInit() {
     if (!this.initialized) throw new Error('Storage not initialized.')
   }
 
-  _create (table, object, opts) {
+  _create(table, object, opts) {
     // console.log('_create2: ' + stringify(object))
     if (Array.isArray(object)) {
       // return table.bulkCreate(values, opts)
@@ -185,7 +193,7 @@ class Sqlite3Storage {
     return this.run(queryString, inputs)
   }
 
-  async _read (table, params, opts) {
+  async _read(table, params, opts) {
     // return table.findAll({ where, ...opts })
     let queryString = table.selectString
 
@@ -193,7 +201,9 @@ class Sqlite3Storage {
 
     let paramsArray = this.params2Array(params, table)
 
-    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(paramsArray)
+    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
+      paramsArray
+    )
 
     let valueArray = whereValueArray
     queryString += whereString
@@ -214,17 +224,21 @@ class Sqlite3Storage {
     return results
   }
 
-  _update (table, values, where, opts) {
+  _update(table, values, where, opts) {
     // return table.update(values, { where, ...opts })
     let queryString = table.updateString
 
     let valueParams = this.params2Array(values, table)
-    let { resultString, valueArray } = this.paramsToAssignmentStringAndValues(valueParams)
+    let { resultString, valueArray } = this.paramsToAssignmentStringAndValues(
+      valueParams
+    )
 
     queryString += resultString
 
     let whereParams = this.params2Array(where, table)
-    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(whereParams)
+    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
+      whereParams
+    )
     queryString += whereString
 
     valueArray = valueArray.concat(whereValueArray)
@@ -234,7 +248,7 @@ class Sqlite3Storage {
     // console.log(queryString + '  VALUES: ' + stringify(valueArray))
     return this.run(queryString, valueArray)
   }
-  _delete (table, where, opts) {
+  _delete(table, where, opts) {
     // if (!where) {
     //   return table.destroy({ ...opts })
     // }
@@ -243,7 +257,9 @@ class Sqlite3Storage {
     let queryString = table.deleteString
 
     let whereParams = this.params2Array(where, table)
-    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(whereParams)
+    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
+      whereParams
+    )
     let valueArray = whereValueArray
     queryString += whereString
     queryString += this.options2string(opts)
@@ -252,13 +268,13 @@ class Sqlite3Storage {
     return this.run(queryString, valueArray)
   }
 
-  _rawQuery (queryString, valueArray) {
+  _rawQuery(queryString, valueArray) {
     // return this.sequelize.query(query, { model: table })
 
     return this.all(queryString, valueArray)
   }
 
-  params2Array (paramsObj, table) {
+  params2Array(paramsObj, table) {
     if (paramsObj == null) {
       return []
     }
@@ -328,7 +344,7 @@ class Sqlite3Storage {
     return paramsArray
   }
 
-  paramsToWhereStringAndValues (paramsArray) {
+  paramsToWhereStringAndValues(paramsArray) {
     let whereValueArray = []
     let whereString = ''
     for (let i = 0; i < paramsArray.length; i++) {
@@ -345,7 +361,7 @@ class Sqlite3Storage {
     return { whereString, whereValueArray }
   }
 
-  paramsToAssignmentStringAndValues (paramsArray) {
+  paramsToAssignmentStringAndValues(paramsArray) {
     let valueArray = []
     let resultString = ''
     for (let i = 0; i < paramsArray.length; i++) {
@@ -359,7 +375,7 @@ class Sqlite3Storage {
     return { resultString, valueArray }
   }
 
-  options2string (optionsObj) {
+  options2string(optionsObj) {
     if (optionsObj == null) {
       return ''
     }
@@ -382,9 +398,9 @@ class Sqlite3Storage {
   }
 
   // run/get/all promise wraps from this tutorial: https://stackabuse.com/a-sqlite-tutorial-with-node-js/
-  run (sql, params = []) {
+  run(sql, params = []) {
     return new Promise((resolve, reject) => {
-      this.db.run(sql, params, function (err) {
+      this.db.run(sql, params, function(err) {
         if (err) {
           console.log('Error running sql ' + sql)
           console.log(err)
@@ -395,7 +411,7 @@ class Sqlite3Storage {
       })
     })
   }
-  get (sql, params = []) {
+  get(sql, params = []) {
     return new Promise((resolve, reject) => {
       this.db.get(sql, params, (err, result) => {
         if (err) {
@@ -409,7 +425,7 @@ class Sqlite3Storage {
     })
   }
 
-  all (sql, params = []) {
+  all(sql, params = []) {
     return new Promise((resolve, reject) => {
       this.db.all(sql, params, (err, rows) => {
         if (err) {
@@ -425,9 +441,9 @@ class Sqlite3Storage {
 }
 
 // From: https://stackoverflow.com/a/21196961
-async function _ensureExists (dir) {
+async function _ensureExists(dir) {
   return new Promise((resolve, reject) => {
-    fs.mkdir(dir, { recursive: true }, (err) => {
+    fs.mkdir(dir, { recursive: true }, err => {
       if (err) {
         // Ignore err if folder exists
         if (err.code === 'EEXIST') resolve()
