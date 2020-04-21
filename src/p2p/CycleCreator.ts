@@ -11,6 +11,7 @@ import * as NodeList from './NodeList'
 import * as Rotation from './Rotation'
 import * as Self from './Self'
 import * as Sync from './Sync'
+import * as Refresh from './Refresh'
 import { GossipHandler, InternalHandler, SignedObject } from './Types'
 import { compareQuery, Comparison } from './Utils'
 
@@ -30,9 +31,10 @@ interface BaseRecord {
   duration: number
 }
 
-export type CycleTxs = Archivers.Txs & Join.Txs & Active.Txs & Rotation.Txs
+export type CycleTxs = Refresh.Txs & Archivers.Txs & Join.Txs & Active.Txs & Rotation.Txs
 
 export type CycleRecord = BaseRecord &
+  Refresh.Record&
   Archivers.Record &
   Join.Record &
   Active.Record &
@@ -55,7 +57,7 @@ const DESIRED_MARKER_MATCHES = 2
 
 let p2pLogger: Logger
 
-export const submodules = [Archivers, Join, Active, Rotation]
+export const submodules = [Archivers, Join, Active, Rotation, Refresh]
 
 export let currentQuarter = -1 // means we have not started creating cycles
 export let currentCycle = 0

@@ -1,12 +1,10 @@
 import * as http from '../http'
 import * as Comms from './Comms'
 import { crypto, logger, network } from './Context'
+import { getCycleChain } from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import { CycleRecord as Cycle } from './CycleCreator'
 import * as CycleParser from './CycleParser'
-import { getCycleChain } from './CycleChain'
-import { DefaultDeserializer } from 'v8'
-import { Receipt } from './GlobalAccounts'
 
 /** TYPES */
 
@@ -78,7 +76,7 @@ export interface Record {
 
 let mainLogger
 
-let archivers: JoinedArchiver[]
+export let archivers: Map<JoinedArchiver['publicKey'], JoinedArchiver>
 let recipients: Array<DataRecipient<Cycle | Transaction | Partition>>
 
 let requests: JoinRequest[]
@@ -90,7 +88,7 @@ let requests: JoinRequest[]
 export function init() {
   mainLogger = logger.getLogger('main')
 
-  archivers = []
+  archivers = new Map()
   recipients = []
 
   reset()
@@ -173,7 +171,7 @@ export function getArchiverUpdates() {
 export function updateArchivers(joinedArchivers) {
   // Update archiversList
   for (const nodeInfo of joinedArchivers) {
-    archivers.push(nodeInfo)
+    archivers.set(nodeInfo.publicKey, nodeInfo)
   }
 }
 
@@ -330,9 +328,7 @@ export function registerRoutes() {
     }
     */
 
-    const nodeInfo = archivers.find(
-      archiver => archiver.publicKey === dataRequest.publicKey
-    )
+    const nodeInfo = archivers.get(dataRequest.publicKey)
 
     if (!nodeInfo) {
       const archiverNotFoundErr = 'Archiver not found in list'
@@ -344,10 +340,11 @@ export function registerRoutes() {
     delete dataRequest.tag
 
     addDataRecipient(nodeInfo, dataRequest)
+    res.json({ success: true})
   })
 
   network.registerExternalGet('archivers', (req, res) => {
-    res.json({ archivers })
+    res.json({ archivers: [...archivers.values()] })
   })
 
   network.registerExternalGet('datarecipients', (req, res) => {
