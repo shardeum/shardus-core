@@ -14,6 +14,7 @@ import StateManager from '../state-manager'
 import ShardFunctions from '../state-manager/shardFunctions'
 import Shardus from '../shardus'
 import { p2p } from './Wrapper'
+import * as utils from '../utils'
 
 /** TYPES */
 
@@ -78,7 +79,10 @@ export function setGlobal(address, value, when, source) {
   console.log(`SETGLOBAL: WE ARE: ${p2p.id.substring(0, 5)}`)
 
   // Only do this if you're active
-  if (!p2p.isActive) return
+  if (!p2p.isActive) {
+    console.log(`setGlobal: Not active yet`)
+    return
+  }
 
   // Create a tx for setting a global account
   const tx: SetGlobalTx = { address, value, when, source }
@@ -87,8 +91,18 @@ export function setGlobal(address, value, when, source) {
   // Sign tx
   const signedTx: SignedSetGlobalTx = crypto.sign(tx)
 
+  if(stateManager == null){
+    console.log(`setGlobal: stateManager == null`)
+  } else {
+    console.log(`setGlobal: stateManager != null`)
+  }
+
   // Get the nodes that tx will be broadcasted to
-  if (!stateManager.currentCycleShardData) return
+  if (!stateManager.currentCycleShardData){
+    console.log(`stateManager.currentCycleShardData == null`)
+
+    return
+  } 
   const homeNode = ShardFunctions.findHomeNode(
     stateManager.currentCycleShardData.shardGlobals,
     source,

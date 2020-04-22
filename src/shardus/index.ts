@@ -683,7 +683,7 @@ class Shardus extends EventEmitter {
     if (this.p2p.isFirstSeed) {
       await this.p2p.goActive()
       console.log('syncAppData - goActive')
-      // await this.stateManager.startCatchUpQueue() // first node skips sync anyhow
+      await this.stateManager.waitForShardCalcs()
       await this.app.sync()
       console.log('syncAppData - sync')
     } else {

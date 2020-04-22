@@ -133,10 +133,15 @@ class State extends EventEmitter {
   getActiveNodes_orig(id) {
     return getSubsetOfNodeList(NodeList.activeByIdOrder, id)
   }
+ 
   getActiveNodes(id) {
-    return Object.values(NodeList.activeOthersByIdOrder)
+    if (id) {
+      return Object.values(NodeList.activeOthersByIdOrder)
+    } else {
+      return Object.values(NodeList.activeByIdOrder)
+    }
   }
-
+  
   // The original function in p2p.state just returns an array with all nodes that are syncing excluding self
   //     there is no concept of neighbors
   getOrderedSyncingNeighbors(node) {

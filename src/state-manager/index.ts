@@ -709,6 +709,15 @@ class StateManager extends EventEmitter {
     return null
   }
 
+  async waitForShardCalcs()
+  {
+    while (this.currentCycleShardData == null) {
+      this.getCurrentCycleShardData()
+      await utils.sleep(1000)
+      this.logger.playbackLogNote('shrd_sync_waitForShardData_firstNode', ``, ` ${utils.stringifyReduce(this.currentCycleShardData)} `)
+    }
+  }
+
   // syncs transactions and application state data
   // This is the main outer loop that will loop over the different partitions
   // The last step catch up on the acceptedTx queue
