@@ -4379,14 +4379,17 @@ class StateManager extends EventEmitter {
       let isGlobalKey = false
       //intercept that we have this data rather than requesting it.
       // only if this tx is not a global modifying tx.   if it is a global set then it is ok to save out the global here.
-      if(this.globalAccountMap.has(key) && isGlobalModifyingTX === false){
-        //hasKey = true
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `setAccount skipGlobal:${utils.makeShortHash(key)}`)
-        this.logger.playbackLogNote('globalAccountMap', `setAccount - has`)
-        continue
+      if(this.globalAccountMap.has(key)){
+        
+        if(isGlobalModifyingTX === false){
+          this.logger.playbackLogNote('globalAccountMap', `setAccount - has`)
+          if (this.verboseLogs) this.mainLogger.debug('setAccount: Not writing global account: ' + utils.makeShortHash(key) )
+          continue          
+        }
+        if (this.verboseLogs) this.mainLogger.debug('setAccount: writing global account: ' + utils.makeShortHash(key) )
       }
 
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `setAccount partial:${wrappedData.isPartial}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `setAccount partial:${wrappedData.isPartial} key:${utils.makeShortHash(key)}`)
       if (wrappedData.isPartial) {
         await this.app.updateAccountPartial(wrappedData, localCachedData[key], applyResponse)
       } else {
@@ -6308,6 +6311,7 @@ class StateManager extends EventEmitter {
     let applyCount = 0
     let applyFailCount = 0
     let hasEffect = false
+    let hasNonGlobalEffect = false
 
     // TSConversion WrappedStates issue
     let accountValuesByKey:WrappedResponses = {}
@@ -6327,20 +6331,31 @@ class StateManager extends EventEmitter {
           let acountsFilter:AccountFilter = {} // this is a filter of accounts that we want to write to
           // find which accounts need txs applied.
           hasEffect = false
+          hasNonGlobalEffect = false
           for (let accountID of keysFilter.sourceKeys) {
             if (allAccountsToResetById[accountID]) {
               acountsFilter[accountID] = 1
               hasEffect = true
+              if(this.isGlobalAccount(accountID) === false){
+                hasNonGlobalEffect = true
+              }
             }
           }
           for (let accountID of keysFilter.targetKeys) {
             if (allAccountsToResetById[accountID]) {
               acountsFilter[accountID] = 1
               hasEffect = true
+              if(this.isGlobalAccount(accountID) === false){
+                hasNonGlobalEffect = true
+              }
             }
           }
           if (!hasEffect) {
             // no need to apply this tx because it would do nothing
+            continue
+          }
+          if(!hasNonGlobalEffect){
+            //if only a global account involved then dont reset!
             continue
           }
 
@@ -6402,13 +6417,13 @@ class StateManager extends EventEmitter {
           for(let wrappedStateKey of wrappedStateKeys){
             let wrappedState = wrappedStates[wrappedStateKey]
       
-            if(wrappedState != null) {
-              if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair applyAllPreparedRepairs wrappedState == null`)
-              //could continue but want to see if there is more we can log.
-            }
+            // if(wrappedState == null) {
+            //   if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair applyAllPreparedRepairs wrappedState == null ${utils.stringifyReduce(wrappedStateKey)} ${tx.timestamp}`)
+            //   //could continue but want to see if there is more we can log.
+            // }
             //is it global. 
             if(this.isGlobalAccount(wrappedStateKey)){ // wrappedState.accountId)){
-              this.logger.playbackLogNote('globalAccountMap', `applyAllPreparedRepairs - has`)
+              this.logger.playbackLogNote('globalAccountMap', `applyAllPreparedRepairs - has`, ` ${wrappedState.accountId} ${wrappedStateKey}`)
               if(wrappedState != null){
                 let globalValueSnapshot = this.getGlobalAccountValueAtTime(wrappedState.accountId, tx.timestamp)           
                 
@@ -6425,10 +6440,19 @@ class StateManager extends EventEmitter {
                 wrappedStates[wrappedStateKey] = newWrappedResponse // update!!
                 // insert thes data into the wrapped states.
                 // yikes probably cant do local cached data at this point.
+                if (this.verboseLogs) {
+                  let globalAccountBackupList = this.getGlobalAccountBackupList(wrappedStateKey)
+                  if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair applyAllPreparedRepairs has global key details ${tx.timestamp} entries:${globalAccountBackupList.length} ${utils.stringifyReduce(globalAccountBackupList.map(a => `${a.timestamp}  ${ utils.makeShortHash( a.accountId )} `    ))}  `)
+                }
+
                 if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs got global account to repair from: ${utils.stringifyReduce(newWrappedResponse)}`)
               } 
             } else {
-              if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair applyAllPreparedRepairs is global account but wrapped state == null`)
+
+              if(wrappedState == null){
+                if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair applyAllPreparedRepairs is not a global account but wrapped state == null ${utils.stringifyReduce(wrappedStateKey)} ${tx.timestamp}`)
+              }
+
             }
           }
           
@@ -6521,6 +6545,7 @@ class StateManager extends EventEmitter {
     cycleEnd -= this.syncSettleTime // adjust by sync settle time
     cycleStart -= this.syncSettleTime // adjust by sync settle time
     let replacmentAccounts:Shardus.AccountsCopy[]
+    let replacmentAccountsMinusGlobals = [] as Shardus.AccountsCopy[]
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts start  numAccounts: ${accountIDs.length} repairing cycle:${cycleNumber}`)
 
     try {
@@ -6528,7 +6553,7 @@ class StateManager extends EventEmitter {
       let prevCycle = cycleNumber - 1
       
       replacmentAccounts = (await this.storage.getAccountReplacmentCopies(accountIDs, prevCycle)) as Shardus.AccountsCopy[]
-
+      
       if (replacmentAccounts.length > 0) {
         for (let accountData of replacmentAccounts) {
           if (utils.isString(accountData.data)) {
@@ -6548,18 +6573,26 @@ class StateManager extends EventEmitter {
           /// ////////////////////////
           //let isGlobalAccount = this.globalAccountMap.has(accountData.accountId )
           
-          // dont need to grab and cache data because that already gets done earlier as we apply normal transactions.
+          //Try not reverting global accounts..
+          if(this.isGlobalAccount(accountData.accountId) === false){
+            replacmentAccountsMinusGlobals.push(accountData)
+            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts not a global account, add to list ${utils.makeShortHash(accountData.accountId)}`)
 
+          } else{
+            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts was a global account, do not add to list ${utils.makeShortHash(accountData.accountId)}`)
+
+          }
 
         }
         // tell the app to replace the account data
-        await this.app.resetAccountData(replacmentAccounts)
+        //await this.app.resetAccountData(replacmentAccounts)
+        await this.app.resetAccountData(replacmentAccountsMinusGlobals)
         // update local state.
       } else {
         if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts No replacment accounts found!!! cycle <= :${prevCycle}`)
       }
 
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts: ${accountIDs.length} replacmentAccounts ${replacmentAccounts.length} repairing cycle:${cycleNumber}`)
+      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts: ${accountIDs.length} replacmentAccounts ${replacmentAccounts.length} repairing cycle:${cycleNumber} replacmentAccountsMinusGlobals: ${replacmentAccountsMinusGlobals.length}`)
 
       // TODO prodution. consider if we need a better set of checks before we delete an account!
       // If we don't have a replacement copy for an account we should try to delete it
@@ -7098,9 +7131,10 @@ class StateManager extends EventEmitter {
     // TSConversion need to sort out account types!!!
     // @ts-ignore This has seemed fine in past so not going to sort out a type discrepencie here.  !== would detect and log it anyhow.
     if (accountDataList.length > 0 && accountDataList[0].timestamp !== txTimestamp) {
-      if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable timestamps dot match txts:${txTimestamp} acc.ts:${accountDataList[0].timestamp} `)
+      if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable timestamps do match txts:${txTimestamp} acc.ts:${accountDataList[0].timestamp} `)
     }
     if(accountDataList.length === 0){
+      // need to decide if this matters!
       if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable empty txts:${txTimestamp}  `)
 
     }
@@ -7126,13 +7160,17 @@ class StateManager extends EventEmitter {
       // wrappedAccounts.push({ accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp })
 
       //TODO Perf: / mem   should we only save if there is a hash change?
-      let globalBackupList:Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
-      if(globalBackupList != null){
-        globalBackupList.push(backupObj) // sort and cleanup later.
+      if(this.isGlobalAccount(accountId) && repairing === false){
+        //make sure it is a global tx.
+        let globalBackupList:Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
+        if(globalBackupList != null){
+          globalBackupList.push(backupObj) // sort and cleanup later.
 
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+          if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
 
+        }        
       }
+
 
       //Aha! Saves the last copy per given cycle! this way when you query cycle-1 you get the right data.
       await this.storage.createOrReplaceAccountCopy(backupObj)
@@ -7143,13 +7181,14 @@ class StateManager extends EventEmitter {
     let result:Shardus.AccountsCopy | null = null
     let globalBackupList:Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
     if(globalBackupList == null || globalBackupList.length === 0){
+      this.logger.playbackLogNote('globalBackupList', `applyAllPreparedRepairs - missing value for ${accountId}`)
       return null
     }
 
     //else fine the closest time lower than our input time
     //non binary search, just start at then end and go backwards.
     //TODO PERF make this a binary search. realistically the lists should be pretty short most of the time
-    if(globalBackupList.length > 1){
+    if(globalBackupList.length >= 1){
       for(let i=globalBackupList.length-1; i>=0; i--) {
         let accountCopy = globalBackupList[i]
         if(accountCopy.timestamp <= oldestTimestamp){
@@ -7157,6 +7196,7 @@ class StateManager extends EventEmitter {
         } 
       }  
     }
+    return null
   }
 
   sortByTimestamp(a:any, b:any): number{
