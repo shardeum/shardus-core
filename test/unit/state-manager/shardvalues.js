@@ -7,7 +7,7 @@ const ShardFunctions = require('../../../build/src/state-manager/shardFunctions.
 // import ShardFunctions from './shardFunctions.js'
 
 const crypto = require('shardus-crypto-utils')
-const utils = require('../../../src/utils')
+const utils = require('../../../build/src/utils')
 crypto('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
 
 // generate a sorted list of nodes
@@ -133,8 +133,9 @@ let useHardcodenodes = true
 // let hardcodeNodes = ['11e8xddd45', '12c8xa6128', '1cb5x276fc', '2556x0d3cc', '3636xb84b3', '36f3x39cc0', '3b3dxe390d', '3ca6x4570b', '3eb3x6a829', '462fx9f1ea', '58c8x1d30f', '5e98xb924f', '621fxcdebc', '773fx3f03c', '8226x56b59', '9008x1db00', '98aax3d65a', '9cf3x5a8d6', '9f9dx52237', 'a795xbecb0', 'bf7cx31bf8', 'd69exef4b6', 'f44dxfff17', 'fb18x295a2', 'fcbbx3f509']
 // let hardcodeNodes2 = null
 
-let hardcodeNodes = ["02b1x3c2d3","5a1bx18ebb","ef1dxfcd62"]
+//let hardcodeNodes = ["02b1x3c2d3","5a1bx18ebb","ef1dxfcd62"]
 //let hardcodeNodes = ["11b1x3c2d3","881bx18ebb","cc1dxfcd62"]
+let hardcodeNodes = ["2114xd7ce1","6232xb72a9","9089x67082","b72dx4eecc","d371x2351d"]
 let hardcodeNodes2 = null
 
 // let hardcodeNodes = ['01cex1bed2', '0793xc7aee', '180bx3a172', '24afxce02d', '2d2ax053f6', '30aex6b5ca', '33d7x0a28e', '42bbx0242f', '43cax9b811', '5c70xdee7d', '5fcfx2f32d', '7303xfd71e', '7354xcedbc', '7b78xf936e', '7eabx5deea', '8609xcccf4', '88ecx4c9ab', '8c5axb8364', '93e3x87831', '9a91xb2cd3', '9d1dx51f4a', '9facx0e61c', 'a452x1f73d', 'a8e6xdd19c', 'bef0x7edf8', 'bfa5x12bbf', 'e116x7c34b', 'e89bxde077', 'eae4xeefb1', 'ffc1x1151f']
@@ -151,9 +152,9 @@ if (useHardcodenodes) {
 if (hardcodeNodes2) {
   numNodes2 = hardcodeNodes2.length
 }
-let debugStartsWith = '02b1' // '8bc4' // '33d7' //'0692' // '23d5' // 'f211' //'147d' // '2054' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
+let debugStartsWith = '9089' // '8bc4' // '33d7' //'0692' // '23d5' // 'f211' //'147d' // '2054' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
 let debugID = debugStartsWith.slice(0, 4) + '7'.repeat(64 - 4)
-let debugAccount = '02b1' + '3'.repeat(60) // 5c43 386e
+let debugAccount = '38ab' + '3'.repeat(60) // 5c43 386e
 let debugNode = null
 // 5c43xba41c account test.. need to expand it.
 
@@ -319,6 +320,8 @@ for (let i = 0; i < testIterations; i++) {
 
     console.log(` summary:${utils.stringifyReduce(summaryObject)}`)
 
+    console.log('Home node for debug acc:' + utils.stringifyReduce(homeNode))
+    console.log('nodeThatStoreOurParitionFull:' + utils.stringifyReduce(homeNode.nodeThatStoreOurParitionFull))
     let { homePartition: partition } = ShardFunctions.addressToPartition(shardGlobals, debugAccount)
 
     let ourNodeData = nodeShardDataMap.get(debugNode.id)

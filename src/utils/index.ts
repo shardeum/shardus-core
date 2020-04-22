@@ -280,6 +280,27 @@ let objKeys =
     return keys
   }
 
+
+export const reviver = (key, value) => {
+  if(typeof value === 'object' && value !== null) {
+    if (value.dataType === 'stringifyReduce_map_2_array') {
+      return new Map(value.value);
+    }
+  }
+  return value;
+}
+export const replacer = (key, value) => {
+  const originalObject = this[key];
+  if(originalObject instanceof Map) {
+    return {
+      dataType: 'stringifyReduce_map_2_array',
+      value: Array.from(originalObject.entries()), // or with spread: value: [...originalObject]
+    };
+  } else {
+    return value;
+  }
+}
+
 export const stringifyReduce = (val, isArrayProp?: boolean) => {
   let i, max, str, keys, key, propVal, toStr
   if (val === true) {
@@ -294,6 +315,14 @@ export const stringifyReduce = (val, isArrayProp?: boolean) => {
         return null
       } else if (val.toJSON && typeof val.toJSON === 'function') {
         return stringifyReduce(val.toJSON(), isArrayProp)
+      } else if(val instanceof Map){
+        // let mapContainer = {stringifyReduce_map_2_array:[...val.entries()]}
+        // return stringifyReduce(mapContainer)
+        let mapContainer = {
+          dataType: 'stringifyReduce_map_2_array',
+          value: Array.from(val.entries()), // or with spread: value: [...originalObject]
+        }
+        return stringifyReduce(mapContainer)
       } else {
         toStr = objToString.call(val)
         if (toStr === '[object Array]') {
@@ -335,6 +364,7 @@ export const stringifyReduce = (val, isArrayProp?: boolean) => {
       const reduced = makeShortHash(val)
       return JSON.stringify(reduced)
     default:
+
       return isFinite(val) ? val : null
   }
 }

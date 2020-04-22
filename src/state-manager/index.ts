@@ -2382,6 +2382,11 @@ class StateManager extends EventEmitter {
       // make sure we have it
       let queueEntry = this.getQueueEntrySafe(payload.txid)// , payload.timestamp)
       if (queueEntry == null) {
+        //if we are syncing we need to queue this transaction!
+
+        //this.queueAcceptedTransaction (acceptedTx:AcceptedTx, sendGossip:boolean = true, sender: Shardus.Node  |  null, globalModification:boolean) 
+
+
         return
       }
       // add the data in
@@ -3285,6 +3290,7 @@ class StateManager extends EventEmitter {
           try {
             let transactionGroup = this.queueEntryGetTransactionGroup(txQueueEntry)
             if (transactionGroup.length > 1) {
+              // should consider only forwarding in some cases?
               this.p2p.sendGossipIn('spread_tx_to_group', acceptedTx, '', sender, transactionGroup)
             }
           // this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
@@ -3531,6 +3537,7 @@ class StateManager extends EventEmitter {
     let txGroup = []
     let uniqueNodes:StringNodeObjectMap = {}
 
+    let hasNonGlobalKeys = false
     for (let key of queueEntry.uniqueKeys) {
       let homeNode = queueEntry.homeNodes[key]
       // txGroup = Array.concat(txGroup, homeNode.nodeThatStoreOurParitionFull)
@@ -3540,15 +3547,27 @@ class StateManager extends EventEmitter {
       if (homeNode.extendedData === false) {
         ShardFunctions.computeExtendedNodePartitionData(this.currentCycleShardData.shardGlobals, this.currentCycleShardData.nodeShardDataMap, this.currentCycleShardData.parititionShardDataMap, homeNode, this.currentCycleShardData.activeNodes)
       }
+
+      // If this is not a global TX then skip tracking of nodes for global accounts used as a reference.
+      if(queueEntry.globalModification === false) {
+        if(this.isGlobalAccount(key) === true){
+          hasNonGlobalKeys = true;
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `queueEntryGetTransactionGroup skipping: ${utils.makeShortHash(key)} tx: ${utils.makeShortHash(queueEntry.acceptedTx.id)}`)
+          continue
+        } 
+      }
       for (let node of homeNode.nodeThatStoreOurParitionFull) { // not iterable!
         uniqueNodes[node.id] = node
       }
       // make sure the home node is in there in case we hit and edge case
       uniqueNodes[homeNode.node.id] = homeNode.node
+
+
     }
     queueEntry.ourNodeInvolved = true
     if (uniqueNodes[this.currentCycleShardData.ourNode.id] == null) {
       queueEntry.ourNodeInvolved = false
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `queueEntryGetTransactionGroup not involved: hasNonG:${hasNonGlobalKeys} tx ${utils.makeShortHash(queueEntry.acceptedTx.id)}`)
     }
 
     // make sure our node is included: needed for gossip! - although we may not care about the data!
@@ -3578,6 +3597,7 @@ class StateManager extends EventEmitter {
     let dataValuesWeHave = []
     let datas:{[accountID:string]:any} = {}
     let remoteShardsByKey:{[accountID:string]:NodeShardData} = {} // shard homenodes that we do not have the data for.
+    let loggedPartition = false
     for (let key of queueEntry.uniqueKeys) {
       ///   test here
       // let hasKey = ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)
@@ -3601,6 +3621,15 @@ class StateManager extends EventEmitter {
         hasKey = true
         isGlobalKey = true
         this.logger.playbackLogNote('globalAccountMap', `tellCorrespondingNodes - has`)
+      }
+
+      if(hasKey === false) {
+        if(loggedPartition === false){
+          loggedPartition = true
+          if (this.verboseLogs) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false: ${utils.stringifyReduce(homeNode.nodeThatStoreOurParitionFull.map( (v) => v.id))}`)
+          if (this.verboseLogs) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false: full: ${utils.stringifyReduce(homeNode.nodeThatStoreOurParitionFull)}`)
+        }
+        if (this.verboseLogs) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false  key: ${utils.stringifyReduce(key)}`)
       }
 
       if (hasKey) { // todo Detect if our node covers this paritition..  need our partition data
@@ -3960,7 +3989,7 @@ class StateManager extends EventEmitter {
             }
 
             // do we have any syncing neighbors?
-            if (this.currentCycleShardData.hasSyncingNeighbors === true) {
+            if (this.currentCycleShardData.hasSyncingNeighbors === true && queueEntry.globalModification === false) {
             // let dataToSend = Object.values(queueEntry.collectedData)
               let dataToSend = []
 
@@ -4066,13 +4095,20 @@ class StateManager extends EventEmitter {
       let accountEnd = partitionShardData.homeRange.high
       let wrappedAccounts = await this.app.getAccountData(accountStart, accountEnd, 10000000)
       // { accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp }
+      let duplicateCheck = {}
       for (let wrappedAccount of wrappedAccounts) {
+        if(duplicateCheck[wrappedAccount.accountId] != null){
+          continue
+        }
+        duplicateCheck[wrappedAccount.accountId] = true
         let v = wrappedAccount.data.balance // hack, todo maybe ask app for a debug value
         if (this.app.getAccountDebugValue != null) {
           v = this.app.getAccountDebugValue(wrappedAccount)
         }
         partition.accounts.push({ id: wrappedAccount.accountId, hash: wrappedAccount.stateId, v: v })
       }
+
+      partition.accounts.sort(this._sortByIdAsc)
     }
 
     //partitionDump.allNodeIds = []
@@ -4331,10 +4367,12 @@ class StateManager extends EventEmitter {
       let wrappedData = wrappedStates[key]
       if(wrappedData == null){
         // TSConversion todo: harden this. throw exception?
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `setAccount wrappedData == null :${utils.makeShortHash(wrappedData.accountId)}`)
         continue
       }
 
       if (canWriteToAccount(wrappedData.accountId) === false) {
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `setAccount canWriteToAccount == false :${utils.makeShortHash(wrappedData.accountId)}`)
         continue
       }
 
@@ -4361,7 +4399,7 @@ class StateManager extends EventEmitter {
   async fifoLock (fifoName:string): Promise<number> {
 
 
-    var stack = new Error().stack
+    var stack = '' // new Error().stack
     this.mainLogger.debug(`fifoLock: ${fifoName} ${stack}`)
 
     let thisFifo = this.fifoLocks[fifoName]
@@ -4397,7 +4435,7 @@ class StateManager extends EventEmitter {
   }
 
   fifoUnlock (fifoName:string, id: number) {
-    var stack = new Error().stack
+    var stack = '' // new Error().stack
     this.mainLogger.debug(`fifoUnlock: ${fifoName} ${stack}`)
 
     let thisFifo = this.fifoLocks[fifoName]
