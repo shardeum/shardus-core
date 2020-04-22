@@ -714,8 +714,6 @@ class StateManager extends EventEmitter {
   // The last step catch up on the acceptedTx queue
   async syncStateData (requiredNodeCount: number) {
     // Dont sync if first node
-    console.log('DBG DATASYNC p2p', this.p2p)
-    console.log('DBG DATASYNC isFirstSeed', this.p2p.isFirstSeed)
     if (this.p2p.isFirstSeed) {
       this.dataSyncMainPhaseComplete = true
 

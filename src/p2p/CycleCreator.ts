@@ -139,7 +139,7 @@ export function init() {
     if (submodule.init) submodule.init()
   }
 
-  // Get a handle to write to main.log
+  // Get a handle to write to p2p.log
   p2pLogger = logger.getLogger('p2p')
 
   // Init state
@@ -223,7 +223,6 @@ async function cycleCreator() {
   }
 
   // Send last record to any subscribed archivers
-  console.log('DBG', `SENDING ARCHIVER DATA ${prevRecord.counter}`, Date.now())
   Archivers.sendData()
   ;({
     cycle: currentCycle,
@@ -249,7 +248,6 @@ async function cycleCreator() {
   schedule(runQ3, startQ3)
   schedule(runQ4, startQ4)
   schedule(cycleCreator, end, { runEvenIfLateBy: Infinity })
-  console.log('DBG', `Scheduled cycleCreator in ${end - Date.now()} ms...`)
 
   madeCycle = false
 }

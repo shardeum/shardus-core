@@ -145,19 +145,6 @@ export function reset() {
 }
 
 function calculateToAccept() {
-  /*
-fn toAccept:
-  if (active < desired)
-    needed = desired - active
-    if (needed > maxNodesPerCycle - syncing) needed = maxNodesPerCycle - syncing
-    if (needed < 0) needed = 0
-  else
-    needed = expired
-    if (needed > expired) needed = expired
-    if (needed > maxNodesPerCycle - syncing) needed = maxNodesPerCycle - syncing
-    if (needed < 0) needed = 0
-  return needed
-*/
   const desired = CycleChain.newest.desired
   const active = CycleChain.newest.active
   const max = config.p2p.maxNodesPerCycle // [TODO] allow autoscaling to change this
@@ -177,16 +164,6 @@ fn toAccept:
   if (needed < 0) {
     needed = 0
   }
-  console.log(
-    'calculateToAccept',
-    desired,
-    active,
-    max,
-    syncing,
-    expired,
-    canSync,
-    needed
-  )
   return needed
 }
 

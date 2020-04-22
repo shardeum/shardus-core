@@ -74,7 +74,7 @@ export interface Record {
 
 /** STATE */
 
-let mainLogger
+let p2pLogger
 
 export let archivers: Map<JoinedArchiver['publicKey'], JoinedArchiver>
 let recipients: Array<DataRecipient<Cycle | Transaction | Partition>>
@@ -86,7 +86,7 @@ let requests: JoinRequest[]
 /** CycleCreator Functions */
 
 export function init() {
-  mainLogger = logger.getLogger('main')
+  p2pLogger = logger.getLogger('p2p')
 
   archivers = new Map()
   recipients = []
@@ -139,13 +139,13 @@ export function queueRequest(request) {}
 /** Original Functions */
 
 function logDebug(...msgs) {
-  mainLogger.debug(
+  p2pLogger.debug(
     'P2PArchivers: ' + msgs.map(msg => JSON.stringify(msg)).join(', ')
   )
 }
 
 function logError(...msgs) {
-  mainLogger.error(
+  p2pLogger.error(
     'P2PArchivers: ' + msgs.map(msg => JSON.stringify(msg)).join(', ')
   )
 }
@@ -306,11 +306,6 @@ export function registerRoutes() {
   )
 
   network.registerExternalPost('requestdata', (req, res) => {
-    console.log(
-      'DBG',
-      `Archivers: requestdata: Got Request ${JSON.stringify(req.body)}`
-    )
-
     if (!req.body) {
       const invalidDataReqErr = 'Invalid data request'
       logError(invalidDataReqErr)

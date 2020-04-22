@@ -169,19 +169,27 @@ class P2P extends EventEmitter {
   }
 
   _registerRoutes() {
+    // NO LONGER NEED THESE
+    /*
     routes.register(this)
     this.lostNodes.registerRoutes()
     this.archivers.registerRoutes()
-    for (const route of P2PApoptosis.internalRoutes)
+    for (const route of P2PApoptosis.internalRoutes) {
       this.registerInternal(route.name, route.handler)
-    for (const route of P2PApoptosis.gossipRoutes)
+    }
+    for (const route of P2PApoptosis.gossipRoutes) {
       this.registerGossipHandler(route.name, route.handler)
-    for (const route of Sync.externalRoutes)
+    }
+    for (const route of Sync.externalRoutes) {
       this.network._registerExternal(route.method, route.name, route.handler)
-    for (const route of GlobalAccounts.internalRoutes)
+    }
+    for (const route of GlobalAccounts.internalRoutes) {
       this.registerInternal(route.name, route.handler)
-    for (const route of GlobalAccounts.gossipRoutes)
+    }
+    for (const route of GlobalAccounts.gossipRoutes) {
       this.registerGossipHandler(route.name, route.handler)
+    }
+    */
   }
 
   _verifyExternalInfo(ipInfo) {
@@ -392,8 +400,9 @@ class P2P extends EventEmitter {
     const dbExternPort = await this.storage.getProperty('externalPort')
 
     // Check if our external network info matches what's in the database, otherwise we need to rejoin
-    if (currExternIp !== dbExternIp || currExternPort !== dbExternPort)
+    if (currExternIp !== dbExternIp || currExternPort !== dbExternPort) {
       return true
+    }
 
     // TODO: Remove this and replace with robust way of seeing if no nodes
     // ----- are currently active before returning true
@@ -593,10 +602,11 @@ class P2P extends EventEmitter {
     if (!this._isInUpdatePhase(currentTime, cycleStart, cycleDuration)) {
       await this._waitUntilUpdatePhase(currentTime, cycleStart, cycleDuration)
     }
-    if (this.verboseLogs)
+    if (this.verboseLogs) {
       this.mainLogger.debug(
         `Gossiping message: ${JSON.stringify(message)} on '${route}'.`
       )
+    }
     this.sendGossipIn(route, message)
   }
 
@@ -625,8 +635,9 @@ class P2P extends EventEmitter {
   async _join(seedNodes) {
     const localTime = utils.getTime('s')
     const { currentTime } = await this._fetchCycleMarker(seedNodes)
-    if (!this._checkWithinSyncLimit(localTime, currentTime))
+    if (!this._checkWithinSyncLimit(localTime, currentTime)) {
       throw Error('Local time out of sync with network.')
+    }
     const timeOffset = currentTime - localTime
     this.mainLogger.debug(`Time offset with selected node: ${timeOffset}`)
     let nodeId = null
@@ -741,8 +752,9 @@ class P2P extends EventEmitter {
     shuffleNodes = true
   ) {
     if (nodes.length === 0) throw new Error('No nodes given.')
-    if (typeof queryFn !== 'function')
+    if (typeof queryFn !== 'function') {
       throw new Error(`Provided queryFn ${queryFn} is not a valid function.`)
+    }
     if (typeof equalityFn !== 'function') equalityFn = util.isDeepStrictEqual
     if (redundancy < 1) redundancy = 3
     if (redundancy > nodes.length) redundancy = nodes.length
@@ -1307,12 +1319,13 @@ class P2P extends EventEmitter {
 
   _wrapAndTagMessage(msg, tracker = '', recipientNode) {
     if (!msg) throw new Error('No message given to wrap and tag!')
-    if (this.verboseLogs)
+    if (this.verboseLogs) {
       this.mainLogger.debug(
         `Attaching sender ${
           this.id
         } to the message: ${utils.stringifyReduceLimit(msg)}`
       )
+    }
     const wrapped = {
       payload: msg,
       sender: this.id,
@@ -1413,12 +1426,13 @@ class P2P extends EventEmitter {
       const respondWrapped = async response => {
         const node = this.state.getNode(sender)
         const signedResponse = this._wrapAndTagMessage(response, tracker, node)
-        if (this.verboseLogs)
+        if (this.verboseLogs) {
           this.mainLogger.debug(
             `The signed wrapped response to send back: ${utils.stringifyReduceLimit(
               signedResponse
             )}`
           )
+        }
         if (route !== 'gossip') {
           this.logger.playbackLog(
             sender,
@@ -1480,18 +1494,20 @@ class P2P extends EventEmitter {
       tracker = this.createGossipTracker()
     }
 
-    if (this.verboseLogs)
+    if (this.verboseLogs) {
       this.mainLogger.debug(
         `Start of sendGossip(${utils.stringifyReduce(payload)})`
       )
+    }
     const gossipPayload = { type, data: payload }
 
     const gossipHash = this.crypto.hash(gossipPayload)
     if (this.gossipedHashesSent.has(gossipHash)) {
-      if (this.verboseLogs)
+      if (this.verboseLogs) {
         this.mainLogger.debug(
           `Gossip already sent: ${gossipHash.substring(0, 5)}`
         )
+      }
       return
     }
 
@@ -1501,7 +1517,7 @@ class P2P extends EventEmitter {
       recipients = removeNodesByID(recipients, [sender])
     }
     try {
-      if (this.verboseLogs)
+      if (this.verboseLogs) {
         this.mainLogger.debug(
           `Gossiping ${type} request to these nodes: ${utils.stringifyReduce(
             recipients.map(
@@ -1509,6 +1525,7 @@ class P2P extends EventEmitter {
             )
           )}`
         )
+      }
       for (const node of recipients) {
         this.logger.playbackLog(
           'self',
@@ -1521,21 +1538,23 @@ class P2P extends EventEmitter {
       }
       await this.tell(recipients, 'gossip', gossipPayload, true, tracker)
     } catch (ex) {
-      if (this.verboseLogs)
+      if (this.verboseLogs) {
         this.mainLogger.error(
           `Failed to sendGossip(${utils.stringifyReduce(
             payload
           )}) Exception => ${ex}`
         )
+      }
       this.fatalLogger.fatal(
         'sendGossip: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
       )
     }
     this.gossipedHashesSent.set(gossipHash, false)
-    if (this.verboseLogs)
+    if (this.verboseLogs) {
       this.mainLogger.debug(
         `End of sendGossip(${utils.stringifyReduce(payload)})`
       )
+    }
   }
 
   sortByID(first, second) {
@@ -1558,18 +1577,20 @@ class P2P extends EventEmitter {
       tracker = this.createGossipTracker()
     }
 
-    if (this.verboseLogs)
+    if (this.verboseLogs) {
       this.mainLogger.debug(
         `Start of sendGossipIn(${utils.stringifyReduce(payload)})`
       )
+    }
     const gossipPayload = { type, data: payload }
 
     const gossipHash = this.crypto.hash(gossipPayload)
     if (this.gossipedHashesSent.has(gossipHash)) {
-      if (this.verboseLogs)
+      if (this.verboseLogs) {
         this.mainLogger.debug(
           `Gossip already sent: ${gossipHash.substring(0, 5)}`
         )
+      }
       return
     }
     // nodes.sort((first, second) => first.id.localeCompare(second.id, 'en', { sensitivity: 'variant' }))
@@ -1589,7 +1610,7 @@ class P2P extends EventEmitter {
       recipients = removeNodesByID(recipients, [sender])
     }
     try {
-      if (this.verboseLogs)
+      if (this.verboseLogs) {
         this.mainLogger.debug(
           `GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(
             recipients.map(
@@ -1597,6 +1618,7 @@ class P2P extends EventEmitter {
             )
           )}`
         )
+      }
       for (const node of recipients) {
         this.logger.playbackLog(
           'self',
@@ -1609,21 +1631,23 @@ class P2P extends EventEmitter {
       }
       await this.tell(recipients, 'gossip', gossipPayload, true, tracker)
     } catch (ex) {
-      if (this.verboseLogs)
+      if (this.verboseLogs) {
         this.mainLogger.error(
           `Failed to sendGossip(${utils.stringifyReduce(
             payload
           )}) Exception => ${ex}`
         )
+      }
       this.fatalLogger.fatal(
         'sendGossipIn: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
       )
     }
     this.gossipedHashesSent.set(gossipHash, false)
-    if (this.verboseLogs)
+    if (this.verboseLogs) {
       this.mainLogger.debug(
         `End of sendGossipIn(${utils.stringifyReduce(payload)})`
       )
+    }
   }
 
   /**
@@ -1642,18 +1666,20 @@ class P2P extends EventEmitter {
       tracker = this.createGossipTracker()
     }
 
-    if (this.verboseLogs)
+    if (this.verboseLogs) {
       this.mainLogger.debug(
         `Start of sendGossipIn(${utils.stringifyReduce(payload)})`
       )
+    }
     const gossipPayload = { type, data: payload }
 
     const gossipHash = this.crypto.hash(gossipPayload)
     if (this.gossipedHashesSent.has(gossipHash)) {
-      if (this.verboseLogs)
+      if (this.verboseLogs) {
         this.mainLogger.debug(
           `Gossip already sent: ${gossipHash.substring(0, 5)}`
         )
+      }
       return
     }
     // Find out your own index in the nodes array
@@ -1665,7 +1691,7 @@ class P2P extends EventEmitter {
       recipients = removeNodesByID(recipients, [sender])
     }
     try {
-      if (this.verboseLogs)
+      if (this.verboseLogs) {
         this.mainLogger.debug(
           `GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(
             recipients.map(
@@ -1673,6 +1699,7 @@ class P2P extends EventEmitter {
             )
           )}`
         )
+      }
       for (const node of recipients) {
         this.logger.playbackLog(
           'self',
@@ -1685,21 +1712,23 @@ class P2P extends EventEmitter {
       }
       await this.tell(recipients, 'gossip', gossipPayload, true, tracker)
     } catch (ex) {
-      if (this.verboseLogs)
+      if (this.verboseLogs) {
         this.mainLogger.error(
           `Failed to sendGossip(${utils.stringifyReduce(
             payload
           )}) Exception => ${ex}`
         )
+      }
       this.fatalLogger.fatal(
         'sendGossipIn: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
       )
     }
     this.gossipedHashesSent.set(gossipHash, false)
-    if (this.verboseLogs)
+    if (this.verboseLogs) {
       this.mainLogger.debug(
         `End of sendGossipIn(${utils.stringifyReduce(payload)})`
       )
+    }
   }
 
   /**
@@ -1707,10 +1736,11 @@ class P2P extends EventEmitter {
    * Payload: {type: ['receipt', 'trustedTransaction'], data: {}}
    */
   async handleGossip(payload, sender, tracker = '') {
-    if (this.verboseLogs)
+    if (this.verboseLogs) {
       this.mainLogger.debug(
         `Start of handleGossip(${utils.stringifyReduce(payload)})`
       )
+    }
     const type = payload.type
     const data = payload.data
 
@@ -1726,30 +1756,33 @@ class P2P extends EventEmitter {
     }
 
     if (this.gossipedHashes.has(gossipHash)) {
-      if (this.verboseLogs)
+      if (this.verboseLogs) {
         this.mainLogger.debug(`Got old gossip: ${gossipHash.substring(0, 5)}`)
+      }
       if (!this.gossipedHashes.get(gossipHash)) {
         setTimeout(
           () => this.gossipedHashes.delete(gossipHash),
           this.gossipTimeout
         )
         this.gossipedHashes.set(gossipHash, true)
-        if (this.verboseLogs)
+        if (this.verboseLogs) {
           this.mainLogger.debug(
             `Marked old gossip for deletion: ${gossipHash.substring(0, 5)} in ${
               this.gossipTimeout
             } ms`
           )
+        }
       }
       return
     }
     this.gossipedHashes.set(gossipHash, false)
     this.logger.playbackLog(sender, 'self', 'GossipRcv', type, tracker, data)
     await gossipHandler(data, sender, tracker)
-    if (this.verboseLogs)
+    if (this.verboseLogs) {
       this.mainLogger.debug(
         `End of handleGossip(${utils.stringifyReduce(payload)})`
       )
+    }
   }
 
   /**

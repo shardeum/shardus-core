@@ -18,7 +18,7 @@ import { Node } from './Types'
 
 export const emitter = new EventEmitter()
 
-let mainLogger: Logger
+let p2pLogger: Logger
 
 export let id: string
 export let isFirst: boolean
@@ -36,13 +36,13 @@ export function init() {
   CycleCreator.init()
 
   // Create a logger for yourself
-  mainLogger = logger.getLogger('main')
+  p2pLogger = logger.getLogger('p2p')
 }
 
 export async function startup(): Promise<boolean> {
   // Emit the 'joining' event before attempting to join
   const publicKey = crypto.getPublicKey()
-  mainLogger.debug('Emitting `joining` event.')
+  p2pLogger.debug('Emitting `joining` event.')
   emitter.emit('joining', publicKey)
 
   // Get new activeNodes and attempt to join until you are successful
@@ -54,15 +54,15 @@ export async function startup(): Promise<boolean> {
     if (wait <= 0 || wait > config.p2p.cycleDuration * 1000 * 2) {
       wait = (config.p2p.cycleDuration * 1000) / 2
     }
-    mainLogger.info(`Trying again in ${wait / 1000} sec...`)
+    p2pLogger.info(`Trying again in ${wait / 1000} sec...`)
     await utils.sleep(wait)
   }
 
   while (!joined) {
     try {
-      mainLogger.info('Getting activeNodes from archiver to join network...')
+      p2pLogger.info('Getting activeNodes from archiver to join network...')
       activeNodes = await contactArchiver()
-      mainLogger.info('Discovering if we are the first node...')
+      p2pLogger.info('Discovering if we are the first node...')
       isFirst = await discoverNetwork(activeNodes)
 
       // Remove yourself from activeNodes if you are present in them but not firstSeed
@@ -76,23 +76,23 @@ export async function startup(): Promise<boolean> {
         }
       }
 
-      mainLogger.info('Attempting to join network...')
+      p2pLogger.info('Attempting to join network...')
       const joinRes = await joinNetwork(activeNodes)
       joined = joinRes[0]
       const tryAgain = joinRes[1]
       if (!joined) {
-        mainLogger.info('Join request not accepted')
+        p2pLogger.info('Join request not accepted')
         await retryWait(tryAgain)
       }
     } catch (err) {
       joined = false
-      mainLogger.error(err)
+      p2pLogger.error(err)
       await retryWait()
     }
   }
 
   // Emit the 'joined' event before attempting to sync to the network
-  mainLogger.debug('Emitting `joined` event.')
+  p2pLogger.debug('Emitting `joined` event.')
   emitter.emit('joined', id, publicKey)
 
   // Enable internal routes
@@ -104,7 +104,7 @@ export async function startup(): Promise<boolean> {
     while (!synced) {
       // Once joined, sync to the network
       try {
-        mainLogger.info(
+        p2pLogger.info(
           'Getting activeNodes from archiver to sync to network...'
         )
         activeNodes = await contactArchiver()
@@ -118,12 +118,12 @@ export async function startup(): Promise<boolean> {
           activeNodes.splice(ourIdx, 1)
         }
 
-        mainLogger.info('Attempting to sync to network...')
+        p2pLogger.info('Attempting to sync to network...')
         synced = await sync(activeNodes)
       } catch (err) {
         synced = false
-        mainLogger.error(err)
-        mainLogger.info('Trying again in 2 sec...')
+        p2pLogger.error(err)
+        p2pLogger.info('Trying again in 2 sec...')
         await utils.sleep(2000)
       }
     }
@@ -161,24 +161,24 @@ async function discoverNetwork(seedNodes) {
   try {
     const timeSynced = await checkTimeSynced(config.p2p.timeServers)
     if (!timeSynced) {
-      mainLogger.warn('Local time out of sync with time server.')
+      p2pLogger.warn('Local time out of sync with time server.')
     }
   } catch (e) {
-    mainLogger.warn(e.message)
+    p2pLogger.warn(e.message)
   }
 
   // Check if we are first seed node
   const isFirstSeed = checkIfFirstSeedNode(seedNodes)
   if (!isFirstSeed) {
-    mainLogger.info('You are not the first seed node...')
+    p2pLogger.info('You are not the first seed node...')
     return false
   }
-  mainLogger.info('You are the first seed node!')
+  p2pLogger.info('You are the first seed node!')
   return true
 }
 
 async function joinNetwork(activeNodes): Promise<[boolean, number]> {
-  mainLogger.debug('Joining network...')
+  p2pLogger.debug('Joining network...')
 
   if (isFirst) {
     // Create the first join request and set our node id
@@ -194,7 +194,7 @@ async function joinNetwork(activeNodes): Promise<[boolean, number]> {
     const tryAgain = await Join.submitJoin(activeNodes, request)
 
     if (tryAgain) {
-      mainLogger.debug(`Told to wait until ${tryAgain}`)
+      p2pLogger.debug(`Told to wait until ${tryAgain}`)
       return [false, tryAgain]
     } else {
       // Wait 1 cycle duration
@@ -223,7 +223,7 @@ export async function checkTimeSynced(timeServers) {
       })
       return time.t <= config.p2p.syncLimit
     } catch (e) {
-      mainLogger.warn(`Couldn't fetch ntp time from server at ${host}`)
+      p2pLogger.warn(`Couldn't fetch ntp time from server at ${host}`)
     }
   }
   throw Error('Unable to check local time against time servers.')
@@ -254,7 +254,7 @@ async function getActiveNodesFromArchiver() {
         e.message
     )
   }
-  mainLogger.debug(`Got signed seed list: ${JSON.stringify(seedListSigned)}`)
+  p2pLogger.debug(`Got signed seed list: ${JSON.stringify(seedListSigned)}`)
   return seedListSigned
 }
 
@@ -293,7 +293,7 @@ export function getThisNodeInfo() {
     joinRequestTimestamp,
     activeTimestamp,
   }
-  mainLogger.debug(`Node info of this node: ${JSON.stringify(nodeInfo)}`)
+  p2pLogger.debug(`Node info of this node: ${JSON.stringify(nodeInfo)}`)
   return nodeInfo
 }
 

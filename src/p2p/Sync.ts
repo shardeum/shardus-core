@@ -20,7 +20,7 @@ export interface ActiveNode {
 
 /** STATE */
 
-let mainLogger: Logger
+let p2pLogger: Logger
 
 /** ROUTES */
 
@@ -52,7 +52,7 @@ const routes = {
 /** FUNCTIONS */
 
 export function init() {
-  mainLogger = logger.getLogger('main')
+  p2pLogger = logger.getLogger('p2p')
 
   for (const route of routes.external) {
     network._registerExternal(route.method, route.name, route.handler)
@@ -165,11 +165,11 @@ export function digestCycle(cycle: CycleCreator.CycleRecord) {
     return
   }
 
-  console.log(`
+  info(`
     Digested C${cycle.counter}
       cycle record: ${JSON.stringify(cycle)}
       node list: ${JSON.stringify([...NodeList.nodes.values()])}
-      active others: ${JSON.stringify(NodeList.activeOthersByIdOrder)}
+      active nodes: ${JSON.stringify(NodeList.activeByIdOrder)}
   `)
 
   applyNodeListChange(parse(cycle))
@@ -232,16 +232,19 @@ function activeNodeCount(cycle: CycleCreator.CycleRecord) {
   )
 }
 
+
 function info(...msg) {
   const entry = `Sync: ${msg.join(' ')}`
-  // p2p.mainLogger.info(entry)
-  mainLogger.info(entry)
+  p2pLogger.info(entry)
+}
+
+function warn(...msg) {
+  const entry = `Sync: ${msg.join(' ')}`
+  p2pLogger.warn(entry)
 }
 
 function error(...msg) {
   const entry = `Sync: ${msg.join(' ')}`
-  // p2p.mainLogger.error(entry)
-  mainLogger.error(entry)
+  p2pLogger.error(entry)
 }
-
 const sleep = promisify(setTimeout)

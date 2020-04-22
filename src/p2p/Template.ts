@@ -85,16 +85,16 @@ export function sendRequests() {}
 /** Module Functions */
 
 function info(...msg) {
-  const entry = `Active: ${msg.join(' ')}`
+  const entry = `[CHANGE ME]: ${msg.join(' ')}`
   p2pLogger.info(entry)
 }
 
 function warn(...msg) {
-  const entry = `Active: ${msg.join(' ')}`
+  const entry = `[CHANGE ME]: ${msg.join(' ')}`
   p2pLogger.warn(entry)
 }
 
 function error(...msg) {
-  const entry = `Active: ${msg.join(' ')}`
+  const entry = `[CHANGE ME]: ${msg.join(' ')}`
   p2pLogger.error(entry)
 }

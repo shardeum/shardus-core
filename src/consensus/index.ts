@@ -54,21 +54,22 @@ class Consensus extends EventEmitter {
 
   async inject(shardusTransaction, global) {
     let transactionReceipt
-    let inTransaction = shardusTransaction.inTransaction
+    const inTransaction = shardusTransaction.inTransaction
     let timestamp = 0
     let debugInfo = ''
     try {
-      let keysResponse = this.app.getKeyFromTransaction(inTransaction)
-      let { sourceKeys, targetKeys } = keysResponse
+      const keysResponse = this.app.getKeyFromTransaction(inTransaction)
+      const { sourceKeys, targetKeys } = keysResponse
       timestamp = keysResponse.timestamp
       debugInfo = keysResponse.debugInfo
 
-      if (this.mainLogs)
+      if (this.mainLogs) {
         this.mainLogger.debug(
           `Start of inject(globalModification:${global}   ${timestamp}  ${debugInfo}  tx: ${utils.stringifyReduce(
             shardusTransaction
           )})`
         )
+      }
       let sourceAddress, targetAddress, stateId, targetStateId
 
       if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
@@ -77,50 +78,57 @@ class Consensus extends EventEmitter {
       if (Array.isArray(targetKeys) && targetKeys.length > 0) {
         targetAddress = targetKeys[0]
       }
-      if (this.mainLogs)
+      if (this.mainLogs) {
         this.mainLogger.debug(
           `sourceAddress: ${utils.makeShortHash(
             sourceAddress
           )} targetAddress: ${utils.makeShortHash(targetAddress)}`
         )
+      }
 
       if (sourceAddress) {
-        if (this.mainLogs)
+        if (this.mainLogs) {
           this.mainLogger.debug(`get source state id for ${sourceAddress}`)
+        }
         stateId = null // await this.app.getStateId(sourceAddress)
-        if (this.mainLogs)
+        if (this.mainLogs) {
           this.mainLogger.debug(
             `StateID: ${stateId} short stateID: ${utils.makeShortHash(
               stateId
             )} `
           )
+        }
       }
 
       if (targetAddress) {
-        if (this.mainLogs)
+        if (this.mainLogs) {
           this.mainLogger.debug(`get target state id for ${targetAddress}`)
+        }
         targetStateId = null // await this.app.getStateId(targetAddress, false) // we don't require this to exist
-        if (this.mainLogs)
+        if (this.mainLogs) {
           this.mainLogger.debug(`targetStateId ${targetStateId}`)
+        }
       }
 
-      if (this.mainLogs)
+      if (this.mainLogs) {
         this.mainLogger.debug(
           `Creating the receipt for the transaction: StateID: ${stateId} short stateID: ${utils.makeShortHash(
             stateId
           )} `
         )
+      }
       transactionReceipt = this.createReceipt(
         inTransaction,
         stateId,
         targetStateId
       )
-      if (this.mainLogs)
+      if (this.mainLogs) {
         this.mainLogger.debug(
           `Done Creating the receipt for the transaction: StateID: ${stateId} short stateID: ${utils.makeShortHash(
             stateId
           )} `
         )
+      }
     } catch (ex) {
       this.logger
         .getLogger('main')
@@ -136,9 +144,9 @@ class Consensus extends EventEmitter {
       throw new Error(ex)
     }
 
-    let txStatus = 1 // todo real values for tx status. this is just a stand in
-    let txId = transactionReceipt.txHash
-    let acceptedTX = {
+    const txStatus = 1 // todo real values for tx status. this is just a stand in
+    const txId = transactionReceipt.txHash
+    const acceptedTX = {
       id: txId,
       timestamp,
       data: inTransaction,
@@ -153,10 +161,11 @@ class Consensus extends EventEmitter {
       `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`
     )
 
-    if (this.mainLogs)
+    if (this.mainLogs) {
       this.mainLogger.debug(
         `End of inject(${timestamp}  debugInfo: ${debugInfo})`
       )
+    }
 
     return transactionReceipt
   }
@@ -164,7 +173,7 @@ class Consensus extends EventEmitter {
   createReceipt(tx, state, targetStateId) {
     let receipt = {
       stateId: state,
-      targetStateId: targetStateId,
+      targetStateId,
       txHash: this.crypto.hash(tx),
       time: Date.now(),
     }
