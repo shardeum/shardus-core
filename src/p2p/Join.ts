@@ -15,13 +15,14 @@ import { robustQuery } from './Utils'
 /** TYPES */
 
 export interface JoinedConsensor extends Types.P2PNode {
-  cycleJoined: string
+  cycleJoined: CycleCreator.CycleMarker
+  counterRefreshed: CycleCreator.CycleRecord['counter']
   id: string
 }
 
 export interface JoinRequest {
   nodeInfo: Types.P2PNode
-  cycleMarker: string
+  cycleMarker: CycleCreator.CycleMarker
   proofOfWork: string
   selectionNum: string
 }
@@ -186,7 +187,8 @@ export function updateRecord(
   const joinedConsensors = txs.join.map(joinRequest => {
     const { nodeInfo, cycleMarker: cycleJoined } = joinRequest
     const id = computeNodeId(nodeInfo.publicKey, cycleJoined)
-    return { ...nodeInfo, cycleJoined, id }
+    const counterRefreshed = record.counter
+    return { ...nodeInfo, cycleJoined, counterRefreshed, id }
   })
 
   record.joinedConsensors = joinedConsensors.sort()

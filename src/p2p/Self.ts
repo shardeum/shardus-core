@@ -35,6 +35,8 @@ export function init() {
   Sync.init()
   CycleCreator.init()
 
+  NodeList.registerRoutes()
+
   // Create a logger for yourself
   p2pLogger = logger.getLogger('p2p')
 }

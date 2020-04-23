@@ -8,10 +8,10 @@ import { config, crypto, logger } from './Context'
 import * as CycleChain from './CycleChain'
 import * as Join from './Join'
 import * as NodeList from './NodeList'
+import * as Refresh from './Refresh'
 import * as Rotation from './Rotation'
 import * as Self from './Self'
 import * as Sync from './Sync'
-import * as Refresh from './Refresh'
 import { GossipHandler, InternalHandler, SignedObject } from './Types'
 import { compareQuery, Comparison } from './Utils'
 
@@ -31,10 +31,14 @@ interface BaseRecord {
   duration: number
 }
 
-export type CycleTxs = Refresh.Txs & Archivers.Txs & Join.Txs & Active.Txs & Rotation.Txs
+export type CycleTxs = Refresh.Txs &
+  Archivers.Txs &
+  Join.Txs &
+  Active.Txs &
+  Rotation.Txs
 
 export type CycleRecord = BaseRecord &
-  Refresh.Record&
+  Refresh.Record &
   Archivers.Record &
   Join.Record &
   Active.Record &
@@ -427,9 +431,6 @@ async function compareCycleMarkers(desired: number) {
         // Otherwise, Get missed CycleTxs
         const unseen = unseenTxs(txs, resp.txs)
         const validUnseen = dropInvalidTxs(unseen)
-        process.stdout.write(
-          `    validUnseen: ${JSON.stringify(validUnseen)}\n`
-        )
 
         // Update this cycle's txs, record, marker, and cert
         txs = deepmerge(txs, validUnseen)

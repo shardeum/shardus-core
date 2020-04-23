@@ -1,5 +1,7 @@
+import { readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
-import { readFileSync, readdirSync } from 'fs'
+
+type Comparator<T> = (a: T, b: T) => number
 
 export const sleep = ms => {
   return new Promise(resolve => {
@@ -23,8 +25,9 @@ export const getTime = (format = 'ms') => {
 }
 
 export const deepCopy = obj => {
-  if (typeof obj !== 'object')
+  if (typeof obj !== 'object') {
     throw Error('Given element is not of type object.')
+  }
   return JSON.parse(JSON.stringify(obj))
 }
 
@@ -44,12 +47,62 @@ export const readJsonDir = dir => {
   return filesObj
 }
 
+/**
+ * Binary find lowest
+ * Returns the index of the lowest element in the array. The array is monotonically increasing to the right, but
+ *     can have a break in the middle. For example
+ * [ 5, 8, 1, 2, 4]
+ * Notice the break is at index 1 when the value drops from 8 to 1, but is other increasing to the right
+ * The index to be returned in this case is 2 which is the indes of the lowest value.
+ * In the following example the index to be returned is also 2.
+ * [ 5, 8, 1, 1, 4]
+ * So when the lowest value is repeated we should return the indes of the left most lowest element.
+ * In the following example the index to be returned is 0.
+ * [ 2, 3, 5, 7, 8]
+ * The simple way of doing this is to scan the whole array to find the left most lowest element.
+ * However if the array is very long it is faster to use a binary search to find it.
+ * This is used when we refresh nodes.
+ *
+ * Parameters:
+ *     ar - A sorted array
+ *     compare_fn - A comparator function. The function takes two arguments: (a, b) and returns:
+ *        a positive number if a is greater than b.
+ *        a negative number if a is less than b.
+ *        0 if a is equal to b;
+ * The array may contain duplicate elements. If there are more than one lowest elements in the array,
+ * the returned value will be the index of the left most lowest element
+ */
+export function binaryLowest<T>(ar: T[], comparator?: Comparator<T>) {
+  if (ar.length < 1) return -1
+  if (comparator == null) {
+    // Emulate the default Array.sort() comparator
+    comparator = (a, b) => {
+      return a > b ? 1 : a < b ? -1 : 0
+    }
+  }
+  let m = 0
+  let n = ar.length - 1
+  if (comparator(ar[m], ar[n]) <= 0) return m
+  while (m <= n) {
+    const k = (n + m) >> 1
+    const cmp = comparator(ar[m], ar[k])
+    if (cmp > 0) {
+      n = k
+    } else if (cmp < 0) {
+      m = k
+    } else {
+      return n
+    }
+  }
+  return m
+}
+
 /*
  * Binary search in JavaScript.
  * Returns the index of of the element in a sorted array or (-n-1) where n is the insertion point for the new element.
  *    If the return value is negative use 1-returned as the insertion point for the element
  * Parameters:
- *     ar - A sorted array
+ *     arr - A sorted array
  *     el - An element to search for
  *     compare_fn - A comparator function. The function takes two arguments: (el, ae) and returns:
  *        a negative number  if el is less than ae;
@@ -59,26 +112,22 @@ export const readJsonDir = dir => {
  * The array may contain duplicate elements. If there are more than one equal elements in the array,
  * the returned value can be the index of any one of the equal elements.
  */
-export function binarySearch(ar, el, compare_fn?: any) {
-  if (compare_fn == null) {
+export function binarySearch<T>(
+  arr: T[],
+  el: Partial<T>,
+  comparator?: Comparator<typeof el>
+) {
+  if (comparator == null) {
     // Emulate the default Array.sort() comparator
-    compare_fn = (a, b) => {
-      // No need to do this JS, why convert numbers to strings before comparing them
-      if (typeof a !== 'string' || typeof b !== 'string') {
-        console.log(
-          'compare function in binarySearch was changed, if nothing is broken remove this'
-        )
-      }
-      //      if (typeof a !== 'string') a = String(a)
-      //      if (typeof b !== 'string') b = String(b)
+    comparator = (a, b) => {
       return a > b ? 1 : a < b ? -1 : 0
     }
   }
-  var m = 0
-  var n = ar.length - 1
+  let m = 0
+  let n = arr.length - 1
   while (m <= n) {
-    var k = (n + m) >> 1
-    var cmp = compare_fn(el, ar[k])
+    const k = (n + m) >> 1
+    const cmp = comparator(el, arr[k])
     if (cmp > 0) {
       m = k + 1
     } else if (cmp < 0) {
@@ -90,94 +139,32 @@ export function binarySearch(ar, el, compare_fn?: any) {
   return -m - 1
 }
 
-export const insertSorted = (arr, item, comparator?: any) => {
+export function insertSorted<T>(arr: T[], item: T, comparator?: Comparator<T>) {
   let i = binarySearch(arr, item, comparator)
   if (i < 0) {
-    i = 1 - i
+    i = -1 - i
   }
   arr.splice(i, 0, item)
-
-  /*  We should use our  binary search function instead of recoding it again */
-
-  /*
-  if (comparator == null) {
-    // Emulate the default Array.sort() comparator
-    comparator = (a, b) => {
-      if (typeof a !== 'string') a = String(a)
-      if (typeof b !== 'string') b = String(b)
-      return (a > b ? 1 : (a < b ? -1 : 0))
-    }
-  }
-
-  // Get the index we need to insert the item at
-  let min = 0
-  let max = arr.length
-  let index = Math.floor((min + max) / 2)
-  while (max > min) {
-    if (comparator(item, arr[index]) < 0) {
-      max = index
-    } else {
-      min = index + 1
-    }
-    index = Math.floor((min + max) / 2)
-  }
-  // Insert the item
-  arr.splice(index, 0, item)
-  */
 }
 
-export const binarySearch_old = (arr, item, comparator) => {
-  if (comparator == null) {
-    // Emulate the default Array.sort() comparator
-    comparator = (a, b) => {
-      if (typeof a !== 'string') a = String(a)
-      if (typeof b !== 'string') b = String(b)
-      return a > b ? 1 : a < b ? -1 : 0
-    }
-  }
-
-  // Get the index of the item
-  let min = 0
-  let max = arr.length
-  let index = Math.floor((min + max) / 2)
-  while (max > min) {
-    const result = comparator(item, arr[index])
-    if (result === 0) {
-      return index
-    } else if (result < 0) {
-      max = index
-    } else {
-      min = index + 1
-    }
-    index = Math.floor((min + max) / 2)
-  }
-  return false
+export function propComparator<T>(prop: keyof T) {
+  const comparator = (a: T, b: T) =>
+    a[prop] > b[prop] ? 1 : a[prop] < b[prop] ? -1 : 0
+  return comparator
 }
 
-export const insertSorted_old = (arr, item, comparator?: any) => {
-  if (comparator == null) {
-    // Emulate the default Array.sort() comparator
-    comparator = (a, b) => {
-      if (typeof a !== 'string') a = String(a)
-      if (typeof b !== 'string') b = String(b)
-      return a > b ? 1 : a < b ? -1 : 0
-    }
-  }
-
-  // Get the index we need to insert the item at
-  let min = 0
-  let max = arr.length
-  let index = Math.floor((min + max) / 2)
-  while (max > min) {
-    if (comparator(item, arr[index]) < 0) {
-      max = index
-    } else {
-      min = index + 1
-    }
-    index = Math.floor((min + max) / 2)
-  }
-  // Insert the item
-  arr.splice(index, 0, item)
+export function propComparator2<T>(prop: keyof T, prop2: keyof T) {
+  const comparator = (a: T, b: T) =>
+    a[prop] === b[prop]
+      ? a[prop2] === b[prop2]
+        ? 0
+        : a[prop2] > b[prop2]
+        ? 1
+        : -1
+      : a[prop] > b[prop]
+      ? 1
+      : -1
+  return comparator
 }
 
 export const computeMedian = (arr = [], sort = true) => {
@@ -204,7 +191,9 @@ export const computeMedian = (arr = [], sort = true) => {
 }
 
 export const XOR = (hexString1, hexString2) => {
+  // tslint:disable-next-line: ban
   const num1 = parseInt(hexString1.substring(0, 8), 16)
+  // tslint:disable-next-line: ban
   const num2 = parseInt(hexString2.substring(0, 8), 16)
   return (num1 ^ num2) >>> 0
 }
@@ -269,16 +258,17 @@ export const makeShortHash = (x, n = 4) => {
   return x
 }
 
-let objToString = Object.prototype.toString
-let objKeys =
+const objToString = Object.prototype.toString
+const objKeys =
   Object.keys ||
-  function(obj) {
-    let keys = []
-    for (let name in obj) {
+  (obj => {
+    const keys = []
+    // tslint:disable-next-line: forin
+    for (const name in obj) {
       keys.push(name)
     }
     return keys
-  }
+  })
 
 
 export const reviver = (key, value) => {

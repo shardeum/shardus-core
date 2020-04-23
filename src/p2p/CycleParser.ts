@@ -23,12 +23,14 @@ export class ChangeSquasher {
   final: Change
   removedIds: Set<Node['id']>
   seenUpdates: Map<Update['id'], Update>
+  addedIds: Set<Node['id']>
   constructor() {
     this.final = {
       added: [],
       removed: [],
       updated: [],
     }
+    this.addedIds = new Set()
     this.removedIds = new Set()
     this.seenUpdates = new Map()
   }
@@ -49,9 +51,11 @@ export class ChangeSquasher {
     }
 
     for (const joinedConsensor of reversed(change.added)) {
+      // Ignore if it's already been added
+      if (this.addedIds.has(joinedConsensor.id)) continue
+
       // Ignore if joinedConsensor.id is already removed
       if (this.removedIds.has(joinedConsensor.id)) {
-        this.removedIds.delete(joinedConsensor.id)
         continue
       }
       // Check if this id has updates
@@ -63,6 +67,8 @@ export class ChangeSquasher {
       }
       // Add joinedConsensor to final.added
       this.final.added.unshift(joinedConsensor)
+      // Mark this id as added
+      this.addedIds.add(joinedConsensor.id)
     }
   }
 }

@@ -29,7 +29,7 @@
     "gossipTimeout": 180,
     "maxSeedNodes": 10,
     "minNodesToAllowTxs": 3,
-    "minNodes": 2,
+    "minNodes": 10,
     "maxNodes": 30,
     "seedNodeOffset": 4,
     "nodeExpiryAge": 30,

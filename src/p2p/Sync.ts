@@ -97,43 +97,11 @@ export async function sync(activeNodes: ActiveNode[]) {
   } while (squasher.final.updated.length < activeNodeCount(cycleToSyncTo))
   applyNodeListChange(squasher.final)
   info('Synced to cycle', cycleToSyncTo.counter)
-
-  /*
-  // Add synced cycles to old p2p-state cyclechain
-  // [TODO] Remove this once everything is using new CycleChain.ts
-  p2p.state.addCycles(CycleChain.cycles)
-
-  // Sync new cycles until you can get unfinished cycle data in time to start making cycles
-  let unfinishedCycle: UnfinshedCycle
-  do {
-    const nextCounter = CycleChain.newest.counter + 1
-    if (isBeforeNextQuarter4(CycleChain.newest)) {
-      info(`waiting until quarter 4 of unfinished cycle ${nextCounter}...`)
-      await waitUntilNextQuarter4(CycleChain.newest)
-      try {
-        info(`getting unfinished cycle data...`)
-        unfinishedCycle = await getUnfinishedCycle(activeNodes)
-        info(`got unfinishedCycle: ${JSON.stringify(unfinishedCycle)}`)
-      } catch (err) {
-        error(err)
-        info(`trying again...`)
-      }
-    } else {
-      info(`waiting until end of unfinished cycle ${nextCounter}...`)
-      await waitUntilNextEnd(CycleChain.newest)
-      info(`syncing new cycles...`)
-      await syncNewCycles(activeNodes)
-    }
-  } while (!unfinishedCycle)
-
-  // Add unfinished cycle data and go active
-  p2p.acceptInternal = true
-  await p2p.state.addUnfinalizedAndStart(unfinishedCycle)
-  */
-
-  info('Sync complete')
-  // info(`NodeList after sync: ${JSON.stringify(p2p.state.nodes)}`)
+  info(
+    `Sync complete; ${NodeList.activeByIdOrder.length} active nodes; ${CycleChain.cycles.length} cycles`
+  )
   info(`NodeList after sync: ${JSON.stringify([...NodeList.nodes.entries()])}`)
+  info(`CycleChain after sync: ${JSON.stringify(CycleChain.cycles)}`)
   return true
 }
 
@@ -161,7 +129,10 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
 export function digestCycle(cycle: CycleCreator.CycleRecord) {
   const marker = CycleCreator.makeCycleMarker(cycle)
   if (CycleChain.cyclesByMarker[marker]) {
-    error(`Tried to digest cycle record twice: ${JSON.stringify(cycle)}`)
+    warn(
+      `Tried to digest cycle record twice: ${JSON.stringify(cycle)}\n` +
+      `${new Error().stack}`
+    )
     return
   }
 
@@ -232,7 +203,6 @@ function activeNodeCount(cycle: CycleCreator.CycleRecord) {
   )
 }
 
-
 function info(...msg) {
   const entry = `Sync: ${msg.join(' ')}`
   p2pLogger.info(entry)
@@ -247,4 +217,3 @@ function error(...msg) {
   const entry = `Sync: ${msg.join(' ')}`
   p2pLogger.error(entry)
 }
-const sleep = promisify(setTimeout)

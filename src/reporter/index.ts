@@ -2,7 +2,9 @@ import Log4js from 'log4js'
 import LoadDetection from '../load-detection'
 import Logger from '../logger'
 import { ipInfo } from '../network'
+import { crypto } from '../p2p/Context'
 import * as CycleChain from '../p2p/CycleChain'
+import * as NodeList from '../p2p/NodeList'
 import * as Rotation from '../p2p/Rotation'
 import { id } from '../p2p/Self'
 import StateManager from '../state-manager'
@@ -159,7 +161,7 @@ class Reporter {
         : allZeroes64
       const cycleMarker = CycleChain.newest.previous || '' // [TODO] Replace with cycle creator
       const cycleCounter = CycleChain.newest.counter
-      const nodelistHash = 'abc' // Not needed anymore
+      const nodelistHash = crypto.hash(NodeList.byJoinOrder)
       const desiredNodes = Rotation.getDesiredCount()
       const txInjected = this.statistics
         ? this.statistics.getPreviousElement('txInjected')
