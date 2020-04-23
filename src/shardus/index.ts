@@ -893,6 +893,10 @@ class Shardus extends EventEmitter {
     return this.p2p.getLatestCycles(amount)
   }
 
+  getCycleMarker() {
+    return this.p2p.getCycleMarker()
+  }
+
   /**
    * @typedef {import('../shardus/index.js').Node} Node
    */

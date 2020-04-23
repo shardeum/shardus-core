@@ -7016,6 +7016,7 @@ class StateManager extends EventEmitter {
   startShardCalculations () {
     //this.p2p.state.on('cycle_q1_start', async (lastCycle, time) => {
     this._registerListener(this.p2p.state, 'cycle_q1_start', async (lastCycle: Shardus.Cycle, time:number) => {  
+      lastCycle = this.p2p.state.getLastCycle()
       if (lastCycle) {
         // this.dumpAccountDebugData()
         this.updateShardValues(lastCycle.counter)
@@ -7027,7 +7028,7 @@ class StateManager extends EventEmitter {
       if (this.currentCycleShardData && this.currentCycleShardData.ourNode.status === 'active') {
         this.calculateChangeInCoverage()
       }
-
+      lastCycle = this.p2p.state.getLastCycle()
       if (lastCycle == null) {
         return
       }
@@ -7058,6 +7059,7 @@ class StateManager extends EventEmitter {
     // })
 
     this._registerListener(this.p2p.state, 'cycle_q2_start', async (lastCycle: Shardus.Cycle, time: number) => {
+      lastCycle = this.p2p.state.getLastCycle()
       if (lastCycle == null) {
         return
       }
