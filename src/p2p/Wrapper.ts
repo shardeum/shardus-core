@@ -52,6 +52,7 @@ class P2P extends EventEmitter {
     this.tell = Comms.tell
     this.sendGossipIn = Comms.sendGossip
     this.robustQuery = Utils.robustQuery
+    //this.sendGossipAll = Comms.sendGossipAll //Need this but will try sendGossipIn as a work around
   }
 
   // Make sure these are copying a reference instead of value
@@ -178,8 +179,16 @@ class State extends EventEmitter {
       }
       return 0
     }
-    const i = utils.binarySearch(CycleChain.cycles, timestamp, compare)
-    if (i >= 0) return i
+    // binary search seems busted
+    //const i = utils.binarySearch(CycleChain.cycles, timestamp, compare)
+    // if (i >= 0) return i
+    // return null
+    //temp simple for loop untill the binary search can be fixed.
+    for(const cycle of CycleChain.cycles){
+      if (cycle.start < secondsTs && cycle.start + cycle.duration >= secondsTs ){
+        return cycle
+      }
+    }    
     return null
   }
 }

@@ -3325,7 +3325,8 @@ class StateManager extends EventEmitter {
             // or data repair will detect and reject this if we get tricked.  could be an easy attack vector
             if (this.currentCycleShardData.hasSyncingNeighbors === true) {
               this.logger.playbackLogNote('shrd_sync_tx', `${txId}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighborsTxGroup.map(x => x.id))}`)
-              this.p2p.sendGossipAll('spread_tx_to_group', acceptedTx, '', sender, this.currentCycleShardData.syncingNeighborsTxGroup)
+              this.p2p.sendGossipIn('spread_tx_to_group', acceptedTx, '', sender, this.currentCycleShardData.syncingNeighborsTxGroup)
+              //This was using sendGossipAll, but changed it for a work around.  maybe this just needs to be a tell.
             }
           }
         }
