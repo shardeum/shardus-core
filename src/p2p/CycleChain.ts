@@ -74,6 +74,13 @@ export function getCycleChain(start, end = Infinity) {
   return cycles.slice(relStart, relEnd + 1)
 }
 
+export function prune(keep: number) {
+  const drop = cycles.length - keep
+  if (drop <= 0) return
+  cycles.splice(0, drop)
+  oldest = cycles[0]
+}
+
 /** HELPER FUNCTIONS */
 
 function computeCycleMarker(fields) {

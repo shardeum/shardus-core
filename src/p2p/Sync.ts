@@ -1,12 +1,13 @@
 import { Handler } from 'express'
 import { Logger } from 'log4js'
-import { promisify } from 'util'
 import * as http from '../http'
+import { sleep } from '../utils'
 import { logger, network } from './Context'
 import * as CycleChain from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import { Change, ChangeSquasher, parse } from './CycleParser'
 import * as NodeList from './NodeList'
+import * as Refresh from './Refresh'
 import { Route } from './Types'
 import { reversed, robustQuery, sequentialQuery } from './Utils'
 
@@ -72,20 +73,32 @@ export async function sync(activeNodes: ActiveNode[]) {
   CycleChain.reset()
   NodeList.reset()
 
-  // Get the networks newest cycle as the anchor point for sync
-  info(`Getting newest cycle...`)
-  const cycleToSyncTo = await getNewestCycle(activeNodes)
-  info(`Syncing till cycle ${cycleToSyncTo.counter}...`)
-
   // Sync old cycles until your active nodes === network active nodes
+  let gotPrevCycles = false
+  let cycleToSyncTo: CycleCreator.CycleRecord
+  let cyclesToGet: number
   const squasher = new ChangeSquasher()
   do {
+    if (gotPrevCycles === false) {
+      // Get the networks newest cycle as the anchor point for sync
+      info(`Getting newest cycle...`)
+      cycleToSyncTo = await getNewestCycle(activeNodes)
+      info(`Syncing till cycle ${cycleToSyncTo.counter}...`)
+      cyclesToGet = Refresh.getRefreshCount(cycleToSyncTo.active) + 5
+    }
+
     const oldestCycle = CycleChain.oldest || cycleToSyncTo
     const prevCycles = await getCycles(
       activeNodes,
-      oldestCycle.counter - 100,
+      oldestCycle.counter - cyclesToGet,
       oldestCycle.counter
     )
+
+    gotPrevCycles = prevCycles.length < 1
+    if (gotPrevCycles === false) {
+      await sleep(1000)
+    }
+
     for (const prevCycle of reversed(prevCycles)) {
       CycleChain.validate(prevCycle, oldestCycle)
       CycleChain.prepend(prevCycle)
@@ -131,7 +144,7 @@ export function digestCycle(cycle: CycleCreator.CycleRecord) {
   if (CycleChain.cyclesByMarker[marker]) {
     warn(
       `Tried to digest cycle record twice: ${JSON.stringify(cycle)}\n` +
-      `${new Error().stack}`
+        `${new Error().stack}`
     )
     return
   }

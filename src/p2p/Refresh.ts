@@ -155,7 +155,7 @@ function refreshConsensors() {
   if (oldest < 0) return []
 
   // Pick the oldest + some nodes to be refreshed
-  const refreshCount = Math.floor(Math.sqrt(NodeList.activeByIdOrder.length))
+  const refreshCount = getRefreshCount(NodeList.activeByIdOrder.length)
   const nodesToRefresh: NodeList.Node[] = []
   let i = oldest
   while (nodesToRefresh.length < refreshCount) {
@@ -176,6 +176,10 @@ function refreshConsensors() {
 
   // Sort by node id before returning
   return nodesToRefresh.sort(propComparator('id'))
+}
+
+export function getRefreshCount(active: number) {
+  return Math.floor(Math.sqrt(active))
 }
 
 function info(...msg) {

@@ -226,6 +226,9 @@ async function cycleCreator() {
     Sync.digestCycle(prevRecord)
   }
 
+  // [TODO] Prune the cycle chain
+  // pruneCycleChain()
+
   // Send last record to any subscribed archivers
   Archivers.sendData()
   ;({
@@ -804,6 +807,15 @@ async function gossipCycleCert() {
     record: bestRecord,
   }
   Comms.sendGossip('gossip-cert', certGossip)
+}
+
+function pruneCycleChain() {
+  // Gets active nodes from most current record
+  const active = CycleChain.newest.active
+  // Uses active nodes to determine number of cycle records to keep
+  const keep = Refresh.getRefreshCount(active) + 5
+  // Throws away extra cycles
+  CycleChain.prune(keep)
 }
 
 function info(...msg) {
