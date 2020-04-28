@@ -246,24 +246,33 @@ function validateReceipt(receipt: Receipt) {
   const consensusGroup = new Set(getConsensusGroupIds(receipt.tx.source))
   // Make sure receipt has enough signs
   if (isReceiptMajority(receipt, consensusGroup) === false) {
-    console.log('Receipt did not have majority')
+    console.log('validateReceipt: Receipt did not have majority')
     return false
   }
   // Make a map of signs that overlap with consensusGroup
   const signsInConsensusGroup: Signature[] = []
   for (const sign of receipt.signs) {
     const node = p2p.state.getNodeByPubKey(sign.owner)
-    console.log(`nodes: ${utils.stringifyReduce(p2p.state.getNodes())}`)
-    console.log(`node: ${utils.stringifyReduce(node)}`)
+    
+    if(node == null){
+      console.log(`validateReceipt: node was null or not found ${utils.stringifyReduce(sign.owner)}`)
+      console.log(`validateReceipt: nodes: ${utils.stringifyReduce(p2p.state.getNodes())}`)
+      
+      //console.log(`validateReceipt node: ${utils.stringifyReduce(node)}`)
+      continue
+    }
+
     const id = node.id
     if (consensusGroup.has(id)) {
       signsInConsensusGroup.push(sign)
+    } else {
+      console.log(`validateReceipt: consensusGroup does not have id: ${id} ${utils.stringifyReduce(consensusGroup)}`)
     }
   }
   // Make sure signs and consensusGroup overlap >= %60
   if ((signsInConsensusGroup.length / consensusGroup.size) * 100 < 60) {
     console.log(
-      'Receipt signature owners and consensus group did not overlap enough'
+      'validateReceipt: Receipt signature owners and consensus group did not overlap enough'
     )
     return false
   }
@@ -274,9 +283,10 @@ function validateReceipt(receipt: Receipt) {
     if (crypto.verify(signedTx)) verified++
   }
   if ((verified / consensusGroup.size) * 100 < 60) {
-    console.log('Receipt does not have enough valid signatures')
+    console.log('validateReceipt: Receipt does not have enough valid signatures')
     return false
   }
+  console.log(`validateReceipt: success! ${utils.stringifyReduce(receipt)}`)
   return true
 }
 

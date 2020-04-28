@@ -86,14 +86,14 @@ function testParse (dir, filename) {
     var data = fs.readFileSync(path.join(localDir, filename), 'utf8')
     // console.log(data)
 
-    testInput = JSON.parse(data)
+    testInput = JSON.parse(data, utils.reviver)
     return testInput
   } catch (e) {
     console.log('Error:', e.stack)
   }
 }
 
-let testInput = testParse('../liberdus-server/instances12/', 'shardCalcs.txt')
+let testInput = testParse('../liberdus-server/instances12/', 'shardCalcs2.txt')
 
 let debugAccount = '38ab' + '3'.repeat(60)
 

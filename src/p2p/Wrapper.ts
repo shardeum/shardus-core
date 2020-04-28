@@ -137,7 +137,7 @@ class State extends EventEmitter {
     if(NodeList.byPubKey.has(pubkey) !== true){
       console.log(`getNodeByPubKey cant find ${utils.makeShortHash(pubkey)} in set: ${utils.stringifyReduce(NodeList.byPubKey.keys)} `)
     }
-    return NodeList.byPubKey[pubkey]
+    return NodeList.byPubKey.get(pubkey) // [pubkey]
   }
 
   // looks like what the original function in p2p-state did is get the active nodes
