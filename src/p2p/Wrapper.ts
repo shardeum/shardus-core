@@ -125,7 +125,18 @@ class State extends EventEmitter {
     return NodeList.nodes.get(id)
   }
 
+  getNodes() {
+    return NodeList
+  }
+
+  // getNodeByPubKey(pubkey) {
+  //   return NodeList.byPubKey[pubkey]
+  // }
+
   getNodeByPubKey(pubkey) {
+    if(NodeList.byPubKey.has(pubkey) !== true){
+      console.log(`getNodeByPubKey cant find ${utils.makeShortHash(pubkey)} in set: ${utils.stringifyReduce(NodeList.byPubKey.keys)} `)
+    }
     return NodeList.byPubKey[pubkey]
   }
 

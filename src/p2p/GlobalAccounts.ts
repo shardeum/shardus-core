@@ -9,7 +9,7 @@ import {
   GossipHandler,
 } from './Types'
 import { Handler } from 'express'
-import { shardus, stateManager, crypto } from './Context'
+import { shardus, stateManager, crypto, network } from './Context'
 import StateManager from '../state-manager'
 import ShardFunctions from '../state-manager/shardFunctions'
 import Shardus from '../shardus'
@@ -43,7 +43,7 @@ export type SignedSetGlobalTx = SetGlobalTx & SignedObject
 
 /** ROUTES */
 
-const makeReceiptRoute: Route<InternalHandler<
+export const makeReceiptRoute: Route<InternalHandler<
   SignedSetGlobalTx,
   unknown,
   string
@@ -54,7 +54,7 @@ const makeReceiptRoute: Route<InternalHandler<
   },
 }
 
-const setGlobalGossipRoute: Route<GossipHandler<Receipt>> = {
+export const setGlobalGossipRoute: Route<GossipHandler<Receipt>> = {
   name: 'set-global',
   handler: payload => {
     if (validateReceipt(payload) === false) return
@@ -252,7 +252,10 @@ function validateReceipt(receipt: Receipt) {
   // Make a map of signs that overlap with consensusGroup
   const signsInConsensusGroup: Signature[] = []
   for (const sign of receipt.signs) {
-    const id = p2p.state.getNodeByPubKey(sign.owner).id
+    const node = p2p.state.getNodeByPubKey(sign.owner)
+    console.log(`nodes: ${utils.stringifyReduce(p2p.state.getNodes())}`)
+    console.log(`node: ${utils.stringifyReduce(node)}`)
+    const id = node.id
     if (consensusGroup.has(id)) {
       signsInConsensusGroup.push(sign)
     }

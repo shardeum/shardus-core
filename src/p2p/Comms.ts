@@ -4,6 +4,7 @@ import { config, crypto, logger, network } from './Context'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { InternalHandler, LooseObject } from './Types'
+import { makeReceiptRoute, setGlobalGossipRoute } from './GlobalAccounts'
 
 /** TYPES */
 
@@ -50,6 +51,8 @@ export function init() {
   for (const [name, handler] of Object.entries(routes.internal)) {
     registerInternal(name, handler)
   }
+  registerInternal(makeReceiptRoute.name, makeReceiptRoute.handler)
+  registerGossipHandler(setGlobalGossipRoute.name, setGlobalGossipRoute.handler)
 }
 
 export function setVerboseLogs(enabled: boolean) {
