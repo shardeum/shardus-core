@@ -257,8 +257,6 @@ function validateReceipt(receipt: Receipt) {
     if(node == null){
       console.log(`validateReceipt: node was null or not found ${utils.stringifyReduce(sign.owner)}`)
       console.log(`validateReceipt: nodes: ${utils.stringifyReduce(p2p.state.getNodes())}`)
-      
-      //console.log(`validateReceipt node: ${utils.stringifyReduce(node)}`)
       continue
     }
 
