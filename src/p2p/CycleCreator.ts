@@ -814,10 +814,8 @@ async function gossipCycleCert() {
 }
 
 function pruneCycleChain() {
-  // Gets active nodes from most current record
-  const active = CycleChain.newest.active
-  // Uses active nodes to determine number of cycle records to keep
-  const keep = Refresh.cyclesToKeep(active)
+  // Determine number of cycle records to keep
+  const keep = Refresh.cyclesToKeep()
   // Throws away extra cycles
   CycleChain.prune(keep)
 }

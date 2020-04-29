@@ -14,10 +14,13 @@ import { Logger } from 'log4js'
 import { propComparator, propComparator2 } from '../utils'
 import * as Archivers from './Archivers'
 import { logger } from './Context'
+import { cycles, newest } from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import * as CycleParser from './CycleParser'
 import * as NodeList from './NodeList'
+import { activeNodeCount, totalNodeCount } from './Sync'
 import * as Types from './Types'
+import { reversed } from './Utils'
 
 /** TYPES */
 
@@ -64,11 +67,6 @@ export function updateRecord(
 ) {
   record.refreshedArchivers = refreshArchivers() // This returns a copy of the objects
   record.refreshedConsensors = refreshConsensors() // This returns a copy of the objects
-
-  info(`
-    refreshedArchivers: ${JSON.stringify(record.refreshedArchivers)}
-    refreshedConsensors: ${JSON.stringify(record.refreshedConsensors)}
-  `)
 }
 
 export function parseRecord(
@@ -138,7 +136,7 @@ function refreshConsensors() {
   // [IMPORTANT] We need to put a copy into the cycle record, so that
   // the cycle chain is not mutated when we make changes to the node entry
 
-  const refreshCount = getRefreshCount(NodeList.activeByIdOrder.length)
+  const refreshCount = getRefreshCount()
 
   // Return copies of the nodes with the oldest counterRefreshed
   const nodesToRefresh = [...NodeList.activeByIdOrder]
@@ -149,16 +147,30 @@ function refreshConsensors() {
   return nodesToRefresh
 }
 
-export function getRefreshCount(active: number) {
-  return Math.floor(Math.sqrt(active))
+export function getRefreshCount() {
+  // This is a function of the active node count
+  return Math.floor(Math.sqrt(NodeList.activeByIdOrder.length))
 }
 
-export function cyclesToKeep(active) {
-  return getRefreshCount(active) * 2 + 5
-}
-
-export function cyclesToGet(active) {
-  return Math.floor(getRefreshCount(active) * 1.5) + 2
+export function cyclesToKeep() {
+  /**
+   * Walk through the cycle chain backwards to calculate how many records we
+   * need to build the current node list
+   */
+  const squasher = new CycleParser.ChangeSquasher()
+  let count = 1
+  for (const record of reversed(cycles)) {
+    squasher.addChange(CycleParser.parse(record))
+    if (
+      squasher.final.updated.length < activeNodeCount(newest) &&
+      squasher.final.added.length < totalNodeCount(newest)
+    ) {
+      break
+    }
+    count++
+  }
+  // Keep a few more than that, just to be safe
+  return count * 2 + 5
 }
 
 function info(...msg) {

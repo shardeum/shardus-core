@@ -6,7 +6,6 @@ import * as CycleChain from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import { Change, ChangeSquasher, parse } from './CycleParser'
 import * as NodeList from './NodeList'
-import * as Refresh from './Refresh'
 import { Route } from './Types'
 import { reversed, robustQuery, sequentialQuery } from './Utils'
 
@@ -68,7 +67,7 @@ export async function sync(activeNodes: ActiveNode[]) {
   info(`Getting newest cycle...`)
   const cycleToSyncTo = await getNewestCycle(activeNodes)
   info(`Syncing till cycle ${cycleToSyncTo.counter}...`)
-  const cyclesToGet = Refresh.cyclesToGet(cycleToSyncTo.active)
+  const cyclesToGet = 10
 
   // Sync old cycles until your active nodes === network active nodes
   const squasher = new ChangeSquasher()
@@ -239,7 +238,7 @@ async function getCycles(
   return cycles
 }
 
-function activeNodeCount(cycle: CycleCreator.CycleRecord) {
+export function activeNodeCount(cycle: CycleCreator.CycleRecord) {
   return (
     cycle.active +
     cycle.activated.length -
@@ -249,7 +248,7 @@ function activeNodeCount(cycle: CycleCreator.CycleRecord) {
   )
 }
 
-function totalNodeCount(cycle: CycleCreator.CycleRecord) {
+export function totalNodeCount(cycle: CycleCreator.CycleRecord) {
   return (
     cycle.syncing +
     cycle.joinedConsensors.length +

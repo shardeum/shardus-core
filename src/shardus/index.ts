@@ -506,7 +506,6 @@ class Shardus extends EventEmitter {
       if (this.reporter) this.reporter.reportJoined(nodeId, publicKey)
     })
     Self.emitter.on('initialized', async () => {
-      // [TODO] Enable once CycleCreator is fully operational
       await this.syncAppData()
     })
     Self.emitter.on('active', nodeId => {
@@ -676,7 +675,9 @@ class Shardus extends EventEmitter {
   async syncAppData() {
     if (!this.app) {
       await this.p2p.goActive()
-      this.stateManager.appFinishedSyncing = true
+      if (this.stateManager) {
+        this.stateManager.appFinishedSyncing = true
+      }
       return
     }
     if (this.stateManager) await this.stateManager.syncStateData(3)
