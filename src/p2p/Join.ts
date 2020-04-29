@@ -33,6 +33,7 @@ export interface Txs {
 }
 
 export interface Record {
+  syncing: number
   joinedConsensors: JoinedConsensor[]
 }
 
@@ -198,6 +199,7 @@ export function updateRecord(
     return { ...nodeInfo, cycleJoined, counterRefreshed, id }
   })
 
+  record.syncing = NodeList.byJoinOrder.length - NodeList.activeByIdOrder.length
   record.joinedConsensors = joinedConsensors.sort()
 }
 

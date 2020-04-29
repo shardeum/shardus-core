@@ -108,7 +108,10 @@ export async function sync(activeNodes: ActiveNode[]) {
       squasher.addChange(parse(prevCycle))
       prepended++
 
-      if (squasher.final.updated.length >= activeNodeCount(cycleToSyncTo)) {
+      if (
+        squasher.final.updated.length >= activeNodeCount(cycleToSyncTo) &&
+        squasher.final.added.length >= totalNodeCount(cycleToSyncTo)
+      ) {
         break
       }
     }
@@ -118,10 +121,18 @@ export async function sync(activeNodes: ActiveNode[]) {
         squasher.final.updated.length
       } active nodes, need ${activeNodeCount(cycleToSyncTo)}`
     )
+    info(
+      `Got ${squasher.final.added.length} total nodes, need ${totalNodeCount(
+        cycleToSyncTo
+      )}`
+    )
 
     // If you weren't able to prepend any of the prevCycles, start over
     if (prepended < 1) throw new Error('Unable to prepend any previous cycles')
-  } while (squasher.final.updated.length < activeNodeCount(cycleToSyncTo))
+  } while (
+    squasher.final.updated.length < activeNodeCount(cycleToSyncTo) &&
+    squasher.final.added.length < totalNodeCount(cycleToSyncTo)
+  )
 
   // [TODO] Now that our node list is synced, validate the anchor cycle's cert
 
@@ -230,6 +241,18 @@ async function getCycles(
 
 function activeNodeCount(cycle: CycleCreator.CycleRecord) {
   return (
+    cycle.active +
+    cycle.activated.length -
+    cycle.apoptosized.length -
+    cycle.removed.length -
+    cycle.lost.length
+  )
+}
+
+function totalNodeCount(cycle: CycleCreator.CycleRecord) {
+  return (
+    cycle.syncing +
+    cycle.joinedConsensors.length +
     cycle.active +
     cycle.activated.length -
     cycle.apoptosized.length -
