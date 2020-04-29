@@ -60,6 +60,7 @@ const DESIRED_MARKER_MATCHES = 2
 /** STATE */
 
 let p2pLogger: Logger
+let cycleLogger: Logger
 
 export const submodules = [Archivers, Join, Active, Rotation, Refresh]
 
@@ -145,6 +146,7 @@ export function init() {
 
   // Get a handle to write to p2p.log
   p2pLogger = logger.getLogger('p2p')
+  cycleLogger = logger.getLogger('cycle')
 
   // Init state
   reset()
@@ -188,11 +190,10 @@ export async function startCycles() {
     bestRecord = recordZero
     madeCycle = true
 
-    // Wait for the real cycle zero start
+    // Schedule the scheduler to run at cycle zero start
     const { startQ1 } = calcIncomingTimes(recordZero)
     schedule(cycleCreator, startQ1)
 
-    // Start creating cycles
     return
   }
 
@@ -226,8 +227,11 @@ async function cycleCreator() {
     Sync.digestCycle(prevRecord)
   }
 
-  // [TODO] Prune the cycle chain
-  // pruneCycleChain()
+  // Print combined cycle log entry
+  cycleLogger.info(CycleChain.getDebug() + NodeList.getDebug())
+
+  // Prune the cycle chain
+  pruneCycleChain()
 
   // Send last record to any subscribed archivers
   Archivers.sendData()
@@ -813,7 +817,7 @@ function pruneCycleChain() {
   // Gets active nodes from most current record
   const active = CycleChain.newest.active
   // Uses active nodes to determine number of cycle records to keep
-  const keep = Refresh.getRefreshCount(active) + 5
+  const keep = Refresh.cyclesToKeep(active)
   // Throws away extra cycles
   CycleChain.prune(keep)
 }

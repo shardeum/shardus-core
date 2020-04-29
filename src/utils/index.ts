@@ -80,18 +80,22 @@ export function binaryLowest<T>(ar: T[], comparator?: Comparator<T>) {
       return a > b ? 1 : a < b ? -1 : 0
     }
   }
+  if (ar.length < 2) return 0
   let m = 0
   let n = ar.length - 1
-  if (comparator(ar[m], ar[n]) <= 0) return m
+  if (comparator(ar[m], ar[n]) < 0) return m
   while (m <= n) {
     const k = (n + m) >> 1
     const cmp = comparator(ar[m], ar[k])
+    console.log(ar)
+    console.log(m, k, ar[m], ar[k], cmp)
     if (cmp > 0) {
       n = k
     } else if (cmp < 0) {
       m = k
     } else {
-      return n
+      if (k + 1 === n) return n
+      m = k
     }
   }
   return m

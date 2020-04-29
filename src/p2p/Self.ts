@@ -8,6 +8,7 @@ import * as Archivers from './Archivers'
 import * as Comms from './Comms'
 import { config, crypto, logger } from './Context'
 import * as CycleCreator from './CycleCreator'
+import * as GlobalAccounts from './GlobalAccounts'
 import * as Join from './Join'
 import * as NodeList from './NodeList'
 import * as Sync from './Sync'
@@ -34,8 +35,7 @@ export function init() {
   Archivers.init()
   Sync.init()
   CycleCreator.init()
-
-  NodeList.registerRoutes()
+  GlobalAccounts.init()
 
   // Create a logger for yourself
   p2pLogger = logger.getLogger('p2p')
@@ -97,9 +97,6 @@ export async function startup(): Promise<boolean> {
   p2pLogger.debug('Emitting `joined` event.')
   emitter.emit('joined', id, publicKey)
 
-  // Enable internal routes
-  Comms.setAcceptInternal(true)
-
   // If not first, get new activeNodes and attempt to sync until you are successful
   if (!isFirst) {
     let synced = false
@@ -130,6 +127,9 @@ export async function startup(): Promise<boolean> {
       }
     }
   }
+
+  // Enable internal routes
+  Comms.setAcceptInternal(true)
 
   // Start creating cycle records
   await CycleCreator.startCycles()

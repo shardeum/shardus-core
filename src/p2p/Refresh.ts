@@ -9,10 +9,10 @@
  * less to sync the cycle chain.
  */
 
+import deepmerge from 'deepmerge'
 import { Logger } from 'log4js'
-import { binaryLowest, propComparator } from '../utils'
+import { propComparator, propComparator2 } from '../utils'
 import * as Archivers from './Archivers'
-import * as Comms from './Comms'
 import { logger } from './Context'
 import * as CycleCreator from './CycleCreator'
 import * as CycleParser from './CycleParser'
@@ -26,17 +26,6 @@ export interface Txs {}
 export interface Record {
   refreshedArchivers: Archivers.JoinedArchiver[]
   refreshedConsensors: NodeList.Node[]
-}
-
-/** ROUTES */
-
-const gossipRoute: Types.GossipHandler = payload => {}
-
-const routes = {
-  internal: {},
-  gossip: {
-    gossip: gossipRoute,
-  },
 }
 
 /** STATE */
@@ -53,24 +42,16 @@ export function init() {
 
   // Init state
   reset()
-
-  // Register routes
-  for (const [name, handler] of Object.entries(routes.internal)) {
-    Comms.registerInternal(name, handler)
-  }
-  for (const [name, handler] of Object.entries(routes.gossip)) {
-    Comms.registerGossipHandler(name, handler)
-  }
 }
 
 export function reset() {}
 
 export function getTxs(): Txs {
-  return
+  return {}
 }
 
 export function dropInvalidTxs(txs: Txs): Txs {
-  return
+  return txs
 }
 
 /*
@@ -81,8 +62,8 @@ export function updateRecord(
   record: CycleCreator.CycleRecord,
   prev: CycleCreator.CycleRecord
 ) {
-  record.refreshedArchivers = refreshArchivers()
-  record.refreshedConsensors = refreshConsensors()
+  record.refreshedArchivers = refreshArchivers() // This returns a copy of the objects
+  record.refreshedConsensors = refreshConsensors() // This returns a copy of the objects
 
   info(`
     refreshedArchivers: ${JSON.stringify(record.refreshedArchivers)}
@@ -147,39 +128,37 @@ function refreshArchivers() {
 }
 
 function refreshConsensors() {
-  // Find the index of the node with the oldest counterRefreshed
-  const oldest = binaryLowest(
-    NodeList.byJoinOrder,
-    propComparator('counterRefreshed')
-  )
-  if (oldest < 0) return []
+  /**
+   * [NOTE] We could update the counterRefreshed value here before putting
+   * it into the cycle record, but we would have to make a copy of the node
+   * entry to avoid mutating our node list. So instead, we update the
+   * counterRefreshed value on the parsing side.
+   */
 
-  // Pick the oldest + some nodes to be refreshed
+  // [IMPORTANT] We need to put a copy into the cycle record, so that
+  // the cycle chain is not mutated when we make changes to the node entry
+
   const refreshCount = getRefreshCount(NodeList.activeByIdOrder.length)
-  const nodesToRefresh: NodeList.Node[] = []
-  let i = oldest
-  while (nodesToRefresh.length < refreshCount) {
-    const node = NodeList.byJoinOrder[i]
-    // Don't include syncing nodes
-    if (node.status === Types.NodeStatus.ACTIVE) {
-      /**
-       * [NOTE] We could update the counterRefreshed value here before putting
-       * it into the cycle record, but we would have to make a copy of the node
-       * entry to avoid mutating our node list. So instead, we update the
-       * counterRefreshed value on the parsing side.
-       */
-      nodesToRefresh.push(node)
-    }
-    // Loop around if you hit the end of the array
-    i = (i + 1) % NodeList.byJoinOrder.length
-  }
 
-  // Sort by node id before returning
-  return nodesToRefresh.sort(propComparator('id'))
+  // Return copies of the nodes with the oldest counterRefreshed
+  const nodesToRefresh = [...NodeList.activeByIdOrder]
+    .sort(propComparator2('counterRefreshed', 'id'))
+    .splice(0, refreshCount)
+    .map(node => deepmerge({}, node))
+
+  return nodesToRefresh
 }
 
 export function getRefreshCount(active: number) {
   return Math.floor(Math.sqrt(active))
+}
+
+export function cyclesToKeep(active) {
+  return getRefreshCount(active) * 2 + 5
+}
+
+export function cyclesToGet(active) {
+  return Math.floor(getRefreshCount(active) * 1.5) + 2
 }
 
 function info(...msg) {

@@ -1,3 +1,4 @@
+import deepmerge from 'deepmerge'
 import { Handler } from 'express'
 import { isDeepStrictEqual } from 'util'
 import * as http from '../http'
@@ -148,10 +149,10 @@ export function reset() {
 function calculateToAccept() {
   const desired = CycleChain.newest.desired
   const active = CycleChain.newest.active
-  const max = config.p2p.maxNodesPerCycle // [TODO] allow autoscaling to change this
+  const maxJoin = config.p2p.maxJoinedPerCycle // [TODO] allow autoscaling to change this
   const syncing = NodeList.byJoinOrder.length - active
   const expired = CycleChain.newest.expired
-  const syncMax = max // we dont want more than this many nodes to sync at the same stime
+  const syncMax = config.p2p.maxSyncingPerCycle // we dont want more than this many nodes to sync at the same stime
   const canSync = syncMax - syncing
   let needed = 0
   if (active < desired) {
@@ -162,6 +163,9 @@ function calculateToAccept() {
   if (needed > canSync) {
     needed = canSync
   }
+  if (needed > maxJoin) {
+    needed = maxJoin
+  }
   if (needed < 0) {
     needed = 0
   }
@@ -169,8 +173,11 @@ function calculateToAccept() {
 }
 
 export function getTxs(): Txs {
+  // [IMPORTANT] Must return a copy to avoid mutation
+  const requestsCopy = deepmerge({}, requests)
+
   return {
-    join: requests,
+    join: requestsCopy,
   }
 }
 
@@ -234,8 +241,9 @@ export async function createJoinRequest(
   return signedJoinReq
 }
 
-export function addJoinRequest(joinRequest) {
+export function addJoinRequest(joinRequest: JoinRequest) {
   const node = joinRequest.nodeInfo
+  info(`Got join request for ${node.externalPort}`)
 
   // Check if this node has already been seen this cycle
   if (seen.has(node.publicKey)) {
@@ -288,13 +296,15 @@ export function addJoinRequest(joinRequest) {
       ? -1
       : 0
   )
+  info(`Added join request for ${joinRequest.nodeInfo.externalPort}`)
 
-  // If we have > maxNodesPerCycle requests, trim them down
+  // If we have > maxJoinedPerCycle requests, trim them down
   const toAccept = calculateToAccept()
+  info(`Requests: ${requests.length}, toAccept: ${toAccept}`)
   if (requests.length > toAccept) {
     const over = requests.length - toAccept
     requests.splice(-over)
-    info(`Over maxNodesPerCycle; removed ${over} requests from join requests`)
+    warn(`Over maxJoinedPerCycle; removed ${over} requests from join requests`)
   }
 
   return true

@@ -1,7 +1,6 @@
 import { Handler } from 'express'
 import { Logger } from 'log4js'
 import * as http from '../http'
-import { sleep } from '../utils'
 import { logger, network } from './Context'
 import * as CycleChain from './CycleChain'
 import * as CycleCreator from './CycleCreator'
@@ -61,60 +60,82 @@ export function init() {
 }
 
 export async function sync(activeNodes: ActiveNode[]) {
-  // If you are the first node, return
-  // if (p2p.isFirstSeed) {
-  //   info('First node, no syncing required')
-  //   p2p.acceptInternal = true
-  //   return true
-  // }
-
-  // Flush old cycles/nodes
-  // p2p.state._resetState()
+  // Flush existing cycles/nodes
   CycleChain.reset()
   NodeList.reset()
 
+  // Get the networks newest cycle as the anchor point for sync
+  info(`Getting newest cycle...`)
+  const cycleToSyncTo = await getNewestCycle(activeNodes)
+  info(`Syncing till cycle ${cycleToSyncTo.counter}...`)
+  const cyclesToGet = Refresh.cyclesToGet(cycleToSyncTo.active)
+
   // Sync old cycles until your active nodes === network active nodes
-  let gotPrevCycles = false
-  let cycleToSyncTo: CycleCreator.CycleRecord
-  let cyclesToGet: number
   const squasher = new ChangeSquasher()
+
+  CycleChain.prepend(cycleToSyncTo)
+  squasher.addChange(parse(CycleChain.oldest))
+
   do {
-    if (gotPrevCycles === false) {
-      // Get the networks newest cycle as the anchor point for sync
-      info(`Getting newest cycle...`)
-      cycleToSyncTo = await getNewestCycle(activeNodes)
-      info(`Syncing till cycle ${cycleToSyncTo.counter}...`)
-      cyclesToGet = Refresh.getRefreshCount(cycleToSyncTo.active) + 5
-    }
+    // Get prevCycles from the network
+    const start = CycleChain.oldest.counter - cyclesToGet
+    const end = CycleChain.oldest.counter
+    info(`Getting cycles ${start} - ${end}...`)
+    const prevCycles = await getCycles(activeNodes, start, end)
+    info(`Got cycles ${JSON.stringify(prevCycles.map(cycle => cycle.counter))}`)
+    info(`  ${JSON.stringify(prevCycles)}`)
 
-    const oldestCycle = CycleChain.oldest || cycleToSyncTo
-    const prevCycles = await getCycles(
-      activeNodes,
-      oldestCycle.counter - cyclesToGet,
-      oldestCycle.counter
-    )
+    // If prevCycles is empty, start over
+    if (prevCycles.length < 1) throw new Error('Got empty previous cycles')
 
-    gotPrevCycles = prevCycles.length < 1
-    if (gotPrevCycles === false) {
-      await sleep(1000)
-    }
+    // Add prevCycles to our cycle chain
+    let prepended = 0
 
     for (const prevCycle of reversed(prevCycles)) {
-      CycleChain.validate(prevCycle, oldestCycle)
+      const marker = CycleChain.computeCycleMarker(prevCycle)
+      // If you already have this cycle, skip it
+      if (CycleChain.cyclesByMarker[marker]) {
+        warn(`Record ${prevCycle.counter} already in cycle chain`)
+        continue
+      }
+      // Stop prepending prevCycles if one of them is invalid
+      if (CycleChain.validate(prevCycle, CycleChain.oldest) === false) {
+        warn(`Record ${prevCycle.counter} failed validation`)
+        break
+      }
+      // Prepend the cycle to our cycle chain
       CycleChain.prepend(prevCycle)
       squasher.addChange(parse(prevCycle))
+      prepended++
+
       if (squasher.final.updated.length >= activeNodeCount(cycleToSyncTo)) {
         break
       }
     }
+
+    info(
+      `Got ${
+        squasher.final.updated.length
+      } active nodes, need ${activeNodeCount(cycleToSyncTo)}`
+    )
+
+    // If you weren't able to prepend any of the prevCycles, start over
+    if (prepended < 1) throw new Error('Unable to prepend any previous cycles')
   } while (squasher.final.updated.length < activeNodeCount(cycleToSyncTo))
+
+  // [TODO] Now that our node list is synced, validate the anchor cycle's cert
+
+  // [TODO] If the anchor cycle was invalid, start over
+
   applyNodeListChange(squasher.final)
+
   info('Synced to cycle', cycleToSyncTo.counter)
   info(
     `Sync complete; ${NodeList.activeByIdOrder.length} active nodes; ${CycleChain.cycles.length} cycles`
   )
   info(`NodeList after sync: ${JSON.stringify([...NodeList.nodes.entries()])}`)
   info(`CycleChain after sync: ${JSON.stringify(CycleChain.cycles)}`)
+
   return true
 }
 
@@ -149,15 +170,15 @@ export function digestCycle(cycle: CycleCreator.CycleRecord) {
     return
   }
 
+  applyNodeListChange(parse(cycle))
+  CycleChain.append(cycle)
+
   info(`
     Digested C${cycle.counter}
       cycle record: ${JSON.stringify(cycle)}
       node list: ${JSON.stringify([...NodeList.nodes.values()])}
       active nodes: ${JSON.stringify(NodeList.activeByIdOrder)}
   `)
-
-  applyNodeListChange(parse(cycle))
-  CycleChain.append(cycle)
 }
 
 function applyNodeListChange(change: Change) {
@@ -202,6 +223,7 @@ async function getCycles(
     return resp
   }
   const { result } = await sequentialQuery(activeNodes, queryFn)
+  // [TODO] Validate whatever came in
   const cycles = result as CycleCreator.CycleRecord[]
   return cycles
 }

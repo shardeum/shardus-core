@@ -1,5 +1,7 @@
-import { crypto } from './Context'
+import { Logger } from 'log4js'
+import { crypto, logger } from './Context'
 import { CycleRecord } from './CycleCreator'
+import { nodes } from './NodeList'
 import { LooseObject } from './Types'
 
 /** TYPES */
@@ -12,18 +14,20 @@ export interface UnfinshedCycle {
 
 /** STATE */
 
+let p2pLogger: Logger
+
 export let cycles: CycleRecord[] // [OLD, ..., NEW]
 export let cyclesByMarker: { [marker: string]: CycleRecord }
 
 export let oldest: CycleRecord
 export let newest: CycleRecord
 
-init()
+reset()
 
 /** FUNCTIONS */
 
 export function init() {
-  reset()
+  p2pLogger = logger.getLogger('p2p')
 }
 
 export function reset() {
@@ -40,10 +44,6 @@ export function append(cycle: CycleRecord) {
     cyclesByMarker[marker] = cycle
     newest = cycle
     if (!oldest) oldest = cycle
-
-    // Add cycle to old p2p-state cyclechain
-    // Remove this once everything is using new CycleChain.ts
-    // p2p.state.addCycles([cycle])
   }
 }
 export function prepend(cycle: CycleRecord) {
@@ -56,20 +56,24 @@ export function prepend(cycle: CycleRecord) {
   }
 }
 export function validate(prev: CycleRecord, next: CycleRecord): boolean {
-  // [TODO] actually validate
+  const prevMarker = computeCycleMarker(prev)
+  if (next.previous !== prevMarker) return false
+  // [TODO] More validation
   return true
 }
 
-export function getCycleChain(start, end = Infinity) {
-  // Ensure start/end are positive and start <= end
-  if (start < 0) start = 0
-  if (end < 0) end = 0
-  if (start > end) start = end
+export function getCycleChain(start, end = start + 100) {
+  if (!oldest) return []
+  if (end < oldest.counter) return []
+  if (start < oldest.counter) start = oldest.counter
+  if (start > end) return []
 
-  // Convert start/end into idxs relative to our cycles array
-  const offset = oldest ? oldest.counter : 0
-  const relStart = start - offset < 0 ? 0 : start - offset
-  const relEnd = end - offset < 0 ? 0 : end - offset
+  const offset = oldest.counter
+  const relStart = start - offset
+  const relEnd = end - offset
+
+  // Limit how many are returned
+  if (end - start > 100) end = start + 100
 
   return cycles.slice(relStart, relEnd + 1)
 }
@@ -83,7 +87,39 @@ export function prune(keep: number) {
 
 /** HELPER FUNCTIONS */
 
-function computeCycleMarker(fields) {
+export function computeCycleMarker(fields) {
   const cycleMarker = crypto.hash(fields)
   return cycleMarker
+}
+
+const idToPort: { [id: string]: number } = {}
+
+export function getDebug() {
+  const chain = cycles.map(record => {
+    const ctr = record.counter
+    const prev = record.previous.slice(0, 5)
+    const actv = record.active
+    const exp = record.expired
+    const joind = record.joinedConsensors.map(c => c.externalPort)
+    const actvd = record.activated.map(id => {
+      if (idToPort[id]) return idToPort[id]
+      idToPort[id] = nodes.get(id).externalPort
+      return idToPort[id]
+    })
+    const rmvd = record.removed.map(id => idToPort[id])
+    const rfshd = record.refreshedConsensors.map(
+      c => `${c.externalPort}:${c.counterRefreshed}`
+    )
+
+    const str = `      ${ctr}: ${prev}: { actv: ${actv}, exp: ${exp}, joind: [${joind.join()}], actvd: [${actvd.join()}], rmvd: [${rmvd.join()}], rfshd: [${rfshd.join()}] }`
+
+    return str
+  })
+
+  const output = `
+    DIGESTED:   ${newest ? newest.counter : newest}
+    CHAIN:
+${chain.join('\n')}`
+
+  return output
 }

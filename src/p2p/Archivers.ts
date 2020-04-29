@@ -1,3 +1,4 @@
+import deepmerge from 'deepmerge'
 import * as http from '../http'
 import * as Comms from './Comms'
 import { crypto, logger, network } from './Context'
@@ -101,8 +102,11 @@ export function reset() {
 }
 
 export function getTxs(): Txs {
+  // [IMPORTANT] Must return a copy to avoid mutation
+  const requestsCopy = deepmerge({}, requests)
+
   return {
-    archivers: requests,
+    archivers: requestsCopy,
   }
 }
 
@@ -335,7 +339,7 @@ export function registerRoutes() {
     delete dataRequest.tag
 
     addDataRecipient(nodeInfo, dataRequest)
-    res.json({ success: true})
+    res.json({ success: true })
   })
 
   network.registerExternalGet('archivers', (req, res) => {

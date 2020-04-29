@@ -477,10 +477,14 @@ declare namespace Shardus {
       seedNodeOffset?: number
       /** The nodeExpiryAge parameter is an Integer specifying the amount of time (in seconds) before a node can be in the network before getting rotated out. */
       nodeExpiryAge?: number
-      /** The maxNodesToRotate parameter is an Integer specifying the maximum number of nodes that can be rotated out of the network. */
-      maxNodesToRotate?: number
-      /** The maxNodesPerCycle parameter is an Integer specifying the maximum number of nodes that can join the syncing phase each cycle. */
-      maxNodesPerCycle?: number
+
+      /** The maxJoinedPerCycle parameter is an Integer specifying the maximum number of nodes that can join the syncing phase each cycle. */
+      maxJoinedPerCycle?: number
+      /** The maxSyncingPerCycle parameter is an Integer specifying the maximum number of nodes that can be in the syncing phase each cycle. */
+      maxSyncingPerCycle?: number
+      /** The maxRotatedPerCycle parameter is an Integer specifying the maximum number of nodes that can that can be rotated out of the network each cycle. */
+      maxRotatedPerCycle?: number
+
       /** The maxPercentOfDelta parameter is an Integer specifying the percent out of 100 that additional nodes can be accepted to the network. */
       maxPercentOfDelta?: number
       /** The scaleReqsNeeded parameter is an Integer specyifying the number of internal scaling requests shardus needs to receive before scaling up or down the number of desired nodes in the network. */

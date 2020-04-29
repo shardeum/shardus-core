@@ -1,20 +1,9 @@
-import {
-  Signature,
-  SignedObject,
-  Route,
-  InternalHandler,
-  Node,
-  NodeInfo,
-  LooseObject,
-  GossipHandler,
-} from './Types'
-import { Handler } from 'express'
-import { shardus, stateManager, crypto, network } from './Context'
-import StateManager from '../state-manager'
 import ShardFunctions from '../state-manager/shardFunctions'
-import Shardus from '../shardus'
-import { p2p } from './Wrapper'
 import * as utils from '../utils'
+import * as Comms from './Comms'
+import { crypto, shardus, stateManager } from './Context'
+import { GossipHandler, InternalHandler, NodeInfo, Route, Signature, SignedObject } from './Types'
+import { p2p } from './Wrapper'
 
 /** TYPES */
 
@@ -63,9 +52,6 @@ export const setGlobalGossipRoute: Route<GossipHandler<Receipt>> = {
   },
 }
 
-export const internalRoutes = [makeReceiptRoute]
-export const gossipRoutes = [setGlobalGossipRoute]
-
 /** STATE */
 
 let lastClean = 0
@@ -74,6 +60,15 @@ const receipts = new Map<TxHash, Receipt>()
 const trackers = new Map<TxHash, Tracker>()
 
 /** FUNCTIONS */
+
+export function init() {
+  // Register routes
+  Comms.registerInternal(makeReceiptRoute.name, makeReceiptRoute.handler)
+  Comms.registerGossipHandler(
+    setGlobalGossipRoute.name,
+    setGlobalGossipRoute.handler
+  )
+}
 
 export function setGlobal(address, value, when, source) {
   console.log(`SETGLOBAL: WE ARE: ${p2p.id.substring(0, 5)}`)

@@ -2,7 +2,6 @@ import { Logger } from 'log4js'
 import { insertSorted } from '../utils'
 import * as Comms from './Comms'
 import { config, logger } from './Context'
-import * as CycleChain from './CycleChain'
 import { CycleRecord } from './CycleCreator'
 import { Change } from './CycleParser'
 import * as NodeList from './NodeList'
@@ -120,7 +119,7 @@ function getExpiredRemoved(start: CycleRecord['start']) {
   let expireTimestamp = (start - config.p2p.nodeExpiryAge) * 1000
   if (expireTimestamp < 0) expireTimestamp = 0
 
-  let maxRemove = config.p2p.maxNodesPerCycle
+  let maxRemove = config.p2p.maxRotatedPerCycle
   if (maxRemove > active - desired) maxRemove = active - desired
 
   // Oldest node has index 0
@@ -136,51 +135,6 @@ function getExpiredRemoved(start: CycleRecord['start']) {
   }
 
   return { expired, removed }
-}
-
-function getExpiredCount(start: CycleRecord['start']) {
-  // Don't expire any if nodeExpiryAge is negative
-  if (config.p2p.nodeExpiryAge < 0) return 0
-
-  let expireTimestamp = (start - config.p2p.nodeExpiryAge) * 1000
-  if (expireTimestamp < 0) expireTimestamp = 0
-  let expiredCount = 0
-
-  // Oldest node has index 0
-  for (const node of NodeList.byJoinOrder) {
-    if (node.status === 'syncing') {
-      continue
-    }
-    if (node.joinRequestTimestamp > expireTimestamp) break
-    expiredCount++
-  }
-
-  return expiredCount
-}
-
-function getRemoved(active: number, desired: number) {
-  // Don't remove any if nodeExpiryAge is negative
-  if (config.p2p.nodeExpiryAge < 0) return []
-
-  // Don't remove any if we have less than desired active nodes
-  if (active <= desired) return []
-
-  const start = CycleChain.newest.start
-  const expireTimestamp = (start - config.p2p.nodeExpiryAge) * 1000
-  const removed = []
-  let maxRemove = config.p2p.maxNodesPerCycle
-  if (maxRemove > active - desired) maxRemove = active - desired
-
-  // Oldest node has index 0
-  for (const node of NodeList.byJoinOrder) {
-    if (node.status === 'syncing') continue
-    if (node.joinRequestTimestamp > expireTimestamp) break
-    removed.push(node.id)
-    if (removed.length >= maxRemove) break
-  }
-
-  removed.sort()
-  return removed
 }
 
 function info(...msg) {

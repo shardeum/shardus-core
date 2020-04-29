@@ -1,4 +1,3 @@
-import { Response } from 'express'
 import { Logger } from 'log4js'
 import { stringify } from 'shardus-crypto-utils'
 import {
@@ -7,7 +6,7 @@ import {
   propComparator,
   propComparator2,
 } from '../utils'
-import { crypto, logger, network } from './Context'
+import { crypto, logger } from './Context'
 import * as CycleChain from './CycleChain'
 import { JoinedConsensor } from './Join'
 import { id } from './Self'
@@ -53,8 +52,6 @@ reset()
 
 export function init() {
   p2pLogger = logger.getLogger('p2p')
-
-  registerRoutes()
 }
 
 export function reset() {
@@ -179,35 +176,28 @@ export function ipPort(ip: string, port: number) {
   return ip + ':' + port
 }
 
-/** ROUTES */
-
-export function registerRoutes() {
-  network.registerExternalGet('nodelist-debug', (req, res: Response) => {
-    const output = `
-
-    byJoinOrder: ${JSON.stringify(byJoinOrder.map(node => node.externalPort))}
-    hash: ${crypto.hash(byJoinOrder)}
-
-    byIdOrder: ${JSON.stringify(byIdOrder.map(node => node.externalPort))}
-    othersByIdOrder: ${JSON.stringify(
-      othersByIdOrder.map(node => node.externalPort)
-    )}
-    activeByIdOrder: ${JSON.stringify(
-      activeByIdOrder.map(node => node.externalPort)
-    )}
-    activeOthersByIdOrder: ${JSON.stringify(
-      activeOthersByIdOrder.map(node => node.externalPort)
-    )}
-
-    byJoinOrder: ${stringify(byJoinOrder)}
-
-    cycles: ${stringify(CycleChain.cycles)}
-
-    `
-    res.write(output)
-    res.end()
-  })
+export function getDebug() {
+  const output = `
+    NODES:
+      hash:                  ${crypto.hash(byJoinOrder).slice(0, 5)}
+      byJoinOrder:           [${byJoinOrder
+        .map(node => `${node.externalPort}:${node.counterRefreshed}`)
+        .join()}]
+      byIdOrder:             [${byIdOrder
+        .map(node => node.externalPort)
+        .join()}]
+      othersByIdOrder:       [${othersByIdOrder.map(node => node.externalPort)}]
+      activeByIdOrder:       [${activeByIdOrder.map(node => node.externalPort)}]
+      activeOthersByIdOrder: [${activeOthersByIdOrder.map(
+        node => node.externalPort
+      )}]
+    NODELIST:   ${stringify(byJoinOrder)}
+    CYCLECHAIN: ${stringify(CycleChain.cycles)}
+  `
+  return output
 }
+
+/** ROUTES */
 
 function info(...msg) {
   const entry = `Refresh: ${msg.join(' ')}`
