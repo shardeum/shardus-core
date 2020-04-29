@@ -1,4 +1,4 @@
-import { EventEmitter, constructor } from 'events'
+import { EventEmitter } from 'events'
 import * as Shardus from '../shardus/shardus-types'
 import * as utils from '../utils'
 import * as Active from './Active'
@@ -130,8 +130,12 @@ class State extends EventEmitter {
   }
 
   getNodeByPubKey(pubkey) {
-    if(NodeList.byPubKey.has(pubkey) !== true){
-      console.log(`getNodeByPubKey cant find ${utils.makeShortHash(pubkey)} in set: ${utils.stringifyReduce(NodeList.byPubKey.keys)} `)
+    if (NodeList.byPubKey.has(pubkey) !== true) {
+      console.log(
+        `getNodeByPubKey cant find ${utils.makeShortHash(
+          pubkey
+        )} in set: ${utils.stringifyReduce(NodeList.byPubKey.keys)} `
+      )
     }
     return NodeList.byPubKey.get(pubkey)
   }
@@ -141,7 +145,7 @@ class State extends EventEmitter {
   getActiveNodes_orig(id) {
     return getSubsetOfNodeList(NodeList.activeByIdOrder, id)
   }
- 
+
   getActiveNodes(id) {
     if (id) {
       return Object.values(NodeList.activeOthersByIdOrder)
@@ -149,7 +153,7 @@ class State extends EventEmitter {
       return Object.values(NodeList.activeByIdOrder)
     }
   }
-  
+
   // The original function in p2p.state just returns an array with all nodes that are syncing excluding self
   //     there is no concept of neighbors
   getOrderedSyncingNeighbors(node) {
@@ -191,11 +195,14 @@ class State extends EventEmitter {
     // if (i >= 0) return i
     // return null
     //temp simple for loop untill the binary search can be fixed.
-    for(const cycle of CycleChain.cycles){
-      if (cycle.start < secondsTs && cycle.start + cycle.duration >= secondsTs ){
+    for (const cycle of CycleChain.cycles) {
+      if (
+        cycle.start < secondsTs &&
+        cycle.start + cycle.duration >= secondsTs
+      ) {
         return cycle
       }
-    }    
+    }
     return null
   }
 }

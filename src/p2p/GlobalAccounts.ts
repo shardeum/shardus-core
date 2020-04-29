@@ -2,7 +2,14 @@ import ShardFunctions from '../state-manager/shardFunctions'
 import * as utils from '../utils'
 import * as Comms from './Comms'
 import { crypto, shardus, stateManager } from './Context'
-import { GossipHandler, InternalHandler, NodeInfo, Route, Signature, SignedObject } from './Types'
+import {
+  GossipHandler,
+  InternalHandler,
+  NodeInfo,
+  Route,
+  Signature,
+  SignedObject,
+} from './Types'
 import { p2p } from './Wrapper'
 
 /** TYPES */
@@ -32,7 +39,7 @@ export type SignedSetGlobalTx = SetGlobalTx & SignedObject
 
 /** ROUTES */
 
-export const makeReceiptRoute: Route<InternalHandler<
+const makeReceiptRoute: Route<InternalHandler<
   SignedSetGlobalTx,
   unknown,
   string
@@ -43,7 +50,7 @@ export const makeReceiptRoute: Route<InternalHandler<
   },
 }
 
-export const setGlobalGossipRoute: Route<GossipHandler<Receipt>> = {
+const setGlobalGossipRoute: Route<GossipHandler<Receipt>> = {
   name: 'set-global',
   handler: payload => {
     if (validateReceipt(payload) === false) return
@@ -86,18 +93,18 @@ export function setGlobal(address, value, when, source) {
   // Sign tx
   const signedTx: SignedSetGlobalTx = crypto.sign(tx)
 
-  if(stateManager == null){
+  if (stateManager == null) {
     console.log(`setGlobal: stateManager == null`)
   } else {
     console.log(`setGlobal: stateManager != null`)
   }
 
   // Get the nodes that tx will be broadcasted to
-  if (!stateManager.currentCycleShardData){
+  if (!stateManager.currentCycleShardData) {
     console.log(`stateManager.currentCycleShardData == null`)
 
     return
-  } 
+  }
   const homeNode = ShardFunctions.findHomeNode(
     stateManager.currentCycleShardData.shardGlobals,
     source,
@@ -255,10 +262,16 @@ function validateReceipt(receipt: Receipt) {
   const signsInConsensusGroup: Signature[] = []
   for (const sign of receipt.signs) {
     const node = p2p.state.getNodeByPubKey(sign.owner)
-    
-    if(node == null){
-      console.log(`validateReceipt: node was null or not found ${utils.stringifyReduce(sign.owner)}`)
-      console.log(`validateReceipt: nodes: ${utils.stringifyReduce(p2p.state.getNodes())}`)
+
+    if (node == null) {
+      console.log(
+        `validateReceipt: node was null or not found ${utils.stringifyReduce(
+          sign.owner
+        )}`
+      )
+      console.log(
+        `validateReceipt: nodes: ${utils.stringifyReduce(p2p.state.getNodes())}`
+      )
       continue
     }
 
@@ -266,7 +279,11 @@ function validateReceipt(receipt: Receipt) {
     if (consensusGroup.has(id)) {
       signsInConsensusGroup.push(sign)
     } else {
-      console.log(`validateReceipt: consensusGroup does not have id: ${id} ${utils.stringifyReduce(consensusGroup)}`)
+      console.log(
+        `validateReceipt: consensusGroup does not have id: ${id} ${utils.stringifyReduce(
+          consensusGroup
+        )}`
+      )
     }
   }
   // Make sure signs and consensusGroup overlap >= %60
@@ -283,7 +300,9 @@ function validateReceipt(receipt: Receipt) {
     if (crypto.verify(signedTx)) verified++
   }
   if ((verified / consensusGroup.size) * 100 < 60) {
-    console.log('validateReceipt: Receipt does not have enough valid signatures')
+    console.log(
+      'validateReceipt: Receipt does not have enough valid signatures'
+    )
     return false
   }
   console.log(`validateReceipt: success! ${utils.stringifyReduce(receipt)}`)
