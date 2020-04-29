@@ -243,6 +243,13 @@ export function attemptCleanup() {
 }
 
 function validateReceipt(receipt: Receipt) {
+
+  if(stateManager.currentCycleShardData == null){
+    // we may get this endpoint way before we are ready, so just log it can exit out
+    console.log('validateReceipt: unable to validate receipt currentCycleShardData not ready')
+    return false
+  }
+
   const consensusGroup = new Set(getConsensusGroupIds(receipt.tx.source))
   // Make sure receipt has enough signs
   if (isReceiptMajority(receipt, consensusGroup) === false) {

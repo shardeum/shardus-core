@@ -3333,10 +3333,14 @@ class StateManager extends EventEmitter {
             // globalModification  TODO pass on to syncing nodes.   (make it pass on the flag too)
             // possibly need to send proof to the syncing node or there could be a huge security loophole.  should share the receipt as an extra parameter
             // or data repair will detect and reject this if we get tricked.  could be an easy attack vector
-            if (this.currentCycleShardData.hasSyncingNeighbors === true) {
-              this.logger.playbackLogNote('shrd_sync_tx', `${txId}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighborsTxGroup.map(x => x.id))}`)
-              this.p2p.sendGossipIn('spread_tx_to_group', acceptedTx, '', sender, this.currentCycleShardData.syncingNeighborsTxGroup)
-              //This was using sendGossipAll, but changed it for a work around.  maybe this just needs to be a tell.
+            if (this.currentCycleShardData.hasSyncingNeighbors === true ) {
+              if( txQueueEntry.globalModification === false){
+                this.logger.playbackLogNote('shrd_sync_tx', `${txId}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighborsTxGroup.map(x => x.id))}`)
+                this.p2p.sendGossipIn('spread_tx_to_group', acceptedTx, '', sender, this.currentCycleShardData.syncingNeighborsTxGroup)
+                //This was using sendGossipAll, but changed it for a work around.  maybe this just needs to be a tell.                
+              } else {
+                if (this.verboseLogs) this.mainLogger.debug(`queueAcceptedTransaction: bugfix detected. avoid forwarding txs where globalModification == true`)
+              }
             }
           }
         }
