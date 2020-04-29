@@ -676,6 +676,7 @@ class Shardus extends EventEmitter {
   async syncAppData() {
     if (!this.app) {
       await this.p2p.goActive()
+      this.stateManager.appFinishedSyncing = true
       return
     }
     if (this.stateManager) await this.stateManager.syncStateData(3)
@@ -686,6 +687,7 @@ class Shardus extends EventEmitter {
       await this.stateManager.waitForShardCalcs()
       await this.app.sync()
       console.log('syncAppData - sync')
+      this.stateManager.appFinishedSyncing = true
     } else {
       await this.stateManager.startCatchUpQueue()
       console.log('syncAppData - startCatchUpQueue')
@@ -693,6 +695,7 @@ class Shardus extends EventEmitter {
       console.log('syncAppData - sync')
       await this.p2p.goActive()
       console.log('syncAppData - goActive')
+      this.stateManager.appFinishedSyncing = true
     }
     // Set network joinable to true
     this.p2p.setJoinRequestToggle(true)

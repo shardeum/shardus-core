@@ -98,6 +98,7 @@ class StateManager extends EventEmitter {
     globalAccountRepairBank: Map<string, Shardus.AccountsCopy[]>
 
     //combinedAccountData:Shardus.WrappedData[]
+    appFinishedSyncing: boolean;
 
   constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage : Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     super()
@@ -130,6 +131,8 @@ class StateManager extends EventEmitter {
     this.queueEntryCounter = 0
     this.queueRestartCounter = 0
     this.lastSeenAccountsMap = null
+
+    this.appFinishedSyncing = false
 
     //BLOCK2
     /** @type {SyncTracker[]} */
@@ -1200,6 +1203,13 @@ class StateManager extends EventEmitter {
     let winners
     try {
       [result, winners] = await this.p2p.robustQuery(nodes, queryFn, equalFn, 3, false)
+
+      if(result.ready === false){
+        this.mainLogger.debug(`DATASYNC: getRobustGlobalReport results not ready wait 10 seconds and try again `)
+        console.log(`DATASYNC: getRobustGlobalReport results not ready wait 10 seconds and try again `)
+        await utils.sleep(10*1000) //wait 10 seconds and try again.
+        return await this.getRobustGlobalReport()
+      }
     } catch (ex) {
       this.mainLogger.debug('getRobustGlobalReport: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       this.fatalLogger.fatal('getRobustGlobalReport: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -2480,7 +2490,7 @@ class StateManager extends EventEmitter {
     })
   
     this.p2p.registerInternal('get_globalaccountreport', async (payload:any, respond: (arg0: GlobalAccountReportResp) => any) => {
-      let result = {combinedHash:"", accounts:[]} as GlobalAccountReportResp
+      let result = {combinedHash:"", accounts:[], ready: this.appFinishedSyncing} as GlobalAccountReportResp
 
       //type GlobalAccountReportResp = {combinedHash:string, accounts:{id:string, hash:string, timestamp:number }[]  }
       //sort by account ids.
