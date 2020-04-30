@@ -3,7 +3,7 @@ import * as CycleCreator from './CycleCreator'
 import { CycleRecord } from './CycleCreator'
 import { JoinedConsensor } from './Join'
 import { Node, Update } from './NodeList'
-import { reversed } from './Utils'
+import { reversed } from '../utils'
 
 export interface Change {
   added: JoinedConsensor[] // order joinRequestTimestamp [OLD, ..., NEW]

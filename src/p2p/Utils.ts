@@ -87,7 +87,7 @@ export async function sequentialQuery<Node = unknown, Response = unknown>(
   verifyFn: VerifyFunction<Response> = () => true
 ): Promise<SequentialQueryResult<Node>> {
   nodes = [...nodes]
-  shuffleArray(nodes)
+  utils.shuffleArray(nodes)
 
   let result: Response
   const errors: Array<SequentialQueryError<Node>> = []
@@ -197,7 +197,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
 
   nodes = [...nodes]
   if (shuffleNodes === true) {
-    shuffleArray(nodes)
+    utils.shuffleArray(nodes)
   }
   const nodeCount = nodes.length
 
@@ -251,28 +251,4 @@ export async function robustQuery<Node = unknown, Response = unknown>(
       nodeCount !== 1 ? 'nodes' : 'node'
     }. Encountered ${errors} query errors.`
   )
-}
-
-// From: https://stackoverflow.com/a/12646864
-export function shuffleArray<T>(array: T[]) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[array[i], array[j]] = [array[j], array[i]]
-  }
-}
-
-export function reversed<T>(thing: Iterable<T>) {
-  const arr = Array.isArray(thing) ? thing : Array.from(thing)
-  let i = arr.length - 1
-  const reverseIterator = {
-    next: () => {
-      const done = i < 0
-      const value = done ? undefined : arr[i]
-      i--
-      return { value, done }
-    },
-  }
-  return {
-    [Symbol.iterator]: () => reverseIterator,
-  }
 }

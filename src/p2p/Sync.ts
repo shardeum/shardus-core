@@ -7,7 +7,8 @@ import * as CycleCreator from './CycleCreator'
 import { Change, ChangeSquasher, parse } from './CycleParser'
 import * as NodeList from './NodeList'
 import { Route } from './Types'
-import { reversed, robustQuery, sequentialQuery } from './Utils'
+import { robustQuery, sequentialQuery } from './Utils'
+import { reversed } from '../utils'
 
 /** TYPES */
 

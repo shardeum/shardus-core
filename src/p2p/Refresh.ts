@@ -11,7 +11,7 @@
 
 import deepmerge from 'deepmerge'
 import { Logger } from 'log4js'
-import { propComparator, propComparator2 } from '../utils'
+import { propComparator, propComparator2, reversed } from '../utils'
 import * as Archivers from './Archivers'
 import { logger } from './Context'
 import { cycles, newest } from './CycleChain'
@@ -20,7 +20,6 @@ import * as CycleParser from './CycleParser'
 import * as NodeList from './NodeList'
 import { activeNodeCount, totalNodeCount } from './Sync'
 import * as Types from './Types'
-import { reversed } from './Utils'
 
 /** TYPES */
 

@@ -512,7 +512,7 @@ export const sortDecProp = (a, b, propName) => {
 }
 
 // From: https://stackoverflow.com/a/12646864
-export function shuffleArray(array) {
+export function shuffleArray<T>(array: T[]) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
     ;[array[i], array[j]] = [array[j], array[i]]
@@ -575,3 +575,20 @@ export function getRandomGossipIn(nodeIdxs, fanOut, myIdx) {
   }
   return results
 }
+
+export function reversed<T>(thing: Iterable<T>) {
+  const arr = Array.isArray(thing) ? thing : Array.from(thing)
+  let i = arr.length - 1
+  const reverseIterator = {
+    next: () => {
+      const done = i < 0
+      const value = done ? undefined : arr[i]
+      i--
+      return { value, done }
+    },
+  }
+  return {
+    [Symbol.iterator]: () => reverseIterator,
+  }
+}
+
