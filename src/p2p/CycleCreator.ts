@@ -340,7 +340,7 @@ async function runQ4() {
 
   let matched
   do {
-    matched = await compareCycleCert(DESIRED_CERT_MATCHES)
+    matched = await compareCycleCert(myC, myQ, DESIRED_CERT_MATCHES)
     if (!matched) {
       if (cycleQuarterChanged(myC, myQ)) return
       await utils.sleep(100)
@@ -727,7 +727,7 @@ function compareCycleCertEndpoint(inp: CompareCertReq, sender) {
   return { certs: bestCycleCert.get(marker), record }
 }
 
-async function compareCycleCert(matches: number) {
+async function compareCycleCert(myC: number, myQ: number, matches: number) {
   const queryFn = async (
     node: NodeList.Node
   ): Promise<[CompareCertRes, NodeList.Node]> => {
@@ -744,6 +744,11 @@ async function compareCycleCert(matches: number) {
   }
 
   const compareFn = respArr => {
+    /**
+     * [IMPORTANT] Don't change things if the awaited call took too long
+     */
+    if (cycleQuarterChanged(myC, myQ)) return Comparison.ABORT
+
     const [resp, node] = respArr
     if (resp.certs[0].marker === bestMarker) {
       // Our markers match
@@ -766,6 +771,14 @@ async function compareCycleCert(matches: number) {
     matches = NodeList.activeOthersByIdOrder.length
   }
 
+  /**
+   * [NOTE] The number of nodesToAsk should be limited based on the amount of
+   * time we have in the quarter
+   */
+  // We shuffle to spread out the network load of cert comparison
+  const nodesToAsk = [...NodeList.activeOthersByIdOrder]
+  utils.shuffleArray(nodesToAsk)
+  
   // If anything compares better than us, compareQuery starts over
   const errors = await compareQuery<
     NodeList.Node,

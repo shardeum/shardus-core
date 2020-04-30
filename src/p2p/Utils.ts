@@ -11,9 +11,10 @@ export type EqualityFunction<Value> = (val1: Value, val2: Value) => boolean
 export type CompareFunction<Result> = (result: Result) => Comparison
 
 export enum Comparison {
-  BETTER = 1,
-  EQUAL = 0,
-  WORSE = -1,
+  BETTER,
+  EQUAL,
+  WORSE,
+  ABORT 
 }
 
 export interface CompareQueryError<Node> {
@@ -40,11 +41,13 @@ export async function compareQuery<Node = unknown, Response = unknown>(
   compareFn: CompareFunction<Response>,
   matches: number
 ): Promise<CompareFunctionResult<Node>> {
+  let abort: boolean
   let startOver: boolean
   let errors: Array<CompareQueryError<Node>>
   let matched: number
 
   do {
+    abort = false
     startOver = false
     errors = []
     matched = 0
@@ -65,9 +68,14 @@ export async function compareQuery<Node = unknown, Response = unknown>(
           case Comparison.WORSE:
             // Try the next one
             break
+          case Comparison.ABORT:
+            // End everything and return 
+            abort = true
+            break
           default:
         }
 
+        if (abort) break
         if (startOver) break
       } catch (error) {
         errors.push({
