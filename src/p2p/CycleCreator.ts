@@ -307,7 +307,7 @@ async function runQ3() {
   // Compare this cycle's marker with the network
   const myC = currentCycle
   const myQ = currentQuarter
-  const matched = await compareCycleMarkers(DESIRED_MARKER_MATCHES)
+  const matched = await compareCycleMarkers(myC, myQ, DESIRED_MARKER_MATCHES)
   if (!matched) return
   if (cycleQuarterChanged(myC, myQ)) return
 
@@ -412,19 +412,26 @@ function makeCycleCert(marker: CycleMarker): CycleCert {
   return crypto.sign({ marker })
 }
 
-async function compareCycleMarkers(desired: number) {
+async function compareCycleMarkers(myC:number, myQ:number, desired: number) {
   info('Comparing cycle markers...')
 
   // Init vars
   let matches = 0
 
   // Get random nodes
+  // [TODO] Use a randomShifted array
   const nodes = utils.getRandom(NodeList.activeOthersByIdOrder, 2 * desired)
 
   for (const node of nodes) {
     // Send marker, txs to /compare-marker endpoint of another node
     const req: CompareMarkerReq = { marker, txs }
     const resp: CompareMarkerRes = await Comms.ask(node, 'compare-marker', req)
+
+    /**
+     * [IMPORTANT] Don't change things if the awaited call took too long
+     */
+    if (cycleQuarterChanged(myC, myQ)) return false
+
     if (resp) {
       if (resp.marker === marker) {
         // Increment our matches if they computed the same marker
