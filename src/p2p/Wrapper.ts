@@ -4,7 +4,7 @@ import * as utils from '../utils'
 import * as Active from './Active'
 import { apoptosizeSelf } from './Apoptosis'
 import * as Comms from './Comms'
-import { config } from './Context'
+import { config, setConfig } from './Context'
 import * as CycleChain from './CycleChain'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
@@ -165,44 +165,24 @@ class State extends EventEmitter {
     return CycleChain.newest
   }
 
-  getCycleByCounter(cycleNumber) {
-    function compare(cycleNum, cycle) {
-      return cycleNum > cycle.counter ? 1 : cycleNum < cycle.counter ? -1 : 0
-    }
-    const i = utils.binarySearch(CycleChain.cycles, cycleNumber, compare)
-    /*
-    for(const cycle of CycleChain.cycles){
-      if (cycle.counter === cycleNumber){ return cycle }
-    }
-    */
-    if (i >= 0) return i
+  getCycleByCounter(counter) {
+    const i = utils.binarySearch(CycleChain.cycles, { counter }, utils.propComparator('counter'))
+    if (i > -1) return CycleChain.cycles[i]
     return null
   }
 
   getCycleByTimestamp(timestamp) {
-    let secondsTs = Math.floor(timestamp * 0.001)
-    function compare(ts, ae) {
-      if (ts > ae.start + ae.duration) {
+    const secondsTs = Math.floor(timestamp * 0.001)
+    const i = utils.binarySearch(CycleChain.cycles, secondsTs, (ts, record) => {
+      if (ts > record.start + record.duration) {
         return 1
       }
-      if (ts < ae.start) {
+      if (ts < record.start) {
         return -1
       }
       return 0
-    }
-    // binary search seems busted
-    //const i = utils.binarySearch(CycleChain.cycles, timestamp, compare)
-    // if (i >= 0) return i
-    // return null
-    //temp simple for loop untill the binary search can be fixed.
-    for (const cycle of CycleChain.cycles) {
-      if (
-        cycle.start < secondsTs &&
-        cycle.start + cycle.duration >= secondsTs
-      ) {
-        return cycle
-      }
-    }
+    })
+    if (i > -1) return CycleChain.cycles[i]
     return null
   }
 }

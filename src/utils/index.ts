@@ -1,7 +1,8 @@
 import { readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
+import { isDeepStrictEqual } from 'util'
 
-type Comparator<T> = (a: T, b: T) => number
+type Comparator<T, E = T> = (a: E, b: T) => number
 
 export const sleep = ms => {
   return new Promise(resolve => {
@@ -101,30 +102,35 @@ export function binaryLowest<T>(ar: T[], comparator?: Comparator<T>) {
   return m
 }
 
-/*
+
+/**
  * Binary search in JavaScript.
  * Returns the index of of the element in a sorted array or (-n-1) where n is the insertion point for the new element.
- *    If the return value is negative use 1-returned as the insertion point for the element
+ *   If the return value is negative use 1-returned as the insertion point for the element
  * Parameters:
  *     arr - A sorted array
  *     el - An element to search for
  *     compare_fn - A comparator function. The function takes two arguments: (el, ae) and returns:
- *        a negative number  if el is less than ae;
- *        a positive number if el is greater than ae.
- *        0 if el is equal to ae;
- *        note that el is the element we are searching for and ae is an array element from the sorted array
+ *       a negative number  if el is less than ae;
+ *       a positive number if el is greater than ae.
+ *       0 if el is equal to ae;
+ *       note that el is the element we are searching for and ae is an array element from the sorted array
  * The array may contain duplicate elements. If there are more than one equal elements in the array,
  * the returned value can be the index of any one of the equal elements.
+ * 
+ * @param arr 
+ * @param el 
+ * @param comparator 
  */
-export function binarySearch<T>(
+export function binarySearch<T, E=Partial<T>>(
   arr: T[],
-  el: Partial<T>,
-  comparator?: Comparator<typeof el>
+  el: E,
+  comparator?: Comparator<T, typeof el>
 ) {
   if (comparator == null) {
     // Emulate the default Array.sort() comparator
     comparator = (a, b) => {
-      return a > b ? 1 : a < b ? -1 : 0
+      return a.toString() > b.toString() ? 1 : a.toString() < b.toString() ? -1 : 0
     }
   }
   let m = 0
