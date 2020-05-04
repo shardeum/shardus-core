@@ -64,7 +64,7 @@ const gossipRouteName = 'apoptosis'
 const allowStopRoute = true
 
 let p2pLogger
-let proposals: { [id: string]: SignedApoptosisProposal } = {}
+const proposals: { [id: string]: SignedApoptosisProposal } = {}
 
 /** ROUTES */
 
@@ -196,7 +196,7 @@ export function init() {
 export function reset() {
   // only delete proposals where the node has been removed
   //   otherwise we will submit the proposal again in the next Q1
-  for (let id of Object.keys(proposals)){
+  for (const id of Object.keys(proposals)){
     if (!nodes.get(id)){  
       delete proposals[id]
     }
@@ -222,7 +222,7 @@ export function updateRecord(
   record: Record,
 ) 
 {
-  let apoptosized = []
+  const apoptosized = []
   for (const request of txs.apoptosis) {
     const publicKey = request.sign.owner
     const node = byPubKey.get(publicKey)
@@ -243,7 +243,7 @@ export function parseRecord(record: Record): Change {
 }
 
 export function sendRequests() {
-  for (let id of Object.keys(proposals)){
+  for (const id of Object.keys(proposals)){
     // make sure node is still in the network, since it might
     //   have already been removed
     if (nodes.get(id)){  
@@ -263,7 +263,7 @@ export function queueRequest(request) {
 
 // [TODO] - We don't need the caller to pass us the list of nodes
 //          remove this after changing references
-export async function apoptosizeSelf(nodes_not_used) {
+export async function apoptosizeSelf(nodesNotUsed) {
   log(`In apoptosize`)
   // [TODO] - maybe we should shuffle this array
   const activeNodes = activeByIdOrder  
@@ -272,13 +272,13 @@ export async function apoptosizeSelf(nodes_not_used) {
 //  await p2p.tell(activeNodes, internalRouteName, proposal)
   await Comms.tell(activeNodes, internalRouteName, proposal)
 */
-  const qF = async function(node){
+  const qF = async (node) => {
 //  use ask instead of tell and expect the node to
 //          acknowledge it received the request by sending 'pass'
     const res = Comms.ask(node, internalRouteName, proposal)
     return res
   }
-  const eF = function(item1, item2){
+  const eF = (item1, item2) => {
     // [TODO] - validate input from network
     if (!item1 || !item2) return false
     if ((item1.s === 'pass') && (item2.s === 'pass')) return true
