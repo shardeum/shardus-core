@@ -1,6 +1,7 @@
 import deepmerge from 'deepmerge'
 import { Logger } from 'log4js'
 import * as utils from '../utils'
+// don't forget to add new modules here
 import * as Active from './Active'
 import * as Archivers from './Archivers'
 import * as Comms from './Comms'
@@ -10,10 +11,12 @@ import * as Join from './Join'
 import * as NodeList from './NodeList'
 import * as Refresh from './Refresh'
 import * as Rotation from './Rotation'
+import * as Apoptosis from './Apoptosis'
 import * as Self from './Self'
 import * as Sync from './Sync'
 import { GossipHandler, InternalHandler, SignedObject } from './Types'
 import { compareQuery, Comparison } from './Utils'
+import { PerformanceObserver } from 'perf_hooks'
 
 /** TYPES */
 
@@ -31,17 +34,21 @@ interface BaseRecord {
   duration: number
 }
 
+// don't forget to add new modules here
 export type CycleTxs = Refresh.Txs &
   Archivers.Txs &
   Join.Txs &
   Active.Txs &
+  Apoptosis.Txs &
   Rotation.Txs
 
+// don't forget to add new modules here
 export type CycleRecord = BaseRecord &
   Refresh.Record &
   Archivers.Record &
   Join.Record &
   Active.Record &
+  Apoptosis.Record &
   Rotation.Record & {
     joined: string[]
     returned: string[]
@@ -62,14 +69,16 @@ const DESIRED_MARKER_MATCHES = 2
 let p2pLogger: Logger
 let cycleLogger: Logger
 
-export const submodules = [Archivers, Join, Active, Rotation, Refresh]
+// don't forget to add new modules here
+export const submodules = [Archivers, Join, Active, Rotation, Refresh, Apoptosis]
 
 export let currentQuarter = -1 // means we have not started creating cycles
 export let currentCycle = 0
 export let nextQ1Start = 0
 
 let madeCycle = false // True if we successfully created the last cycle record, otherwise false
-let madeCert = false // set to True after we make our own cert and try to gossip it
+// not used anymore
+//let madeCert = false // set to True after we make our own cert and try to gossip it
 
 let txs: CycleTxs
 let record: CycleRecord
@@ -212,9 +221,20 @@ async function cycleCreator() {
   // Set current quater to 0 while we are setting up the previous record
   //   Routes should use this to not process and just single-forward gossip
   currentQuarter = 0
+  info(`C${currentCycle} Q${currentQuarter}`)
+  info(`madeCycle: ${madeCycle} bestMarker: ${bestMarker}`)
   // Get the previous record
-  let prevRecord = madeCycle ? bestRecord : await fetchLatestRecord()
+  //let prevRecord = madeCycle ? bestRecord : await fetchLatestRecord()
+  let prevRecord = bestRecord
+  if (!prevRecord){
+    prevRecord = await fetchLatestRecord()
+  }
   while (!prevRecord) {
+    // [TODO] - when there are few nodes in the network, we may not
+    //          be able to get a previous record since the number of
+    //          matches for robust query may not be met. Maybe we should
+    //          count the number of tries and lower the number of matches
+    //          needed if the number of tries increases.
     warn(
       'CycleCreator: cycleCreator: Could not get prevRecord. Trying again in 1 sec...'
     )
@@ -223,9 +243,9 @@ async function cycleCreator() {
   }
 
   // Apply the previous records changes to the NodeList
-  if (madeCycle) {
+  //if (madeCycle) {
     Sync.digestCycle(prevRecord)
-  }
+  //}
 
   // Print combined cycle log entry
   cycleLogger.info(CycleChain.getDebug() + NodeList.getDebug())
@@ -638,6 +658,13 @@ function validateCertSign(certs: CycleCert[], sender: NodeList.Node['id']) {
 function validateCerts(certs: CycleCert[], record, sender) {
   if (!certs || !Array.isArray(certs) || certs.length <= 0) {
     warn('validateCerts: bad certificate format')
+    warn(`validateCerts:   sent by: port:${(NodeList.nodes.get(sender)).externalPort} id:${JSON.stringify(sender)}`)
+    return false
+  }
+  //  make sure the cycle counter is what we expect
+  if (record.counter != CycleChain.newest.counter+1){
+    warn(`validateCerts: bad cycle record counter; expected ${CycleChain.newest.counter+1} but got ${record.counter}`)
+    warn(`validateCerts:   sent by: port:${(NodeList.nodes.get(sender)).externalPort} id:${JSON.stringify(sender)}`)
     return false
   }
   // make sure all the certs are for the same cycle marker
@@ -646,20 +673,35 @@ function validateCerts(certs: CycleCert[], record, sender) {
   for (let i = 1; i < certs.length; i++) {
     if (inpMarker !== certs[i].marker) {
       warn('validateCerts: certificates marker does not match hash of record')
+      warn(`validateCerts:   sent by: port:${(NodeList.nodes.get(sender)).externalPort} id:${JSON.stringify(sender)}`)
       return false
     }
   }
+  // make sure that the certs are from different owners and not the same node
+  const seen = {}
+  for (let i = 0; i < certs.length; i++) {
+    if (seen[certs[i].sign.owner]){
+      warn(`validateCerts: multiple certificate from same owner ${JSON.stringify(certs)}`)
+      warn(`validateCerts:   sent by: port:${(NodeList.nodes.get(sender)).externalPort} id:${JSON.stringify(sender)}`)
+      return false
+    }
+    seen[certs[i].sign.owner] = true
+  }
   //  checks signatures; more expensive
   if (!validateCertSign(certs, sender)) {
-    warn('validateCerts: certificate has bad sign')
+    warn(`validateCerts: certificate has bad sign; certs:${JSON.stringify(certs)}`)
+    warn(`validateCerts:   sent by: port:${(NodeList.nodes.get(sender)).externalPort} id:${JSON.stringify(sender)}`)
     return false
   }
   return true
 }
 
-// Given an array of cycle certs, go through them and see if we can improve our best cert
+// Given an array of valid cycle certs, go through them and see if we can improve our best cert
 // return true if we improved it
+// We assume the certs have already been checked
 function improveBestCert(certs: CycleCert[], record) {
+  warn(`improveBestCert: certs:${JSON.stringify(certs)}`)
+  warn(`improveBestCert: record:${JSON.stringify(record)}`)
   let improved = false
   if (certs.length <= 0) {
     return false
@@ -670,23 +712,32 @@ function improveBestCert(certs: CycleCert[], record) {
       bscore = bestCertScore.get(bestMarker)
     }
   }
+  warn(`improveBestCert: bscore:${JSON.stringify(bscore)}`)
+  const bcerts = bestCycleCert.get(certs[0].marker)
+  warn(`improveBestCert: bcerts:${JSON.stringify(bcerts)}`)
+  const have = {}
+  if (bcerts){
+    for (const cert of bcerts){
+      have[cert.sign.owner] = true
+    }
+  }
+  warn(`improveBestCert: have:${JSON.stringify(have)}`)
   for (const cert of certs) {
+    // make sure we don't store more than one cert from the same owner with the same marker
+    if (have[cert.sign.owner]) continue
     cert.score = scoreCert(cert)
     if (!bestCycleCert.get(cert.marker)) {
       bestCycleCert.set(cert.marker, [cert])
     } else {
-      const bcerts = bestCycleCert.get(cert.marker)
       let added = false
+      const bcerts = bestCycleCert.get(cert.marker)
       let i = 0
       for (; i < bcerts.length; i++) {
         if (bcerts[i].score < cert.score) {
-          if (bcerts[i].sign.owner !== cert.sign.owner) {
-            // make sure we don't store more than one cert from the same owner with the same marker
-            bcerts.splice(i, 0, cert)
-            bcerts.splice(BEST_CERTS_WANTED)
-            added = true
-            break
-          }
+          bcerts.splice(i, 0, cert)
+          bcerts.splice(BEST_CERTS_WANTED)
+          added = true
+          break
         }
       }
       if (!added && i < BEST_CERTS_WANTED) {
@@ -707,6 +758,10 @@ function improveBestCert(certs: CycleCert[], record) {
       improved = true
     }
   }
+  info(`improveBestCert: bestScore:${bestCertScore.get(bestMarker)}`)
+  info(`improveBestCert: bestMarker:${bestMarker}`)
+  info(`improveBestCert: bestCerts:${JSON.stringify(bestCycleCert.get(bestMarker))}`)
+  info(`improveBestCert: improved:${improved}`)
   return improved
 }
 
@@ -798,7 +853,7 @@ async function gossipMyCycleCert() {
   if (!Self.isActive && !Self.isFirst) return
 
   // We may have already received certs from other other nodes so gossip only if our cert improves it
-  madeCert = true
+  // madeCert = true  // not used
   info('About to improveBestCert with our cert...')
   if (improveBestCert([cert], record)) {
     // don't need the following line anymore since improveBestCert sets bestRecord if it improved

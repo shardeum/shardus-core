@@ -15,6 +15,10 @@ export interface Record {
   field: string
 }
 
+/** STATE */
+
+let p2pLogger: Logger
+
 /** ROUTES */
 
 const gossipRoute: Types.GossipHandler = payload => {}
@@ -25,10 +29,6 @@ const routes = {
     gossip: gossipRoute,
   },
 }
-
-/** STATE */
-
-let p2pLogger: Logger
 
 /** FUNCTIONS */
 

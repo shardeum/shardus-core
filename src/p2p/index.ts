@@ -1254,10 +1254,11 @@ class P2P extends EventEmitter {
       this.mainLogger.debug(errMsg)
       throw new Error(errMsg)
     }
-    this.mainLogger.debug(`Node ID to find in group: ${nodeId}`)
+//    this.mainLogger.debug(`Node ID to find in group: ${nodeId}`)
     for (const node of group) {
       if (node.id === nodeId) return node
     }
+    this.mainLogger.debug(`Node ID not found in group: ${nodeId}`)
     return false
   }
 
@@ -1271,7 +1272,7 @@ class P2P extends EventEmitter {
         )
         return false
       }
-      this.mainLogger.debug(`Expected publicKey: ${node.curvePublicKey}`)
+//      this.mainLogger.debug(`Expected publicKey: ${node.curvePublicKey}`)
       result = this.crypto.authenticate(message, node.curvePublicKey)
     } catch (e) {
       this.mainLogger.debug(
@@ -1313,7 +1314,7 @@ class P2P extends EventEmitter {
     const payload = wrappedPayload.payload
     const sender = wrappedPayload.sender
     const tracker = wrappedPayload.tracker
-    this.mainLogger.debug('Internal payload successfully authenticated.')
+//    this.mainLogger.debug('Internal payload successfully authenticated.')
     return [payload, sender, tracker]
   }
 

@@ -545,6 +545,25 @@ class Shardus extends EventEmitter {
       // Shutdown cleanly
       process.exit()
     })
+    Self.emitter.on('apoptosized', async () => {
+      this.fatalLogger.fatal('Shardus: caught apoptosized event; cleaning up')
+      if (this.statistics) {
+        this.statistics.stopSnapshots()
+        this.statistics.initialize()
+      }
+      if (this.reporter) {
+        this.reporter.stopReporting()
+        await this.reporter.reportRemoved(Self.id)
+      }
+      if (this.app) {
+        this.app.deleteLocalAccountData()
+        this._attemptRemoveAppliedListener()
+        this._unlinkStateManager()
+        await this.stateManager.cleanup()
+      }
+      this.fatalLogger.fatal('Shardus: caught apoptosized event; finished clean up')
+      // Don't have to exit here, the Apoptosis module does it
+    })
 
     Context.setShardusContext(this)
 

@@ -63,10 +63,11 @@ function _findNodeInGroup(nodeId, group) {
     p2pLogger.debug(errMsg)
     throw new Error(errMsg)
   }
-  p2pLogger.debug(`Node ID to find in group: ${nodeId}`)
+//  p2pLogger.debug(`Node ID to find in group: ${nodeId}`)
   for (const node of group) {
     if (node.id === nodeId) return node
   }
+  p2pLogger.debug(`Node ID not found in group: ${nodeId}`)
   return false
 }
 
@@ -80,7 +81,7 @@ function _authenticateByNode(message, node) {
       )
       return false
     }
-    p2pLogger.debug(`Expected publicKey: ${node.curvePublicKey}`)
+//    p2pLogger.debug(`Expected publicKey: ${node.curvePublicKey}`)
     result = crypto.authenticate(message, node.curvePublicKey)
   } catch (e) {
     p2pLogger.debug(
@@ -122,7 +123,7 @@ function _extractPayload(wrappedPayload, nodeGroup) {
   const payload = wrappedPayload.payload
   const sender = wrappedPayload.sender
   const tracker = wrappedPayload.tracker
-  p2pLogger.debug('Internal payload successfully authenticated.')
+//  p2pLogger.debug('Internal payload successfully authenticated.')
   return [payload, sender, tracker]
 }
 

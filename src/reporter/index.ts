@@ -130,6 +130,9 @@ class Reporter {
       )
       console.error(e)
     }
+    // Omar added this, since, just clearing the timer did not work
+    //   it was still sending one more heartbeat after sending a removed
+    this.hasRecipient = false
   }
 
   // Sends a report

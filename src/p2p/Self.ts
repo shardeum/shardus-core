@@ -180,7 +180,7 @@ async function discoverNetwork(seedNodes) {
 }
 
 async function joinNetwork(activeNodes): Promise<[boolean, number]> {
-  p2pLogger.debug('Joining network...')
+  p2pLogger.debug('Tryting to join network...')
 
   if (isFirst) {
     // Create the first join request and set our node id
@@ -196,6 +196,7 @@ async function joinNetwork(activeNodes): Promise<[boolean, number]> {
     const tryAgain = await Join.submitJoin(activeNodes, request)
 
     if (tryAgain) {
+// [TODO] - see why logs never show Told to wait message
       p2pLogger.debug(`Told to wait until ${tryAgain}`)
       return [false, tryAgain]
     } else {

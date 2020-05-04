@@ -174,6 +174,7 @@ function calculateToAccept() {
 }
 
 export function getTxs(): Txs {
+  // Omar - maybe we don't have to make a copy 
   // [IMPORTANT] Must return a copy to avoid mutation
   const requestsCopy = deepmerge({}, requests)
 
