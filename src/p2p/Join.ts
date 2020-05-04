@@ -346,11 +346,15 @@ export async function fetchCycleMarker(nodes) {
 export async function submitJoin(nodes, joinRequest) {
   for (const node of nodes) {
     info(`Sending join request to ${node.ip}:${node.port}`)
-    const resubmit = await http.post(
-      `${node.ip}:${node.port}/join`,
-      joinRequest
-    )
-    if (resubmit) return resubmit
+    try {
+      const resubmit = await http.post(
+        `${node.ip}:${node.port}/join`,
+        joinRequest
+      )
+      if (resubmit) return resubmit
+    } catch (err) {
+      error(`Join: submitJoin: Error posting join request to ${node.ip}:${node.port}`, err)
+    }
   }
 }
 
