@@ -11,7 +11,7 @@ const packageJsonNew = Object.assign({}, packageJson)
 packageJsonNew.name = packageJson.name + '-dist'
 packageJsonNew.description = `Compiled version of ${packageJson.name}.`
 packageJsonNew.main = './index.js'
-delete packageJsonNew.types
+packageJsonNew.types = './shardus-types.d.ts'
 delete packageJsonNew.files
 delete packageJsonNew.config
 delete packageJsonNew.scripts
@@ -28,6 +28,9 @@ copyFolderSync(path.join(rootDir, 'src/config'), path.join(distDir, 'config'))
 // Copy src/.../computePowGenerator.js and scripts/build-index.js into dist/
 fs.copyFileSync(path.join(rootDir, 'src/crypto/computePowGenerator.js'), path.join(distDir, 'computePowGenerator.js'))
 fs.copyFileSync(path.join(__dirname, '../', 'scripts/build-index.js'), path.join(distDir, 'index.js'))
+
+// Copy src/.../shardus-types.d.ts into dist/
+fs.copyFileSync(path.join(rootDir, 'src/shardus/shardus-types.d.ts'), path.join(distDir, 'shardus-types.d.ts'))
 
 // Modified from https://stackoverflow.com/a/52338335
 function copyFolderSync(from, to) {
