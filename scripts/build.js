@@ -11,7 +11,7 @@ const packageJsonNew = Object.assign({}, packageJson)
 packageJsonNew.name = packageJson.name + '-dist'
 packageJsonNew.description = `Compiled version of ${packageJson.name}.`
 packageJsonNew.main = './index.js'
-packageJsonNew.types = './src/shardus/shardus-types.d.ts'
+delete packageJsonNew.types
 delete packageJsonNew.files
 delete packageJsonNew.config
 delete packageJsonNew.scripts
