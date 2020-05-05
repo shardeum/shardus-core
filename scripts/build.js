@@ -10,6 +10,9 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.
 const packageJsonNew = Object.assign({}, packageJson)
 packageJsonNew.name = packageJson.name + '-dist'
 packageJsonNew.description = `Compiled version of ${packageJson.name}.`
+packageJsonNew.main = './index.js'
+delete packageJsonNew.types
+delete packageJsonNew.files
 delete packageJsonNew.config
 delete packageJsonNew.scripts
 delete packageJsonNew.repository
