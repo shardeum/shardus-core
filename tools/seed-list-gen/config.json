@@ -1,5 +1,0 @@
-{
-  "inFile": "./seed-list.json",
-  "outFile": "./seed-list-signed.json",
-  "keypair": "./keys.json"
-}
