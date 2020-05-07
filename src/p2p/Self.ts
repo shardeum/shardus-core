@@ -24,12 +24,18 @@ let p2pLogger: Logger
 export let id: string
 export let isFirst: boolean
 export let isActive = false
+export let ip: string
+export let port: number
 
 /** ROUTES */
 
 /** FUNCTIONS */
 
 export function init() {
+  // Setup our IP and port so modules like Sync can use it
+  ip = ipInfo.externalIp
+  port = ipInfo.externalPort
+
   // Init submodules
   Comms.init()
   Archivers.init()

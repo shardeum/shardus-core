@@ -308,6 +308,18 @@ function runQ2() {
 /**
  * Handles cycle record creation tasks for quarter 3
  */
+/*
+[TODO] - might need to change how nodes compare cycle markers in Q3.
+  Noticed a problem where if a node is lost in Q2 and all nodes in
+  the network try to do a compare with this node, they all slowed down
+  and are not able to make a cycle record/marker and thus all try to
+  ask others for the missed cycle record, but no one has it, so the
+  network progress stops.
+  We should just do a robust query for the cycle marker and go with
+  the one that was most commonly used, otherwise just use what we
+  created, so that a slow node cannot prevent us from making our
+  marker.
+*/
 async function runQ3() {
   currentQuarter = 3
   Self.emitter.emit('cycle_q3_start')
@@ -328,8 +340,14 @@ async function runQ3() {
   const myC = currentCycle
   const myQ = currentQuarter
   const matched = await compareCycleMarkers(myC, myQ, DESIRED_MARKER_MATCHES)
-  if (!matched) return
-  if (cycleQuarterChanged(myC, myQ)) return
+  if (!matched){ 
+    warn(`In Q3 no match from compareCycleMarker with DESIRED_MARKER_MATCHES of ${DESIRED_MARKER_MATCHES}`)
+    return
+  }
+  if (cycleQuarterChanged(myC, myQ)){ 
+    warn(`In Q3 ran out of time waiting for match from compareCycleMarker`)
+    return
+  }
 
   info(`
     Compared cycle txs: ${JSON.stringify(txs)}
@@ -352,7 +370,10 @@ async function runQ4() {
   info(`C${currentCycle} Q${currentQuarter}`)
 
   // Don't do cert comparison if you didn't make the cycle
-  if (madeCycle === false) return
+  if (madeCycle === false){
+    warn(`In Q4 nothing to do since we madeCycle is false.`)
+    return
+  }
 
   // Compare your cert for this cycle with the network
   const myC = currentCycle
@@ -362,7 +383,10 @@ async function runQ4() {
   do {
     matched = await compareCycleCert(myC, myQ, DESIRED_CERT_MATCHES)
     if (!matched) {
-      if (cycleQuarterChanged(myC, myQ)) return
+      if (cycleQuarterChanged(myC, myQ)) {
+        warn(`In Q4 ran out of time waiting for compareCycleCert with DESIRED_CERT_MATCHES of ${DESIRED_CERT_MATCHES}`)
+        return
+      }
       await utils.sleep(100)
     }
   } while (!matched)
@@ -373,7 +397,8 @@ async function runQ4() {
     Certified cycle cert: ${JSON.stringify(cert)}
   `)
 
-  if (cycleQuarterChanged(myC, myQ)) return
+  // Dont need this any more since we are not doing anything after this
+  // if (cycleQuarterChanged(myC, myQ)) return
 }
 
 /** HELPER FUNCTIONS */

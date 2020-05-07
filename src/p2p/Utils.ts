@@ -128,7 +128,11 @@ export async function sequentialQuery<Node = unknown, Response = unknown>(
 
 /**
  * [TODO] robustQuery should handle being given an enourmous node list (Dont copy and shuffle it)
+ * 
+ * Note -
  * robustQuery should NOT be given a node list that includes yourself (Use NodeList.activeOthersByIdOrder).
+ * OR
+ * the queryFunction can return null if the node being queried is Self.id
  *
  * @param nodes
  * @param queryFn
@@ -164,6 +168,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
       this.items = []
     }
     add(newItem: Response, node: Node) {
+      if (newItem === null) return null
       // We search to see if we've already seen this item before
       for (const item of this.items) {
         // If the value of the new item is not equal to the current item, we continue searching
@@ -199,10 +204,29 @@ export async function robustQuery<Node = unknown, Response = unknown>(
       }
       return highestCount
     }
+    getHighestCountItem() {
+      if (!this.items.length) return {}
+      let highestCount = 0
+      let highestIndex = 0
+      let i = 0
+      for (const item of this.items) {
+        if (item.count > highestCount) {
+          highestCount = item.count
+          highestIndex = i
+        }
+        i += 1
+      }
+      return this.items[highestIndex]
+    }
   }
   const responses = new Tally(redundancy, equalityFn)
   let errors = 0
 
+  // [TODO] - Change the way we shuffle the array.
+  //     This is not scaleable, if the size of the nodes array is over 100 we should create an array of
+  //     indexes and shuffle that. Or maybe use a function that treats the array as a ring and starts at
+  //     a random offset in the ring and a random direction. Or use a function that visits every element
+  //     in the array once in a random order.
   nodes = [...nodes]
   if (shuffleNodes === true) {
     utils.shuffleArray(nodes)
@@ -227,6 +251,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     let finalResult
     for (const result of results) {
       const { response, node } = result
+      if (responses === null) continue  // ignore null response; can be null if we tried to query ourself
       finalResult = responses.add(response, node)
       if (finalResult) break
     }
@@ -241,17 +266,45 @@ export async function robustQuery<Node = unknown, Response = unknown>(
   }
 
   let finalResult = null
+  let tries = 0
   while (!finalResult) {
+    tries += 1
     const toQuery = redundancy - responses.getHighestCount()
-    if (nodes.length < toQuery) break
+    if (nodes.length < toQuery){
+      console.log('In robustQuery stopping since we ran out of nodes to query.')
+      break
+    }
     const nodesToQuery = nodes.splice(0, toQuery)
     finalResult = await queryNodes(nodesToQuery)
+    if (tries>=20){
+      console.log('In robustQuery stopping after 20 tries.')
+      console.trace()
+      break
+    }
   }
   if (finalResult) {
+    console.log(`In robustQuery stopping sinc we got a finalResult:${JSON.stringify(finalResult)}`)
     return finalResult
   }
+  else{
+  // TODO:  We return the item that had the most nodes reporting it. However, the caller should know
+  //        what the count was. We should return [item, count] so that caller gets both.
+  //        This change would require also changing all the places it is called.
+    console.log(
+    `Could not get ${redundancy} ${
+      redundancy > 1 ? 'redundant responses' : 'response'
+    } from ${nodeCount} ${
+      nodeCount !== 1 ? 'nodes' : 'node'
+    }. Encountered ${errors} query errors.`
+    )
+    console.trace()
+    return responses.getHighestCountItem()
+  }
 
-  // TODO: Don't throw an error, should just return what had the most
+  // Omar - throwing an error casues the function to not return, but the program does not exit. Anything after
+  //   the call to this function will not be run, but the program is still alive and well.
+  // : Don't throw an error, should just return what had the most common value was
+  /*
   throw new Error(
     `Could not get ${redundancy} ${
       redundancy > 1 ? 'redundant responses' : 'response'
@@ -259,4 +312,5 @@ export async function robustQuery<Node = unknown, Response = unknown>(
       nodeCount !== 1 ? 'nodes' : 'node'
     }. Encountered ${errors} query errors.`
   )
+  */
 }

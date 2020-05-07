@@ -727,7 +727,7 @@ class P2P extends EventEmitter {
       ? this.state.getActiveNodes(this.id)
       : this.archiverActiveNodes
   ) {
-    P2PApoptosis.apoptosizeSelf(activeNodes)
+    P2PApoptosis.apoptosizeSelf()
   }
 
   isActive() {

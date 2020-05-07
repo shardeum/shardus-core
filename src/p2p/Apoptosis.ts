@@ -59,7 +59,7 @@ export const cycleUpdatesName = 'apoptosis'
 const internalRouteName = 'apoptosize'
 const gossipRouteName = 'apoptosis'
 
-// [TODO] - This enables a debug route and should be set to false after testing
+// [TODO] - This enables the /stop debug route and should be set to false after testing
 //          Normally oter parts of the program can just call apoptosizeSelf()
 const allowStopRoute = true
 
@@ -74,7 +74,7 @@ const stopExternalRoute: Types.Route<Handler> = {
   handler: (_req, res) => {
     if (allowStopRoute){
       res.json({status: 'goodbye cruel world'})
-      apoptosizeSelf([])
+      apoptosizeSelf()
     }
   },
 }
@@ -98,6 +98,7 @@ const apoptosisInternalRoute: Route<InternalHandler<SignedApoptosisProposal>> = 
 //  if (addProposal(payload)) Comms.sendGossip(gossipRouteName, payload)
 //  Omar - we must always accept the original apoptosis message regardless of quarter and save it to gossip next cycle
 //    but if we are in Q1 gossip it, otherwise save for Q1 of next cycle
+      log(`sender is not apop node: sender:${sender} apop:${payload.id}`)
       if (addProposal(payload)){
         if (currentQuarter === 1){  // if it is Q1 we can try to gossip the message now instead of waiting for Q1 of next cycle
           Comms.sendGossip(gossipRouteName, payload)
@@ -105,31 +106,16 @@ const apoptosisInternalRoute: Route<InternalHandler<SignedApoptosisProposal>> = 
         response({s:'pass'})
         return
       }
-    } 
-    response({s:'fail',r:3})
-  }
-}
-
-/*
-const apoptosisInternalRoute: Route<InternalHandler<SignedApoptosisProposal>> = {
-  name: internalRouteName,
-  handler: (payload, sender:string) => {
-    log(`Got Apoptosis proposal: ${JSON.stringify(payload)}`)
-//    if (addProposal(payload)) p2p.sendGossipIn(gossipRouteName, payload)
-//    if (addProposal(payload)) Comms.sendGossip(gossipRouteName, payload)
-// Omar - we must always accept the original apoptosis message regardless of quarter and save it to gossip next cycle
-//   but if we are in Q1 regossip, otherwise safe for next cycle
-    if (addProposal(payload)){
-      // [TODO] - check that the node which sent this is the same as the node that signed it, otherwise this is not original message so ignore it
-      if (sender === payload.id){
-        if (currentQuarter === 1){  // if it is Q1 we can try to gossip the message now instead of waiting for Q1 of next cycle
-          Comms.sendGossip(gossipRouteName, payload)
-        }
+      else{
+        log(`addProposal failed for payload: ${JSON.stringify(payload)}`)
       }
     } 
-  },
+    else{
+      log(`sender is not apop node: sender:${sender} apop:${payload.id}`)
+      response({s:'fail',r:3})
+    }
+  }
 }
-*/
 
 const apoptosisGossipRoute: GossipHandler<SignedApoptosisProposal> = 
    (payload, sender, tracker) => {
@@ -141,25 +127,6 @@ const apoptosisGossipRoute: GossipHandler<SignedApoptosisProposal> =
     }
   }
 }
-
-/*
-const apoptosisGossipRoute: Route<GossipHandler<SignedApoptosisProposal>> = {
-  name: gossipRouteName,
-  handler: (payload, sender, tracker) => {
-    log(`Got Apoptosis gossip: ${JSON.stringify(payload)}`)
-    if (addProposal(payload)) {
-//      p2p.sendGossipIn(gossipRouteName, payload, tracker, sender)
-      Comms.sendGossip(gossipRouteName, payload, tracker, sender)
-    }
-  },
-}
-*/
-
-
-/* Old stuff - remove later
-export const internalRoutes = [apoptosisInternalRoute]
-export const gossipRoutes = [apoptosisGossipRoute]
-*/
 
 const routes = {
   external: [stopExternalRoute ],
@@ -182,7 +149,7 @@ export function init() {
   // Register routes
   for (const route of routes.external) {
     // [TODO] - Add Comms.registerExternalGet and Post that pass through to network.*
-    //          so that we can always just use Comms.*
+    //          so that we can always just use Comms.* instead of network.*
     network.registerExternalGet(route.name, route.handler)
   }
   for (const route of routes.internal) {
@@ -252,18 +219,12 @@ export function sendRequests() {
   }
 }
 
-/* Don't need this, since addProposal does it
-export function queueRequest(request) {
-  queuedProposals.push(request)
-}
-*/
-
 
 /* Module functions */
 
 // [TODO] - We don't need the caller to pass us the list of nodes
 //          remove this after changing references
-export async function apoptosizeSelf(nodesNotUsed) {
+export async function apoptosizeSelf() {
   log(`In apoptosize`)
   // [TODO] - maybe we should shuffle this array
   const activeNodes = activeByIdOrder  
@@ -275,6 +236,7 @@ export async function apoptosizeSelf(nodesNotUsed) {
   const qF = async (node) => {
 //  use ask instead of tell and expect the node to
 //          acknowledge it received the request by sending 'pass'
+    if (node.id === Self.id) return null
     const res = Comms.ask(node, internalRouteName, proposal)
     return res
   }
@@ -287,7 +249,11 @@ export async function apoptosizeSelf(nodesNotUsed) {
   // If we don't have any active nodes; means we are still joining
   if (activeNodes.length > 0){
     log(`In apoptosizeSelf calling robustQuery proposal`)
-    await robustQuery(activeNodes, qF, eF, 3, true)
+    let redunancy = 1
+    if (activeNodes.length > 5){ redunancy = 2 }
+    if (activeNodes.length > 10){ redunancy = 3 }
+    log(`Redunancy is ${redunancy}`)
+    await robustQuery(activeNodes, qF, eF, redunancy, true)
     log(`Sent apoptosize-self proposal: ${JSON.stringify(proposal)}`)
   }
 // Omar - added the following line. Maybe we should emit an event when we apoptosize so other modules and app can clean up
@@ -326,12 +292,6 @@ function addProposal(proposal: SignedApoptosisProposal): boolean {
   return true
 }
 
-/*
-function clearProposals() {
-  proposals = {}
-}
-*/
-
 function validateProposal(payload: unknown): boolean {
   // [TODO] Type checking
   if (!payload) return false
@@ -341,23 +301,6 @@ function validateProposal(payload: unknown): boolean {
   const proposal = payload as SignedApoptosisProposal
   const id = proposal.id
 
-  // Don't check if it is recent here, only check that if it is
-  //    coming from the originating node
-/*
-  // Check that the proposal is recent
-  if (when > currentCycle || when < currentCycle-20) return false
-*/
-
-  /*
-  // Check if node is in nodelist
-  let node
-  try {
-//    node = p2p.state.getNode(nodeId)
-    node = nodes.get(nodeId)  // even joining nodes can send apoptosis message
-  } catch (e) {
-    return false
-  }
-  */
   // even joining nodes can send apoptosis message, so check all nodes list
   const node = nodes.get(id)  
   if (! node) return false
@@ -370,78 +313,6 @@ function validateProposal(payload: unknown): boolean {
   return true
 }
 
-/** CYCLE HOOKS */
-
-/**
- * Hook to let submodules reset their cycle updates and data fields
- */
-/*
-export function resetCycle(cycleUpdates, cycleData) {
-  cycleUpdates[cycleUpdatesName] = []
-  cycleData[cycleDataName] = []
-}
-*/
-
-/**
- * Hook to let submodule add collected proposals to cycle
- */
-/*
-export function proposalsToCycle(cycleUpdates, cycleData) {
-  for (const publicKey of Object.keys(apoptosisProposals)) {
-    const proposal = apoptosisProposals[publicKey]
-    insertSorted(cycleUpdates[cycleUpdatesName], proposal)
-    insertSorted(cycleData[cycleDataName], proposal.id)
-  }
-  clearProposals()
-}
-*/
-
-/**
- * Hook to let submodules apply received cycle updates to cycle
- */
-/*
-export function updatesToCycle(cycleUpdates, cycleData): boolean {
-  const newCycleData = []
-  for (const proposal of cycleUpdates[cycleUpdatesName]) {
-    if (validateProposal(proposal) === false) return false
-    insertSorted(newCycleData, proposal.id)
-  }
-  cycleData[cycleDataName] = newCycleData
-  return true
-}
-*/
-
-/**
- * Hook to let submodules apply cycle data to the actual p2p state
- */
-/*
-export async function cycleToState(cycleData) {
-  const apoptosizedIds: string[] = cycleData[cycleDataName]
-  if (Array.isArray(apoptosizedIds) === false) return
-  if (apoptosizedIds.length < 1) return
-
-  const apoptosizedNodes = apoptosizedIds.reduce((arr: any[], id: string) => {
-    // [TODO] [HACK] Don't restart on being apoptosized, so that logs are preserved
-//    if (id === p2p.id) {
-    if (id === Self.id) {
-      log(`I have been apoptosized, exiting with code 1...`)
-      process.exit(1)
-    }
-//    arr.push(p2p.state.getNode(id))
-    arr.push(nodes.get(id))
-    return arr
-  }, [])
-
-//  p2p.state.removeNodes(apoptosizedNodes)
-  removeNode(apoptosizedNodes)
-
-  log(
-    `Removed apoptosized nodes from nodelist: ${JSON.stringify(
-      apoptosizedNodes
-    )}`
-  )
-}
-*/
 
 /** STORAGE DATA */
 

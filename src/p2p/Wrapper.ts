@@ -78,7 +78,7 @@ class P2P extends EventEmitter {
     //          we should gossip this, but origninal gossip is only allowed in Q1 and the node cannot
     //          wait until then.
     //          Need to think about the best way to handle this.
-    apoptosizeSelf(NodeList.activeOthersByIdOrder)
+    apoptosizeSelf()
   }
 
   allowTransactions() {

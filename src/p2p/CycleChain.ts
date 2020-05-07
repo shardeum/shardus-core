@@ -107,11 +107,12 @@ export function getDebug() {
       return idToPort[id]
     })
     const rmvd = record.removed.map(id => idToPort[id])
+    const apopd = record.apoptosized.map(id => idToPort[id])
     const rfshd = record.refreshedConsensors.map(
       c => `${c.externalPort}:${c.counterRefreshed}`
     )
 
-    const str = `      ${ctr}: ${prev}: { actv: ${actv}, exp: ${exp}, joind: [${joind.join()}], actvd: [${actvd.join()}], rmvd: [${rmvd.join()}], rfshd: [${rfshd.join()}] }`
+    const str = `      ${ctr}:${prev}: { actv:${actv}, exp:${exp}, joind:[${joind.join()}], actvd:[${actvd.join()}], apop:[${apopd.join()}] rmvd:[${rmvd.join()}], rfshd:[${rfshd.join()}] }`
 
     return str
   })

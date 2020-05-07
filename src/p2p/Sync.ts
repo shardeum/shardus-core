@@ -6,9 +6,11 @@ import * as CycleChain from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import { Change, ChangeSquasher, parse } from './CycleParser'
 import * as NodeList from './NodeList'
+import * as Self from './Self'
 import { Route } from './Types'
 import { robustQuery, sequentialQuery } from './Utils'
 import { reversed } from '../utils'
+import { apoptosizeSelf } from './Apoptosis'
 
 /** TYPES */
 
@@ -204,10 +206,29 @@ async function getNewestCycle(
   const queryFn = async (node: SyncNode) => {
     const ip = node.ip ? node.ip : node.externalIp
     const port = node.port ? node.port : node.externalPort
+    // the queryFunction must return null if the given node is our own
+    // while syncing nodeList we dont have node.id, so use ip and port
+    if (ip === Self.ip && port === Self.port) return null  
     const resp = await http.get(`${ip}:${port}/sync-newest-cycle`)
     return resp
   }
-  const [response, _responders] = await robustQuery(activeNodes, queryFn)
+  const eqFn = (item1, item2) => {
+    console.log(`item is: ${JSON.stringify(item1)}`)
+    try{
+      if (item1.newestCycle.counter === item2.newestCycle.counter) return true
+      return false
+    }
+    catch(err){
+      return false
+    }
+  }
+  let redundancy = 1
+  if (activeNodes.length > 5) redundancy = 2
+  if (activeNodes.length > 10) redundancy = 3
+  //const [response, _responders] = await robustQuery(activeNodes, queryFn)
+  const [response, _responders] = await robustQuery(activeNodes, queryFn, eqFn, redundancy, true)
+  console.log(`response is: ${JSON.stringify(response)}`)
+  
 
   // [TODO] Validate response
   if (!response) throw new Error('Bad response')
