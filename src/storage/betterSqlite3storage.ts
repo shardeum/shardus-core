@@ -3,7 +3,7 @@ import Shardus from '../shardus/shardus-types'
 import Profiler from '../utils/profiler'
 import fs from 'fs'
 import path from 'path'
-import { Sequelize } from 'sequelize'
+import * as Sequelize from 'sequelize'
 import * as utils from '../utils'
 import Logger from '../logger'
 

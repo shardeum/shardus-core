@@ -1,4 +1,4 @@
-import { Sequelize } from 'sequelize'
+import * as Sequelize from 'sequelize'
 import P2PApoptosis = require('../../p2p/Apoptosis')
 
 // dont forget to add the certificate field as JSON

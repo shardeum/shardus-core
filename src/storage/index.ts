@@ -2,8 +2,7 @@ import ShardusTypes from './../shardus/shardus-types'
 import Log4js from 'log4js'
 // const fs = require('fs')
 // const path = require('path')
-import { Sequelize } from 'sequelize'
-const Op = Sequelize.Op
+import { Sequelize, Op } from 'sequelize'
 import models from './models'
 // const stringify = require('fast-stable-stringify')
 // const utils = require('../utils')

@@ -1,4 +1,4 @@
-import { Sequelize } from 'sequelize'
+import * as Sequelize from 'sequelize'
 
 const properties = [
   'properties',

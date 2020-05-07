@@ -35,7 +35,7 @@
     "got": "^9.6.0",
     "log4js": "^3.0.6",
     "log4js-extend": "^0.2.1",
-    "sequelize": "^4.41.0",
+    "sequelize": "^5.21.7",
     "shardus-crypto-utils": "gitlab:shardus/shardus-crypto-utils",
     "shardus-net": "gitlab:shardus/shardus-net",
     "sqlite": "^3.0.0",
@@ -47,16 +47,14 @@
     "@types/cors": "^2.8.6",
     "@types/express": "^4.17.3",
     "@types/got": "^9.6.9",
-    "@types/log4js": "^2.3.5",
     "@types/node": "^13.9.0",
-    "@types/sequelize": "^4.28.8",
     "@types/tar-fs": "^1.16.2",
     "@types/trie-prefix-tree": "^1.5.0",
-    "bytenode-webpack-plugin": "1.0.4",
+    "bytenode-webpack-plugin": "^1.0.5",
     "gts": "^2.0.0",
     "typescript": "~3.7.0",
-    "webpack": "^4.36.1",
-    "webpack-cli": "^3.3.6",
+    "webpack": "^4.43.0",
+    "webpack-cli": "^3.3.11",
     "webpack-node-externals": "^1.7.2"
   }
 }
