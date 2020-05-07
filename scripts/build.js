@@ -18,7 +18,8 @@ delete packageJsonNew.scripts
 delete packageJsonNew.repository
 delete packageJsonNew.devDependencies
 
-packageJsonNew.dependencies['bytenode'] = '1.1.1'
+const packageLockJson = JSON.parse(fs.readFileSync(path.join(__dirname, '../package-lock.json'), { encoding: 'utf8' }))
+packageJsonNew.dependencies['bytenode'] = packageLockJson.dependencies.bytenode.version
 
 fs.writeFileSync(path.join(distDir, 'package.json'), JSON.stringify(packageJsonNew, null, 2))
 
