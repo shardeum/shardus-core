@@ -318,7 +318,33 @@ function runQ2() {
   We should just do a robust query for the cycle marker and go with
   the one that was most commonly used, otherwise just use what we
   created, so that a slow node cannot prevent us from making our
-  marker.
+  marker. But rather than use cycle marker we should use set of
+  txhashes to make it easier to find which txs are being applied.
+
+  During Q1 and Q2 nodes build a list of valid txs they have seen.
+  At the start of Q3 they generate a hash of all the txs they have seen.
+  The cycle tx_hash is a hash of all the hashes of each valid tx
+  the node has seen and validated. If the node is queried for the
+  cycle_tx_hash it returns this even if sees and adds new txs to
+  the list of txs the node has seen and validated.
+  During Q3 the node does a robust query to get the most common
+  cycle_tx_hash and queries the node that provided it to get the
+  associated txs. The node validates these transactions and if
+  any one of the txs is invalid it does not use what it got from
+  the query. Otherwise as long as 2 or more nodes provided the
+  cycle_tx_hash it switches to using this.
+  Once the node has decided on the cycle_tx_hash it generates
+  the a cycle_tx_hash_vote by signing the cycle_tx_hash and gossips
+  that to other nodes. A node can only sign one cycle_tx_hash. If
+  it tries to sign more than one it can be punished and all votes
+  it submitted are ignored. The vote value is determined using
+  XOR of the node_id hash and the cycle_tx_hash. A cycle_cert is
+  created by combining the 3 highest value votes for a cycle_tx_hash.
+  A node regossips if the gossip it received improved the value
+  of the cert for the given cycle_tx_hash. The node regossips the
+  all or up to the 3 best votes it has for the cycle tx_hash.
+  The node also uses robust query to compare the best cycle_cert
+  it has with other nodes.
 */
 async function runQ3() {
   currentQuarter = 3
@@ -339,6 +365,10 @@ async function runQ3() {
   // Compare this cycle's marker with the network
   const myC = currentCycle
   const myQ = currentQuarter
+
+  // Omar - decided that we can get by with not doing a round of compareCycleMarkers
+  //     and instead going straight to comparing cycle certificates.
+  /*
   const matched = await compareCycleMarkers(myC, myQ, DESIRED_MARKER_MATCHES)
   if (!matched){ 
     warn(`In Q3 no match from compareCycleMarker with DESIRED_MARKER_MATCHES of ${DESIRED_MARKER_MATCHES}`)
@@ -355,6 +385,7 @@ async function runQ3() {
     Compared cycle marker: ${JSON.stringify(marker)}
     Compared cycle cert: ${JSON.stringify(cert)}
   `)
+  */
 
   madeCycle = true
 
