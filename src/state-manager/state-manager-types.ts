@@ -250,6 +250,9 @@ type TempTxRecord = {
      * below 0 for not redacted. a value above zero indicates the cycle this was redacted
      */
     redacted: number;
+
+    isGlobalModifyingTX: boolean;
+    savedSomething: boolean;
 };
 /**
  * an object that tracks our TXs that we are storing for later.

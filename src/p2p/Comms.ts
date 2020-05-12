@@ -410,6 +410,84 @@ export async function sendGossip(
   }
 }
 
+export async function sendGossipAll(
+  type,
+  payload,
+  tracker = '',
+  sender = null,
+  inpNodes = NodeList.byIdOrder // Joining nodes need gossip too; we don't send to ourself
+) {
+  // [TODO] Don't copy the node list once sorted lists are passed in
+  const nodes = [...inpNodes]
+
+  if (nodes.length === 0) return
+
+  if (tracker === '') {
+    tracker = createGossipTracker()
+  }
+
+  if (verboseLogs) {
+    p2pLogger.debug(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
+  }
+  const gossipPayload = { type, data: payload }
+
+  const gossipHash = crypto.hash(gossipPayload)
+  if (gossipedHashesSent.has(gossipHash)) {
+    if (verboseLogs) {
+      p2pLogger.debug(`Gossip already sent: ${gossipHash.substring(0, 5)}`)
+    }
+    return
+  }
+  // nodes.sort((first, second) => first.id.localeCompare(second.id, 'en', { sensitivity: 'variant' }))
+  nodes.sort(sortByID)
+  const nodeIdxs = new Array(nodes.length).fill(0).map((curr, idx) => idx)
+  // Find out your own index in the nodes array
+  const myIdx = nodes.findIndex(node => node.id === Self.id)
+  if (myIdx < 0) throw new Error('Could not find self in nodes array')
+
+  let recipients = nodes
+  if (sender != null) {
+    recipients = utils.removeNodesByID(recipients, [sender])
+  }
+  try {
+    if (verboseLogs) {
+      p2pLogger.debug(
+        `GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(
+          recipients.map(
+            node => utils.makeShortHash(node.id) + ':' + node.externalPort
+          )
+        )}`
+      )
+    }
+    for (const node of recipients) {
+      logger.playbackLog(
+        'self',
+        node.id,
+        'GossipInSend',
+        type,
+        tracker,
+        gossipPayload
+      )
+    }
+    await tell(recipients, 'gossip', gossipPayload, true, tracker)
+  } catch (ex) {
+    if (verboseLogs) {
+      p2pLogger.error(
+        `Failed to sendGossip(${utils.stringifyReduce(
+          payload
+        )}) Exception => ${ex}`
+      )
+    }
+    p2pLogger.fatal(
+      'sendGossipIn: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
+    )
+  }
+  gossipedHashesSent.set(gossipHash, false)
+  if (verboseLogs) {
+    p2pLogger.debug(`End of sendGossipIn(${utils.stringifyReduce(payload)})`)
+  }
+}
+
 /**
  * Handle Goosip Transactions
  * Payload: {type: ['receipt', 'trustedTransaction'], data: {}}

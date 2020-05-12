@@ -39,6 +39,14 @@ class P2P extends EventEmitter {
     sender?: any,
     inpNodes?: NodeList.Node[]
   ) => Promise<void>
+  sendGossipAll: (
+    type: any,
+    payload: any,
+    tracker?: string,
+    sender?: any,
+    inpNodes?: NodeList.Node[]
+  ) => Promise<void>
+
   robustQuery: any
   state: typeof state
   archiver: typeof archiver
@@ -53,7 +61,7 @@ class P2P extends EventEmitter {
     this.tell = Comms.tell
     this.sendGossipIn = Comms.sendGossip
     this.robustQuery = Utils.robustQuery
-    //this.sendGossipAll = Comms.sendGossipAll //Need this but will try sendGossipIn as a work around
+    this.sendGossipAll = Comms.sendGossipAll //Need this but will try sendGossipIn as a work around
   }
 
   // Make sure these are copying a reference instead of value

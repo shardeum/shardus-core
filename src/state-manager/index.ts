@@ -2070,7 +2070,7 @@ class StateManager extends EventEmitter {
             return
           }
 
-          if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results ${utils.stringifyReduce(payload)}`)
+          if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results payload: ${utils.stringifyReduce(payload)}`)
 
           if (!payload.partitionResults[0].sign) {
             // TODO security need to check that this is signed by a valid and correct node
@@ -2452,6 +2452,8 @@ class StateManager extends EventEmitter {
         return
       }
       if (transactionGroup.length > 1) {
+
+        this.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `gossip to neighbors`, transactionGroup) 
         this.p2p.sendGossipIn('spread_tx_to_group', payload, tracker, sender, transactionGroup)
       }
 
@@ -2860,9 +2862,16 @@ class StateManager extends EventEmitter {
           sourceState = accountEntry.stateId
           hasStateTableData = true
           if (accountStates.length === 0 || accountStates[0].stateBefore !== sourceState) {
-            if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1')
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1 stateId: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
-            return { success: false, hasStateTableData }
+            if(accountStates[0].stateBefore === '0'.repeat(64)){
+              //sorta broken security hole.
+              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + 'bypass state comparision if before state was 00000: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
+
+            } else{
+              if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1')
+              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1 stateId: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
+              return { success: false, hasStateTableData }              
+            }
+
           }
         }
       }
@@ -2937,6 +2946,9 @@ class StateManager extends EventEmitter {
     let accountKeys = []
     let ourAccountLocks = null
     let applyResponse: Shardus.ApplyResponse | null = null
+    //have to figure out if this is a global modifying tx, since that impacts if we will write to global account.
+    let isGlobalModifyingTX = false
+    let savedSomething = false
     try {
       let tx = acceptedTX.data
       // let receipt = acceptedTX.receipt
@@ -2944,8 +2956,7 @@ class StateManager extends EventEmitter {
       let { timestamp, debugInfo } = keysResponse
       txTs = timestamp
 
-      //have to figure out if this is a global modifying tx, since that impacts if we will write to global account.
-      let isGlobalModifyingTX = false
+
       let queueEntry = this.getQueueEntry(acceptedTX.id)
       if(queueEntry != null){
         if(queueEntry.globalModification === true){
@@ -2990,7 +3001,7 @@ class StateManager extends EventEmitter {
 
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
       // wrappedStates are side effected for now
-      await this.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter)
+      savedSomething = await this.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter)
 
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
@@ -3012,9 +3023,9 @@ class StateManager extends EventEmitter {
     } catch (ex) {
       this.fatalLogger.fatal('tryApplyTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       this.mainLogger.debug(`tryApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
-      if(applyResponse){
+      if(applyResponse){ // && savedSomething){
         // TSConversion do we really want to record this?
-        if (!repairing) this.tempRecordTXByCycle(txTs, acceptedTX, false, applyResponse)
+        if (!repairing) this.tempRecordTXByCycle(txTs, acceptedTX, false, applyResponse, isGlobalModifyingTX, savedSomething)
       } else {
         // this.fatalLogger.fatal('tryApplyTransaction failed: applyResponse == null')
       }
@@ -3066,8 +3077,10 @@ class StateManager extends EventEmitter {
 
     if (!repairing) {
       // await this.updateAccountsCopyTable(accountDataList)
-
-      this.tempRecordTXByCycle(txTs, acceptedTX, true, applyResponse)
+      //if(savedSomething){
+        this.tempRecordTXByCycle(txTs, acceptedTX, true, applyResponse, isGlobalModifyingTX, savedSomething)
+      //}
+      
 
       //WOW this was not good!  had acceptedTX.transactionGroup[0].id
       //if (this.p2p.getNodeId() === acceptedTX.transactionGroup[0].id) {
@@ -3196,6 +3209,11 @@ class StateManager extends EventEmitter {
     }
   }
 
+  debugNodeGroup(key,key2, msg, nodes) {
+    this.logger.playbackLogNote('debugNodeGroup', `${utils.stringifyReduce(key)}_${key2}` , `${msg} ${utils.stringifyReduce(nodes.map((node) => { return { id: node.id, port: node.externalPort } } ))}` )
+
+  }
+
   //
   //
   //
@@ -3310,6 +3328,7 @@ class StateManager extends EventEmitter {
             let transactionGroup = this.queueEntryGetTransactionGroup(txQueueEntry)
             if (transactionGroup.length > 1) {
               // should consider only forwarding in some cases?
+              this.debugNodeGroup(txId, timestamp, `share to neighbors`, transactionGroup) 
               this.p2p.sendGossipIn('spread_tx_to_group', acceptedTx, '', sender, transactionGroup)
             }
           // this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
@@ -3336,7 +3355,8 @@ class StateManager extends EventEmitter {
             if (this.currentCycleShardData.hasSyncingNeighbors === true ) {
               if( txQueueEntry.globalModification === false){
                 this.logger.playbackLogNote('shrd_sync_tx', `${txId}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighborsTxGroup.map(x => x.id))}`)
-                this.p2p.sendGossipIn('spread_tx_to_group', acceptedTx, '', sender, this.currentCycleShardData.syncingNeighborsTxGroup)
+                this.debugNodeGroup(txId, timestamp, `share to syncing neighbors`, this.currentCycleShardData.syncingNeighborsTxGroup) 
+                this.p2p.sendGossipAll('spread_tx_to_group', acceptedTx, '', sender, this.currentCycleShardData.syncingNeighborsTxGroup)
                 //This was using sendGossipAll, but changed it for a work around.  maybe this just needs to be a tell.                
               } else {
                 if (this.verboseLogs) this.mainLogger.debug(`queueAcceptedTransaction: bugfix detected. avoid forwarding txs where globalModification == true`)
@@ -4385,6 +4405,8 @@ class StateManager extends EventEmitter {
       return (!accountFilter) || (accountFilter[accountId] !== undefined)
     }
 
+    let savedSomething = false
+
     let keys = Object.keys(wrappedStates)
     keys.sort() // have to sort this because object.keys is non sorted and we always use the [0] index for hashset strings
     for (let key of keys) {
@@ -4419,7 +4441,10 @@ class StateManager extends EventEmitter {
       } else {
         await this.app.updateAccountFull(wrappedData, localCachedData[key], applyResponse)
       }
+      savedSomething = true
     }
+
+    return savedSomething
   }
 
   /// /////////////////////////////////////////////////////////
@@ -5686,6 +5711,8 @@ class StateManager extends EventEmitter {
             if (this.extendedRepairLogging) console.log(`get_transactions_by_partition_index ok! ${debugKey} count:${result.acceptedTX.length} payload: ${utils.stringifyReduce(payload)} reqCount:${payload.tx_indicies.length}`)
             for (let j = 0; j < result.acceptedTX.length; j++) {
               let acceptedTX = result.acceptedTX[j]
+
+              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `syncTXsFromHashSetStrings gotTX: ${utils.stringifyReduce(acceptedTX.id)} ${acceptedTX.timestamp} ${utils.stringifyReduce(acceptedTX)} `)
               if(result.passFail == null){
                 throw new Error(`syncTXsFromHashSetStrings (result.passFail == null  ${debugKey} ${utils.stringifyReduce(result)} `);
               }
@@ -7280,9 +7307,10 @@ class StateManager extends EventEmitter {
  * @param {AcceptedTx} acceptedTx
  * @param {boolean} passed
  * @param {ApplyResponse} applyResponse
+ * @param {boolean} isGlobalModifyingTX
  */
-  tempRecordTXByCycle (txTS: number, acceptedTx: AcceptedTx, passed: boolean, applyResponse: ApplyResponse) {
-    this.tempTXRecords.push({ txTS, acceptedTx, passed, redacted: -1, applyResponse: applyResponse })
+  tempRecordTXByCycle (txTS: number, acceptedTx: AcceptedTx, passed: boolean, applyResponse: ApplyResponse, isGlobalModifyingTX: boolean, savedSomething: boolean) {
+    this.tempTXRecords.push({ txTS, acceptedTx, passed, redacted: -1, applyResponse, isGlobalModifyingTX, savedSomething })
   }
 
   /**
@@ -7318,13 +7346,15 @@ class StateManager extends EventEmitter {
     // sort our records before recording them!
     this.tempTXRecords.sort(this.sortTXRecords)
 
+    //savedSomething
+
     for (let txRecord of this.tempTXRecords) {
       if (txRecord.redacted > 0) {
         if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair recordTXByCycle: ${utils.makeShortHash(txRecord.acceptedTx.id)} cycle: ${cycle.counter} redacted!!! ${txRecord.redacted}`)
         continue
       }
       if (txRecord.txTS < cycleEnd) {
-        this.recordTXByCycle(txRecord.txTS, txRecord.acceptedTx, txRecord.passed, txRecord.applyResponse)
+        this.recordTXByCycle(txRecord.txTS, txRecord.acceptedTx, txRecord.passed, txRecord.applyResponse, txRecord.isGlobalModifyingTX)
         txsRecorded++
       } else {
         newTempTX.push(txRecord)
@@ -7414,7 +7444,7 @@ class StateManager extends EventEmitter {
    * @param {boolean} passed
    * @param {ApplyResponse} applyResponse
    */
-  recordTXByCycle (txTS: number, acceptedTx: AcceptedTx, passed: boolean, applyResponse: ApplyResponse) {
+  recordTXByCycle (txTS: number, acceptedTx: AcceptedTx, passed: boolean, applyResponse: ApplyResponse, isGlobalModifyingTX: boolean) {
     // TODO sharding.  done because it uses getTXList . filter TSs by the partition they belong to. Double check that this is still needed
 
     // get the cycle that this tx timestamp would belong to.
@@ -7439,6 +7469,27 @@ class StateManager extends EventEmitter {
     if(lastCycleShardValues == null){
       throw new Error(`recordTXByCycle lastCycleShardValues == null`)
     }
+
+    if(isGlobalModifyingTX){
+      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle:  ignore loggging globalTX ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+      return
+    }
+
+    let globalACC = 0
+    let nonGlobal = 0
+    //filter out stuff.
+    if(isGlobalModifyingTX === false){
+      for (let accountKey of allKeys) {
+        if(this.isGlobalAccount(accountKey)){
+          globalACC++
+        } else{
+          nonGlobal++
+        }
+      }
+    }
+
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle: globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+
     for (let accountKey of allKeys) {
       /** @type {NodeShardData} */
       let homeNode = ShardFunctions.findHomeNode(lastCycleShardValues.shardGlobals, accountKey, lastCycleShardValues.parititionShardDataMap)
@@ -7446,6 +7497,14 @@ class StateManager extends EventEmitter {
         throw new Error(`recordTXByCycle homeNode == null`)
       }
       let partitionID = homeNode.homePartition
+
+      let weStoreThisParition = ShardFunctions.testInRange(partitionID, this.currentCycleShardData.nodeShardData.storedPartitions)
+      if(weStoreThisParition === false){
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle:  skip partition we dont save: P: ${partitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+
+        continue
+      }
+
       let txList = this.getTXList(cycleNumber, partitionID) // todo sharding - done: pass partition ID
 
       if (txList.processed) {
@@ -7454,7 +7513,7 @@ class StateManager extends EventEmitter {
 
       let key = 'p' + partitionID
       if (seenParitions[key] != null) {
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair recordTXByCycle: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle: seenParitions[key] != null P: ${partitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
         // skip because this partition already has this TX!
         continue
       }
@@ -7464,6 +7523,7 @@ class StateManager extends EventEmitter {
       txList.passed.push((passed) ? 1 : 0)
       txList.txs.push(acceptedTx)
 
+      let recordedState = false
       if (applyResponse != null && applyResponse.accountData != null) {
         let states = []
         let foundAccountIndex = 0
@@ -7489,8 +7549,11 @@ class StateManager extends EventEmitter {
 
           // account data got upgraded earlier to have hash on it
 
+          //if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle: Pushed! P: ${partitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
+
           states.push(utils.makeShortHash(((accountData as unknown) as Shardus.AccountData).hash)) 
           index++
+          recordedState=true
         }
         txList.states.push(states[foundAccountIndex]) // TXSTATE_TODO does this check out?
       } else {
@@ -7498,7 +7561,7 @@ class StateManager extends EventEmitter {
       }
       // txList.txById[acceptedTx.id] = acceptedTx
       // TODO sharding perf.  need to add some periodic cleanup when we have more cycles than needed stored in this map!!!
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair recordTXByCycle: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length}`)
+      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair recordTXByCycle: pushedData P: ${partitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} recordedState: ${recordedState}`)
     }
   }
 
