@@ -109,6 +109,13 @@ export function addNodes(newNodes: Node[]) {
 export function removeNode(id) {
   let idx
 
+  // Omar added this so we don't crash if a node gets remove more than once
+  if (!nodes.has(id)){
+    console.log('Tried to delete a node that is not in the nodes list.', id)
+    console.trace()
+    return 
+  } 
+
   // Remove from arrays
   idx = binarySearch(activeOthersByIdOrder, { id }, propComparator('id'))
   if (idx >= 0) activeOthersByIdOrder.splice(idx, 1)
@@ -176,6 +183,8 @@ export function ipPort(ip: string, port: number) {
   return ip + ':' + port
 }
 
+function idTrim(id){ return id.substr(0,4) }
+
 export function getDebug() {
   const output = `
     NODES:
@@ -184,7 +193,7 @@ export function getDebug() {
         .map(node => `${node.externalPort}:${node.counterRefreshed}`)
         .join()}]
       byIdOrder:             [${byIdOrder
-        .map(node => node.externalPort)
+        .map(node => ''+node.externalPort+':x'+idTrim(node.id))
         .join()}]
       othersByIdOrder:       [${othersByIdOrder.map(node => node.externalPort)}]
       activeByIdOrder:       [${activeByIdOrder.map(node => node.externalPort)}]

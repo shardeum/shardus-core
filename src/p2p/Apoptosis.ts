@@ -123,7 +123,7 @@ const apoptosisGossipRoute: GossipHandler<SignedApoptosisProposal> =
   if ([1,2].includes(currentQuarter)){  
     if (addProposal(payload)) {
 //    p2p.sendGossipIn(gossipRouteName, payload, tracker, sender)
-      Comms.sendGossip(gossipRouteName, payload, tracker, sender)
+      Comms.sendGossip(gossipRouteName, payload, tracker, Self.id) // use Self.id so we don't gossip to ourself
     }
   }
 }

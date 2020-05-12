@@ -420,9 +420,9 @@ export async function handleGossip(payload, sender, tracker = '') {
     if (verboseLogs) {
       p2pLogger.debug(`Got old gossip: ${gossipHash.substring(0, 5)}`)
     }
-    if (!gossipedHashes.get(gossipHash)) {
+    if (!gossipedHashes.get(gossipHash)) {  // [TODO] - double check logic; gossipHash should be gettable here since has() is true; so we never setTimeout()
       setTimeout(
-        () => gossipedHashes.delete(gossipHash),
+        () => gossipedHashes.delete(gossipHash),    // [TODO] - we should not be using setTimeout to delete old gossipHashes; it can be deleted before Q1 starts;
         config.p2p.gossipTimeout
       )
       gossipedHashes.set(gossipHash, true)
@@ -436,7 +436,7 @@ export async function handleGossip(payload, sender, tracker = '') {
     }
     return
   }
-  gossipedHashes.set(gossipHash, false)
+  gossipedHashes.set(gossipHash, false)    // [TODO] - double check logic; we setTimeout to delete gossipHash if we get it a second time, but not first time ???
   logger.playbackLog(sender, 'self', 'GossipRcv', type, tracker, data)
   await gossipHandler(data, sender, tracker)
   if (verboseLogs) {

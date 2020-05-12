@@ -12,6 +12,7 @@ import * as NodeList from './NodeList'
 import * as Refresh from './Refresh'
 import * as Rotation from './Rotation'
 import * as Apoptosis from './Apoptosis'
+import * as Lost from './Lost'
 import * as Self from './Self'
 import * as Sync from './Sync'
 import { GossipHandler, InternalHandler, SignedObject } from './Types'
@@ -40,6 +41,7 @@ export type CycleTxs = Refresh.Txs &
   Join.Txs &
   Active.Txs &
   Apoptosis.Txs &
+  Lost.Txs &
   Rotation.Txs
 
 // don't forget to add new modules here
@@ -49,6 +51,7 @@ export type CycleRecord = BaseRecord &
   Join.Record &
   Active.Record &
   Apoptosis.Record &
+  Lost.Record &
   Rotation.Record & {
     joined: string[]
     returned: string[]
@@ -70,7 +73,7 @@ let p2pLogger: Logger
 let cycleLogger: Logger
 
 // don't forget to add new modules here
-export const submodules = [Archivers, Join, Active, Rotation, Refresh, Apoptosis]
+export const submodules = [Archivers, Join, Active, Rotation, Refresh, Apoptosis, Lost]
 
 export let currentQuarter = -1 // means we have not started creating cycles
 export let currentCycle = 0
@@ -355,12 +358,14 @@ async function runQ3() {
   txs = collectCycleTxs()
   ;({ record, marker, cert } = makeCycleData(txs, CycleChain.newest))
 
+  /*
   info(`
     Original cycle txs: ${JSON.stringify(txs)}
     Original cycle record: ${JSON.stringify(record)}
     Original cycle marker: ${JSON.stringify(marker)}
     Original cycle cert: ${JSON.stringify(cert)}
   `)
+  */
 
   // Compare this cycle's marker with the network
   const myC = currentCycle
@@ -756,8 +761,8 @@ function validateCerts(certs: CycleCert[], record, sender) {
 // return true if we improved it
 // We assume the certs have already been checked
 function improveBestCert(certs: CycleCert[], record) {
-  warn(`improveBestCert: certs:${JSON.stringify(certs)}`)
-  warn(`improveBestCert: record:${JSON.stringify(record)}`)
+//  warn(`improveBestCert: certs:${JSON.stringify(certs)}`)
+//  warn(`improveBestCert: record:${JSON.stringify(record)}`)
   let improved = false
   if (certs.length <= 0) {
     return false
@@ -768,16 +773,16 @@ function improveBestCert(certs: CycleCert[], record) {
       bscore = bestCertScore.get(bestMarker)
     }
   }
-  warn(`improveBestCert: bscore:${JSON.stringify(bscore)}`)
+//  warn(`improveBestCert: bscore:${JSON.stringify(bscore)}`)
   const bcerts = bestCycleCert.get(certs[0].marker)
-  warn(`improveBestCert: bcerts:${JSON.stringify(bcerts)}`)
+//  warn(`improveBestCert: bcerts:${JSON.stringify(bcerts)}`)
   const have = {}
   if (bcerts){
     for (const cert of bcerts){
       have[cert.sign.owner] = true
     }
   }
-  warn(`improveBestCert: have:${JSON.stringify(have)}`)
+//  warn(`improveBestCert: have:${JSON.stringify(have)}`)
   for (const cert of certs) {
     // make sure we don't store more than one cert from the same owner with the same marker
     if (have[cert.sign.owner]) continue
@@ -814,10 +819,10 @@ function improveBestCert(certs: CycleCert[], record) {
       improved = true
     }
   }
-  info(`improveBestCert: bestScore:${bestCertScore.get(bestMarker)}`)
-  info(`improveBestCert: bestMarker:${bestMarker}`)
-  info(`improveBestCert: bestCerts:${JSON.stringify(bestCycleCert.get(bestMarker))}`)
-  info(`improveBestCert: improved:${improved}`)
+//  info(`improveBestCert: bestScore:${bestCertScore.get(bestMarker)}`)
+//  info(`improveBestCert: bestMarker:${bestMarker}`)
+//  info(`improveBestCert: bestCerts:${JSON.stringify(bestCycleCert.get(bestMarker))}`)
+//  info(`improveBestCert: improved:${improved}`)
   return improved
 }
 

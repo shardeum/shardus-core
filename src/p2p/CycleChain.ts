@@ -3,6 +3,7 @@ import { crypto, logger } from './Context'
 import { CycleRecord } from './CycleCreator'
 import { nodes } from './NodeList'
 import { LooseObject } from './Types'
+import { id } from './Self'
 
 /** TYPES */
 
@@ -107,12 +108,14 @@ export function getDebug() {
       return idToPort[id]
     })
     const rmvd = record.removed.map(id => idToPort[id])
+    const lost = record.lost.map(id => idToPort[id])
+    const refu = record.refuted.map(id => idToPort[id])
     const apopd = record.apoptosized.map(id => idToPort[id])
     const rfshd = record.refreshedConsensors.map(
       c => `${c.externalPort}:${c.counterRefreshed}`
     )
 
-    const str = `      ${ctr}:${prev}: { actv:${actv}, exp:${exp}, joind:[${joind.join()}], actvd:[${actvd.join()}], apop:[${apopd.join()}] rmvd:[${rmvd.join()}], rfshd:[${rfshd.join()}] }`
+    const str = `      ${ctr}:${prev}: { actv:${actv}, exp:${exp}, joind:[${joind.join()}], actvd:[${actvd.join()}], lost:[${lost.join()}] refu:[${refu.join()}] apop:[${apopd.join()}] rmvd:[${rmvd.join()}], rfshd:[${rfshd.join()}] }`
 
     return str
   })

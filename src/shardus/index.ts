@@ -12,6 +12,7 @@ import * as Active from '../p2p/Active'
 import * as Context from '../p2p/Context'
 import * as GlobalAccounts from '../p2p/GlobalAccounts'
 import * as Self from '../p2p/Self'
+import { reportLost } from '../p2p/Lost'
 import RateLimiting from '../rate-limiting'
 import Reporter from '../reporter'
 import StateManager from '../state-manager'
@@ -406,10 +407,14 @@ class Shardus extends EventEmitter {
 
     // Setup network
     await this.network.setup(Network.ipInfo)
-    this.network.on('timeout', () => {
+    this.network.on('timeout', (node) => {
+      console.log('in Shardus got network timeout from', node)
+      reportLost(node, 'timeout')
       /** [TODO] Report lost */
     })
-    this.network.on('error', () => {
+    this.network.on('error', (node) => {
+      console.log('in Shardus got network error from', node)
+      reportLost(node, 'error')
       /** [TODO] Report lost */
     })
 
