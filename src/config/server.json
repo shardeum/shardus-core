@@ -42,10 +42,10 @@
     "amountToScale": 1
   },
   "ip": {
-    "externalIp": "127.0.0.1",
+    "externalIp": "0.0.0.0",
     "externalPort": 9001,
-    "internalIp": "127.0.0.1",
-    "internalPort": 9005
+    "internalIp": "0.0.0.0",
+    "internalPort": 10001
   },
   "network": {
     "timeout": 1

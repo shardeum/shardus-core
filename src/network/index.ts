@@ -1,14 +1,18 @@
+import Sntp from '@hapi/sntp'
 import bodyParser from 'body-parser'
 import cors from 'cors'
 import { EventEmitter } from 'events'
 import express from 'express'
 import Log4js from 'log4js'
+import NatAPI = require('nat-api')
+import * as net from 'net'
+import { join } from 'path'
 import { Sn } from 'shardus-net'
+import { promisify } from 'util'
 import * as http from '../http'
 import Logger from '../logger'
-import { ShardusConfiguration } from '../shardus/shardus-types'
-import Sntp from '@hapi/sntp'
 import { config, logger } from '../p2p/Context'
+import { readJsonDir } from '../utils'
 
 /** TYPES */
 export interface IPInfo {
@@ -21,6 +25,8 @@ export interface IPInfo {
 /** STATE */
 
 let mainLogger: Log4js.Logger
+
+let natClient: any
 
 export let ipInfo: IPInfo
 
@@ -69,7 +75,7 @@ export class NetworkClass extends EventEmitter {
   _setupExternal() {
     return new Promise((resolve, reject) => {
       const self = this
-      const storeRequests = function(req, res, next) {
+      const storeRequests = function (req, res, next) {
         if (req.url !== '/test') {
           if (self.verboseLogsNet) {
             self.netLogger.debug(
@@ -170,7 +176,7 @@ export class NetworkClass extends EventEmitter {
         )
       this.InternalTellCounter++
       const promise = this.sn.send(node.internalPort, node.internalIp, data)
-      promise.catch(err => {
+      promise.catch((err) => {
         this.mainLogger.error('Network: ' + err)
         this.mainLogger.error(err.stack)
         this.emit('error', node)
@@ -193,7 +199,7 @@ export class NetworkClass extends EventEmitter {
       }
 
       const data = { route, payload: message }
-      const onRes = res => {
+      const onRes = (res) => {
         if (!logged)
           this.logger.playbackLog(
             'self',
@@ -265,7 +271,7 @@ export class NetworkClass extends EventEmitter {
     let self = this
     let wrappedHandler = handler
     if (this.logger.playbackLogEnabled) {
-      wrappedHandler = function(req, res) {
+      wrappedHandler = function (req, res) {
         self.logger.playbackLog(
           req.hostname,
           'self',
@@ -281,27 +287,27 @@ export class NetworkClass extends EventEmitter {
 
     switch (method) {
       case 'GET':
-        this.externalRoutes.push(app => {
+        this.externalRoutes.push((app) => {
           app.get(formattedRoute, wrappedHandler)
         })
         break
       case 'POST':
-        this.externalRoutes.push(app => {
+        this.externalRoutes.push((app) => {
           app.post(formattedRoute, wrappedHandler)
         })
         break
       case 'PUT':
-        this.externalRoutes.push(app => {
+        this.externalRoutes.push((app) => {
           app.put(formattedRoute, wrappedHandler)
         })
         break
       case 'DELETE':
-        this.externalRoutes.push(app => {
+        this.externalRoutes.push((app) => {
           app.delete(formattedRoute, wrappedHandler)
         })
         break
       case 'PATCH':
-        this.externalRoutes.push(app => {
+        this.externalRoutes.push((app) => {
           app.patch(formattedRoute, wrappedHandler)
         })
         break
@@ -360,16 +366,198 @@ export class NetworkClass extends EventEmitter {
 
 /** FUNCTIONS */
 
+// export async function init() {
+//   mainLogger = logger.getLogger('main')
+
+//   // Make sure we know our IP configuration
+//   ipInfo = {
+//     externalIp:
+//       config.ip.externalIp || (await discoverExternalIp(config.p2p.ipServer)),
+//     externalPort: config.ip.externalPort,
+//     internalIp: config.ip.internalIp,
+//     internalPort: config.ip.internalPort,
+//   }
+// }
+
 export async function init() {
+  // Get main logger
   mainLogger = logger.getLogger('main')
 
-  // Make sure we know our IP configuration
+  // Get default values for IP config
+  const defaultConfigs = readJsonDir(join(__dirname, '../config'))
+  const defaults = defaultConfigs['server']['ip'] as IPInfo
+
+  // Set ipInfo to passed config, automtically if passed 'auto', or to default
+  const externalIp =
+    (config.ip.externalIp === 'auto'
+      ? await getExternalIp()
+      : config.ip.externalIp) || defaults['externalIp']
+
+  const externalPort =
+    (config.ip.externalPort === 'auto'
+      ? await getNextExternalPort(externalIp)
+      : config.ip.externalPort) || defaults['externalPort']
+
+  const internalIp =
+    (config.ip.internalIp === 'auto' ? externalIp : config.ip.internalIp) ||
+    defaults['internalIp']
+
+  const internalPort =
+    (config.ip.internalPort === 'auto'
+      ? await getNextExternalPort(internalIp)
+      : config.ip.internalPort) || defaults['internalPort']
+
   ipInfo = {
-    externalIp:
-      config.ip.externalIp || (await discoverExternalIp(config.p2p.ipServer)),
-    externalPort: config.ip.externalPort,
-    internalIp: config.ip.internalIp,
-    internalPort: config.ip.internalPort,
+    externalIp,
+    externalPort,
+    internalIp,
+    internalPort,
+  }
+
+  mainLogger.info(`This nodes ipInfo:`)
+  mainLogger.info(JSON.stringify(ipInfo, null, 2))
+}
+
+function initNatClient() {
+  // If not initialized
+  if (!natClient) {
+    // Initialize 'nat-api' client
+    natClient = new NatAPI()
+    natClient['es6'] = {}
+    natClient['es6']['externalIp'] = promisify(
+      natClient.externalIp.bind(natClient)
+    )
+    natClient['es6']['map'] = promisify(natClient.map.bind(natClient))
+
+    // CLean up client on process exit
+    function cleanup() {
+      natClient.destroy()
+    }
+    process.on('SIGTERM', cleanup)
+    process.on('SIGINT', cleanup)
+    process.on('SIGHUP', cleanup)
+    process.on('SIGBREAK', cleanup)
+  }
+}
+
+async function getExternalIp() {
+  initNatClient()
+
+  try {
+    const ip = await natClient.es6.externalIp()
+    return ip
+  } catch (err) {
+    mainLogger.warn(`Failed to get external IP from gateway:`, err.message)
+
+    try {
+      const ip = await discoverExternalIp(config.p2p.ipServer)
+      return ip
+    } catch (err) {
+      mainLogger.warn(`Failed to get external IP from IP server:`, err.message)
+    }
+  }
+}
+
+async function getNextExternalPort(ip: string) {
+  initNatClient()
+
+  // Get the next available port from the OS and test it
+  let [reachable, port] = await wrapTest(new ConnectTest(ip))
+
+  // If port is unreachable attempt to forward it with UPnP, then PMP
+  if (reachable === false) {
+    const attempts = [{ enablePMP: false }, { enablePMP: true }]
+
+    for (const opts of attempts) {
+      mainLogger.info(
+        `Forwarding ${port} via ${opts.enablePMP ? 'PMP' : 'UPnP'}...`
+      )
+
+      try {
+        await natClient.es6.map(
+          Object.assign(
+            { publicPort: port, privatePort: port, protocol: 'TCP' },
+            opts
+          )
+        )
+        mainLogger.info('  Success!')
+        break
+      } catch (err) {
+        mainLogger.info('  Error:', err.message)
+      }
+    }
+  }
+
+  // Test it again
+  ;[reachable] = await wrapTest(new ConnectTest(ip, port))
+  if (reachable) {
+    return port
+  } else {
+    mainLogger.warn('Failed to get next external port')
+  }
+}
+
+async function wrapTest(test: ConnectTest) {
+  mainLogger.info(`Testing ${test.ip}...`)
+
+  test.once('port', (port) =>
+    mainLogger.info(`  Listening on ${port}. Connecting...`)
+  )
+
+  let result: [boolean, number]
+
+  try {
+    const success = await test.start()
+    result = [success, test.port]
+    mainLogger.info('  Success!')
+  } catch (err) {
+    mainLogger.info('  Failed:', err.message)
+    result = [false, test.port]
+  }
+
+  return result
+}
+
+class ConnectTest extends EventEmitter {
+  ip: string
+  port: number
+  constructor(ip: string, port?: number) {
+    super()
+    this.ip = ip
+    this.port = port || -1
+  }
+  start() {
+    return new Promise<true>((resolve, reject) => {
+      // Open a port on 0.0.0.0 (any IP)
+      const server = net.createServer(() => {})
+      server.unref()
+      server.on('error', reject)
+      const listenPort = this.port > -1 ? this.port : 0
+      server.listen(listenPort, () => {
+        // Get opened port
+        const address = server.address() as net.AddressInfo
+        this.port = address.port
+        this.emit('port', this.port)
+
+        // Try to connect to given IP at opened port
+        const socket = net.createConnection(this.port, this.ip, () => {
+          socket.destroy()
+          server.close(() => resolve(true))
+        })
+        socket.unref()
+        socket.setTimeout(2000)
+        socket.on('error', (err) => {
+          socket.destroy()
+          server.close()
+          reject(err)
+        })
+        socket.on('timeout', () => {
+          socket.destroy()
+          server.close()
+          reject('Connection timed out')
+        })
+      })
+    })
   }
 }
 
@@ -389,6 +577,12 @@ export async function checkTimeSynced(timeServers) {
 }
 
 async function discoverExternalIp(server: string) {
+  // Figure out if we're behind a NAT
+
+  // Attempt NAT traversal with UPnP
+
+  //
+
   try {
     const { ip }: { ip: string } = await http.get(server)
     return ip
@@ -401,7 +595,7 @@ async function discoverExternalIp(server: string) {
 }
 
 function closeServer(server) {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     server.close()
     server.unref()
     resolve()

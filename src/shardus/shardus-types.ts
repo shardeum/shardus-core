@@ -497,13 +497,13 @@ declare namespace Shardus {
     /** Server IP configuration */
     ip?: {
       /** The IP address the server will run the external API */
-      externalIp?: string
+      externalIp?: string | 'auto'
       /** The port the server will run the external API */
-      externalPort?: number
+      externalPort?: number | 'auto'
       /** The IP address the server will run the internal comunication API */
-      internalIp?: string
+      internalIp?: string | 'auto'
       /** The port the server will run the internal comunication API  */
-      internalPort?: number
+      internalPort?: number | 'auto'
     }
     /** Server Network module configuration */
     network?: {
