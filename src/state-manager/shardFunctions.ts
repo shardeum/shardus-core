@@ -375,39 +375,129 @@ class ShardFunctions {
 
   /**
    * @param {ShardGlobals} shardGlobals
-   * @param {number} s1
-   * @param {number} e1
-   * @param {number} s2
-   * @param {number} e2
-   * @param {number} start
-   * @param {number} end
+   * @param {number} s1 stored partition left lower bound (always 0)
+   * @param {number} e1 stored partition left upper bound
+   * @param {number} s2 stored partition right lower bound 
+   * @param {number} e2 stored partition right upper bound (always highest parition)
+   * @param {number} start start of consensus range
+   * @param {number} end end of consensus range
    * @returns {{s1:number; e1: number; s2: number; e2: number; split: boolean; changed: boolean }}
    */
   static mergeDiverseRanges (shardGlobals: ShardGlobals, s1: number, e1: number, s2: number, e2: number, start: number, end: number) : MergeResults {
     let results = { s1, e1, s2, e2, split: true, changed: false }
 
+    //These refer to the consensus range haning off the edge of the stored range.  i.e. consenus going further than stored.
     let leftOverlap = false
     let rightOverlap = false
-    // left overlap?
-    if (s1 >= start && e1 >= start) {
-      leftOverlap = true
-    }
-    // right overlap
-    if (s2 <= end && e2 >= end) {
-      rightOverlap = true
+    let leftOverhang = false
+    let rightOverhang = false
+
+    let nonSplitConsensusRange = (start <= end)
+
+    let storedfullyOverlapsConsensus = false
+
+    // check overlap in simple case where consensus does not wrap
+    if(nonSplitConsensusRange){    
+      // left overlap.  Really this means that there is some overlap of consenus and the left side range of stored partitions
+      if (s1 <= start && e1 >= start) {
+        // number = partition id.   s = stored partition c = consensus partition  ^ = where the test point or points are
+        // 0123456789
+        // sss      s
+        //  ccc
+        //  ^
+        leftOverlap = true
+      }
+      // right overlap  Really this means that there is some overlap of consenus and the right side range of stored partitions
+      if (s2 <= end && e2 >= end) {
+        // 0123456789
+        // s      sss
+        //       ccc
+        //         ^
+        rightOverlap = true
+      }
+
+      // full overlap left
+      if (s1 <= start && e1 >= end) {
+        // 0123456789
+        // sssss    s
+        //   ccc
+        //   ^ ^
+        storedfullyOverlapsConsensus = true
+      }
+      // full overlap right
+      if (s2 <= start && e2 >= end) {
+        // 0123456789
+        // s    sssss
+        //       ccc
+        //       ^ ^
+        storedfullyOverlapsConsensus = true
+      }      
     }
 
-    if (leftOverlap === false && rightOverlap === false) {
+    // If the consensus range wraps across our ranges then we need to check additional cases
+    if(nonSplitConsensusRange === false){
+      if ((s1 <= end && e1 >= end) && (s2 <= start && e2 >= start))  {
+        // 0123456789
+        // ssss    ss
+        // ccc      c
+        // ^ ^      ^  
+        storedfullyOverlapsConsensus = true
+      }
+ 
+      //cases not caught yet?
+      // 0123456789
+      // ss     sss
+      // c     cccc
+      //         
+
+      // 0123456789
+      // ss     sss
+      // ccc     cc
+      //  
+
+      if (end > e1 && end < s2) {
+        // 0123456789
+        // ss     sss
+        // ccc     cc
+        //   ^
+        leftOverhang = true
+      }
+      // right overlap  Really this means that there is some overlap of consenus and the right side range of stored partitions
+      if (start < s2 && start > e1) {
+        // number = partition id.   s = stored partition c = consensus partition  ^ = where the test point or points are
+        // 0123456789
+        // ss     sss
+        // c     cccc
+        //       ^
+        rightOverhang = true
+      }
+
+    }
+
+    // nothing to do ther is full overlap
+    if(storedfullyOverlapsConsensus === true){
+      return results
+    }
+
+    if (leftOverlap === false && rightOverlap === false && nonSplitConsensusRange === true) {
       let partitionDistanceStart = ShardFunctions.circularDistance(start, e1, shardGlobals.numPartitions)
       let partitionDistanceEnd = ShardFunctions.circularDistance(end, s2, shardGlobals.numPartitions)
 
       if (partitionDistanceStart < partitionDistanceEnd) {
+        // 0123456789
+        // ss      ss
+        //    cc
+        // rrrrr   rr  r= result range  
         if (results.e1 < end) {
           results.e1 = end
           results.changed = true
           return results
         }
       } else {
+        // 0123456789
+        // ss      ss
+        //      cc
+        // rr   rrrrr  r= result range  
         if (results.s2 > start) {
           results.s2 = start
           results.changed = true
@@ -416,8 +506,12 @@ class ShardFunctions {
       }
     }
 
-    if (leftOverlap === true && rightOverlap === true) {
-      // actually this would be the entire full range
+    if (leftOverlap === true && rightOverlap === true && nonSplitConsensusRange === true) {
+      // if left and right overlap then all partitions are stored:
+      // 0123456789
+      // ss     sss
+      //  ccccccc
+      // rrrrrrrrrr  r= result range  
       if (results.e1 !== results.e2) {
         results.split = false
         results.e1 = results.e2 // s1 -> e1 covers entire range
@@ -427,17 +521,47 @@ class ShardFunctions {
     }
 
     if (leftOverlap) {
+        // 0123456789
+        // sss      s
+        //  ccc
+        // rrrr     r
       if (results.e1 < end) {
         results.e1 = end
         results.changed = true
       }
     }
     if (rightOverlap) {
+        // 0123456789
+        // sss      s
+        //  ccc
+        // rrrr     r
       if (results.s2 > start) {
         results.s2 = start
         results.changed = true
       }
     }
+
+    if (leftOverhang) {
+        // 0123456789
+        // ss     sss
+        // ccc     cc
+        // rrr    rrr  r= result range   
+      if (results.e1 < end) {
+        results.e1 = end
+        results.changed = true
+      }
+    }
+    if (rightOverhang) {
+        // 0123456789
+        // s      sss
+        //       ccc
+        // r     rrrr  r= result range   
+      if (results.s2 > start) {
+        results.s2 = start
+        results.changed = true
+      }
+    }
+
 
     return results
   }
