@@ -48,7 +48,7 @@
     "internalPort": 9005
   },
   "network": {
-    "timeout": 10
+    "timeout": 1
   },
   "reporting": {
     "report": true,

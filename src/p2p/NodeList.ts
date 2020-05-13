@@ -46,6 +46,8 @@ export let othersByIdOrder: Node[] // used by sendGossipIn
 export let activeByIdOrder: Node[]
 export let activeOthersByIdOrder: Node[]
 
+const VERBOSE = false    // Use to dump complete NodeList and CycleChain data
+
 reset()
 
 /** FUNCTIONS */
@@ -186,7 +188,7 @@ export function ipPort(ip: string, port: number) {
 function idTrim(id){ return id.substr(0,4) }
 
 export function getDebug() {
-  const output = `
+  let output = `
     NODES:
       hash:                  ${crypto.hash(byJoinOrder).slice(0, 5)}
       byJoinOrder:           [${byJoinOrder
@@ -200,6 +202,8 @@ export function getDebug() {
       activeOthersByIdOrder: [${activeOthersByIdOrder.map(
         node => node.externalPort
       )}]
+      `
+      if (VERBOSE) output += `
     NODELIST:   ${stringify(byJoinOrder)}
     CYCLECHAIN: ${stringify(CycleChain.cycles)}
   `

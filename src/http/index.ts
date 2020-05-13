@@ -18,8 +18,8 @@ function _normalizeUrl(url: string) {
 
 async function _get(url, getResponseObj = false) {
   const res = await got.get(url, {
-    timeout: 10000,
-    retry: 3,
+    timeout: 1000,   //  Omar - setting this to 1 sec
+    retry: 0,   // Omar - setting this to 0.
     json: true,
   })
   if (getResponseObj) return res
@@ -64,8 +64,8 @@ async function get(url: string, getResponseObj = false) {
 
 async function _post(host, payload, getResponseObj = false) {
   const res = await got.post(host, {
-    timeout: 10000,
-    retry: 3,
+    timeout: 1000,   // Omar - set this to 1 sec
+    retry: 0,   // Omar - set this to 0
     json: true,
     body: payload,
   })

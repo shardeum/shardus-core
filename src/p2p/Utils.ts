@@ -283,7 +283,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     }
   }
   if (finalResult) {
-    console.log(`In robustQuery stopping sinc we got a finalResult:${JSON.stringify(finalResult)}`)
+   // console.log(`In robustQuery stopping since we got a finalResult:${JSON.stringify(finalResult)}`)
     return finalResult
   }
   else{

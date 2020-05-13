@@ -306,7 +306,7 @@ export function reportLost(target, reason){
   if (target.id === Self.id) return  // don't report self
   if (stopReporting[target.id]) return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
 // we set isDown cache to the cycle number here; to speed up deciding if a node is down
-  isDown[target.id] = currentCycle
+  isDown[target.id] = currentCycle  
   const key = `${target.id}-${currentCycle}`
   const lostRec = lost.get(key)
   if (lostRec) return  // we have already seen this node for this cycle
@@ -353,9 +353,7 @@ async function lostReportHandler (payload, response, sender) {
   lost.set(key, obj)
   // check if we already know that this node is down
   if (isDown[payload.target]){obj.status = 'down'; return}
-  // checking if the node is really down 
   let result = await isDownCache(nodes.get(payload.target))
-// TODO remove following line after testing killother
   if (allowKillRoute && payload.killother) result = 'down'
   if (obj.status === 'checking') obj.status = result
   log('Status after checking is '+obj.status)
@@ -437,6 +435,7 @@ function pruneStopReporting(){
 //          Although this could allow a rouge node to more easily fool checks.
 async function isDownCheck(node){
 // Check the internal route
+// The timeout for this is controled by the network.timeout paramater in server.json
   log(`Checking internal connection for ${node.id}`)
   const res = await Comms.ask(node, 'apoptosize', {id:'bad'})
   try{
