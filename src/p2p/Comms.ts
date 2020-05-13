@@ -4,6 +4,7 @@ import { config, crypto, logger, network } from './Context'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { InternalHandler, LooseObject } from './Types'
+import { currentCycle } from './CycleCreator'
 
 /** TYPES */
 
@@ -34,9 +35,14 @@ let acceptInternal = false
 
 let keyCounter = 0
 let internalRecvCounter = 0
-const gossipedHashesSent = new Map()
-const gossipedHashes = new Map()
+// const gossipedHashesSent = new Map()     // No longer used
+// const gossipedHashesRecv = new Map()    // No longer used
 const gossipHandlers = {}
+
+let gossipSent = 0
+let gossipRecv = 0
+const gossipTypeSent = {}
+const gossipTypeRecv = {}
 
 /** FUNCTIONS */
 export function setAcceptInternal(enabled: boolean) {
@@ -50,6 +56,9 @@ export function init() {
   for (const [name, handler] of Object.entries(routes.internal)) {
     registerInternal(name, handler)
   }
+
+  // Catch Q1 start events and log size of hashes
+  Self.emitter.on('cycle_q1_start', pruneGossipHashes)
 }
 
 export function setVerboseLogs(enabled: boolean) {
@@ -330,6 +339,7 @@ export async function sendGossip(
   }
   const gossipPayload = { type, data: payload }
 
+  /*
   const gossipHash = crypto.hash(gossipPayload)
   if (gossipedHashesSent.has(gossipHash)) {
     if (verboseLogs) {
@@ -337,9 +347,11 @@ export async function sendGossip(
     }
     return
   }
+  */
+
   // nodes.sort((first, second) => first.id.localeCompare(second.id, 'en', { sensitivity: 'variant' }))
   nodes.sort(sortByID)
-  const nodeIdxs = new Array(nodes.length).fill(0).map((curr, idx) => idx)
+  const nodeIdxs = new Array(nodes.length).fill(0).map((curr, idx) => idx)     // [TODO]  - we need to make sure that we never iterate, or copy the full nodes list. Assume it could be a million nodes.
   // Find out your own index in the nodes array
   const myIdx = nodes.findIndex(node => node.id === Self.id)
   if (myIdx < 0) throw new Error('Could not find self in nodes array')
@@ -372,6 +384,8 @@ export async function sendGossip(
         tracker,
         gossipPayload
       )
+      gossipSent++
+      gossipTypeSent[type] = gossipTypeSent[type]  ? gossipTypeSent[type]+1 : 1
     }
     await tell(recipients, 'gossip', gossipPayload, true, tracker)
   } catch (ex) {
@@ -386,7 +400,7 @@ export async function sendGossip(
       'sendGossipIn: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
     )
   }
-  gossipedHashesSent.set(gossipHash, false)
+  // gossipedHashesSent.set(gossipHash, currentCycle)    // No longer used
   if (verboseLogs) {
     p2pLogger.debug(`End of sendGossipIn(${utils.stringifyReduce(payload)})`)
   }
@@ -411,21 +425,42 @@ export async function handleGossip(payload, sender, tracker = '') {
     return
   }
 
+  /*
   const gossipHash = crypto.hash(payload)
   if (gossipedHashesSent.has(gossipHash)) {
     return
   }
+  */
 
-  if (gossipedHashes.has(gossipHash)) {
+  /*
+  2020.05.12 Omar decided that we should not try to block received gossip from reaching the gossip handlers.
+.                         It is possible that the handler ignored a gossip message when it was first seen, but could apply
+.                         it later if the quarter changed or an internal message received from another node changes the context.
+.                         Or who the gossip is received from could make a difference. For example in Q2 the handler ignores
+.                          gossip from the originator, but accepts it from others.
+.                     *  Also we should not block gossip for messages we have sent. We may need the message to come
+.                          in through the handler so that we apply it.
+.                    *   Also we should not set a timeout for every gossip hash to delete it later. We should delete old
+.                         hashes once per cycle.
+.                    *   Also there is cost of doing a hash on every message received. But at the handler we could easily
+.                          check a field in the message to decide if we processed this before.
+.                    *   For all of the above reasones we should not try to block gossip that we have seen before at this
+.                         layer and let the handlers deal with it.
+.                    *   We should  block sending the same gossip message we have already sent before. However, some
+.                          logging found that we don't typically send the same gossip message again. So the effort to compute,
+.                          save and delete the hashes is wasted.
+  */
+ /*
+  if (gossipedHashesRecv.has(gossipHash)) {
     if (verboseLogs) {
       p2pLogger.debug(`Got old gossip: ${gossipHash.substring(0, 5)}`)
     }
-    if (!gossipedHashes.get(gossipHash)) {  // [TODO] - double check logic; gossipHash should be gettable here since has() is true; so we never setTimeout()
+    if (!gossipedHashesRecv.get(gossipHash)) {  // [TODO] - double check logic; gossipHash should be gettable here since has() is true; so we never setTimeout()
       setTimeout(
-        () => gossipedHashes.delete(gossipHash),    // [TODO] - we should not be using setTimeout to delete old gossipHashes; it can be deleted before Q1 starts;
+        () => gossipedHashesRecv.delete(gossipHash),    // [TODO] - we should not be using setTimeout to delete old gossipHashes; it can be deleted before Q1 starts;
         config.p2p.gossipTimeout
       )
-      gossipedHashes.set(gossipHash, true)
+      gossipedHashesRecv.set(gossipHash, true)
       if (verboseLogs) {
         p2pLogger.debug(
           `Marked old gossip for deletion: ${gossipHash.substring(0, 5)} in ${
@@ -436,7 +471,11 @@ export async function handleGossip(payload, sender, tracker = '') {
     }
     return
   }
-  gossipedHashes.set(gossipHash, false)    // [TODO] - double check logic; we setTimeout to delete gossipHash if we get it a second time, but not first time ???
+  gossipedHashesRecv.set(gossipHash, false)    // [TODO] - double check logic; we setTimeout to delete gossipHash if we get it a second time, but not first time ???
+  */
+
+  gossipRecv++
+  gossipTypeRecv[type] = gossipTypeRecv[type]  ? gossipTypeRecv[type]+1 : 1
   logger.playbackLog(sender, 'self', 'GossipRcv', type, tracker, data)
   await gossipHandler(data, sender, tracker)
   if (verboseLogs) {
@@ -465,4 +504,12 @@ export function unregisterGossipHandler(type) {
   if (gossipHandlers[type]) {
     delete gossipHandlers[type]
   }
+}
+
+// We don't need to prune gossip hashes since we are not creating them anymore.
+function pruneGossipHashes(){
+//  p2pLogger.warn(`gossipedHashesRecv:${gossipedHashesRecv.size} gossipedHashesSent:${gossipedHashesSent.size}`)
+  p2pLogger.info(`Total  gossipSent:${gossipSent} gossipRecv:${gossipRecv}`)
+  p2pLogger.info(`Sent gossip by type: ${JSON.stringify(gossipTypeSent)}`)
+  p2pLogger.info(`Recv gossip by type: ${JSON.stringify(gossipTypeRecv)}`)
 }
