@@ -259,6 +259,7 @@ export class NetworkClass extends EventEmitter {
       const promises = []
       if (this.extServer) promises.push(closeServer(this.extServer))
       if (this.sn) promises.push(this.sn.stopListening(this.intServer))
+      if (natClient) promises.push(natClient.es6.destroy())
       await Promise.all(promises)
     } catch (e) {
       if (e.code !== 'ERR_SERVER_NOT_RUNNING') throw e
@@ -419,24 +420,15 @@ export async function init() {
 }
 
 function initNatClient() {
-  // If not initialized
+  // Initialize 'nat-api' client if not initialized
   if (!natClient) {
-    // Initialize 'nat-api' client
     natClient = new NatAPI()
     natClient['es6'] = {}
     natClient['es6']['externalIp'] = promisify(
       natClient.externalIp.bind(natClient)
     )
     natClient['es6']['map'] = promisify(natClient.map.bind(natClient))
-
-    // CLean up client on process exit
-    function cleanup() {
-      natClient.destroy()
-    }
-    process.on('SIGTERM', cleanup)
-    process.on('SIGINT', cleanup)
-    process.on('SIGHUP', cleanup)
-    process.on('SIGBREAK', cleanup)
+    natClient['es6']['destroy'] = promisify(natClient.destroy.bind(natClient))
   }
 }
 
@@ -447,13 +439,13 @@ async function getExternalIp() {
     const ip = await natClient.es6.externalIp()
     return ip
   } catch (err) {
-    mainLogger.warn(`Failed to get external IP from gateway:`, err.message)
+    mainLogger.warn(`Failed to get external IP from gateway:`, err.message ? err.message : err)
 
     try {
       const ip = await discoverExternalIp(config.p2p.ipServer)
       return ip
     } catch (err) {
-      mainLogger.warn(`Failed to get external IP from IP server:`, err.message)
+      mainLogger.warn(`Failed to get external IP from IP server:`, err.message ? err.message : err)
     }
   }
 }
@@ -511,7 +503,7 @@ async function wrapTest(test: ConnectTest) {
     result = [success, test.port]
     mainLogger.info('  Success!')
   } catch (err) {
-    mainLogger.info('  Failed:', err.message)
+    mainLogger.info('  Failed:', err.message ? err.message : err)
     result = [false, test.port]
   }
 
