@@ -159,9 +159,13 @@ class Reporter {
   startReporting() {
     // Creates and sends a report every `interval` seconds
     this.reportTimer = setInterval(async () => {
+    /* 
+    Stop calling getAccountsStateHash() since this is not of use in a sharded network, also expensive to compute.
       let appState = this.stateManager
         ? await this.stateManager.getAccountsStateHash()
         : allZeroes64
+    */
+      let appState = allZeroes64 // monititor server will set color based on partition report
       const cycleMarker = CycleChain.newest.previous || '' // [TODO] Replace with cycle creator
       const cycleCounter = CycleChain.newest.counter
       const nodelistHash = crypto.hash(NodeList.byJoinOrder)
