@@ -21,7 +21,7 @@ delete packageJsonNew.devDependencies
 const packageLockJson = JSON.parse(fs.readFileSync(path.join(__dirname, '../package-lock.json'), { encoding: 'utf8' }))
 packageJsonNew.dependencies['bytenode'] = packageLockJson.dependencies.bytenode.version
 
-fs.writeFileSync(path.join(distDir, 'package.json'), JSON.stringify(packageJsonNew, null, 2))
+fs.writeFileSync(path.join(distDir, 'package.json'), JSON.stringify(packageJsonNew, null, 2), { flag: 'w' })
 
 // Copy config/, into dist/
 copyFolderSync(path.join(rootDir, 'src/config'), path.join(distDir, 'config'))
@@ -31,14 +31,14 @@ fs.copyFileSync(path.join(rootDir, 'src/crypto/computePowGenerator.js'), path.jo
 fs.copyFileSync(path.join(__dirname, '../', 'scripts/build-index.js'), path.join(distDir, 'index.js'))
 
 // Copy build/src/shardus/shardus-types.d.ts into dist/src/shardus/shardus-types.d.ts
-fs.mkdirSync(path.join(distDir, 'src'))
-fs.mkdirSync(path.join(distDir, 'src/shardus'))
+fs.mkdirSync(path.join(distDir, 'src'), { recursive: true })
+fs.mkdirSync(path.join(distDir, 'src/shardus'), { recursive: true })
 fs.copyFileSync(path.join(rootDir, 'src/shardus/shardus-types.d.ts'), path.join(distDir, 'src/shardus/shardus-types.d.ts'))
 
 // Modified from https://stackoverflow.com/a/52338335
 function copyFolderSync(from, to) {
   try {
-    fs.mkdirSync(to)
+    fs.mkdirSync(to, {recursive: true})
   } catch (e) {
     if (e.code !== 'EEXIST') {
       console.log(e)
