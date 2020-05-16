@@ -7,6 +7,7 @@ import { Change } from './CycleParser'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import * as Types from './Types'
+import { validateTypes } from '../utils'
 
 /** TYPES */
 
@@ -35,7 +36,11 @@ const gossipActiveRoute: Types.GossipHandler<SignedActiveRequest> = (
   sender
 ) => {
   info(`Got active request: ${JSON.stringify(payload)}`)
-  // [TODO] Validate input
+  let err = ''
+  err = validateTypes(payload, {nodeId:'s',status:'s',timestamp:'n',sign:'o'})
+  if (err){ warn('bad input '+err); return }
+  err = validateTypes(payload.sign, {owner:'s',sig:'s'})
+  if (err){ warn('bad input sign '+err); return }
 
   const signer = NodeList.byPubKey.get(payload.sign.owner)
   if (!signer) {

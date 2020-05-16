@@ -29,7 +29,7 @@ import { SignedObject } from './Types'
 import * as Types from './Types'
 import { nodes, removeNode, byPubKey, activeByIdOrder } from './NodeList'
 import { currentQuarter, currentCycle } from './CycleCreator'
-import { sleep } from '../utils'
+import { sleep, validateTypes } from '../utils'
 import { robustQuery } from './Utils'
 
 /** TYPES */
@@ -85,8 +85,12 @@ const stopExternalRoute: Types.Route<Handler> = {
 const apoptosisInternalRoute: Route<InternalHandler<SignedApoptosisProposal>> = {
   name: internalRouteName,
   handler: (payload, response, sender) => {
-// [TODO] - validate input from network
     log(`Got Apoptosis proposal: ${JSON.stringify(payload)}`)
+    let err = ''
+    err = validateTypes(payload, {when:'n',id:'s',sign:'o'})
+    if (err){ log('bad input '+err); return }
+    err = validateTypes(payload.sign, {owner:'s',sig:'s'})
+    if (err){ log('bad input sign '+err); return }
 // The when must be set to current cycle +-1 because it is being
 //    received from the originating node
     if (!(payload as LooseObject).when){ response({s:'fail',r:1}); return }
@@ -120,6 +124,11 @@ const apoptosisInternalRoute: Route<InternalHandler<SignedApoptosisProposal>> = 
 const apoptosisGossipRoute: GossipHandler<SignedApoptosisProposal> = 
    (payload, sender, tracker) => {
   log(`Got Apoptosis gossip: ${JSON.stringify(payload)}`)
+  let err = ''
+  err = validateTypes(payload, {when:'n',id:'s',sign:'o'})
+  if (err){ log('bad input '+err); return }
+  err = validateTypes(payload.sign, {owner:'s',sig:'s'})
+  if (err){ log('bad input sign '+err); return }
   if ([1,2].includes(currentQuarter)){  
     if (addProposal(payload)) {
 //    p2p.sendGossipIn(gossipRouteName, payload, tracker, sender)
@@ -241,8 +250,8 @@ export async function apoptosizeSelf() {
     return res
   }
   const eF = (item1, item2) => {
-    // [TODO] - validate input from network
     if (!item1 || !item2) return false
+    if (!item1.s || !item2.s) return false
     if ((item1.s === 'pass') && (item2.s === 'pass')) return true
     return false
   }

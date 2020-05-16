@@ -19,7 +19,7 @@ import { SignedObject } from './Types'
 import * as Types from './Types'
 import { nodes, removeNode, byPubKey, activeByIdOrder } from './NodeList'
 import { currentQuarter, currentCycle } from './CycleCreator'
-import { sleep, binarySearch } from '../utils'
+import { sleep, binarySearch, validateTypes } from '../utils'
 import Logger from '../logger'
 
 /** TYPES */
@@ -156,7 +156,6 @@ export function init() {
     Comms.registerGossipHandler(name, handler)
   }
 }
-
 
 // This gets called before start of Q1
 export function reset() {
@@ -337,9 +336,13 @@ function getCheckerNode(id, cycle){
 }
 
 async function lostReportHandler (payload, response, sender) {
-// [TODO] - validate input from network
   log(`Got investigate request: ${JSON.stringify(payload)} from ${JSON.stringify(sender)}`)
-  if (stopReporting[payload.target.id]) return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
+  let err = ''
+  err = validateTypes(payload, {target:'s',reporter:'s',checker:'s',cycle:'n',sign:'o'})
+  if (err){ log('bad input '+err); return }
+  err = validateTypes(payload.sign, {owner:'s',sig:'s'})
+  if (err){ log('bad input sign '+err); return }
+  if (stopReporting[payload.target]) return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
   const key = `${payload.target}-${payload.cycle}`
   if (lost.get(key)) return // we have already seen this node for this cycle
   const [valid, reason] = checkReport(payload, currentCycle+1)
@@ -468,7 +471,15 @@ async function isDownCheck(node){
 
 function downGossipHandler(payload:SignedDownGossipMessage, sender, tracker){
   log(`Got downGossip: ${JSON.stringify(payload)}`)
-  // [TODO] - validate inputs
+  let err = ''
+  err = validateTypes(payload, {cycle:'n',report:'o',status:'s',sign:'o'})
+  if (err){ log('bad input '+err); return }
+  err = validateTypes(payload.report, {target:'s',reporter:'s',checker:'s',cycle:'n',sign:'o'})
+  if (err){ log('bad input report '+err); return }
+  err = validateTypes(payload.report.sign, {owner:'s',sig:'s'})
+  if (err){ log('bad input report sign '+err); return }
+  err = validateTypes(payload.sign, {owner:'s',sig:'s'})
+  if (err){ log('bad input sign '+err); return }
   const key = `${payload.report.target}-${payload.report.cycle}`
   let rec = lost.get(key)
   if (rec && ['up','down'].includes(rec.status)) return // we have already gossiped this node for this cycle
@@ -506,7 +517,11 @@ function checkDownMsg(payload:SignedDownGossipMessage, expectedCycle){
 
 function upGossipHandler(payload, sender, tracker){
   log(`Got upGossip: ${JSON.stringify(payload)}`)
-  // [TODO] - validate inputs
+  let err = ''
+  err = validateTypes(payload, {cycle:'n',target:'s',status:'s',sign:'o'})
+  if (err){ log('bad input '+err); return }
+  err = validateTypes(payload.sign, {owner:'s',sig:'s'})
+  if (err){ log('bad input sign '+err); return }
   if (! stopReporting[payload.target]){
     log('Bad upGossip. We did not see this node in the lost field, but got a up msg from it; ignoring it')
     return
