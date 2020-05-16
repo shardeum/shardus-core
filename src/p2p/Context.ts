@@ -4,8 +4,12 @@ import Crypto from '../crypto'
 import Logger from '../logger'
 import { NetworkClass } from '../network'
 import Shardus from '../shardus'
+import {
+  LogsConfiguration,
+  ShardusConfiguration,
+  StorageConfiguration,
+} from '../shardus/shardus-types'
 import StateManager from '../state-manager'
-import { ShardusConfiguration } from '../shardus/shardus-types'
 
 export type P2PModuleContext = P2P & EventEmitter
 
@@ -16,6 +20,11 @@ export let network: NetworkClass
 export let shardus: Shardus
 export let stateManager: StateManager
 export let config: ShardusConfiguration
+export let defaultConfigs: {
+  server: ShardusConfiguration
+  logs: LogsConfiguration
+  storage: StorageConfiguration
+}
 
 export function setP2pContext(context: P2PModuleContext) {
   p2p = context
@@ -43,4 +52,8 @@ export function setStateManagerContext(context) {
 
 export function setConfig(conf) {
   config = conf
+}
+
+export function setDefaultConfigs(conf) {
+  defaultConfigs = conf
 }

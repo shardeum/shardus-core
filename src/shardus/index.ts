@@ -8,23 +8,30 @@ import ExitHandler from '../exit-handler'
 import LoadDetection from '../load-detection'
 import Logger from '../logger'
 import * as Network from '../network'
-import * as Active from '../p2p/Active'
 import * as Context from '../p2p/Context'
 import * as GlobalAccounts from '../p2p/GlobalAccounts'
-import * as Self from '../p2p/Self'
 import { reportLost } from '../p2p/Lost'
+import * as Self from '../p2p/Self'
+import * as Wrapper from '../p2p/Wrapper'
 import RateLimiting from '../rate-limiting'
 import Reporter from '../reporter'
 import StateManager from '../state-manager'
 import Statistics from '../statistics'
 import Storage from '../storage'
-import * as Wrapper from '../p2p/Wrapper'
 import * as utils from '../utils'
+import { readJsonDir } from '../utils'
 import Profiler from '../utils/profiler'
 import ShardusTypes = require('../shardus/shardus-types')
 const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
 const saveConsoleOutput = require('./saveConsoleOutput')
+
+const defaultConfigs = readJsonDir(path.join(__dirname, 'config')) as {
+  server: ShardusTypes.ShardusConfiguration
+  logs: ShardusTypes.LogsConfiguration
+  storage: ShardusTypes.StorageConfiguration
+}
+Context.setDefaultConfigs(defaultConfigs)
 
 interface Shardus {
   profiler: Profiler
@@ -501,7 +508,7 @@ class Shardus extends EventEmitter {
     this._registerRoutes()
 
     // Register listeners for P2P events
-    Self.emitter.on('joining', publicKey => {
+    Self.emitter.on('joining', (publicKey) => {
       this.logger.playbackLogState('joining', '', publicKey)
       if (this.reporter) this.reporter.reportJoining(publicKey)
     })
@@ -513,7 +520,7 @@ class Shardus extends EventEmitter {
     Self.emitter.on('initialized', async () => {
       await this.syncAppData()
     })
-    Self.emitter.on('active', nodeId => {
+    Self.emitter.on('active', (nodeId) => {
       this.logger.playbackLogState('active', nodeId, '')
       if (this.reporter) {
         this.reporter.reportActive(nodeId)
@@ -525,7 +532,7 @@ class Shardus extends EventEmitter {
     Self.emitter.on('failed', () => {
       this.shutdown(true)
     })
-    Self.emitter.on('error', e => {
+    Self.emitter.on('error', (e) => {
       console.log(e.message + ' at ' + e.stack)
       this.mainLogger.debug('shardus.start() ' + e.message + ' at ' + e.stack)
       this.fatalLogger.fatal('shardus.start() ' + e.message + ' at ' + e.stack)
@@ -566,7 +573,9 @@ class Shardus extends EventEmitter {
         this._unlinkStateManager()
         await this.stateManager.cleanup()
       }
-      this.fatalLogger.fatal('Shardus: caught apoptosized event; finished clean up')
+      this.fatalLogger.fatal(
+        'Shardus: caught apoptosized event; finished clean up'
+      )
       // Don't have to exit here, the Apoptosis module does it
     })
 
@@ -628,10 +637,10 @@ class Shardus extends EventEmitter {
    */
   _attemptCreateAppliedListener() {
     if (!this.statistics || !this.stateManager) return
-    this._registerListener(this.stateManager, 'txQueued', txId =>
+    this._registerListener(this.stateManager, 'txQueued', (txId) =>
       this.statistics.startTimer('txTimeInQueue', txId)
     )
-    this._registerListener(this.stateManager, 'txPopped', txId =>
+    this._registerListener(this.stateManager, 'txPopped', (txId) =>
       this.statistics.stopTimer('txTimeInQueue', txId)
     )
     this._registerListener(this.stateManager, 'txApplied', () =>
@@ -866,7 +875,7 @@ class Shardus extends EventEmitter {
       )
       this.profiler.profileSectionStart('consensusInject')
 
-      this.consensus.inject(signedShardusTx, global).then(txReceipt => {
+      this.consensus.inject(signedShardusTx, global).then((txReceipt) => {
         this.profiler.profileSectionEnd('consensusInject')
         if (this.verboseLogs)
           this.mainLogger.debug(
@@ -935,7 +944,7 @@ class Shardus extends EventEmitter {
    * @returns {string[]} returns a list of nodes ids that are closest. roughly in order of closeness
    */
   getClosestNodes(hash, count = 1) {
-    return this.stateManager.getClosestNodes(hash, count).map(node => node.id)
+    return this.stateManager.getClosestNodes(hash, count).map((node) => node.id)
   }
 
   getClosestNodesGlobal(hash, count) {
@@ -1096,7 +1105,7 @@ class Shardus extends EventEmitter {
       }
 
       if (typeof application.validateTxnFields === 'function') {
-        applicationInterfaceImpl.validateTxnFields = inTx =>
+        applicationInterfaceImpl.validateTxnFields = (inTx) =>
           application.validateTxnFields(inTx)
       } else {
         throw new Error(
@@ -1235,7 +1244,7 @@ class Shardus extends EventEmitter {
       }
 
       if (typeof application.calculateAccountHash === 'function') {
-        applicationInterfaceImpl.calculateAccountHash = account =>
+        applicationInterfaceImpl.calculateAccountHash = (account) =>
           application.calculateAccountHash(account)
       } else {
         throw new Error(
@@ -1248,7 +1257,7 @@ class Shardus extends EventEmitter {
       // Stores the records into the Accounts table if the hash of the Acc_data matches State_id
       // Returns a list of failed Acc_id
       if (typeof application.setAccountData === 'function') {
-        applicationInterfaceImpl.setAccountData = async accountRecords =>
+        applicationInterfaceImpl.setAccountData = async (accountRecords) =>
           application.setAccountData(accountRecords)
       } else {
         throw new Error('Missing requried interface function. setAccountData()')
@@ -1256,7 +1265,7 @@ class Shardus extends EventEmitter {
 
       // pass array of account copies to this (only looks at the data field) and it will reset the account state
       if (typeof application.resetAccountData === 'function') {
-        applicationInterfaceImpl.resetAccountData = async accountRecords =>
+        applicationInterfaceImpl.resetAccountData = async (accountRecords) =>
           application.resetAccountData(accountRecords)
       } else {
         throw new Error(
@@ -1266,7 +1275,7 @@ class Shardus extends EventEmitter {
 
       // pass array of account ids to this and it will delete the accounts
       if (typeof application.deleteAccountData === 'function') {
-        applicationInterfaceImpl.deleteAccountData = async addressList =>
+        applicationInterfaceImpl.deleteAccountData = async (addressList) =>
           application.deleteAccountData(addressList)
       } else {
         throw new Error(
@@ -1275,7 +1284,7 @@ class Shardus extends EventEmitter {
       }
 
       if (typeof application.getAccountDataByList === 'function') {
-        applicationInterfaceImpl.getAccountDataByList = async addressList =>
+        applicationInterfaceImpl.getAccountDataByList = async (addressList) =>
           application.getAccountDataByList(addressList)
       } else {
         throw new Error(
@@ -1291,26 +1300,26 @@ class Shardus extends EventEmitter {
         )
       }
       if (typeof application.getAccountDebugValue === 'function') {
-        applicationInterfaceImpl.getAccountDebugValue = wrappedAccount =>
+        applicationInterfaceImpl.getAccountDebugValue = (wrappedAccount) =>
           application.getAccountDebugValue(wrappedAccount)
       } else {
-        applicationInterfaceImpl.getAccountDebugValue = wrappedAccount =>
+        applicationInterfaceImpl.getAccountDebugValue = (wrappedAccount) =>
           'getAccountDebugValue() missing on app'
         // throw new Error('Missing requried interface function. deleteLocalAccountData()')
       }
 
       if (typeof application.canDebugDropTx === 'function') {
-        applicationInterfaceImpl.canDebugDropTx = tx =>
+        applicationInterfaceImpl.canDebugDropTx = (tx) =>
           application.canDebugDropTx(tx)
       } else {
-        applicationInterfaceImpl.canDebugDropTx = tx => true
+        applicationInterfaceImpl.canDebugDropTx = (tx) => true
       }
 
       if (typeof application.sync === 'function') {
         applicationInterfaceImpl.sync = async () => application.sync()
       } else {
         const thisPtr = this
-        applicationInterfaceImpl.sync = async function() {
+        applicationInterfaceImpl.sync = async function () {
           thisPtr.mainLogger.debug('no app.sync() function defined')
         }
       }
@@ -1417,17 +1426,17 @@ class Shardus extends EventEmitter {
    * Registers exception handlers for "uncaughtException" and "unhandledRejection"
    */
   registerExceptionHandler() {
-    const logFatalAndExit = err => {
+    const logFatalAndExit = (err) => {
       console.log('Encountered a fatal error. Check fatal log for details.')
       this.fatalLogger.fatal('unhandledRejection: ' + err.stack)
       // this.exitHandler.exitCleanly()
 
       this.exitHandler.exitUncleanly()
     }
-    process.on('uncaughtException', err => {
+    process.on('uncaughtException', (err) => {
       logFatalAndExit(err)
     })
-    process.on('unhandledRejection', err => {
+    process.on('unhandledRejection', (err) => {
       logFatalAndExit(err)
     })
   }

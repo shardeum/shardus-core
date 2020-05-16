@@ -4,15 +4,13 @@ import cors from 'cors'
 import { EventEmitter } from 'events'
 import express from 'express'
 import Log4js from 'log4js'
-import NatAPI = require('nat-api')
 import * as net from 'net'
-import { join } from 'path'
 import { Sn } from 'shardus-net'
 import { promisify } from 'util'
 import * as http from '../http'
 import Logger from '../logger'
-import { config, logger } from '../p2p/Context'
-import { readJsonDir } from '../utils'
+import { config, defaultConfigs, logger } from '../p2p/Context'
+import NatAPI = require('nat-api')
 
 /** TYPES */
 export interface IPInfo {
@@ -385,7 +383,6 @@ export async function init() {
   mainLogger = logger.getLogger('main')
 
   // Get default values for IP config
-  const defaultConfigs = readJsonDir(join(__dirname, '../config'))
   const defaults = defaultConfigs['server']['ip'] as IPInfo
 
   // Set ipInfo to passed config, automtically if passed 'auto', or to default
@@ -439,13 +436,19 @@ async function getExternalIp() {
     const ip = await natClient.es6.externalIp()
     return ip
   } catch (err) {
-    mainLogger.warn(`Failed to get external IP from gateway:`, err.message ? err.message : err)
+    mainLogger.warn(
+      `Failed to get external IP from gateway:`,
+      err.message ? err.message : err
+    )
 
     try {
       const ip = await discoverExternalIp(config.p2p.ipServer)
       return ip
     } catch (err) {
-      mainLogger.warn(`Failed to get external IP from IP server:`, err.message ? err.message : err)
+      mainLogger.warn(
+        `Failed to get external IP from IP server:`,
+        err.message ? err.message : err
+      )
     }
   }
 }
