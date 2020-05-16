@@ -12,7 +12,7 @@
     "dist": "./dist"
   },
   "scripts": {
-    "build": "webpack && node scripts/build.js",
+    "build": "node scripts/build.js",
     "update-dist": "node scripts/update-dist.js",
     "check": "gts check",
     "clean": "gts clean",
