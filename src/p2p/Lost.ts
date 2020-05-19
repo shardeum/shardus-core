@@ -263,7 +263,7 @@ export function sendRequests() {
       msg = crypto.sign(msg)
       obj.message = msg
       obj.gossiped = true
-      log(`Gossiping node down message: ${JSON.stringify(msg)}`)
+      info(`Gossiping node down message: ${JSON.stringify(msg)}`)
       Comms.sendGossip('lost-down', msg)
     }
   }
@@ -271,11 +271,11 @@ export function sendRequests() {
 //   It has to be based on the lost node seeing it's node id in the lost field of the cycle record.
 //   Send refute is set to the cycle counter + 1 of the cycle record where we saw our id in the lost field
 //   We cannot create a message which has the down message since we may not have received that gossip
-if (sendRefute>0) log(`sendRequest 5  sendRefute:${sendRefute}  currentCycle:${currentCycle}`)
+  if (sendRefute>0) info(`sendRequest 5  sendRefute:${sendRefute}  currentCycle:${currentCycle}`)
   if (sendRefute === currentCycle){
     let msg = {target:Self.id, status:"up", cycle:currentCycle}
     msg = crypto.sign(msg)
-    log(`Gossiping node up message: ${JSON.stringify(msg)}`)
+    info(`Gossiping node up message: ${JSON.stringify(msg)}`)
     Comms.sendGossip('lost-up', msg)
   }
 }
@@ -284,16 +284,16 @@ if (sendRefute>0) log(`sendRequest 5  sendRefute:${sendRefute}  currentCycle:${c
 /* Module functions */
 
 async function killSelf() {
-  log(`In killSelf`)
+  info(`In killSelf`)
   Self.emitter.emit('apoptosized')
-  log(`I have been killed, waiting 1 sec ...`)
+  info(`I have been killed, waiting 1 sec ...`)
   await sleep(1000)
-  log(`I have been killed, exiting with code 1...`)
+  info(`I have been killed, exiting with code 1...`)
   process.exit(1)
 }
 
 async function killOther() {
-  log(`In killOther`)
+  info(`In killOther`)
   let target = activeByIdOrder[0]
   if (target.id === Self.id) target = activeByIdOrder[1]
   reportLost(target, 'killother')
@@ -315,7 +315,7 @@ export function reportLost(target, reason){
   let msg:LostReport = {target:target.id, checker:checker.id, reporter:Self.id, cycle:currentCycle}
 // [TODO] - remove the following line after testing killother
   if (allowKillRoute && reason === 'killother') msg.killother = true
-  log(`Sending investigate request: reporter:${Self.port} checker:${checker.externalPort} target:${target.externalPort} `+JSON.stringify(msg))
+  info(`Sending investigate request: reporter:${Self.port} checker:${checker.externalPort} target:${target.externalPort} `+JSON.stringify(msg))
   msg = crypto.sign(msg)
   lost.set(key, obj)
   Comms.tell([checker], 'lost-report', msg)
@@ -330,24 +330,24 @@ function getCheckerNode(id, cycle){
   const oidx = idx
   if (idx < 0) idx = (-1 - idx)%activeByIdOrder.length
   if (activeByIdOrder[idx].id === id) idx = (idx+1)%activeByIdOrder.length  // skip to next node if the selected node is target
-  log(`in getCheckerNode oidx:${oidx} idx:${idx} near:${near}  cycle:${cycle}  id:${id}`)
-  log(`${JSON.stringify(activeByIdOrder.map(n => n.id))}`)
+  info(`in getCheckerNode oidx:${oidx} idx:${idx} near:${near}  cycle:${cycle}  id:${id}`)
+  info(`${JSON.stringify(activeByIdOrder.map(n => n.id))}`)
   return activeByIdOrder[idx]
 }
 
 async function lostReportHandler (payload, response, sender) {
-  log(`Got investigate request: ${JSON.stringify(payload)} from ${JSON.stringify(sender)}`)
+  info(`Got investigate request: ${JSON.stringify(payload)} from ${JSON.stringify(sender)}`)
   let err = ''
   err = validateTypes(payload, {target:'s',reporter:'s',checker:'s',cycle:'n',sign:'o'})
-  if (err){ log('bad input '+err); return }
+  if (err){ warn('bad input '+err); return }
   err = validateTypes(payload.sign, {owner:'s',sig:'s'})
-  if (err){ log('bad input sign '+err); return }
+  if (err){ warn('bad input sign '+err); return }
   if (stopReporting[payload.target]) return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
   const key = `${payload.target}-${payload.cycle}`
   if (lost.get(key)) return // we have already seen this node for this cycle
   const [valid, reason] = checkReport(payload, currentCycle+1)
   if (!valid){ 
-    log('Got bad investigate request. Reason: '+reason)
+    warn('Got bad investigate request. Reason: '+reason)
     return
   }
   if (sender !== payload.reporter) return // sender must be same as reporter
@@ -359,7 +359,7 @@ async function lostReportHandler (payload, response, sender) {
   let result = await isDownCache(nodes.get(payload.target))
   if (allowKillRoute && payload.killother) result = 'down'
   if (obj.status === 'checking') obj.status = result
-  log('Status after checking is '+obj.status)
+  info('Status after checking is '+obj.status)
   // At start of Q1 of the next cycle sendRequests() will start a gossip if the node was found to be down
 }
 
@@ -439,7 +439,7 @@ function pruneStopReporting(){
 async function isDownCheck(node){
 // Check the internal route
 // The timeout for this is controled by the network.timeout paramater in server.json
-  log(`Checking internal connection for ${node.id}`)
+  info(`Checking internal connection for ${node.id}`)
   const res = await Comms.ask(node, 'apoptosize', {id:'bad'})
   try{
     if (typeof(res.s) !== 'string') return 'down'
@@ -448,7 +448,7 @@ async function isDownCheck(node){
     return 'down'
   }
   if (node.externalIp === node.interalIp) return 'up'
-  log(`Checking external connection for ${node.id}`)
+  info(`Checking external connection for ${node.id}`)
 // Check the external route if ip is different than internal
   const queryExt = async (node) => {
     const ip = node.ip ? node.ip : node.externalIp
@@ -470,29 +470,29 @@ async function isDownCheck(node){
 }
 
 function downGossipHandler(payload:SignedDownGossipMessage, sender, tracker){
-  log(`Got downGossip: ${JSON.stringify(payload)}`)
+  info(`Got downGossip: ${JSON.stringify(payload)}`)
   let err = ''
   err = validateTypes(payload, {cycle:'n',report:'o',status:'s',sign:'o'})
-  if (err){ log('bad input '+err); return }
+  if (err){ warn('bad input '+err); return }
   err = validateTypes(payload.report, {target:'s',reporter:'s',checker:'s',cycle:'n',sign:'o'})
-  if (err){ log('bad input report '+err); return }
+  if (err){ warn('bad input report '+err); return }
   err = validateTypes(payload.report.sign, {owner:'s',sig:'s'})
-  if (err){ log('bad input report sign '+err); return }
+  if (err){ warn('bad input report sign '+err); return }
   err = validateTypes(payload.sign, {owner:'s',sig:'s'})
-  if (err){ log('bad input sign '+err); return }
+  if (err){ warn('bad input sign '+err); return }
   const key = `${payload.report.target}-${payload.report.cycle}`
   let rec = lost.get(key)
   if (rec && ['up','down'].includes(rec.status)) return // we have already gossiped this node for this cycle
   let [valid, reason] = checkQuarter(payload.report.checker, sender)
   if (!valid){
-    log(`Bad downGossip message. reason:${reason} message:${JSON.stringify(payload)}`)
-    log(`cycle:${currentCycle} quarter:${currentQuarter} sender:${sender}`)
+    warn(`Bad downGossip message. reason:${reason} message:${JSON.stringify(payload)}`)
+    warn(`cycle:${currentCycle} quarter:${currentQuarter} sender:${sender}`)
     return
   }
   [valid, reason] = checkDownMsg(payload, currentCycle)
   if (!valid){
-    log(`Bad downGossip message. reason:${reason}. message:${JSON.stringify(payload)}`)
-    log(`cycle:${currentCycle} quarter:${currentQuarter} sender:${sender}`)
+    warn(`Bad downGossip message. reason:${reason}. message:${JSON.stringify(payload)}`)
+    warn(`cycle:${currentCycle} quarter:${currentQuarter} sender:${sender}`)
     return
   }
   let obj:LostRecord = {target:payload.report.target, cycle:payload.report.cycle, status:'down', message:payload }
@@ -516,19 +516,19 @@ function checkDownMsg(payload:SignedDownGossipMessage, expectedCycle){
 }
 
 function upGossipHandler(payload, sender, tracker){
-  log(`Got upGossip: ${JSON.stringify(payload)}`)
+  info(`Got upGossip: ${JSON.stringify(payload)}`)
   let err = ''
   err = validateTypes(payload, {cycle:'n',target:'s',status:'s',sign:'o'})
-  if (err){ log('bad input '+err); return }
+  if (err){ warn('bad input '+err); return }
   err = validateTypes(payload.sign, {owner:'s',sig:'s'})
-  if (err){ log('bad input sign '+err); return }
+  if (err){ warn('bad input sign '+err); return }
   if (! stopReporting[payload.target]){
-    log('Bad upGossip. We did not see this node in the lost field, but got a up msg from it; ignoring it')
+    warn('Bad upGossip. We did not see this node in the lost field, but got a up msg from it; ignoring it')
     return
   }
   let [valid, reason] = checkQuarter(payload.target, sender)
   if (!valid){
-    log(`Bad upGossip message. reason:${reason} message:${JSON.stringify(payload)}`)
+    warn(`Bad upGossip message. reason:${reason} message:${JSON.stringify(payload)}`)
     return
   }
   const key = `${payload.target}-${payload.cycle}`
@@ -536,7 +536,7 @@ function upGossipHandler(payload, sender, tracker){
   if (rec && rec.status === 'up') return // we have already gossiped this node for this cycle
   [valid, reason] = checkUpMsg(payload, currentCycle)
   if (!valid){
-    log(`Bad upGossip message. reason:${reason} message:${JSON.stringify(payload)}`)
+    warn(`Bad upGossip message. reason:${reason} message:${JSON.stringify(payload)}`)
     return
   }
   let obj = {target:payload.target, status:'up', cycle:payload.cycle, message:payload}
@@ -551,22 +551,17 @@ function checkUpMsg(payload:SignedUpGossipMessage, expectedCycle){
   return [true, '']
 }
 
-function log(msg: string, level = 'info') {
-//  p2p.mainLogger[level]('P2PApoptosis: ' + msg)
-  p2pLogger[level]('P2PLost: ' + msg)
-}
-
 function info(...msg) {
-  const entry = `[CHANGE ME]: ${msg.join(' ')}`
+  const entry = `Lost: ${msg.join(' ')}`
   p2pLogger.info(entry)
 }
 
 function warn(...msg) {
-  const entry = `[CHANGE ME]: ${msg.join(' ')}`
+  const entry = `Lost: ${msg.join(' ')}`
   p2pLogger.warn(entry)
 }
 
 function error(...msg) {
-  const entry = `[CHANGE ME]: ${msg.join(' ')}`
+  const entry = `Lost: ${msg.join(' ')}`
   p2pLogger.error(entry)
 }

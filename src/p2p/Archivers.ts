@@ -6,6 +6,7 @@ import { getCycleChain } from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import { CycleRecord as Cycle } from './CycleCreator'
 import * as CycleParser from './CycleParser'
+import { validateTypes } from '../utils'
 
 /** TYPES */
 
@@ -142,24 +143,32 @@ export function queueRequest(request) {}
 
 /** Original Functions */
 
-function logDebug(...msgs) {
-  p2pLogger.debug(
-    'P2PArchivers: ' + msgs.map(msg => JSON.stringify(msg)).join(', ')
-  )
-}
-
-function logError(...msgs) {
-  p2pLogger.error(
-    'P2PArchivers: ' + msgs.map(msg => JSON.stringify(msg)).join(', ')
-  )
-}
-
 export function resetJoinRequests() {
   requests = []
 }
 
 export function addJoinRequest(joinRequest, tracker?, gossip = true) {
-  // [TODO] Verify signature
+
+  // validate input
+  let err = validateTypes(joinRequest,{nodeInfo:'o',sign:'o'})
+  if (err){
+    warn('addJoinRequest: bad joinRequest '+err)
+    return false
+  }
+  err = validateTypes(joinRequest.nodeInfo, {curvePk:'s',ip:'s',port:'n',publicKey:'s'})
+  if (err){
+    warn('addJoinRequest: bad joinRequest.nodeInfo '+err)
+    return false
+  }
+  err = validateTypes(joinRequest.sign, {owner:'s',sig:'s'})
+  if (err){
+    warn('addJoinRequest: bad joinRequest.sign '+err)
+    return false
+  }
+  if (! crypto.verify(joinRequest)){
+    warn('addJoinRequest: bad signature')
+    return false
+  }
 
   requests.push(joinRequest)
   if (gossip === true) {
@@ -253,7 +262,7 @@ export function sendData() {
       })
       .catch(err => {
         // Remove recipient from dataRecipients
-        logError('Error sending data to dataRecipient.', err)
+        warn('Error sending data to dataRecipient.', err)
         removeDataRecipient(recipient.nodeInfo.publicKey)
       })
   }
@@ -264,7 +273,7 @@ export function sendPartitionData(partitionReceipt, paritionObject) {
   //   const nodeUrl = `http://${nodeInfo.ip}:${nodeInfo.port}/post_partition`
   //   http.post(nodeUrl, { partitionReceipt, paritionObject })
   //     .catch(err => {
-  //       logError(`sendPartitionData: Failed to post to ${nodeUrl} ` + err)
+  //       warn(`sendPartitionData: Failed to post to ${nodeUrl} ` + err)
   //     })
   // }
 }
@@ -278,51 +287,57 @@ export function sendTransactionData(
   //   const nodeUrl = `http://${nodeInfo.ip}:${nodeInfo.port}/post_transactions`
   //   http.post(nodeUrl, { partitionNumber, cycleNumber, transactions })
   //     .catch(err => {
-  //       logError(`sendTransactionData: Failed to post to ${nodeUrl} ` + err)
+  //       warn(`sendTransactionData: Failed to post to ${nodeUrl} ` + err)
   //     })
   // }
 }
 
 export function registerRoutes() {
   network.registerExternalPost('joinarchiver', async (req, res) => {
-    const invalidJoinReqErr = 'Invalid archiver join request'
-    if (!req.body) {
-      logError(invalidJoinReqErr)
-      return res.json({ success: false, error: invalidJoinReqErr })
+    let err = validateTypes(req, {body:'o'})
+    if (err) {
+      warn(`joinarchiver: bad req ${err}`)
+      return res.json({ success: false, error: err})
     }
 
+
     const joinRequest = req.body
-    logDebug(`Archiver join request received: ${JSON.stringify(joinRequest)}`)
+    info(`Archiver join request received: ${JSON.stringify(joinRequest)}`)
     res.json({ success: true })
 
     const accepted = await addJoinRequest(joinRequest)
-    if (!accepted) return logDebug('Archiver join request not accepted.')
-    logDebug('Archiver join request accepted!')
+    if (!accepted) return warn('Archiver join request not accepted.')
+    info('Archiver join request accepted!')
   })
 
   Comms.registerGossipHandler(
     'joinarchiver',
     async (payload, sender, tracker) => {
       const accepted = await addJoinRequest(payload, tracker, false)
-      if (!accepted) return logDebug('Archiver join request not accepted.')
-      logDebug('Archiver join request accepted!')
+      if (!accepted) return warn('Archiver join request not accepted.')
+      info('Archiver join request accepted!')
     }
   )
 
   network.registerExternalPost('requestdata', (req, res) => {
-    if (!req.body) {
-      const invalidDataReqErr = 'Invalid data request'
-      logError(invalidDataReqErr)
-      return res.json({ success: false, error: invalidDataReqErr })
+    let err = validateTypes(req, {body:'o'})
+    if (err) {
+      warn(`requestdata: bad req ${err}`)
+      return res.json({ success: false, error: err})
     }
+    err = validateTypes(req.body, {lastData:'n',type:'s',publicKey:'s',tag:'s'})
+    if (err) {
+      warn(`requestdata: bad req.body ${err}`)
+      return res.json({ success: false, error: err})
+    }
+    // [TODO] Authenticate tag
 
     const dataRequest = req.body
 
-    // [TODO] Authenticate tag
     /*
     const invalidTagErr = 'Tag is invalid'
     if (!crypto.authenticate(dataRequest, crypto.getCurvePublicKey(dataRequest.publicKey))) {
-      logError(invalidTagErr)
+      warn(invalidTagErr)
       return res.json({ success: false, error: invalidTagErr })
     }
     */
@@ -331,7 +346,7 @@ export function registerRoutes() {
 
     if (!nodeInfo) {
       const archiverNotFoundErr = 'Archiver not found in list'
-      logError(archiverNotFoundErr)
+      warn(archiverNotFoundErr)
       return res.json({ success: false, error: archiverNotFoundErr })
     }
 
@@ -349,4 +364,19 @@ export function registerRoutes() {
   network.registerExternalGet('datarecipients', (req, res) => {
     res.json({ dataRecipients: recipients })
   })
+}
+
+function info(...msg) {
+  const entry = `Archiver: ${msg.join(' ')}`
+  p2pLogger.info(entry)
+}
+
+function warn(...msg) {
+  const entry = `Archiver: ${msg.join(' ')}`
+  p2pLogger.warn(entry)
+}
+
+function error(...msg) {
+  const entry = `Archiver: ${msg.join(' ')}`
+  p2pLogger.error(entry)
 }

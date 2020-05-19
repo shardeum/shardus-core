@@ -69,14 +69,13 @@ export function setVerboseLogs(enabled: boolean) {
 function _findNodeInGroup(nodeId, group) {
   if (!group) {
     const errMsg = 'No group given for _findNodeInGroup()'
-    p2pLogger.debug(errMsg)
+    warn(errMsg)
     throw new Error(errMsg)
   }
-//  p2pLogger.debug(`Node ID to find in group: ${nodeId}`)
   for (const node of group) {
     if (node.id === nodeId) return node
   }
-  p2pLogger.debug(`Node ID not found in group: ${nodeId}`)
+  warn(`Node ID not found in group: ${nodeId}`)
   return false
 }
 
@@ -85,15 +84,14 @@ function _authenticateByNode(message, node) {
   let result
   try {
     if (!node.curvePublicKey) {
-      p2pLogger.debug(
+      error(
         'Node object did not contain curve public key for authenticateByNode()!'
       )
       return false
     }
-//    p2pLogger.debug(`Expected publicKey: ${node.curvePublicKey}`)
     result = crypto.authenticate(message, node.curvePublicKey)
   } catch (e) {
-    p2pLogger.debug(
+    error(
       `Invalid or missing authentication tag on message: ${JSON.stringify(
         message
       )}`
@@ -104,17 +102,27 @@ function _authenticateByNode(message, node) {
 }
 
 function _extractPayload(wrappedPayload, nodeGroup) {
+  let err = utils.validateTypes(wrappedPayload,{error:'s?'})
+  if (err){
+    warn('extractPayload: bad wrappedPayload: '+err+' '+JSON.stringify(wrappedPayload))
+    return [null]
+  }
   if (wrappedPayload.error) {
     const error = wrappedPayload.error
-    p2pLogger.debug(
+    warn(
       `_extractPayload Failed to extract payload. Error: ${error}`
     )
+    return [null]
+  }
+  err = utils.validateTypes(wrappedPayload,{sender:'s',payload:'o',tag:'s',tracker:'s?'})
+  if (err){
+    warn('extractPayload: bad wrappedPayload: '+err+' '+JSON.stringify(wrappedPayload))
     return [null]
   }
   // Check to see if node is in expected node group
   const node = _findNodeInGroup(wrappedPayload.sender, nodeGroup)
   if (!node) {
-    p2pLogger.debug(
+    warn(
       `_extractPayload Invalid sender on internal payload. sender: ${
         wrappedPayload.sender
       } payload: ${utils.stringifyReduceLimit(wrappedPayload)}`
@@ -124,7 +132,7 @@ function _extractPayload(wrappedPayload, nodeGroup) {
   const authenticatedByNode = _authenticateByNode(wrappedPayload, node)
   // Check if actually signed by that node
   if (!authenticatedByNode) {
-    p2pLogger.debug(
+    warn(
       '_extractPayload Internal payload not authenticated by an expected node.'
     )
     return [null]
@@ -132,14 +140,13 @@ function _extractPayload(wrappedPayload, nodeGroup) {
   const payload = wrappedPayload.payload
   const sender = wrappedPayload.sender
   const tracker = wrappedPayload.tracker
-//  p2pLogger.debug('Internal payload successfully authenticated.')
   return [payload, sender, tracker]
 }
 
 function _wrapAndTagMessage(msg, tracker = '', recipientNode) {
   if (!msg) throw new Error('No message given to wrap and tag!')
   if (verboseLogs) {
-    p2pLogger.debug(
+    warn(
       `Attaching sender ${Self.id} to the message: ${utils.stringifyReduceLimit(
         msg
       )}`
@@ -189,7 +196,7 @@ export async function tell(
   const promises = []
   for (const node of nodes) {
     if (node.id === Self.id) {
-      p2pLogger.info('p2p/Comms:tell: Not telling self')
+      info('p2p/Comms:tell: Not telling self')
       continue
     }
     const signedMessage = _wrapAndTagMessage(message, tracker, node)
@@ -198,7 +205,7 @@ export async function tell(
   try {
     await Promise.all(promises)
   } catch (err) {
-    p2pLogger.debug('P2P TELL: failed', err)
+    warn('P2P TELL: failed', err)
   }
 }
 
@@ -214,7 +221,7 @@ export async function ask(
     tracker = createMsgTracker()
   }
   if (node.id === Self.id) {
-    p2pLogger.info('p2p/Comms:ask: Not asking self')
+    info('p2p/Comms:ask: Not asking self')
     return false
   }
   const signedMessage = _wrapAndTagMessage(message, tracker, node)
@@ -222,12 +229,9 @@ export async function ask(
   try {
     signedResponse = await network.ask(node, route, signedMessage, logged)
   } catch (err) {
-    p2pLogger.error('P2P: ask: network.ask: ' + err)
+    error('P2P: ask: network.ask: ' + err)
     return false
   }
-  p2pLogger.debug(
-    `Result of network-level ask: ${JSON.stringify(signedResponse)}`
-  )
   try {
     const [response] = _extractPayload(signedResponse, [node])
     if (!response) {
@@ -239,7 +243,7 @@ export async function ask(
     }
     return response
   } catch (err) {
-    p2pLogger.error('P2P: ask: _extractPayload: ' + err)
+    error('P2P: ask: _extractPayload: ' + err)
     return false
   }
 }
@@ -250,7 +254,7 @@ export function registerInternal(route, handler) {
     internalRecvCounter++
     // We have internal requests turned off until we have a node id
     if (!acceptInternal) {
-      p2pLogger.debug('We are not currently accepting internal requests...')
+      info('We are not currently accepting internal requests...')
       return
     }
     let tracker = ''
@@ -259,7 +263,7 @@ export function registerInternal(route, handler) {
       const node = NodeList.nodes.get(sender)
       const signedResponse = _wrapAndTagMessage(response, tracker, node)
       if (verboseLogs) {
-        p2pLogger.debug(
+        info(
           `The signed wrapped response to send back: ${utils.stringifyReduceLimit(
             signedResponse
           )}`
@@ -285,7 +289,7 @@ export function registerInternal(route, handler) {
     const [payload, sender] = payloadArray
     tracker = payloadArray[2] || ''
     if (!payload) {
-      p2pLogger.debug(
+      warn(
         'Payload unable to be extracted, possible missing signature...'
       )
       return
@@ -335,7 +339,7 @@ export async function sendGossip(
   }
 
   if (verboseLogs) {
-    p2pLogger.debug(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
+    info(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
   }
   const gossipPayload = { type, data: payload }
 
@@ -343,7 +347,7 @@ export async function sendGossip(
   const gossipHash = crypto.hash(gossipPayload)
   if (gossipedHashesSent.has(gossipHash)) {
     if (verboseLogs) {
-      p2pLogger.debug(`Gossip already sent: ${gossipHash.substring(0, 5)}`)
+      warn(`Gossip already sent: ${gossipHash.substring(0, 5)}`)
     }
     return
   }
@@ -367,7 +371,7 @@ export async function sendGossip(
   }
   try {
     if (verboseLogs) {
-      p2pLogger.debug(
+      info(
         `GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(
           recipients.map(
             node => utils.makeShortHash(node.id) + ':' + node.externalPort
@@ -390,19 +394,19 @@ export async function sendGossip(
     await tell(recipients, 'gossip', gossipPayload, true, tracker)
   } catch (ex) {
     if (verboseLogs) {
-      p2pLogger.error(
+      error(
         `Failed to sendGossip(${utils.stringifyReduce(
           payload
         )}) Exception => ${ex}`
       )
     }
-    p2pLogger.fatal(
+    fatal(
       'sendGossipIn: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
     )
   }
   // gossipedHashesSent.set(gossipHash, currentCycle)    // No longer used
   if (verboseLogs) {
-    p2pLogger.debug(`End of sendGossipIn(${utils.stringifyReduce(payload)})`)
+    info(`End of sendGossipIn(${utils.stringifyReduce(payload)})`)
   }
 }
 
@@ -412,14 +416,29 @@ export async function sendGossip(
  */
 export async function handleGossip(payload, sender, tracker = '') {
   if (verboseLogs) {
-    p2pLogger.debug(`Start of handleGossip(${utils.stringifyReduce(payload)})`)
+    info(`Start of handleGossip(${utils.stringifyReduce(payload)})`)
   }
+
+  let err = utils.validateTypes(payload,{type:'s',data:'o'})
+  if (err){
+    warn('handleGossip: bad payload: '+err)
+    return
+  }
+
+  // Simulating bad network by dropping received gossip 
+  //   set the propability of dropping to a number between 0 to 1
+  if (Math.random() < 0.00){
+    warn('Dropped gossip to simulate bad network')
+    return
+  }
+
+
   const type = payload.type
   const data = payload.data
 
   const gossipHandler = gossipHandlers[type]
   if (!gossipHandler) {
-    p2pLogger.debug(
+    warn(
       `Gossip Handler not found: type ${type}, data: ${JSON.stringify(data)}`
     )
     return
@@ -453,7 +472,7 @@ export async function handleGossip(payload, sender, tracker = '') {
  /*
   if (gossipedHashesRecv.has(gossipHash)) {
     if (verboseLogs) {
-      p2pLogger.debug(`Got old gossip: ${gossipHash.substring(0, 5)}`)
+      warn(`Got old gossip: ${gossipHash.substring(0, 5)}`)
     }
     if (!gossipedHashesRecv.get(gossipHash)) {  // [TODO] - double check logic; gossipHash should be gettable here since has() is true; so we never setTimeout()
       setTimeout(
@@ -462,7 +481,7 @@ export async function handleGossip(payload, sender, tracker = '') {
       )
       gossipedHashesRecv.set(gossipHash, true)
       if (verboseLogs) {
-        p2pLogger.debug(
+        warn(
           `Marked old gossip for deletion: ${gossipHash.substring(0, 5)} in ${
             config.p2p.gossipTimeout
           } ms`
@@ -477,9 +496,10 @@ export async function handleGossip(payload, sender, tracker = '') {
   gossipRecv++
   gossipTypeRecv[type] = gossipTypeRecv[type]  ? gossipTypeRecv[type]+1 : 1
   logger.playbackLog(sender, 'self', 'GossipRcv', type, tracker, data)
+  // [TODO] - maybe we don't need to await the following line
   await gossipHandler(data, sender, tracker)
   if (verboseLogs) {
-    p2pLogger.debug(`End of handleGossip(${utils.stringifyReduce(payload)})`)
+    info(`End of handleGossip(${utils.stringifyReduce(payload)})`)
   }
 }
 
@@ -508,8 +528,29 @@ export function unregisterGossipHandler(type) {
 
 // We don't need to prune gossip hashes since we are not creating them anymore.
 function pruneGossipHashes(){
-//  p2pLogger.warn(`gossipedHashesRecv:${gossipedHashesRecv.size} gossipedHashesSent:${gossipedHashesSent.size}`)
-  p2pLogger.info(`Total  gossipSent:${gossipSent} gossipRecv:${gossipRecv}`)
-  p2pLogger.info(`Sent gossip by type: ${JSON.stringify(gossipTypeSent)}`)
-  p2pLogger.info(`Recv gossip by type: ${JSON.stringify(gossipTypeRecv)}`)
+//  warn(`gossipedHashesRecv:${gossipedHashesRecv.size} gossipedHashesSent:${gossipedHashesSent.size}`)
+  info(`Total  gossipSent:${gossipSent} gossipRecv:${gossipRecv}`)
+  info(`Sent gossip by type: ${JSON.stringify(gossipTypeSent)}`)
+  info(`Recv gossip by type: ${JSON.stringify(gossipTypeRecv)}`)
 }
+
+function info(...msg) {
+  const entry = `Comms: ${msg.join(' ')}`
+  p2pLogger.info(entry)
+}
+
+function warn(...msg) {
+  const entry = `Comms: ${msg.join(' ')}`
+  p2pLogger.warn(entry)
+}
+
+function error(...msg) {
+  const entry = `Comms: ${msg.join(' ')}`
+  p2pLogger.error(entry)
+}
+
+function fatal(...msg) {
+  const entry = `Comms: ${msg.join(' ')}`
+  p2pLogger.fatal(entry)
+}
+

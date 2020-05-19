@@ -24,6 +24,7 @@ let p2pLogger: Logger
 
 /** ROUTES */
 
+// [TODO] - since we don't have any routes, no need to create and register this emply function
 const gossipRoute: Types.GossipHandler = payload => {}
 
 const routes = {

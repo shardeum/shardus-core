@@ -85,12 +85,12 @@ const stopExternalRoute: Types.Route<Handler> = {
 const apoptosisInternalRoute: Route<InternalHandler<SignedApoptosisProposal>> = {
   name: internalRouteName,
   handler: (payload, response, sender) => {
-    log(`Got Apoptosis proposal: ${JSON.stringify(payload)}`)
+    info(`Got Apoptosis proposal: ${JSON.stringify(payload)}`)
     let err = ''
     err = validateTypes(payload, {when:'n',id:'s',sign:'o'})
-    if (err){ log('bad input '+err); return }
+    if (err){ warn('bad input '+err); return }
     err = validateTypes(payload.sign, {owner:'s',sig:'s'})
-    if (err){ log('bad input sign '+err); return }
+    if (err){ warn('bad input sign '+err); return }
 // The when must be set to current cycle +-1 because it is being
 //    received from the originating node
     if (!(payload as LooseObject).when){ response({s:'fail',r:1}); return }
@@ -102,7 +102,6 @@ const apoptosisInternalRoute: Route<InternalHandler<SignedApoptosisProposal>> = 
 //  if (addProposal(payload)) Comms.sendGossip(gossipRouteName, payload)
 //  Omar - we must always accept the original apoptosis message regardless of quarter and save it to gossip next cycle
 //    but if we are in Q1 gossip it, otherwise save for Q1 of next cycle
-      log(`sender is not apop node: sender:${sender} apop:${payload.id}`)
       if (addProposal(payload)){
         if (currentQuarter === 1){  // if it is Q1 we can try to gossip the message now instead of waiting for Q1 of next cycle
           Comms.sendGossip(gossipRouteName, payload)
@@ -111,11 +110,11 @@ const apoptosisInternalRoute: Route<InternalHandler<SignedApoptosisProposal>> = 
         return
       }
       else{
-        log(`addProposal failed for payload: ${JSON.stringify(payload)}`)
+        warn(`addProposal failed for payload: ${JSON.stringify(payload)}`)
       }
     } 
     else{
-      log(`sender is not apop node: sender:${sender} apop:${payload.id}`)
+      warn(`sender is not apop node: sender:${sender} apop:${payload.id}`)
       response({s:'fail',r:3})
     }
   }
@@ -123,12 +122,12 @@ const apoptosisInternalRoute: Route<InternalHandler<SignedApoptosisProposal>> = 
 
 const apoptosisGossipRoute: GossipHandler<SignedApoptosisProposal> = 
    (payload, sender, tracker) => {
-  log(`Got Apoptosis gossip: ${JSON.stringify(payload)}`)
+  info(`Got Apoptosis gossip: ${JSON.stringify(payload)}`)
   let err = ''
   err = validateTypes(payload, {when:'n',id:'s',sign:'o'})
-  if (err){ log('bad input '+err); return }
+  if (err){ warn('apoptosisGossipRoute bad payload: '+err); return }
   err = validateTypes(payload.sign, {owner:'s',sig:'s'})
-  if (err){ log('bad input sign '+err); return }
+  if (err){ warn('apoptosisGossipRoute bad payload.sign: '+err); return }
   if ([1,2].includes(currentQuarter)){  
     if (addProposal(payload)) {
 //    p2p.sendGossipIn(gossipRouteName, payload, tracker, sender)
@@ -210,7 +209,12 @@ export function updateRecord(
 }
 
 export function parseRecord(record: Record): Change {
-   return {
+  if (record.apoptosized.includes(Self.id)) {
+    // This could happen if our Internet connection was bad.
+    warn(`We got marked for apoptosis even though we didn't ask for it. Being nice and leaving.`)
+    Self.emitter.emit('apoptosized')
+  }
+  return {
     added: [],
     removed: record.apoptosized,
     updated: []
@@ -234,7 +238,7 @@ export function sendRequests() {
 // [TODO] - We don't need the caller to pass us the list of nodes
 //          remove this after changing references
 export async function apoptosizeSelf() {
-  log(`In apoptosize`)
+  warn(`In apoptosizeSelf`)
   // [TODO] - maybe we should shuffle this array
   const activeNodes = activeByIdOrder  
   const proposal = createProposal()
@@ -257,27 +261,22 @@ export async function apoptosizeSelf() {
   }
   // If we don't have any active nodes; means we are still joining
   if (activeNodes.length > 0){
-    log(`In apoptosizeSelf calling robustQuery proposal`)
+    info(`In apoptosizeSelf calling robustQuery proposal`)
     let redunancy = 1
     if (activeNodes.length > 5){ redunancy = 2 }
     if (activeNodes.length > 10){ redunancy = 3 }
-    log(`Redunancy is ${redunancy}`)
+    info(`Redunancy is ${redunancy}`)
     await robustQuery(activeNodes, qF, eF, redunancy, true)
-    log(`Sent apoptosize-self proposal: ${JSON.stringify(proposal)}`)
+    info(`Sent apoptosize-self proposal: ${JSON.stringify(proposal)}`)
   }
 // Omar - added the following line. Maybe we should emit an event when we apoptosize so other modules and app can clean up
   Self.emitter.emit('apoptosized')
 // Omar - we should not add any proposal since we are exiting; we already sent our proposal to some nodes
 //  addProposal(proposal)
-  log(`I have been apoptosized, waiting 1 sec ...`)
+  info(`I have been apoptosized, waiting 1 sec ...`)
   await sleep(1000)
-  log(`I have been apoptosized, exiting with code 1...`)
+  info(`I have been apoptosized, exiting with code 1...`)
   process.exit(1)
-}
-
-function log(msg: string, level = 'info') {
-//  p2p.mainLogger[level]('P2PApoptosis: ' + msg)
-  p2pLogger[level]('P2PApoptosis: ' + msg)
 }
 
 function createProposal(): SignedApoptosisProposal {
@@ -297,7 +296,7 @@ function addProposal(proposal: SignedApoptosisProposal): boolean {
   const id = proposal.id
   if (proposals[id]) return false
   proposals[id] = proposal
-  log(`Marked ${proposal.id} for apoptosis`)
+  info(`Marked ${proposal.id} for apoptosis`)
   return true
 }
 
@@ -320,6 +319,21 @@ function validateProposal(payload: unknown): boolean {
   if (!valid) return false
 
   return true
+}
+
+function info(...msg) {
+  const entry = `Apoptosis: ${msg.join(' ')}`
+  p2pLogger.info(entry)
+}
+
+function warn(...msg) {
+  const entry = `Apoptosis: ${msg.join(' ')}`
+  p2pLogger.warn(entry)
+}
+
+function error(...msg) {
+  const entry = `Apoptosis: ${msg.join(' ')}`
+  p2pLogger.error(entry)
 }
 
 

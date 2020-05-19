@@ -38,6 +38,7 @@ export type TxHash = string
 export type SignedSetGlobalTx = SetGlobalTx & SignedObject
 
 /** ROUTES */
+// [TODO] - need to add validattion of types to the routes
 
 const makeReceiptRoute: Route<InternalHandler<
   SignedSetGlobalTx,

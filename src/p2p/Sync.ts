@@ -9,7 +9,7 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { Route } from './Types'
 import { robustQuery, sequentialQuery } from './Utils'
-import { reversed } from '../utils'
+import { reversed, validateTypes } from '../utils'
 import { apoptosizeSelf } from './Apoptosis'
 
 /** TYPES */
@@ -39,6 +39,18 @@ const cyclesRoute: Route<Handler> = {
   method: 'POST',
   name: 'sync-cycles',
   handler: (req, res) => {
+    let err = validateTypes(req, {body:'o'})
+    if (err){
+      warn('sync-cycles bad req '+err)
+      res.json([])
+      return
+    }
+    err = validateTypes(req.body, {start:'n?',end:'n?'})
+    if (err){
+      warn('sync-cycles bad req.body '+err)
+      res.json([])
+      return
+    }
     const start = req.body.start | 0
     const end = req.body.end | 0
     // const cycles = p2p.state.getCycles(start, end)
@@ -162,12 +174,18 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
   while (CycleChain.newest.counter < newestCycle.counter) {
     const nextCycles = await getCycles(
       activeNodes,
-      CycleChain.newest.counter,
+      CycleChain.newest.counter,  // [TODO] maybe we should +1 so that we don't get the record we already have
       newestCycle.counter
     )
     for (const nextCycle of nextCycles) {
-      CycleChain.validate(CycleChain.newest, newestCycle)
-      await digestCycle(nextCycle)
+//      CycleChain.validate(CycleChain.newest, newestCycle)
+      if (CycleChain.validate(CycleChain.newest, nextCycle))
+        await digestCycle(nextCycle)
+      else
+        error(`syncNewCycles next record does not fit with prev record.\nnext: ${JSON.stringify(CycleChain.newest)}\nprev: ${JSON.stringify(newestCycle)}`)
+        // [TODO] If we ever hit this, we should return from here after setting 
+        //        a timeout to run syncNewCycles function again. Maybe also through away
+        //        the most recent record we have in case it was bad.
     }
     newestCycle = await getNewestCycle(activeNodes)
   }
@@ -237,6 +255,8 @@ async function getNewestCycle(
   const newestCycle = response.newestCycle as CycleCreator.CycleRecord
   return newestCycle
 }
+
+// This tries to get the cycles with counter from start to end inclusively.
 async function getCycles(
   activeNodes: SyncNode[],
   start: number,

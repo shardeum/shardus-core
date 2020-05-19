@@ -635,14 +635,18 @@ Returns a string with the first error encountered or and empty string ''.
 Errors are: "[name] is required" or "[name] must be, [type]"
 */
 export function validateTypes(inp, def){
+  if (inp === undefined) return 'input is undefined'
+  if (inp === null) return 'input is null'
+  if (typeof(inp) !== 'object') return 'input must be object, not '+typeof(inp)
   const map = {string:'s',number:'n',boolean:'b',bigint:'B',array:'a',object:'o'}
   const imap = {s:'string',n:'number',b:'boolean',B:'bigint',a:'array',o:'object'}
   const fields = Object.keys(def)
   for(let name of fields){
     const types = def[name]
     const opt = types.substr(-1,1) === '?' ? 1 : 0
-    if (inp[name] === undefined && !opt) return ''+name+' is required'
-    else{
+    if (inp[name] === undefined && !opt) return name+' is required'
+    if (inp[name] !== undefined){
+      if (inp[name] === null && !opt) return name+' cannot be null'
       let found = 0
       let be = ''
       for(let t=0; t<types.length-opt; t++){
@@ -652,7 +656,7 @@ export function validateTypes(inp, def){
         if (it === is){ found = 1; break}
         else be += ', '+imap[is]
       }
-      if (!found) return ''+name+' must be'+be
+      if (!found) return name+' must be'+be
     }
   }
   return ''

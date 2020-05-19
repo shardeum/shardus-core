@@ -26,6 +26,7 @@ export interface JoinRequest {
   cycleMarker: CycleCreator.CycleMarker
   proofOfWork: string
   selectionNum: string
+  sign: Sign
 }
 
 export interface Txs {
@@ -61,7 +62,6 @@ const joinRoute: Types.Route<Handler> = {
   method: 'POST',
   name: 'join',
   handler: (req, res) => {
-    // [TODO] Validate joinReq
 
     // Dont accept join requests if you're not active
     if (Self.isActive === false) {
@@ -84,12 +84,13 @@ const joinRoute: Types.Route<Handler> = {
       return
     }
 
+    //  Validate of joinReq is done in addJoinRequest
     const joinRequest = req.body
     if (addJoinRequest(joinRequest)) {
       Comms.sendGossip('gossip-join', joinRequest)
     }
     res.end()
-  },
+  }
 }
 
 const joinedRoute: Types.Route<Handler> = {
@@ -97,6 +98,16 @@ const joinedRoute: Types.Route<Handler> = {
   name: 'joined/:publicKey',
   handler: (req, res) => {
     // Respond with id if node's join request was accepted, otherwise undefined
+    let err = utils.validateTypes(req,{params:'o'})
+    if (err){
+      warn('joined/:publicKey bad req '+err)
+      res.json()
+    }
+    err = utils.validateTypes(req.params,{publicKey:'s'})
+    if (err){
+      warn('joined/:publicKey bad req.params '+err)
+      res.json()
+    }
     const publicKey = req.params.publicKey
     // [TODO] Validate input
     const node = NodeList.byPubKey.get(publicKey)
@@ -113,6 +124,7 @@ const gossipJoinRoute: Types.GossipHandler<JoinRequest, NodeList.Node['id']> = (
   // Do not forward gossip after quarter 2
   if (CycleCreator.currentQuarter >= 3) return
 
+    //  Validate of payload is done in addJoinRequest
   if (addJoinRequest(payload)) Comms.sendGossip('gossip-join', payload)
 }
 
@@ -245,12 +257,32 @@ export async function createJoinRequest(
 }
 
 export function addJoinRequest(joinRequest: JoinRequest) {
+  //  Validate joinReq
+  let err = utils.validateTypes(joinRequest,{cycleMarker:'s',nodeInfo:'o',sign:'o'})
+  if (err){
+    warn('join bad joinRequest '+err)
+    return false
+  }
+  err = utils.validateTypes(joinRequest.nodeInfo,{activeTimestamp:'n',address:'s',
+    externalIp:'s',externalPort:'n',internalIp:'s',internalPort:'n',
+    joinRequestTimestamp:'n',publicKey:'s'
+  })
+  if (err){
+    warn('join bad joinRequest.nodeInfo '+err)
+    return false
+  }
+  err = utils.validateTypes(joinRequest.sign,{owner:'s',sig:'s'})
+  if (err){
+    warn('join bad joinRequest.sign '+err)
+    return false
+  }
+
   const node = joinRequest.nodeInfo
   info(`Got join request for ${node.externalPort}`)
 
   // Check if this node has already been seen this cycle
   if (seen.has(node.publicKey)) {
-    warn('Node has already been seen this cycle. Unable to add join request.')
+    info('Node has already been seen this cycle. Unable to add join request.')
     return false
   }
 
@@ -260,7 +292,7 @@ export function addJoinRequest(joinRequest: JoinRequest) {
   // Return if we already know about this node
   const ipPort = NodeList.ipPort(node.internalIp, node.internalPort)
   if (NodeList.byIpPort.has(ipPort)) {
-    warn('Cannot add join request for this node, already a known node.')
+    info('Cannot add join request for this node, already a known node.')
     return false
   }
 
@@ -281,7 +313,7 @@ export function addJoinRequest(joinRequest: JoinRequest) {
     last &&
     !crypto.isGreaterHash(joinRequest.selectionNum, last.selectionNum)
   ) {
-    warn('Join request not better than lowest, not added.')
+//    info('Join request not better than lowest, not added.')
     return false
   }
 
@@ -290,6 +322,12 @@ export function addJoinRequest(joinRequest: JoinRequest) {
   // ----- if hook doesn't exist, then we go with default order based on selection number
   // ----- hook signature = (currentList, newJoinRequest, numDesired) returns [newOrder, added]
   // ----- should create preconfigured hooks for adding POW, allowing join based on netadmin sig, etc.
+
+  // Check the signature as late as possible since it is expensive
+  if (! crypto.verify(joinRequest, joinRequest.nodeInfo.publicKey)){
+    warn('join bad sign '+JSON.stringify(joinRequest))
+    return false
+  }
 
   // Insert sorted into best list if we made it this far
   utils.insertSorted(requests, joinRequest, (a, b) =>
@@ -307,7 +345,7 @@ export function addJoinRequest(joinRequest: JoinRequest) {
   if (requests.length > toAccept) {
     const over = requests.length - toAccept
     requests.splice(-over)
-    warn(`Over maxJoinedPerCycle; removed ${over} requests from join requests`)
+//    info(`Over maxJoinedPerCycle; removed ${over} requests from join requests`)
   }
 
   return true
