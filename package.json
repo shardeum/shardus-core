@@ -12,8 +12,9 @@
     "dist": "./dist"
   },
   "scripts": {
-    "build": "node scripts/build.js",
-    "update-dist": "node scripts/update-dist.js",
+    "build-dist": "node scripts/build-dist.js",
+    "update-dist": "node scripts/update-dist.js master",
+    "update-dist-arm": "node scripts/update-dist.js arm",
     "check": "gts check",
     "clean": "gts clean",
     "compile": "tsc -p .",

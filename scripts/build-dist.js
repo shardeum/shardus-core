@@ -1,5 +1,14 @@
 const fs = require('fs')
 const path = require('path')
+const execa = require('execa')
+
+/** Compile src into dist/shardus.jsc */
+
+execa.commandSync('webpack', { stdio: [0, 1, 2] })
+
+/** Copy supporting files into dist/ (package.json, configs, etc.) */
+
+console.log('Copying supporting files (package.json, configs/, etc.) into dist/...')
 
 const rootDir = path.resolve(__dirname, '../build')
 const distDir = path.resolve(rootDir, '../', process.env.npm_package_config_dist)
@@ -34,6 +43,8 @@ fs.copyFileSync(path.join(__dirname, '../', 'scripts/build-index.js'), path.join
 fs.mkdirSync(path.join(distDir, 'src'), { recursive: true })
 fs.mkdirSync(path.join(distDir, 'src/shardus'), { recursive: true })
 fs.copyFileSync(path.join(rootDir, 'src/shardus/shardus-types.d.ts'), path.join(distDir, 'src/shardus/shardus-types.d.ts'))
+
+console.log('Done')
 
 // Modified from https://stackoverflow.com/a/52338335
 function copyFolderSync(from, to) {
