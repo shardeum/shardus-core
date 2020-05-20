@@ -7478,17 +7478,23 @@ class StateManager extends EventEmitter {
     let globalACC = 0
     let nonGlobal = 0
     let storedNonGlobal = 0
+    let storedGlobal = 0
     //filter out stuff.
     if(isGlobalModifyingTX === false){
       for (let accountKey of allKeys) {
+        let {homePartition} = ShardFunctions.addressToPartition(lastCycleShardValues.shardGlobals, accountKey)
+        let partitionID = homePartition
+        let weStoreThisParition = ShardFunctions.testInRange(partitionID, lastCycleShardValues.nodeShardData.storedPartitions)
+
         if(this.isGlobalAccount(accountKey)){
           globalACC++
+
+          if(weStoreThisParition === true){
+            storedGlobal++
+          }
         } else{
           nonGlobal++
-          let {homePartition} = ShardFunctions.addressToPartition(lastCycleShardValues.shardGlobals, accountKey)
-          let partitionID = homePartition
-    
-          let weStoreThisParition = ShardFunctions.testInRange(partitionID, this.currentCycleShardData.nodeShardData.storedPartitions)
+
           if(weStoreThisParition === true){
             storedNonGlobal++
           }
@@ -7496,12 +7502,12 @@ class StateManager extends EventEmitter {
       }
     }
 
-    if(storedNonGlobal === 0)
+    if(storedNonGlobal === 0 && storedGlobal === 0)
     {
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle: nothing to save globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle: nothing to save globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
       return
     }
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle: globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle: globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal}  tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
 
     for (let accountKey of allKeys) {
       /** @type {NodeShardData} */
@@ -7513,7 +7519,7 @@ class StateManager extends EventEmitter {
       let {homePartition} = ShardFunctions.addressToPartition(lastCycleShardValues.shardGlobals, accountKey)
       let partitionID = homePartition
 
-      let weStoreThisParition = ShardFunctions.testInRange(partitionID, this.currentCycleShardData.nodeShardData.storedPartitions)
+      let weStoreThisParition = ShardFunctions.testInRange(partitionID, lastCycleShardValues.nodeShardData.storedPartitions)
       if(weStoreThisParition === false){
         if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle:  skip partition we dont save: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
 
