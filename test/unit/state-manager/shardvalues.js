@@ -166,9 +166,9 @@ if (useHardcodenodes) {
 if (hardcodeNodes2) {
   numNodes2 = hardcodeNodes2.length
 }
-let debugStartsWith = 'e029' // '8bc4' // '33d7' //'0692' // '23d5' // 'f211' //'147d' // '2054' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
+let debugStartsWith = '4a45' // '8bc4' // '33d7' //'0692' // '23d5' // 'f211' //'147d' // '2054' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
 let debugID = debugStartsWith.slice(0, 4) + '7'.repeat(64 - 4)
-let debugAccount = '60b1' + '3'.repeat(60) // 5c43 386e
+let debugAccount = '0000' + '3'.repeat(60) // 5c43 386e 60b1  60b1 c173
 let debugNode = null
 // 5c43xba41c account test.. need to expand it.
 
@@ -329,7 +329,8 @@ for (let i = 0; i < testIterations; i++) {
   if (debugAccount != null) {
     let homeNode = ShardFunctions.findHomeNode(shardGlobals, debugAccount, parititionShardDataMap)
     // let shardParition = parititionShardDataMap.get(5)
-
+    let {homePartition, addressNum} = ShardFunctions.addressToPartition(shardGlobals, debugAccount)
+    //ShardFunctions.
     let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
     let relationString = ShardFunctions.getNodeRelation(homeNode, debugID)
 

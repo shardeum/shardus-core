@@ -432,12 +432,12 @@ export async function sendGossipAll(
   const gossipPayload = { type, data: payload }
 
   const gossipHash = crypto.hash(gossipPayload)
-  if (gossipedHashesSent.has(gossipHash)) {
-    if (verboseLogs) {
-      p2pLogger.debug(`Gossip already sent: ${gossipHash.substring(0, 5)}`)
-    }
-    return
-  }
+  // if (gossipedHashesSent.has(gossipHash)) {
+  //   if (verboseLogs) {
+  //     p2pLogger.debug(`Gossip already sent: ${gossipHash.substring(0, 5)}`)
+  //   }
+  //   return
+  // }
   // nodes.sort((first, second) => first.id.localeCompare(second.id, 'en', { sensitivity: 'variant' }))
   nodes.sort(sortByID)
   const nodeIdxs = new Array(nodes.length).fill(0).map((curr, idx) => idx)
@@ -482,7 +482,7 @@ export async function sendGossipAll(
       'sendGossipIn: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
     )
   }
-  gossipedHashesSent.set(gossipHash, false)
+  //gossipedHashesSent.set(gossipHash, false)
   if (verboseLogs) {
     p2pLogger.debug(`End of sendGossipIn(${utils.stringifyReduce(payload)})`)
   }

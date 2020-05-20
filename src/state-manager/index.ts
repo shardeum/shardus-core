@@ -7477,6 +7477,7 @@ class StateManager extends EventEmitter {
 
     let globalACC = 0
     let nonGlobal = 0
+    let storedNonGlobal = 0
     //filter out stuff.
     if(isGlobalModifyingTX === false){
       for (let accountKey of allKeys) {
@@ -7484,11 +7485,23 @@ class StateManager extends EventEmitter {
           globalACC++
         } else{
           nonGlobal++
+          let {homePartition} = ShardFunctions.addressToPartition(lastCycleShardValues.shardGlobals, accountKey)
+          let partitionID = homePartition
+    
+          let weStoreThisParition = ShardFunctions.testInRange(partitionID, this.currentCycleShardData.nodeShardData.storedPartitions)
+          if(weStoreThisParition === true){
+            storedNonGlobal++
+          }
         }
       }
     }
 
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle: globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+    if(storedNonGlobal === 0)
+    {
+      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle: nothing to save globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+      return
+    }
+    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle: globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
 
     for (let accountKey of allKeys) {
       /** @type {NodeShardData} */
@@ -7496,14 +7509,18 @@ class StateManager extends EventEmitter {
       if(homeNode == null){
         throw new Error(`recordTXByCycle homeNode == null`)
       }
-      let partitionID = homeNode.homePartition
+      let homeNodepartitionID = homeNode.homePartition
+      let {homePartition} = ShardFunctions.addressToPartition(lastCycleShardValues.shardGlobals, accountKey)
+      let partitionID = homePartition
 
       let weStoreThisParition = ShardFunctions.testInRange(partitionID, this.currentCycleShardData.nodeShardData.storedPartitions)
       if(weStoreThisParition === false){
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle:  skip partition we dont save: P: ${partitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle:  skip partition we dont save: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
 
         continue
       }
+
+      //check if we are only storing this because it is a global account...
 
       let txList = this.getTXList(cycleNumber, partitionID) // todo sharding - done: pass partition ID
 
@@ -7513,7 +7530,7 @@ class StateManager extends EventEmitter {
 
       let key = 'p' + partitionID
       if (seenParitions[key] != null) {
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle: seenParitions[key] != null P: ${partitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle: seenParitions[key] != null P: ${partitionID}  homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
         // skip because this partition already has this TX!
         continue
       }
@@ -7561,7 +7578,7 @@ class StateManager extends EventEmitter {
       }
       // txList.txById[acceptedTx.id] = acceptedTx
       // TODO sharding perf.  need to add some periodic cleanup when we have more cycles than needed stored in this map!!!
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair recordTXByCycle: pushedData P: ${partitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} recordedState: ${recordedState}`)
+      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair recordTXByCycle: pushedData P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} recordedState: ${recordedState}`)
     }
   }
 
