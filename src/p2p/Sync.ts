@@ -82,7 +82,8 @@ export async function sync(activeNodes: ActiveNode[]) {
   info(`Getting newest cycle...`)
   const cycleToSyncTo = await getNewestCycle(activeNodes)
   info(`Syncing till cycle ${cycleToSyncTo.counter}...`)
-  const cyclesToGet = 10
+  const cyclesToGet = 2*Math.floor(Math.sqrt(cycleToSyncTo.active)) + 2
+  info(`Cycles to get is ${cyclesToGet}`)
 
   // Sync old cycles until your active nodes === network active nodes
   const squasher = new ChangeSquasher()
@@ -92,8 +93,8 @@ export async function sync(activeNodes: ActiveNode[]) {
 
   do {
     // Get prevCycles from the network
-    const start = CycleChain.oldest.counter - cyclesToGet
-    const end = CycleChain.oldest.counter
+    const end = CycleChain.oldest.counter -1
+    const start = end - cyclesToGet
     info(`Getting cycles ${start} - ${end}...`)
     const prevCycles = await getCycles(activeNodes, start, end)
     info(`Got cycles ${JSON.stringify(prevCycles.map(cycle => cycle.counter))}`)
@@ -140,11 +141,14 @@ export async function sync(activeNodes: ActiveNode[]) {
         cycleToSyncTo
       )}`
     )
+    if (squasher.final.added.length < totalNodeCount(cycleToSyncTo))
+      info('Short on nodes. Need to get more cycles. Cycle:'+cycleToSyncTo.counter)
+//    showNodeCount(cycleToSyncTo)
 
     // If you weren't able to prepend any of the prevCycles, start over
     if (prepended < 1) throw new Error('Unable to prepend any previous cycles')
   } while (
-    squasher.final.updated.length < activeNodeCount(cycleToSyncTo) &&
+    squasher.final.updated.length < activeNodeCount(cycleToSyncTo) ||
     squasher.final.added.length < totalNodeCount(cycleToSyncTo)
   )
 
@@ -171,6 +175,7 @@ type SyncNode = Partial<
 
 export async function syncNewCycles(activeNodes: SyncNode[]) {
   let newestCycle = await getNewestCycle(activeNodes)
+  warn(`myNewest=${CycleChain.newest.counter} netNewest=${newestCycle.counter}`)
   while (CycleChain.newest.counter < newestCycle.counter) {
     const nextCycles = await getCycles(
       activeNodes,
@@ -290,12 +295,25 @@ export function activeNodeCount(cycle: CycleCreator.CycleRecord) {
   )
 }
 
+export function showNodeCount(cycle: CycleCreator.CycleRecord){
+  warn(` syncing + joined + active - apop - rem - lost
+    ${cycle.syncing} +
+    ${cycle.joinedConsensors.length} +
+    ${cycle.active} +
+    ${cycle.apoptosized.length} -
+    ${cycle.removed.length} -
+    ${cycle.lost.length}
+    ${cycle.counter}
+  `)
+//    ${cycle.activated.length} -
+}
+
 export function totalNodeCount(cycle: CycleCreator.CycleRecord) {
   return (
     cycle.syncing +
     cycle.joinedConsensors.length +
     cycle.active +
-    cycle.activated.length -
+//    cycle.activated.length -      // don't count activated because it was already counted in syncing
     cycle.apoptosized.length -
     cycle.removed.length -
     cycle.lost.length

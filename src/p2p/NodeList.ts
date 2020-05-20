@@ -185,7 +185,7 @@ export function ipPort(ip: string, port: number) {
   return ip + ':' + port
 }
 
-function idTrim(id){ return id.substr(0,4) }
+function idTrim(id){ return id.substr(0,3) }
 
 export function getDebug() {
   let output = `

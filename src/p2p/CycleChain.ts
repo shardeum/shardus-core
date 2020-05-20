@@ -98,7 +98,8 @@ const idToPort: { [id: string]: number } = {}
 export function getDebug() {
   const chain = cycles.map(record => {
     const ctr = record.counter
-    const prev = record.previous.slice(0, 5)
+    const prev = record.previous.slice(0, 4)
+    const rhash = crypto.hash(record).slice(0, 4)
     const actv = record.active
     const exp = record.expired
     const joind = record.joinedConsensors.map(c => c.externalPort)
@@ -107,15 +108,16 @@ export function getDebug() {
       idToPort[id] = nodes.get(id).externalPort
       return idToPort[id]
     })
-    const rmvd = record.removed.map(id => idToPort[id])
-    const lost = record.lost.map(id => idToPort[id])
-    const refu = record.refuted.map(id => idToPort[id])
-    const apopd = record.apoptosized.map(id => idToPort[id])
+//    const rmvd = record.removed.map(id => idToPort[id])
+    const rmvd = record.removed.map(id => idToPort[id] ? idToPort[id] : 'x'+id.slice(0,3))
+    const lost = record.lost.map(id => idToPort[id] ? idToPort[id] : 'x'+id.slice(0,3))
+    const refu = record.refuted.map(id => idToPort[id] ? idToPort[id] : 'x'+id.slice(0,3))
+    const apopd = record.apoptosized.map(id => idToPort[id] ? idToPort[id] : 'x'+id.slice(0,3))
     const rfshd = record.refreshedConsensors.map(
       c => `${c.externalPort}:${c.counterRefreshed}`
     )
 
-    const str = `      ${ctr}:${prev}: { actv:${actv}, exp:${exp}, joind:[${joind.join()}], actvd:[${actvd.join()}], lost:[${lost.join()}] refu:[${refu.join()}] apop:[${apopd.join()}] rmvd:[${rmvd.join()}], rfshd:[${rfshd.join()}] }`
+    const str = `      ${ctr}:${prev}:${rhash} { actv:${actv}, exp:${exp}, joind:[${joind.join()}], actvd:[${actvd.join()}], lost:[${lost.join()}] refu:[${refu.join()}] apop:[${apopd.join()}] rmvd:[${rmvd.join()}], rfshd:[${rfshd.join()}] }`
 
     return str
   })

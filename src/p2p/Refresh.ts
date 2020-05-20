@@ -18,7 +18,7 @@ import { cycles, newest } from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import * as CycleParser from './CycleParser'
 import * as NodeList from './NodeList'
-import { activeNodeCount, totalNodeCount } from './Sync'
+import { activeNodeCount, totalNodeCount, showNodeCount } from './Sync'
 import * as Types from './Types'
 
 /** TYPES */
@@ -156,20 +156,28 @@ export function cyclesToKeep() {
    * Walk through the cycle chain backwards to calculate how many records we
    * need to build the current node list
    */
-  const squasher = new CycleParser.ChangeSquasher()
+//  const squasher = new CycleParser.ChangeSquasher()
   let count = 1
+  let seen = new Map()
   for (const record of reversed(cycles)) {
+/*
     squasher.addChange(CycleParser.parse(record))
     if (
-      squasher.final.updated.length < activeNodeCount(newest) &&
-      squasher.final.added.length < totalNodeCount(newest)
+      squasher.final.updated.length >= activeNodeCount(newest) &&
+      squasher.final.added.length >= totalNodeCount(newest)
     ) {
       break
     }
+*/
+    for (const n of record.refreshedConsensors) seen.set(n.publicKey, 1)
+    for (const n of record.joinedConsensors) seen.set(n.publicKey, 1)
+    if (seen.size >= totalNodeCount(newest)) break
     count++
   }
+  info('cycles to keep is '+count)
+//  showNodeCount(newest)
   // Keep a few more than that, just to be safe
-  return count * 2 + 5
+  return count + 3
 }
 
 function info(...msg) {

@@ -73,6 +73,7 @@ let p2pLogger: Logger
 let cycleLogger: Logger
 
 // don't forget to add new modules here
+//   need to keep the Lost module after the Apoptosis module
 export const submodules = [Archivers, Join, Active, Rotation, Refresh, Apoptosis, Lost]
 
 export let currentQuarter = -1 // means we have not started creating cycles
@@ -247,6 +248,7 @@ async function cycleCreator() {
 
   // Apply the previous records changes to the NodeList
   //if (madeCycle) {
+  if (!CycleChain.newest || CycleChain.newest.counter < prevRecord.counter)
     Sync.digestCycle(prevRecord)
   //}
 
@@ -608,11 +610,11 @@ async function fetchLatestRecord(): Promise<CycleRecord> {
     await Sync.syncNewCycles(NodeList.activeOthersByIdOrder)
     if (CycleChain.newest.counter <= oldCounter) {
       // We didn't actually sync
-      info('CycleCreator: fetchLatestRecord: synced record not newer')
+      warn('CycleCreator: fetchLatestRecord: synced record not newer')
       return null
     }
   } catch (err) {
-    info('CycleCreator: fetchLatestRecord: syncNewCycles failed:', err)
+    warn('CycleCreator: fetchLatestRecord: syncNewCycles failed:', err)
     return null
   }
   return CycleChain.newest
@@ -861,7 +863,7 @@ function compareCycleCertEndpoint(inp: CompareCertReq, sender) {
   if (!validateCertsRecordTypes(inp, 'compareCycleCertEndpoint')) { 
     return { certs: bestCycleCert.get(bestMarker), record:bestRecord }
   }
-  // submodules need to validate their part of the record
+  // [TODO] - submodules need to validate their part of the record
   const { certs: inpCerts, record: inpRecord } = inp
   if (!validateCerts(inpCerts, inpRecord, sender)) {
     return { certs: bestCycleCert.get(bestMarker), record:bestRecord }
@@ -884,7 +886,7 @@ async function compareCycleCert(myC: number, myQ: number, matches: number) {
     }
     const resp: CompareCertRes = await Comms.ask(node, 'compare-cert', req) // NEED to set the route string
     if (!validateCertsRecordTypes(resp, 'compareCycleCert')) return [null, node]
-    // submodules need to validate their part of the record
+    // [TODO] - submodules need to validate their part of the record
     if (!(resp && resp.certs && resp.certs[0].marker && resp.record)) {
       throw new Error('compareCycleCert: Invalid query response')
     }
@@ -962,7 +964,7 @@ function gossipHandlerCycleCert(
   sender: NodeList.Node['id']
 ) {
   if (!validateCertsRecordTypes(inp, 'gossipHandlerCycleCert')) return
-  // submodules need to validate their part of the record
+  // [TODO] - submodules need to validate their part of the record
   const { certs: inpCerts, record: inpRecord } = inp
   if (!validateCerts(inpCerts, inpRecord, sender)) {
     return

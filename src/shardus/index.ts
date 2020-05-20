@@ -174,6 +174,7 @@ class Shardus extends EventEmitter {
       this.mainLogger.info('Shutting down logs...')
       await this.logger.shutdown()
     })
+    // [TODO] - need to make an exitHandler for P2P; otherwise CycleCreator is continuing even after rest of the system cleans up and is ready to exit
 
     this.logger.playbackLogState('constructed', '', '')
   }
