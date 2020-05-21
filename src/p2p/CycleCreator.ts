@@ -118,7 +118,6 @@ const compareMarkerRoute: InternalHandler<
   CompareMarkerReq,
   CompareMarkerRes
 > = (payload, respond, sender) => {
-  // [TODO] validate input
   const req = payload
   respond(compareCycleMarkersEndpoint(req))
 }
@@ -128,7 +127,6 @@ const compareCertRoute: InternalHandler<
   CompareCertRes,
   NodeList.Node['id']
 > = (payload, respond, sender) => {
-  // [TODO] Validate payload
   respond(compareCycleCertEndpoint(payload, sender))
 }
 
@@ -779,6 +777,11 @@ function validateCertsRecordTypes(inp, caller){
     start:'n',syncing:'n'
   })
   if (err){ warn(caller+' bad input.record: '+err); return false}
+  //  submodules need to validate their part of the record
+  for (const submodule of submodules){ 
+    err = submodule.validateRecordTypes(inp.record)
+    if (err){ warn(caller+' bad input.record.* '+err); return false}
+  }
   return true
 }
 
@@ -863,7 +866,6 @@ function compareCycleCertEndpoint(inp: CompareCertReq, sender) {
   if (!validateCertsRecordTypes(inp, 'compareCycleCertEndpoint')) { 
     return { certs: bestCycleCert.get(bestMarker), record:bestRecord }
   }
-  // [TODO] - submodules need to validate their part of the record
   const { certs: inpCerts, record: inpRecord } = inp
   if (!validateCerts(inpCerts, inpRecord, sender)) {
     return { certs: bestCycleCert.get(bestMarker), record:bestRecord }

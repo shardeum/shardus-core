@@ -11,7 +11,7 @@
 
 import deepmerge from 'deepmerge'
 import { Logger } from 'log4js'
-import { propComparator, propComparator2, reversed } from '../utils'
+import { propComparator, propComparator2, reversed, validateTypes } from '../utils'
 import * as Archivers from './Archivers'
 import { logger } from './Context'
 import { cycles, newest } from './CycleChain'
@@ -50,6 +50,23 @@ export function reset() {}
 
 export function getTxs(): Txs {
   return {}
+}
+
+export function validateRecordTypes(rec: Record): string{
+  let err = validateTypes(rec,{refreshedArchivers:'a',refreshedConsensors:'a'})
+  if (err) return err
+  for(const item of rec.refreshedArchivers){
+    err = validateTypes(item,{publicKey:'s',ip:'s',port:'n',curvePk:'s'})
+    if (err) return 'in refreshedArchivers array '+err
+  }
+  for(const item of rec.refreshedConsensors){
+    err = validateTypes(item,{activeTimestamp:'n',address:'s',externalIp:'s',externalPort:'n',
+      internalIp:'s',internalPort:'n',joinRequestTimestamp:'n',publicKey:'s',
+      cycleJoined:'s',counterRefreshed:'n',id:'s',curvePublicKey:'s',status:'s'
+    })
+    if (err) return 'in joinedConsensors array '+err
+  }
+  return ''
 }
 
 export function dropInvalidTxs(txs: Txs): Txs {

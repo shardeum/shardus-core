@@ -63,7 +63,6 @@ export interface Txs {
 }
 
 export interface Record {
-  missing: string[],
   lost: string[],
   refuted: string[]
 }
@@ -191,6 +190,18 @@ export function getTxs(): Txs {
     lost: [...lostTxs],
     refuted: [...refutedTxs]
   }
+}
+
+export function validateRecordTypes(rec: Record): string{
+  let err = validateTypes(rec,{lost:'a',refuted:'a'})
+  if (err) return err
+  for(const item of rec.lost){
+    if (typeof(item) !== 'string') return 'items of lost array must be strings'
+  }
+  for(const item of rec.refuted){
+    if (typeof(item) !== 'string') return 'items of refuted array must be strings'
+  }
+  return ''
 }
 
 // This gets called during Q3 after getTxs

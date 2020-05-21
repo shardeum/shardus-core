@@ -111,6 +111,16 @@ export function getTxs(): Txs {
   }
 }
 
+export function validateRecordTypes(rec: Record): string{
+  let err = validateTypes(rec,{joinedArchivers:'a'})
+  if (err) return err
+  for(const item of rec.joinedArchivers){
+    err = validateTypes(item,{publicKey:'s',ip:'s',port:'n',curvePk:'s'})
+    if (err) return 'in joinedArchivers array '+err
+  }
+  return ''
+}
+
 export function updateRecord(
   txs: Txs,
   record: CycleCreator.CycleRecord,

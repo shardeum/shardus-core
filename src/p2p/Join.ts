@@ -12,6 +12,7 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import * as Types from './Types'
 import { robustQuery } from './Utils'
+import { validateTypes } from '../utils'
 
 /** TYPES */
 
@@ -193,6 +194,19 @@ export function getTxs(): Txs {
   return {
     join: requestsCopy,
   }
+}
+
+export function validateRecordTypes(rec: Record): string{
+  let err = validateTypes(rec,{syncing:'n',joinedConsensors:'a'})
+  if (err) return err
+  for(const item of rec.joinedConsensors){
+    err = validateTypes(item,{activeTimestamp:'n',address:'s',externalIp:'s',externalPort:'n',
+      internalIp:'s',internalPort:'n',joinRequestTimestamp:'n',publicKey:'s',
+      cycleJoined:'s',counterRefreshed:'n',id:'s'
+    })
+    if (err) return 'in joinedConsensors array '+err
+  }
+  return ''
 }
 
 export function dropInvalidTxs(txs: Txs): Txs {

@@ -184,6 +184,15 @@ export function getTxs(): Txs {
   }
 }
 
+export function validateRecordTypes(rec: Record): string{
+  let err = validateTypes(rec,{apoptosized:'a'})
+  if (err) return err
+  for(const item of rec.apoptosized){
+    if (typeof(item) !== 'string') return 'items of apoptosized array must be strings'
+  }
+  return ''
+}
+
 export function dropInvalidTxs(txs: Txs): Txs {
   const valid = txs.apoptosis.filter(request => validateProposal(request))
   return { apoptosis: valid }

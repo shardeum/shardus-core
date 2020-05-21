@@ -1,5 +1,5 @@
 import { Logger } from 'log4js'
-import { insertSorted } from '../utils'
+import { insertSorted, validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { config, logger } from './Context'
 import { CycleRecord } from './CycleCreator'
@@ -58,6 +58,15 @@ export function reset() {}
 
 export function getTxs(): Txs {
   return {}
+}
+
+export function validateRecordTypes(rec: Record): string{
+  let err = validateTypes(rec,{desired:'n',expired:'n',removed:'a'})
+  if (err) return err
+  for(const item of rec.removed){
+    if (typeof(item) !== 'string') return 'items of removed array must be strings'
+  }
+  return ''
 }
 
 export function dropInvalidTxs(txs: Txs): Txs {

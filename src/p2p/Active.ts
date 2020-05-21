@@ -101,6 +101,18 @@ export function getTxs(): Txs {
   }
 }
 
+export function validateRecordTypes(rec: Record): string{
+  let err = validateTypes(rec,{active:'n',activated:'a',activatedPublicKeys:'a'})
+  if (err) return err
+  for(const item of rec.activated){
+    if (typeof(item) !== 'string') return 'items of activated array must be strings'
+  }
+  for(const item of rec.activatedPublicKeys ){
+    if (typeof(item) !== 'string') return 'items of activatedPublicKeys array must be strings'
+  }
+  return ''
+}
+
 export function dropInvalidTxs(txs: Txs): Txs {
   const active = txs.active.filter(request => validateActiveRequest(request))
   return { active }
