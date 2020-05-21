@@ -26,7 +26,7 @@ const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
 const saveConsoleOutput = require('./saveConsoleOutput')
 
-const defaultConfigs = readJsonDir(path.join(__dirname, 'config')) as {
+const defaultConfigs = readJsonDir(path.join(__dirname, '../config')) as {
   server: ShardusTypes.ShardusConfiguration
   logs: ShardusTypes.LogsConfiguration
   storage: ShardusTypes.StorageConfiguration
