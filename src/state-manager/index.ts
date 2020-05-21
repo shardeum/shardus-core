@@ -3592,14 +3592,18 @@ class StateManager extends EventEmitter {
         ShardFunctions.computeExtendedNodePartitionData(this.currentCycleShardData.shardGlobals, this.currentCycleShardData.nodeShardDataMap, this.currentCycleShardData.parititionShardDataMap, homeNode, this.currentCycleShardData.activeNodes)
       }
 
+      //may need to go back and sync this logic with how we decide what partition to save a record in.
+
       // If this is not a global TX then skip tracking of nodes for global accounts used as a reference.
       if(queueEntry.globalModification === false) {
         if(this.isGlobalAccount(key) === true){
-          hasNonGlobalKeys = true;
           if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `queueEntryGetTransactionGroup skipping: ${utils.makeShortHash(key)} tx: ${utils.makeShortHash(queueEntry.acceptedTx.id)}`)
           continue
-        } 
+        } else {
+          hasNonGlobalKeys = true;
+        }
       }
+
       for (let node of homeNode.nodeThatStoreOurParitionFull) { // not iterable!
         uniqueNodes[node.id] = node
       }
@@ -7465,6 +7469,7 @@ class StateManager extends EventEmitter {
     let { allKeys } = keysResponse
 
     let seenParitions:StringBoolObjectMap = {}
+    let partitionHasNonGlobal:StringBoolObjectMap = {}
     // for (let partitionID of lastCycleShardValues.ourConsensusPartitions) {
     if(lastCycleShardValues == null){
       throw new Error(`recordTXByCycle lastCycleShardValues == null`)
@@ -7485,6 +7490,7 @@ class StateManager extends EventEmitter {
         let {homePartition} = ShardFunctions.addressToPartition(lastCycleShardValues.shardGlobals, accountKey)
         let partitionID = homePartition
         let weStoreThisParition = ShardFunctions.testInRange(partitionID, lastCycleShardValues.nodeShardData.storedPartitions)
+        let key = 'p' + partitionID
 
         if(this.isGlobalAccount(accountKey)){
           globalACC++
@@ -7497,6 +7503,7 @@ class StateManager extends EventEmitter {
 
           if(weStoreThisParition === true){
             storedNonGlobal++
+            partitionHasNonGlobal[key] = true
           }
         }
       }
@@ -7518,6 +7525,12 @@ class StateManager extends EventEmitter {
       let homeNodepartitionID = homeNode.homePartition
       let {homePartition} = ShardFunctions.addressToPartition(lastCycleShardValues.shardGlobals, accountKey)
       let partitionID = homePartition
+      let key = 'p' + partitionID
+
+      if(this.isGlobalAccount(accountKey)){
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle:  skip partition. dont save due to global: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+        continue
+      }
 
       let weStoreThisParition = ShardFunctions.testInRange(partitionID, lastCycleShardValues.nodeShardData.storedPartitions)
       if(weStoreThisParition === false){
@@ -7526,6 +7539,11 @@ class StateManager extends EventEmitter {
         continue
       }
 
+      if(partitionHasNonGlobal[key] === false){
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle:  skip partition. we store it but only a global ref involved this time: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+
+        continue
+      }
       //check if we are only storing this because it is a global account...
 
       let txList = this.getTXList(cycleNumber, partitionID) // todo sharding - done: pass partition ID
@@ -7534,7 +7552,7 @@ class StateManager extends EventEmitter {
         this.mainLogger.error(`_repair trying to record transaction after we have already finalized our parition object for cycle ${cycle.counter} `)
       }
 
-      let key = 'p' + partitionID
+      
       if (seenParitions[key] != null) {
         if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle: seenParitions[key] != null P: ${partitionID}  homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
         // skip because this partition already has this TX!
