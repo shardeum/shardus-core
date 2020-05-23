@@ -6,6 +6,7 @@ import { apoptosizeSelf } from './Apoptosis'
 import * as Comms from './Comms'
 import { config, setConfig } from './Context'
 import * as CycleChain from './CycleChain'
+import * as CycleCreator from './CycleCreator'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import * as Utils from './Utils'
@@ -115,6 +116,10 @@ class P2P extends EventEmitter {
       return CycleChain.cycles
     }
     return CycleChain.cycles.slice(0 - amount)
+  }
+
+  shutdown(){
+    CycleCreator.shutdown()
   }
 }
 

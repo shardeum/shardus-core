@@ -297,10 +297,7 @@ export function sendRequests() {
 async function killSelf() {
   info(`In killSelf`)
   Self.emitter.emit('apoptosized')
-  info(`I have been killed, waiting 1 sec ...`)
-  await sleep(1000)
-  info(`I have been killed, exiting with code 1...`)
-  process.exit(1)
+  info(`I have been killed, will not restart.`)
 }
 
 async function killOther() {

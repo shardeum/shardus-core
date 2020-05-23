@@ -94,6 +94,8 @@ let bestMarker: CycleMarker
 let bestCycleCert: Map<CycleMarker, CycleCert[]>
 let bestCertScore: Map<CycleMarker, number>
 
+let timers = {}
+
 /** ROUTES */
 
 interface CompareMarkerReq {
@@ -680,14 +682,24 @@ export function schedule<T, U extends unknown[]>(
     return
   }
   const toWait = time - now
-  setTimeout(callback, toWait)
+  if (timers[callback.name]) clearTimeout(timers[callback.name])
+  timers[callback.name] = setTimeout(callback, toWait)
+}
+
+export function shutdown(){
+  warn('Cycle creator shutdown')
+  for(const timer of Object.keys(timers)){ 
+    warn(`clearing timer ${timer}`)
+    clearTimeout(timers[timer]) 
+  }
+  warn(`current cycle and quarter is: C${currentCycle} Q${currentQuarter}`)
+  currentCycle += 1; currentQuarter = 0  // to stop functions which check if we are in the same quarter
+  warn(`changed cycle and quarter to: C${currentCycle} Q${currentQuarter}`)
 }
 
 function cycleQuarterChanged(cycle: number, quarter: number) {
   return cycle !== currentCycle || quarter !== currentQuarter
 }
-
-// Following added by Omar - needs to be checked
 
 function scoreCert(cert: CycleCert): number {
   try {

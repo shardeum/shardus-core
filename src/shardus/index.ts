@@ -22,7 +22,8 @@ import * as utils from '../utils'
 import { readJsonDir } from '../utils'
 import Profiler from '../utils/profiler'
 import ShardusTypes = require('../shardus/shardus-types')
-const P2P = require('../p2p')
+// the following can be removed now since we are not using the old p2p code
+//const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
 const saveConsoleOutput = require('./saveConsoleOutput')
 
@@ -150,31 +151,45 @@ class Shardus extends EventEmitter {
     this.exitHandler.addSigListeners()
     this.exitHandler.registerSync('reporter', () => {
       if (this.reporter) {
+        this.mainLogger.info('Stopping reporter...')
         this.reporter.stopReporting()
       }
     })
+    this.exitHandler.registerAsync('application', async () => {
+      if (this.app && this.app.close) {
+        this.mainLogger.info('Shutting down the application...')
+        await this.app.close()  // this needs to be awaited since it is async
+      }
+    })
     this.exitHandler.registerSync('crypto', () => {
+      this.mainLogger.info('Stopping POW generators...')
       this.crypto.stopAllGenerators()
+    })
+    this.exitHandler.registerSync('cycleCreator', () => {
+    // [TODO] - need to make an exitHandler for P2P; otherwise CycleCreator is continuing even after rest of the system cleans up and is ready to exit
+      this.mainLogger.info('Shutting down p2p...')
+      this.p2p.shutdown()
     })
     this.exitHandler.registerAsync('network', async () => {
       this.mainLogger.info('Shutting down networking...')
-      await this.network.shutdown()
+      await this.network.shutdown()  // this is taking a long time
     })
     this.exitHandler.registerAsync('storage', async () => {
       this.mainLogger.info('Closing Database connections...')
       await this.storage.close()
     })
+    /* moved stopping the application to earlier
     this.exitHandler.registerAsync('application', async () => {
       if (this.app && this.app.close) {
         this.mainLogger.info('Shutting down the application...')
-        this.app.close()
+        await this.app.close()  // this needs to be awaited since it is async
       }
     })
+    */
     this.exitHandler.registerAsync('logger', async () => {
       this.mainLogger.info('Shutting down logs...')
       await this.logger.shutdown()
     })
-    // [TODO] - need to make an exitHandler for P2P; otherwise CycleCreator is continuing even after rest of the system cleans up and is ready to exit
 
     this.logger.playbackLogState('constructed', '', '')
   }
@@ -540,6 +555,10 @@ class Shardus extends EventEmitter {
       throw new Error(e)
     })
     Self.emitter.on('removed', async () => {
+// Omar - Why are we trying to call the functions in modules directly before exiting. 
+//        The modules have already registered shutdown functions with the exitHandler.
+//        We should let exitHandler handle the shutdown process.
+/*
       if (this.statistics) {
         this.statistics.stopSnapshots()
         this.statistics.initialize()
@@ -557,8 +576,18 @@ class Shardus extends EventEmitter {
 
       // Shutdown cleanly
       process.exit()
+*/
+      if (this.reporter) {
+        this.reporter.stopReporting()
+        await this.reporter.reportRemoved(Self.id)
+      }
+      this.exitHandler.exitCleanly()  // exits with status 0 so that PM2 can restart the process
     })
-    Self.emitter.on('apoptosized', async () => {
+    Self.emitter.on('apoptosized', async (restart) => {
+// Omar - Why are we trying to call the functions in modules directly before exiting. 
+//        The modules have already registered shutdown functions with the exitHandler.
+//        We should let exitHandler handle the shutdown process.
+/*
       this.fatalLogger.fatal('Shardus: caught apoptosized event; cleaning up')
       if (this.statistics) {
         this.statistics.stopSnapshots()
@@ -577,7 +606,15 @@ class Shardus extends EventEmitter {
       this.fatalLogger.fatal(
         'Shardus: caught apoptosized event; finished clean up'
       )
-      // Don't have to exit here, the Apoptosis module does it
+*/
+      if (this.reporter) {
+        this.reporter.stopReporting()
+        await this.reporter.reportRemoved(Self.id)
+      }
+      if (restart)
+        this.exitHandler.exitCleanly()  // exits with status 0 so that PM2 can restart the process
+      else
+        this.exitHandler.exitUncleanly()  // exits with status 0 so that PM2 can restart the process
     })
 
     Context.setShardusContext(this)

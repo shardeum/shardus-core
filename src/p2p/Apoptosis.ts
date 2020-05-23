@@ -79,6 +79,19 @@ const stopExternalRoute: Types.Route<Handler> = {
   },
 }
 
+const failExternalRoute: Types.Route<Handler> = {
+  method: 'GET',
+  name: 'fail',
+  handler: (_req, res) => {
+    if (allowStopRoute){
+      warn ('fail route invoked in Apoptosis; used to test unclean exit')
+      let x = undefined
+      console.log(x.a)
+//      throw Error('fail route invoked in Apoptosis; used to test unclean exit')
+    }
+  },
+}
+
 // This route is expected to return "pass" or "fail" so that
 //   the exiting node can know that some other nodes have 
 //   received the message and will send it to other nodes
@@ -137,7 +150,7 @@ const apoptosisGossipRoute: GossipHandler<SignedApoptosisProposal> =
 }
 
 const routes = {
-  external: [stopExternalRoute ],
+  external: [stopExternalRoute, failExternalRoute ],
   internal: [apoptosisInternalRoute ],
   gossip: {
 //    'gossip-join': gossipJoinRoute,
@@ -279,13 +292,10 @@ export async function apoptosizeSelf() {
     info(`Sent apoptosize-self proposal: ${JSON.stringify(proposal)}`)
   }
 // Omar - added the following line. Maybe we should emit an event when we apoptosize so other modules and app can clean up
-  Self.emitter.emit('apoptosized')
+  Self.emitter.emit('apoptosized') // we can pass true as a parameter if we want to be restarted
 // Omar - we should not add any proposal since we are exiting; we already sent our proposal to some nodes
 //  addProposal(proposal)
-  info(`I have been apoptosized, waiting 1 sec ...`)
-  await sleep(1000)
-  info(`I have been apoptosized, exiting with code 1...`)
-  process.exit(1)
+  warn('We have been apoptosized. Exiting with status 1. Will not be restarted.')
 }
 
 function createProposal(): SignedApoptosisProposal {

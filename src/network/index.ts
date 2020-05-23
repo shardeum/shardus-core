@@ -256,7 +256,8 @@ export class NetworkClass extends EventEmitter {
     try {
       const promises = []
       if (this.extServer) promises.push(closeServer(this.extServer))
-      if (this.sn) promises.push(this.sn.stopListening(this.intServer))
+// [TODO] - need to see why it is taking minutes for stopListening promises to return; for now Omar decided to comment this out
+//      if (this.sn) promises.push(this.sn.stopListening(this.intServer))
       if (natClient) promises.push(natClient.es6.destroy())
       await Promise.all(promises)
     } catch (e) {
