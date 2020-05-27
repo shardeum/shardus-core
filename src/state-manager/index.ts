@@ -7163,6 +7163,13 @@ class StateManager extends EventEmitter {
     this._registerListener(this.p2p.state, 'cycle_q1_start', async (lastCycle: Shardus.Cycle, time:number) => {  
       lastCycle = this.p2p.state.getLastCycle()
       if (lastCycle) {
+        let ourNode = this.p2p.state.getNode(this.p2p.id)
+
+        if(ourNode == null){
+          //dont attempt more calculations we may be shutting down
+          return
+        }
+
         // this.dumpAccountDebugData()
         this.updateShardValues(lastCycle.counter)
         this.dumpAccountDebugData() // better to print values after an update!
