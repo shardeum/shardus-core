@@ -712,6 +712,30 @@ class StateManager extends EventEmitter {
     return null
   }
 
+  // Check the entire range for a partition to see if any of it is covered by a sync tracker. 
+  getSyncTrackerForParition (partitionID: number, cycleShardData:CycleShardData ): SyncTracker | null {
+    if(cycleShardData == null){
+      return null
+    }
+    let partitionShardData:ShardInfo = cycleShardData.parititionShardDataMap.get(partitionID)
+
+    let addressLow = partitionShardData.homeRange.low
+    let addressHigh = partitionShardData.homeRange.high
+    // return the sync tracker.
+    for (let i = 0; i < this.syncTrackers.length; i++) {
+      let syncTracker = this.syncTrackers[i]
+      // if (syncTracker.isGlobalSyncTracker === true && syncTracker.globalAddressMap[address] === true) {
+      //   return syncTracker
+      // }
+      // need to see if address is in range. if so return the tracker.
+      if (syncTracker.range.low <= addressLow && addressHigh <= syncTracker.range.high) {
+        return syncTracker
+      }
+
+    }
+    return null
+  }
+
   async waitForShardCalcs()
   {
     while (this.currentCycleShardData == null) {
@@ -6998,10 +7022,18 @@ class StateManager extends EventEmitter {
     }
     // sign results as needed
     for (let i = 0; i < partitionResults.length; i++) {
+
+
       /** @type {PartitionResult} */
       let partitionResult = partitionResults[i]
       if (!partitionResult.sign) {
         partitionResult = this.crypto.sign(partitionResult)
+      }
+
+      //check if we are syncing that cycle if so don't send out info on it!
+      if(this.getSyncTrackerForParition(partitionResult.Partition_id, lastCycleShardValues)) {
+        if (this.verboseLogs ) this.mainLogger.debug( `broadcastPartitionResults skipped because parition is syncing ${partitionResult.Partition_id}`)
+        continue
       }
 
       /** @type {ShardInfo} */
