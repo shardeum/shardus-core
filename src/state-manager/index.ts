@@ -7048,10 +7048,10 @@ class StateManager extends EventEmitter {
       //   continue
       // }
 
-      if(lastCycleShardValues.partitionsToSkip.has(partitionResult.Partition_id) === true){
-        if (this.verboseLogs ) this.mainLogger.debug( `broadcastPartitionResults skipped because parition is syncing ${partitionResult.Partition_id}`)
-        continue
-      }
+      // if(lastCycleShardValues.partitionsToSkip.has(partitionResult.Partition_id) === true){
+      //   if (this.verboseLogs ) this.mainLogger.debug( `broadcastPartitionResults skipped because parition is syncing ${partitionResult.Partition_id}`)
+      //   continue
+      // }
 
       //if there is any tx that gets a slow down need to mark it.
 
