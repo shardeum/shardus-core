@@ -173,6 +173,7 @@ type ShardInfo = {
     edgeNodes: Shardus.Node[];
     c2NodeForOurNode: Shardus.Node[];
     outOfDefaultRangeNodes: Shardus.Node[];
+    patchedOnNodes: Shardus.Node[];
   };
   /**
   * A range of addresses

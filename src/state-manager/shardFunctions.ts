@@ -295,6 +295,8 @@ class ShardFunctions {
 
     nodeShardData.consensusStartPartition = homePartition
     nodeShardData.consensusEndPartition = homePartition
+    
+    nodeShardData.patchedOnNodes = []
 
     // push the data in to the correct homenode list for the home partition
     let partitionShard = parititionShardDataMap.get(homePartition)

@@ -12,6 +12,7 @@ type QueueEntry = {
     collectedData: any;
     originalData: any;
     homeNodes: {[accountID:string]:import('./shardFunctionTypes').NodeShardData};
+    patchedOnNodes: Map<string, import('./shardFunctionTypes').NodeShardData>; //{[accountID:string]:import('./shardFunctionTypes').NodeShardData};
     hasShardInfo: boolean;
     state: string;
     dataCollected: number;

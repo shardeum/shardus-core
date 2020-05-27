@@ -3199,6 +3199,7 @@ class StateManager extends EventEmitter {
           throw new Error(`updateHomeInformation homeNode == null ${txQueueEntry}`)
         }
 
+        // HOMENODEMATHS Based on home node.. should this be chaned to homepartition?
         let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
         let relationString = ShardFunctions.getNodeRelation(homeNode, this.currentCycleShardData.ourNode.id)
         // route_to_home_node
@@ -3245,7 +3246,7 @@ class StateManager extends EventEmitter {
     let txId = acceptedTx.receipt.txHash
 
     this.queueEntryCounter++
-    let txQueueEntry:QueueEntry = { acceptedTx: acceptedTx, txKeys: keysResponse, collectedData: {}, originalData: {}, homeNodes: {}, hasShardInfo: false, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [], logstate:'', requests:{}, globalModification:globalModification } // age comes from timestamp
+    let txQueueEntry:QueueEntry = { acceptedTx: acceptedTx, txKeys: keysResponse, collectedData: {}, originalData: {}, homeNodes: {}, patchedOnNodes: new Map(), hasShardInfo: false, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [], logstate:'', requests:{}, globalModification:globalModification } // age comes from timestamp
     // partition data would store stuff like our list of nodes that store this ts
     // collected data is remote data we have recieved back
     // //tx keys ... need a sorted list (deterministic) of partition.. closest to a number?
@@ -3607,10 +3608,43 @@ class StateManager extends EventEmitter {
       for (let node of homeNode.nodeThatStoreOurParitionFull) { // not iterable!
         uniqueNodes[node.id] = node
       }
+
+      let scratch1 = {}
+      for (let node of homeNode.nodeThatStoreOurParitionFull) { // not iterable!
+        scratch1[node.id] = true
+      }
       // make sure the home node is in there in case we hit and edge case
       uniqueNodes[homeNode.node.id] = homeNode.node
 
+      // HOMENODEMATHS need to patch in nodes that would cover this partition!
+      // TODO PERF make an optimized version of this in ShardFunctions that is smarter about which node range to check and saves off the calculation
+      // maybe this could go on the partitions.
+      let {homePartition} = ShardFunctions.addressToPartition(this.currentCycleShardData.shardGlobals, key)
+      if(homePartition != homeNode.homePartition){
+        //loop all nodes for now
+        for(let nodeID of this.currentCycleShardData.nodeShardDataMap.keys()){
+          let nodeShardData:NodeShardData = this.currentCycleShardData.nodeShardDataMap.get(nodeID)
+          let nodeStoresThisPartition = ShardFunctions.testInRange(homePartition, nodeShardData.storedPartitions)
+          if(nodeStoresThisPartition === true && uniqueNodes[nodeID] == null){
+            //setting this will cause it to end up in the transactionGroup
+            uniqueNodes[nodeID] = nodeShardData.node
+            queueEntry.patchedOnNodes.set(nodeID, nodeShardData)
 
+            
+          }
+
+          // build index for patched nodes based on the home node:
+          if(nodeStoresThisPartition === true){
+            if(scratch1[nodeID] == null ){
+              homeNode.patchedOnNodes.push(nodeShardData.node)
+              scratch1[nodeID] = true
+            }
+          }
+
+        }
+
+
+      }
     }
     queueEntry.ourNodeInvolved = true
     if (uniqueNodes[this.currentCycleShardData.ourNode.id] == null) {
@@ -3660,8 +3694,18 @@ class StateManager extends EventEmitter {
             hasKey = true
             break
           }
+          
         }
       }
+
+      // HOMENODEMATHS tellCorrespondingNodes patch the value of hasKey
+      // did we get patched in
+      if(queueEntry.patchedOnNodes.has(ourNodeData.node.id)){
+        hasKey = true
+      }
+
+      // for(let patchedNodeID of queueEntry.patchedOnNodes.values()){
+      // }
 
       let isGlobalKey = false
       //intercept that we have this data rather than requesting it.
@@ -3723,6 +3767,16 @@ class StateManager extends EventEmitter {
             let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.consensusNodeForOurNodeFull.length, ourLocalConsensusIndex + 1)
             let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.edgeNodes.length, ourLocalConsensusIndex + 1)
 
+            let patchIndicies = []
+            if(remoteHomeNode.patchedOnNodes.length > 0){
+              patchIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.patchedOnNodes.length, ourLocalConsensusIndex + 1)
+
+            }
+
+            
+            // HOMENODEMATHS need to work out sending data to our patched range.
+            // let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.edgeNodes.length, ourLocalConsensusIndex + 1)
+
             // for each remote node lets save it's id
             for (let index of indicies) {
               let node = remoteHomeNode.consensusNodeForOurNodeFull[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
@@ -3738,6 +3792,15 @@ class StateManager extends EventEmitter {
                 edgeNodeIds.push(node.id)
               }
             }
+
+            for (let index of patchIndicies) {
+              let node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+              if (node != null && node !== ourNodeData.node.id) {
+                nodesToSendTo[node.id] = node
+                //edgeNodeIds.push(node.id)
+              }
+            }
+
 
             correspondingAccNodes = Object.values(nodesToSendTo)
             let dataToSend = []
@@ -4214,6 +4277,7 @@ class StateManager extends EventEmitter {
     let ourNodeShardData = this.currentCycleShardData.nodeShardData
     let minP = ourNodeShardData.consensusStartPartition
     let maxP = ourNodeShardData.consensusEndPartition
+    // HOMENODEMATHS this seems good.  making sure our node covers this partition
     let { homePartition } = ShardFunctions.addressToPartition(this.currentCycleShardData.shardGlobals, address)
     accountIsRemote = (ShardFunctions.partitionInConsensusRange(homePartition, minP, maxP) === false)
 
@@ -4287,6 +4351,8 @@ class StateManager extends EventEmitter {
     this.logger.playbackLogNote('getAccountFailDump', ` `, `${utils.makeShortHash(address)} ${message} `)
   }
 
+
+  // HOMENODEMATHS is this used by any apps? it is not used by shardus
   async getRemoteAccount (address:string) {
     let wrappedAccount
 
@@ -4326,6 +4392,8 @@ class StateManager extends EventEmitter {
     if(homeNode == null){
       throw new Error(`getClosestNodes: no home node found`)
     }
+
+    // HOMENODEMATHS consider using partition of the raw hash instead of home node of hash
     let homeNodeIndex = homeNode.ourNodeIndex
     let idToExclude = ''
     let results = ShardFunctions.getNodesByProximity(cycleShardData.shardGlobals, cycleShardData.activeNodes, homeNodeIndex, idToExclude, count, true)
@@ -4352,33 +4420,13 @@ class StateManager extends EventEmitter {
     return nodeDistMap.slice(0, count).map(node => node.id)
   }
 
-  // /**
-  //  * isNodeInDistance
-  //  * @param {string} hash
-  //  * @param {string} nodeId
-  //  * @param {number} distance
-  //  * @returns {boolean}
-  //  */
-  // isNodeInDistance (hash, nodeId, distance) {
-  //   if (this.currentCycleShardData == null) {
-  //     throw new Error('isNodeInDistance: network not ready')
-  //   }
-  //   let cycleShardData = this.currentCycleShardData
-  //   let [homePartition, addressNum] = ShardFunctions.addressToPartition(cycleShardData.shardGlobals, nodeId)
-  //   let [homePartition2, addressNum2] = ShardFunctions.addressToPartition(cycleShardData.shardGlobals, hash)
-  //   let partitionDistance = Math.abs(homePartition2 - homePartition)
-  //   if (partitionDistance < distance) {
-  //     return true
-  //   }
-  //   return false
-  // }
-
   // TSConversion todo see if we need to log any of the new early exits.
   isNodeInDistance (shardGlobals: ShardGlobals, parititionShardDataMap: ParititionShardDataMap, hash:string, nodeId:string, distance:number) {
     let cycleShardData = this.currentCycleShardData
     if(cycleShardData == null){
       return false
     }
+    // HOMENODEMATHS need to eval useage here
     let someNode = ShardFunctions.findHomeNode(cycleShardData.shardGlobals, nodeId, cycleShardData.parititionShardDataMap)
     if(someNode == null){
       return false
@@ -7487,6 +7535,7 @@ class StateManager extends EventEmitter {
     //filter out stuff.
     if(isGlobalModifyingTX === false){
       for (let accountKey of allKeys) {
+        // HOMENODEMATHS recordTXByCycle: using partition to decide recording partition
         let {homePartition} = ShardFunctions.addressToPartition(lastCycleShardValues.shardGlobals, accountKey)
         let partitionID = homePartition
         let weStoreThisParition = ShardFunctions.testInRange(partitionID, lastCycleShardValues.nodeShardData.storedPartitions)
@@ -7522,6 +7571,7 @@ class StateManager extends EventEmitter {
       if(homeNode == null){
         throw new Error(`recordTXByCycle homeNode == null`)
       }
+      // HOMENODEMATHS recordTXByCycle: this code has moved to use homepartition instead of home node's partition
       let homeNodepartitionID = homeNode.homePartition
       let {homePartition} = ShardFunctions.addressToPartition(lastCycleShardValues.shardGlobals, accountKey)
       let partitionID = homePartition

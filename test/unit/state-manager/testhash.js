@@ -74,8 +74,6 @@ crypto('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
 // test1.testM.set('saddf', 33)
 // let serialized1 = utils.stringifyReduce(test1)
 // console.log( serialized1)
-
-
 // let test2 = JSON.parse(serialized1, utils.reviver)
 // return
 
