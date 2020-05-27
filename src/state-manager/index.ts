@@ -355,6 +355,7 @@ class StateManager extends EventEmitter {
     cycleShardData.activeNodes.sort(utils.sort_id_Asc) // function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
     cycleShardData.cycleNumber = cycleNumber
     
+    cycleShardData.partitionsToSkip = new Map()
 
     try {
       cycleShardData.ourNode = this.p2p.state.getNode(this.p2p.id) // ugh, I bet there is a nicer way to get our node
@@ -3346,6 +3347,17 @@ class StateManager extends EventEmitter {
           this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, ` qId: ${txQueueEntry.entryID}`)
         }
       }
+
+      //if we had any sync at all flag all non global partitions..
+      if(txQueueEntry.didSync){
+        for (let key of txQueueEntry.uniqueKeys) {
+          //if(this.globalAccountMap.has(key)){
+          let {homePartition, addressNum} = ShardFunctions.addressToPartition(this.currentCycleShardData.shardGlobals, key)
+          this.currentCycleShardData.partitionsToSkip.set(homePartition, true)
+          //}
+        }
+      }
+
 
       if (txQueueEntry.hasShardInfo) {
         if (sendGossip && txQueueEntry.globalModification === false) {
@@ -7031,10 +7043,17 @@ class StateManager extends EventEmitter {
       }
 
       //check if we are syncing that cycle if so don't send out info on it!
-      if(this.getSyncTrackerForParition(partitionResult.Partition_id, lastCycleShardValues)) {
+      // if(this.getSyncTrackerForParition(partitionResult.Partition_id, lastCycleShardValues)) {
+      //   if (this.verboseLogs ) this.mainLogger.debug( `broadcastPartitionResults skipped because parition is syncing ${partitionResult.Partition_id}`)
+      //   continue
+      // }
+
+      if(lastCycleShardValues.partitionsToSkip.has(partitionResult.Partition_id) === true){
         if (this.verboseLogs ) this.mainLogger.debug( `broadcastPartitionResults skipped because parition is syncing ${partitionResult.Partition_id}`)
         continue
       }
+
+      //if there is any tx that gets a slow down need to mark it.
 
       /** @type {ShardInfo} */
       let partitionShardData = lastCycleShardValues.parititionShardDataMap.get(partitionResult.Partition_id)

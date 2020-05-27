@@ -66,6 +66,8 @@ type CycleShardData = {
     syncingNeighborsTxGroup: import("../shardus/shardus-types").Node[];
     hasSyncingNeighbors: boolean;
 
+    partitionsToSkip: Map<number, boolean>
+
     timestamp:number // timestamp for cleanup purposes, may not match exactly the rules of which transactions will live in a partition for this cycle.
     /**
      * hashlist index of the voters for this vote
