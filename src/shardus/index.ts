@@ -27,7 +27,11 @@ import ShardusTypes = require('../shardus/shardus-types')
 const allZeroes64 = '0'.repeat(64)
 const saveConsoleOutput = require('./saveConsoleOutput')
 
-const defaultConfigs = readJsonDir(path.join(__dirname, '../config')) as {
+const defaultConfigs = {
+  server: require('../config/server.json'),
+  logs: require('../config/logs.json'),
+  storage: require('../config/storage.json')
+} as {
   server: ShardusTypes.ShardusConfiguration
   logs: ShardusTypes.LogsConfiguration
   storage: ShardusTypes.StorageConfiguration
