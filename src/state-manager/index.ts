@@ -3548,13 +3548,32 @@ class StateManager extends EventEmitter {
       if (queueEntry.collectedData[key] == null && queueEntry.requests[key] == null) {
         let homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
 
-        let randomIndex = this.getRandomInt(homeNodeShardData.consensusNodeForOurNodeFull.length - 1)
-        let node = homeNodeShardData.consensusNodeForOurNodeFull[randomIndex]
-
-        // make sure we didn't get or own node
-        while (node.id === this.currentCycleShardData.nodeShardData.node.id) {
+        // find a random node to ask that is not us
+        let node = null
+        let randomIndex
+        let foundValidNode = false
+        let maxTries = 1000
+        while (foundValidNode == false) {
+          maxTries--
           randomIndex = this.getRandomInt(homeNodeShardData.consensusNodeForOurNodeFull.length - 1)
           node = homeNodeShardData.consensusNodeForOurNodeFull[randomIndex]
+          if(node == null){
+            continue
+          }
+          if(node.id === this.currentCycleShardData.nodeShardData.node.id){
+            continue
+          }
+          if(maxTries < 0){
+            //FAILED
+            this.fatalLogger.fatal(`queueEntryRequestMissingData: unable to find node to ask after 1000 tries tx:${utils.makeShortHash(queueEntry.acceptedTx.id)} key: ${utils.makeShortHash(key)} ${utils.stringifyReduce(homeNodeShardData.consensusNodeForOurNodeFull.map((x)=> (x!=null)? x.id : 'null'))}`)
+            break
+          }
+          foundValidNode = true
+        }
+
+        if(node == null)
+        {
+          continue
         }
 
         // Todo: expand this to grab a consensus node from any of the involved consensus nodes.
