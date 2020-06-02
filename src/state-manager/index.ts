@@ -3050,7 +3050,9 @@ class StateManager extends EventEmitter {
       this.mainLogger.debug(`tryApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
       if(applyResponse){ // && savedSomething){
         // TSConversion do we really want to record this?
-        if (!repairing) this.tempRecordTXByCycle(txTs, acceptedTX, false, applyResponse, isGlobalModifyingTX, savedSomething)
+        // if (!repairing) this.tempRecordTXByCycle(txTs, acceptedTX, false, applyResponse, isGlobalModifyingTX, savedSomething)
+        // record no-op state table fail:
+
       } else {
         // this.fatalLogger.fatal('tryApplyTransaction failed: applyResponse == null')
       }
@@ -3557,16 +3559,16 @@ class StateManager extends EventEmitter {
           maxTries--
           randomIndex = this.getRandomInt(homeNodeShardData.consensusNodeForOurNodeFull.length - 1)
           node = homeNodeShardData.consensusNodeForOurNodeFull[randomIndex]
+          if(maxTries < 0){
+            //FAILED
+            this.fatalLogger.fatal(`queueEntryRequestMissingData: unable to find node to ask after 1000 tries tx:${utils.makeShortHash(queueEntry.acceptedTx.id)} key: ${utils.makeShortHash(key)} ${utils.stringifyReduce(homeNodeShardData.consensusNodeForOurNodeFull.map((x)=> (x!=null)? x.id : 'null'))}`)
+            break
+          }
           if(node == null){
             continue
           }
           if(node.id === this.currentCycleShardData.nodeShardData.node.id){
             continue
-          }
-          if(maxTries < 0){
-            //FAILED
-            this.fatalLogger.fatal(`queueEntryRequestMissingData: unable to find node to ask after 1000 tries tx:${utils.makeShortHash(queueEntry.acceptedTx.id)} key: ${utils.makeShortHash(key)} ${utils.stringifyReduce(homeNodeShardData.consensusNodeForOurNodeFull.map((x)=> (x!=null)? x.id : 'null'))}`)
-            break
           }
           foundValidNode = true
         }
