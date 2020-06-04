@@ -4806,7 +4806,12 @@ class StateManager extends EventEmitter {
    * @returns {PartitionResult}
    */
   generatePartitionResult (partitionObject:PartitionObject): PartitionResult {
+
+    let tempStates  = partitionObject.States
+    partitionObject.States = []
     let partitionHash = /** @type {string} */(this.crypto.hash(partitionObject))
+    partitionObject.States = tempStates //Temp fix. do not record states as part of hash (for now)
+
     /** @type {PartitionResult} */
     let partitionResult = { Partition_hash: partitionHash, Partition_id: partitionObject.Partition_id, Cycle_number: partitionObject.Cycle_number, hashSet: '' }
 
@@ -8723,6 +8728,7 @@ class StateManager extends EventEmitter {
         if (!dataHash) {
           dataHash = 'xx'
         }
+        dataHash = 'xx' // temp hack stop tracking data hashes for now.
         hashSet += txHash.slice(0, cHashSetTXStepSize)
         hashSet += dataHash.slice(0, cHashSetDataStepSize)
       }
