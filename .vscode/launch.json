@@ -40,6 +40,15 @@
         {
             "type": "node",
             "request": "launch",
+            "name": "shardValues2",
+            "program": "${workspaceFolder}\\test\\unit\\state-manager\\shardvalues2.js",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        },
+        {
+            "type": "node",
+            "request": "launch",
             "name": "hashset2",
             "program": "${workspaceFolder}\\test\\unit\\state-manager\\hashset2.js",
             "skipFiles": [
