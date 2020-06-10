@@ -241,18 +241,18 @@ class ShardFunctions2 {
     }
   }
 
-//   static computeNodePartitionDataMapExt (shardGlobals: ShardGlobals2, nodeShardDataMap: NodeShardDataMap2, nodesToGenerate: Shardus.Node[], parititionShardDataMap: ParititionShardDataMap2, activeNodes: Shardus.Node[]) {
-//     for (let node of nodesToGenerate) {
-//       let nodeShardData = nodeShardDataMap.get(node.id)
-//       if (!nodeShardData) {
-//         nodeShardData = ShardFunctions2.computeNodePartitionData(shardGlobals, node, nodeShardDataMap, parititionShardDataMap, activeNodes)
-//       }
-//       // ShardFunctions2.computeExtendedNodePartitionData(shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes)
-//       //
-//       // this wont be able to extend things though.
-//       ShardFunctions2.updateFullConsensusGroup(shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes)
-//     }
-//   }
+  static computeNodePartitionDataMapExt (shardGlobals: ShardGlobals2, nodeShardDataMap: NodeShardDataMap2, nodesToGenerate: Shardus.Node[], parititionShardDataMap: ParititionShardDataMap2, activeNodes: Shardus.Node[]) {
+    // for (let node of nodesToGenerate) {
+    //   let nodeShardData = nodeShardDataMap.get(node.id)
+    //   if (!nodeShardData) {
+    //     nodeShardData = ShardFunctions2.computeNodePartitionData(shardGlobals, node, nodeShardDataMap, parititionShardDataMap, activeNodes)
+    //   }
+    //   // ShardFunctions2.computeExtendedNodePartitionData(shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes)
+    //   //
+    //   // this wont be able to extend things though.
+    //   ShardFunctions2.updateFullConsensusGroup(shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes)
+    // }
+  }
 
   static computeNodePartitionData (shardGlobals : ShardGlobals2, node : Shardus.Node, nodeShardDataMap: NodeShardDataMap2, parititionShardDataMap: ParititionShardDataMap2, activeNodes: Shardus.Node[], extendedData?: boolean) : NodeShardData2 {
     let numPartitions = shardGlobals.numPartitions
@@ -261,11 +261,11 @@ class ShardFunctions2 {
 
     nodeShardData.ourNodeIndex = activeNodes.findIndex(function (_node) { return _node.id === node.id })
 
-    if (nodeShardData.ourNodeIndex !== -1) {
+    if (nodeShardData.ourNodeIndex === -1) {
         //todo node is syncing need to find closest index.
         for(let i=0; i<activeNodes.length; i++){
             nodeShardData.ourNodeIndex = i
-            if(activeNodes[i].id < node.id){
+            if(activeNodes[i].id >= node.id){
                 break
             }
         }
@@ -292,10 +292,11 @@ class ShardFunctions2 {
     }
 
     if(partitionShard == null){
-      throw new Error('computeNodePartitionData: cant find partitionShard for ')
+      throw new Error(`computeNodePartitionData: cant find partitionShard for index:${nodeShardData.ourNodeIndex} size:${parititionShardDataMap.size} activeNodes:${activeNodes.length}  `)
     }
 
     if (nodeShardData.ourNodeIndex !== -1) {
+      partitionShard.homeNodes = []
       partitionShard.homeNodes.push(nodeShardData)
     }
 

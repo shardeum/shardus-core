@@ -1,13 +1,10 @@
 import { ShardusConfiguration } from '../shardus/shardus-types'
 import Shardus = require('../shardus/shardus-types')
 
-//import ShardFunctions2 from './shardFunctions'
-//import './shardFunctions.ts'
-//const ShardFunctions2 = require('./shardFunctions.js')
+
 import {ShardGlobals2,ShardInfo2,StoredPartition2,NodeShardData2,AddressRange2, HomeNodeSummary2,ParititionShardDataMap2,NodeShardDataMap2,MergeResults2,BasicAddressRange2} from  './shardFunction2Types'
-//import ShardFunctionTypes = require( './shardFunctionTypes')
-//import ShardFunctions2 = require( './shardFunctions')
-import ShardFunctions2 from './shardFunctions.js'
+
+import ShardFunctions from './shardFunctions2.js'
 
 const EventEmitter = require('events')
 import * as utils from '../utils'
@@ -382,28 +379,28 @@ class StateManager extends EventEmitter {
 
 
     // save this per cycle?
-    cycleShardData.shardGlobals = ShardFunctions2.calculateShardGlobals(cycleShardData.activeNodes.length, this.config.sharding.nodesPerConsensusGroup as number)
+    cycleShardData.shardGlobals = ShardFunctions.calculateShardGlobals(cycleShardData.activeNodes.length, this.config.sharding.nodesPerConsensusGroup as number)
 
     // partition shard data
-    ShardFunctions2.computePartitionShardDataMap(cycleShardData.shardGlobals, cycleShardData.parititionShardDataMap, 0, cycleShardData.shardGlobals.numPartitions)
+    ShardFunctions.computePartitionShardDataMap(cycleShardData.shardGlobals, cycleShardData.parititionShardDataMap, 0, cycleShardData.shardGlobals.numPartitions)
 
     // generate limited data for all nodes data for all nodes.
-    ShardFunctions2.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, false)
+    ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, false)
 
     // get extended data for our node
-    cycleShardData.nodeShardData = ShardFunctions2.computeNodePartitionData(cycleShardData.shardGlobals, cycleShardData.ourNode, cycleShardData.nodeShardDataMap, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true)
+    cycleShardData.nodeShardData = ShardFunctions.computeNodePartitionData(cycleShardData.shardGlobals, cycleShardData.ourNode, cycleShardData.nodeShardDataMap, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true)
 
     // generate full data for nodes that store our home partition
-    ShardFunctions2.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.nodeShardData.nodeThatStoreOurParitionFull, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true)
+    ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.nodeShardData.nodeThatStoreOurParitionFull, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true)
 
     // cycleShardData.nodeShardData = cycleShardData.nodeShardDataMap.get(cycleShardData.ourNode.id)
 
     // generate lightweight data for all active nodes  (note that last parameter is false to specify the lightweight data)
     let fullDataForDebug = true // Set this to false for performance reasons!!! setting it to true saves us from having to recalculate stuff when we dump logs.
-    ShardFunctions2.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, fullDataForDebug)
+    ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, fullDataForDebug)
 
     // TODO if fullDataForDebug gets turned false we will update the guts of this calculation
-    ShardFunctions2.computeNodePartitionDataMapExt(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes)
+    ShardFunctions.computeNodePartitionDataMapExt(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes)
 
     this.currentCycleShardData = cycleShardData
     this.shardValuesByCycle.set(cycleNumber, cycleShardData)
@@ -462,10 +459,10 @@ class StateManager extends EventEmitter {
 
     // calculate our consensus partitions for use by data repair:
     // cycleShardData.ourConsensusPartitions = []
-    let partitions = ShardFunctions2.getConsenusPartitionList(cycleShardData.shardGlobals, cycleShardData.nodeShardData)
+    let partitions = ShardFunctions.getConsenusPartitionList(cycleShardData.shardGlobals, cycleShardData.nodeShardData)
     cycleShardData.ourConsensusPartitions = partitions
 
-    let partitions2 = ShardFunctions2.getStoredPartitionList(cycleShardData.shardGlobals, cycleShardData.nodeShardData)
+    let partitions2 = ShardFunctions.getStoredPartitionList(cycleShardData.shardGlobals, cycleShardData.nodeShardData)
     cycleShardData.ourStoredPartitions = partitions2
 
     // this will be a huge log.
@@ -505,20 +502,20 @@ class StateManager extends EventEmitter {
     }
     let cycle = this.currentCycleShardData.cycleNumber
     // oldShardData.shardGlobals, newSharddata.shardGlobals
-    let coverageChanges = ShardFunctions2.computeCoverageChanges(oldShardData.nodeShardData, newSharddata.nodeShardData)
+    let coverageChanges = ShardFunctions.computeCoverageChanges(oldShardData.nodeShardData, newSharddata.nodeShardData)
 
     for (let change of coverageChanges) {
       // log info about the change.
       // ${utils.stringifyReduce(change)}
-      this.logger.playbackLogNote('shrd_sync_change', `${oldShardData.cycleNumber}->${newSharddata.cycleNumber}`, ` ${ShardFunctions2.leadZeros8((change.start).toString(16))}->${ShardFunctions2.leadZeros8((change.end).toString(16))} `)
+      this.logger.playbackLogNote('shrd_sync_change', `${oldShardData.cycleNumber}->${newSharddata.cycleNumber}`, ` ${ShardFunctions.leadZeros8((change.start).toString(16))}->${ShardFunctions.leadZeros8((change.end).toString(16))} `)
 
       // create a range object from our coverage change.
  
       let range = { startAddr: 0, endAddr: 0, low: '', high: '' } as BasicAddressRange2 // this init is a somewhat wastefull way to allow the type to be happy.
       range.startAddr = change.start
       range.endAddr = change.end
-      range.low = ShardFunctions2.leadZeros8((range.startAddr).toString(16)) + '0'.repeat(56)
-      range.high = ShardFunctions2.leadZeros8((range.endAddr).toString(16)) + 'f'.repeat(56)
+      range.low = ShardFunctions.leadZeros8((range.startAddr).toString(16)) + '0'.repeat(56)
+      range.high = ShardFunctions.leadZeros8((range.endAddr).toString(16)) + 'f'.repeat(56)
       // create sync trackers
       this.createSyncTrackerByRange(range, cycle)
     }
@@ -702,7 +699,7 @@ class StateManager extends EventEmitter {
       let syncTracker = this.syncTrackers[i]
 
       // need to see if address is in range. if so return the tracker.
-      // if (ShardFunctions2.testAddressInRange(address, syncTracker.range)) {
+      // if (ShardFunctions.testAddressInRange(address, syncTracker.range)) {
       //if(syncTracker.isGlobalSyncTracker){
         if (syncTracker.range.low <= address && address <= syncTracker.range.high) {
           return syncTracker
@@ -804,11 +801,11 @@ class StateManager extends EventEmitter {
     // old tracker calculations.
     // if (nodeShardData.storedPartitions.partitionStart1 < homePartition && nodeShardData.storedPartitions.partitionEnd1 > homePartition) {
     //   // two ranges
-    //   let range1 = ShardFunctions2.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, nodeShardData.storedPartitions.partitionStart1, homePartition)
-    //   let range2 = ShardFunctions2.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, homePartition, nodeShardData.storedPartitions.partitionEnd1)
+    //   let range1 = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, nodeShardData.storedPartitions.partitionStart1, homePartition)
+    //   let range2 = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, homePartition, nodeShardData.storedPartitions.partitionEnd1)
 
     //   // stich the addresses together
-    //   let [centerAddr, centerAddrPlusOne] = ShardFunctions2.findCenterAddressPair(range1.high, range2.low)
+    //   let [centerAddr, centerAddrPlusOne] = ShardFunctions.findCenterAddressPair(range1.high, range2.low)
     //   range1.high = centerAddr
     //   range2.low = centerAddrPlusOne
     //   rangesToSync.push(range1)
@@ -822,10 +819,10 @@ class StateManager extends EventEmitter {
     // if (nodeShardData.storedPartitions.rangeIsSplit) {
     //   if (nodeShardData.storedPartitions.partitionStart2 < homePartition && nodeShardData.storedPartitions.partitionEnd2 > homePartition) {
     //   // two ranges
-    //     let range1 = ShardFunctions2.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, nodeShardData.storedPartitions.partitionStart2, homePartition)
-    //     let range2 = ShardFunctions2.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, homePartition, nodeShardData.storedPartitions.partitionEnd2)
+    //     let range1 = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, nodeShardData.storedPartitions.partitionStart2, homePartition)
+    //     let range2 = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, homePartition, nodeShardData.storedPartitions.partitionEnd2)
     //     // stich the addresses together
-    //     let [centerAddr, centerAddrPlusOne] = ShardFunctions2.findCenterAddressPair(range1.high, range2.low)
+    //     let [centerAddr, centerAddrPlusOne] = ShardFunctions.findCenterAddressPair(range1.high, range2.low)
     //     range1.high = centerAddr
     //     range2.low = centerAddrPlusOne
     //     rangesToSync.push(range1)
@@ -857,9 +854,9 @@ class StateManager extends EventEmitter {
       let i = 0
       while (currentEnd < end) {
         currentEnd = Math.min(currentStart + partitionsPerRange, end)
-        let range = ShardFunctions2.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, currentStart, currentEnd)
+        let range = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, currentStart, currentEnd)
 
-        let { address1, address2 } = ShardFunctions2.getNextAdjacentAddresses(range.high)
+        let { address1, address2 } = ShardFunctions.getNextAdjacentAddresses(range.high)
         range.high = address1
 
         if (nextLowAddress != null) {
@@ -880,9 +877,9 @@ class StateManager extends EventEmitter {
 
       while (currentEnd < end) {
         currentEnd = Math.min(currentStart + partitionsPerRange, end)
-        let range = ShardFunctions2.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, currentStart, currentEnd)
+        let range = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, currentStart, currentEnd)
 
-        let { address1, address2 } = ShardFunctions2.getNextAdjacentAddresses(range.high)
+        let { address1, address2 } = ShardFunctions.getNextAdjacentAddresses(range.high)
         range.high = address1
 
         if (nextLowAddress != null) {
@@ -909,9 +906,9 @@ class StateManager extends EventEmitter {
       let i = 0
       while (currentEnd < end) {
         currentEnd = Math.min(currentStart + partitionsPerRange, end)
-        let range = ShardFunctions2.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, currentStart, currentEnd)
+        let range = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, currentStart, currentEnd)
 
-        let { address1, address2 } = ShardFunctions2.getNextAdjacentAddresses(range.high)
+        let { address1, address2 } = ShardFunctions.getNextAdjacentAddresses(range.high)
         range.high = address1
 
         if (nextLowAddress != null) {
@@ -928,13 +925,13 @@ class StateManager extends EventEmitter {
     // if we don't have a range to sync yet manually sync the whole range.
     if (rangesToSync.length === 0) {
       console.log(`syncStateData ranges: pushing full range, no ranges found`)
-      let range = ShardFunctions2.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, 0, this.currentCycleShardData.shardGlobals.numPartitions - 1)
+      let range = ShardFunctions.partitionToAddressRange2(this.currentCycleShardData.shardGlobals, 0, this.currentCycleShardData.shardGlobals.numPartitions - 1)
       rangesToSync.push(range)
     }
     console.log(`syncStateData ranges: ${utils.stringifyReduce(rangesToSync)}}`)
 
     for (let range of rangesToSync) {
-      // let nodes = ShardFunctions2.getNodesThatCoverRange(this.currentCycleShardData.shardGlobals, range.low, range.high, this.currentCycleShardData.ourNode, this.currentCycleShardData.activeNodes)
+      // let nodes = ShardFunctions.getNodesThatCoverRange(this.currentCycleShardData.shardGlobals, range.low, range.high, this.currentCycleShardData.ourNode, this.currentCycleShardData.activeNodes)
       this.createSyncTrackerByRange(range, cycle)
     }
 
@@ -1300,13 +1297,13 @@ class StateManager extends EventEmitter {
         return result
       }
 
-      let centerNode = ShardFunctions2.getCenterHomeNode(this.currentCycleShardData.shardGlobals, this.currentCycleShardData.parititionShardDataMap, lowAddress, highAddress)
+      let centerNode = ShardFunctions.getCenterHomeNode(this.currentCycleShardData.shardGlobals, this.currentCycleShardData.parititionShardDataMap, lowAddress, highAddress)
       if(centerNode == null){
         this.mainLogger.debug(`centerNode not found`)
         return
       }
       
-      let nodes:Shardus.Node[] = ShardFunctions2.getNodesByProximity(this.currentCycleShardData.shardGlobals, this.currentCycleShardData.activeNodes, centerNode.ourNodeIndex, this.p2p.id, 40)
+      let nodes:Shardus.Node[] = ShardFunctions.getNodesByProximity(this.currentCycleShardData.shardGlobals, this.currentCycleShardData.activeNodes, centerNode.ourNodeIndex, this.p2p.id, 40)
 
       // let nodes = this.getActiveNodesInRange(lowAddress, highAddress) // this.p2p.state.getActiveNodes(this.p2p.id)
       if (nodes.length === 0) {
@@ -3219,7 +3216,7 @@ class StateManager extends EventEmitter {
         if(key == null){
           throw new Error(`updateHomeInformation key == null ${key}`)
         }
-        let homeNode = ShardFunctions2.findHomeNode(this.currentCycleShardData.shardGlobals, key, this.currentCycleShardData.parititionShardDataMap)
+        let homeNode = ShardFunctions.findHomeNode(this.currentCycleShardData.shardGlobals, key, this.currentCycleShardData.parititionShardDataMap)
         if(homeNode == null){
           throw new Error(`updateHomeInformation homeNode == null ${key}`)
         }
@@ -3230,8 +3227,8 @@ class StateManager extends EventEmitter {
         }
 
         // HOMENODEMATHS Based on home node.. should this be chaned to homepartition?
-        let summaryObject = ShardFunctions2.getHomeNodeSummaryObject(homeNode)
-        let relationString = ShardFunctions2.getNodeRelation(homeNode, this.currentCycleShardData.ourNode.id)
+        let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
+        let relationString = ShardFunctions.getNodeRelation(homeNode, this.currentCycleShardData.ourNode.id)
         // route_to_home_node
         this.logger.playbackLogNote('shrd_homeNodeSummary', `${txId}`, `account:${utils.makeShortHash(key)} rel:${relationString} summary:${utils.stringifyReduce(summaryObject)}`)
       }
@@ -3357,7 +3354,7 @@ class StateManager extends EventEmitter {
       if(txQueueEntry.didSync){
         for (let key of txQueueEntry.uniqueKeys) {
           //if(this.globalAccountMap.has(key)){
-          let {homePartition, addressNum} = ShardFunctions2.addressToPartition(this.currentCycleShardData.shardGlobals, key)
+          let {homePartition, addressNum} = ShardFunctions.addressToPartition(this.currentCycleShardData.shardGlobals, key)
           this.currentCycleShardData.partitionsToSkip.set(homePartition, true)
           //}
         }
@@ -3587,7 +3584,7 @@ class StateManager extends EventEmitter {
           queueEntry.requests[key2] = node
         }
 
-        let relationString = ShardFunctions2.getNodeRelation(homeNodeShardData, this.currentCycleShardData.ourNode.id)
+        let relationString = ShardFunctions.getNodeRelation(homeNodeShardData, this.currentCycleShardData.ourNode.id)
         this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
 
         let message = { keys: allKeys, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
@@ -3650,7 +3647,7 @@ class StateManager extends EventEmitter {
         console.log('queueEntryGetTransactionGroup homenode:null')
       }
       if (homeNode.extendedData === false) {
-        ShardFunctions2.computeExtendedNodePartitionData(this.currentCycleShardData.shardGlobals, this.currentCycleShardData.nodeShardDataMap, this.currentCycleShardData.parititionShardDataMap, homeNode, this.currentCycleShardData.activeNodes)
+        ShardFunctions.computeExtendedNodePartitionData(this.currentCycleShardData.shardGlobals, this.currentCycleShardData.nodeShardDataMap, this.currentCycleShardData.parititionShardDataMap, homeNode, this.currentCycleShardData.activeNodes)
       }
 
       //may need to go back and sync this logic with how we decide what partition to save a record in.
@@ -3677,14 +3674,14 @@ class StateManager extends EventEmitter {
       uniqueNodes[homeNode.node.id] = homeNode.node
 
       // HOMENODEMATHS need to patch in nodes that would cover this partition!
-      // TODO PERF make an optimized version of this in ShardFunctions2 that is smarter about which node range to check and saves off the calculation
+      // TODO PERF make an optimized version of this in ShardFunctions that is smarter about which node range to check and saves off the calculation
       // maybe this could go on the partitions.
-      let {homePartition} = ShardFunctions2.addressToPartition(this.currentCycleShardData.shardGlobals, key)
+      let {homePartition} = ShardFunctions.addressToPartition(this.currentCycleShardData.shardGlobals, key)
       if(homePartition != homeNode.homePartition){
         //loop all nodes for now
         for(let nodeID of this.currentCycleShardData.nodeShardDataMap.keys()){
           let nodeShardData:NodeShardData2 = this.currentCycleShardData.nodeShardDataMap.get(nodeID)
-          let nodeStoresThisPartition = ShardFunctions2.testInRange(homePartition, nodeShardData.storedPartitions)
+          let nodeStoresThisPartition = ShardFunctions.testInRange(homePartition, nodeShardData.storedPartitions)
           if(nodeStoresThisPartition === true && uniqueNodes[nodeID] == null){
             //setting this will cause it to end up in the transactionGroup
             uniqueNodes[nodeID] = nodeShardData.node
@@ -3742,7 +3739,7 @@ class StateManager extends EventEmitter {
     let loggedPartition = false
     for (let key of queueEntry.uniqueKeys) {
       ///   test here
-      // let hasKey = ShardFunctions2.testAddressInRange(key, ourNodeData.storedPartitions)
+      // let hasKey = ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)
       // todo : if this works maybe a nicer or faster version could be used
       let hasKey = false
       let homeNode = queueEntry.homeNodes[key]
@@ -3824,18 +3821,18 @@ class StateManager extends EventEmitter {
             }
 
             // must add one to each lookup index!
-            let indicies = ShardFunctions2.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.consensusNodeForOurNodeFull.length, ourLocalConsensusIndex + 1)
-            let edgeIndicies = ShardFunctions2.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.edgeNodes.length, ourLocalConsensusIndex + 1)
+            let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.consensusNodeForOurNodeFull.length, ourLocalConsensusIndex + 1)
+            let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.edgeNodes.length, ourLocalConsensusIndex + 1)
 
             let patchIndicies = []
             if(remoteHomeNode.patchedOnNodes.length > 0){
-              patchIndicies = ShardFunctions2.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.patchedOnNodes.length, ourLocalConsensusIndex + 1)
+              patchIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.patchedOnNodes.length, ourLocalConsensusIndex + 1)
 
             }
 
             
             // HOMENODEMATHS need to work out sending data to our patched range.
-            // let edgeIndicies = ShardFunctions2.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.edgeNodes.length, ourLocalConsensusIndex + 1)
+            // let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.edgeNodes.length, ourLocalConsensusIndex + 1)
 
             // for each remote node lets save it's id
             for (let index of indicies) {
@@ -3867,8 +3864,8 @@ class StateManager extends EventEmitter {
             dataToSend.push(datas[key]) // only sending just this one key at a time
             message = { stateList: dataToSend, txid: queueEntry.acceptedTx.id }
             if (correspondingAccNodes.length > 0) {
-              let remoteRelation = ShardFunctions2.getNodeRelation(remoteHomeNode, this.currentCycleShardData.ourNode.id)
-              let localRelation = ShardFunctions2.getNodeRelation(localHomeNode, this.currentCycleShardData.ourNode.id)
+              let remoteRelation = ShardFunctions.getNodeRelation(remoteHomeNode, this.currentCycleShardData.ourNode.id)
+              let localRelation = ShardFunctions.getNodeRelation(localHomeNode, this.currentCycleShardData.ourNode.id)
               this.logger.playbackLogNote('shrd_tellCorrespondingNodes', `${queueEntry.acceptedTx.id}`, `remoteRel: ${remoteRelation} localrel: ${localRelation} qId: ${queueEntry.entryID} AccountBeingShared: ${utils.makeShortHash(key)} EdgeNodes:${utils.stringifyReduce(edgeNodeIds)} ConsesusNodes${utils.stringifyReduce(consensusNodeIds)}`)
               this.p2p.tell(correspondingAccNodes, 'broadcast_state', message)
             }
@@ -4338,8 +4335,8 @@ class StateManager extends EventEmitter {
     let minP = ourNodeShardData.consensusStartPartition
     let maxP = ourNodeShardData.consensusEndPartition
     // HOMENODEMATHS this seems good.  making sure our node covers this partition
-    let { homePartition } = ShardFunctions2.addressToPartition(this.currentCycleShardData.shardGlobals, address)
-    accountIsRemote = (ShardFunctions2.partitionInConsensusRange(homePartition, minP, maxP) === false)
+    let { homePartition } = ShardFunctions.addressToPartition(this.currentCycleShardData.shardGlobals, address)
+    accountIsRemote = (ShardFunctions.partitionInConsensusRange(homePartition, minP, maxP) === false)
 
     // hack to say we have all the data
     if (this.currentCycleShardData.activeNodes.length <= this.currentCycleShardData.shardGlobals.consensusRadius) {
@@ -4350,7 +4347,7 @@ class StateManager extends EventEmitter {
     }
 
     if (accountIsRemote) {
-      let homeNode = ShardFunctions2.findHomeNode(this.currentCycleShardData.shardGlobals, address, this.currentCycleShardData.parititionShardDataMap)
+      let homeNode = ShardFunctions.findHomeNode(this.currentCycleShardData.shardGlobals, address, this.currentCycleShardData.parititionShardDataMap)
       if(homeNode== null){
         throw new Error(`getLocalOrRemoteAccount: no home node found`)
       }
@@ -4422,7 +4419,7 @@ class StateManager extends EventEmitter {
       throw new Error('getRemoteAccount: network not ready')
     }
 
-    let homeNode = ShardFunctions2.findHomeNode(this.currentCycleShardData.shardGlobals, address, this.currentCycleShardData.parititionShardDataMap)
+    let homeNode = ShardFunctions.findHomeNode(this.currentCycleShardData.shardGlobals, address, this.currentCycleShardData.parititionShardDataMap)
     if(homeNode== null){
       throw new Error(`getRemoteAccount: no home node found`)
     }
@@ -4448,7 +4445,7 @@ class StateManager extends EventEmitter {
       throw new Error('getClosestNodes: network not ready')
     }
     let cycleShardData = this.currentCycleShardData
-    let homeNode = ShardFunctions2.findHomeNode(cycleShardData.shardGlobals, hash, cycleShardData.parititionShardDataMap)
+    let homeNode = ShardFunctions.findHomeNode(cycleShardData.shardGlobals, hash, cycleShardData.parititionShardDataMap)
     if(homeNode == null){
       throw new Error(`getClosestNodes: no home node found`)
     }
@@ -4456,7 +4453,7 @@ class StateManager extends EventEmitter {
     // HOMENODEMATHS consider using partition of the raw hash instead of home node of hash
     let homeNodeIndex = homeNode.ourNodeIndex
     let idToExclude = ''
-    let results = ShardFunctions2.getNodesByProximity(cycleShardData.shardGlobals, cycleShardData.activeNodes, homeNodeIndex, idToExclude, count, true)
+    let results = ShardFunctions.getNodesByProximity(cycleShardData.shardGlobals, cycleShardData.activeNodes, homeNodeIndex, idToExclude, count, true)
 
     return results
   }
@@ -4487,13 +4484,13 @@ class StateManager extends EventEmitter {
       return false
     }
     // HOMENODEMATHS need to eval useage here
-    let someNode = ShardFunctions2.findHomeNode(cycleShardData.shardGlobals, nodeId, cycleShardData.parititionShardDataMap)
+    let someNode = ShardFunctions.findHomeNode(cycleShardData.shardGlobals, nodeId, cycleShardData.parititionShardDataMap)
     if(someNode == null){
       return false
     }
     let someNodeIndex = someNode.ourNodeIndex
 
-    let homeNode = ShardFunctions2.findHomeNode(cycleShardData.shardGlobals, hash, cycleShardData.parititionShardDataMap)
+    let homeNode = ShardFunctions.findHomeNode(cycleShardData.shardGlobals, hash, cycleShardData.parititionShardDataMap)
     if(homeNode == null){
       return false
     }
@@ -4724,7 +4721,7 @@ class StateManager extends EventEmitter {
   generatePartitionObjects (lastCycle:Shardus.Cycle) {
     let lastCycleShardValues = this.shardValuesByCycle.get(lastCycle.counter)
 
-    // let partitions = ShardFunctions2.getConsenusPartitions(lastCycleShardValues.shardGlobals, lastCycleShardValues.nodeShardData)
+    // let partitions = ShardFunctions.getConsenusPartitions(lastCycleShardValues.shardGlobals, lastCycleShardValues.nodeShardData)
     // lastCycleShardValues.ourConsensusPartitions = partitions
 
     if(lastCycleShardValues == null){
@@ -7627,9 +7624,9 @@ class StateManager extends EventEmitter {
     if(isGlobalModifyingTX === false){
       for (let accountKey of allKeys) {
         // HOMENODEMATHS recordTXByCycle: using partition to decide recording partition
-        let {homePartition} = ShardFunctions2.addressToPartition(lastCycleShardValues.shardGlobals, accountKey)
+        let {homePartition} = ShardFunctions.addressToPartition(lastCycleShardValues.shardGlobals, accountKey)
         let partitionID = homePartition
-        let weStoreThisParition = ShardFunctions2.testInRange(partitionID, lastCycleShardValues.nodeShardData.storedPartitions)
+        let weStoreThisParition = ShardFunctions.testInRange(partitionID, lastCycleShardValues.nodeShardData.storedPartitions)
         let key = 'p' + partitionID
 
         if(this.isGlobalAccount(accountKey)){
@@ -7658,13 +7655,13 @@ class StateManager extends EventEmitter {
 
     for (let accountKey of allKeys) {
       /** @type {NodeShardData2} */
-      let homeNode = ShardFunctions2.findHomeNode(lastCycleShardValues.shardGlobals, accountKey, lastCycleShardValues.parititionShardDataMap)
+      let homeNode = ShardFunctions.findHomeNode(lastCycleShardValues.shardGlobals, accountKey, lastCycleShardValues.parititionShardDataMap)
       if(homeNode == null){
         throw new Error(`recordTXByCycle homeNode == null`)
       }
       // HOMENODEMATHS recordTXByCycle: this code has moved to use homepartition instead of home node's partition
       let homeNodepartitionID = homeNode.homePartition
-      let {homePartition} = ShardFunctions2.addressToPartition(lastCycleShardValues.shardGlobals, accountKey)
+      let {homePartition} = ShardFunctions.addressToPartition(lastCycleShardValues.shardGlobals, accountKey)
       let partitionID = homePartition
       let key = 'p' + partitionID
 
@@ -7673,7 +7670,7 @@ class StateManager extends EventEmitter {
         continue
       }
 
-      let weStoreThisParition = ShardFunctions2.testInRange(partitionID, lastCycleShardValues.nodeShardData.storedPartitions)
+      let weStoreThisParition = ShardFunctions.testInRange(partitionID, lastCycleShardValues.nodeShardData.storedPartitions)
       if(weStoreThisParition === false){
         if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle:  skip partition we dont save: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
 

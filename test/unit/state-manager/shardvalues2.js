@@ -2,7 +2,7 @@
 /*eslint-disable*/
 // const StateManager = require('../../../src/state-manager')
 //const ShardFunctions2 = require('../../../src/state-manager/shardFunctions.js')
-const ShardFunctions2 = require('../../../build/src/state-manager/shardFunctions.js').default
+const ShardFunctions2 = require('../../../build/src/state-manager/shardFunctions2.js').default
 // import {ShardGlobals,ShardInfo,StoredPartition,NodeShardData,AddressRange, HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange} from  './shardFunctionTypes'
 // import ShardFunctions2 from './shardFunctions.js'
 
@@ -100,7 +100,9 @@ let useHardcodenodes = true
 //t19
 //let hardcodeNodes = ["4423x0ab77","4a45x22d27","55bax46bbb","5d01x39d48","63eexfbe34","7ddcxb6586","9b8exa1c15","b520x4eef8","cab2x831cb","e029x146ea","f00bx0522f"]
 //c25
-let hardcodeNodes = ["0ac8x88ef1","21f7x6483c","6f96xae48b","796fxf7e39","8134x3d98c","833ax8a51b","851cxab703","9d26x9011c","c4c2x62e22","d085xb50f6","d49ax34fec","e172xb3af1","ed8fx77d71","fc4bx4d28e"]
+//let hardcodeNodes = ["0ac8x88ef1","21f7x6483c","6f96xae48b","796fxf7e39","8134x3d98c","833ax8a51b","851cxab703","9d26x9011c","c4c2x62e22","d085xb50f6","d49ax34fec","e172xb3af1","ed8fx77d71","fc4bx4d28e"]
+let hardcodeNodes = ["0ac8x88ef1","21f7x6483c"]
+
 let hardcodeNodes2 = null
 
 if (useHardcodenodes) {
@@ -109,7 +111,7 @@ if (useHardcodenodes) {
 if (hardcodeNodes2) {
   numNodes2 = hardcodeNodes2.length
 }
-let debugStartsWith = '851c' // 21f7 851c '8bc4' // '33d7' //'0692' // '23d5' // 'f211' //'147d' // '2054' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
+let debugStartsWith = '0ac8' // 21f7 851c '8bc4' // '33d7' //'0692' // '23d5' // 'f211' //'147d' // '2054' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
 let debugID = debugStartsWith.slice(0, 4) + '7'.repeat(64 - 4)
 let debugAccount = '44dc' + '3'.repeat(60) // 5c43 386e 60b1  60b1 c173
 let debugNode = null
