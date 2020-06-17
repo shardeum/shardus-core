@@ -88,7 +88,7 @@ function testPartitionMath1_new(numNodes, debugIndex){
 
 // testPartitionMath1_B(1111)
 
-let maxNodesToTest = 5000
+let maxNodesToTest = 300
 
 // test node counts 1 through maxNodesToTest node networks
 

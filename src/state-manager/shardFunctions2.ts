@@ -1017,6 +1017,11 @@ class ShardFunctions2 {
     // 2^32
     let size = Math.round(4294967296 / numPartitions)
     let homePartition = Math.round(addressNum / size)
+
+    if(homePartition === numPartitions){
+      homePartition = homePartition - 1 
+    }
+
     return {homePartition, addressNum}
   }
 
@@ -1025,6 +1030,11 @@ class ShardFunctions2 {
     // 2^32
     let size = Math.round(4294967296 / numPartitions)
     let homePartition = Math.round(addressNum / size)
+    
+    if(homePartition === numPartitions){
+      homePartition = homePartition - 1 
+    }
+
     return homePartition
   }
 
