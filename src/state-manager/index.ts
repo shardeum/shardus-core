@@ -7262,6 +7262,9 @@ class StateManager extends EventEmitter {
       // Q2 was chosen so that any transactions submitted with a time stamp that falls in the previous quarter will have been processed and finalized. This could be changed to Q3 if we find that more time is needed.
       this.generatePartitionObjects(lastCycle)
 
+      // Hook for Snapshot module to listen to after partition data is settled
+      this.emit('prevCycleTxsFinalized')
+
       // pre-allocate the next cycle data to be safe!
       let prekey = 'c' + (lastCycle.counter + 1)
       this.partitionObjectsByCycle[prekey] = []

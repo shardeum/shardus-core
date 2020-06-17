@@ -22,6 +22,7 @@ import * as utils from '../utils'
 import { readJsonDir } from '../utils'
 import Profiler from '../utils/profiler'
 import ShardusTypes = require('../shardus/shardus-types')
+import * as Snapshot from '../snapshot'
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
@@ -105,6 +106,7 @@ class Shardus extends EventEmitter {
       this.logger,
       this.profiler
     )
+    Context.setStorageContext(this.storage)
     this.crypto = new Crypto(this.config, this.logger, this.storage)
     Context.setCryptoContext(this.crypto)
     this.network = new Network.NetworkClass(config.network, this.logger)
@@ -512,6 +514,9 @@ class Shardus extends EventEmitter {
     if (this.app) {
       this._createAndLinkStateManager()
       this._attemptCreateAppliedListener()
+
+      // Start state snapshotting once you go active with an app
+      this.once('active', Snapshot.init)
     }
 
     this.reporter = this.config.reporting.report

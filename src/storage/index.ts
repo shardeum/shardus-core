@@ -729,6 +729,20 @@ class Storage {
       throw new Error(e)
     }
   }
+
+  async getAccountCopiesByCycle( cycleNumber) {
+    this._checkInit()
+    try {
+      //const query = `select accountId, max(cycleNumber) cycleNumber, data, timestamp, hash from accountsCopy WHERE cycleNumber <= ? group by accountId `
+      //same as above minus data
+      const query = `select accountId, max(cycleNumber) cycleNumber, timestamp, hash from accountsCopy WHERE cycleNumber <= ? group by accountId `
+      let result = await this._query(query, [cycleNumber])
+      return result
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
   // example of a raw query with some similarities to what we want:
 
   // async getAllLatestAccounts () {

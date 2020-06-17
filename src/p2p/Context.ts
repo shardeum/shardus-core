@@ -10,6 +10,7 @@ import {
   StorageConfiguration,
 } from '../shardus/shardus-types'
 import StateManager from '../state-manager'
+import Storage from '../storage'
 
 export type P2PModuleContext = P2P & EventEmitter
 
@@ -19,6 +20,7 @@ export let crypto: Crypto
 export let network: NetworkClass
 export let shardus: Shardus
 export let stateManager: StateManager
+export let storage: Storage
 export let config: ShardusConfiguration
 export let defaultConfigs: {
   server: ShardusConfiguration
@@ -48,6 +50,10 @@ export function setShardusContext(context) {
 
 export function setStateManagerContext(context) {
   stateManager = context
+}
+
+export function setStorageContext(context) {
+  storage = context
 }
 
 export function setConfig(conf) {
