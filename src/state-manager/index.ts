@@ -24,6 +24,7 @@ import { P2PModuleContext as P2P } from "../p2p/Context"
 import Storage from "../storage"
 import Crypto from "../crypto"
 import Logger from "../logger"
+import { NodeShardData } from './shardFunctionTypes'
 //import NodeList from "../p2p/NodeList"
 
 //let shardFunctions = import("./shardFunctions").
@@ -4208,9 +4209,9 @@ class StateManager extends EventEmitter {
     // hmm how to deal with data that is changing... it cant!!
     let partitionMap = this.currentCycleShardData.parititionShardDataMap
 
-    let ourNodeShardData = this.currentCycleShardData.nodeShardData
+    let ourNodeShardData:NodeShardData = this.currentCycleShardData.nodeShardData
     // partittions:
-    let partitionDump:DebugDumpPartitions = { partitions: [], cycle:0, rangesCovered:{} as DebugDumpRangesCovered,nodesCovered:{} as DebugDumpNodesCovered,allNodeIds:[], globalAccountIDs:[]  }
+    let partitionDump:DebugDumpPartitions = { partitions: [], cycle:0, rangesCovered:{} as DebugDumpRangesCovered,nodesCovered:{} as DebugDumpNodesCovered,allNodeIds:[], globalAccountIDs:[], globalAccountSummary:[], globalStateHash:""  }
     partitionDump.cycle = this.currentCycleShardData.cycleNumber
 
     // todo port this to a static stard function!
@@ -4234,62 +4235,84 @@ class StateManager extends EventEmitter {
       partitionDump.nodesCovered.stored.push({ idx: nodeData.ourNodeIndex, hp: nodeData.homePartition })
     }
 
-    for (var [key, value] of partitionMap) {
-      let partition:DebugDumpPartition = { parititionID: key, accounts: [], skip:{} as DebugDumpPartitionSkip }
-      partitionDump.partitions.push(partition)
+    if(this.currentCycleShardData.ourNode.status === 'active' ) {
+      for (var [key, value] of partitionMap) {
+        let partition:DebugDumpPartition = { parititionID: key, accounts: [], skip:{} as DebugDumpPartitionSkip }
+        partitionDump.partitions.push(partition)
 
-      // normal case
-      if (maxP > minP) {
-        // are we outside the min to max range
-        if (key < minP || key > maxP) {
-          partition.skip = { p: key, min: minP, max: maxP }
-          continue
+        // normal case
+        if (maxP > minP) {
+          // are we outside the min to max range
+          if (key < minP || key > maxP) {
+            partition.skip = { p: key, min: minP, max: maxP }
+            continue
+          }
+        } else if (maxP === minP) {
+          if (key !== maxP) {
+            partition.skip = { p: key, min: minP, max: maxP, noSpread: true }
+            continue
+          }
+        } else {
+          // are we inside the min to max range (since the covered rage is inverted)
+          if (key > maxP && key < minP) {
+            partition.skip = { p: key, min: minP, max: maxP, inverted: true }
+            continue
+          }
         }
-      } else if (maxP === minP) {
-        if (key !== maxP) {
-          partition.skip = { p: key, min: minP, max: maxP, noSpread: true }
-          continue
+
+        let partitionShardData = value
+        let accountStart = partitionShardData.homeRange.low
+        let accountEnd = partitionShardData.homeRange.high
+        let wrappedAccounts = await this.app.getAccountData(accountStart, accountEnd, 10000000)
+        // { accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp }
+        let duplicateCheck = {}
+        for (let wrappedAccount of wrappedAccounts) {
+          if(duplicateCheck[wrappedAccount.accountId] != null){
+            continue
+          }
+          duplicateCheck[wrappedAccount.accountId] = true
+          let v = wrappedAccount.data.balance // hack, todo maybe ask app for a debug value
+          if (this.app.getAccountDebugValue != null) {
+            v = this.app.getAccountDebugValue(wrappedAccount)
+          }
+          partition.accounts.push({ id: wrappedAccount.accountId, hash: wrappedAccount.stateId, v: v })
         }
-      } else {
-        // are we inside the min to max range (since the covered rage is inverted)
-        if (key > maxP && key < minP) {
-          partition.skip = { p: key, min: minP, max: maxP, inverted: true }
-          continue
-        }
+
+        partition.accounts.sort(this._sortByIdAsc)
       }
 
-      let partitionShardData = value
-      let accountStart = partitionShardData.homeRange.low
-      let accountEnd = partitionShardData.homeRange.high
-      let wrappedAccounts = await this.app.getAccountData(accountStart, accountEnd, 10000000)
-      // { accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp }
-      let duplicateCheck = {}
-      for (let wrappedAccount of wrappedAccounts) {
-        if(duplicateCheck[wrappedAccount.accountId] != null){
-          continue
-        }
-        duplicateCheck[wrappedAccount.accountId] = true
-        let v = wrappedAccount.data.balance // hack, todo maybe ask app for a debug value
-        if (this.app.getAccountDebugValue != null) {
-          v = this.app.getAccountDebugValue(wrappedAccount)
-        }
-        partition.accounts.push({ id: wrappedAccount.accountId, hash: wrappedAccount.stateId, v: v })
+      //partitionDump.allNodeIds = []
+      for (let node of this.currentCycleShardData.activeNodes) {
+        partitionDump.allNodeIds.push(utils.makeShortHash(node.id))
       }
 
-      partition.accounts.sort(this._sortByIdAsc)
+      partitionDump.globalAccountIDs = Array.from(this.globalAccountMap.keys())
+      partitionDump.globalAccountIDs.sort()
+      // dump information about consensus group and edge nodes for each partition
+      // for (var [key, value] of this.currentCycleShardData.parititionShardDataMap){
+
+      // }
+
+      //hash over global accounts values
+
+
+      let globalAccountSummary = []
+      for(let globalID in partitionDump.globalAccountIDs){
+
+        let backupList:Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(globalID)
+        //let globalAccount = this.globalAccountMap.get(globalID)
+        if(backupList != null && backupList.length > 0){
+          let globalAccount = backupList[backupList.length-1]
+          let summaryObj = {id:globalID,  state : globalAccount.hash, ts:globalAccount.timestamp }
+          globalAccountSummary.push(summaryObj)
+        }
+
+      }
+      partitionDump.globalAccountSummary = globalAccountSummary
+      let globalStateHash = this.crypto.hash(globalAccountSummary)
+      partitionDump.globalStateHash = globalStateHash
+
     }
-
-    //partitionDump.allNodeIds = []
-    for (let node of this.currentCycleShardData.activeNodes) {
-      partitionDump.allNodeIds.push(utils.makeShortHash(node.id))
-    }
-
-    partitionDump.globalAccountIDs = Array.from(this.globalAccountMap.keys())
-
-    // dump information about consensus group and edge nodes for each partition
-    // for (var [key, value] of this.currentCycleShardData.parititionShardDataMap){
-
-    // }
 
     this.shardLogger.debug(utils.stringifyReduce(partitionDump))
   }

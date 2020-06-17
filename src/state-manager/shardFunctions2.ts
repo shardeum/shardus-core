@@ -42,7 +42,10 @@ class ShardFunctions2 {
     shardinfo.homeNodes = []
     shardinfo.addressPrefix = parseInt(address.slice(0, 8), 16)
     shardinfo.addressPrefixHex = ShardFunctions2.leadZeros8((shardinfo.addressPrefix).toString(16))
-    shardinfo.homePartition = Math.floor(shardGlobals.numPartitions * (shardinfo.addressPrefix / 0xffffffff))
+    // old calculation
+    //shardinfo.homePartition = Math.floor(shardGlobals.numPartitions * (shardinfo.addressPrefix / 0xffffffff))
+    shardinfo.homePartition = ShardFunctions2.addressNumberToPartition(shardGlobals, shardinfo.addressPrefix)
+
     shardinfo.homeRange = ShardFunctions2.partitionToAddressRange2(shardGlobals, shardinfo.homePartition)
     shardinfo.coveredBy = {} // consensus nodes that cover us.
     shardinfo.storedBy = {}
@@ -999,12 +1002,32 @@ class ShardFunctions2 {
   }
 
   //TODO TSConversion  get a better output type than any.. switch to an object maybe.
-  static addressToPartition (shardGlobals : ShardGlobals2, address: string) : {homePartition : number, addressNum: number} {
+  static addressToPartition_old (shardGlobals : ShardGlobals2, address: string) : {homePartition : number, addressNum: number} {
     let numPartitions = shardGlobals.numPartitions
     let addressNum = parseInt(address.slice(0, 8), 16)
     let homePartition = Math.floor(numPartitions * (addressNum / 0xffffffff))
     return {homePartition, addressNum}
   }
+
+
+  static addressToPartition (shardGlobals : ShardGlobals2, address: string) : {homePartition : number, addressNum: number} {
+    let numPartitions = shardGlobals.numPartitions
+    let addressNum = parseInt(address.slice(0, 8), 16)
+
+    // 2^32
+    let size = Math.round(4294967296 / numPartitions)
+    let homePartition = Math.round(addressNum / size)
+    return {homePartition, addressNum}
+  }
+
+  static addressNumberToPartition (shardGlobals : ShardGlobals2, addressNum: number) : number {
+    let numPartitions = shardGlobals.numPartitions
+    // 2^32
+    let size = Math.round(4294967296 / numPartitions)
+    let homePartition = Math.round(addressNum / size)
+    return homePartition
+  }
+
 
   static findHomeNode (shardGlobals: ShardGlobals2, address: string, parititionShardDataMap: Map<number, ShardInfo2>): NodeShardData2 | null {
     let {homePartition, addressNum} = ShardFunctions2.addressToPartition(shardGlobals, address)
@@ -1131,11 +1154,11 @@ class ShardFunctions2 {
 
   // todo memoize this per cycle!!!
   // TODO TSConversion partitionMax was equal to null before as optional param. what to do now?
-  static partitionToAddressRange2 (shardGlobals : ShardGlobals2, partition : number, paritionMax? : number) : AddressRange2 {
+  static partitionToAddressRange2_old (shardGlobals : ShardGlobals2, partition : number, paritionMax? : number) : AddressRange2 {
     let result = {} as AddressRange2
     result.partition = partition
     let startAddr = 0xffffffff * (partition / shardGlobals.numPartitions)
-    startAddr = Math.floor(startAddr)
+    startAddr = Math.ceil(startAddr)
 
     result.p_low = partition
     //result.p_high = paritionMax // was a TS error
@@ -1149,7 +1172,11 @@ class ShardFunctions2 {
     }
     result.partitionEnd = endPartition
     let endAddr = 0xffffffff * ((endPartition) / shardGlobals.numPartitions)
-    endAddr = Math.floor(endAddr)
+    endAddr = Math.ceil(endAddr)
+
+    // if(endAddr > 0){
+    //   endAddr = endAddr - 1
+    // }
 
     // it seems we dont need/want this code:
     // if (paritionMax === null) {
@@ -1164,6 +1191,47 @@ class ShardFunctions2 {
 
     return result
   }
+
+  static partitionToAddressRange2 (shardGlobals : ShardGlobals2, partition : number, paritionMax? : number) : AddressRange2 {
+    let result = {} as AddressRange2
+    result.partition = partition
+
+    // 2^32
+    let size = Math.round(4294967296 / shardGlobals.numPartitions)
+    let startAddr = partition * size
+
+    result.p_low = partition
+
+    let endPartition = partition + 1
+    if (paritionMax) {
+      result.p_high = paritionMax
+      endPartition = paritionMax + 1
+    } else {
+      //result.p_high = partition
+    }
+    result.partitionEnd = endPartition
+    let endAddr = (endPartition * size) 
+    
+    //fix for int precision problem where id of the highest shard rolls over
+    if(endAddr > 4294967295){
+      endAddr = 4294967295
+    } 
+    if(endPartition === shardGlobals.numPartitions){
+
+      endPartition = shardGlobals.numPartitions - 1
+      result.partitionEnd = endPartition
+    }
+
+
+    result.startAddr = startAddr
+    result.endAddr = endAddr
+
+    result.low = ('00000000' + (startAddr).toString(16)).slice(-8) + '0'.repeat(56)
+    result.high = ('00000000' + (endAddr).toString(16)).slice(-8) + 'f'.repeat(56)
+
+    return result
+  }
+
 
   // todo save off per node calculations?
   // get nodes with coverage of this range (does not support wrapping)
@@ -1421,6 +1489,8 @@ class ShardFunctions2 {
    * @param {string} address
    * @returns {{address1:string; address2:string}}
    * TODO TSConversion  what is a good way to define these on the fly return results?
+   * 
+   * TODO needs to check for case where addressNum = 0xFFFFFFFF because +1 would be an overflow. but.. how does that matter to calling code
    */
   static getNextAdjacentAddresses (address: string) {
     let addressNum = parseInt(address.slice(0, 8), 16)

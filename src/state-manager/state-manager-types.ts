@@ -511,7 +511,7 @@ type DebugDumpNodesCovered = { idx: number, ipPort:string, id: string, fracID: n
 type DebugDumpRangesCovered = { ipPort:string, id: string, fracID: number, hP: number, cMin: number, cMax: number, stMin: number, stMax: number, numP: number }
 type DebugDumpPartition = {parititionID:number, accounts:DebugDumpPartitionAccount[], skip:DebugDumpPartitionSkip} // {[id:string]:string}
 type DebugDumpPartitionSkip = { p: number, min: number, max: number, noSpread?: boolean, inverted?:boolean }
-type DebugDumpPartitions =  { partitions: DebugDumpPartition[], cycle:number, rangesCovered:DebugDumpRangesCovered,nodesCovered:DebugDumpNodesCovered,allNodeIds:string[], globalAccountIDs:string[]  }
+type DebugDumpPartitions =  { partitions: DebugDumpPartition[], cycle:number, rangesCovered:DebugDumpRangesCovered,nodesCovered:DebugDumpNodesCovered,allNodeIds:string[], globalAccountIDs:string[], globalAccountSummary:any[], globalStateHash:string }
 
 
 //queue process related:
