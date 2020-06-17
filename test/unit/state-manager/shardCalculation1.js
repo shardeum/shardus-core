@@ -77,9 +77,9 @@ function testPartitionMath1_new(numNodes, debugIndex){
     // if(partitionStart !== highResult.homePartition){
     //   logErrorLimited(`failed partition ${partitionStart} high result: ${highResult.homePartition}`)
     // }
-    // if(highResult.homePartition !== addressRange.partitionEnd){
-    //   logErrorLimited(`failed partition ${addressRange.partitionEnd} high result: ${highResult.homePartition}`)
-    // }
+    if(highResult.homePartition !== addressRange.partitionEnd){
+      logErrorLimited(`failed partition ${addressRange.partitionEnd} high result: ${highResult.homePartition}`)
+    }
   }
   if(errorsLogged > 0){
     console.log(`B num nodes: ${numNodes} complete total Errors: ${errorsLogged}`)
@@ -100,7 +100,7 @@ let maxNodesToTest = 300
 // }
 console.log(`--------New math--------------`)
 // New math
-for(let i=2; i<maxNodesToTest; i++){
+for(let i=1; i < maxNodesToTest; i++){
   errorsLogged=0
   testPartitionMath1_new(i)
 }
