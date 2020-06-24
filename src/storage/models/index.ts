@@ -4,6 +4,9 @@ import properties from './properties'
 import acceptedTxs from './acceptedTxs'
 import accountStates from './accountStates'
 import accountsCopy from './accountsCopy'
+import globalAccounts from './globalAccounts'
+import partitions from './partitions'
+import network from './network'
 
 const models = [
   cycles,
@@ -11,7 +14,10 @@ const models = [
   properties,
   acceptedTxs,
   accountStates,
-  accountsCopy
+  accountsCopy,
+  globalAccounts,
+  partitions,
+  network
 ]
 
 export default models

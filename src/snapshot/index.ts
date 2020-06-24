@@ -9,6 +9,8 @@ type PartitionAccounts = Map<AddressRange['partition'], [string, string][]>
 
 type ParitionHashes = Map<AddressRange['partition'], string>
 
+type NetworkStateHash = string
+
 let oldDataPath: string
 
 export function setOldDataPath(path) {
@@ -22,6 +24,19 @@ export function startSnapshotting() {
     const accounts = await storage.getAccountCopiesByCycle(shard.cycleNumber)
     const partitionAccounts = getPartitionAccounts(shard, accounts)
     const partitionHashes = createPartitionHashes(partitionAccounts)
+    const networkStateHash = createNetworkStateHash(partitionHashes)
+
+    for (const [partitionId, hash] of partitionHashes) {
+      await storage.addPartitionHash({
+        partitionId,
+        cycleNumber: shard.cycleNumber,
+        hash,
+      })
+    }
+    await storage.addNetworkState({
+      cycleNumber: shard.cycleNumber,
+      hash: networkStateHash
+    })
 
     log(`
     cycle: ${shard.cycleNumber}
@@ -82,6 +97,17 @@ function createPartitionHashes(
   }
 
   return partitionHashes
+}
+
+function createNetworkStateHash(
+  partitionHashes: ParitionHashes
+): NetworkStateHash {
+  let partitionHashArray = []
+  for (const [partitionId, hash] of partitionHashes) {
+    partitionHashArray.push(hash)
+  }
+  const hash = crypto.hash(partitionHashArray)
+  return hash
 }
 
 function getPartitionRanges(shard: CycleShardData): PartitionRanges {

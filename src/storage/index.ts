@@ -75,6 +75,15 @@ class Storage {
     await this.storage.runCreate(
       'CREATE TABLE if not exists `accountsCopy` (`accountId` VARCHAR(255) NOT NULL, `cycleNumber` BIGINT NOT NULL, `data` JSON NOT NULL, `timestamp` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, PRIMARY KEY (`accountId`, `cycleNumber`))'
     )
+    await this.storage.runCreate(
+      'CREATE TABLE if not exists `globalAccounts` (`accountId` VARCHAR(255) NOT NULL, `cycleNumber` BIGINT NOT NULL, `data` JSON NOT NULL, `timestamp` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, PRIMARY KEY (`accountId`, `cycleNumber`))'
+    )
+    await this.storage.runCreate(
+      'CREATE TABLE if not exists `partitions` (`partitionId` VARCHAR(255) NOT NULL, `cycleNumber` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, PRIMARY KEY (`partitionId`, `cycleNumber`))'
+    )
+    await this.storage.runCreate(
+      'CREATE TABLE if not exists `network` (`cycleNumber` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, PRIMARY KEY (`cycleNumber`))'
+    )
 
     await this.storage.run(P2PApoptosis.addCycleFieldQuery)
 
@@ -385,6 +394,28 @@ class Storage {
     this._checkInit()
     try {
       await this._create(this.storageModels.acceptedTxs, acceptedTransactions, {
+        createOrReplace: true,
+      })
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
+  async addPartitionHash(partition) {
+    this._checkInit()
+    try {
+      await this._create(this.storageModels.partitions, partition, {
+        createOrReplace: true,
+      })
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
+  async addNetworkState(networkState) {
+    this._checkInit()
+    try {
+      await this._create(this.storageModels.network, networkState, {
         createOrReplace: true,
       })
     } catch (e) {
