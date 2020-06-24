@@ -229,7 +229,7 @@ class Storage {
     } catch (e) {
       throw new Error(e)
     }
-    return cycles.map(c => c.dataValues)
+    return cycles.map((c) => c.dataValues)
   }
 
   async addNodes(nodes) {
@@ -264,7 +264,7 @@ class Storage {
     this._checkInit()
     const nodeIds = []
     // Attempt to add node to the nodeIds list
-    const addNodeToList = node => {
+    const addNodeToList = (node) => {
       if (!node.id) {
         this.mainLogger.error(
           `Node attempted to be deleted without ID: ${JSON.stringify(node)}`
@@ -352,7 +352,7 @@ class Storage {
     } catch (e) {
       throw new Error(e)
     }
-    return keys.map(k => k.key)
+    return keys.map((k) => k.key)
   }
 
   async clearP2pState() {

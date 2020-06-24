@@ -5,6 +5,7 @@ import * as Sequelize from 'sequelize'
 import fs from 'fs'
 import path from 'path'
 import * as utils from '../utils'
+import * as Snapshot from '../snapshot'
 
 const Op = Sequelize.Op
 var sqlite3 = require('sqlite3').verbose()
@@ -37,20 +38,6 @@ class Sqlite3Storage {
     // for (let [modelName, modelAttributes] of models) this.sequelize.define(modelName, modelAttributes)
     // this.models = this.sequelize.models
     this.initialized = false
-
-    // [AS] Delete database if it already exists; fixes weirdness when restarting from a clean slate
-    try {
-      fs.unlinkSync(this.storageConfig.options.storage)
-      this.mainLogger.info(
-        'Storage: sqlite3storage: constructor: Deleted existing db file'
-      )
-    } catch (err) {
-      this.mainLogger.info(
-        'Storage: sqlite3storage: constructor: Failed to delete existing db file: ' +
-          err
-      )
-    }
-
     this.storageModels = {}
     for (let [modelName, modelAttributes] of models) {
       this.sqlite3Define(modelName, modelAttributes)
@@ -108,8 +95,16 @@ class Sqlite3Storage {
   }
 
   async init() {
-    // Create dbDir if it doesn't exist
     let dbDir = path.parse(this.storageConfig.options.storage).dir
+
+    // Rename dbDir if it exists
+    try {
+      const oldDirPath =  dbDir + '-old-' + Date.now()
+      fs.renameSync(dbDir, oldDirPath)
+      Snapshot.setOldDataPath(oldDirPath)
+    } catch (e) {}
+
+    // Create dbDir if it doesn't exist
     await _ensureExists(dbDir)
     this.mainLogger.info('Created Database directory.')
 
@@ -400,7 +395,7 @@ class Sqlite3Storage {
   // run/get/all promise wraps from this tutorial: https://stackabuse.com/a-sqlite-tutorial-with-node-js/
   run(sql, params = []) {
     return new Promise((resolve, reject) => {
-      this.db.run(sql, params, function(err) {
+      this.db.run(sql, params, function (err) {
         if (err) {
           console.log('Error running sql ' + sql)
           console.log(err)
@@ -443,7 +438,7 @@ class Sqlite3Storage {
 // From: https://stackoverflow.com/a/21196961
 async function _ensureExists(dir) {
   return new Promise((resolve, reject) => {
-    fs.mkdir(dir, { recursive: true }, err => {
+    fs.mkdir(dir, { recursive: true }, (err) => {
       if (err) {
         // Ignore err if folder exists
         if (err.code === 'EEXIST') resolve()

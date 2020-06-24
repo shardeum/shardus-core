@@ -1,13 +1,100 @@
 import { storage, stateManager, crypto } from '../p2p/Context'
-import { currentCycle } from '../p2p/CycleCreator'
+import ShardFunctions from '../state-manager/shardFunctions'
+import { AddressRange } from '../state-manager/shardFunctionTypes'
+import { parseRecord } from '../p2p/Archivers'
 
-export function init() {
-  stateManager.on('prevCycleTxsFinalized', createPartitionStateHash)
+type PartitionRanges = Map<AddressRange['partition'], AddressRange>
+
+type PartitionAccounts = Map<AddressRange['partition'], [string, string][]>
+
+type ParitionHashes = Map<AddressRange['partition'], string>
+
+let oldDataPath: string
+
+export function setOldDataPath(path) {
+  oldDataPath = path
+  log('set old-data-path', oldDataPath)
 }
 
-export async function createPartitionStateHash() {
-  const accts = await storage.getAccountCopiesByCycle(currentCycle)
-  log('partitionStateHash', crypto.hash(accts))
+export function startSnapshotting() {
+  stateManager.on('cycleTxsFinalized', async (shard: CycleShardData) => {
+    const partitionRanges = getPartitionRanges(shard)
+    const accounts = await storage.getAccountCopiesByCycle(shard.cycleNumber)
+    const partitionAccounts = getPartitionAccounts(shard, accounts)
+    const partitionHashes = createPartitionHashes(partitionAccounts)
+
+    log(`
+    cycle: ${shard.cycleNumber}
+
+    partitions: ${partitionRanges.size}
+    `)
+
+    for (const partition of shard.ourStoredPartitions) {
+      const range = partitionRanges.get(partition)
+      if (range) {
+        const acctsLow = range.low.substring(0, 5)
+        const acctsHigh = range.high.substring(0, 5)
+        const partHash = partitionHashes.get(partition)
+        const formattedPartHash = partHash ? partHash.substring(0, 5) : 'N/A'
+        console.log(`      part ${partition} | accts ${acctsLow} - ${acctsHigh} | hash ${formattedPartHash}
+      `)
+      }
+      const accounts = partitionAccounts.get(partition)
+      if (accounts) {
+        for (const account of accounts) {
+          const acctId = account[0].substring(0, 5)
+          const acctHash = account[1].substring(0, 5)
+          console.log(`        acct ${acctId} | hash ${acctHash}`)
+        }
+        console.log()
+      }
+    }
+  })
+}
+
+function getPartitionAccounts(
+  shard: CycleShardData,
+  accounts: { accountId: string; hash: string }[]
+): PartitionAccounts {
+  const partitionAccounts: Map<number, [string, string][]> = new Map()
+
+  for (const account of accounts) {
+    const { homePartition } = ShardFunctions.addressToPartition(
+      shard.shardGlobals,
+      account.accountId
+    )
+    const accounts = partitionAccounts.get(homePartition) || []
+    accounts.push([account.accountId, account.hash])
+    partitionAccounts.set(homePartition, accounts)
+  }
+
+  return partitionAccounts
+}
+
+function createPartitionHashes(
+  partitionAccounts: PartitionAccounts
+): ParitionHashes {
+  const partitionHashes: Map<number, string> = new Map()
+
+  for (const [partition, accounts] of partitionAccounts) {
+    const hash = crypto.hash(accounts)
+    partitionHashes.set(partition, hash)
+  }
+
+  return partitionHashes
+}
+
+function getPartitionRanges(shard: CycleShardData): PartitionRanges {
+  const partitionRanges = new Map()
+
+  for (const partition of shard.ourStoredPartitions) {
+    partitionRanges.set(
+      partition,
+      ShardFunctions.partitionToAddressRange2(shard.shardGlobals, partition)
+    )
+  }
+
+  return partitionRanges
 }
 
 function log(...things) {

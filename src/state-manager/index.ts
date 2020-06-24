@@ -7263,7 +7263,7 @@ class StateManager extends EventEmitter {
       this.generatePartitionObjects(lastCycle)
 
       // Hook for Snapshot module to listen to after partition data is settled
-      this.emit('prevCycleTxsFinalized')
+      this.emit('cycleTxsFinalized', lastCycleShardValues)
 
       // pre-allocate the next cycle data to be safe!
       let prekey = 'c' + (lastCycle.counter + 1)
