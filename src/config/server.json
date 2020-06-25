@@ -59,7 +59,7 @@
   "debug": {
     "loseReceiptChance": 0.0,
     "loseTxChance": 0.0,
-    "canDataRepair": true
+    "canDataRepair": false
   },
   "statistics": {
     "save": true,

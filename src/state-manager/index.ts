@@ -4989,6 +4989,7 @@ class StateManager extends EventEmitter {
   async startRepairProcess (cycle:Cycle, topResult:PartitionResult | null, partitionId:number, ourLastResultHash:string) {
     this.stateIsGood = false
     if (this.canDataRepair === false) {
+      if (this.verboseLogs) this.mainLogger.error( `cycle: ${cycle} this.canDataRepair === false data oos detected but will not start repairs`)
       return
     }
 
