@@ -1,0 +1,44 @@
+/** TYPES */
+
+type count = number
+
+type hash = string
+
+type PartitionId = number
+
+type PartitionMap = Map<NodeId, PartitionId[]>
+
+type PartitionHashes = Map<PartitionId, hash>
+
+/** STATE */
+
+allHashes: PartitionHashes
+
+hashTally: Map<PartitionId, Map<hash, count>>
+
+nodeToPartitions: PartitionMap
+
+numPartitions: number
+
+/** FUNCTIONS */
+
+on gossip:
+
+  sender: NodeId
+  payload: PartitionHashes
+
+  Check nodeToPartitions to make sure all PartitionIds in payload belong to sender
+
+  Add partition hashes from payload into hashTally
+
+  Once hashTally has numPartitions number of PartitionId's,
+    For each PartitionId, take the hash with the highest count and put it into allHashes
+
+
+### NOTES ###
+
+Since this consensus needs to happen for each cycle, we're going to run into problems with asynchroniety here
+that have been solved by CycleCreator.
+
+This makes me think partition hashes and the network hash might be better suited as a cycle module, but we can do that
+after we get something working.

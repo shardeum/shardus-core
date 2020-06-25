@@ -1,17 +1,29 @@
-import { storage, stateManager, crypto } from '../p2p/Context'
+import { storage, stateManager, crypto, network } from '../p2p/Context'
 import ShardFunctions from '../state-manager/shardFunctions'
 import { AddressRange } from '../state-manager/shardFunctionTypes'
-import { parseRecord } from '../p2p/Archivers'
+import { PartitionGossip } from './partition-gossip'
+import { sleep } from '../utils'
+
+/** TYPES */
+
+interface Account {
+  accountId: string
+  hash: string
+}
 
 type PartitionRanges = Map<AddressRange['partition'], AddressRange>
 
-type PartitionAccounts = Map<AddressRange['partition'], [string, string][]>
+type PartitionAccounts = Map<AddressRange['partition'], Account[]>
 
-type ParitionHashes = Map<AddressRange['partition'], string>
+export type PartitionHashes = Map<AddressRange['partition'], string>
 
 type NetworkStateHash = string
 
+/** STATE */
+
 let oldDataPath: string
+
+/** FUNCTIONS */
 
 export function setOldDataPath(path) {
   oldDataPath = path
@@ -20,58 +32,48 @@ export function setOldDataPath(path) {
 
 export function startSnapshotting() {
   stateManager.on('cycleTxsFinalized', async (shard: CycleShardData) => {
+    // Compute partition hashes for all partitions we cover
     const partitionRanges = getPartitionRanges(shard)
-    const accounts = await storage.getAccountCopiesByCycle(shard.cycleNumber)
+    const accounts = (await storage.getAccountCopiesByCycle(
+      shard.cycleNumber
+    )) as Account[]
     const partitionAccounts = getPartitionAccounts(shard, accounts)
     const partitionHashes = createPartitionHashes(partitionAccounts)
-    const networkStateHash = createNetworkStateHash(partitionHashes)
 
-    for (const [partitionId, hash] of partitionHashes) {
-      await storage.addPartitionHash({
-        partitionId,
-        cycleNumber: shard.cycleNumber,
-        hash,
-      })
-    }
-    await storage.addNetworkState({
-      cycleNumber: shard.cycleNumber,
-      hash: networkStateHash
+    // Gossip to get all partition hashes
+    const partitionGossip = new PartitionGossip(shard)
+
+    partitionGossip.once('gotAllHashes', (allHashes: PartitionHashes) => {
+      // Compute network hash from all partition hashes
+      const networkStateHash = createNetworkStateHash(allHashes)
+
+      // Save partion and network hashes to DB
+      savePartitionAndNetworkHashes(shard, allHashes, networkStateHash)
+
+      // Log partitions and accounts
+      logPartitionsAndAccounts(
+        shard,
+        partitionRanges,
+        partitionHashes,
+        partitionAccounts
+      )
     })
 
-    log(`
-    cycle: ${shard.cycleNumber}
+    await sleep(500) // [HACK] Wait for everyone to register their handlers 
+    /**
+     * [NOTE] Try sleeping longer if nodes are missing gossip
+     * But don't sleep longer than 1000 ms. This could cause cycle problems
+     */
 
-    partitions: ${partitionRanges.size}
-    `)
-
-    for (const partition of shard.ourStoredPartitions) {
-      const range = partitionRanges.get(partition)
-      if (range) {
-        const acctsLow = range.low.substring(0, 5)
-        const acctsHigh = range.high.substring(0, 5)
-        const partHash = partitionHashes.get(partition)
-        const formattedPartHash = partHash ? partHash.substring(0, 5) : 'N/A'
-        console.log(`      part ${partition} | accts ${acctsLow} - ${acctsHigh} | hash ${formattedPartHash}
-      `)
-      }
-      const accounts = partitionAccounts.get(partition)
-      if (accounts) {
-        for (const account of accounts) {
-          const acctId = account[0].substring(0, 5)
-          const acctHash = account[1].substring(0, 5)
-          console.log(`        acct ${acctId} | hash ${acctHash}`)
-        }
-        console.log()
-      }
-    }
+    partitionGossip.send(partitionHashes) // Start gossiping
   })
 }
 
 function getPartitionAccounts(
   shard: CycleShardData,
-  accounts: { accountId: string; hash: string }[]
+  accounts: Account[]
 ): PartitionAccounts {
-  const partitionAccounts: Map<number, [string, string][]> = new Map()
+  const partitionAccounts: PartitionAccounts = new Map()
 
   for (const account of accounts) {
     const { homePartition } = ShardFunctions.addressToPartition(
@@ -79,7 +81,10 @@ function getPartitionAccounts(
       account.accountId
     )
     const accounts = partitionAccounts.get(homePartition) || []
-    accounts.push([account.accountId, account.hash])
+    accounts.push({
+      accountId: account.accountId,
+      hash: account.hash,
+    })
     partitionAccounts.set(homePartition, accounts)
   }
 
@@ -88,7 +93,7 @@ function getPartitionAccounts(
 
 function createPartitionHashes(
   partitionAccounts: PartitionAccounts
-): ParitionHashes {
+): PartitionHashes {
   const partitionHashes: Map<number, string> = new Map()
 
   for (const [partition, accounts] of partitionAccounts) {
@@ -100,9 +105,9 @@ function createPartitionHashes(
 }
 
 function createNetworkStateHash(
-  partitionHashes: ParitionHashes
+  partitionHashes: PartitionHashes
 ): NetworkStateHash {
-  let partitionHashArray = []
+  const partitionHashArray = []
   for (const [partitionId, hash] of partitionHashes) {
     partitionHashArray.push(hash)
   }
@@ -121,6 +126,58 @@ function getPartitionRanges(shard: CycleShardData): PartitionRanges {
   }
 
   return partitionRanges
+}
+
+async function savePartitionAndNetworkHashes(
+  shard: CycleShardData,
+  partitionHashes: PartitionHashes,
+  networkHash: NetworkStateHash
+) {
+  for (const [partitionId, hash] of partitionHashes) {
+    await storage.addPartitionHash({
+      partitionId,
+      cycleNumber: shard.cycleNumber,
+      hash,
+    })
+  }
+  await storage.addNetworkState({
+    cycleNumber: shard.cycleNumber,
+    hash: networkHash,
+  })
+}
+
+function logPartitionsAndAccounts(
+  shard: CycleShardData,
+  ranges: PartitionRanges,
+  partitionHashes: PartitionHashes,
+  partitionAccounts: PartitionAccounts
+) {
+  log(`
+  cycle: ${shard.cycleNumber}
+
+  partitions: ${ranges.size}
+  `)
+
+  for (const partition of shard.ourStoredPartitions) {
+    const range = ranges.get(partition)
+    if (range) {
+      const acctsLow = range.low.substring(0, 5)
+      const acctsHigh = range.high.substring(0, 5)
+      const partHash = partitionHashes.get(partition)
+      const formattedPartHash = partHash ? partHash.substring(0, 5) : 'N/A'
+      console.log(`      part ${partition} | accts ${acctsLow} - ${acctsHigh} | hash ${formattedPartHash}
+    `)
+    }
+    const accounts = partitionAccounts.get(partition)
+    if (accounts) {
+      for (const account of accounts) {
+        const acctId = account[0].substring(0, 5)
+        const acctHash = account[1].substring(0, 5)
+        console.log(`        acct ${acctId} | hash ${acctHash}`)
+      }
+      console.log()
+    }
+  }
 }
 
 function log(...things) {
