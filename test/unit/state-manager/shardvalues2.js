@@ -95,7 +95,7 @@ let numNodes = 6
 let numNodes2 = 0
 
 /** @type {boolean} */
-let useHardcodenodes = true
+let useHardcodenodes = false
 
 //t19
 //let hardcodeNodes = ["4423x0ab77","4a45x22d27","55bax46bbb","5d01x39d48","63eexfbe34","7ddcxb6586","9b8exa1c15","b520x4eef8","cab2x831cb","e029x146ea","f00bx0522f"]
@@ -321,6 +321,7 @@ for (let i = 0; i < testIterations; i++) {
   // test home node search
   for (let j = 0; j < homeNodeQueryTests; ++j) {
     let address = crypto.randomBytes() // '160a' + '7'.repeat(60) //crypto.randomBytes()
+
     let homeNode = ShardFunctions2.findHomeNode(shardGlobals, address, parititionShardDataMap)
     if (homeNode == null) {
       homeNode = ShardFunctions2.findHomeNode(shardGlobals, address, parititionShardDataMap)
@@ -333,6 +334,22 @@ for (let i = 0; i < testIterations; i++) {
       throw new Error('home node not in range 1')
     }
     let { homePartition, addressNum } = ShardFunctions2.addressToPartition(shardGlobals, address)
+    let addressRangeHome = ShardFunctions2.partitionToAddressRange2(shardGlobals, homePartition)
+    
+    if(addressRangeHome.low > address){
+      let {homePartition2, addressNum2} = ShardFunctions2.addressToPartition(shardGlobals, address)
+      ShardFunctions2.addressToPartition(shardGlobals, address)
+      let fail = true
+      let asdf = homePartition2
+    }
+    if(addressRangeHome.high < address){
+      let {homePartition3, addressNum3} = ShardFunctions2.addressToPartition(shardGlobals, address)
+      ShardFunctions2.addressToPartition(shardGlobals, address)
+      let asdf = homePartition3
+      let fail = true
+    }
+
+
     let inRange2 = ShardFunctions2.testInRange(homePartition, homeNode.storedPartitions)
     if (inRange2 === false) {
       homeNode = ShardFunctions2.findHomeNode(shardGlobals, address, parititionShardDataMap)
@@ -361,6 +378,42 @@ for (let i = 0; i < testIterations; i++) {
       let partitionInRange = ShardFunctions2.testInRange(homePartition, nodeData.storedPartitions)
       let inRange4 = ShardFunctions2.testAddressInRange(address, nodeData.storedPartitions)
       if (partitionInRange && inRange4 === false) {
+        partitionInRange = ShardFunctions2.testInRange(homePartition, nodeData.storedPartitions)
+        inRange4 = ShardFunctions2.testAddressInRange(address, nodeData.storedPartitions)
+
+        if(nodeData.storedPartitions.rangeIsSplit === true){
+          let addressRange1 = ShardFunctions2.partitionToAddressRange2(shardGlobals, nodeData.storedPartitions.partitionStart1)
+          let addressRange2 = ShardFunctions2.partitionToAddressRange2(shardGlobals, nodeData.storedPartitions.partitionEnd1)
+
+          if(addressRange1.low > address){
+            let fail = true
+          }
+          if(addressRange2.high < address){
+            let fail = true
+          }
+
+          let addressRange1b = ShardFunctions2.partitionToAddressRange2(shardGlobals, nodeData.storedPartitions.partitionStart2)
+          let addressRange2b = ShardFunctions2.partitionToAddressRange2(shardGlobals, nodeData.storedPartitions.partitionEnd2)
+
+          if(addressRange1b.low > address){
+            let fail = true
+          }
+          if(addressRange2b.high < address){
+            let fail = true
+          }
+        } else {
+          let addressRange1 = ShardFunctions2.partitionToAddressRange2(shardGlobals, nodeData.storedPartitions.partitionStart1)
+          let addressRange2 = ShardFunctions2.partitionToAddressRange2(shardGlobals, nodeData.storedPartitions.partitionEnd1)
+
+          if(addressRange1.low > address){
+            let fail = true
+          }
+          if(addressRange2.high < address){
+            let fail = true
+          }
+        }
+        //let addressRange = ShardFunctions2.partitionToAddressRange2(shardGlobals, partitionStart)
+
         throw new Error(`address not in range 2. node: ${utils.makeShortHash(node.id)} addr: ${utils.makeShortHash(address)} home: ${utils.makeShortHash(homeNode.node.id)} p:${partitionInRange}`)
       }
       // if (inRange4 === true && partitionInRange === false) {

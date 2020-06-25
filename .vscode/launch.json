@@ -106,5 +106,14 @@
                 "<node_internals>/**"
             ]
         },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "shardCalculation2",
+            "program": "${workspaceFolder}\\test\\unit\\state-manager\\shardCalculation2.js",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        },
     ]
 }

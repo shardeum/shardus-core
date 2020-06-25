@@ -18,12 +18,16 @@ type ShardGlobals2 = {
      */
     numVisiblePartitions: number;
     /**
-     * consenus radius (number of nodes to each side of us that hold consensus data)
+     * consenus radius "R" (number of nodes to each side of us that hold consensus data)
      */
     consensusRadius: number;
     /**
-     * Address range to look left and right (4 byte numeric)
+     * number of nodes in and edge on one side "E"
      */
+    nodesPerEdge: number;
+    /**
+     * Address range to look left and right (4 byte numeric)
+     */    
     nodeLookRange: number;
     /**
      * End address in numeric form (4 bytes)

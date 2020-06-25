@@ -20,7 +20,7 @@ class ShardFunctions {
    * @param {number} numNodes
    * @param {number} nodesPerConsenusGroup
    */
-  static calculateShardGlobals (numNodes: number, nodesPerConsenusGroup: number) : ShardGlobals {
+  static calculateShardGlobals (numNodes: number, nodesPerConsenusGroup: number, nodesPerEdge: number) : ShardGlobals {
 
     let shardGlobals = {} as ShardGlobals
     

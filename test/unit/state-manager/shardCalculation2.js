@@ -1,16 +1,11 @@
 // @ts-nocheck
 /*eslint-disable*/
-// const StateManager = require('../../../src/state-manager')
-//const ShardFunctions2 = require('../../../src/state-manager/shardFunctions.js')
+
 const ShardFunctions2 = require('../../../build/src/state-manager/shardFunctions2.js').default
-// import {ShardGlobals,ShardInfo,StoredPartition,NodeShardData,AddressRange, HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange} from  './shardFunctionTypes'
-// import ShardFunctions2 from './shardFunctions.js'
 
 const crypto = require('shardus-crypto-utils')
 const utils = require('../../../build/src/utils')
 crypto('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
-
-
 
 let maxLogs = 100
 
@@ -44,12 +39,7 @@ function testPartitionMath1_old(numNodes, debugIndex){
     if(partitionStart !== lowResult.homePartition){
       logErrorLimited(`failed partition ${partitionStart} low result: ${lowResult.homePartition}`)
     }
-    // if(partitionStart !== highResult.homePartition){
-    //   logErrorLimited(`failed partition ${partitionStart} high result: ${highResult.homePartition}`)
-    // }
-    // if(highResult.homePartition !== addressRange.partitionEnd){
-    //   logErrorLimited(`failed partition ${addressRange.partitionEnd} high result: ${highResult.homePartition}`)
-    // }
+
   }
   if(errorsLogged > 0){
     console.log(`A num nodes: ${numNodes} complete total Errors: ${errorsLogged}`)
@@ -59,6 +49,7 @@ function testPartitionMath1_old(numNodes, debugIndex){
 function testPartitionMath1_new(numNodes, debugIndex){
   let shardGlobals = ShardFunctions2.calculateShardGlobals(numNodes, nodesPerConsenusGroup)
 
+  let nextAddress = null
   for(let i=0; i<numNodes; i++ ){
     let partitionStart = i
 
@@ -71,24 +62,32 @@ function testPartitionMath1_new(numNodes, debugIndex){
     let lowResult = ShardFunctions2.addressToPartition(shardGlobals, addressRange.low)
     let highResult = ShardFunctions2.addressToPartition(shardGlobals, addressRange.high)
 
+    let { address1, address2 } = ShardFunctions2.getNextAdjacentAddresses(addressRange.high)
+    
+    // logErrorLimited(`info i:${i}/${numNodes} ${utils.stringifyReduce(addressRange.low)} hi ${utils.stringifyReduce(addressRange.high)}`)
+    logErrorLimited(`info i:${i}/${numNodes} ${(addressRange.low)} hi ${(addressRange.high)}`)
+
     if(partitionStart !== lowResult.homePartition){
       logErrorLimited(`failed partition ${partitionStart} low result: ${lowResult.homePartition}`)
     }
-    // if(partitionStart !== highResult.homePartition){
-    //   logErrorLimited(`failed partition ${partitionStart} high result: ${highResult.homePartition}`)
-    // }
+
     if(highResult.homePartition !== addressRange.partitionEnd){
       logErrorLimited(`failed partition ${addressRange.partitionEnd} high result: ${highResult.homePartition}`)
     }
+
+    if(nextAddress != null && nextAddress !== addressRange.low){
+      logErrorLimited(`failed getNextAdjacentAddresses ${nextAddress} addressRange.low: ${addressRange.low}`)
+    }
+    nextAddress = address2
   }
   if(errorsLogged > 0){
     console.log(`B num nodes: ${numNodes} complete total Errors: ${errorsLogged}`)
   }
 }
 
-// testPartitionMath1_B(1111)
+testPartitionMath1_new(10)
 
-let maxNodesToTest = 3000
+let maxNodesToTest = 300
 
 // test node counts 1 through maxNodesToTest node networks
 
@@ -98,11 +97,8 @@ let maxNodesToTest = 3000
 //   errorsLogged=0
 //   testPartitionMath1_old(i)
 // }
-
-testPartitionMath1_new(10)
-
-// console.log(`--------New math--------------`)
-// // New math
+console.log(`--------New math--------------`)
+// New math
 // for(let i=1; i < maxNodesToTest; i++){
 //   errorsLogged=0
 //   testPartitionMath1_new(i)

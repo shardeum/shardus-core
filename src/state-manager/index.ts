@@ -378,9 +378,10 @@ class StateManager extends EventEmitter {
       cycleShardData.timestamp = cycle.start * 1000
     }
 
+    let edgeNodes = this.config.sharding.nodesPerConsensusGroup as number
 
     // save this per cycle?
-    cycleShardData.shardGlobals = ShardFunctions.calculateShardGlobals(cycleShardData.activeNodes.length, this.config.sharding.nodesPerConsensusGroup as number)
+    cycleShardData.shardGlobals = ShardFunctions.calculateShardGlobals(cycleShardData.activeNodes.length, this.config.sharding.nodesPerConsensusGroup as number, edgeNodes)
 
     // partition shard data
     ShardFunctions.computePartitionShardDataMap(cycleShardData.shardGlobals, cycleShardData.parititionShardDataMap, 0, cycleShardData.shardGlobals.numPartitions)

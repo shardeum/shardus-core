@@ -11,7 +11,7 @@ class ShardFunctions2 {
    * @param {number} numNodes
    * @param {number} nodesPerConsenusGroup
    */
-  static calculateShardGlobals (numNodes: number, nodesPerConsenusGroup: number) : ShardGlobals2 {
+  static calculateShardGlobals (numNodes: number, nodesPerConsenusGroup: number, nodesPerEdge: number) : ShardGlobals2 {
 
     let shardGlobals = {} as ShardGlobals2
     
@@ -19,13 +19,29 @@ class ShardFunctions2 {
       nodesPerConsenusGroup++
       console.log('upgrading consensus size to odd number: ' + nodesPerConsenusGroup)
     }
-
+    //OLD math before "E" became separate term
+    // shardGlobals.numActiveNodes = numNodes
+    // shardGlobals.nodesPerConsenusGroup = nodesPerConsenusGroup
+    // shardGlobals.numPartitions = shardGlobals.numActiveNodes
+    // shardGlobals.numVisiblePartitions = 2 * shardGlobals.nodesPerConsenusGroup
+    // shardGlobals.consensusRadius = Math.floor((nodesPerConsenusGroup - 1) / 2)
+    // let partitionStoreRadius = (((shardGlobals.numVisiblePartitions) / 2) + 0) // removed the +1.0 that was getting added before we divded by two.  also the .5
+    // shardGlobals.nodeLookRange = Math.floor((partitionStoreRadius / shardGlobals.numPartitions) * 0xffffffff) // 0.5 added since our search will look from the center of a partition
+   
+    //Calculate with E
     shardGlobals.numActiveNodes = numNodes
     shardGlobals.nodesPerConsenusGroup = nodesPerConsenusGroup
     shardGlobals.numPartitions = shardGlobals.numActiveNodes
-    shardGlobals.numVisiblePartitions = 2 * shardGlobals.nodesPerConsenusGroup
+
     shardGlobals.consensusRadius = Math.floor((nodesPerConsenusGroup - 1) / 2)
-    let partitionStoreRadius = (((shardGlobals.numVisiblePartitions) / 2) + 0) // removed the +1.0 that was getting added before we divded by two.  also the .5
+    if(nodesPerEdge == null){
+      nodesPerEdge = shardGlobals.consensusRadius
+    }
+    shardGlobals.nodesPerEdge = nodesPerEdge
+
+    let partitionStoreRadius = shardGlobals.consensusRadius + shardGlobals.nodesPerEdge
+    shardGlobals.numVisiblePartitions = shardGlobals.nodesPerConsenusGroup + nodesPerEdge * 2
+
     shardGlobals.nodeLookRange = Math.floor((partitionStoreRadius / shardGlobals.numPartitions) * 0xffffffff) // 0.5 added since our search will look from the center of a partition
 
     return shardGlobals
@@ -1016,8 +1032,9 @@ class ShardFunctions2 {
 
     // 2^32
     let size = Math.round(4294967296 / numPartitions)
+    let preRound = addressNum / size
     let homePartition = Math.round(addressNum / size)
-
+    let asdf = preRound
     if(homePartition === numPartitions){
       homePartition = homePartition - 1 
     }
@@ -1030,7 +1047,7 @@ class ShardFunctions2 {
     // 2^32
     let size = Math.round(4294967296 / numPartitions)
     let homePartition = Math.round(addressNum / size)
-    
+
     if(homePartition === numPartitions){
       homePartition = homePartition - 1 
     }
@@ -1223,11 +1240,14 @@ class ShardFunctions2 {
     let endAddr = (endPartition * size) 
     
     //fix for int precision problem where id of the highest shard rolls over
-    if(endAddr > 4294967295){
+    if(endAddr >= 4294967295){
       endAddr = 4294967295
-    } 
-    if(endPartition === shardGlobals.numPartitions){
+    } else {
+      // If we are not at the end of our max range then need to back up one to stay in the same partition as the start address
+      endAddr = endAddr - 1 //subtract 1 so we do not overlap!
+    }
 
+    if(endPartition === shardGlobals.numPartitions){
       endPartition = shardGlobals.numPartitions - 1
       result.partitionEnd = endPartition
     }
@@ -1494,13 +1514,12 @@ class ShardFunctions2 {
     return [centerAddr, centerAddrPlusOne]
   }
 
-  /**
+ /**
    * This will find two address that are close to what we want
    * @param {string} address
    * @returns {{address1:string; address2:string}}
-   * TODO TSConversion  what is a good way to define these on the fly return results?
+   * WARNING this only works input ends in all Fs after first byte.
    * 
-   * TODO needs to check for case where addressNum = 0xFFFFFFFF because +1 would be an overflow. but.. how does that matter to calling code
    */
   static getNextAdjacentAddresses (address: string) {
     let addressNum = parseInt(address.slice(0, 8), 16)
@@ -1511,6 +1530,42 @@ class ShardFunctions2 {
     let address1 = addressPrefixHex + 'f'.repeat(56)
     let address2 = addressPrefixHex2 + '0'.repeat(56)
     return { address1, address2 } // is this valid: as {address1:string; address2:string}
+  }
+
+  /**
+   * This will find two address that are close to what we want
+   * @param {string} address
+   * @returns {{address1:string; address2:string}}
+   * 
+   */
+  static getNextAdjacentAddresses_wip (address: string) {
+    let addressNum = parseInt(address.slice(0, 8), 16)
+
+    let addressPrefixHex = ShardFunctions2.leadZeros8((addressNum).toString(16))
+
+    let trail = address.slice(8,64)
+
+    if(trail === 'f'.repeat(56)){
+      //If we are not at the end look one ahead
+      if(addressNum < 4294967295){
+        addressNum = addressNum + 1
+      }
+
+      let addressPrefixHex2 = ShardFunctions2.leadZeros8((addressNum).toString(16))
+
+      let address1 = addressPrefixHex + 'f'.repeat(56)
+      let address2 = addressPrefixHex2 + '0'.repeat(56)
+      return { address1, address2 } 
+    }
+    else { // if(trail === '0'.repeat(56)){
+      //If we are not at the end look one ahead
+      let addressPrefixHex2 = ShardFunctions2.leadZeros8((addressNum).toString(16))
+
+      let address1 = addressPrefixHex + '0'.repeat(56)
+      let address2 = addressPrefixHex2 + '0'.repeat(55) + '1'
+      return { address1, address2 } 
+    }
+    //else real math.
   }
 
   static getCenterHomeNode (shardGlobals: ShardGlobals2, parititionShardDataMap: ParititionShardDataMap2, lowAddress: string, highAddress: string): NodeShardData2 | null {
