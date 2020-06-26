@@ -7186,7 +7186,8 @@ class StateManager extends EventEmitter {
 
   startShardCalculations () {
     //this.p2p.state.on('cycle_q1_start', async (lastCycle, time) => {
-    this._registerListener(this.p2p.state, 'cycle_q1_start', async (lastCycle: Shardus.Cycle, time:number) => {  
+    this._registerListener(this.p2p.state, 'cycle_q1_start', async (lastCycle: Shardus.Cycle, time:number) => {
+      this.emit('set_queue_partition_gossip')  
       lastCycle = this.p2p.state.getLastCycle()
       if (lastCycle) {
         let ourNode = this.p2p.state.getNode(this.p2p.id)

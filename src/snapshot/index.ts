@@ -1,5 +1,6 @@
 import { storage, stateManager, crypto, network } from '../p2p/Context'
 import ShardFunctions from '../state-manager/shardFunctions'
+import Shardus = require('../shardus/shardus-types')
 import { AddressRange } from '../state-manager/shardFunctionTypes'
 import { PartitionGossip } from './partition-gossip'
 import { sleep } from '../utils'
@@ -31,6 +32,14 @@ export function setOldDataPath(path) {
 }
 
 export function startSnapshotting() {
+  const partitionGossip = new PartitionGossip()
+  partitionGossip.registerGossipHandler()
+
+  // set queue_partition_gossip flag at the start of Q1
+  stateManager.on('set_queue_partition_gossip', async () => {
+    partitionGossip.setGossipQueueFlag()
+  })
+
   stateManager.on('cycleTxsFinalized', async (shard: CycleShardData) => {
     // Compute partition hashes for all partitions we cover
     const partitionRanges = getPartitionRanges(shard)
@@ -39,10 +48,8 @@ export function startSnapshotting() {
     )) as Account[]
     const partitionAccounts = getPartitionAccounts(shard, accounts)
     const partitionHashes = createPartitionHashes(partitionAccounts)
-
-    // Gossip to get all partition hashes
-    const partitionGossip = new PartitionGossip(shard)
-
+    
+    partitionGossip.setCycleShard(shard) // set shard value for calculations
     partitionGossip.once('gotAllHashes', (allHashes: PartitionHashes) => {
       // Compute network hash from all partition hashes
       const networkStateHash = createNetworkStateHash(allHashes)
@@ -65,7 +72,10 @@ export function startSnapshotting() {
      * But don't sleep longer than 1000 ms. This could cause cycle problems
      */
 
+    // Gossip to get all partition hashes
     partitionGossip.send(partitionHashes) // Start gossiping
+    partitionGossip.processGossip(null) // process the gossips in the Queue
+    partitionGossip.clearGossipQueueFlag() // clear flag to immediately process next incoming gossips
   })
 }
 
