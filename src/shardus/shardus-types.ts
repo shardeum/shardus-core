@@ -299,6 +299,9 @@ declare namespace Shardus {
     data: any
     /** Timestamp */
     timestamp: number
+
+    /** optional data related to sync process */
+    syncData?: any
   }
 
   export interface WrappedResponse extends WrappedData {

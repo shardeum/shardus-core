@@ -96,8 +96,9 @@ class StateManager extends EventEmitter {
     /** how to handle reparing a global account... yikes that is hard. */
     globalAccountRepairBank: Map<string, Shardus.AccountsCopy[]>
 
-    //combinedAccountData:Shardus.WrappedData[]
     appFinishedSyncing: boolean;
+
+    combinedAccountData: Shardus.WrappedData[];
 
   constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage : Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     super()
@@ -212,6 +213,8 @@ class StateManager extends EventEmitter {
     
 
     this.globalAccountMap = new Map()
+
+
 
     // debug hack
     if (p2p == null) {
@@ -1155,15 +1158,17 @@ class StateManager extends EventEmitter {
       }
 
       let dataToSet = []
-
       let cycleNumber = this.currentCycleShardData.cycleNumber // Math.max(1, this.currentCycleShardData.cycleNumber-1 ) //kinda hacky?
+
+      let goodAccounts:Shardus.WrappedData[] = []
+
       //Write the data! and set global memory data!.  set accounts copy data too.
       for(let report of globalReport2.accounts){
         let accountData = accountDataById[report.id]
         if(accountData != null){
 
           dataToSet.push(accountData)
-
+          goodAccounts.push(accountData)
           if(this.globalAccountMap.has(report.id)){
             this.mainLogger.debug(`DATASYNC: syncStateDataGlobals has ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
           } else {
@@ -1188,6 +1193,8 @@ class StateManager extends EventEmitter {
    
       let failedHashes = await this.checkAndSetAccountData(dataToSet)
      
+      await this.writeCombinedAccountDataToBackups(goodAccounts, failedHashes)
+
       if(failedHashes && failedHashes.length > 0){
         throw new Error("setting data falied no error handling for this yet")
       }
@@ -1665,7 +1672,7 @@ class StateManager extends EventEmitter {
 
     //   For each account in the Account State Table make sure the entry in Account data has the same State_after value; if not save the account id to be looked up later
     this.accountsWithStateConflict = []
-    this.goodAccounts = []
+    let goodAccounts:Shardus.WrappedData[] = []
     let noSyncData = 0
     let noMatches = 0
     let outOfDateNoTxs = 0
@@ -1696,13 +1703,13 @@ class StateManager extends EventEmitter {
         //   }
         // }
         delete account.syncData
-        this.goodAccounts.push(account)
+        goodAccounts.push(account)
       }
     }
 
-    this.mainLogger.debug(`DATASYNC: processAccountData saving ${this.goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase} outOfDateNoTxs: ${outOfDateNoTxs}`)
+    this.mainLogger.debug(`DATASYNC: processAccountData saving ${goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase} outOfDateNoTxs: ${outOfDateNoTxs}`)
     // failedHashes is a list of accounts that failed to match the hash reported by the server
-    let failedHashes = await this.checkAndSetAccountData(this.goodAccounts) // repeatable form may need to call this in batches
+    let failedHashes = await this.checkAndSetAccountData(goodAccounts) // repeatable form may need to call this in batches
 
     if (failedHashes.length > 1000) {
       this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
@@ -1732,12 +1739,16 @@ class StateManager extends EventEmitter {
       }
     }
 
-    await this.writeCombinedAccountDataToBackups(failedHashes)
+    await this.writeCombinedAccountDataToBackups(goodAccounts, failedHashes)
 
     this.combinedAccountData = [] // we can clear this now.
   }
 
-  async writeCombinedAccountDataToBackups (failedHashes: string[]) {  // ?:{[id:string]: boolean}
+  /**
+   * writeCombinedAccountDataToBackups
+   * @param failedHashes This is a list of hashes that failed and should be ignored in the write operation.
+   */
+  async writeCombinedAccountDataToBackups (goodAccounts:Shardus.WrappedData[] , failedHashes: string[]) {  // ?:{[id:string]: boolean}
     if (failedHashes.length === 0) {
       return // nothing to do yet
     }
@@ -1750,7 +1761,7 @@ class StateManager extends EventEmitter {
     const lastCycle = this.p2p.state.getLastCycle()
     let cycleNumber = lastCycle.counter
     let accountCopies:AccountCopy[] = []
-    for (let accountEntry of this.goodAccounts) {
+    for (let accountEntry of goodAccounts) {
       // check failed hashes
       if (failedAccountsById[accountEntry.stateId]) {
         continue
