@@ -181,9 +181,11 @@ function logPartitionsAndAccounts(
     const accounts = partitionAccounts.get(partition)
     if (accounts) {
       for (const account of accounts) {
-        const acctId = account[0].substring(0, 5)
-        const acctHash = account[1].substring(0, 5)
-        console.log(`        acct ${acctId} | hash ${acctHash}`)
+          let accountId =account[0]
+          let hash = account[1]
+          const acctId = (accountId != null)?accountId.substring(0, 5):'null'
+          const acctHash = (hash != null)?hash.substring(0, 5):'null'
+          console.log(`        acct ${acctId} | hash ${acctHash}`)         
       }
       console.log()
     }
