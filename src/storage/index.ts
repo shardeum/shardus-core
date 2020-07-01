@@ -774,6 +774,17 @@ class Storage {
     }
   }
 
+  async getAccountCopiesByCycleAndRange (cycleNumber, lowAddress, highAddress) {
+    this._checkInit()
+    try {
+      const query = `select accountId, cycleNumber, hash from accountsCopy WHERE cycleNumber<=${cycleNumber} and accountId>="${lowAddress}" and accountId<="${highAddress}"  group by accountId order by accountId asc`
+      let result = await this._query(query, [])
+      return result
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
   // example of a raw query with some similarities to what we want:
 
   // async getAllLatestAccounts () {
