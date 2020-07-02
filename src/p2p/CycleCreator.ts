@@ -29,6 +29,7 @@ export interface CycleCert extends SignedObject {
 }
 
 interface BaseRecord {
+  networkId: string
   counter: number
   previous: string
   start: number
@@ -466,6 +467,7 @@ function makeCycleRecord(
   prevRecord?: CycleRecord
 ): CycleRecord {
   const baseRecord: BaseRecord = {
+    networkId: crypto.hash({rand: Math.floor(Math.random() * 1000000)}),
     counter: prevRecord ? prevRecord.counter + 1 : 0,
     previous: prevRecord ? makeCycleMarker(prevRecord) : '0'.repeat(64),
     start: prevRecord

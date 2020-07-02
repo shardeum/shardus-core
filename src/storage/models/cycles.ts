@@ -5,6 +5,7 @@ import P2PApoptosis = require('../../p2p/Apoptosis')
 const cycles = [
   'cycles',
   {
+    networkId: { type: Sequelize.TEXT, allowNull: false },
     counter: { type: Sequelize.BIGINT, unique: true, primaryKey: true, allowNull: false },
     certificate: { type: Sequelize.JSON, allowNull: false },
     previous: { type: Sequelize.TEXT, allowNull: false },
