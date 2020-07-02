@@ -1,6 +1,7 @@
-import { PartitionHashes } from './index'
-import { registerGossipHandler, sendGossip } from '../p2p/Comms'
 import { EventEmitter } from 'events'
+import { registerGossipHandler } from '../p2p/Comms'
+import { AddressRange } from '../state-manager/shardFunctionTypes'
+import { PartitionHashes } from './index'
 
 /** TYPES */
 
@@ -16,9 +17,9 @@ type Queue = Map<Message['cycle'], Message[]>
 
 type Collectors = Map<Message['cycle'], Collector>
 
-type Message = {
+export type Message = {
   cycle: number
-  data: any
+  data: Record<AddressRange['partition'], string>
 }
 
 const queue: Queue = new Map()
@@ -30,18 +31,18 @@ export class Collector extends EventEmitter {
   allHashes: PartitionHashes
   hashCounter: Map<PartitionId, Map<Hash, Count>>
 
-  constructor (shard: CycleShardData) {
+  constructor(shard: CycleShardData) {
     super()
     this.shard = shard
     this.allHashes = new Map()
     this.hashCounter = new Map()
   }
-  process (message: Message[]) {
+  process(message: Message[]) {
     // Loop through messages and add to hash tally
     for (let i = 0; i < message.length; i++) {
-      let data: any = message[i].data
+      const data = message[i].data
       const partitionHashes = new Map() as PartitionHashes
-      for (let partitionId in data) {
+      for (const partitionId in data) {
         partitionHashes.set(parseInt(partitionId), data[partitionId])
       }
 
@@ -49,11 +50,11 @@ export class Collector extends EventEmitter {
       // // [NOTE] Implement this last after everything is working
 
       // Add partition hashes into hashTally
-      for (let [partitionId, hash] of partitionHashes) {
+      for (const [partitionId, hash] of partitionHashes) {
         if (!this.hashCounter.has(partitionId)) {
           this.hashCounter.set(partitionId, new Map([[hash, 1]]))
         } else if (this.hashCounter.has(partitionId)) {
-          let counterMap = this.hashCounter.get(partitionId)
+          const counterMap = this.hashCounter.get(partitionId)
           counterMap.set(hash, counterMap.get(hash) + 1)
         }
       }
@@ -62,10 +63,10 @@ export class Collector extends EventEmitter {
     // When the hashes of all partitions have been collected, emit the 'gotAllHashes' event
     // and pass the most popular hash for each partition
     if (this.hashCounter.size === this.shard.shardGlobals.numPartitions) {
-      for (let [partitionId, counterMap] of this.hashCounter) {
+      for (const [partitionId, counterMap] of this.hashCounter) {
         let selectedHash
         let maxCount = 0
-        for (let [hash, counter] of counterMap) {
+        for (const [hash, counter] of counterMap) {
           if (counter > maxCount) {
             selectedHash = hash
             maxCount = counter
@@ -82,15 +83,15 @@ export class Collector extends EventEmitter {
 /** FUNCTIONS */
 
 // Registers partition gossip handler
-export function initGossip () {
-  registerGossipHandler('snapshot_gossip', message => {
+export function initGossip() {
+  registerGossipHandler('snapshot_gossip', (message) => {
     const { cycle } = message
     const collector = collectors.get(cycle)
     if (collector) {
       collector.process([message])
     } else {
       if (queue.has(cycle)) {
-        let messageList = queue.get(cycle)
+        const messageList = queue.get(cycle)
         messageList.push(message)
       } else {
         queue.set(cycle, [message])
@@ -100,7 +101,7 @@ export function initGossip () {
 }
 
 // Make a Collector to handle gossip for the given cycle
-export function newCollector (shard: CycleShardData): Collector {
+export function newCollector(shard: CycleShardData): Collector {
   // Creates a new Collector instance
   const collector = new Collector(shard)
 
@@ -115,7 +116,7 @@ export function newCollector (shard: CycleShardData): Collector {
 }
 
 // Cleans the collector and any remaining gossip in the queue for the given cycle
-export function clean (cycle: number) {
+export function clean(cycle: number) {
   collectors.delete(cycle)
   queue.delete(cycle)
 }

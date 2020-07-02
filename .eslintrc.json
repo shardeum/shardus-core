@@ -1,0 +1,11 @@
+{
+  "extends": "./node_modules/gts/",
+  "overrides": [
+    {
+      "files": ["**/*.ts", "**/*.tsx"],
+      "rules": {
+        "@typescript-eslint/member-delimiter-style": "off"
+      }
+    }
+  ]
+}

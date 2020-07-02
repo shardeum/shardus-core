@@ -1,10 +1,8 @@
-import { storage, stateManager, crypto, network } from '../p2p/Context'
-import ShardFunctions from '../state-manager/shardFunctions'
-import Shardus = require('../shardus/shardus-types')
-import { AddressRange } from '../state-manager/shardFunctionTypes'
-import { newCollector, initGossip, clean } from './partition-gossip'
-import { sleep } from '../utils'
 import { sendGossip } from '../p2p/Comms'
+import { crypto, stateManager, storage } from '../p2p/Context'
+import ShardFunctions from '../state-manager/shardFunctions'
+import { AddressRange } from '../state-manager/shardFunctionTypes'
+import { clean, initGossip, Message, newCollector } from './partition-gossip'
 
 /** TYPES */
 interface Account {
@@ -26,12 +24,12 @@ let oldDataPath: string
 
 /** FUNCTIONS */
 
-export function setOldDataPath (path) {
+export function setOldDataPath(path) {
   oldDataPath = path
   log('set old-data-path', oldDataPath)
 }
 
-export function startSnapshotting () {
+export function startSnapshotting() {
   initGossip()
   stateManager.on('cycleTxsFinalized', async (shard: CycleShardData) => {
     // 1) create our own partition hashes for that cycle number
@@ -40,12 +38,12 @@ export function startSnapshotting () {
     for (const partition of shard.ourStoredPartitions) {
       const range = partitionRanges.get(partition)
       if (range) {
-        let accountsInPartition = await storage.getAccountCopiesByCycleAndRange(
+        const accountsInPartition = await storage.getAccountCopiesByCycleAndRange(
           shard.cycleNumber,
           range.low,
           range.high
         )
-        let hash = crypto.hash(accountsInPartition)
+        const hash = crypto.hash(accountsInPartition)
         partitionHashes.set(partition, hash)
       }
     }
@@ -54,7 +52,7 @@ export function startSnapshotting () {
     const collector = newCollector(shard)
 
     // 3) gossip our partitition hashes to the rest of the network with that cycle number
-    const message = {
+    const message: Message = {
       cycle: shard.cycleNumber,
       data: {},
     }
@@ -81,11 +79,11 @@ export function startSnapshotting () {
   })
 }
 
-function createNetworkStateHash (
+function createNetworkStateHash(
   partitionHashes: PartitionHashes
 ): NetworkStateHash {
   let partitionHashArray = []
-  for (const [partitionId, hash] of partitionHashes) {
+  for (const [, hash] of partitionHashes) {
     partitionHashArray.push(hash)
   }
   partitionHashArray = partitionHashArray.sort()
@@ -93,7 +91,7 @@ function createNetworkStateHash (
   return hash
 }
 
-function getPartitionRanges (shard: CycleShardData): PartitionRanges {
+function getPartitionRanges(shard: CycleShardData): PartitionRanges {
   const partitionRanges = new Map()
 
   for (const partition of shard.ourStoredPartitions) {
@@ -106,7 +104,7 @@ function getPartitionRanges (shard: CycleShardData): PartitionRanges {
   return partitionRanges
 }
 
-async function savePartitionAndNetworkHashes (
+async function savePartitionAndNetworkHashes(
   shard: CycleShardData,
   partitionHashes: PartitionHashes,
   networkHash: NetworkStateHash
@@ -124,42 +122,6 @@ async function savePartitionAndNetworkHashes (
   })
 }
 
-function logPartitionsAndAccounts (
-  shard: CycleShardData,
-  ranges: PartitionRanges,
-  partitionHashes: PartitionHashes,
-  partitionAccounts: PartitionAccounts
-) {
-  log(`
-  cycle: ${shard.cycleNumber}
-
-  partitions: ${ranges.size}
-  `)
-
-  for (const partition of shard.ourStoredPartitions) {
-    const range = ranges.get(partition)
-    if (range) {
-      const acctsLow = range.low.substring(0, 5)
-      const acctsHigh = range.high.substring(0, 5)
-      const partHash = partitionHashes.get(partition)
-      const formattedPartHash = partHash ? partHash.substring(0, 5) : 'N/A'
-      console.log(`      part ${partition} | accts ${acctsLow} - ${acctsHigh} | hash ${formattedPartHash}
-    `)
-    }
-    const accounts = partitionAccounts.get(partition)
-    if (accounts) {
-      for (const account of accounts) {
-        let accountId = account[0]
-        let hash = account[1]
-        const acctId = accountId != null ? accountId.substring(0, 5) : 'null'
-        const acctHash = hash != null ? hash.substring(0, 5) : 'null'
-        console.log(`        acct ${acctId} | hash ${acctHash}`)
-      }
-      console.log()
-    }
-  }
-}
-
-function log (...things) {
+function log(...things) {
   console.log('DBG', 'SNAPSHOT', ...things)
 }
