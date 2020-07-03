@@ -6,6 +6,8 @@ import { CycleRecord } from './CycleCreator'
 import { Change } from './CycleParser'
 import { isFirst } from './Self'
 import * as Types from './Types'
+import { validateTypes } from '../utils'
+
 
 /** TYPES */
 
@@ -97,6 +99,11 @@ export function updateRecord(txs: Txs, record: CycleRecord, prev: CycleRecord) {
      * a boolean or something
      */
   }
+}
+
+export function validateRecordTypes(rec: Record): string{
+  // [TODO] Implement actual validation
+  return ''
 }
 
 export function parseRecord(record: CycleRecord): Change {

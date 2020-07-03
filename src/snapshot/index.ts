@@ -79,20 +79,34 @@ export function startSnapshotting() {
   })
 }
 
-export function getSafetyModeVals() {
+export async function readOldCycleRecord() {
+  let oldCycles = await storage.listOldCycles()
+  if (oldCycles && oldCycles.length > 0) return oldCycles[0]
+}
+
+export async function readOldNetworkHash() {
+  let networkStateHash = await storage.getLastOldNetworkHash()
+  console.log('Read Old network state hash', networkStateHash)
+  if (networkStateHash && networkStateHash.length > 0) return networkStateHash[0]
+}
+
+export async function getSafetyModeVals() {
   let safetyMode = false
   let safetyNum = 0
   let networkStateHash = ''
 
   if (oldDataPath) {
+    let oldCycleRecord = await readOldCycleRecord()
+    let oldNetworkHash = await readOldNetworkHash()
+
     // Turn safety node on
     safetyMode = true
 
-    // [TODO] Set the safetyNum to the number of active nodes in the last cycle saved in the old data
-    safetyNum = 0
+    // Set the safetyNum to the number of active nodes in the last cycle saved in the old data
+    safetyNum = oldCycleRecord.active
 
-    // [TODO] Set networkStateHash to the last network state hash saved in the old data
-    networkStateHash = ''
+    // Set networkStateHash to the last network state hash saved in the old data
+    networkStateHash = oldNetworkHash
   }
 
   return {

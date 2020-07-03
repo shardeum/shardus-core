@@ -18,7 +18,8 @@ interface Sqlite3Storage {
   mainLogger: Log4js.Logger
   initialized: boolean
   storageModels: any
-  db: any
+  db: any,
+  oldDb: any
 }
 
 class Sqlite3Storage {
@@ -98,10 +99,14 @@ class Sqlite3Storage {
     let dbDir = path.parse(this.storageConfig.options.storage).dir
 
     // Rename dbDir if it exists
+    let oldDirPath
     try {
-      const oldDirPath =  dbDir + '-old-' + Date.now()
+      oldDirPath =  dbDir + '-old-' + Date.now()
       fs.renameSync(dbDir, oldDirPath)
       Snapshot.setOldDataPath(oldDirPath)
+      if(oldDirPath) {
+        this.oldDb = new sqlite3.Database(`${oldDirPath}/db.sqlite`)
+      }
     } catch (e) {}
 
     // Create dbDir if it doesn't exist
@@ -141,6 +146,7 @@ class Sqlite3Storage {
   async close() {
     // this.mainLogger.info('Closing Database connections.')
     await this.db.close()
+    if (this.oldDb) await this.oldDb.close()
   }
 
   async runCreate(createStatement) {
@@ -207,6 +213,36 @@ class Sqlite3Storage {
     // console.log(queryString + '  VALUES: ' + stringify(valueArray))
 
     let results = await this.all(queryString, valueArray)
+    // optionally parse results!
+    if (!opts || !opts.raw) {
+      if (table.JSONkeys.length > 0) {
+        // for (let i = 0; i < results.length; i++) {
+        //   let result = results[i]
+        //   console.log('todo parse this??? ' + result)
+        // }
+      }
+    }
+    return results
+  }
+  async _readOld(table, params, opts) {
+    // return table.findAll({ where, ...opts })
+    let queryString = table.selectString
+
+    // let valueArray = []
+
+    let paramsArray = this.params2Array(params, table)
+
+    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
+      paramsArray
+    )
+
+    let valueArray = whereValueArray
+    queryString += whereString
+    queryString += this.options2string(opts)
+
+    // console.log(queryString + '  VALUES: ' + stringify(valueArray))
+
+    let results = await this.allOld(queryString, valueArray)
     // optionally parse results!
     if (!opts || !opts.raw) {
       if (table.JSONkeys.length > 0) {
@@ -324,6 +360,16 @@ class Sqlite3Storage {
             // paramEntry.v2 = between[1]
             paramEntry.sql = `${paramEntry.name} >= ?`
             paramEntry.vals = [paramEntry.v1]
+          } else {
+            paramEntry.type = '='
+            paramEntry.v1 = value
+            paramEntry.sql = `${paramEntry.name} ${paramEntry.type} ?`
+  
+            if (table.isColumnJSON[paramEntry.name]) {
+              paramEntry.v1 = stringify(paramEntry.v1)
+            }
+            paramEntry.vals = [paramEntry.v1]
+
           }
         } else {
           paramEntry.type = '='
@@ -431,6 +477,21 @@ class Sqlite3Storage {
           console.log(err)
           reject(err)
         } else {
+          resolve(rows)
+        }
+      })
+    })
+  }
+  allOld(sql, params = []) {
+    console.log(sql, params)
+    return new Promise((resolve, reject) => {
+      this.oldDb.all(sql, params, (err, rows) => {
+        if (err) {
+          console.log('Error running sql: ' + sql)
+          console.log(err)
+          reject(err)
+        } else {
+          console.log('ROWS: ', rows)
           resolve(rows)
         }
       })

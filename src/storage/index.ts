@@ -24,6 +24,7 @@ interface Storage {
   initialized: boolean
   _create: any
   _read: any
+  _readOld: any
   _update: any
   _delete: any
   _query: any
@@ -62,7 +63,7 @@ class Storage {
       'CREATE TABLE if not exists `accountStates` ( `accountId` VARCHAR(255) NOT NULL, `txId` VARCHAR(255) NOT NULL, `txTimestamp` BIGINT NOT NULL, `stateBefore` VARCHAR(255) NOT NULL, `stateAfter` VARCHAR(255) NOT NULL,  PRIMARY KEY (`accountId`, `txTimestamp`))'
     )
     await this.storage.runCreate(
-      'CREATE TABLE if not exists `cycles` (`networkId` TEXT NOT NULL, `counter` BIGINT NOT NULL UNIQUE PRIMARY KEY, `certificate` JSON NOT NULL, `previous` TEXT NOT NULL, `marker` TEXT NOT NULL, `start` BIGINT NOT NULL, `duration` BIGINT NOT NULL, `active` BIGINT NOT NULL, `desired` BIGINT NOT NULL, `expired` BIGINT NOT NULL, `joined` JSON NOT NULL, `joinedArchivers` JSON NOT NULL, `joinedConsensors` JSON NOT NULL, `activated` JSON NOT NULL, `activatedPublicKeys` JSON NOT NULL, `removed` JSON NOT NULL, `returned` JSON NOT NULL, `lost` JSON NOT NULL, `refuted` JSON NOT NULL)'
+      'CREATE TABLE if not exists `cycles` (`networkId` TEXT NOT NULL, `counter` BIGINT NOT NULL UNIQUE PRIMARY KEY, `safetyMode` BOOLEAN, `safetyNum` BIGINT,`networkStateHash` BIGINT,  `certificate` JSON NOT NULL, `previous` TEXT NOT NULL, `marker` TEXT NOT NULL, `start` BIGINT NOT NULL, `duration` BIGINT NOT NULL, `active` BIGINT NOT NULL, `syncing` BIGINT NOT NULL, `desired` BIGINT NOT NULL, `expired` BIGINT NOT NULL, `joined` JSON NOT NULL, `joinedArchivers` JSON NOT NULL, `joinedConsensors` JSON NOT NULL,`refreshedArchivers` JSON NOT NULL, `refreshedConsensors` JSON NOT NULL, `activated` JSON NOT NULL, `activatedPublicKeys` JSON NOT NULL, `removed` JSON NOT NULL, `returned` JSON NOT NULL, `lost` JSON NOT NULL, `refuted` JSON NOT NULL)'
     )
     await this.storage.runCreate(
       'CREATE TABLE if not exists `nodes` (`id` TEXT NOT NULL PRIMARY KEY, `publicKey` TEXT NOT NULL, `curvePublicKey` TEXT NOT NULL, `cycleJoined` TEXT NOT NULL, `internalIp` VARCHAR(255) NOT NULL, `externalIp` VARCHAR(255) NOT NULL, `internalPort` SMALLINT NOT NULL, `externalPort` SMALLINT NOT NULL, `joinRequestTimestamp` BIGINT NOT NULL, `activeTimestamp` BIGINT NOT NULL, `address` VARCHAR(255) NOT NULL, `status` VARCHAR(255) NOT NULL)'
@@ -92,6 +93,8 @@ class Storage {
       this.storage._create(table, values, opts)
     this._read = async (table, where, opts) =>
       this.storage._read(table, where, opts)
+    this._readOld = async (table, where, opts) =>
+      this.storage._readOld(table, where, opts)
     this._update = async (table, values, where, opts) =>
       this.storage._update(table, values, where, opts)
     this._delete = async (table, where, opts) =>
@@ -183,7 +186,7 @@ class Storage {
   async updateCycle(record, newRecord) {
     this._checkInit()
     try {
-      await this._update(this.storageModels.cycles, record, newRecord)
+      await this._update(this.storageModels.cycles, newRecord, record)
     } catch (e) {
       throw new Error(e)
     }
@@ -250,6 +253,35 @@ class Storage {
       throw new Error(e)
     }
     return cycles.map((c) => c.dataValues)
+  }
+  
+  async listOldCycles() {
+    this._checkInit()
+    let cycles
+    try {
+      cycles = await this._readOld(this.storageModels.cycles, null, {
+        attributes: { exclude: ['createdAt', 'updatedAt'] },
+      })
+    } catch (e) {
+      throw new Error(e)
+    }
+    return cycles
+  }
+
+  async getLastOldNetworkHash() {
+    this._checkInit()
+    let networkStateHash
+    try {
+      networkStateHash = await this._readOld(this.storageModels.network, null, {
+        limit: 1,
+        order: [['cycleNumber', 'DESC']],
+        attributes: { exclude: ['createdAt', 'updatedAt', 'id'] },
+        raw: true
+      })
+    } catch (e) {
+      throw new Error(e)
+    }
+    return networkStateHash
   }
 
   async addNodes(nodes) {

@@ -85,6 +85,7 @@ export const submodules = [
   Refresh,
   Apoptosis,
   Lost,
+  SafetyMode
 ]
 
 export let currentQuarter = -1 // means we have not started creating cycles
@@ -267,8 +268,18 @@ async function cycleCreator() {
   //}
 
   // Save the previous record to the DB
-  await storage.updateCycle(lastSavedRecord, prevRecord)
-  lastSavedRecord = prevRecord
+  const marker = makeCycleMarker(prevRecord)
+  const certificate = makeCycleCert(marker)
+  const newRecord = {...prevRecord, marker, certificate}
+  if (lastSavedRecord) {
+    await storage.updateCycle({ networkId: lastSavedRecord.networkId }, newRecord)
+    lastSavedRecord = newRecord
+  }
+  else {
+    await storage.addCycles({...prevRecord, marker, certificate})
+    lastSavedRecord = newRecord
+  }
+  
 
   // Print combined cycle log entry
   cycleLogger.info(CycleChain.getDebug() + NodeList.getDebug())
