@@ -6,7 +6,7 @@ import * as Active from './Active'
 import * as Apoptosis from './Apoptosis'
 import * as Archivers from './Archivers'
 import * as Comms from './Comms'
-import { config, crypto, logger } from './Context'
+import { config, crypto, logger, storage } from './Context'
 import * as CycleChain from './CycleChain'
 import * as Join from './Join'
 import * as Lost from './Lost'
@@ -103,6 +103,9 @@ let bestCycleCert: Map<CycleMarker, CycleCert[]>
 let bestCertScore: Map<CycleMarker, number>
 
 const timers = {}
+
+// Keeps track of the last saved record in the DB in order to update it
+let lastSavedRecord: CycleRecord
 
 /** ROUTES */
 
@@ -259,6 +262,10 @@ async function cycleCreator() {
   if (!CycleChain.newest || CycleChain.newest.counter < prevRecord.counter)
     Sync.digestCycle(prevRecord)
   //}
+
+  // Save the previous record to the DB
+  await storage.updateCycle(lastSavedRecord, prevRecord)
+  lastSavedRecord = prevRecord
 
   // Print combined cycle log entry
   cycleLogger.info(CycleChain.getDebug() + NodeList.getDebug())

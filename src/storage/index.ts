@@ -180,6 +180,17 @@ class Storage {
       throw new Error(e)
     }
   }
+
+  async updateCycle(record, newRecord) {
+    this._checkInit()
+    try {
+      await this._update(this.storageModels.cycles, record, newRecord)
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
+
   async getCycleByCounter(counter) {
     this._checkInit()
     try {
