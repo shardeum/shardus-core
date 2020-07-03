@@ -3,21 +3,20 @@ import { Logger } from 'log4js'
 import * as utils from '../utils'
 // don't forget to add new modules here
 import * as Active from './Active'
+import * as Apoptosis from './Apoptosis'
 import * as Archivers from './Archivers'
 import * as Comms from './Comms'
 import { config, crypto, logger } from './Context'
 import * as CycleChain from './CycleChain'
 import * as Join from './Join'
+import * as Lost from './Lost'
 import * as NodeList from './NodeList'
 import * as Refresh from './Refresh'
 import * as Rotation from './Rotation'
-import * as Apoptosis from './Apoptosis'
-import * as Lost from './Lost'
 import * as Self from './Self'
 import * as Sync from './Sync'
 import { GossipHandler, InternalHandler, SignedObject } from './Types'
 import { compareQuery, Comparison } from './Utils'
-import { PerformanceObserver } from 'perf_hooks'
 
 /** TYPES */
 
@@ -75,7 +74,15 @@ let cycleLogger: Logger
 
 // don't forget to add new modules here
 //   need to keep the Lost module after the Apoptosis module
-export const submodules = [Archivers, Join, Active, Rotation, Refresh, Apoptosis, Lost]
+export const submodules = [
+  Archivers,
+  Join,
+  Active,
+  Rotation,
+  Refresh,
+  Apoptosis,
+  Lost,
+]
 
 export let currentQuarter = -1 // means we have not started creating cycles
 export let currentCycle = 0
@@ -95,7 +102,7 @@ let bestMarker: CycleMarker
 let bestCycleCert: Map<CycleMarker, CycleCert[]>
 let bestCertScore: Map<CycleMarker, number>
 
-let timers = {}
+const timers = {}
 
 /** ROUTES */
 
@@ -231,7 +238,7 @@ async function cycleCreator() {
   // Get the previous record
   //let prevRecord = madeCycle ? bestRecord : await fetchLatestRecord()
   let prevRecord = bestRecord
-  if (!prevRecord){
+  if (!prevRecord) {
     prevRecord = await fetchLatestRecord()
   }
   while (!prevRecord) {
@@ -287,7 +294,6 @@ async function cycleCreator() {
   schedule(runQ3, startQ3)
   schedule(runQ4, startQ4)
   schedule(cycleCreator, end, { runEvenIfLateBy: Infinity })
-
 }
 
 /**
@@ -379,11 +385,11 @@ async function runQ3() {
   //     and instead going straight to comparing cycle certificates.
   /*
   const matched = await compareCycleMarkers(myC, myQ, DESIRED_MARKER_MATCHES)
-  if (!matched){ 
+  if (!matched){
     warn(`In Q3 no match from compareCycleMarker with DESIRED_MARKER_MATCHES of ${DESIRED_MARKER_MATCHES}`)
     return
   }
-  if (cycleQuarterChanged(myC, myQ)){ 
+  if (cycleQuarterChanged(myC, myQ)){
     warn(`In Q3 ran out of time waiting for match from compareCycleMarker`)
     return
   }
@@ -411,8 +417,8 @@ async function runQ4() {
 
   // Don't do cert comparison if you didn't make the cycle
   // [TODO] - maybe we should still compare if we have bestCert since we may have got it from gossip
-  if (madeCycle === false){
-    warn(`In Q4 nothing to do since we madeCycle is false.`)
+  if (madeCycle === false) {
+    warn('In Q4 nothing to do since we madeCycle is false.')
     return
   }
 
@@ -425,7 +431,9 @@ async function runQ4() {
     matched = await compareCycleCert(myC, myQ, DESIRED_CERT_MATCHES)
     if (!matched) {
       if (cycleQuarterChanged(myC, myQ)) {
-        warn(`In Q4 ran out of time waiting for compareCycleCert with DESIRED_CERT_MATCHES of ${DESIRED_CERT_MATCHES}`)
+        warn(
+          `In Q4 ran out of time waiting for compareCycleCert with DESIRED_CERT_MATCHES of ${DESIRED_CERT_MATCHES}`
+        )
         return
       }
       await utils.sleep(100)
@@ -458,7 +466,7 @@ function makeCycleData(txs: CycleTxs, prevRecord?: CycleRecord) {
 
 function collectCycleTxs(): CycleTxs {
   // Collect cycle txs from all submodules
-  const txs = submodules.map(submodule => submodule.getTxs())
+  const txs = submodules.map((submodule) => submodule.getTxs())
   return Object.assign({}, ...txs)
 }
 
@@ -467,7 +475,7 @@ function makeCycleRecord(
   prevRecord?: CycleRecord
 ): CycleRecord {
   const baseRecord: BaseRecord = {
-    networkId: crypto.hash({rand: Math.floor(Math.random() * 1000000)}),
+    networkId: crypto.hash({ rand: Math.floor(Math.random() * 1000000) }),
     counter: prevRecord ? prevRecord.counter + 1 : 0,
     previous: prevRecord ? makeCycleMarker(prevRecord) : '0'.repeat(64),
     start: prevRecord
@@ -484,7 +492,7 @@ function makeCycleRecord(
     apoptosized: [],
   }) as CycleRecord
 
-  submodules.map(submodule =>
+  submodules.map((submodule) =>
     submodule.updateRecord(cycleTxs, cycleRecord, prevRecord)
   )
 
@@ -499,7 +507,7 @@ function makeCycleCert(marker: CycleMarker): CycleCert {
   return crypto.sign({ marker })
 }
 
-async function compareCycleMarkers(myC:number, myQ:number, desired: number) {
+async function compareCycleMarkers(myC: number, myQ: number, desired: number) {
   info('Comparing cycle markers...')
 
   // Init vars
@@ -579,7 +587,7 @@ function unseenTxs(ours: CycleTxs, theirs: CycleTxs) {
     if (theirs[field] && ours[field]) {
       if (crypto.hash(theirs[field]) !== crypto.hash(ours[field])) {
         // Go through each tx of theirs and see if ours has it
-        const ourTxHashes = new Set(ours[field].map(tx => crypto.hash(tx)))
+        const ourTxHashes = new Set(ours[field].map((tx) => crypto.hash(tx)))
         for (const tx of theirs[field]) {
           if (!ourTxHashes.has(crypto.hash(tx))) {
             // If it doesn't, add it to unseen
@@ -688,14 +696,15 @@ export function schedule<T, U extends unknown[]>(
   timers[callback.name] = setTimeout(callback, toWait)
 }
 
-export function shutdown(){
+export function shutdown() {
   warn('Cycle creator shutdown')
-  for(const timer of Object.keys(timers)){ 
+  for (const timer of Object.keys(timers)) {
     warn(`clearing timer ${timer}`)
-    clearTimeout(timers[timer]) 
+    clearTimeout(timers[timer])
   }
   warn(`current cycle and quarter is: C${currentCycle} Q${currentQuarter}`)
-  currentCycle += 1; currentQuarter = 0  // to stop functions which check if we are in the same quarter
+  currentCycle += 1
+  currentQuarter = 0 // to stop functions which check if we are in the same quarter
   warn(`changed cycle and quarter to: C${currentCycle} Q${currentQuarter}`)
 }
 
@@ -736,14 +745,26 @@ function validateCertSign(certs: CycleCert[], sender: NodeList.Node['id']) {
 function validateCerts(certs: CycleCert[], record, sender) {
   if (!certs || !Array.isArray(certs) || certs.length <= 0) {
     warn('validateCerts: bad certificate format')
-    warn(`validateCerts:   sent by: port:${(NodeList.nodes.get(sender)).externalPort} id:${JSON.stringify(sender)}`)
+    warn(
+      `validateCerts:   sent by: port:${
+        NodeList.nodes.get(sender).externalPort
+      } id:${JSON.stringify(sender)}`
+    )
     return false
   }
   if (!record || record === null || typeof record !== 'object') return false
   //  make sure the cycle counter is what we expect
-  if (record.counter != CycleChain.newest.counter+1){
-    warn(`validateCerts: bad cycle record counter; expected ${CycleChain.newest.counter+1} but got ${record.counter}`)
-    warn(`validateCerts:   sent by: port:${(NodeList.nodes.get(sender)).externalPort} id:${JSON.stringify(sender)}`)
+  if (record.counter != CycleChain.newest.counter + 1) {
+    warn(
+      `validateCerts: bad cycle record counter; expected ${
+        CycleChain.newest.counter + 1
+      } but got ${record.counter}`
+    )
+    warn(
+      `validateCerts:   sent by: port:${
+        NodeList.nodes.get(sender).externalPort
+      } id:${JSON.stringify(sender)}`
+    )
     return false
   }
   // make sure all the certs are for the same cycle marker
@@ -751,50 +772,97 @@ function validateCerts(certs: CycleCert[], record, sender) {
   for (let i = 1; i < certs.length; i++) {
     if (inpMarker !== certs[i].marker) {
       warn('validateCerts: certificates marker does not match hash of record')
-      warn(`validateCerts:   sent by: port:${(NodeList.nodes.get(sender)).externalPort} id:${JSON.stringify(sender)}`)
+      warn(
+        `validateCerts:   sent by: port:${
+          NodeList.nodes.get(sender).externalPort
+        } id:${JSON.stringify(sender)}`
+      )
       return false
     }
   }
   // make sure that the certs are from different owners and not the same node
   const seen = {}
   for (let i = 0; i < certs.length; i++) {
-    if (seen[certs[i].sign.owner]){
-      warn(`validateCerts: multiple certificate from same owner ${JSON.stringify(certs)}`)
-      warn(`validateCerts:   sent by: port:${(NodeList.nodes.get(sender)).externalPort} id:${JSON.stringify(sender)}`)
+    if (seen[certs[i].sign.owner]) {
+      warn(
+        `validateCerts: multiple certificate from same owner ${JSON.stringify(
+          certs
+        )}`
+      )
+      warn(
+        `validateCerts:   sent by: port:${
+          NodeList.nodes.get(sender).externalPort
+        } id:${JSON.stringify(sender)}`
+      )
       return false
     }
     seen[certs[i].sign.owner] = true
   }
   //  checks signatures; more expensive
   if (!validateCertSign(certs, sender)) {
-    warn(`validateCerts: certificate has bad sign; certs:${JSON.stringify(certs)}`)
-    warn(`validateCerts:   sent by: port:${(NodeList.nodes.get(sender)).externalPort} id:${JSON.stringify(sender)}`)
+    warn(
+      `validateCerts: certificate has bad sign; certs:${JSON.stringify(certs)}`
+    )
+    warn(
+      `validateCerts:   sent by: port:${
+        NodeList.nodes.get(sender).externalPort
+      } id:${JSON.stringify(sender)}`
+    )
     return false
   }
   return true
 }
 
-function validateCertsRecordTypes(inp, caller){
-  let err = utils.validateTypes(inp,{certs:'a',record:'o'})
-  if (err){ warn(caller+' bad input: '+err+' '+JSON.stringify(inp)); return false}
-  for(let cert of inp.certs){
-    err = utils.validateTypes(cert,{marker:'s',score:'n',sign:'o'})
-    if (err){ warn(caller+' bad input.certs: '+err); return false}
-    err = utils.validateTypes(cert.sign,{owner:'s',sig:'s'})
-    if (err){ warn(caller+' bad input.sign: '+err); return false}
+function validateCertsRecordTypes(inp, caller) {
+  let err = utils.validateTypes(inp, { certs: 'a', record: 'o' })
+  if (err) {
+    warn(caller + ' bad input: ' + err + ' ' + JSON.stringify(inp))
+    return false
   }
-  err = utils.validateTypes(inp.record,{
-    activated:'a',activatedPublicKeys:'a',active:'n',apoptosized:'a',
-    counter:'n',desired:'n',duration:'n',expired:'n',joined:'a',
-    joinedArchivers:'a',joinedConsensors:'a',lost:'a',previous:'s',
-    refreshedArchivers:'a',refreshedConsensors:'a',refuted:'a',removed:'a',
-    start:'n',syncing:'n'
+  for (const cert of inp.certs) {
+    err = utils.validateTypes(cert, { marker: 's', score: 'n', sign: 'o' })
+    if (err) {
+      warn(caller + ' bad input.certs: ' + err)
+      return false
+    }
+    err = utils.validateTypes(cert.sign, { owner: 's', sig: 's' })
+    if (err) {
+      warn(caller + ' bad input.sign: ' + err)
+      return false
+    }
+  }
+  err = utils.validateTypes(inp.record, {
+    activated: 'a',
+    activatedPublicKeys: 'a',
+    active: 'n',
+    apoptosized: 'a',
+    counter: 'n',
+    desired: 'n',
+    duration: 'n',
+    expired: 'n',
+    joined: 'a',
+    joinedArchivers: 'a',
+    joinedConsensors: 'a',
+    lost: 'a',
+    previous: 's',
+    refreshedArchivers: 'a',
+    refreshedConsensors: 'a',
+    refuted: 'a',
+    removed: 'a',
+    start: 'n',
+    syncing: 'n',
   })
-  if (err){ warn(caller+' bad input.record: '+err); return false}
+  if (err) {
+    warn(caller + ' bad input.record: ' + err)
+    return false
+  }
   //  submodules need to validate their part of the record
-  for (const submodule of submodules){ 
+  for (const submodule of submodules) {
     err = submodule.validateRecordTypes(inp.record)
-    if (err){ warn(caller+' bad input.record.* '+err); return false}
+    if (err) {
+      warn(caller + ' bad input.record.* ' + err)
+      return false
+    }
   }
   return true
 }
@@ -803,8 +871,8 @@ function validateCertsRecordTypes(inp, caller){
 // return true if we improved it
 // We assume the certs have already been checked
 function improveBestCert(inpCerts: CycleCert[], inpRecord) {
-//  warn(`improveBestCert: certs:${JSON.stringify(certs)}`)
-//  warn(`improveBestCert: record:${JSON.stringify(record)}`)
+  //  warn(`improveBestCert: certs:${JSON.stringify(certs)}`)
+  //  warn(`improveBestCert: record:${JSON.stringify(record)}`)
   let improved = false
   if (inpCerts.length <= 0) {
     return false
@@ -815,16 +883,16 @@ function improveBestCert(inpCerts: CycleCert[], inpRecord) {
       bscore = bestCertScore.get(bestMarker)
     }
   }
-//  warn(`improveBestCert: bscore:${JSON.stringify(bscore)}`)
+  //  warn(`improveBestCert: bscore:${JSON.stringify(bscore)}`)
   const bcerts = bestCycleCert.get(inpCerts[0].marker)
-//  warn(`improveBestCert: bcerts:${JSON.stringify(bcerts)}`)
+  //  warn(`improveBestCert: bcerts:${JSON.stringify(bcerts)}`)
   const have = {}
-  if (bcerts){
-    for (const cert of bcerts){
+  if (bcerts) {
+    for (const cert of bcerts) {
       have[cert.sign.owner] = true
     }
   }
-//  warn(`improveBestCert: have:${JSON.stringify(have)}`)
+  //  warn(`improveBestCert: have:${JSON.stringify(have)}`)
   for (const cert of inpCerts) {
     // make sure we don't store more than one cert from the same owner with the same marker
     if (have[cert.sign.owner]) continue
@@ -861,35 +929,35 @@ function improveBestCert(inpCerts: CycleCert[], inpRecord) {
       improved = true
     }
   }
-//  info(`improveBestCert: bestScore:${bestCertScore.get(bestMarker)}`)
-//  info(`improveBestCert: bestMarker:${bestMarker}`)
-//  info(`improveBestCert: bestCerts:${JSON.stringify(bestCycleCert.get(bestMarker))}`)
-//  info(`improveBestCert: improved:${improved}`)
+  //  info(`improveBestCert: bestScore:${bestCertScore.get(bestMarker)}`)
+  //  info(`improveBestCert: bestMarker:${bestMarker}`)
+  //  info(`improveBestCert: bestCerts:${JSON.stringify(bestCycleCert.get(bestMarker))}`)
+  //  info(`improveBestCert: improved:${improved}`)
   return improved
 }
 
 function compareCycleCertEndpoint(inp: CompareCertReq, sender) {
-  if (bestMarker === undefined){ 
+  if (bestMarker === undefined) {
     // This should almost never happen since we generate and gossip our
     //   cert at the begining of Q3 and don't start comparing certs until
     //   the begining of Q4.
     warn('compareCycleCertEndpoint - bestMarker is undefined')
-    return { certs: [], record:record }  // receiving node will igore our response
+    return { certs: [], record: record } // receiving node will igore our response
   }
 
-  if (!validateCertsRecordTypes(inp, 'compareCycleCertEndpoint')) { 
-    return { certs: bestCycleCert.get(bestMarker), record:bestRecord }
+  if (!validateCertsRecordTypes(inp, 'compareCycleCertEndpoint')) {
+    return { certs: bestCycleCert.get(bestMarker), record: bestRecord }
   }
   const { certs: inpCerts, record: inpRecord } = inp
   if (!validateCerts(inpCerts, inpRecord, sender)) {
-    return { certs: bestCycleCert.get(bestMarker), record:bestRecord }
+    return { certs: bestCycleCert.get(bestMarker), record: bestRecord }
   }
   const inpMarker = inpCerts[0].marker
   if (inpMarker !== makeCycleMarker(inpRecord)) {
-    return { certs: bestCycleCert.get(bestMarker), record:bestRecord }
+    return { certs: bestCycleCert.get(bestMarker), record: bestRecord }
   }
   improveBestCert(inpCerts, inpRecord)
-  return { certs: bestCycleCert.get(bestMarker), record:bestRecord }
+  return { certs: bestCycleCert.get(bestMarker), record: bestRecord }
 }
 
 async function compareCycleCert(myC: number, myQ: number, matches: number) {
@@ -909,7 +977,7 @@ async function compareCycleCert(myC: number, myQ: number, matches: number) {
     return [resp, node]
   }
 
-  const compareFn = respArr => {
+  const compareFn = (respArr) => {
     /**
      * [IMPORTANT] Don't change things if the awaited call took too long
      */
@@ -945,7 +1013,7 @@ async function compareCycleCert(myC: number, myQ: number, matches: number) {
   // We shuffle to spread out the network load of cert comparison
   const nodesToAsk = [...NodeList.activeOthersByIdOrder]
   utils.shuffleArray(nodesToAsk)
-  
+
   // If anything compares better than us, compareQuery starts over
   const errors = await compareQuery<
     NodeList.Node,

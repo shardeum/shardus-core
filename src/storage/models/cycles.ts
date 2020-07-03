@@ -6,7 +6,12 @@ const cycles = [
   'cycles',
   {
     networkId: { type: Sequelize.TEXT, allowNull: false },
-    counter: { type: Sequelize.BIGINT, unique: true, primaryKey: true, allowNull: false },
+    counter: {
+      type: Sequelize.BIGINT,
+      unique: true,
+      primaryKey: true,
+      allowNull: false,
+    },
     certificate: { type: Sequelize.JSON, allowNull: false },
     previous: { type: Sequelize.TEXT, allowNull: false },
     marker: { type: Sequelize.TEXT, allowNull: false },
@@ -24,8 +29,8 @@ const cycles = [
     returned: { type: Sequelize.JSON, allowNull: false },
     lost: { type: Sequelize.JSON, allowNull: false },
     refuted: { type: Sequelize.JSON, allowNull: false },
-    ...P2PApoptosis.sequelizeCycleFieldModel
-  }
+    ...P2PApoptosis.sequelizeCycleFieldModel,
+  },
 ]
 
 export default cycles

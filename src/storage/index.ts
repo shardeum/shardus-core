@@ -1,21 +1,20 @@
-import ShardusTypes from './../shardus/shardus-types'
 import Log4js from 'log4js'
 // const fs = require('fs')
 // const path = require('path')
-import { Sequelize, Op } from 'sequelize'
+import { Op } from 'sequelize'
+import Logger from '../logger'
+import StateManager from '../state-manager'
+import Profiler from '../utils/profiler'
+import ShardusTypes from './../shardus/shardus-types'
 import models from './models'
 // const stringify = require('fast-stable-stringify')
 // const utils = require('../utils')
-
 // const SequelizeStorage = require('./sequelizeStorage')
 import Sqlite3Storage from './sqlite3storage'
-import StateManager from '../state-manager'
-import Profiler from '../utils/profiler'
-import Shardus from '../shardus'
-import Logger from '../logger'
 // const BetterSqlite3Storage = require('./betterSqlite3storage')
 
 import P2PApoptosis = require('../p2p/Apoptosis')
+import { CycleRecord } from '../p2p/CycleCreator'
 
 interface Storage {
   profiler: Profiler
@@ -311,7 +310,7 @@ class Storage {
   async setProperty(key, value) {
     this._checkInit()
     try {
-      let [prop] = await this._read(this.storageModels.properties, { key })
+      const [prop] = await this._read(this.storageModels.properties, { key })
       if (!prop) {
         await this._create(this.storageModels.properties, {
           key,
@@ -488,7 +487,7 @@ class Storage {
   async queryAcceptedTransactions(tsStart, tsEnd, limit) {
     this._checkInit()
     try {
-      let result = await this._read(
+      const result = await this._read(
         this.storageModels.acceptedTxs,
         { timestamp: { [Op.between]: [tsStart, tsEnd] } },
         {
@@ -507,7 +506,7 @@ class Storage {
   async queryAcceptedTransactionsByIds(ids) {
     this._checkInit()
     try {
-      let result = await this._read(
+      const result = await this._read(
         this.storageModels.acceptedTxs,
         { id: { [Op.in]: ids } },
         {
@@ -532,7 +531,7 @@ class Storage {
   ) {
     this._checkInit()
     try {
-      let result = await this._read(
+      const result = await this._read(
         this.storageModels.accountStates,
         {
           accountId: { [Op.between]: [accountStart, accountEnd] },
@@ -558,7 +557,7 @@ class Storage {
   async queryAccountStateTableByList(addressList, tsStart, tsEnd) {
     this._checkInit()
     try {
-      let result = await this._read(
+      const result = await this._read(
         this.storageModels.accountStates,
         {
           txTimestamp: { [Op.between]: [tsStart, tsEnd] },
@@ -657,7 +656,7 @@ class Storage {
   async searchAccountStateTable(accountId, txTimestamp) {
     this._checkInit()
     try {
-      let result = await this._read(
+      const result = await this._read(
         this.storageModels.accountStates,
         { accountId, txTimestamp },
         {
@@ -702,7 +701,7 @@ class Storage {
   async getAccountReplacmentCopies1(accountIDs, cycleNumber) {
     this._checkInit()
     try {
-      let result = await this._read(
+      const result = await this._read(
         this.storageModels.accountsCopy,
         {
           cycleNumber: { [Op.lte]: cycleNumber },
@@ -733,7 +732,7 @@ class Storage {
       }
       // cycleNumber const query = `select accountId, max(cycleNumber), data, timestamp, hash from accountsCopy WHERE cycleNumber <= ? and accountId IN (${expandQ}) group by accountId `
       const query = `select accountId, max(cycleNumber) cycleNumber, data, timestamp, hash from accountsCopy WHERE cycleNumber <= ? and accountId IN (${expandQ}) group by accountId `
-      let result = await this._query(query, [cycleNumber, ...accountIDs])
+      const result = await this._query(query, [cycleNumber, ...accountIDs])
       return result
     } catch (e) {
       throw new Error(e)
@@ -761,24 +760,25 @@ class Storage {
     }
   }
 
-  async getAccountCopiesByCycle( cycleNumber) {
+  async getAccountCopiesByCycle(cycleNumber) {
     this._checkInit()
     try {
       //const query = `select accountId, max(cycleNumber) cycleNumber, data, timestamp, hash from accountsCopy WHERE cycleNumber <= ? group by accountId `
       //same as above minus data
-      const query = `select accountId, max(cycleNumber) cycleNumber, timestamp, hash from accountsCopy WHERE cycleNumber <= ? group by accountId `
-      let result = await this._query(query, [cycleNumber])
+      const query =
+        'select accountId, max(cycleNumber) cycleNumber, timestamp, hash from accountsCopy WHERE cycleNumber <= ? group by accountId '
+      const result = await this._query(query, [cycleNumber])
       return result
     } catch (e) {
       throw new Error(e)
     }
   }
 
-  async getAccountCopiesByCycleAndRange (cycleNumber, lowAddress, highAddress) {
+  async getAccountCopiesByCycleAndRange(cycleNumber, lowAddress, highAddress) {
     this._checkInit()
     try {
       const query = `select accountId, cycleNumber, hash from accountsCopy WHERE cycleNumber<=${cycleNumber} and accountId>="${lowAddress}" and accountId<="${highAddress}"  group by accountId order by accountId asc`
-      let result = await this._query(query, [])
+      const result = await this._query(query, [])
       return result
     } catch (e) {
       throw new Error(e)
