@@ -79,6 +79,29 @@ export function startSnapshotting() {
   })
 }
 
+export function getSafetyModeVals() {
+  let safetyMode = false
+  let safetyNum = 0
+  let networkStateHash = ''
+
+  if (oldDataPath) {
+    // Turn safety node on
+    safetyMode = true
+
+    // [TODO] Set the safetyNum to the number of active nodes in the last cycle saved in the old data
+    safetyNum = 0
+
+    // [TODO] Set networkStateHash to the last network state hash saved in the old data
+    networkStateHash = ''
+  }
+
+  return {
+    safetyMode,
+    safetyNum,
+    networkStateHash,
+  }
+}
+
 function createNetworkStateHash(
   partitionHashes: PartitionHashes
 ): NetworkStateHash {

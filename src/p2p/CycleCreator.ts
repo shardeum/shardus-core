@@ -17,6 +17,7 @@ import * as Self from './Self'
 import * as Sync from './Sync'
 import { GossipHandler, InternalHandler, SignedObject } from './Types'
 import { compareQuery, Comparison } from './Utils'
+import * as SafetyMode from './SafetyMode'
 
 /** TYPES */
 
@@ -36,7 +37,8 @@ interface BaseRecord {
 }
 
 // don't forget to add new modules here
-export type CycleTxs = Refresh.Txs &
+export type CycleTxs = SafetyMode.Txs &
+  Refresh.Txs &
   Archivers.Txs &
   Join.Txs &
   Active.Txs &
@@ -46,6 +48,7 @@ export type CycleTxs = Refresh.Txs &
 
 // don't forget to add new modules here
 export type CycleRecord = BaseRecord &
+  SafetyMode.Record &
   Refresh.Record &
   Archivers.Record &
   Join.Record &
@@ -761,7 +764,7 @@ function validateCerts(certs: CycleCert[], record, sender) {
   }
   if (!record || record === null || typeof record !== 'object') return false
   //  make sure the cycle counter is what we expect
-  if (record.counter != CycleChain.newest.counter + 1) {
+  if (record.counter !== CycleChain.newest.counter + 1) {
     warn(
       `validateCerts: bad cycle record counter; expected ${
         CycleChain.newest.counter + 1
