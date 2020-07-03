@@ -14,7 +14,6 @@ import Sqlite3Storage from './sqlite3storage'
 // const BetterSqlite3Storage = require('./betterSqlite3storage')
 
 import P2PApoptosis = require('../p2p/Apoptosis')
-import { CycleRecord } from '../p2p/CycleCreator'
 
 interface Storage {
   profiler: Profiler
@@ -190,11 +189,11 @@ class Storage {
     }
   }
 
-
   async getCycleByCounter(counter) {
     this._checkInit()
+    let cycle
     try {
-      var [cycle] = await this._read(
+      ;[cycle] = await this._read(
         this.storageModels.cycles,
         { counter },
         { attributes: { exclude: ['createdAt', 'updatedAt'] } }
@@ -209,8 +208,9 @@ class Storage {
   }
   async getCycleByMarker(marker) {
     this._checkInit()
+    let cycle
     try {
-      var [cycle] = await this._read(
+      ;[cycle] = await this._read(
         this.storageModels.cycles,
         { marker },
         { attributes: { exclude: ['createdAt', 'updatedAt'] } }
@@ -241,8 +241,9 @@ class Storage {
   }
   async listCycles() {
     this._checkInit()
+    let cycles
     try {
-      var cycles = await this._read(this.storageModels.cycles, null, {
+      cycles = await this._read(this.storageModels.cycles, null, {
         attributes: { exclude: ['createdAt', 'updatedAt'] },
       })
     } catch (e) {
@@ -261,8 +262,9 @@ class Storage {
   }
   async getNodes(node) {
     this._checkInit()
+    let nodes
     try {
-      var nodes = await this._read(this.storageModels.nodes, node, {
+      nodes = await this._read(this.storageModels.nodes, node, {
         attributes: { exclude: ['createdAt', 'updatedAt'] },
         raw: true,
       })
@@ -307,8 +309,9 @@ class Storage {
   }
   async listNodes() {
     this._checkInit()
+    let nodes
     try {
-      var nodes = await this._read(this.storageModels.nodes, null, {
+      nodes = await this._read(this.storageModels.nodes, null, {
         attributes: { exclude: ['createdAt', 'updatedAt'] },
         raw: true,
       })
@@ -343,8 +346,9 @@ class Storage {
   }
   async getProperty(key) {
     this._checkInit()
+    let prop
     try {
-      var [prop] = await this._read(this.storageModels.properties, { key })
+      ;[prop] = await this._read(this.storageModels.properties, { key })
     } catch (e) {
       throw new Error(e)
     }
@@ -363,8 +367,9 @@ class Storage {
   }
   async listProperties() {
     this._checkInit()
+    let keys
     try {
-      var keys = await this._read(this.storageModels.properties, null, {
+      keys = await this._read(this.storageModels.properties, null, {
         attributes: ['key'],
         raw: true,
       })
