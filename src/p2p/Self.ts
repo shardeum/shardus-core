@@ -76,7 +76,7 @@ export async function startup(): Promise<boolean> {
       // Remove yourself from activeNodes if you are present in them but not firstSeed
       if (isFirst === false) {
         const ourIdx = activeNodes.findIndex(
-          node =>
+          (node) =>
             node.ip === ipInfo.externalIp && node.port === ipInfo.externalPort
         )
         if (ourIdx > -1) {
@@ -109,14 +109,12 @@ export async function startup(): Promise<boolean> {
     while (!synced) {
       // Once joined, sync to the network
       try {
-        info(
-          'Getting activeNodes from archiver to sync to network...'
-        )
+        info('Getting activeNodes from archiver to sync to network...')
         activeNodes = await contactArchiver()
 
         // Remove yourself from activeNodes if you are present in them
         const ourIdx = activeNodes.findIndex(
-          node =>
+          (node) =>
             node.ip === ipInfo.externalIp && node.port === ipInfo.externalPort
         )
         if (ourIdx > -1) {
@@ -171,7 +169,9 @@ async function discoverNetwork(seedNodes) {
     //          try another backup method like Omar's timediff script
     const timeSynced = await checkTimeSynced(config.p2p.timeServers)
     if (!timeSynced) {
-      warn('Local time out of sync with time server. Use NTP to keep system time in sync.')
+      warn(
+        'Local time out of sync with time server. Use NTP to keep system time in sync.'
+      )
     }
   } catch (e) {
     warn(e.message)
@@ -204,7 +204,7 @@ async function joinNetwork(activeNodes): Promise<[boolean, number]> {
     const tryAgain = await Join.submitJoin(activeNodes, request)
 
     if (tryAgain) {
-// [TODO] - see why logs never show Told to wait message
+      // [TODO] - see why logs never show Told to wait message
       info(`Told to wait until ${tryAgain}`)
       return [false, tryAgain]
     } else {

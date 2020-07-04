@@ -13,11 +13,11 @@ import * as Lost from './Lost'
 import * as NodeList from './NodeList'
 import * as Refresh from './Refresh'
 import * as Rotation from './Rotation'
+import * as SafetyMode from './SafetyMode'
 import * as Self from './Self'
 import * as Sync from './Sync'
 import { GossipHandler, InternalHandler, SignedObject } from './Types'
 import { compareQuery, Comparison } from './Utils'
-import * as SafetyMode from './SafetyMode'
 
 /** TYPES */
 
@@ -85,7 +85,7 @@ export const submodules = [
   Refresh,
   Apoptosis,
   Lost,
-  SafetyMode
+  SafetyMode,
 ]
 
 export let currentQuarter = -1 // means we have not started creating cycles
@@ -270,16 +270,17 @@ async function cycleCreator() {
   // Save the previous record to the DB
   const marker = makeCycleMarker(prevRecord)
   const certificate = makeCycleCert(marker)
-  const newRecord = {...prevRecord, marker, certificate}
+  const newRecord = { ...prevRecord, marker, certificate }
   if (lastSavedRecord) {
-    await storage.updateCycle({ networkId: lastSavedRecord.networkId }, newRecord)
+    await storage.updateCycle(
+      { networkId: lastSavedRecord.networkId },
+      newRecord
+    )
+    lastSavedRecord = newRecord
+  } else {
+    await storage.addCycles({ ...prevRecord, marker, certificate })
     lastSavedRecord = newRecord
   }
-  else {
-    await storage.addCycles({...prevRecord, marker, certificate})
-    lastSavedRecord = newRecord
-  }
-  
 
   // Print combined cycle log entry
   cycleLogger.info(CycleChain.getDebug() + NodeList.getDebug())

@@ -1,13 +1,11 @@
 import { Logger } from 'log4js'
-import { getSafetyModeVals } from '../snapshot'
+import { initSafetyModeVals } from '../snapshot'
 import * as Comms from './Comms'
 import { logger } from './Context'
 import { CycleRecord } from './CycleCreator'
 import { Change } from './CycleParser'
 import { isFirst } from './Self'
 import * as Types from './Types'
-import { validateTypes } from '../utils'
-
 
 /** TYPES */
 
@@ -81,7 +79,7 @@ export function updateRecord(txs: Txs, record: CycleRecord, prev: CycleRecord) {
   // If you're the first node
   if (isFirst) {
     // Ask snapshot for saftey mode field values
-    const safetyModeVals = getSafetyModeVals()
+    const safetyModeVals = initSafetyModeVals()
     Object.assign(record, safetyModeVals)
   }
   // If you're not the first node
@@ -90,18 +88,20 @@ export function updateRecord(txs: Txs, record: CycleRecord, prev: CycleRecord) {
     record.safetyMode = prev.safetyMode
     record.safetyNum = prev.safetyNum
     record.networkStateHash = prev.networkStateHash
+  }
 
-    /**
-     * [TODO] [NOTE] The check for turning off safety mode once safefy number of nodes
-     * have become active should probably go here.
-     *
-     * It should call a function exposed by Snapshot that does the check and returns
-     * a boolean or something
-     */
+  /**
+   * [NOTE] The check for turning off safety mode once safefy number of nodes
+   * have become active should probably go here.
+   */
+  if (record.safetyMode === true) {
+    if (prev.active >= prev.safetyNum) {
+      record.safetyMode = false
+    }
   }
 }
 
-export function validateRecordTypes(rec: Record): string{
+export function validateRecordTypes(rec: Record): string {
   // [TODO] Implement actual validation
   return ''
 }

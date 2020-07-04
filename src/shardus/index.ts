@@ -9,20 +9,20 @@ import LoadDetection from '../load-detection'
 import Logger from '../logger'
 import * as Network from '../network'
 import * as Context from '../p2p/Context'
+import * as CycleChain from '../p2p/CycleChain'
 import * as GlobalAccounts from '../p2p/GlobalAccounts'
 import { reportLost } from '../p2p/Lost'
 import * as Self from '../p2p/Self'
 import * as Wrapper from '../p2p/Wrapper'
 import RateLimiting from '../rate-limiting'
 import Reporter from '../reporter'
+import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
 import Statistics from '../statistics'
 import Storage from '../storage'
 import * as utils from '../utils'
-import { readJsonDir } from '../utils'
 import Profiler from '../utils/profiler'
 import ShardusTypes = require('../shardus/shardus-types')
-import * as Snapshot from '../snapshot'
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
@@ -31,7 +31,7 @@ const saveConsoleOutput = require('./saveConsoleOutput')
 const defaultConfigs = {
   server: require('../config/server.json'),
   logs: require('../config/logs.json'),
-  storage: require('../config/storage.json')
+  storage: require('../config/storage.json'),
 } as {
   server: ShardusTypes.ShardusConfiguration
   logs: ShardusTypes.LogsConfiguration
@@ -128,7 +128,7 @@ class Shardus extends EventEmitter {
 
     this.mainLogger.info(`Server started with pid: ${process.pid}`)
 
-    this.mainLogger.info(`===== Server config: =====`)
+    this.mainLogger.info('===== Server config: =====')
     this.mainLogger.info(JSON.stringify(config, null, 2))
 
     this._listeners = {}
@@ -164,7 +164,7 @@ class Shardus extends EventEmitter {
     this.exitHandler.registerAsync('application', async () => {
       if (this.app && this.app.close) {
         this.mainLogger.info('Shutting down the application...')
-        await this.app.close()  // this needs to be awaited since it is async
+        await this.app.close() // this needs to be awaited since it is async
       }
     })
     this.exitHandler.registerSync('crypto', () => {
@@ -172,13 +172,13 @@ class Shardus extends EventEmitter {
       this.crypto.stopAllGenerators()
     })
     this.exitHandler.registerSync('cycleCreator', () => {
-    // [TODO] - need to make an exitHandler for P2P; otherwise CycleCreator is continuing even after rest of the system cleans up and is ready to exit
+      // [TODO] - need to make an exitHandler for P2P; otherwise CycleCreator is continuing even after rest of the system cleans up and is ready to exit
       this.mainLogger.info('Shutting down p2p...')
       this.p2p.shutdown()
     })
     this.exitHandler.registerAsync('network', async () => {
       this.mainLogger.info('Shutting down networking...')
-      await this.network.shutdown()  // this is taking a long time
+      await this.network.shutdown() // this is taking a long time
     })
     this.exitHandler.registerAsync('storage', async () => {
       this.mainLogger.info('Closing Database connections...')
@@ -543,7 +543,13 @@ class Shardus extends EventEmitter {
       if (this.reporter) this.reporter.reportJoined(nodeId, publicKey)
     })
     Self.emitter.on('initialized', async () => {
-      await this.syncAppData()
+      // If network is in safety mode
+      if (CycleChain.newest.safetyMode === true) {
+        // Use snapshot to put old app data into state-manager then go active
+        await Snapshot.safetySync()
+      } else {
+        await this.syncAppData()
+      }
     })
     Self.emitter.on('active', (nodeId) => {
       this.logger.playbackLogState('active', nodeId, '')
@@ -564,10 +570,10 @@ class Shardus extends EventEmitter {
       throw new Error(e)
     })
     Self.emitter.on('removed', async () => {
-// Omar - Why are we trying to call the functions in modules directly before exiting. 
-//        The modules have already registered shutdown functions with the exitHandler.
-//        We should let exitHandler handle the shutdown process.
-/*
+      // Omar - Why are we trying to call the functions in modules directly before exiting.
+      //        The modules have already registered shutdown functions with the exitHandler.
+      //        We should let exitHandler handle the shutdown process.
+      /*
       if (this.statistics) {
         this.statistics.stopSnapshots()
         this.statistics.initialize()
@@ -590,13 +596,13 @@ class Shardus extends EventEmitter {
         this.reporter.stopReporting()
         await this.reporter.reportRemoved(Self.id)
       }
-      this.exitHandler.exitCleanly()  // exits with status 0 so that PM2 can restart the process
+      this.exitHandler.exitCleanly() // exits with status 0 so that PM2 can restart the process
     })
     Self.emitter.on('apoptosized', async (restart) => {
-// Omar - Why are we trying to call the functions in modules directly before exiting. 
-//        The modules have already registered shutdown functions with the exitHandler.
-//        We should let exitHandler handle the shutdown process.
-/*
+      // Omar - Why are we trying to call the functions in modules directly before exiting.
+      //        The modules have already registered shutdown functions with the exitHandler.
+      //        We should let exitHandler handle the shutdown process.
+      /*
       this.fatalLogger.fatal('Shardus: caught apoptosized event; cleaning up')
       if (this.statistics) {
         this.statistics.stopSnapshots()
@@ -620,10 +626,9 @@ class Shardus extends EventEmitter {
         this.reporter.stopReporting()
         await this.reporter.reportRemoved(Self.id)
       }
-      if (restart)
-        this.exitHandler.exitCleanly()  // exits with status 0 so that PM2 can restart the process
-      else
-        this.exitHandler.exitUncleanly()  // exits with status 0 so that PM2 can restart the process
+      if (restart) this.exitHandler.exitCleanly()
+      // exits with status 0 so that PM2 can restart the process
+      else this.exitHandler.exitUncleanly() // exits with status 0 so that PM2 can restart the process
     })
 
     Context.setShardusContext(this)
@@ -878,7 +883,7 @@ class Shardus extends EventEmitter {
       // Perform basic validation of the transaction fields
       if (this.verboseLogs)
         this.mainLogger.debug(
-          `Performing initial validation of the transaction`
+          'Performing initial validation of the transaction'
         )
       const initValidationResp = this.app.validateTxnFields(tx)
       if (this.verboseLogs)
@@ -1413,7 +1418,7 @@ class Shardus extends EventEmitter {
           this.mainLogger.debug(
             `testGlobalAccountTX: req:${utils.stringifyReduce(req.body)}`
           )
-          let tx = req.body.tx
+          const tx = req.body.tx
           this.put(tx, false, true)
           res.json({ success: true })
         } catch (ex) {
@@ -1444,7 +1449,7 @@ class Shardus extends EventEmitter {
           this.mainLogger.debug(
             `testGlobalAccountTXSet: req:${utils.stringifyReduce(req.body)}`
           )
-          let tx = req.body.tx
+          const tx = req.body.tx
           this.put(tx, true, true)
           res.json({ success: true })
         } catch (ex) {
@@ -1530,7 +1535,7 @@ class Shardus extends EventEmitter {
 
     // this.mainLogger.debug(`TransactionAge: ${txnAge}`)
     if (txnAge >= txnExprationTime * 1000) {
-      this.fatalLogger.error(`Transaction Expired`)
+      this.fatalLogger.error('Transaction Expired')
       transactionExpired = true
     }
     // this.mainLogger.debug(`End of _isTransactionTimestampExpired(${timestamp})`)

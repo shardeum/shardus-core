@@ -1,3 +1,4 @@
+import * as Active from '../p2p/Active'
 import { sendGossip } from '../p2p/Comms'
 import { crypto, stateManager, storage } from '../p2p/Context'
 import ShardFunctions from '../state-manager/shardFunctions'
@@ -80,24 +81,26 @@ export function startSnapshotting() {
 }
 
 export async function readOldCycleRecord() {
-  let oldCycles = await storage.listOldCycles()
+  const oldCycles = await storage.listOldCycles()
   if (oldCycles && oldCycles.length > 0) return oldCycles[0]
 }
 
 export async function readOldNetworkHash() {
-  let networkStateHash = await storage.getLastOldNetworkHash()
+  const networkStateHash = await storage.getLastOldNetworkHash()
   console.log('Read Old network state hash', networkStateHash)
-  if (networkStateHash && networkStateHash.length > 0) return networkStateHash[0]
+  if (networkStateHash && networkStateHash.length > 0)
+    return networkStateHash[0]
 }
 
-export async function getSafetyModeVals() {
+export async function initSafetyModeVals() {
   let safetyMode = false
   let safetyNum = 0
   let networkStateHash = ''
 
+  // If old data exists, set safety mode vals
   if (oldDataPath) {
-    let oldCycleRecord = await readOldCycleRecord()
-    let oldNetworkHash = await readOldNetworkHash()
+    const oldCycleRecord = await readOldCycleRecord()
+    const oldNetworkHash = await readOldNetworkHash()
 
     // Turn safety node on
     safetyMode = true
@@ -114,6 +117,54 @@ export async function getSafetyModeVals() {
     safetyNum,
     networkStateHash,
   }
+}
+
+export async function safetySync() {
+  /**
+   * [NOTE] For safety sync to complete, >= safetyNum # of nodes must go
+   * active.
+   *
+   * [NOTE] For a node to go active when the network is in safety mode, it
+   * must get the old partition(s) data it is responsible for and put it back
+   * into state-manager
+   *
+   *                OLD NETWORK:
+   *
+   *               P1   P2   P3   P4   P5   P6
+   * Partitions: |----|----|----|----|----|----|
+   * Active    :   N0   N1   N2   N3   N4   N5
+   *
+   *          NEW NETWORK (SAFETY MODE):
+   *
+   *               P1   P2   P3   P4   P5   P6
+   * Partitions: |----|----|----|----|----|----|
+   * Active    :                  N0
+   * Syncing   :   N3
+   * Joining   :        N5   N2        N1   N4
+   */
+  /**
+   * [NOTE] At this point in our nodes lifecycle, it has joined the network,
+   * synced the nodelist, and has a node Id.
+   *
+   * The safetyNum from the cycle chain === the num of partitions there were
+   * in the old network. We can divide the address space by this num and
+   * figure out which old partition/s our node Id is responsible for.
+   *
+   * Once we know our nodes old partition/s, we must get the data for those
+   * partitions and pass it to state-manager before we can go active.
+   *
+   * First, we should look for it in any old data we had when we started.
+   * Who knows, we might get lucky ;).
+   *
+   * If that doesn't work, we'll use gossip to tell everyone in the network to
+   * send that data to us if they have it
+   *
+   */
+  /**
+   * Once we receive our old data and put it into state-manager, go active with
+   * P2P/Active's requestActive:
+   */
+  Active.requestActive()
 }
 
 function createNetworkStateHash(

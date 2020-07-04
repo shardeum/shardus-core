@@ -1,6 +1,7 @@
 import { Handler } from 'express'
 import { Logger } from 'log4js'
 import * as http from '../http'
+import { reversed, validateTypes } from '../utils'
 import { logger, network } from './Context'
 import * as CycleChain from './CycleChain'
 import * as CycleCreator from './CycleCreator'
@@ -9,8 +10,6 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { Route } from './Types'
 import { robustQuery, sequentialQuery } from './Utils'
-import { reversed, validateTypes } from '../utils'
-import { apoptosizeSelf } from './Apoptosis'
 
 /** TYPES */
 
@@ -39,15 +38,15 @@ const cyclesRoute: Route<Handler> = {
   method: 'POST',
   name: 'sync-cycles',
   handler: (req, res) => {
-    let err = validateTypes(req, {body:'o'})
-    if (err){
-      warn('sync-cycles bad req '+err)
+    let err = validateTypes(req, { body: 'o' })
+    if (err) {
+      warn('sync-cycles bad req ' + err)
       res.json([])
       return
     }
-    err = validateTypes(req.body, {start:'n?',end:'n?'})
-    if (err){
-      warn('sync-cycles bad req.body '+err)
+    err = validateTypes(req.body, { start: 'n?', end: 'n?' })
+    if (err) {
+      warn('sync-cycles bad req.body ' + err)
       res.json([])
       return
     }
@@ -79,10 +78,10 @@ export async function sync(activeNodes: ActiveNode[]) {
   NodeList.reset()
 
   // Get the networks newest cycle as the anchor point for sync
-  info(`Getting newest cycle...`)
+  info('Getting newest cycle...')
   const cycleToSyncTo = await getNewestCycle(activeNodes)
   info(`Syncing till cycle ${cycleToSyncTo.counter}...`)
-  const cyclesToGet = 2*Math.floor(Math.sqrt(cycleToSyncTo.active)) + 2
+  const cyclesToGet = 2 * Math.floor(Math.sqrt(cycleToSyncTo.active)) + 2
   info(`Cycles to get is ${cyclesToGet}`)
 
   // Sync old cycles until your active nodes === network active nodes
@@ -93,11 +92,13 @@ export async function sync(activeNodes: ActiveNode[]) {
 
   do {
     // Get prevCycles from the network
-    const end = CycleChain.oldest.counter -1
+    const end = CycleChain.oldest.counter - 1
     const start = end - cyclesToGet
     info(`Getting cycles ${start} - ${end}...`)
     const prevCycles = await getCycles(activeNodes, start, end)
-    info(`Got cycles ${JSON.stringify(prevCycles.map(cycle => cycle.counter))}`)
+    info(
+      `Got cycles ${JSON.stringify(prevCycles.map((cycle) => cycle.counter))}`
+    )
     info(`  ${JSON.stringify(prevCycles)}`)
 
     // If prevCycles is empty, start over
@@ -142,8 +143,11 @@ export async function sync(activeNodes: ActiveNode[]) {
       )}`
     )
     if (squasher.final.added.length < totalNodeCount(cycleToSyncTo))
-      info('Short on nodes. Need to get more cycles. Cycle:'+cycleToSyncTo.counter)
-//    showNodeCount(cycleToSyncTo)
+      info(
+        'Short on nodes. Need to get more cycles. Cycle:' +
+          cycleToSyncTo.counter
+      )
+    //    showNodeCount(cycleToSyncTo)
 
     // If you weren't able to prepend any of the prevCycles, start over
     if (prepended < 1) throw new Error('Unable to prepend any previous cycles')
@@ -179,18 +183,22 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
   while (CycleChain.newest.counter < newestCycle.counter) {
     const nextCycles = await getCycles(
       activeNodes,
-      CycleChain.newest.counter,  // [TODO] maybe we should +1 so that we don't get the record we already have
+      CycleChain.newest.counter, // [TODO] maybe we should +1 so that we don't get the record we already have
       newestCycle.counter
     )
     for (const nextCycle of nextCycles) {
-//      CycleChain.validate(CycleChain.newest, newestCycle)
+      //      CycleChain.validate(CycleChain.newest, newestCycle)
       if (CycleChain.validate(CycleChain.newest, nextCycle))
         await digestCycle(nextCycle)
       else
-        error(`syncNewCycles next record does not fit with prev record.\nnext: ${JSON.stringify(CycleChain.newest)}\nprev: ${JSON.stringify(newestCycle)}`)
-        // [TODO] If we ever hit this, we should return from here after setting 
-        //        a timeout to run syncNewCycles function again. Maybe also through away
-        //        the most recent record we have in case it was bad.
+        error(
+          `syncNewCycles next record does not fit with prev record.\nnext: ${JSON.stringify(
+            CycleChain.newest
+          )}\nprev: ${JSON.stringify(newestCycle)}`
+        )
+      // [TODO] If we ever hit this, we should return from here after setting
+      //        a timeout to run syncNewCycles function again. Maybe also through away
+      //        the most recent record we have in case it was bad.
     }
     newestCycle = await getNewestCycle(activeNodes)
   }
@@ -218,7 +226,7 @@ export function digestCycle(cycle: CycleCreator.CycleRecord) {
 }
 
 function applyNodeListChange(change: Change) {
-  NodeList.addNodes(change.added.map(joined => NodeList.createNode(joined)))
+  NodeList.addNodes(change.added.map((joined) => NodeList.createNode(joined)))
   NodeList.updateNodes(change.updated)
   NodeList.removeNodes(change.removed)
 }
@@ -231,17 +239,16 @@ async function getNewestCycle(
     const port = node.port ? node.port : node.externalPort
     // the queryFunction must return null if the given node is our own
     // while syncing nodeList we dont have node.id, so use ip and port
-    if (ip === Self.ip && port === Self.port) return null  
+    if (ip === Self.ip && port === Self.port) return null
     const resp = await http.get(`${ip}:${port}/sync-newest-cycle`)
     return resp
   }
   const eqFn = (item1, item2) => {
     console.log(`item is: ${JSON.stringify(item1)}`)
-    try{
+    try {
       if (item1.newestCycle.counter === item2.newestCycle.counter) return true
       return false
-    }
-    catch(err){
+    } catch (err) {
       return false
     }
   }
@@ -249,9 +256,14 @@ async function getNewestCycle(
   if (activeNodes.length > 5) redundancy = 2
   if (activeNodes.length > 10) redundancy = 3
   //const [response, _responders] = await robustQuery(activeNodes, queryFn)
-  const [response, _responders] = await robustQuery(activeNodes, queryFn, eqFn, redundancy, true)
+  const [response, _responders] = await robustQuery(
+    activeNodes,
+    queryFn,
+    eqFn,
+    redundancy,
+    true
+  )
   console.log(`response is: ${JSON.stringify(response)}`)
-  
 
   // [TODO] Validate response
   if (!response) throw new Error('Bad response')
@@ -295,7 +307,7 @@ export function activeNodeCount(cycle: CycleCreator.CycleRecord) {
   )
 }
 
-export function showNodeCount(cycle: CycleCreator.CycleRecord){
+export function showNodeCount(cycle: CycleCreator.CycleRecord) {
   warn(` syncing + joined + active - apop - rem - lost
     ${cycle.syncing} +
     ${cycle.joinedConsensors.length} +
@@ -305,7 +317,7 @@ export function showNodeCount(cycle: CycleCreator.CycleRecord){
     ${cycle.lost.length}
     ${cycle.counter}
   `)
-//    ${cycle.activated.length} -
+  //    ${cycle.activated.length} -
 }
 
 export function totalNodeCount(cycle: CycleCreator.CycleRecord) {
@@ -313,7 +325,7 @@ export function totalNodeCount(cycle: CycleCreator.CycleRecord) {
     cycle.syncing +
     cycle.joinedConsensors.length +
     cycle.active +
-//    cycle.activated.length -      // don't count activated because it was already counted in syncing
+    //    cycle.activated.length -      // don't count activated because it was already counted in syncing
     cycle.apoptosized.length -
     cycle.removed.length -
     cycle.lost.length
