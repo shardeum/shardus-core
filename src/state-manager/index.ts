@@ -3190,6 +3190,175 @@ class StateManager extends EventEmitter {
     return true
   }
 
+
+  /**
+   * tryPreApplyTransaction this will try to apply a transaction but will not commit the data
+   * @param acceptedTX 
+   * @param hasStateTableData 
+   * @param repairing 
+   * @param filter 
+   * @param wrappedStates 
+   * @param localCachedData 
+   */
+  async tryPreApplyTransaction (acceptedTX:AcceptedTx, hasStateTableData:boolean, repairing:boolean, filter:AccountFilter, wrappedStates:WrappedResponses, localCachedData:LocalCachedData ) {
+    let ourLockID = -1
+    let accountDataList
+    let txTs = 0
+    let accountKeys = []
+    let ourAccountLocks = null
+    let applyResponse: Shardus.ApplyResponse | null = null
+    //have to figure out if this is a global modifying tx, since that impacts if we will write to global account.
+    let isGlobalModifyingTX = false
+    let savedSomething = false
+    try {
+      let tx = acceptedTX.data
+      // let receipt = acceptedTX.receipt
+      let keysResponse = this.app.getKeyFromTransaction(tx)
+      let { timestamp, debugInfo } = keysResponse
+      txTs = timestamp
+
+
+      let queueEntry = this.getQueueEntry(acceptedTX.id)
+      if(queueEntry != null){
+        if(queueEntry.globalModification === true){
+          isGlobalModifyingTX = true
+        }
+      }
+
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
+
+      if (repairing !== true) {
+        // get a list of modified account keys that we will lock
+        let { sourceKeys, targetKeys } = keysResponse
+        for (let accountID of sourceKeys) {
+          accountKeys.push(accountID)
+        }
+        for (let accountID of targetKeys) {
+          accountKeys.push(accountID)
+        }
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
+        ourAccountLocks = await this.bulkFifoLockAccounts(accountKeys)
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+      }
+
+      ourLockID = await this.fifoLock('accountModification')
+
+      if (this.verboseLogs) console.log(`tryApplyTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
+      // if (this.verboseLogs) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
+      this.applySoftLock = true
+
+      // let replyObject = { stateTableResults: [], txId, txTimestamp, accountData: [] }
+      // let wrappedStatesList = Object.values(wrappedStates)
+
+      // TSConversion need to check how save this cast is for the apply fuction, should probably do more in depth look at the tx param.
+      applyResponse = this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
+      let { stateTableResults, accountData: _accountdata } = applyResponse
+      accountDataList = _accountdata
+
+
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+      // wrappedStates are side effected for now
+      savedSomething = await this.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter)
+
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
+
+      this.applySoftLock = false
+      // only write our state table data if we dont already have it in the db
+      if (hasStateTableData === false) {
+        for (let stateT of stateTableResults) {
+          if (this.verboseLogs) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
+        }
+        await this.storage.addAccountStates(stateTableResults)
+      }
+
+      // post validate that state ended up correctly?
+
+      // write the accepted TX to storage
+      this.storage.addAcceptedTransactions([acceptedTX])
+    } catch (ex) {
+      this.fatalLogger.fatal('tryApplyTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.mainLogger.debug(`tryApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
+      if(applyResponse){ // && savedSomething){
+        // TSConversion do we really want to record this?
+        // if (!repairing) this.tempRecordTXByCycle(txTs, acceptedTX, false, applyResponse, isGlobalModifyingTX, savedSomething)
+        // record no-op state table fail:
+
+      } else {
+        // this.fatalLogger.fatal('tryApplyTransaction failed: applyResponse == null')
+      }
+      
+
+      return false
+    } finally {
+      this.fifoUnlock('accountModification', ourLockID)
+      if (repairing !== true) {
+        if(ourAccountLocks != null){
+          this.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
+        }
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+      }
+    }
+
+    // have to wrestle with the data a bit so we can backup the full account and not jsut the partial account!
+    // let dataResultsByKey = {}
+    let dataResultsFullList = []
+    for (let wrappedData of applyResponse.accountData) {
+      // if (wrappedData.isPartial === false) {
+      //   dataResultsFullList.push(wrappedData.data)
+      // } else {
+      //   dataResultsFullList.push(wrappedData.localCache)
+      // }
+      if (wrappedData.localCache != null) {
+        dataResultsFullList.push(wrappedData)
+      }
+      // dataResultsByKey[wrappedData.accountId] = wrappedData.data
+    }
+
+    // this is just for debug!!!
+    if (dataResultsFullList[0] == null) {
+      for (let wrappedData of applyResponse.accountData) {
+        if (wrappedData.localCache != null) {
+          dataResultsFullList.push(wrappedData)
+        }
+        // dataResultsByKey[wrappedData.accountId] = wrappedData.data
+      }
+    }
+    // if(dataResultsFullList == null){
+    //   throw new Error(`tryApplyTransaction (dataResultsFullList == null  ${txTs} ${utils.stringifyReduce(acceptedTX)} `);
+    // }
+
+    // TSConversion verified that app.setAccount calls shardus.applyResponseAddState  that adds hash and txid to the data and turns it into AccountData
+    let upgradedAccountDataList:Shardus.AccountData[] = (dataResultsFullList as unknown) as Shardus.AccountData[]
+
+    await this.updateAccountsCopyTable(upgradedAccountDataList, repairing, txTs)
+
+    if (!repairing) {
+      // await this.updateAccountsCopyTable(accountDataList)
+      //if(savedSomething){
+        this.tempRecordTXByCycle(txTs, acceptedTX, true, applyResponse, isGlobalModifyingTX, savedSomething)
+      //}
+      
+
+      //WOW this was not good!  had acceptedTX.transactionGroup[0].id
+      //if (this.p2p.getNodeId() === acceptedTX.transactionGroup[0].id) {
+      
+      let queueEntry:QueueEntry | null = this.getQueueEntry(acceptedTX.id )
+      if (queueEntry != null && queueEntry.transactionGroup != null && this.p2p.getNodeId() === queueEntry.transactionGroup[0].id) {  
+        this.emit('txProcessed')
+      }
+
+      this.emit('txApplied', acceptedTX)
+    }
+
+    return true
+  }
+
   // leaving this for ref for a bit longer because it is interesting
   // tryStartAcceptedQueue () {
   //   if (!this.dataSyncMainPhaseComplete) {
@@ -3253,6 +3422,55 @@ class StateManager extends EventEmitter {
     }
     return { success: applyResult, reason: 'apply result' }
   }
+
+
+  /**
+   * preApplyAcceptedTransaction will apply a transaction to the in memory data but will not save the results to the database yet
+   * @param acceptedTX 
+   * @param wrappedStates 
+   * @param localCachedData 
+   * @param filter 
+   */
+  async preApplyAcceptedTransaction (acceptedTX:AcceptedTx, wrappedStates:WrappedResponses, localCachedData:LocalCachedData, filter:AccountFilter) : PreApplyAcceptedTransactionResult {
+    if (this.queueStopped) return
+    let tx = acceptedTX.data
+    let keysResponse = this.app.getKeyFromTransaction(tx)
+    let { sourceKeys, targetKeys, timestamp, debugInfo } = keysResponse
+
+    if (this.verboseLogs) console.log('applyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
+
+    let allkeys:string[] = []
+    allkeys = allkeys.concat(sourceKeys)
+    allkeys = allkeys.concat(targetKeys)
+
+    for (let key of allkeys) {
+      if (wrappedStates[key] == null) {
+        if (this.verboseLogs) console.log(`applyAcceptedTransaction missing some account data. timestamp:${timestamp}  key: ${utils.makeShortHash(key)}  debuginfo:${debugInfo}`)
+        return { applied: false, applyResult:'', reason: 'missing some account data' }
+      }
+    }
+
+    // todo review what we are checking here.
+    let { success, hasStateTableData } = await this.testAccountTimesAndStateTable2(tx, wrappedStates)
+
+    if (!success) {
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction pretest failed: ' + timestamp)
+      this.logger.playbackLogNote('tx_apply_rejected 1', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
+      return { applied: false, applyResult:'', reason: 'applyAcceptedTransaction pretest failed, TX rejected' }
+    }
+  
+    let preApplyResult = await this.tryPreApplyTransaction(acceptedTX, hasStateTableData, false, filter, wrappedStates, localCachedData)
+    if (preApplyResult) {
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction SUCCEDED ' + timestamp)
+      this.logger.playbackLogNote('tx_applied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
+    } else {
+      this.logger.playbackLogNote('tx_apply_rejected 3', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
+    }
+
+    return { applied: preApplyResult.applied , applyResult:preApplyResult.applyResult,  reason: 'apply result' }
+  }
+  
 
   interruptibleSleep (ms: number, targetTime: number) {
     let resolveFn:any = null //TSConversion just setting this to any for now.
@@ -3669,6 +3887,7 @@ class StateManager extends EventEmitter {
           queueEntry.logstate = 'got all missing data'
         } else {
           queueEntry.logstate = 'failed to get data:' + queueEntry.hasAll
+          // queueEntry.state = 'failed to get data'
         }
 
         this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
@@ -4178,7 +4397,11 @@ class StateManager extends EventEmitter {
 
             // 7.  Manually request missing state
             try {
+              // TODO consider if this function should set 'failed to get data'
+              // note this is call is not awaited.  is that ok?
+              // 
               this.queueEntryRequestMissingData(queueEntry)
+
             } catch (ex) {
               this.mainLogger.debug('processAcceptedTxQueue2 queueEntryRequestMissingData:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
               this.fatalLogger.fatal('processAcceptedTxQueue2 queueEntryRequestMissingData:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -4186,35 +4409,33 @@ class StateManager extends EventEmitter {
           } else if (queueEntry.hasAll) {
             queueEntry.state = 'applying'
           }
-
-          // TODO Need condition to check if age is greater than M3? to fail the tx from the queue
-        } else if (queueEntry.state === 'applying') {
+        } else if (queueEntry.state === 'consensing') {
           if (accountSeen(queueEntry) === false) {
             markAccountsSeen(queueEntry)
 
-            if (this.verboseLogs) this.logger.playbackLogNote('shrd_workingOnTx', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-            this.emit('txPopped', queueEntry.acceptedTx.receipt.txHash)
+            if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingTx', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
 
-            // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processAcceptedTxQueue2. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
+            // TODO sync related need to reconsider how to set this up again
+            // if (queueEntry.didSync) {
+            //   this.logger.playbackLogNote('shrd_sync_consensing', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
+            //   // if we did sync it is time to JIT query local data.  alternatively could have other nodes send us this data, but that could be very high bandwidth.
+            //   for (let key of queueEntry.syncKeys) {
+            //     let wrappedState = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
+            //     this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)} hash:${wrappedState.stateId}`)
+            //     queueEntry.localCachedData[key] = wrappedState.localCache
+            //   }
+            // }
 
-            if (queueEntry.didSync) {
-              this.logger.playbackLogNote('shrd_sync_applying', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
-
-              // if we did sync it is time to JIT query local data.  alternatively could have other nodes send us this data, but that could be very high bandwidth.
-              for (let key of queueEntry.syncKeys) {
-                let wrappedState = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
-                this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)} hash:${wrappedState.stateId}`)
-                queueEntry.localCachedData[key] = wrappedState.localCache
-              }
-            }
-
-            let wrappedStates = queueEntry.collectedData // Object.values(queueEntry.collectedData)
+            let wrappedStates = queueEntry.collectedData
             let localCachedData = queueEntry.localCachedData
             try {
-            // this.mainLogger.debug(` processAcceptedTxQueue2. applyAcceptedTransaction ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp} queuerestarts: ${localRestartCounter} queueLen: ${this.newAcceptedTxQueue.length}`)
               let filter = queueEntry.localKeys
               queueEntry.acceptedTx.transactionGroup = queueEntry.transactionGroup // Used to not double count txProcessed
-              let txResult = await this.applyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates, localCachedData, filter)
+              let txResult = await this.preApplyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates, localCachedData, filter)
+
+              //TODO send out consensing info here.
+
+              // TODO may need to adjust result since a pass or fail is ok...
               if (txResult != null && txResult.success) {
                 acceptedTXCount++
                 // clearAccountsSeen(queueEntry)
@@ -4230,51 +4451,80 @@ class StateManager extends EventEmitter {
               this.mainLogger.debug('processAcceptedTxQueue2 applyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
               this.fatalLogger.fatal('processAcceptedTxQueue2 applyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
             } finally {
-            // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processAcceptedTxQueue2. clear and remove. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
-              clearAccountsSeen(queueEntry)
-              // remove from queue
-              // this.newAcceptedTxQueue.splice(currentIndex, 1)
-              // this.archivedQueueEntries.push(queueEntry)
-              // if (this.archivedQueueEntries.length > 10000) { // todo make this a constant and decide what len should really be!
-              //   this.archivedQueueEntries.shift()
-              // }
-              this.removeFromQueue(queueEntry, currentIndex)
-              queueEntry.state = 'applied'
-
-              if (this.verboseLogs) this.logger.playbackLogNote('shrd_workingOnTxFinished', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-            }
-
-            // do we have any syncing neighbors?
-            if (this.currentCycleShardData.hasSyncingNeighbors === true && queueEntry.globalModification === false) {
-            // let dataToSend = Object.values(queueEntry.collectedData)
-              let dataToSend = []
-
-              let keys = Object.keys(queueEntry.originalData)
-              for (let key of keys) {
-                dataToSend.push(JSON.parse(queueEntry.originalData[key]))
-              }
-
-              // maybe have to send localcache over, or require the syncing node to grab this data itself JIT!
-              // let localCacheTransport = Object.values(queueEntry.localCachedData)
-
-              // send data to syncing neighbors.
-              if (this.currentCycleShardData.syncingNeighbors.length > 0) {
-                let message = { stateList: dataToSend, txid: queueEntry.acceptedTx.id }
-                this.logger.playbackLogNote('shrd_sync_dataTell', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} AccountBeingShared: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)} txid: ${utils.makeShortHash(message.txid)} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighbors.map(x => x.id))}`)
-                this.p2p.tell(this.currentCycleShardData.syncingNeighbors, 'broadcast_state', message)
-              }
+  
+              if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingTx2', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
             }
           }
-        } else if (queueEntry.state === 'failed to get data') {
-          // TODO log
-          // remove from queue
-          // this.newAcceptedTxQueue.splice(currentIndex, 1)
-          // this.archivedQueueEntries.push(queueEntry)
-          // if (this.archivedQueueEntries.length > 10000) {
-          //   this.archivedQueueEntries.shift()
-          // }
-          this.removeFromQueue(queueEntry, currentIndex)
-        }
+        } else if (queueEntry.state === 'commiting') {
+          if (accountSeen(queueEntry) === false) {
+            markAccountsSeen(queueEntry)
+
+            if (this.verboseLogs) this.logger.playbackLogNote('shrd_commitingTx', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+            this.emit('txPopped', queueEntry.acceptedTx.receipt.txHash)
+
+            // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processAcceptedTxQueue2. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
+
+            // TODO sync related need to reconsider how to set this up again
+            // if (queueEntry.didSync) {
+            //   this.logger.playbackLogNote('shrd_sync_commiting', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
+            //   // if we did sync it is time to JIT query local data.  alternatively could have other nodes send us this data, but that could be very high bandwidth.
+            //   for (let key of queueEntry.syncKeys) {
+            //     let wrappedState = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
+            //     this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)} hash:${wrappedState.stateId}`)
+            //     queueEntry.localCachedData[key] = wrappedState.localCache
+            //   }
+            // }
+
+            let wrappedStates = queueEntry.collectedData // Object.values(queueEntry.collectedData)
+            let localCachedData = queueEntry.localCachedData
+            try {
+            // this.mainLogger.debug(` processAcceptedTxQueue2. applyAcceptedTransaction ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp} queuerestarts: ${localRestartCounter} queueLen: ${this.newAcceptedTxQueue.length}`)
+              let filter = queueEntry.localKeys
+              queueEntry.acceptedTx.transactionGroup = queueEntry.transactionGroup // Used to not double count txProcessed
+              let commitResult = await this.commitConsensedTransaction(queueEntry.acceptedTx, wrappedStates, localCachedData, filter)
+              if (commitResult != null && commitResult.success) {
+                
+              }
+            } catch (ex) {
+              this.mainLogger.debug('processAcceptedTxQueue2 commiting Transaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+              this.fatalLogger.fatal('processAcceptedTxQueue2 commiting Transaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+            } finally {
+              clearAccountsSeen(queueEntry)
+              this.removeFromQueue(queueEntry, currentIndex)
+
+              // TODO this is now 'pass' or 'fail' and we need to save the state from 'consensing' state
+              queueEntry.state = 'applied'
+              if (this.verboseLogs) this.logger.playbackLogNote('shrd_commitingTxFinished', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+            }
+
+            // TODO syncing related.. need to consider how we will re activate this 
+            // // do we have any syncing neighbors?
+            // if (this.currentCycleShardData.hasSyncingNeighbors === true && queueEntry.globalModification === false) {
+            // // let dataToSend = Object.values(queueEntry.collectedData)
+            //   let dataToSend = []
+
+            //   let keys = Object.keys(queueEntry.originalData)
+            //   for (let key of keys) {
+            //     dataToSend.push(JSON.parse(queueEntry.originalData[key]))
+            //   }
+
+            //   // maybe have to send localcache over, or require the syncing node to grab this data itself JIT!
+            //   // let localCacheTransport = Object.values(queueEntry.localCachedData)
+
+            //   // send data to syncing neighbors.
+            //   if (this.currentCycleShardData.syncingNeighbors.length > 0) {
+            //     let message = { stateList: dataToSend, txid: queueEntry.acceptedTx.id }
+            //     this.logger.playbackLogNote('shrd_sync_dataTell', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} AccountBeingShared: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)} txid: ${utils.makeShortHash(message.txid)} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighbors.map(x => x.id))}`)
+            //     this.p2p.tell(this.currentCycleShardData.syncingNeighbors, 'broadcast_state', message)
+            //   }
+            // }
+          }          
+        } 
+        // Disabled this because it cant happen..  TXs will time out instead now.
+        // we could consider this as a state when attempting to get missing data fails
+        // else if (queueEntry.state === 'failed to get data') {
+        //   this.removeFromQueue(queueEntry, currentIndex)
+        // }
         currentIndex--
       }
     } finally {

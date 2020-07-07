@@ -483,6 +483,8 @@ type GetAccountDataWithQueueHintsResp = { accountData: import("../shardus/shardu
 
 type GlobalAccountReportResp = {combinedHash:string, accounts:{id:string, hash:string, timestamp:number }[]  }
 
+type PreApplyAcceptedTransactionResult = { applied: boolean, applyResult:string, reason:string }
+
 
 // Sync related
 type StateHashResult = {stateHash:string}
