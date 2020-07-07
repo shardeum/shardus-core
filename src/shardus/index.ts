@@ -750,7 +750,7 @@ class Shardus extends EventEmitter {
           ShardusTypes.Node,
           boolean
         ]
-      ) => this.stateManager.queueAcceptedTransaction(...txArgs)
+      ) => this.stateManager.routeAndQueueAcceptedTransaction(...txArgs)
     )
 
     this.storage.stateManager = this.stateManager
@@ -829,7 +829,7 @@ class Shardus extends EventEmitter {
    * }
    *
    */
-  put(tx, set = false, global = false) {
+  put (tx, set = false, global = false) {
     if (!this.appProvided)
       throw new Error(
         'Please provide an App object to Shardus.setup before calling Shardus.put'
@@ -896,13 +896,17 @@ class Shardus extends EventEmitter {
           )}`
         )
 
-      // Validate the transaction timestamp
+      if(initValidationResp.success !== true){
+        return { success: false, reason: `Validation Failed` }
+      }
+
+      // Validate the transaction timestamp   //TODO call this before validateTxnFields
       const timestamp = initValidationResp.txnTimestamp
       if (this._isTransactionTimestampExpired(timestamp)) {
         this.fatalLogger.fatal(
           `Transaction Expired: ${utils.stringifyReduce(tx)}`
         )
-        this.statistics.incrementCounter('txExpired')
+        this.statistics.incrementCounter('txRejected')
         return { success: false, reason: 'Transaction Expired' }
       }
 

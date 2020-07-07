@@ -150,13 +150,13 @@ declare namespace Shardus {
      * A function responsible for validation the incoming transaction fields
      */
     validateTxnFields: (
-      inTx: Shardus.IncomingTransaction
+      inTx: Shardus.OpaqueTransaction // it is better to not use IncomingTransaction 
     ) => Shardus.IncomingTransactionResult
     /**
      * A function responsible for applying an accepted transaction
      */
     apply: (
-      inTx: Shardus.IncomingTransaction,
+      inTx: Shardus.OpaqueTransaction, // it is better to not use IncomingTransaction,
       wrappedStates: any
     ) => Shardus.ApplyResponse
 

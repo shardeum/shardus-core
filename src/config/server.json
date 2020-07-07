@@ -25,7 +25,7 @@
     "maxRejoinTime": 20,
     "difficulty": 2,
     "queryDelay": 1,
-    "gossipRecipients": 4,
+    "gossipRecipients": 8,
     "gossipTimeout": 180,
     "maxSeedNodes": 10,
     "minNodesToAllowTxs": 3,

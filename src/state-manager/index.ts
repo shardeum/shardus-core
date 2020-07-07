@@ -433,7 +433,7 @@ class StateManager extends EventEmitter {
       // if (this.preTXQueue.length > 0) {
       //   for (let tx of this.preTXQueue) {
       //     this.logger.playbackLogNote('shrd_sync_preTX', ` `, ` ${utils.stringifyReduce(tx)} `)
-      //     this.queueAcceptedTransaction(tx, false, null)
+      //     this.routeAndQueueAcceptedTransaction(tx, false, null)
       //   }
       //   this.preTXQueue = []
       // }
@@ -1935,7 +1935,7 @@ class StateManager extends EventEmitter {
 
       this.p2p.sendGossipIn('acceptedTx', acceptedTX, tracker, sender)
 
-      this.queueAcceptedTransaction(acceptedTX,/*sendGossip*/ false, sender, /*globalModification*/ false)
+      this.routeAndQueueAcceptedTransaction(acceptedTX,/*sendGossip*/ false, sender, /*globalModification*/ false)
       //Note await not needed so beware if you add code below this.
     })
 
@@ -2426,7 +2426,7 @@ class StateManager extends EventEmitter {
     //     // already have this in our queue
     //   }
 
-    //   this.queueAcceptedTransaction(payload.acceptedTx, true, null, false) // todo pass in sender?
+    //   this.routeAndQueueAcceptedTransaction(payload.acceptedTx, true, null, false) // todo pass in sender?
 
     //   // no response needed?
     // })
@@ -2468,7 +2468,7 @@ class StateManager extends EventEmitter {
       if (queueEntry == null) {
         //if we are syncing we need to queue this transaction!
 
-        //this.queueAcceptedTransaction (acceptedTx:AcceptedTx, sendGossip:boolean = true, sender: Shardus.Node  |  null, globalModification:boolean) 
+        //this.routeAndQueueAcceptedTransaction (acceptedTx:AcceptedTx, sendGossip:boolean = true, sender: Shardus.Node  |  null, globalModification:boolean) 
 
 
         return
@@ -2492,15 +2492,17 @@ class StateManager extends EventEmitter {
         // already have this in our queue
       }
 
-      let added = this.queueAcceptedTransaction(payload, /*sendGossip*/ false, sender, /*globalModification*/ false)
+      //TODO need to check transaction fields.
+
+      let added = this.routeAndQueueAcceptedTransaction(payload, /*sendGossip*/ false, sender, /*globalModification*/ false)
       if (added === 'lost') {
         return // we are faking that the message got lost so bail here
       }
       if (added === 'out of range') {
-        return // we are faking that the message got lost so bail here
+        return
       }
       if (added === 'notReady') {
-        return // we are faking that the message got lost so bail here
+        return
       }
       queueEntry = this.getQueueEntrySafe(payload.id) //, payload.timestamp) // now that we added it to the queue, it should be possible to get the queueEntry now
 
@@ -2509,6 +2511,31 @@ class StateManager extends EventEmitter {
         this.fatalLogger.fatal(`spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(payload.id)}` )
         return
       }
+
+      //Validation.
+      const initValidationResp = this.app.validateTxnFields(queueEntry.acceptedTx.data)
+      if(initValidationResp.success !== true){
+        this.fatalLogger.fatal(`spread_tx_to_group validateTxnFields failed: ${utils.stringifyReduce(
+          initValidationResp
+        )}`)
+        return
+      }
+
+      //TODO check time before inserting queueEntry.  1sec future 5 second past max
+      let timeM = this.queueSitTime
+      let timestamp = queueEntry.txKeys.timestamp
+      let age = Date.now() - timestamp
+      if (age > timeM * 0.9) {
+        this.fatalLogger.fatal('spread_tx_to_group cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
+        this.logger.playbackLogNote('shrd_spread_tx_to_groupToOld', '', 'spread_tx_to_group working on older tx ' + timestamp + ' age: ' + age)
+        return
+      }
+      if (age < -1000) {
+        this.fatalLogger.fatal('spread_tx_to_group cannot accept tx more than 1 second in future ' + timestamp + ' age: ' + age)
+        this.logger.playbackLogNote('shrd_spread_tx_to_groupToFutrue', '', 'spread_tx_to_group tx too far in future' + timestamp + ' age: ' + age)
+        return
+      }
+
       // how did this work before??
       // get transaction group. 3 accounds, merge lists.
       let transactionGroup = this.queueEntryGetTransactionGroup(queueEntry)
@@ -2522,7 +2549,7 @@ class StateManager extends EventEmitter {
         this.p2p.sendGossipIn('spread_tx_to_group', payload, tracker, sender, transactionGroup)
       }
 
-      // await this.queueAcceptedTransaction(acceptedTX, false, sender)
+      // await this.routeAndQueueAcceptedTransaction(acceptedTX, false, sender)
     })
 
     this.p2p.registerInternal('get_account_data_with_queue_hints', async (payload: { accountIds: string[] }, respond: (arg0: GetAccountDataWithQueueHintsResp) => any) => {
@@ -2722,7 +2749,7 @@ class StateManager extends EventEmitter {
 
   //   // await this.applyAcceptedTx()
   //   for (let acceptedTx of acceptedTXs) {
-  //     this.queueAcceptedTransaction(acceptedTx, false, helper)
+  //     this.routeAndQueueAcceptedTransaction(acceptedTx, false, helper)
   //   }
 
   //   // todo insert these in a sorted way to the new queue
@@ -3262,7 +3289,7 @@ class StateManager extends EventEmitter {
         }
         txQueueEntry.homeNodes[key] = homeNode
         if (homeNode == null) {
-          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` queueAcceptedTransaction: ${key} `)
+          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` routeAndQueueAcceptedTransaction: ${key} `)
           throw new Error(`updateHomeInformation homeNode == null ${txQueueEntry}`)
         }
 
@@ -3294,13 +3321,13 @@ class StateManager extends EventEmitter {
   //         Q
   //          QQ
 
-  queueAcceptedTransaction (acceptedTx:AcceptedTx, sendGossip:boolean = true, sender: Shardus.Node  |  null, globalModification:boolean) : string | boolean {
+  routeAndQueueAcceptedTransaction (acceptedTx:AcceptedTx, sendGossip:boolean = true, sender: Shardus.Node  |  null, globalModification:boolean) : string | boolean {
     // dropping these too early.. hmm  we finished syncing before we had the first shard data.
     // if (this.currentCycleShardData == null) {
     //   // this.preTXQueue.push(acceptedTX)
     //   return 'notReady' // it is too early to care about the tx
     // }
-    this.logger.playbackLogNote('queueAcceptedTransaction-debug', '', `sendGossip:${sendGossip} globalModification:${globalModification} this.readyforTXs:${this.readyforTXs} hasshardData:${(this.currentCycleShardData != null)} acceptedTx:${utils.stringifyReduce(acceptedTx)} `)
+    this.logger.playbackLogNote('routeAndQueueAcceptedTransaction-debug', '', `sendGossip:${sendGossip} globalModification:${globalModification} this.readyforTXs:${this.readyforTXs} hasshardData:${(this.currentCycleShardData != null)} acceptedTx:${utils.stringifyReduce(acceptedTx)} `)
     if (this.readyforTXs === false) {
       return 'notReady' // it is too early to care about the tx
     }
@@ -3337,15 +3364,15 @@ class StateManager extends EventEmitter {
     try {
       let age = Date.now() - timestamp
       if (age > this.queueSitTime * 0.9) {
-        this.fatalLogger.fatal('queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
+        this.fatalLogger.fatal('routeAndQueueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
         // TODO consider throwing this out.  right now it is just a warning
-        this.logger.playbackLogNote('shrd_oldQueueInsertion', '', 'queueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
+        this.logger.playbackLogNote('shrd_oldQueueInsertion', '', 'routeAndQueueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
       }
       let keyHash:StringBoolObjectMap = {}
       for (let key of txQueueEntry.txKeys.allKeys) {
         if(key == null){
-         // throw new Error(`queueAcceptedTransaction key == null ${key}`)
-         if (this.verboseLogs) this.mainLogger.error(`queueAcceptedTransaction key == null ${timestamp} not putting tx in queue.`)
+         // throw new Error(`routeAndQueueAcceptedTransaction key == null ${key}`)
+         if (this.verboseLogs) this.mainLogger.error(`routeAndQueueAcceptedTransaction key == null ${timestamp} not putting tx in queue.`)
          return false
         }
 
@@ -3360,7 +3387,7 @@ class StateManager extends EventEmitter {
         if(globalModification === true){
           // TODO: globalaccounts 
           if(this.globalAccountMap.has(key)){
-            this.logger.playbackLogNote('globalAccountMap', `queueAcceptedTransaction - has`)
+            this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - has`)
             // indicate that we will have global data in this transaction!
             // I think we do not need to test that here afterall.
           } else {
@@ -3369,7 +3396,7 @@ class StateManager extends EventEmitter {
             //it should be that p2p has already checked the receipt before calling shardus.push with global=true
 
             this.globalAccountMap.set(key, null)
-            this.logger.playbackLogNote('globalAccountMap', `queueAcceptedTransaction - set`)
+            this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - set`)
 
           }            
         }
@@ -3425,7 +3452,7 @@ class StateManager extends EventEmitter {
             return 'out of range'// we are done, not involved!!!
           } else {
             // let tempList =  // can be returned by the function below
-            if (this.verboseLogs) this.mainLogger.debug(`queueAcceptedTransaction: getOrderedSyncingNeighbors`)
+            if (this.verboseLogs) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: getOrderedSyncingNeighbors`)
             this.p2p.state.getOrderedSyncingNeighbors(this.currentCycleShardData.ourNode)
             // TODO: globalaccounts 
             // globalModification  TODO pass on to syncing nodes.   (make it pass on the flag too)
@@ -3438,7 +3465,7 @@ class StateManager extends EventEmitter {
                 this.p2p.sendGossipAll('spread_tx_to_group', acceptedTx, '', sender, this.currentCycleShardData.syncingNeighborsTxGroup)
                 //This was using sendGossipAll, but changed it for a work around.  maybe this just needs to be a tell.                
               } else {
-                if (this.verboseLogs) this.mainLogger.debug(`queueAcceptedTransaction: bugfix detected. avoid forwarding txs where globalModification == true`)
+                if (this.verboseLogs) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: bugfix detected. avoid forwarding txs where globalModification == true`)
               }
             }
           }
@@ -3450,7 +3477,7 @@ class StateManager extends EventEmitter {
       this.tryStartAcceptedQueue()
     } catch (error) {
       this.logger.playbackLogNote('shrd_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)}`)
-      this.fatalLogger.fatal('queueAcceptedTransaction failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+      this.fatalLogger.fatal('routeAndQueueAcceptedTransaction failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
       throw new Error(error)
     }
     return true
@@ -3971,7 +3998,7 @@ class StateManager extends EventEmitter {
 
       let timeM = this.queueSitTime
       let timeM2 = timeM * 2
-      // let timeM3 = timeM * 3
+      let timeM3 = timeM * 3
       let currentTime = Date.now() // when to update this?
 
 
@@ -4053,6 +4080,13 @@ class StateManager extends EventEmitter {
             lastTx = this.newAcceptedTxQueue[index]
           }
 
+          //TODO check time before inserting queueEntry. make sure it is not older than 90% of M
+          let age = Date.now() - timestamp
+          if (age > timeM * 0.9) {
+            this.fatalLogger.fatal('processAcceptedTxQueue cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
+            this.logger.playbackLogNote('shrd_processAcceptedTxQueueToOld', '', 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
+          }
+
           txQueueEntry.approximateCycleAge = this.currentCycleShardData.cycleNumber
           this.newAcceptedTxQueue.splice(index + 1, 0, txQueueEntry)
           this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)} indexInserted: ${index + 1}`)
@@ -4086,6 +4120,17 @@ class StateManager extends EventEmitter {
         //   continue
         // }
 
+        //check for TX older than M3 and expire them
+        if(txAge > timeM3) {
+          this.statistics.incrementCounter('txExpired')
+          queueEntry.state = 'expired'
+          this.removeFromQueue(queueEntry, currentIndex)
+          this.logger.playbackLogNote('txExpired', `${queueEntry.acceptedTx.id}`, `txExpired ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+          currentIndex--
+          continue
+        }
+
+
         if (queueEntry.state === 'syncing') {
           markAccountsSeen(queueEntry)
         } else if (queueEntry.state === 'aging') {
@@ -4113,12 +4158,15 @@ class StateManager extends EventEmitter {
           if(queueEntry.globalModification === true){
             // no data to await.
             queueEntry.state = 'applying'
+            currentIndex--
             continue
           }
           // check if we have all accounts
           if (queueEntry.hasAll === false && txAge > timeM2) {
             if (this.queueEntryHasAllData(queueEntry) === true) {
+              // I think this can't happen
               this.logger.playbackLogNote('shrd_hadDataAfterall', `${queueEntry.acceptedTx.id}`, `This is kind of an error, and should not happen`)
+              currentIndex--
               continue
             }
 
