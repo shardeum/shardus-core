@@ -122,7 +122,7 @@ export async function initSafetyModeVals() {
     safetyMode = true
 
     // Set the safetyNum to the number of active nodes in the last cycle saved in the old data
-    safetyNum = oldCycleRecord.active
+    safetyNum = oldCycleRecord ? oldCycleRecord.active : 0
 
     // Set networkStateHash to the last network state hash saved in the old data
     networkStateHash = oldNetworkHash

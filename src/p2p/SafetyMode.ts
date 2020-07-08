@@ -85,9 +85,11 @@ export function updateRecord(txs: Txs, record: CycleRecord, prev: CycleRecord) {
   // If you're not the first node
   else {
     // Just copy the safety mode, safteyNum, and networkStateHash vals for now
-    record.safetyMode = prev.safetyMode
-    record.safetyNum = prev.safetyNum
-    record.networkStateHash = prev.networkStateHash
+    if (prev) {
+      record.safetyMode = prev.safetyMode
+      record.safetyNum = prev.safetyNum
+      record.networkStateHash = prev.networkStateHash
+    }
   }
 
   /**
@@ -107,7 +109,11 @@ export function validateRecordTypes(rec: Record): string {
 }
 
 export function parseRecord(record: CycleRecord): Change {
-  return
+  return {
+    added: [],
+    removed: [],
+    updated: [],
+  }
 }
 
 export function queueRequest(request) {}
