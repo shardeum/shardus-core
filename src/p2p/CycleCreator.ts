@@ -63,6 +63,11 @@ export type CycleRecord = BaseRecord &
     apoptosized: string[]
   }
 
+export type CycleData = CycleRecord & {
+  marker: CycleMarker
+  certificate: CycleCert
+}
+
 /** CONSTANTS */
 
 const SECOND = 1000
@@ -109,7 +114,7 @@ let bestCertScore: Map<CycleMarker, number>
 const timers = {}
 
 // Keeps track of the last saved record in the DB in order to update it
-let lastSavedRecord: CycleRecord
+let lastSavedData: CycleRecord
 
 /** ROUTES */
 
@@ -270,17 +275,16 @@ async function cycleCreator() {
   // Save the previous record to the DB
   const marker = makeCycleMarker(prevRecord)
   const certificate = makeCycleCert(marker)
-  const newRecord = { ...prevRecord, marker, certificate }
-  if (lastSavedRecord) {
-    await storage.updateCycle(
-      { networkId: lastSavedRecord.networkId },
-      newRecord
-    )
-    lastSavedRecord = newRecord
+  const data: CycleData = { ...prevRecord, marker, certificate }
+  if (lastSavedData) {
+    await storage.updateCycle({ networkId: lastSavedData.networkId }, data)
+    lastSavedData = data
   } else {
     await storage.addCycles({ ...prevRecord, marker, certificate })
-    lastSavedRecord = newRecord
+    lastSavedData = data
   }
+
+  Self.emitter.emit('new_cycle_data', data)
 
   // Print combined cycle log entry
   cycleLogger.info(CycleChain.getDebug() + NodeList.getDebug())

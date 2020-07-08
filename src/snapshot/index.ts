@@ -4,6 +4,10 @@ import { crypto, stateManager, storage } from '../p2p/Context'
 import ShardFunctions from '../state-manager/shardFunctions'
 import { AddressRange } from '../state-manager/shardFunctionTypes'
 import { clean, initGossip, Message, newCollector } from './partition-gossip'
+import { resolve } from 'path'
+import { rejects } from 'assert'
+import { CycleRecord, CycleData } from '../p2p/CycleCreator'
+import { emitter } from '../p2p/Self'
 
 /** TYPES */
 interface Account {
@@ -156,14 +160,29 @@ export async function safetySync() {
    * First, we should look for it in any old data we had when we started.
    * Who knows, we might get lucky ;).
    *
-   * If that doesn't work, we'll use gossip to tell everyone in the network to
-   * send that data to us if they have it
-   *
    */
   /**
    * Once we receive our old data and put it into state-manager, go active with
    * P2P/Active's requestActive:
    */
+
+  // Wait until safetyNum of nodes have joined the network
+  await new Promise((resolve) => {
+    emitter.on('new_cycle_data', (data: CycleData) => {
+      if (data.syncing >= data.safetyNum) {
+        resolve()
+      }
+    })
+  })
+
+  // Figure out which nodes hold which partitions in the new network
+
+  // Once you get the old data you need, go active
+
+  // If you have old data, figure out which partitions you have
+
+  // Send the old data you have to the new node/s responsible for it
+
   Active.requestActive()
 }
 
