@@ -305,6 +305,12 @@ class Sqlite3Storage {
     return this.all(queryString, valueArray)
   }
 
+  _rawQueryOld(queryString, valueArray) {
+    // return this.sequelize.query(query, { model: table })
+
+    return this.allOld(queryString, valueArray)
+  }
+
   params2Array(paramsObj, table) {
     if (paramsObj == null) {
       return []
@@ -483,7 +489,6 @@ class Sqlite3Storage {
     })
   }
   allOld(sql, params = []) {
-    console.log(sql, params)
     return new Promise((resolve, reject) => {
       this.oldDb.all(sql, params, (err, rows) => {
         if (err) {
@@ -491,7 +496,6 @@ class Sqlite3Storage {
           console.log(err)
           reject(err)
         } else {
-          console.log('ROWS: ', rows)
           resolve(rows)
         }
       })

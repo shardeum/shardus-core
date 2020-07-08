@@ -65,10 +65,10 @@ const joinRoute: Types.Route<Handler> = {
   handler: (req, res) => {
 
     // Dont accept join requests if you're not active
-    if (Self.isActive === false) {
-      res.end()
-      return
-    }
+    // if (Self.isActive === false) {
+    //   res.end()
+    //   return
+    // }
 
     // Omar - [TODO] - if currentQuater <= 0 then we are not ready
     //        just gossip this request to one other node

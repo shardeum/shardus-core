@@ -28,6 +28,7 @@ interface Storage {
   _update: any
   _delete: any
   _query: any
+  _queryOld: any
 }
 
 class Storage {
@@ -101,6 +102,8 @@ class Storage {
       this.storage._delete(table, where, opts)
     this._query = async (query, tableModel) =>
       this.storage._rawQuery(query, tableModel) // or queryString, valueArray for non-sequelize
+    this._queryOld = async (query, tableModel) =>
+      this.storage._rawQueryOld(query, tableModel) // or queryString, valueArray for non-sequelize
 
     this.initialized = true
   }
@@ -827,6 +830,17 @@ class Storage {
     try {
       const query = `select accountId, cycleNumber, hash from accountsCopy WHERE cycleNumber<=${cycleNumber} and accountId>="${lowAddress}" and accountId<="${highAddress}"  group by accountId order by accountId asc`
       const result = await this._query(query, [])
+      return result
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
+  async getOldAccountCopiesByCycleAndRange(lowAddress, highAddress) {
+    this._checkInit()
+    try {
+      const query = `select accountId, cycleNumber, hash from accountsCopy WHERE accountId>="${lowAddress}" and accountId<="${highAddress}"  group by accountId order by accountId asc`
+      const result = await this._queryOld(query, [])
       return result
     } catch (e) {
       throw new Error(e)

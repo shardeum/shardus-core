@@ -79,8 +79,9 @@ export function updateRecord(txs: Txs, record: CycleRecord, prev: CycleRecord) {
   // If you're the first node
   if (isFirst) {
     // Ask snapshot for saftey mode field values
-    const safetyModeVals = initSafetyModeVals()
-    Object.assign(record, safetyModeVals)
+    initSafetyModeVals().then(safetyModeVals => {
+      Object.assign(record, safetyModeVals)
+    })
   }
   // If you're not the first node
   else {
