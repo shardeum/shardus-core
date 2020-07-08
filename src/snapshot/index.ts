@@ -1,13 +1,13 @@
 import * as Active from '../p2p/Active'
-import { sendGossip } from '../p2p/Comms'
-import { crypto, stateManager, storage } from '../p2p/Context'
+import * as Comms from '../p2p/Comms'
+import * as Context from '../p2p/Context'
+import * as CycleCreator from '../p2p/CycleCreator'
+import * as NodeList from '../p2p/NodeList'
+import * as Self from '../p2p/Self'
+import * as shardusTypes from '../shardus/shardus-types'
 import ShardFunctions from '../state-manager/shardFunctions'
-import { AddressRange } from '../state-manager/shardFunctionTypes'
-import { clean, initGossip, Message, newCollector } from './partition-gossip'
-import { resolve } from 'path'
-import { rejects } from 'assert'
-import { CycleRecord, CycleData } from '../p2p/CycleCreator'
-import { emitter } from '../p2p/Self'
+import * as shardFunctionTypes from '../state-manager/shardFunctionTypes'
+import * as partitionGossip from './partition-gossip'
 
 /** TYPES */
 interface Account {
@@ -15,11 +15,20 @@ interface Account {
   hash: string
 }
 
-type PartitionRanges = Map<AddressRange['partition'], AddressRange>
+type PartitionRanges = Map<
+  shardFunctionTypes.AddressRange['partition'],
+  shardFunctionTypes.AddressRange
+>
 
-type PartitionAccounts = Map<AddressRange['partition'], Account[]>
+type PartitionAccounts = Map<
+  shardFunctionTypes.AddressRange['partition'],
+  Account[]
+>
 
-export type PartitionHashes = Map<AddressRange['partition'], string>
+export type PartitionHashes = Map<
+  shardFunctionTypes.AddressRange['partition'],
+  string
+>
 
 type NetworkStateHash = string
 
@@ -35,62 +44,65 @@ export function setOldDataPath(path) {
 }
 
 export function startSnapshotting() {
-  initGossip()
-  stateManager.on('cycleTxsFinalized', async (shard: CycleShardData) => {
-    // 1) create our own partition hashes for that cycle number
-    const partitionRanges = getPartitionRanges(shard)
-    const partitionHashes = new Map()
-    for (const partition of shard.ourStoredPartitions) {
-      const range = partitionRanges.get(partition)
-      if (range) {
-        const accountsInPartition = await storage.getAccountCopiesByCycleAndRange(
-          shard.cycleNumber,
-          range.low,
-          range.high
-        )
-        const hash = crypto.hash(accountsInPartition)
-        partitionHashes.set(partition, hash)
+  partitionGossip.initGossip()
+  Context.stateManager.on(
+    'cycleTxsFinalized',
+    async (shard: CycleShardData) => {
+      // 1) create our own partition hashes for that cycle number
+      const partitionRanges = getPartitionRanges(shard)
+      const partitionHashes = new Map()
+      for (const partition of shard.ourStoredPartitions) {
+        const range = partitionRanges.get(partition)
+        if (range) {
+          const accountsInPartition = await Context.storage.getAccountCopiesByCycleAndRange(
+            shard.cycleNumber,
+            range.low,
+            range.high
+          )
+          const hash = Context.crypto.hash(accountsInPartition)
+          partitionHashes.set(partition, hash)
+        }
       }
+
+      // 2) process gossip from the queue for that cycle number
+      const collector = partitionGossip.newCollector(shard)
+
+      // 3) gossip our partitition hashes to the rest of the network with that cycle number
+      const message: partitionGossip.Message = {
+        cycle: shard.cycleNumber,
+        data: {},
+      }
+      for (const [partitionId, hash] of partitionHashes) {
+        message.data[partitionId] = hash
+      }
+      collector.process([message])
+      Comms.sendGossip('snapshot_gossip', message)
+
+      collector.once('gotAllHashes', (allHashes: PartitionHashes) => {
+        // 4) create a network state hash once we have all partition hashes for that cycle number
+        const networkStateHash = createNetworkStateHash(allHashes)
+
+        // 5) save the partition and network hashes for that cycle number to the DB
+        savePartitionAndNetworkHashes(shard, allHashes, networkStateHash)
+
+        // 6) clean up gossip and collector for that cycle number
+        partitionGossip.clean(shard.cycleNumber)
+        console.log(
+          `Network Hash for cycle ${shard.cycleNumber}`,
+          networkStateHash
+        )
+      })
     }
-
-    // 2) process gossip from the queue for that cycle number
-    const collector = newCollector(shard)
-
-    // 3) gossip our partitition hashes to the rest of the network with that cycle number
-    const message: Message = {
-      cycle: shard.cycleNumber,
-      data: {},
-    }
-    for (const [partitionId, hash] of partitionHashes) {
-      message.data[partitionId] = hash
-    }
-    collector.process([message])
-    sendGossip('snapshot_gossip', message)
-
-    collector.once('gotAllHashes', (allHashes: PartitionHashes) => {
-      // 4) create a network state hash once we have all partition hashes for that cycle number
-      const networkStateHash = createNetworkStateHash(allHashes)
-
-      // 5) save the partition and network hashes for that cycle number to the DB
-      savePartitionAndNetworkHashes(shard, allHashes, networkStateHash)
-
-      // 6) clean up gossip and collector for that cycle number
-      clean(shard.cycleNumber)
-      console.log(
-        `Network Hash for cycle ${shard.cycleNumber}`,
-        networkStateHash
-      )
-    })
-  })
+  )
 }
 
 export async function readOldCycleRecord() {
-  const oldCycles = await storage.listOldCycles()
+  const oldCycles = await Context.storage.listOldCycles()
   if (oldCycles && oldCycles.length > 0) return oldCycles[0]
 }
 
 export async function readOldNetworkHash() {
-  const networkStateHash = await storage.getLastOldNetworkHash()
+  const networkStateHash = await Context.storage.getLastOldNetworkHash()
   console.log('Read Old network state hash', networkStateHash)
   if (networkStateHash && networkStateHash.length > 0)
     return networkStateHash[0]
@@ -167,21 +179,56 @@ export async function safetySync() {
    */
 
   // Wait until safetyNum of nodes have joined the network
+  let safetyNum: number
+
   await new Promise((resolve) => {
-    emitter.on('new_cycle_data', (data: CycleData) => {
+    Self.emitter.on('new_cycle_data', (data: CycleCreator.CycleData) => {
       if (data.syncing >= data.safetyNum) {
+        safetyNum = data.safetyNum
         resolve()
       }
     })
   })
 
-  // Figure out which nodes hold which partitions in the new network
+  // [TODO] Figure out which nodes hold which partitions in the new network
+  const shardGlobals = ShardFunctions.calculateShardGlobals(
+    safetyNum,
+    Context.config.sharding.nodesPerConsensusGroup,
+    Context.config.sharding.nodesPerConsensusGroup
+  )
 
-  // Once you get the old data you need, go active
+  const partitionShardDataMap: shardFunctionTypes.ParititionShardDataMap = new Map()
+  ShardFunctions.computePartitionShardDataMap(
+    shardGlobals,
+    partitionShardDataMap,
+    0,
+    shardGlobals.numPartitions
+  )
 
-  // If you have old data, figure out which partitions you have
+  const nodeShardDataMap: shardFunctionTypes.NodeShardDataMap = new Map()
 
-  // Send the old data you have to the new node/s responsible for it
+  /**
+   * [NOTE] [AS] Need to do this because type of 'cycleJoined' field differs
+   * between ShardusTypes.Node (number) and P2P/NodeList.Node (string)
+   */
+  const nodes = (NodeList.byIdOrder as unknown) as shardusTypes.Node[]
+
+  ShardFunctions.computeNodePartitionDataMap(
+    shardGlobals,
+    nodeShardDataMap,
+    nodes,
+    partitionShardDataMap,
+    nodes,
+    false
+  )
+
+  // [TODO] If you have old data, figure out which partitions you have
+
+  // [TODO] Send the old data you have to the new node/s responsible for it
+
+  //   [NOTE] Register a new route for this called 'snapshot-data'
+
+  // [TODO] Once you get the old data you need, go active
 
   Active.requestActive()
 }
@@ -194,7 +241,7 @@ function createNetworkStateHash(
     partitionHashArray.push(hash)
   }
   partitionHashArray = partitionHashArray.sort()
-  const hash = crypto.hash(partitionHashArray)
+  const hash = Context.crypto.hash(partitionHashArray)
   return hash
 }
 
@@ -217,13 +264,13 @@ async function savePartitionAndNetworkHashes(
   networkHash: NetworkStateHash
 ) {
   for (const [partitionId, hash] of partitionHashes) {
-    await storage.addPartitionHash({
+    await Context.storage.addPartitionHash({
       partitionId,
       cycleNumber: shard.cycleNumber,
       hash,
     })
   }
-  await storage.addNetworkState({
+  await Context.storage.addNetworkState({
     cycleNumber: shard.cycleNumber,
     hash: networkHash,
   })
