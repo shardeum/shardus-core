@@ -191,9 +191,6 @@ export async function safetySync() {
 
   await new Promise((resolve) => {
     Self.emitter.on('new_cycle_data', (data: CycleCreator.CycleData) => {
-      console.log(data)
-      console.log('Syncing node count: ', data.syncing)
-      console.log('Safety Num: ', data.safetyNum)
       if (data.syncing >= data.safetyNum) {
         safetyNum = data.safetyNum
         resolve()
@@ -240,7 +237,7 @@ export async function safetySync() {
     const highAddress = partitonObj.homeRange.high
 
     const oldAccountCopiesInPartition = await Context.storage.getOldAccountCopiesByCycleAndRange(lowAddress, highAddress)
-    
+
     if (oldAccountCopiesInPartition && oldAccountCopiesInPartition.length > 0) {
       oldDataMap.set(partitionId, oldAccountCopiesInPartition)
     }
