@@ -104,9 +104,10 @@ class Sqlite3Storage {
     try {
       oldDirPath = dbDir + '-old-' + Date.now()
       fs.renameSync(dbDir, oldDirPath)
-      Snapshot.setOldDataPath(oldDirPath)
       if (oldDirPath) {
+        Snapshot.setOldDataPath(oldDirPath)
         this.oldDb = new sqlite3.Database(`${oldDirPath}/db.sqlite`)
+        await Snapshot.initSafetyModeVals()
       }
     } catch (e) {}
 

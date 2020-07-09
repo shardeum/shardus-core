@@ -1,10 +1,10 @@
 import { Logger } from 'log4js'
-import { initSafetyModeVals } from '../snapshot'
+import * as snapshot from '../snapshot'
 import * as Comms from './Comms'
-import { logger } from './Context'
-import { CycleRecord } from './CycleCreator'
-import { Change } from './CycleParser'
-import { isFirst } from './Self'
+import * as Context from './Context'
+import * as CycleCreator from './CycleCreator'
+import * as CycleParser from './CycleParser'
+import * as Self from './Self'
 import * as Types from './Types'
 
 /** TYPES */
@@ -48,7 +48,7 @@ const routes = {
 
 export function init() {
   // Init logger
-  p2pLogger = logger.getLogger('p2p')
+  p2pLogger = Context.logger.getLogger('p2p')
 
   // Init state
   reset()
@@ -75,13 +75,15 @@ export function dropInvalidTxs(txs: Txs): Txs {
 /*
 Given the txs and prev cycle record mutate the referenced record
 */
-export function updateRecord(txs: Txs, record: CycleRecord, prev: CycleRecord) {
+export function updateRecord(
+  txs: Txs,
+  record: CycleCreator.CycleRecord,
+  prev: CycleCreator.CycleRecord
+) {
   // If you're the first node
-  if (isFirst) {
-    // Ask snapshot for saftey mode field values
-    initSafetyModeVals().then(safetyModeVals => {
-      Object.assign(record, safetyModeVals)
-    })
+  if (Self.isFirst) {
+    // Get saftey mode field values from snapshot
+    Object.assign(record, snapshot.safetyModeVals)
   }
   // If you're not the first node
   else {
@@ -109,7 +111,9 @@ export function validateRecordTypes(rec: Record): string {
   return ''
 }
 
-export function parseRecord(record: CycleRecord): Change {
+export function parseRecord(
+  record: CycleCreator.CycleRecord
+): CycleParser.Change {
   return {
     added: [],
     removed: [],

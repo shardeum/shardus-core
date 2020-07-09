@@ -41,11 +41,31 @@ type NetworkStateHash = string
 
 let oldDataPath: string
 
+export const safetyModeVals = {
+  safetyMode: false,
+  safetyNum: 0,
+  networkStateHash: '',
+}
+
 /** FUNCTIONS */
 
 export function setOldDataPath(path) {
   oldDataPath = path
   log('set old-data-path', oldDataPath)
+}
+
+export async function initSafetyModeVals() {
+  const oldCycleRecord = await readOldCycleRecord()
+  const oldNetworkHash = await readOldNetworkHash()
+
+  // Turn safety node on
+  safetyModeVals.safetyMode = true
+
+  // Set the safetyNum to the number of active nodes in the last cycle saved in the old data
+  safetyModeVals.safetyNum = oldCycleRecord ? oldCycleRecord.active : 0
+
+  // Set networkStateHash to the last network state hash saved in the old data
+  safetyModeVals.networkStateHash = oldNetworkHash
 }
 
 export function startSnapshotting() {
@@ -111,33 +131,6 @@ export async function readOldNetworkHash() {
   console.log('Read Old network state hash', networkStateHash)
   if (networkStateHash && networkStateHash.length > 0)
     return networkStateHash[0]
-}
-
-export async function initSafetyModeVals() {
-  let safetyMode = false
-  let safetyNum = 0
-  let networkStateHash = ''
-
-  // If old data exists, set safety mode vals
-  if (oldDataPath) {
-    const oldCycleRecord = await readOldCycleRecord()
-    const oldNetworkHash = await readOldNetworkHash()
-
-    // Turn safety node on
-    safetyMode = true
-
-    // Set the safetyNum to the number of active nodes in the last cycle saved in the old data
-    safetyNum = oldCycleRecord ? oldCycleRecord.active : 0
-
-    // Set networkStateHash to the last network state hash saved in the old data
-    networkStateHash = oldNetworkHash
-  }
-
-  return {
-    safetyMode,
-    safetyNum,
-    networkStateHash,
-  }
 }
 
 export async function safetySync() {
