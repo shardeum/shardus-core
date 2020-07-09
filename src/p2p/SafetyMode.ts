@@ -99,7 +99,7 @@ export function updateRecord(
    * [NOTE] The check for turning off safety mode once safefy number of nodes
    * have become active should probably go here.
    */
-  if (record.safetyMode === true) {
+  if (record.safetyMode === true && prev) {
     if (prev.active >= prev.safetyNum) {
       record.safetyMode = false
     }

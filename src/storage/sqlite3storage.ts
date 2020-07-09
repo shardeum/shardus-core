@@ -106,10 +106,11 @@ class Sqlite3Storage {
       fs.renameSync(dbDir, oldDirPath)
       if (oldDirPath) {
         Snapshot.setOldDataPath(oldDirPath)
-        this.oldDb = new sqlite3.Database(`${oldDirPath}/db.sqlite`)
-        await Snapshot.initSafetyModeVals()
+        this.oldDb = new sqlite3.Database(`${oldDirPath}/db.sqlite`)     
       }
-    } catch (e) {}
+    } catch (e) {
+      console.log(e)
+    }
 
     // Create dbDir if it doesn't exist
     await _ensureExists(dbDir)

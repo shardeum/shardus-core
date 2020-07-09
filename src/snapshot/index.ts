@@ -37,9 +37,21 @@ export type PartitionHashes = Map<
 
 type NetworkStateHash = string
 
+type PartitionNum = number
+
+enum offerResponse {
+  needed = 'needed',
+  notNeeded = 'not_needed',
+  tryLater = 'try_later',
+  sendTo = 'send_to'
+}
+
 /** STATE */
 
 let oldDataPath: string
+let oldDataMap: Map<PartitionNum, any[]> = new Map()
+let oldPartitionHashMap: Map<PartitionNum, any[]> = new Map()
+let missingPartitions: PartitionNum[] = []
 
 export const safetyModeVals = {
   safetyMode: false,
@@ -57,6 +69,7 @@ export function setOldDataPath(path) {
 export async function initSafetyModeVals() {
   const oldCycleRecord = await readOldCycleRecord()
   const oldNetworkHash = await readOldNetworkHash()
+  const oldPartitionHashes = await readOldPartitionHashes()
 
   // Turn safety node on
   safetyModeVals.safetyMode = true
@@ -65,7 +78,13 @@ export async function initSafetyModeVals() {
   safetyModeVals.safetyNum = oldCycleRecord ? oldCycleRecord.active : 0
 
   // Set networkStateHash to the last network state hash saved in the old data
-  safetyModeVals.networkStateHash = oldNetworkHash
+  safetyModeVals.networkStateHash = oldNetworkHash.hash
+
+  for (let row of oldPartitionHashes) {
+    oldPartitionHashMap.set(row.partitionId, row.hash)
+  }
+  console.log(safetyModeVals)
+  console.log('Old partition hashes: ', oldPartitionHashMap)
 }
 
 export function startSnapshotting() {
@@ -133,55 +152,19 @@ export async function readOldNetworkHash() {
     return networkStateHash[0]
 }
 
+export async function readOldPartitionHashes() {
+  const partitionHashes = await Context.storage.getLastOldPartitionHashes()
+  console.log('Read Old partition_state_hashes', partitionHashes)
+  return partitionHashes
+}
+
 export async function safetySync() {
-  /**
-   * [NOTE] For safety sync to complete, >= safetyNum # of nodes must go
-   * active.
-   *
-   * [NOTE] For a node to go active when the network is in safety mode, it
-   * must get the old partition(s) data it is responsible for and put it back
-   * into state-manager
-   *
-   *                OLD NETWORK:
-   *
-   *               P1   P2   P3   P4   P5   P6
-   * Partitions: |----|----|----|----|----|----|
-   * Active    :   N0   N1   N2   N3   N4   N5
-   *
-   *          NEW NETWORK (SAFETY MODE):
-   *
-   *               P1   P2   P3   P4   P5   P6
-   * Partitions: |----|----|----|----|----|----|
-   * Active    :                  N0
-   * Syncing   :   N3
-   * Joining   :        N5   N2        N1   N4
-   */
-  /**
-   * [NOTE] At this point in our nodes lifecycle, it has joined the network,
-   * synced the nodelist, and has a node Id.
-   *
-   * The safetyNum from the cycle chain === the num of partitions there were
-   * in the old network. We can divide the address space by this num and
-   * figure out which old partition/s our node Id is responsible for.
-   *
-   * Once we know our nodes old partition/s, we must get the data for those
-   * partitions and pass it to state-manager before we can go active.
-   *
-   * First, we should look for it in any old data we had when we started.
-   * Who knows, we might get lucky ;).
-   *
-   */
-  /**
-   * Once we receive our old data and put it into state-manager, go active with
-   * P2P/Active's requestActive:
-   */
+  let safetyNum: number
 
   // Register snapshot routes
   registerSnapshotRoutes()
 
   // Wait until safetyNum of nodes have joined the network
-  let safetyNum: number
-
   await new Promise((resolve) => {
     Self.emitter.on('new_cycle_data', (data: CycleCreator.CycleData) => {
       if (data.syncing >= data.safetyNum) {
@@ -191,13 +174,12 @@ export async function safetySync() {
     })
   })
 
-  // [TODO] Figure out which nodes hold which partitions in the new network
+  // Figure out which nodes hold which partitions in the new network
   const shardGlobals = ShardFunctions.calculateShardGlobals(
     safetyNum,
     Context.config.sharding.nodesPerConsensusGroup,
     Context.config.sharding.nodesPerConsensusGroup
   )
-
   const partitionShardDataMap: shardFunctionTypes.ParititionShardDataMap = new Map()
   ShardFunctions.computePartitionShardDataMap(
     shardGlobals,
@@ -205,9 +187,7 @@ export async function safetySync() {
     0,
     shardGlobals.numPartitions
   )
-
   const nodeShardDataMap: shardFunctionTypes.NodeShardDataMap = new Map()
-
   /**
    * [NOTE] [AS] Need to do this because type of 'cycleJoined' field differs
    * between ShardusTypes.Node (number) and P2P/NodeList.Node (string)
@@ -220,59 +200,109 @@ export async function safetySync() {
     nodes,
     partitionShardDataMap,
     nodes,
-    false
+    true
   )
 
-  // [TODO] If you have old data, figure out which partitions you have
-  const oldDataMap = new Map()
+  // If we have old data, figure out which partitions we have and put into OldDataMap
   for (const [partitionId, partitonObj] of partitionShardDataMap) {
     const lowAddress = partitonObj.homeRange.low
     const highAddress = partitonObj.homeRange.high
-
     const oldAccountCopiesInPartition = await Context.storage.getOldAccountCopiesByCycleAndRange(
       lowAddress,
       highAddress
     )
-
     if (oldAccountCopiesInPartition && oldAccountCopiesInPartition.length > 0) {
       oldDataMap.set(partitionId, oldAccountCopiesInPartition)
     }
   }
 
+  // check if we have data for each partition we cover in new network. We will use this array to request data from other nodes
+  checkMissingPartitions(shardGlobals)
+  
+
   // Send the old data you have to the new node/s responsible for it
   for (const [partitionId, oldAccountCopies] of oldDataMap) {
-    await sendOldDataToNodes(partitionId, oldAccountCopies, nodeShardDataMap)
+    await sendOldDataToNodes(partitionId, shardGlobals, nodeShardDataMap)
   }
 
-  // [TODO] Once you get the old data you need, go active
+  // [TODO] Check if we have all old data. Once we get the old data you need, go active
   Active.requestActive()
+}
+
+function checkMissingPartitions(shardGlobals: shardFunctionTypes.ShardGlobals) {
+  const { homePartition } = ShardFunctions.addressToPartition(shardGlobals, Self.id)
+  const {partitionStart, partitionEnd} = ShardFunctions.calculateStoredPartitions2(shardGlobals, homePartition)
+  for (let i = partitionStart; i <= partitionEnd; i++) {
+    if (oldDataMap.has(i)) {
+    } else {
+      missingPartitions.push(i)
+    }
+  }
 }
 
 async function sendOldDataToNodes(
   partitionId: number,
-  oldAccountCopies: any[],
+  shardGlobals: shardFunctionTypes.ShardGlobals,
   nodeShardDataMap: shardFunctionTypes.NodeShardDataMap
 ) {
-  const nodesToSendData: shardusTypes.Node[] = getNodesInPartition(
+  // calcuate all nodes that covers a particular partitions
+  const nodesToSendData: shardusTypes.Node[] = getNodesThatCoverPartition(
     partitionId,
+    shardGlobals,
     nodeShardDataMap
   )
+  
+  const offer = createOffer()
+
+  // send data offer to each nodes
   for (let i = 0; i < nodesToSendData.length; i++) {
-    await http.post(
-      `${nodesToSendData[i].externalIp}:${nodesToSendData[i].externalPort}/snapshot-data`,
-      oldAccountCopies
+    const res = await http.post(
+      `${nodesToSendData[i].externalIp}:${nodesToSendData[i].externalPort}/snapshot-data-offer`,
+      offer
     )
+    const answer = res.answer
+    // If a node reply us as 'needed', send requested data for requested partitions
+    if (answer === offerResponse.needed) {
+      const requestedPartitions = res.partitions
+      const dataToSend = {}
+      for (let partitionId of requestedPartitions) {
+        dataToSend[partitionId] = {
+          data: oldDataMap.get(partitionId),
+          hash: oldPartitionHashMap.get(partitionId)
+        }
+      }
+      await http.post(
+        `${nodesToSendData[i].externalIp}:${nodesToSendData[i].externalPort}/snapshot-data`,
+        dataToSend
+      )
+    }
   }
 }
 
-function getNodesInPartition(
+function createOffer() {
+  const partitionsToOffer = []
+  for (const [partitionId,] of oldDataMap) {
+    partitionsToOffer.push(partitionId)
+  }
+  return {
+    networkStateHash: safetyModeVals.networkStateHash,
+    partitions: partitionsToOffer,
+  }
+}
+
+function getNodesThatCoverPartition(
   partitionId,
+  shardGlobals: shardFunctionTypes.ShardGlobals,
   nodeShardDataMap: shardFunctionTypes.NodeShardDataMap
 ): shardusTypes.Node[] {
   const nodesInPartition: shardusTypes.Node[] = []
   nodeShardDataMap.forEach((data, nodeId) => {
-    if (data.homePartition === partitionId) {
-      nodesInPartition.push(data.node)
+    if (nodeId === Self.id) return
+    const node = data.node
+    const homePartition = data.homePartition
+    const {partitionStart, partitionEnd} = ShardFunctions.calculateStoredPartitions2(shardGlobals, homePartition)
+    if (partitionId >= partitionStart && partitionId <= partitionEnd) {
+      nodesInPartition.push(node)
     }
   })
   return nodesInPartition
@@ -292,7 +322,6 @@ function createNetworkStateHash(
 
 function getPartitionRanges(shard: CycleShardData): PartitionRanges {
   const partitionRanges = new Map()
-
   for (const partition of shard.ourStoredPartitions) {
     partitionRanges.set(
       partition,
@@ -332,15 +361,52 @@ function registerSnapshotRoutes() {
         res.json([])
         return
       }
+      const data = req.body
+      log('Recieved missing data: ', data)
       // [TODO] check and store offered data
       res.json({ success: true })
     },
   }
-  Context.network._registerExternal(
-    snapshotRoute.method,
-    snapshotRoute.name,
-    snapshotRoute.handler
-  )
+  const snapshotDataOfferRoute: Route<Handler> = {
+    method: 'POST',
+    name: 'snapshot-data-offer',
+    handler: (req, res) => {
+      const err = validateTypes(req, { body: 'o' })
+      if (err) {
+        console.log('snapshot-data-offer bad req ' + err)
+        res.json([])
+        return
+      }
+      const offerRequest = req.body
+      let answer = offerResponse.notNeeded
+      let neededPartitonIds = []
+      let neededHashes = []
+      if (offerRequest.networkStateHash === safetyModeVals.networkStateHash) {
+        for (const partitionId of offerRequest.partitions ) {
+          // request only the needed partitions
+          const isNeeded = missingPartitions.includes(partitionId)
+          if (isNeeded) {
+            neededPartitonIds.push(partitionId)
+            const hasHashForPartition = oldPartitionHashMap.has(partitionId)
+            // if node does not have partition_hash for needed partition, request it too.
+            if (!hasHashForPartition) neededHashes.push(partitionId)
+          }
+        }
+        if(neededPartitonIds.length > 0) answer = offerResponse.needed
+      }
+      if (answer === offerResponse.needed) {
+        res.json({ answer, partitions: neededPartitonIds, hashes: neededHashes })
+      } else {
+        res.json({ answer })
+      }
+    },
+  }
+
+  const routes = [snapshotRoute, snapshotDataOfferRoute]
+
+  for (const route of routes) {
+    Context.network._registerExternal(route.method, route.name, route.handler)
+  }
 }
 
 function log(...things) {

@@ -14,6 +14,7 @@ import Sqlite3Storage from './sqlite3storage'
 // const BetterSqlite3Storage = require('./betterSqlite3storage')
 
 import P2PApoptosis = require('../p2p/Apoptosis')
+import * as Snapshot from '../snapshot'
 
 interface Storage {
   profiler: Profiler
@@ -106,6 +107,7 @@ class Storage {
       this.storage._rawQueryOld(query, tableModel) // or queryString, valueArray for non-sequelize
 
     this.initialized = true
+    if(this.initialized) await Snapshot.initSafetyModeVals()
   }
   async close() {
     await this.storage.close()
@@ -285,6 +287,18 @@ class Storage {
       throw new Error(e)
     }
     return networkStateHash
+  }
+
+  async getLastOldPartitionHashes() {
+    this._checkInit()
+    let partitionHashes = []
+    try {
+      const query = `SELECT partitionId, hash FROM partitions WHERE (partitionId,cycleNumber) IN ( SELECT partitionId, MAX(cycleNumber) FROM partitions GROUP BY partitionId)`
+      partitionHashes = await this._queryOld(query, [])
+    } catch (e) {
+      throw new Error(e)
+    }
+    return partitionHashes
   }
 
   async addNodes(nodes) {
