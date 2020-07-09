@@ -1,3 +1,4 @@
+/* eslint-disable no-empty */
 import Shardus from '../shardus/shardus-types'
 import Profiler from '../utils/profiler'
 import Log4js from 'log4js'
@@ -8,7 +9,7 @@ import * as utils from '../utils'
 import * as Snapshot from '../snapshot'
 
 const Op = Sequelize.Op
-var sqlite3 = require('sqlite3').verbose()
+const sqlite3 = require('sqlite3').verbose()
 const stringify = require('fast-stable-stringify')
 
 interface Sqlite3Storage {
@@ -18,7 +19,7 @@ interface Sqlite3Storage {
   mainLogger: Log4js.Logger
   initialized: boolean
   storageModels: any
-  db: any,
+  db: any
   oldDb: any
 }
 
@@ -40,15 +41,15 @@ class Sqlite3Storage {
     // this.models = this.sequelize.models
     this.initialized = false
     this.storageModels = {}
-    for (let [modelName, modelAttributes] of models) {
+    for (const [modelName, modelAttributes] of models) {
       this.sqlite3Define(modelName, modelAttributes)
     }
   }
 
   sqlite3Define(modelName, modelAttributes) {
-    let tableName = modelName
+    const tableName = modelName
 
-    let modelData: any = { tableName }
+    const modelData: any = { tableName }
     modelData.columns = []
     modelData.columnsString = ''
     modelData.substitutionString = ''
@@ -57,7 +58,7 @@ class Sqlite3Storage {
     for (var key in modelAttributes) {
       if (modelAttributes.hasOwnProperty(key)) {
         modelData.columns.push(key)
-        let value = modelAttributes[key]
+        const value = modelAttributes[key]
 
         let type = value.type
         if (!type) {
@@ -96,15 +97,15 @@ class Sqlite3Storage {
   }
 
   async init() {
-    let dbDir = path.parse(this.storageConfig.options.storage).dir
+    const dbDir = path.parse(this.storageConfig.options.storage).dir
 
     // Rename dbDir if it exists
     let oldDirPath
     try {
-      oldDirPath =  dbDir + '-old-' + Date.now()
+      oldDirPath = dbDir + '-old-' + Date.now()
       fs.renameSync(dbDir, oldDirPath)
       Snapshot.setOldDataPath(oldDirPath)
-      if(oldDirPath) {
+      if (oldDirPath) {
         this.oldDb = new sqlite3.Database(`${oldDirPath}/db.sqlite`)
       }
     } catch (e) {}
@@ -167,7 +168,7 @@ class Sqlite3Storage {
       // return table.bulkCreate(values, opts)
       // todo transaciton or something else
 
-      for (let subObj of object) {
+      for (const subObj of object) {
         // console.log('sub obj: ' + stringify(subObj))
         this._create(table, subObj, opts)
       }
@@ -177,9 +178,9 @@ class Sqlite3Storage {
     if (opts && opts.createOrReplace) {
       queryString = table.insertOrReplaceString
     }
-    let inputs = []
+    const inputs = []
     // console.log('columns: ' + stringify(table.columns))
-    for (let column of table.columns) {
+    for (const column of table.columns) {
       let value = object[column]
 
       if (table.isColumnJSON[column]) {
@@ -200,19 +201,19 @@ class Sqlite3Storage {
 
     // let valueArray = []
 
-    let paramsArray = this.params2Array(params, table)
+    const paramsArray = this.params2Array(params, table)
 
-    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
+    const { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
       paramsArray
     )
 
-    let valueArray = whereValueArray
+    const valueArray = whereValueArray
     queryString += whereString
     queryString += this.options2string(opts)
 
     // console.log(queryString + '  VALUES: ' + stringify(valueArray))
 
-    let results = await this.all(queryString, valueArray)
+    const results = await this.all(queryString, valueArray)
     // optionally parse results!
     if (!opts || !opts.raw) {
       if (table.JSONkeys.length > 0) {
@@ -230,19 +231,19 @@ class Sqlite3Storage {
 
     // let valueArray = []
 
-    let paramsArray = this.params2Array(params, table)
+    const paramsArray = this.params2Array(params, table)
 
-    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
+    const { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
       paramsArray
     )
 
-    let valueArray = whereValueArray
+    const valueArray = whereValueArray
     queryString += whereString
     queryString += this.options2string(opts)
 
     // console.log(queryString + '  VALUES: ' + stringify(valueArray))
 
-    let results = await this.allOld(queryString, valueArray)
+    const results = await this.allOld(queryString, valueArray)
     // optionally parse results!
     if (!opts || !opts.raw) {
       if (table.JSONkeys.length > 0) {
@@ -259,15 +260,15 @@ class Sqlite3Storage {
     // return table.update(values, { where, ...opts })
     let queryString = table.updateString
 
-    let valueParams = this.params2Array(values, table)
+    const valueParams = this.params2Array(values, table)
     let { resultString, valueArray } = this.paramsToAssignmentStringAndValues(
       valueParams
     )
 
     queryString += resultString
 
-    let whereParams = this.params2Array(where, table)
-    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
+    const whereParams = this.params2Array(where, table)
+    const { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
       whereParams
     )
     queryString += whereString
@@ -287,11 +288,11 @@ class Sqlite3Storage {
 
     let queryString = table.deleteString
 
-    let whereParams = this.params2Array(where, table)
-    let { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
+    const whereParams = this.params2Array(where, table)
+    const { whereString, whereValueArray } = this.paramsToWhereStringAndValues(
       whereParams
     )
-    let valueArray = whereValueArray
+    const valueArray = whereValueArray
     queryString += whereString
     queryString += this.options2string(opts)
 
@@ -315,10 +316,10 @@ class Sqlite3Storage {
     if (paramsObj == null) {
       return []
     }
-    let paramsArray = []
-    for (var key in paramsObj) {
+    const paramsArray = []
+    for (const key in paramsObj) {
       if (paramsObj.hasOwnProperty(key)) {
-        let paramEntry: any = { name: key }
+        const paramEntry: any = { name: key }
 
         const value = paramsObj[key]
         if (
@@ -327,7 +328,7 @@ class Sqlite3Storage {
         ) {
           // WHERE column_name BETWEEN value1 AND value2;
           if (value[Op.between]) {
-            let between = value[Op.between]
+            const between = value[Op.between]
             paramEntry.type = 'BETWEEN'
             paramEntry.v1 = between[0]
             paramEntry.v2 = between[1]
@@ -336,7 +337,7 @@ class Sqlite3Storage {
           }
           // WHERE column_name IN (value1, value2, ...)
           if (value[Op.in]) {
-            let inValues = value[Op.in]
+            const inValues = value[Op.in]
             paramEntry.type = 'IN'
             // paramEntry.v1 = between[0]
             // paramEntry.v2 = between[1]
@@ -352,7 +353,7 @@ class Sqlite3Storage {
             paramEntry.vals = paramEntry.vals.concat(inValues)
           }
           if (value[Op.lte]) {
-            let rightHandValue = value[Op.lte]
+            const rightHandValue = value[Op.lte]
             paramEntry.type = 'LTE'
             paramEntry.v1 = rightHandValue
             // paramEntry.v2 = between[1]
@@ -360,7 +361,7 @@ class Sqlite3Storage {
             paramEntry.vals = [paramEntry.v1]
           }
           if (value[Op.gte]) {
-            let rightHandValue = value[Op.gte]
+            const rightHandValue = value[Op.gte]
             paramEntry.type = 'GTE'
             paramEntry.v1 = rightHandValue
             // paramEntry.v2 = between[1]
@@ -370,12 +371,11 @@ class Sqlite3Storage {
             paramEntry.type = '='
             paramEntry.v1 = value
             paramEntry.sql = `${paramEntry.name} ${paramEntry.type} ?`
-  
+
             if (table.isColumnJSON[paramEntry.name]) {
               paramEntry.v1 = stringify(paramEntry.v1)
             }
             paramEntry.vals = [paramEntry.v1]
-
           }
         } else {
           paramEntry.type = '='
@@ -401,7 +401,7 @@ class Sqlite3Storage {
       if (i === 0) {
         whereString += ' WHERE '
       }
-      let paramEntry = paramsArray[i]
+      const paramEntry = paramsArray[i]
       whereString += '(' + paramEntry.sql + ')'
       if (i < paramsArray.length - 1) {
         whereString += ' AND '
@@ -415,7 +415,7 @@ class Sqlite3Storage {
     let valueArray = []
     let resultString = ''
     for (let i = 0; i < paramsArray.length; i++) {
-      let paramEntry = paramsArray[i]
+      const paramEntry = paramsArray[i]
       resultString += paramEntry.sql
       if (i < paramsArray.length - 1) {
         resultString += ' , '
@@ -433,7 +433,7 @@ class Sqlite3Storage {
     if (optionsObj.order) {
       optionsString += ' ORDER BY '
       for (let i = 0; i < optionsObj.order.length; i++) {
-        let orderEntry = optionsObj.order[i]
+        const orderEntry = optionsObj.order[i]
         optionsString += ` ${orderEntry[0]} ${orderEntry[1]} `
         if (i < optionsObj.order.length - 1) {
           optionsString += ','

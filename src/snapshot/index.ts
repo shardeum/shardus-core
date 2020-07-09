@@ -214,7 +214,7 @@ export async function safetySync() {
   )
 
   const nodeShardDataMap: shardFunctionTypes.NodeShardDataMap = new Map()
- 
+
   /**
    * [NOTE] [AS] Need to do this because type of 'cycleJoined' field differs
    * between ShardusTypes.Node (number) and P2P/NodeList.Node (string)
@@ -229,20 +229,23 @@ export async function safetySync() {
     nodes,
     false
   )
-  
+
   // [TODO] If you have old data, figure out which partitions you have
   const oldDataMap = new Map()
   for (const [partitionId, partitonObj] of partitionShardDataMap) {
     const lowAddress = partitonObj.homeRange.low
     const highAddress = partitonObj.homeRange.high
 
-    const oldAccountCopiesInPartition = await Context.storage.getOldAccountCopiesByCycleAndRange(lowAddress, highAddress)
+    const oldAccountCopiesInPartition = await Context.storage.getOldAccountCopiesByCycleAndRange(
+      lowAddress,
+      highAddress
+    )
 
     if (oldAccountCopiesInPartition && oldAccountCopiesInPartition.length > 0) {
       oldDataMap.set(partitionId, oldAccountCopiesInPartition)
     }
   }
-  
+
   // Send the old data you have to the new node/s responsible for it
   for (const [partitionId, oldAccountCopies] of oldDataMap) {
     await sendOldDataToNodes(partitionId, oldAccountCopies, nodeShardDataMap)
@@ -252,15 +255,28 @@ export async function safetySync() {
   Active.requestActive()
 }
 
-async function sendOldDataToNodes(partitionId: number, oldAccountCopies: any[], nodeShardDataMap: shardFunctionTypes.NodeShardDataMap) {
-  const nodesToSendData: shardusTypes.Node[] = getNodesInPartition(partitionId, nodeShardDataMap)
-  for (let i=0; i < nodesToSendData.length; i++) {
-    await http.post(`${nodesToSendData[i].externalIp}:${nodesToSendData[i].externalPort}/snapshot-data`, oldAccountCopies)
+async function sendOldDataToNodes(
+  partitionId: number,
+  oldAccountCopies: any[],
+  nodeShardDataMap: shardFunctionTypes.NodeShardDataMap
+) {
+  const nodesToSendData: shardusTypes.Node[] = getNodesInPartition(
+    partitionId,
+    nodeShardDataMap
+  )
+  for (let i = 0; i < nodesToSendData.length; i++) {
+    await http.post(
+      `${nodesToSendData[i].externalIp}:${nodesToSendData[i].externalPort}/snapshot-data`,
+      oldAccountCopies
+    )
   }
 }
 
-function getNodesInPartition(partitionId, nodeShardDataMap: shardFunctionTypes.NodeShardDataMap): shardusTypes.Node[] {
-  let nodesInPartition: shardusTypes.Node[] = []
+function getNodesInPartition(
+  partitionId,
+  nodeShardDataMap: shardFunctionTypes.NodeShardDataMap
+): shardusTypes.Node[] {
+  const nodesInPartition: shardusTypes.Node[] = []
   nodeShardDataMap.forEach((data, nodeId) => {
     if (data.homePartition === partitionId) {
       nodesInPartition.push(data.node)
@@ -312,23 +328,26 @@ async function savePartitionAndNetworkHashes(
   })
 }
 
-
 function registerSnapshotRoutes() {
   const snapshotRoute: Route<Handler> = {
     method: 'POST',
     name: 'snapshot-data',
     handler: (req, res) => {
-      let err = validateTypes(req, { body: 'o' })
+      const err = validateTypes(req, { body: 'o' })
       if (err) {
         console.log('snapshot-data bad req ' + err)
         res.json([])
         return
       }
       // [TODO] check and store offered data
-      res.json({success: true})
+      res.json({ success: true })
     },
   }
-  Context.network._registerExternal(snapshotRoute.method, snapshotRoute.name, snapshotRoute.handler)
+  Context.network._registerExternal(
+    snapshotRoute.method,
+    snapshotRoute.name,
+    snapshotRoute.handler
+  )
 }
 
 function log(...things) {
