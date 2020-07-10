@@ -49,6 +49,7 @@ enum offerResponse {
 
 let oldDataPath: string
 const oldDataMap: Map<PartitionNum, any[]> = new Map()
+const dataToMigrate: Map<PartitionNum, any[]> = new Map()
 const oldPartitionHashMap: Map<PartitionNum, any[]> = new Map()
 const missingPartitions: PartitionNum[] = []
 
@@ -220,8 +221,8 @@ export async function safetySync() {
     await sendOldDataToNodes(partitionId, shardGlobals, nodeShardDataMap)
   }
 
-  // [TODO] Check if we have all old data. Once we get the old data you need, go active
-  Active.requestActive()
+  // Check if we have all old data. Once we get the old data you need, go active
+  goActiveIfDataComplete()
 }
 
 function checkMissingPartitions(shardGlobals: shardFunctionTypes.ShardGlobals) {
@@ -236,6 +237,7 @@ function checkMissingPartitions(shardGlobals: shardFunctionTypes.ShardGlobals) {
   for (let i = partitionStart; i <= partitionEnd; i++) {
     if (oldDataMap.has(i)) {
       // [TODO] Were good, we have the data. Need to do something with it now...
+      dataToMigrate.set(i, oldDataMap.get(i))
     } else {
       missingPartitions.push(i)
     }
@@ -355,6 +357,20 @@ async function savePartitionAndNetworkHashes(
   })
 }
 
+function goActiveIfDataComplete() {
+  if (missingPartitions.length === 0) {
+    log(`We have complete data. Ready to go active`)
+    // store account data to new database
+    storeDataToNewDB(dataToMigrate)
+    Active.requestActive()
+  }
+}
+
+function storeDataToNewDB(dataMap) {
+  // [TODO] store data to new DB
+  log('Storing data to new DB')
+}
+
 function registerSnapshotRoutes() {
   const snapshotRoute: Route<Handler> = {
     method: 'POST',
@@ -366,9 +382,22 @@ function registerSnapshotRoutes() {
         res.json([])
         return
       }
-      const data = req.body
-      log('Recieved missing data: ', data)
-      // [TODO] check and store offered data
+      const receivedData = req.body
+      log('Recieved missing data: ', receivedData)
+      for (let partitionId in Object.keys(receivedData)) {
+        // check and store offered data
+        const partitionData = receivedData[partitionId]
+        const computedHash = Context.crypto.hash(partitionData.data)
+        if (computedHash === partitionData.hash) {
+          log(`Computed hash and received hash matches for partition ${partitionId}`)
+          // store into dataToMigrate temporarily. Will use it to store data to new DB
+          dataToMigrate.set(parseInt(partitionId), partitionData.data)
+          // remove partition id from missing partition list
+          const index = missingPartitions.indexOf(parseInt(partitionId))
+          missingPartitions.splice(index, 1)
+          goActiveIfDataComplete()
+        }
+      }
       res.json({ success: true })
     },
   }
