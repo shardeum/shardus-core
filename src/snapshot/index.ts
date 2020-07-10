@@ -1,18 +1,17 @@
+import { Handler } from 'express'
+import * as http from '../http'
 import * as Active from '../p2p/Active'
 import * as Comms from '../p2p/Comms'
 import * as Context from '../p2p/Context'
 import * as CycleCreator from '../p2p/CycleCreator'
 import * as NodeList from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
+import { Route } from '../p2p/Types'
 import * as shardusTypes from '../shardus/shardus-types'
 import ShardFunctions from '../state-manager/shardFunctions'
 import * as shardFunctionTypes from '../state-manager/shardFunctionTypes'
-import * as partitionGossip from './partition-gossip'
-import { Handler } from 'express'
-import { Route } from '../p2p/Types'
 import { validateTypes } from '../utils'
-import * as http from '../http'
-import Shardus from '../shardus'
+import * as partitionGossip from './partition-gossip'
 
 /** TYPES */
 interface Account {
@@ -43,15 +42,15 @@ enum offerResponse {
   needed = 'needed',
   notNeeded = 'not_needed',
   tryLater = 'try_later',
-  sendTo = 'send_to'
+  sendTo = 'send_to',
 }
 
 /** STATE */
 
 let oldDataPath: string
-let oldDataMap: Map<PartitionNum, any[]> = new Map()
-let oldPartitionHashMap: Map<PartitionNum, any[]> = new Map()
-let missingPartitions: PartitionNum[] = []
+const oldDataMap: Map<PartitionNum, any[]> = new Map()
+const oldPartitionHashMap: Map<PartitionNum, any[]> = new Map()
+const missingPartitions: PartitionNum[] = []
 
 export const safetyModeVals = {
   safetyMode: false,
@@ -80,11 +79,11 @@ export async function initSafetyModeVals() {
   // Set networkStateHash to the last network state hash saved in the old data
   safetyModeVals.networkStateHash = oldNetworkHash.hash
 
-  for (let row of oldPartitionHashes) {
+  for (const row of oldPartitionHashes) {
     oldPartitionHashMap.set(row.partitionId, row.hash)
   }
-  console.log(safetyModeVals)
-  console.log('Old partition hashes: ', oldPartitionHashMap)
+  log(safetyModeVals)
+  log('Old partition hashes: ', oldPartitionHashMap)
 }
 
 export function startSnapshotting() {
@@ -131,10 +130,7 @@ export function startSnapshotting() {
 
         // 6) clean up gossip and collector for that cycle number
         partitionGossip.clean(shard.cycleNumber)
-        console.log(
-          `Network Hash for cycle ${shard.cycleNumber}`,
-          networkStateHash
-        )
+        log(`Network Hash for cycle ${shard.cycleNumber}`, networkStateHash)
       })
     }
   )
@@ -147,14 +143,14 @@ export async function readOldCycleRecord() {
 
 export async function readOldNetworkHash() {
   const networkStateHash = await Context.storage.getLastOldNetworkHash()
-  console.log('Read Old network state hash', networkStateHash)
+  log('Read Old network state hash', networkStateHash)
   if (networkStateHash && networkStateHash.length > 0)
     return networkStateHash[0]
 }
 
 export async function readOldPartitionHashes() {
   const partitionHashes = await Context.storage.getLastOldPartitionHashes()
-  console.log('Read Old partition_state_hashes', partitionHashes)
+  log('Read Old partition_state_hashes', partitionHashes)
   return partitionHashes
 }
 
@@ -218,7 +214,6 @@ export async function safetySync() {
 
   // check if we have data for each partition we cover in new network. We will use this array to request data from other nodes
   checkMissingPartitions(shardGlobals)
-  
 
   // Send the old data you have to the new node/s responsible for it
   for (const [partitionId, oldAccountCopies] of oldDataMap) {
@@ -230,10 +225,17 @@ export async function safetySync() {
 }
 
 function checkMissingPartitions(shardGlobals: shardFunctionTypes.ShardGlobals) {
-  const { homePartition } = ShardFunctions.addressToPartition(shardGlobals, Self.id)
-  const {partitionStart, partitionEnd} = ShardFunctions.calculateStoredPartitions2(shardGlobals, homePartition)
+  const { homePartition } = ShardFunctions.addressToPartition(
+    shardGlobals,
+    Self.id
+  )
+  const {
+    partitionStart,
+    partitionEnd,
+  } = ShardFunctions.calculateStoredPartitions2(shardGlobals, homePartition)
   for (let i = partitionStart; i <= partitionEnd; i++) {
     if (oldDataMap.has(i)) {
+      // [TODO] Were good, we have the data. Need to do something with it now...
     } else {
       missingPartitions.push(i)
     }
@@ -251,7 +253,7 @@ async function sendOldDataToNodes(
     shardGlobals,
     nodeShardDataMap
   )
-  
+
   const offer = createOffer()
 
   // send data offer to each nodes
@@ -265,10 +267,10 @@ async function sendOldDataToNodes(
     if (answer === offerResponse.needed) {
       const requestedPartitions = res.partitions
       const dataToSend = {}
-      for (let partitionId of requestedPartitions) {
+      for (const partitionId of requestedPartitions) {
         dataToSend[partitionId] = {
           data: oldDataMap.get(partitionId),
-          hash: oldPartitionHashMap.get(partitionId)
+          hash: oldPartitionHashMap.get(partitionId),
         }
       }
       await http.post(
@@ -281,7 +283,7 @@ async function sendOldDataToNodes(
 
 function createOffer() {
   const partitionsToOffer = []
-  for (const [partitionId,] of oldDataMap) {
+  for (const [partitionId] of oldDataMap) {
     partitionsToOffer.push(partitionId)
   }
   return {
@@ -300,7 +302,10 @@ function getNodesThatCoverPartition(
     if (nodeId === Self.id) return
     const node = data.node
     const homePartition = data.homePartition
-    const {partitionStart, partitionEnd} = ShardFunctions.calculateStoredPartitions2(shardGlobals, homePartition)
+    const {
+      partitionStart,
+      partitionEnd,
+    } = ShardFunctions.calculateStoredPartitions2(shardGlobals, homePartition)
     if (partitionId >= partitionStart && partitionId <= partitionEnd) {
       nodesInPartition.push(node)
     }
@@ -357,7 +362,7 @@ function registerSnapshotRoutes() {
     handler: (req, res) => {
       const err = validateTypes(req, { body: 'o' })
       if (err) {
-        console.log('snapshot-data bad req ' + err)
+        log('snapshot-data bad req ' + err)
         res.json([])
         return
       }
@@ -373,16 +378,16 @@ function registerSnapshotRoutes() {
     handler: (req, res) => {
       const err = validateTypes(req, { body: 'o' })
       if (err) {
-        console.log('snapshot-data-offer bad req ' + err)
+        log('snapshot-data-offer bad req ' + err)
         res.json([])
         return
       }
       const offerRequest = req.body
       let answer = offerResponse.notNeeded
-      let neededPartitonIds = []
-      let neededHashes = []
+      const neededPartitonIds = []
+      const neededHashes = []
       if (offerRequest.networkStateHash === safetyModeVals.networkStateHash) {
-        for (const partitionId of offerRequest.partitions ) {
+        for (const partitionId of offerRequest.partitions) {
           // request only the needed partitions
           const isNeeded = missingPartitions.includes(partitionId)
           if (isNeeded) {
@@ -392,10 +397,14 @@ function registerSnapshotRoutes() {
             if (!hasHashForPartition) neededHashes.push(partitionId)
           }
         }
-        if(neededPartitonIds.length > 0) answer = offerResponse.needed
+        if (neededPartitonIds.length > 0) answer = offerResponse.needed
       }
       if (answer === offerResponse.needed) {
-        res.json({ answer, partitions: neededPartitonIds, hashes: neededHashes })
+        res.json({
+          answer,
+          partitions: neededPartitonIds,
+          hashes: neededHashes,
+        })
       } else {
         res.json({ answer })
       }

@@ -1,16 +1,16 @@
 /* eslint-disable no-empty */
-import Shardus from '../shardus/shardus-types'
-import Profiler from '../utils/profiler'
-import Log4js from 'log4js'
-import * as Sequelize from 'sequelize'
+import stringify from 'fast-stable-stringify'
 import fs from 'fs'
+import Log4js from 'log4js'
 import path from 'path'
-import * as utils from '../utils'
+import * as Sequelize from 'sequelize'
+import Shardus from '../shardus/shardus-types'
 import * as Snapshot from '../snapshot'
+import * as utils from '../utils'
+import Profiler from '../utils/profiler'
 
 const Op = Sequelize.Op
 const sqlite3 = require('sqlite3').verbose()
-const stringify = require('fast-stable-stringify')
 
 interface Sqlite3Storage {
   baseDir: string
@@ -55,7 +55,10 @@ class Sqlite3Storage {
     modelData.substitutionString = ''
     modelData.isColumnJSON = {}
     modelData.JSONkeys = []
-    for (var key in modelAttributes) {
+    let key
+    for (const attr in modelAttributes) {
+      key = attr
+      // eslint-disable-next-line no-prototype-builtins
       if (modelAttributes.hasOwnProperty(key)) {
         modelData.columns.push(key)
         const value = modelAttributes[key]
@@ -106,7 +109,7 @@ class Sqlite3Storage {
       fs.renameSync(dbDir, oldDirPath)
       if (oldDirPath) {
         Snapshot.setOldDataPath(oldDirPath)
-        this.oldDb = new sqlite3.Database(`${oldDirPath}/db.sqlite`)     
+        this.oldDb = new sqlite3.Database(`${oldDirPath}/db.sqlite`)
       }
     } catch (e) {
       console.log(e)
@@ -263,6 +266,7 @@ class Sqlite3Storage {
     let queryString = table.updateString
 
     const valueParams = this.params2Array(values, table)
+    // eslint-disable-next-line prefer-const
     let { resultString, valueArray } = this.paramsToAssignmentStringAndValues(
       valueParams
     )
@@ -315,11 +319,12 @@ class Sqlite3Storage {
   }
 
   params2Array(paramsObj, table) {
-    if (paramsObj == null) {
+    if (paramsObj === null) {
       return []
     }
     const paramsArray = []
     for (const key in paramsObj) {
+      // eslint-disable-next-line no-prototype-builtins
       if (paramsObj.hasOwnProperty(key)) {
         const paramEntry: any = { name: key }
 
@@ -428,7 +433,7 @@ class Sqlite3Storage {
   }
 
   options2string(optionsObj) {
-    if (optionsObj == null) {
+    if (optionsObj === null) {
       return ''
     }
     let optionsString = ''
