@@ -8871,6 +8871,73 @@ class StateManager extends EventEmitter {
       // or check for open repairs. older than what we want to clear out.
     }
   }
+
+  /**
+   * _commitAccountCopies
+   * This takes an array of account data and pushes it directly into the system with app.resetAccountData
+   * Account backup copies and in memory global account backups are also updated
+   * you only need to set the true values for the globalAccountKeyMap
+   * @param accountCopies 
+   */
+  async _commitAccountCopies (accountCopies: Shardus.AccountsCopy[], globalAccountKeyMap:{[key:string]: boolean}) {
+    
+    if (accountCopies.length > 0) {
+      for (let accountData of accountCopies) {
+        // make sure the data is not a json string
+        if (utils.isString(accountData.data)) {
+          accountData.data = JSON.parse(accountData.data)
+        }
+
+        if (accountData == null || accountData.data == null || accountData.accountId == null) {
+          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _commitAccountCopies null account data found: ${accountData.accountId} data: ${utils.stringifyReduce(accountData)}`)
+          continue
+        } else {
+          if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _commitAccountCopies: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} data: ${utils.stringifyReduce(accountData)}`)
+        }
+
+      }
+      // tell the app to replace the account data
+      await this.app.resetAccountData(accountCopies)
+
+      // update the account copies and global backups
+      // it is possible some of this gets to go away eventually
+      for (let accountEntry of accountCopies) {
+        let { accountId, data, timestamp, hash } = accountEntry
+  
+        const cycle = this.p2p.state.getCycleByTimestamp(timestamp + this.syncSettleTime)
+        // find the correct cycle based on timetamp
+        if (!cycle) {
+          this.mainLogger.error(`_commitAccountCopies failed to get cycle for timestamp ${timestamp} accountId:${utils.makeShortHash(accountId)}`)
+          continue
+        }
+        let cycleNumber = cycle.counter
+        let backupObj:Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber }
+  
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `_commitAccountCopies acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+  
+        // If the account is global ad it to the global backup list
+        if(globalAccountKeyMap[accountId] === true){ //this.isGlobalAccount(accountId)){
+        
+          // If we do not realized this account is global yet, then set it and log to playback log
+          if(this.isGlobalAccount(accountId) === false){
+            this.globalAccountMap.set(accountId, null) // we use null. ended up not using the data, only checking for the key is used
+            this.logger.playbackLogNote('globalAccountMap', `set global in _commitAccountCopies accountId:${utils.makeShortHash(accountId)}`)
+          }
+
+          let globalBackupList:Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
+          if(globalBackupList != null){
+            globalBackupList.push(backupObj) // sort and cleanup later
+            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `_commitAccountCopies added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+          } else {
+            this.mainLogger.error(`_commitAccountCopies no global backup list found for accountId:${utils.makeShortHash(accountId)}`)
+          }       
+        }
+        //Saves the last copy per given cycle! this way when you query cycle-1 you get the right data.
+        await this.storage.createOrReplaceAccountCopy(backupObj)
+
+      }
+    } 
+  }
 }
 
 export default StateManager
