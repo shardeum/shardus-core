@@ -843,7 +843,7 @@ class Storage {
   async getAccountCopiesByCycleAndRange(cycleNumber, lowAddress, highAddress) {
     this._checkInit()
     try {
-      const query = `select accountId, cycleNumber, hash from accountsCopy WHERE cycleNumber<=${cycleNumber} and accountId>="${lowAddress}" and accountId<="${highAddress}"  group by accountId order by accountId asc`
+      const query = `select accountId, cycleNumber, data, timestamp, hash from accountsCopy WHERE cycleNumber<=${cycleNumber} and accountId>="${lowAddress}" and accountId<="${highAddress}"  group by accountId order by accountId asc`
       const result = await this._query(query, [])
       return result
     } catch (e) {
@@ -854,7 +854,7 @@ class Storage {
   async getOldAccountCopiesByCycleAndRange(lowAddress, highAddress) {
     this._checkInit()
     try {
-      const query = `select accountId, cycleNumber, hash from accountsCopy WHERE accountId>="${lowAddress}" and accountId<="${highAddress}"  group by accountId order by accountId asc`
+      const query = `select accountId, cycleNumber, data, timestamp, hash from accountsCopy WHERE accountId>="${lowAddress}" and accountId<="${highAddress}"  group by accountId order by accountId asc`
       const result = await this._queryOld(query, [])
       return result
     } catch (e) {

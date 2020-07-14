@@ -319,7 +319,7 @@ class Sqlite3Storage {
   }
 
   params2Array(paramsObj, table) {
-    if (paramsObj === null) {
+    if (paramsObj === null || paramsObj === undefined) {
       return []
     }
     const paramsArray = []
@@ -433,7 +433,7 @@ class Sqlite3Storage {
   }
 
   options2string(optionsObj) {
-    if (optionsObj === null) {
+    if (optionsObj === null || optionsObj === undefined) {
       return ''
     }
     let optionsString = ''
