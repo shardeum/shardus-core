@@ -8902,15 +8902,17 @@ class StateManager extends EventEmitter {
       // update the account copies and global backups
       // it is possible some of this gets to go away eventually
       for (let accountEntry of accountCopies) {
-        let { accountId, data, timestamp, hash } = accountEntry
+        let { accountId, data, timestamp, hash, cycleNumber } = accountEntry
   
-        const cycle = this.p2p.state.getCycleByTimestamp(timestamp + this.syncSettleTime)
-        // find the correct cycle based on timetamp
-        if (!cycle) {
-          this.mainLogger.error(`_commitAccountCopies failed to get cycle for timestamp ${timestamp} accountId:${utils.makeShortHash(accountId)}`)
-          continue
-        }
-        let cycleNumber = cycle.counter
+        // Maybe don't try to calculate the cycle number....
+        // const cycle = this.p2p.state.getCycleByTimestamp(timestamp + this.syncSettleTime)
+        // // find the correct cycle based on timetamp
+        // if (!cycle) {
+        //   this.mainLogger.error(`_commitAccountCopies failed to get cycle for timestamp ${timestamp} accountId:${utils.makeShortHash(accountId)}`)
+        //   continue
+        // }
+        // let cycleNumber = cycle.counter
+
         let backupObj:Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber }
   
         if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `_commitAccountCopies acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
