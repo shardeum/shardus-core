@@ -47,7 +47,7 @@ enum offerResponse {
 
 /** STATE */
 
-let oldDataPath: string
+export let oldDataPath: string
 const oldDataMap: Map<PartitionNum, any[]> = new Map()
 const dataToMigrate: Map<PartitionNum, any[]> = new Map()
 const oldPartitionHashMap: Map<PartitionNum, string> = new Map()

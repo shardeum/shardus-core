@@ -544,7 +544,7 @@ class Shardus extends EventEmitter {
     })
     Self.emitter.on('initialized', async () => {
       // If network is in safety mode
-      if (CycleChain.newest.safetyMode === true) {
+      if (CycleChain.newest && CycleChain.newest.safetyMode === true) {
         // Use snapshot to put old app data into state-manager then go active
         await Snapshot.safetySync()
       } else {

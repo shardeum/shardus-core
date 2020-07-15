@@ -107,7 +107,7 @@ class Storage {
       this.storage._rawQueryOld(query, tableModel) // or queryString, valueArray for non-sequelize
 
     this.initialized = true
-    if (this.initialized) await Snapshot.initSafetyModeVals()
+    if (Snapshot.oldDataPath) await Snapshot.initSafetyModeVals()
   }
   async close() {
     await this.storage.close()
