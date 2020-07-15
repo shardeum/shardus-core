@@ -139,7 +139,7 @@ class State extends EventEmitter {
   }
 
   getNodes() {
-    return NodeList
+    return NodeList.nodes
   }
 
   getNodeByPubKey(pubkey) {

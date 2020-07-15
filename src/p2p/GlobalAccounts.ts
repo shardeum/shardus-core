@@ -1,3 +1,9 @@
+/**
+ * [NOTE] [AS] To break this modules dependency on Wrapper, search for
+ * all references to 'p2p' imported from Wrapper and replace them with
+ * a direct call to whatever Wrapper.p2p was calling
+ */
+
 import ShardFunctions from '../state-manager/shardFunctions'
 import * as utils from '../utils'
 import * as Comms from './Comms'
@@ -56,6 +62,7 @@ const setGlobalGossipRoute: Route<GossipHandler<Receipt>> = {
   handler: payload => {
     if (validateReceipt(payload) === false) return
     if (processReceipt(payload) === false) return
+    /** [TODO] [AS] Replace with Comms.sendGossip() */
     p2p.sendGossipIn('set-global', payload)
   },
 }
@@ -79,9 +86,11 @@ export function init() {
 }
 
 export function setGlobal(address, value, when, source) {
+  /** [TODO] [AS] Replace with Self.id */
   console.log(`SETGLOBAL: WE ARE: ${p2p.id.substring(0, 5)}`)
 
   // Only do this if you're active
+  /** [TODO] [AS] Replace with Self.isActive */
   if (!p2p.isActive) {
     console.log(`setGlobal: Not active yet`)
     return
@@ -117,6 +126,7 @@ export function setGlobal(address, value, when, source) {
       n.id.substring(0, 5)
     )}`
   )
+  /** [TODO] [AS] Replace p2p.id with Self.id */
   const ourIdx = consensusGroup.findIndex(node => node.id === p2p.id)
   if (ourIdx === -1) return // Return if we're not in the consensusGroup
   consensusGroup.splice(ourIdx, 1) // Remove ourself from consensusGroup
@@ -129,6 +139,7 @@ export function setGlobal(address, value, when, source) {
 
   const onTimeout = () => {
     console.log(`SETGLOBAL: TIMED OUT: ${txHash}`)
+    /** [TODO] [AS] Replace with Self.emitter.removeListener */
     p2p.removeListener(handle, onReceipt)
     attemptCleanup()
   }
@@ -139,12 +150,16 @@ export function setGlobal(address, value, when, source) {
     clearTimeout(timer)
     // Gossip receipt to every node in network to apply to global account
     if (processReceipt(receipt) === false) return
+    /** [TODO] [AS] Replace with Comms.sendGossip */
     p2p.sendGossipIn('set-global', receipt)
   }
+  /** [TODO] [AS] Replace with Self.emitter.on() */
   p2p.on(handle, onReceipt)
 
   // Broadcast tx to /makeReceipt of all nodes in source consensus group to trigger creation of receiptCollection
+  /** [TODO] [AS] Replace with Self.id */
   makeReceipt(signedTx, p2p.id) // Need this because internalRoute handler ignores messages from ourselves
+  /** [TODO] [AS] Replace with Comms.tell */
   p2p.tell(consensusGroup, 'make-receipt', signedTx)
 }
 
@@ -216,6 +231,7 @@ export function makeReceipt(
   )
   if (isReceiptMajority(receipt, receipt.consensusGroup)) {
     const handle = createMakeReceiptHandle(txHash)
+    /** [TODO] [AS] Replace with Self.emitter.emit() */
     p2p.emit(handle, receipt)
   }
 }
@@ -262,6 +278,7 @@ function validateReceipt(receipt: Receipt) {
   // Make a map of signs that overlap with consensusGroup
   const signsInConsensusGroup: Signature[] = []
   for (const sign of receipt.signs) {
+    /** [TODO] [AS] Replace with NodeList.byPubKey.get() */
     const node = p2p.state.getNodeByPubKey(sign.owner)
 
     if (node == null) {
@@ -270,6 +287,7 @@ function validateReceipt(receipt: Receipt) {
           sign.owner
         )}`
       )
+      /** [TODO] [AS] Replace with NodeList.nodes */
       console.log(
         `validateReceipt: nodes: ${utils.stringifyReduce(p2p.state.getNodes())}`
       )
