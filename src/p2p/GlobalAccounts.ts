@@ -7,7 +7,9 @@
 import ShardFunctions from '../state-manager/shardFunctions'
 import * as utils from '../utils'
 import * as Comms from './Comms'
-import { crypto, shardus, stateManager } from './Context'
+import * as Context from './Context'
+import * as NodeList from './NodeList'
+import * as Self from './Self'
 import {
   GossipHandler,
   InternalHandler,
@@ -16,7 +18,6 @@ import {
   Signature,
   SignedObject,
 } from './Types'
-import { p2p } from './Wrapper'
 
 /** TYPES */
 
@@ -59,11 +60,12 @@ const makeReceiptRoute: Route<InternalHandler<
 
 const setGlobalGossipRoute: Route<GossipHandler<Receipt>> = {
   name: 'set-global',
-  handler: payload => {
+  handler: (payload) => {
     if (validateReceipt(payload) === false) return
     if (processReceipt(payload) === false) return
     /** [TODO] [AS] Replace with Comms.sendGossip() */
-    p2p.sendGossipIn('set-global', payload)
+    // p2p.sendGossipIn('set-global', payload)
+    Comms.sendGossip('set-global', payload)
   },
 }
 
@@ -87,47 +89,50 @@ export function init() {
 
 export function setGlobal(address, value, when, source) {
   /** [TODO] [AS] Replace with Self.id */
-  console.log(`SETGLOBAL: WE ARE: ${p2p.id.substring(0, 5)}`)
+  // console.log(`SETGLOBAL: WE ARE: ${p2p.id.substring(0, 5)}`)
+  console.log(`SETGLOBAL: WE ARE: ${Self.id.substring(0, 5)}`)
 
   // Only do this if you're active
   /** [TODO] [AS] Replace with Self.isActive */
-  if (!p2p.isActive) {
-    console.log(`setGlobal: Not active yet`)
+  // if (!p2p.isActive) {
+  if (!Self.isActive) {
+    console.log('setGlobal: Not active yet')
     return
   }
 
   // Create a tx for setting a global account
   const tx: SetGlobalTx = { address, value, when, source }
-  const txHash = crypto.hash(tx)
+  const txHash = Context.crypto.hash(tx)
 
   // Sign tx
-  const signedTx: SignedSetGlobalTx = crypto.sign(tx)
+  const signedTx: SignedSetGlobalTx = Context.crypto.sign(tx)
 
-  if (stateManager == null) {
-    console.log(`setGlobal: stateManager == null`)
+  if (Context.stateManager === null) {
+    console.log('setGlobal: stateManager == null')
   } else {
-    console.log(`setGlobal: stateManager != null`)
+    console.log('setGlobal: stateManager != null')
   }
 
   // Get the nodes that tx will be broadcasted to
-  if (!stateManager.currentCycleShardData) {
-    console.log(`stateManager.currentCycleShardData == null`)
+  if (!Context.stateManager.currentCycleShardData) {
+    console.log('stateManager.currentCycleShardData == null')
 
     return
   }
   const homeNode = ShardFunctions.findHomeNode(
-    stateManager.currentCycleShardData.shardGlobals,
+    Context.stateManager.currentCycleShardData.shardGlobals,
     source,
-    stateManager.currentCycleShardData.parititionShardDataMap
+    Context.stateManager.currentCycleShardData.parititionShardDataMap
   )
   const consensusGroup = [...homeNode.consensusNodeForOurNodeFull]
   console.log(
-    `SETGLOBAL: CONSENSUS_GROUP: ${consensusGroup.map(n =>
+    `SETGLOBAL: CONSENSUS_GROUP: ${consensusGroup.map((n) =>
       n.id.substring(0, 5)
     )}`
   )
   /** [TODO] [AS] Replace p2p.id with Self.id */
-  const ourIdx = consensusGroup.findIndex(node => node.id === p2p.id)
+  // const ourIdx = consensusGroup.findIndex(node => node.id === p2p.id)
+  const ourIdx = consensusGroup.findIndex((node) => node.id === Self.id)
   if (ourIdx === -1) return // Return if we're not in the consensusGroup
   consensusGroup.splice(ourIdx, 1) // Remove ourself from consensusGroup
 
@@ -140,27 +145,32 @@ export function setGlobal(address, value, when, source) {
   const onTimeout = () => {
     console.log(`SETGLOBAL: TIMED OUT: ${txHash}`)
     /** [TODO] [AS] Replace with Self.emitter.removeListener */
-    p2p.removeListener(handle, onReceipt)
+    // p2p.removeListener(handle, onReceipt)
+    Self.emitter.removeListener(handle, onReceipt)
     attemptCleanup()
   }
   const timer = setTimeout(onTimeout, timeout)
 
-  const onReceipt = receipt => {
+  const onReceipt = (receipt) => {
     console.log(`SETGLOBAL: GOT RECEIPT: ${txHash} ${JSON.stringify(receipt)}`)
     clearTimeout(timer)
     // Gossip receipt to every node in network to apply to global account
     if (processReceipt(receipt) === false) return
     /** [TODO] [AS] Replace with Comms.sendGossip */
-    p2p.sendGossipIn('set-global', receipt)
+    // p2p.sendGossipIn('set-global', receipt)
+    Comms.sendGossip('set-global', receipt)
   }
   /** [TODO] [AS] Replace with Self.emitter.on() */
-  p2p.on(handle, onReceipt)
+  // p2p.on(handle, onReceipt)
+  Self.emitter.on(handle, onReceipt)
 
   // Broadcast tx to /makeReceipt of all nodes in source consensus group to trigger creation of receiptCollection
   /** [TODO] [AS] Replace with Self.id */
-  makeReceipt(signedTx, p2p.id) // Need this because internalRoute handler ignores messages from ourselves
+  // makeReceipt(signedTx, p2p.id) // Need this because internalRoute handler ignores messages from ourselves
+  makeReceipt(signedTx, Self.id) // Need this because internalRoute handler ignores messages from ourselves
   /** [TODO] [AS] Replace with Comms.tell */
-  p2p.tell(consensusGroup, 'make-receipt', signedTx)
+  // p2p.tell(consensusGroup, 'make-receipt', signedTx)
+  Comms.tell(consensusGroup, 'make-receipt', signedTx)
 }
 
 export function createMakeReceiptHandle(txHash: string) {
@@ -171,7 +181,7 @@ export function makeReceipt(
   signedTx: SignedSetGlobalTx,
   sender: NodeInfo['id']
 ) {
-  if (!stateManager) {
+  if (!Context.stateManager) {
     console.log('GlobalAccounts: makeReceipt: stateManager not ready')
     return
   }
@@ -181,7 +191,7 @@ export function makeReceipt(
   const tx = { ...signedTx }
   delete tx.sign
 
-  const txHash = crypto.hash(tx)
+  const txHash = Context.crypto.hash(tx)
 
   // Put into correct Receipt and Tracker
   let receipt: Receipt = receipts.get(txHash)
@@ -198,7 +208,7 @@ export function makeReceipt(
         0,
         5
       )}: ${JSON.stringify(
-        [...receipt.consensusGroup].map(id => id.substring(0, 5))
+        [...receipt.consensusGroup].map((id) => id.substring(0, 5))
       )}`
     )
   }
@@ -232,16 +242,17 @@ export function makeReceipt(
   if (isReceiptMajority(receipt, receipt.consensusGroup)) {
     const handle = createMakeReceiptHandle(txHash)
     /** [TODO] [AS] Replace with Self.emitter.emit() */
-    p2p.emit(handle, receipt)
+    // p2p.emit(handle, receipt)
+    Self.emitter.emit(handle, receipt)
   }
 }
 
 export function processReceipt(receipt: Receipt) {
-  const txHash = crypto.hash(receipt.tx)
+  const txHash = Context.crypto.hash(receipt.tx)
   const tracker = trackers.get(txHash) || createTracker(txHash)
   tracker.timestamp = receipt.tx.when
   if (tracker.gossiped) return false
-  shardus.put(receipt.tx.value, false, true)
+  Context.shardus.put(receipt.tx.value, false, true)
   console.log(`Processed set-global receipt: ${JSON.stringify(receipt)}`)
   tracker.gossiped = true
   attemptCleanup()
@@ -262,10 +273,11 @@ export function attemptCleanup() {
 }
 
 function validateReceipt(receipt: Receipt) {
-
-  if(stateManager.currentCycleShardData == null){
+  if (Context.stateManager.currentCycleShardData === null) {
     // we may get this endpoint way before we are ready, so just log it can exit out
-    console.log('validateReceipt: unable to validate receipt currentCycleShardData not ready')
+    console.log(
+      'validateReceipt: unable to validate receipt currentCycleShardData not ready'
+    )
     return false
   }
 
@@ -279,9 +291,10 @@ function validateReceipt(receipt: Receipt) {
   const signsInConsensusGroup: Signature[] = []
   for (const sign of receipt.signs) {
     /** [TODO] [AS] Replace with NodeList.byPubKey.get() */
-    const node = p2p.state.getNodeByPubKey(sign.owner)
+    // const node = p2p.state.getNodeByPubKey(sign.owner)
+    const node = NodeList.byPubKey.get(sign.owner)
 
-    if (node == null) {
+    if (node === null) {
       console.log(
         `validateReceipt: node was null or not found ${utils.stringifyReduce(
           sign.owner
@@ -289,7 +302,8 @@ function validateReceipt(receipt: Receipt) {
       )
       /** [TODO] [AS] Replace with NodeList.nodes */
       console.log(
-        `validateReceipt: nodes: ${utils.stringifyReduce(p2p.state.getNodes())}`
+        // `validateReceipt: nodes: ${utils.stringifyReduce(p2p.state.getNodes())}`
+        `validateReceipt: nodes: ${utils.stringifyReduce(NodeList.nodes)}`
       )
       continue
     }
@@ -316,7 +330,7 @@ function validateReceipt(receipt: Receipt) {
   let verified = 0
   for (const sign of signsInConsensusGroup) {
     const signedTx = { ...receipt.tx, sign }
-    if (crypto.verify(signedTx)) verified++
+    if (Context.crypto.verify(signedTx)) verified++
   }
   if ((verified / consensusGroup.size) * 100 < 60) {
     console.log(
@@ -340,11 +354,11 @@ function createTracker(txHash) {
 
 function getConsensusGroupIds(address) {
   const homeNode = ShardFunctions.findHomeNode(
-    stateManager.currentCycleShardData.shardGlobals,
+    Context.stateManager.currentCycleShardData.shardGlobals,
     address,
-    stateManager.currentCycleShardData.parititionShardDataMap
+    Context.stateManager.currentCycleShardData.parititionShardDataMap
   )
-  return homeNode.consensusNodeForOurNodeFull.map(node => node.id)
+  return homeNode.consensusNodeForOurNodeFull.map((node) => node.id)
 }
 
 function isReceiptMajority(receipt, consensusGroup) {
@@ -353,7 +367,7 @@ function isReceiptMajority(receipt, consensusGroup) {
 
 function intersect(a, b) {
   const setB = new Set(b)
-  return [...new Set(a)].filter(x => setB.has(x))
+  return [...new Set(a)].filter((x) => setB.has(x))
 }
 
 function intersectCount(a, b) {
