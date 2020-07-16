@@ -35,7 +35,18 @@ type QueueEntry = {
     ourNodeInvolved?: boolean;
     transactionGroup?: import("../shardus/shardus-types").Node[];
     approximateCycleAge?: number;
+
+    // Local preapply response
+    preApplyTXResult? : PreApplyAcceptedTransactionResult; // import("../shardus/shardus-types").ApplyResponse;
+
+    // Consensus tracking:
+    ourVote? : AppliedVote;
+    collectedVotes : AppliedVote[];
+    // receipt that we created
+    appliedReceipt?: AppliedReceipt;
     
+    // receipt that we got from gossip
+    recievedAppliedReceipt?: AppliedReceipt;
 };
 
 type SyncTracker = {
@@ -442,6 +453,54 @@ type AccountCopy = {
     isGlobal: boolean
 };
 
+// AppliedVote
+// The vote contains: [txid, [account_id], [account_state_hash_after], transaction_result, sign]; 
+
+// where the 
+// result is the transaction result; 
+// the account_id array is sorted by account_id and 
+// the account_state_hash_after array is in corresponding order. 
+// The applied vote is sent even if the result is ‘fail’.
+
+type AppliedVoteCore = {
+    txid: string;
+    transaction_result: boolean;
+    sign?: import("../shardus/shardus-types").Sign
+}
+
+// type AppliedVote2 = {
+//     coreVote: AppliedVoteCore;
+//     account_id: string[];
+//     account_state_hash_after: string[];
+//     cant_apply: boolean; // indicates that the preapply could not give a pass or fail
+//     sign?: import("../shardus/shardus-types").Sign
+// };
+
+
+type AppliedVote = {
+    txid: string;
+    transaction_result: boolean;
+    account_id: string[];
+    account_state_hash_after: string[];
+    cant_apply: boolean;  // indicates that the preapply could not give a pass or fail
+    sign?: import("../shardus/shardus-types").Sign
+};
+
+// type AppliedReceipt2 = {
+//     vote: AppliedVoteCore;
+//     signatures: import("../shardus/shardus-types").Sign[]
+// };
+
+//[txid, result, [applied_receipt]]
+type AppliedReceipt = {
+    txid: string;
+    result: boolean;
+    appliedVotes: AppliedVote[]
+};
+
+// type AppliedReceiptGossip2 = {
+//     appliedReceipt: AppliedReceipt2
+// };
 
 //Transaction Related
 type TimeRangeandLimit = {tsStart:number, tsEnd:number, limit:number}
@@ -483,8 +542,9 @@ type GetAccountDataWithQueueHintsResp = { accountData: import("../shardus/shardu
 
 type GlobalAccountReportResp = {combinedHash:string, accounts:{id:string, hash:string, timestamp:number }[]  }
 
-type PreApplyAcceptedTransactionResult = { applied: boolean, applyResult:string, reason:string }
+type PreApplyAcceptedTransactionResult = { applied: boolean, passed: boolean, applyResult:string, reason:string, applyResponse? : import("../shardus/shardus-types").ApplyResponse }
 
+type CommitConsensedTransactionResult = { success: boolean }
 
 // Sync related
 type StateHashResult = {stateHash:string}

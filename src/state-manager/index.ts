@@ -25,6 +25,7 @@ import Storage from "../storage"
 import Crypto from "../crypto"
 import Logger from "../logger"
 import { NodeShardData } from './shardFunctionTypes'
+// import { platform } from 'os' //why did this automatically get added?
 //import NodeList from "../p2p/NodeList"
 
 //let shardFunctions = import("./shardFunctions").
@@ -2552,6 +2553,62 @@ class StateManager extends EventEmitter {
       // await this.routeAndQueueAcceptedTransaction(acceptedTX, false, sender)
     })
 
+    this.p2p.registerGossipHandler('spread_appliedVote', async (payload, sender, tracker) => {
+
+      let queueEntry = this.getQueueEntrySafe(payload.id)// , payload.timestamp)
+      if (queueEntry == null) {
+        return
+        
+      }
+      let newVote = payload as AppliedVote
+      // TODO STATESHARDING4 check format and sender !!!
+    
+      if (this.tryAppendVote(queueEntry, newVote)) {
+
+        // share the vote.
+        let sender = null
+        let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry) // TODO STATESHARDING4 use real consensus group
+        if (consensusGroup.length > 1) {
+          // should consider only forwarding in some cases?
+          this.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share tx vote to neighbors`, consensusGroup) 
+          this.p2p.sendGossipIn('spread_appliedVote', newVote, '', sender, consensusGroup)
+        }
+      }
+    })
+
+    this.p2p.registerGossipHandler('spread_appliedReceipt', async (payload, sender, tracker) => {
+
+      let queueEntry = this.getQueueEntrySafe(payload.id)// , payload.timestamp)
+      if (queueEntry == null) {
+        return
+        
+      }
+      let appliedReceipt = payload as AppliedReceipt
+      // TODO STATESHARDING4 check format and sender !!!
+    
+      if (queueEntry.recievedAppliedReceipt === null) {
+        queueEntry.recievedAppliedReceipt = appliedReceipt
+
+        // TODO STATESHARDING4 NEED to handle negative cases here???
+
+        // I think we handle the negative cases later by checking queueEntry.recievedAppliedReceipt vs queueEntry.appliedReceipt
+
+        // share the appliedReceipt.
+        let sender = null
+        let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry)
+        if (consensusGroup.length > 1) {
+          // should consider only forwarding in some cases?
+          this.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, consensusGroup) 
+          this.p2p.sendGossipIn('spread_appliedReceipt',appliedReceipt , '', sender, consensusGroup)
+        }
+      }
+    })
+
+
+
+
+
+
     this.p2p.registerInternal('get_account_data_with_queue_hints', async (payload: { accountIds: string[] }, respond: (arg0: GetAccountDataWithQueueHintsResp) => any) => {
       let result = {} as GetAccountDataWithQueueHintsResp //TSConversion  This is complicated !! check app for details.
       let accountData = null
@@ -3190,7 +3247,6 @@ class StateManager extends EventEmitter {
     return true
   }
 
-
   /**
    * tryPreApplyTransaction this will try to apply a transaction but will not commit the data
    * @param acceptedTX 
@@ -3200,13 +3256,90 @@ class StateManager extends EventEmitter {
    * @param wrappedStates 
    * @param localCachedData 
    */
-  async tryPreApplyTransaction (acceptedTX:AcceptedTx, hasStateTableData:boolean, repairing:boolean, filter:AccountFilter, wrappedStates:WrappedResponses, localCachedData:LocalCachedData ) {
+  async tryPreApplyTransaction (acceptedTX:AcceptedTx, hasStateTableData:boolean, repairing:boolean, filter:AccountFilter, wrappedStates:WrappedResponses, localCachedData:LocalCachedData) : Promise<{passed : boolean, applyResult:string, applyResponse? : Shardus.ApplyResponse}> {
     let ourLockID = -1
     let accountDataList
     let txTs = 0
     let accountKeys = []
     let ourAccountLocks = null
     let applyResponse: Shardus.ApplyResponse | null = null
+    //have to figure out if this is a global modifying tx, since that impacts if we will write to global account.
+    let isGlobalModifyingTX = false
+
+    try {
+      let tx = acceptedTX.data
+      // let receipt = acceptedTX.receipt
+      let keysResponse = this.app.getKeyFromTransaction(tx)
+      let { timestamp, debugInfo } = keysResponse
+      txTs = timestamp
+
+
+      let queueEntry = this.getQueueEntry(acceptedTX.id)
+      if(queueEntry != null){
+        if(queueEntry.globalModification === true){
+          isGlobalModifyingTX = true
+        }
+      }
+
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryPreApplyTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryPreApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryPreApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryPreApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryPreApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
+
+      if (repairing !== true) {
+        // get a list of modified account keys that we will lock
+        let { sourceKeys, targetKeys } = keysResponse
+        for (let accountID of sourceKeys) {
+          accountKeys.push(accountID)
+        }
+        for (let accountID of targetKeys) {
+          accountKeys.push(accountID)
+        }
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` tryPreApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
+        ourAccountLocks = await this.bulkFifoLockAccounts(accountKeys)
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` tryPreApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+      }
+
+      ourLockID = await this.fifoLock('accountModification')
+
+      if (this.verboseLogs) console.log(`tryPreApplyTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
+      this.applySoftLock = true
+
+      applyResponse = this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
+      let { stateTableResults, accountData: _accountdata } = applyResponse
+      accountDataList = _accountdata
+
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryPreApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+
+      this.applySoftLock = false
+
+    } catch (ex) {
+      this.fatalLogger.fatal('tryPreApplyTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.mainLogger.debug(`tryPreApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
+
+      return { passed:false, applyResponse, applyResult: ex.message }
+
+    } finally {
+      this.fifoUnlock('accountModification', ourLockID)
+      if (repairing !== true) {
+        if(ourAccountLocks != null){
+          this.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
+        }
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` tryPreApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+      }
+    }
+
+    return { passed:true, applyResponse, applyResult:'applied' }
+  }
+
+  async commitConsensedTransaction (applyResponse:Shardus.ApplyResponse, acceptedTX:AcceptedTx, hasStateTableData:boolean, repairing:boolean, filter:AccountFilter, wrappedStates:WrappedResponses, localCachedData:LocalCachedData ) : Promise<CommitConsensedTransactionResult> {
+    let ourLockID = -1
+    let accountDataList
+    let txTs = 0
+    let accountKeys = []
+    let ourAccountLocks = null
+   
     //have to figure out if this is a global modifying tx, since that impacts if we will write to global account.
     let isGlobalModifyingTX = false
     let savedSomething = false
@@ -3251,11 +3384,6 @@ class StateManager extends EventEmitter {
       // if (this.verboseLogs) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
       this.applySoftLock = true
 
-      // let replyObject = { stateTableResults: [], txId, txTimestamp, accountData: [] }
-      // let wrappedStatesList = Object.values(wrappedStates)
-
-      // TSConversion need to check how save this cast is for the apply fuction, should probably do more in depth look at the tx param.
-      applyResponse = this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
       let { stateTableResults, accountData: _accountdata } = applyResponse
       accountDataList = _accountdata
 
@@ -3294,7 +3422,7 @@ class StateManager extends EventEmitter {
       }
       
 
-      return false
+      return {success:false}
     } finally {
       this.fifoUnlock('accountModification', ourLockID)
       if (repairing !== true) {
@@ -3356,72 +3484,54 @@ class StateManager extends EventEmitter {
       this.emit('txApplied', acceptedTX)
     }
 
-    return true
+    return {success:true}
   }
 
-  // leaving this for ref for a bit longer because it is interesting
-  // tryStartAcceptedQueue () {
-  //   if (!this.dataSyncMainPhaseComplete) {
-  //     return
+
+  // async applyAcceptedTransaction (acceptedTX:AcceptedTx, wrappedStates:WrappedResponses, localCachedData:LocalCachedData, filter:AccountFilter) {
+  //   if (this.queueStopped) return
+  //   let tx = acceptedTX.data
+  //   let keysResponse = this.app.getKeyFromTransaction(tx)
+  //   let { sourceKeys, targetKeys, timestamp, debugInfo } = keysResponse
+
+  //   if (this.verboseLogs) console.log('applyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
+  //   if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
+
+  //   let allkeys:string[] = []
+  //   allkeys = allkeys.concat(sourceKeys)
+  //   allkeys = allkeys.concat(targetKeys)
+
+  //   for (let key of allkeys) {
+  //     if (wrappedStates[key] == null) {
+  //       if (this.verboseLogs) console.log(`applyAcceptedTransaction missing some account data. timestamp:${timestamp}  key: ${utils.makeShortHash(key)}  debuginfo:${debugInfo}`)
+  //       return { success: false, reason: 'missing some account data' }
+  //     }
   //   }
-  //   if (!this.newAcceptedTxQueueRunning) {
-  //     this.processAcceptedTxQueue()
-  //   } else if (this.newAcceptedTxQueue.length > 0) {
-  //     this.interruptSleepIfNeeded(this.newAcceptedTxQueue[0].timestamp)
+
+  //   // let accountData = await this.app.getAccountDataByList(allkeys) Now that we are sharded we must use the wrapped states instead of asking for account data! (faster anyhow!)
+
+  //   let { success, hasStateTableData } = await this.testAccountTimesAndStateTable2(tx, wrappedStates)
+
+  //   if (!success) {
+  //     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction pretest failed: ' + timestamp)
+  //     this.logger.playbackLogNote('tx_apply_rejected 1', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
+  //     return { success: false, reason: 'applyAcceptedTransaction pretest failed' }
   //   }
+
+  //   // Validate transaction through the application. Shardus can see inside the transaction
+  //   this.profiler.profileSectionStart('validateTx')
+  //   // todo add data fetch to the result and pass it into app apply(), include previous hashes
+
+  //   // todo2 refactor the state table data checks out of try apply and calculate them with less effort using results from validate
+  //   let applyResult = await this.tryApplyTransaction(acceptedTX, hasStateTableData, false, filter, wrappedStates, localCachedData)
+  //   if (applyResult) {
+  //     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction SUCCEDED ' + timestamp)
+  //     this.logger.playbackLogNote('tx_applied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
+  //   } else {
+  //     this.logger.playbackLogNote('tx_apply_rejected 3', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
+  //   }
+  //   return { success: applyResult, reason: 'apply result' }
   // }
-  // async _firstTimeQueueAwait () {
-  //   if (this.newAcceptedTxQueueRunning) {
-  //     this.fatalLogger.fatal('DATASYNC: newAcceptedTxQueueRunning')
-  //     return
-  //   }
-  //   await this.processAcceptedTxQueue(Date.now())
-  // }
-
-  async applyAcceptedTransaction (acceptedTX:AcceptedTx, wrappedStates:WrappedResponses, localCachedData:LocalCachedData, filter:AccountFilter) {
-    if (this.queueStopped) return
-    let tx = acceptedTX.data
-    let keysResponse = this.app.getKeyFromTransaction(tx)
-    let { sourceKeys, targetKeys, timestamp, debugInfo } = keysResponse
-
-    if (this.verboseLogs) console.log('applyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
-
-    let allkeys:string[] = []
-    allkeys = allkeys.concat(sourceKeys)
-    allkeys = allkeys.concat(targetKeys)
-
-    for (let key of allkeys) {
-      if (wrappedStates[key] == null) {
-        if (this.verboseLogs) console.log(`applyAcceptedTransaction missing some account data. timestamp:${timestamp}  key: ${utils.makeShortHash(key)}  debuginfo:${debugInfo}`)
-        return { success: false, reason: 'missing some account data' }
-      }
-    }
-
-    // let accountData = await this.app.getAccountDataByList(allkeys) Now that we are sharded we must use the wrapped states instead of asking for account data! (faster anyhow!)
-
-    let { success, hasStateTableData } = await this.testAccountTimesAndStateTable2(tx, wrappedStates)
-
-    if (!success) {
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction pretest failed: ' + timestamp)
-      this.logger.playbackLogNote('tx_apply_rejected 1', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
-      return { success: false, reason: 'applyAcceptedTransaction pretest failed' }
-    }
-
-    // Validate transaction through the application. Shardus can see inside the transaction
-    this.profiler.profileSectionStart('validateTx')
-    // todo add data fetch to the result and pass it into app apply(), include previous hashes
-
-    // todo2 refactor the state table data checks out of try apply and calculate them with less effort using results from validate
-    let applyResult = await this.tryApplyTransaction(acceptedTX, hasStateTableData, false, filter, wrappedStates, localCachedData)
-    if (applyResult) {
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction SUCCEDED ' + timestamp)
-      this.logger.playbackLogNote('tx_applied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
-    } else {
-      this.logger.playbackLogNote('tx_apply_rejected 3', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
-    }
-    return { success: applyResult, reason: 'apply result' }
-  }
 
 
   /**
@@ -3431,13 +3541,13 @@ class StateManager extends EventEmitter {
    * @param localCachedData 
    * @param filter 
    */
-  async preApplyAcceptedTransaction (acceptedTX:AcceptedTx, wrappedStates:WrappedResponses, localCachedData:LocalCachedData, filter:AccountFilter) : PreApplyAcceptedTransactionResult {
+  async preApplyAcceptedTransaction (acceptedTX:AcceptedTx, wrappedStates:WrappedResponses, localCachedData:LocalCachedData, filter:AccountFilter) : Promise<PreApplyAcceptedTransactionResult> {
     if (this.queueStopped) return
     let tx = acceptedTX.data
     let keysResponse = this.app.getKeyFromTransaction(tx)
     let { sourceKeys, targetKeys, timestamp, debugInfo } = keysResponse
 
-    if (this.verboseLogs) console.log('applyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
+    if (this.verboseLogs) console.log('preApplyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
 
     let allkeys:string[] = []
@@ -3446,8 +3556,8 @@ class StateManager extends EventEmitter {
 
     for (let key of allkeys) {
       if (wrappedStates[key] == null) {
-        if (this.verboseLogs) console.log(`applyAcceptedTransaction missing some account data. timestamp:${timestamp}  key: ${utils.makeShortHash(key)}  debuginfo:${debugInfo}`)
-        return { applied: false, applyResult:'', reason: 'missing some account data' }
+        if (this.verboseLogs) console.log(`preApplyAcceptedTransaction missing some account data. timestamp:${timestamp}  key: ${utils.makeShortHash(key)}  debuginfo:${debugInfo}`)
+        return { applied: false, passed: false, applyResult:'', reason: 'missing some account data' }
       }
     }
 
@@ -3455,20 +3565,23 @@ class StateManager extends EventEmitter {
     let { success, hasStateTableData } = await this.testAccountTimesAndStateTable2(tx, wrappedStates)
 
     if (!success) {
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction pretest failed: ' + timestamp)
-      this.logger.playbackLogNote('tx_apply_rejected 1', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
-      return { applied: false, applyResult:'', reason: 'applyAcceptedTransaction pretest failed, TX rejected' }
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'preApplyAcceptedTransaction pretest failed: ' + timestamp)
+      this.logger.playbackLogNote('tx_preapply_rejected 1', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
+      return { applied: false, passed:false, applyResult:'', reason: 'preApplyAcceptedTransaction pretest failed, TX rejected' }
     }
   
+    // TODO STATESHARDING4 I am not sure if this really needs to be split into a function anymore.
+    // That mattered with data repair in older versions of the code, but that may be the wrong thing to do now
     let preApplyResult = await this.tryPreApplyTransaction(acceptedTX, hasStateTableData, false, filter, wrappedStates, localCachedData)
+
     if (preApplyResult) {
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction SUCCEDED ' + timestamp)
-      this.logger.playbackLogNote('tx_applied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'preApplyAcceptedTransaction SUCCEDED ' + timestamp)
+      this.logger.playbackLogNote('tx_preapplied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
     } else {
-      this.logger.playbackLogNote('tx_apply_rejected 3', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
+      this.logger.playbackLogNote('tx_preapply_rejected 3', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
     }
 
-    return { applied: preApplyResult.applied , applyResult:preApplyResult.applyResult,  reason: 'apply result' }
+    return { applied: true , passed: preApplyResult.passed, applyResult:preApplyResult.applyResult,  reason: 'apply result', applyResponse: preApplyResult.applyResponse }
   }
   
 
@@ -3558,7 +3671,7 @@ class StateManager extends EventEmitter {
     let txId = acceptedTx.receipt.txHash
 
     this.queueEntryCounter++
-    let txQueueEntry:QueueEntry = { acceptedTx: acceptedTx, txKeys: keysResponse, collectedData: {}, originalData: {}, homeNodes: {}, patchedOnNodes: new Map(), hasShardInfo: false, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [], logstate:'', requests:{}, globalModification:globalModification } // age comes from timestamp
+    let txQueueEntry:QueueEntry = { acceptedTx: acceptedTx, txKeys: keysResponse, collectedData: {}, originalData: {}, homeNodes: {}, patchedOnNodes: new Map(), hasShardInfo: false, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [], logstate:'', requests:{}, globalModification:globalModification, collectedVotes:[] } // age comes from timestamp
     // partition data would store stuff like our list of nodes that store this ts
     // collected data is remote data we have recieved back
     // //tx keys ... need a sorted list (deterministic) of partition.. closest to a number?
@@ -4321,7 +4434,7 @@ class StateManager extends EventEmitter {
         if (currentIndex < 0) {
           break
         }
-        let queueEntry = this.newAcceptedTxQueue[currentIndex]
+        let queueEntry: QueueEntry = this.newAcceptedTxQueue[currentIndex]
         let txTime = queueEntry.txKeys.timestamp
         let txAge = currentTime - txTime
         if (txAge < timeM) {
@@ -4349,13 +4462,14 @@ class StateManager extends EventEmitter {
           continue
         }
 
-
-        if (queueEntry.state === 'syncing') {
+        
+        if (queueEntry.state === 'syncing') { ///////////////////////////////////////////////--syncing--////////////////////////////////////////////////////////////
           markAccountsSeen(queueEntry)
-        } else if (queueEntry.state === 'aging') {
+
+        } else if (queueEntry.state === 'aging') { ///////////////////////////////////////////--aging--////////////////////////////////////////////////////////////////
           queueEntry.state = 'processing'
           markAccountsSeen(queueEntry)
-        } else if (queueEntry.state === 'processing') {
+        } else if (queueEntry.state === 'processing') { ////////////////////////////////////////--processing--///////////////////////////////////////////////////////////////////
           if (accountSeen(queueEntry) === false) {
             markAccountsSeen(queueEntry)
             try {
@@ -4371,7 +4485,7 @@ class StateManager extends EventEmitter {
             }
           }
           markAccountsSeen(queueEntry)
-        } else if (queueEntry.state === 'awaiting data') {
+        } else if (queueEntry.state === 'awaiting data') { ///////////////////////////////////////--awaiting data--////////////////////////////////////////////////////////////////////
           markAccountsSeen(queueEntry)
 
           if(queueEntry.globalModification === true){
@@ -4407,55 +4521,103 @@ class StateManager extends EventEmitter {
               this.fatalLogger.fatal('processAcceptedTxQueue2 queueEntryRequestMissingData:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
             }
           } else if (queueEntry.hasAll) {
-            queueEntry.state = 'applying'
-          }
-        } else if (queueEntry.state === 'consensing') {
-          if (accountSeen(queueEntry) === false) {
-            markAccountsSeen(queueEntry)
 
-            if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingTx', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-
-            // TODO sync related need to reconsider how to set this up again
-            // if (queueEntry.didSync) {
-            //   this.logger.playbackLogNote('shrd_sync_consensing', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
-            //   // if we did sync it is time to JIT query local data.  alternatively could have other nodes send us this data, but that could be very high bandwidth.
-            //   for (let key of queueEntry.syncKeys) {
-            //     let wrappedState = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
-            //     this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)} hash:${wrappedState.stateId}`)
-            //     queueEntry.localCachedData[key] = wrappedState.localCache
-            //   }
-            // }
-
-            let wrappedStates = queueEntry.collectedData
-            let localCachedData = queueEntry.localCachedData
-            try {
-              let filter = queueEntry.localKeys
-              queueEntry.acceptedTx.transactionGroup = queueEntry.transactionGroup // Used to not double count txProcessed
-              let txResult = await this.preApplyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates, localCachedData, filter)
-
-              //TODO send out consensing info here.
-
-              // TODO may need to adjust result since a pass or fail is ok...
-              if (txResult != null && txResult.success) {
-                acceptedTXCount++
-                // clearAccountsSeen(queueEntry)
-              } else {
-                // clearAccountsSeen(queueEntry)
-                if (!edgeFailDetected && acceptedTXCount > 0) {
-                  edgeFailDetected = true
-                  if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-                  this.fatalLogger.fatal(this.dataPhaseTag + `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`) // todo: consider if this is just an error
-                }
-              }
-            } catch (ex) {
-              this.mainLogger.debug('processAcceptedTxQueue2 applyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-              this.fatalLogger.fatal('processAcceptedTxQueue2 applyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-            } finally {
+            // As soon as we have all the data we preApply it and then send out a receipt
+            
+            if (accountSeen(queueEntry) === false) {
+              markAccountsSeen(queueEntry)
   
-              if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingTx2', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+              if (this.verboseLogs) this.logger.playbackLogNote('shrd_preApplyTx', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+  
+              // TODO sync related need to reconsider how to set this up again
+              // if (queueEntry.didSync) {
+              //   this.logger.playbackLogNote('shrd_sync_consensing', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
+              //   // if we did sync it is time to JIT query local data.  alternatively could have other nodes send us this data, but that could be very high bandwidth.
+              //   for (let key of queueEntry.syncKeys) {
+              //     let wrappedState = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
+              //     this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)} hash:${wrappedState.stateId}`)
+              //     queueEntry.localCachedData[key] = wrappedState.localCache
+              //   }
+              // }
+  
+              let wrappedStates = queueEntry.collectedData
+              let localCachedData = queueEntry.localCachedData
+              try {
+                let filter:AccountFilter = {}
+                // need to convert to map of numbers, could refactor this away later
+                for(let key of Object.keys(queueEntry.localKeys)){
+                  filter[key] = (queueEntry[key] == true)? 1 : 0
+                }
+
+                // Need to go back and thing on how this was supposed to work:
+                // queueEntry.acceptedTx.transactionGroup = queueEntry.transactionGroup // Used to not double count txProcessed
+                let txResult = await this.preApplyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates, localCachedData, filter)
+  
+            
+                // TODO STATESHARDING4 evaluate how much of this we still need, does the edge fail stuff still matter
+                if (txResult != null ) {
+                  if( txResult.passed === true){
+                    acceptedTXCount++
+                  }
+                  // clearAccountsSeen(queueEntry)
+                } else {
+                  // clearAccountsSeen(queueEntry)
+                  // if (!edgeFailDetected && acceptedTXCount > 0) {
+                  //   edgeFailDetected = true
+                  //   if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+                  //   this.fatalLogger.fatal(this.dataPhaseTag + `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`) // todo: consider if this is just an error
+                  // }
+                }
+
+                if(txResult != null && txResult.applied === true){
+                  queueEntry.state = 'consensing'
+
+                  queueEntry.preApplyTXResult = txResult
+                  //Broadcast our vote
+                  await this.createAndShareVote(queueEntry)
+                }
+              } catch (ex) {
+                this.mainLogger.debug('processAcceptedTxQueue2 applyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+                this.fatalLogger.fatal('processAcceptedTxQueue2 applyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+              } finally {
+    
+                if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingTx2', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+              }
+
             }
           }
-        } else if (queueEntry.state === 'commiting') {
+        } else if (queueEntry.state === 'consensing') { /////////////////////////////////////////--consensing--//////////////////////////////////////////////////////////////////
+          
+            if (accountSeen(queueEntry) === false) {
+              markAccountsSeen(queueEntry)
+
+
+              let result = this.tryProduceReceipt(queueEntry)
+              if(result != null){
+                if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} `)
+
+                // Broadcast the receipt
+                await this.shareAppliedReceipt(queueEntry)
+
+                queueEntry.state = 'commiting'
+                continue
+              }
+
+              // TODO STATESHARDING4 handling negative case / new data repair
+              // What if we run out of time and never make a receipt??
+              // may also need to handle this in gossip?
+              // may need a waiting on receipt mode for queue entries that failed..  when to take them out of the queue though?
+              // note we never can actually get here, need to implment this in the correct spot
+              if(txAge > timeM3 ){
+                // TODO time runs out but we have seen a 
+                if(queueEntry.recievedAppliedReceipt != null){
+                    // new kind of data repair!
+                }
+
+              }
+              
+            }
+        } else if (queueEntry.state === 'commiting') {  ///////////////////////////////////////////--commiting--////////////////////////////////////////////////////////////////
           if (accountSeen(queueEntry) === false) {
             markAccountsSeen(queueEntry)
 
@@ -4464,7 +4626,7 @@ class StateManager extends EventEmitter {
 
             // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processAcceptedTxQueue2. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
 
-            // TODO sync related need to reconsider how to set this up again
+            // TODO STATESHARDING4 sync related need to reconsider how to set this up again
             // if (queueEntry.didSync) {
             //   this.logger.playbackLogNote('shrd_sync_commiting', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
             //   // if we did sync it is time to JIT query local data.  alternatively could have other nodes send us this data, but that could be very high bandwidth.
@@ -4478,10 +4640,25 @@ class StateManager extends EventEmitter {
             let wrappedStates = queueEntry.collectedData // Object.values(queueEntry.collectedData)
             let localCachedData = queueEntry.localCachedData
             try {
-            // this.mainLogger.debug(` processAcceptedTxQueue2. applyAcceptedTransaction ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp} queuerestarts: ${localRestartCounter} queueLen: ${this.newAcceptedTxQueue.length}`)
-              let filter = queueEntry.localKeys
-              queueEntry.acceptedTx.transactionGroup = queueEntry.transactionGroup // Used to not double count txProcessed
-              let commitResult = await this.commitConsensedTransaction(queueEntry.acceptedTx, wrappedStates, localCachedData, filter)
+              // this.mainLogger.debug(` processAcceptedTxQueue2. applyAcceptedTransaction ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp} queuerestarts: ${localRestartCounter} queueLen: ${this.newAcceptedTxQueue.length}`)
+              let filter:AccountFilter = {}
+              // need to convert to map of numbers, could refactor this away later
+              for(let key of Object.keys(queueEntry.localKeys)){
+                filter[key] = (queueEntry[key] == true)? 1 : 0
+              }
+              // Need to go back and thing on how this was supposed to work:
+              //queueEntry.acceptedTx.transactionGroup = queueEntry.transactionGroup // Used to not double count txProcessed
+              let hasStateTableData = false
+              let repairing = false
+              let commitResult = await this.commitConsensedTransaction ( 
+                queueEntry.preApplyTXResult.applyResponse, 
+                queueEntry.acceptedTx, 
+                hasStateTableData, 
+                repairing,
+                filter,
+                localCachedData, 
+                wrappedStates)
+
               if (commitResult != null && commitResult.success) {
                 
               }
@@ -4492,12 +4669,17 @@ class StateManager extends EventEmitter {
               clearAccountsSeen(queueEntry)
               this.removeFromQueue(queueEntry, currentIndex)
 
-              // TODO this is now 'pass' or 'fail' and we need to save the state from 'consensing' state
-              queueEntry.state = 'applied'
+              // the final state of the queue entry will be pass or fail based on the receipt
+              if(queueEntry.appliedReceipt.result === true){
+                queueEntry.state = 'pass'
+              } else {
+                queueEntry.state = 'fail'
+              }
+              
               if (this.verboseLogs) this.logger.playbackLogNote('shrd_commitingTxFinished', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
             }
 
-            // TODO syncing related.. need to consider how we will re activate this 
+            // TODO STATESHARDING4 syncing related.. need to consider how we will re activate this 
             // // do we have any syncing neighbors?
             // if (this.currentCycleShardData.hasSyncingNeighbors === true && queueEntry.globalModification === false) {
             // // let dataToSend = Object.values(queueEntry.collectedData)
@@ -4537,6 +4719,178 @@ class StateManager extends EventEmitter {
       this.lastSeenAccountsMap = seenAccounts
     }
   }
+
+
+  /**
+   * shareAppliedReceipt 
+   * gossip the appliedReceipt to the transaction group
+   * @param queueEntry 
+   */
+  async shareAppliedReceipt (queueEntry: QueueEntry) {
+    if (this.verboseLogs) this.logger.playbackLogNote('shrd_shareAppliedReceipt', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} `)
+
+    let appliedReceipt = queueEntry.appliedReceipt
+
+    // share the appliedReceipt.
+    let sender = null
+    let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry)
+    if (consensusGroup.length > 1) {
+      // should consider only forwarding in some cases?
+      this.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, consensusGroup) 
+      this.p2p.sendGossipIn('spread_appliedReceipt',appliedReceipt , '', sender, consensusGroup)
+    }
+
+  }
+
+  /**
+   * tryProduceReceipt
+   * try to produce an AppliedReceipt
+   * if we can't do that yet return null
+   * 
+   * @param queueEntry 
+   */
+  tryProduceReceipt (queueEntry: QueueEntry) : (AppliedReceipt | null) {
+
+    let passed = false
+    let canProduceReceipt = false
+
+    let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry) // todo use real consensus group!!!
+    let requiredVotes = Math.round(consensusGroup.length * (2/3.0))
+
+    let numVotes = queueEntry.collectedVotes.length
+
+    if(numVotes < requiredVotes){
+      // we need more votes
+      return null
+    }
+
+    let passCount = 0
+    let failCount = 0
+    // tally our votes
+    for(let i=0; i<numVotes; i++){
+      let currentVote = queueEntry.collectedVotes[i]
+
+      if(currentVote.transaction_result === true){
+        passCount++
+      } else {
+        failCount++
+      }
+      
+      if(passCount > requiredVotes){
+        canProduceReceipt = true
+        passed = true
+      }
+      if(failCount > requiredVotes){
+        canProduceReceipt = true
+        passed = false
+      }
+    }
+    // TODO STATESHARDING4 There isn't really an analysis of account_state_hash_after.  seems like we should make sure the hashes match up
+
+    // if we can create a receipt do that now
+    if(canProduceReceipt === true){
+      let appliedReceipt:AppliedReceipt = {
+        txid:queueEntry.acceptedTx.id,
+        result: passed,
+        appliedVotes:[]
+      }
+      // grab just the votes that match the winning pass or fail status
+      for(let i=0; i<numVotes; i++){
+        let currentVote = queueEntry.collectedVotes[i]
+        if(passed === currentVote.transaction_result){
+          appliedReceipt.appliedVotes.push(currentVote)
+        }
+      }
+
+      // recored our generated receipt to the queue entry
+      queueEntry.appliedReceipt = appliedReceipt
+      return appliedReceipt
+    }
+
+    return null
+  }
+
+  sortByAccountId(first, second) {
+    return utils.sortAscProp(first, second, 'accountId')
+  }
+
+  /**
+   * createAndShareVote
+   * create an AppliedVote
+   * gossip the AppliedVote
+   * @param queueEntry 
+   */
+  async createAndShareVote(queueEntry: QueueEntry) {
+    if (this.verboseLogs) this.logger.playbackLogNote('shrd_createAndShareVote', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} `)
+
+    // create our applied vote
+    let ourVote: AppliedVote = {
+      txid:queueEntry.acceptedTx.id,
+      transaction_result: queueEntry.preApplyTXResult.passed,
+      account_id:[],
+      account_state_hash_after:[],
+      cant_apply: (queueEntry.preApplyTXResult.applied === false),
+    }
+    // fill out the lists of account ids and after states
+    let applyResponse = queueEntry.preApplyTXResult.applyResponse as ApplyResponse
+    if(applyResponse != null){
+      //we need to sort this list and doing it in place seems ok
+      applyResponse.stateTableResults.sort(this.sortByAccountId )
+      for(let stateTableObject of applyResponse.stateTableResults ){
+
+        ourVote.account_id.push(stateTableObject.accountId)
+        ourVote.account_state_hash_after.push(stateTableObject.stateAfter)
+      }
+    }
+    // save our vote to our queueEntry
+    queueEntry.ourVote = ourVote
+    // also append it to the total list of votes
+    this.tryAppendVote(queueEntry, ourVote)
+    // share the vote via gossip
+    let sender = null
+    let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry) // TODO STATESHARDING4 use real consensus group
+    if (consensusGroup.length > 1) {
+      // should consider only forwarding in some cases?
+      this.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share tx vote to neighbors`, consensusGroup) 
+      this.p2p.sendGossipIn('spread_appliedVote', ourVote, '', sender, consensusGroup)
+    }
+  }
+
+  /**
+   * tryAppendVote
+   * if we have not seen this vote yet search our list of votes and append it in 
+   * the correct spot sorted by signer's id
+   * @param queueEntry 
+   * @param vote 
+   */
+  tryAppendVote (queueEntry: QueueEntry, vote:AppliedVote ) : boolean {
+    let numVotes = queueEntry.collectedVotes.length
+
+    // just add the vote if we dont have any yet
+    if(numVotes === 0){
+      queueEntry.collectedVotes.push(vote)
+      return true
+    }
+
+    //compare to existing votes.  keep going until we find that this vote is already in the list or our id is at the right spot to insert sorted
+    for(let i=0; i<numVotes; i++){
+      let currentVote = queueEntry.collectedVotes[i]
+
+      if(currentVote.sign.owner === vote.sign.owner){
+        // already in our list so do nothing and return
+        return false
+      }
+
+      if(currentVote.sign.owner < vote.sign.owner){
+        // insert in the spot after the vote we are looking at
+        queueEntry.collectedVotes.splice(i+1, 0, vote);
+        return true
+      }
+    }
+
+    return false
+  }
+
 
   async dumpAccountDebugData () {
     if (this.currentCycleShardData == null) {
