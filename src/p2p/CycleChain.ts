@@ -3,7 +3,6 @@ import { crypto, logger } from './Context'
 import { CycleRecord } from './CycleCreator'
 import { nodes } from './NodeList'
 import { LooseObject } from './Types'
-import { id } from './Self'
 
 /** TYPES */
 
@@ -36,6 +35,10 @@ export function reset() {
   cyclesByMarker = {}
   oldest = null
   newest = null
+}
+
+export function getNewest() {
+  return newest
 }
 
 export function append(cycle: CycleRecord) {
@@ -96,25 +99,33 @@ export function computeCycleMarker(fields) {
 const idToPort: { [id: string]: number } = {}
 
 export function getDebug() {
-  const chain = cycles.map(record => {
+  const chain = cycles.map((record) => {
     const ctr = record.counter
     const prev = record.previous.slice(0, 4)
     const rhash = crypto.hash(record).slice(0, 4)
     const actv = record.active
     const exp = record.expired
-    const joind = record.joinedConsensors.map(c => c.externalPort)
-    const actvd = record.activated.map(id => {
+    const joind = record.joinedConsensors.map((c) => c.externalPort)
+    const actvd = record.activated.map((id) => {
       if (idToPort[id]) return idToPort[id]
       idToPort[id] = nodes.get(id).externalPort
       return idToPort[id]
     })
-//    const rmvd = record.removed.map(id => idToPort[id])
-    const rmvd = record.removed.map(id => idToPort[id] ? idToPort[id] : 'x'+id.slice(0,3))
-    const lost = record.lost.map(id => idToPort[id] ? idToPort[id] : 'x'+id.slice(0,3))
-    const refu = record.refuted.map(id => idToPort[id] ? idToPort[id] : 'x'+id.slice(0,3))
-    const apopd = record.apoptosized.map(id => idToPort[id] ? idToPort[id] : 'x'+id.slice(0,3))
+    //    const rmvd = record.removed.map(id => idToPort[id])
+    const rmvd = record.removed.map((id) =>
+      idToPort[id] ? idToPort[id] : 'x' + id.slice(0, 3)
+    )
+    const lost = record.lost.map((id) =>
+      idToPort[id] ? idToPort[id] : 'x' + id.slice(0, 3)
+    )
+    const refu = record.refuted.map((id) =>
+      idToPort[id] ? idToPort[id] : 'x' + id.slice(0, 3)
+    )
+    const apopd = record.apoptosized.map((id) =>
+      idToPort[id] ? idToPort[id] : 'x' + id.slice(0, 3)
+    )
     const rfshd = record.refreshedConsensors.map(
-      c => `${c.externalPort}:${c.counterRefreshed}`
+      (c) => `${c.externalPort}:${c.counterRefreshed}`
     )
 
     const str = `      ${ctr}:${prev}:${rhash} { actv:${actv}, exp:${exp}, joind:[${joind.join()}], actvd:[${actvd.join()}], lost:[${lost.join()}] refu:[${refu.join()}] apop:[${apopd.join()}] rmvd:[${rmvd.join()}], rfshd:[${rfshd.join()}] }`

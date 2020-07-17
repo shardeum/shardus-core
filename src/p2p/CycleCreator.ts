@@ -225,7 +225,7 @@ export async function startCycles() {
 
     // Schedule the scheduler to run at cycle zero start
     const { startQ1 } = calcIncomingTimes(recordZero)
-    schedule(cycleCreator, startQ1)
+    await schedule(cycleCreator, startQ1)
 
     return
   }
@@ -707,19 +707,29 @@ function calcIncomingTimes(record: CycleRecord) {
  * @param args
  */
 export function schedule<T, U extends unknown[]>(
-  callback: (...args: U) => T,
+  callback: (...args: U) => T | Promise<T>,
   time: number,
   { runEvenIfLateBy = 0 } = {},
   ...args: U
 ) {
-  const now = Date.now()
-  if (now >= time) {
-    if (now - time <= runEvenIfLateBy) setImmediate(callback, ...args)
-    return
-  }
-  const toWait = time - now
-  if (timers[callback.name]) clearTimeout(timers[callback.name])
-  timers[callback.name] = setTimeout(callback, toWait)
+  return new Promise((resolve) => {
+    const now = Date.now()
+    if (now >= time) {
+      if (now - time <= runEvenIfLateBy) {
+        setImmediate(async () => {
+          await callback(...args)
+          resolve()
+        })
+      }
+      return
+    }
+    const toWait = time - now
+    if (timers[callback.name]) clearTimeout(timers[callback.name])
+    timers[callback.name] = setTimeout(async () => {
+      await callback(...args)
+      resolve()
+    }, toWait)
+  })
 }
 
 export function shutdown() {
