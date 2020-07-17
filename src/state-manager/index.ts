@@ -751,6 +751,18 @@ class StateManager extends EventEmitter {
     }
   }
 
+  /**
+   * Skips app data sync and sets flags to enable external tx processing.
+   * Called by snapshot module after data recovery is complete.
+   */
+  skipSync() {
+    this.dataSyncMainPhaseComplete = true
+
+    this.readyforTXs = true
+    this.mainLogger.debug(`DATASYNC: isFirstSeed = true. skipping sync`)
+    return
+  }
+
   // syncs transactions and application state data
   // This is the main outer loop that will loop over the different partitions
   // The last step catch up on the acceptedTx queue

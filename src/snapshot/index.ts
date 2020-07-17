@@ -368,6 +368,9 @@ function goActiveIfDataComplete() {
     log('We have complete data. Ready to go active')
     // store account data to new database
     storeDataToNewDB(dataToMigrate)
+    // Start state-manager (skip syncing)
+    Context.stateManager.skipSync()
+    // Go active
     Active.requestActive()
   }
 }
