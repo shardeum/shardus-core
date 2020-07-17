@@ -115,6 +115,7 @@ class Shardus extends EventEmitter {
     // Set the old P2P to a Wrapper into the new P2P
     // [TODO] Remove this once everything calls p2p/* modules directly
     this.p2p = Wrapper.p2p
+    Context.setP2pContext(this.p2p)
 
     this.debug = null
     this.consensus = null

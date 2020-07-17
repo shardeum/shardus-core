@@ -362,7 +362,7 @@ async function savePartitionAndNetworkHashes(
   })
 }
 
-function goActiveIfDataComplete() {
+async function goActiveIfDataComplete() {
   log('Missing partitions: ', missingPartitions)
   if (missingPartitions.length === 0) {
     log('We have complete data. Ready to go active')
@@ -372,6 +372,8 @@ function goActiveIfDataComplete() {
     Context.stateManager.skipSync()
     // Go active
     Active.requestActive()
+    await Context.p2p.goActive()
+    await Context.stateManager.startSyncPartitions()
   }
 }
 
