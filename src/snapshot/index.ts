@@ -372,7 +372,6 @@ async function goActiveIfDataComplete() {
     Context.stateManager.skipSync()
     // Go active
     Active.requestActive()
-    await Context.p2p.goActive()
     await Context.stateManager.startSyncPartitions()
   }
 }
