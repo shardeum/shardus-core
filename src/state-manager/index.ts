@@ -4462,6 +4462,19 @@ class StateManager extends EventEmitter {
           continue
         }
 
+        // TODO STATESHARDING4 Does this queueEntry have a receipt?
+        //     
+        //  A: if preapply results match the receipt results
+        //  if we have the data we need to apply it:
+        //       queueEntry.state = 'commiting'  
+        //
+        //  B: if they dont match then
+        //     -sync account from another node (based on hash values in receipt)
+        //     Write the data that synced
+        //
+        //  C: if we get a receipt but have not pre applied yet?
+        //     ? would still be waiting on data.
+        //     this is not normal.  a node would be really behind.  Just do the data repair like step "B"
         
         if (queueEntry.state === 'syncing') { ///////////////////////////////////////////////--syncing--////////////////////////////////////////////////////////////
           markAccountsSeen(queueEntry)
@@ -4623,6 +4636,8 @@ class StateManager extends EventEmitter {
           if (accountSeen(queueEntry) === false) {
             markAccountsSeen(queueEntry)
 
+            // TODO STATESHARDING4 Check if we have already commited the data from a receipt we saw earlier
+
             if (this.verboseLogs) this.logger.playbackLogNote('shrd_commitingTx', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
             this.emit('txPopped', queueEntry.acceptedTx.receipt.txHash)
 
@@ -4653,7 +4668,7 @@ class StateManager extends EventEmitter {
               let hasStateTableData = false
               let repairing = false
               let commitResult = await this.commitConsensedTransaction ( 
-                queueEntry.preApplyTXResult.applyResponse, 
+                queueEntry.preApplyTXResult.applyResponse,   // TODO STATESHARDING4 ... if we get here from a non standard path may need to get this data from somewhere else
                 queueEntry.acceptedTx, 
                 hasStateTableData, 
                 repairing,
@@ -4803,9 +4818,6 @@ class StateManager extends EventEmitter {
           appliedReceipt.appliedVotes.push(currentVote)
         }
       }
-      // TODO STATESHARDING4 do we need to sort.
-      // appliedReceipt.appliedVotes.
-
       // recored our generated receipt to the queue entry
       queueEntry.appliedReceipt = appliedReceipt
       return appliedReceipt
