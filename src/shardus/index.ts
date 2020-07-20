@@ -900,7 +900,7 @@ class Shardus extends EventEmitter {
         return { success: false, reason: `Validation Failed` }
       }
 
-      // Validate the transaction timestamp   //TODO call this before validateTxnFields
+      // Validate the transaction timestamp
       const timestamp = initValidationResp.txnTimestamp
       if (this._isTransactionTimestampExpired(timestamp)) {
         this.fatalLogger.fatal(

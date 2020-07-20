@@ -4467,6 +4467,7 @@ class StateManager extends EventEmitter {
           markAccountsSeen(queueEntry)
 
         } else if (queueEntry.state === 'aging') { ///////////////////////////////////////////--aging--////////////////////////////////////////////////////////////////
+          // we know that tx age is greater than M
           queueEntry.state = 'processing'
           markAccountsSeen(queueEntry)
         } else if (queueEntry.state === 'processing') { ////////////////////////////////////////--processing--///////////////////////////////////////////////////////////////////
@@ -4514,6 +4515,7 @@ class StateManager extends EventEmitter {
               // TODO consider if this function should set 'failed to get data'
               // note this is call is not awaited.  is that ok?
               // 
+              // TODO STATESHARDING4 should we await this.
               this.queueEntryRequestMissingData(queueEntry)
 
             } catch (ex) {
@@ -4523,7 +4525,7 @@ class StateManager extends EventEmitter {
           } else if (queueEntry.hasAll) {
 
             // As soon as we have all the data we preApply it and then send out a receipt
-            
+            // TODO STATESHARDING4 check if this is wrong.
             if (accountSeen(queueEntry) === false) {
               markAccountsSeen(queueEntry)
   
