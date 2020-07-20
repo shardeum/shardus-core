@@ -4799,10 +4799,12 @@ class StateManager extends EventEmitter {
       // grab just the votes that match the winning pass or fail status
       for(let i=0; i<numVotes; i++){
         let currentVote = queueEntry.collectedVotes[i]
-        if(passed === currentVote.transaction_result){
+        if(passed === currentVote.transaction_result){  
           appliedReceipt.appliedVotes.push(currentVote)
         }
       }
+      // TODO STATESHARDING4 do we need to sort.
+      // appliedReceipt.appliedVotes.
 
       // recored our generated receipt to the queue entry
       queueEntry.appliedReceipt = appliedReceipt
