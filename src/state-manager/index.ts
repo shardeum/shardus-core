@@ -4065,6 +4065,7 @@ class StateManager extends EventEmitter {
       // make sure the home node is in there in case we hit and edge case
       uniqueNodes[homeNode.node.id] = homeNode.node
 
+      // TODO STATESHARDING4 is this next block even needed:
       // HOMENODEMATHS need to patch in nodes that would cover this partition!
       // TODO PERF make an optimized version of this in ShardFunctions that is smarter about which node range to check and saves off the calculation
       // maybe this could go on the partitions.
@@ -4078,10 +4079,7 @@ class StateManager extends EventEmitter {
             //setting this will cause it to end up in the transactionGroup
             uniqueNodes[nodeID] = nodeShardData.node
             queueEntry.patchedOnNodes.set(nodeID, nodeShardData)
-
-            
           }
-
           // build index for patched nodes based on the home node:
           if(nodeStoresThisPartition === true){
             if(scratch1[nodeID] == null ){
@@ -4089,10 +4087,7 @@ class StateManager extends EventEmitter {
               scratch1[nodeID] = true
             }
           }
-
         }
-
-
       }
     }
     queueEntry.ourNodeInvolved = true
@@ -4111,6 +4106,73 @@ class StateManager extends EventEmitter {
     queueEntry.transactionGroup = txGroup
     return txGroup
   }
+
+  /**
+   * queueEntryGetConsensusGroup
+   * Gets a merged results of all the consensus nodes for all of the accounts involved in the transaction
+   * Ignores global accounts if globalModification == false and the account is global
+   * @param {QueueEntry} queueEntry
+   * @returns {Node[]}
+   */
+  queueEntryGetConsensusGroup (queueEntry:QueueEntry): Shardus.Node[] {
+    if(this.currentCycleShardData == null){
+      throw new Error('queueEntryGetConsensusGroup: currentCycleShardData == null')
+    }
+    if(queueEntry.uniqueKeys == null){
+      throw new Error('queueEntryGetConsensusGroup: queueEntry.uniqueKeys == null')
+    }
+    if (queueEntry.conensusGroup != null) {
+      return queueEntry.conensusGroup
+    }
+    let txGroup = []
+    let uniqueNodes:StringNodeObjectMap = {}
+
+    let hasNonGlobalKeys = false
+    for (let key of queueEntry.uniqueKeys) {
+      let homeNode = queueEntry.homeNodes[key]
+      if (homeNode == null) {
+        console.log('queueEntryGetConsensusGroup homenode:null')
+      }
+      if (homeNode.extendedData === false) {
+        ShardFunctions.computeExtendedNodePartitionData(this.currentCycleShardData.shardGlobals, this.currentCycleShardData.nodeShardDataMap, this.currentCycleShardData.parititionShardDataMap, homeNode, this.currentCycleShardData.activeNodes)
+      }
+
+      // TODO STATESHARDING4 GLOBALACCOUNTS is this next block of logic needed?
+      // If this is not a global TX then skip tracking of nodes for global accounts used as a reference.
+      if(queueEntry.globalModification === false) {
+        if(this.isGlobalAccount(key) === true){
+          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `queueEntryGetConsensusGroup skipping: ${utils.makeShortHash(key)} tx: ${utils.makeShortHash(queueEntry.acceptedTx.id)}`)
+          continue
+        } else {
+          hasNonGlobalKeys = true;
+        }
+      }
+
+      for (let node of homeNode.consensusNodeForOurNodeFull) {
+        uniqueNodes[node.id] = node
+      }
+
+      // make sure the home node is in there in case we hit and edge case
+      uniqueNodes[homeNode.node.id] = homeNode.node
+    }
+    queueEntry.ourNodeInvolved = true
+    if (uniqueNodes[this.currentCycleShardData.ourNode.id] == null) {
+      queueEntry.ourNodeInvolved = false
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `queueEntryGetConsensusGroup not involved: hasNonG:${hasNonGlobalKeys} tx ${utils.makeShortHash(queueEntry.acceptedTx.id)}`)
+    }
+
+    // make sure our node is included: needed for gossip! - although we may not care about the data!
+    uniqueNodes[this.currentCycleShardData.ourNode.id] = this.currentCycleShardData.ourNode
+
+    let values = Object.values(uniqueNodes)
+    for (let v of values) {
+      txGroup.push(v)
+    }
+    queueEntry.conensusGroup = txGroup
+    return txGroup
+  }
+
+
 
   // should work even if there are zero nodes to tell and should load data locally into queue entry
   async tellCorrespondingNodes (queueEntry:QueueEntry) {
@@ -4839,7 +4901,7 @@ class StateManager extends EventEmitter {
     this.tryAppendVote(queueEntry, ourVote)
     // share the vote via gossip
     let sender = null
-    let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry) // TODO STATESHARDING4 use real consensus group
+    let consensusGroup = this.queueEntryGetConsensusGroup(queueEntry)
     if (consensusGroup.length > 1) {
       // should consider only forwarding in some cases?
       this.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share tx vote to neighbors`, consensusGroup) 

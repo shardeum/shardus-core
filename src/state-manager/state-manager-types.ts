@@ -34,6 +34,7 @@ type QueueEntry = {
     uniqueKeys?: string[];
     ourNodeInvolved?: boolean;
     transactionGroup?: import("../shardus/shardus-types").Node[];
+    conensusGroup?: import("../shardus/shardus-types").Node[];
     approximateCycleAge?: number;
 
     // Local preapply response
