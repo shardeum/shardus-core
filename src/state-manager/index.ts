@@ -4680,7 +4680,7 @@ class StateManager extends EventEmitter {
 
             // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processAcceptedTxQueue2. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
 
-            // TODO STATESHARDING4 sync related need to reconsider how to set this up again
+            // TODO STATESHARDING4 SYNC related need to reconsider how to set this up again
             // if (queueEntry.didSync) {
             //   this.logger.playbackLogNote('shrd_sync_commiting', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
             //   // if we did sync it is time to JIT query local data.  alternatively could have other nodes send us this data, but that could be very high bandwidth.
@@ -4733,7 +4733,7 @@ class StateManager extends EventEmitter {
               if (this.verboseLogs) this.logger.playbackLogNote('shrd_commitingTxFinished', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
             }
 
-            // TODO STATESHARDING4 syncing related.. need to consider how we will re activate this 
+            // TODO STATESHARDING4 SYNC related.. need to consider how we will re activate this 
             // // do we have any syncing neighbors?
             // if (this.currentCycleShardData.hasSyncingNeighbors === true && queueEntry.globalModification === false) {
             // // let dataToSend = Object.values(queueEntry.collectedData)
