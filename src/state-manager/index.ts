@@ -2566,15 +2566,7 @@ class StateManager extends EventEmitter {
       // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
     
       if (this.tryAppendVote(queueEntry, newVote)) {
-        // share the vote.
-        let sender = null
-        let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry) // TODO STATESHARDING4 use real consensus group
-        if (consensusGroup.length > 1) {
-          // should consider only forwarding in some cases?
-          this.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share tx vote to neighbors`, consensusGroup) 
-          // TODO STATESHARDING4 ENDPOINTS this needs to change from gossip to a tell
-          this.p2p.sendGossipIn('spread_appliedVote', newVote, '', sender, consensusGroup)
-        }
+        // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
       }
     })
 
