@@ -2553,6 +2553,7 @@ class StateManager extends EventEmitter {
       // await this.routeAndQueueAcceptedTransaction(acceptedTX, false, sender)
     })
 
+    // TODO STATESHARDING4 ENDPOINTS this needs to change from gossip to a tell
     this.p2p.registerGossipHandler('spread_appliedVote', async (payload, sender, tracker) => {
 
       let queueEntry = this.getQueueEntrySafe(payload.id)// , payload.timestamp)
@@ -2561,16 +2562,17 @@ class StateManager extends EventEmitter {
         
       }
       let newVote = payload as AppliedVote
-      // TODO STATESHARDING4 check format and sender !!!
+      // TODO STATESHARDING4 ENDPOINTS check payload format
+      // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
     
       if (this.tryAppendVote(queueEntry, newVote)) {
-
         // share the vote.
         let sender = null
         let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry) // TODO STATESHARDING4 use real consensus group
         if (consensusGroup.length > 1) {
           // should consider only forwarding in some cases?
           this.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share tx vote to neighbors`, consensusGroup) 
+          // TODO STATESHARDING4 ENDPOINTS this needs to change from gossip to a tell
           this.p2p.sendGossipIn('spread_appliedVote', newVote, '', sender, consensusGroup)
         }
       }
@@ -2584,13 +2586,12 @@ class StateManager extends EventEmitter {
         
       }
       let appliedReceipt = payload as AppliedReceipt
-      // TODO STATESHARDING4 check format and sender !!!
+      // TODO STATESHARDING4 ENDPOINTS check payload format
+      // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
     
       if (queueEntry.recievedAppliedReceipt === null) {
         queueEntry.recievedAppliedReceipt = appliedReceipt
-
-        // TODO STATESHARDING4 NEED to handle negative cases here???
-
+        
         // I think we handle the negative cases later by checking queueEntry.recievedAppliedReceipt vs queueEntry.appliedReceipt
 
         // share the appliedReceipt.
@@ -4500,16 +4501,19 @@ class StateManager extends EventEmitter {
           }
           markAccountsSeen(queueEntry)
         } else if (queueEntry.state === 'awaiting data') { ///////////////////////////////////////--awaiting data--////////////////////////////////////////////////////////////////////
-          markAccountsSeen(queueEntry)
+          
 
-          if(queueEntry.globalModification === true){
-            // no data to await.
-            queueEntry.state = 'applying'
-            currentIndex--
-            continue
-          }
+          // TODO STATESHARDING4 GLOBALACCOUNTS need to find way to turn this back on..
+          // if(queueEntry.globalModification === true){
+          //   markAccountsSeen(queueEntry)
+          //   // no data to await.
+          //   queueEntry.state = 'applying'
+          //   currentIndex--
+          //   continue
+          // }
           // check if we have all accounts
           if (queueEntry.hasAll === false && txAge > timeM2) {
+            markAccountsSeen(queueEntry)
             if (this.queueEntryHasAllData(queueEntry) === true) {
               // I think this can't happen
               this.logger.playbackLogNote('shrd_hadDataAfterall', `${queueEntry.acceptedTx.id}`, `This is kind of an error, and should not happen`)
@@ -4536,14 +4540,12 @@ class StateManager extends EventEmitter {
               this.fatalLogger.fatal('processAcceptedTxQueue2 queueEntryRequestMissingData:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
             }
           } else if (queueEntry.hasAll) {
-
-            // As soon as we have all the data we preApply it and then send out a receipt
-            // TODO STATESHARDING4 check if this is wrong.
             if (accountSeen(queueEntry) === false) {
               markAccountsSeen(queueEntry)
-  
+
+              // As soon as we have all the data we preApply it and then send out a vote
               if (this.verboseLogs) this.logger.playbackLogNote('shrd_preApplyTx', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-  
+
               // TODO sync related need to reconsider how to set this up again
               // if (queueEntry.didSync) {
               //   this.logger.playbackLogNote('shrd_sync_consensing', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
@@ -4554,7 +4556,7 @@ class StateManager extends EventEmitter {
               //     queueEntry.localCachedData[key] = wrappedState.localCache
               //   }
               // }
-  
+
               let wrappedStates = queueEntry.collectedData
               let localCachedData = queueEntry.localCachedData
               try {
@@ -4567,8 +4569,7 @@ class StateManager extends EventEmitter {
                 // Need to go back and thing on how this was supposed to work:
                 // queueEntry.acceptedTx.transactionGroup = queueEntry.transactionGroup // Used to not double count txProcessed
                 let txResult = await this.preApplyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates, localCachedData, filter)
-  
-            
+
                 // TODO STATESHARDING4 evaluate how much of this we still need, does the edge fail stuff still matter
                 if (txResult != null ) {
                   if( txResult.passed === true){
@@ -4598,15 +4599,11 @@ class StateManager extends EventEmitter {
     
                 if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingTx2', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
               }
-
             }
           }
         } else if (queueEntry.state === 'consensing') { /////////////////////////////////////////--consensing--//////////////////////////////////////////////////////////////////
-          
             if (accountSeen(queueEntry) === false) {
               markAccountsSeen(queueEntry)
-
-
               let result = this.tryProduceReceipt(queueEntry)
               if(result != null){
                 if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} `)
@@ -4616,21 +4613,7 @@ class StateManager extends EventEmitter {
 
                 queueEntry.state = 'commiting'
                 continue
-              }
-
-              // TODO STATESHARDING4 handling negative case / new data repair
-              // What if we run out of time and never make a receipt??
-              // may also need to handle this in gossip?
-              // may need a waiting on receipt mode for queue entries that failed..  when to take them out of the queue though?
-              // note we never can actually get here, need to implment this in the correct spot
-              if(txAge > timeM3 ){
-                // TODO time runs out but we have seen a 
-                if(queueEntry.recievedAppliedReceipt != null){
-                    // new kind of data repair!
-                }
-
-              }
-              
+              }              
             }
         } else if (queueEntry.state === 'commiting') {  ///////////////////////////////////////////--commiting--////////////////////////////////////////////////////////////////
           if (accountSeen(queueEntry) === false) {
@@ -4868,6 +4851,7 @@ class StateManager extends EventEmitter {
     if (consensusGroup.length > 1) {
       // should consider only forwarding in some cases?
       this.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share tx vote to neighbors`, consensusGroup) 
+      // TODO STATESHARDING4 ENDPOINTS this needs to change from gossip to a tell
       this.p2p.sendGossipIn('spread_appliedVote', ourVote, '', sender, consensusGroup)
     }
   }
