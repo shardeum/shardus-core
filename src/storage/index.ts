@@ -74,7 +74,7 @@ class Storage {
       'CREATE TABLE if not exists `properties` (`key` VARCHAR(255) NOT NULL PRIMARY KEY, `value` JSON)'
     )
     await this.storage.runCreate(
-      'CREATE TABLE if not exists `accountsCopy` (`accountId` VARCHAR(255) NOT NULL, `cycleNumber` BIGINT NOT NULL, `data` JSON NOT NULL, `timestamp` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, PRIMARY KEY (`accountId`, `cycleNumber`))'
+      'CREATE TABLE if not exists `accountsCopy` (`accountId` VARCHAR(255) NOT NULL, `cycleNumber` BIGINT NOT NULL, `data` JSON NOT NULL, `timestamp` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, `isGlobal` BOOLEAN NOT NULL, PRIMARY KEY (`accountId`, `cycleNumber`))'
     )
     await this.storage.runCreate(
       'CREATE TABLE if not exists `globalAccounts` (`accountId` VARCHAR(255) NOT NULL, `cycleNumber` BIGINT NOT NULL, `data` JSON NOT NULL, `timestamp` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, PRIMARY KEY (`accountId`, `cycleNumber`))'
@@ -843,7 +843,18 @@ class Storage {
   async getAccountCopiesByCycleAndRange(cycleNumber, lowAddress, highAddress) {
     this._checkInit()
     try {
-      const query = `select accountId, cycleNumber, data, timestamp, hash from accountsCopy WHERE cycleNumber<=${cycleNumber} and accountId>="${lowAddress}" and accountId<="${highAddress}"  group by accountId order by accountId asc`
+      const query = `SELECT * FROM accountsCopy WHERE cycleNumber<=${cycleNumber} and accountId>="${lowAddress}" and accountId<="${highAddress}" and isGlobal=false group by accountId order by accountId asc`
+      const result = await this._query(query, [])
+      return result
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
+  async getGlobalAccountCopies(cycleNumber) {
+    this._checkInit()
+    try {
+      const query = `select * from accountsCopy WHERE cycleNumber<=${cycleNumber} and isGlobal=true group by accountId order by accountId asc`
       const result = await this._query(query, [])
       return result
     } catch (e) {
@@ -854,7 +865,18 @@ class Storage {
   async getOldAccountCopiesByCycleAndRange(lowAddress, highAddress) {
     this._checkInit()
     try {
-      const query = `select accountId, cycleNumber, data, timestamp, hash from accountsCopy WHERE accountId>="${lowAddress}" and accountId<="${highAddress}"  group by accountId order by accountId asc`
+      const query = `SELECT * FROM accountsCopy WHERE accountId>="${lowAddress}" and accountId<="${highAddress}" and isGlobal=false group by accountId order by accountId asc`
+      const result = await this._queryOld(query, [])
+      return result
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
+  async getOldGlobalAccountCopies() {
+    this._checkInit()
+    try {
+      const query = `select * from accountsCopy WHERE isGlobal=true group by accountId order by accountId asc`
       const result = await this._queryOld(query, [])
       return result
     } catch (e) {

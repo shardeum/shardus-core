@@ -439,6 +439,7 @@ type AccountCopy = {
     timestamp: number;
     hash: string;
     cycleNumber: number;
+    isGlobal: boolean
 };
 
 

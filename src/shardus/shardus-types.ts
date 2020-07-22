@@ -287,7 +287,8 @@ declare namespace Shardus {
     cycleNumber: number
     data: any
     timestamp: number
-    hash: string
+    hash: string,
+    isGlobal: boolean
   }
 
   export interface WrappedData {

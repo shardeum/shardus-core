@@ -62,7 +62,7 @@ export class Collector extends EventEmitter {
 
     // When the hashes of all partitions have been collected, emit the 'gotAllHashes' event
     // and pass the most popular hash for each partition
-    if (this.hashCounter.size === this.shard.shardGlobals.numPartitions) {
+    if (this.hashCounter.size >= this.shard.shardGlobals.numPartitions) {
       for (const [partitionId, counterMap] of this.hashCounter) {
         let selectedHash
         let maxCount = 0

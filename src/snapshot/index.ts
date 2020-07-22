@@ -138,6 +138,11 @@ export function startSnapshotting() {
 MEM ACCOUNTS C${shard.cycleNumber}:
 ${debugStrs.join('\n')}
 `)
+      const globalAccounts = await Context.storage.getGlobalAccountCopies(shard.cycleNumber)
+      const globalAccountHash = Context.crypto.hash(globalAccounts)
+      
+      // partition hash for globalAccounts
+      partitionHashes.set(-1, globalAccountHash)
 
       // 2) process gossip from the queue for that cycle number
       const collector = partitionGossip.newCollector(shard)
@@ -248,6 +253,18 @@ export async function safetySync() {
         oldDataMap.set(partitionId, oldAccountCopiesInPartition)
     }
   }
+
+  // check if we have global account in old DB
+  const oldGlobalAccounts = await Context.storage.getOldGlobalAccountCopies()
+  if (oldGlobalAccounts) {
+    const existingGlobalHash = oldPartitionHashMap.get(-1)
+    const computedGlobalHash = Context.crypto.hash(oldGlobalAccounts)
+    // make sure that we really have correct data only if hashes match
+    if (computedGlobalHash === existingGlobalHash) {
+      dataToMigrate.set(-1, oldGlobalAccounts) // -1 is used for virtual partition for global accounts
+    }
+  }
+      
 
   // check if we have data for each partition we cover in new network. We will use this array to request data from other nodes
   checkMissingPartitions(shardGlobals)

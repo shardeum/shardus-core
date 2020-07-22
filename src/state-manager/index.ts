@@ -1192,7 +1192,8 @@ class StateManager extends EventEmitter {
             let data = accountData.data
             let timestamp = accountData.timestamp
             let hash = accountData.stateId
-            let backupObj:Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber }
+            let isGlobal = this.isGlobalAccount(accountId)
+            let backupObj:Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
             //if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
             let globalBackupList:Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
             if(globalBackupList != null){
@@ -1781,8 +1782,16 @@ class StateManager extends EventEmitter {
         continue
       }
       // wrappedAccounts.push({ accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp })
-      let accountCopy: AccountCopy = { accountId: accountEntry.accountId, data: accountEntry.data, timestamp: accountEntry.timestamp, hash: accountEntry.stateId, cycleNumber }
-      accountCopies.push(accountCopy)
+    const isGlobal = this.isGlobalAccount(accountEntry.accountId)
+    let accountCopy: AccountCopy = {
+      accountId: accountEntry.accountId,
+      data: accountEntry.data,
+      timestamp: accountEntry.timestamp,
+      hash: accountEntry.stateId,
+      cycleNumber,
+      isGlobal: isGlobal || false
+    }
+    accountCopies.push(accountCopy)
     }
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'writeCombinedAccountDataToBackups ' + accountCopies.length + ' ' + JSON.stringify(accountCopies[0]))
 
@@ -7389,8 +7398,9 @@ class StateManager extends EventEmitter {
 
     for (let accountEntry of accountDataList) {
       let { accountId, data, timestamp, hash } = accountEntry
+      let isGlobal = this.isGlobalAccount(accountId)
 
-      let backupObj:Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber }
+      let backupObj:Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
 
       if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
 
@@ -8915,6 +8925,7 @@ class StateManager extends EventEmitter {
       // it is possible some of this gets to go away eventually
       for (let accountEntry of accountCopies) {
         let { accountId, data, timestamp, hash, cycleNumber } = accountEntry
+        let isGlobal = this.isGlobalAccount(accountId)
   
         // Maybe don't try to calculate the cycle number....
         // const cycle = this.p2p.state.getCycleByTimestamp(timestamp + this.syncSettleTime)
@@ -8925,7 +8936,7 @@ class StateManager extends EventEmitter {
         // }
         // let cycleNumber = cycle.counter
 
-        let backupObj:Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber }
+        let backupObj:Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
   
         if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `_commitAccountCopies acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
   
