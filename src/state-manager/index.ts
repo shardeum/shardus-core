@@ -1192,6 +1192,8 @@ class StateManager extends EventEmitter {
       }
    
       let failedHashes = await this.checkAndSetAccountData(dataToSet)
+
+      console.log('DBG goodAccounts', goodAccounts)
      
       await this.writeCombinedAccountDataToBackups(goodAccounts, failedHashes)
 
@@ -1749,7 +1751,7 @@ class StateManager extends EventEmitter {
    * @param failedHashes This is a list of hashes that failed and should be ignored in the write operation.
    */
   async writeCombinedAccountDataToBackups (goodAccounts:Shardus.WrappedData[] , failedHashes: string[]) {  // ?:{[id:string]: boolean}
-    if (failedHashes.length === 0) {
+    if (failedHashes.length === 0 && goodAccounts.length === 0) {
       return // nothing to do yet
     }
 
@@ -1771,7 +1773,11 @@ class StateManager extends EventEmitter {
       accountCopies.push(accountCopy)
     }
     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'writeCombinedAccountDataToBackups ' + accountCopies.length + ' ' + JSON.stringify(accountCopies[0]))
-    await this.storage.createAccountCopies(accountCopies)
+
+    console.log('DBG accountCopies', accountCopies)
+
+    // await this.storage.createAccountCopies(accountCopies)
+    await this.storage.createOrReplaceAccountCopy(accountCopies)
   }
 
   // Sync the failed accounts
