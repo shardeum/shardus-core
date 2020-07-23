@@ -77,6 +77,19 @@ crypto('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
 // let test2 = JSON.parse(serialized1, utils.reviver)
 // return
 
+//TEST account hash:
+let accTest1str = '{"current":{"defaultToll":1,"description":"These are the initial network parameters liberdus started with","devProposalFee":50,"faucetAmount":10,"maintenanceFee":0,"maintenanceInterval":86400000,"nodePenalty":10,"nodeRewardAmount":1,"nodeRewardInterval":3600000,"proposalFee":50,"stakeRequired":5,"title":"Initial parameters","transactionFee":0.001},"devIssue":1,"devWindows":{"devApplyWindow":[1595874113020,1596046943020],"devGraceWindow":[1595787683020,1595874113020],"devProposalWindow":[1595442023020,1595528453020],"devVotingWindow":[1595528453020,1595787683020]},"developerFund":[],"hash":"a451c379443deac8e1376254b433ec88c4a20c9d6b35ce6cccefafccf01cbbec","id":"0000000000000000000000000000000000000000000000000000000000000000","issue":1,"next":{},"nextDevWindows":{},"nextDeveloperFund":[],"nextWindows":{},"timestamp":1595442023020,"windows":{"applyWindow":[1595874113020,1596046943020],"graceWindow":[1595787683020,1595874113020],"proposalWindow":[1595442023020,1595528453020],"votingWindow":[1595528453020,1595787683020]}}'
+let accTest1obj = JSON.parse(accTest1str, utils.reviver)
+
+let accTest1OldHash = accTest1obj.hash
+accTest1obj.hash = ''
+let accTest1Hash = crypto.hashObj(accTest1obj)
+
+console.log(`accTest acc.hash=${accTest1OldHash} crypto.hashObj = ${accTest1Hash}`)
+
+return //early
+
+
 function testParse (dir, filename) {
   let testInput = null
   try {

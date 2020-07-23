@@ -1878,11 +1878,17 @@ class StateManager extends EventEmitter {
     if(accountDataList == null){
       return;      
     }
-    for (let { accountId, stateId, data: recordData } of accountDataList) {
+    for (let wrappedData of accountDataList) {
+      let { accountId, stateId, data: recordData } = wrappedData
+      //stateId = wrappedData.stateId
+      if(stateId != wrappedData.stateId){
+        this.mainLogger.error(`testAccountDataWrapped what is going on!!:  ${utils.makeShortHash(wrappedData.stateId)}  stateId: ${utils.makeShortHash(stateId)} ` )
+      }
       let hash = this.app.calculateAccountHash(recordData)
       if (stateId !== hash) {
         this.mainLogger.error(`testAccountDataWrapped hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
-        this.mainLogger.error('testAccountDataWrapped hash test failed: details: ' + utils.stringifyReduce(recordData))
+        this.mainLogger.error('testAccountDataWrapped hash test failed: details: ' + stringify(recordData))
+        this.mainLogger.error('testAccountDataWrapped hash test failed: wrappedData.stateId: ' + utils.makeShortHash(wrappedData.stateId) )
         var stack = new Error().stack
         this.mainLogger.error(`stack: ${stack}`)
       } 
@@ -1936,7 +1942,8 @@ class StateManager extends EventEmitter {
 
       this.p2p.sendGossipIn('acceptedTx', acceptedTX, tracker, sender)
 
-      this.routeAndQueueAcceptedTransaction(acceptedTX,/*sendGossip*/ false, sender, /*globalModification*/ false)
+      let noConsensus = false // this can only be true for a set command which will never come from an endpoint
+      this.routeAndQueueAcceptedTransaction(acceptedTX,/*sendGossip*/ false, sender, /*globalModification*/ false, noConsensus)
       //Note await not needed so beware if you add code below this.
     })
 
@@ -2495,7 +2502,8 @@ class StateManager extends EventEmitter {
 
       //TODO need to check transaction fields.
 
-      let added = this.routeAndQueueAcceptedTransaction(payload, /*sendGossip*/ false, sender, /*globalModification*/ false)
+      let noConsensus = false // this can only be true for a set command which will never come from an endpoint
+      let added = this.routeAndQueueAcceptedTransaction(payload, /*sendGossip*/ false, sender, /*globalModification*/ false, noConsensus)
       if (added === 'lost') {
         return // we are faking that the message got lost so bail here
       }
@@ -3351,11 +3359,11 @@ class StateManager extends EventEmitter {
         }
       }
 
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction  filter: ${utils.stringifyReduce(filter)}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
 
       if (repairing !== true) {
         // get a list of modified account keys that we will lock
@@ -3366,14 +3374,14 @@ class StateManager extends EventEmitter {
         for (let accountID of targetKeys) {
           accountKeys.push(accountID)
         }
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
         ourAccountLocks = await this.bulkFifoLockAccounts(accountKeys)
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
       }
 
       ourLockID = await this.fifoLock('accountModification')
 
-      if (this.verboseLogs) console.log(`tryApplyTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
+      if (this.verboseLogs) console.log(`commitConsensedTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
       // if (this.verboseLogs) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
       this.applySoftLock = true
 
@@ -3381,12 +3389,13 @@ class StateManager extends EventEmitter {
       accountDataList = _accountdata
 
 
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
       // wrappedStates are side effected for now
       savedSomething = await this.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter)
 
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction  savedSomething: ${savedSomething}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
 
       this.applySoftLock = false
       // only write our state table data if we dont already have it in the db
@@ -3403,8 +3412,8 @@ class StateManager extends EventEmitter {
       // write the accepted TX to storage
       this.storage.addAcceptedTransactions([acceptedTX])
     } catch (ex) {
-      this.fatalLogger.fatal('tryApplyTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      this.mainLogger.debug(`tryApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
+      this.fatalLogger.fatal('commitConsensedTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.mainLogger.debug(`commitConsensedTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
       if(applyResponse){ // && savedSomething){
         // TSConversion do we really want to record this?
         // if (!repairing) this.tempRecordTXByCycle(txTs, acceptedTX, false, applyResponse, isGlobalModifyingTX, savedSomething)
@@ -3422,7 +3431,7 @@ class StateManager extends EventEmitter {
         if(ourAccountLocks != null){
           this.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
         }
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
       }
     }
 
@@ -3645,13 +3654,13 @@ class StateManager extends EventEmitter {
   //         Q
   //          QQ
 
-  routeAndQueueAcceptedTransaction (acceptedTx:AcceptedTx, sendGossip:boolean = true, sender: Shardus.Node  |  null, globalModification:boolean) : string | boolean {
+  routeAndQueueAcceptedTransaction (acceptedTx:AcceptedTx, sendGossip:boolean = true, sender: Shardus.Node  |  null, globalModification:boolean, noConsensus: boolean) : string | boolean {
     // dropping these too early.. hmm  we finished syncing before we had the first shard data.
     // if (this.currentCycleShardData == null) {
     //   // this.preTXQueue.push(acceptedTX)
     //   return 'notReady' // it is too early to care about the tx
     // }
-    this.logger.playbackLogNote('routeAndQueueAcceptedTransaction-debug', '', `sendGossip:${sendGossip} globalModification:${globalModification} this.readyforTXs:${this.readyforTXs} hasshardData:${(this.currentCycleShardData != null)} acceptedTx:${utils.stringifyReduce(acceptedTx)} `)
+    this.logger.playbackLogNote('routeAndQueueAcceptedTransaction-debug', '', `sendGossip:${sendGossip} globalModification:${globalModification} noConsensus:${noConsensus} this.readyforTXs:${this.readyforTXs} hasshardData:${(this.currentCycleShardData != null)} acceptedTx:${utils.stringifyReduce(acceptedTx)} `)
     if (this.readyforTXs === false) {
       return 'notReady' // it is too early to care about the tx
     }
@@ -3664,7 +3673,7 @@ class StateManager extends EventEmitter {
     let txId = acceptedTx.receipt.txHash
 
     this.queueEntryCounter++
-    let txQueueEntry:QueueEntry = { acceptedTx: acceptedTx, txKeys: keysResponse, collectedData: {}, originalData: {}, homeNodes: {}, patchedOnNodes: new Map(), hasShardInfo: false, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [], logstate:'', requests:{}, globalModification:globalModification, collectedVotes:[] } // age comes from timestamp
+    let txQueueEntry:QueueEntry = { acceptedTx: acceptedTx, txKeys: keysResponse, noConsensus, collectedData: {}, originalData: {}, homeNodes: {}, patchedOnNodes: new Map(), hasShardInfo: false, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [], logstate:'', requests:{}, globalModification:globalModification, collectedVotes:[] } // age comes from timestamp
     // partition data would store stuff like our list of nodes that store this ts
     // collected data is remote data we have recieved back
     // //tx keys ... need a sorted list (deterministic) of partition.. closest to a number?
@@ -4238,6 +4247,13 @@ class StateManager extends EventEmitter {
       if (hasKey) { // todo Detect if our node covers this paritition..  need our partition data
         let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
         //only queue this up to share if it is not a global account. global accounts dont need to be shared.
+
+        //if this is not freshly created data then we need to make a backup copy of it!!
+        //This prevents us from changing data before the commiting phase
+        if(data.accountCreated == false){
+          data = utils.deepCopy(data)
+        }
+
         if(isGlobalKey === false)
         {
           datas[key] = data
@@ -4509,7 +4525,7 @@ class StateManager extends EventEmitter {
 
         //check for TX older than M3 and expire them
         if(txAge > timeM3) {
-          this.statistics.incrementCounter('txExpired')
+          //this.statistics.incrementCounter('txExpired')
           queueEntry.state = 'expired'
           this.removeFromQueue(queueEntry, currentIndex)
           this.logger.playbackLogNote('txExpired', `${queueEntry.acceptedTx.id}`, `txExpired ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
@@ -4644,7 +4660,16 @@ class StateManager extends EventEmitter {
 
                   queueEntry.preApplyTXResult = txResult
                   //Broadcast our vote
-                  await this.createAndShareVote(queueEntry)
+                  if(queueEntry.noConsensus === true){
+                    // not sure about how to share or generate an applied receipt though for a no consensus step
+                    this.mainLogger.debug(`processAcceptedTxQueue2 noConsensus : ${utils.stringifyReduce(queueEntry.acceptedTx.id)} `)
+                    queueEntry.state = 'commiting'
+
+                  } else {
+                    this.mainLogger.debug(`processAcceptedTxQueue2 createAndShareVote : ${utils.stringifyReduce(queueEntry.acceptedTx.id)} `)
+                    await this.createAndShareVote(queueEntry)
+                  }
+                  
                 }
               } catch (ex) {
                 this.mainLogger.debug('processAcceptedTxQueue2 applyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -4658,6 +4683,7 @@ class StateManager extends EventEmitter {
         } else if (queueEntry.state === 'consensing') { /////////////////////////////////////////--consensing--//////////////////////////////////////////////////////////////////
             if (accountSeen(queueEntry) === false) {
               markAccountsSeen(queueEntry)
+              this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${utils.stringifyReduce(queueEntry.acceptedTx.id)} `)
               let result = this.tryProduceReceipt(queueEntry)
               if(result != null){
                 if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} `)
@@ -4674,7 +4700,7 @@ class StateManager extends EventEmitter {
             markAccountsSeen(queueEntry)
 
             // TODO STATESHARDING4 Check if we have already commited the data from a receipt we saw earlier
-
+            this.mainLogger.debug(`processAcceptedTxQueue2 commiting : ${utils.stringifyReduce(queueEntry.acceptedTx.id)} `)
             if (this.verboseLogs) this.logger.playbackLogNote('shrd_commitingTx', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
             this.emit('txPopped', queueEntry.acceptedTx.receipt.txHash)
 
@@ -4704,14 +4730,15 @@ class StateManager extends EventEmitter {
               //queueEntry.acceptedTx.transactionGroup = queueEntry.transactionGroup // Used to not double count txProcessed
               let hasStateTableData = false
               let repairing = false
-              let commitResult = await this.commitConsensedTransaction ( 
+              let commitResult = await this.commitConsensedTransaction( 
                 queueEntry.preApplyTXResult.applyResponse,   // TODO STATESHARDING4 ... if we get here from a non standard path may need to get this data from somewhere else
                 queueEntry.acceptedTx, 
                 hasStateTableData, 
                 repairing,
                 filter,
-                localCachedData, 
-                wrappedStates)
+                wrappedStates,
+                localCachedData
+                )
 
               if (commitResult != null && commitResult.success) {
                 
@@ -4723,12 +4750,22 @@ class StateManager extends EventEmitter {
               clearAccountsSeen(queueEntry)
               this.removeFromQueue(queueEntry, currentIndex)
 
-              // the final state of the queue entry will be pass or fail based on the receipt
-              if(queueEntry.appliedReceipt.result === true){
-                queueEntry.state = 'pass'
+              if(queueEntry.noConsensus === true){
+                // dont have a receipt for a non consensus TX. not even sure if we want to keep that!
+                if(queueEntry.preApplyTXResult.passed === true){
+                  queueEntry.state = 'pass'
+                } else {
+                  queueEntry.state = 'fail'
+                }
               } else {
-                queueEntry.state = 'fail'
+                // the final state of the queue entry will be pass or fail based on the receipt
+                if(queueEntry.appliedReceipt.result === true){
+                  queueEntry.state = 'pass'
+                } else {
+                  queueEntry.state = 'fail'
+                }
               }
+
               
               if (this.verboseLogs) this.logger.playbackLogNote('shrd_commitingTxFinished', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
             }

@@ -52,7 +52,7 @@ class Consensus extends EventEmitter {
     this.lastServed = 0
   }
 
-  async inject(shardusTransaction, global) {
+  async inject(shardusTransaction, global, noConsensus) {
     let transactionReceipt
     const inTransaction = shardusTransaction.inTransaction
     let timestamp = 0
@@ -65,7 +65,7 @@ class Consensus extends EventEmitter {
 
       if (this.mainLogs) {
         this.mainLogger.debug(
-          `Start of inject(globalModification:${global}   ${timestamp}  ${debugInfo}  tx: ${utils.stringifyReduce(
+          `Start of inject(globalModification:${global}  ts: ${timestamp} noConsensus:${noConsensus} dbg: ${debugInfo}  tx: ${utils.stringifyReduce(
             shardusTransaction
           )})`
         )
@@ -154,7 +154,7 @@ class Consensus extends EventEmitter {
       receipt: transactionReceipt,
     }
 
-    this.emit('accepted', acceptedTX, true, null, global)
+    this.emit('accepted', acceptedTX, true, null, global, noConsensus)
     this.logger.playbackLogNote(
       'tx_accepted',
       `TransactionId: ${txId}`,

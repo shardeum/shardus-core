@@ -748,6 +748,7 @@ class Shardus extends EventEmitter {
           ShardusTypes.AcceptedTx,
           boolean,
           ShardusTypes.Node,
+          boolean,
           boolean
         ]
       ) => this.stateManager.routeAndQueueAcceptedTransaction(...txArgs)
@@ -830,13 +831,15 @@ class Shardus extends EventEmitter {
    *
    */
   put (tx, set = false, global = false) {
+    let noConsensus = set || global
+    
     if (!this.appProvided)
       throw new Error(
         'Please provide an App object to Shardus.setup before calling Shardus.put'
       )
 
     if (this.verboseLogs)
-      this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(tx)}`) // not reducing tx here so we can get the long hashes
+      this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(tx)} set:${set} global:${global}`) // not reducing tx here so we can get the long hashes
 
     if (!this.stateManager.dataSyncMainPhaseComplete) {
       this.statistics.incrementCounter('txRejected')
@@ -934,7 +937,7 @@ class Shardus extends EventEmitter {
       )
       this.profiler.profileSectionStart('consensusInject')
 
-      this.consensus.inject(signedShardusTx, global).then((txReceipt) => {
+      this.consensus.inject(signedShardusTx, global, noConsensus).then((txReceipt) => {
         this.profiler.profileSectionEnd('consensusInject')
         if (this.verboseLogs)
           this.mainLogger.debug(

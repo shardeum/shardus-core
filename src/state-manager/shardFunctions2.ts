@@ -1403,24 +1403,56 @@ class ShardFunctions2 {
     // if (exclude.length === allNodes.length) {
     //   return results
     // }
+    let expectedNodes = Math.min(allNodes.length - exclude.length, radius * 2)
 
+    //or check radius being geater than max nodes... and do simple loop minus exclude..
+
+    let scanAmount = radius * 2 + 1
+    let scanCount = 0
+
+    // if we need to scan all the nodes, just do that here in a simple way
+    if(scanAmount >= allNodes.length){
+      for (let i = 0; i < allNodes.length; i++) {
+        let node = allNodes[i]
+        if (exclude.includes(node.id)) {        
+          continue
+        }
+        if (node.status === 'active') {
+          results.push(node)
+        }
+      }
+      return results
+    }
+
+    // this got a bit ugly should think about how to clean it up
     let scanIndex = scanStart
-    for (let i = 0; i < radius * 2 + 1; i++) {
+    for (let i = 0; i < scanAmount; i++) {
+      scanCount++
+      if(scanCount >= allNodes.length) {
+        break
+      }
+
       if (scanIndex >= allNodes.length) {
         scanIndex = 0
       }
 
       let node = allNodes[scanIndex]
-      scanIndex++
-      if (exclude.includes(node.id)) {
+      
+      if (exclude.includes(node.id)) {        
         continue
       }
+
       if (node.status === 'active') {
         results.push(node)
       }
 
+      scanIndex++
+      // This does not work if we skip over it due to exclude
       if (scanIndex === scanStart) {
         break // we looped
+      }
+      if(results.length >= expectedNodes ){
+        break
       }
     }
     return results
