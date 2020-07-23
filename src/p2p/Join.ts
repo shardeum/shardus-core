@@ -63,7 +63,6 @@ const joinRoute: Types.Route<Handler> = {
   method: 'POST',
   name: 'join',
   handler: (req, res) => {
-
     // Dont accept join requests if you're not active
     // if (Self.isActive === false) {
     //   res.end()
@@ -91,7 +90,7 @@ const joinRoute: Types.Route<Handler> = {
       Comms.sendGossip('gossip-join', joinRequest)
     }
     res.end()
-  }
+  },
 }
 
 const joinedRoute: Types.Route<Handler> = {
@@ -99,14 +98,14 @@ const joinedRoute: Types.Route<Handler> = {
   name: 'joined/:publicKey',
   handler: (req, res) => {
     // Respond with id if node's join request was accepted, otherwise undefined
-    let err = utils.validateTypes(req,{params:'o'})
-    if (err){
-      warn('joined/:publicKey bad req '+err)
+    let err = utils.validateTypes(req, { params: 'o' })
+    if (err) {
+      warn('joined/:publicKey bad req ' + err)
       res.json()
     }
-    err = utils.validateTypes(req.params,{publicKey:'s'})
-    if (err){
-      warn('joined/:publicKey bad req.params '+err)
+    err = utils.validateTypes(req.params, { publicKey: 's' })
+    if (err) {
+      warn('joined/:publicKey bad req.params ' + err)
       res.json()
     }
     const publicKey = req.params.publicKey
@@ -125,7 +124,7 @@ const gossipJoinRoute: Types.GossipHandler<JoinRequest, NodeList.Node['id']> = (
   // Do not forward gossip after quarter 2
   if (CycleCreator.currentQuarter >= 3) return
 
-    //  Validate of payload is done in addJoinRequest
+  //  Validate of payload is done in addJoinRequest
   if (addJoinRequest(payload)) Comms.sendGossip('gossip-join', payload)
 }
 
@@ -166,7 +165,13 @@ function calculateToAccept() {
   const maxJoin = config.p2p.maxJoinedPerCycle // [TODO] allow autoscaling to change this
   const syncing = NodeList.byJoinOrder.length - active
   const expired = CycleChain.newest.expired
-  const syncMax = config.p2p.maxSyncingPerCycle // we dont want more than this many nodes to sync at the same stime
+
+  // If in safetyMode, set syncMax to safetyNum
+  const syncMax =
+    CycleChain.newest.safetyMode === true
+      ? CycleChain.newest.safetyNum
+      : config.p2p.maxSyncingPerCycle
+
   const canSync = syncMax - syncing
   let needed = 0
   if (active < desired) {
@@ -187,7 +192,7 @@ function calculateToAccept() {
 }
 
 export function getTxs(): Txs {
-  // Omar - maybe we don't have to make a copy 
+  // Omar - maybe we don't have to make a copy
   // [IMPORTANT] Must return a copy to avoid mutation
   const requestsCopy = deepmerge({}, requests)
 
@@ -196,21 +201,30 @@ export function getTxs(): Txs {
   }
 }
 
-export function validateRecordTypes(rec: Record): string{
-  let err = validateTypes(rec,{syncing:'n',joinedConsensors:'a'})
+export function validateRecordTypes(rec: Record): string {
+  let err = validateTypes(rec, { syncing: 'n', joinedConsensors: 'a' })
   if (err) return err
-  for(const item of rec.joinedConsensors){
-    err = validateTypes(item,{activeTimestamp:'n',address:'s',externalIp:'s',externalPort:'n',
-      internalIp:'s',internalPort:'n',joinRequestTimestamp:'n',publicKey:'s',
-      cycleJoined:'s',counterRefreshed:'n',id:'s'
+  for (const item of rec.joinedConsensors) {
+    err = validateTypes(item, {
+      activeTimestamp: 'n',
+      address: 's',
+      externalIp: 's',
+      externalPort: 'n',
+      internalIp: 's',
+      internalPort: 'n',
+      joinRequestTimestamp: 'n',
+      publicKey: 's',
+      cycleJoined: 's',
+      counterRefreshed: 'n',
+      id: 's',
     })
-    if (err) return 'in joinedConsensors array '+err
+    if (err) return 'in joinedConsensors array ' + err
   }
   return ''
 }
 
 export function dropInvalidTxs(txs: Txs): Txs {
-  const join = txs.join.filter(request => validateJoinRequest(request))
+  const join = txs.join.filter((request) => validateJoinRequest(request))
   return { join }
 }
 
@@ -219,7 +233,7 @@ export function updateRecord(
   record: CycleCreator.CycleRecord,
   _prev: CycleCreator.CycleRecord
 ) {
-  const joinedConsensors = txs.join.map(joinRequest => {
+  const joinedConsensors = txs.join.map((joinRequest) => {
     const { nodeInfo, cycleMarker: cycleJoined } = joinRequest
     const id = computeNodeId(nodeInfo.publicKey, cycleJoined)
     const counterRefreshed = record.counter
@@ -272,22 +286,32 @@ export async function createJoinRequest(
 
 export function addJoinRequest(joinRequest: JoinRequest) {
   //  Validate joinReq
-  let err = utils.validateTypes(joinRequest,{cycleMarker:'s',nodeInfo:'o',sign:'o'})
-  if (err){
-    warn('join bad joinRequest '+err)
-    return false
-  }
-  err = utils.validateTypes(joinRequest.nodeInfo,{activeTimestamp:'n',address:'s',
-    externalIp:'s',externalPort:'n',internalIp:'s',internalPort:'n',
-    joinRequestTimestamp:'n',publicKey:'s'
+  let err = utils.validateTypes(joinRequest, {
+    cycleMarker: 's',
+    nodeInfo: 'o',
+    sign: 'o',
   })
-  if (err){
-    warn('join bad joinRequest.nodeInfo '+err)
+  if (err) {
+    warn('join bad joinRequest ' + err)
     return false
   }
-  err = utils.validateTypes(joinRequest.sign,{owner:'s',sig:'s'})
-  if (err){
-    warn('join bad joinRequest.sign '+err)
+  err = utils.validateTypes(joinRequest.nodeInfo, {
+    activeTimestamp: 'n',
+    address: 's',
+    externalIp: 's',
+    externalPort: 'n',
+    internalIp: 's',
+    internalPort: 'n',
+    joinRequestTimestamp: 'n',
+    publicKey: 's',
+  })
+  if (err) {
+    warn('join bad joinRequest.nodeInfo ' + err)
+    return false
+  }
+  err = utils.validateTypes(joinRequest.sign, { owner: 's', sig: 's' })
+  if (err) {
+    warn('join bad joinRequest.sign ' + err)
     return false
   }
 
@@ -327,7 +351,7 @@ export function addJoinRequest(joinRequest: JoinRequest) {
     last &&
     !crypto.isGreaterHash(joinRequest.selectionNum, last.selectionNum)
   ) {
-//    info('Join request not better than lowest, not added.')
+    //    info('Join request not better than lowest, not added.')
     return false
   }
 
@@ -338,8 +362,8 @@ export function addJoinRequest(joinRequest: JoinRequest) {
   // ----- should create preconfigured hooks for adding POW, allowing join based on netadmin sig, etc.
 
   // Check the signature as late as possible since it is expensive
-  if (! crypto.verify(joinRequest, joinRequest.nodeInfo.publicKey)){
-    warn('join bad sign '+JSON.stringify(joinRequest))
+  if (!crypto.verify(joinRequest, joinRequest.nodeInfo.publicKey)) {
+    warn('join bad sign ' + JSON.stringify(joinRequest))
     return false
   }
 
@@ -359,7 +383,7 @@ export function addJoinRequest(joinRequest: JoinRequest) {
   if (requests.length > toAccept) {
     const over = requests.length - toAccept
     requests.splice(-over)
-//    info(`Over maxJoinedPerCycle; removed ${over} requests from join requests`)
+    //    info(`Over maxJoinedPerCycle; removed ${over} requests from join requests`)
   }
 
   return true
@@ -376,7 +400,7 @@ export async function firstJoin() {
 }
 
 export async function fetchCycleMarker(nodes) {
-  const queryFn = async node => {
+  const queryFn = async (node) => {
     const marker = await http.get(`${node.ip}:${node.port}/cyclemarker`)
     return marker
   }
@@ -405,13 +429,16 @@ export async function submitJoin(nodes, joinRequest) {
       )
       if (resubmit) return resubmit
     } catch (err) {
-      error(`Join: submitJoin: Error posting join request to ${node.ip}:${node.port}`, err)
+      error(
+        `Join: submitJoin: Error posting join request to ${node.ip}:${node.port}`,
+        err
+      )
     }
   }
 }
 
 export async function fetchJoined(activeNodes) {
-  const queryFn = async node => {
+  const queryFn = async (node) => {
     const publicKey = crypto.keypair.publicKey
     const res = await http.get(`${node.ip}:${node.port}/joined/${publicKey}`)
     return res
