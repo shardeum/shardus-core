@@ -2561,10 +2561,10 @@ class StateManager extends EventEmitter {
       // await this.routeAndQueueAcceptedTransaction(acceptedTX, false, sender)
     })
 
-    // TODO STATESHARDING4 ENDPOINTS this needs to change from gossip to a tell
-    this.p2p.registerGossipHandler('spread_appliedVote', async (payload, sender, tracker) => {
-
-      let queueEntry = this.getQueueEntrySafe(payload.id)// , payload.timestamp)
+    // TODO STATESHARDING4 ENDPOINTS ok, I changed this to tell, but we still need to check sender!
+    //this.p2p.registerGossipHandler('spread_appliedVote', async (payload, sender, tracker) => {
+    this.p2p.registerInternal('spread_appliedVote', async (payload: AppliedVote, respond: any) => {
+      let queueEntry = this.getQueueEntrySafe(payload.txid)// , payload.timestamp)
       if (queueEntry == null) {
         return
         
@@ -4858,6 +4858,8 @@ class StateManager extends EventEmitter {
     let passCount = 0
     let failCount = 0
     // tally our votes
+
+    // TODO STATESHARDING4 CHECK VOTES PER CONSENSUS GROUP
     for(let i=0; i<numVotes; i++){
       let currentVote = queueEntry.collectedVotes[i]
 
@@ -4877,6 +4879,10 @@ class StateManager extends EventEmitter {
       }
     }
     // TODO STATESHARDING4 There isn't really an analysis of account_state_hash_after.  seems like we should make sure the hashes match up
+
+
+    this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} `)
+    this.mainLogger.debug(`tryProduceReceipt canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} `)
 
     // if we can create a receipt do that now
     if(canProduceReceipt === true){
@@ -4913,6 +4919,8 @@ class StateManager extends EventEmitter {
   async createAndShareVote(queueEntry: QueueEntry) {
     if (this.verboseLogs) this.logger.playbackLogNote('shrd_createAndShareVote', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} `)
 
+    // TODO STATESHARDING4 CHECK VOTES PER CONSENSUS GROUP
+
     // create our applied vote
     let ourVote: AppliedVote = {
       txid:queueEntry.acceptedTx.id,
@@ -4939,11 +4947,16 @@ class StateManager extends EventEmitter {
     // share the vote via gossip
     let sender = null
     let consensusGroup = this.queueEntryGetConsensusGroup(queueEntry)
-    if (consensusGroup.length > 1) {
+    if (consensusGroup.length >= 1 ) {
       // should consider only forwarding in some cases?
       this.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share tx vote to neighbors`, consensusGroup) 
       // TODO STATESHARDING4 ENDPOINTS this needs to change from gossip to a tell
-      this.p2p.sendGossipIn('spread_appliedVote', ourVote, '', sender, consensusGroup)
+      //this.p2p.sendGossipIn('spread_appliedVote', ourVote, '', sender, consensusGroup)
+
+      this.mainLogger.debug(`createAndShareVote numNodes: ${consensusGroup.length} ourVote: ${utils.stringifyReduce(ourVote)} `)
+      this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.id}`, `numNodes: ${consensusGroup.length} ourVote: ${utils.stringifyReduce(ourVote)} `)
+
+      this.p2p.tell(consensusGroup, 'spread_appliedVote', ourVote )
     }
   }
 
@@ -4956,6 +4969,10 @@ class StateManager extends EventEmitter {
    */
   tryAppendVote (queueEntry: QueueEntry, vote:AppliedVote ) : boolean {
     let numVotes = queueEntry.collectedVotes.length
+
+    this.logger.playbackLogNote('tryAppendVote', `${queueEntry.acceptedTx.id}`, `collectedVotes: ${queueEntry.collectedVotes.length}`)
+    this.mainLogger.debug(`tryAppendVote collectedVotes: ${queueEntry.collectedVotes.length} `)
+
 
     // just add the vote if we dont have any yet
     if(numVotes === 0){
