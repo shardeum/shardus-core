@@ -91,6 +91,7 @@ class Shardus extends EventEmitter {
     this.verboseLogs = false
     this.logger = new Logger(config.baseDir, logsConfig)
     Context.setLoggerContext(this.logger)
+    Snapshot.initLogger()
 
     if (logsConfig.saveConsoleOutput) {
       saveConsoleOutput.startSaving(path.join(config.baseDir, logsConfig.dir))

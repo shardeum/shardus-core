@@ -1,4 +1,5 @@
 import { Handler } from 'express'
+import { Logger } from 'log4js'
 import * as http from '../http'
 import * as Active from '../p2p/Active'
 import * as Comms from '../p2p/Comms'
@@ -59,7 +60,13 @@ export const safetyModeVals = {
   networkStateHash: '',
 }
 
+let snapshotLogger: Logger
+
 /** FUNCTIONS */
+
+export function initLogger() {
+  snapshotLogger = Context.logger.getLogger('snapshot')
+}
 
 export function setOldDataPath(path) {
   oldDataPath = path
@@ -92,6 +99,8 @@ export function startSnapshotting() {
   Context.stateManager.on(
     'cycleTxsFinalized',
     async (shard: CycleShardData) => {
+      const debugStrs = []
+
       // 1) create our own partition hashes for that cycle number
       const partitionRanges = getPartitionRanges(shard)
       const partitionHashes = new Map()
@@ -105,8 +114,30 @@ export function startSnapshotting() {
           )
           const hash = Context.crypto.hash(accountsInPartition)
           partitionHashes.set(partition, hash)
+
+          //DBG: Print all accounts in mem
+          const wrappedAccts = await Context.stateManager.app.getAccountData(
+            range.low,
+            range.high,
+            10000000
+          )
+          debugStrs.push(
+            `  PARTITION ${partition}\n` +
+              wrappedAccts
+                .map((acct) => {
+                  const id = acct.accountId.substr(0, 8)
+                  const hash = acct.stateId.substr(0, 8)
+                  return `    ID: ${id} HASH: ${hash}`
+                })
+                .join('\n')
+          )
         }
       }
+
+      snapshotLogger.debug(`
+MEM ACCOUNTS C${shard.cycleNumber}:
+${debugStrs.join('\n')}
+`)
 
       // 2) process gossip from the queue for that cycle number
       const collector = partitionGossip.newCollector(shard)
