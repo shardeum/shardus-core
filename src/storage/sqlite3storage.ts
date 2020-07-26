@@ -278,8 +278,11 @@ class Sqlite3Storage {
       if (paramsObj.hasOwnProperty(key)) {
         let paramEntry: any = { name: key }
 
-        let value = paramsObj[key]
-        if (utils.isObject(value)) {
+        const value = paramsObj[key]
+        if (
+          utils.isObject(value) &&
+          table.isColumnJSON[paramEntry.name] === false
+        ) {
           // WHERE column_name BETWEEN value1 AND value2;
           if (value[Op.between]) {
             let between = value[Op.between]
