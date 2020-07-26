@@ -4669,14 +4669,15 @@ class StateManager extends EventEmitter {
                     this.mainLogger.debug(`processAcceptedTxQueue2 createAndShareVote : ${utils.stringifyReduce(queueEntry.acceptedTx.id)} `)
                     await this.createAndShareVote(queueEntry)
                   }
-                  
+                } else {
+                  this.mainLogger.erro(`processAcceptedTxQueue2 txResult problem txid:${utils.stringifyReduce(queueEntry.acceptedTx.id)} res: ${utils.stringifyReduce(txResult)} `)
                 }
               } catch (ex) {
                 this.mainLogger.debug('processAcceptedTxQueue2 applyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
                 this.fatalLogger.fatal('processAcceptedTxQueue2 applyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
               } finally {
     
-                if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingTx2', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+                if (this.verboseLogs) this.logger.playbackLogNote('shrd_preapplyFinish', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
               }
             }
           }
@@ -4940,6 +4941,9 @@ class StateManager extends EventEmitter {
         ourVote.account_state_hash_after.push(stateTableObject.stateAfter)
       }
     }
+
+    ourVote = this.crypto.sign(ourVote)
+
     // save our vote to our queueEntry
     queueEntry.ourVote = ourVote
     // also append it to the total list of votes
@@ -4970,8 +4974,8 @@ class StateManager extends EventEmitter {
   tryAppendVote (queueEntry: QueueEntry, vote:AppliedVote ) : boolean {
     let numVotes = queueEntry.collectedVotes.length
 
-    this.logger.playbackLogNote('tryAppendVote', `${queueEntry.acceptedTx.id}`, `collectedVotes: ${queueEntry.collectedVotes.length}`)
-    this.mainLogger.debug(`tryAppendVote collectedVotes: ${queueEntry.collectedVotes.length} `)
+    this.logger.playbackLogNote('tryAppendVote', `${utils.stringifyReduce(queueEntry.acceptedTx.id)}`, `collectedVotes: ${queueEntry.collectedVotes.length}`)
+    this.mainLogger.debug(`tryAppendVote collectedVotes: ${utils.stringifyReduce(queueEntry.acceptedTx.id)}   ${queueEntry.collectedVotes.length} `)
 
 
     // just add the vote if we dont have any yet
@@ -4988,15 +4992,11 @@ class StateManager extends EventEmitter {
         // already in our list so do nothing and return
         return false
       }
-
-      if(currentVote.sign.owner < vote.sign.owner){
-        // insert in the spot after the vote we are looking at
-        queueEntry.collectedVotes.splice(i+1, 0, vote);
-        return true
-      }
     }
 
-    return false
+    queueEntry.collectedVotes.push(vote)
+
+    return true
   }
 
 
