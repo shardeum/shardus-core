@@ -374,15 +374,6 @@ class Sqlite3Storage {
             // paramEntry.v2 = between[1]
             paramEntry.sql = `${paramEntry.name} >= ?`
             paramEntry.vals = [paramEntry.v1]
-          } else {
-            paramEntry.type = '='
-            paramEntry.v1 = value
-            paramEntry.sql = `${paramEntry.name} ${paramEntry.type} ?`
-
-            if (table.isColumnJSON[paramEntry.name]) {
-              paramEntry.v1 = stringify(paramEntry.v1)
-            }
-            paramEntry.vals = [paramEntry.v1]
           }
         } else {
           paramEntry.type = '='
