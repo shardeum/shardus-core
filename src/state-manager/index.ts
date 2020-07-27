@@ -2580,16 +2580,21 @@ class StateManager extends EventEmitter {
 
     this.p2p.registerGossipHandler('spread_appliedReceipt', async (payload, sender, tracker) => {
 
-      let queueEntry = this.getQueueEntrySafe(payload.id)// , payload.timestamp)
+      let appliedReceipt = payload as AppliedReceipt      
+      let queueEntry = this.getQueueEntrySafe(appliedReceipt.txid)// , payload.timestamp)
       if (queueEntry == null) {
+        this.mainLogger.error(`spread_appliedReceipt no queue entry for ${appliedReceipt.txid} `)
         return
-        
       }
-      let appliedReceipt = payload as AppliedReceipt
+
       // TODO STATESHARDING4 ENDPOINTS check payload format
       // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
     
-      if (queueEntry.recievedAppliedReceipt === null) {
+      let receiptNotNull = appliedReceipt != null
+
+      if (queueEntry.recievedAppliedReceipt == null) {
+        this.mainLogger.debug(`spread_appliedReceipt update ${utils.stringifyReduce(queueEntry.acceptedTx.id)} receiptNotNull:${receiptNotNull}`)
+
         queueEntry.recievedAppliedReceipt = appliedReceipt
         
         // I think we handle the negative cases later by checking queueEntry.recievedAppliedReceipt vs queueEntry.appliedReceipt
@@ -2600,8 +2605,11 @@ class StateManager extends EventEmitter {
         if (consensusGroup.length > 1) {
           // should consider only forwarding in some cases?
           this.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, consensusGroup) 
-          this.p2p.sendGossipIn('spread_appliedReceipt',appliedReceipt , '', sender, consensusGroup)
+          this.p2p.sendGossipIn('spread_appliedReceipt',appliedReceipt , tracker, sender, consensusGroup)
         }
+      } else {
+        this.mainLogger.debug(`spread_appliedReceipt skipped ${utils.stringifyReduce(queueEntry.acceptedTx.id)} receiptNotNull:${receiptNotNull}`)
+
       }
     })
 
@@ -4529,6 +4537,8 @@ class StateManager extends EventEmitter {
           queueEntry.state = 'expired'
           this.removeFromQueue(queueEntry, currentIndex)
           this.logger.playbackLogNote('txExpired', `${queueEntry.acceptedTx.id}`, `txExpired ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+          this.logger.playbackLogNote('txExpired', `${queueEntry.acceptedTx.id}`, `queueEntry.recievedAppliedReceipt: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+
           currentIndex--
           continue
         }
@@ -4670,11 +4680,11 @@ class StateManager extends EventEmitter {
                     await this.createAndShareVote(queueEntry)
                   }
                 } else {
-                  this.mainLogger.erro(`processAcceptedTxQueue2 txResult problem txid:${utils.stringifyReduce(queueEntry.acceptedTx.id)} res: ${utils.stringifyReduce(txResult)} `)
+                  this.mainLogger.error(`processAcceptedTxQueue2 txResult problem txid:${utils.stringifyReduce(queueEntry.acceptedTx.id)} res: ${utils.stringifyReduce(txResult)} `)
                 }
               } catch (ex) {
-                this.mainLogger.debug('processAcceptedTxQueue2 applyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-                this.fatalLogger.fatal('processAcceptedTxQueue2 applyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+                this.mainLogger.debug('processAcceptedTxQueue2 preApplyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+                this.fatalLogger.fatal('processAcceptedTxQueue2 preApplyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
               } finally {
     
                 if (this.verboseLogs) this.logger.playbackLogNote('shrd_preapplyFinish', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
@@ -4684,17 +4694,43 @@ class StateManager extends EventEmitter {
         } else if (queueEntry.state === 'consensing') { /////////////////////////////////////////--consensing--//////////////////////////////////////////////////////////////////
             if (accountSeen(queueEntry) === false) {
               markAccountsSeen(queueEntry)
-              this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${utils.stringifyReduce(queueEntry.acceptedTx.id)} `)
+
+              let hasReceivedApplyReceipt = queueEntry.recievedAppliedReceipt != null
+
+              this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${utils.stringifyReduce(queueEntry.acceptedTx.id)} receiptRcv:${hasReceivedApplyReceipt}`)
               let result = this.tryProduceReceipt(queueEntry)
               if(result != null){
-                if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} `)
+                if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete_madeReceipt', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} `)
 
                 // Broadcast the receipt
                 await this.shareAppliedReceipt(queueEntry)
 
                 queueEntry.state = 'commiting'
                 continue
-              }              
+              }     
+              
+              // if we got a reciept while waiting see if we should use it
+              if(hasReceivedApplyReceipt){
+
+
+                if(this.hasAppliedReceiptMatchingPreApply(queueEntry)){
+                  if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} `)
+                  queueEntry.state = 'commiting'
+                  continue
+                } else{
+
+
+                  if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptFail', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} `)
+
+                  // TODO STATESHARDING4 NEGATIVECASE need to break this down..
+                  // have we seen a reipt yet?
+                  // have we seen on that our state does not match?
+                }
+                
+              } else {
+
+              }
+
             }
         } else if (queueEntry.state === 'commiting') {  ///////////////////////////////////////////--commiting--////////////////////////////////////////////////////////////////
           if (accountSeen(queueEntry) === false) {
@@ -4758,13 +4794,27 @@ class StateManager extends EventEmitter {
                 } else {
                   queueEntry.state = 'fail'
                 }
-              } else {
+                this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : noConsensus:${queueEntry.state} ${utils.stringifyReduce(queueEntry.acceptedTx.id)} `)
+              } else if(queueEntry.appliedReceipt != null) {
                 // the final state of the queue entry will be pass or fail based on the receipt
                 if(queueEntry.appliedReceipt.result === true){
                   queueEntry.state = 'pass'
                 } else {
                   queueEntry.state = 'fail'
                 }
+                this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : Recpt:${queueEntry.state} ${utils.stringifyReduce(queueEntry.acceptedTx.id)} `)
+              } else if(queueEntry.recievedAppliedReceipt != null) {
+                // the final state of the queue entry will be pass or fail based on the receipt
+                if(queueEntry.recievedAppliedReceipt.result === true){
+                  queueEntry.state = 'pass'
+                } else {
+                  queueEntry.state = 'fail'
+                }
+                this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : recvRecpt:${queueEntry.state} ${utils.stringifyReduce(queueEntry.acceptedTx.id)} `)
+              } else {
+                queueEntry.state = 'fail'
+
+                this.mainLogger.error(`processAcceptedTxQueue2 commiting finished : no receipt ${utils.stringifyReduce(queueEntry.acceptedTx.id)} `)
               }
 
               
@@ -4832,6 +4882,51 @@ class StateManager extends EventEmitter {
       this.p2p.sendGossipIn('spread_appliedReceipt',appliedReceipt , '', sender, consensusGroup)
     }
 
+  }
+
+
+  /**
+   * hasAppliedReceiptMatchingPreApply
+   * check if recievedAppliedReceipt matches what we voted for.
+   * this implies that our pre apply had the same result.
+   * 
+   * @param queueEntry 
+   */
+  hasAppliedReceiptMatchingPreApply (queueEntry: QueueEntry) : boolean {
+
+    if(queueEntry.recievedAppliedReceipt == null){
+      return false
+    }
+    
+    if(queueEntry.recievedAppliedReceipt != null){
+
+      if(queueEntry.recievedAppliedReceipt.result !== queueEntry.ourVote.transaction_result){
+        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.acceptedTx.id} ${queueEntry.recievedAppliedReceipt.result}, ${queueEntry.ourVote.transaction_result} queueEntry.recievedAppliedReceipt.result !== queueEntry.ourVote.transaction_result`)
+        return false
+      }
+      if(queueEntry.recievedAppliedReceipt.txid !== queueEntry.ourVote.txid){
+        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.acceptedTx.id} queueEntry.recievedAppliedReceipt.txid !== queueEntry.ourVote.txid`)
+        return false
+      }
+      if(queueEntry.recievedAppliedReceipt.appliedVotes.length === 0){
+        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.acceptedTx.id} recievedAppliedReceipt.appliedVotes.length`)
+        return false
+      }
+
+      if(queueEntry.recievedAppliedReceipt.appliedVotes[0].cant_apply === true){
+        // TODO STATESHARDING4 NEGATIVECASE    need to figure out what to do here
+        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.acceptedTx.id} queueEntry.recievedAppliedReceipt.appliedVotes[0].cant_apply === true`)
+        return false
+      }
+
+      // TODO STATESHARDING4 check that al the account states were reported the same afterwards in our vote vs receipt
+      this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.acceptedTx.id} `)
+      this.logger.playbackLogNote('hasAppliedReceiptMatchingPreApply', `${queueEntry.acceptedTx.id}`, `  `)
+
+    }
+
+
+    return true
   }
 
   /**
