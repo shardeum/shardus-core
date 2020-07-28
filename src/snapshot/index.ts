@@ -125,8 +125,8 @@ export function startSnapshotting() {
             `  PARTITION ${partition}\n` +
               wrappedAccts
                 .map((acct) => {
-                  const id = acct.accountId.substr(0, 8)
-                  const hash = acct.stateId.substr(0, 8)
+                  const id = (acct.accountId==null)?"null":acct.accountId.substr(0, 8)
+                  const hash = (acct.stateId==null)?"null":acct.stateId.substr(0, 8)
                   return `    ID: ${id} HASH: ${hash}`
                 })
                 .join('\n')
