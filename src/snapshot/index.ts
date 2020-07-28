@@ -112,37 +112,52 @@ export function startSnapshotting() {
             range.low,
             range.high
           )
+          snapshotLogger.debug('Accounts in partition: ', partition, accountsInPartition)
+
           const hash = Context.crypto.hash(accountsInPartition)
           partitionHashes.set(partition, hash)
 
-          //DBG: Print all accounts in mem
-          const wrappedAccts = await Context.stateManager.app.getAccountData(
-            range.low,
-            range.high,
-            10000000
-          )
-          debugStrs.push(
-            `  PARTITION ${partition}\n` +
-              wrappedAccts
-                .map((acct) => {
+          try {
+            //DBG: Print all accounts in mem
+            const wrappedAccts = await Context.stateManager.app.getAccountData(
+              range.low,
+              range.high,
+              10000000
+            )
+            debugStrs.push(
+              `  PARTITION ${partition}\n` +
+                wrappedAccts
+                  .map(acct => {
                   const id = (acct.accountId==null)?"null":acct.accountId.substr(0, 8)
                   const hash = (acct.stateId==null)?"null":acct.stateId.substr(0, 8)
-                  return `    ID: ${id} HASH: ${hash}`
-                })
-                .join('\n')
-          )
+                    return `    ID: ${id} HASH: ${hash}`
+                  })
+                  .join('\n')
+            )
+          } catch (e) {
+            console.log(e)
+          }
+
         }
       }
-
-      snapshotLogger.debug(`
-MEM ACCOUNTS C${shard.cycleNumber}:
-${debugStrs.join('\n')}
-`)
+      
+      try {
+        snapshotLogger.debug(`
+        MEM ACCOUNTS C${shard.cycleNumber}:
+        ${debugStrs.join('\n')}
+        `)
+      } catch(e) {
+        console.log(e)
+      }
       const globalAccounts = await Context.storage.getGlobalAccountCopies(shard.cycleNumber)
       const globalAccountHash = Context.crypto.hash(globalAccounts)
       
       // partition hash for globalAccounts
       partitionHashes.set(-1, globalAccountHash)
+
+      snapshotLogger.debug('Global Accounts: ', globalAccounts)
+      snapshotLogger.debug('Partition Hashes: ', partitionHashes)
+
 
       // 2) process gossip from the queue for that cycle number
       const collector = partitionGossip.newCollector(shard)
@@ -192,6 +207,7 @@ export async function readOldPartitionHashes() {
 }
 
 export async function safetySync() {
+  console.log('Doing SafetySync...')
   let safetyNum: number
 
   // Register snapshot routes
@@ -202,6 +218,11 @@ export async function safetySync() {
     Self.emitter.on('new_cycle_data', (data: CycleCreator.CycleData) => {
       if (data.syncing >= data.safetyNum) {
         safetyNum = data.safetyNum
+        if (!safetyModeVals.networkStateHash) {
+          safetyModeVals.networkStateHash = data.networkStateHash
+          console.log('Empty local network state hash detected.')
+          console.log('safetyModeVals', safetyModeVals)
+        }
         resolve()
       }
     })
@@ -238,31 +259,62 @@ export async function safetySync() {
 
   // If we have old data, figure out which partitions we have and put into OldDataMap
   for (const [partitionId, partitonObj] of partitionShardDataMap) {
-    const lowAddress = partitonObj.homeRange.low
-    const highAddress = partitonObj.homeRange.high
-    const oldAccountCopiesInPartition = await Context.storage.getOldAccountCopiesByCycleAndRange(
-      lowAddress,
-      highAddress
-    )
-    if (oldAccountCopiesInPartition) {
-      const existingHash = oldPartitionHashMap.get(partitionId)
-      const computedHash = Context.crypto.hash(oldAccountCopiesInPartition)
-
-      // make sure that we really have correct data only if hashes match
-      if (computedHash === existingHash)
-        oldDataMap.set(partitionId, oldAccountCopiesInPartition)
+    try {
+      const lowAddress = partitonObj.homeRange.low
+      const highAddress = partitonObj.homeRange.high
+      const oldAccountCopiesInPartition = await Context.storage.getOldAccountCopiesByCycleAndRange(
+        lowAddress,
+        highAddress
+      )
+      if (oldAccountCopiesInPartition) {
+        const existingHash = oldPartitionHashMap.get(partitionId)
+        const oldAccountsWithoutCycleNumber = oldAccountCopiesInPartition.map(acc => {
+          return {
+            accountId: acc.accountId,
+            data: acc.data,
+            timestamp: acc.timestamp,
+            hash: acc.hash,
+            isGlobal: acc.isGlobal
+          }
+        })
+        const computedHash = Context.crypto.hash(oldAccountsWithoutCycleNumber)
+        log(`old accounts in partition: ${partitionId}: `, oldAccountCopiesInPartition)
+        log(computedHash, existingHash)
+  
+        // make sure that we really have correct data only if hashes match
+        if (computedHash === existingHash)
+          oldDataMap.set(partitionId, oldAccountCopiesInPartition)
+      }
+    } catch(e) {
+      console.log(e)
     }
   }
 
   // check if we have global account in old DB
-  const oldGlobalAccounts = await Context.storage.getOldGlobalAccountCopies()
-  if (oldGlobalAccounts) {
-    const existingGlobalHash = oldPartitionHashMap.get(-1)
-    const computedGlobalHash = Context.crypto.hash(oldGlobalAccounts)
-    // make sure that we really have correct data only if hashes match
-    if (computedGlobalHash === existingGlobalHash) {
-      dataToMigrate.set(-1, oldGlobalAccounts) // -1 is used for virtual partition for global accounts
+  try {
+    const oldGlobalAccounts = await Context.storage.getOldGlobalAccountCopies()
+    if (oldGlobalAccounts) {
+      const existingGlobalHash = oldPartitionHashMap.get(-1)
+      const oldGlobalAccWithoutCycleNumber = oldGlobalAccounts.map(acc => {
+        return {
+          accountId: acc.accountId,
+          data: acc.data,
+          timestamp: acc.timestamp,
+          hash: acc.hash,
+          isGlobal: acc.isGlobal
+        }
+      })
+      const computedGlobalHash = Context.crypto.hash(oldGlobalAccWithoutCycleNumber)
+      console.log('computed global hash: ', computedGlobalHash)
+      console.log('existing global hash: ', existingGlobalHash)
+      // make sure that we really have correct data only if hashes match
+      if (computedGlobalHash === existingGlobalHash) {
+        oldDataMap.set(-1, oldGlobalAccounts)
+        dataToMigrate.set(-1, oldGlobalAccounts) // -1 is used for virtual partition for global accounts
+      }
     }
+  } catch (e) {
+    console.log(e)
   }
       
 
@@ -279,6 +331,8 @@ export async function safetySync() {
 }
 
 function checkMissingPartitions(shardGlobals: shardFunctionTypes.ShardGlobals) {
+  log('Checking missing partitions...')
+  log('oldDataMap: ', oldDataMap)
   const { homePartition } = ShardFunctions.addressToPartition(
     shardGlobals,
     Self.id
@@ -295,6 +349,10 @@ function checkMissingPartitions(shardGlobals: shardFunctionTypes.ShardGlobals) {
       missingPartitions.push(i)
     }
   }
+  // check for virtual global partiton
+  if (!oldDataMap.has(-1)) {
+    missingPartitions.push(-1)
+  }
 }
 
 async function sendOldDataToNodes(
@@ -310,6 +368,11 @@ async function sendOldDataToNodes(
   )
 
   const offer = createOffer()
+
+  if (offer.partitions.length === 0) {
+    console.log('No partition data to offer.')
+    return
+  }
 
   // send data offer to each nodes
   for (let i = 0; i < nodesToSendData.length; i++) {
@@ -353,18 +416,26 @@ function getNodesThatCoverPartition(
   nodeShardDataMap: shardFunctionTypes.NodeShardDataMap
 ): shardusTypes.Node[] {
   const nodesInPartition: shardusTypes.Node[] = []
-  nodeShardDataMap.forEach((data, nodeId) => {
-    if (nodeId === Self.id) return
-    const node = data.node
-    const homePartition = data.homePartition
-    const {
-      partitionStart,
-      partitionEnd,
-    } = ShardFunctions.calculateStoredPartitions2(shardGlobals, homePartition)
-    if (partitionId >= partitionStart && partitionId <= partitionEnd) {
+  if (partitionId === -1) {
+    nodeShardDataMap.forEach((data, nodeId) => {
+      if (nodeId === Self.id) return
+      const node = data.node
       nodesInPartition.push(node)
-    }
-  })
+    })
+  } else {
+    nodeShardDataMap.forEach((data, nodeId) => {
+      if (nodeId === Self.id) return
+      const node = data.node
+      const homePartition = data.homePartition
+      const {
+        partitionStart,
+        partitionEnd,
+      } = ShardFunctions.calculateStoredPartitions2(shardGlobals, homePartition)
+      if (partitionId >= partitionStart && partitionId <= partitionEnd) {
+        nodesInPartition.push(node)
+      }
+    })
+  }
   return nodesInPartition
 }
 
@@ -450,23 +521,39 @@ function registerSnapshotRoutes() {
         return
       }
       try {
+        if(Self.isActive) return res.json({ success: true })
         const receivedData = req.body
         log('Recieved missing data: ', receivedData)
         for (const partitionId in receivedData) {
           // check and store offered data
           const partitionData = receivedData[partitionId]
-          const computedHash = Context.crypto.hash(partitionData.data)
+          const accountsInPartition = partitionData.data.map(acc => {
+            return {
+              accountId: acc.accountId,
+              data: acc.data,
+              timestamp: acc.timestamp,
+              hash: acc.hash,
+              isGlobal: acc.isGlobal
+            }
+          })
+          const computedHash = Context.crypto.hash(accountsInPartition)
           log(computedHash, partitionData.hash)
           if (computedHash === partitionData.hash) {
             log(
               `Computed hash and received hash matches for partition ${partitionId}`
             )
             // store into dataToMigrate temporarily. Will use it to store data to new DB
-            dataToMigrate.set(parseInt(partitionId), partitionData.data)
-            // remove partition id from missing partition list
-            const index = missingPartitions.indexOf(parseInt(partitionId))
-            missingPartitions.splice(index, 1)
-            goActiveIfDataComplete()
+            if(!dataToMigrate.has(parseInt(partitionId))) {
+              dataToMigrate.set(parseInt(partitionId), partitionData.data)
+              // remove partition id from missing partition list
+              const index = missingPartitions.indexOf(parseInt(partitionId))
+              missingPartitions.splice(index, 1)
+              goActiveIfDataComplete()
+            }
+          } else {
+            log(
+              `Computed hash and received hash are DIFFERENT for ${partitionId}`
+            )
           }
         }
       } catch (e) {
@@ -485,6 +572,7 @@ function registerSnapshotRoutes() {
         res.json([])
         return
       }
+      if(Self.isActive) return res.json({ answer: offerResponse.notNeeded })
       const offerRequest = req.body
       let answer = offerResponse.notNeeded
       const neededPartitonIds = []

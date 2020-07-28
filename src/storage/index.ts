@@ -831,7 +831,7 @@ class Storage {
     try {
       //const query = `select accountId, max(cycleNumber) cycleNumber, data, timestamp, hash from accountsCopy WHERE cycleNumber <= ? group by accountId `
       //same as above minus data
-      const query = `SELECT a.* FROM accountsCopy a INNER JOIN (SELECT accountId, MAX(cycleNumber) cycleNumber FROM accountsCopy GROUP BY accountId) b ON a.accountId = b.accountId AND a.cycleNumber = b.cycleNumber WHERE a.cycleNumber<=${cycleNumber} and a.isGlobal=false order by a.accountId asc`
+      const query = `SELECT a.accountId,a.data,a.timestamp,a.hash,a.isGlobal FROM accountsCopy a INNER JOIN (SELECT accountId, MAX(cycleNumber) cycleNumber FROM accountsCopy GROUP BY accountId) b ON a.accountId = b.accountId AND a.cycleNumber = b.cycleNumber WHERE a.cycleNumber<=${cycleNumber} and a.isGlobal=false order by a.accountId asc`
       const result = await this._query(query, [cycleNumber])
       return result
     } catch (e) {
@@ -842,7 +842,7 @@ class Storage {
   async getAccountCopiesByCycleAndRange(cycleNumber, lowAddress, highAddress) {
     this._checkInit()
     try {
-      const query = `SELECT a.* FROM accountsCopy a INNER JOIN (SELECT accountId, MAX(cycleNumber) cycleNumber FROM accountsCopy GROUP BY accountId) b ON a.accountId = b.accountId AND a.cycleNumber = b.cycleNumber WHERE a.cycleNumber<=${cycleNumber} and a.accountId>="${lowAddress}" and a.accountId<="${highAddress}" and a.isGlobal=false order by a.accountId asc`
+      const query = `SELECT a.accountId,a.data,a.timestamp,a.hash,a.isGlobal FROM accountsCopy a INNER JOIN (SELECT accountId, MAX(cycleNumber) cycleNumber FROM accountsCopy GROUP BY accountId) b ON a.accountId = b.accountId AND a.cycleNumber = b.cycleNumber WHERE a.cycleNumber<=${cycleNumber} and a.accountId>="${lowAddress}" and a.accountId<="${highAddress}" and a.isGlobal=false order by a.accountId asc`
       const result = await this._query(query, [])
       return result
     } catch (e) {
@@ -853,7 +853,7 @@ class Storage {
   async getGlobalAccountCopies(cycleNumber) {
     this._checkInit()
     try {
-      const query = `SELECT a.* FROM accountsCopy a INNER JOIN (SELECT accountId, MAX(cycleNumber) cycleNumber FROM accountsCopy GROUP BY accountId) b ON a.accountId = b.accountId AND a.cycleNumber = b.cycleNumber WHERE a.cycleNumber<=${cycleNumber} and a.isGlobal=true order by a.accountId asc`
+      const query = `SELECT a.accountId,a.data,a.timestamp,a.hash,a.isGlobal FROM accountsCopy a INNER JOIN (SELECT accountId, MAX(cycleNumber) cycleNumber FROM accountsCopy GROUP BY accountId) b ON a.accountId = b.accountId AND a.cycleNumber = b.cycleNumber WHERE a.cycleNumber<=${cycleNumber} and a.isGlobal=true order by a.accountId asc`
       const result = await this._query(query, [])
       return result
     } catch (e) {

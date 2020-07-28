@@ -55,30 +55,39 @@ export class Collector extends EventEmitter {
           this.hashCounter.set(partitionId, new Map([[hash, 1]]))
         } else if (this.hashCounter.has(partitionId)) {
           const counterMap = this.hashCounter.get(partitionId)
-          counterMap.set(hash, counterMap.get(hash) + 1)
+          counterMap.set(hash, counterMap.get(hash) || 0 + 1)
         }
       }
     }
-
     // When the hashes of all partitions have been collected, emit the 'gotAllHashes' event
     // and pass the most popular hash for each partition
-    if (this.hashCounter.size === this.shard.shardGlobals.numPartitions + 1) { // +1 is for virtual global partition
+    if (this.hashCounter.size === this.shard.shardGlobals.numPartitions + 1) {
+      // +1 is for virtual global partition
       for (const [partitionId, counterMap] of this.hashCounter) {
         let selectedHash
         let maxCount = 0
+        let possibleHashes = []
         for (const [hash, counter] of counterMap) {
           if (counter > maxCount) {
-            selectedHash = hash
             maxCount = counter
           }
         }
-        this.allHashes.set(partitionId, selectedHash)
+        for (const [hash, counter] of counterMap) {
+          if (counter === maxCount) {
+            possibleHashes.push(hash)
+          }
+        }
+        possibleHashes = possibleHashes.sort()
+        if (possibleHashes.length > 0) selectedHash = possibleHashes[0]
+        if (selectedHash) this.allHashes.set(partitionId, possibleHashes[0])
+        // Emit an event once allHashes are collected
+        this.emit('gotAllHashes', this.allHashes)
       }
-      // Emit an event once allHashes are collected
-      this.emit('gotAllHashes', this.allHashes)
     }
   }
 }
+
+
 
 /** FUNCTIONS */
 
