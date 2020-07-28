@@ -4754,31 +4754,56 @@ class StateManager extends EventEmitter {
             //   }
             // }
 
+
+
             let wrappedStates = queueEntry.collectedData // Object.values(queueEntry.collectedData)
             let localCachedData = queueEntry.localCachedData
             try {
-              // this.mainLogger.debug(` processAcceptedTxQueue2. applyAcceptedTransaction ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp} queuerestarts: ${localRestartCounter} queueLen: ${this.newAcceptedTxQueue.length}`)
-              let filter:AccountFilter = {}
-              // need to convert to map of numbers, could refactor this away later
-              for(let key of Object.keys(queueEntry.localKeys)){
-                filter[key] = (queueEntry[key] == true)? 1 : 0
-              }
-              // Need to go back and thing on how this was supposed to work:
-              //queueEntry.acceptedTx.transactionGroup = queueEntry.transactionGroup // Used to not double count txProcessed
-              let hasStateTableData = false
-              let repairing = false
-              let commitResult = await this.commitConsensedTransaction( 
-                queueEntry.preApplyTXResult.applyResponse,   // TODO STATESHARDING4 ... if we get here from a non standard path may need to get this data from somewhere else
-                queueEntry.acceptedTx, 
-                hasStateTableData, 
-                repairing,
-                filter,
-                wrappedStates,
-                localCachedData
-                )
 
-              if (commitResult != null && commitResult.success) {
-                
+              let canCommitTX = true
+              if(queueEntry.noConsensus === true){
+                // dont have a receipt for a non consensus TX. not even sure if we want to keep that!
+                if(queueEntry.preApplyTXResult.passed === false){
+                  canCommitTX = false
+                }
+               } else if(queueEntry.appliedReceipt != null) {
+                // the final state of the queue entry will be pass or fail based on the receipt
+                if(queueEntry.appliedReceipt.result === false){
+                  canCommitTX = false
+                }
+              } else if(queueEntry.recievedAppliedReceipt != null) {
+                // the final state of the queue entry will be pass or fail based on the receipt
+                if(queueEntry.recievedAppliedReceipt.result === false){
+                  canCommitTX = false
+                }
+              } else {
+                canCommitTX = false
+              }
+
+              if(canCommitTX){
+                // this.mainLogger.debug(` processAcceptedTxQueue2. applyAcceptedTransaction ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp} queuerestarts: ${localRestartCounter} queueLen: ${this.newAcceptedTxQueue.length}`)
+                let filter:AccountFilter = {}
+                // need to convert to map of numbers, could refactor this away later
+                for(let key of Object.keys(queueEntry.localKeys)){
+                  filter[key] = (queueEntry[key] == true)? 1 : 0
+                }
+                // Need to go back and thing on how this was supposed to work:
+                //queueEntry.acceptedTx.transactionGroup = queueEntry.transactionGroup // Used to not double count txProcessed
+                let hasStateTableData = false
+                let repairing = false
+                let commitResult = await this.commitConsensedTransaction( 
+                  queueEntry.preApplyTXResult.applyResponse,   // TODO STATESHARDING4 ... if we get here from a non standard path may need to get this data from somewhere else
+                  queueEntry.acceptedTx, 
+                  hasStateTableData, 
+                  repairing,
+                  filter,
+                  wrappedStates,
+                  localCachedData
+                  )
+
+                if (commitResult != null && commitResult.success) {
+                  
+                }
               }
             } catch (ex) {
               this.mainLogger.debug('processAcceptedTxQueue2 commiting Transaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
