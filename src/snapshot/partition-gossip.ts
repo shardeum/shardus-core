@@ -79,10 +79,10 @@ export class Collector extends EventEmitter {
         }
         possibleHashes = possibleHashes.sort()
         if (possibleHashes.length > 0) selectedHash = possibleHashes[0]
-        if (selectedHash) this.allHashes.set(partitionId, possibleHashes[0])
-        // Emit an event once allHashes are collected
-        this.emit('gotAllHashes', this.allHashes)
+        if (selectedHash) this.allHashes.set(partitionId, selectedHash)
       }
+      // Emit an event once allHashes are collected
+      this.emit('gotAllHashes', this.allHashes)
     }
   }
 }
