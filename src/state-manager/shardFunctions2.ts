@@ -1438,7 +1438,8 @@ class ShardFunctions2 {
 
       let node = allNodes[scanIndex]
       
-      if (exclude.includes(node.id)) {        
+      if (exclude.includes(node.id)) {      
+        scanIndex++  
         continue
       }
 
