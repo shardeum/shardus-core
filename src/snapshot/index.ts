@@ -337,16 +337,33 @@ function checkMissingPartitions(shardGlobals: shardFunctionTypes.ShardGlobals) {
     shardGlobals,
     Self.id
   )
+  log(`Home partition for us is: ${homePartition}`)
   const {
     partitionStart,
     partitionEnd,
   } = ShardFunctions.calculateStoredPartitions2(shardGlobals, homePartition)
-  for (let i = partitionStart; i <= partitionEnd; i++) {
-    if (oldDataMap.has(i)) {
+  const partitionsToCheck = []
+  if (partitionStart < partitionEnd) {
+    for (let i = partitionStart; i <= partitionEnd; i++) {
+      partitionsToCheck.push(i)
+    }
+  } else if (partitionStart > partitionEnd) {
+    const largestPartition = safetyModeVals.safetyNum - 1
+    for (let i = partitionStart; i <= largestPartition; i++) {
+      partitionsToCheck.push(i)
+    }
+    for (let i = 0; i <= partitionEnd; i++) {
+      partitionsToCheck.push(i)
+    }
+  }
+  log(`Partitions to check: `, partitionsToCheck)
+  for (let i = 0; i < partitionsToCheck.length; i++) {
+    const partitionId = partitionsToCheck[i]
+    if (oldDataMap.has(partitionId)) {
       // [TODO] Were good, we have the data. Need to do something with it now...
-      dataToMigrate.set(i, oldDataMap.get(i))
+      dataToMigrate.set(partitionId, oldDataMap.get(partitionId))
     } else {
-      missingPartitions.push(i)
+      missingPartitions.push(partitionId)
     }
   }
   // check for virtual global partiton
