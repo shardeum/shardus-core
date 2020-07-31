@@ -67,7 +67,7 @@ export class Collector extends EventEmitter {
     // When the hashes of all partitions have been collected, emit the 'gotAllHashes' event
     // and pass the most popular hash for each partition
     const numOfGossipReceived = gossipCounter.get(cycle)
-    const requiredGossipCount = Math.ceil(this.shard.shardGlobals.numPartitions * 0.6)
+    const requiredGossipCount = Math.floor(this.shard.shardGlobals.numPartitions / 2)
     console.log(`Num of gossip received: `, numOfGossipReceived)
     console.log(`Num of gossip reqired: `, requiredGossipCount)
     if (numOfGossipReceived >= requiredGossipCount && this.hashCounter.size === this.shard.shardGlobals.numPartitions + 1) {
