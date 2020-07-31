@@ -222,6 +222,8 @@ export async function safetySync() {
         safetyNum = data.safetyNum
         if (!safetyModeVals.networkStateHash) {
           safetyModeVals.networkStateHash = data.networkStateHash
+          safetyModeVals.safetyNum = data.safetyNum
+          safetyModeVals.safetyMode = data.safetyMode
           console.log('Empty local network state hash detected.')
           console.log('safetyModeVals', safetyModeVals)
         }
@@ -344,6 +346,8 @@ function checkMissingPartitions(shardGlobals: shardFunctionTypes.ShardGlobals) {
     partitionStart,
     partitionEnd,
   } = ShardFunctions.calculateStoredPartitions2(shardGlobals, homePartition)
+  log(`partition start: `, partitionStart)
+  log(`partition end: `, partitionEnd)
   const partitionsToCheck = []
   if (partitionStart < partitionEnd) {
     for (let i = partitionStart; i <= partitionEnd; i++) {
@@ -549,13 +553,14 @@ function registerSnapshotRoutes() {
           const accountsInPartition = partitionData.data.map(acc => {
             return {
               accountId: acc.accountId,
-              data: acc.data,
+              data: (typeof acc.data === 'object') ? JSON.stringify(acc.data) : acc.data,
               timestamp: acc.timestamp,
               hash: acc.hash,
               isGlobal: acc.isGlobal
             }
           })
           const computedHash = Context.crypto.hash(accountsInPartition)
+          log(`Received data for partition ${partitionId} => `, accountsInPartition)
           log(computedHash, partitionData.hash)
           if (computedHash === partitionData.hash) {
             log(
