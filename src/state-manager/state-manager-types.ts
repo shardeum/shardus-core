@@ -1,5 +1,7 @@
 //import { AccountData } from "../shardus/shardus-types";
 
+//import { WrappedResponse } from "../shardus/shardus-types";
+
 //import { ShardGlobals } from "./shardFunctionTypes";
 
 //import { WrappedData } from "../shardus/shardus-types";
@@ -49,6 +51,13 @@ type QueueEntry = {
     
     // receipt that we got from gossip
     recievedAppliedReceipt?: AppliedReceipt;
+
+    // receipt that we need to repair to
+    appliedReceiptForRepair?: AppliedReceipt;
+
+    repairFinished?: boolean;
+
+    //collectedData for repair
 };
 
 type SyncTracker = {
@@ -485,6 +494,7 @@ type AppliedVote = {
     account_id: string[];
     account_state_hash_after: string[];
     cant_apply: boolean;  // indicates that the preapply could not give a pass or fail
+    node_id: string; // record the node that is making this vote.. todo could look this up from the sig later
     sign?: import("../shardus/shardus-types").Sign
 };
 
@@ -538,7 +548,10 @@ type GetPartitionTxidsReq = { Partition_id: any; Cycle_number: string }
 type RouteToHomeNodeReq = { txid: any; timestamp: any; acceptedTx: import("../shardus/shardus-types").AcceptedTx }
 
 type RequestStateForTxReq = { txid: string; timestamp: number; keys: any }
-type RequestStateForTxResp = { stateList: any[]; note: string }
+type RequestStateForTxResp = { stateList: import("../shardus/shardus-types").WrappedResponse[]; note: string; success:boolean }
+//type RequestStateForTxResp = { stateList: any[]; note: string; success:boolean }
+
+type RequestStateForTxReqPost = { txid: string; timestamp: number; key:string; hash:string }
 
 type GetAccountDataWithQueueHintsResp = { accountData: import("../shardus/shardus-types").WrappedDataFromQueue[] | null}
 

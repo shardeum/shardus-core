@@ -25,6 +25,7 @@ import Storage from "../storage"
 import Crypto from "../crypto"
 import Logger from "../logger"
 import { NodeShardData } from './shardFunctionTypes'
+import ShardFunctions2 from './shardFunctions2.js'
 // import { platform } from 'os' //why did this automatically get added?
 //import NodeList from "../p2p/NodeList"
 
@@ -1897,7 +1898,7 @@ class StateManager extends EventEmitter {
 
 
   // TSConversion TODO need to fix some any types
-  async checkAndSetAccountData (accountRecords: any[]): Promise<string[]> {
+  async checkAndSetAccountData (accountRecords: Shardus.WrappedData[]): Promise<string[]> {
     let accountsToAdd:any[] = []
     let failedHashes:string[] = []
     for (let { accountId, stateId, data: recordData } of accountRecords) {
@@ -2441,7 +2442,7 @@ class StateManager extends EventEmitter {
 
     // p2p ASK
     this.p2p.registerInternal('request_state_for_tx', async (payload: RequestStateForTxReq, respond: (arg0: RequestStateForTxResp) => any) => {
-      let response:RequestStateForTxResp = { stateList: [] , note: ""}
+      let response:RequestStateForTxResp = { stateList: [] , note: "", success: false}
       // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
       let queueEntry = this.getQueueEntrySafe(payload.txid)// , payload.timestamp)
       if (queueEntry == null) {
@@ -2462,6 +2463,42 @@ class StateManager extends EventEmitter {
           response.stateList.push(JSON.parse(data))
         }
       }
+      response.success = true
+      await respond(response)
+    })
+
+    
+    this.p2p.registerInternal('request_state_for_tx_post', async (payload: RequestStateForTxReqPost, respond: (arg0: RequestStateForTxResp) => any) => {
+      let response:RequestStateForTxResp = { stateList: [] , note: "", success: false}
+      // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
+      let queueEntry = this.getQueueEntrySafe(payload.txid)// , payload.timestamp)
+      if (queueEntry == null) {
+        queueEntry = this.getQueueEntryArchived(payload.txid)// , payload.timestamp)
+      }
+
+      if (queueEntry == null) {
+        response.note = `failed to find queue entry: ${payload.txid}  ${payload.timestamp}`
+        await respond(response)
+        return
+      }
+
+     
+      //let data = queueEntry.originalData[payload.key] // collectedData
+      let transformedAccounts = queueEntry.preApplyTXResult.applyResponse.accountData
+      for(let i = 0; i< transformedAccounts.length; i++){
+        let accountData = transformedAccounts[i]
+
+        if(accountData.stateId != payload.hash){
+          response.note = `failed accountData.stateId != payload.hash: ${payload.txid}  ${payload.timestamp} ${utils.makeShortHash(accountData.stateId)}`
+          await respond(response)
+          return
+        }
+        if (accountData) {
+          response.stateList.push(accountData)
+        }
+      }
+   
+      response.success = true
       await respond(response)
     })
 
@@ -2724,10 +2761,13 @@ class StateManager extends EventEmitter {
     // new shard endpoints:
     // this.p2p.unregisterInternal('route_to_home_node')
     this.p2p.unregisterInternal('request_state_for_tx')
+    this.p2p.unregisterInternal('request_state_for_tx_post')
     this.p2p.unregisterInternal('broadcast_state')
     this.p2p.unregisterGossipHandler('spread_tx_to_group')
     this.p2p.unregisterInternal('get_account_data_with_queue_hints')
     this.p2p.unregisterInternal('get_globalaccountreport')
+    this.p2p.unregisterInternal('spread_appliedVote')
+    this.p2p.unregisterGossipHandler('spread_appliedReceipt')
   }
 
   // ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3942,7 +3982,7 @@ class StateManager extends EventEmitter {
       queueEntry.requests = {}
     }
     if (queueEntry.uniqueKeys == null){
-      throw new Error('queueEntryRequestMissingData')
+      throw new Error('queueEntryRequestMissingData queueEntry.uniqueKeys == null')
     }
 
     let allKeys = []
@@ -3996,14 +4036,14 @@ class StateManager extends EventEmitter {
         this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
 
         let message = { keys: allKeys, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
-        let result = await this.p2p.ask(node, 'request_state_for_tx', message) // not sure if we should await this.
-        if (result === false) { this.mainLogger.error('ASK FAIL 9') }
+        let result:RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx', message) // not sure if we should await this.
+        if (result.success === false) { this.mainLogger.error('ASK FAIL 9') }
         let dataCountReturned = 0
         let accountIdsReturned = []
         for (let data of result.stateList) {
           this.queueEntryAddData(queueEntry, data)
           dataCountReturned++
-          accountIdsReturned.push(utils.makeShortHash(data.id))
+          accountIdsReturned.push(utils.makeShortHash(data.accountId))
         }
 
         if (queueEntry.hasAll === true) {
@@ -4028,6 +4068,121 @@ class StateManager extends EventEmitter {
         }
       }
     }
+  }
+
+  async repairToMatchReceipt (queueEntry:QueueEntry) {
+    if(this.currentCycleShardData == null)
+    {
+      return
+    }
+    // if (!queueEntry.requests) {
+    //   queueEntry.requests = {}
+    // }
+    if (queueEntry.uniqueKeys == null){
+      throw new Error('repairToMatchReceipt queueEntry.uniqueKeys == null')
+    }
+
+    // Need to build a list of what accounts we need, what state they should be in and who to get them from
+    let requestObjects: {[id:string]:{appliedVote:AppliedVote, voteIndex:number, accountHash:string, accountId:string, nodeShardInfo:NodeShardData}} = {}
+    let appliedVotes = queueEntry.appliedReceiptForRepair.appliedVotes
+    //TODO could random shuffle the vote list
+    let allKeys = []
+    for (let key of queueEntry.uniqueKeys) {
+
+      let coveredKey = false
+      for(let i = 0; i<appliedVotes.length; i++ ){
+        let appliedVote = appliedVotes[i]
+        for(let j = 0; j< appliedVote.account_id.length; j++){
+          let id = appliedVote.account_id[j]
+          let hash = appliedVote.account_state_hash_after[j]
+          if(id === key && hash != null){
+            coveredKey = true
+            if(appliedVote.node_id != this.currentCycleShardData.ourNode.id ){
+              //dont reference our own node, should not happen anyway
+              continue
+            }
+            if(this.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === false){
+              continue
+            }
+            let nodeShardInfo:NodeShardData2 = this.currentCycleShardData.nodeShardDataMap.get(appliedVote.node_id)
+
+            if(nodeShardInfo == null){
+
+            }
+            if(ShardFunctions2.testAddressInRange(id, nodeShardInfo.storedPartitions ) == false){
+              continue
+            }
+
+            requestObjects[key] = {appliedVote, voteIndex:j, accountHash:hash, accountId:id, nodeShardInfo}
+          }
+        }
+      }
+
+      if(coveredKey === false){
+        //todo log error on us not finding this key
+      }
+    }
+
+    let receipt = queueEntry.appliedReceiptForRepair
+
+    this.logger.playbackLogNote('shrd_repairToMatchReceipt_start', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
+
+    for (let key of queueEntry.uniqueKeys) {
+      if ( requestObjects[key] == null) {
+        let requestObject = requestObjects[key]
+
+        let node = requestObject.nodeShardInfo.node
+
+        if(node == null)
+        {
+          continue
+        }
+
+        let relationString = "" //ShardFunctions.getNodeRelation(homeNodeShardData, this.currentCycleShardData.ourNode.id)
+        this.logger.playbackLogNote('shrd_repairToMatchReceipt_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
+
+        let message = { key: requestObject.accountId, hash:requestObject.accountHash, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
+        let result:RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx_post', message) // not sure if we should await this.
+        if (result.success === false) { this.mainLogger.error('ASK FAIL repairToMatchReceipt') }
+        let dataCountReturned = 0
+        let accountIdsReturned = []
+        for (let data of result.stateList) {
+
+          //Commit the data
+          let dataToSet = [data]
+          let failedHashes = await this.checkAndSetAccountData(dataToSet)
+          await this.writeCombinedAccountDataToBackups(dataToSet, failedHashes)
+
+          //update global cache?  that will be obsolete soona anyhow!
+
+
+        }
+
+        // if (queueEntry.hasAll === true) {
+        //   queueEntry.logstate = 'got all missing data'
+        // } else {
+        //   queueEntry.logstate = 'failed to get data:' + queueEntry.hasAll
+        //   // queueEntry.state = 'failed to get data'
+        // }
+
+        this.logger.playbackLogNote('shrd_repairToMatchReceipt_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
+
+        // // queueEntry.homeNodes[key] = null
+        // for (let key2 of allKeys) {
+        //   //consider deleteing these instead?  
+        //   //TSConversion changed to a delete opertaion should double check this
+        //   //queueEntry.requests[key2] = null
+        //   delete queueEntry.requests[key2]
+        // }
+
+        // if (queueEntry.hasAll === true) {
+        //   break
+        // }
+      }
+    }
+
+    // Set this when data has been repaired. 
+    queueEntry.repairFinished = true
   }
 
   /**
@@ -4612,7 +4767,7 @@ class StateManager extends EventEmitter {
               // TODO consider if this function should set 'failed to get data'
               // note this is call is not awaited.  is that ok?
               // 
-              // TODO STATESHARDING4 should we await this.
+              // TODO STATESHARDING4 should we await this.  I think no since this waits on outside nodes to respond
               this.queueEntryRequestMissingData(queueEntry)
 
             } catch (ex) {
@@ -4690,48 +4845,81 @@ class StateManager extends EventEmitter {
                 if (this.verboseLogs) this.logger.playbackLogNote('shrd_preapplyFinish', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
               }
             }
+            markAccountsSeen(queueEntry)
           }
         } else if (queueEntry.state === 'consensing') { /////////////////////////////////////////--consensing--//////////////////////////////////////////////////////////////////
             if (accountSeen(queueEntry) === false) {
               markAccountsSeen(queueEntry)
 
               let hasReceivedApplyReceipt = queueEntry.recievedAppliedReceipt != null
+              let didNotMatchReceipt = false
+              
 
               this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${utils.stringifyReduce(queueEntry.acceptedTx.id)} receiptRcv:${hasReceivedApplyReceipt}`)
               let result = this.tryProduceReceipt(queueEntry)
               if(result != null){
-                if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete_madeReceipt', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} `)
+                if(this.hasAppliedReceiptMatchingPreApply(queueEntry, result)){
+                  if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete_madeReceipt', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID}  `)
 
-                // Broadcast the receipt
-                await this.shareAppliedReceipt(queueEntry)
+                  // Broadcast the receipt
+                  await this.shareAppliedReceipt(queueEntry)
 
-                queueEntry.state = 'commiting'
-                continue
+                  queueEntry.state = 'commiting'
+                  continue
+
+                } else{
+                  if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch1', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID}  `)
+                  didNotMatchReceipt = true
+                  queueEntry.appliedReceiptForRepair = result
+                }
+
               }     
               
               // if we got a reciept while waiting see if we should use it
               if(hasReceivedApplyReceipt){
-
-
-                if(this.hasAppliedReceiptMatchingPreApply(queueEntry)){
-                  if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} `)
+                if(this.hasAppliedReceiptMatchingPreApply(queueEntry, queueEntry.recievedAppliedReceipt)){
+                  if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} `)
                   queueEntry.state = 'commiting'
                   continue
                 } else{
-
-
-                  if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptFail', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} `)
-
-                  // TODO STATESHARDING4 NEGATIVECASE need to break this down..
-                  // have we seen a reipt yet?
-                  // have we seen on that our state does not match?
+                  if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch2', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID}  `)
+                  didNotMatchReceipt = true
+                  queueEntry.appliedReceiptForRepair = queueEntry.recievedAppliedReceipt
                 }
-                
               } else {
-
+                //just keep waiting.
               }
 
+              // we got a receipt but did not match it.
+              if(didNotMatchReceipt === true){
+                queueEntry.repairFinished = false
+                if(queueEntry.appliedReceiptForRepair.result === true){
+                  // need to start repair process and wait
+                  this.repairToMatchReceipt(queueEntry)
+                  queueEntry.state = 'await repair'
+                } else {
+                  // we are finished since there is nothing to apply
+                  this.removeFromQueue(queueEntry, currentIndex)
+                  queueEntry.state = 'fail'
+                }
+              }
             }
+            markAccountsSeen(queueEntry)
+        } else if (queueEntry.state === 'await repair') {  ///////////////////////////////////////////--await repair--////////////////////////////////////////////////////////////////
+          markAccountsSeen(queueEntry)
+
+          // at this point we are just waiting to see if we applied the data and repaired correctlyl
+          if(queueEntry.repairFinished === true){
+            this.removeFromQueue(queueEntry, currentIndex)
+            if(queueEntry.appliedReceiptForRepair.result === true){
+              queueEntry.state = 'pass'
+            } else {
+              // technically should never get here
+              queueEntry.state = 'fail'
+            }      
+          }
+
+
         } else if (queueEntry.state === 'commiting') {  ///////////////////////////////////////////--commiting--////////////////////////////////////////////////////////////////
           if (accountSeen(queueEntry) === false) {
             markAccountsSeen(queueEntry)
@@ -4917,30 +5105,30 @@ class StateManager extends EventEmitter {
    * 
    * @param queueEntry 
    */
-  hasAppliedReceiptMatchingPreApply (queueEntry: QueueEntry) : boolean {
+  hasAppliedReceiptMatchingPreApply (queueEntry: QueueEntry, appliedReceipt:AppliedReceipt) : boolean {
 
-    if(queueEntry.recievedAppliedReceipt == null){
+    if(appliedReceipt == null){
       return false
     }
     
-    if(queueEntry.recievedAppliedReceipt != null){
+    if(appliedReceipt != null){
 
-      if(queueEntry.recievedAppliedReceipt.result !== queueEntry.ourVote.transaction_result){
-        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.acceptedTx.id} ${queueEntry.recievedAppliedReceipt.result}, ${queueEntry.ourVote.transaction_result} queueEntry.recievedAppliedReceipt.result !== queueEntry.ourVote.transaction_result`)
+      if(appliedReceipt.result !== queueEntry.ourVote.transaction_result){
+        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.acceptedTx.id} ${appliedReceipt.result}, ${queueEntry.ourVote.transaction_result} appliedReceipt.result !== queueEntry.ourVote.transaction_result`)
         return false
       }
-      if(queueEntry.recievedAppliedReceipt.txid !== queueEntry.ourVote.txid){
-        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.acceptedTx.id} queueEntry.recievedAppliedReceipt.txid !== queueEntry.ourVote.txid`)
+      if(appliedReceipt.txid !== queueEntry.ourVote.txid){
+        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.acceptedTx.id} appliedReceipt.txid !== queueEntry.ourVote.txid`)
         return false
       }
-      if(queueEntry.recievedAppliedReceipt.appliedVotes.length === 0){
-        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.acceptedTx.id} recievedAppliedReceipt.appliedVotes.length`)
+      if(appliedReceipt.appliedVotes.length === 0){
+        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.acceptedTx.id} appliedReceipt.appliedVotes.length`)
         return false
       }
 
-      if(queueEntry.recievedAppliedReceipt.appliedVotes[0].cant_apply === true){
+      if(appliedReceipt.appliedVotes[0].cant_apply === true){
         // TODO STATESHARDING4 NEGATIVECASE    need to figure out what to do here
-        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.acceptedTx.id} queueEntry.recievedAppliedReceipt.appliedVotes[0].cant_apply === true`)
+        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.acceptedTx.id} appliedReceipt.appliedVotes[0].cant_apply === true`)
         return false
       }
 
@@ -5048,6 +5236,7 @@ class StateManager extends EventEmitter {
       transaction_result: queueEntry.preApplyTXResult.passed,
       account_id:[],
       account_state_hash_after:[],
+      node_id: this.currentCycleShardData.ourNode.id,
       cant_apply: (queueEntry.preApplyTXResult.applied === false),
     }
     // fill out the lists of account ids and after states
