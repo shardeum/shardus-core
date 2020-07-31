@@ -24,6 +24,7 @@ export type Message = {
 
 const queue: Queue = new Map()
 const collectors: Collectors = new Map()
+const gossipCounter = new Map()
 
 // A class responsible for collecting and processing partition gossip for a given Cycle
 export class Collector extends EventEmitter {
@@ -38,9 +39,11 @@ export class Collector extends EventEmitter {
     this.hashCounter = new Map()
   }
   process(message: Message[]) {
+    let cycle
     // Loop through messages and add to hash tally
     for (let i = 0; i < message.length; i++) {
       const data = message[i].data
+      if (!cycle) cycle = message[i].cycle
       const partitionHashes = new Map() as PartitionHashes
       for (const partitionId in data) {
         partitionHashes.set(parseInt(partitionId), data[partitionId])
@@ -55,13 +58,19 @@ export class Collector extends EventEmitter {
           this.hashCounter.set(partitionId, new Map([[hash, 1]]))
         } else if (this.hashCounter.has(partitionId)) {
           const counterMap = this.hashCounter.get(partitionId)
-          counterMap.set(hash, counterMap.get(hash) || 0 + 1)
+          const currentCount = counterMap.get(hash)
+          if(currentCount) counterMap.set(hash, currentCount + 1)
+          else counterMap.set(hash, 1)
         }
       }
     }
     // When the hashes of all partitions have been collected, emit the 'gotAllHashes' event
     // and pass the most popular hash for each partition
-    if (this.hashCounter.size === this.shard.shardGlobals.numPartitions + 1) {
+    const numOfGossipReceived = gossipCounter.get(cycle)
+    const requiredGossipCount = Math.ceil(this.shard.shardGlobals.numPartitions * 0.6)
+    console.log(`Num of gossip received: `, numOfGossipReceived)
+    console.log(`Num of gossip reqired: `, requiredGossipCount)
+    if (numOfGossipReceived >= requiredGossipCount && this.hashCounter.size === this.shard.shardGlobals.numPartitions + 1) {
       // +1 is for virtual global partition
       for (const [partitionId, counterMap] of this.hashCounter) {
         let selectedHash
@@ -78,6 +87,8 @@ export class Collector extends EventEmitter {
           }
         }
         possibleHashes = possibleHashes.sort()
+        
+        console.log(`CounterMap for Cycle ${cycle} Partition: ${partitionId} => `, counterMap)
         if (possibleHashes.length > 0) selectedHash = possibleHashes[0]
         if (selectedHash) this.allHashes.set(partitionId, selectedHash)
       }
@@ -95,6 +106,11 @@ export class Collector extends EventEmitter {
 export function initGossip() {
   registerGossipHandler('snapshot_gossip', (message) => {
     const { cycle } = message
+    if (gossipCounter.has(cycle)) {
+      gossipCounter.set(cycle, gossipCounter.get(cycle) + 1)
+    } else {
+      gossipCounter.set(cycle, 1)
+    }
     const collector = collectors.get(cycle)
     if (collector) {
       collector.process([message])

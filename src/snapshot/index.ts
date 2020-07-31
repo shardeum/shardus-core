@@ -177,6 +177,8 @@ export function startSnapshotting() {
         // 4) create a network state hash once we have all partition hashes for that cycle number
         const networkStateHash = createNetworkStateHash(allHashes)
 
+        log('Got all hashes: ', allHashes)
+
         // 5) save the partition and network hashes for that cycle number to the DB
         savePartitionAndNetworkHashes(shard, allHashes, networkStateHash)
 
