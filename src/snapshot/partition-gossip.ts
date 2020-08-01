@@ -63,7 +63,7 @@ export class Collector extends EventEmitter {
         // console.log(partitionShardData)
         console.log(`partition: ${partitionId} is covered by ${Object.keys(coveredBy).length} nodes`)
         let currentCount = gossipCounterForEachPartition.get(parseInt(partitionId))
-        let requiredCount = Math.ceil(Object.keys(coveredBy).length / 2)
+        let requiredCount = Math.floor(Object.keys(coveredBy).length / 2)
         if(currentCount) {
           let newCount = currentCount + 1
           gossipCounterForEachPartition.set(parseInt(partitionId), newCount)
