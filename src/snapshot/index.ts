@@ -166,6 +166,7 @@ export function startSnapshotting() {
       const message: partitionGossip.Message = {
         cycle: shard.cycleNumber,
         data: {},
+        sender: Self.id
       }
       for (const [partitionId, hash] of partitionHashes) {
         message.data[partitionId] = hash

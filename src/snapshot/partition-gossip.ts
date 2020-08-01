@@ -2,6 +2,7 @@ import { EventEmitter } from 'events'
 import { registerGossipHandler } from '../p2p/Comms'
 import { AddressRange } from '../state-manager/shardFunctionTypes'
 import { PartitionHashes } from './index'
+import * as Comm from '../p2p/Comms'
 
 /** TYPES */
 
@@ -20,6 +21,7 @@ type Collectors = Map<Message['cycle'], Collector>
 export type Message = {
   cycle: number
   data: Record<AddressRange['partition'], string>
+  sender: string
 }
 
 const queue: Queue = new Map()
@@ -28,6 +30,7 @@ const gossipCounter = new Map()
 let gossipCounterForEachPartition
 let readyPartitions
 let parititionShardDataMap
+let forwardedGossips = new Map()
 
 // A class responsible for collecting and processing partition gossip for a given Cycle
 export class Collector extends EventEmitter {
@@ -46,8 +49,21 @@ export class Collector extends EventEmitter {
     // Loop through messages and add to hash tally
     for (let i = 0; i < messages.length; i++) {
       const message = messages[i]
-      const data = messages[i].data
+      let data = messages[i].data
       if (!cycle) cycle = messages[i].cycle
+
+      // forward snapshot gossip if gossip cycle is same as current cycle
+      if (this.shard.cycleNumber === message.cycle) {
+        if (!forwardedGossips.has(message.sender)) {
+          console.log(`Forwarding the snapshot gossip from ${message.sender}`)
+          Comm.sendGossip('snapshot_gossip', message)
+          forwardedGossips.set(message.sender, true)
+        } else if (forwardedGossips.has(message.sender)) {
+          console.log(`Received already forwarded message`)
+          return
+        }
+      }
+
       if (!parititionShardDataMap) {
         console.log('No partition shard data map')
         return
@@ -60,10 +76,14 @@ export class Collector extends EventEmitter {
           continue
         }
         let coveredBy = partitionShardData.coveredBy
-        // console.log(partitionShardData)
-        console.log(`partition: ${partitionId} is covered by ${Object.keys(coveredBy).length} nodes`)
+        let isSenderCoverThePartition = coveredBy[message.sender]
+        if (!isSenderCoverThePartition) {
+          console.log(`Sender ${message.sender} does not cover this partition ${partitionId}`)
+          delete data[partitionId]
+          continue
+        }
         let currentCount = gossipCounterForEachPartition.get(parseInt(partitionId))
-        let requiredCount = Math.floor(Object.keys(coveredBy).length / 2)
+        let requiredCount = Math.ceil(Object.keys(coveredBy).length / 2)
         if(currentCount) {
           let newCount = currentCount + 1
           gossipCounterForEachPartition.set(parseInt(partitionId), newCount)
@@ -126,6 +146,7 @@ export class Collector extends EventEmitter {
       // Emit an event once allHashes are collected
       this.emit('gotAllHashes', this.allHashes)
     }
+   
   }
 }
 
@@ -161,6 +182,7 @@ export function initGossip() {
 export function newCollector(shard: CycleShardData): Collector {
   gossipCounterForEachPartition = new Map()
   readyPartitions = new Map()
+  forwardedGossips = new Map()
   parititionShardDataMap = shard.parititionShardDataMap
 
 
