@@ -11,7 +11,7 @@ type App = import("../shardus/shardus-types").App;
 type QueueEntry = {
     acceptedTx: import("../shardus/shardus-types").AcceptedTx;
     txKeys: import("../shardus/shardus-types").TransactionKeys
-    collectedData: any;
+    collectedData: WrappedResponses;
     originalData: any;
     homeNodes: {[accountID:string]:import('./shardFunctionTypes').NodeShardData};
     patchedOnNodes: Map<string, import('./shardFunctionTypes').NodeShardData>; //{[accountID:string]:import('./shardFunctionTypes').NodeShardData};
@@ -34,6 +34,8 @@ type QueueEntry = {
     requests: {[key:string]:import("../shardus/shardus-types").Node} // map of account keys to the node that we are requesting the account data from 
     globalModification:boolean;
     noConsensus:boolean; // This means our queue entry does not need the consensus step. should only be used for initial network set commands
+    m2TimeoutReached:boolean; // A flag to track if we have executed the M2 timeout yet.
+    waitForReceiptOnly:boolean; // This means dont try to produce a receipt
     uniqueKeys?: string[];
     ourNodeInvolved?: boolean;
     transactionGroup?: import("../shardus/shardus-types").Node[];
@@ -58,6 +60,7 @@ type QueueEntry = {
     repairFinished?: boolean;
 
     //collectedData for repair
+    debugFail1:boolean;
 };
 
 type SyncTracker = {
