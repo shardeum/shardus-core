@@ -2,6 +2,7 @@ import { Handler } from 'express'
 import { Logger } from 'log4js'
 import * as http from '../http'
 import * as Active from '../p2p/Active'
+import * as Sync from '../p2p/Sync'
 import * as Comms from '../p2p/Comms'
 import * as Context from '../p2p/Context'
 import * as CycleCreator from '../p2p/CycleCreator'
@@ -53,6 +54,7 @@ const oldDataMap: Map<PartitionNum, any[]> = new Map()
 const dataToMigrate: Map<PartitionNum, any[]> = new Map()
 const oldPartitionHashMap: Map<PartitionNum, string> = new Map()
 const missingPartitions: PartitionNum[] = []
+let safetSyncing: boolean = false // to set true when data exchange occurs during safetySync
 
 export const safetyModeVals = {
   safetyMode: false,
@@ -137,7 +139,6 @@ export function startSnapshotting() {
           } catch (e) {
             console.log(e)
           }
-
         }
       }
       
@@ -197,16 +198,24 @@ export async function readOldCycleRecord() {
 }
 
 export async function readOldNetworkHash() {
-  const networkStateHash = await Context.storage.getLastOldNetworkHash()
-  log('Read Old network state hash', networkStateHash)
-  if (networkStateHash && networkStateHash.length > 0)
-    return networkStateHash[0]
+  try {
+    const networkStateHash = await Context.storage.getLastOldNetworkHash()
+    log('Read Old network state hash', networkStateHash)
+    if (networkStateHash && networkStateHash.length > 0)
+      return networkStateHash[0]
+  } catch(e) {
+    snapshotLogger.error('Unable to read old network state hash')
+  }
 }
 
 export async function readOldPartitionHashes() {
-  const partitionHashes = await Context.storage.getLastOldPartitionHashes()
+  try {
+    const partitionHashes = await Context.storage.getLastOldPartitionHashes()
   log('Read Old partition_state_hashes', partitionHashes)
   return partitionHashes
+  } catch(e) {
+    snapshotLogger.error('Unable to read old partition hashes')
+  }
 }
 
 export async function safetySync() {
@@ -239,6 +248,24 @@ export async function safetySync() {
     Context.config.sharding.nodesPerConsensusGroup,
     Context.config.sharding.nodesPerConsensusGroup
   )
+  const nodeShardDataMap: shardFunctionTypes.NodeShardDataMap = new Map()
+
+  // populate DataToMigrate and oldDataMap
+  await calculateOldDataMap(shardGlobals, nodeShardDataMap)
+  
+  // check if we have data for each partition we cover in new network. We will use this array to request data from other nodes
+  checkMissingPartitions(shardGlobals)
+
+  // Send the old data you have to the new node/s responsible for it
+  for (const [partitionId, oldAccountCopies] of oldDataMap) {
+    await sendOldDataToNodes(partitionId, shardGlobals, nodeShardDataMap)
+  }
+
+  // Check if we have all old data. Once we get the old data you need, go active
+  goActiveIfDataComplete()
+}
+
+async function calculateOldDataMap(shardGlobals: shardFunctionTypes.ShardGlobals, nodeShardDataMap: shardFunctionTypes.NodeShardDataMap) {
   const partitionShardDataMap: shardFunctionTypes.ParititionShardDataMap = new Map()
   ShardFunctions.computePartitionShardDataMap(
     shardGlobals,
@@ -246,7 +273,7 @@ export async function safetySync() {
     0,
     shardGlobals.numPartitions
   )
-  const nodeShardDataMap: shardFunctionTypes.NodeShardDataMap = new Map()
+  
   /**
    * [NOTE] [AS] Need to do this because type of 'cycleJoined' field differs
    * between ShardusTypes.Node (number) and P2P/NodeList.Node (string)
@@ -322,17 +349,6 @@ export async function safetySync() {
     console.log(e)
   }
       
-
-  // check if we have data for each partition we cover in new network. We will use this array to request data from other nodes
-  checkMissingPartitions(shardGlobals)
-
-  // Send the old data you have to the new node/s responsible for it
-  for (const [partitionId, oldAccountCopies] of oldDataMap) {
-    await sendOldDataToNodes(partitionId, shardGlobals, nodeShardDataMap)
-  }
-
-  // Check if we have all old data. Once we get the old data you need, go active
-  goActiveIfDataComplete()
 }
 
 function checkMissingPartitions(shardGlobals: shardFunctionTypes.ShardGlobals) {
@@ -519,6 +535,66 @@ async function goActiveIfDataComplete() {
   }
 }
 
+export async function startWitnessMode() {
+  snapshotLogger.debug(`Starting in witness mode...`)
+  const archiver = Context.config.p2p.existingArchivers[0]
+  const fullNodesSigned = await Self.getFullNodesFromArchiver()
+  log(`Full Node List: `, fullNodesSigned)
+  if (!Context.crypto.verify(fullNodesSigned, archiver.publicKey)) {
+    throw Error('Fatal: Full Node list was not signed by archiver!')
+  }
+  const nodeList = fullNodesSigned.nodeList
+  const newestCycle = await Sync.getNewestCycle(nodeList)
+  const oldNetworkHash = await readOldNetworkHash()
+  const oldPartitionHashes = await readOldPartitionHashes()
+
+  log('Newest Cycle => ', newestCycle)
+  log('Old network state => ', oldNetworkHash)
+  log('Old partition hashes => ', oldPartitionHashes)
+
+  if (newestCycle.safetyMode && newestCycle.networkStateHash === oldNetworkHash) {
+    log('Network is in safety mode and network state hashes match')
+
+    // Figure out which nodes hold which partitions in the new network
+    const shardGlobals = ShardFunctions.calculateShardGlobals(
+      newestCycle.safetyNum,
+      Context.config.sharding.nodesPerConsensusGroup,
+      Context.config.sharding.nodesPerConsensusGroup
+    )
+    const nodeShardDataMap: shardFunctionTypes.NodeShardDataMap = new Map()
+
+    await calculateOldDataMap(shardGlobals, nodeShardDataMap)
+    const offer = createOffer()
+
+        // send data offer to each nodes
+    for (let i = 0; i < nodeList.length; i++) {
+      const res = await http.post(
+        `${nodeList[i].ip}:${nodeList[i].port}/snapshot-data-offer`,
+        offer
+      )
+      const answer = res.answer
+      // If a node reply us as 'needed', send requested data for requested partitions
+      if (answer === offerResponse.needed) {
+        const requestedPartitions = res.partitions
+        const dataToSend = {}
+        for (const partitionId of requestedPartitions) {
+          dataToSend[partitionId] = {
+            data: oldDataMap.get(partitionId),
+            hash: oldPartitionHashMap.get(parseInt(partitionId)),
+          }
+        }
+        await http.post(
+          `${nodeList[i].ip}:${nodeList[i].port}/snapshot-data`,
+          dataToSend
+        )
+      }
+    }
+  }
+
+ 
+  return true
+}
+
 async function storeDataToNewDB(dataMap) {
   // store data to new DB
   log('Storing data to new DB')
@@ -626,8 +702,50 @@ function registerSnapshotRoutes() {
       }
     },
   }
+  const snapshotWitnessDataOfferRoute: Route<Handler> = {
+    method: 'POST',
+    name: 'snapshot-witness-data',
+    handler: (req, res) => {
+      const err = validateTypes(req, { body: 'o' })
+      if (err) {
+        log('snapshot-witness-data bad req ' + err)
+        res.json([])
+        return
+      }
+      if(Self.isActive) {
+        return res.json({ answer: offerResponse.notNeeded })
+      }
+      const offerRequest = req.body
+      const neededPartitonIds = []
+      const neededHashes = []
+      if (offerRequest.networkStateHash === safetyModeVals.networkStateHash) {
+        // ask witnessing node to try offering data later
+        if (!safetSyncing) {
+          return res.json({ answer: offerResponse.tryLater })
+        }
+        for (const partitionId of offerRequest.partitions) {
+          // request only the needed partitions
+          const isNeeded = missingPartitions.includes(partitionId)
+          if (isNeeded) {
+            neededPartitonIds.push(partitionId)
+            const hasHashForPartition = oldPartitionHashMap.has(partitionId)
+            // if node does not have partition_hash for needed partition, request it too.
+            if (!hasHashForPartition) neededHashes.push(partitionId)
+          }
+        }
+        if (neededPartitonIds.length > 0) {
+          return res.json({
+            answer: offerResponse.needed,
+            partitions: neededPartitonIds,
+            hashes: neededHashes,
+          })
+        }
+      }
+      return res.json({ answer: offerResponse.notNeeded })
+    }
+  }
 
-  const routes = [snapshotRoute, snapshotDataOfferRoute]
+  const routes = [snapshotRoute, snapshotDataOfferRoute, snapshotWitnessDataOfferRoute]
 
   for (const route of routes) {
     Context.network._registerExternal(route.method, route.name, route.handler)

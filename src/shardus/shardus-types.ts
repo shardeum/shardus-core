@@ -497,6 +497,8 @@ declare namespace Shardus {
       maxScaleReqs?: number
       /** The amountToScale parameter is an Integer specifying the amount of nodes to add or remove from the number of desired nodes the network wants. */
       amountToScale?: number
+      /** If witenss mode is true, node will not join the network but help other nodes to sync the data */
+      startInWitnessMode?: boolean
     }
     /** Server IP configuration */
     ip?: {

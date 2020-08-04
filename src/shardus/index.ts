@@ -535,6 +535,10 @@ class Shardus extends EventEmitter {
     this._registerRoutes()
 
     // Register listeners for P2P events
+    Self.emitter.on('witnessing', async (publicKey) => {
+      this.logger.playbackLogState('witnessing', '', publicKey)
+      await Snapshot.startWitnessMode()
+    })
     Self.emitter.on('joining', (publicKey) => {
       this.logger.playbackLogState('joining', '', publicKey)
       if (this.reporter) this.reporter.reportJoining(publicKey)

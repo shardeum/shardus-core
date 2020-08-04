@@ -39,7 +39,8 @@
     "maxPercentOfDelta": 40,
     "scaleReqsNeeded": 5,
     "maxScaleReqs": 10,
-    "amountToScale": 1
+    "amountToScale": 1,
+    "startInWitnessMode": false
   },
   "ip": {
     "externalIp": "0.0.0.0",

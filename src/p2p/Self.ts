@@ -50,6 +50,10 @@ export function init() {
 export async function startup(): Promise<boolean> {
   // Emit the 'joining' event before attempting to join
   const publicKey = crypto.getPublicKey()
+  if (config.p2p.startInWitnessMode) {
+    emitter.emit('witnessing', publicKey)
+    return
+  }
   info('Emitting `joining` event.')
   emitter.emit('joining', publicKey)
 
@@ -267,6 +271,23 @@ async function getActiveNodesFromArchiver() {
   }
   info(`Got signed seed list: ${JSON.stringify(seedListSigned)}`)
   return seedListSigned
+}
+
+export async function getFullNodesFromArchiver() {
+  const archiver = config.p2p.existingArchivers[0]
+  const nodeListUrl = `http://${archiver.ip}:${archiver.port}/full-nodelist`
+  const nodeInfo = getPublicNodeInfo()
+  let fullNodeList
+  try {
+    fullNodeList = await http.get(nodeListUrl)
+  } catch (e) {
+    throw Error(
+      `Fatal: Could not get seed list from seed node server ${nodeListUrl}: ` +
+        e.message
+    )
+  }
+  info(`Got signed full node list: ${JSON.stringify(fullNodeList)}`)
+  return fullNodeList
 }
 
 function getPublicNodeInfo() {

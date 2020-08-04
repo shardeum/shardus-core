@@ -231,7 +231,7 @@ function applyNodeListChange(change: Change) {
   NodeList.removeNodes(change.removed)
 }
 
-async function getNewestCycle(
+export async function getNewestCycle(
   activeNodes: SyncNode[]
 ): Promise<CycleCreator.CycleRecord> {
   const queryFn = async (node: SyncNode) => {

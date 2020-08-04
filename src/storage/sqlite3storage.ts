@@ -8,6 +8,7 @@ import Shardus from '../shardus/shardus-types'
 import * as Snapshot from '../snapshot'
 import * as utils from '../utils'
 import Profiler from '../utils/profiler'
+import { config, crypto, logger } from '../p2p/Context'
 
 const Op = Sequelize.Op
 const sqlite3 = require('sqlite3').verbose()
@@ -112,7 +113,9 @@ class Sqlite3Storage {
         this.oldDb = new sqlite3.Database(`${oldDirPath}/db.sqlite`)
       }
     } catch (e) {
-      console.log(e)
+      if (config.p2p.startInWitnessMode) {
+        throw new Error('Unable to start in witness mode: no old data')
+      }
     }
 
     // Create dbDir if it doesn't exist
