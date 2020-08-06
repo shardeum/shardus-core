@@ -55,7 +55,7 @@ const dataToMigrate: Map<PartitionNum, any[]> = new Map()
 const oldPartitionHashMap: Map<PartitionNum, string> = new Map()
 const missingPartitions: PartitionNum[] = []
 const notNeededRepliedNodes: Map<string, true> = new Map()
-let safetSyncing: boolean = false // to set true when data exchange occurs during safetySync
+let safetySyncing: boolean = false // to set true when data exchange occurs during safetySync
 
 export const safetyModeVals = {
   safetyMode: false,
@@ -256,6 +256,8 @@ export async function safetySync() {
   
   // check if we have data for each partition we cover in new network. We will use this array to request data from other nodes
   checkMissingPartitions(shardGlobals)
+
+  safetySyncing = true
 
   // Send the old data you have to the new node/s responsible for it
   for (const [partitionId, oldAccountCopies] of oldDataMap) {
@@ -554,8 +556,7 @@ export async function startWitnessMode() {
         log(`Num of not_needed replied nodes => `, notNeededRepliedNodes.size)
         log(`Node will exit witness mode and shutdown.`)
         clearInterval(witnessInterval)
-        // TODO: how to shutdown the node correctly
-        // process.exit()
+        await Context.shardus.shutdown()
         return
       }
     
@@ -592,13 +593,19 @@ export async function startWitnessMode() {
 }
 
 async function sendOfferToNode(node, offer) {
-  log(`Offer is => `, offer)
-  const res = await http.post(
-    `${node.ip}:${node.port}/snapshot-witness-data`,
-    offer
-  )
-  const answer = res.answer
-  log(`Offer response is => `, answer)
+  let answer
+  let res
+  try {
+    res = await http.post(
+      `${node.ip}:${node.port}/snapshot-witness-data`,
+      offer
+    )
+    answer = res.answer
+  } catch(e) {
+    log('ERROR: unable to send offer to node')
+    log('ERROR: ', e)
+  }
+  log(`Offer response from ${node.ip}:${node.port} is => `, answer)
   // If a node reply us as 'needed', send requested data for requested partitions
   if (answer === offerResponse.needed) {
     const requestedPartitions = res.partitions
@@ -757,11 +764,14 @@ function registerSnapshotRoutes() {
       const offerRequest = req.body
       const neededPartitonIds = []
       const neededHashes = []
+      if (!safetySyncing || !safetyModeVals.networkStateHash) {
+        if(!safetySyncing) log(`We are not doing data exchange yet. Try agian later`)
+        if(!safetyModeVals.networkStateHash) log(`We have empty network state hash. Try agian later`)
+        return res.json({ answer: offerResponse.tryLater, waitTime: Context.config.p2p.cycleDuration * 1000 * 0.5 })
+      }
       if (offerRequest.networkStateHash === safetyModeVals.networkStateHash) {
         // ask witnessing node to try offering data later
-        if (!safetSyncing) {
-          return res.json({ answer: offerResponse.tryLater, waitTime: Context.config.p2p.cycleDuration * 1000 })
-        }
+
         for (const partitionId of offerRequest.partitions) {
           // request only the needed partitions
           const isNeeded = missingPartitions.includes(partitionId)
