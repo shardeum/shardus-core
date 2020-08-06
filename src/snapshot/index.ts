@@ -55,6 +55,8 @@ const dataToMigrate: Map<PartitionNum, any[]> = new Map()
 const oldPartitionHashMap: Map<PartitionNum, string> = new Map()
 const missingPartitions: PartitionNum[] = []
 const notNeededRepliedNodes: Map<string, true> = new Map()
+const alreadyOfferedNodes = new Map()
+
 let safetySyncing: boolean = false // to set true when data exchange occurs during safetySync
 
 export const safetyModeVals = {
@@ -540,7 +542,6 @@ async function goActiveIfDataComplete() {
 
 export async function startWitnessMode() {
   log(`Starting in witness mode...`)
-  const alreadyOfferedNodes = new Map()
   const archiver = Context.config.p2p.existingArchivers[0]
   const witnessInterval = setInterval(async () => {
     try {
@@ -592,7 +593,7 @@ export async function startWitnessMode() {
   }, Context.config.p2p.cycleDuration * 1000)
 }
 
-async function sendOfferToNode(node, offer) {
+async function sendOfferToNode(node, offer, isSuggestedByNetwork = false) {
   let answer
   let res
   try {
@@ -620,17 +621,28 @@ async function sendOfferToNode(node, offer) {
       `${node.ip}:${node.port}/snapshot-data`,
       dataToSend
     )
+    // If a node reply us 'try_later', wait X amount of time provided by node (OR) cycleDuration/2
   } else if (answer === offerResponse.tryLater) {
     const waitTime = res.waitTime || 5 * Context.config.p2p.cycleDuration * 1000
     setTimeout(() => {
       log(`Trying again to send to ${node.ip}:${node.port} after waiting ${waitTime} ms`)
-      sendOfferToNode(node, offer)
+      sendOfferToNode(node, offer, isSuggestedByNetwork)
     }, waitTime)
+    // If a node reply us 'send_to', send data to those provided nodes
   } else if (answer === offerResponse.sendTo) {
-    const suggestedNode = res.node
-    if (suggestedNode) {
-      log(`Sending to ${suggestedNode.ip}:${suggestedNode.port} as suggested by ${node.ip}:${node.port}`)
-      sendOfferToNode(suggestedNode, offer)
+    if (isSuggestedByNetwork) {
+      // this node is suggesed by other nodes in the network, so send_to response is ignored to prevent infinite loop
+      return
+    }
+    const suggestedNodes = res.nodes
+    if (suggestedNodes && suggestedNodes.length > 0) {
+      for (let i = 0; i < suggestedNodes.length; i++) {
+        const suggestedNode = suggestedNodes[i]
+        if (!alreadyOfferedNodes.has(suggestedNode.id)) {
+          log(`Sending offer to suggested Node ${node.ip}:${node.port}`)
+          sendOfferToNode(suggestedNode, offer, true)
+        }
+      }
     }
   } else if (answer === offerResponse.notNeeded) {
     increaseNotNeededNodes(node.id)
@@ -771,7 +783,6 @@ function registerSnapshotRoutes() {
       }
       if (offerRequest.networkStateHash === safetyModeVals.networkStateHash) {
         // ask witnessing node to try offering data later
-
         for (const partitionId of offerRequest.partitions) {
           // request only the needed partitions
           const isNeeded = missingPartitions.includes(partitionId)
