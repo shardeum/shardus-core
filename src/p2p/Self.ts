@@ -3,6 +3,7 @@ import { EventEmitter } from 'events'
 import { Logger } from 'log4js'
 import * as http from '../http'
 import { ipInfo } from '../network'
+import * as snapshot from '../snapshot'
 import * as utils from '../utils'
 import * as Archivers from './Archivers'
 import * as Comms from './Comms'
@@ -47,8 +48,163 @@ export function init() {
   p2pLogger = logger.getLogger('p2p')
 }
 
+export async function startup2(): Promise<boolean> {
+  info('Emitting `joining` event.')
+  emitter.emit('joining')
+
+  let result, wait
+
+  // Attempt to join/witness for network until you are successful
+  do {
+    try {
+      ;({ result, wait } = await joinOrWitnessForNetwork())
+      if (result === 'tryAgain') {
+        info(`Trying to join/witness again in ${wait / 1000} seconds...`)
+        await utils.sleep(wait)
+      }
+    } catch (err) {
+      warn('Error while joining/witnessing for network:')
+      warn(err)
+      info('Trying to join/witness again in 2 seconds...')
+      await utils.sleep(2000)
+    }
+  } while (result === 'tryAgain')
+
+  switch (result) {
+    case 'witness': {
+      info('Emitting `witness` event.')
+      emitter.emit('witness')
+      break
+    }
+    case 'joined': {
+      info('Emitting `joined` event.')
+      emitter.emit('joined')
+
+      // Sync cycle chain from network
+      await syncCycleChain()
+
+      // Enable internal routes
+      Comms.setAcceptInternal(true)
+
+      // Start creating cycle records
+      await CycleCreator.startCycles()
+      info('Emitting `initialized` event.')
+      emitter.emit('initilized')
+    }
+  }
+
+  return true
+}
+
+async function joinOrWitnessForNetwork(): Promise<{
+  result: 'joined' | 'witness' | 'tryAgain'
+  wait: number
+}> {
+  // Get active nodes from Archiver
+  const activeNodes = await contactArchiver()
+
+  // Check if you're the first node
+  isFirst = await discoverNetwork(activeNodes)
+
+  // Remove yourself from activeNodes if you are present in them
+  const ourIdx = activeNodes.findIndex(
+    (node) => node.ip === ipInfo.externalIp && node.port === ipInfo.externalPort
+  )
+  if (ourIdx > -1) {
+    activeNodes.splice(ourIdx, 1)
+  }
+
+  if (isFirst) {
+    // Join your own network and give yourself an ID
+    id = await Join.firstJoin()
+
+    // Return joined
+    return {
+      result: 'joined',
+      wait: 0,
+    }
+  }
+
+  // Get latest cycle record from active nodes
+  const latestCycle = await Sync.getNewestCycle(activeNodes)
+
+  // If network conditions are right to become a witness
+  const oldDataCycleRecord = await snapshot.readOldCycleRecord()
+  const oldDataNetworkId = oldDataCycleRecord.networkId
+  if (
+    snapshot.oldDataPath &&
+    latestCycle.safetyMode &&
+    oldDataNetworkId === latestCycle.networkId
+  ) {
+    // Return witness
+    return {
+      result: 'witness',
+      wait: 0,
+    }
+  }
+
+  // Create join request from latest cycle
+  const request = await Join.createJoinRequest(latestCycle.previous)
+
+  // Submit join request to active nodes
+  const tryAgain = await Join.submitJoin(activeNodes, request)
+
+  if (tryAgain) {
+    // [TODO] Make sure tryAgain is a sane wait time
+    return {
+      result: 'tryAgain',
+      wait: tryAgain,
+    }
+  }
+
+  // Wait approx. one cycle
+  await utils.sleep(config.p2p.cycleDuration * 1000 + 500)
+
+  // Check if joined by trying to set our node ID
+  id = await Join.fetchJoined(activeNodes)
+  if (id) {
+    return {
+      result: 'joined',
+      wait: 0,
+    }
+  }
+
+  // Otherwise, try again in approx. one cycle
+  return {
+    result: 'tryAgain',
+    wait: config.p2p.cycleDuration * 1000 + 500,
+  }
+}
+
+async function syncCycleChain() {
+  let synced = false
+  while (!synced) {
+    // Once joined, sync to the network
+    try {
+      info('Getting activeNodes from archiver to sync to network...')
+      const activeNodes = await contactArchiver()
+
+      // Remove yourself from activeNodes if you are present in them
+      const ourIdx = activeNodes.findIndex(
+        (node) =>
+          node.ip === ipInfo.externalIp && node.port === ipInfo.externalPort
+      )
+      if (ourIdx > -1) {
+        activeNodes.splice(ourIdx, 1)
+      }
+
+      info('Attempting to sync to network...')
+      synced = await sync(activeNodes)
+    } catch (err) {
+      synced = false
+      warn(err)
+      info('Trying again in 2 sec...')
+      await utils.sleep(2000)
+    }
+  }
+}
+
 export async function startup(): Promise<boolean> {
-  // Emit the 'joining' event before attempting to join
   const publicKey = crypto.getPublicKey()
   if (config.p2p.startInWitnessMode) {
     emitter.emit('witnessing', publicKey)
