@@ -644,7 +644,7 @@ class Shardus extends EventEmitter {
     Self.init()
 
     // Start P2P
-    await Self.startup()
+    await Self.startup2()
   }
 
   /**

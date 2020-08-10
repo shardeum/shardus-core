@@ -138,11 +138,11 @@ export function startSnapshotting() {
                 wrappedAccts
                   .map((acct) => {
                     const id =
-                      acct.accountId == null
+                      acct.accountId === null
                         ? 'null'
                         : acct.accountId.substr(0, 8)
                     const hash =
-                      acct.stateId == null ? 'null' : acct.stateId.substr(0, 8)
+                      acct.stateId === null ? 'null' : acct.stateId.substr(0, 8)
                     return `    ID: ${id} HASH: ${hash}`
                   })
                   .join('\n')
@@ -271,7 +271,7 @@ export async function safetySync() {
   safetySyncing = true
 
   // Send the old data you have to the new node/s responsible for it
-  for (const [partitionId, oldAccountCopies] of oldDataMap) {
+  for (const [partitionId] of oldDataMap) {
     await sendOldDataToNodes(partitionId, shardGlobals, nodeShardDataMap)
   }
 
@@ -679,7 +679,7 @@ async function storeDataToNewDB(dataMap) {
   // store data to new DB
   log('Storing data to new DB')
   const accountCopies: shardusTypes.AccountsCopy[] = []
-  for (const [partitionId, data] of dataMap) {
+  for (const [, data] of dataMap) {
     if (data && data.length > 0) {
       data.forEach((accountData) => {
         accountCopies.push(accountData)
