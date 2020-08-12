@@ -112,7 +112,7 @@ export async function startup(): Promise<boolean> {
       // Start creating cycle records
       await CycleCreator.startCycles()
       info('Emitting `initialized` event.')
-      emitter.emit('initilized')
+      emitter.emit('initialized')
     }
   }
 
