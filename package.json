@@ -44,11 +44,11 @@
     "log4js-extend": "^0.2.1",
     "nat-api": "^0.3.0",
     "sequelize": "^5.21.7",
-    "shardus-crypto-utils": "gitlab:shardus/shardus-crypto-utils#semvar:^3",
-    "shardus-net": "gitlab:shardus/shardus-net#semvar:^1",
+    "shardus-crypto-utils": "git+https://gitlab.com/shardus/shardus-crypto-utils.git#semver:^3.0.1",
+    "shardus-net": "git+https://gitlab.com/shardus/shardus-net.git#semver:^1.0.1",
     "sqlite": "^3.0.0",
     "sqlite3": "^4.1.1",
-    "tar-fs": "github:shardus/tar-fs",
+    "tar-fs": "^2.1.0",
     "trie-prefix-tree": "^1.5.1"
   },
   "devDependencies": {
