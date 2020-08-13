@@ -3,8 +3,7 @@
 Active nodes in the Shardus network will reports various useful information about the Node and Network to a monitor server. Monitor server will process those data (report) received from the Nodes and expose an API. A front-end application (Monitor Client) will use this API to show the information in Graphical User Interface. Developers can easily view the status and information of Nodes, Transaction Statistics and Network related information using monitor client.
 
 ### Overview of Reporting System
-
-Overview diagram picture to be inserted here.
+![State Snapshot Creation Outline](reporting-overview-diagram.png)
 
 ### Consenser Nodes
 
