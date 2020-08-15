@@ -1,6 +1,6 @@
 {
   "name": "shardus-global-server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "engines": {
     "node": "^12.18.3"
   },
@@ -46,8 +46,7 @@
     "sequelize": "^5.21.7",
     "shardus-crypto-utils": "git+https://gitlab.com/shardus/shardus-crypto-utils.git#semver:^3.0.1",
     "shardus-net": "git+https://gitlab.com/shardus/shardus-net.git#semver:^1.0.1",
-    "sqlite": "^3.0.0",
-    "sqlite3": "^4.1.1",
+    "sqlite3": "^5.0.0",
     "tar-fs": "^2.1.0",
     "trie-prefix-tree": "^1.5.1"
   },
