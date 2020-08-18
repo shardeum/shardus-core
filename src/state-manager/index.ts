@@ -104,6 +104,13 @@ class StateManager extends EventEmitter {
 
     combinedAccountData: Shardus.WrappedData[];
 
+    dataSourceNode: Shardus.Node;
+    dataSourceNodeList: Shardus.Node[];
+    dataSourceNodeIndex: number;
+
+    debugNoVoting: boolean;
+    debugOneNode: boolean;
+
   constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage : Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     super()
     this.verboseLogs = verboseLogs
@@ -176,6 +183,16 @@ class StateManager extends EventEmitter {
         this.canDataRepair = false
       }
     }
+    
+    this.debugNoVoting = false
+    // this controls the repair portion of data repair.
+    if (this.config && this.config.debug) {
+      this.debugNoVoting = this.config.debug.debugOneNode
+      if (this.debugNoVoting == null) {
+        this.debugNoVoting = false
+      }
+    }
+    this.debugOneNode = this.debugNoVoting
 
     this.stateIsGood = true
     // the original way this was setup was to reset and apply repair results one partition at a time.
@@ -218,7 +235,9 @@ class StateManager extends EventEmitter {
 
     this.globalAccountMap = new Map()
 
-
+    this.dataSourceNode = null
+    this.dataSourceNodeList = []
+    this.dataSourceNodeIndex = 0
 
     // debug hack
     if (p2p == null) {
@@ -324,6 +343,8 @@ class StateManager extends EventEmitter {
     // These are all for the given partition
     this.addressRange = null
     this.dataSourceNode = null
+    this.dataSourceNodeList = []
+    this.dataSourceNodeIndex = 0
     this.removedNodes = []
 
     // this.state = EnumSyncState.NotStarted
@@ -1133,6 +1154,13 @@ class StateManager extends EventEmitter {
         let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
         if (result === false) { this.mainLogger.error('ASK FAIL 4') }
     
+        if(result == null){
+          if(this.tryNextDataSourceNode('syncStateDataGlobals') == false){
+            break
+          }
+          continue
+        }
+
         //{ accountData: Shardus.WrappedData[] | null }
         //this.combinedAccountData = this.combinedAccountData.concat(result.accountData)
         accountData = accountData.concat(result.accountData)
@@ -1274,8 +1302,9 @@ class StateManager extends EventEmitter {
       throw new Error('FailAndRestartPartition1')
     }
     this.mainLogger.debug(`DATASYNC: getRobustGlobalReport found a winner.  results: ${utils.stringifyReduce(result)}`)
-    this.dataSourceNode = winners[0] // Todo random index
-
+    this.dataSourceNodeIndex = 0
+    this.dataSourceNode = winners[this.dataSourceNodeIndex] // Todo random index
+    this.dataSourceNodeList = winners
     return result as GlobalAccountReportResp
   }
 
@@ -1377,6 +1406,13 @@ class StateManager extends EventEmitter {
         let result = await this.p2p.ask(this.dataSourceNode, 'get_account_state', message)
         if (result === false) { this.mainLogger.error('ASK FAIL 2') }
 
+        if(result == null){
+          if(this.tryNextDataSourceNode('syncStateDataGlobals') == false){
+            break
+          }
+          continue
+        }
+
         let accountStateData = result.accountStates
         // get the timestamp of the last account state received so we can use it as the low timestamp for our next query
         if (accountStateData.length > 0) {
@@ -1437,6 +1473,19 @@ class StateManager extends EventEmitter {
     }
   }
 
+  tryNextDataSourceNode(debugString) : boolean {
+    this.dataSourceNodeIndex++
+    this.mainLogger.error(`tryNextDataSourceNode ${debugString} try next node: ${this.dataSourceNodeIndex}`)
+    if(this.dataSourceNodeIndex >= this.dataSourceNodeList.length){
+      this.mainLogger.error(`tryNextDataSourceNode ${debugString} ran out of nodes ask for data`)
+      this.dataSourceNodeIndex = 0
+      return false
+    }
+    // pick new data source node
+    this.dataSourceNode = this.dataSourceNodeList[this.dataSourceNodeIndex]
+    return true
+  }
+
   async syncAccountData (lowAddress:string, highAddress:string) {
     // Sync the Account data
     //   Use the /get_account_data API to get the data from the Account Table using any of the nodes that had a matching hash
@@ -1465,6 +1514,13 @@ class StateManager extends EventEmitter {
       if (r === false) { this.mainLogger.error('ASK FAIL 3') }
       // TSConversion need to consider better error handling here!
       let result:GetAccountData3Resp = r as GetAccountData3Resp
+
+      if(result == null){
+        if(this.tryNextDataSourceNode('syncAccountData') == false){
+          break
+        }
+        continue
+      }
       // accountData is in the form [{accountId, stateId, data}] for n accounts.
       let accountData = result.data.wrappedAccounts
 
@@ -1834,6 +1890,14 @@ class StateManager extends EventEmitter {
     let message = { accountIds: addressList }
     let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
     if (result === false) { this.mainLogger.error('ASK FAIL 4') }
+
+    if(result == null){
+      if(this.tryNextDataSourceNode('syncStateDataGlobals') == false){
+        return
+      }
+      //we picked a new node to ask so relaunch
+      await this.syncFailedAcccounts (lowAddress, highAddress)
+    }
 
     this.combinedAccountData = this.combinedAccountData.concat(result.accountData)
 
@@ -3745,6 +3809,10 @@ class StateManager extends EventEmitter {
     let timestamp = keysResponse.timestamp
     let txId = acceptedTx.receipt.txHash
 
+    if(this.debugNoVoting === true){
+      noConsensus = true
+    }
+
     this.queueEntryCounter++
     let txQueueEntry:QueueEntry = { acceptedTx: acceptedTx, txKeys: keysResponse, noConsensus, collectedData: {}, originalData: {}, homeNodes: {}, patchedOnNodes: new Map(), hasShardInfo: false, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [], logstate:'', requests:{}, globalModification:globalModification, collectedVotes:[], waitForReceiptOnly:false, m2TimeoutReached:false, debugFail1:false } // age comes from timestamp
     // partition data would store stuff like our list of nodes that store this ts
@@ -4039,77 +4107,96 @@ class StateManager extends EventEmitter {
 
     for (let key of queueEntry.uniqueKeys) {
       if (queueEntry.collectedData[key] == null && queueEntry.requests[key] == null) {
-        let homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
+        let keepTrying = true
+        let triesLeft = 5
+        while(keepTrying){
 
-        // find a random node to ask that is not us
-        let node = null
-        let randomIndex
-        let foundValidNode = false
-        let maxTries = 1000
-        while (foundValidNode == false) {
-          maxTries--
-          randomIndex = this.getRandomInt(homeNodeShardData.consensusNodeForOurNodeFull.length - 1)
-          node = homeNodeShardData.consensusNodeForOurNodeFull[randomIndex]
-          if(maxTries < 0){
-            //FAILED
-            this.fatalLogger.fatal(`queueEntryRequestMissingData: unable to find node to ask after 1000 tries tx:${utils.makeShortHash(queueEntry.acceptedTx.id)} key: ${utils.makeShortHash(key)} ${utils.stringifyReduce(homeNodeShardData.consensusNodeForOurNodeFull.map((x)=> (x!=null)? x.id : 'null'))}`)
+          if(triesLeft <= 0){
+            keepTrying = false
             break
           }
-          if(node == null){
+          let homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
+
+          // find a random node to ask that is not us
+          let node = null
+          let randomIndex
+          let foundValidNode = false
+          let maxTries = 1000
+          while (foundValidNode == false) {
+            maxTries--
+            randomIndex = this.getRandomInt(homeNodeShardData.consensusNodeForOurNodeFull.length - 1)
+            node = homeNodeShardData.consensusNodeForOurNodeFull[randomIndex]
+            if(maxTries < 0){
+              //FAILED
+              this.fatalLogger.fatal(`queueEntryRequestMissingData: unable to find node to ask after 1000 tries tx:${utils.makeShortHash(queueEntry.acceptedTx.id)} key: ${utils.makeShortHash(key)} ${utils.stringifyReduce(homeNodeShardData.consensusNodeForOurNodeFull.map((x)=> (x!=null)? x.id : 'null'))}`)
+              break
+            }
+            if(node == null){
+              continue
+            }
+            if(node.id === this.currentCycleShardData.nodeShardData.node.id){
+              continue
+            }
+            foundValidNode = true
+          }
+
+          if(node == null)
+          {
             continue
           }
-          if(node.id === this.currentCycleShardData.nodeShardData.node.id){
+
+          // Todo: expand this to grab a consensus node from any of the involved consensus nodes.
+
+          for (let key2 of allKeys) {
+            queueEntry.requests[key2] = node
+          }
+
+          let relationString = ShardFunctions.getNodeRelation(homeNodeShardData, this.currentCycleShardData.ourNode.id)
+          this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
+
+          let message = { keys: allKeys, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
+          let result:RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx', message) // not sure if we should await this.
+
+          if(result == null){
+            this.mainLogger.error('ASK FAIL request_state_for_tx')
+            this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+            triesLeft--
             continue
           }
-          foundValidNode = true
-        }
+          if (result.success === false) { this.mainLogger.error('ASK FAIL 9') }
+          let dataCountReturned = 0
+          let accountIdsReturned = []
+          for (let data of result.stateList) {
+            this.queueEntryAddData(queueEntry, data)
+            dataCountReturned++
+            accountIdsReturned.push(utils.makeShortHash(data.accountId))
+          }
 
-        if(node == null)
-        {
-          continue
-        }
+          if (queueEntry.hasAll === true) {
+            queueEntry.logstate = 'got all missing data'
+          } else {
+            queueEntry.logstate = 'failed to get data:' + queueEntry.hasAll
+            // queueEntry.state = 'failed to get data'
+          }
 
-        // Todo: expand this to grab a consensus node from any of the involved consensus nodes.
+          this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
 
-        for (let key2 of allKeys) {
-          queueEntry.requests[key2] = node
-        }
+          // queueEntry.homeNodes[key] = null
+          for (let key2 of allKeys) {
+            //consider deleteing these instead?  
+            //TSConversion changed to a delete opertaion should double check this
+            //queueEntry.requests[key2] = null
+            delete queueEntry.requests[key2]
+          }
 
-        let relationString = ShardFunctions.getNodeRelation(homeNodeShardData, this.currentCycleShardData.ourNode.id)
-        this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
+          if (queueEntry.hasAll === true) {
+            break
+          }
 
-        let message = { keys: allKeys, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
-        let result:RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx', message) // not sure if we should await this.
-        if (result.success === false) { this.mainLogger.error('ASK FAIL 9') }
-        let dataCountReturned = 0
-        let accountIdsReturned = []
-        for (let data of result.stateList) {
-          this.queueEntryAddData(queueEntry, data)
-          dataCountReturned++
-          accountIdsReturned.push(utils.makeShortHash(data.accountId))
-        }
-
-        if (queueEntry.hasAll === true) {
-          queueEntry.logstate = 'got all missing data'
-        } else {
-          queueEntry.logstate = 'failed to get data:' + queueEntry.hasAll
-          // queueEntry.state = 'failed to get data'
-        }
-
-        this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
-
-        // queueEntry.homeNodes[key] = null
-        for (let key2 of allKeys) {
-          //consider deleteing these instead?  
-          //TSConversion changed to a delete opertaion should double check this
-          //queueEntry.requests[key2] = null
-          delete queueEntry.requests[key2]
-        }
-
-        if (queueEntry.hasAll === true) {
-          break
+          keepTrying = false
         }
       }
+
     }
   }
 
@@ -5211,6 +5298,11 @@ class StateManager extends EventEmitter {
       return false
     }
     
+    if(queueEntry.ourVote == null){
+      this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.acceptedTx.id} ourVote == null`)
+      return false
+    }
+
     if(appliedReceipt != null){
 
       if(appliedReceipt.result !== queueEntry.ourVote.transaction_result){
@@ -5282,11 +5374,11 @@ class StateManager extends EventEmitter {
         failCount++
       }
       
-      if(passCount > requiredVotes){
+      if(passCount >= requiredVotes){
         canProduceReceipt = true
         passed = true
       }
-      if(failCount > requiredVotes){
+      if(failCount >= requiredVotes){
         canProduceReceipt = true
         passed = false
       }
