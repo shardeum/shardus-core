@@ -108,8 +108,7 @@ class StateManager extends EventEmitter {
     dataSourceNodeList: Shardus.Node[];
     dataSourceNodeIndex: number;
 
-    debugNoVoting: boolean;
-    debugOneNode: boolean;
+    debugNoTxVoting: boolean;
 
   constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage : Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     super()
@@ -183,16 +182,14 @@ class StateManager extends EventEmitter {
         this.canDataRepair = false
       }
     }
-    
-    this.debugNoVoting = false
+    this.debugNoTxVoting = false
     // this controls the repair portion of data repair.
     if (this.config && this.config.debug) {
-      this.debugNoVoting = this.config.debug.debugOneNode
-      if (this.debugNoVoting == null) {
-        this.debugNoVoting = false
+      this.debugNoTxVoting = this.config.debug.debugNoTxVoting
+      if (this.debugNoTxVoting == null) {
+        this.debugNoTxVoting = false
       }
     }
-    this.debugOneNode = this.debugNoVoting
 
     this.stateIsGood = true
     // the original way this was setup was to reset and apply repair results one partition at a time.
@@ -1152,7 +1149,7 @@ class StateManager extends EventEmitter {
         
         let message = { accountIds: remainingAccountsToSync }
         let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
-        if (result === false) { this.mainLogger.error('ASK FAIL 4') }
+        if (result === false) { this.mainLogger.error('ASK FAIL syncStateDataGlobals 4') }
     
         if(result == null){
           if(this.tryNextDataSourceNode('syncStateDataGlobals') == false){
@@ -1269,7 +1266,8 @@ class StateManager extends EventEmitter {
     }
     let queryFn = async (node: Shardus.Node) => {
       let result = await this.p2p.ask(node, 'get_globalaccountreport', {})
-      if (result === false) { this.mainLogger.error('ASK FAIL 1') }
+      if (result === false) { this.mainLogger.error('ASK FAIL getRobustGlobalReport 1') }
+      if (result === null) { this.mainLogger.error('ASK FAIL getRobustGlobalReport 1b') }
       return result
     }
     //can ask any active nodes for global data.
@@ -1350,7 +1348,7 @@ class StateManager extends EventEmitter {
       }
       let queryFn = async (node: Shardus.Node) => {
         let result = await this.p2p.ask(node, 'get_account_state_hash', message)
-        if (result === false) { this.mainLogger.error('ASK FAIL 1') }
+        if (result === false) { this.mainLogger.error('ASK FAIL syncStateTableData 1') }
         return result
       }
 
@@ -1404,7 +1402,7 @@ class StateManager extends EventEmitter {
       while (moreDataRemaining) {
         let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: lowTimeQuery, tsEnd: endTime }
         let result = await this.p2p.ask(this.dataSourceNode, 'get_account_state', message)
-        if (result === false) { this.mainLogger.error('ASK FAIL 2') }
+        if (result === false) { this.mainLogger.error('ASK FAIL syncStateTableData 2') }
 
         if(result == null){
           if(this.tryNextDataSourceNode('syncStateDataGlobals') == false){
@@ -1511,7 +1509,7 @@ class StateManager extends EventEmitter {
       // max records artificially low to make testing coverage better.  todo refactor: make it a config or calculate based on data size
       let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, maxRecords: this.config.stateManager.accountBucketSize }
       let r:GetAccountData3Resp | boolean = await this.p2p.ask(this.dataSourceNode, 'get_account_data3', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
-      if (r === false) { this.mainLogger.error('ASK FAIL 3') }
+      if (r === false) { this.mainLogger.error('ASK FAIL syncAccountData 3') }
       // TSConversion need to consider better error handling here!
       let result:GetAccountData3Resp = r as GetAccountData3Resp
 
@@ -1889,7 +1887,7 @@ class StateManager extends EventEmitter {
 
     let message = { accountIds: addressList }
     let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
-    if (result === false) { this.mainLogger.error('ASK FAIL 4') }
+    if (result === false) { this.mainLogger.error('ASK FAIL syncFailedAcccounts 4') }
 
     if(result == null){
       if(this.tryNextDataSourceNode('syncStateDataGlobals') == false){
@@ -2859,164 +2857,6 @@ class StateManager extends EventEmitter {
     this.p2p.unregisterGossipHandler('spread_appliedReceipt')
   }
 
-  // ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  // //////////////////////////   Old simple sync check, could be handy for debugging/test?   //////////////////////////
-  // ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  // enableSyncCheck () {
-  //   // return // hack no sync check , dont check in!!!!!
-  //   this._registerListener(this.p2p.state, 'newCycle', (cycles: Shardus.Cycle[]) => process.nextTick(async () => {
-  //     if (cycles.length < 2) {
-  //       return
-  //     }
-  //     let thisCycle = cycles[cycles.length - 1]
-  //     let lastCycle = cycles[cycles.length - 2]
-  //     let endTime = thisCycle.start * 1000
-  //     let startTime = lastCycle.start * 1000
-
-  //     let accountStart = '0'.repeat(64)
-  //     let accountEnd = 'f'.repeat(64)
-  //     let message = { accountStart, accountEnd, tsStart: startTime, tsEnd: endTime }
-
-  //     await utils.sleep(this.syncSettleTime) // wait a few seconds for things to settle
-
-  //     let equalFn = (a:StateHashResult, b:StateHashResult) => {
-  //       return a.stateHash === b.stateHash
-  //     }
-  //     let queryFn = async (node: Shardus.Node) => {
-  //       let result = await this.p2p.ask(node, 'get_account_state_hash', message)
-  //       if (result === false) { this.mainLogger.error('ASK FAIL 5') }
-  //       return result
-  //     }
-  //     // let nodes = this.p2p.state.getAllNodes(this.p2p.id)
-  //     let nodes = this.getRandomNodesInRange(100, accountStart, accountEnd, [])
-  //     if (nodes.length === 0) {
-  //       return // nothing to do
-  //     }
-  //     let [result, winners] = await this.p2p.robustQuery(nodes, queryFn, equalFn, 3)
-  //     if (result && result.stateHash) {
-  //       let stateHash = await this.getAccountsStateHash(accountStart, accountEnd, startTime, endTime)
-  //       if (stateHash === result.stateHash) {
-  //         this.logger.playbackLogNote('appStateCheck', '', `Hashes Match = ${utils.makeShortHash(stateHash)} num cycles:${cycles.length} start: ${startTime}  end:${endTime}`)
-  //       } else {
-  //         this.logger.playbackLogNote('appStateCheck', '', `Hashes Dont Match ourState: ${utils.makeShortHash(stateHash)} otherState: ${utils.makeShortHash(result.stateHash)} window: ${startTime} to ${endTime}`)
-  //         // winners[0]
-  //         await this.restoreAccountDataByTx(winners, accountStart, accountEnd, startTime, endTime)
-  //       }
-  //     }
-  //   }))
-  // }
-
-  // async restoreAccountDataByTx (nodes:Shardus.Node[], accountStart:string, accountEnd:string, timeStart:number, timeEnd:number) : Promise<void> {
-  //   this.logger.playbackLogNote('restoreByTx', '', `start`)
-
-  //   let helper = nodes[0]
-
-  //   let message = { tsStart: timeStart, tsEnd: timeEnd, limit: 10000 }
-  //   let result = await this.p2p.ask(helper, 'get_accepted_transactions', message) // todo perf, could await these in parallel
-  //   if (result === false) { this.mainLogger.error('ASK FAIL 6') }
-  //   let acceptedTXs = result.transactions
-
-  //   let toParse = {} //as (AcceptedTx & string)[] 
-  //   try {
-  //     for (let i = 0; i < acceptedTXs.length; i++) {
-  //       toParse = acceptedTXs[i]
-  //       if (utils.isObject(toParse) === false) {
-  //         // this is crazy, could have been nicer to just ignore the error:
-  //         //let funtime =  /** @type {string} */ (/** @type {unknown} */ (toParse))
-  //         let funtime = toParse as string
-  //         acceptedTXs[i] = JSON.parse(funtime)
-  //         // this.logger.playbackLogNote('restoreByTx', '', `parsed: ${acceptedTXs[i]}`)
-  //       } else {
-  //         // this.logger.playbackLogNote('restoreByTx', '', acceptedTXs[i])
-  //         // This is pretty crazy but is need to explain to TS that some forms of this data may need to have data and receipt parsed more.
-  //         let acceptedTX = toParse as AcceptedTx
-  //         let partiallyParsed = toParse as {data:string, receipt:string}
-  //         acceptedTX.data = JSON.parse(partiallyParsed.data)
-  //         acceptedTX.receipt = JSON.parse(partiallyParsed.receipt)
-  //       }
-  //     }
-  //   } catch (ex) {
-  //     this.fatalLogger.fatal('restoreByTx error: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack + ' while parsing: ' + toParse)
-  //   }
-  //   this.acceptedTXQueue = this.acceptedTXQueue.concat(acceptedTXs)
-
-  //   this.logger.playbackLogNote('restoreByTx', '', `tx count: ${this.acceptedTXQueue.length} queue: `) // ${utils.stringifyReduce(this.acceptedTXQueue)}
-
-  //   // await this.applyAcceptedTx()
-  //   for (let acceptedTx of acceptedTXs) {
-  //     this.routeAndQueueAcceptedTransaction(acceptedTx, false, helper)
-  //   }
-
-  //   // todo insert these in a sorted way to the new queue
-
-  //   this.logger.playbackLogNote('restoreByTx', '', `end`)
-  // }
-
-  // // Code Not in use, but could be used as a reference for future code
-  // sortedArrayDifference (a, b, compareFn) {
-  //   let results = []
-  //   // let aIdx = 0
-  //   let bIdx = 0
-
-  //   for (let i = 0; i < a.length; ++i) {
-  //     let aEntry = a[i]
-  //     let bEntry = b[bIdx]
-  //     let cmp = compareFn(aEntry, bEntry)
-  //     if (cmp === 0) {
-  //       bIdx++
-  //     } else if (cmp < 1) {
-  //       results.push(aEntry)
-  //     } else {
-  //       // nothing
-  //     }
-  //   }
-  //   return results
-  // }
-
-  // Code Not in use/finished, but could be used as a reference for future code
-  // async restoreAccountData (nodes: Shardus.Node[], accountStart:string, accountEnd:string, timeStart:number, timeEnd:number) : Promise<void> {
-  //   let helper = nodes[0]
-
-  //   let message = { accountStart: accountStart, accountEnd: accountEnd, tsStart: timeStart, tsEnd: timeEnd }
-  //   let remoteAccountStates = await this.p2p.ask(helper, 'get_account_state', message) // todo perf, could await these in parallel
-  //   if (remoteAccountStates === false) { this.mainLogger.error('ASK FAIL 7') }
-  //   let accountStates = await this.storage.queryAccountStateTable(accountStart, accountEnd, timeStart, timeEnd, 100000000)
-
-  //   let compareFn = (a:Shardus.StateTableObject, b:Shardus.StateTableObject) => {
-  //     if (a.txTimestamp !== b.txTimestamp) {
-  //       return (a.txTimestamp > b.txTimestamp) ? 1 : -1
-  //     } else if (a.accountId !== b.accountId) {
-  //       return (a.accountId > b.accountId) ? 1 : -1
-  //     } else {
-  //       return 0
-  //     }
-  //   }
-  //   let diff = this.sortedArrayDifference(remoteAccountStates, accountStates, compareFn)
-  //   if (diff.length <= 0) {
-  //     return // give up
-  //   }
-  //   let accountsToPatch = []
-  //   // patch account states
-  //   await this.storage.addAccountStates(diff)
-  //   for (let state of diff) {
-  //     if (state.accountId) {
-  //       accountsToPatch.push(state.accountId)
-  //     }
-  //   }
-
-  //   let message2 = { accountIds: accountsToPatch }
-  //   let accountData = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message2)
-  //   if (accountData === false) { this.mainLogger.error('ASK FAIL 8') }
-
-  //   if (accountData) {
-  //     // for(let account in accountData) {
-  //     //   //if exists update.
-  //     //   //else create
-  //     // }
-  //     // todo  this.todo.patchUpdateAccounts(accountData)
-  //   }
-  // }
-
   // //////////////////////////////////////////////////////////////////////////
   // //////////////////////////   END Old sync check     //////////////////////////
   // //////////////////////////////////////////////////////////////////////////
@@ -3809,7 +3649,8 @@ class StateManager extends EventEmitter {
     let timestamp = keysResponse.timestamp
     let txId = acceptedTx.receipt.txHash
 
-    if(this.debugNoVoting === true){
+    // This flag turns of consensus for all TXs for debuggging
+    if(this.debugNoTxVoting === true){
       noConsensus = true
     }
 
@@ -4163,7 +4004,7 @@ class StateManager extends EventEmitter {
             triesLeft--
             continue
           }
-          if (result.success === false) { this.mainLogger.error('ASK FAIL 9') }
+          if (result.success === false) { this.mainLogger.error('ASK FAIL queueEntryRequestMissingData 9') }
           let dataCountReturned = 0
           let accountIdsReturned = []
           for (let data of result.stateList) {
@@ -5704,7 +5545,7 @@ class StateManager extends EventEmitter {
       }
       let message = { accountIds: [address] }
       let r:GetAccountDataWithQueueHintsResp | boolean = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
-      if (r === false) { this.mainLogger.error('ASK FAIL 10') }
+      if (r === false) { this.mainLogger.error('ASK FAIL getLocalOrRemoteAccount 10') }
       let result = r as GetAccountDataWithQueueHintsResp
       if (result != null && result.accountData != null && result.accountData.length > 0) {
         wrappedAccount = result.accountData[0]
@@ -5776,7 +5617,7 @@ class StateManager extends EventEmitter {
     }
     let message = { accountIds: [address] }
     let result = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
-    if (result === false) { this.mainLogger.error('ASK FAIL 11') }
+    if (result === false) { this.mainLogger.error('ASK FAIL getRemoteAccount 11') }
     if (result != null && result.accountData != null && result.accountData.length > 0) {
       wrappedAccount = result.accountData[0]
       return wrappedAccount
@@ -6320,242 +6161,7 @@ class StateManager extends EventEmitter {
       return
     }
 
-    let repairTracker = this._getRepairTrackerForCycle(cycle.counter, partitionId)
-
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess begin.  repairTracker: ${utils.stringifyReduce(repairTracker)}`)
-
-    repairTracker.repairing = true
-
-    this.repairTrackerClearForNextRepair(repairTracker)
-    // let partitionID
-    let cycleNumber
-    let key
-    let key2
-    let debugKey
-
-    let usedSyncTXsFromHashSetStrings = false
-    // partitionId = partitionId // topResult.Partition_id
-    cycleNumber = cycle.counter // topResult.Cycle_number
-    key = 'c' + cycleNumber
-    key2 = 'p' + partitionId
-    debugKey = `rkeys: ${key} ${key2}`  
-    let combinedKey = key + key2      
-
-    try {
-      if (this.repairStartedMap.has(combinedKey)) {
-        if (this.verboseLogs) this.mainLogger.error(`repairStats: Already started repair on ${combinedKey}`)
-      } else {
-        this.dataRepairStack.push(repairTracker)
-        this.dataRepairsStarted++
-        this.repairStartedMap.set(combinedKey, true)
-
-        if (this.verboseLogs) this.mainLogger.debug(`repairStats: staring repair ${combinedKey}`)
-      }
-      topResult = null // hack to force full synce
-      if (topResult) {
-        // @ts-ignore  have to ignore due to topResult hack
-        repairTracker.triedHashes.push(topResult.Partition_hash)
-        await this.syncTXsFromWinningHash(topResult)
-      } else {
-        if (this.useHashSets) {
-          let retCode = await this.syncTXsFromHashSetStrings(cycleNumber, partitionId, repairTracker, ourLastResultHash)
-
-          if (retCode === 100) {
-            // syncTXsFromHashSetStrings has failed
-            repairTracker.awaitWinningHash = true
-            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` syncTXsFromHashSetStrings failed so we will set awaitWinningHash=true and hope a hash code wins ${debugKey} `)
-            return
-          }
-
-          // return // bail since code is not complete
-          usedSyncTXsFromHashSetStrings = true
-        } else {
-          // this probably fails with out hashsets.. or keeps tring forever
-        }
-      }
-
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess syncTXs finished. ${debugKey} `)
-
-      this.generatePartitionObjects(cycle) // this will stomp our old results TODO PERF: (a bit inefficient since it works on all partitions)
-
-      // get responses
-      let responsesById = this.allPartitionResponsesByCycleByPartition[key]
-      let responses = responsesById[key2]
-
-      // find our result
-      let ourPartitionValues = this.ourPartitionResultsByCycle[key]
-      let ourResult = null
-      for (let obj of ourPartitionValues) {
-        if (obj.Partition_id === partitionId) {
-          ourResult = obj
-          break
-        }
-      }
-
-      if(ourResult == null){
-        throw new Error(`startRepairProcess ourResult == null`)
-      }
-
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess our result: ${debugKey} ${utils.stringifyReduce(ourResult)} obj: ${utils.stringifyReduce(this.partitionObjectsByCycle[key])} `)
-
-      // check if our hash now matches the majority one, maybe even re check the majority hash..?
-      let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult, true)
-      let { partitionReceipt, topResult: topResult2, success } = receiptResults
-
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess tryGeneratePartitionReciept: ${debugKey} ${utils.stringifyReduce({ partitionReceipt, topResult2, success })}  `)
-
-      if (!success) {
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess success==false starting repair again in 3 seconds! ${debugKey}`)
-
-        let cycle = this.p2p.state.getCycleByCounter(cycleNumber)
-
-        await utils.sleep(3000) // wait a second.. also when to give up
-        await this.startRepairProcess(cycle, topResult2, partitionId, ourResult.Partition_hash)
-        return
-      } else if (partitionReceipt) {
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess success==ok ${debugKey}`)
-
-        if (usedSyncTXsFromHashSetStrings === false) {
-          this.storePartitionReceipt(cycleNumber, partitionReceipt)
-          repairTracker.txRepairComplete = true
-        } else {
-          repairTracker.awaitWinningHash = true
-        }
-
-        repairTracker.txRepairReady = true
-
-        this.mainLogger.debug(`startRepairProcess testAndApplyRepairs ${debugKey} txRepairReady `)
-
-        // are all repairs complete. if so apply them to accounts.
-        // look at the repair tracker for every partition.
-
-        let cycleKey = 'c' + cycle.counter
-
-        let allFinished = true
-        let repairsByPartition = this.repairTrackingByCycleById[key]
-
-        if (!repairsByPartition) {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess repairsByPartition==null ${debugKey} ck: ${cycleKey} `)
-        }
-
-        // OLD PATH.  reset and apply transactions per partition
-        if (this.resetAndApplyPerPartition) {
-          // check that all the repair keys are good
-          let repairKeys = Object.keys(repairsByPartition)
-          for (let partitionKey of repairKeys) {
-            let repairTracker1 = repairsByPartition[partitionKey]
-            if ((repairTracker1.txRepairComplete === false && repairTracker1.evaluationStarted) || repairTracker1.evaluationStarted === false) {
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess repairTracker1 ${debugKey} txRepairComplete === false ${utils.stringifyReduce(repairTracker1)} `)
-            // Dont clear all finished ... we can try repairing one parition at a time with the data we have i gues..
-            //      what will happen if a TX applies to two accounts in two diff partitions we own.  well it will reset account and play tx in each partition.
-            // allFinished = false // TODO sharding done. turned all finished = false line back on   need to fix this logic so that we make sure all partitions are good before we proceed to merge and apply things
-            // TODO sharding looks ok but needs testing.
-            // perhaps check that awaitWinningHash == true for all of them now? idk..
-            }
-          }
-
-          if (allFinished) {
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess allFinished, start merge and apply ${debugKey}`)
-            await this.mergeAndApplyTXRepairs(cycleNumber, partitionId)
-
-            // only declare victory after we matched hashes
-            if (usedSyncTXsFromHashSetStrings === false) {
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess 1 allFinished, final ${debugKey} hash:${utils.stringifyReduce({ topResult2 })}`)
-              this.repairTrackerMarkFinished(repairTracker, 'startRepairProcess:A')
-              return
-            } else {
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess set evaluationStarted=false so we can tally up hashes again ${debugKey}`)
-              repairTracker.evaluationStarted = false
-              // repairTracker.evaluationComplete = true
-              repairTracker.awaitWinningHash = true
-
-              // TODO SHARDING... need to refactor this so it happens per partition before we are all done
-              // now that we are done see if we can form a receipt with what we have on the off change that all other nodes have sent us their corrected receipts already
-              let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
-              let { partitionReceipt: partitionReceipt3, topResult: topResult3, success: success3 } = receiptResults
-              if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess immediate receipt check. ${debugKey} success:${success3} topResult:${utils.stringifyReduce(topResult3)}  partitionReceipt: ${utils.stringifyReduce({ partitionReceipt3 })}`)
-
-              // see if we already have a winning hash to correct to
-              if (!success3) {
-                if (repairTracker.awaitWinningHash) {
-                  if (topResult3 == null) {
-                  // if we are awaitWinningHash then wait for a top result before we start repair process again
-                    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess awaitWinningHash:true but topResult == null so keep waiting ${debugKey}`)
-                  } else {
-                    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess awaitWinningHash:true and we have a top result so start reparing! ${debugKey}`)
-                    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess: tryGeneratePartitionReciept failed start repair process 2 ${debugKey}  ${utils.stringifyReduce(receiptResults)}`)
-                    let cycle = this.p2p.state.getCycleByCounter(cycleNumber)
-                    await utils.sleep(1000)
-                    await this.startRepairProcess(cycle, topResult3, partitionId, ourResult.Partition_hash)
-                    return // we are correcting to another hash.  don't bother sending our hash out
-                  }
-                }
-              } else {
-                if(partitionReceipt3 == null){
-                  throw new Error(`startRepairProcess partitionReceipt3 == null ${cycleNumber}`)
-                }
-                this.storePartitionReceipt(cycleNumber, partitionReceipt3)
-                this.repairTrackerMarkFinished(repairTracker, 'startRepairProcess:B')
-                if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess 2 allFinished, final ${debugKey} hash:${utils.stringifyReduce({ topResult3 })}`)
-              }
-            }
-          }
-        } else if (this.resetAndApplyPerPartition === false) {
-          // this is where the new version of the code can live that stashes the data somewhere save and applies things all at once later.
-          this.updateTrackingAndPrepareRepairs(cycleNumber, partitionId)
-
-          this.testAndApplyRepairs(cycleNumber)
-        }
-      }
-
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess we repaired stuff so re-broadcast our results ${debugKey}`)
-      // broadcast our upgraded result again
-      // how about for just this partition?
-      // TODO repair.  how to make this converge towards order and heal the network problems. is this the right time/place to broadcaast it?  I think it does converge now since merge does a strait copy of the winner
-      // todo figure out if this needs to be called sooner to not stall out.   i think so
-      await this.broadcastPartitionResults(cycleNumber)
-
-      // if not look for other missing txids from hashes we have not investigated yet and repeat process.
-    } catch (ex) {
-      this.mainLogger.debug('_repair: startRepairProcess ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      this.fatalLogger.fatal('_repair: startRepairProcess ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      // throw new Error('FailAndRestartPartition0')
-
-      if (repairTracker.awaitWinningHash !== true) {
-        this.fatalLogger.fatal('_repair: startRepairProcess will attempt awaitWinningHash=true mode')
-        // if we fail try skipping to the last phase:
-        repairTracker.evaluationStarted = false
-        repairTracker.awaitWinningHash = true
-        await this.checkForGoodPartitionReciept(cycleNumber, partitionId)
-      }
-    } finally {
-      repairTracker.repairing = false // ? really
-    }
-  }
-
-  async testAndApplyRepairs (cycleNumber: number) {
-    // can we apply the repairs
-
-    this.mainLogger.debug(`testAndApplyRepairs c:${cycleNumber} `)
-
-    let key = 'c' + cycleNumber
-    let repairsByPartition = this.repairTrackingByCycleById[key]
-    let repairKeys = Object.keys(repairsByPartition)
-    for (let partitionKey of repairKeys) {
-      let repairTracker1 = repairsByPartition[partitionKey]
-      if ((repairTracker1.txRepairReady === false && repairTracker1.evaluationStarted && repairTracker1.repairsFullyComplete === false) || repairTracker1.evaluationStarted === false) {
-        // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startRepairProcess repairTracker1 ${debugKey} txRepairReady === false ${utils.stringifyReduce(repairTracker1)} `)
-        this.mainLogger.debug(`testAndApplyRepairs c:${cycleNumber} -not ready yet:${partitionKey} txRepairReady:${repairTracker1.txRepairReady} evaluationStarted:${repairTracker1.evaluationStarted}  numkeys:${repairKeys.length} repairsFullyComplete:${repairTracker1.repairsFullyComplete}`)
-        return
-      }
-    }
-
-    this.mainLogger.debug(`testAndApplyRepairs c:${cycleNumber} -starting repair apply! `)
-    await this.applyAllPreparedRepairs(cycleNumber)
-    // where all do we track do something with the all finished status
-    // if (usedSyncTXsFromHashSetStrings === false) {
-    // } else {
-    // }
+    return
   }
 
   // todo refactor some of the duped code in here
@@ -6617,642 +6223,11 @@ class StateManager extends EventEmitter {
     }
   }
 
-  /**
-   * syncTXsFromWinningHash
-   * This is used when a simple vote of hashes revealse a most popular hash.  In this case we can just sync the txs from any of the nodes that had this winning hash
-   * @param {PartitionResult} topResult
-   */
-  async syncTXsFromWinningHash (topResult:PartitionResult) {
-    if (topResult.sign == null) {
-      this.mainLogger.fatal(this.dataPhaseTag + ` _repair syncTXsFromWinningHash: topResult.sign=null ${utils.stringifyReduce(topResult)}`)
-      throw new Error(`syncTXsFromWinningHash topResult.sign  ${utils.stringifyReduceLimit(topResult, 100)}`)
-    }
-
-    // get node ID from signing.
-    // obj.sign = { owner: pk, sig }
-    let signingNode = topResult.sign.owner
-    let allNodes = this.p2p.state.getActiveNodes(this.p2p.id) // todo convert to a versio of this: this.getActiveNodesInRange(lowAddress, highAddress) //
-    let nodeToContact
-
-    if (!allNodes) {
-      if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: allNodes: undefined ')
-      throw new Error('allNodes undefined')
-    }
-
-    for (const node of allNodes) {
-      if (node.address === signingNode) {
-        nodeToContact = node
-        break
-      }
-    }
-    if (nodeToContact) {
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: node to ask for TXs: ' + utils.stringifyReduce(topResult))
-    } else {
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: cant find node: ' + utils.stringifyReduce(topResult))
-      throw new Error(`nodeToContact undefined ${utils.stringifyReduce(allNodes)}  ${utils.makeShortHash(signingNode)}`)
-    }
-
-    // get the list of tx ids for a partition?..
-    let payload = { Cycle_number: topResult.Cycle_number, Partition_id: topResult.Partition_id }
-    /** @type {PartitionObject} */
-    let partitionObject = await this.p2p.ask(nodeToContact, 'get_partition_txids', payload)
-    // @ts-ignore This will get fixed when we go to throwing exceptions!
-    if (partitionObject === false) { this.mainLogger.error('ASK FAIL 12') }
-
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: partitionObject: ' + utils.stringifyReduce(partitionObject))
-
-    let winningStatusMap = this.partitionObjectToTxMaps(partitionObject)
-    let ourPartitionObj = this.getPartitionObject(topResult.Cycle_number, topResult.Partition_id)
-
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: ourPartitionObj: ' + utils.stringifyReduce(ourPartitionObj))
-
-    if(ourPartitionObj == null){
-      throw new Error(`syncTXsFromWinningHash ourPartitionObj == null  ${topResult.Cycle_number} ${topResult.Partition_id}`)
-    }
-
-    let ourStatusMap = this.partitionObjectToTxMaps(ourPartitionObj)
-    // need to match up on all data, but only sync what we need and remove what we dont.
-
-    // get state data:
-    let winningStateMap = this.partitionObjectToStateMaps(partitionObject)
-    let ourStateMap =     this.partitionObjectToStateMaps(ourPartitionObj)
-    // filter to only get accepted txs
-
-    // for (let i = 0; i < partitionObject.Txids.length; i++) {
-    //   if (partitionObject.Status[i] === 1) {
-    //     // partitionObject.Txids
-    //     acceptedTXIDs.push(partitionObject.Txids[i])
-    //   }
-    // }
-
-    // partitionObjectToStateMaps // check states too?
-
-    let repairTracker = this._getRepairTrackerForCycle(topResult.Cycle_number, topResult.Partition_id)
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' _repair syncTXsFromWinningHash: _getRepairTrackerForCycle: ' + utils.stringifyReduce(repairTracker))
-
-    let missingAcceptedTxIDs = []
-    let missingFailedTXs = []
-    let allMissingTXs = []
-    for (let i = 0; i < partitionObject.Txids.length; i++) {
-      let status = partitionObject.Status[i]
-      let tx = partitionObject.Txids[i]
-      if (ourStatusMap.hasOwnProperty(tx) === false) {
-        if (status === 1) {
-          missingAcceptedTxIDs.push(tx)
-        } else {
-          missingFailedTXs.push(tx)
-        }
-        repairTracker.missingTXIds.push(tx)
-        allMissingTXs.push(tx)
-      }
-    }
-    let invalidAcceptedTxIDs = []
-    let extraFailedState = 0
-    let extraFailedStatus = 0
-    for (let i = 0; i < ourPartitionObj.Txids.length; i++) {
-      // let status = ourPartitionObj.Status[i]
-      let tx = ourPartitionObj.Txids[i]
-      if (winningStatusMap.hasOwnProperty(tx) === false) {
-        invalidAcceptedTxIDs.push(tx)
-        repairTracker.extraTXIds.push(tx)
-      } else {
-        // both paritions have this tx but need to test the pass/fail and hash value for the partition
-        let failed = false
-        // check if state or status is wrong!
-        if (winningStateMap.hasOwnProperty(tx)) {
-          let winState = winningStateMap[tx]
-          let ourState = ourStateMap[tx]
-          if (winState !== ourState) {
-            failed = true
-            extraFailedState++
-          }
-        }
-        if (winningStatusMap.hasOwnProperty(tx)) {
-          let winStatus = winningStatusMap[tx]
-          let ourStatus = ourStatusMap[tx]
-          if (winStatus !== ourStatus) {
-            failed = true
-            extraFailedStatus++
-          }
-        }
-        if (failed) {
-          // Extra
-          invalidAcceptedTxIDs.push(tx)
-          repairTracker.extraTXIds.push(tx)
-          // And we need the missing one!
-          let status = winningStatusMap[tx]
-          if (status === 1) {
-            missingAcceptedTxIDs.push(tx)
-          } else {
-            missingFailedTXs.push(tx)
-          }
-          repairTracker.missingTXIds.push(tx)
-          allMissingTXs.push(tx)
-        }
-      }
-    }
-
-    // ask for missing txs of other node
-    let payload2 = { Tx_ids: missingAcceptedTxIDs }
-    let txs = await this.p2p.ask(nodeToContact, 'get_transactions_by_list', payload2)
-    if (txs === false) { this.mainLogger.error('ASK FAIL 13') }
-    repairTracker.newPendingTXs = txs // ?
-
-    // get failed txs that we are missing
-    payload2 = { Tx_ids: missingFailedTXs }
-    txs = await this.p2p.ask(nodeToContact, 'get_transactions_by_list', payload2)
-    if (txs === false) { this.mainLogger.error('ASK FAIL 14') }
-    repairTracker.newFailedTXs = txs
-    // this.storage.addAcceptedTransactions(txs) // commit the failed TXs to our db. not sure if this is strictly necessary
-
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair syncTXsFromWinningHash: extraFailedState:${extraFailedState} extraFailedStatus:${extraFailedStatus} repairTracker updates: ` + utils.stringifyReduce(repairTracker) + ` invalidAcceptedTxIDs: ${invalidAcceptedTxIDs.length}`)
-
-    this._mergeRepairDataIntoLocalState(repairTracker, ourPartitionObj, winningStatusMap, partitionObject)
-  }
-
-  /**
-   * _mergeRepairDataIntoLocalState
-   * used with syncTXsFromWinningHash in the simple case where a most popular hash wins.
-   * @param {RepairTracker} repairTracker todo repair tracker type
-   * @param {PartitionObject} ourPartitionObj
-   * @param {*} otherStatusMap todo status map, but this is unused
-   * @param {PartitionObject} otherPartitionObject
-   */
-  _mergeRepairDataIntoLocalState (repairTracker:RepairTracker, ourPartitionObj:PartitionObject, otherStatusMap:any, otherPartitionObject: PartitionObject) {
-    // just simple assignment.  if we changed things to merge the best N results this would need to change.
-    ourPartitionObj.Txids = [...otherPartitionObject.Txids]
-    ourPartitionObj.Status = [...otherPartitionObject.Status]
-    ourPartitionObj.States = [...otherPartitionObject.States]
-
-    // add/remove them somewhere else?  to the structure used to generate the lists
-    // let look at where a partition object is generated.
-    let key = repairTracker.key
-    let txList = this.getTXListByKey(key, repairTracker.partitionId)
-
-    // txList.hashes = ourPartitionObj.Txids
-    // txList.passed = ourPartitionObj.Status
-    // txList.states = ourPartitionObj.States // TXSTATE_TODO
-
-    //TxTallyList  CLConversion Added thashes: [], tpassed: [], ttxs: [], tstates: []  to make this type fit.  should double check tha tthis doesnt break things. also had to add processed
-    let newTxList:NewTXList = { hashes: [...ourPartitionObj.Txids], passed: [...ourPartitionObj.Status], states: [...ourPartitionObj.States], txs:[], thashes: [], tpassed: [], ttxs: [], tstates: [], processed:false }
-    // let newTxList = { hashes: [], passed: [], txs: [], thashes: [], tpassed: [], ttxs: [], tstates: [], states: [] }
-    txList.newTxList = newTxList
-
-    // build a map that merges our tx data
-    let allTXs:AcceptedTxObjectById = {}
-    for (let tx of txList.txs) {
-      allTXs[tx.id] = tx
-    }
-    for (let tx of repairTracker.newPendingTXs) {
-      allTXs[tx.id] = tx
-    }
-    for (let tx of repairTracker.newFailedTXs) {
-      allTXs[tx.id] = tx
-    }
-    let txs = []
-    let missingTXs = []
-    // build a list of txs based on our map and list of hashes.
-    for (let txID of txList.hashes) {
-      let tx = allTXs[txID]
-      if (tx != null) {
-        txs.push(tx)
-      } else {
-        missingTXs.push(txID)
-      }
-    }
-    if (missingTXs.length > 0) {
-      this.fatalLogger.fatal(` _mergeRepairDataIntoLocalState missing some TXS :${utils.stringifyReduce(missingTXs)}  `)
-    }
-
-    // Set the txs!
-    newTxList.txs = txs
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair _mergeRepairDataIntoLocalState:  key: ${key} txlist: ${utils.stringifyReduce({ hashes: txList.hashes, passed: txList.passed })} `)
-  }
-
-  //  this works with syncTXsFromHashSetStrings to correct our partition object data. unlike the other version of this function this just creates entries on a
-  //  temp member newTxList that will be used for the next partition object calculation
-
-  /**
-   * _mergeRepairDataIntoLocalState2
-   * used by syncTXsFromHashSetStrings in the complex case where we had to run consensus on individual transactions and request transactions from possibly multiple nodes
-   * @param {RepairTracker} repairTracker
-   * @param {PartitionObject} ourPartitionObj
-   * @param {any} ourLastResultHash
-   * @param {GenericHashSetEntry & IHashSetEntryPartitions} ourHashSet
-   */
-  _mergeRepairDataIntoLocalState2 (repairTracker:RepairTracker, ourPartitionObj:PartitionObject, ourLastResultHash:any, ourHashSet:HashSetEntryPartitions, txListOverride:TxTallyList | null = null) {
-    let key = repairTracker.key
-    let txList:TxTallyList | null = null
-    if (txListOverride != null) {
-      txList = txListOverride
-    } else {
-      txList = this.getTXListByKey(key, repairTracker.partitionId)
-    }
-
-    let key2 = 'p' + repairTracker.partitionId
-    let debugKey = `rkeys: ${key} ${key2}`
-
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 ${debugKey}`)
-
-    // repairTracker.solutionDeltas holds all the solutions we got from asking different nodes for the the transactions we are missing
-    // repairTracker.extraTXIds holds the txids (hashes) of the transactions that are extra and need to be removed from the partition object.
-
-    if(repairTracker.solutionDeltas == null){
-      throw new Error('_mergeRepairDataIntoLocalState2 repairTracker.solutionDeltas == null')
-    }
-    if(ourHashSet.extraMap == null){
-      throw new Error('_mergeRepairDataIntoLocalState2 ourHashSet.extraMap')
-    }
-
-    let txSourceList = txList
-    if (txList.newTxList) {
-    //  txSourceList = txList.newTxList  //not sure if we should keep this... or at least update the part where we remove extra entries
-    }
-    // let newTxList = { hashes: [...txList.hashes], passed: [...txList.passed], txs: [...txList.txs] }  forced to add processed here.
-    let newTxList:NewTXList = { hashes: [], passed: [], txs: [], thashes: [], tpassed: [], ttxs: [], tstates: [], states: [], processed:false }
-    txList.newTxList = newTxList // append it to tx list for now.
-    repairTracker.solutionDeltas.sort(utils.sort_i_Asc) // function (a, b) { return a.i - b.i }) // why did b - a help us once??
-
-    let debugSol = []
-    for (let solution of repairTracker.solutionDeltas) {
-      debugSol.push({ i: solution.i, tx: solution.tx.id.slice(0, 4), st: solution.state }) // TXSTATE_TODO
-    }
-
-    ourHashSet.extraMap.sort(utils.sortAsc) // function (a, b) { return a - b })
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 z  ${debugKey} ourHashSet.extraMap: ${utils.stringifyReduce(ourHashSet.extraMap)} debugSol: ${utils.stringifyReduce(debugSol)}`)
-
-    // build up a working list for the solution but leave out the extra entries.
-    let extraIndex = 0
-    for (let i = 0; i < txSourceList.hashes.length; i++) {
-      // let extra = -1
-      // if (extraIndex < ourHashSet.extraMap.length) {
-      //   extra = ourHashSet.extraMap[extraIndex]
-      // }
-      // if (extra === i) {
-      //   extraIndex++
-      //   continue
-      // }
-      newTxList.thashes.push(txSourceList.hashes[i])
-      newTxList.tpassed.push(txSourceList.passed[i])
-      newTxList.ttxs.push(txSourceList.txs[i])
-      newTxList.tstates.push(txSourceList.states[i]) // TXSTATE_TODO
-    }
-
-    // let stepSize = cHashSetStepSize
-    // let hashSet = ''
-    // for (let hash of newTxList.thashes) {
-    //   hashSet += hash.slice(0, stepSize)
-    // }
-
-    let hashSet = StateManager.createHashSetString(newTxList.thashes, newTxList.tstates) // TXSTATE_TODO
-
-    if(ourHashSet.indexMap == null){
-      throw new Error(`_mergeRepairDataIntoLocalState2 ourHashSet.indexMap == null ${debugKey}`); 
-    }
-
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a  ${debugKey} len: ${ourHashSet.indexMap.length}  extraIndex: ${extraIndex} ourPreHashSet: ${hashSet}`)
-
-    // Txids: txSourceData.hashes, // txid1, txid2, …],  - ordered from oldest to recent
-    // Status: txSourceData.passed, // [1,0, …],      - ordered corresponding to Txids; 1 for applied; 0 for failed
-    // build our data while skipping extras.
-
-    // insert corrections in order for each -1 in our local list (or write from our temp lists above)
-    let ourCounter = 0
-    let solutionIndex = 0
-    try {
-      for (let i = 0; i < ourHashSet.indexMap.length; i++) {
-        let currentIndex = ourHashSet.indexMap[i]
-        if (currentIndex >= 0) {
-        // pull from our list? but we have already removed stuff?
-          newTxList.hashes[i] = newTxList.thashes[currentIndex]
-          newTxList.passed[i] = newTxList.tpassed[currentIndex]
-          newTxList.txs[i] = newTxList.ttxs[currentIndex]
-          newTxList.states[i] = newTxList.tstates[currentIndex]
-          ourCounter++
-          // if we get into this check it is because it seemed we did not have a tx locally even though the calculations thought we did
-          if (newTxList.hashes[i] == null) {
-            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 ${debugKey} a error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}  newTxList.hashes.length: ${newTxList.hashes.length} newTxList.thashes.length: ${newTxList.thashes.length} ourHashSet.indexMap.length:${ourHashSet.indexMap.length} txSourceList.hashes.length: ${txSourceList.hashes.length}`)
-            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 ${debugKey} a error null at i: ${i}  newTxList:${utils.stringifyReduce(newTxList)}`)
-            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 ${debugKey} a error null at i: ${i}  txSourceList:${utils.stringifyReduce(txSourceList)}`)
-
-            // if (this.verboseLogs) this.mainLogger.error('failnugget:' + stringify({ txList, repairTracker, ourHashSet }))
-            throw new Error('aborting data repair. fatal problem')
-          }
-        } else {
-          // Index was set to -1 and the transaction was something that we had to query other nodes for.  The results of this got put in repairTracker.solutionDeltas
-          // repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j] })
-          let solutionDelta = repairTracker.solutionDeltas[solutionIndex]
-
-          if (!solutionDelta) {
-            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error solutionDelta=null  solutionIndex: ${solutionIndex} i:${i} of ${ourHashSet.indexMap.length} deltas: ${utils.stringifyReduce(repairTracker.solutionDeltas)}`)
-          }
-          // insert the next one
-          newTxList.hashes[i] = solutionDelta.tx.id
-          newTxList.passed[i] = solutionDelta.pf
-          newTxList.txs[i] = solutionDelta.tx
-          newTxList.states[i] = solutionDelta.state // TXSTATE_TODO
-          solutionIndex++
-          if (newTxList.hashes[i] == null) {
-            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 b error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
-          }
-        }
-      }
-    } catch (ex) {
-      this.mainLogger.debug('_repair: _mergeRepairDataIntoLocalState2 ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      this.fatalLogger.fatal('_repair: _mergeRepairDataIntoLocalState2 ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 c  Exception when applying solution. going apoptosis. solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter} ourHashSet: ${hashSet}`)
-
-      if (this.verboseLogs) this.mainLogger.error('failnugget2:' + stringify({ txList, repairTracker, ourHashSet }))
-      this.p2p.initApoptosis()
-      throw new Error('aborting data repair. starting apoptosis')
-    }
-
-    hashSet = ''
-    // for (let hash of newTxList.hashes) {
-    //   if (!hash) {
-    //     hashSet += 'xx'
-    //     continue
-    //   }
-    //   hashSet += hash.slice(0, stepSize)
-    // }
-    hashSet = StateManager.createHashSetString(newTxList.hashes, newTxList.states) // TXSTATE_TODO
-
-    // if(hashSet == null){
-    //   throw new Error(`_mergeRepairDataIntoLocalState2 hashSet == null 2 ${debugKey}`); 
-    // }
-
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 c  len: ${ourHashSet.indexMap.length}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter} ourHashSet: ${hashSet}`)
-
-    if (repairTracker.outputHashSet !== hashSet) {
-      this.mainLogger.error(`Failed to match our hashset to the solution hashSet: ${hashSet}  solution: ${repairTracker.outputHashSet}  `)
-
-      /** @type {GenericHashSetEntry[]} */
-      let hashSetList:GenericHashSetEntry[] = []
-      hashSetList.push(/** @type {GenericHashSetEntry} */{ hash: 'a1', votePower: 1, hashSet: hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, indexMap: [], extraMap: [], waitForIndex: -1, ownVotes: [] })
-      hashSetList.push(/** @type {GenericHashSetEntry} */{ hash: 'b1', votePower: 10, hashSet: repairTracker.outputHashSet!, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, indexMap: [], extraMap: [], waitForIndex: -1, ownVotes: [] })
-      let output = StateManager.solveHashSets2(hashSetList)
-      for (let hashSetEntry of hashSetList) {
-        this.mainLogger.error(JSON.stringify(hashSetEntry))
-      }
-      this.mainLogger.error(JSON.stringify(output))
-      StateManager.expandIndexMapping(hashSetList[0], output)
-      this.mainLogger.error(JSON.stringify(hashSetList[0].indexMap))
-      this.mainLogger.error(JSON.stringify(hashSetList[0].extraMap))
-
-      return false
-    }
-
-    return true
-  }
-
   initApoptosisAndQuitSyncing () {
     console.log('initApoptosisAndQuitSyncing ' + utils.getTime('s'))
     this.mainLogger.error(this.dataPhaseTag + `initApoptosisAndQuitSyncing `)
     this.failAndDontRestartSync()
     this.p2p.initApoptosis()
-  }
-
-  /**
-   * syncTXsFromHashSetStrings
-   * This is used when there is no clear winning hash and we must do consensus on each transaction
-   *  This takes the various hashset strings we have collected and feeds them in to a general purpose solver
-   *  The first pass in the solver finds the consensus merged string
-   *  The secon pass of the solver helps generate the solution operations needed to make our data match the solved list (i.e. delete or insert certain elements)
-   *  After the solvers are run we can build lists of requests to one or more nodes and ask for missing transactions. (get_transactions_by_partition_index)
-   *  Finally we can call _mergeRepairDataIntoLocalState2 to to merge the results that we queried for into our set of data that is used for forming partition objects.
-   * @param {number} cycleNumber
-   * @param {number} partitionId
-   * @param {RepairTracker} repairTracker
-   * @param {string} ourLastResultHash
-   */
-  async syncTXsFromHashSetStrings (cycleNumber: number, partitionId: number, repairTracker: RepairTracker, ourLastResultHash: string): Promise<100 | undefined> {
-    let cycleCounter = cycleNumber
-    if (!this.useHashSets) {
-      return
-    }
-
-    let key1 = 'c' + cycleNumber
-    let key2 = 'p' + partitionId
-    let debugKey = `rkeys: ${key1} ${key2}`
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `syncTXsFromHashSetStrings: ${debugKey}`)
-
-    // This will create an set of input to send to the general purpose solver
-    let hashSetList = /** @type {HashSetEntryPartitions[]} */(this.solveHashSetsPrep(cycleCounter, partitionId, this.crypto.getPublicKey()))
-    // sort so that solution will be deterministic
-    hashSetList.sort(utils.sortHashAsc)
-    // This runs the general purose solver
-    let output = StateManager.solveHashSets2(hashSetList)
-    // build a hashset string from the solved output
-    let outputHashSet = ''
-    for (let hash of output) {
-      outputHashSet += hash
-    }
-    repairTracker.outputHashSet = outputHashSet
-
-    // Now that we have run the solver once we will run it a again with a large vote for the previous computed winner
-    // The only reason this is done is because solveHashSets is not quite as good as it needs to be at generating change list but it can do better if
-    // the first pass finds the answer and the second pass finds the delta to the answer rather than doing it all at once.
-
-    // REFLOW HACK.  when we randomize host selection should make sure not to pick this forced solution as an answer (edit: not sure what this means any more.)
-    // TODO perf:  if we fixed the algorith we could probably do this in one pass instead
-    let hashSetList2 = /** @type {HashSetEntryPartitions[]} */(this.solveHashSetsPrep(cycleCounter, partitionId, this.crypto.getPublicKey()))
-    // sort so that solution will be deterministic
-    hashSetList2.sort(utils.sortHashAsc) // sort so that solution will be deterministic
-    /** @type {HashSetEntryPartitions} */
-    let hashSet = { hash: 'FORCED', votePower: 1000, hashSet: outputHashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [], ourRow: false, indexMap: [], extraMap: [], waitForIndex: -1, ownVotes: [] }
-    hashSetList2.push(hashSet)
-    output = StateManager.solveHashSets2(hashSetList2, 40, 0.625)//, output)
-    hashSetList = hashSetList2
-
-    // now that we have run the solver a second time we need to process the results and figure out which nodes to ask for missing transactions
-
-    // expand details and print out all the entries.
-    for (let hashSetEntry of hashSetList) {
-      StateManager.expandIndexMapping(hashSetEntry, output) // expand them all for debug.  (this data gets used later so not really a perf hit)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + JSON.stringify(hashSetEntry))
-    }
-
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + JSON.stringify(output))
-    // find our solution
-    let ourSolution = hashSetList.find((a) => a.ourRow === true) // owner
-    if(ourSolution == null){
-      throw new Error(`syncTXsFromHashSetStrings ourSolution == null 2 ${debugKey}`); 
-    }
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'ourSolution: ' + JSON.stringify({ ourSolution, len: ourSolution.hash.length }))
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'solved outputHashSet: ' + outputHashSet)
-    // lets generate the indexMap and extraMap index tables for out hashlist solution
-    StateManager.expandIndexMapping(ourSolution, output)
-
-    let insertCount = 0
-    // flag extras
-    /** @type {{ requests: number[]; hostIndex: number[]; stateSnippets: string[]; hash?: string; txSnippets: string[] }[]} */
-    let requestsByHost = new Array(hashSetList.length).fill(null)
-    for (let correction of ourSolution.corrections) {
-      let index = correction.i
-      if (correction.t === 'insert') {
-        let greedyAsk = -1 // todo perf: could try non greedy
-
-        let voters = correction.tv.voters // correction.tv.vote.voters  old solver needed this:
-        if(voters == null){
-          throw new Error(`syncTXsFromHashSetStrings voters == null  ${debugKey}  ${utils.stringifyReduce(correction)}`); 
-        }
-        for (let i = 0; i < voters.length; i++) {
-          if (voters[i] === hashSetList.length - 1) {
-            // Because of FORCED solution the last voter is always a invalid?
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `skipped greedy index (type1) for FORCED ${voters[i]}`)
-            continue
-          }
-          if (requestsByHost[voters[i]]) {
-            greedyAsk = voters[i]
-            // added this for perf, needs testing:  (once we get a a valid greedyAsk value bail from the loop)
-            // if (greedyAsk >= 0){
-            //   continue
-            // }
-          }
-        }
-        // no entries found so init one
-        if (greedyAsk < 0) {
-          // greedyAsk = voters[0]
-          let findValidIndex = 0
-          do {
-            greedyAsk = voters[findValidIndex]
-            findValidIndex++
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `skipped greedy index (type2) for FORCED ${greedyAsk}`)
-          } while (greedyAsk === hashSetList.length - 1 && findValidIndex < voters.length)
-
-          requestsByHost[greedyAsk] = { requests: [], hostIndex: [], stateSnippets: [], txSnippets: [] }
-        }
-        // generate the index map for the server we will ask as needed
-        if (hashSetList[greedyAsk].indexMap == null) {
-          StateManager.expandIndexMapping(hashSetList[greedyAsk], output)
-        }
-
-        // use the remote hosts index map to determine for the exact index. this will get assigned to tx_indicies and the
-        let hashSet = hashSetList[greedyAsk]
-        if(hashSet == null || hashSet.indexMap == null){
-          throw new Error(`syncTXsFromHashSetStrings hashSet == null  ${debugKey} ${utils.stringifyReduce(hashSet)} `);
-        }
-        let hostIndex = hashSet.indexMap[index]
-        requestsByHost[greedyAsk].hostIndex.push(hostIndex) // todo calc this on host side, requires some cache mgmt!
-
-        // just ask for the correction and let the remote host do the translation!
-        requestsByHost[greedyAsk].requests.push(index)
-
-        // send the hash we are asking for so we will have a ref for the index
-        requestsByHost[greedyAsk].hash = hashSetList[greedyAsk].hash
-
-        requestsByHost[greedyAsk].txSnippets.push(correction.v)
-        // grab chars from the solution that will rep the data hash we want
-        requestsByHost[greedyAsk].stateSnippets.push(correction.v.slice(cHashSetTXStepSize, cHashSetTXStepSize + cHashSetDataStepSize))
-        insertCount++
-      }
-    }
-
-    // stomp or create a repair deltas array parallel to the other changes
-    repairTracker.solutionDeltas = []
-
-    for (let i = 0; i < requestsByHost.length; i++) {
-      if (requestsByHost[i] != null) {
-        // I think we don't need this anymore:
-        // requestsByHost[i].requests.sort(BAD SORT function (a, b) { return a - b }) // sort these since the reponse for the host will also sort by timestamp
-
-        let payload = { partitionId: partitionId, cycle: cycleNumber, tx_indicies: requestsByHost[i].hostIndex, hash: requestsByHost[i].hash, debugSnippets: requestsByHost[i].txSnippets }
-        if (this.extendedRepairLogging) console.log(`get_transactions_by_partition_index ok! ${debugKey} payload: ${utils.stringifyReduce(payload)}`)
-        if (this.extendedRepairLogging) console.log(`requestsByHost[i].stateSnippets ${debugKey} ${utils.stringifyReduce(requestsByHost[i].stateSnippets)} `)
-        if (hashSetList[i].owners.length > 0) {
-          // not sure how that worked!!
-          // let nodeToContact = this.p2p.state.getNodeByPubKey(hashSetList[i].owners[0])
-
-          //  need to make this use the requestsByHost
-          let nodeToContact = this.p2p.state.getNodeByPubKey(hashSetList[i].owners[0])
-
-          let r:TransactionsByPartitionResp | boolean = await this.p2p.ask(nodeToContact, 'get_transactions_by_partition_index', payload)
-          //TSConversion kinda funky way to handle an ask result that can also be false
-          if (r === false) { this.mainLogger.error('ASK FAIL 15') }
-          let result:TransactionsByPartitionResp = r as TransactionsByPartitionResp
-          // { success: true, acceptedTX: result, passFail: passFailList }
-          if (result.success === true) {
-            let returnedResults = 0
-            let expectedResults = payload.tx_indicies.length
-            if (this.extendedRepairLogging) console.log(`get_transactions_by_partition_index ok! ${debugKey} count:${result.acceptedTX.length} payload: ${utils.stringifyReduce(payload)} reqCount:${payload.tx_indicies.length}`)
-            for (let j = 0; j < result.acceptedTX.length; j++) {
-              let acceptedTX = result.acceptedTX[j]
-
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `syncTXsFromHashSetStrings gotTX: ${utils.stringifyReduce(acceptedTX.id)} ${acceptedTX.timestamp} ${utils.stringifyReduce(acceptedTX)} `)
-              if(result.passFail == null){
-                throw new Error(`syncTXsFromHashSetStrings (result.passFail == null  ${debugKey} ${utils.stringifyReduce(result)} `);
-              }
-              if (result.passFail[j] === 1) {
-                repairTracker.newPendingTXs.push(acceptedTX)
-                repairTracker.missingTXIds.push(acceptedTX.id)
-              } else {
-                repairTracker.newFailedTXs.push(acceptedTX) // todo perf:  could make the response more complex so that it does not return the full tx for falied ones!.   this could take a fair amount of work.
-              }
-
-              if (acceptedTX == null) {
-                if (this.verboseLogs) this.mainLogger.error(`syncTXsFromHashSetStrings acceptedTX == null ${debugKey} j:${j} i:${i} pf:${result.passFail[j]}`)
-              }
-              // update our solution deltas.. hopefully that is enough info to patch up our state.
-              //   // TXSTATE_TODO   need a way to set state on this entry!
-              //      probably best to just copy it from what we queried?
-
-              // now we have statesList also
-              let state = requestsByHost[i].stateSnippets[j] // snippets are just the first 2 characters of state if we have stateList use that instead.
-              if(result.statesList == null){
-                throw new Error(`syncTXsFromHashSetStrings (result.statesList == null  ${debugKey} ${utils.stringifyReduce(result)} `);
-              }
-              state = result.statesList[j]
-              repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j], state: state })
-              returnedResults++
-            }
-
-            if (returnedResults < expectedResults) {
-              if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults recv ${returnedResults} < ${expectedResults}`)
-            }
-          } else {
-            // todo datasync:  assert/fail/or retry
-            if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index failed! ${debugKey} payload: ${utils.stringifyReduce(payload)}`)
-          }
-
-          // add these TXs to newPendingTXs or newFailedTXs  and the IDs to missingTXIds
-          // host needs to give us pass/fail info
-        }
-      }
-    }
-
-    if (insertCount !== repairTracker.solutionDeltas.length) {
-      if (this.verboseLogs) this.mainLogger.error(`${debugKey} insertCount !== repairTracker.solutionDeltas.length: ${insertCount} , ${repairTracker.solutionDeltas.length} `)
-    }
-
-    // calculate extraTXIds
-    // first find the partition object that matches the hash we used in this solution
-    let key = 'c' + cycleNumber
-    let partitionObjectsByHash = this.recentPartitionObjectsByCycleByHash[key]
-    if (!partitionObjectsByHash) {
-      return
-    }
-    let partitionObject = partitionObjectsByHash[ourSolution.hash]
-    if (!partitionObject) {
-      return
-    }
-    if(ourSolution.extraMap == null){
-      throw new Error(`syncTXsFromHashSetStrings (ourSolution.extraMap == null  ${debugKey} ${utils.stringifyReduce(ourSolution)} `);
-    }
-    // next use our extraMap indicies to grab the actual transactions we need for the list
-    for (let i = 0; i < ourSolution.extraMap.length; i++) {
-      // these indexes will be relative to the object map we had the first time.
-      let index = ourSolution.extraMap[i]
-      repairTracker.extraTXIds.push(partitionObject.Txids[index])
-      // repairTracker.extraTXs.push(partitionObject.txs[index])
-    }
-
-    let mergeOk = this._mergeRepairDataIntoLocalState2(repairTracker, partitionObject, ourLastResultHash, ourSolution)
-
-    if (mergeOk === false) {
-      return 100 // ugh super hack ret value
-    }
-    // todo print hash set here.
-    return
   }
 
   // async applyHashSetSolution (solution) {
