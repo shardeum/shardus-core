@@ -1149,9 +1149,9 @@ class StateManager extends EventEmitter {
         
         let message = { accountIds: remainingAccountsToSync }
         let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
-        if (result === false) { this.mainLogger.error('ASK FAIL syncStateDataGlobals 4') }
-    
+
         if(result == null){
+          if (this.verboseLogs)  { this.mainLogger.error('ASK FAIL syncStateTableData result == null') }
           if(this.tryNextDataSourceNode('syncStateDataGlobals') == false){
             break
           }
@@ -1266,8 +1266,8 @@ class StateManager extends EventEmitter {
     }
     let queryFn = async (node: Shardus.Node) => {
       let result = await this.p2p.ask(node, 'get_globalaccountreport', {})
-      if (result === false) { this.mainLogger.error('ASK FAIL getRobustGlobalReport 1') }
-      if (result === null) { this.mainLogger.error('ASK FAIL getRobustGlobalReport 1b') }
+      if (result === false) { this.mainLogger.error('ASK FAIL getRobustGlobalReport result === false') }
+      if (result === null) { this.mainLogger.error('ASK FAIL getRobustGlobalReport result === null') }
       return result
     }
     //can ask any active nodes for global data.
@@ -1348,7 +1348,8 @@ class StateManager extends EventEmitter {
       }
       let queryFn = async (node: Shardus.Node) => {
         let result = await this.p2p.ask(node, 'get_account_state_hash', message)
-        if (result === false) { this.mainLogger.error('ASK FAIL syncStateTableData 1') }
+        if (result === false) { this.mainLogger.error('ASK FAIL syncStateTableData result === false') }
+        if (result === null) { this.mainLogger.error('ASK FAIL syncStateTableData result === null') }
         return result
       }
 
@@ -1402,9 +1403,9 @@ class StateManager extends EventEmitter {
       while (moreDataRemaining) {
         let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: lowTimeQuery, tsEnd: endTime }
         let result = await this.p2p.ask(this.dataSourceNode, 'get_account_state', message)
-        if (result === false) { this.mainLogger.error('ASK FAIL syncStateTableData 2') }
 
         if(result == null){
+          if (this.verboseLogs)  { this.mainLogger.error('ASK FAIL syncStateTableData result == null') }
           if(this.tryNextDataSourceNode('syncStateDataGlobals') == false){
             break
           }
@@ -1509,11 +1510,12 @@ class StateManager extends EventEmitter {
       // max records artificially low to make testing coverage better.  todo refactor: make it a config or calculate based on data size
       let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, maxRecords: this.config.stateManager.accountBucketSize }
       let r:GetAccountData3Resp | boolean = await this.p2p.ask(this.dataSourceNode, 'get_account_data3', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
-      if (r === false) { this.mainLogger.error('ASK FAIL syncAccountData 3') }
+
       // TSConversion need to consider better error handling here!
       let result:GetAccountData3Resp = r as GetAccountData3Resp
 
       if(result == null){
+        if (this.verboseLogs) { this.mainLogger.error('ASK FAIL syncAccountData result == null') }
         if(this.tryNextDataSourceNode('syncAccountData') == false){
           break
         }
@@ -1887,9 +1889,9 @@ class StateManager extends EventEmitter {
 
     let message = { accountIds: addressList }
     let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
-    if (result === false) { this.mainLogger.error('ASK FAIL syncFailedAcccounts 4') }
 
     if(result == null){
+      if (this.verboseLogs) { this.mainLogger.error('ASK FAIL syncFailedAcccounts result == null') }
       if(this.tryNextDataSourceNode('syncStateDataGlobals') == false){
         return
       }
@@ -3999,7 +4001,7 @@ class StateManager extends EventEmitter {
           let result:RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx', message) // not sure if we should await this.
 
           if(result == null){
-            this.mainLogger.error('ASK FAIL request_state_for_tx')
+            if (this.verboseLogs) { this.mainLogger.error('ASK FAIL request_state_for_tx') }
             this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
             triesLeft--
             continue
@@ -4057,7 +4059,10 @@ class StateManager extends EventEmitter {
     // Need to build a list of what accounts we need, what state they should be in and who to get them from
     let requestObjects: {[id:string]:{appliedVote:AppliedVote, voteIndex:number, accountHash:string, accountId:string, nodeShardInfo:NodeShardData}} = {}
     let appliedVotes = queueEntry.appliedReceiptForRepair.appliedVotes
-    //TODO could random shuffle the vote list
+    
+    //shuffle the array
+    utils.shuffleArray(appliedVotes)
+
     let allKeys = []
 
     this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `appliedVotes ${utils.stringifyReduce(appliedVotes)}  `)
@@ -4137,7 +4142,16 @@ class StateManager extends EventEmitter {
 
         let message = { key: requestObject.accountId, hash:requestObject.accountHash, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
         let result:RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx_post', message) // not sure if we should await this.
-        if (result.success === false) { this.mainLogger.error('ASK FAIL repairToMatchReceipt') }
+        
+        if(result == null){
+          if (this.verboseLogs)  { this.mainLogger.error('ASK FAIL repairToMatchReceipt request_state_for_tx_post result == null') }
+          // We shuffle the array of votes each time so hopefully will ask another node next time
+          // TODO more robust limits to this process, maybe a delay?
+          this.mainLogger.error(`ASK FAIL repairToMatchReceipt request_state_for_tx_post no reponse from ${utils.stringifyReduce(node.id)}`)
+          return
+        }
+
+        if (result.success === false) { this.mainLogger.error('ASK FAIL repairToMatchReceipt result.success === false' ) }
         let dataCountReturned = 0
         let accountIdsReturned = []
         for (let data of result.stateList) {
@@ -5545,7 +5559,8 @@ class StateManager extends EventEmitter {
       }
       let message = { accountIds: [address] }
       let r:GetAccountDataWithQueueHintsResp | boolean = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
-      if (r === false) { this.mainLogger.error('ASK FAIL getLocalOrRemoteAccount 10') }
+      if (r === false) { this.mainLogger.error('ASK FAIL getLocalOrRemoteAccount r === false') }
+
       let result = r as GetAccountDataWithQueueHintsResp
       if (result != null && result.accountData != null && result.accountData.length > 0) {
         wrappedAccount = result.accountData[0]
@@ -5617,7 +5632,8 @@ class StateManager extends EventEmitter {
     }
     let message = { accountIds: [address] }
     let result = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
-    if (result === false) { this.mainLogger.error('ASK FAIL getRemoteAccount 11') }
+    if (result === false) { this.mainLogger.error('ASK FAIL getRemoteAccount result === false') }
+    if (result === null) { this.mainLogger.error('ASK FAIL getRemoteAccount result === null') }
     if (result != null && result.accountData != null && result.accountData.length > 0) {
       wrappedAccount = result.accountData[0]
       return wrappedAccount
