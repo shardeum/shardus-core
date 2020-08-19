@@ -7,6 +7,8 @@ import * as CycleCreator from './CycleCreator'
 import { CycleRecord as Cycle } from './CycleCreator'
 import * as CycleParser from './CycleParser'
 import { validateTypes } from '../utils'
+import { Request } from 'express'
+import { StateHashes } from '../snapshot'
 
 /** TYPES */
 
@@ -14,44 +16,46 @@ export interface Transaction {
   id: string
 }
 
-export interface Partition {
-  hash: string
-}
-
-export type ValidTypes = Cycle | Transaction | Partition
+export type ValidTypes = Cycle | Transaction | StateHashes
 
 export enum TypeNames {
   CYCLE = 'CYCLE',
   TRANSACTION = 'TRANSACTION',
-  PARTITION = 'PARTITION',
+  STATE = 'STATE',
+}
+
+interface NamesToTypes {
+  CYCLE: Cycle
+  TRANSACTION: Transaction
+  STATE: StateHashes
 }
 
 export type TypeName<T extends ValidTypes> = T extends Cycle
   ? TypeNames.CYCLE
   : T extends Transaction
   ? TypeNames.TRANSACTION
-  : TypeNames.PARTITION
+  : TypeNames.STATE
 
 export type TypeIndex<T extends ValidTypes> = T extends Cycle
   ? Cycle['counter']
   : T extends Transaction
   ? Transaction['id']
-  : Partition['hash']
+  : StateHashes['counter']
 export interface DataRequest<T extends ValidTypes> {
   type: TypeName<T>
   lastData: TypeIndex<T>
 }
 
-interface DataResponse<T extends ValidTypes> {
+interface DataResponse {
   publicKey: string
-  type: string
-  data: T[]
+  responses: {
+    [T in TypeNames]?: NamesToTypes[T][]
+  }
 }
 
-interface DataRecipient<T extends ValidTypes> {
+interface DataRecipient {
   nodeInfo: JoinedArchiver
-  type: DataRequest<T>['type']
-  lastData: DataRequest<T>['lastData']
+  dataRequests: DataRequest<Cycle | Transaction | StateHashes>[]
   curvePk: string
 }
 
@@ -79,7 +83,7 @@ export interface Record {
 let p2pLogger
 
 export let archivers: Map<JoinedArchiver['publicKey'], JoinedArchiver>
-let recipients: Array<DataRecipient<Cycle | Transaction | Partition>>
+let recipients: DataRecipient[]
 
 let requests: JoinRequest[]
 
@@ -111,12 +115,17 @@ export function getTxs(): Txs {
   }
 }
 
-export function validateRecordTypes(rec: Record): string{
-  let err = validateTypes(rec,{joinedArchivers:'a'})
+export function validateRecordTypes(rec: Record): string {
+  let err = validateTypes(rec, { joinedArchivers: 'a' })
   if (err) return err
-  for(const item of rec.joinedArchivers){
-    err = validateTypes(item,{publicKey:'s',ip:'s',port:'n',curvePk:'s'})
-    if (err) return 'in joinedArchivers array '+err
+  for (const item of rec.joinedArchivers) {
+    err = validateTypes(item, {
+      publicKey: 's',
+      ip: 's',
+      port: 'n',
+      curvePk: 's',
+    })
+    if (err) return 'in joinedArchivers array ' + err
   }
   return ''
 }
@@ -127,7 +136,9 @@ export function updateRecord(
   _prev: CycleCreator.CycleRecord
 ) {
   // Add join requests to the cycle record
-  const joinedArchivers = txs.archivers.map(joinRequest => joinRequest.nodeInfo)
+  const joinedArchivers = txs.archivers.map(
+    (joinRequest) => joinRequest.nodeInfo
+  )
   record.joinedArchivers = joinedArchivers.sort()
 }
 
@@ -158,24 +169,28 @@ export function resetJoinRequests() {
 }
 
 export function addJoinRequest(joinRequest, tracker?, gossip = true) {
-
   // validate input
-  let err = validateTypes(joinRequest,{nodeInfo:'o',sign:'o'})
-  if (err){
-    warn('addJoinRequest: bad joinRequest '+err)
+  let err = validateTypes(joinRequest, { nodeInfo: 'o', sign: 'o' })
+  if (err) {
+    warn('addJoinRequest: bad joinRequest ' + err)
     return false
   }
-  err = validateTypes(joinRequest.nodeInfo, {curvePk:'s',ip:'s',port:'n',publicKey:'s'})
-  if (err){
-    warn('addJoinRequest: bad joinRequest.nodeInfo '+err)
+  err = validateTypes(joinRequest.nodeInfo, {
+    curvePk: 's',
+    ip: 's',
+    port: 'n',
+    publicKey: 's',
+  })
+  if (err) {
+    warn('addJoinRequest: bad joinRequest.nodeInfo ' + err)
     return false
   }
-  err = validateTypes(joinRequest.sign, {owner:'s',sig:'s'})
-  if (err){
-    warn('addJoinRequest: bad joinRequest.sign '+err)
+  err = validateTypes(joinRequest.sign, { owner: 's', sig: 's' })
+  if (err) {
+    warn('addJoinRequest: bad joinRequest.sign ' + err)
     return false
   }
-  if (! crypto.verify(joinRequest)){
+  if (!crypto.verify(joinRequest)) {
     warn('addJoinRequest: bad signature')
     return false
   }
@@ -200,12 +215,11 @@ export function updateArchivers(joinedArchivers) {
 
 export function addDataRecipient(
   nodeInfo: JoinedArchiver,
-  dataRequest: DataRequest<Cycle | Transaction | Partition>
+  dataRequests: DataRequest<Cycle | Transaction | StateHashes>[]
 ) {
   const recipient = {
     nodeInfo,
-    type: dataRequest.type,
-    lastData: dataRequest.lastData,
+    requestedData: dataRequests,
     curvePk: crypto.convertPublicKeyToCurve(nodeInfo.publicKey),
   }
   recipients.push(recipient)
@@ -225,38 +239,43 @@ export function sendData() {
   for (const recipient of recipients) {
     const recipientUrl = `http://${recipient.nodeInfo.ip}:${recipient.nodeInfo.port}/newdata`
 
-    const baseDataResponse = {
-      publicKey: crypto.getPublicKey(),
-      type: recipient.type,
+    const responses: DataResponse['responses'] = {}
+
+    for (const request of recipient.dataRequests) {
+      switch (request.type) {
+        case 'CYCLE': {
+          // Identify request type
+          const typedRequest = request as DataRequest<NamesToTypes['CYCLE']>
+          // Get latest cycles since lastData
+          const data = getCycleChain(typedRequest.lastData + 1)
+          // Update lastData
+          if (data.length > 0) {
+            typedRequest.lastData = data[data.length - 1].counter
+          }
+          // Add to responses
+          responses.CYCLE = data
+          break
+        }
+        case 'TRANSACTION': {
+          // [TODO] Send latest txs
+          break
+        }
+        case 'STATE': {
+          // Identify request type
+          const typedRequest = request as DataRequest<NamesToTypes['STATE']>
+          // [TODO] Get latest state hash data since lastData
+          // [TODO] Update lastData
+          // Add to responses
+          responses.STATE = []
+          break
+        }
+        default:
+      }
     }
 
-    let dataResponse
-
-    switch (recipient.type) {
-      case 'CYCLE': {
-        // Identify recipients type
-        const typedRecipient = recipient as DataRecipient<Cycle>
-        // Get latest cycles since recipients lastData
-        const data = getCycleChain(typedRecipient.lastData + 1)
-        // Update lastData
-        if (data.length > 0) {
-          typedRecipient.lastData = data[data.length - 1].counter
-        }
-        // Make dataResponse
-        dataResponse = Object.assign(baseDataResponse, {
-          data,
-        })
-        break
-      }
-      case 'TRANSACTION': {
-        // [TODO] Send latest txs
-        break
-      }
-      case 'PARTITION': {
-        // [TODO] Send latest partitions
-        break
-      }
-      default:
+    const dataResponse: DataResponse = {
+      publicKey: crypto.getPublicKey(),
+      responses,
     }
 
     // Tag dataResponse
@@ -264,13 +283,13 @@ export function sendData() {
 
     http
       .post(recipientUrl, taggedDataResponse)
-      .then(dataKeepAlive => {
+      .then((dataKeepAlive) => {
         if (dataKeepAlive.keepAlive === false) {
           // Remove recipient from dataRecipients
           removeDataRecipient(recipient.nodeInfo.publicKey)
         }
       })
-      .catch(err => {
+      .catch((err) => {
         // Remove recipient from dataRecipients
         warn('Error sending data to dataRecipient.', err)
         removeDataRecipient(recipient.nodeInfo.publicKey)
@@ -278,38 +297,13 @@ export function sendData() {
   }
 }
 
-export function sendPartitionData(partitionReceipt, paritionObject) {
-  // for (const nodeInfo of cycleRecipients) {
-  //   const nodeUrl = `http://${nodeInfo.ip}:${nodeInfo.port}/post_partition`
-  //   http.post(nodeUrl, { partitionReceipt, paritionObject })
-  //     .catch(err => {
-  //       warn(`sendPartitionData: Failed to post to ${nodeUrl} ` + err)
-  //     })
-  // }
-}
-
-export function sendTransactionData(
-  partitionNumber,
-  cycleNumber,
-  transactions
-) {
-  // for (const nodeInfo of cycleRecipients) {
-  //   const nodeUrl = `http://${nodeInfo.ip}:${nodeInfo.port}/post_transactions`
-  //   http.post(nodeUrl, { partitionNumber, cycleNumber, transactions })
-  //     .catch(err => {
-  //       warn(`sendTransactionData: Failed to post to ${nodeUrl} ` + err)
-  //     })
-  // }
-}
-
 export function registerRoutes() {
   network.registerExternalPost('joinarchiver', async (req, res) => {
-    let err = validateTypes(req, {body:'o'})
+    const err = validateTypes(req, { body: 'o' })
     if (err) {
       warn(`joinarchiver: bad req ${err}`)
-      return res.json({ success: false, error: err})
+      return res.json({ success: false, error: err })
     }
-
 
     const joinRequest = req.body
     info(`Archiver join request received: ${JSON.stringify(joinRequest)}`)
@@ -330,15 +324,20 @@ export function registerRoutes() {
   )
 
   network.registerExternalPost('requestdata', (req, res) => {
-    let err = validateTypes(req, {body:'o'})
+    let err = validateTypes(req, { body: 'o' })
     if (err) {
       warn(`requestdata: bad req ${err}`)
-      return res.json({ success: false, error: err})
+      return res.json({ success: false, error: err })
     }
-    err = validateTypes(req.body, {lastData:'n',type:'s',publicKey:'s',tag:'s'})
+    err = validateTypes(req.body, {
+      lastData: 'n',
+      type: 's',
+      publicKey: 's',
+      tag: 's',
+    })
     if (err) {
       warn(`requestdata: bad req.body ${err}`)
-      return res.json({ success: false, error: err})
+      return res.json({ success: false, error: err })
     }
     // [TODO] Authenticate tag
 

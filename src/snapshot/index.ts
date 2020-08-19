@@ -14,8 +14,14 @@ import ShardFunctions from '../state-manager/shardFunctions'
 import * as shardFunctionTypes from '../state-manager/shardFunctionTypes'
 import * as utils from '../utils'
 import * as partitionGossip from './partition-gossip'
-
 /** TYPES */
+
+export interface StateHashes {
+  counter: Cycle['counter']
+  partitionHashes: PartitionHashes
+  networkHash: NetworkStateHash
+}
+
 interface Account {
   accountId: string
   hash: string
@@ -36,7 +42,7 @@ export type PartitionHashes = Map<
   string
 >
 
-type NetworkStateHash = string
+export type NetworkStateHash = string
 
 type PartitionNum = number
 
