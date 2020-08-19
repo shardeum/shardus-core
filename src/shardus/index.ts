@@ -860,11 +860,17 @@ class Shardus extends EventEmitter {
 
     if (set === false) {
       if (!this.p2p.allowTransactions()) {
-        this.statistics.incrementCounter('txRejected')
-        return {
-          success: false,
-          reason: 'Network conditions to allow transactions are not met.',
-        }
+        if(global === true && this.p2p.allowSet()){
+          // This ok because we are initializing a global at the set time period
+        } else {
+          if (this.verboseLogs) this.mainLogger.debug(`txRejected ${JSON.stringify(tx)} set:${set} global:${global}`)
+          
+          this.statistics.incrementCounter('txRejected')
+          return {
+            success: false,
+            reason: 'Network conditions to allow transactions are not met.',
+          }  
+        }  
       }
     } else {
       if (!this.p2p.allowSet()) {

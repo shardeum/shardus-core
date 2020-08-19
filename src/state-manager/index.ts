@@ -3691,9 +3691,8 @@ class StateManager extends EventEmitter {
         }
       }
     } else {
-      this.mainLogger.error('tx_failReceiptTest set  ' + this.config.debug.loseTxChance)
-      this.config.debug.loseTxChance = 0.02
-
+      // this.mainLogger.error('tx_failReceiptTest set  ' + this.config.debug.loseTxChance)
+      // this.config.debug.loseTxChance = 0
     }
 
     try {
@@ -4061,7 +4060,7 @@ class StateManager extends EventEmitter {
     let appliedVotes = queueEntry.appliedReceiptForRepair.appliedVotes
     
     //shuffle the array
-    utils.shuffleArray(appliedVotes)
+    //utils.shuffleArray(appliedVotes)
 
     let allKeys = []
 
