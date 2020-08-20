@@ -97,6 +97,17 @@ function updateStateHashesByCycleMap (counter: Cycle['counter'], stateHash: Stat
   log('stateHashesByCycle', stateHashesByCycle)
 }
 
+export function getStateHashes(start: Cycle['counter'], end?: Cycle['counter']): StateHashes[] {
+  if (!start) throw new Error('No start cycle is provided to getStateHashes function')
+  let collector: StateHashes[] = []
+  for (let [key, ] of stateHashesByCycle) {
+    if (key >= start && (end) ? key <= end : true) {// check against end cycle only if it's provided
+      collector.push(stateHashesByCycle.get(key))
+    }
+  }
+  return collector
+}
+
 export async function initSafetyModeVals() {
   const oldCycleRecord = await readOldCycleRecord()
   const oldNetworkHash = await readOldNetworkHash()

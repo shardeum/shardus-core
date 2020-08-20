@@ -215,13 +215,16 @@ export function updateArchivers(joinedArchivers) {
 
 export function addDataRecipient(
   nodeInfo: JoinedArchiver,
-  dataRequests: DataRequest<Cycle | Transaction | StateHashes>[]
+  dataRequests: DataRequest<Cycle | Transaction | StateHashes>
 ) {
+  console.log('dataReques parameter: ', dataRequests)
   const recipient = {
     nodeInfo,
-    dataRequests,
+    // TODO: dataRequest should be an array
+    dataRequests: [dataRequests],
     curvePk: crypto.convertPublicKeyToCurve(nodeInfo.publicKey),
   }
+  console.log('dataRequests: ', recipient.dataRequests)
   recipients.push(recipient)
 }
 
