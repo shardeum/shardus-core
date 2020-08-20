@@ -2533,7 +2533,34 @@ class StateManager extends EventEmitter {
       await respond(response)
     })
 
+    // p2p ASK
+    this.p2p.registerInternal('request_receipt_for_tx', async (payload: RequestReceiptForTxReq, respond: (arg0: RequestReceiptForTxResp) => any) => {
+      let response:RequestReceiptForTxResp = { receipt: null , note: "", success: false}
+      let queueEntry = this.getQueueEntrySafe(payload.txid)// , payload.timestamp)
+      if (queueEntry == null) {
+        queueEntry = this.getQueueEntryArchived(payload.txid)// , payload.timestamp)
+      }
+
+      if (queueEntry == null) {
+        response.note = `failed to find queue entry: ${payload.txid}  ${payload.timestamp}`
+        await respond(response)
+        return
+      }
+
+      if(queueEntry.appliedReceipt != null){
+        response.receipt = queueEntry.appliedReceipt
+      } else if(queueEntry.recievedAppliedReceipt != null){
+        response.receipt = queueEntry.recievedAppliedReceipt
+      }
+      if(response.receipt != null){
+        response.success = true        
+      }
+      await respond(response)
+    }) 
+
     
+
+
     this.p2p.registerInternal('request_state_for_tx_post', async (payload: RequestStateForTxReqPost, respond: (arg0: RequestStateForTxResp) => any) => {
       let response:RequestStateForTxResp = { stateList: [] , note: "", success: false}
       // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
@@ -2739,11 +2766,6 @@ class StateManager extends EventEmitter {
       }
     })
 
-
-
-
-
-
     this.p2p.registerInternal('get_account_data_with_queue_hints', async (payload: { accountIds: string[] }, respond: (arg0: GetAccountDataWithQueueHintsResp) => any) => {
       let result = {} as GetAccountDataWithQueueHintsResp //TSConversion  This is complicated !! check app for details.
       let accountData = null
@@ -2851,6 +2873,7 @@ class StateManager extends EventEmitter {
     // this.p2p.unregisterInternal('route_to_home_node')
     this.p2p.unregisterInternal('request_state_for_tx')
     this.p2p.unregisterInternal('request_state_for_tx_post')
+    this.p2p.unregisterInternal('request_receipt_for_tx')
     this.p2p.unregisterInternal('broadcast_state')
     this.p2p.unregisterGossipHandler('spread_tx_to_group')
     this.p2p.unregisterInternal('get_account_data_with_queue_hints')
@@ -3657,11 +3680,33 @@ class StateManager extends EventEmitter {
     }
 
     this.queueEntryCounter++
-    let txQueueEntry:QueueEntry = { acceptedTx: acceptedTx, txKeys: keysResponse, noConsensus, collectedData: {}, originalData: {}, homeNodes: {}, patchedOnNodes: new Map(), hasShardInfo: false, state: 'aging', dataCollected: 0, hasAll: false, entryID: this.queueEntryCounter, localKeys: {}, localCachedData: {}, syncCounter: 0, didSync: false, syncKeys: [], logstate:'', requests:{}, globalModification:globalModification, collectedVotes:[], waitForReceiptOnly:false, m2TimeoutReached:false, debugFail1:false } // age comes from timestamp
-    // partition data would store stuff like our list of nodes that store this ts
-    // collected data is remote data we have recieved back
-    // //tx keys ... need a sorted list (deterministic) of partition.. closest to a number?
-
+    let txQueueEntry:QueueEntry = { 
+      acceptedTx: acceptedTx, 
+      txKeys: keysResponse, 
+      noConsensus, 
+      collectedData: {}, 
+      originalData: {}, 
+      homeNodes: {}, 
+      patchedOnNodes: new Map(), 
+      hasShardInfo: false, 
+      state: 'aging', 
+      dataCollected: 0, 
+      hasAll: false, 
+      entryID: this.queueEntryCounter, 
+      localKeys: {}, 
+      localCachedData: {}, 
+      syncCounter: 0, 
+      didSync: false, 
+      syncKeys: [], 
+      logstate:'', 
+      requests:{}, 
+      globalModification:globalModification, 
+      collectedVotes:[], 
+      waitForReceiptOnly:false, 
+      m2TimeoutReached:false, 
+      debugFail1:false, 
+      requestingReceipt:false
+     } // age comes from timestamp
 
     // todo faster hash lookup for this maybe?
     let entry = this.getQueueEntrySafe(acceptedTx.id) // , acceptedTx.timestamp)
@@ -3925,7 +3970,6 @@ class StateManager extends EventEmitter {
     return false
   }
 
-  // THIS QUEUE ENTRY seems to be way off spec from the normal one, what is up?
   async queueEntryRequestMissingData (queueEntry:QueueEntry) {
     if(this.currentCycleShardData == null)
     {
@@ -4042,6 +4086,99 @@ class StateManager extends EventEmitter {
     }
   }
 
+  async queueEntryRequestMissingReceipt (queueEntry:QueueEntry) {
+    
+    if(this.currentCycleShardData == null)
+    {
+      return
+    }
+
+    if (queueEntry.uniqueKeys == null){
+      throw new Error('queueEntryRequestMissingReceipt queueEntry.uniqueKeys == null')
+    }
+
+    if(queueEntry.requestingReceipt === true){
+      return
+    }
+
+    queueEntry.requestingReceipt = true
+
+    this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_start', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID}`)
+
+    //the outer loop here could just use the transaction group of nodes instead. but already had this working in a similar function
+    //TODO change it to loop the transaction group untill we get a good receipt
+    let gotReceipt = false
+    for (let key of queueEntry.uniqueKeys) {
+      if(gotReceipt === true){
+        break
+      }
+
+      let keepTrying = true
+      let triesLeft = 5
+      while(keepTrying){
+
+        if(triesLeft <= 0){
+          keepTrying = false
+          break
+        }
+        let homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
+
+        // find a random node to ask that is not us
+        let node = null
+        let randomIndex
+        let foundValidNode = false
+        let maxTries = 1000
+        while (foundValidNode == false) {
+          maxTries--
+          randomIndex = this.getRandomInt(homeNodeShardData.consensusNodeForOurNodeFull.length - 1)
+          node = homeNodeShardData.consensusNodeForOurNodeFull[randomIndex]
+          if(maxTries < 0){
+            //FAILED
+            this.fatalLogger.fatal(`queueEntryRequestMissingReceipt: unable to find node to ask after 1000 tries tx:${utils.makeShortHash(queueEntry.acceptedTx.id)} key: ${utils.makeShortHash(key)} ${utils.stringifyReduce(homeNodeShardData.consensusNodeForOurNodeFull.map((x)=> (x!=null)? x.id : 'null'))}`)
+            break
+          }
+          if(node == null){
+            continue
+          }
+          if(node.id === this.currentCycleShardData.nodeShardData.node.id){
+            continue
+          }
+          foundValidNode = true
+        }
+
+        if(node == null)
+        {
+          continue
+        }
+
+        let relationString = ShardFunctions.getNodeRelation(homeNodeShardData, this.currentCycleShardData.ourNode.id)
+        this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+
+        let message = { txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
+        let result:RequestReceiptForTxResp = await this.p2p.ask(node, 'request_receipt_for_tx', message) // not sure if we should await this.
+
+        if(result == null){
+          if (this.verboseLogs) { this.mainLogger.error('ASK FAIL request_receipt_for_tx') }
+          this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+          triesLeft--
+          continue
+        }
+        if (result.success === false) { this.mainLogger.error('ASK FAIL queueEntryRequestMissingReceipt 9') }
+
+        this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} result: ${utils.stringifyReduce(result)}`)
+
+        if(result.receipt != null){
+          queueEntry.recievedAppliedReceipt = result.receipt
+          keepTrying = false
+          gotReceipt = true
+        }
+        triesLeft--
+      }
+    }
+    queueEntry.requestingReceipt = false
+  }
+
+
   async repairToMatchReceipt (queueEntry:QueueEntry) {
     if(this.currentCycleShardData == null)
     {
@@ -4060,7 +4197,7 @@ class StateManager extends EventEmitter {
     let appliedVotes = queueEntry.appliedReceiptForRepair.appliedVotes
     
     //shuffle the array
-    //utils.shuffleArray(appliedVotes)
+    utils.shuffleArray(appliedVotes)
 
     let allKeys = []
 
@@ -4571,6 +4708,7 @@ class StateManager extends EventEmitter {
 
       let timeM = this.queueSitTime
       let timeM2 = timeM * 2
+      let timeM2_5 = timeM * 2.5
       let timeM3 = timeM * 3
       let currentTime = Date.now() // when to update this?
 
@@ -4707,6 +4845,26 @@ class StateManager extends EventEmitter {
         let shortID = `${utils.makeShortHash(queueEntry.acceptedTx.id)}`
 
         if(this.dataSyncMainPhaseComplete === true){
+
+          if(txAge > timeM2 && queueEntry.didSync === true){
+            if(verboseLogs) this.mainLogger.error(`info: tx did sync. ask for receipt now:${shortID} `)
+            this.logger.playbackLogNote('syncNeedsReceipt', `${shortID}`, `syncNeedsReceipt ${shortID}`)
+            markAccountsSeen(queueEntry)
+            this.queueEntryRequestMissingReceipt(queueEntry)
+            continue
+          }
+
+          // have not seen a receipt yet?
+          if(txAge > timeM2_5){
+            if(queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null){
+              if(verboseLogs) this.mainLogger.error(`txMissingReceipt txid:${shortID} `)
+              this.logger.playbackLogNote('txMissingReceipt', `${shortID}`, `txMissingReceipt ${shortID}`)
+              markAccountsSeen(queueEntry)
+              this.queueEntryRequestMissingReceipt(queueEntry)
+              continue
+            }
+          }
+
           //check for TX older than M3 and expire them
           if(txAge > timeM3) {
             //this.statistics.incrementCounter('txExpired')

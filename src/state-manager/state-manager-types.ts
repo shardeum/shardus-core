@@ -59,6 +59,8 @@ type QueueEntry = {
 
     repairFinished?: boolean;
 
+    requestingReceipt: boolean;
+
     //collectedData for repair
     debugFail1:boolean;
 };
@@ -552,6 +554,9 @@ type RouteToHomeNodeReq = { txid: any; timestamp: any; acceptedTx: import("../sh
 
 type RequestStateForTxReq = { txid: string; timestamp: number; keys: any }
 type RequestStateForTxResp = { stateList: import("../shardus/shardus-types").WrappedResponse[]; note: string; success:boolean }
+
+type RequestReceiptForTxReq = { txid: string; timestamp: number; }
+type RequestReceiptForTxResp = { receipt:AppliedReceipt ; note: string; success:boolean }
 //type RequestStateForTxResp = { stateList: any[]; note: string; success:boolean }
 
 type RequestStateForTxReqPost = { txid: string; timestamp: number; key:string; hash:string }
