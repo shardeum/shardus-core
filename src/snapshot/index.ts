@@ -62,7 +62,7 @@ const oldPartitionHashMap: Map<PartitionNum, string> = new Map()
 const missingPartitions: PartitionNum[] = []
 const notNeededRepliedNodes: Map<string, true> = new Map()
 const alreadyOfferedNodes = new Map()
-
+const stateHashesByCycle: Map<Cycle['counter'], StateHashes> = new Map()
 let safetySyncing = false // to set true when data exchange occurs during safetySync
 
 export const safetyModeVals = {
@@ -82,6 +82,19 @@ export function initLogger() {
 export function setOldDataPath(path) {
   oldDataPath = path
   log('set old-data-path', oldDataPath)
+}
+
+function updateStateHashesByCycleMap (counter: Cycle['counter'], stateHash: StateHashes) {
+  stateHashesByCycle.set(counter, stateHash)
+  if (stateHashesByCycle.size > 100 && counter > 100) {
+    const limit = counter - 100
+    for (let [key, value] of stateHashesByCycle) {
+      if (key < limit) {
+        stateHashesByCycle.delete(key)
+      }
+    }
+  }
+  log('stateHashesByCycle', stateHashesByCycle)
 }
 
 export async function initSafetyModeVals() {
@@ -545,6 +558,12 @@ async function savePartitionAndNetworkHashes(
     cycleNumber: shard.cycleNumber,
     hash: networkHash,
   })
+  const newStateHash: StateHashes = {
+    counter: shard.cycleNumber,
+    partitionHashes,
+    networkHash
+  }
+  updateStateHashesByCycleMap(shard.cycleNumber, newStateHash)
 }
 
 async function goActiveIfDataComplete() {

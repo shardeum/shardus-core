@@ -219,7 +219,7 @@ export function addDataRecipient(
 ) {
   const recipient = {
     nodeInfo,
-    requestedData: dataRequests,
+    dataRequests,
     curvePk: crypto.convertPublicKeyToCurve(nodeInfo.publicKey),
   }
   recipients.push(recipient)
