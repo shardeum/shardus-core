@@ -293,7 +293,7 @@ async function cycleCreator() {
   pruneCycleChain()
 
   // Send last record to any subscribed archivers
-  Archivers.sendData()
+  Archivers.sendData(Archivers.TypeNames.CYCLE)
   ;({
     cycle: currentCycle,
     quarter: currentQuarter,

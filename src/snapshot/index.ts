@@ -9,6 +9,7 @@ import * as NodeList from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
 import * as Sync from '../p2p/Sync'
 import * as Types from '../p2p/Types'
+import * as Archivers from '../p2p/Archivers'
 import * as shardusTypes from '../shardus/shardus-types'
 import ShardFunctions from '../state-manager/shardFunctions'
 import * as shardFunctionTypes from '../state-manager/shardFunctionTypes'
@@ -94,14 +95,12 @@ function updateStateHashesByCycleMap (counter: Cycle['counter'], stateHash: Stat
       }
     }
   }
-  log('stateHashesByCycle', stateHashesByCycle)
 }
 
-export function getStateHashes(start: Cycle['counter'], end?: Cycle['counter']): StateHashes[] {
-  if (!start) throw new Error('No start cycle is provided to getStateHashes function')
+export function getStateHashes(start: Cycle['counter'] = 0, end?: Cycle['counter']): StateHashes[] {
   let collector: StateHashes[] = []
   for (let [key, ] of stateHashesByCycle) {
-    if (key >= start && (end) ? key <= end : true) {// check against end cycle only if it's provided
+    if (key >= start) {// check against end cycle only if it's provided
       collector.push(stateHashesByCycle.get(key))
     }
   }
@@ -571,10 +570,11 @@ async function savePartitionAndNetworkHashes(
   })
   const newStateHash: StateHashes = {
     counter: shard.cycleNumber,
-    partitionHashes,
+    partitionHashes, // May be sending partition hashes as Map over HTTP will cause data lose. To check
     networkHash
   }
   updateStateHashesByCycleMap(shard.cycleNumber, newStateHash)
+  Archivers.sendData(Archivers.TypeNames.STATE)
 }
 
 async function goActiveIfDataComplete() {

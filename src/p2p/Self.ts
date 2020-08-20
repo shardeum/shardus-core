@@ -252,8 +252,16 @@ async function contactArchiver() {
       )
     }
   }
-  const dataRequest = activeNodesSigned.dataRequest
-  if (dataRequest) {
+  const dataRequestCycle = activeNodesSigned.dataRequestCycle
+  const dataRequestState = activeNodesSigned.dataRequestState
+  const dataRequest = []
+  if (dataRequestCycle) {
+    dataRequest.push(dataRequestCycle)
+  }
+  if (dataRequestState) {
+    dataRequest.push(dataRequestState)
+  }
+  if (dataRequest.length > 0) {
     Archivers.addDataRecipient(joinRequest.nodeInfo, dataRequest)
   }
   return activeNodesSigned.nodeList

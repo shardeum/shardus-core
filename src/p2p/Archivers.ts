@@ -8,7 +8,7 @@ import { CycleRecord as Cycle } from './CycleCreator'
 import * as CycleParser from './CycleParser'
 import { validateTypes } from '../utils'
 import { Request } from 'express'
-import { StateHashes } from '../snapshot'
+import { StateHashes, getStateHashes } from '../snapshot'
 
 /** TYPES */
 
@@ -50,7 +50,8 @@ interface DataResponse {
   publicKey: string
   responses: {
     [T in TypeNames]?: NamesToTypes[T][]
-  }
+  },
+  type: TypeNames.CYCLE | TypeNames.STATE | TypeNames.TRANSACTION
 }
 
 interface DataRecipient {
@@ -215,13 +216,14 @@ export function updateArchivers(joinedArchivers) {
 
 export function addDataRecipient(
   nodeInfo: JoinedArchiver,
-  dataRequests: DataRequest<Cycle | Transaction | StateHashes>
+  dataRequests: DataRequest<Cycle | Transaction | StateHashes>[]
 ) {
+  console.log('Adding data recipient..')
   console.log('dataReques parameter: ', dataRequests)
   const recipient = {
     nodeInfo,
     // TODO: dataRequest should be an array
-    dataRequests: [dataRequests],
+    dataRequests: dataRequests,
     curvePk: crypto.convertPublicKeyToCurve(nodeInfo.publicKey),
   }
   console.log('dataRequests: ', recipient.dataRequests)
@@ -238,15 +240,17 @@ function removeDataRecipient(publicKey) {
   }
 }
 
-export function sendData() {
+export function sendData(typeToSend: TypeNames.CYCLE | TypeNames.STATE | TypeNames.TRANSACTION) {
+  console.log('Sending data to recipient: ', typeToSend)
   for (const recipient of recipients) {
     const recipientUrl = `http://${recipient.nodeInfo.ip}:${recipient.nodeInfo.port}/newdata`
 
     const responses: DataResponse['responses'] = {}
 
     for (const request of recipient.dataRequests) {
+      if (request.type !== typeToSend) continue
       switch (request.type) {
-        case 'CYCLE': {
+        case TypeNames.CYCLE: {
           // Identify request type
           const typedRequest = request as DataRequest<NamesToTypes['CYCLE']>
           // Get latest cycles since lastData
@@ -259,17 +263,22 @@ export function sendData() {
           responses.CYCLE = data
           break
         }
-        case 'TRANSACTION': {
+        case TypeNames.TRANSACTION: {
           // [TODO] Send latest txs
           break
         }
-        case 'STATE': {
+        case TypeNames.STATE: {
           // Identify request type
           const typedRequest = request as DataRequest<NamesToTypes['STATE']>
           // [TODO] Get latest state hash data since lastData
+          const data = getStateHashes(typedRequest.lastData + 1)
           // [TODO] Update lastData
+          console.log('data to send', data)
+          if (data.length > 0) {
+            typedRequest.lastData = data[data.length - 1].counter
+          }
           // Add to responses
-          responses.STATE = []
+          responses.STATE = data
           break
         }
         default:
@@ -279,6 +288,7 @@ export function sendData() {
     const dataResponse: DataResponse = {
       publicKey: crypto.getPublicKey(),
       responses,
+      type: typeToSend
     }
 
     // Tag dataResponse
