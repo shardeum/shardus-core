@@ -241,7 +241,6 @@ function removeDataRecipient(publicKey) {
 }
 
 export function sendData(typeToSend: TypeNames.CYCLE | TypeNames.STATE | TypeNames.TRANSACTION) {
-  console.log('Sending data to recipient: ', typeToSend)
   for (const recipient of recipients) {
     const recipientUrl = `http://${recipient.nodeInfo.ip}:${recipient.nodeInfo.port}/newdata`
 
@@ -270,10 +269,9 @@ export function sendData(typeToSend: TypeNames.CYCLE | TypeNames.STATE | TypeNam
         case TypeNames.STATE: {
           // Identify request type
           const typedRequest = request as DataRequest<NamesToTypes['STATE']>
-          // [TODO] Get latest state hash data since lastData
+          // Get latest state hash data since lastData
           const data = getStateHashes(typedRequest.lastData + 1)
-          // [TODO] Update lastData
-          console.log('data to send', data)
+          // Update lastData
           if (data.length > 0) {
             typedRequest.lastData = data[data.length - 1].counter
           }

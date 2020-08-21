@@ -19,7 +19,7 @@ import * as partitionGossip from './partition-gossip'
 
 export interface StateHashes {
   counter: Cycle['counter']
-  partitionHashes: PartitionHashes
+  partitionHashes: object
   networkHash: NetworkStateHash
 }
 
@@ -86,7 +86,11 @@ export function setOldDataPath(path) {
 }
 
 function updateStateHashesByCycleMap (counter: Cycle['counter'], stateHash: StateHashes) {
-  stateHashesByCycle.set(counter, stateHash)
+  let transformedStateHash = {
+    ...stateHash,
+    partitionHashes: convertMapToObj(stateHash.partitionHashes)
+  }
+  stateHashesByCycle.set(counter, transformedStateHash)
   if (stateHashesByCycle.size > 100 && counter > 100) {
     const limit = counter - 100
     for (let [key, value] of stateHashesByCycle) {
@@ -570,7 +574,7 @@ async function savePartitionAndNetworkHashes(
   })
   const newStateHash: StateHashes = {
     counter: shard.cycleNumber,
-    partitionHashes, // May be sending partition hashes as Map over HTTP will cause data lose. To check
+    partitionHashes,
     networkHash
   }
   updateStateHashesByCycleMap(shard.cycleNumber, newStateHash)
@@ -883,6 +887,14 @@ function registerSnapshotRoutes() {
   for (const route of routes) {
     Context.network._registerExternal(route.method, route.name, route.handler)
   }
+}
+
+function convertMapToObj(inputMap) {
+  let obj = {}
+  for (const [key, value] of inputMap) {
+    obj[key] = value
+  }
+  return obj
 }
 
 function log(...things) {
