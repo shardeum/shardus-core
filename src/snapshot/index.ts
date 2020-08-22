@@ -2,6 +2,7 @@ import * as express from 'express'
 import * as log4js from 'log4js'
 import * as http from '../http'
 import * as Active from '../p2p/Active'
+import * as Archivers from '../p2p/Archivers'
 import * as Comms from '../p2p/Comms'
 import * as Context from '../p2p/Context'
 import * as CycleCreator from '../p2p/CycleCreator'
@@ -85,15 +86,18 @@ export function setOldDataPath(path) {
   log('set old-data-path', oldDataPath)
 }
 
-function updateStateHashesByCycleMap (counter: Cycle['counter'], stateHash: StateHashes) {
-  let transformedStateHash = {
+function updateStateHashesByCycleMap(
+  counter: Cycle['counter'],
+  stateHash: StateHashes
+) {
+  const transformedStateHash = {
     ...stateHash,
-    partitionHashes: convertMapToObj(stateHash.partitionHashes)
+    partitionHashes: convertMapToObj(stateHash.partitionHashes),
   }
   stateHashesByCycle.set(counter, transformedStateHash)
   if (stateHashesByCycle.size > 100 && counter > 100) {
     const limit = counter - 100
-    for (let [key, value] of stateHashesByCycle) {
+    for (const [key, value] of stateHashesByCycle) {
       if (key < limit) {
         stateHashesByCycle.delete(key)
       }
@@ -101,10 +105,14 @@ function updateStateHashesByCycleMap (counter: Cycle['counter'], stateHash: Stat
   }
 }
 
-export function getStateHashes(start: Cycle['counter'] = 0, end?: Cycle['counter']): StateHashes[] {
-  let collector: StateHashes[] = []
-  for (let [key, ] of stateHashesByCycle) {
-    if (key >= start) {// check against end cycle only if it's provided
+export function getStateHashes(
+  start: Cycle['counter'] = 0,
+  end?: Cycle['counter']
+): StateHashes[] {
+  const collector: StateHashes[] = []
+  for (const [key] of stateHashesByCycle) {
+    if (key >= start) {
+      // check against end cycle only if it's provided
       collector.push(stateHashesByCycle.get(key))
     }
   }
@@ -575,10 +583,9 @@ async function savePartitionAndNetworkHashes(
   const newStateHash: StateHashes = {
     counter: shard.cycleNumber,
     partitionHashes,
-    networkHash
+    networkHash,
   }
   updateStateHashesByCycleMap(shard.cycleNumber, newStateHash)
-  Archivers.sendData(Archivers.TypeNames.STATE)
 }
 
 async function goActiveIfDataComplete() {
@@ -890,7 +897,7 @@ function registerSnapshotRoutes() {
 }
 
 function convertMapToObj(inputMap) {
-  let obj = {}
+  const obj = {}
   for (const [key, value] of inputMap) {
     obj[key] = value
   }

@@ -1,14 +1,13 @@
 import deepmerge from 'deepmerge'
 import * as http from '../http'
+import { getStateHashes, StateHashes } from '../snapshot'
+import { validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { crypto, logger, network } from './Context'
 import { getCycleChain } from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import { CycleRecord as Cycle } from './CycleCreator'
 import * as CycleParser from './CycleParser'
-import { validateTypes } from '../utils'
-import { Request } from 'express'
-import { StateHashes, getStateHashes } from '../snapshot'
 
 /** TYPES */
 
@@ -50,8 +49,7 @@ interface DataResponse {
   publicKey: string
   responses: {
     [T in TypeNames]?: NamesToTypes[T][]
-  },
-  type: TypeNames.CYCLE | TypeNames.STATE | TypeNames.TRANSACTION
+  }
 }
 
 interface DataRecipient {
@@ -131,11 +129,7 @@ export function validateRecordTypes(rec: Record): string {
   return ''
 }
 
-export function updateRecord(
-  txs: Txs,
-  record: CycleCreator.CycleRecord,
-  _prev: CycleCreator.CycleRecord
-) {
+export function updateRecord(txs: Txs, record: CycleCreator.CycleRecord) {
   // Add join requests to the cycle record
   const joinedArchivers = txs.archivers.map(
     (joinRequest) => joinRequest.nodeInfo
@@ -161,7 +155,7 @@ export function parseRecord(
 export function sendRequests() {}
 
 /** Not used by Archivers */
-export function queueRequest(request) {}
+export function queueRequest() {}
 
 /** Original Functions */
 
@@ -247,7 +241,6 @@ export function sendData(typeToSend: TypeNames.CYCLE | TypeNames.STATE | TypeNam
     const responses: DataResponse['responses'] = {}
 
     for (const request of recipient.dataRequests) {
-      if (request.type !== typeToSend) continue
       switch (request.type) {
         case TypeNames.CYCLE: {
           // Identify request type
@@ -286,7 +279,6 @@ export function sendData(typeToSend: TypeNames.CYCLE | TypeNames.STATE | TypeNam
     const dataResponse: DataResponse = {
       publicKey: crypto.getPublicKey(),
       responses,
-      type: typeToSend
     }
 
     // Tag dataResponse
@@ -396,6 +388,7 @@ function warn(...msg) {
   p2pLogger.warn(entry)
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function error(...msg) {
   const entry = `Archiver: ${msg.join(' ')}`
   p2pLogger.error(entry)
