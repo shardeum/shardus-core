@@ -2751,7 +2751,12 @@ class StateManager extends EventEmitter {
       let queueEntry = this.getQueueEntrySafe(appliedReceipt.txid)// , payload.timestamp)
       if (queueEntry == null) {
         if (queueEntry == null) {
+          // It is ok to search the archive for this.  Not checking this was possibly breaking the gossip chain before
           queueEntry = this.getQueueEntryArchived(payload.txid)// , payload.timestamp)
+          if(queueEntry != null){
+            // TODO : PERF on a faster version we may just bail if this lives in the arcive list.
+            // would need to make sure we send gossip though.
+          }
         }
         if (queueEntry == null) {
           this.mainLogger.error(`spread_appliedReceipt no queue entry for ${appliedReceipt.txid} `)
@@ -4066,7 +4071,6 @@ class StateManager extends EventEmitter {
           if(result == null){
             if (this.verboseLogs) { this.mainLogger.error('ASK FAIL request_state_for_tx') }
             this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
-            //triesLeft--
             continue
           }
           if (result.success === false) { this.mainLogger.error('ASK FAIL queueEntryRequestMissingData 9') }
@@ -4181,7 +4185,6 @@ class StateManager extends EventEmitter {
         if(result == null){
           if (this.verboseLogs) { this.mainLogger.error('ASK FAIL request_receipt_for_tx') }
           this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
-          //triesLeft--
           continue
         }
         if (result.success === false) { this.mainLogger.error(`ASK FAIL queueEntryRequestMissingReceipt 9 ${triesLeft} ${node.id}`) }
@@ -4193,7 +4196,6 @@ class StateManager extends EventEmitter {
           keepTrying = false
           gotReceipt = true
         }
-        //triesLeft--
       }
     }
     queueEntry.requestingReceipt = false
@@ -4815,14 +4817,10 @@ class StateManager extends EventEmitter {
           //TODO check time before inserting queueEntry. make sure it is not older than 90% of M
           let age = Date.now() - timestamp
           if (age > timeM * 0.9) {
+            // IT turns out the correct thing to check is didSync flag only report errors if we did not wait on this TX while syncing
             if(txQueueEntry.didSync == false){
-              //if(this.dataSyncMainPhaseComplete === true){
-                this.fatalLogger.fatal('processAcceptedTxQueue cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
-                this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld1', `${utils.makeShortHash(txQueueEntry.acceptedTx.id)}`, 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
-              //} else {
-
-              //}
-
+              this.fatalLogger.fatal('processAcceptedTxQueue cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
+              this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld1', `${utils.makeShortHash(txQueueEntry.acceptedTx.id)}`, 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
               //txQueueEntry.waitForReceiptOnly = true              
             }
           }
@@ -4879,20 +4877,22 @@ class StateManager extends EventEmitter {
             this.logger.playbackLogNote('txExpired', `${shortID}`, `txExpired ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
             this.logger.playbackLogNote('txExpired', `${shortID}`, `queueEntry.recievedAppliedReceipt: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
 
-            // currentIndex--
             continue
           }   
 
+          // if we have a pending request for a receipt mark account seen and continue
           if(queueEntry.requestingReceipt === true){
             markAccountsSeen(queueEntry)
             continue
           }
+
+          // This was checking at m2 before, but there was a chance that would be too early. 
+          // Checking at m2.5 allows the network a chance at a receipt existing
           if(txAge > timeM2_5 && queueEntry.didSync === true){
             if(verboseLogs) this.mainLogger.error(`info: tx did sync. ask for receipt now:${shortID} `)
             this.logger.playbackLogNote('syncNeedsReceipt', `${shortID}`, `syncNeedsReceipt ${shortID}`)
             markAccountsSeen(queueEntry)
             this.queueEntryRequestMissingReceipt(queueEntry)
-            // currentIndex--
             continue
           }
 
@@ -4903,7 +4903,6 @@ class StateManager extends EventEmitter {
               this.logger.playbackLogNote('txMissingReceipt', `${shortID}`, `txMissingReceipt ${shortID}`)
               markAccountsSeen(queueEntry)
               this.queueEntryRequestMissingReceipt(queueEntry)
-              // currentIndex--
               continue
             }
           }
@@ -4916,7 +4915,6 @@ class StateManager extends EventEmitter {
             this.logger.playbackLogNote('txExpired', `${shortID}`, `txExpired 2  ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
             this.logger.playbackLogNote('txExpired', `${shortID}`, `queueEntry.recievedAppliedReceipt 2: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
 
-            // currentIndex--
             continue
           } 
         }
@@ -4927,7 +4925,6 @@ class StateManager extends EventEmitter {
           queueEntry.m2TimeoutReached = true
           queueEntry.state = 'consensing'
 
-          // currentIndex--
           continue
         }
         
@@ -4976,7 +4973,6 @@ class StateManager extends EventEmitter {
           //   markAccountsSeen(queueEntry)
           //   // no data to await.
           //   queueEntry.state = 'applying'
-          //   currentIndex--
           //   continue
           // }
           // check if we have all accounts
@@ -4988,7 +4984,6 @@ class StateManager extends EventEmitter {
             if (this.queueEntryHasAllData(queueEntry) === true) {
               // I think this can't happen
               this.logger.playbackLogNote('shrd_hadDataAfterall', `${shortID}`, `This is kind of an error, and should not happen`)
-              // currentIndex--
               continue
             }
 
@@ -5108,7 +5103,6 @@ class StateManager extends EventEmitter {
                   // Broadcast the receipt
                   await this.shareAppliedReceipt(queueEntry)
                   queueEntry.state = 'commiting'
-                  // currentIndex--
                   continue
 
                 } else{
@@ -5124,7 +5118,6 @@ class StateManager extends EventEmitter {
                 if(this.hasAppliedReceiptMatchingPreApply(queueEntry, queueEntry.recievedAppliedReceipt)){
                   if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${shortID}`, `qId: ${queueEntry.entryID} `)
                   queueEntry.state = 'commiting'
-                  // currentIndex--
                   continue
                 } else{
                   if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch2', `${shortID}`, `qId: ${queueEntry.entryID}  `)
@@ -5308,7 +5301,6 @@ class StateManager extends EventEmitter {
         // else if (queueEntry.state === 'failed to get data') {
         //   this.removeFromQueue(queueEntry, currentIndex)
         // }
-        // currentIndex--
       }
     } finally {
       // restart loop if there are still elements in it
