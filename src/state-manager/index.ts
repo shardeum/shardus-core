@@ -1370,6 +1370,11 @@ class StateManager extends EventEmitter {
       
       let nodes:Shardus.Node[] = ShardFunctions.getNodesByProximity(this.currentCycleShardData.shardGlobals, this.currentCycleShardData.activeNodes, centerNode.ourNodeIndex, this.p2p.id, 40)
 
+      if(Array.isArray(nodes) === false){
+        this.mainLogger.error(`syncStateTableData: non array returned ${utils.stringifyReduce(nodes)}`)
+        return // nothing to do
+      }
+
       // let nodes = this.getActiveNodesInRange(lowAddress, highAddress) // this.p2p.state.getActiveNodes(this.p2p.id)
       if (nodes.length === 0) {
         this.mainLogger.debug(`no nodes available`)
@@ -2745,8 +2750,13 @@ class StateManager extends EventEmitter {
       let appliedReceipt = payload as AppliedReceipt      
       let queueEntry = this.getQueueEntrySafe(appliedReceipt.txid)// , payload.timestamp)
       if (queueEntry == null) {
-        this.mainLogger.error(`spread_appliedReceipt no queue entry for ${appliedReceipt.txid} `)
-        return
+        if (queueEntry == null) {
+          queueEntry = this.getQueueEntryArchived(payload.txid)// , payload.timestamp)
+        }
+        if (queueEntry == null) {
+          this.mainLogger.error(`spread_appliedReceipt no queue entry for ${appliedReceipt.txid} `)
+          return
+        }
       }
 
       // TODO STATESHARDING4 ENDPOINTS check payload format
@@ -4135,7 +4145,7 @@ class StateManager extends EventEmitter {
         let homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
 
         // find a random node to ask that is not us
-        let node = null
+        let node:Shardus.Node = null
         let randomIndex
         let foundValidNode = false
         let maxTries = 1000
@@ -4174,7 +4184,7 @@ class StateManager extends EventEmitter {
           //triesLeft--
           continue
         }
-        if (result.success === false) { this.mainLogger.error('ASK FAIL queueEntryRequestMissingReceipt 9') }
+        if (result.success === false) { this.mainLogger.error(`ASK FAIL queueEntryRequestMissingReceipt 9 ${triesLeft} ${node.id}`) }
 
         this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} result: ${utils.stringifyReduce(result)}`)
 
@@ -4805,14 +4815,16 @@ class StateManager extends EventEmitter {
           //TODO check time before inserting queueEntry. make sure it is not older than 90% of M
           let age = Date.now() - timestamp
           if (age > timeM * 0.9) {
-            //if(this.dataSyncMainPhaseComplete === true){
-              this.fatalLogger.fatal('processAcceptedTxQueue cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
-              this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld1', `${utils.makeShortHash(txQueueEntry.acceptedTx.id)}`, 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
-            //} else {
+            if(txQueueEntry.didSync == false){
+              //if(this.dataSyncMainPhaseComplete === true){
+                this.fatalLogger.fatal('processAcceptedTxQueue cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
+                this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld1', `${utils.makeShortHash(txQueueEntry.acceptedTx.id)}`, 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
+              //} else {
 
-            //}
+              //}
 
-            //txQueueEntry.waitForReceiptOnly = true
+              //txQueueEntry.waitForReceiptOnly = true              
+            }
           }
           if (age > timeM) {
             this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld2', `${utils.makeShortHash(txQueueEntry.acceptedTx.id)}`, 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
@@ -4875,7 +4887,7 @@ class StateManager extends EventEmitter {
             markAccountsSeen(queueEntry)
             continue
           }
-          if(txAge > timeM2 && queueEntry.didSync === true){
+          if(txAge > timeM2_5 && queueEntry.didSync === true){
             if(verboseLogs) this.mainLogger.error(`info: tx did sync. ask for receipt now:${shortID} `)
             this.logger.playbackLogNote('syncNeedsReceipt', `${shortID}`, `syncNeedsReceipt ${shortID}`)
             markAccountsSeen(queueEntry)
@@ -4895,8 +4907,6 @@ class StateManager extends EventEmitter {
               continue
             }
           }
-
-       
         } else {
           //check for TX older than 10x M3 and expire them
           if(txAge > (timeM3 * 10)) {
@@ -8225,7 +8235,8 @@ class StateManager extends EventEmitter {
       let txList = this.getTXList(cycleNumber, partitionID) // todo sharding - done: pass partition ID
 
       if (txList.processed) {
-        this.mainLogger.error(`_repair trying to record transaction after we have already finalized our parition object for cycle ${cycle.counter} `)
+        continue
+        //this.mainLogger.error(`_repair trying to record transaction after we have already finalized our parition object for cycle ${cycle.counter} `)
       }
 
       
