@@ -1142,7 +1142,14 @@ class StateManager extends EventEmitter {
       let accountData:Shardus.WrappedData[] = []
       let accountDataById:{[id:string]:Shardus.WrappedData} = {}
       let globalReport2:GlobalAccountReportResp = {combinedHash:"", accounts:[] }
+      let maxTries = 10
       while(hasAllGlobalData === false){
+
+        maxTries--
+        if(maxTries <= 0){
+          this.mainLogger.error(`DATASYNC: syncStateDataGlobals max tries excceded `)
+          return
+        }
         this.mainLogger.debug(`DATASYNC: syncStateDataGlobals hasAllGlobalData === false `)
         //Get accounts.
         //this.combinedAccountData = []
@@ -1181,6 +1188,7 @@ class StateManager extends EventEmitter {
         }
         //check the full report for any missing data
         for(let report of globalReport2.accounts){
+          this.mainLogger.debug(`DATASYNC: syncStateDataGlobals loop globalReport2.accounts `)
           let data = accountDataById[report.id]
           if(data == null){
             //we dont have the data
@@ -1205,6 +1213,7 @@ class StateManager extends EventEmitter {
 
       //Write the data! and set global memory data!.  set accounts copy data too.
       for(let report of globalReport2.accounts){
+        this.mainLogger.debug(`DATASYNC: syncStateDataGlobals loop globalReport2.accounts 2`)
         let accountData = accountDataById[report.id]
         if(accountData != null){
 
@@ -4001,6 +4010,7 @@ class StateManager extends EventEmitter {
             keepTrying = false
             break
           }
+          triesLeft--
           let homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
 
           // find a random node to ask that is not us
@@ -4046,7 +4056,7 @@ class StateManager extends EventEmitter {
           if(result == null){
             if (this.verboseLogs) { this.mainLogger.error('ASK FAIL request_state_for_tx') }
             this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
-            triesLeft--
+            //triesLeft--
             continue
           }
           if (result.success === false) { this.mainLogger.error('ASK FAIL queueEntryRequestMissingData 9') }
@@ -4121,6 +4131,7 @@ class StateManager extends EventEmitter {
           keepTrying = false
           break
         }
+        triesLeft--
         let homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
 
         // find a random node to ask that is not us
@@ -4160,7 +4171,7 @@ class StateManager extends EventEmitter {
         if(result == null){
           if (this.verboseLogs) { this.mainLogger.error('ASK FAIL request_receipt_for_tx') }
           this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
-          triesLeft--
+          //triesLeft--
           continue
         }
         if (result.success === false) { this.mainLogger.error('ASK FAIL queueEntryRequestMissingReceipt 9') }
@@ -4172,7 +4183,7 @@ class StateManager extends EventEmitter {
           keepTrying = false
           gotReceipt = true
         }
-        triesLeft--
+        //triesLeft--
       }
     }
     queueEntry.requestingReceipt = false
@@ -4820,7 +4831,9 @@ class StateManager extends EventEmitter {
       let currentIndex = this.newAcceptedTxQueue.length - 1
 
       let lastLog = 0
+      currentIndex++ //increment once so we can handle the decrement at the top of the loop and be safe about continue statements
       while (this.newAcceptedTxQueue.length > 0) {
+        currentIndex--
         if (currentIndex < 0) {
           break
         }
@@ -4846,11 +4859,28 @@ class StateManager extends EventEmitter {
 
         if(this.dataSyncMainPhaseComplete === true){
 
+          //check for TX older than M3 and expire them
+          if(txAge > timeM3) {
+            //this.statistics.incrementCounter('txExpired')
+            queueEntry.state = 'expired'
+            this.removeFromQueue(queueEntry, currentIndex)
+            this.logger.playbackLogNote('txExpired', `${shortID}`, `txExpired ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+            this.logger.playbackLogNote('txExpired', `${shortID}`, `queueEntry.recievedAppliedReceipt: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+
+            // currentIndex--
+            continue
+          }   
+
+          if(queueEntry.requestingReceipt === true){
+            markAccountsSeen(queueEntry)
+            continue
+          }
           if(txAge > timeM2 && queueEntry.didSync === true){
             if(verboseLogs) this.mainLogger.error(`info: tx did sync. ask for receipt now:${shortID} `)
             this.logger.playbackLogNote('syncNeedsReceipt', `${shortID}`, `syncNeedsReceipt ${shortID}`)
             markAccountsSeen(queueEntry)
             this.queueEntryRequestMissingReceipt(queueEntry)
+            // currentIndex--
             continue
           }
 
@@ -4861,21 +4891,24 @@ class StateManager extends EventEmitter {
               this.logger.playbackLogNote('txMissingReceipt', `${shortID}`, `txMissingReceipt ${shortID}`)
               markAccountsSeen(queueEntry)
               this.queueEntryRequestMissingReceipt(queueEntry)
+              // currentIndex--
               continue
             }
           }
 
-          //check for TX older than M3 and expire them
-          if(txAge > timeM3) {
+       
+        } else {
+          //check for TX older than 10x M3 and expire them
+          if(txAge > (timeM3 * 10)) {
             //this.statistics.incrementCounter('txExpired')
             queueEntry.state = 'expired'
             this.removeFromQueue(queueEntry, currentIndex)
-            this.logger.playbackLogNote('txExpired', `${shortID}`, `txExpired ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-            this.logger.playbackLogNote('txExpired', `${shortID}`, `queueEntry.recievedAppliedReceipt: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+            this.logger.playbackLogNote('txExpired', `${shortID}`, `txExpired 2  ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+            this.logger.playbackLogNote('txExpired', `${shortID}`, `queueEntry.recievedAppliedReceipt 2: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
 
-            currentIndex--
+            // currentIndex--
             continue
-          }          
+          } 
         }
 
         if(txAge > timeM2 && queueEntry.m2TimeoutReached === false && queueEntry.globalModification === false){
@@ -4883,6 +4916,8 @@ class StateManager extends EventEmitter {
           queueEntry.waitForReceiptOnly = true
           queueEntry.m2TimeoutReached = true
           queueEntry.state = 'consensing'
+
+          // currentIndex--
           continue
         }
         
@@ -4943,7 +4978,7 @@ class StateManager extends EventEmitter {
             if (this.queueEntryHasAllData(queueEntry) === true) {
               // I think this can't happen
               this.logger.playbackLogNote('shrd_hadDataAfterall', `${shortID}`, `This is kind of an error, and should not happen`)
-              currentIndex--
+              // currentIndex--
               continue
             }
 
@@ -5063,6 +5098,7 @@ class StateManager extends EventEmitter {
                   // Broadcast the receipt
                   await this.shareAppliedReceipt(queueEntry)
                   queueEntry.state = 'commiting'
+                  // currentIndex--
                   continue
 
                 } else{
@@ -5078,6 +5114,7 @@ class StateManager extends EventEmitter {
                 if(this.hasAppliedReceiptMatchingPreApply(queueEntry, queueEntry.recievedAppliedReceipt)){
                   if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${shortID}`, `qId: ${queueEntry.entryID} `)
                   queueEntry.state = 'commiting'
+                  // currentIndex--
                   continue
                 } else{
                   if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch2', `${shortID}`, `qId: ${queueEntry.entryID}  `)
@@ -5261,7 +5298,7 @@ class StateManager extends EventEmitter {
         // else if (queueEntry.state === 'failed to get data') {
         //   this.removeFromQueue(queueEntry, currentIndex)
         // }
-        currentIndex--
+        // currentIndex--
       }
     } finally {
       // restart loop if there are still elements in it
