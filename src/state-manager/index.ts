@@ -474,6 +474,7 @@ class StateManager extends EventEmitter {
               queueEntry.syncCounter--
               if (queueEntry.syncCounter <= 0) {
                 queueEntry.state = 'aging'
+                queueEntry.didWakeup = true
                 this.updateHomeInformation(queueEntry)
                 this.logger.playbackLogNote('shrd_sync_wakeupTX', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`)
               }
@@ -3715,6 +3716,8 @@ class StateManager extends EventEmitter {
       noConsensus = true
     }
 
+    let cycleNumber = this.currentCycleShardData.cycleNumber
+
     this.queueEntryCounter++
     let txQueueEntry:QueueEntry = { 
       acceptedTx: acceptedTx, 
@@ -3733,6 +3736,7 @@ class StateManager extends EventEmitter {
       localCachedData: {}, 
       syncCounter: 0, 
       didSync: false, 
+      didWakeup: false,
       syncKeys: [], 
       logstate:'', 
       requests:{}, 
@@ -3745,7 +3749,9 @@ class StateManager extends EventEmitter {
       cycleToRecordOn:-5,
       involvedPartitions: [],
       involvedGlobalPartitions: [],
-      shortReceiptHash: ''
+      shortReceiptHash: '',
+      requestingReceiptFailed:false,
+      approximateCycleAge:cycleNumber,
      } // age comes from timestamp
 
     // todo faster hash lookup for this maybe?
@@ -4217,14 +4223,23 @@ class StateManager extends EventEmitter {
 
         this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} result: ${utils.stringifyReduce(result)}`)
 
-        if(result.receipt != null){
+        if(result.success === true && result.receipt != null){
           queueEntry.recievedAppliedReceipt = result.receipt
           keepTrying = false
           gotReceipt = true
         }
       }
+
+      // break the outer loop after we are done trying.  todo refactor this.
+      if(keepTrying == false){
+        break
+      }
     }
     queueEntry.requestingReceipt = false
+
+    if(gotReceipt === false){
+      queueEntry.requestingReceiptFailed = true
+    }
   }
 
 
@@ -4896,7 +4911,8 @@ class StateManager extends EventEmitter {
         if(this.dataSyncMainPhaseComplete === true){
 
           //check for TX older than M3 and expire them
-          if(txAge > timeM3) {
+          if(txAge > timeM3 && queueEntry.didSync == false) {
+            //if(queueEntry.didSync == true && queueEntry.didWakeup == )
             //this.statistics.incrementCounter('txExpired')
             queueEntry.state = 'expired'
             this.removeFromQueue(queueEntry, currentIndex)
@@ -4905,6 +4921,24 @@ class StateManager extends EventEmitter {
 
             continue
           }   
+          if(txAge > (timeM3 * 20) && queueEntry.didSync == true) {
+            //this.statistics.incrementCounter('txExpired')
+            queueEntry.state = 'expired'
+            this.removeFromQueue(queueEntry, currentIndex)
+            this.logger.playbackLogNote('txExpired', `${shortID}`, `txExpired 2  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
+            this.logger.playbackLogNote('txExpired', `${shortID}`, `queueEntry.recievedAppliedReceipt 2: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+
+            continue
+          } 
+
+          if(txAge > (timeM3) && queueEntry.requestingReceiptFailed) {
+            //this.statistics.incrementCounter('txExpired')
+            queueEntry.state = 'expired'
+            this.removeFromQueue(queueEntry, currentIndex)
+            this.logger.playbackLogNote('txExpired', `${shortID}`, `txExpired 3 requestingReceiptFailed  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
+            this.logger.playbackLogNote('txExpired', `${shortID}`, `queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+            continue
+          } 
 
           // if we have a pending request for a receipt mark account seen and continue
           if(queueEntry.requestingReceipt === true){
@@ -4914,16 +4948,18 @@ class StateManager extends EventEmitter {
 
           // This was checking at m2 before, but there was a chance that would be too early. 
           // Checking at m2.5 allows the network a chance at a receipt existing
-          if(txAge > timeM2_5 && queueEntry.didSync === true){
-            if(verboseLogs) this.mainLogger.error(`info: tx did sync. ask for receipt now:${shortID} `)
-            this.logger.playbackLogNote('syncNeedsReceipt', `${shortID}`, `syncNeedsReceipt ${shortID}`)
-            markAccountsSeen(queueEntry)
-            this.queueEntryRequestMissingReceipt(queueEntry)
-            continue
+          if(txAge > timeM2_5 && queueEntry.didSync === true && queueEntry.requestingReceiptFailed === false){
+            if(queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null){
+              if(verboseLogs) this.mainLogger.error(`info: tx did sync. ask for receipt now:${shortID} `)
+              this.logger.playbackLogNote('syncNeedsReceipt', `${shortID}`, `syncNeedsReceipt ${shortID}`)
+              markAccountsSeen(queueEntry)
+              this.queueEntryRequestMissingReceipt(queueEntry)
+              continue
+            }
           }
 
           // have not seen a receipt yet?
-          if(txAge > timeM2_5){
+          if(txAge > timeM2_5 && queueEntry.requestingReceiptFailed === false){
             if(queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null){
               if(verboseLogs) this.mainLogger.error(`txMissingReceipt txid:${shortID} `)
               this.logger.playbackLogNote('txMissingReceipt', `${shortID}`, `txMissingReceipt ${shortID}`)
@@ -4938,8 +4974,8 @@ class StateManager extends EventEmitter {
             //this.statistics.incrementCounter('txExpired')
             queueEntry.state = 'expired'
             this.removeFromQueue(queueEntry, currentIndex)
-            this.logger.playbackLogNote('txExpired', `${shortID}`, `txExpired 2  ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-            this.logger.playbackLogNote('txExpired', `${shortID}`, `queueEntry.recievedAppliedReceipt 2: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+            this.logger.playbackLogNote('txExpired', `${shortID}`, `txExpired 4  ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+            this.logger.playbackLogNote('txExpired', `${shortID}`, `queueEntry.recievedAppliedReceipt 4: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
 
             continue
           } 
@@ -7569,7 +7605,8 @@ class StateManager extends EventEmitter {
     while (oldQueueEntries && this.archivedQueueEntries.length > 0) {
       let queueEntry = this.archivedQueueEntries[0]
       // the time is approximate so make sure it is older than five cycles.
-      if (queueEntry.approximateCycleAge && queueEntry.approximateCycleAge < oldestCycle - 1) {
+      // added a few more to oldest cycle to keep entries in the queue longer in case syncing nodes need the data
+      if (queueEntry.approximateCycleAge < oldestCycle - 3) {
         this.archivedQueueEntries.shift()
         archivedEntriesRemoved++
       } else {

@@ -29,6 +29,7 @@ type QueueEntry = {
     localCachedData: any;
     syncCounter: number;
     didSync: boolean;
+    didWakeup: boolean;
     syncKeys: any[];
     logstate: string; // logging state
     requests: {[key:string]:import("../shardus/shardus-types").Node} // map of account keys to the node that we are requesting the account data from 
@@ -75,6 +76,8 @@ type QueueEntry = {
     // receipt status is in the receipt
 
 
+    requestingReceiptFailed: boolean;
+    
     //collectedData for repair
     debugFail1:boolean;
 };
