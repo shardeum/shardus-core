@@ -10,6 +10,7 @@ import { id } from '../p2p/Self'
 import StateManager from '../state-manager'
 import Statistics from '../statistics'
 import Profiler from '../utils/profiler'
+import packageJson from '../../package.json'
 
 const http = require('../http')
 const allZeroes64 = '0'.repeat(64)
@@ -245,6 +246,7 @@ class Reporter {
           currentLoad,
           queueLength,
           txTimeInQueue,
+          shardusVersion: packageJson.version
         })
       } catch (e) {
         this.mainLogger.error(
