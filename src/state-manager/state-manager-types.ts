@@ -30,6 +30,7 @@ type QueueEntry = {
     syncCounter: number;
     didSync: boolean;
     didWakeup: boolean;
+    txGroupDebug: string;
     syncKeys: any[];
     logstate: string; // logging state
     requests: {[key:string]:import("../shardus/shardus-types").Node} // map of account keys to the node that we are requesting the account data from 
@@ -38,10 +39,11 @@ type QueueEntry = {
     m2TimeoutReached:boolean; // A flag to track if we have executed the M2 timeout yet.
     waitForReceiptOnly:boolean; // This means dont try to produce a receipt
     uniqueKeys?: string[];
-    ourNodeInvolved?: boolean;
+    ourNodeInTransactionGroup: boolean;
+    ourNodeInConsensusGroup: boolean;
     transactionGroup?: import("../shardus/shardus-types").Node[];
     conensusGroup?: import("../shardus/shardus-types").Node[];
-    approximateCycleAge?: number;
+    approximateCycleAge: number;
 
     // Local preapply response
     preApplyTXResult? : PreApplyAcceptedTransactionResult; // import("../shardus/shardus-types").ApplyResponse;
@@ -77,9 +79,11 @@ type QueueEntry = {
 
 
     requestingReceiptFailed: boolean;
-    
+
     //collectedData for repair
     debugFail1:boolean;
+    //short log id
+    logID:string;
 };
 
 type SyncTracker = {
