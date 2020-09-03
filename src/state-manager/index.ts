@@ -60,6 +60,9 @@ class StateManager extends EventEmitter {
     syncTrackers:SyncTracker[];
     shardValuesByCycle:Map<number, CycleShardData>;
     currentCycleShardData: (CycleShardData | null);
+    globalAccountsSynced: boolean;
+    knownGlobals: {[id:string]:boolean };
+    hasknownGlobals: boolean;
 
     dataRepairStack :RepairTracker[]
     dataRepairsCompleted:number 
@@ -111,6 +114,7 @@ class StateManager extends EventEmitter {
     debugNoTxVoting: boolean;
 
     syncSettleTime: number;
+    debugTXHistory:{[id:string]: string}; // need to disable or clean this as it will leak memory
 
   constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage : Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     super()
@@ -153,6 +157,10 @@ class StateManager extends EventEmitter {
 
     this.acceptedTXQueue = []
     this.acceptedTXByHash = {}
+
+    this.globalAccountsSynced = false
+    this.knownGlobals = {}
+    this.hasknownGlobals = false
 
     //BLOCK3
     this.dataPhaseTag = 'DATASYNC: '
@@ -237,6 +245,8 @@ class StateManager extends EventEmitter {
     this.dataSourceNode = null
     this.dataSourceNodeList = []
     this.dataSourceNodeIndex = 0
+
+    this.debugTXHistory = {}
 
     // debug hack
     if (p2p == null) {
@@ -824,6 +834,8 @@ class StateManager extends EventEmitter {
     if (this.p2p.isFirstSeed) {
       this.dataSyncMainPhaseComplete = true
 
+      this.globalAccountsSynced = true
+      this.hasknownGlobals = true
       this.readyforTXs = true
       this.mainLogger.debug(`DATASYNC: isFirstSeed = true. skipping sync`)
       return
@@ -850,6 +862,7 @@ class StateManager extends EventEmitter {
     console.log('GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
 
     let rangesToSync = [] as AddressRange2[]
+
 
     // get list of partitions to sync.  Strong typing helped figure out this block was dead code (had a serious bug)
     // let partitionsToSync = []
@@ -1007,7 +1020,9 @@ class StateManager extends EventEmitter {
 
     this.createSyncTrackerByForGlobals(cycle)
 
-    // could potentially push this back a bit.
+
+    // must get a list of globals before we can listen to any TXs, otherwise the isGlobal function returns bad values
+    await this.getGlobalListEarly()
     this.readyforTXs = true
 
     await utils.sleep(8000) // sleep to make sure we are listening to some txs before we sync them
@@ -1134,6 +1149,23 @@ class StateManager extends EventEmitter {
     }
   }
 
+  async getGlobalListEarly () {
+    
+    let globalReport:GlobalAccountReportResp = await this.getRobustGlobalReport()
+    
+    this.knownGlobals = {}
+    let temp = []
+    for(let report of globalReport.accounts){
+
+      this.knownGlobals[report.id] = true
+
+      temp.push(report.id)
+    }
+    this.mainLogger.debug(`DATASYNC: getGlobalListEarly: ${temp}`)
+
+    this.hasknownGlobals = true
+  }
+
   async syncStateDataGlobals (syncTracker: SyncTracker) {
     try {
       let partition = 'globals!'
@@ -1172,7 +1204,7 @@ class StateManager extends EventEmitter {
       }
       let accountData:Shardus.WrappedData[] = []
       let accountDataById:{[id:string]:Shardus.WrappedData} = {}
-      let globalReport2:GlobalAccountReportResp = {combinedHash:"", accounts:[] }
+      let globalReport2:GlobalAccountReportResp = {ready: false, combinedHash:"", accounts:[] }
       let maxTries = 10
       while(hasAllGlobalData === false){
 
@@ -1294,6 +1326,8 @@ class StateManager extends EventEmitter {
         await this.failandRestart()
       }
     }
+
+    this.globalAccountsSynced = true
   }
 
   async getRobustGlobalReport(): Promise<GlobalAccountReportResp> {
@@ -1308,6 +1342,9 @@ class StateManager extends EventEmitter {
       let result = await this.p2p.ask(node, 'get_globalaccountreport', {})
       if (result === false) { this.mainLogger.error('ASK FAIL getRobustGlobalReport result === false') }
       if (result === null) { this.mainLogger.error('ASK FAIL getRobustGlobalReport result === null') }
+      // if (result != null && result.notReady === true){
+      //   result = { ready:false, msg:`not ready: ${Math.random()}` }
+      // }
       return result
     }
     //can ask any active nodes for global data.
@@ -2562,7 +2599,7 @@ class StateManager extends EventEmitter {
       }
 
       if (queueEntry == null) {
-        response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp}`
+        response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
         await respond(response)
         // TODO ???? if we dont have a queue entry should we do db queries to get the needed data?
         // my guess is probably not yet
@@ -2588,7 +2625,7 @@ class StateManager extends EventEmitter {
       }
 
       if (queueEntry == null) {
-        response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp}`
+        response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
         await respond(response)
         return
       }
@@ -2618,7 +2655,7 @@ class StateManager extends EventEmitter {
       }
 
       if (queueEntry == null) {
-        response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp}`
+        response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
         await respond(response)
         return
       }
@@ -2793,7 +2830,7 @@ class StateManager extends EventEmitter {
           }
         }
         if (queueEntry == null) {
-          this.mainLogger.error(`spread_appliedReceipt no queue entry for ${appliedReceipt.txid} `)
+          this.mainLogger.error(`spread_appliedReceipt no queue entry for ${appliedReceipt.txid} dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`)
           return
         }
       }
@@ -2864,6 +2901,12 @@ class StateManager extends EventEmitter {
       let globalAccountKeys = this.globalAccountMap.keys()
       
       let toQuery:string[] = []
+
+      // not ready 
+      if(this.globalAccountsSynced === false){
+        result.ready = false
+        await respond(result)
+      }
 
       //TODO: Perf  could do things faster by pulling from cache, but would need extra testing:
       // let notInCache:string[]
@@ -3737,6 +3780,11 @@ class StateManager extends EventEmitter {
     {
       return 'notReady'
     }
+
+    if(this.hasknownGlobals == false){
+      return 'notReady'
+    }
+
     let keysResponse = this.app.getKeyFromTransaction(acceptedTx.data)
     let timestamp = keysResponse.timestamp
     let txId = acceptedTx.receipt.txHash
@@ -3804,6 +3852,9 @@ class StateManager extends EventEmitter {
     //     }
     //   }
     // }
+
+    this.debugTXHistory[txQueueEntry.logID] = 'enteredQueue'
+
 
     if (this.config.debug != null && this.config.debug.loseTxChance && this.config.debug.loseTxChance > 0) {
       let rand = Math.random()
@@ -4016,7 +4067,8 @@ class StateManager extends EventEmitter {
       }
     }
     // todo make this and error.
-    this.mainLogger.error(`getQueueEntryArchived failed to find: ${utils.stringifyReduce(txid)} ${msg}`)
+    this.mainLogger.error(`getQueueEntryArchived failed to find: ${utils.stringifyReduce(txid)} ${msg} dbg:${this.debugTXHistory[utils.stringifyReduce(txid)]}`)
+
     return null
   }
 
@@ -4979,8 +5031,11 @@ class StateManager extends EventEmitter {
         //   removeFromQueue(queueEntry, currentIndex)
         //   continue
         // }
+
+        this.debugTXHistory[queueEntry.logID ] = queueEntry.state
+
         let hasReceivedApplyReceipt = queueEntry.recievedAppliedReceipt != null
-        let shortID = `${utils.makeShortHash(queueEntry.acceptedTx.id)}`
+        let shortID = queueEntry.logID //`${utils.makeShortHash(queueEntry.acceptedTx.id)}`
 
         if(this.dataSyncMainPhaseComplete === true){
 
@@ -5042,9 +5097,6 @@ class StateManager extends EventEmitter {
               continue
             }
           }
-
-
-
         } else {
           //check for TX older than 10x M3 and expire them
           if(txAge > (timeM3 * 10)) {
@@ -5053,7 +5105,6 @@ class StateManager extends EventEmitter {
             this.removeFromQueue(queueEntry, currentIndex)
             this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 4  ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
             this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 4: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
-
             continue
           } 
         }
@@ -7694,6 +7745,8 @@ class StateManager extends EventEmitter {
       if (queueEntry.approximateCycleAge < oldestCycle - 3) {
         this.archivedQueueEntries.shift()
         archivedEntriesRemoved++
+
+        if (this.verboseLogs) this.mainLogger.log(`queue entry removed from archive ${queueEntry.logID} tx cycle: ${queueEntry.approximateCycleAge} cycle: ${this.currentCycleShardData.cycleNumber}`)
       } else {
         oldQueueEntries = false
         break
@@ -8129,6 +8182,11 @@ class StateManager extends EventEmitter {
   }
 
   isGlobalAccount(accountID:string):boolean{
+
+    if(this.globalAccountsSynced === false){
+      return this.knownGlobals[accountID] === true
+    }
+
     return this.globalAccountMap.has(accountID)
   }
 

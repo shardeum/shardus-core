@@ -585,7 +585,7 @@ type RequestStateForTxReqPost = { txid: string; timestamp: number; key:string; h
 
 type GetAccountDataWithQueueHintsResp = { accountData: import("../shardus/shardus-types").WrappedDataFromQueue[] | null}
 
-type GlobalAccountReportResp = {combinedHash:string, accounts:{id:string, hash:string, timestamp:number }[]  }
+type GlobalAccountReportResp = {ready:boolean, combinedHash:string, accounts:{id:string, hash:string, timestamp:number }[]  }
 
 type PreApplyAcceptedTransactionResult = { applied: boolean, passed: boolean, applyResult:string, reason:string, applyResponse? : import("../shardus/shardus-types").ApplyResponse }
 
