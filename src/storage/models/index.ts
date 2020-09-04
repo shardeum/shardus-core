@@ -6,7 +6,9 @@ import accountStates from './accountStates'
 import accountsCopy from './accountsCopy'
 import globalAccounts from './globalAccounts'
 import partitions from './partitions'
+import receipt from './receipt'
 import network from './network'
+import networkReceipt from './networkReceipt'
 
 const models = [
   cycles,
@@ -17,7 +19,9 @@ const models = [
   accountsCopy,
   globalAccounts,
   partitions,
-  network
+  receipt,
+  network,
+  networkReceipt
 ]
 
 export default models

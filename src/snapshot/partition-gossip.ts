@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
 import { registerGossipHandler } from '../p2p/Comms'
 import { AddressRange } from '../state-manager/shardFunctionTypes'
-import { PartitionHashes } from './index'
+import { PartitionHashes, ReceiptMapHashes } from './index'
 import * as Comm from '../p2p/Comms'
 
 /** TYPES */
@@ -20,7 +20,10 @@ type Collectors = Map<Message['cycle'], Collector>
 
 export type Message = {
   cycle: number
-  data: Record<AddressRange['partition'], string>
+  data: {
+    partitionHash: any,
+    receiptMapHash: any
+  }
   sender: string
 }
 
@@ -35,21 +38,26 @@ let forwardedGossips = new Map()
 // A class responsible for collecting and processing partition gossip for a given Cycle
 export class Collector extends EventEmitter {
   shard: CycleShardData
-  allHashes: PartitionHashes
-  hashCounter: Map<PartitionId, Map<Hash, Count>>
+  allPartitionHashes: PartitionHashes
+  allReceiptMapHashes: ReceiptMapHashes
+  partitionHashCounter: Map<PartitionId, Map<Hash, Count>>
+  receiptHashCounter: Map<PartitionId, Map<Hash, Count>>
 
   constructor(shard: CycleShardData) {
     super()
     this.shard = shard
-    this.allHashes = new Map()
-    this.hashCounter = new Map()
+    this.allPartitionHashes = new Map()
+    this.allReceiptMapHashes = new Map()
+    this.partitionHashCounter = new Map()
+    this.receiptHashCounter = new Map()
   }
   process(messages: Message[]) {
     let cycle
     // Loop through messages and add to hash tally
     for (let i = 0; i < messages.length; i++) {
       const message = messages[i]
-      let data = messages[i].data
+      let partitionHashData = messages[i].data.partitionHash
+      let receiptHashData = messages[i].data.receiptMapHash
       if (!cycle) cycle = messages[i].cycle
 
       // forward snapshot gossip if gossip cycle is same as current cycle
@@ -68,8 +76,10 @@ export class Collector extends EventEmitter {
         console.log('No partition shard data map')
         return
       }
-      for (let i = 0; i < Object.keys(data).length; i++) {
-        let partitionId = Object.keys(data)[i]
+
+      // Record number of gossip recieved for each partition
+      for (let i = 0; i < Object.keys(partitionHashData).length; i++) {
+        let partitionId = Object.keys(partitionHashData)[i]
           let partitionShardData = parititionShardDataMap.get(parseInt(partitionId))
         if (!partitionShardData) {
           console.log('No partition shard data for partition: ', partitionId)
@@ -79,7 +89,7 @@ export class Collector extends EventEmitter {
         let isSenderCoverThePartition = coveredBy[message.sender]
         if (!isSenderCoverThePartition) {
           console.log(`Sender ${message.sender} does not cover this partition ${partitionId}`)
-          delete data[partitionId]
+          delete partitionHashData[partitionId]
           continue
         }
         let currentCount = gossipCounterForEachPartition.get(parseInt(partitionId))
@@ -96,19 +106,35 @@ export class Collector extends EventEmitter {
       }
 
       const partitionHashes = new Map() as PartitionHashes
-      for (const partitionId in data) {
-        partitionHashes.set(parseInt(partitionId), data[partitionId])
+      const receiptHashes = new Map() as ReceiptMapHashes
+      for (const partitionId in partitionHashData) {
+        partitionHashes.set(parseInt(partitionId), partitionHashData[partitionId])
+      }
+      for (const partitionId in receiptHashData) {
+        receiptHashes.set(parseInt(partitionId), receiptHashData[partitionId])
       }
 
       // // [TODO] Check nodeToPartitions to make sure all PartitionIds in payload belong to sender
       // // [NOTE] Implement this last after everything is working
 
-      // Add partition hashes into hashTally
+      // Add partition hashes into partition hashTally
       for (const [partitionId, hash] of partitionHashes) {
-        if (!this.hashCounter.has(partitionId)) {
-          this.hashCounter.set(partitionId, new Map([[hash, 1]]))
-        } else if (this.hashCounter.has(partitionId)) {
-          const counterMap = this.hashCounter.get(partitionId)
+        if (!this.partitionHashCounter.has(partitionId)) {
+          this.partitionHashCounter.set(partitionId, new Map([[hash, 1]]))
+        } else if (this.partitionHashCounter.has(partitionId)) {
+          const counterMap = this.partitionHashCounter.get(partitionId)
+          const currentCount = counterMap.get(hash)
+          if(currentCount) counterMap.set(hash, currentCount + 1)
+          else counterMap.set(hash, 1)
+        }
+      }
+
+      // Add receipt hashes into receipt hashTally
+      for (const [partitionId, hash] of receiptHashes) {
+        if (!this.receiptHashCounter.has(partitionId)) {
+          this.receiptHashCounter.set(partitionId, new Map([[hash, 1]]))
+        } else if (this.receiptHashCounter.has(partitionId)) {
+          const counterMap = this.receiptHashCounter.get(partitionId)
           const currentCount = counterMap.get(hash)
           if(currentCount) counterMap.set(hash, currentCount + 1)
           else counterMap.set(hash, 1)
@@ -121,9 +147,11 @@ export class Collector extends EventEmitter {
     console.log(`Num of gossip received: `, numOfGossipReceived)
     console.log(`Gossip counter for each partition (cycle: ${cycle}): `, gossipCounterForEachPartition)
     console.log(`Ready partitions for (cycle: ${cycle}): `, readyPartitions)
-    if (readyPartitions.size >= this.shard.shardGlobals.numPartitions && this.hashCounter.size === this.shard.shardGlobals.numPartitions + 1) {
+    if (readyPartitions.size >= this.shard.shardGlobals.numPartitions && this.partitionHashCounter.size === this.shard.shardGlobals.numPartitions + 1) {
       // +1 is for virtual global partition
-      for (const [partitionId, counterMap] of this.hashCounter) {
+
+      // decide winner partition hashes based on hash tally
+      for (const [partitionId, counterMap] of this.partitionHashCounter) {
         let selectedHash
         let maxCount = 0
         let possibleHashes = []
@@ -139,12 +167,37 @@ export class Collector extends EventEmitter {
         }
         possibleHashes = possibleHashes.sort()
         
-        console.log(`CounterMap for Cycle ${cycle} Partition: ${partitionId} => `, counterMap)
+        console.log(`PARTITION: CounterMap for Cycle ${cycle} Partition: ${partitionId} => `, counterMap)
         if (possibleHashes.length > 0) selectedHash = possibleHashes[0]
-        if (selectedHash) this.allHashes.set(partitionId, selectedHash)
+        if (selectedHash) this.allPartitionHashes.set(partitionId, selectedHash)
+      }
+
+      // decide winner receipt hashes based on hash tally
+      for (const [partitionId, counterMap] of this.receiptHashCounter) {
+        let selectedHash
+        let maxCount = 0
+        let possibleHashes = []
+        for (const [hash, counter] of counterMap) {
+          if (counter > maxCount) {
+            maxCount = counter
+          }
+        }
+        for (const [hash, counter] of counterMap) {
+          if (counter === maxCount) {
+            possibleHashes.push(hash)
+          }
+        }
+        possibleHashes = possibleHashes.sort()
+        
+        console.log(`RECEIPT: CounterMap for Cycle ${cycle} Partition: ${partitionId} => `, counterMap)
+        if (possibleHashes.length > 0) selectedHash = possibleHashes[0]
+        if (selectedHash) this.allReceiptMapHashes.set(partitionId, selectedHash)
       }
       // Emit an event once allHashes are collected
-      this.emit('gotAllHashes', this.allHashes)
+      this.emit('gotAllHashes', {
+        partitionHashes: this.allPartitionHashes,
+        receiptHashes: this.allReceiptMapHashes,
+      })
     }
    
   }

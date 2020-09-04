@@ -23,6 +23,12 @@ export interface StateHashes {
   networkHash: NetworkStateHash
 }
 
+export interface ReceiptHashes {
+  counter: Cycle['counter']
+  receiptMapHashes: object
+  networkReceiptHash: NetworkStateHash
+}
+
 interface Account {
   accountId: string
   hash: string
@@ -43,7 +49,13 @@ export type PartitionHashes = Map<
   string
 >
 
+export type ReceiptMapHashes = Map<
+  shardFunctionTypes.AddressRange['partition'],
+  string
+>
+
 export type NetworkStateHash = string
+export type NetworkReceiptHash = string
 
 type PartitionNum = number
 
@@ -64,7 +76,26 @@ const missingPartitions: PartitionNum[] = []
 const notNeededRepliedNodes: Map<string, true> = new Map()
 const alreadyOfferedNodes = new Map()
 const stateHashesByCycle: Map<Cycle['counter'], StateHashes> = new Map()
+const receiptHashesByCycle: Map<Cycle['counter'], ReceiptHashes> = new Map()
 let safetySyncing = false // to set true when data exchange occurs during safetySync
+
+type hex = string // Limited to valid hex chars
+
+ 
+const status: 'applied' | 'rejected' = 'applied'
+const netId: hex = '123abc' // ID unique to that Shardus network
+const tx = { /* Unsigned transaction */ }
+type txId = string
+type txId2 = string
+type ReceiptMap = Map<txId, txId2[]>
+interface PartitionBlock {
+  cycle: Cycle['counter'],
+  partitionId: PartitionNum,
+  receiptMap: ReceiptMap
+}
+ 
+const partitionBlockMap: Map<Cycle['counter'], Map<PartitionNum, ReceiptMap>> = new Map()
+
 
 export const safetyModeVals = {
   safetyMode: false,
@@ -104,6 +135,25 @@ function updateStateHashesByCycleMap(
   }
 }
 
+function updateReceiptHashesByCycleMap(
+  counter: Cycle['counter'],
+  receiptHash: ReceiptHashes
+) {
+  const transformedStateHash = {
+    ...receiptHash,
+    receiptMapHashes: convertMapToObj(receiptHash.receiptMapHashes),
+  }
+  receiptHashesByCycle.set(counter, transformedStateHash)
+  if (receiptHashesByCycle.size > 100 && counter > 100) {
+    const limit = counter - 100
+    for (const [key, value] of receiptHashesByCycle) {
+      if (key < limit) {
+        receiptHashesByCycle.delete(key)
+      }
+    }
+  }
+}
+
 export function getStateHashes(
   start: Cycle['counter'] = 0,
   end?: Cycle['counter']
@@ -116,6 +166,54 @@ export function getStateHashes(
     }
   }
   return collector
+}
+
+export function getReceiptHashes(
+  start: Cycle['counter'] = 0,
+  end?: Cycle['counter']
+): ReceiptHashes[] {
+  const collector: ReceiptHashes[] = []
+  for (const [key] of receiptHashesByCycle) {
+    if (key >= start) {
+      // check against end cycle only if it's provided
+      collector.push(receiptHashesByCycle.get(key))
+    }
+  }
+  return collector
+}
+
+function generateFakeTxId1(): txId {
+  return Context.crypto.hash({data: Math.random() * 10000})
+}
+
+function generateFakeTxId2Array(): txId2[] {
+  return [Context.crypto.hash({data: Math.random() * 10000})]
+}
+
+let fakeReceipMap = new Map()
+
+function generateFakeReceiptMap() {
+  // generate 10 fake txId and save to receipt Map
+  for (let i = 0; i < 5; i++) {
+    fakeReceipMap.set(generateFakeTxId1(), generateFakeTxId2Array())
+  }
+}
+
+function calculatePartitionBlock(shard) {
+  const partitionToReceiptMap: Map<PartitionNum, ReceiptMap> = new Map()
+  for (const partition of shard.ourStoredPartitions) {
+    const receiptMap: ReceiptMap = new Map()
+    partitionToReceiptMap.set(partition, fakeReceipMap)
+  }
+  // set receiptMap for global partition
+  partitionToReceiptMap.set(-1, fakeReceipMap)
+  log('partitionToReceiptMap for this cycle => ', partitionToReceiptMap)
+  return partitionToReceiptMap
+}
+
+function hashReceiptMap(receiptMap) {
+  console.log('receiptMap before converting to obj', receiptMap)
+  return Context.crypto.hash(convertMapToObj(receiptMap))
 }
 
 export async function initSafetyModeVals() {
@@ -141,6 +239,7 @@ export async function initSafetyModeVals() {
 
 export function startSnapshotting() {
   partitionGossip.initGossip()
+  generateFakeReceiptMap()
   Context.stateManager.on(
     'cycleTxsFinalized',
     async (shard: CycleShardData) => {
@@ -215,30 +314,46 @@ export function startSnapshotting() {
       // 2) process gossip from the queue for that cycle number
       const collector = partitionGossip.newCollector(shard)
 
-      // 3) gossip our partitition hashes to the rest of the network with that cycle number
+      // 3) gossip our partitition hashes and receipt map to the rest of the network with that cycle number
+
+      // Each node computes a receipt_map_hash for each partition it covers
+      const partitionBlockMap = calculatePartitionBlock(shard)
       const message: partitionGossip.Message = {
         cycle: shard.cycleNumber,
-        data: {},
+        data: {
+          partitionHash: {},
+          receiptMapHash: {}
+        },
         sender: Self.id,
       }
       for (const [partitionId, hash] of partitionHashes) {
-        message.data[partitionId] = hash
+        log(partitionId, hash)
+        message.data.partitionHash[partitionId] = hash
+        message.data.receiptMapHash[partitionId] = hashReceiptMap(partitionBlockMap.get(parseInt(partitionId)))
       }
       collector.process([message])
+
       Comms.sendGossip('snapshot_gossip', message)
 
-      collector.once('gotAllHashes', (allHashes: PartitionHashes) => {
-        // 4) create a network state hash once we have all partition hashes for that cycle number
-        const networkStateHash = createNetworkStateHash(allHashes)
+      collector.once('gotAllHashes', (allHashes) => {
 
-        log('Got all hashes: ', allHashes)
+        const { partitionHashes, receiptHashes } = allHashes
+
+        // 4) create a network state hash once we have all partition hashes for that cycle number
+        const networkStateHash = createNetworkHash(partitionHashes)
+        const networkReceiptMapHash = createNetworkHash(receiptHashes)
+
+        log('Got all partition hashes: ', partitionHashes)
+        log('Got all receipt hashes: ', receiptHashes)
 
         // 5) save the partition and network hashes for that cycle number to the DB
-        savePartitionAndNetworkHashes(shard, allHashes, networkStateHash)
+        savePartitionAndNetworkHashes(shard, partitionHashes, networkStateHash)
+        saveReceiptAndNetworkHashes(shard, receiptHashes, networkReceiptMapHash)
 
         // 6) clean up gossip and collector for that cycle number
         partitionGossip.clean(shard.cycleNumber)
-        log(`Network Hash for cycle ${shard.cycleNumber}`, networkStateHash)
+        log(`Network State Hash for cycle ${shard.cycleNumber}`, networkStateHash)
+        log(`Network Receipt Hash for cycle ${shard.cycleNumber}`, networkReceiptMapHash)
       })
     }
   )
@@ -539,15 +654,15 @@ function getNodesThatCoverPartition(
   return nodesInPartition
 }
 
-function createNetworkStateHash(
-  partitionHashes: PartitionHashes
+function createNetworkHash(
+  hashes: PartitionHashes | ReceiptMapHashes
 ): NetworkStateHash {
-  let partitionHashArray = []
-  for (const [, hash] of partitionHashes) {
-    partitionHashArray.push(hash)
+  let hashArray = []
+  for (const [, hash] of hashes) {
+    hashArray.push(hash)
   }
-  partitionHashArray = partitionHashArray.sort()
-  const hash = Context.crypto.hash(partitionHashArray)
+  hashArray = hashArray.sort()
+  const hash = Context.crypto.hash(hashArray)
   return hash
 }
 
@@ -585,6 +700,30 @@ async function savePartitionAndNetworkHashes(
     networkHash,
   }
   updateStateHashesByCycleMap(shard.cycleNumber, newStateHash)
+}
+
+async function saveReceiptAndNetworkHashes(
+  shard: CycleShardData,
+  receiptMapHashes: ReceiptMapHashes,
+  networkReceiptHash: NetworkReceiptHash
+) {
+  for (const [partitionId, hash] of receiptMapHashes) {
+    await Context.storage.addReceiptMapHash({
+      partitionId,
+      cycleNumber: shard.cycleNumber,
+      hash,
+    })
+  }
+  await Context.storage.addNetworkReceipt({
+    cycleNumber: shard.cycleNumber,
+    hash: networkReceiptHash,
+  })
+  const newReceiptHash: ReceiptHashes = {
+    counter: shard.cycleNumber,
+    receiptMapHashes,
+    networkReceiptHash,
+  }
+  updateReceiptHashesByCycleMap(shard.cycleNumber, newReceiptHash)
 }
 
 async function goActiveIfDataComplete() {
