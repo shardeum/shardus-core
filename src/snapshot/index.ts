@@ -15,6 +15,7 @@ import ShardFunctions from '../state-manager/shardFunctions'
 import * as shardFunctionTypes from '../state-manager/shardFunctionTypes'
 import * as utils from '../utils'
 import * as partitionGossip from './partition-gossip'
+import * as SnapshotFunctions from './snapshotFunctions'
 /** TYPES */
 
 export interface StateHashes {
@@ -75,8 +76,8 @@ const oldPartitionHashMap: Map<PartitionNum, string> = new Map()
 const missingPartitions: PartitionNum[] = []
 const notNeededRepliedNodes: Map<string, true> = new Map()
 const alreadyOfferedNodes = new Map()
-const stateHashesByCycle: Map<Cycle['counter'], StateHashes> = new Map()
-const receiptHashesByCycle: Map<Cycle['counter'], ReceiptHashes> = new Map()
+let stateHashesByCycle: Map<Cycle['counter'], StateHashes> = new Map()
+let receiptHashesByCycle: Map<Cycle['counter'], ReceiptHashes> = new Map()
 let safetySyncing = false // to set true when data exchange occurs during safetySync
 
 type hex = string // Limited to valid hex chars
@@ -103,7 +104,7 @@ export const safetyModeVals = {
   networkStateHash: '',
 }
 
-let snapshotLogger: log4js.Logger
+export let snapshotLogger: log4js.Logger
 
 /** FUNCTIONS */
 
@@ -114,44 +115,6 @@ export function initLogger() {
 export function setOldDataPath(path) {
   oldDataPath = path
   log('set old-data-path', oldDataPath)
-}
-
-function updateStateHashesByCycleMap(
-  counter: Cycle['counter'],
-  stateHash: StateHashes
-) {
-  const transformedStateHash = {
-    ...stateHash,
-    partitionHashes: convertMapToObj(stateHash.partitionHashes),
-  }
-  stateHashesByCycle.set(counter, transformedStateHash)
-  if (stateHashesByCycle.size > 100 && counter > 100) {
-    const limit = counter - 100
-    for (const [key, value] of stateHashesByCycle) {
-      if (key < limit) {
-        stateHashesByCycle.delete(key)
-      }
-    }
-  }
-}
-
-function updateReceiptHashesByCycleMap(
-  counter: Cycle['counter'],
-  receiptHash: ReceiptHashes
-) {
-  const transformedStateHash = {
-    ...receiptHash,
-    receiptMapHashes: convertMapToObj(receiptHash.receiptMapHashes),
-  }
-  receiptHashesByCycle.set(counter, transformedStateHash)
-  if (receiptHashesByCycle.size > 100 && counter > 100) {
-    const limit = counter - 100
-    for (const [key, value] of receiptHashesByCycle) {
-      if (key < limit) {
-        receiptHashesByCycle.delete(key)
-      }
-    }
-  }
 }
 
 export function getStateHashes(
@@ -182,44 +145,14 @@ export function getReceiptHashes(
   return collector
 }
 
-function generateFakeTxId1(): txId {
-  return Context.crypto.hash({data: Math.random() * 10000})
-}
-
-function generateFakeTxId2Array(): txId2[] {
-  return [Context.crypto.hash({data: Math.random() * 10000})]
-}
-
-let fakeReceipMap = new Map()
-
-function generateFakeReceiptMap() {
-  // generate 10 fake txId and save to receipt Map
-  for (let i = 0; i < 5; i++) {
-    fakeReceipMap.set(generateFakeTxId1(), generateFakeTxId2Array())
-  }
-}
-
-function calculatePartitionBlock(shard) {
-  const partitionToReceiptMap: Map<PartitionNum, ReceiptMap> = new Map()
-  for (const partition of shard.ourStoredPartitions) {
-    const receiptMap: ReceiptMap = new Map()
-    partitionToReceiptMap.set(partition, fakeReceipMap)
-  }
-  // set receiptMap for global partition
-  partitionToReceiptMap.set(-1, fakeReceipMap)
-  log('partitionToReceiptMap for this cycle => ', partitionToReceiptMap)
-  return partitionToReceiptMap
-}
-
 function hashReceiptMap(receiptMap) {
-  console.log('receiptMap before converting to obj', receiptMap)
-  return Context.crypto.hash(convertMapToObj(receiptMap))
+  return Context.crypto.hash(SnapshotFunctions.convertMapToObj(receiptMap))
 }
 
 export async function initSafetyModeVals() {
-  const oldCycleRecord = await readOldCycleRecord()
-  const oldNetworkHash = await readOldNetworkHash()
-  const oldPartitionHashes = await readOldPartitionHashes()
+  const oldCycleRecord = await SnapshotFunctions.readOldCycleRecord()
+  const oldNetworkHash = await SnapshotFunctions.readOldNetworkHash()
+  const oldPartitionHashes = await SnapshotFunctions.readOldPartitionHashes()
 
   // Turn safety node on
   safetyModeVals.safetyMode = true
@@ -233,19 +166,17 @@ export async function initSafetyModeVals() {
   for (const row of oldPartitionHashes) {
     oldPartitionHashMap.set(parseInt(row.partitionId), row.hash)
   }
-  log(safetyModeVals)
-  log('Old partition hashes: ', oldPartitionHashMap)
 }
 
 export function startSnapshotting() {
   partitionGossip.initGossip()
-  generateFakeReceiptMap()
+  SnapshotFunctions.generateFakeReceiptMap()
   Context.stateManager.on(
     'cycleTxsFinalized',
     async (shard: CycleShardData, receiptMapResults:ReceiptMapResult[]) => {
       const debugStrs = []
 
-      // 1) create our own partition hashes for that cycle number
+      // create our own partition hashes for that cycle number
       const partitionRanges = getPartitionRanges(shard)
       const partitionHashes = new Map()
       for (const partition of shard.ourStoredPartitions) {
@@ -311,13 +242,13 @@ export function startSnapshotting() {
       snapshotLogger.debug('Global Accounts: ', globalAccounts)
       snapshotLogger.debug('Partition Hashes: ', partitionHashes)
 
-      // 2) process gossip from the queue for that cycle number
+      // process gossip from the queue for that cycle number
       const collector = partitionGossip.newCollector(shard)
 
-      // 3) gossip our partitition hashes and receipt map to the rest of the network with that cycle number
+      // gossip our partitition hashes and receipt map to the rest of the network with that cycle number
 
       // Each node computes a receipt_map_hash for each partition it covers
-      const partitionBlockMap = calculatePartitionBlock(shard)
+      const partitionBlockMap = SnapshotFunctions.calculatePartitionBlock(shard)
       const message: partitionGossip.Message = {
         cycle: shard.cycleNumber,
         data: {
@@ -339,50 +270,40 @@ export function startSnapshotting() {
 
         const { partitionHashes, receiptHashes } = allHashes
 
-        // 4) create a network state hash once we have all partition hashes for that cycle number
-        const networkStateHash = createNetworkHash(partitionHashes)
-        const networkReceiptMapHash = createNetworkHash(receiptHashes)
+        // create a network state hash once we have all partition hashes for that cycle number
+        const networkStateHash = SnapshotFunctions.createNetworkHash(partitionHashes)
+        const networkReceiptMapHash = SnapshotFunctions.createNetworkHash(receiptHashes)
 
         log('Got all partition hashes: ', partitionHashes)
         log('Got all receipt hashes: ', receiptHashes)
 
-        // 5) save the partition and network hashes for that cycle number to the DB
-        savePartitionAndNetworkHashes(shard, partitionHashes, networkStateHash)
-        saveReceiptAndNetworkHashes(shard, receiptHashes, networkReceiptMapHash)
+        // save the partition and network hashes for that cycle number to the DB
+        SnapshotFunctions.savePartitionAndNetworkHashes(shard, partitionHashes, networkStateHash)
+        SnapshotFunctions.saveReceiptAndNetworkHashes(shard, receiptHashes, networkReceiptMapHash)
 
-        // 6) clean up gossip and collector for that cycle number
+        // Update stateHashes by Cycle map
+        const newStateHash: StateHashes = {
+          counter: shard.cycleNumber,
+          partitionHashes,
+          networkHash: networkStateHash,
+        }
+        stateHashesByCycle = SnapshotFunctions.updateStateHashesByCycleMap(shard.cycleNumber, newStateHash, stateHashesByCycle)
+
+        // Update receiptHashes by Cycle map
+        const newReceiptHash: ReceiptHashes = {
+          counter: shard.cycleNumber,
+          receiptMapHashes: receiptHashes,
+          networkReceiptHash: networkReceiptMapHash,
+        }
+        receiptHashesByCycle = SnapshotFunctions.updateReceiptHashesByCycleMap(shard.cycleNumber, newReceiptHash, receiptHashesByCycle)
+
+        // clean up gossip and collector for that cycle number
         partitionGossip.clean(shard.cycleNumber)
         log(`Network State Hash for cycle ${shard.cycleNumber}`, networkStateHash)
         log(`Network Receipt Hash for cycle ${shard.cycleNumber}`, networkReceiptMapHash)
       })
     }
   )
-}
-
-export async function readOldCycleRecord() {
-  const oldCycles = await Context.storage.listOldCycles()
-  if (oldCycles && oldCycles.length > 0) return oldCycles[0]
-}
-
-export async function readOldNetworkHash() {
-  try {
-    const networkStateHash = await Context.storage.getLastOldNetworkHash()
-    log('Read Old network state hash', networkStateHash)
-    if (networkStateHash && networkStateHash.length > 0)
-      return networkStateHash[0]
-  } catch (e) {
-    snapshotLogger.error('Unable to read old network state hash')
-  }
-}
-
-export async function readOldPartitionHashes() {
-  try {
-    const partitionHashes = await Context.storage.getLastOldPartitionHashes()
-    log('Read Old partition_state_hashes', partitionHashes)
-    return partitionHashes
-  } catch (e) {
-    snapshotLogger.error('Unable to read old partition hashes')
-  }
 }
 
 export async function safetySync() {
@@ -418,7 +339,7 @@ export async function safetySync() {
   const nodeShardDataMap: shardFunctionTypes.NodeShardDataMap = new Map()
 
   // populate DataToMigrate and oldDataMap
-  await calculateOldDataMap(shardGlobals, nodeShardDataMap)
+  await SnapshotFunctions.calculateOldDataMap(shardGlobals, nodeShardDataMap, oldPartitionHashMap, oldDataMap, dataToMigrate)
 
   // check if we have data for each partition we cover in new network. We will use this array to request data from other nodes
   checkMissingPartitions(shardGlobals)
@@ -432,98 +353,6 @@ export async function safetySync() {
 
   // Check if we have all old data. Once we get the old data you need, go active
   goActiveIfDataComplete()
-}
-
-async function calculateOldDataMap(
-  shardGlobals: shardFunctionTypes.ShardGlobals,
-  nodeShardDataMap: shardFunctionTypes.NodeShardDataMap
-) {
-  const partitionShardDataMap: shardFunctionTypes.ParititionShardDataMap = new Map()
-  ShardFunctions.computePartitionShardDataMap(
-    shardGlobals,
-    partitionShardDataMap,
-    0,
-    shardGlobals.numPartitions
-  )
-
-  /**
-   * [NOTE] [AS] Need to do this because type of 'cycleJoined' field differs
-   * between ShardusTypes.Node (number) and P2P/NodeList.Node (string)
-   */
-  const nodes = (NodeList.byIdOrder as unknown) as shardusTypes.Node[]
-
-  ShardFunctions.computeNodePartitionDataMap(
-    shardGlobals,
-    nodeShardDataMap,
-    nodes,
-    partitionShardDataMap,
-    nodes,
-    true
-  )
-
-  // If we have old data, figure out which partitions we have and put into OldDataMap
-  for (const [partitionId, partitonObj] of partitionShardDataMap) {
-    try {
-      const lowAddress = partitonObj.homeRange.low
-      const highAddress = partitonObj.homeRange.high
-      const oldAccountCopiesInPartition = await Context.storage.getOldAccountCopiesByCycleAndRange(
-        lowAddress,
-        highAddress
-      )
-      if (oldAccountCopiesInPartition) {
-        const existingHash = oldPartitionHashMap.get(partitionId)
-        const oldAccountsWithoutCycleNumber = oldAccountCopiesInPartition.map(
-          (acc) => {
-            return {
-              accountId: acc.accountId,
-              data: acc.data,
-              timestamp: acc.timestamp,
-              hash: acc.hash,
-              isGlobal: acc.isGlobal,
-            }
-          }
-        )
-        const computedHash = Context.crypto.hash(oldAccountsWithoutCycleNumber)
-        // log(`old accounts in partition: ${partitionId}: `, oldAccountCopiesInPartition)
-        // log(computedHash, existingHash)
-
-        // make sure that we really have correct data only if hashes match
-        if (computedHash === existingHash)
-          oldDataMap.set(partitionId, oldAccountCopiesInPartition)
-      }
-    } catch (e) {
-      console.log(e)
-    }
-  }
-
-  // check if we have global account in old DB
-  try {
-    const oldGlobalAccounts = await Context.storage.getOldGlobalAccountCopies()
-    if (oldGlobalAccounts) {
-      const existingGlobalHash = oldPartitionHashMap.get(-1)
-      const oldGlobalAccWithoutCycleNumber = oldGlobalAccounts.map((acc) => {
-        return {
-          accountId: acc.accountId,
-          data: acc.data,
-          timestamp: acc.timestamp,
-          hash: acc.hash,
-          isGlobal: acc.isGlobal,
-        }
-      })
-      const computedGlobalHash = Context.crypto.hash(
-        oldGlobalAccWithoutCycleNumber
-      )
-      console.log('computed global hash: ', computedGlobalHash)
-      console.log('existing global hash: ', existingGlobalHash)
-      // make sure that we really have correct data only if hashes match
-      if (computedGlobalHash === existingGlobalHash) {
-        oldDataMap.set(-1, oldGlobalAccounts)
-        dataToMigrate.set(-1, oldGlobalAccounts) // -1 is used for virtual partition for global accounts
-      }
-    }
-  } catch (e) {
-    console.log(e)
-  }
 }
 
 function checkMissingPartitions(shardGlobals: shardFunctionTypes.ShardGlobals) {
@@ -654,18 +483,6 @@ function getNodesThatCoverPartition(
   return nodesInPartition
 }
 
-function createNetworkHash(
-  hashes: PartitionHashes | ReceiptMapHashes
-): NetworkStateHash {
-  let hashArray = []
-  for (const [, hash] of hashes) {
-    hashArray.push(hash)
-  }
-  hashArray = hashArray.sort()
-  const hash = Context.crypto.hash(hashArray)
-  return hash
-}
-
 function getPartitionRanges(shard: CycleShardData): PartitionRanges {
   const partitionRanges = new Map()
   for (const partition of shard.ourStoredPartitions) {
@@ -676,54 +493,6 @@ function getPartitionRanges(shard: CycleShardData): PartitionRanges {
   }
 
   return partitionRanges
-}
-
-async function savePartitionAndNetworkHashes(
-  shard: CycleShardData,
-  partitionHashes: PartitionHashes,
-  networkHash: NetworkStateHash
-) {
-  for (const [partitionId, hash] of partitionHashes) {
-    await Context.storage.addPartitionHash({
-      partitionId,
-      cycleNumber: shard.cycleNumber,
-      hash,
-    })
-  }
-  await Context.storage.addNetworkState({
-    cycleNumber: shard.cycleNumber,
-    hash: networkHash,
-  })
-  const newStateHash: StateHashes = {
-    counter: shard.cycleNumber,
-    partitionHashes,
-    networkHash,
-  }
-  updateStateHashesByCycleMap(shard.cycleNumber, newStateHash)
-}
-
-async function saveReceiptAndNetworkHashes(
-  shard: CycleShardData,
-  receiptMapHashes: ReceiptMapHashes,
-  networkReceiptHash: NetworkReceiptHash
-) {
-  for (const [partitionId, hash] of receiptMapHashes) {
-    await Context.storage.addReceiptMapHash({
-      partitionId,
-      cycleNumber: shard.cycleNumber,
-      hash,
-    })
-  }
-  await Context.storage.addNetworkReceipt({
-    cycleNumber: shard.cycleNumber,
-    hash: networkReceiptHash,
-  })
-  const newReceiptHash: ReceiptHashes = {
-    counter: shard.cycleNumber,
-    receiptMapHashes,
-    networkReceiptHash,
-  }
-  updateReceiptHashesByCycleMap(shard.cycleNumber, newReceiptHash)
 }
 
 async function goActiveIfDataComplete() {
@@ -751,7 +520,7 @@ export async function startWitnessMode() {
       }
       const nodeList = fullNodesSigned.nodeList
       const newestCycle = await Sync.getNewestCycle(nodeList)
-      const oldNetworkHash = await readOldNetworkHash()
+      const oldNetworkHash = await SnapshotFunctions.readOldNetworkHash()
 
       if (
         newestCycle.safetyMode === false ||
@@ -778,7 +547,7 @@ export async function startWitnessMode() {
           Context.config.sharding.nodesPerConsensusGroup
         )
         const nodeShardDataMap: shardFunctionTypes.NodeShardDataMap = new Map()
-        await calculateOldDataMap(shardGlobals, nodeShardDataMap)
+        await SnapshotFunctions.calculateOldDataMap(shardGlobals, nodeShardDataMap, oldPartitionHashMap, oldDataMap, dataToMigrate)
         const offer = createOffer()
 
         // send offer to each syncing + active nodes unless data is already offered
@@ -1032,14 +801,6 @@ function registerSnapshotRoutes() {
   for (const route of routes) {
     Context.network._registerExternal(route.method, route.name, route.handler)
   }
-}
-
-function convertMapToObj(inputMap) {
-  const obj = {}
-  for (const [key, value] of inputMap) {
-    obj[key] = value
-  }
-  return obj
 }
 
 function log(...things) {

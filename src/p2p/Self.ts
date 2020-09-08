@@ -14,6 +14,7 @@ import * as Join from './Join'
 import * as NodeList from './NodeList'
 import * as Sync from './Sync'
 import * as Types from './Types'
+import { readOldCycleRecord } from '../snapshot/snapshotFunctions'
 
 /** TYPES */
 
@@ -154,7 +155,7 @@ async function joinOrWitnessForNetwork(): Promise<JoinOrWitnessResult> {
 
   // Become a witness if we have old data and network conditions are right
   if (snapshot.oldDataPath) {
-    const oldDataCycleRecord = await snapshot.readOldCycleRecord()
+    const oldDataCycleRecord = await readOldCycleRecord()
     const oldDataNetworkId = oldDataCycleRecord.networkId
     if (latestCycle.safetyMode && oldDataNetworkId === latestCycle.networkId) {
       // Return witness
