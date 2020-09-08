@@ -57,9 +57,23 @@ type QueueEntry = {
     // receipt that we need to repair to
     appliedReceiptForRepair?: AppliedReceipt;
 
+    // receipt coalesced in getReceipt(). 
+    appliedReceiptFinal?: AppliedReceipt;
+
     repairFinished?: boolean;
 
     requestingReceipt: boolean;
+
+    //calculate this data early to make the receipt map easy to calculate
+    cycleToRecordOn: number;
+    //any partitions that are involved in this TX (includes global)
+    involvedPartitions: number[];
+    //any global partitions that are involved in this TX
+    involvedGlobalPartitions: number[];
+    //short copy of the hash
+    shortReceiptHash: string;
+    // receipt status is in the receipt
+
 
     //collectedData for repair
     debugFail1:boolean;
@@ -79,7 +93,7 @@ type SyncTracker = {
 
 
 type CycleShardData = {
-    shardGlobals: any;
+    shardGlobals: any // import('./shardFunctionTypes').ShardGlobals;
     cycleNumber: number;
     ourNode: import("../shardus/shardus-types").Node;
     /**
@@ -96,6 +110,7 @@ type CycleShardData = {
     partitionsToSkip: Map<number, boolean>
 
     timestamp:number // timestamp for cleanup purposes, may not match exactly the rules of which transactions will live in a partition for this cycle.
+    timestampEndCycle:number 
     /**
      * hashlist index of the voters for this vote
      */
@@ -621,3 +636,12 @@ type StringStringObjectMap = {[key:string]:string}
 type FifoWaitingEntry = { id: number }
 type FifoLock = { fifoName:string, queueCounter: number, waitingList: FifoWaitingEntry[], lastServed: number, queueLocked: boolean, lockOwner: number }
 type FifoLockObjectMap = {[lockID:string]:FifoLock}
+
+type ReceiptMap = {[txId:string] : string[]  }
+
+type ReceiptMapResult = {
+    cycle:number;
+    partition:number;
+    receiptMap:ReceiptMap;
+    txCount:number
+}

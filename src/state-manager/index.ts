@@ -110,6 +110,8 @@ class StateManager extends EventEmitter {
 
     debugNoTxVoting: boolean;
 
+    syncSettleTime: number;
+
   constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage : Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     super()
     this.verboseLogs = verboseLogs
@@ -401,8 +403,9 @@ class StateManager extends EventEmitter {
     let cycle = this.p2p.state.getLastCycle()
     if(cycle != null){
       cycleShardData.timestamp = cycle.start * 1000
+      cycleShardData.timestampEndCycle = (cycle.start + cycle.duration) * 1000
     }
-
+    
     let edgeNodes = this.config.sharding.nodesPerConsensusGroup as number
 
     // save this per cycle?
@@ -3652,6 +3655,15 @@ class StateManager extends EventEmitter {
           throw new Error(`updateHomeInformation homeNode == null ${txQueueEntry}`)
         }
 
+        // calculate the partitions this TX is involved in for the receipt map
+        let isGlobalAccount = this.isGlobalAccount(key)
+        if(isGlobalAccount === true){
+          txQueueEntry.involvedPartitions.push(homeNode.homePartition)
+          txQueueEntry.involvedGlobalPartitions.push(homeNode.homePartition)
+        } else {
+          txQueueEntry.involvedPartitions.push(homeNode.homePartition)
+        }
+
         // HOMENODEMATHS Based on home node.. should this be chaned to homepartition?
         let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
         let relationString = ShardFunctions.getNodeRelation(homeNode, this.currentCycleShardData.ourNode.id)
@@ -3729,7 +3741,11 @@ class StateManager extends EventEmitter {
       waitForReceiptOnly:false, 
       m2TimeoutReached:false, 
       debugFail1:false, 
-      requestingReceipt:false
+      requestingReceipt:false,
+      cycleToRecordOn:-5,
+      involvedPartitions: [],
+      involvedGlobalPartitions: [],
+      shortReceiptHash: ''
      } // age comes from timestamp
 
     // todo faster hash lookup for this maybe?
@@ -3737,6 +3753,9 @@ class StateManager extends EventEmitter {
     if (entry) {
       return false // already in our queue, or temp queue
     }
+
+
+
 
 
     // if (this.config.debug != null && this.config.debug.loseTxChance && this.config.debug.loseTxChance > 0) {
@@ -3784,6 +3803,13 @@ class StateManager extends EventEmitter {
       txQueueEntry.uniqueKeys = Object.keys(keyHash)
 
       this.updateHomeInformation(txQueueEntry)
+
+      // calculate information needed for receiptmap
+      txQueueEntry.cycleToRecordOn = this.getCycleNumberFromTimestamp(timestamp)
+      if(txQueueEntry.cycleToRecordOn < 0){
+        if (this.verboseLogs) this.mainLogger.error(`routeAndQueueAcceptedTransaction failed to calculate cycle ${timestamp} error code:${txQueueEntry.cycleToRecordOn}`)
+        return false
+      }
 
       // Global account keys.
       for (let key of txQueueEntry.uniqueKeys) {
@@ -7802,8 +7828,10 @@ class StateManager extends EventEmitter {
       // Q2 was chosen so that any transactions submitted with a time stamp that falls in the previous quarter will have been processed and finalized. This could be changed to Q3 if we find that more time is needed.
       this.generatePartitionObjects(lastCycle)
 
+      let receiptMapResults = this.generateReceiptMapResults(lastCycle)
+
       // Hook for Snapshot module to listen to after partition data is settled
-      this.emit('cycleTxsFinalized', lastCycleShardValues)
+      this.emit('cycleTxsFinalized', lastCycleShardValues, receiptMapResults)
 
       // pre-allocate the next cycle data to be safe!
       let prekey = 'c' + (lastCycle.counter + 1)
@@ -9440,6 +9468,141 @@ class StateManager extends EventEmitter {
       }
     } 
   }
+
+  /**
+   * getReceipt
+   * Since there are few places where receipts can be stored on a QueueEntry this determines the correct one to return
+   * @param queueEntry 
+   */
+  getReceipt(queueEntry:QueueEntry) : AppliedReceipt {
+      if(queueEntry.appliedReceiptFinal != null){
+        return queueEntry.appliedReceiptFinal 
+      }
+      // start with a receipt we made
+      let receipt:AppliedReceipt = queueEntry.appliedReceipt
+      if(receipt == null){
+        // or see if we got one
+        receipt = queueEntry.recievedAppliedReceipt
+      }
+      // if we had to repair use that instead. this stomps the other ones
+      if(queueEntry.appliedReceiptForRepair != null){
+        receipt = queueEntry.appliedReceiptForRepair
+      }
+      queueEntry.appliedReceiptFinal = receipt
+      return receipt
+  }
+
+  generateReceiptMapResults (lastCycle:Shardus.Cycle) : ReceiptMapResult[] {
+    let results: ReceiptMapResult[] = []
+
+    let cycleToSave = lastCycle.counter
+
+    //init results per partition
+    let receiptMapByPartition:Map<number, ReceiptMapResult> = new Map()
+    for(let i=0; i<this.currentCycleShardData.shardGlobals.numPartitions; i++) {
+      let mapResult:ReceiptMapResult = {
+        cycle: cycleToSave,
+        partition: i,
+        receiptMap: {},
+        txCount: 0
+       }
+      receiptMapByPartition.set(i, mapResult)
+      // add to the list we will return
+      results.push(mapResult)
+    }
+
+    let queueEntriesToSave:QueueEntry[] = []
+    for (let queueEntry of this.newAcceptedTxQueue) {
+      if (queueEntry.cycleToRecordOn === cycleToSave) {
+        // make sure we have a receipt
+        let receipt = this.getReceipt(queueEntry)
+        if(receipt == null) {
+          this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in newAcceptedTxQueue. ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+        } else {
+          queueEntriesToSave.push(queueEntry)
+        }
+      }
+    }
+
+    for (let queueEntry of this.archivedQueueEntries) {
+      if (queueEntry.cycleToRecordOn === cycleToSave) {
+        // make sure we have a receipt
+        let receipt = this.getReceipt(queueEntry)
+        if(receipt == null) {
+          this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in archivedQueueEntries. ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+        } else {
+          queueEntriesToSave.push(queueEntry)
+        }
+      }
+    }
+
+    const netId: string = '123abc'
+    //go over the save list..
+    for (let queueEntry of queueEntriesToSave) {
+      for(let partition of queueEntry.involvedPartitions){
+        let receipt = this.getReceipt(queueEntry)
+
+        let status = (receipt.result === true)?'applied' : 'rejected'
+        let txHash = queueEntry.acceptedTx.id
+        let txResultFullHash = this.crypto.hash({tx:txHash, status, netId  })
+        let txIdShort = utils.short(txHash)
+        let txResult = utils.short(txResultFullHash)
+        if(receiptMapByPartition.has(partition)){
+          let mapResult:ReceiptMapResult = receiptMapByPartition.get(partition)     
+          //create an array if we have not seen this index yet  
+          if(mapResult.receiptMap[txIdShort] == null){
+            mapResult.receiptMap[txIdShort] = []
+          }
+          //push the result.  note the order is not deterministic unless we were to sort at the end.
+          mapResult.receiptMap[txIdShort].push(txResult)
+          mapResult.txCount++
+        }
+      }
+    }
+
+    return results
+  }
+
+  /**
+   * getCycleNumberFromTimestamp
+   * cycle numbers are calculated from the queue entry timestamp, but an offset is needed so that we can
+   * finalize cycles in time. when you start a new cycle there could still be unfinished transactions for
+   * syncSettleTime milliseconds.
+   * 
+   * returns a negative number code if we can not determine the cycle
+   */
+  getCycleNumberFromTimestamp(timestamp, allowOlder:boolean = true) : number {
+    let offsetTimestamp = timestamp + this.syncSettleTime
+  
+    //currentCycleShardData
+    if(this.currentCycleShardData.timestamp <= offsetTimestamp && offsetTimestamp < this.currentCycleShardData.timestampEndCycle ){
+      return this.currentCycleShardData.cycleNumber
+    }
+
+    //is it in the future
+    if(this.currentCycleShardData.timestampEndCycle <= offsetTimestamp){
+      if( offsetTimestamp < this.currentCycleShardData.timestampEndCycle ){
+        return this.currentCycleShardData.cycleNumber + 1
+      } else {
+        //too far in the future
+        return -2
+      }
+    } 
+    if(allowOlder === true){
+      //cycle is in the past, by process of elimination
+      let offsetSeconds = Math.floor(offsetTimestamp * 0.001)
+      const cycle = this.p2p.state.getCycleByTimestamp(offsetSeconds)
+      if(cycle != null){
+        return cycle.cycleNumber
+      }      
+    }
+
+    //failed to match, return -1
+    return -1
+  }
+
+
+
 }
 
 export default StateManager

@@ -271,6 +271,19 @@ export const makeShortHash = (x, n = 4) => {
   return x
 }
 
+/**
+ * short
+ * grab the first n (default=4) bytes of a string
+ * @param x 
+ * @param n 
+ */
+export const short = (x:string, n = 4) => {
+  if (!x) {
+    return x
+  }
+  return x.slice(0, n)
+}
+
 const objToString = Object.prototype.toString
 const objKeys =
   Object.keys ||

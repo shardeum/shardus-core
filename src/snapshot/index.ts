@@ -242,7 +242,7 @@ export function startSnapshotting() {
   generateFakeReceiptMap()
   Context.stateManager.on(
     'cycleTxsFinalized',
-    async (shard: CycleShardData) => {
+    async (shard: CycleShardData, receiptMapResults:ReceiptMapResult[]) => {
       const debugStrs = []
 
       // 1) create our own partition hashes for that cycle number
