@@ -15,7 +15,7 @@ import ShardFunctions from '../state-manager/shardFunctions'
 import * as shardFunctionTypes from '../state-manager/shardFunctionTypes'
 import * as utils from '../utils'
 import * as partitionGossip from './partition-gossip'
-import { snapshotLogger, oldDataPath } from './index'
+import { snapshotLogger, safetyModeVals } from './index'
 /** TYPES */
 
 const status: 'applied' | 'rejected' = 'applied'
@@ -230,11 +230,10 @@ export async function readOldPartitionHashes () {
 export async function calculateOldDataMap(
     shardGlobals: shardFunctionTypes.ShardGlobals,
     nodeShardDataMap: shardFunctionTypes.NodeShardDataMap,
-    oldPartitionHashMap,
-    oldDataMap,
-    dataToMigrate
+    oldPartitionHashMap
   ) {
     const partitionShardDataMap: shardFunctionTypes.ParititionShardDataMap = new Map()
+    const oldDataMap: Map<PartitionNum, any[]> = new Map()
     ShardFunctions.computePartitionShardDataMap(
       shardGlobals,
       partitionShardDataMap,
@@ -284,8 +283,9 @@ export async function calculateOldDataMap(
           // log(computedHash, existingHash)
   
           // make sure that we really have correct data only if hashes match
-          if (computedHash === existingHash)
+          if (computedHash === existingHash) {
             oldDataMap.set(partitionId, oldAccountCopiesInPartition)
+          }
         }
       } catch (e) {
         console.log(e)
@@ -312,13 +312,63 @@ export async function calculateOldDataMap(
         // make sure that we really have correct data only if hashes match
         if (computedGlobalHash === existingGlobalHash) {
           oldDataMap.set(-1, oldGlobalAccounts)
-          dataToMigrate.set(-1, oldGlobalAccounts) // -1 is used for virtual partition for global accounts
         }
       }
     } catch (e) {
       console.log(e)
     }
-    return [oldDataMap, dataToMigrate]
+    return oldDataMap
+  }
+
+  export function copyOldDataToDataToMigrate(oldDataMap, dataToMigrate) {
+    for (let [key, value] of oldDataMap) {
+      if (!dataToMigrate.has(key)) {
+        dataToMigrate.set(key, value)
+      }
+    }
+  }
+
+  export function getMissingPartitions(shardGlobals: shardFunctionTypes.ShardGlobals, oldDataMap) {
+    log('Checking missing partitions...')
+    log('oldDataMap: ', oldDataMap)
+    const missingPartitions = []
+    const { homePartition } = ShardFunctions.addressToPartition(
+      shardGlobals,
+      Self.id
+    )
+    log(`Home partition for us is: ${homePartition}`)
+    const {
+      partitionStart,
+      partitionEnd,
+    } = ShardFunctions.calculateStoredPartitions2(shardGlobals, homePartition)
+    log('partition start: ', partitionStart)
+    log('partition end: ', partitionEnd)
+    const partitionsToCheck = []
+    if (partitionStart < partitionEnd) {
+      for (let i = partitionStart; i <= partitionEnd; i++) {
+        partitionsToCheck.push(i)
+      }
+    } else if (partitionStart > partitionEnd) {
+      const largestPartition = safetyModeVals.safetyNum - 1
+      for (let i = partitionStart; i <= largestPartition; i++) {
+        partitionsToCheck.push(i)
+      }
+      for (let i = 0; i <= partitionEnd; i++) {
+        partitionsToCheck.push(i)
+      }
+    }
+    log('Partitions to check: ', partitionsToCheck)
+    for (let i = 0; i < partitionsToCheck.length; i++) {
+      const partitionId = partitionsToCheck[i]
+      if (!oldDataMap.has(partitionId)) {  
+        missingPartitions.push(partitionId)
+      }
+    }
+    // check for virtual global partiton
+    if (!oldDataMap.has(-1)) {
+      missingPartitions.push(-1)
+    }
+    return missingPartitions
   }
 
 export function convertMapToObj(inputMap) {

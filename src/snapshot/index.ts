@@ -70,10 +70,10 @@ enum offerResponse {
 /** STATE */
 
 export let oldDataPath: string
-const oldDataMap: Map<PartitionNum, any[]> = new Map()
-const dataToMigrate: Map<PartitionNum, any[]> = new Map()
+let oldDataMap: Map<PartitionNum, any[]> = new Map()
+let dataToMigrate: Map<PartitionNum, any[]> = new Map()
 const oldPartitionHashMap: Map<PartitionNum, string> = new Map()
-const missingPartitions: PartitionNum[] = []
+let missingPartitions: PartitionNum[] = []
 const notNeededRepliedNodes: Map<string, true> = new Map()
 const alreadyOfferedNodes = new Map()
 let stateHashesByCycle: Map<Cycle['counter'], StateHashes> = new Map()
@@ -339,10 +339,11 @@ export async function safetySync() {
   const nodeShardDataMap: shardFunctionTypes.NodeShardDataMap = new Map()
 
   // populate DataToMigrate and oldDataMap
-  await SnapshotFunctions.calculateOldDataMap(shardGlobals, nodeShardDataMap, oldPartitionHashMap, oldDataMap, dataToMigrate)
+  oldDataMap = await SnapshotFunctions.calculateOldDataMap(shardGlobals, nodeShardDataMap, oldPartitionHashMap)
+  SnapshotFunctions.copyOldDataToDataToMigrate(oldDataMap, dataToMigrate)
 
   // check if we have data for each partition we cover in new network. We will use this array to request data from other nodes
-  checkMissingPartitions(shardGlobals)
+  missingPartitions = SnapshotFunctions.getMissingPartitions(shardGlobals, oldDataMap)
 
   safetySyncing = true
 
@@ -355,49 +356,6 @@ export async function safetySync() {
   goActiveIfDataComplete()
 }
 
-function checkMissingPartitions(shardGlobals: shardFunctionTypes.ShardGlobals) {
-  log('Checking missing partitions...')
-  log('oldDataMap: ', oldDataMap)
-  const { homePartition } = ShardFunctions.addressToPartition(
-    shardGlobals,
-    Self.id
-  )
-  log(`Home partition for us is: ${homePartition}`)
-  const {
-    partitionStart,
-    partitionEnd,
-  } = ShardFunctions.calculateStoredPartitions2(shardGlobals, homePartition)
-  log('partition start: ', partitionStart)
-  log('partition end: ', partitionEnd)
-  const partitionsToCheck = []
-  if (partitionStart < partitionEnd) {
-    for (let i = partitionStart; i <= partitionEnd; i++) {
-      partitionsToCheck.push(i)
-    }
-  } else if (partitionStart > partitionEnd) {
-    const largestPartition = safetyModeVals.safetyNum - 1
-    for (let i = partitionStart; i <= largestPartition; i++) {
-      partitionsToCheck.push(i)
-    }
-    for (let i = 0; i <= partitionEnd; i++) {
-      partitionsToCheck.push(i)
-    }
-  }
-  log('Partitions to check: ', partitionsToCheck)
-  for (let i = 0; i < partitionsToCheck.length; i++) {
-    const partitionId = partitionsToCheck[i]
-    if (oldDataMap.has(partitionId)) {
-      // [TODO] Were good, we have the data. Need to do something with it now...
-      dataToMigrate.set(partitionId, oldDataMap.get(partitionId))
-    } else {
-      missingPartitions.push(partitionId)
-    }
-  }
-  // check for virtual global partiton
-  if (!oldDataMap.has(-1)) {
-    missingPartitions.push(-1)
-  }
-}
 
 async function sendOldDataToNodes(
   partitionId: number,
@@ -547,7 +505,7 @@ export async function startWitnessMode() {
           Context.config.sharding.nodesPerConsensusGroup
         )
         const nodeShardDataMap: shardFunctionTypes.NodeShardDataMap = new Map()
-        await SnapshotFunctions.calculateOldDataMap(shardGlobals, nodeShardDataMap, oldPartitionHashMap, oldDataMap, dataToMigrate)
+        oldDataMap = await SnapshotFunctions.calculateOldDataMap(shardGlobals, nodeShardDataMap, oldPartitionHashMap)
         const offer = createOffer()
 
         // send offer to each syncing + active nodes unless data is already offered
