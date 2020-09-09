@@ -7830,6 +7830,8 @@ class StateManager extends EventEmitter {
 
       let receiptMapResults = this.generateReceiptMapResults(lastCycle)
 
+      if(this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `receiptMapResults: ${stringify(receiptMapResults)}`)
+
       // Hook for Snapshot module to listen to after partition data is settled
       this.emit('cycleTxsFinalized', lastCycleShardValues, receiptMapResults)
 
@@ -9581,9 +9583,18 @@ class StateManager extends EventEmitter {
 
     //is it in the future
     if(this.currentCycleShardData.timestampEndCycle <= offsetTimestamp){
-      if( offsetTimestamp < this.currentCycleShardData.timestampEndCycle ){
+      let cycle:Shardus.Cycle = this.p2p.state.getLastCycle()
+      let endOfNextCycle = this.currentCycleShardData.timestampEndCycle + (cycle.duration * 1000 )
+      if( offsetTimestamp < endOfNextCycle + this.syncSettleTime){
         return this.currentCycleShardData.cycleNumber + 1
+      } else if(offsetTimestamp < endOfNextCycle  + this.syncSettleTime + (cycle.duration * 1000 )) {
+        this.mainLogger.error(`getCycleNumberFromTimestamp fail2: endOfNextCycle:${endOfNextCycle} offsetTimestamp:${offsetTimestamp} timestamp:${timestamp}`)
+
+        return this.currentCycleShardData.cycleNumber + 2
       } else {
+
+        this.mainLogger.error(`getCycleNumberFromTimestamp fail: endOfNextCycle:${endOfNextCycle} offsetTimestamp:${offsetTimestamp} timestamp:${timestamp}`)
+
         //too far in the future
         return -2
       }
