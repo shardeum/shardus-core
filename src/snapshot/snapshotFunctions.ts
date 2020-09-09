@@ -16,6 +16,10 @@ import * as shardFunctionTypes from '../state-manager/shardFunctionTypes'
 import * as utils from '../utils'
 import * as partitionGossip from './partition-gossip'
 import { snapshotLogger, safetyModeVals } from './index'
+import got from 'got'
+import stream from 'stream'
+import zlib from 'zlib'
+const { Transform } = require('stream')
 /** TYPES */
 
 const status: 'applied' | 'rejected' = 'applied'
@@ -120,50 +124,54 @@ export function createNetworkHash (
   return hash
 }
 
-export function updateStateHashesByCycleMap(
-    counter: Cycle['counter'],
-    stateHash: StateHashes,
+export function updateStateHashesByCycleMap (
+  counter: Cycle['counter'],
+  stateHash: StateHashes,
+  stateHashesByCycle
+) {
+  const newStateHashByCycle: Map<Cycle['counter'], StateHashes> = new Map(
     stateHashesByCycle
-  ) {
-    const newStateHashByCycle: Map<Cycle['counter'], StateHashes> = new Map(stateHashesByCycle)
-    const transformedStateHash = {
-      ...stateHash,
-      partitionHashes: convertMapToObj(stateHash.partitionHashes),
-    }
-    newStateHashByCycle.set(counter, transformedStateHash)
-    if (newStateHashByCycle.size > 100 && counter > 100) {
-      const limit = counter - 100
-      for (const [key, value] of newStateHashByCycle) {
-        if (key < limit) {
-          newStateHashByCycle.delete(key)
-        }
+  )
+  const transformedStateHash = {
+    ...stateHash,
+    partitionHashes: convertMapToObj(stateHash.partitionHashes),
+  }
+  newStateHashByCycle.set(counter, transformedStateHash)
+  if (newStateHashByCycle.size > 100 && counter > 100) {
+    const limit = counter - 100
+    for (const [key, value] of newStateHashByCycle) {
+      if (key < limit) {
+        newStateHashByCycle.delete(key)
       }
     }
-    return newStateHashByCycle
   }
+  return newStateHashByCycle
+}
 
-export function updateReceiptHashesByCycleMap(
-    counter: Cycle['counter'],
-    receiptHash: ReceiptHashes,
+export function updateReceiptHashesByCycleMap (
+  counter: Cycle['counter'],
+  receiptHash: ReceiptHashes,
+  receiptHashesByCycle
+) {
+  const newReceiptHashesByCycle: Map<Cycle['counter'], ReceiptHashes> = new Map(
     receiptHashesByCycle
-  ) {
-    const newReceiptHashesByCycle: Map<Cycle['counter'], ReceiptHashes> = new Map(receiptHashesByCycle)
+  )
 
-    const transformedStateHash = {
-      ...receiptHash,
-      receiptMapHashes: convertMapToObj(receiptHash.receiptMapHashes),
-    }
-    newReceiptHashesByCycle.set(counter, transformedStateHash)
-    if (newReceiptHashesByCycle.size > 100 && counter > 100) {
-      const limit = counter - 100
-      for (const [key, value] of newReceiptHashesByCycle) {
-        if (key < limit) {
-          newReceiptHashesByCycle.delete(key)
-        }
+  const transformedStateHash = {
+    ...receiptHash,
+    receiptMapHashes: convertMapToObj(receiptHash.receiptMapHashes),
+  }
+  newReceiptHashesByCycle.set(counter, transformedStateHash)
+  if (newReceiptHashesByCycle.size > 100 && counter > 100) {
+    const limit = counter - 100
+    for (const [key, value] of newReceiptHashesByCycle) {
+      if (key < limit) {
+        newReceiptHashesByCycle.delete(key)
       }
     }
-    return newReceiptHashesByCycle
   }
+  return newReceiptHashesByCycle
+}
 
 export async function savePartitionAndNetworkHashes (
   shard: CycleShardData,
@@ -227,157 +235,219 @@ export async function readOldPartitionHashes () {
   }
 }
 
-export async function calculateOldDataMap(
-    shardGlobals: shardFunctionTypes.ShardGlobals,
-    nodeShardDataMap: shardFunctionTypes.NodeShardDataMap,
-    oldPartitionHashMap
-  ) {
-    const partitionShardDataMap: shardFunctionTypes.ParititionShardDataMap = new Map()
-    const oldDataMap: Map<PartitionNum, any[]> = new Map()
-    ShardFunctions.computePartitionShardDataMap(
-      shardGlobals,
-      partitionShardDataMap,
-      0,
-      shardGlobals.numPartitions
-    )
-  
-    /**
-     * [NOTE] [AS] Need to do this because type of 'cycleJoined' field differs
-     * between ShardusTypes.Node (number) and P2P/NodeList.Node (string)
-     */
-    const nodes = (NodeList.byIdOrder as unknown) as shardusTypes.Node[]
-  
-    ShardFunctions.computeNodePartitionDataMap(
-      shardGlobals,
-      nodeShardDataMap,
-      nodes,
-      partitionShardDataMap,
-      nodes,
-      true
-    )
-  
-    // If we have old data, figure out which partitions we have and put into OldDataMap
-    for (const [partitionId, partitonObj] of partitionShardDataMap) {
-      try {
-        const lowAddress = partitonObj.homeRange.low
-        const highAddress = partitonObj.homeRange.high
-        const oldAccountCopiesInPartition = await Context.storage.getOldAccountCopiesByCycleAndRange(
-          lowAddress,
-          highAddress
-        )
-        if (oldAccountCopiesInPartition) {
-          const existingHash = oldPartitionHashMap.get(partitionId)
-          const oldAccountsWithoutCycleNumber = oldAccountCopiesInPartition.map(
-            (acc) => {
-              return {
-                accountId: acc.accountId,
-                data: acc.data,
-                timestamp: acc.timestamp,
-                hash: acc.hash,
-                isGlobal: acc.isGlobal,
-              }
-            }
-          )
-          const computedHash = Context.crypto.hash(oldAccountsWithoutCycleNumber)
-          // log(`old accounts in partition: ${partitionId}: `, oldAccountCopiesInPartition)
-          // log(computedHash, existingHash)
-  
-          // make sure that we really have correct data only if hashes match
-          if (computedHash === existingHash) {
-            oldDataMap.set(partitionId, oldAccountCopiesInPartition)
-          }
-        }
-      } catch (e) {
-        console.log(e)
-      }
-    }
-  
-    // check if we have global account in old DB
+export async function calculateOldDataMap (
+  shardGlobals: shardFunctionTypes.ShardGlobals,
+  nodeShardDataMap: shardFunctionTypes.NodeShardDataMap,
+  oldPartitionHashMap
+) {
+  const partitionShardDataMap: shardFunctionTypes.ParititionShardDataMap = new Map()
+  const oldDataMap: Map<PartitionNum, any[]> = new Map()
+  ShardFunctions.computePartitionShardDataMap(
+    shardGlobals,
+    partitionShardDataMap,
+    0,
+    shardGlobals.numPartitions
+  )
+
+  /**
+   * [NOTE] [AS] Need to do this because type of 'cycleJoined' field differs
+   * between ShardusTypes.Node (number) and P2P/NodeList.Node (string)
+   */
+  const nodes = (NodeList.byIdOrder as unknown) as shardusTypes.Node[]
+
+  ShardFunctions.computeNodePartitionDataMap(
+    shardGlobals,
+    nodeShardDataMap,
+    nodes,
+    partitionShardDataMap,
+    nodes,
+    true
+  )
+
+  // If we have old data, figure out which partitions we have and put into OldDataMap
+  for (const [partitionId, partitonObj] of partitionShardDataMap) {
     try {
-      const oldGlobalAccounts = await Context.storage.getOldGlobalAccountCopies()
-      if (oldGlobalAccounts) {
-        const existingGlobalHash = oldPartitionHashMap.get(-1)
-        const oldGlobalAccWithoutCycleNumber = oldGlobalAccounts.map((acc) => {
-          return {
-            accountId: acc.accountId,
-            data: acc.data,
-            timestamp: acc.timestamp,
-            hash: acc.hash,
-            isGlobal: acc.isGlobal,
+      const lowAddress = partitonObj.homeRange.low
+      const highAddress = partitonObj.homeRange.high
+      const oldAccountCopiesInPartition = await Context.storage.getOldAccountCopiesByCycleAndRange(
+        lowAddress,
+        highAddress
+      )
+      if (oldAccountCopiesInPartition) {
+        const existingHash = oldPartitionHashMap.get(partitionId)
+        const oldAccountsWithoutCycleNumber = oldAccountCopiesInPartition.map(
+          acc => {
+            return {
+              accountId: acc.accountId,
+              data: acc.data,
+              timestamp: acc.timestamp,
+              hash: acc.hash,
+              isGlobal: acc.isGlobal,
+            }
           }
-        })
-        const computedGlobalHash = Context.crypto.hash(
-          oldGlobalAccWithoutCycleNumber
         )
+        const computedHash = Context.crypto.hash(oldAccountsWithoutCycleNumber)
+        // log(`old accounts in partition: ${partitionId}: `, oldAccountCopiesInPartition)
+        // log(computedHash, existingHash)
+
         // make sure that we really have correct data only if hashes match
-        if (computedGlobalHash === existingGlobalHash) {
-          oldDataMap.set(-1, oldGlobalAccounts)
+        if (computedHash === existingHash) {
+          oldDataMap.set(partitionId, oldAccountCopiesInPartition)
         }
       }
     } catch (e) {
       console.log(e)
     }
-    return oldDataMap
   }
 
-  export function copyOldDataToDataToMigrate(oldDataMap, dataToMigrate) {
-    for (let [key, value] of oldDataMap) {
-      if (!dataToMigrate.has(key)) {
-        dataToMigrate.set(key, value)
+  // check if we have global account in old DB
+  try {
+    const oldGlobalAccounts = await Context.storage.getOldGlobalAccountCopies()
+    if (oldGlobalAccounts) {
+      const existingGlobalHash = oldPartitionHashMap.get(-1)
+      const oldGlobalAccWithoutCycleNumber = oldGlobalAccounts.map(acc => {
+        return {
+          accountId: acc.accountId,
+          data: acc.data,
+          timestamp: acc.timestamp,
+          hash: acc.hash,
+          isGlobal: acc.isGlobal,
+        }
+      })
+      const computedGlobalHash = Context.crypto.hash(
+        oldGlobalAccWithoutCycleNumber
+      )
+      // make sure that we really have correct data only if hashes match
+      if (computedGlobalHash === existingGlobalHash) {
+        oldDataMap.set(-1, oldGlobalAccounts)
       }
+    }
+  } catch (e) {
+    console.log(e)
+  }
+  return oldDataMap
+}
+
+export function copyOldDataToDataToMigrate (oldDataMap, dataToMigrate) {
+  for (let [key, value] of oldDataMap) {
+    if (!dataToMigrate.has(key)) {
+      dataToMigrate.set(key, value)
+    }
+  }
+}
+
+export function getMissingPartitions (
+  shardGlobals: shardFunctionTypes.ShardGlobals,
+  oldDataMap
+) {
+  log('Checking missing partitions...')
+  const missingPartitions = []
+  const { homePartition } = ShardFunctions.addressToPartition(
+    shardGlobals,
+    Self.id
+  )
+  log(`Home partition for us is: ${homePartition}`)
+  const {
+    partitionStart,
+    partitionEnd,
+  } = ShardFunctions.calculateStoredPartitions2(shardGlobals, homePartition)
+  log('partition start: ', partitionStart)
+  log('partition end: ', partitionEnd)
+  const partitionsToCheck = []
+  if (partitionStart < partitionEnd) {
+    for (let i = partitionStart; i <= partitionEnd; i++) {
+      partitionsToCheck.push(i)
+    }
+  } else if (partitionStart > partitionEnd) {
+    const largestPartition = safetyModeVals.safetyNum - 1
+    for (let i = partitionStart; i <= largestPartition; i++) {
+      partitionsToCheck.push(i)
+    }
+    for (let i = 0; i <= partitionEnd; i++) {
+      partitionsToCheck.push(i)
+    }
+  }
+  log('Partitions to check: ', partitionsToCheck)
+  for (let i = 0; i < partitionsToCheck.length; i++) {
+    const partitionId = partitionsToCheck[i]
+    if (!oldDataMap.has(partitionId)) {
+      missingPartitions.push(partitionId)
+    }
+  }
+  // check for virtual global partiton
+  if (!oldDataMap.has(-1)) {
+    missingPartitions.push(-1)
+  }
+  return missingPartitions
+}
+
+export function createDataStream (data) {
+  var rs = new stream.Readable({ objectMode: true })
+  rs.push(data)
+  rs.push(null)
+  return rs
+}
+
+export function registerDownloadRoutes (network, oldDataMap, oldPartitionHashMap) {
+  let dataToSend = {}
+  for (const [partitionId, value] of oldDataMap) {
+    dataToSend[partitionId] = {
+      data: oldDataMap.get(partitionId),
+      hash: oldPartitionHashMap.get(parseInt(partitionId)),
     }
   }
 
-  export function getMissingPartitions(shardGlobals: shardFunctionTypes.ShardGlobals, oldDataMap) {
-    log('Checking missing partitions...')
-    log('oldDataMap: ', oldDataMap)
-    const missingPartitions = []
-    const { homePartition } = ShardFunctions.addressToPartition(
-      shardGlobals,
-      Self.id
-    )
-    log(`Home partition for us is: ${homePartition}`)
-    const {
-      partitionStart,
-      partitionEnd,
-    } = ShardFunctions.calculateStoredPartitions2(shardGlobals, homePartition)
-    log('partition start: ', partitionStart)
-    log('partition end: ', partitionEnd)
-    const partitionsToCheck = []
-    if (partitionStart < partitionEnd) {
-      for (let i = partitionStart; i <= partitionEnd; i++) {
-        partitionsToCheck.push(i)
-      }
-    } else if (partitionStart > partitionEnd) {
-      const largestPartition = safetyModeVals.safetyNum - 1
-      for (let i = partitionStart; i <= largestPartition; i++) {
-        partitionsToCheck.push(i)
-      }
-      for (let i = 0; i <= partitionEnd; i++) {
-        partitionsToCheck.push(i)
-      }
-    }
-    log('Partitions to check: ', partitionsToCheck)
-    for (let i = 0; i < partitionsToCheck.length; i++) {
-      const partitionId = partitionsToCheck[i]
-      if (!oldDataMap.has(partitionId)) {  
-        missingPartitions.push(partitionId)
-      }
-    }
-    // check for virtual global partiton
-    if (!oldDataMap.has(-1)) {
-      missingPartitions.push(-1)
-    }
-    return missingPartitions
-  }
+  const objectToString = new Transform({
+    writableObjectMode: true,
 
-export function convertMapToObj(inputMap) {
-    const obj = {}
-    for (const [key, value] of inputMap) {
-      obj[key] = value
-    }
-    return obj
+    transform (chunk, encoding, callback) {
+      this.push(JSON.stringify(chunk) + '\n')
+      callback()
+    },
+  })
+
+  network.registerExternalGet('download-snapshot-data', (req, res) => {
+    const dataReadStream = createDataStream(dataToSend)
+    const gzip = zlib.createGzip()
+    res.set('content-disposition', `attachment; filename="snapshot-data"`)
+    res.set('content-type', 'application/gzip')
+    dataReadStream
+      .pipe(objectToString)
+      .pipe(gzip)
+      .pipe(res)
+  })
+}
+
+
+export async function downloadDataFromNode (url) {
+  log('Downloading snapshot data from server...')
+  const res = await got(url, {
+    timeout: 1000, //  Omar - setting this to 1 sec
+    retry: 0, // Omar - setting this to 0.
+    decompress: true,
+    encoding: null,
+    headers: {
+      "Content-Encoding": 'gzip'
+    },
+  })
+  return new Promise((resolve, reject) => {
+    zlib.unzip(res.body, (err, result) => {
+      if (err) {
+        reject(err)
+      } else {
+        resolve(JSON.parse(result.toString()))
+      }
+    })
+  })
+}
+
+export function convertMapToObj (inputMap) {
+  const obj = {}
+  for (const [key, value] of inputMap) {
+    obj[key] = value
   }
+  return obj
+}
 
 function log (...things) {
   console.log('DBG', 'SNAPSHOT', ...things)

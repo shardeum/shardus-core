@@ -341,6 +341,7 @@ export async function safetySync() {
   // populate DataToMigrate and oldDataMap
   oldDataMap = await SnapshotFunctions.calculateOldDataMap(shardGlobals, nodeShardDataMap, oldPartitionHashMap)
   SnapshotFunctions.copyOldDataToDataToMigrate(oldDataMap, dataToMigrate)
+  SnapshotFunctions.registerDownloadRoutes(Context.network, oldDataMap, oldPartitionHashMap)
 
   // check if we have data for each partition we cover in new network. We will use this array to request data from other nodes
   missingPartitions = SnapshotFunctions.getMissingPartitions(shardGlobals, oldDataMap)
@@ -382,22 +383,22 @@ async function sendOldDataToNodes(
       `${nodesToSendData[i].externalIp}:${nodesToSendData[i].externalPort}/snapshot-data-offer`,
       offer
     )
-    const answer = res.answer
+    // const answer = res.answer
     // If a node reply us as 'needed', send requested data for requested partitions
-    if (answer === offerResponse.needed) {
-      const requestedPartitions = res.partitions
-      const dataToSend = {}
-      for (const partitionId of requestedPartitions) {
-        dataToSend[partitionId] = {
-          data: oldDataMap.get(partitionId),
-          hash: oldPartitionHashMap.get(parseInt(partitionId)),
-        }
-      }
-      await http.post(
-        `${nodesToSendData[i].externalIp}:${nodesToSendData[i].externalPort}/snapshot-data`,
-        dataToSend
-      )
-    }
+    // if (answer === offerResponse.needed) {
+    //   const requestedPartitions = res.partitions
+    //   const dataToSend = {}
+    //   for (const partitionId of requestedPartitions) {
+    //     dataToSend[partitionId] = {
+    //       data: oldDataMap.get(partitionId),
+    //       hash: oldPartitionHashMap.get(parseInt(partitionId)),
+    //     }
+    //   }
+    //   await http.post(
+    //     `${nodesToSendData[i].externalIp}:${nodesToSendData[i].externalPort}/snapshot-data`,
+    //     dataToSend
+    //   )
+    // }
   }
 }
 
@@ -409,6 +410,7 @@ function createOffer() {
   return {
     networkStateHash: safetyModeVals.networkStateHash,
     partitions: partitionsToOffer,
+    downloadUrl: `http://${Self.ip}:${Self.port}/download-snapshot-data`
   }
 }
 
@@ -506,6 +508,7 @@ export async function startWitnessMode() {
         )
         const nodeShardDataMap: shardFunctionTypes.NodeShardDataMap = new Map()
         oldDataMap = await SnapshotFunctions.calculateOldDataMap(shardGlobals, nodeShardDataMap, oldPartitionHashMap)
+        SnapshotFunctions.registerDownloadRoutes(Context.network, oldDataMap, oldPartitionHashMap)
         const offer = createOffer()
 
         // send offer to each syncing + active nodes unless data is already offered
@@ -601,70 +604,54 @@ async function storeDataToNewDB(dataMap) {
   await Context.stateManager._commitAccountCopies(accountCopies, {})
 }
 
-function registerSnapshotRoutes() {
-  const snapshotRoute: Types.Route<express.Handler> = {
-    method: 'POST',
-    name: 'snapshot-data',
-    handler: (req, res) => {
-      const err = utils.validateTypes(req, { body: 'o' })
-      if (err) {
-        log('snapshot-data bad req ' + err)
-        res.json([])
-        return
+function processDownloadedMissingData(missingData) {
+  log('Processing downloaded data')
+  for (const partitionId in missingData) {
+    // check and store offered data
+    const partitionData = missingData[partitionId]
+    const accountsInPartition = partitionData.data.map((acc) => {
+      return {
+        accountId: acc.accountId,
+        data:
+          typeof acc.data === 'object'
+            ? JSON.stringify(acc.data)
+            : acc.data,
+        timestamp: acc.timestamp,
+        hash: acc.hash,
+        isGlobal: acc.isGlobal,
       }
-      try {
-        if (Self.isActive) return res.json({ success: true })
-        const receivedData = req.body
-        log('Recieved missing data: ', receivedData)
-        for (const partitionId in receivedData) {
-          // check and store offered data
-          const partitionData = receivedData[partitionId]
-          const accountsInPartition = partitionData.data.map((acc) => {
-            return {
-              accountId: acc.accountId,
-              data:
-                typeof acc.data === 'object'
-                  ? JSON.stringify(acc.data)
-                  : acc.data,
-              timestamp: acc.timestamp,
-              hash: acc.hash,
-              isGlobal: acc.isGlobal,
-            }
-          })
-          const computedHash = Context.crypto.hash(accountsInPartition)
-          log(
-            `Received data for partition ${partitionId} => `,
-            accountsInPartition
-          )
-          log(computedHash, partitionData.hash)
-          if (computedHash === partitionData.hash) {
-            log(
-              `Computed hash and received hash matches for partition ${partitionId}`
-            )
-            // store into dataToMigrate temporarily. Will use it to store data to new DB
-            if (!dataToMigrate.has(parseInt(partitionId))) {
-              dataToMigrate.set(parseInt(partitionId), partitionData.data)
-              // remove partition id from missing partition list
-              const index = missingPartitions.indexOf(parseInt(partitionId))
-              missingPartitions.splice(index, 1)
-              goActiveIfDataComplete()
-            }
-          } else {
-            log(
-              `Computed hash and received hash are DIFFERENT for ${partitionId}`
-            )
-          }
-        }
-      } catch (e) {
-        log('ERROR: ', e)
+    })
+    const computedHash = Context.crypto.hash(accountsInPartition)
+    log(
+      `Received data for partition ${partitionId} => `,
+      accountsInPartition
+    )
+    log(computedHash, partitionData.hash)
+    if (computedHash === partitionData.hash) {
+      log(
+        `Computed hash and received hash matches for partition ${partitionId}`
+      )
+      // store into dataToMigrate temporarily. Will use it to store data to new DB
+      if (!dataToMigrate.has(parseInt(partitionId))) {
+        dataToMigrate.set(parseInt(partitionId), partitionData.data)
+        // remove partition id from missing partition list
+        const index = missingPartitions.indexOf(parseInt(partitionId))
+        missingPartitions.splice(index, 1)
+        goActiveIfDataComplete()
       }
-      res.json({ success: true })
-    },
+    } else {
+      log(
+        `Computed hash and received hash are DIFFERENT for ${partitionId}`
+      )
+    }
   }
+}
+
+function registerSnapshotRoutes() {
   const snapshotDataOfferRoute: Types.Route<express.Handler> = {
     method: 'POST',
     name: 'snapshot-data-offer',
-    handler: (req, res) => {
+    handler: async (req, res) => {
       const err = utils.validateTypes(req, { body: 'o' })
       if (err) {
         log('snapshot-data-offer bad req ' + err)
@@ -690,6 +677,9 @@ function registerSnapshotRoutes() {
         if (neededPartitonIds.length > 0) answer = offerResponse.needed
       }
       if (answer === offerResponse.needed) {
+        const downloadedSnapshotData = await SnapshotFunctions.downloadDataFromNode(offerRequest.downloadUrl)
+        log('Downloaded missing data', downloadedSnapshotData)
+        processDownloadedMissingData(downloadedSnapshotData)
         res.json({
           answer,
           partitions: neededPartitonIds,
@@ -751,7 +741,6 @@ function registerSnapshotRoutes() {
   }
 
   const routes = [
-    snapshotRoute,
     snapshotDataOfferRoute,
     snapshotWitnessDataOfferRoute,
   ]
