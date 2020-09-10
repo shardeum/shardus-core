@@ -213,7 +213,6 @@ export function addDataRecipient(
   dataRequests: DataRequest<Cycle | Transaction | StateHashes>[]
 ) {
   console.log('Adding data recipient..')
-  console.log('dataReques parameter: ', dataRequests)
   const recipient = {
     nodeInfo,
     // TODO: dataRequest should be an array
@@ -333,10 +332,9 @@ export function registerRoutes() {
       return res.json({ success: false, error: err })
     }
     err = validateTypes(req.body, {
-      lastData: 'n',
-      type: 's',
       publicKey: 's',
       tag: 's',
+      nodeInfo: 'o'
     })
     if (err) {
       warn(`requestdata: bad req.body ${err}`)
@@ -345,7 +343,7 @@ export function registerRoutes() {
     // [TODO] Authenticate tag
 
     const dataRequest = req.body
-
+    info('dataRequest received', dataRequest)
     /*
     const invalidTagErr = 'Tag is invalid'
     if (!crypto.authenticate(dataRequest, crypto.getCurvePublicKey(dataRequest.publicKey))) {
@@ -365,7 +363,18 @@ export function registerRoutes() {
     delete dataRequest.publicKey
     delete dataRequest.tag
 
-    addDataRecipient(nodeInfo, dataRequest)
+    const dataRequestCycle = dataRequest.dataRequestCycle
+    const dataRequestState = dataRequest.dataRequestState
+    const dataRequestTypes = []
+    if (dataRequestCycle) {
+      dataRequestTypes.push(dataRequestCycle)
+    }
+    if (dataRequestState) {
+      dataRequestTypes.push(dataRequestState)
+    }
+    if (dataRequestTypes.length > 0) {
+      addDataRecipient(dataRequest.nodeInfo, dataRequestTypes)
+    }
     res.json({ success: true })
   })
 
