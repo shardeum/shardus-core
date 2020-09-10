@@ -7,10 +7,11 @@ import Log4js from 'log4js'
 import * as net from 'net'
 import { Sn } from 'shardus-net'
 import { promisify } from 'util'
-import * as http from '../http'
+import * as httpModule from '../http'
 import Logger from '../logger'
 import { config, defaultConfigs, logger } from '../p2p/Context'
 import NatAPI = require('nat-api')
+import http from 'http'
 
 /** TYPES */
 export interface IPInfo {
@@ -32,6 +33,8 @@ export let ipInfo: IPInfo
 
 export class NetworkClass extends EventEmitter {
   app: any
+  io: SocketIO.Server
+  server: any
   sn: any
   logger: Logger
   mainLogger: Log4js.Logger
@@ -97,8 +100,10 @@ export class NetworkClass extends EventEmitter {
         const msg = `External server running on port ${this.ipInfo.externalPort}...`
         console.log(msg)
         this.mainLogger.info('Network: ' + msg)
-        resolve()
       })
+
+      this.io = require('socket.io')(this.extServer)
+      resolve(this.io)
     })
   }
 
@@ -249,8 +254,8 @@ export class NetworkClass extends EventEmitter {
 
     this.logger.setPlaybackIPInfo(ipInfo)
 
-    await this._setupExternal()
     this._setupInternal()
+    return await this._setupExternal()
   }
 
   async shutdown() {
@@ -581,7 +586,7 @@ async function discoverExternalIp(server: string) {
   //
 
   try {
-    const { ip }: { ip: string } = await http.get(server)
+    const { ip }: { ip: string } = await httpModule.get(server)
     return ip
   } catch (err) {
     throw Error(

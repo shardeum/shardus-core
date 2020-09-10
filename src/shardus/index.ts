@@ -40,6 +40,7 @@ const defaultConfigs = {
 Context.setDefaultConfigs(defaultConfigs)
 
 interface Shardus {
+  io: SocketIO.Server
   profiler: Profiler
   config: ShardusTypes.ShardusConfiguration
   verboseLogs: boolean
@@ -437,7 +438,10 @@ class Shardus extends EventEmitter {
     await Network.checkTimeSynced(this.config.p2p.timeServers)
 
     // Setup network
-    await this.network.setup(Network.ipInfo)
+    this.io = await this.network.setup(Network.ipInfo) as SocketIO.Server
+    this.io.on('connection', () => {
+      console.log('Archive server has subscribed to this node!')
+    })
     this.network.on('timeout', (node) => {
       console.log('in Shardus got network timeout from', node)
       reportLost(node, 'timeout')
@@ -540,10 +544,12 @@ class Shardus extends EventEmitter {
       await Snapshot.startWitnessMode()
     })
     Self.emitter.on('joining', (publicKey) => {
+      this.io.emit('DATA', `NODE JOINING ${publicKey}`)
       this.logger.playbackLogState('joining', '', publicKey)
       if (this.reporter) this.reporter.reportJoining(publicKey)
     })
     Self.emitter.on('joined', (nodeId, publicKey) => {
+      this.io.emit('DATA', `NODE JOINED ${nodeId}`)
       this.logger.playbackLogState('joined', nodeId, publicKey)
       this.logger.setPlaybackID(nodeId)
       if (this.reporter) this.reporter.reportJoined(nodeId, publicKey)
@@ -559,6 +565,7 @@ class Shardus extends EventEmitter {
       }
     })
     Self.emitter.on('active', (nodeId) => {
+      this.io.emit('DATA', `NODE ACTIVE ${nodeId}`)
       this.logger.playbackLogState('active', nodeId, '')
       if (this.reporter) {
         this.reporter.reportActive(nodeId)
@@ -835,8 +842,9 @@ class Shardus extends EventEmitter {
    *
    */
   put (tx, set = false, global = false) {
+    this.io.emit('DATA', tx)
     let noConsensus = set || global
-    
+
     if (!this.appProvided)
       throw new Error(
         'Please provide an App object to Shardus.setup before calling Shardus.put'
@@ -864,13 +872,13 @@ class Shardus extends EventEmitter {
           // This ok because we are initializing a global at the set time period
         } else {
           if (this.verboseLogs) this.mainLogger.debug(`txRejected ${JSON.stringify(tx)} set:${set} global:${global}`)
-          
+
           this.statistics.incrementCounter('txRejected')
           return {
             success: false,
             reason: 'Network conditions to allow transactions are not met.',
-          }  
-        }  
+          }
+        }
       }
     } else {
       if (!this.p2p.allowSet()) {
