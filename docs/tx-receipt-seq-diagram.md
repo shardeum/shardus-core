@@ -19,7 +19,7 @@ sequenceDiagram
 
       E->>U: "found", txResult[]
 
-      Note left of U: computes short(hash(hash(tx), status, netId)) <br/> for all possible statuses: <br/> "applied", "rejected"
+      Note left of U: computes short(hash([tx, status, netId])) <br/> for all possible statuses: <br/> "applied", "rejected"
       Note left of U: if txResult[] contains "applied" short hash <br/> tx was applied
       Note left of U: if txResult[] contains "rejected" short hash <br/> tx was rejected
 
