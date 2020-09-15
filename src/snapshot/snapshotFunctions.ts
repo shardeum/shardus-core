@@ -388,7 +388,11 @@ export function createDataStream (data) {
   return rs
 }
 
-export function registerDownloadRoutes (network, oldDataMap, oldPartitionHashMap) {
+export function registerDownloadRoutes (
+  network,
+  oldDataMap,
+  oldPartitionHashMap
+) {
   let dataToSend = {}
   for (const [partitionId, value] of oldDataMap) {
     dataToSend[partitionId] = {
@@ -418,7 +422,6 @@ export function registerDownloadRoutes (network, oldDataMap, oldPartitionHashMap
   })
 }
 
-
 export async function downloadDataFromNode (url) {
   log('Downloading snapshot data from server...')
   const res = await got(url, {
@@ -427,7 +430,7 @@ export async function downloadDataFromNode (url) {
     decompress: true,
     encoding: null,
     headers: {
-      "Content-Encoding": 'gzip'
+      'Content-Encoding': 'gzip',
     },
   })
   return new Promise((resolve, reject) => {
@@ -445,6 +448,13 @@ export function convertMapToObj (inputMap) {
   const obj = {}
   for (const [key, value] of inputMap) {
     obj[key] = value
+  }
+  return obj
+}
+export function convertArrayToObj (inputArr) {
+  const obj = {}
+  for (let i = 0; i < inputArr.length; i++) {
+    obj[i] = inputArr[i]
   }
   return obj
 }

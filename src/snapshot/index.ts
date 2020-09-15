@@ -78,25 +78,8 @@ const notNeededRepliedNodes: Map<string, true> = new Map()
 const alreadyOfferedNodes = new Map()
 let stateHashesByCycle: Map<Cycle['counter'], StateHashes> = new Map()
 let receiptHashesByCycle: Map<Cycle['counter'], ReceiptHashes> = new Map()
+let partitionBlockMapByCycle: Map<Cycle['counter'], ReceiptMapResult[]> = new Map()
 let safetySyncing = false // to set true when data exchange occurs during safetySync
-
-type hex = string // Limited to valid hex chars
-
- 
-const status: 'applied' | 'rejected' = 'applied'
-const netId: hex = '123abc' // ID unique to that Shardus network
-const tx = { /* Unsigned transaction */ }
-type txId = string
-type txId2 = string
-type ReceiptMap = Map<txId, txId2[]>
-interface PartitionBlock {
-  cycle: Cycle['counter'],
-  partitionId: PartitionNum,
-  receiptMap: ReceiptMap
-}
- 
-const partitionBlockMap: Map<Cycle['counter'], Map<PartitionNum, ReceiptMap>> = new Map()
-
 
 export const safetyModeVals = {
   safetyMode: false,
@@ -145,8 +128,9 @@ export function getReceiptHashes(
   return collector
 }
 
-function hashReceiptMap(receiptMap) {
-  return Context.crypto.hash(SnapshotFunctions.convertMapToObj(receiptMap))
+function hashPartitionBlocks(partitionId, partitionBlocks) {
+  const partitionBlock = partitionBlocks.find(b => b.partition === partitionId)
+  return Context.crypto.hash(partitionBlock || {})
 }
 
 export async function initSafetyModeVals() {
@@ -181,9 +165,12 @@ export function startSnapshotting() {
      * a 'PartitionBlock' obj and pass it down the pipeline to the archiver 
      * 
      */
-    receiptMapResults parameter */
+    /* receiptMapResults parameter */
     async (shard: CycleShardData, receiptMapResults:ReceiptMapResult[]) => {
       const debugStrs = []
+
+      // store receiptMap for this cycle number
+      partitionBlockMapByCycle.set(shard.cycleNumber, receiptMapResults)
 
       // create our own partition hashes for that cycle number
       const partitionRanges = getPartitionRanges(shard)
@@ -255,9 +242,6 @@ export function startSnapshotting() {
       const collector = partitionGossip.newCollector(shard)
 
       // gossip our partitition hashes and receipt map to the rest of the network with that cycle number
-
-      // Each node computes a receipt_map_hash for each partition it covers
-      const partitionBlockMap = SnapshotFunctions.calculatePartitionBlock(shard)
       const message: partitionGossip.Message = {
         cycle: shard.cycleNumber,
         data: {
@@ -267,10 +251,10 @@ export function startSnapshotting() {
         sender: Self.id,
       }
       for (const [partitionId, hash] of partitionHashes) {
-        log(partitionId, hash)
         message.data.partitionHash[partitionId] = hash
-        message.data.receiptMapHash[partitionId] = hashReceiptMap(partitionBlockMap.get(parseInt(partitionId)))
+        message.data.receiptMapHash[partitionId] = hashPartitionBlocks(partitionId, partitionBlockMapByCycle.get(shard.cycleNumber))
       }
+
       collector.process([message])
 
       Comms.sendGossip('snapshot_gossip', message)
@@ -392,22 +376,6 @@ async function sendOldDataToNodes(
       `${nodesToSendData[i].externalIp}:${nodesToSendData[i].externalPort}/snapshot-data-offer`,
       offer
     )
-    // const answer = res.answer
-    // If a node reply us as 'needed', send requested data for requested partitions
-    // if (answer === offerResponse.needed) {
-    //   const requestedPartitions = res.partitions
-    //   const dataToSend = {}
-    //   for (const partitionId of requestedPartitions) {
-    //     dataToSend[partitionId] = {
-    //       data: oldDataMap.get(partitionId),
-    //       hash: oldPartitionHashMap.get(parseInt(partitionId)),
-    //     }
-    //   }
-    //   await http.post(
-    //     `${nodesToSendData[i].externalIp}:${nodesToSendData[i].externalPort}/snapshot-data`,
-    //     dataToSend
-    //   )
-    // }
   }
 }
 

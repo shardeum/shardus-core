@@ -1,6 +1,6 @@
 import deepmerge from 'deepmerge'
 import * as http from '../http'
-import { getStateHashes, StateHashes } from '../snapshot'
+import { getStateHashes, StateHashes, ReceiptHashes, getReceiptHashes } from '../snapshot'
 import { validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { crypto, logger, network } from './Context'
@@ -15,30 +15,32 @@ export interface Transaction {
   id: string
 }
 
-export type ValidTypes = Cycle | Transaction | StateHashes
+export type ValidTypes = Cycle | Transaction | StateHashes | ReceiptHashes
 
 export enum TypeNames {
   CYCLE = 'CYCLE',
   TRANSACTION = 'TRANSACTION',
   STATE = 'STATE',
+  RECEIPT = 'RECEIPT',
 }
 
 interface NamesToTypes {
   CYCLE: Cycle
   TRANSACTION: Transaction
-  STATE: StateHashes
+  STATE: StateHashes,
+  RECEIPT: ReceiptHashes
 }
 
 export type TypeName<T extends ValidTypes> = T extends Cycle
   ? TypeNames.CYCLE
-  : T extends Transaction
-  ? TypeNames.TRANSACTION
+  : T extends ReceiptHashes
+  ? TypeNames.RECEIPT
   : TypeNames.STATE
 
 export type TypeIndex<T extends ValidTypes> = T extends Cycle
   ? Cycle['counter']
-  : T extends Transaction
-  ? Transaction['id']
+  : T extends ReceiptHashes
+  ? ReceiptHashes['counter']
   : StateHashes['counter']
 export interface DataRequest<T extends ValidTypes> {
   type: TypeName<T>
@@ -54,7 +56,7 @@ interface DataResponse {
 
 interface DataRecipient {
   nodeInfo: JoinedArchiver
-  dataRequests: DataRequest<Cycle | Transaction | StateHashes>[]
+  dataRequests: DataRequest<Cycle | Transaction | StateHashes | ReceiptHashes>[]
   curvePk: string
 }
 
@@ -210,7 +212,7 @@ export function updateArchivers(joinedArchivers) {
 
 export function addDataRecipient(
   nodeInfo: JoinedArchiver,
-  dataRequests: DataRequest<Cycle | Transaction | StateHashes>[]
+  dataRequests: DataRequest<Cycle | Transaction | StateHashes | ReceiptHashes>[]
 ) {
   console.log('Adding data recipient..')
   const recipient = {
@@ -233,7 +235,7 @@ function removeDataRecipient(publicKey) {
   }
 }
 
-export function sendData(typeToSend: TypeNames.CYCLE | TypeNames.STATE | TypeNames.TRANSACTION) {
+export function sendData() {
   for (const recipient of recipients) {
     const recipientUrl = `http://${recipient.nodeInfo.ip}:${recipient.nodeInfo.port}/newdata`
 
@@ -254,10 +256,6 @@ export function sendData(typeToSend: TypeNames.CYCLE | TypeNames.STATE | TypeNam
           responses.CYCLE = data
           break
         }
-        case TypeNames.TRANSACTION: {
-          // [TODO] Send latest txs
-          break
-        }
         case TypeNames.STATE: {
           // Identify request type
           const typedRequest = request as DataRequest<NamesToTypes['STATE']>
@@ -269,6 +267,19 @@ export function sendData(typeToSend: TypeNames.CYCLE | TypeNames.STATE | TypeNam
           }
           // Add to responses
           responses.STATE = data
+          break
+        }
+        case TypeNames.RECEIPT: {
+          // Identify request type
+          const typedRequest = request as DataRequest<NamesToTypes['RECEIPT']>
+          // Get latest state hash data since lastData
+          const data = getReceiptHashes(typedRequest.lastData + 1)
+          // Update lastData
+          if (data.length > 0) {
+            typedRequest.lastData = data[data.length - 1].counter
+          }
+          // Add to responses
+          responses.RECEIPT = data
           break
         }
         default:
@@ -365,12 +376,16 @@ export function registerRoutes() {
 
     const dataRequestCycle = dataRequest.dataRequestCycle
     const dataRequestState = dataRequest.dataRequestState
+    const dataRequestReceipt = dataRequest.dataRequestReceipt
     const dataRequestTypes = []
     if (dataRequestCycle) {
       dataRequestTypes.push(dataRequestCycle)
     }
     if (dataRequestState) {
       dataRequestTypes.push(dataRequestState)
+    }
+    if (dataRequestReceipt) {
+      dataRequestTypes.push(dataRequestReceipt)
     }
     if (dataRequestTypes.length > 0) {
       addDataRecipient(dataRequest.nodeInfo, dataRequestTypes)
