@@ -388,12 +388,15 @@ class StateManager extends EventEmitter {
     cycleShardData.nodeShardDataMap = new Map()
     cycleShardData.parititionShardDataMap = new Map()
 
-    cycleShardData.activeNodes = this.p2p.state.getActiveNodes(null)
+    //this.p2p.state.getActiveNodes(null)
+    cycleShardData.activeNodes =   this.p2p.state.getActiveNodes(null)//this.p2p.getActiveNodes(null)  //this.p2p.state.getActiveNodes(null)
     // cycleShardData.activeNodes.sort(utils.sort_id_Asc) // function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
 
     cycleShardData.cycleNumber = cycleNumber
     
     cycleShardData.partitionsToSkip = new Map()
+
+    cycleShardData.hasCompleteData = false
 
     try {
       cycleShardData.ourNode = this.p2p.state.getNode(this.p2p.id) // ugh, I bet there is a nicer way to get our node
@@ -403,6 +406,7 @@ class StateManager extends EventEmitter {
     }
 
     if (cycleShardData.activeNodes.length === 0) {
+      this.logger.playbackLogNote('shrd_sync_noNodeListAvailable', `${cycleNumber}`, `  `)
       return // no active nodes so stop calculating values
     }
 
@@ -535,6 +539,8 @@ class StateManager extends EventEmitter {
 
     // this will be a huge log.
     this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${cycleNumber} data: ${utils.stringifyReduce(cycleShardData)}`)
+
+    cycleShardData.hasCompleteData = true
   }
 
   /**
@@ -853,10 +859,27 @@ class StateManager extends EventEmitter {
 
     this.requiredNodeCount = requiredNodeCount
 
-    while (this.currentCycleShardData == null) {
+    let hasValidShardData = this.currentCycleShardData != null 
+    if(this.currentCycleShardData != null){
+      hasValidShardData = this.currentCycleShardData.hasCompleteData
+    }
+    while (hasValidShardData === false) {
       this.getCurrentCycleShardData()
       await utils.sleep(1000)
-      this.logger.playbackLogNote('shrd_sync_waitForShardData', ` `, ` ${utils.stringifyReduce(this.currentCycleShardData)} `)
+      if(this.currentCycleShardData == null){
+        this.logger.playbackLogNote('shrd_sync_waitForShardData', ` `, ` ${utils.stringifyReduce(this.currentCycleShardData)} `)
+        hasValidShardData  = false
+      } 
+      if(this.currentCycleShardData != null){
+        if(this.currentCycleShardData.hasCompleteData == false){
+          let temp = this.p2p.state.getActiveNodes(null)
+          this.logger.playbackLogNote('shrd_sync_waitForShardData', ` `, `hasCompleteData:${this.currentCycleShardData.hasCompleteData} active:${utils.stringifyReduce(temp)} ${utils.stringifyReduce(this.currentCycleShardData)} `)
+
+        } else {
+          hasValidShardData = true
+        }
+      }
+      
     }
     let nodeShardData = this.currentCycleShardData.nodeShardData
     console.log('GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
@@ -3504,6 +3527,11 @@ class StateManager extends EventEmitter {
       // only write our state table data if we dont already have it in the db
       if (hasStateTableData === false) {
         for (let stateT of stateTableResults) {
+
+          // we have to correct this because it now gets stomped in the vote
+          let wrappedRespose = wrappedStates[stateT.accountId]
+          stateT.stateBefore = wrappedRespose.prevStateId
+
           if (this.verboseLogs) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
           if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
         }
@@ -3663,6 +3691,9 @@ class StateManager extends EventEmitter {
       if (wrappedStates[key] == null) {
         if (this.verboseLogs) console.log(`preApplyAcceptedTransaction missing some account data. timestamp:${timestamp}  key: ${utils.makeShortHash(key)}  debuginfo:${debugInfo}`)
         return { applied: false, passed: false, applyResult:'', reason: 'missing some account data' }
+      } else {
+        let wrappedState = wrappedStates[key]
+        wrappedState.prevStateId = wrappedState.stateId
       }
     }
 
@@ -4072,7 +4103,7 @@ class StateManager extends EventEmitter {
     return null
   }
 
-  queueEntryAddData (queueEntry:QueueEntry, data:any) {
+  queueEntryAddData (queueEntry:QueueEntry, data:Shardus.WrappedResponse) {
     if (queueEntry.collectedData[data.accountId] != null) {
       return // already have the data
     }
@@ -4094,7 +4125,7 @@ class StateManager extends EventEmitter {
       delete data.localCache
     }
 
-    this.logger.playbackLogNote('shrd_addData', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `key ${utils.makeShortHash(data.accountId)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}  ${queueEntry.acceptedTx.timestamp}`)
+    this.logger.playbackLogNote('shrd_addData', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `key ${utils.makeShortHash(data.accountId)} hash: ${utils.makeShortHash(data.stateId)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}  ${queueEntry.acceptedTx.timestamp}`)
   }
 
   queueEntryHasAllData (queueEntry: QueueEntry) {
@@ -5271,6 +5302,8 @@ class StateManager extends EventEmitter {
                   }
                 } else {
                   this.mainLogger.error(`processAcceptedTxQueue2 txResult problem txid:${queueEntry.logID} res: ${utils.stringifyReduce(txResult)} `)
+                  queueEntry.waitForReceiptOnly = true
+                  queueEntry.state = 'consensing'
                 }
               } catch (ex) {
                 this.mainLogger.debug('processAcceptedTxQueue2 preApplyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -5573,12 +5606,34 @@ class StateManager extends EventEmitter {
         return false
       }
 
-      // TODO STATESHARDING4 check that al the account states were reported the same afterwards in our vote vs receipt
-      this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} `)
-      this.logger.playbackLogNote('hasAppliedReceiptMatchingPreApply', `${queueEntry.logID}`, `  `)
+      //test our vote against data hashes.
+      let wrappedStates = queueEntry.collectedData
+      let wrappedStateKeys =Object.keys( queueEntry.collectedData) 
+      let vote = appliedReceipt.appliedVotes[0] //queueEntry.ourVote
+      for(let j = 0; j< vote.account_id.length; j++){
+        let id = vote.account_id[j]
+        let hash = vote.account_state_hash_after[j]
+        let found = false
+        for(let key of wrappedStateKeys ){
+          let wrappedState = wrappedStates[key]
+          if(wrappedState.accountId === id){
+            found = true
+            if( wrappedState.stateId !== hash){
+              this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} state does not match id:${utils.stringifyReduce(id)} hash:${utils.stringifyReduce(wrappedState.stateId)} votehash:${utils.stringifyReduce(hash)}`)
+              return false
+            }
+          }
+        }
+        if(found === false){
+          this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} state does not match missing id:${utils.stringifyReduce(id)} `)
+          return false
+        }
+      }
+
+      this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} Good Match`)
+      this.logger.playbackLogNote('hasAppliedReceiptMatchingPreApply', `${queueEntry.logID}`, `  Good Match`)
 
     }
-
 
     return true
   }
@@ -5633,11 +5688,60 @@ class StateManager extends EventEmitter {
       }
     }
     // TODO STATESHARDING4 There isn't really an analysis of account_state_hash_after.  seems like we should make sure the hashes match up
+    //   type AppliedVote = {
+    //     txid: string;
+    //     transaction_result: boolean;
+    //     account_id: string[];
+    //     account_state_hash_after: string[];
+    //     cant_apply: boolean;  // indicates that the preapply could not give a pass or fail
+    //     node_id: string; // record the node that is making this vote.. todo could look this up from the sig later
+    //     sign?: import("../shardus/shardus-types").Sign
+    // };
+
+    //big ol fun vote tally 
+
+    //idk if we should check passed or not
+    let topHashByID:{[id:string]:{hash:string, count:number}} = {}
+    let topValuesByIDByHash:{[id:string]:{[id:string]:{count:number}}} = {}
+    if(passed && canProduceReceipt){
+      if(canProduceReceipt === true){
+        for(let i=0; i<numVotes; i++){
+          let currentVote = queueEntry.collectedVotes[i]
+          if(passed === currentVote.transaction_result){  
+            let vote = currentVote
+            for(let j = 0; j< vote.account_id.length; j++){
+              let id = vote.account_id[j]
+              let hash = vote.account_state_hash_after[j]
+              
+              if(topValuesByIDByHash[id] == null){
+                topValuesByIDByHash[id] = {}
+              }
+              if(topValuesByIDByHash[id][hash] == null){
+                topValuesByIDByHash[id][hash] = {count:0}
+              }
+              let count = topValuesByIDByHash[id][hash].count + 1
+              topValuesByIDByHash[id][hash].count = count
+
+              if(topHashByID[id] == null){
+                topHashByID[id] = {hash:'', count:0}
+              }
+              if(count > topHashByID[id].count){
+                topHashByID[id].count = count
+                topHashByID[id].hash = hash
+              }
+            }
+          }
+        }
+      } 
+
+    }
+
 
 
     this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} `)
     this.mainLogger.debug(`tryProduceReceipt canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} `)
 
+    let secondTally = 0
     // if we can create a receipt do that now
     if(canProduceReceipt === true){
       let appliedReceipt:AppliedReceipt = {
@@ -5645,13 +5749,40 @@ class StateManager extends EventEmitter {
         result: passed,
         appliedVotes:[]
       }
+
       // grab just the votes that match the winning pass or fail status
       for(let i=0; i<numVotes; i++){
         let currentVote = queueEntry.collectedVotes[i]
         if(passed === currentVote.transaction_result){  
+          
+          if(passed){
+            let badVoteMatch = false
+            for(let j = 0; j< currentVote.account_id.length; j++){
+              let id = currentVote.account_id[j]
+              let hash = currentVote.account_state_hash_after[j]
+              if(topHashByID[id].hash === hash){
+                secondTally++
+              } else {
+                badVoteMatch = true
+                break
+              }
+            }
+            if(badVoteMatch){
+              continue
+            }
+          }
+
+
           appliedReceipt.appliedVotes.push(currentVote)
         }
       }
+
+      if(secondTally < requiredVotes){
+        this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} secondTally:${secondTally}`)
+        this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} secondTally:${secondTally} `)
+        return null
+      }
+
       // recored our generated receipt to the queue entry
       queueEntry.appliedReceipt = appliedReceipt
       return appliedReceipt
@@ -5711,6 +5842,8 @@ class StateManager extends EventEmitter {
       for(let key of Object.keys(wrappedStates) ){
         let wrappedState = wrappedStates[key]
 
+        // note this is going to stomp the hash value for the account 
+        // this used to happen in dapp.updateAccountFull  we now have to save off prevStateId on the wrappedResponse
         //We have to update the hash now! Not sure if this is the greatest place but it needs to be done
         let updatedHash = this.app.calculateAccountHash(wrappedState.data)
         wrappedState.stateId = updatedHash
@@ -5778,6 +5911,9 @@ class StateManager extends EventEmitter {
   }
 
 
+  /**
+   * dumpAccountDebugData this is what creats the shardreports
+   */
   async dumpAccountDebugData () {
     if (this.currentCycleShardData == null) {
       return
@@ -5888,6 +6024,14 @@ class StateManager extends EventEmitter {
       partitionDump.globalAccountSummary = globalAccountSummary
       let globalStateHash = this.crypto.hash(globalAccountSummary)
       partitionDump.globalStateHash = globalStateHash
+
+    } else {
+
+      if(this.currentCycleShardData != null && this.currentCycleShardData.activeNodes.length > 0){
+        for (let node of this.currentCycleShardData.activeNodes) {
+          partitionDump.allNodeIds.push(utils.makeShortHash(node.id))
+        }        
+      }
 
     }
 

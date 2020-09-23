@@ -168,6 +168,17 @@ class P2P extends EventEmitter {
     this._registerRoutes()
   }
 
+  // getActiveNodes(self) {
+  //   //return this.state.getActiveNodes(self) 
+  //   this
+  //   if (id) {
+  //     return Object.values(NodeList.activeOthersByIdOrder)
+  //   } else {
+  //     return Object.values(NodeList.activeByIdOrder)
+  //   }
+  // }
+
+
   _registerRoutes() {
     // NO LONGER NEED THESE
     /*

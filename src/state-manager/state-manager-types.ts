@@ -118,6 +118,9 @@ type CycleShardData = {
 
     timestamp:number // timestamp for cleanup purposes, may not match exactly the rules of which transactions will live in a partition for this cycle.
     timestampEndCycle:number 
+
+    hasCompleteData:boolean;
+
     /**
      * hashlist index of the voters for this vote
      */

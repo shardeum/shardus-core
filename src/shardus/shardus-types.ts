@@ -303,6 +303,8 @@ declare namespace Shardus {
 
     /** optional data related to sync process */
     syncData?: any
+
+
   }
 
   export interface WrappedResponse extends WrappedData {
@@ -312,6 +314,9 @@ declare namespace Shardus {
     //Set by setPartialData
     userTag?: any
     localCache?: any
+
+    // state manager tracking
+    prevStateId?: string
   }
 
   // old version:
