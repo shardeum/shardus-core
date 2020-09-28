@@ -27,11 +27,11 @@ updated with each tx
 1. When all the txs for a cycle have settled, all Consensors gossip and collect
    3 kinds of partition hashes for that cycle:
 
-   1. `data_hash_n = hash([account_1_hash, account_2_hash, ...])`  
+   1. `data_hash_n = hash([account_000_hash, ..., account_999_hash])`  
       The hash of all account hashes in data partition block `n`
-   2. `receipt_hash_n = hash(receipt_map)`  
+   2. `receipt_hash_n = hash(receipt_map_n)`  
       The hash of the receipt map in data partition block `n`
-   3. `summary_hash_n = hash(summary_blob)`  
+   3. `summary_hash_n = hash(summary_blob_n)`  
       The hash of the app defined summary blob in summary partition block `n`
 
 2. When a Consensor has collected the hashes for all partition blocks in a given
@@ -50,7 +50,7 @@ updated with each tx
      * and the partition level hashes used to compute the network hash. Ex:  
        `[data_hash_1, data_hash_2, ...]`
 
-   are signed and sent as an update to the Consensors subscriber. Ex:  
+   are signed and sent as an update to the Consensors subscribers.
 
 4. When an Archiver gets a:
 
