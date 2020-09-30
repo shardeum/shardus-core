@@ -27,7 +27,12 @@ export interface StateHashes {
 export interface ReceiptHashes {
   counter: Cycle['counter']
   receiptMapHashes: object
-  networkReceiptHash: NetworkStateHash
+  networkReceiptHash: NetworkReceiptHash
+}
+export interface SummaryHashes {
+  counter: Cycle['counter']
+  summaryHashes: object
+  networkSummaryHash: NetworkSummarytHash
 }
 
 interface Account {
@@ -57,6 +62,7 @@ export type ReceiptMapHashes = Map<
 
 export type NetworkStateHash = string
 export type NetworkReceiptHash = string
+export type NetworkSummarytHash = string
 
 type PartitionNum = number
 
@@ -78,6 +84,7 @@ const notNeededRepliedNodes: Map<string, true> = new Map()
 const alreadyOfferedNodes = new Map()
 let stateHashesByCycle: Map<Cycle['counter'], StateHashes> = new Map()
 let receiptHashesByCycle: Map<Cycle['counter'], ReceiptHashes> = new Map()
+let summaryHashesByCycle: Map<Cycle['counter'], SummaryHashes> = new Map()
 let partitionBlockMapByCycle: Map<Cycle['counter'], ReceiptMapResult[]> = new Map()
 let safetySyncing = false // to set true when data exchange occurs during safetySync
 
@@ -128,6 +135,20 @@ export function getReceiptHashes(
   return collector
 }
 
+export function getSummaryHashes(
+  start: Cycle['counter'] = 0,
+  end?: Cycle['counter']
+): SummaryHashes[] {
+  const collector: SummaryHashes[] = []
+  for (const [key] of summaryHashesByCycle) {
+    if (key >= start) {
+      // check against end cycle only if it's provided
+      collector.push(summaryHashesByCycle.get(key))
+    }
+  }
+  return collector
+}
+
 function hashPartitionBlocks(partitionId, partitionBlocks) {
   const partitionBlock = partitionBlocks.find(b => b.partition === partitionId)
   return Context.crypto.hash(partitionBlock || {})
@@ -171,6 +192,9 @@ export function startSnapshotting() {
 
       // store receiptMap for this cycle number
       partitionBlockMapByCycle.set(shard.cycleNumber, receiptMapResults)
+
+      // store summary blob map for this cycle
+      const summaryBlobMap = SnapshotFunctions.generateFakeSummaryBlobMap()
 
       // create our own partition hashes for that cycle number
       const partitionRanges = getPartitionRanges(shard)
@@ -246,7 +270,8 @@ export function startSnapshotting() {
         cycle: shard.cycleNumber,
         data: {
           partitionHash: {},
-          receiptMapHash: {}
+          receiptMapHash: {},
+          summaryHash: {},
         },
         sender: Self.id,
       }
@@ -254,25 +279,30 @@ export function startSnapshotting() {
         message.data.partitionHash[partitionId] = hash
         message.data.receiptMapHash[partitionId] = hashPartitionBlocks(partitionId, partitionBlockMapByCycle.get(shard.cycleNumber))
       }
+      
+      for (const [partitionId, blob] of summaryBlobMap) {
+        message.data.summaryHash[partitionId] = SnapshotFunctions.generateFakeSummaryHash(blob)
+      }
 
       collector.process([message])
 
       Comms.sendGossip('snapshot_gossip', message)
 
       collector.once('gotAllHashes', (allHashes) => {
-
-        const { partitionHashes, receiptHashes } = allHashes
-
+        const { partitionHashes, receiptHashes, summaryHashes } = allHashes
         // create a network state hash once we have all partition hashes for that cycle number
         const networkStateHash = SnapshotFunctions.createNetworkHash(partitionHashes)
         const networkReceiptMapHash = SnapshotFunctions.createNetworkHash(receiptHashes)
+        const networkSummaryHash = SnapshotFunctions.createNetworkHash(summaryHashes)
 
         log('Got all partition hashes: ', partitionHashes)
         log('Got all receipt hashes: ', receiptHashes)
+        log('Got all summary hashes: ', summaryHashes)
 
         // save the partition and network hashes for that cycle number to the DB
         SnapshotFunctions.savePartitionAndNetworkHashes(shard, partitionHashes, networkStateHash)
         SnapshotFunctions.saveReceiptAndNetworkHashes(shard, receiptHashes, networkReceiptMapHash)
+        SnapshotFunctions.saveSummaryAndNetworkHashes(shard, summaryHashes, networkSummaryHash)
 
         // Update stateHashes by Cycle map
         const newStateHash: StateHashes = {
@@ -290,10 +320,19 @@ export function startSnapshotting() {
         }
         receiptHashesByCycle = SnapshotFunctions.updateReceiptHashesByCycleMap(shard.cycleNumber, newReceiptHash, receiptHashesByCycle)
 
+        // Update summaryHashes by Cycle map
+        const newSummaryHash: SummaryHashes = {
+          counter: shard.cycleNumber,
+          summaryHashes: summaryHashes,
+          networkSummaryHash: networkSummaryHash,
+        }
+        summaryHashesByCycle = SnapshotFunctions.updateSummaryHashesByCycleMap(shard.cycleNumber, newSummaryHash, summaryHashesByCycle)
+
         // clean up gossip and collector for that cycle number
         partitionGossip.clean(shard.cycleNumber)
         log(`Network State Hash for cycle ${shard.cycleNumber}`, networkStateHash)
         log(`Network Receipt Hash for cycle ${shard.cycleNumber}`, networkReceiptMapHash)
+        log(`Network Summary Hash for cycle ${shard.cycleNumber}`, networkSummaryHash)
       })
     }
   )

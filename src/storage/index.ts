@@ -86,10 +86,16 @@ class Storage {
       'CREATE TABLE if not exists `receipt` (`partitionId` VARCHAR(255) NOT NULL, `cycleNumber` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, PRIMARY KEY (`partitionId`, `cycleNumber`))'
     )
     await this.storage.runCreate(
+      'CREATE TABLE if not exists `summary` (`partitionId` VARCHAR(255) NOT NULL, `cycleNumber` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, PRIMARY KEY (`partitionId`, `cycleNumber`))'
+    )
+    await this.storage.runCreate(
       'CREATE TABLE if not exists `network` (`cycleNumber` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, PRIMARY KEY (`cycleNumber`))'
     )
     await this.storage.runCreate(
       'CREATE TABLE if not exists `networkReceipt` (`cycleNumber` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, PRIMARY KEY (`cycleNumber`))'
+    )
+    await this.storage.runCreate(
+      'CREATE TABLE if not exists `networkSummary` (`cycleNumber` BIGINT NOT NULL, `hash` VARCHAR(255) NOT NULL, PRIMARY KEY (`cycleNumber`))'
     )
 
     await this.storage.run(P2PApoptosis.addCycleFieldQuery)
@@ -494,6 +500,17 @@ class Storage {
     }
   }
 
+  async addSummaryHash(summaryHash) {
+    this._checkInit()
+    try {
+      await this._create(this.storageModels.summary, summaryHash, {
+        createOrReplace: true,
+      })
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
   async addNetworkState(networkState) {
     this._checkInit()
     try {
@@ -509,6 +526,17 @@ class Storage {
     this._checkInit()
     try {
       await this._create(this.storageModels.networkReceipt, networkReceipt, {
+        createOrReplace: true,
+      })
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
+  async addNetworkSummary(networkSummary) {
+    this._checkInit()
+    try {
+      await this._create(this.storageModels.networkSummary, networkSummary, {
         createOrReplace: true,
       })
     } catch (e) {

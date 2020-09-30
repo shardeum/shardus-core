@@ -15,7 +15,8 @@ import ShardFunctions from '../state-manager/shardFunctions'
 import * as shardFunctionTypes from '../state-manager/shardFunctionTypes'
 import * as utils from '../utils'
 import * as partitionGossip from './partition-gossip'
-import { snapshotLogger, safetyModeVals } from './index'
+import { snapshotLogger, safetyModeVals, StateHashes, ReceiptHashes, SummaryHashes, NetworkSummarytHash } from './index'
+import { hashMap } from './partition-gossip'
 import got from 'got'
 import stream from 'stream'
 import zlib from 'zlib'
@@ -34,19 +35,6 @@ interface PartitionBlock {
   partitionId: PartitionNum
   receiptMap: ReceiptMap
 }
-
-export interface StateHashes {
-  counter: Cycle['counter']
-  partitionHashes: object
-  networkHash: NetworkStateHash
-}
-
-export interface ReceiptHashes {
-  counter: Cycle['counter']
-  receiptMapHashes: object
-  networkReceiptHash: NetworkStateHash
-}
-
 interface Account {
   accountId: string
   hash: string
@@ -62,18 +50,9 @@ type PartitionAccounts = Map<
   Account[]
 >
 
-export type PartitionHashes = Map<
-  shardFunctionTypes.AddressRange['partition'],
-  string
->
-
-export type ReceiptMapHashes = Map<
-  shardFunctionTypes.AddressRange['partition'],
-  string
->
-
 export type NetworkStateHash = string
 export type NetworkReceiptHash = string
+export type NetworkSummaryHash = string
 
 type PartitionNum = number
 
@@ -112,8 +91,23 @@ export function generateFakeReceiptMap () {
   }
 }
 
+export function generateFakeSummaryBlobMap() {
+  let summaryBlobMap = new Map()
+  for (let i = 0; i < 64; i++) {
+    summaryBlobMap.set(i, {
+      blob: Context.crypto.hash({data: Math.random() * 10000})
+    })
+  }
+  return summaryBlobMap
+}
+
+export function generateFakeSummaryHash(blob) {
+  let summaryHashes = Context.crypto.hash(blob)
+  return summaryHashes
+}
+
 export function createNetworkHash (
-  hashes: PartitionHashes | ReceiptMapHashes
+  hashes: Map<number, string>
 ): NetworkStateHash {
   let hashArray = []
   for (const [, hash] of hashes) {
@@ -173,9 +167,34 @@ export function updateReceiptHashesByCycleMap (
   return newReceiptHashesByCycle
 }
 
+export function updateSummaryHashesByCycleMap (
+  counter: Cycle['counter'],
+  summaryHashes: SummaryHashes,
+  summaryHashesByCycle
+) {
+  const newSummaryHashesByCycle: Map<Cycle['counter'], SummaryHashes> = new Map(
+    summaryHashesByCycle
+  )
+
+  const transformedSummaryHash = {
+    ...summaryHashes,
+    summaryHashes: convertMapToObj(summaryHashes.summaryHashes),
+  }
+  newSummaryHashesByCycle.set(counter, transformedSummaryHash)
+  if (newSummaryHashesByCycle.size > 100 && counter > 100) {
+    const limit = counter - 100
+    for (const [key, value] of newSummaryHashesByCycle) {
+      if (key < limit) {
+        newSummaryHashesByCycle.delete(key)
+      }
+    }
+  }
+  return newSummaryHashesByCycle
+}
+
 export async function savePartitionAndNetworkHashes (
   shard: CycleShardData,
-  partitionHashes: PartitionHashes,
+  partitionHashes: hashMap,
   networkHash: NetworkStateHash
 ) {
   for (const [partitionId, hash] of partitionHashes) {
@@ -193,7 +212,7 @@ export async function savePartitionAndNetworkHashes (
 
 export async function saveReceiptAndNetworkHashes (
   shard: CycleShardData,
-  receiptMapHashes: ReceiptMapHashes,
+  receiptMapHashes: hashMap,
   networkReceiptHash: NetworkReceiptHash
 ) {
   for (const [partitionId, hash] of receiptMapHashes) {
@@ -206,6 +225,24 @@ export async function saveReceiptAndNetworkHashes (
   await Context.storage.addNetworkReceipt({
     cycleNumber: shard.cycleNumber,
     hash: networkReceiptHash,
+  })
+}
+
+export async function saveSummaryAndNetworkHashes (
+  shard: CycleShardData,
+  summaryHashes: hashMap,
+  summaryReceiptHash: NetworkSummarytHash
+) {
+  for (const [partitionId, hash] of summaryHashes) {
+    await Context.storage.addSummaryHash({
+      partitionId,
+      cycleNumber: shard.cycleNumber,
+      hash,
+    })
+  }
+  await Context.storage.addNetworkSummary({
+    cycleNumber: shard.cycleNumber,
+    hash: summaryReceiptHash,
   })
 }
 
