@@ -254,17 +254,14 @@ async function contactArchiver() {
     }
   }
   const dataRequestCycle = activeNodesSigned.dataRequestCycle
-  const dataRequestState = activeNodesSigned.dataRequestState
-  const dataRequestReceipt = activeNodesSigned.dataRequestReceipt
+  const dataRequestStateMetaData = activeNodesSigned.dataRequestStateMetaData
+
   const dataRequest = []
   if (dataRequestCycle) {
     dataRequest.push(dataRequestCycle)
   }
-  if (dataRequestState) {
-    dataRequest.push(dataRequestState)
-  }
-  if (dataRequestReceipt) {
-    dataRequest.push(dataRequestReceipt)
+  if (dataRequestStateMetaData) {
+    dataRequest.push(dataRequestStateMetaData)
   }
   if (dataRequest.length > 0) {
     Archivers.addDataRecipient(joinRequest.nodeInfo, dataRequest)

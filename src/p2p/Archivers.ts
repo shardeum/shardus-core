@@ -1,6 +1,6 @@
 import deepmerge from 'deepmerge'
 import * as http from '../http'
-import { getStateHashes, StateHashes, ReceiptHashes, getReceiptHashes } from '../snapshot'
+import { getStateHashes, StateHashes, ReceiptHashes, getReceiptHashes, getSummaryHashes, SummaryHashes } from '../snapshot'
 import { validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { crypto, logger, network } from './Context'
@@ -15,33 +15,32 @@ export interface Transaction {
   id: string
 }
 
-export type ValidTypes = Cycle | Transaction | StateHashes | ReceiptHashes
+export interface StateMetaData {
+  counter: Cycle['counter']
+  stateHashes: StateHashes[],
+  receiptHashes: ReceiptHashes[],
+  summaryHashes: SummaryHashes[]
+}
+
+export type ValidTypes = Cycle | StateMetaData
 
 export enum TypeNames {
   CYCLE = 'CYCLE',
-  TRANSACTION = 'TRANSACTION',
-  STATE = 'STATE',
-  RECEIPT = 'RECEIPT',
+  STATE_METADATA = 'STATE_METADATA',
 }
 
 interface NamesToTypes {
   CYCLE: Cycle
-  TRANSACTION: Transaction
-  STATE: StateHashes,
-  RECEIPT: ReceiptHashes
+  STATE_METADATA: StateMetaData
 }
 
 export type TypeName<T extends ValidTypes> = T extends Cycle
   ? TypeNames.CYCLE
-  : T extends ReceiptHashes
-  ? TypeNames.RECEIPT
-  : TypeNames.STATE
+  : TypeNames.STATE_METADATA
 
 export type TypeIndex<T extends ValidTypes> = T extends Cycle
   ? Cycle['counter']
-  : T extends ReceiptHashes
-  ? ReceiptHashes['counter']
-  : StateHashes['counter']
+  : StateMetaData['counter']
 export interface DataRequest<T extends ValidTypes> {
   type: TypeName<T>
   lastData: TypeIndex<T>
@@ -56,7 +55,7 @@ interface DataResponse {
 
 interface DataRecipient {
   nodeInfo: JoinedArchiver
-  dataRequests: DataRequest<Cycle | Transaction | StateHashes | ReceiptHashes>[]
+  dataRequests: DataRequest<Cycle | StateMetaData>[]
   curvePk: string
 }
 
@@ -212,7 +211,7 @@ export function updateArchivers(joinedArchivers) {
 
 export function addDataRecipient(
   nodeInfo: JoinedArchiver,
-  dataRequests: DataRequest<Cycle | Transaction | StateHashes | ReceiptHashes>[]
+  dataRequests: DataRequest<Cycle | StateMetaData>[]
 ) {
   console.log('Adding data recipient..')
   const recipient = {
@@ -256,30 +255,27 @@ export function sendData() {
           responses.CYCLE = data
           break
         }
-        case TypeNames.STATE: {
+        case TypeNames.STATE_METADATA: {
           // Identify request type
-          const typedRequest = request as DataRequest<NamesToTypes['STATE']>
+          const typedRequest = request as DataRequest<NamesToTypes['STATE_METADATA']>
           // Get latest state hash data since lastData
-          const data = getStateHashes(typedRequest.lastData + 1)
+          const stateHashes = getStateHashes(typedRequest.lastData + 1)
+          const receiptHashes = getReceiptHashes(typedRequest.lastData + 1)
+          const summaryHashes = getSummaryHashes(typedRequest.lastData + 1)
           // Update lastData
-          if (data.length > 0) {
-            typedRequest.lastData = data[data.length - 1].counter
+          if (stateHashes.length > 0) {
+            typedRequest.lastData = stateHashes[stateHashes.length - 1].counter
           }
-          // Add to responses
-          responses.STATE = data
-          break
-        }
-        case TypeNames.RECEIPT: {
-          // Identify request type
-          const typedRequest = request as DataRequest<NamesToTypes['RECEIPT']>
-          // Get latest state hash data since lastData
-          const data = getReceiptHashes(typedRequest.lastData + 1)
-          // Update lastData
-          if (data.length > 0) {
-            typedRequest.lastData = data[data.length - 1].counter
+
+          let metadata: StateMetaData = {
+            counter: typedRequest.lastData >= 0 ? typedRequest.lastData : 0,
+            stateHashes,
+            receiptHashes,
+            summaryHashes
           }
+          console.log('Metadata to send:', metadata)
           // Add to responses
-          responses.RECEIPT = data
+          responses.STATE_METADATA = [metadata]
           break
         }
         default:
