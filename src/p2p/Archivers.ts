@@ -3,7 +3,7 @@ import * as http from '../http'
 import { getStateHashes, StateHashes, ReceiptHashes, getReceiptHashes, getSummaryHashes, SummaryHashes } from '../snapshot'
 import { validateTypes } from '../utils'
 import * as Comms from './Comms'
-import { crypto, logger, network } from './Context'
+import { crypto, logger, network, io } from './Context'
 import { getCycleChain } from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import { CycleRecord as Cycle } from './CycleCreator'
@@ -290,19 +290,21 @@ export function sendData() {
     // Tag dataResponse
     const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
 
-    http
-      .post(recipientUrl, taggedDataResponse)
-      .then((dataKeepAlive) => {
-        if (dataKeepAlive.keepAlive === false) {
-          // Remove recipient from dataRecipients
-          removeDataRecipient(recipient.nodeInfo.publicKey)
-        }
-      })
-      .catch((err) => {
-        // Remove recipient from dataRecipients
-        warn('Error sending data to dataRecipient.', err)
-        removeDataRecipient(recipient.nodeInfo.publicKey)
-      })
+    io.emit('DATA', taggedDataResponse)
+
+    // http
+    //   .post(recipientUrl, taggedDataResponse)
+    //   .then((dataKeepAlive) => {
+    //     if (dataKeepAlive.keepAlive === false) {
+    //       // Remove recipient from dataRecipients
+    //       removeDataRecipient(recipient.nodeInfo.publicKey)
+    //     }
+    //   })
+    //   .catch((err) => {
+    //     // Remove recipient from dataRecipients
+    //     warn('Error sending data to dataRecipient.', err)
+    //     removeDataRecipient(recipient.nodeInfo.publicKey)
+    //   })
   }
 }
 

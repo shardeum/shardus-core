@@ -21,6 +21,7 @@ export let network: NetworkClass
 export let shardus: Shardus
 export let stateManager: StateManager
 export let storage: Storage
+export let io
 export let config: ShardusConfiguration
 export let defaultConfigs: {
   server: ShardusConfiguration
@@ -54,6 +55,10 @@ export function setStateManagerContext(context) {
 
 export function setStorageContext(context) {
   storage = context
+}
+
+export function setIOContext(context) {
+  io = context
 }
 
 export function setConfig(conf) {

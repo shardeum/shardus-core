@@ -439,6 +439,7 @@ class Shardus extends EventEmitter {
 
     // Setup network
     this.io = await this.network.setup(Network.ipInfo) as SocketIO.Server
+    Context.setIOContext(this.io)
     this.io.on('connection', () => {
       console.log('Archive server has subscribed to this node!')
     })
