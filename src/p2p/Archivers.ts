@@ -1,6 +1,6 @@
 import deepmerge from 'deepmerge'
 import * as http from '../http'
-import { getStateHashes, StateHashes, ReceiptHashes, getReceiptHashes, getSummaryHashes, SummaryHashes } from '../snapshot'
+import { getStateHashes, StateHashes, ReceiptHashes, getReceiptHashes, getSummaryHashes, SummaryHashes, getReceiptMap } from '../snapshot'
 import { validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { crypto, logger, network, io } from './Context'
@@ -389,6 +389,42 @@ export function registerRoutes() {
       addDataRecipient(dataRequest.nodeInfo, dataRequestTypes)
     }
     res.json({ success: true })
+  })
+
+  network.registerExternalPost('querydata', (req, res) => {
+    let err = validateTypes(req, { body: 'o' })
+    if (err) {
+      warn(`querydata: bad req ${err}`)
+      return res.json({ success: false, error: err })
+    }
+    err = validateTypes(req.body, {
+      publicKey: 's',
+      tag: 's',
+      nodeInfo: 'o'
+    })
+    if (err) {
+      warn(`querydata: bad req.body ${err}`)
+      return res.json({ success: false, error: err })
+    }
+    // [TODO] Authenticate tag
+
+    const queryRequest = req.body
+    info('queryRequest received', JSON.stringify(queryRequest))
+  
+    const nodeInfo = archivers.get(queryRequest.publicKey)
+    if (!nodeInfo) {
+      const archiverNotFoundErr = 'Archiver not found in list'
+      warn(archiverNotFoundErr)
+      return res.json({ success: false, error: archiverNotFoundErr })
+    }
+    delete queryRequest.publicKey
+    delete queryRequest.tag
+    let data
+    if (queryRequest.type === 'RECEIPT_MAP') {
+      data = getReceiptMap(queryRequest.lastData)
+      console.log('receiptMaps to send', data)
+    }
+    res.json({ success: true, data: data })
   })
 
   network.registerExternalGet('archivers', (req, res) => {

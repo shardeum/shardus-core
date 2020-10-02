@@ -149,6 +149,20 @@ export function getSummaryHashes(
   return collector
 }
 
+export function getReceiptMap(
+  start: Cycle['counter'] = 0,
+  end?: Cycle['counter']
+) {
+  const collector = {}
+  for (const [key] of partitionBlockMapByCycle) {
+    if (key >= start) {
+      // check against end cycle only if it's provided
+      collector[key] = partitionBlockMapByCycle.get(key)
+    }
+  }
+  return collector
+}
+
 function hashPartitionBlocks(partitionId, partitionBlocks) {
   const partitionBlock = partitionBlocks.find(b => b.partition === partitionId)
   return Context.crypto.hash(partitionBlock || {})
