@@ -15,7 +15,7 @@ import ShardFunctions from '../state-manager/shardFunctions'
 import * as shardFunctionTypes from '../state-manager/shardFunctionTypes'
 import * as utils from '../utils'
 import * as partitionGossip from './partition-gossip'
-import { snapshotLogger, safetyModeVals, StateHashes, ReceiptHashes, SummaryHashes, NetworkSummarytHash } from './index'
+import { snapshotLogger, safetyModeVals, StateHashes, ReceiptHashes, SummaryHashes, NetworkSummarytHash, SummaryBlob } from './index'
 import { hashMap } from './partition-gossip'
 import got from 'got'
 import stream from 'stream'
@@ -91,14 +91,16 @@ export function generateFakeReceiptMap () {
   }
 }
 
-export function generateFakeSummaryBlobMap() {
-  let summaryBlobMap = new Map()
+export function generateFakeSummaryBlobs(cycle):SummaryBlob[] {
+  let blobs = []
   for (let i = 0; i < 64; i++) {
-    summaryBlobMap.set(i, {
+    blobs.push({
+      cycle,
+      partition: i,
       blob: Context.crypto.hash({data: Math.random() * 10000})
     })
   }
-  return summaryBlobMap
+  return blobs
 }
 
 export function generateFakeSummaryHash(blob) {

@@ -60,6 +60,12 @@ export type ReceiptMapHashes = Map<
   string
 >
 
+export interface SummaryBlob {
+  cycle: number,
+  partition: number, 
+  blob: unknown
+}
+
 export type NetworkStateHash = string
 export type NetworkReceiptHash = string
 export type NetworkSummarytHash = string
@@ -86,6 +92,7 @@ let stateHashesByCycle: Map<Cycle['counter'], StateHashes> = new Map()
 let receiptHashesByCycle: Map<Cycle['counter'], ReceiptHashes> = new Map()
 let summaryHashesByCycle: Map<Cycle['counter'], SummaryHashes> = new Map()
 let partitionBlockMapByCycle: Map<Cycle['counter'], ReceiptMapResult[]> = new Map()
+let summaryBlobMapByCycle: Map<Cycle['counter'], SummaryBlob[]> = new Map()
 let safetySyncing = false // to set true when data exchange occurs during safetySync
 
 export const safetyModeVals = {
@@ -163,6 +170,20 @@ export function getReceiptMap(
   return collector
 }
 
+export function getSummaryBlob(
+  start: Cycle['counter'] = 0,
+  end?: Cycle['counter']
+) {
+  const collector = {}
+  for (const [key] of summaryBlobMapByCycle) {
+    if (key >= start) {
+      // check against end cycle only if it's provided
+      collector[key] = summaryBlobMapByCycle.get(key)
+    }
+  }
+  return collector
+}
+
 function hashPartitionBlocks(partitionId, partitionBlocks) {
   const partitionBlock = partitionBlocks.find(b => b.partition === partitionId)
   return Context.crypto.hash(partitionBlock || {})
@@ -208,7 +229,8 @@ export function startSnapshotting() {
       partitionBlockMapByCycle.set(shard.cycleNumber, receiptMapResults)
 
       // store summary blob map for this cycle
-      const summaryBlobMap = SnapshotFunctions.generateFakeSummaryBlobMap()
+      const summaryBlobsForThisCycle: SummaryBlob[] = SnapshotFunctions.generateFakeSummaryBlobs(shard.cycleNumber)
+      summaryBlobMapByCycle.set(shard.cycleNumber, summaryBlobsForThisCycle)
 
       // create our own partition hashes for that cycle number
       const partitionRanges = getPartitionRanges(shard)
@@ -294,8 +316,8 @@ export function startSnapshotting() {
         message.data.receiptMapHash[partitionId] = hashPartitionBlocks(partitionId, partitionBlockMapByCycle.get(shard.cycleNumber))
       }
       
-      for (const [partitionId, blob] of summaryBlobMap) {
-        message.data.summaryHash[partitionId] = SnapshotFunctions.generateFakeSummaryHash(blob)
+      for (const blob of summaryBlobsForThisCycle) {
+        message.data.summaryHash[blob.partition] = SnapshotFunctions.generateFakeSummaryHash(blob)
       }
 
       collector.process([message])

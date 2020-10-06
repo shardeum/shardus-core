@@ -1,6 +1,6 @@
 import deepmerge from 'deepmerge'
 import * as http from '../http'
-import { getStateHashes, StateHashes, ReceiptHashes, getReceiptHashes, getSummaryHashes, SummaryHashes, getReceiptMap } from '../snapshot'
+import { getStateHashes, StateHashes, ReceiptHashes, getReceiptHashes, getSummaryHashes, SummaryHashes, getReceiptMap, getSummaryBlob } from '../snapshot'
 import { validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { crypto, logger, network, io } from './Context'
@@ -423,6 +423,9 @@ export function registerRoutes() {
     if (queryRequest.type === 'RECEIPT_MAP') {
       data = getReceiptMap(queryRequest.lastData)
       console.log('receiptMaps to send', data)
+    } else if (queryRequest.type === 'SUMMARY_BLOB') {
+      data = getSummaryBlob(queryRequest.lastData)
+      console.log('summaryBlobs to send', data)
     }
     res.json({ success: true, data: data })
   })
