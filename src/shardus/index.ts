@@ -1263,7 +1263,6 @@ class Shardus extends EventEmitter {
         this.mainLogger.debug('getStateId not used by global server')
       }
 
-      // opitonal methods
       if (typeof application.close === 'function') {
         applicationInterfaceImpl.close = async () => application.close()
       } else {
@@ -1404,6 +1403,33 @@ class Shardus extends EventEmitter {
           thisPtr.mainLogger.debug('no app.sync() function defined')
         }
       }
+
+      if (typeof application.sync === 'function') {
+        applicationInterfaceImpl.dataSummaryInit = async (blob, accountData) => application.dataSummaryInit(blob, accountData)
+      } else {
+        //const thisPtr = this
+        applicationInterfaceImpl.dataSummaryInit = async function (blob, accountData) {
+          //thisPtr.mainLogger.debug('no app.dataSummaryInit() function defined')
+        }
+      }
+      if (typeof application.sync === 'function') {
+        applicationInterfaceImpl.dataSummaryUpdate = async (blob, accountDataBefore, accountDataAfter) => application.dataSummaryUpdate(blob, accountDataBefore, accountDataAfter)
+      } else {
+        //const thisPtr = this
+        applicationInterfaceImpl.dataSummaryUpdate = async function (blob, accountDataBefore, accountDataAfter) {
+          //thisPtr.mainLogger.debug('no app.dataSummaryUpdate() function defined')
+        }
+      }
+      if (typeof application.sync === 'function') {
+        applicationInterfaceImpl.txSummaryUpdate = async (blob, tx, wrappedStates) => application.txSummaryUpdate(blob, tx, wrappedStates)
+      } else {
+        //const thisPtr = this
+        applicationInterfaceImpl.txSummaryUpdate = async function (blob, tx, wrappedStates) {
+          //thisPtr.mainLogger.debug('no app.txSummaryUpdate() function defined')
+        }
+      }
+      //txSummaryUpdate: (blob: any, tx: any, wrappedStates: any)
+
     } catch (ex) {
       this.fatalLogger.fatal(
         `Required application interface not implemented. Exception: ${ex}`

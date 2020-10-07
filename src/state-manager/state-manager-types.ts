@@ -655,3 +655,8 @@ type ReceiptMapResult = {
     receiptMap:ReceiptMap;
     txCount:number
 }
+
+type OpaqueBlob = any
+type SummaryBlob = {latestCycle: number, counter:number, errorNull:number, partition:number, opaqueBlob:OpaqueBlob}
+
+type SummaryBlobCollection = {cycle:number, blobsByPartition:Map<number, SummaryBlob>}

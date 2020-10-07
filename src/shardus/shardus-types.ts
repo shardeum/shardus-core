@@ -223,6 +223,11 @@ declare namespace Shardus {
      * If it is not the first node it could use getLocalOrRemote() to query data it needs.
      */
     sync: () => any
+
+    dataSummaryInit: (blob: any, accountData: any) => void
+    dataSummaryUpdate: (blob: any, accountDataBefore: any, accountDataAfter: any) => void
+    txSummaryUpdate: (blob: any, tx: any, wrappedStates: any) => void
+
   }
 
   export interface TransactionKeys {
@@ -313,10 +318,16 @@ declare namespace Shardus {
 
     //Set by setPartialData
     userTag?: any
-    localCache?: any
+    localCache?: any  // TODO CODEREIVEW: use by partial data, but really need to code review everything localCache related.
+                      // LocalCache was supposed to be a full copy of the account before tx was applied. This would allow for 
+                      // sending partial account data out for a TX but still doing the full transform when it is local
+                      // for some reason localCache is also getting check for logic to determin if the account should be saved locally,
+                      // a more explicit mechanism would be nicer
 
     // state manager tracking
     prevStateId?: string
+    // need a before copy of the data for stats system. may not be super effcient. possibly merge this with original data on the queue entry
+    prevDataCopy?: any
   }
 
   // old version:

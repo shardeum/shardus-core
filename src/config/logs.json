@@ -54,6 +54,11 @@
         "type": "file",
         "maxLogSize": 10000000,
         "backups": 10
+      },
+      "statsDump": {
+        "type": "file",
+        "maxLogSize": 10000000,
+        "backups": 10
       }
     },
     "categories": {
@@ -65,7 +70,8 @@
       "fatal": { "appenders": ["fatal"], "level": "fatal" },
       "net": { "appenders": ["net"], "level": "trace" },
       "playback": { "appenders": ["playback"], "level": "trace" },
-      "shardDump": { "appenders": ["shardDump"], "level": "trace" }
+      "shardDump": { "appenders": ["shardDump"], "level": "trace" },
+      "statsDump": { "appenders": ["statsDump"], "level": "trace" }
     }
   }
 }

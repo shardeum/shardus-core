@@ -26,12 +26,14 @@ import Crypto from "../crypto"
 import Logger from "../logger"
 import { NodeShardData } from './shardFunctionTypes'
 import ShardFunctions2 from './shardFunctions2.js'
+import * as Context from '../p2p/Context'
 // import { platform } from 'os' //why did this automatically get added?
 //import NodeList from "../p2p/NodeList"
 
 //let shardFunctions = import("./shardFunctions").
 //type foo = ShardFunctionTypes.BasicAddressRange2
 
+import StateManagerStats from './state-manager-stats'
 
 /**
  * StateManager
@@ -116,6 +118,15 @@ class StateManager extends EventEmitter {
     syncSettleTime: number;
     debugTXHistory:{[id:string]: string}; // need to disable or clean this as it will leak memory
 
+    // summaryBlobByPartition: Map<number, SummaryBlob>;
+    // summaryPartitionCount: number;
+
+    // txSummaryBlobCollections: SummaryBlobCollection[];
+
+    // extensiveRangeChecking: boolean; // non required range checks that can show additional errors (should not impact flow control)
+
+    stateManagerStats: StateManagerStats;
+
   constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage : Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     super()
     this.verboseLogs = verboseLogs
@@ -149,6 +160,8 @@ class StateManager extends EventEmitter {
     this.lastSeenAccountsMap = null
 
     this.appFinishedSyncing = false
+
+    this.extensiveRangeChecking = true
 
     //BLOCK2
     /** @type {SyncTracker[]} */
@@ -200,6 +213,12 @@ class StateManager extends EventEmitter {
         this.debugNoTxVoting = false
       }
     }
+
+    //Init Summary Blobs
+    
+    this.stateManagerStats = new StateManagerStats(verboseLogs, profiler, app, logger, crypto, config)
+    this.stateManagerStats.summaryPartitionCount = 32
+    this.stateManagerStats.initSummaryBlobs()
 
     this.stateIsGood = true
     // the original way this was setup was to reset and apply repair results one partition at a time.
@@ -346,6 +365,8 @@ class StateManager extends EventEmitter {
     this.logger.playbackLogNote('canDataRepair', `0`, `canDataRepair: ${this.canDataRepair}  `)
 
   }
+
+
 
   // this clears state data related to the current partion we are syncing.
   clearPartitionData () {
@@ -1328,7 +1349,9 @@ class StateManager extends EventEmitter {
         }
       }
    
-      let failedHashes = await this.checkAndSetAccountData(dataToSet, 'syncStateDataGlobals')
+      let failedHashes = await this.checkAndSetAccountData(dataToSet, 'syncStateDataGlobals', true)
+
+      //this.stateManagerStats.statsDataSummaryInit(dataToSet)
 
       console.log('DBG goodAccounts', goodAccounts)
      
@@ -1352,6 +1375,91 @@ class StateManager extends EventEmitter {
 
     this.globalAccountsSynced = true
   }
+
+  // initSummaryBlobs() {
+  //   for (let i = 0; i < this.summaryPartitionCount; i++) {
+  //     this.summaryBlobByPartition.set(i, {})
+  //   }
+  // }
+
+  // initTXSummaryBlobsForCycle(cycleNumber:number):SummaryBlobCollection {
+  //   let summaryBlobCollection = {cycle:cycleNumber, blobsByPartition: new Map()  }
+  //   for (let i = 0; i < this.summaryPartitionCount; i++) {
+  //     summaryBlobCollection.blobsByPartition.set(i, {})
+  //   }
+  //   this.txSummaryBlobCollections.push(summaryBlobCollection)
+  //   return summaryBlobCollection
+  // }
+
+  // getOrCreateTXSummaryBlobCollectionByCycle(cycle:number):SummaryBlobCollection {
+  //   let summaryBlobCollectionToUse = null
+  //   for (let i = this.txSummaryBlobCollections.length-1; i >= 0; i--) {
+  //     let summaryBlobCollection = this.txSummaryBlobCollections[i]
+  //     if(summaryBlobCollection.cycle === cycle){
+  //       summaryBlobCollectionToUse = summaryBlobCollection
+  //     }
+  //   }
+  //   if(summaryBlobCollectionToUse === null){
+  //     summaryBlobCollectionToUse = this.initTXSummaryBlobsForCycle(cycle)
+
+  //   }
+  //   return summaryBlobCollectionToUse
+  // }
+
+  // getSummaryBlobPartition(address:string) : number{
+  //   let addressNum = parseInt(address.slice(0, 8), 16)
+  //   let size = Math.round(4294967296 / this.summaryPartitionCount)
+  //   let preRound = addressNum / size
+  //   let summaryPartition = Math.round(addressNum / size)
+
+  //   if(this.extensiveRangeChecking){
+  //     if(summaryPartition < 0){
+  //       this.mainLogger.error(`getSummaryBlobPartition summaryPartition < 0 ${summaryPartition}`)
+  //     }
+  //     if(summaryPartition > this.summaryPartitionCount){
+  //       this.mainLogger.error(`getSummaryBlobPartition summaryPartition > this.summaryPartitionCount ${summaryPartition}`)
+  //     }
+  //   }
+
+  //   if(summaryPartition === this.summaryPartitionCount){
+  //     summaryPartition = summaryPartition - 1 
+  //   }  
+  //   return summaryPartition
+  // }
+
+  // getSummaryBlob(address:string) : SummaryBlob{
+  //   let partition = this.getSummaryBlobPartition(address)
+    
+  //   let blob:SummaryBlob = this.summaryBlobByPartition.get(partition)
+  //   return blob
+  // }
+
+  // statsDataSummaryInit(accountData:Shardus.WrappedData){
+  //   let blob:SummaryBlob = this.getSummaryBlob(accountData.accountId)
+  //   this.app.dataSummaryInit(blob, accountData.data)
+
+  // }
+
+  // statsDataSummaryUpdate(accountDataBefore:Shardus.WrappedData, accountDataAfter:Shardus.WrappedData){
+  //   let blob:SummaryBlob = this.getSummaryBlob(accountDataBefore.accountId)
+
+  //   this.app.dataSummaryUpdate(blob, accountDataBefore.data, accountDataAfter.data)
+  // }
+
+  // statsTxSummaryUpdate(queueEntry:QueueEntry){
+  //   let partition = this.getSummaryBlobPartition(queueEntry.acceptedTx.id)
+
+  //   let summaryBlobCollection = this.getOrCreateTXSummaryBlobCollectionByCycle(queueEntry.cycleToRecordOn)
+  //   if(summaryBlobCollection != null){
+
+  //     let blob:SummaryBlob = summaryBlobCollection.blobsByPartition.get(partition)
+
+  //     this.app.txSummaryUpdate(blob, queueEntry.acceptedTx.data, null) //todo send data or not?
+  //   }
+
+  // }
+
+
 
   async getRobustGlobalReport(): Promise<GlobalAccountReportResp> {
 
@@ -1889,7 +1997,9 @@ class StateManager extends EventEmitter {
 
     this.mainLogger.debug(`DATASYNC: processAccountData saving ${goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase} outOfDateNoTxs: ${outOfDateNoTxs}`)
     // failedHashes is a list of accounts that failed to match the hash reported by the server
-    let failedHashes = await this.checkAndSetAccountData(goodAccounts, 'syncNonGlobals:processAccountData') // repeatable form may need to call this in batches
+    let failedHashes = await this.checkAndSetAccountData(goodAccounts, 'syncNonGlobals:processAccountData', true) // repeatable form may need to call this in batches
+    
+    //this.stateManagerStats.statsDataSummaryInit(goodAccounts)
 
     if (failedHashes.length > 1000) {
       this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
@@ -2069,10 +2179,11 @@ class StateManager extends EventEmitter {
 
 
   // TSConversion TODO need to fix some any types
-  async checkAndSetAccountData (accountRecords: Shardus.WrappedData[], note:string): Promise<string[]> {
+  async checkAndSetAccountData (accountRecords: Shardus.WrappedData[], note:string, initStats:boolean): Promise<string[]> {
     let accountsToAdd:any[] = []
     let failedHashes:string[] = []
-    for (let { accountId, stateId, data: recordData } of accountRecords) {
+    for (let wrapedAccount of accountRecords) {
+      let { accountId, stateId, data: recordData } = wrapedAccount
       let hash = this.app.calculateAccountHash(recordData)
       if (stateId === hash) {
         // if (recordData.owners) recordData.owners = JSON.parse(recordData.owners)
@@ -2082,6 +2193,12 @@ class StateManager extends EventEmitter {
         let debugString = `setAccountData: note:${note} acc: ${utils.makeShortHash(accountId)} hash: ${utils.makeShortHash(hash)}`
         this.mainLogger.debug(debugString)
         if (this.verboseLogs) console.log(debugString)
+
+        if(initStats){
+          let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
+          this.stateManagerStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount)
+        }
+
       } else {
         this.mainLogger.error(`setAccountData hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
         this.mainLogger.error('setAccountData hash test failed: details: ' + utils.stringifyReduce(recordData))
@@ -2978,6 +3095,14 @@ class StateManager extends EventEmitter {
 
       await respond(result)
     })
+
+    //<pre id="json"></pre>
+    Context.network.registerExternalGet('debug_stats', (req, res) => {
+      let cycle = this.currentCycleShardData.cycleNumber - 1
+
+      let blob = this.stateManagerStats.dumpLogsForCycle(cycle, false)
+      res.json({cycle,  blob })
+    })
   }
 
   _unregisterEndpoints () {
@@ -3004,6 +3129,7 @@ class StateManager extends EventEmitter {
     this.p2p.unregisterInternal('get_globalaccountreport')
     this.p2p.unregisterInternal('spread_appliedVote')
     this.p2p.unregisterGossipHandler('spread_appliedReceipt')
+
   }
 
   // //////////////////////////////////////////////////////////////////////////
@@ -3542,6 +3668,9 @@ class StateManager extends EventEmitter {
 
       // write the accepted TX to storage
       this.storage.addAcceptedTransactions([acceptedTX])
+
+      
+
     } catch (ex) {
       this.fatalLogger.fatal('commitConsensedTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       this.mainLogger.debug(`commitConsensedTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
@@ -3613,8 +3742,25 @@ class StateManager extends EventEmitter {
       if (queueEntry != null && queueEntry.transactionGroup != null && this.p2p.getNodeId() === queueEntry.transactionGroup[0].id) {  
         this.emit('txProcessed')
       }
-
       this.emit('txApplied', acceptedTX)
+
+
+      this.stateManagerStats.statsTxSummaryUpdate(queueEntry.cycleToRecordOn, queueEntry)
+      for (let wrappedData of applyResponse.accountData) {
+        //this.stateManagerStats.statsDataSummaryUpdate(wrappedData.prevDataCopy, wrappedData)
+
+        let queueData = queueEntry.collectedData[wrappedData.accountId]
+
+        if(queueData != null){
+          if(queueData.accountCreated){
+            //account was created to do a summary init
+            this.stateManagerStats.statsDataSummaryInit(queueEntry.cycleToRecordOn, queueData);
+          }
+          this.stateManagerStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, queueData.prevDataCopy, wrappedData)
+        } else {
+          this.mainLogger.error(`commitConsensedTransaction failed to get account data for stats ${wrappedData.accountId}`)
+        }
+      }
     }
 
     return {success:true}
@@ -3694,6 +3840,8 @@ class StateManager extends EventEmitter {
       } else {
         let wrappedState = wrappedStates[key]
         wrappedState.prevStateId = wrappedState.stateId
+
+        wrappedState.prevDataCopy = utils.deepCopy(wrappedState.data)
       }
     }
 
@@ -4103,6 +4251,7 @@ class StateManager extends EventEmitter {
     return null
   }
 
+  // TODO CODEREVIEW.  need to look at the use of local cache.  also is the early out ok?
   queueEntryAddData (queueEntry:QueueEntry, data:Shardus.WrappedResponse) {
     if (queueEntry.collectedData[data.accountId] != null) {
       return // already have the data
@@ -4515,12 +4664,23 @@ class StateManager extends EventEmitter {
           this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `write data: ${utils.stringifyReduce(data)}`)
           //Commit the data
           let dataToSet = [data]
-          let failedHashes = await this.checkAndSetAccountData(dataToSet, 'repairToMatchReceipt')
+          let failedHashes = await this.checkAndSetAccountData(dataToSet, 'repairToMatchReceipt', false)
           await this.writeCombinedAccountDataToBackups(dataToSet, failedHashes)
 
           //update global cache?  that will be obsolete soona anyhow!
+          //need to loop and call update
 
-
+          let wrappedAccountDataBefore = queueEntry.collectedData[data.accountId]
+          let beforeData = null
+          if(wrappedAccountDataBefore != null){
+            beforeData = wrappedAccountDataBefore.data
+          }
+          if(beforeData == null){
+            let results = await this.app.getAccountDataByList([data.accountId])
+            beforeData = results[0]
+            this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 had to query for data ${utils.stringifyReduce(data.accountId)} `)
+          }
+          this.stateManagerStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, beforeData, data)
         }
 
         // if (queueEntry.hasAll === true) {
@@ -8099,6 +8259,8 @@ class StateManager extends EventEmitter {
       if (lastCycleShardValues == null) {
         return
       }
+
+      this.stateManagerStats.dumpLogsForCycle(lastCycle.counter)
 
       // do this every 5 cycles.
       if (lastCycle.counter % 5 !== 0) {
