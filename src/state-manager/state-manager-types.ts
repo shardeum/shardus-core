@@ -656,7 +656,19 @@ type ReceiptMapResult = {
     txCount:number
 }
 
-type OpaqueBlob = any
-type SummaryBlob = {latestCycle: number, counter:number, errorNull:number, partition:number, opaqueBlob:OpaqueBlob}
+type OpaqueBlob = any //Shardus is not supposed to know about the details of this, it is up to the dapp to define
 
-type SummaryBlobCollection = {cycle:number, blobsByPartition:Map<number, SummaryBlob>}
+//Shardus wrapper for a summary blob.  Has information that is needed for the reduce algorithm
+type SummaryBlob = {
+    latestCycle: number; //The highest cycle that was used in this summary.  
+    counter:number; 
+    errorNull:number; 
+    partition:number; 
+    opaqueBlob:OpaqueBlob;
+}
+
+//A collection of blobs that share the same cycle.  For TX summaries
+type SummaryBlobCollection = {
+    cycle:number; 
+    blobsByPartition:Map<number, SummaryBlob>;
+}

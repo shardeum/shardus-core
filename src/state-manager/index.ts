@@ -3754,7 +3754,8 @@ class StateManager extends EventEmitter {
         if(queueData != null){
           if(queueData.accountCreated){
             //account was created to do a summary init
-            this.stateManagerStats.statsDataSummaryInit(queueEntry.cycleToRecordOn, queueData);
+            //this.stateManagerStats.statsDataSummaryInit(queueEntry.cycleToRecordOn, queueData);
+            this.stateManagerStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, queueData.accountId, queueData.prevDataCopy);
           }
           this.stateManagerStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, queueData.prevDataCopy, wrappedData)
         } else {

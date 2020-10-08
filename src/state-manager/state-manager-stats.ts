@@ -136,6 +136,23 @@ class StateManagerStats {
 
     }
 
+    statsDataSummaryInitRaw(cycle:number, accountId:string, accountDataRaw:any){
+        let blob:SummaryBlob = this.getSummaryBlob(accountId)
+        blob.counter++
+
+        if(accountDataRaw == null){
+            blob.errorNull++
+            this.mainLogger.error(`statsDataSummaryInit errorNull`)
+            return
+        }
+        if(cycle > blob.latestCycle){
+            blob.latestCycle = cycle
+        }
+
+        this.app.dataSummaryInit(blob.opaqueBlob, accountDataRaw)
+
+    }
+
     //statsDataSummaryUpdate(accountDataBefore:any, accountDataAfter:Shardus.WrappedData){
     statsDataSummaryUpdate(cycle:number, accountData:Shardus.WrappedResponse){
         let blob:SummaryBlob = this.getSummaryBlob(accountData.accountId)
