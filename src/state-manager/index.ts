@@ -3100,7 +3100,13 @@ class StateManager extends EventEmitter {
     Context.network.registerExternalGet('debug_stats', (req, res) => {
       let cycle = this.currentCycleShardData.cycleNumber - 1
 
-      let blob = this.stateManagerStats.dumpLogsForCycle(cycle, false)
+      //todo wrap his up
+      let cycleShardValues = null
+      if(this.shardValuesByCycle.has(cycle)){
+        cycleShardValues = this.shardValuesByCycle.get(cycle)
+      }
+
+      let blob = this.stateManagerStats.dumpLogsForCycle(cycle, false, cycleShardValues)
       res.json({cycle,  blob })
     })
   }
@@ -4996,14 +5002,14 @@ class StateManager extends EventEmitter {
             // for each remote node lets save it's id
             for (let index of indicies) {
               let node = remoteHomeNode.consensusNodeForOurNodeFull[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
-              if (node != null && node !== ourNodeData.node.id) {
+              if (node != null && node.id !== ourNodeData.node.id) {
                 nodesToSendTo[node.id] = node
                 consensusNodeIds.push(node.id)
               }
             }
             for (let index of edgeIndicies) {
               let node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
-              if (node != null && node !== ourNodeData.node.id) {
+              if (node != null && node.id !== ourNodeData.node.id) {
                 nodesToSendTo[node.id] = node
                 edgeNodeIds.push(node.id)
               }
@@ -5011,7 +5017,7 @@ class StateManager extends EventEmitter {
 
             for (let index of patchIndicies) {
               let node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
-              if (node != null && node !== ourNodeData.node.id) {
+              if (node != null && node.id !== ourNodeData.node.id) {
                 nodesToSendTo[node.id] = node
                 //edgeNodeIds.push(node.id)
               }
@@ -8261,7 +8267,13 @@ class StateManager extends EventEmitter {
         return
       }
 
-      this.stateManagerStats.dumpLogsForCycle(lastCycle.counter)
+      //todo wrap his up
+      let cycleShardValues = null
+      if(this.shardValuesByCycle.has(lastCycle.counter)){
+        cycleShardValues = this.shardValuesByCycle.get(lastCycle.counter)
+      }
+
+      this.stateManagerStats.dumpLogsForCycle(lastCycle.counter, true, cycleShardValues)
 
       // do this every 5 cycles.
       if (lastCycle.counter % 5 !== 0) {

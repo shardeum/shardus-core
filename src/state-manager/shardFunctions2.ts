@@ -185,6 +185,20 @@ class ShardFunctions2 {
     return false
   }
 
+  static testAddressNumberInRange (address: number, storedPartitions: StoredPartition2) : boolean {
+    if (storedPartitions.rangeIsSplit) {
+      if ((address >= storedPartitions.partitionRange.startAddr && address <= storedPartitions.partitionRange.endAddr) ||
+      (address >= storedPartitions.partitionRange2.startAddr && address <= storedPartitions.partitionRange2.endAddr)) {
+        return true
+      }
+    } else {
+      if (address >= storedPartitions.partitionRange.startAddr && address <= storedPartitions.partitionRange.endAddr) {
+        return true
+      }
+    }
+    return false
+  }
+
   static testInRange (partition: number, storedPartitions: StoredPartition2) : boolean {
     if (storedPartitions.rangeIsSplit) {
       if ((partition >= storedPartitions.partitionStart1 && partition <= storedPartitions.partitionEnd1) ||

@@ -1,5 +1,7 @@
 import Shardus = require('../shardus/shardus-types');
 
+//TODO get rid of this soon, consider how to get rid of shard functions2
+
 type ShardGlobals2 = {
     /**
      * number of active nodes

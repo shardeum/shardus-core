@@ -208,9 +208,37 @@ class StateManagerStats {
         }
     }
 
-    dumpLogsForCycle(cycle:number, writeTofile:boolean = true) {
-        let statsDump = {cycle, dataStats:[], txStats:[]}
+    //the return value is a bit obtuse. should decide if a list or map output is better, or are they both needed.
+    getStoredSnapshotPartitions(cycleShardData:CycleShardData) : {list: number[], map:Map<number,boolean>} {
+        //figure out which summary partitions are fully covered by 
+        let result = {list:[], map:new Map()}
+        for (let i = 0; i < this.summaryPartitionCount; i++) {
+            
+            let addressLowNum = (i / this.summaryPartitionCount) * 4294967296
+            let addressHighNum = (((i+1) / this.summaryPartitionCount) * 4294967296) - 1
+            let inRangeLow = ShardFunctions2.testAddressNumberInRange(addressLowNum, cycleShardData.nodeShardData.storedPartitions)
+            let inRangeHigh = false
+            if(inRangeLow){
+                inRangeHigh = ShardFunctions2.testAddressNumberInRange(addressHighNum, cycleShardData.nodeShardData.storedPartitions)
+            }
+            if(inRangeLow && inRangeHigh){
+                result.list.push(i)
+                result.map.set(i, true)
+            }
+        }
+        return result
+    }
 
+
+    dumpLogsForCycle(cycle:number, writeTofile:boolean = true, cycleShardData:CycleShardData = null) {
+        let statsDump = {cycle, dataStats:[], txStats:[], covered:[]}
+
+        let covered = null
+        if(cycleShardData != null){
+            covered = this.getStoredSnapshotPartitions(cycleShardData) 
+            statsDump.covered = covered.list
+        }
+        
         //get out a sparse collection data blobs
         for(let key of this.summaryBlobByPartition.keys()){
             let summaryBlob = this.summaryBlobByPartition.get(key)
@@ -231,6 +259,8 @@ class StateManagerStats {
         if(writeTofile){
             this.statsLogger.debug(`logs for cycle ${cycle}: ` + utils.stringifyReduce(statsDump))
         }
+
+       
 
         return statsDump
     }

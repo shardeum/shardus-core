@@ -106,9 +106,9 @@ type CycleShardData = {
     /**
      * our node's node shard data
      */
-    nodeShardData: any;
-    nodeShardDataMap: Map<string, any>;
-    parititionShardDataMap: Map<number, any>;
+    nodeShardData: import('./shardFunctionTypes').NodeShardData;
+    nodeShardDataMap: Map<string, import('./shardFunctionTypes').NodeShardData>;
+    parititionShardDataMap: Map<number, import('./shardFunctionTypes').ShardInfo>;
     activeNodes: import("../shardus/shardus-types").Node[];
     syncingNeighbors: import("../shardus/shardus-types").Node[];
     syncingNeighborsTxGroup: import("../shardus/shardus-types").Node[];
