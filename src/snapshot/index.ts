@@ -311,11 +311,13 @@ export function startSnapshotting() {
         },
         sender: Self.id,
       }
+      // attach partition and receipt hashes to the message to be gossiped
       for (const [partitionId, hash] of partitionHashes) {
         message.data.partitionHash[partitionId] = hash
         message.data.receiptMapHash[partitionId] = hashPartitionBlocks(partitionId, partitionBlockMapByCycle.get(shard.cycleNumber))
       }
       
+      // attach summary hashes to the message to be gossiped
       for (const blob of summaryBlobsForThisCycle) {
         message.data.summaryHash[blob.partition] = SnapshotFunctions.generateFakeSummaryHash(blob)
       }
@@ -331,9 +333,9 @@ export function startSnapshotting() {
         const networkReceiptMapHash = SnapshotFunctions.createNetworkHash(receiptHashes)
         const networkSummaryHash = SnapshotFunctions.createNetworkHash(summaryHashes)
 
-        log('Got all partition hashes: ', partitionHashes)
-        log('Got all receipt hashes: ', receiptHashes)
-        log('Got all summary hashes: ', summaryHashes)
+        // log('Got all partition hashes: ', partitionHashes)
+        // log('Got all receipt hashes: ', receiptHashes)
+        // log('Got all summary hashes: ', summaryHashes)
 
         // save the partition and network hashes for that cycle number to the DB
         SnapshotFunctions.savePartitionAndNetworkHashes(shard, partitionHashes, networkStateHash)
@@ -657,6 +659,7 @@ async function storeDataToNewDB(dataMap) {
 }
 
 function processDownloadedMissingData(missingData) {
+  if (missingPartitions.length === 0) return // we don't have missing data anymore
   log('Processing downloaded data')
   for (const partitionId in missingData) {
     // check and store offered data
@@ -728,17 +731,10 @@ function registerSnapshotRoutes() {
         }
         if (neededPartitonIds.length > 0) answer = offerResponse.needed
       }
-      if (answer === offerResponse.needed) {
+      res.json({ answer })
+      if (answer === offerResponse.needed && missingPartitions.length > 0) {
         const downloadedSnapshotData = await SnapshotFunctions.downloadDataFromNode(offerRequest.downloadUrl)
-        log('Downloaded missing data', downloadedSnapshotData)
-        processDownloadedMissingData(downloadedSnapshotData)
-        res.json({
-          answer,
-          partitions: neededPartitonIds,
-          hashes: neededHashes,
-        })
-      } else {
-        res.json({ answer })
+        if(downloadedSnapshotData) processDownloadedMissingData(downloadedSnapshotData)
       }
     },
   }

@@ -420,13 +420,6 @@ export function getMissingPartitions (
   return missingPartitions
 }
 
-export function createDataStream (data) {
-  var rs = new stream.Readable({ objectMode: true })
-  rs.push(data)
-  rs.push(null)
-  return rs
-}
-
 export function registerDownloadRoutes (
   network,
   oldDataMap,
@@ -439,30 +432,30 @@ export function registerDownloadRoutes (
       hash: oldPartitionHashMap.get(parseInt(partitionId)),
     }
   }
-
-  const objectToString = new Transform({
-    writableObjectMode: true,
-
-    transform (chunk, encoding, callback) {
-      this.push(JSON.stringify(chunk) + '\n')
-      callback()
-    },
-  })
+  dataToSend = JSON.stringify(dataToSend)
+  console.log('Registering download route', typeof dataToSend, dataToSend)
 
   network.registerExternalGet('download-snapshot-data', (req, res) => {
-    const dataReadStream = createDataStream(dataToSend)
+    const readerStream = stream.Readable.from([dataToSend])
     const gzip = zlib.createGzip()
+
     res.set('content-disposition', `attachment; filename="snapshot-data"`)
     res.set('content-type', 'application/gzip')
-    dataReadStream
-      .pipe(objectToString)
-      .pipe(gzip)
+
+    readerStream.on('error', err => console.log('rs Error', err));
+    gzip.on('error', err => console.log('gzip Error', err))
+    res.on('error', err => console.log('res Error', err))
+
+    readerStream.pipe(gzip)
       .pipe(res)
+      .on('end', function () {
+        res.end({ success: true })
+      })
   })
 }
 
 export async function downloadDataFromNode (url) {
-  log('Downloading snapshot data from server...')
+  log('Downloading snapshot data from server...', url)
   const res = await got(url, {
     timeout: 1000, //  Omar - setting this to 1 sec
     retry: 0, // Omar - setting this to 0.
@@ -477,7 +470,12 @@ export async function downloadDataFromNode (url) {
       if (err) {
         reject(err)
       } else {
-        resolve(JSON.parse(result.toString()))
+        try {
+          let parsedData = JSON.parse(result.toString())
+          resolve(parsedData)
+        } catch(e) {
+          resolve(null)
+        }
       }
     })
   })
