@@ -213,16 +213,7 @@ export function startSnapshotting() {
   SnapshotFunctions.generateFakeReceiptMap()
   Context.stateManager.on(
     'cycleTxsFinalized',
-    /**
-     * [AS] [TODO] Have the cycleTxsFinalized listener start using the passed
-     * receiptMapResults param
-     * 
-     * [NOTE] Use the params passed to the listener to have it construct
-     * a 'PartitionBlock' obj and pass it down the pipeline to the archiver 
-     * 
-     */
-    /* receiptMapResults parameter */
-    async (shard: CycleShardData, receiptMapResults:ReceiptMapResult[]) => {
+    async (shard: CycleShardData, receiptMapResults:ReceiptMapResult[], statsClump:StatsClump) => {
       const debugStrs = []
 
       // store receiptMap for this cycle number

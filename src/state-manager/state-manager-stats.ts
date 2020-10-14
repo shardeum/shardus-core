@@ -264,6 +264,60 @@ class StateManagerStats {
 
         return statsDump
     }
+
+    
+    getCoveredStatsPartitions(cycleShardData:CycleShardData, excludeEmpty:boolean = true): StatsClump {
+        let cycle = cycleShardData.cycleNumber
+        let statsDump:StatsClump = {error: false, cycle, dataStats:[], txStats:[], covered:[], coveredParititionCount:0, skippedParitionCount:0 }
+
+        let coveredParitionCount = 0
+        let skippedParitionCount = 0
+        if(cycleShardData == null){
+            this.mainLogger.error(`getCoveredStatsPartitions missing cycleShardData`)
+            statsDump.error = true
+            return statsDump
+        }
+    
+        let covered:{list: number[], map:Map<number,boolean>} = null
+       
+        covered = this.getStoredSnapshotPartitions(cycleShardData) 
+        statsDump.covered = covered.list
+    
+        //get out a sparse collection data blobs
+        for(let key of this.summaryBlobByPartition.keys()){
+            let summaryBlob = this.summaryBlobByPartition.get(key)
+   
+            if(covered.map.has(key) === false){
+                skippedParitionCount++
+                continue
+            }
+            if(excludeEmpty === false || summaryBlob.counter > 0){
+                statsDump.dataStats.push(summaryBlob)
+            }
+            coveredParitionCount++
+            continue
+    
+            
+        }
+
+        let summaryBlobCollection = this.getOrCreateTXSummaryBlobCollectionByCycle(cycle)
+        if(summaryBlobCollection != null){
+            for(let key of summaryBlobCollection.blobsByPartition.keys()){
+                let summaryBlob = summaryBlobCollection.blobsByPartition.get(key)
+       
+                if(covered.map.has(key) === false){
+                    continue
+                }  
+                if(excludeEmpty === false || summaryBlob.counter > 0){
+                    statsDump.txStats.push(summaryBlob)
+                }
+      
+            }
+        }
+        statsDump.coveredParititionCount = coveredParitionCount
+        statsDump.skippedParitionCount = skippedParitionCount
+        return statsDump
+    }
 }
 
 

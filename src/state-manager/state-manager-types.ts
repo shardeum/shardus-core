@@ -672,3 +672,14 @@ type SummaryBlobCollection = {
     cycle:number; 
     blobsByPartition:Map<number, SummaryBlob>;
 }
+
+// Stats collected for a cycle
+type StatsClump = {
+    error:boolean; 
+    cycle:number; 
+    dataStats:SummaryBlob[]; 
+    txStats:SummaryBlob[]; 
+    covered:number[];
+    coveredParititionCount:number;
+    skippedParitionCount:number; 
+}

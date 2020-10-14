@@ -3100,7 +3100,6 @@ class StateManager extends EventEmitter {
     Context.network.registerExternalGet('debug_stats', (req, res) => {
       let cycle = this.currentCycleShardData.cycleNumber - 1
 
-      //todo wrap his up
       let cycleShardValues = null
       if(this.shardValuesByCycle.has(cycle)){
         cycleShardValues = this.shardValuesByCycle.get(cycle)
@@ -3109,6 +3108,20 @@ class StateManager extends EventEmitter {
       let blob = this.stateManagerStats.dumpLogsForCycle(cycle, false, cycleShardValues)
       res.json({cycle,  blob })
     })
+
+    Context.network.registerExternalGet('debug_stats2', (req, res) => {
+      let cycle = this.currentCycleShardData.cycleNumber - 1
+
+      let blob = {}
+      let cycleShardValues = null
+      if(this.shardValuesByCycle.has(cycle)){
+        cycleShardValues = this.shardValuesByCycle.get(cycle)
+        blob = this.stateManagerStats.getCoveredStatsPartitions( cycleShardValues)
+      }
+      res.json({cycle,  blob })
+    })
+
+    
   }
 
   _unregisterEndpoints () {
@@ -8326,8 +8339,10 @@ class StateManager extends EventEmitter {
 
       if(this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `receiptMapResults: ${stringify(receiptMapResults)}`)
 
+      let statsClump = this.stateManagerStats.getCoveredStatsPartitions(lastCycleShardValues)
+
       // Hook for Snapshot module to listen to after partition data is settled
-      this.emit('cycleTxsFinalized', lastCycleShardValues, receiptMapResults)
+      this.emit('cycleTxsFinalized', lastCycleShardValues, receiptMapResults, statsClump)
 
       // pre-allocate the next cycle data to be safe!
       let prekey = 'c' + (lastCycle.counter + 1)

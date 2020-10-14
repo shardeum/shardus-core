@@ -1253,8 +1253,11 @@ class ShardFunctions2 {
     result.partitionEnd = endPartition
     let endAddr = (endPartition * size) 
     
+    // compounded rounding errors can reach up to num partitions at worst
+    let roundingErrorSupport = shardGlobals.numPartitions
+
     //fix for int precision problem where id of the highest shard rolls over
-    if(endAddr >= 4294967295){
+    if(endAddr >= 4294967295 - roundingErrorSupport){
       endAddr = 4294967295
     } else {
       // If we are not at the end of our max range then need to back up one to stay in the same partition as the start address

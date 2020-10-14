@@ -8,7 +8,7 @@ const ShardFunctions2 = require('../../../build/src/state-manager/shardFunctions
 
 const crypto = require('shardus-crypto-utils')
 const utils = require('../../../build/src/utils')
-crypto('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
+crypto.init('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
 
 // generate a sorted list of nodes
 function generateNodes (count, predefinedList = null) {
@@ -102,7 +102,8 @@ let useHardcodenodes = true
 //c25
 //let hardcodeNodes = ["0ac8x88ef1","21f7x6483c","6f96xae48b","796fxf7e39","8134x3d98c","833ax8a51b","851cxab703","9d26x9011c","c4c2x62e22","d085xb50f6","d49ax34fec","e172xb3af1","ed8fx77d71","fc4bx4d28e"]
 //let hardcodeNodes = ["008cx3f9d4","2f28x55213","3c3ax5395e","4480x93b0c","5d98xe3f67","a314x7b0ba","d5d7x603d3","e23cx83629","eb91x7dfc6","f06axd2445"] 
-let hardcodeNodes = ["33e4x18d90","776cx08287","a22ax45b79","a3b4xe0801","e160x14237"] 
+let hardcodeNodes = ["0207x62255","0630x66e49","16a8x2d372","1ad2xc49cb","1f8ex01728","3725xe69a4","3e94xb36f2","4f20xd6147","532cx9cd86","5a2ax330c8","8543xf4d0b","8831xd511c","88e9x2a387","8ea5xf1ea6","96a7x12f0f","9b28x844b6","ba4ax3e47d","d583x4f667"]
+
 
 
 
@@ -114,7 +115,7 @@ if (useHardcodenodes) {
 if (hardcodeNodes2) {
   numNodes2 = hardcodeNodes2.length
 }
-let debugStartsWith = '33e4' // 21f7 851c '8bc4' // '33d7' //'0692' // '23d5' // 'f211' //'147d' // '2054' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
+let debugStartsWith = '8ea5' // 21f7 851c '8bc4' // '33d7' //'0692' // '23d5' // 'f211' //'147d' // '2054' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
 let debugID = debugStartsWith.slice(0, 4) + '7'.repeat(64 - 4)
 let debugAccount = '44dc' + '3'.repeat(60) // 5c43 386e 60b1  60b1 c173
 let debugNode = null
@@ -151,6 +152,10 @@ for (let i = 0; i < testIterations; i++) {
   let shardGlobals = ShardFunctions2.calculateShardGlobals(numNodes, nodesPerConsenusGroup)
 
   let totalPartitions = numNodes
+
+
+  ShardFunctions2.partitionToAddressRange2(shardGlobals, 5, 17)
+
 
   // calculate data for all partitions
   let parititionShardDataMap = new Map()
