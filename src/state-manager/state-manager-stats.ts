@@ -30,6 +30,9 @@ class StateManagerStats {
     txSummaryBlobCollections: SummaryBlobCollection[];
     extensiveRangeChecking: boolean; // non required range checks that can show additional errors (should not impact flow control)
 
+    seenCreatedAccounts: Map<string, boolean>; // Extra level of safety at the cost of memory to prevent double init
+    useSeenAccountMap:boolean;
+
     constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger, crypto: Crypto, config: Shardus.ShardusConfiguration) {
         
         this.verboseLogs = verboseLogs
@@ -49,6 +52,9 @@ class StateManagerStats {
 
         this.summaryBlobByPartition = new Map()
         this.txSummaryBlobCollections = []
+
+        this.useSeenAccountMap = true
+        this.seenCreatedAccounts = new Map()
 
         this.initSummaryBlobs()
 
@@ -123,6 +129,15 @@ class StateManagerStats {
         let blob:SummaryBlob = this.getSummaryBlob(accountData.accountId)
         blob.counter++
 
+        if(this.useSeenAccountMap === true && this.seenCreatedAccounts.has(accountData.accountId)){
+            this.mainLogger.error(`statsDataSummaryInit seenCreatedAccounts dupe: ${utils.stringifyReduce(accountData.accountId)}`)
+            return
+        }
+        if(this.useSeenAccountMap === true){
+            this.seenCreatedAccounts.set(accountData.accountId, true)
+        }
+        
+
         if(accountData.data == null){
             blob.errorNull++
             this.mainLogger.error(`statsDataSummaryInit errorNull`)
@@ -140,9 +155,17 @@ class StateManagerStats {
         let blob:SummaryBlob = this.getSummaryBlob(accountId)
         blob.counter++
 
+        if(this.useSeenAccountMap === true && this.seenCreatedAccounts.has(accountId)){
+            this.mainLogger.error(`statsDataSummaryInitRaw seenCreatedAccounts dupe: ${utils.stringifyReduce(accountId)}`)
+            return
+        }
+        if(this.useSeenAccountMap === true){
+            this.seenCreatedAccounts.set(accountId, true)
+        }
+
         if(accountDataRaw == null){
             blob.errorNull++
-            this.mainLogger.error(`statsDataSummaryInit errorNull`)
+            this.mainLogger.error(`statsDataSummaryInitRaw errorNull`)
             return
         }
         if(cycle > blob.latestCycle){
