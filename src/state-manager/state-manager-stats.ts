@@ -130,7 +130,7 @@ class StateManagerStats {
         blob.counter++
 
         if(this.useSeenAccountMap === true && this.seenCreatedAccounts.has(accountData.accountId)){
-            this.mainLogger.error(`statsDataSummaryInit seenCreatedAccounts dupe: ${utils.stringifyReduce(accountData.accountId)}`)
+            // this.mainLogger.error(`statsDataSummaryInit seenCreatedAccounts dupe: ${utils.stringifyReduce(accountData.accountId)}`)
             return
         }
         if(this.useSeenAccountMap === true){
@@ -156,7 +156,7 @@ class StateManagerStats {
         blob.counter++
 
         if(this.useSeenAccountMap === true && this.seenCreatedAccounts.has(accountId)){
-            this.mainLogger.error(`statsDataSummaryInitRaw seenCreatedAccounts dupe: ${utils.stringifyReduce(accountId)}`)
+            // this.mainLogger.error(`statsDataSummaryInitRaw seenCreatedAccounts dupe: ${utils.stringifyReduce(accountId)}`)
             return
         }
         if(this.useSeenAccountMap === true){
