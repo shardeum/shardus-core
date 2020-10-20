@@ -70,11 +70,9 @@ export class Collector extends EventEmitter {
       // forward snapshot gossip if gossip cycle is same as current cycle
       if (this.shard.cycleNumber === message.cycle) {
         if (!forwardedGossips.has(message.sender)) {
-          console.log(`Forwarding the snapshot gossip from ${message.sender}`)
           Comm.sendGossip('snapshot_gossip', message)
           forwardedGossips.set(message.sender, true)
         } else if (forwardedGossips.has(message.sender)) {
-          console.log(`Received already forwarded message`)
           return
         }
       }
@@ -95,7 +93,6 @@ export class Collector extends EventEmitter {
         let coveredBy = partitionShardData.coveredBy
         let isSenderCoverThePartition = coveredBy[message.sender]
         if (!isSenderCoverThePartition) {
-          console.log(`Sender ${message.sender} does not cover this partition ${partitionId}`)
           delete partitionHashData[partitionId]
           continue
         }
@@ -115,20 +112,6 @@ export class Collector extends EventEmitter {
       const dataHashes = convertObjectToHashMap(partitionHashData)
       const receiptHashes = convertObjectToHashMap(receiptHashData)
       const summaryHashes = convertObjectToHashMap(summaryHashData)
-
-      // const partitionHashes = new Map() as hashMap
-      // const receiptHashes = new Map() as hashMap
-      // const summaryHashes = new Map() as hashMap
-
-      // for (const partitionId in partitionHashData) {
-      //   partitionHashes.set(parseInt(partitionId), partitionHashData[partitionId])
-      // }
-      // for (const partitionId in receiptHashData) {
-      //   receiptHashes.set(parseInt(partitionId), receiptHashData[partitionId])
-      // }
-      // for (const partitionId in summaryHashData) {
-      //   summaryHashes.set(parseInt(partitionId), summaryHashData[partitionId])
-      // }
 
       // Add partition hashes into partition hashTally
       for (const [partitionId, hash] of dataHashes) {
@@ -192,7 +175,7 @@ export class Collector extends EventEmitter {
         }
         possibleHashes = possibleHashes.sort()
         
-        console.log(`DATA HASH COUNTER: Cycle ${cycle}, Partition ${partitionId} => `, counterMap)
+        // console.log(`DATA HASH COUNTER: Cycle ${cycle}, Partition ${partitionId} => `, counterMap)
         if (possibleHashes.length > 0) selectedHash = possibleHashes[0]
         if (selectedHash) this.allDataHashes.set(partitionId, selectedHash)
       }
@@ -214,7 +197,7 @@ export class Collector extends EventEmitter {
         }
         possibleHashes = possibleHashes.sort()
     
-        console.log(`RECEIPT HASH COUNTER: Cycle ${cycle}, Partition ${partitionId} => `, counterMap)
+        // console.log(`RECEIPT HASH COUNTER: Cycle ${cycle}, Partition ${partitionId} => `, counterMap)
         if (possibleHashes.length > 0) selectedHash = possibleHashes[0]
         if (selectedHash) this.allReceiptMapHashes.set(partitionId, selectedHash)
       }
@@ -236,7 +219,7 @@ export class Collector extends EventEmitter {
         }
         possibleHashes = possibleHashes.sort()
         
-        console.log(`SUMMARY HASH COUNTER: Cycle ${cycle}, Partition ${partitionId} => `, counterMap)
+        // console.log(`SUMMARY HASH COUNTER: Cycle ${cycle}, Partition ${partitionId} => `, counterMap)
         if (possibleHashes.length > 0) selectedHash = possibleHashes[0]
         if (selectedHash) this.allSummaryHashes.set(partitionId, selectedHash)
       }

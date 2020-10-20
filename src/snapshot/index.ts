@@ -1,5 +1,6 @@
 import * as express from 'express'
 import * as log4js from 'log4js'
+import Crypto from '../crypto'
 import * as http from '../http'
 import * as Active from '../p2p/Active'
 import * as Archivers from '../p2p/Archivers'
@@ -92,7 +93,7 @@ let stateHashesByCycle: Map<Cycle['counter'], StateHashes> = new Map()
 let receiptHashesByCycle: Map<Cycle['counter'], ReceiptHashes> = new Map()
 let summaryHashesByCycle: Map<Cycle['counter'], SummaryHashes> = new Map()
 let partitionBlockMapByCycle: Map<Cycle['counter'], ReceiptMapResult[]> = new Map()
-let summaryBlobMapByCycle: Map<Cycle['counter'], SummaryBlob[]> = new Map()
+let statesClumpMapByCycle: Map<Cycle['counter'], StatsClump> = new Map()
 let safetySyncing = false // to set true when data exchange occurs during safetySync
 
 export const safetyModeVals = {
@@ -175,10 +176,10 @@ export function getSummaryBlob(
   end?: Cycle['counter']
 ) {
   const collector = {}
-  for (const [key] of summaryBlobMapByCycle) {
+  for (const [key] of statesClumpMapByCycle) {
     if (key >= start) {
       // check against end cycle only if it's provided
-      collector[key] = summaryBlobMapByCycle.get(key)
+      collector[key] = statesClumpMapByCycle.get(key)
     }
   }
   return collector
@@ -216,12 +217,16 @@ export function startSnapshotting() {
     async (shard: CycleShardData, receiptMapResults:ReceiptMapResult[], statsClump:StatsClump) => {
       const debugStrs = []
 
+      console.log('statsClump', statsClump)
+      console.log('statsClump', JSON.stringify(statsClump.dataStats))
+      console.log('statsClump', JSON.stringify(statsClump.txStats))
+
       // store receiptMap for this cycle number
       partitionBlockMapByCycle.set(shard.cycleNumber, receiptMapResults)
 
       // store summary blob map for this cycle
-      const summaryBlobsForThisCycle: SummaryBlob[] = SnapshotFunctions.generateFakeSummaryBlobs(shard.cycleNumber)
-      summaryBlobMapByCycle.set(shard.cycleNumber, summaryBlobsForThisCycle)
+      const statsClumpForThisCycle: StatsClump = statsClump
+      statesClumpMapByCycle.set(shard.cycleNumber, statsClumpForThisCycle)
 
       // create our own partition hashes for that cycle number
       const partitionRanges = getPartitionRanges(shard)
@@ -309,10 +314,21 @@ export function startSnapshotting() {
       }
       
       // attach summary hashes to the message to be gossiped
-      for (const blob of summaryBlobsForThisCycle) {
-        message.data.summaryHash[blob.partition] = SnapshotFunctions.generateFakeSummaryHash(blob)
+      let summaryDataStatHash = {}
+      let summarytxStatsHash = {}
+      for (const blob of statsClumpForThisCycle.dataStats) {
+        summaryDataStatHash[blob.partition] = blob
+      }
+      for (const blob of statsClumpForThisCycle.txStats) {
+        summarytxStatsHash[blob.partition] = blob
       }
 
+      for (const partition of statsClumpForThisCycle.covered) {
+        message.data.summaryHash[partition] = Context.crypto.hash({
+          dataStat: summaryDataStatHash[partition],
+          txStats: summarytxStatsHash[partition],
+        })
+      }
       collector.process([message])
 
       Comms.sendGossip('snapshot_gossip', message)

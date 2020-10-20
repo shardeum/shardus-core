@@ -422,10 +422,8 @@ export function registerRoutes() {
     let data
     if (queryRequest.type === 'RECEIPT_MAP') {
       data = getReceiptMap(queryRequest.lastData)
-      console.log('receiptMaps to send', data)
     } else if (queryRequest.type === 'SUMMARY_BLOB') {
       data = getSummaryBlob(queryRequest.lastData)
-      console.log('summaryBlobs to send', data)
     }
     res.json({ success: true, data: data })
   })
