@@ -317,6 +317,9 @@ export function startSnapshotting() {
 
       Comms.sendGossip('snapshot_gossip', message)
 
+      // Clean partition gossip that's older than 10 cycles
+      partitionGossip.cleanOld(shard.cycleNumber, 10)
+
       collector.once('gotAllHashes', (allHashes) => {
         const { partitionHashes, receiptHashes, summaryHashes } = allHashes
         // create a network state hash once we have all partition hashes for that cycle number

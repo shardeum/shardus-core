@@ -309,3 +309,14 @@ export function clean(cycle: number) {
   collectors.delete(cycle)
   queue.delete(cycle)
 }
+
+// Cleans partition gossip for cycles older than current - age
+export function cleanOld(current: number, age: number) {
+  if (age > current) return
+  for (const [cycle] of collectors) {
+    if (cycle <= current - age) collectors.delete(cycle)
+  }
+  for (const [cycle] of queue) {
+    if (cycle <= current - age) queue.delete(cycle)
+  }
+}
