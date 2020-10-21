@@ -108,8 +108,12 @@ export function getDebug() {
     const joind = record.joinedConsensors.map((c) => c.externalPort)
     const actvd = record.activated.map((id) => {
       if (idToPort[id]) return idToPort[id]
-      idToPort[id] = nodes.get(id).externalPort
-      return idToPort[id]
+      let node = nodes.get(id)
+      if(node != null){
+        idToPort[id] = node.externalPort
+        return idToPort[id]
+      }
+      return -1 // port not found
     })
     //    const rmvd = record.removed.map(id => idToPort[id])
     const rmvd = record.removed.map((id) =>
