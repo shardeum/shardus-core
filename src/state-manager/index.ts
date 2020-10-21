@@ -2,7 +2,9 @@ import { ShardusConfiguration } from '../shardus/shardus-types'
 import Shardus = require('../shardus/shardus-types')
 
 
-import {ShardGlobals2,ShardInfo2,StoredPartition2,NodeShardData2,AddressRange2, HomeNodeSummary2,ParititionShardDataMap2,NodeShardDataMap2,MergeResults2,BasicAddressRange2} from  './shardFunction2Types'
+//import {ShardGlobals,ShardInfo,StoredPartition,NodeShardData,AddressRange, HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange} from  './shardFunction2Types'
+import {ShardGlobals,ShardInfo,StoredPartition,NodeShardData,AddressRange, HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange} from  './shardFunctionTypes'
+
 
 import ShardFunctions from './shardFunctions2.js'
 
@@ -24,14 +26,14 @@ import { P2PModuleContext as P2P } from "../p2p/Context"
 import Storage from "../storage"
 import Crypto from "../crypto"
 import Logger from "../logger"
-import { NodeShardData } from './shardFunctionTypes'
+//import { NodeShardData } from './shardFunctionTypes'
 import ShardFunctions2 from './shardFunctions2.js'
 import * as Context from '../p2p/Context'
 // import { platform } from 'os' //why did this automatically get added?
 //import NodeList from "../p2p/NodeList"
 
 //let shardFunctions = import("./shardFunctions").
-//type foo = ShardFunctionTypes.BasicAddressRange2
+//type foo = ShardFunctionTypes.BasicAddressRange
 
 import StateManagerStats from './state-manager-stats'
 
@@ -606,7 +608,7 @@ class StateManager extends EventEmitter {
 
       // create a range object from our coverage change.
  
-      let range = { startAddr: 0, endAddr: 0, low: '', high: '' } as BasicAddressRange2 // this init is a somewhat wastefull way to allow the type to be happy.
+      let range = { startAddr: 0, endAddr: 0, low: '', high: '' } as BasicAddressRange // this init is a somewhat wastefull way to allow the type to be happy.
       range.startAddr = change.start
       range.endAddr = change.end
       range.low = ShardFunctions.leadZeros8((range.startAddr).toString(16)) + '0'.repeat(56)
@@ -759,11 +761,11 @@ class StateManager extends EventEmitter {
 
   /**
    * createSyncTrackerByRange
-   * @param {BasicAddressRange2} range
+   * @param {BasicAddressRange} range
    * @param {number} cycle
    * @return {SyncTracker}
    */
-  createSyncTrackerByRange (range: BasicAddressRange2, cycle: number): SyncTracker {
+  createSyncTrackerByRange (range: BasicAddressRange, cycle: number): SyncTracker {
     // let partition = -1
     let index = this.syncTrackerIndex++
     let syncTracker = { range, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false, isGlobalSyncTracker:false, globalAddressMap:{} } as SyncTracker// partition,
@@ -813,7 +815,7 @@ class StateManager extends EventEmitter {
     if(cycleShardData == null){
       return null
     }
-    let partitionShardData:ShardInfo2 = cycleShardData.parititionShardDataMap.get(partitionID)
+    let partitionShardData:ShardInfo = cycleShardData.parititionShardDataMap.get(partitionID)
 
     let addressLow = partitionShardData.homeRange.low
     let addressHigh = partitionShardData.homeRange.high
@@ -905,7 +907,7 @@ class StateManager extends EventEmitter {
     let nodeShardData = this.currentCycleShardData.nodeShardData
     console.log('GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
 
-    let rangesToSync = [] as AddressRange2[]
+    let rangesToSync = [] as AddressRange[]
 
 
     // get list of partitions to sync.  Strong typing helped figure out this block was dead code (had a serious bug)
@@ -4621,7 +4623,7 @@ class StateManager extends EventEmitter {
               this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `this.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === false ${utils.stringifyReduce(appliedVote.node_id)} `)
               continue
             }
-            let nodeShardInfo:NodeShardData2 = this.currentCycleShardData.nodeShardDataMap.get(appliedVote.node_id)
+            let nodeShardInfo:NodeShardData = this.currentCycleShardData.nodeShardDataMap.get(appliedVote.node_id)
 
             if(nodeShardInfo == null){
 
@@ -4794,7 +4796,7 @@ class StateManager extends EventEmitter {
       if(homePartition != homeNode.homePartition){
         //loop all nodes for now
         for(let nodeID of this.currentCycleShardData.nodeShardDataMap.keys()){
-          let nodeShardData:NodeShardData2 = this.currentCycleShardData.nodeShardDataMap.get(nodeID)
+          let nodeShardData:NodeShardData = this.currentCycleShardData.nodeShardDataMap.get(nodeID)
           let nodeStoresThisPartition = ShardFunctions.testInRange(homePartition, nodeShardData.storedPartitions)
           if(nodeStoresThisPartition === true && uniqueNodes[nodeID] == null){
             //setting this will cause it to end up in the transactionGroup
@@ -4910,7 +4912,7 @@ class StateManager extends EventEmitter {
     let dataKeysWeHave = []
     let dataValuesWeHave = []
     let datas:{[accountID:string]:any} = {}
-    let remoteShardsByKey:{[accountID:string]:NodeShardData2} = {} // shard homenodes that we do not have the data for.
+    let remoteShardsByKey:{[accountID:string]:NodeShardData} = {} // shard homenodes that we do not have the data for.
     let loggedPartition = false
     for (let key of queueEntry.uniqueKeys) {
       ///   test here
@@ -6408,7 +6410,7 @@ class StateManager extends EventEmitter {
   }
 
   // TSConversion todo see if we need to log any of the new early exits.
-  isNodeInDistance (shardGlobals: ShardGlobals2, parititionShardDataMap: ParititionShardDataMap2, hash:string, nodeId:string, distance:number) {
+  isNodeInDistance (shardGlobals: ShardGlobals, parititionShardDataMap: ParititionShardDataMap, hash:string, nodeId:string, distance:number) {
     let cycleShardData = this.currentCycleShardData
     if(cycleShardData == null){
       return false
@@ -8149,7 +8151,7 @@ class StateManager extends EventEmitter {
 
       //if there is any tx that gets a slow down need to mark it.
 
-      /** @type {ShardInfo2} */
+      /** @type {ShardInfo} */
       let partitionShardData = lastCycleShardValues.parititionShardDataMap.get(partitionResult.Partition_id)
       // calculate nodes that care about this partition here
       // since we are using store partitions use storedBy
@@ -8742,7 +8744,7 @@ class StateManager extends EventEmitter {
     if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle: globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal}  tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
 
     for (let accountKey of allKeys) {
-      /** @type {NodeShardData2} */
+      /** @type {NodeShardData} */
       let homeNode = ShardFunctions.findHomeNode(lastCycleShardValues.shardGlobals, accountKey, lastCycleShardValues.parititionShardDataMap)
       if(homeNode == null){
         throw new Error(`recordTXByCycle homeNode == null`)

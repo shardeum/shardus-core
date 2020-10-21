@@ -1,6 +1,7 @@
 import { ShardusConfiguration } from '../shardus/shardus-types'
 import Shardus = require('../shardus/shardus-types')
-import {ShardGlobals2,ShardInfo2,StoredPartition2,NodeShardData2,AddressRange2, HomeNodeSummary2,ParititionShardDataMap2,NodeShardDataMap2,MergeResults2,BasicAddressRange2} from  './shardFunction2Types'
+//import {ShardGlobals,ShardInfo,StoredPartition,NodeShardData,AddressRange, HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange} from  './shardFunction2Types'
+import {ShardGlobals,ShardInfo,StoredPartition,NodeShardData,AddressRange, HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange} from  './shardFunctionTypes'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
 
