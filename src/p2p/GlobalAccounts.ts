@@ -4,7 +4,7 @@
  * a direct call to whatever Wrapper.p2p was calling
  */
 
-import ShardFunctions from '../state-manager/shardFunctions'
+import ShardFunctions from '../state-manager/shardFunctions2'
 import * as utils from '../utils'
 import * as Comms from './Comms'
 import * as Context from './Context'
