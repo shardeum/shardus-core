@@ -100,9 +100,10 @@ class StateManagerStats {
 
     getSummaryBlobPartition(address:string) : number{
         let addressNum = parseInt(address.slice(0, 8), 16)
-        let size = Math.round(4294967296 / this.summaryPartitionCount)
-        let preRound = addressNum / size
-        let summaryPartition = Math.round(addressNum / size)
+        // 2^32  4294967296 or 0xFFFFFFFF + 1
+        let size = Math.round((0xFFFFFFFF + 1) / this.summaryPartitionCount)
+        //let preRound = addressNum / size
+        let summaryPartition = Math.floor(addressNum / size)
 
         if(this.extensiveRangeChecking){
             if(summaryPartition < 0){
@@ -236,9 +237,9 @@ class StateManagerStats {
         //figure out which summary partitions are fully covered by 
         let result = {list:[], map:new Map()}
         for (let i = 0; i < this.summaryPartitionCount; i++) {
-            
-            let addressLowNum = (i / this.summaryPartitionCount) * 4294967296
-            let addressHighNum = (((i+1) / this.summaryPartitionCount) * 4294967296) - 1
+            // 2^32  4294967296 or 0xFFFFFFFF + 1
+            let addressLowNum = (i / this.summaryPartitionCount) * (0xFFFFFFFF + 1)
+            let addressHighNum = (((i+1) / this.summaryPartitionCount) * (0xFFFFFFFF + 1)) - 1
             let inRangeLow = ShardFunctions2.testAddressNumberInRange(addressLowNum, cycleShardData.nodeShardData.storedPartitions)
             let inRangeHigh = false
             if(inRangeLow){

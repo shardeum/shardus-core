@@ -34,9 +34,12 @@ class ShardFunctions2 {
     shardGlobals.numPartitions = shardGlobals.numActiveNodes
 
     shardGlobals.consensusRadius = Math.floor((nodesPerConsenusGroup - 1) / 2)
-    if(nodesPerEdge == null){
-      nodesPerEdge = shardGlobals.consensusRadius
-    }
+
+    // NOT ready for using nodes per edge as an input, so we will force it to a procedural value
+    // if(nodesPerEdge == null){
+    //   nodesPerEdge = shardGlobals.consensusRadius
+    // }
+    nodesPerEdge = shardGlobals.consensusRadius
     shardGlobals.nodesPerEdge = nodesPerEdge
 
     let partitionStoreRadius = shardGlobals.consensusRadius + shardGlobals.nodesPerEdge
@@ -1044,11 +1047,9 @@ class ShardFunctions2 {
     let numPartitions = shardGlobals.numPartitions
     let addressNum = parseInt(address.slice(0, 8), 16)
 
-    // 2^32
-    let size = Math.round(4294967296 / numPartitions)
-    let preRound = addressNum / size
-    let homePartition = Math.round(addressNum / size)
-    let asdf = preRound
+    // 2^32  4294967296 or 0xFFFFFFFF + 1
+    let size = Math.round((0xFFFFFFFF + 1) / numPartitions)
+    let homePartition = Math.floor(addressNum / size)
     if(homePartition === numPartitions){
       homePartition = homePartition - 1 
     }
@@ -1058,10 +1059,11 @@ class ShardFunctions2 {
 
   static addressNumberToPartition (shardGlobals : ShardGlobals2, addressNum: number) : number {
     let numPartitions = shardGlobals.numPartitions
-    // 2^32
-    let size = Math.round(4294967296 / numPartitions)
-    let homePartition = Math.round(addressNum / size)
-
+    // 2^32  4294967296 or 0xFFFFFFFF + 1
+    let size = Math.round((0xFFFFFFFF + 1) / numPartitions)
+    let preround = addressNum / size
+    let homePartition = Math.floor(addressNum / size)
+    let asdf = preround
     if(homePartition === numPartitions){
       homePartition = homePartition - 1 
     }
@@ -1237,8 +1239,8 @@ class ShardFunctions2 {
     let result = {} as AddressRange2
     result.partition = partition
 
-    // 2^32
-    let size = Math.round(4294967296 / shardGlobals.numPartitions)
+    // 2^32  4294967296 or 0xFFFFFFFF + 1
+    let size = Math.round((0xFFFFFFFF + 1) / shardGlobals.numPartitions)
     let startAddr = partition * size
 
     result.p_low = partition

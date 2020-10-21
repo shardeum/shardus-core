@@ -5,7 +5,7 @@ const ShardFunctions2 = require('../../../build/src/state-manager/shardFunctions
 
 const crypto = require('shardus-crypto-utils')
 const utils = require('../../../build/src/utils')
-crypto('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
+crypto.init('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
 
 let maxLogs = 100
 
@@ -64,14 +64,19 @@ function testPartitionMath1_new(numNodes, debugIndex){
 
     let { address1, address2 } = ShardFunctions2.getNextAdjacentAddresses(addressRange.high)
     
-    // logErrorLimited(`info i:${i}/${numNodes} ${utils.stringifyReduce(addressRange.low)} hi ${utils.stringifyReduce(addressRange.high)}`)
-    logErrorLimited(`info i:${i}/${numNodes} ${(addressRange.low)} hi ${(addressRange.high)}`)
+    //logErrorLimited(`info i:${i}/${numNodes} ${utils.stringifyReduce(addressRange.low)} hi ${utils.stringifyReduce(addressRange.high)}`)
+    //logErrorLimited(`info i:${i}/${numNodes} ${(addressRange.low)} hi ${(addressRange.high)}`)
 
     if(partitionStart !== lowResult.homePartition){
       logErrorLimited(`failed partition ${partitionStart} low result: ${lowResult.homePartition}`)
     }
 
-    if(highResult.homePartition !== addressRange.partitionEnd){
+    // not sure how this was ever a good test.
+    // if(highResult.homePartition !== addressRange.partitionEnd){
+    //   logErrorLimited(`failed partition ${addressRange.partitionEnd} high result: ${highResult.homePartition}`)
+    // }
+
+    if(partitionStart !== highResult.homePartition){
       logErrorLimited(`failed partition ${addressRange.partitionEnd} high result: ${highResult.homePartition}`)
     }
 
@@ -85,9 +90,50 @@ function testPartitionMath1_new(numNodes, debugIndex){
   }
 }
 
-testPartitionMath1_new(10)
 
-let maxNodesToTest = 300
+function computePartitionShardDataMap (shardGlobals, partitionStart, partitionsToScan) {
+  let partitionIndex = partitionStart
+  let numPartitions = shardGlobals.numPartitions
+  for (let i = 0; i < partitionsToScan; ++i) {
+    if (partitionIndex >= numPartitions) {
+      partitionIndex = 0
+    }
+    let fpAdressCenter = ((i + 0.5) / numPartitions)
+    let addressPrefix = Math.floor(fpAdressCenter * 0xffffffff)
+
+    let addressPrefixHex = ShardFunctions2.leadZeros8((addressPrefix).toString(16))
+    let address = addressPrefixHex + '7' + 'f'.repeat(55) // 55 + 1 + 8 = 64
+
+    let shardinfo = ShardFunctions2.calculateShardValues(shardGlobals, address)
+    //parititionShardDataMap.set(i, shardinfo)
+    // increment index:
+    let {homePartition, addressNum} = ShardFunctions2.addressToPartition(shardGlobals, address)
+
+    if(homePartition !== i){
+      logErrorLimited(`failed computePartitionShardDataMap ${homePartition} != ${i}`)
+      return
+    }
+
+    partitionIndex++
+    if (partitionIndex === partitionStart) {
+      break // we looped
+    }
+  }
+}
+
+
+console.log(`--------unit test a hacked computePartitionShardDataMap--------------`)
+for(let i = 1; i< 1000; i++){
+  let numParitions = i
+  let shardGlobals = ShardFunctions2.calculateShardGlobals(numParitions, nodesPerConsenusGroup)
+  computePartitionShardDataMap(shardGlobals,0,numParitions)
+
+}
+
+
+//testPartitionMath1_new(10)
+
+let maxNodesToTest = 1000
 
 // test node counts 1 through maxNodesToTest node networks
 
@@ -99,11 +145,12 @@ let maxNodesToTest = 300
 // }
 console.log(`--------New math--------------`)
 // New math
-// for(let i=1; i < maxNodesToTest; i++){
-//   errorsLogged=0
-//   testPartitionMath1_new(i)
-// }
+for(let i=1; i < maxNodesToTest; i++){
+  errorsLogged=0
+  testPartitionMath1_new(i)
+}
 
+//testPartitionMath1_new(10)
 
 //testPartitionMath1_B(i)
 
