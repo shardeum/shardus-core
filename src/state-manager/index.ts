@@ -4413,7 +4413,11 @@ class StateManager extends EventEmitter {
             this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
             continue
           }
-          if (result.success === false) { this.mainLogger.error('ASK FAIL queueEntryRequestMissingData 9') }
+          if (result.success === false) { 
+            this.mainLogger.error('ASK FAIL queueEntryRequestMissingData 9') 
+            this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry2', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+            continue;
+          }
           let dataCountReturned = 0
           let accountIdsReturned = []
           for (let data of result.stateList) {
