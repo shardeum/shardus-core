@@ -216,11 +216,6 @@ export function startSnapshotting() {
     'cycleTxsFinalized',
     async (shard: CycleShardData, receiptMapResults:ReceiptMapResult[], statsClump:StatsClump) => {
       const debugStrs = []
-
-      console.log('statsClump', statsClump)
-      console.log('statsClump', JSON.stringify(statsClump.dataStats))
-      console.log('statsClump', JSON.stringify(statsClump.txStats))
-
       // store receiptMap for this cycle number
       partitionBlockMapByCycle.set(shard.cycleNumber, receiptMapResults)
 
@@ -297,45 +292,7 @@ export function startSnapshotting() {
       // process gossip from the queue for that cycle number
       const collector = partitionGossip.newCollector(shard)
 
-      // gossip our partitition hashes and receipt map to the rest of the network with that cycle number
-      const message: partitionGossip.Message = {
-        cycle: shard.cycleNumber,
-        data: {
-          partitionHash: {},
-          receiptMapHash: {},
-          summaryHash: {},
-        },
-        sender: Self.id,
-      }
-      // attach partition and receipt hashes to the message to be gossiped
-      for (const [partitionId, hash] of partitionHashes) {
-        message.data.partitionHash[partitionId] = hash
-        message.data.receiptMapHash[partitionId] = hashPartitionBlocks(partitionId, partitionBlockMapByCycle.get(shard.cycleNumber))
-      }
-      
-      // attach summary hashes to the message to be gossiped
-      let summaryDataStatHash = {}
-      let summarytxStatsHash = {}
-      for (const blob of statsClumpForThisCycle.dataStats) {
-        summaryDataStatHash[blob.partition] = blob
-      }
-      for (const blob of statsClumpForThisCycle.txStats) {
-        summarytxStatsHash[blob.partition] = blob
-      }
-
-      for (const partition of statsClumpForThisCycle.covered) {
-        message.data.summaryHash[partition] = Context.crypto.hash({
-          dataStat: summaryDataStatHash[partition],
-          txStats: summarytxStatsHash[partition],
-        })
-      }
-      collector.process([message])
-
-      Comms.sendGossip('snapshot_gossip', message)
-
-      // Clean partition gossip that's older than 10 cycles
-      partitionGossip.cleanOld(shard.cycleNumber, 10)
-
+      // registering event handler for 'gotAllHashes'
       collector.once('gotAllHashes', (allHashes) => {
         const { partitionHashes, receiptHashes, summaryHashes } = allHashes
         // create a network state hash once we have all partition hashes for that cycle number
@@ -382,6 +339,46 @@ export function startSnapshotting() {
         log(`Network Receipt Hash for cycle ${shard.cycleNumber}`, networkReceiptMapHash)
         log(`Network Summary Hash for cycle ${shard.cycleNumber}`, networkSummaryHash)
       })
+      partitionGossip.processMessagesInGossipQueue(shard, collector)
+
+      // gossip our partitition hashes and receipt map to the rest of the network with that cycle number
+      const message: partitionGossip.Message = {
+        cycle: shard.cycleNumber,
+        data: {
+          partitionHash: {},
+          receiptMapHash: {},
+          summaryHash: {},
+        },
+        sender: Self.id,
+      }
+      // attach partition and receipt hashes to the message to be gossiped
+      for (const [partitionId, hash] of partitionHashes) {
+        message.data.partitionHash[partitionId] = hash
+        message.data.receiptMapHash[partitionId] = hashPartitionBlocks(partitionId, partitionBlockMapByCycle.get(shard.cycleNumber))
+      }
+      
+      // attach summary hashes to the message to be gossiped
+      let summaryDataStatHash = {}
+      let summarytxStatsHash = {}
+      for (const blob of statsClumpForThisCycle.dataStats) {
+        summaryDataStatHash[blob.partition] = blob
+      }
+      for (const blob of statsClumpForThisCycle.txStats) {
+        summarytxStatsHash[blob.partition] = blob
+      }
+
+      for (const partition of statsClumpForThisCycle.covered) {
+        message.data.summaryHash[partition] = Context.crypto.hash({
+          dataStat: summaryDataStatHash[partition],
+          txStats: summarytxStatsHash[partition],
+        })
+      }      
+
+      Comms.sendGossip('snapshot_gossip', message)
+      collector.process([message])
+
+      // Clean partition gossip that's older than 10 cycles
+      partitionGossip.cleanOld(shard.cycleNumber, 10)
     }
   )
 }

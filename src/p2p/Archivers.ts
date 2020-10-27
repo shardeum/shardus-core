@@ -273,7 +273,6 @@ export function sendData() {
             receiptHashes,
             summaryHashes
           }
-          console.log('Metadata to send:', metadata)
           // Add to responses
           responses.STATE_METADATA = [metadata]
           break
