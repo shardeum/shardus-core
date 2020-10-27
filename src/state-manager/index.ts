@@ -1479,8 +1479,8 @@ class StateManager extends EventEmitter {
     }
     let queryFn = async (node: Shardus.Node) => {
       let result = await this.p2p.ask(node, 'get_globalaccountreport', {})
-      if (result === false) { this.mainLogger.error('ASK FAIL getRobustGlobalReport result === false') }
-      if (result === null) { this.mainLogger.error('ASK FAIL getRobustGlobalReport result === null') }
+      if (result === false) { this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === false node:${utils.stringifyReduce(node.id)}`) }
+      if (result === null) { this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === null node:${utils.stringifyReduce(node.id)}`) }
 
       // TODO I dont know the best way to handle a non null network error here, below is something I had before but disabled for some reason
 
@@ -1567,8 +1567,8 @@ class StateManager extends EventEmitter {
       }
       let queryFn = async (node: Shardus.Node) => {
         let result = await this.p2p.ask(node, 'get_account_state_hash', message)
-        if (result === false) { this.mainLogger.error('ASK FAIL syncStateTableData result === false') }
-        if (result == null) { this.mainLogger.error('ASK FAIL syncStateTableData result == null') }
+        if (result === false) { this.mainLogger.error(`ASK FAIL syncStateTableData result === false node:${utils.stringifyReduce(node.id)}`) }
+        if (result == null) { this.mainLogger.error(`ASK FAIL syncStateTableData result == null node:${utils.stringifyReduce(node.id)}`) }
 
         // TODO I dont know the best way to handle a non null network error here, below is an idea
 
@@ -1753,14 +1753,14 @@ class StateManager extends EventEmitter {
       let result:GetAccountData3Resp = r as GetAccountData3Resp
 
       if(result == null){
-        if (this.verboseLogs) { this.mainLogger.error('ASK FAIL syncAccountData result == null') }
+        if (this.verboseLogs) { this.mainLogger.error(`ASK FAIL syncAccountData result == null node:${this.dataSourceNode.id}`) }
         if(this.tryNextDataSourceNode('syncAccountData') == false){
           break
         }
         continue
       }
       if(result.data == null){
-        if (this.verboseLogs) { this.mainLogger.error('ASK FAIL syncAccountData result.data == null') }
+        if (this.verboseLogs) { this.mainLogger.error(`ASK FAIL syncAccountData result.data == null node:${this.dataSourceNode.id}`) }
         if(this.tryNextDataSourceNode('syncAccountData') == false){
           break
         }
@@ -4590,7 +4590,7 @@ class StateManager extends EventEmitter {
           continue
         }
         if (result.success !== true) { 
-          this.mainLogger.error(`ASK FAIL queueEntryRequestMissingReceipt 9 ${triesLeft} ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)} ${result.note}`) 
+          this.mainLogger.error(`ASK FAIL queueEntryRequestMissingReceipt 9 ${triesLeft} ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)} note:${result.note} txid:${queueEntry.logID}`) 
           continue
         }
 
