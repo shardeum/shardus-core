@@ -1273,7 +1273,13 @@ class StateManager extends EventEmitter {
           }
           continue
         }
-
+        if(result.accountData == null){
+          if (this.verboseLogs)  { this.mainLogger.error('ASK FAIL syncStateTableData result.accountData == null') }
+          if(this.tryNextDataSourceNode('syncStateDataGlobals') == false){
+            break
+          }
+          continue   
+        }
         //{ accountData: Shardus.WrappedData[] | null }
         //this.combinedAccountData = this.combinedAccountData.concat(result.accountData)
         accountData = accountData.concat(result.accountData)
@@ -1475,6 +1481,9 @@ class StateManager extends EventEmitter {
       let result = await this.p2p.ask(node, 'get_globalaccountreport', {})
       if (result === false) { this.mainLogger.error('ASK FAIL getRobustGlobalReport result === false') }
       if (result === null) { this.mainLogger.error('ASK FAIL getRobustGlobalReport result === null') }
+
+      // TODO I dont know the best way to handle a non null network error here, below is something I had before but disabled for some reason
+
       // if (result != null && result.notReady === true){
       //   result = { ready:false, msg:`not ready: ${Math.random()}` }
       // }
@@ -1559,7 +1568,14 @@ class StateManager extends EventEmitter {
       let queryFn = async (node: Shardus.Node) => {
         let result = await this.p2p.ask(node, 'get_account_state_hash', message)
         if (result === false) { this.mainLogger.error('ASK FAIL syncStateTableData result === false') }
-        if (result === null) { this.mainLogger.error('ASK FAIL syncStateTableData result === null') }
+        if (result == null) { this.mainLogger.error('ASK FAIL syncStateTableData result == null') }
+
+        // TODO I dont know the best way to handle a non null network error here, below is an idea
+
+        // if (result.stateHash == null) { 
+        //   this.mainLogger.error('ASK FAIL syncStateTableData result.stateHash == null') 
+        //   result = null //if we get something back that is not the right data type clear it to null
+        // }
         return result
       }
 
@@ -1621,6 +1637,13 @@ class StateManager extends EventEmitter {
 
         if(result == null){
           if (this.verboseLogs)  { this.mainLogger.error('ASK FAIL syncStateTableData result == null') }
+          if(this.tryNextDataSourceNode('syncStateDataGlobals') == false){
+            break
+          }
+          continue
+        }
+        if(result.accountStates == null){
+          if (this.verboseLogs)  { this.mainLogger.error('ASK FAIL syncStateTableData result.accountStates == null') }
           if(this.tryNextDataSourceNode('syncStateDataGlobals') == false){
             break
           }
@@ -1731,6 +1754,13 @@ class StateManager extends EventEmitter {
 
       if(result == null){
         if (this.verboseLogs) { this.mainLogger.error('ASK FAIL syncAccountData result == null') }
+        if(this.tryNextDataSourceNode('syncAccountData') == false){
+          break
+        }
+        continue
+      }
+      if(result.data == null){
+        if (this.verboseLogs) { this.mainLogger.error('ASK FAIL syncAccountData result.data == null') }
         if(this.tryNextDataSourceNode('syncAccountData') == false){
           break
         }
@@ -2114,7 +2144,17 @@ class StateManager extends EventEmitter {
       }
       //we picked a new node to ask so relaunch
       await this.syncFailedAcccounts (lowAddress, highAddress)
+      return
     }
+    if(result.accountData == null){
+      if (this.verboseLogs) { this.mainLogger.error('ASK FAIL syncFailedAcccounts result.accountData == null') }
+      if(this.tryNextDataSourceNode('syncStateDataGlobals') == false){
+        return
+      }
+      //we picked a new node to ask so relaunch
+      await this.syncFailedAcccounts (lowAddress, highAddress)
+      return
+    }    
 
     this.combinedAccountData = this.combinedAccountData.concat(result.accountData)
 
@@ -4408,14 +4448,14 @@ class StateManager extends EventEmitter {
           this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
 
           let message = { keys: allKeys, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
-          let result:RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx', message) // not sure if we should await this.
+          let result:RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx', message)
 
           if(result == null){
             if (this.verboseLogs) { this.mainLogger.error('ASK FAIL request_state_for_tx') }
             this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
             continue
           }
-          if (result.success === false) { 
+          if (result.success !== true) { 
             this.mainLogger.error('ASK FAIL queueEntryRequestMissingData 9') 
             this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry2', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
             continue;
@@ -4549,7 +4589,10 @@ class StateManager extends EventEmitter {
           this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
           continue
         }
-        if (result.success === false) { this.mainLogger.error(`ASK FAIL queueEntryRequestMissingReceipt 9 ${triesLeft} ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)} ${result.note}`) }
+        if (result.success !== true) { 
+          this.mainLogger.error(`ASK FAIL queueEntryRequestMissingReceipt 9 ${triesLeft} ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)} ${result.note}`) 
+          continue
+        }
 
         this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} result: ${utils.stringifyReduce(result)}`)
 
@@ -4680,10 +4723,16 @@ class StateManager extends EventEmitter {
           // We shuffle the array of votes each time so hopefully will ask another node next time
           // TODO more robust limits to this process, maybe a delay?
           this.mainLogger.error(`ASK FAIL repairToMatchReceipt request_state_for_tx_post no reponse from ${utils.stringifyReduce(node.id)}`)
+          this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt missing logic to ask a new node! 1 ${utils.stringifyReduce(node.id)}`)
           return
         }
 
-        if (result.success === false) { this.mainLogger.error('ASK FAIL repairToMatchReceipt result.success === false' ) }
+        if (result.success !== true) { 
+          this.mainLogger.error('ASK FAIL repairToMatchReceipt result.success === false' ) 
+          this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt missing logic to ask a new node! 2 ${utils.stringifyReduce(node.id)}`)
+          return
+        }
+        
         let dataCountReturned = 0
         let accountIdsReturned = []
         for (let data of result.stateList) {
