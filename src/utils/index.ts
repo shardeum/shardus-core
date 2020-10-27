@@ -273,7 +273,7 @@ export const makeShortHash = (x, n = 4) => {
 
 /**
  * short
- * grab the first n (default=4) bytes of a string
+ * grab the first n (default=4) hex bytes of a string (4 bytes == 8 char hex string)
  * @param x 
  * @param n 
  */
@@ -281,7 +281,7 @@ export const short = (x:string, n = 4) => {
   if (!x) {
     return x
   }
-  return x.slice(0, n)
+  return x.slice(0, n * 2)
 }
 
 const objToString = Object.prototype.toString
