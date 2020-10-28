@@ -183,6 +183,16 @@ declare namespace Shardus {
      */
     getStateId: (accountAddress: string, mustExist?: boolean) => string
     /**
+     * A function that returns the timestamp for a given Account Address
+     */
+    getAccountTimestamp: (accountAddress: string, mustExist?: boolean) => number
+
+    /**
+     * A function that allows the app to look at a passed in account ane return the hash and timestamp
+     */
+    getTimestampAndHashFromAccount: (account: any) => { timestamp:number, hash: string }
+
+    /**
      * A function that will be called when the shardus instance shuts down
      */
     close: () => void

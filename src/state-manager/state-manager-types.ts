@@ -683,3 +683,9 @@ type StatsClump = {
     coveredParititionCount:number;
     skippedParitionCount:number; 
 }
+
+// cache 
+type AccountMemoryCache = {
+    t: number;  //timestamp
+    h: string;  //hash.  todo, a compact form acceptable?
+}

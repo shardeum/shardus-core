@@ -1404,28 +1404,43 @@ class Shardus extends EventEmitter {
         }
       }
 
-      if (typeof application.sync === 'function') {
+      if (typeof application.dataSummaryInit === 'function') {
         applicationInterfaceImpl.dataSummaryInit = async (blob, accountData) => application.dataSummaryInit(blob, accountData)
       } else {
-        //const thisPtr = this
         applicationInterfaceImpl.dataSummaryInit = async function (blob, accountData) {
           //thisPtr.mainLogger.debug('no app.dataSummaryInit() function defined')
         }
       }
-      if (typeof application.sync === 'function') {
+      if (typeof application.dataSummaryUpdate === 'function') {
         applicationInterfaceImpl.dataSummaryUpdate = async (blob, accountDataBefore, accountDataAfter) => application.dataSummaryUpdate(blob, accountDataBefore, accountDataAfter)
       } else {
-        //const thisPtr = this
         applicationInterfaceImpl.dataSummaryUpdate = async function (blob, accountDataBefore, accountDataAfter) {
           //thisPtr.mainLogger.debug('no app.dataSummaryUpdate() function defined')
         }
       }
-      if (typeof application.sync === 'function') {
+      if (typeof application.txSummaryUpdate === 'function') {
         applicationInterfaceImpl.txSummaryUpdate = async (blob, tx, wrappedStates) => application.txSummaryUpdate(blob, tx, wrappedStates)
       } else {
-        //const thisPtr = this
         applicationInterfaceImpl.txSummaryUpdate = async function (blob, tx, wrappedStates) {
           //thisPtr.mainLogger.debug('no app.txSummaryUpdate() function defined')
+        }
+      }
+
+      if (typeof application.getAccountTimestamp === 'function') {
+        //getAccountTimestamp(accountAddress, mustExist = true)
+        applicationInterfaceImpl.getAccountTimestamp = async (accountAddress, mustExist) => application.getAccountTimestamp(accountAddress, mustExist)
+      } else {
+        applicationInterfaceImpl.getAccountTimestamp = async function (accountAddress, mustExist) {
+          //thisPtr.mainLogger.debug('no app.getAccountTimestamp() function defined')
+          return 0
+        }
+      }
+      
+      if (typeof application.getTimestampAndHashFromAccount === 'function') {
+        applicationInterfaceImpl.getTimestampAndHashFromAccount = async (account) => application.getTimestampAndHashFromAccount(account)
+      } else {
+        applicationInterfaceImpl.getTimestampAndHashFromAccount = async function (account) {
+          return {timestamp:0, hash:'getTimestampAndHashFromAccount not impl'}
         }
       }
       //txSummaryUpdate: (blob: any, tx: any, wrappedStates: any)

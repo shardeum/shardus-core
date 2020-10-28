@@ -1150,7 +1150,9 @@ class StateManager extends EventEmitter {
       let lowAddress = this.addressRange.low
       let highAddress = this.addressRange.high
 
-      this.mainLogger.debug(`DATASYNC: syncStateDataForPartition partition: ${partition} low: ${lowAddress} high: ${highAddress} `)
+      partition = `${utils.stringifyReduce(lowAddress)} - ${utils.stringifyReduce(highAddress)}`
+
+      this.mainLogger.debug(`DATASYNC: syncStateDataForPartition partition: ${partition} `)
 
       await this.syncStateTableData(lowAddress, highAddress, 0, Date.now() - this.syncSettleTime)
       this.mainLogger.debug(`DATASYNC: partition: ${partition}, syncStateTableData 1st pass done.`)
@@ -4744,18 +4746,35 @@ class StateManager extends EventEmitter {
 
           //update global cache?  that will be obsolete soona anyhow!
           //need to loop and call update
-
-          let wrappedAccountDataBefore = queueEntry.collectedData[data.accountId]
-          let beforeData = null
-          if(wrappedAccountDataBefore != null){
-            beforeData = wrappedAccountDataBefore.data
+          let beforeData = data.prevDataCopy
+          
+          if(beforeData == null){
+            //prevDataCopy
+            let wrappedAccountDataBefore = queueEntry.collectedData[data.accountId]
+            if(wrappedAccountDataBefore != null){
+              beforeData = wrappedAccountDataBefore.data
+            }
           }
           if(beforeData == null){
             let results = await this.app.getAccountDataByList([data.accountId])
             beforeData = results[0]
-            this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 had to query for data ${utils.stringifyReduce(data.accountId)} `)
+            this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData: had to query for data 1 ${utils.stringifyReduce(data.accountId)} `)
+            if(beforeData == null){
+              this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData: had to query for data 1 not found ${utils.stringifyReduce(data.accountId)} `)
+            }
           }
-          this.stateManagerStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, beforeData, data)
+          if(beforeData == null){
+            this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData data is null ${utils.stringifyReduce(data.accountId)} `)
+          } else {
+
+            if(this.stateManagerStats.hasAccountBeenSeenByStats(data.accountId) === false){
+              // Init stats because we have not seen this account yet.
+              this.stateManagerStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, data.accountId, beforeData)
+            }
+
+            this.stateManagerStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, beforeData, data)
+          }
+          
         }
 
         // if (queueEntry.hasAll === true) {
