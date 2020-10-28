@@ -304,6 +304,8 @@ export function startSnapshotting() {
         // log('Got all receipt hashes: ', receiptHashes)
         // log('Got all summary hashes: ', summaryHashes)
 
+        safetyModeVals.networkStateHash = networkStateHash
+
         // save the partition and network hashes for that cycle number to the DB
         SnapshotFunctions.savePartitionAndNetworkHashes(shard, partitionHashes, networkStateHash)
         SnapshotFunctions.saveReceiptAndNetworkHashes(shard, receiptHashes, networkReceiptMapHash)
