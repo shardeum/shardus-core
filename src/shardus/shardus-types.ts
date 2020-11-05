@@ -563,6 +563,14 @@ declare namespace Shardus {
       canDataRepair?: boolean
       /** Disable voting consensus for TXs (true = on | false = off) */
       debugNoTxVoting?: boolean
+      /** ignore initial incomming receipt */
+      ignoreRecieptChance?: number
+      /** ignore initial incomming vote */
+      ignoreVoteChance?: number
+      /** chance to fail making a receipt */
+      failReceiptChance?: number
+      /** chance to flip our vote */
+      voteFlipChance?: number      
     }
     /** Options for the statistics module */
     statistics?: {

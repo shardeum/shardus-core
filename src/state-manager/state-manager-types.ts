@@ -81,7 +81,7 @@ type QueueEntry = {
     requestingReceiptFailed: boolean;
 
     //collectedData for repair
-    debugFail1:boolean;
+    debugFail_voteFlip:boolean;
     //short log id
     logID:string;
 };

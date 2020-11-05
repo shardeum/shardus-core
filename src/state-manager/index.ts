@@ -28,6 +28,7 @@ import Crypto from "../crypto"
 import Logger from "../logger"
 //import { NodeShardData } from './shardFunctionTypes'
 import ShardFunctions2 from './shardFunctions2.js'
+import { throws } from 'assert'
 import * as Context from '../p2p/Context'
 // import { platform } from 'os' //why did this automatically get added?
 //import NodeList from "../p2p/NodeList"
@@ -116,6 +117,12 @@ class StateManager extends EventEmitter {
     dataSourceNodeIndex: number;
 
     debugNoTxVoting: boolean;
+
+    ignoreRecieptChance: number;
+    ignoreVoteChance: number; 
+    loseTxChance: number;
+    failReceiptChance: number;
+    voteFlipChance: number;  
 
     syncSettleTime: number;
     debugTXHistory:{[id:string]: string}; // need to disable or clean this as it will leak memory
@@ -216,6 +223,46 @@ class StateManager extends EventEmitter {
       }
     }
 
+
+    this.ignoreRecieptChance = 0
+    if (this.config && this.config.debug) {
+      this.ignoreRecieptChance = this.config.debug.ignoreRecieptChance
+      if (this.ignoreRecieptChance == null) {
+        this.ignoreRecieptChance = 0
+      }
+    }
+
+    this.ignoreVoteChance = 0
+    if (this.config && this.config.debug) {
+      this.ignoreVoteChance = this.config.debug.ignoreVoteChance
+      if (this.ignoreVoteChance == null) {
+        this.ignoreVoteChance = 0
+      }
+    }
+
+    this.loseTxChance = 0
+    if (this.config && this.config.debug) {
+      this.loseTxChance = this.config.debug.loseTxChance
+      if (this.loseTxChance == null) {
+        this.loseTxChance = 0
+      }
+    }
+
+    this.failReceiptChance = 0
+    if (this.config && this.config.debug) {
+      this.failReceiptChance = this.config.debug.failReceiptChance
+      if (this.failReceiptChance == null) {
+        this.failReceiptChance = 0
+      }
+    }  
+
+    this.voteFlipChance = 0
+    if (this.config && this.config.debug) {
+      this.voteFlipChance = this.config.debug.voteFlipChance
+      if (this.voteFlipChance == null) {
+        this.voteFlipChance = 0
+      }
+    }  
     //Init Summary Blobs
     
     this.stateManagerStats = new StateManagerStats(verboseLogs, profiler, app, logger, crypto, config)
@@ -695,6 +742,23 @@ class StateManager extends EventEmitter {
 
   getRandomInt (max: number): number {
     return Math.floor(Math.random() * Math.floor(max))
+  }
+
+  testFailChance (failChance: number, debugName:string, key:string, message:string, verboseRequired:boolean) : boolean {
+    if(failChance == null){
+      return false
+    }
+
+    let rand = Math.random()
+    if (failChance > rand) {
+      if(debugName != null){
+        if(verboseRequired === false || this.verboseLogs){
+          this.logger.playbackLogNote(`dbg_fail_${debugName}`, key, message)
+        }
+      }
+      return true
+    }
+    return false
   }
 
   // getRandomIndex (list: any[]) {
@@ -3030,6 +3094,10 @@ class StateManager extends EventEmitter {
         }
       }
 
+      if(this.testFailChance(this.ignoreRecieptChance, 'spread_appliedReceipt', utils.stringifyReduce(appliedReceipt.txid), '', this.verboseLogs  ) === true){
+        return;
+      }
+
       // TODO STATESHARDING4 ENDPOINTS check payload format
       // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
     
@@ -4076,7 +4144,7 @@ class StateManager extends EventEmitter {
       collectedVotes:[], 
       waitForReceiptOnly:false, 
       m2TimeoutReached:false, 
-      debugFail1:false, 
+      debugFail_voteFlip:false, 
       requestingReceipt:false,
       cycleToRecordOn:-5,
       involvedPartitions: [],
@@ -4110,20 +4178,31 @@ class StateManager extends EventEmitter {
     this.debugTXHistory[txQueueEntry.logID] = 'enteredQueue'
 
 
-    if (this.config.debug != null && this.config.debug.loseTxChance && this.config.debug.loseTxChance > 0) {
-      let rand = Math.random()
-      if (this.config.debug.loseTxChance > rand) {
-        if (this.app.canDebugDropTx(acceptedTx.data)) {
-          this.mainLogger.error('tx_failReceiptTest fail vote tx  ' + txId + ' ' + timestamp)
-          this.logger.playbackLogNote('tx_failReceiptTest', txId, 'fail vote tx ' + timestamp)
-          //return 'lost'
-          txQueueEntry.debugFail1 = true
-        }
+    if(this.app.canDebugDropTx(acceptedTx.data) ){
+      if( this.testFailChance(this.loseTxChance, 'loseTxChance', utils.stringifyReduce(acceptedTx.id), '', this.verboseLogs  ) === true){
+        return 'lost'
       }
-    } else {
-      // this.mainLogger.error('tx_failReceiptTest set  ' + this.config.debug.loseTxChance)
-      // this.config.debug.loseTxChance = 0
+
+      if(this.testFailChance(this.voteFlipChance, 'voteFlipChance', utils.stringifyReduce(acceptedTx.id), '', this.verboseLogs  ) === true){
+        txQueueEntry.debugFail_voteFlip = true
+      } 
     }
+
+
+    // if (this.config.debug != null && this.config.debug.loseTxChance && this.config.debug.loseTxChance > 0) {
+    //   let rand = Math.random()
+    //   if (this.config.debug.loseTxChance > rand) {
+    //     if (this.app.canDebugDropTx(acceptedTx.data)) {
+    //       this.mainLogger.error('tx_failReceiptTest fail vote tx  ' + txId + ' ' + timestamp)
+    //       this.logger.playbackLogNote('tx_failReceiptTest', txId, 'fail vote tx ' + timestamp)
+    //       //return 'lost'
+    //       txQueueEntry.debugFail_voteFlip = true
+    //     }
+    //   }
+    // } else {
+    //   // this.mainLogger.error('tx_failReceiptTest set  ' + this.config.debug.loseTxChance)
+    //   // this.config.debug.loseTxChance = 0
+    // }
 
     try {
       let age = Date.now() - timestamp
@@ -6119,8 +6198,8 @@ class StateManager extends EventEmitter {
       cant_apply: (queueEntry.preApplyTXResult.applied === false),
     }
 
-    if(queueEntry.debugFail1 === true){
-      if (this.verboseLogs) this.logger.playbackLogNote('shrd_createAndShareVote_debugFail1', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} `)
+    if(queueEntry.debugFail_voteFlip === true){
+      if (this.verboseLogs) this.logger.playbackLogNote('shrd_createAndShareVote_voteFlip', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} `)
 
       ourVote.transaction_result = !ourVote.transaction_result
     }
