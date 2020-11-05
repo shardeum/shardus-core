@@ -1486,9 +1486,14 @@ class StateManager extends EventEmitter {
 
       // TODO I dont know the best way to handle a non null network error here, below is something I had before but disabled for some reason
 
-      // if (result != null && result.notReady === true){
-      //   result = { ready:false, msg:`not ready: ${Math.random()}` }
-      // }
+      if (result != null && result.accounts == null ){
+        //this.mainLogger.error('ASK FAIL getRobustGlobalReport result.stateHash == null') 
+        result = { ready:false, msg:`invalid data format: ${Math.random()}` }
+      }
+      if (result != null && result.notReady === true ){
+        //this.mainLogger.error('ASK FAIL getRobustGlobalReport result.stateHash == null') 
+        result = { ready:false, msg:`not ready: ${Math.random()}` }
+      }
       return result
     }
     //can ask any active nodes for global data.
@@ -1578,6 +1583,12 @@ class StateManager extends EventEmitter {
         //   this.mainLogger.error('ASK FAIL syncStateTableData result.stateHash == null') 
         //   result = null //if we get something back that is not the right data type clear it to null
         // }
+        if (result != null && result.stateHash == null) { 
+          result = { ready:false, msg:`invalid data format: ${Math.random()}` }
+          //this.mainLogger.error('ASK FAIL syncStateTableData result.stateHash == null') 
+          result = null //if we get something back that is not the right data type clear it to null
+        }
+        
         return result
       }
 
@@ -4634,7 +4645,7 @@ class StateManager extends EventEmitter {
 
     let shortHash = utils.makeShortHash(queueEntry.acceptedTx.id)
     // Need to build a list of what accounts we need, what state they should be in and who to get them from
-    let requestObjects: {[id:string]:{appliedVote:AppliedVote, voteIndex:number, accountHash:string, accountId:string, nodeShardInfo:NodeShardData}} = {}
+    let requestObjects: {[id:string]:{appliedVote:AppliedVote, voteIndex:number, accountHash:string, accountId:string, nodeShardInfo:NodeShardData, alternates:string[]}} = {}
     let appliedVotes = queueEntry.appliedReceiptForRepair.appliedVotes
     
     //shuffle the array
@@ -4644,6 +4655,8 @@ class StateManager extends EventEmitter {
 
     this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `appliedVotes ${utils.stringifyReduce(appliedVotes)}  `)
     this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `queueEntry.uniqueKeys ${utils.stringifyReduce(queueEntry.uniqueKeys)}`)
+
+    this.mainLogger.debug(`repairToMatchReceipt: ${shortHash} queueEntry.uniqueKeys ${utils.stringifyReduce(queueEntry.uniqueKeys)}`)
 
     for (let key of queueEntry.uniqueKeys) {
 
@@ -4655,6 +4668,13 @@ class StateManager extends EventEmitter {
           let hash = appliedVote.account_state_hash_after[j]
           if(id === key && hash != null){
             if(requestObjects[key] != null){
+              //todo perf delay these checks for jit. 
+              if(appliedVote.node_id !== this.currentCycleShardData.ourNode.id ){
+                if(this.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === true){
+                  //build a list of alternates
+                  requestObjects[key].alternates.push(appliedVote.node_id)
+                }
+              }
               continue //we already have this request ready to go
             }
 
@@ -4671,13 +4691,14 @@ class StateManager extends EventEmitter {
             let nodeShardInfo:NodeShardData = this.currentCycleShardData.nodeShardDataMap.get(appliedVote.node_id)
 
             if(nodeShardInfo == null){
-
+              this.mainLogger.error(`shrd_repairToMatchReceipt nodeShardInfo == null ${utils.stringifyReduce(appliedVote.node_id)}`)
+              continue
             }
             if(ShardFunctions2.testAddressInRange(id, nodeShardInfo.storedPartitions ) == false){
               this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `address not in range ${utils.stringifyReduce(nodeShardInfo.storedPartitions)}`)
               continue
             }
-            let objectToSet = {appliedVote, voteIndex:j, accountHash:hash, accountId:id, nodeShardInfo}
+            let objectToSet = {appliedVote, voteIndex:j, accountHash:hash, accountId:id, nodeShardInfo, alternates:[]}
             this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `setting key ${utils.stringifyReduce(key)} ${utils.stringifyReduce(objectToSet)} `)
             requestObjects[key] = objectToSet
             allKeys.push(key)
@@ -4703,100 +4724,128 @@ class StateManager extends EventEmitter {
 
         if(requestObject == null){
           this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `requestObject == null`)
-
           continue
         }
 
         let node = requestObject.nodeShardInfo.node
-
         if(node == null){
+          this.mainLogger.error(`shrd_repairToMatchReceipt node == null ${utils.stringifyReduce(requestObject.accountId)}`)
           this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `node == null`)
           continue
         }
 
-        let relationString = "" //ShardFunctions.getNodeRelation(homeNodeShardData, this.currentCycleShardData.ourNode.id)
-        this.logger.playbackLogNote('shrd_repairToMatchReceipt_ask', `${shortHash}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
+        let alternateIndex = 0
+        let attemptsRemaining = true
+        while(attemptsRemaining === true){
 
-        let message = { key: requestObject.accountId, hash:requestObject.accountHash, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
-        let result:RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx_post', message) // not sure if we should await this.
-        
-        if(result == null){
-          if (this.verboseLogs)  { this.mainLogger.error('ASK FAIL repairToMatchReceipt request_state_for_tx_post result == null') }
-          // We shuffle the array of votes each time so hopefully will ask another node next time
-          // TODO more robust limits to this process, maybe a delay?
-          this.mainLogger.error(`ASK FAIL repairToMatchReceipt request_state_for_tx_post no reponse from ${utils.stringifyReduce(node.id)}`)
-          this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt missing logic to ask a new node! 1 ${utils.stringifyReduce(node.id)}`)
-          return
-        }
-
-        if (result.success !== true) { 
-          this.mainLogger.error('ASK FAIL repairToMatchReceipt result.success === false' ) 
-          this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt missing logic to ask a new node! 2 ${utils.stringifyReduce(node.id)}`)
-          return
-        }
-        
-        let dataCountReturned = 0
-        let accountIdsReturned = []
-        for (let data of result.stateList) {
-          this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `write data: ${utils.stringifyReduce(data)}`)
-          //Commit the data
-          let dataToSet = [data]
-          let failedHashes = await this.checkAndSetAccountData(dataToSet, 'repairToMatchReceipt', false)
-          await this.writeCombinedAccountDataToBackups(dataToSet, failedHashes)
-
-          //update global cache?  that will be obsolete soona anyhow!
-          //need to loop and call update
-          let beforeData = data.prevDataCopy
-          
-          if(beforeData == null){
-            //prevDataCopy
-            let wrappedAccountDataBefore = queueEntry.collectedData[data.accountId]
-            if(wrappedAccountDataBefore != null){
-              beforeData = wrappedAccountDataBefore.data
+          //go down alternates list as needed.
+          while(node == null){
+            //possibly make this not at an error once verified
+            this.mainLogger.error(`shrd_repairToMatchReceipt while(node == null) look for other node txId. idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}`)
+            //find alternate
+            if(alternateIndex >= requestObject.alternates.length ){
+              this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt failed to find alternate node to ask for receipt. txId. ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}`)
+              attemptsRemaining = false
+              return
             }
+            let altId = requestObject.alternates[alternateIndex]
+            let nodeShardInfo:NodeShardData = this.currentCycleShardData.nodeShardDataMap.get(altId)
+            if(nodeShardInfo != null){
+              node = nodeShardInfo.node
+              this.mainLogger.error(`shrd_repairToMatchReceipt got alt source node: idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(node.id)}`)
+            } else {
+              this.mainLogger.error(`shrd_repairToMatchReceipt nodeShardInfo == null for ${utils.stringifyReduce(altId)}`)
+            }
+            alternateIndex++
           }
-          if(beforeData == null){
-            let results = await this.app.getAccountDataByList([data.accountId])
-            beforeData = results[0]
-            this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData: had to query for data 1 ${utils.stringifyReduce(data.accountId)} `)
+
+          let relationString = "" //ShardFunctions.getNodeRelation(homeNodeShardData, this.currentCycleShardData.ourNode.id)
+          this.logger.playbackLogNote('shrd_repairToMatchReceipt_ask', `${shortHash}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
+
+          let message = { key: requestObject.accountId, hash:requestObject.accountHash, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
+          let result:RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx_post', message) // not sure if we should await this.
+          
+          if(result == null){
+            if (this.verboseLogs)  { this.mainLogger.error('ASK FAIL repairToMatchReceipt request_state_for_tx_post result == null') }
+            // We shuffle the array of votes each time so hopefully will ask another node next time
+            // TODO more robust limits to this process, maybe a delay?
+            this.mainLogger.error(`ASK FAIL repairToMatchReceipt request_state_for_tx_post no reponse from ${utils.stringifyReduce(node.id)}`)
+            //this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt missing logic to ask a new node! 1 ${utils.stringifyReduce(node.id)}`)
+            node = null
+            continue
+          }
+
+          if (result.success !== true) { 
+            this.mainLogger.error('ASK FAIL repairToMatchReceipt result.success === false' ) 
+            //this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt missing logic to ask a new node! 2 ${utils.stringifyReduce(node.id)}`)
+            node = null
+            continue
+          }
+          
+          let dataCountReturned = 0
+          let accountIdsReturned = []
+          for (let data of result.stateList) {
+            this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `write data: ${utils.stringifyReduce(data)}`)
+            //Commit the data
+            let dataToSet = [data]
+            let failedHashes = await this.checkAndSetAccountData(dataToSet, 'repairToMatchReceipt', false)
+            await this.writeCombinedAccountDataToBackups(dataToSet, failedHashes)
+            attemptsRemaining = false
+            //update global cache?  that will be obsolete soona anyhow!
+            //need to loop and call update
+            let beforeData = data.prevDataCopy
+            
             if(beforeData == null){
-              this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData: had to query for data 1 not found ${utils.stringifyReduce(data.accountId)} `)
+              //prevDataCopy
+              let wrappedAccountDataBefore = queueEntry.collectedData[data.accountId]
+              if(wrappedAccountDataBefore != null){
+                beforeData = wrappedAccountDataBefore.data
+              }
             }
-          }
-          if(beforeData == null){
-            this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData data is null ${utils.stringifyReduce(data.accountId)} `)
-          } else {
-
-            if(this.stateManagerStats.hasAccountBeenSeenByStats(data.accountId) === false){
-              // Init stats because we have not seen this account yet.
-              this.stateManagerStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, data.accountId, beforeData)
+            if(beforeData == null){
+              let results = await this.app.getAccountDataByList([data.accountId])
+              beforeData = results[0]
+              this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData: had to query for data 1 ${utils.stringifyReduce(data.accountId)} `)
+              if(beforeData == null){
+                this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData: had to query for data 1 not found ${utils.stringifyReduce(data.accountId)} `)
+              }
             }
+            if(beforeData == null){
+              this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData data is null ${utils.stringifyReduce(data.accountId)} `)
+            } else {
 
-            this.stateManagerStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, beforeData, data)
+              if(this.stateManagerStats.hasAccountBeenSeenByStats(data.accountId) === false){
+                // Init stats because we have not seen this account yet.
+                this.stateManagerStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, data.accountId, beforeData)
+              }
+
+              this.stateManagerStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, beforeData, data)
+            }
+            
           }
-          
+
+          // if (queueEntry.hasAll === true) {
+          //   queueEntry.logstate = 'got all missing data'
+          // } else {
+          //   queueEntry.logstate = 'failed to get data:' + queueEntry.hasAll
+          //   // queueEntry.state = 'failed to get data'
+          // }
+
+          this.logger.playbackLogNote('shrd_repairToMatchReceipt_result', `${shortHash}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
+
+          // // queueEntry.homeNodes[key] = null
+          // for (let key2 of allKeys) {
+          //   //consider deleteing these instead?  
+          //   //TSConversion changed to a delete opertaion should double check this
+          //   //queueEntry.requests[key2] = null
+          //   delete queueEntry.requests[key2]
+          // }
+
+          // if (queueEntry.hasAll === true) {
+          //   break
+          // }
         }
 
-        // if (queueEntry.hasAll === true) {
-        //   queueEntry.logstate = 'got all missing data'
-        // } else {
-        //   queueEntry.logstate = 'failed to get data:' + queueEntry.hasAll
-        //   // queueEntry.state = 'failed to get data'
-        // }
-
-        this.logger.playbackLogNote('shrd_repairToMatchReceipt_result', `${shortHash}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
-
-        // // queueEntry.homeNodes[key] = null
-        // for (let key2 of allKeys) {
-        //   //consider deleteing these instead?  
-        //   //TSConversion changed to a delete opertaion should double check this
-        //   //queueEntry.requests[key2] = null
-        //   delete queueEntry.requests[key2]
-        // }
-
-        // if (queueEntry.hasAll === true) {
-        //   break
-        // }
       }
     }
 
@@ -8749,8 +8798,9 @@ class StateManager extends EventEmitter {
     // add in syncSettleTime when selecting which bucket to put a transaction in
     const cycle = this.p2p.state.getCycleByTimestamp(txTS + this.syncSettleTime)
 
-    if (!cycle) {
-      this.mainLogger.error('_repair Failed to find cycle that would contain this timestamp')
+    if (cycle == null) {
+      this.mainLogger.error(`recordTXByCycle Failed to find cycle that would contain this timestamp txid:${utils.stringifyReduce(acceptedTx.id)} txts1: ${acceptedTx.timestamp} txts: ${txTS}`)
+      return
     }
 
     let cycleNumber = cycle.counter

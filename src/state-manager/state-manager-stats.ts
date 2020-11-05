@@ -214,7 +214,7 @@ class StateManagerStats {
             if(this.seenCreatedAccounts.has(accountId)){
                 let accountMemData:AccountMemoryCache = this.seenCreatedAccounts.get(accountId)
                 if(accountMemData.t > timestamp){
-                    this.mainLogger.error(`statsDataSummaryUpdate: good error?: dont update stats with older data skipping update`)
+                    this.mainLogger.error(`statsDataSummaryUpdate: good error?: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
                     return
                 }                
             } else {
@@ -253,7 +253,7 @@ class StateManagerStats {
             if(this.seenCreatedAccounts.has(accountId)){
                 let accountMemData:AccountMemoryCache = this.seenCreatedAccounts.get(accountId)
                 if(accountMemData.t > timestamp){
-                    this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update`)
+                    this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
                     return
                 }                
             } else {
