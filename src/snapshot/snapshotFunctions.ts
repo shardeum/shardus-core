@@ -328,6 +328,9 @@ export async function calculateOldDataMap (
         const computedHash = Context.crypto.hash(oldAccountsWithoutCycleNumber)
         // log(`old accounts in partition: ${partitionId}: `, oldAccountCopiesInPartition)
         // log(computedHash, existingHash)
+        log('partition: ', partitionId)
+        log('existing hash: ', existingHash)
+        log('computed hash: ', computedHash)
 
         // make sure that we really have correct data only if hashes match
         if (computedHash === existingHash) {
