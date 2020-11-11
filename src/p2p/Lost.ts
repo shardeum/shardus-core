@@ -421,6 +421,23 @@ async function isDownCache(node){
   return status
 }
 
+export function isNodeDown(nodeId:string) : {down:boolean, state:string} {
+  // First check the isUp isDown caches to see if we already checked this node before
+  if (isDown[nodeId]) return {down:true, state:'down'} 
+  if (isUp[nodeId]) return {down:false, state:'up'} 
+  return {down:false, state:'noLastState'} 
+}
+
+export function isNodeLost(nodeId:string): boolean  {
+  // First check the isUp isDown caches to see if we already checked this node before
+  const key = `${nodeId}-${currentCycle}`
+  const lostRec = lost.get(key)
+  if (lostRec != null) {
+    return true
+  }
+  return false
+}
+
 // This is called once per cycle by reset
 function pruneIsDown(){
   for (const [key, value] of Object.entries(isDown)) {

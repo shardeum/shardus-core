@@ -5,6 +5,7 @@ import Shardus = require('../shardus/shardus-types')
 //import {ShardGlobals,ShardInfo,StoredPartition,NodeShardData,AddressRange, HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange} from  './shardFunction2Types'
 import {ShardGlobals,ShardInfo,StoredPartition,NodeShardData,AddressRange, HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange} from  './shardFunctionTypes'
 
+import {isNodeDown, isNodeLost} from '../p2p/Lost'
 
 import ShardFunctions from './shardFunctions2.js'
 
@@ -1329,6 +1330,14 @@ class StateManager extends EventEmitter {
         //Get accounts.
         //this.combinedAccountData = []
         
+        // Node Precheck!
+        if(this.isNodeValidForInternalMessage(this.dataSourceNode.id, "syncStateDataGlobals", true, true) === false){
+          if(this.tryNextDataSourceNode('syncStateDataGlobals') == false){
+            break
+          }
+          continue
+        }
+
         let message = { accountIds: remainingAccountsToSync }
         let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
 
@@ -1544,6 +1553,11 @@ class StateManager extends EventEmitter {
       return a.combinedHash === b.combinedHash
     }
     let queryFn = async (node: Shardus.Node) => {
+      // Node Precheck!
+      if(this.isNodeValidForInternalMessage(node.id, "getRobustGlobalReport", true, true) === false){
+        return { ready:false, msg:`getRobustGlobalReport invalid node to ask: ${utils.stringifyReduce(node.id)}` }
+      }
+
       let result = await this.p2p.ask(node, 'get_globalaccountreport', {})
       if (result === false) { this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === false node:${utils.stringifyReduce(node.id)}`) }
       if (result === null) { this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === null node:${utils.stringifyReduce(node.id)}`) }
@@ -1637,6 +1651,10 @@ class StateManager extends EventEmitter {
         return a.stateHash === b.stateHash
       }
       let queryFn = async (node: Shardus.Node) => {
+        // Node Precheck!
+        if(this.isNodeValidForInternalMessage(node.id, "get_account_state_hash", true, true) === false){
+          return { ready:false, msg:`get_account_state_hash invalid node to ask: ${utils.stringifyReduce(node.id)}` }
+        }
         let result = await this.p2p.ask(node, 'get_account_state_hash', message)
         if (result === false) { this.mainLogger.error(`ASK FAIL syncStateTableData result === false node:${utils.stringifyReduce(node.id)}`) }
         if (result == null) { this.mainLogger.error(`ASK FAIL syncStateTableData result == null node:${utils.stringifyReduce(node.id)}`) }
@@ -1709,6 +1727,14 @@ class StateManager extends EventEmitter {
 
       // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
       while (moreDataRemaining) {
+        // Node Precheck!
+        if(this.isNodeValidForInternalMessage(this.dataSourceNode.id, "syncStateTableData", true, true) === false){
+          if(this.tryNextDataSourceNode('syncStateTableData') == false){
+            break
+          }
+          continue
+        }
+
         let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: lowTimeQuery, tsEnd: endTime }
         let result = await this.p2p.ask(this.dataSourceNode, 'get_account_state', message)
 
@@ -1822,6 +1848,14 @@ class StateManager extends EventEmitter {
     let lowTimeQuery = startTime
     // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
     while (moreDataRemaining) {
+      // Node Precheck!
+      if(this.isNodeValidForInternalMessage(this.dataSourceNode.id, "syncAccountData", true, true) === false){
+        if(this.tryNextDataSourceNode('syncAccountData') == false){
+          break
+        }
+        continue
+      }
+
       // max records artificially low to make testing coverage better.  todo refactor: make it a config or calculate based on data size
       let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, maxRecords: this.config.stateManager.accountBucketSize }
       let r:GetAccountData3Resp | boolean = await this.p2p.ask(this.dataSourceNode, 'get_account_data3', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
@@ -2210,6 +2244,16 @@ class StateManager extends EventEmitter {
 
     // TODO m11:  should we pick different nodes to ask? (at the very least need to change the data source node!!!!!!)
     this.mainLogger.debug(`DATASYNC: syncFailedAcccounts requesting data for failed hashes ${utils.stringifyReduce(addressList)}`)
+    
+    // Node Precheck!
+    if(this.isNodeValidForInternalMessage(this.dataSourceNode.id, "syncStateDataGlobals", true, true) === false){
+      if(this.tryNextDataSourceNode('syncStateDataGlobals') == false){
+        return
+      }
+      //we picked a new node to ask so relaunch
+      await this.syncFailedAcccounts (lowAddress, highAddress)
+      return
+    }
 
     let message = { accountIds: addressList }
     let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
@@ -4499,6 +4543,8 @@ class StateManager extends EventEmitter {
           let randomIndex
           let foundValidNode = false
           let maxTries = 1000
+
+          // todo make this non random!!!
           while (foundValidNode == false) {
             maxTries--
             randomIndex = this.getRandomInt(homeNodeShardData.consensusNodeForOurNodeFull.length - 1)
@@ -4538,6 +4584,14 @@ class StateManager extends EventEmitter {
 
           let relationString = ShardFunctions.getNodeRelation(homeNodeShardData, this.currentCycleShardData.ourNode.id)
           this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
+
+          // Node Precheck!
+          if(this.isNodeValidForInternalMessage(node.id, "queueEntryRequestMissingData", true, true) === false){
+            // if(this.tryNextDataSourceNode('queueEntryRequestMissingData') == false){
+            //   break
+            // }
+            continue
+          }
 
           let message = { keys: allKeys, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
           let result:RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx', message)
@@ -4672,6 +4726,14 @@ class StateManager extends EventEmitter {
 
         let relationString = ShardFunctions.getNodeRelation(homeNodeShardData, this.currentCycleShardData.ourNode.id)
         this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+
+        // Node Precheck!
+        if(this.isNodeValidForInternalMessage(node.id, "queueEntryRequestMissingReceipt", true, true) === false){
+          // if(this.tryNextDataSourceNode('queueEntryRequestMissingReceipt') == false){
+          //   break
+          // }
+          continue
+        }
 
         let message = { txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
         let result:RequestReceiptForTxResp = await this.p2p.ask(node, 'request_receipt_for_tx', message) // not sure if we should await this.
@@ -4840,6 +4902,15 @@ class StateManager extends EventEmitter {
 
           let relationString = "" //ShardFunctions.getNodeRelation(homeNodeShardData, this.currentCycleShardData.ourNode.id)
           this.logger.playbackLogNote('shrd_repairToMatchReceipt_ask', `${shortHash}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
+
+          // Node Precheck!
+          if(this.isNodeValidForInternalMessage(node.id, "repairToMatchReceipt", true, true) === false){
+            // if(this.tryNextDataSourceNode('repairToMatchReceipt') == false){
+            //   break
+            // }
+            node = null
+            continue
+          }
 
           let message = { key: requestObject.accountId, hash:requestObject.accountHash, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
           let result:RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx_post', message) // not sure if we should await this.
@@ -5247,7 +5318,16 @@ class StateManager extends EventEmitter {
               let remoteRelation = ShardFunctions.getNodeRelation(remoteHomeNode, this.currentCycleShardData.ourNode.id)
               let localRelation = ShardFunctions.getNodeRelation(localHomeNode, this.currentCycleShardData.ourNode.id)
               this.logger.playbackLogNote('shrd_tellCorrespondingNodes', `${queueEntry.acceptedTx.id}`, `remoteRel: ${remoteRelation} localrel: ${localRelation} qId: ${queueEntry.entryID} AccountBeingShared: ${utils.makeShortHash(key)} EdgeNodes:${utils.stringifyReduce(edgeNodeIds)} ConsesusNodes${utils.stringifyReduce(consensusNodeIds)}`)
-              this.p2p.tell(correspondingAccNodes, 'broadcast_state', message)
+
+              // Filter nodes before we send tell()
+              let filteredNodes = this.filterValidNodesForInternalMessage(correspondingAccNodes, "tellCorrespondingNodes", true, true)
+              if(filteredNodes.length === 0){
+                this.mainLogger.error('tellCorrespondingNodes: filterValidNodesForInternalMessage no valid nodes left to try') 
+                return null
+              }
+              let filterdCorrespondingAccNodes = filteredNodes
+
+              this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_state', message)
             }
           }
         }
@@ -6253,7 +6333,16 @@ class StateManager extends EventEmitter {
       this.mainLogger.debug(`createAndShareVote numNodes: ${consensusGroup.length} ourVote: ${utils.stringifyReduce(ourVote)} `)
       this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.id}`, `numNodes: ${consensusGroup.length} ourVote: ${utils.stringifyReduce(ourVote)} `)
 
-      this.p2p.tell(consensusGroup, 'spread_appliedVote', ourVote )
+      // Filter nodes before we send tell()
+      let filteredNodes = this.filterValidNodesForInternalMessage(consensusGroup, "createAndShareVote", true, true)
+      if(filteredNodes.length === 0){
+        this.mainLogger.error('createAndShareVote: filterValidNodesForInternalMessage no valid nodes left to try') 
+        return null
+      }
+      let filteredConsensusGroup = filteredNodes
+
+
+      this.p2p.tell(filteredConsensusGroup, 'spread_appliedVote', ourVote )
     }
   }
 
@@ -6477,6 +6566,18 @@ class StateManager extends EventEmitter {
       if(homeNode== null){
         throw new Error(`getLocalOrRemoteAccount: no home node found`)
       }
+
+      // Node Precheck!
+      if(this.isNodeValidForInternalMessage(homeNode.node.id, "getLocalOrRemoteAccount", true, true) === false){
+        // if(this.tryNextDataSourceNode('getLocalOrRemoteAccount') == false){
+        //   break
+        // }
+        
+        //throw new Error(`getLocalOrRemoteAccount: no retry implmented yet`)
+        if (this.verboseLogs) this.getAccountFailDump(address, 'getLocalOrRemoteAccount: isNodeValidForInternalMessage failed, no retry')
+        return null
+      }
+
       let message = { accountIds: [address] }
       let r:GetAccountDataWithQueueHintsResp | boolean = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
       if (r === false) { this.mainLogger.error('ASK FAIL getLocalOrRemoteAccount r === false') }
@@ -6550,6 +6651,17 @@ class StateManager extends EventEmitter {
     if(homeNode== null){
       throw new Error(`getRemoteAccount: no home node found`)
     }
+
+    // Node Precheck!  TODO implement retry
+    if(this.isNodeValidForInternalMessage(homeNode.node.id, "getRemoteAccount", true, true) === false){
+      // if(this.tryNextDataSourceNode('getRemoteAccount') == false){
+      //   break
+      // }
+      // throw new Error(`getRemoteAccount: not retry yet`)
+      this.mainLogger.error('getRemoteAccount: isNodeValidForInternalMessage failed, no retry yet') 
+      return null
+    }
+
     let message = { accountIds: [address] }
     let result = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
     if (result === false) { this.mainLogger.error('ASK FAIL getRemoteAccount result === false') }
@@ -8394,6 +8506,14 @@ class StateManager extends EventEmitter {
       let shorthash = utils.makeShortHash(partitionResultsToSend.node.id)
       let toNodeStr = shorthash + ':' + partitionResultsToSend.node.externalPort
       this.logger.playbackLogNote('broadcastPartitionResults', `${cycleNumber}`, `to ${toNodeStr} ${partitionResultsToSend.debugStr} `)
+
+      // Filter nodes before we send tell()
+      let filteredNodes = this.filterValidNodesForInternalMessage([partitionResultsToSend.node], "tellCorrespondingNodes", true, true)
+      if(filteredNodes.length === 0){
+        this.mainLogger.error('broadcastPartitionResults: filterValidNodesForInternalMessage skipping node') 
+        continue //only doing one node at a time in this loop so just skip to next node.
+      }
+      
       let promise = this.p2p.tell([partitionResultsToSend.node], 'post_partition_results', payload)
       promises.push(promise)
     }
@@ -10329,7 +10449,68 @@ class StateManager extends EventEmitter {
     return -1
   }
 
+  isNodeValidForInternalMessage(nodeId:string, debugMsg: string, checkForNodeDown: boolean = true, checkForNodeLost: boolean = true) : boolean {
+    let node:Shardus.Node = this.p2p.state.getNode(nodeId)
+    let logErrors = true
+    if(node == null){
+      if(logErrors) this.mainLogger.error(`isNodeValidForInternalMessage node == null ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+      return false
+    }
+    let nodeStatus = node.status
+    if(nodeStatus != "active"){
+      if(logErrors) this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+      return false
+    }
+    if(checkForNodeDown) {
+      let {down, state} = isNodeDown(nodeId)
+      if(down === true){
+        if(logErrors) this.mainLogger.error(`isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+        return false
+      }
+    }
+    if(checkForNodeLost) {
+      if(isNodeLost(nodeId) === true) {
+        if(logErrors) this.mainLogger.error(`isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+        return false
+      }
+    }
+    return true
+  }
 
+  filterValidNodesForInternalMessage(nodeList:Shardus.Node[], debugMsg: string, checkForNodeDown: boolean = true, checkForNodeLost: boolean = true) : Shardus.Node[] {
+    let filteredNodes = []
+
+    let logErrors = true
+    for(let node of nodeList)
+    {
+      let nodeId = node.id
+      
+      if(node == null){
+        if(logErrors) this.mainLogger.error(`isNodeValidForInternalMessage node == null ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+        continue
+      }
+      let nodeStatus = node.status
+      if(nodeStatus != "active"){
+        if(logErrors) this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+        continue
+      }
+      if(checkForNodeDown) {
+        let {down, state} = isNodeDown(nodeId)
+        if(down === true){
+          if(logErrors) this.mainLogger.error(`isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+          continue
+        }
+      }
+      if(checkForNodeLost) {
+        if(isNodeLost(nodeId) === true) {
+          if(logErrors) this.mainLogger.error(`isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+          continue
+        }
+      }
+      filteredNodes.push(node)
+    }
+    return filteredNodes
+  }
 
 }
 
