@@ -141,7 +141,11 @@ function getExpiredRemoved(start: CycleRecord['start']) {
     // Count the expired node
     expired++
     // Add it to removed if it isn't full
-    if (removed.length < maxRemove) insertSorted(removed, node.id)
+    if (removed.length < maxRemove){
+      insertSorted(removed, node.id)
+      node.status = Types.NodeStatus.REMOVED
+    }
+     
   }
 
   return { expired, removed }
