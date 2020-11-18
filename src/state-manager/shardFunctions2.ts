@@ -601,10 +601,13 @@ class ShardFunctions2 {
       nodeShardData.consensusNodeForOurNodeFull = ShardFunctions2.getNeigborNodesInRange(nodeShardData.ourNodeIndex, shardGlobals.consensusRadius, [], activeNodes)
 
       // calcuate partition range for consensus
-      if (nodeShardData.consensusNodeForOurNode.length >= 2) {
+      // note we must use consensusNodeForOurNodeFull because consensusNodeForOurNode is not our node, 
+      //     but our node could be at the front or back of the not wrapped list of nodes.
+      //     if we left our node out then it would truncate the consensus range
+      if (nodeShardData.consensusNodeForOurNodeFull.length >= 2) {
         // this logic only works because we know that getNeigborNodesInRange starts at the starting point
-        let startNode = nodeShardData.consensusNodeForOurNode[0]
-        let endNode = nodeShardData.consensusNodeForOurNode[nodeShardData.consensusNodeForOurNode.length - 1]
+        let startNode = nodeShardData.consensusNodeForOurNodeFull[0]
+        let endNode = nodeShardData.consensusNodeForOurNodeFull[nodeShardData.consensusNodeForOurNodeFull.length - 1]
  
         let startPartition = nodeShardDataMap.get(startNode.id).homePartition
         let endPartition = nodeShardDataMap.get(endNode.id).homePartition

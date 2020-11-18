@@ -4140,14 +4140,17 @@ class StateManager extends EventEmitter {
     // }
     this.logger.playbackLogNote('routeAndQueueAcceptedTransaction-debug', '', `sendGossip:${sendGossip} globalModification:${globalModification} noConsensus:${noConsensus} this.readyforTXs:${this.readyforTXs} hasshardData:${(this.currentCycleShardData != null)} acceptedTx:${utils.stringifyReduce(acceptedTx)} `)
     if (this.readyforTXs === false) {
+      if (this.verboseLogs) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: this.readyforTXs === false`)
       return 'notReady' // it is too early to care about the tx
     }
     if(this.currentCycleShardData == null)
     {
+      if (this.verboseLogs) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: this.currentCycleShardData == null`)
       return 'notReady'
     }
 
     if(this.hasknownGlobals == false){
+      if (this.verboseLogs) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: this.hasknownGlobals == false`)
       return 'notReady'
     }
 
@@ -10245,7 +10248,7 @@ class StateManager extends EventEmitter {
    * you only need to set the true values for the globalAccountKeyMap
    * @param accountCopies 
    */
-  async _commitAccountCopies (accountCopies: Shardus.AccountsCopy[], globalAccountKeyMap:{[key:string]: boolean}) {
+  async _commitAccountCopies (accountCopies: Shardus.AccountsCopy[]) {
     
     if (accountCopies.length > 0) {
       for (let accountData of accountCopies) {
@@ -10265,11 +10268,20 @@ class StateManager extends EventEmitter {
       // tell the app to replace the account data
       await this.app.resetAccountData(accountCopies)
 
+      let globalAccountKeyMap:{[key:string]: boolean} = {} 
+      
+      //we just have to trust that if we are restoring from data then the globals will be known
+      this.hasknownGlobals = true
+      
       // update the account copies and global backups
       // it is possible some of this gets to go away eventually
       for (let accountEntry of accountCopies) {
-        let { accountId, data, timestamp, hash, cycleNumber } = accountEntry
-        let isGlobal = this.isGlobalAccount(accountId)
+        let { accountId, data, timestamp, hash, cycleNumber, isGlobal } = accountEntry
+        
+        // check if the is global bit was set and keep local track of it.  Before this was going to be passed in as separate data
+        if(isGlobal == true ){
+          globalAccountKeyMap[accountId] = true
+        }
   
         // Maybe don't try to calculate the cycle number....
         // const cycle = this.p2p.state.getCycleByTimestamp(timestamp + this.syncSettleTime)

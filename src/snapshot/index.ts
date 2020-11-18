@@ -664,7 +664,7 @@ async function storeDataToNewDB(dataMap) {
       })
     }
   }
-  await Context.stateManager._commitAccountCopies(accountCopies, {})
+  await Context.stateManager._commitAccountCopies(accountCopies)
 }
 
 function processDownloadedMissingData(missingData) {
