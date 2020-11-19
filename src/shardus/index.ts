@@ -1215,6 +1215,13 @@ class Shardus extends EventEmitter {
         throw new Error('Missing requried interface function. apply()')
       }
 
+      if (typeof application.transactionApproved === 'function') {
+        applicationInterfaceImpl.transactionApproved = async (tx, wrappedStates, applyResponse) => application.transactionApproved(tx, wrappedStates, applyResponse)
+      } else {
+        applicationInterfaceImpl.transactionApproved = async function (tx, wrappedStates, applyResponse) {
+        }
+      }
+
       if (typeof application.updateAccountFull === 'function') {
         applicationInterfaceImpl.updateAccountFull = async (
           wrappedStates,

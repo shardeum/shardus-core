@@ -156,9 +156,20 @@ declare namespace Shardus {
      * A function responsible for applying an accepted transaction
      */
     apply: (
-      inTx: Shardus.OpaqueTransaction, // it is better to not use IncomingTransaction,
+      inTx: Shardus.OpaqueTransaction,
       wrappedStates: any
     ) => Shardus.ApplyResponse
+
+    /**
+     * This is called after consensus has received or produced a receipt and the trasaction is approved.
+     * Do not change any of the values passes in.
+     * This is a place to generate other transactions, or do off chain work like send and email.
+     */
+    transactionApproved: (
+      inTx: Shardus.OpaqueTransaction,
+      wrappedStates: any,
+      applyResponse: Shardus.ApplyResponse
+    ) => void
 
     updateAccountFull: (
       wrappedState: WrappedResponse,

@@ -3855,7 +3855,8 @@ class StateManager extends EventEmitter {
       // write the accepted TX to storage
       this.storage.addAcceptedTransactions([acceptedTX])
 
-      
+      // endpoint to allow dapp to execute something that depends on a transaction being approved.
+      this.app.transactionApproved(acceptedTX.data, wrappedStates, applyResponse)
 
     } catch (ex) {
       this.fatalLogger.fatal('commitConsensedTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
