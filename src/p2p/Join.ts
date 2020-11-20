@@ -13,6 +13,7 @@ import * as Self from './Self'
 import * as Types from './Types'
 import { robustQuery } from './Utils'
 import { validateTypes } from '../utils'
+import { version } from '../../package.json'
 
 /** TYPES */
 
@@ -26,7 +27,8 @@ export interface JoinRequest {
   nodeInfo: Types.P2PNode
   cycleMarker: CycleCreator.CycleMarker
   proofOfWork: string
-  selectionNum: string
+  selectionNum: string,
+  version: string
   sign: Sign
 }
 
@@ -63,16 +65,9 @@ const joinRoute: Types.Route<Handler> = {
   method: 'POST',
   name: 'join',
   handler: (req, res) => {
-    // Dont accept join requests if you're not active
-    // if (Self.isActive === false) {
-    //   res.end()
-    //   return
-    // }
-
-    // Omar - [TODO] - if currentQuater <= 0 then we are not ready
-    //        just gossip this request to one other node
+    const joinRequest = req.body
     if (CycleCreator.currentQuarter < 1) {
-      //      Comms.sendGossipOne('gossip-join', joinRequest)
+      // if currentQuater <= 0 then we are not ready
       res.end()
       return
     }
@@ -85,7 +80,6 @@ const joinRoute: Types.Route<Handler> = {
     }
 
     //  Validate of joinReq is done in addJoinRequest
-    const joinRequest = req.body
     if (addJoinRequest(joinRequest)) {
       Comms.sendGossip('gossip-join', joinRequest)
     }
@@ -109,7 +103,6 @@ const joinedRoute: Types.Route<Handler> = {
       res.json()
     }
     const publicKey = req.params.publicKey
-    // [TODO] Validate input
     const node = NodeList.byPubKey.get(publicKey)
     res.json({ node })
   },
@@ -119,8 +112,6 @@ const gossipJoinRoute: Types.GossipHandler<JoinRequest, NodeList.Node['id']> = (
   payload,
   _sender
 ) => {
-  // [TODO] Validate joinReq
-
   // Do not forward gossip after quarter 2
   if (CycleCreator.currentQuarter >= 3) return
 
@@ -266,9 +257,6 @@ export async function createJoinRequest(
 ): Promise<JoinRequest & Types.SignedObject> {
   // Build and return a join request
   const nodeInfo = Self.getThisNodeInfo()
-  // Omar - [TODO] the join request should not have the selectionNum
-  //        in it. It is calculated on the server.
-  const selectionNum = crypto.hash({ cycleMarker, address: nodeInfo.address })
   // TO-DO: Think about if the selection number still needs to be signed
   const proofOfWork = {
     compute: await crypto.getComputeProofOfWork(
@@ -276,9 +264,7 @@ export async function createJoinRequest(
       config.p2p.difficulty
     ),
   }
-  // TODO: add a version number at some point
-  // version: '0.0.0'
-  const joinReq = { nodeInfo, cycleMarker, proofOfWork, selectionNum }
+  const joinReq = { nodeInfo, cycleMarker, proofOfWork, version }
   const signedJoinReq = crypto.sign(joinReq)
   info(`Join request created... Join request: ${JSON.stringify(signedJoinReq)}`)
   return signedJoinReq
@@ -315,6 +301,11 @@ export function addJoinRequest(joinRequest: JoinRequest) {
     return false
   }
 
+  if (joinRequest.version !== version) {
+    warn(`version number is different. Our node version is ${version}. Join request node version is ${joinRequest.version}`)
+    return false
+  }
+
   const node = joinRequest.nodeInfo
   info(`Got join request for ${node.externalPort}`)
 
@@ -336,22 +327,23 @@ export function addJoinRequest(joinRequest: JoinRequest) {
 
   // Check if we are better than the lowest selectionNum
   const last = requests.length > 0 ? requests[requests.length - 1] : undefined
-  // Omar - [TODO] we need to calculate the selection based on the join
-  //        request info and don't allow joining node to specify it.
-  //        for now we can use the hash of node public key and cycle number
-  //        but in the future the application will provide what to use
-  //        and we can hash that with the cycle number. For example the
-  //        application may want to use the steaking address or the POW.
-  //        It should be something that the node cannot easily change to
-  //        guess a high selection number. If we generate a network
-  //        random number we have to be careful that a node inside the network
-  //        does not have an advantage by having access to this info and
-  //        is able to create a stronger selectionNum.
+  /*
+    [TODO] To calclulate selectionNumber, we now use the hash of node public key and cycle number
+    but in the future the application will provide what to use
+    and we can hash that with the cycle number. For example the
+    application may want to use the steaking address or the POW.
+    It should be something that the node cannot easily change to
+    guess a high selection number. If we generate a network
+    random number we have to be careful that a node inside the network
+    does not have an advantage by having access to this info and
+    is able to create a stronger selectionNum.
+  */
+  const selectionNum = crypto.hash({ cycleNumber: CycleChain.newest.counter, address: node.publicKey })
   if (
     last &&
-    !crypto.isGreaterHash(joinRequest.selectionNum, last.selectionNum)
+    !crypto.isGreaterHash(selectionNum, last.selectionNum)
   ) {
-    //    info('Join request not better than lowest, not added.')
+    info('Join request not better than lowest, not added.')
     return false
   }
 
@@ -366,9 +358,8 @@ export function addJoinRequest(joinRequest: JoinRequest) {
     warn('join bad sign ' + JSON.stringify(joinRequest))
     return false
   }
-
   // Insert sorted into best list if we made it this far
-  utils.insertSorted(requests, joinRequest, (a, b) =>
+  utils.insertSorted(requests, {...joinRequest, selectionNum}, (a, b) =>
     a.selectionNum < b.selectionNum
       ? 1
       : a.selectionNum > b.selectionNum
@@ -447,7 +438,16 @@ export async function fetchJoined(activeNodes) {
     const [response, _responders] = await robustQuery(activeNodes, queryFn)
     if (!response) return
     if (!response.node) return
-    // [TODO] Validate response
+    let err = utils.validateTypes(response, { node: 'o' })
+    if (err) {
+      warn('fetchJoined invalid response response.node' + err)
+      return
+    }
+    err = validateTypes(response.node, { id: 's' })
+    if (err) {
+      warn('fetchJoined invalid response response.node.id' + err)
+      return
+    }
     const node = response.node as NodeList.Node
     return node.id
   } catch (err) {
