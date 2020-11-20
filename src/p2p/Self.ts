@@ -173,9 +173,7 @@ async function joinOrWitnessForNetwork(): Promise<JoinOrWitnessResult> {
 
   // Submit join request to active nodes
   const tryAgain = await Join.submitJoin(activeNodes, request)
-
-  if (tryAgain) {
-    // [TODO] Make sure tryAgain is a sane wait time
+  if (tryAgain && tryAgain < Date.now() + Context.config.p2p.cycleDuration * 1000 * 2) {
     return {
       outcome: 'tryAgain',
       wait: tryAgain,
@@ -201,7 +199,7 @@ async function joinOrWitnessForNetwork(): Promise<JoinOrWitnessResult> {
   // Otherwise, try again in approx. one cycle
   return {
     outcome: 'tryAgain',
-    wait: Context.config.p2p.cycleDuration * 1000 + 500,
+    wait: Date.now() + Context.config.p2p.cycleDuration * 1000 + 500,
     isFirst,
     id: undefined,
   }
