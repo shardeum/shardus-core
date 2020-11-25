@@ -1065,6 +1065,7 @@ class Shardus extends EventEmitter {
       txId,
       txTimestamp,
       accountData: [],
+      appDefinedData: {}
     }
     return replyObject
   }
@@ -1215,10 +1216,17 @@ class Shardus extends EventEmitter {
         throw new Error('Missing requried interface function. apply()')
       }
 
-      if (typeof application.transactionApproved === 'function') {
-        applicationInterfaceImpl.transactionApproved = async (tx, wrappedStates, applyResponse) => application.transactionApproved(tx, wrappedStates, applyResponse)
+      if (typeof application.transactionReceiptPass === 'function') {
+        applicationInterfaceImpl.transactionReceiptPass = async (tx, wrappedStates, applyResponse) => application.transactionReceiptPass(tx, wrappedStates, applyResponse)
       } else {
-        applicationInterfaceImpl.transactionApproved = async function (tx, wrappedStates, applyResponse) {
+        applicationInterfaceImpl.transactionReceiptPass = async function (tx, wrappedStates, applyResponse) {
+        }
+      }
+
+      if (typeof application.transactionReceiptFail === 'function') {
+        applicationInterfaceImpl.transactionReceiptFail = async (tx, wrappedStates, applyResponse) => application.transactionReceiptFail(tx, wrappedStates, applyResponse)
+      } else {
+        applicationInterfaceImpl.transactionReceiptFail = async function (tx, wrappedStates, applyResponse) {
         }
       }
 

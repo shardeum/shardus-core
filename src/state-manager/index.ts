@@ -3856,7 +3856,7 @@ class StateManager extends EventEmitter {
       this.storage.addAcceptedTransactions([acceptedTX])
 
       // endpoint to allow dapp to execute something that depends on a transaction being approved.
-      this.app.transactionApproved(acceptedTX.data, wrappedStates, applyResponse)
+      this.app.transactionReceiptPass(acceptedTX.data, wrappedStates, applyResponse)
 
     } catch (ex) {
       this.fatalLogger.fatal('commitConsensedTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -5880,6 +5880,7 @@ class StateManager extends EventEmitter {
             try {
 
               let canCommitTX = true
+              let hasReceiptFail = false
               if(queueEntry.noConsensus === true){
                 // dont have a receipt for a non consensus TX. not even sure if we want to keep that!
                 if(queueEntry.preApplyTXResult.passed === false){
@@ -5889,11 +5890,13 @@ class StateManager extends EventEmitter {
                 // the final state of the queue entry will be pass or fail based on the receipt
                 if(queueEntry.appliedReceipt.result === false){
                   canCommitTX = false
+                  hasReceiptFail = true
                 }
               } else if(queueEntry.recievedAppliedReceipt != null) {
                 // the final state of the queue entry will be pass or fail based on the receipt
                 if(queueEntry.recievedAppliedReceipt.result === false){
                   canCommitTX = false
+                  hasReceiptFail = false
                 }
               } else {
                 canCommitTX = false
@@ -5925,6 +5928,15 @@ class StateManager extends EventEmitter {
                   
                 }
               }
+              if(hasReceiptFail){
+                // endpoint to allow dapp to execute something that depends on a transaction failing
+              
+                let applyReponse = queueEntry.preApplyTXResult.applyResponse // TODO STATESHARDING4 ... if we get here from a non standard path may need to get this data from somewhere else
+
+                this.app.transactionReceiptFail(queueEntry.acceptedTx.data, wrappedStates, applyReponse)
+
+              }
+
             } catch (ex) {
               this.mainLogger.debug('processAcceptedTxQueue2 commiting Transaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
               this.fatalLogger.fatal('processAcceptedTxQueue2 commiting Transaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)

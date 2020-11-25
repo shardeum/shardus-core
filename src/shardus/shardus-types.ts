@@ -165,11 +165,23 @@ declare namespace Shardus {
      * Do not change any of the values passes in.
      * This is a place to generate other transactions, or do off chain work like send and email.
      */
-    transactionApproved: (
+    transactionReceiptPass: (
       inTx: Shardus.OpaqueTransaction,
       wrappedStates: any,
       applyResponse: Shardus.ApplyResponse
     ) => void
+    
+    /**
+     * This is called after consensus has received or produced a receipt and the trasaction fails.
+     * Do not change any of the values passes in.
+     * This is a place to generate other transactions, or do off chain work like send and email.
+     */    
+    transactionReceiptFail: (
+      inTx: Shardus.OpaqueTransaction,
+      wrappedStates: any,
+      applyResponse: Shardus.ApplyResponse
+    ) => void
+
 
     updateAccountFull: (
       wrappedState: WrappedResponse,
@@ -292,6 +304,11 @@ declare namespace Shardus {
      * Account data array
      */
     accountData: WrappedResponse[]
+    /**
+     * a blob for the app to define. 
+     * This gets passed to post apply
+     */
+    appDefinedData: any
   }
 
   export interface AccountData {
