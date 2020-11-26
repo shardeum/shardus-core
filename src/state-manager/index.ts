@@ -6214,25 +6214,26 @@ class StateManager extends EventEmitter {
         result: passed,
         appliedVotes:[]
       }
-
-      // grab just the votes that match the winning pass or fail status
-      for(let i=0; i<numVotes; i++){
-        let currentVote = queueEntry.collectedVotes[i]
-        if(passed === currentVote.transaction_result){  
-          
-          if(passed){
-            let badVoteMatch = false
-            for(let j = 0; j< currentVote.account_id.length; j++){
-              let id = currentVote.account_id[j]
-              let hash = currentVote.account_state_hash_after[j]
-              if(topHashByID[id].hash === hash){
-                secondTally++
-              } else {
-                badVoteMatch = true
-                break
+      // if a passing vote won then check all the hashes.
+      if(passed) {
+        // grab just the votes that match the winning pass or fail status
+        for(let i=0; i<numVotes; i++){
+          let currentVote = queueEntry.collectedVotes[i]
+          if(passed === currentVote.transaction_result){  
+            
+            if(passed){
+              let badVoteMatch = false
+              for(let j = 0; j< currentVote.account_id.length; j++){
+                let id = currentVote.account_id[j]
+                let hash = currentVote.account_state_hash_after[j]
+                if(topHashByID[id].hash === hash){
+                  secondTally++
+                } else {
+                  badVoteMatch = true
+                  break
+                }
               }
-            }
-            if(badVoteMatch){
+              if(badVoteMatch){
               continue
             }
           }
@@ -6242,10 +6243,11 @@ class StateManager extends EventEmitter {
         }
       }
 
-      if(secondTally < requiredVotes){
-        this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} secondTally:${secondTally}`)
-        this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} secondTally:${secondTally} `)
-        return null
+        if(secondTally < requiredVotes){
+          this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} secondTally:${secondTally}`)
+          this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} secondTally:${secondTally} `)
+          return null
+        }
       }
 
       // recored our generated receipt to the queue entry
