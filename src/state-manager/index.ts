@@ -3754,8 +3754,8 @@ class StateManager extends EventEmitter {
       this.applySoftLock = false
 
     } catch (ex) {
-      this.fatalLogger.fatal('tryPreApplyTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      this.mainLogger.debug(`tryPreApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
+      this.mainLogger.error(`tryPreApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}: ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.mainLogger.error(`tryPreApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
 
       return { passed:false, applyResponse, applyResult: ex.message }
 
@@ -7214,9 +7214,11 @@ class StateManager extends EventEmitter {
    * @param {string} ourLastResultHash
    */
   async startRepairProcess (cycle:Cycle, topResult:PartitionResult | null, partitionId:number, ourLastResultHash:string) {
+    // todo update stateIsGood to follow a new metric based on the new data repair.
     this.stateIsGood = false
     if (this.canDataRepair === false) {
-      if (this.verboseLogs) this.mainLogger.error( `cycle: ${cycle} this.canDataRepair === false data oos detected but will not start repairs`)
+      // todo fix false negative results.  This may require inserting 
+      if (this.verboseLogs) this.mainLogger.error( `data oos detected. (old system) False negative results given if syncing. cycle: ${cycle.counter} partition: ${partitionId} `)
       return
     }
 
