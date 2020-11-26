@@ -6061,7 +6061,7 @@ class StateManager extends EventEmitter {
         return false
       }
       if(appliedReceipt.appliedVotes.length === 0){
-        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.appliedVotes.length`)
+        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.appliedVotes.length == 0`)
         return false
       }
 
@@ -6201,7 +6201,7 @@ class StateManager extends EventEmitter {
 
     }
 
-
+    // TODO: possibly need an extra check to make sure all the top hash by ID values match to a single vote (and are not spread between multiple votes)
 
     this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} `)
     this.mainLogger.debug(`tryProduceReceipt canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} `)
@@ -6214,35 +6214,41 @@ class StateManager extends EventEmitter {
         result: passed,
         appliedVotes:[]
       }
-      // if a passing vote won then check all the hashes.
-      if(passed) {
-        // grab just the votes that match the winning pass or fail status
-        for(let i=0; i<numVotes; i++){
-          let currentVote = queueEntry.collectedVotes[i]
-          if(passed === currentVote.transaction_result){  
-            
-            if(passed){
-              let badVoteMatch = false
-              for(let j = 0; j< currentVote.account_id.length; j++){
-                let id = currentVote.account_id[j]
-                let hash = currentVote.account_state_hash_after[j]
-                if(topHashByID[id].hash === hash){
-                  secondTally++
-                } else {
-                  badVoteMatch = true
-                  break
-                }
+
+      // grab just the votes that match the winning pass or fail status
+      for(let i=0; i<numVotes; i++){
+        let currentVote = queueEntry.collectedVotes[i]
+        // build a list of applied votes 
+        if(passed === true){  
+          if(currentVote.transaction_result === true){
+            let badVoteMatch = false
+            //Test that state after hash values match with the winning vote hashes
+            for(let j = 0; j< currentVote.account_id.length; j++){
+              let id = currentVote.account_id[j]
+              let hash = currentVote.account_state_hash_after[j]
+              if(topHashByID[id].hash === hash){
+                secondTally++
+              } else {
+                badVoteMatch = true
+                break
               }
-              if(badVoteMatch){
+            }
+            if(badVoteMatch){
               continue
             }
+            appliedReceipt.appliedVotes.push(currentVote)
           }
-
-
-          appliedReceipt.appliedVotes.push(currentVote)
+    
+        } else if(passed === false){
+          if(currentVote.transaction_result === false){ 
+            //not checking state after hashes since a failed TX can not change account state
+            appliedReceipt.appliedVotes.push(currentVote)
+          }
         }
       }
 
+      // if a passing vote won then check all the hashes.
+      if(passed) {
         if(secondTally < requiredVotes){
           this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} secondTally:${secondTally}`)
           this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} secondTally:${secondTally} `)
