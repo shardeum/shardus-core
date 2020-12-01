@@ -7,6 +7,7 @@ import * as Archivers from '../p2p/Archivers'
 import * as Comms from '../p2p/Comms'
 import * as Context from '../p2p/Context'
 import * as CycleCreator from '../p2p/CycleCreator'
+import * as CycleChain from '../p2p/CycleChain'
 import * as NodeList from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
 import * as Sync from '../p2p/Sync'
@@ -654,13 +655,17 @@ function increaseNotNeededNodes(id) {
 }
 
 async function storeDataToNewDB(dataMap) {
+  let currentCycle = CycleChain.getNewest()
   // store data to new DB
   log('Storing data to new DB')
   const accountCopies: shardusTypes.AccountsCopy[] = []
   for (const [, data] of dataMap) {
     if (data && data.length > 0) {
       data.forEach((accountData) => {
-        accountCopies.push(accountData)
+        accountCopies.push({
+          ...accountData,
+          cycleNumber: currentCycle.counter
+        })
       })
     }
   }
