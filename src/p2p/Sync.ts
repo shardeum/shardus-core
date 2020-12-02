@@ -156,9 +156,24 @@ export async function sync(activeNodes: ActiveNode[]) {
     squasher.final.added.length < totalNodeCount(cycleToSyncTo)
   )
 
-  // [TODO] Now that our node list is synced, validate the anchor cycle's cert
+  // Now that our node list is synced, validate the anchor cycle's cert
+  let nodesToQuery = squasher.final.added.map(node => ({
+    ip: node.externalIp,
+    port: node.externalPort,
+    publicKey: node.publicKey
+  }))
+  let anchorCycleFromNetwork = await getNewestCycle(nodesToQuery)
+  let cycleToSyncMarker = CycleChain.computeCycleMarker(cycleToSyncTo)
+  let markerFromNetwork = CycleChain.computeCycleMarker(anchorCycleFromNetwork)
 
-  // [TODO] If the anchor cycle was invalid, start over
+  info('cycleToSyncMarker', cycleToSyncMarker)
+  info('markerFromNetwork', markerFromNetwork)
+
+  // If the anchor cycle was invalid, start over
+  if (cycleToSyncMarker !== markerFromNetwork) {
+    warn(`Anchor cycle's cert is different from other nodes in the network`)
+    return false
+  }
 
   applyNodeListChange(squasher.final)
 
