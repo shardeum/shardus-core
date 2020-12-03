@@ -1,7 +1,7 @@
 import Sntp from '@hapi/sntp'
 import * as events from 'events'
 import * as log4js from 'log4js'
-import shell from 'shelljs'
+import got from 'got'
 import * as http from '../http'
 import * as network from '../network'
 import * as snapshot from '../snapshot'
@@ -295,14 +295,15 @@ async function discoverNetwork(seedNodes) {
 
 /** HELPER FUNCTIONS */
 
-function calculateTimeDifference() {
-  const googleTime = shell.exec(`date -d  "$(wget -qSO- --max-redirect=0 google.com 2>&1 | grep Date: | cut -d' ' -f5-8)Z" +%s`)
-  const localTime = shell.exec(`date -d  "$(wget -qSO- --max-redirect=0 ntp.org 2>&1 | grep Date: | cut -d' ' -f5-8)Z" +%s`)
-  const timeDiff = Math.abs(googleTime - localTime)
-  info('googleTime', googleTime)
-  info('localTime', localTime)
-  info('timeDiff', timeDiff)
-  return timeDiff
+async function calculateTimeDifference () {
+    const response: any = await got.get('https://google.com')
+    const localTime = Date.now()
+    const googleTime = Date.parse(response.headers.date)
+    const timeDiff = Math.abs(localTime - googleTime)
+    info('googleTime', googleTime)
+    info('localTime', localTime)
+    info('Time diff between google.com and local machine', timeDiff)
+    return timeDiff
 }
 
 export async function checkTimeSynced(timeServers) {
@@ -318,8 +319,8 @@ export async function checkTimeSynced(timeServers) {
     }
   }
   try {
-    const localTimeDiff = calculateTimeDifference()
-    return localTimeDiff <= Context.config.p2p.syncLimit
+    const localTimeDiff = await calculateTimeDifference()
+    return localTimeDiff <= Context.config.p2p.syncLimit * 1000
   } catch(e) {
     warn('local time is out of sync with google time server')
   }
