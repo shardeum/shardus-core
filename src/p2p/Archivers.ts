@@ -372,17 +372,14 @@ export function registerRoutes() {
     delete dataRequest.tag
 
     const dataRequestCycle = dataRequest.dataRequestCycle
-    const dataRequestState = dataRequest.dataRequestState
-    const dataRequestReceipt = dataRequest.dataRequestReceipt
+    const dataRequestStateMetaData = dataRequest.dataRequestStateMetaData
+
     const dataRequestTypes = []
     if (dataRequestCycle) {
       dataRequestTypes.push(dataRequestCycle)
     }
-    if (dataRequestState) {
-      dataRequestTypes.push(dataRequestState)
-    }
-    if (dataRequestReceipt) {
-      dataRequestTypes.push(dataRequestReceipt)
+    if (dataRequestStateMetaData) {
+      dataRequestTypes.push(dataRequestStateMetaData)
     }
     if (dataRequestTypes.length > 0) {
       addDataRecipient(dataRequest.nodeInfo, dataRequestTypes)
