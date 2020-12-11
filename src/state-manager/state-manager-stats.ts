@@ -1,6 +1,5 @@
 import { ShardusConfiguration } from '../shardus/shardus-types'
 import Shardus = require('../shardus/shardus-types')
-//import {ShardGlobals,ShardInfo,StoredPartition,NodeShardData,AddressRange, HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange} from  './shardFunction2Types'
 import {ShardGlobals,ShardInfo,StoredPartition,NodeShardData,AddressRange, HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange} from  './shardFunctionTypes'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
@@ -11,6 +10,7 @@ import Storage from "../storage"
 import Crypto from "../crypto"
 import Logger from "../logger"
 import ShardFunctions2 from './shardFunctions2.js'
+import StateManagerCache from './state-manager-cache'
 
 class StateManagerStats {
 
@@ -31,10 +31,15 @@ class StateManagerStats {
     txSummaryBlobCollections: SummaryBlobCollection[];
     extensiveRangeChecking: boolean; // non required range checks that can show additional errors (should not impact flow control)
 
+    // add cycle then , never delete one from previous cycle.  
+    //     quick lookup
+    //     
     seenCreatedAccounts: Map<string, AccountMemoryCache>; // Extra level of safety at the cost of memory to prevent double init.  starting point to have in memory hash of accounts
     useSeenAccountMap:boolean;
 
-    constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger, crypto: Crypto, config: Shardus.ShardusConfiguration) {
+    stateManagerCache: StateManagerCache;
+
+    constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger, crypto: Crypto, config: Shardus.ShardusConfiguration, stateManagerCache: StateManagerCache) {
         
         this.verboseLogs = verboseLogs
         this.crypto = crypto
@@ -50,12 +55,13 @@ class StateManagerStats {
         //Init Summary Blobs
         this.summaryPartitionCount = 32
 
-
         this.summaryBlobByPartition = new Map()
         this.txSummaryBlobCollections = []
 
         this.useSeenAccountMap = true
         this.seenCreatedAccounts = new Map()
+
+        this.stateManagerCache = stateManagerCache
 
         this.initSummaryBlobs()
     }
@@ -129,15 +135,19 @@ class StateManagerStats {
         let blob:SummaryBlob = this.getSummaryBlob(accountData.accountId)
         blob.counter++
 
-        if(this.useSeenAccountMap === true && this.seenCreatedAccounts.has(accountData.accountId)){
-            // this.mainLogger.error(`statsDataSummaryInit seenCreatedAccounts dupe: ${utils.stringifyReduce(accountData.accountId)}`)
-            return
-        }
-        if(this.useSeenAccountMap === true){
-            let accountMemData:AccountMemoryCache = {t:accountData.timestamp, h:accountData.stateId}
-            this.seenCreatedAccounts.set(accountData.accountId, accountMemData)
-        }
+        // if(this.useSeenAccountMap === true && this.seenCreatedAccounts.has(accountData.accountId)){
+        //     // this.mainLogger.error(`statsDataSummaryInit seenCreatedAccounts dupe: ${utils.stringifyReduce(accountData.accountId)}`)
+        //     return
+        // }
+        // if(this.useSeenAccountMap === true){
+        //     let accountMemData:AccountMemoryCache = {t:accountData.timestamp, h:accountData.stateId}
+        //     this.seenCreatedAccounts.set(accountData.accountId, accountMemData)
+        // }
         
+        if(this.stateManagerCache.hasAccount(accountData.accountId)){
+            return  
+        }
+        this.stateManagerCache.updateAccountHash(accountData.accountId, accountData.stateId, accountData.timestamp, cycle)
 
         if(accountData.data == null){
             blob.errorNull++
@@ -151,31 +161,39 @@ class StateManagerStats {
     }
 
     hasAccountBeenSeenByStats(accountId){
-        if(this.useSeenAccountMap === false){
-            this.mainLogger.error(`hasAccountBeenSeenByStats disabled`)
-            return false
-        }
-        return this.seenCreatedAccounts.has(accountId)
+        // if(this.useSeenAccountMap === false){
+        //     this.mainLogger.error(`hasAccountBeenSeenByStats disabled`)
+        //     return false
+        // }
+        // return this.seenCreatedAccounts.has(accountId)
+
+        return this.stateManagerCache.hasAccount(accountId)
     }
 
     statsDataSummaryInitRaw(cycle:number, accountId:string, accountDataRaw:any){
         let blob:SummaryBlob = this.getSummaryBlob(accountId)
         blob.counter++
 
-        if(this.useSeenAccountMap === true && this.seenCreatedAccounts.has(accountId)){
-            // this.mainLogger.error(`statsDataSummaryInitRaw seenCreatedAccounts dupe: ${utils.stringifyReduce(accountId)}`)
-            return
-        }
-        if(this.useSeenAccountMap === true){
-            // let timestamp = this.app.getAccountTimestamp(accountId)
-            // let hash = this.app.getStateId(accountId)
+        // if(this.useSeenAccountMap === true && this.seenCreatedAccounts.has(accountId)){
+        //     // this.mainLogger.error(`statsDataSummaryInitRaw seenCreatedAccounts dupe: ${utils.stringifyReduce(accountId)}`)
+        //     return
+        // }
+        // if(this.useSeenAccountMap === true){
+        //     // let timestamp = this.app.getAccountTimestamp(accountId)
+        //     // let hash = this.app.getStateId(accountId)
 
-            let accountInfo = this.app.getTimestampAndHashFromAccount(accountDataRaw)
+        //     let accountInfo = this.app.getTimestampAndHashFromAccount(accountDataRaw)
 
-            //let accountMemData:AccountMemoryCache = {t:0, h:'uninit'}
-            let accountMemData:AccountMemoryCache = {t:accountInfo.timestamp, h:accountInfo.hash}
-            this.seenCreatedAccounts.set(accountId, accountMemData)
+        //     //let accountMemData:AccountMemoryCache = {t:0, h:'uninit'}
+        //     let accountMemData:AccountMemoryCache = {t:accountInfo.timestamp, h:accountInfo.hash}
+        //     this.seenCreatedAccounts.set(accountId, accountMemData)
+        // }
+
+        if(this.stateManagerCache.hasAccount(accountId)){
+            return  
         }
+        let accountInfo = this.app.getTimestampAndHashFromAccount(accountDataRaw)
+        this.stateManagerCache.updateAccountHash(accountId, accountInfo.hash, accountInfo.timestamp, cycle)
 
         if(accountDataRaw == null){
             blob.errorNull++
@@ -206,24 +224,40 @@ class StateManagerStats {
         }
 
 
-        if(this.useSeenAccountMap === true){
-            let accountId = accountData.accountId
-            let timestamp = accountData.timestamp //  this.app.getAccountTimestamp(accountId)
-            let hash = accountData.stateId //this.app.getStateId(accountId)
+        // if(this.useSeenAccountMap === true){
+        //     let accountId = accountData.accountId
+        //     let timestamp = accountData.timestamp //  this.app.getAccountTimestamp(accountId)
+        //     let hash = accountData.stateId //this.app.getStateId(accountId)
             
-            if(this.seenCreatedAccounts.has(accountId)){
-                let accountMemData:AccountMemoryCache = this.seenCreatedAccounts.get(accountId)
-                if(accountMemData.t > timestamp){
-                    this.mainLogger.error(`statsDataSummaryUpdate: good error?: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
-                    return
-                }                
-            } else {
-                this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account`)
-            }
+        //     if(this.seenCreatedAccounts.has(accountId)){
+        //         let accountMemData:AccountMemoryCache = this.seenCreatedAccounts.get(accountId)
+        //         if(accountMemData.t > timestamp){
+        //             this.mainLogger.error(`statsDataSummaryUpdate: good error?: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
+        //             return
+        //         }                
+        //     } else {
+        //         this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account`)
+        //     }
 
-            let accountMemDataUpdate:AccountMemoryCache = {t:timestamp, h:hash}
-            this.seenCreatedAccounts.set(accountId, accountMemDataUpdate)
+        //     let accountMemDataUpdate:AccountMemoryCache = {t:timestamp, h:hash}
+        //     this.seenCreatedAccounts.set(accountId, accountMemDataUpdate)
+        // }
+
+        let accountId = accountData.accountId
+        let timestamp = accountData.timestamp //  this.app.getAccountTimestamp(accountId)
+        let hash = accountData.stateId
+
+        if(this.stateManagerCache.hasAccount(accountId)){
+            let accountMemData:AccountHashCache = this.stateManagerCache.getAccountHash(accountId)
+            if(accountMemData.t > timestamp){
+                this.mainLogger.error(`statsDataSummaryUpdate: good error?: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
+                return
+            }                
+        } else {
+            this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account`)
         }
+        this.stateManagerCache.updateAccountHash(accountId, hash, timestamp, cycle)
+
 
         if(cycle > blob.latestCycle){
             blob.latestCycle = cycle
@@ -245,25 +279,41 @@ class StateManagerStats {
             return
         }
 
-        if(this.useSeenAccountMap === true){
-            let accountId = accountDataAfter.accountId
-            let timestamp = accountDataAfter.timestamp //  this.app.getAccountTimestamp(accountId)
-            let hash = accountDataAfter.stateId //this.app.getStateId(accountId)
+        // if(this.useSeenAccountMap === true){
+        //     let accountId = accountDataAfter.accountId
+        //     let timestamp = accountDataAfter.timestamp //  this.app.getAccountTimestamp(accountId)
+        //     let hash = accountDataAfter.stateId //this.app.getStateId(accountId)
             
-            if(this.seenCreatedAccounts.has(accountId)){
-                let accountMemData:AccountMemoryCache = this.seenCreatedAccounts.get(accountId)
-                if(accountMemData.t > timestamp){
-                    this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
-                    return
-                }                
-            } else {
-                this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account: 2`)
-            }
+        //     if(this.seenCreatedAccounts.has(accountId)){
+        //         let accountMemData:AccountMemoryCache = this.seenCreatedAccounts.get(accountId)
+        //         if(accountMemData.t > timestamp){
+        //             this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
+        //             return
+        //         }                
+        //     } else {
+        //         this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account: 2`)
+        //     }
 
 
-            let accountMemDataUpdate:AccountMemoryCache = {t:timestamp, h:hash}
-            this.seenCreatedAccounts.set(accountId, accountMemDataUpdate)
+        //     let accountMemDataUpdate:AccountMemoryCache = {t:timestamp, h:hash}
+        //     this.seenCreatedAccounts.set(accountId, accountMemDataUpdate)
+        // }
+
+        let accountId = accountDataAfter.accountId
+        let timestamp = accountDataAfter.timestamp //  this.app.getAccountTimestamp(accountId)
+        let hash = accountDataAfter.stateId //this.app.getStateId(accountId)
+
+        if(this.stateManagerCache.hasAccount(accountId)){
+            let accountMemData:AccountHashCache = this.stateManagerCache.getAccountHash(accountId)
+            if(accountMemData.t > timestamp){
+                this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
+                return
+            }                
+        } else {
+            this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account: 2`)
         }
+        this.stateManagerCache.updateAccountHash(accountId, hash, timestamp, cycle)
+
 
         if(cycle > blob.latestCycle){
             blob.latestCycle = cycle

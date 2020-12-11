@@ -1093,6 +1093,7 @@ class Shardus extends EventEmitter {
       txId,
       timestamp: txTimestamp,
       hash: stateAfter,
+      stateId: stateAfter, // duplicate of hash.., really need to go back and add types to this
       localCache,
     })
   }
@@ -1466,9 +1467,9 @@ class Shardus extends EventEmitter {
       }
       
       if (typeof application.getTimestampAndHashFromAccount === 'function') {
-        applicationInterfaceImpl.getTimestampAndHashFromAccount = async (account) => application.getTimestampAndHashFromAccount(account)
+        applicationInterfaceImpl.getTimestampAndHashFromAccount = (account) => application.getTimestampAndHashFromAccount(account)
       } else {
-        applicationInterfaceImpl.getTimestampAndHashFromAccount = async function (account) {
+        applicationInterfaceImpl.getTimestampAndHashFromAccount = function (account) {
           return {timestamp:0, hash:'getTimestampAndHashFromAccount not impl'}
         }
       }

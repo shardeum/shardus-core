@@ -225,7 +225,7 @@ export function startSnapshotting() {
   partitionGossip.initGossip()
   Context.stateManager.on(
     'cycleTxsFinalized',
-    async (shard: CycleShardData, receiptMapResults:ReceiptMapResult[], statsClump:StatsClump) => {
+    async (shard: CycleShardData, receiptMapResults:ReceiptMapResult[], statsClump:StatsClump, mainHashResults:MainHashResults) => {
       const debugStrs = []
       // store receiptMap for this cycle number
       partitionBlockMapByCycle.set(shard.cycleNumber, receiptMapResults)

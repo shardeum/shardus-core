@@ -689,3 +689,90 @@ type AccountMemoryCache = {
     t: number;  //timestamp
     h: string;  //hash.  todo, a compact form acceptable?
 }
+
+type AccountHashCache = {
+    t: number;  //timestamp
+    h: string;  //hash.  todo, a compact form acceptable?
+    c: number;  //cycle number
+    //p: number;  //partition -1 for global? --built into list.
+}
+
+
+
+// METHOD 2 stuff below here:
+
+/**
+ * History for a single account
+ * Recent history, and a index to to the last list it was written to
+ */
+type AccountHashCacheHistory = {
+    lastSeenCycle: number; 
+    lastSeenSortIndex: number;
+    queueIndex: SafeIndex;
+    accountHashList: AccountHashCache[]
+}
+
+type SafeIndex = {
+    id:number;
+    idx:number;
+}
+/**
+ * This list holds a list of different accounts
+ */
+type AccountHashesForPartition = {
+    partition: number;
+    //note that these are also stored in the map.
+    accountHashesSorted: AccountHashCache[]; // for current cycle. all account changes? (same account can occur multiple times) (option to fast remove on the go)
+    accountIDs: string[]; // list of account IDs for validation parallel to the above data.
+}
+
+/**
+ * This is the complete cache structure (old method 2)
+ */
+type AccountHashCacheHistoryOld = {
+    lastSeenCycle: number; 
+    lastSeenSortIndex: number;
+    accountHashList: AccountHashCache[]
+}
+type AccountHashCacheMain = {
+    accountHashCacheByPartition: Map<number, AccountHashesForPartition>;
+    accountHashMap: Map<string, AccountHashCacheHistoryOld>
+}
+
+type AccountHashCacheList = {
+    accountIDs: string[]; //index matches above list.
+    accountHashesSorted: AccountHashCache[]; //sorted by timestamp. then by address
+}
+
+// METHOD 3 stuff below here:
+type AccountHashCacheMain3 = {
+    currentCalculationCycle: number
+    // accountHashesSorted: AccountHashCache[]; //sorted by timestamp. then by address
+    // accountIDs: string[]; //index matches above list.
+    workingHistoryList:AccountHashCacheList
+    accountHashMap: Map<string, AccountHashCacheHistory>
+
+
+    //queue stuff here that we are not ready for yet
+    futureHistoryList:AccountHashCacheList
+}
+
+
+// type AccountReport = {
+//     id: string;  // id
+//     h: string;  // hash
+//     t: number; // timestamp
+// }
+
+type PartitionHashResults = {
+    partition: number;
+    hashOfHashes: string;
+    ids: string[]
+    hashes: string[]
+    timestamps: number[]
+}
+
+type MainHashResults = {
+    cycle:number
+    partitionHashResults: Map<number, PartitionHashResults>;
+}

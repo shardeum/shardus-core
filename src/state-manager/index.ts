@@ -38,6 +38,7 @@ import * as Context from '../p2p/Context'
 //type foo = ShardFunctionTypes.BasicAddressRange
 
 import StateManagerStats from './state-manager-stats'
+import StateManagerCache from './state-manager-cache'
 
 /**
  * StateManager
@@ -136,6 +137,8 @@ class StateManager extends EventEmitter {
     // extensiveRangeChecking: boolean; // non required range checks that can show additional errors (should not impact flow control)
 
     stateManagerStats: StateManagerStats;
+
+    stateManagerCache: StateManagerCache;
 
   constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage : Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     super()
@@ -264,11 +267,15 @@ class StateManager extends EventEmitter {
         this.voteFlipChance = 0
       }
     }  
+
+    this.stateManagerCache = new StateManagerCache(verboseLogs, profiler, app, logger, crypto, config)
+
     //Init Summary Blobs
     
-    this.stateManagerStats = new StateManagerStats(verboseLogs, profiler, app, logger, crypto, config)
+    this.stateManagerStats = new StateManagerStats(verboseLogs, profiler, app, logger, crypto, config, this.stateManagerCache)
     this.stateManagerStats.summaryPartitionCount = 32
     this.stateManagerStats.initSummaryBlobs()
+
 
     this.stateIsGood = true
     // the original way this was setup was to reset and apply repair results one partition at a time.
@@ -2358,6 +2365,8 @@ class StateManager extends EventEmitter {
         if (this.verboseLogs) console.log(debugString)
 
         if(initStats){
+          // todo perf, evaluate getCycleNumberFromTimestamp for really old timestamps.
+          // the algorithims may run worst case for old cycles.
           let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
           this.stateManagerStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount)
         }
@@ -8609,6 +8618,12 @@ class StateManager extends EventEmitter {
           return
         }
 
+        // this seems like the correct place for the calculation because we are on the "old" currentCycleShardData
+        // 
+        // if(this.currentCycleShardData  && this.currentCycleShardData.ourNode.status === 'active'){
+        //   this.stateManagerCache.buildPartitionHashesForNode(this.currentCycleShardData)    
+        // }
+ 
         // this.dumpAccountDebugData()
         this.updateShardValues(lastCycle.counter)
         this.dumpAccountDebugData() // better to print values after an update!
@@ -8689,8 +8704,26 @@ class StateManager extends EventEmitter {
 
       let statsClump = this.stateManagerStats.getCoveredStatsPartitions(lastCycleShardValues)
 
+
+      // feels like our correctness calc is off by a whole cycle in partition numbers.
+      //really need to think more on if this is the right cycle to compute on
+      // let previousFullCycleNumber = this.currentCycleShardData.cycleNumber-1
+      // if(this.shardValuesByCycle.has(previousFullCycleNumber)){
+
+      //   let previousFullCycleData = this.shardValuesByCycle.get(previousFullCycleNumber)
+      //   if(previousFullCycleData && previousFullCycleData.ourNode.status === 'active'){
+      //     this.stateManagerCache.buildPartitionHashesForNode(previousFullCycleData)    
+      //   }
+      // }
+      //build partition hashes from previous full cycle
+      let mainHashResults:MainHashResults = null
+      if(this.currentCycleShardData && this.currentCycleShardData.ourNode.status === 'active'){
+        mainHashResults = this.stateManagerCache.buildPartitionHashesForNode(this.currentCycleShardData)    
+      }
+
+
       // Hook for Snapshot module to listen to after partition data is settled
-      this.emit('cycleTxsFinalized', lastCycleShardValues, receiptMapResults, statsClump)
+      this.emit('cycleTxsFinalized', lastCycleShardValues, receiptMapResults, statsClump, mainHashResults)
 
       // pre-allocate the next cycle data to be safe!
       let prekey = 'c' + (lastCycle.counter + 1)
