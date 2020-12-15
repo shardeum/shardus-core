@@ -374,15 +374,15 @@ export function registerRoutes() {
     const dataRequestCycle = dataRequest.dataRequestCycle
     const dataRequestStateMetaData = dataRequest.dataRequestStateMetaData
 
-    const dataRequestTypes = []
+    const dataRequests = []
     if (dataRequestCycle) {
-      dataRequestTypes.push(dataRequestCycle)
+      dataRequests.push(dataRequestCycle)
     }
     if (dataRequestStateMetaData) {
-      dataRequestTypes.push(dataRequestStateMetaData)
+      dataRequests.push(dataRequestStateMetaData)
     }
-    if (dataRequestTypes.length > 0) {
-      addDataRecipient(dataRequest.nodeInfo, dataRequestTypes)
+    if (dataRequests.length > 0) {
+      addDataRecipient(dataRequest.nodeInfo, dataRequests)
     }
     res.json({ success: true })
   })
