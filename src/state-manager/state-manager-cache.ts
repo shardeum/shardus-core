@@ -50,6 +50,8 @@ class StateManagerCache {
         this.shardLogger = logger.getLogger('shardDump')
         this.statsLogger = logger.getLogger('statsDump')
 
+        
+
         this.accountsHashCache = new Map()
 
         this.accountsHashCacheMain = { accountHashCacheByPartition: new Map(), accountHashMap: new Map() }
@@ -326,7 +328,7 @@ class StateManagerCache {
             if(cycle == accountHashCacheHistory.queueIndex.id) {
                 lastIndex = accountHashCacheHistory.queueIndex.idx
             }
-            let index = this.insertIntoHistoryList(accountId, accountHashData, this.accountsHashCache3.workingHistoryList, lastIndex)
+            let index = this.insertIntoHistoryList(accountId, accountHashData, this.accountsHashCache3.futureHistoryList, lastIndex)
             accountHashCacheHistory.queueIndex.idx = index
             accountHashCacheHistory.queueIndex.id = cycle
         }
@@ -397,7 +399,10 @@ class StateManagerCache {
     }
 
     // currently a sync function, dont have correct buffers for async
-    buildPartitionHashesForNode(cycleShardData: CycleShardData) : MainHashResults {
+    buildPartitionHashesForNode1(cycleShardData: CycleShardData) : MainHashResults {
+
+        if(this.verboseLogs) this.mainLogger.debug(`accountsHashCache3 ${cycleShardData.cycleNumber}: ${utils.stringifyReduce(this.accountsHashCache3)}`)
+
         this.accountsHashCache3.currentCalculationCycle = cycleShardData.cycleNumber
 
         let mainHashResults: MainHashResults = {
@@ -411,6 +416,141 @@ class StateManagerCache {
             accountIDs:[]
         }
 
+        let newIndex=0;
+        // process the working list.  split data into partitions and build a new list with nulled spots cleared out
+        for(let index=0; index < this.accountsHashCache3.workingHistoryList.accountHashesSorted.length; index++){
+            let accountHashData:AccountHashCache = this.accountsHashCache3.workingHistoryList.accountHashesSorted[index]
+            if(accountHashData == null){
+                //if this is null then it is blank entry (by design how we remove from the array at run time and retain perf)
+                continue
+            }
+            let accountID = this.accountsHashCache3.workingHistoryList.accountIDs[index]
+            
+            //split data into partitions.
+            let partitionHashResults:PartitionHashResults = null
+            let {homePartition:partition} = ShardFunctions.addressToPartition(cycleShardData.shardGlobals, accountID)
+            if(mainHashResults.partitionHashResults.has(partition) === false){
+                partitionHashResults = {
+                    partition,
+                    hashOfHashes: '',
+                    ids: [],
+                    hashes: [],
+                    timestamps: [],
+                }
+                mainHashResults.partitionHashResults.set(partition, partitionHashResults)
+            } else {
+                partitionHashResults = mainHashResults.partitionHashResults.get(partition)
+            }
+            partitionHashResults.ids.push(accountID)
+            partitionHashResults.hashes.push(accountHashData.h)
+            partitionHashResults.timestamps.push(accountHashData.t)
+
+            //build up our next list
+            nextList.accountHashesSorted.push(accountHashData)
+            nextList.accountIDs.push(accountID)
+
+            // need to update the list index
+            // this is slower than I would like, but faster than alternatives that I can think of
+            let accountHashCacheHistory:AccountHashCacheHistory = this.accountsHashCache3.accountHashMap.get(accountID)
+            accountHashCacheHistory.lastSeenSortIndex = newIndex
+
+            newIndex++
+        }
+
+        // build a hash over all the data hashes per partition
+        for(let partition of mainHashResults.partitionHashResults.keys()){
+            let partitionHashResults:PartitionHashResults = mainHashResults.partitionHashResults.get(partition)
+
+            partitionHashResults.hashOfHashes = this.crypto.hash(partitionHashResults.hashes)
+        }
+
+
+        // merge future list into our new working list.        
+        for(let index=0; index < this.accountsHashCache3.futureHistoryList.accountHashesSorted.length; index++){
+            let accountHashData:AccountHashCache = this.accountsHashCache3.futureHistoryList.accountHashesSorted[index]
+            if(accountHashData == null){
+                continue
+            }
+            let accountID = this.accountsHashCache3.futureHistoryList.accountIDs[index]
+            
+            // need to update the list index
+            // build up our next list
+            nextList.accountHashesSorted.push(accountHashData)
+            nextList.accountIDs.push(accountID)
+            let accountHashCacheHistory:AccountHashCacheHistory = this.accountsHashCache3.accountHashMap.get(accountID)
+            accountHashCacheHistory.lastSeenSortIndex = newIndex
+
+            newIndex++
+        }
+
+        // update the cycle we are tracking now
+        this.accountsHashCache3.currentCalculationCycle = cycleShardData.cycleNumber + 1
+
+        // set our new working list and future list. 
+        this.accountsHashCache3.workingHistoryList = nextList
+        this.accountsHashCache3.futureHistoryList = {
+            accountHashesSorted:[], 
+            accountIDs:[]
+        }
+        this.currentMainHashResults = mainHashResults
+        return mainHashResults
+    }
+
+    sortByTimestampIdAsc(first, second) : number {
+        if(first.t < second.t){
+            return -1
+        }
+        if(first.t > second.t){
+            return 1
+        }
+        if(first.id < second.id){
+            return -1
+        }
+        if(first.id > second.id){
+            return 1
+        }
+        return 0
+    }
+
+     // currently a sync function, dont have correct buffers for async
+     buildPartitionHashesForNode(cycleShardData: CycleShardData) : MainHashResults {
+
+        if(this.verboseLogs) this.mainLogger.debug(`accountsHashCache3 ${cycleShardData.cycleNumber}: ${utils.stringifyReduce(this.accountsHashCache3)}`)
+
+        this.accountsHashCache3.currentCalculationCycle = cycleShardData.cycleNumber
+
+        let mainHashResults: MainHashResults = {
+            cycle:cycleShardData.cycleNumber,
+            partitionHashResults:new Map()
+        }
+
+
+        let nextList:AccountHashCacheList = {
+            accountHashesSorted:[], 
+            accountIDs:[]
+        }
+
+        let tempList1 = []
+
+        for(let key of this.accountsHashCache3.accountHashMap.keys()) {
+            let accountCacheHistory = this.accountsHashCache3.accountHashMap.get(key)
+            let index = 0
+            while(index < accountCacheHistory.accountHashList.length && accountCacheHistory.accountHashList[index].c > cycleShardData.cycleNumber){
+                index++
+            }
+            let entry = accountCacheHistory.accountHashList[index]
+            tempList1.push({id:key, t:entry.t,  entry}) 
+        }
+        tempList1.sort(this.sortByTimestampIdAsc)
+
+        this.accountsHashCache3.workingHistoryList.accountHashesSorted = []
+        this.accountsHashCache3.workingHistoryList.accountIDs = []
+        for(let entry of tempList1) {
+            this.accountsHashCache3.workingHistoryList.accountHashesSorted.push(entry.entry)
+            this.accountsHashCache3.workingHistoryList.accountIDs.push(entry.id)
+        }
+
+ 
         let newIndex=0;
         // process the working list.  split data into partitions and build a new list with nulled spots cleared out
         for(let index=0; index < this.accountsHashCache3.workingHistoryList.accountHashesSorted.length; index++){
