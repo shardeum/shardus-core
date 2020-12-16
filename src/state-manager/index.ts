@@ -4039,6 +4039,10 @@ class StateManager extends EventEmitter {
         wrappedState.prevStateId = wrappedState.stateId
 
         wrappedState.prevDataCopy = utils.deepCopy(wrappedState.data)
+
+        //important to update the wrappedState timestamp here to prevent bad timestamps from propagating the system
+        let {timestamp:updatedTimestamp, hash:updatedHash} = this.app.getTimestampAndHashFromAccount(wrappedState.data)
+        wrappedState.timestamp = updatedTimestamp
       }
     }
 
@@ -4982,6 +4986,12 @@ class StateManager extends EventEmitter {
                 this.stateManagerStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, data.accountId, beforeData)
               }
 
+              // important to update the timestamp.  There are various reasons it could be incorrectly set to 0
+              let {timestamp:updatedTimestamp, hash:updatedHash} = this.app.getTimestampAndHashFromAccount(data.data)
+              if(data.timestamp != updatedTimestamp){
+                this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 timstamp had to be corrected from ${data.timestamp} to ${updatedTimestamp} `)
+              }
+              data.timestamp = updatedTimestamp
               this.stateManagerStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, beforeData, data)
             }
             
