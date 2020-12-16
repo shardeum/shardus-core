@@ -73,55 +73,55 @@ class StateManagerCache {
      */
     ///////////////  
 
-    updateAccountHash1(accountId: string, hash:string, timestamp:number, cycle:number){
-        let accountHashList:AccountHashCache[]
-        if(this.accountsHashCache.has(accountId) === false) {
-            accountHashList = []
-            this.accountsHashCache.set(accountId, accountHashList)
-        } else {
-            accountHashList = this.accountsHashCache.get(accountId)
-        }
+    // updateAccountHash1(accountId: string, hash:string, timestamp:number, cycle:number){
+    //     let accountHashList:AccountHashCache[]
+    //     if(this.accountsHashCache.has(accountId) === false) {
+    //         accountHashList = []
+    //         this.accountsHashCache.set(accountId, accountHashList)
+    //     } else {
+    //         accountHashList = this.accountsHashCache.get(accountId)
+    //     }
 
-        //update or replace
-        let accountHashData:AccountHashCache = {t:timestamp, h:hash, c:cycle}
+    //     //update or replace
+    //     let accountHashData:AccountHashCache = {t:timestamp, h:hash, c:cycle}
 
-        if(accountHashList.length === 0){
-            accountHashList.push(accountHashData)
-        } else {
-            if(accountHashList.length > 0){
-                //0 is the newest?
-                let current = accountHashList[0]
+    //     if(accountHashList.length === 0){
+    //         accountHashList.push(accountHashData)
+    //     } else {
+    //         if(accountHashList.length > 0){
+    //             //0 is the newest?
+    //             let current = accountHashList[0]
 
-                if(current.c === cycle){
-                    //update current
-                    current.h = hash
-                    current.t = timestamp
-                } else {
-                    //push new entry to head
-                    accountHashList.unshift(accountHashData)
-                    while(accountHashList.length > 3){
-                        //remove from end.
-                        accountHashList.pop()
-                    }
-                }
-            }
-        }
-    }
-    hasAccount1(accountId: string) {
-        return this.accountsHashCache.has(accountId)
-    }
+    //             if(current.c === cycle){
+    //                 //update current
+    //                 current.h = hash
+    //                 current.t = timestamp
+    //             } else {
+    //                 //push new entry to head
+    //                 accountHashList.unshift(accountHashData)
+    //                 while(accountHashList.length > 3){
+    //                     //remove from end.
+    //                     accountHashList.pop()
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+    // hasAccount1(accountId: string) {
+    //     return this.accountsHashCache.has(accountId)
+    // }
 
-    getAccountHash1(accountId: string) : AccountHashCache {
-        if(this.accountsHashCache.has(accountId) === false) {
-            return null
-        }
-        let accountHashList = this.accountsHashCache.get(accountId)
-        if(accountHashList.length > 0){
-            //0 is the newest?
-            return accountHashList[0]
-        }
+    // getAccountHash1(accountId: string) : AccountHashCache {
+    //     if(this.accountsHashCache.has(accountId) === false) {
+    //         return null
+    //     }
+    //     let accountHashList = this.accountsHashCache.get(accountId)
+    //     if(accountHashList.length > 0){
+    //         //0 is the newest?
+    //         return accountHashList[0]
+    //     }
 
-    }
+    // }
 
 
 
@@ -136,115 +136,115 @@ class StateManagerCache {
         this.shardValuesByCycle = shardValuesByCycle
     }
 
-    updateAccountHash2(accountId: string, hash:string, timestamp:number, cycle:number){
+    // updateAccountHash2(accountId: string, hash:string, timestamp:number, cycle:number){
 
-        //get partition for the current given cycle. could we require this to be passed in?
-        let cycleShardData = null
-        if(this.shardValuesByCycle.has(cycle)){
-            cycleShardData = this.shardValuesByCycle.get(cycle)
-        }
+    //     //get partition for the current given cycle. could we require this to be passed in?
+    //     let cycleShardData = null
+    //     if(this.shardValuesByCycle.has(cycle)){
+    //         cycleShardData = this.shardValuesByCycle.get(cycle)
+    //     }
         
-        let partition = -100
-        if(cycleShardData != null)
-        {
-            let {homePartition, addressNum } = ShardFunctions.addressToPartition(cycleShardData.shardGlobals, accountId)
-            partition = homePartition
-        }
+    //     let partition = -100
+    //     if(cycleShardData != null)
+    //     {
+    //         let {homePartition, addressNum } = ShardFunctions.addressToPartition(cycleShardData.shardGlobals, accountId)
+    //         partition = homePartition
+    //     }
         
 
-        let accountHashHistory:AccountHashCacheHistoryOld
-        let accountHashListForHistory: AccountHashCache[]
-        if(this.accountsHashCacheMain.accountHashMap.has(accountId) == false){
-            accountHashListForHistory = []
-            accountHashHistory = {lastSeenCycle:cycle,lastSeenSortIndex:-1, accountHashList:accountHashListForHistory}
-            this.accountsHashCacheMain.accountHashMap.set(accountId, accountHashHistory)
-        } else {
-            accountHashHistory = this.accountsHashCacheMain.accountHashMap.get(accountId)
-            accountHashListForHistory = accountHashHistory.accountHashList
-        }
+    //     let accountHashHistory:AccountHashCacheHistoryOld
+    //     let accountHashListForHistory: AccountHashCache[]
+    //     if(this.accountsHashCacheMain.accountHashMap.has(accountId) == false){
+    //         accountHashListForHistory = []
+    //         accountHashHistory = {lastSeenCycle:cycle,lastSeenSortIndex:-1, accountHashList:accountHashListForHistory}
+    //         this.accountsHashCacheMain.accountHashMap.set(accountId, accountHashHistory)
+    //     } else {
+    //         accountHashHistory = this.accountsHashCacheMain.accountHashMap.get(accountId)
+    //         accountHashListForHistory = accountHashHistory.accountHashList
+    //     }
 
-        let accountHashCache:AccountHashCache // = {c:cycle, t:timestamp, h:hash}
-        //update the accountHashHistory accountHashMap.accountHashList 
-        if(accountHashHistory.lastSeenSortIndex == -1 || accountHashHistory.lastSeenCycle != cycle) {
-            // it is new for the list.
+    //     let accountHashCache:AccountHashCache // = {c:cycle, t:timestamp, h:hash}
+    //     //update the accountHashHistory accountHashMap.accountHashList 
+    //     if(accountHashHistory.lastSeenSortIndex == -1 || accountHashHistory.lastSeenCycle != cycle) {
+    //         // it is new for the list.
 
-            //search from end of list to find timestamp correct location
+    //         //search from end of list to find timestamp correct location
 
 
 
-        } else {
-            // it is already in the list.
+    //     } else {
+    //         // it is already in the list.
 
-        }  
+    //     }  
             
-        //update accountHashesByPartition
-        if(partition != -100)
-        {
-            let accountHashesByPartition = this.accountsHashCacheMain.accountHashCacheByPartition
-            let accountHashesForPartition:AccountHashesForPartition = null
-            if(accountHashesByPartition.has(partition) == false)
-            {
-                accountHashesForPartition = { partition, accountHashesSorted:[], accountIDs:[]  }
-                accountHashesByPartition.set(partition, accountHashesForPartition)
-            }
+    //     //update accountHashesByPartition
+    //     if(partition != -100)
+    //     {
+    //         let accountHashesByPartition = this.accountsHashCacheMain.accountHashCacheByPartition
+    //         let accountHashesForPartition:AccountHashesForPartition = null
+    //         if(accountHashesByPartition.has(partition) == false)
+    //         {
+    //             accountHashesForPartition = { partition, accountHashesSorted:[], accountIDs:[]  }
+    //             accountHashesByPartition.set(partition, accountHashesForPartition)
+    //         }
 
-            //do we already have an index into the list?  (todo created timestamp?)
+    //         //do we already have an index into the list?  (todo created timestamp?)
 
-            //find index in accountHashesForPartition based on timestamp
-
-
-        }
+    //         //find index in accountHashesForPartition based on timestamp
 
 
-        // let accountHashList:AccountHashCache[]
-        // if(this.accountsHashCache.has(accountId) === false) {
-        //     accountHashList = []
-        //     this.accountsHashCache.set(accountId, accountHashList)
-        // } else {
-        //     accountHashList = this.accountsHashCache.get(accountId)
-        // }
+    //     }
 
-        // //update or replace
-        // let accountHashData:AccountHashCache = {t:timestamp, h:hash, c:cycle}
 
-        // if(accountHashList.length === 0){
-        //     accountHashList.push(accountHashData)
-        // } else {
-        //     if(accountHashList.length > 0){
-        //         //0 is the newest?
-        //         let current = accountHashList[0]
+    //     // let accountHashList:AccountHashCache[]
+    //     // if(this.accountsHashCache.has(accountId) === false) {
+    //     //     accountHashList = []
+    //     //     this.accountsHashCache.set(accountId, accountHashList)
+    //     // } else {
+    //     //     accountHashList = this.accountsHashCache.get(accountId)
+    //     // }
 
-        //         if(current.c === cycle){
-        //             //update current
-        //             current.h = hash
-        //             current.t = timestamp
-        //         } else {
-        //             //push new entry to head
-        //             accountHashList.unshift(accountHashData)
-        //             while(accountHashList.length > 3){
-        //                 //remove from end.
-        //                 accountHashList.pop()
-        //             }
-        //         }
-        //     }
-        // }
-    }
+    //     // //update or replace
+    //     // let accountHashData:AccountHashCache = {t:timestamp, h:hash, c:cycle}
 
-    hasAccount2(accountId: string) {
-        return this.accountsHashCache.has(accountId)
-    }
+    //     // if(accountHashList.length === 0){
+    //     //     accountHashList.push(accountHashData)
+    //     // } else {
+    //     //     if(accountHashList.length > 0){
+    //     //         //0 is the newest?
+    //     //         let current = accountHashList[0]
 
-    getAccountHash2(accountId: string) : AccountHashCache {
-        if(this.accountsHashCache.has(accountId) === false) {
-            return null
-        }
-        let accountHashList = this.accountsHashCache.get(accountId)
-        if(accountHashList.length > 0){
-            //0 is the newest?
-            return accountHashList[0]
-        }
+    //     //         if(current.c === cycle){
+    //     //             //update current
+    //     //             current.h = hash
+    //     //             current.t = timestamp
+    //     //         } else {
+    //     //             //push new entry to head
+    //     //             accountHashList.unshift(accountHashData)
+    //     //             while(accountHashList.length > 3){
+    //     //                 //remove from end.
+    //     //                 accountHashList.pop()
+    //     //             }
+    //     //         }
+    //     //     }
+    //     // }
+    // }
 
-    }
+    // hasAccount2(accountId: string) {
+    //     return this.accountsHashCache.has(accountId)
+    // }
+
+    // getAccountHash2(accountId: string) : AccountHashCache {
+    //     if(this.accountsHashCache.has(accountId) === false) {
+    //         return null
+    //     }
+    //     let accountHashList = this.accountsHashCache.get(accountId)
+    //     if(accountHashList.length > 0){
+    //         //0 is the newest?
+    //         return accountHashList[0]
+    //     }
+
+    // }
     
     // function getPartitionRanges(shard: CycleShardData): PartitionRanges {
     //     const partitionRanges = new Map()
@@ -535,10 +535,18 @@ class StateManagerCache {
         for(let key of this.accountsHashCache3.accountHashMap.keys()) {
             let accountCacheHistory = this.accountsHashCache3.accountHashMap.get(key)
             let index = 0
-            while(index < accountCacheHistory.accountHashList.length && accountCacheHistory.accountHashList[index].c > cycleShardData.cycleNumber){
+            while(index < (accountCacheHistory.accountHashList.length-1) && accountCacheHistory.accountHashList[index].c > cycleShardData.cycleNumber){
                 index++
             }
+            if(index >= accountCacheHistory.accountHashList.length){
+                this.mainLogger.error(`buildPartitionHashesForNode: indexToohigh :${index} `) 
+            }
+
             let entry = accountCacheHistory.accountHashList[index]
+            if(entry == null){
+                this.mainLogger.error(`buildPartitionHashesForNode: entry==null :${index} cycle: ${cycleShardData.cycleNumber} key:${utils.stringifyReduce(key)}:  ${utils.stringifyReduce(accountCacheHistory)}`) 
+                continue
+            }
             tempList1.push({id:key, t:entry.t,  entry}) 
         }
         tempList1.sort(this.sortByTimestampIdAsc)
@@ -608,6 +616,11 @@ class StateManagerCache {
             }
             let accountID = this.accountsHashCache3.futureHistoryList.accountIDs[index]
             
+            if(this.accountsHashCache3.accountHashMap.has(accountID) == false){
+                this.mainLogger.error(`buildPartitionHashesForNode: missing accountID:${accountID} index:${index} len:${this.accountsHashCache3.futureHistoryList.accountHashesSorted.length}`) 
+                continue
+            }
+
             // need to update the list index
             // build up our next list
             nextList.accountHashesSorted.push(accountHashData)
