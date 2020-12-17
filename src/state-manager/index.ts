@@ -140,6 +140,8 @@ class StateManager extends EventEmitter {
 
     stateManagerCache: StateManagerCache;
 
+    syncPartitionsStarted: boolean
+
   constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage : Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     super()
     this.verboseLogs = verboseLogs
@@ -173,6 +175,7 @@ class StateManager extends EventEmitter {
     this.lastSeenAccountsMap = null
 
     this.appFinishedSyncing = false
+    this.syncPartitionsStarted = false
 
     this.extensiveRangeChecking = true
 
@@ -8767,22 +8770,27 @@ class StateManager extends EventEmitter {
           return
         }
 
-        // this seems like the correct place for the calculation because we are on the "old" currentCycleShardData
-        // 
-        // if(this.currentCycleShardData  && this.currentCycleShardData.ourNode.status === 'active'){
-        //   this.stateManagerCache.buildPartitionHashesForNode(this.currentCycleShardData)    
-        // }
- 
         // this.dumpAccountDebugData()
         this.updateShardValues(lastCycle.counter)
-        //this.dumpAccountDebugData() // better to print values after an update!
+        // this.dumpAccountDebugData() // better to print values after an update!
+
+        // calculate coverage change asap
+        if (this.currentCycleShardData && this.currentCycleShardData.ourNode.status === 'active') {
+          this.calculateChangeInCoverage()
+        }
+
+        if(this.syncPartitionsStarted){
+          // not certain if we want await
+          this.processPreviousCycleSummaries()
+        }
       }
     })
 
     this._registerListener(this.p2p.state, 'cycle_q3_start', async (lastCycle: Shardus.Cycle, time:number) => {
-      if (this.currentCycleShardData && this.currentCycleShardData.ourNode.status === 'active') {
-        this.calculateChangeInCoverage()
-      }
+      // moved coverage calculation changes earlier to q1
+      // if (this.currentCycleShardData && this.currentCycleShardData.ourNode.status === 'active') {
+      //   this.calculateChangeInCoverage()
+      // }
       lastCycle = this.p2p.state.getLastCycle()
       if (lastCycle == null) {
         return
@@ -8813,6 +8821,72 @@ class StateManager extends EventEmitter {
     })
   }
 
+  async processPreviousCycleSummaries() {
+    let lastCycle = this.p2p.state.getLastCycle()
+    if (lastCycle == null) {
+      return
+    }
+    let cycleShardValues = this.shardValuesByCycle.get(lastCycle.counter - 1)
+    if (cycleShardValues == null) {
+      return
+    }
+    if(this.currentCycleShardData == null){
+      return
+    }
+    if (this.currentCycleShardData.ourNode.status !== 'active') {
+      return
+    }
+    if (cycleShardValues.ourNode.status !== 'active') {
+      return
+    }
+    let cycle = this.p2p.state.getCycleByCounter(cycleShardValues.cycleNumber)
+    if(cycle == null){
+      return
+    }
+
+    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processPreviousCycleSummaries cycle: ${cycle.counter}`)
+    // this will take temp TXs and make sure they are stored in the correct place for us to generate partitions
+    this.processTempTXs(cycle)
+
+    // During the Q2 phase of a cycle, nodes compute the partition hash of the previous cycle for all the partitions covered by the node.
+    // Q2 was chosen so that any transactions submitted with a time stamp that falls in the previous quarter will have been processed and finalized. This could be changed to Q3 if we find that more time is needed.
+    this.generatePartitionObjects(cycle)
+
+    let receiptMapResults = this.generateReceiptMapResults(cycle)
+
+    if(this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `receiptMapResults: ${stringify(receiptMapResults)}`)
+
+    let statsClump = this.stateManagerStats.getCoveredStatsPartitions(cycleShardValues)
+
+    //build partition hashes from previous full cycle
+    let mainHashResults:MainHashResults = null
+    if(cycleShardValues && cycleShardValues.ourNode.status === 'active'){
+      mainHashResults = this.stateManagerCache.buildPartitionHashesForNode(cycleShardValues)    
+    }
+
+    // Hook for Snapshot module to listen to after partition data is settled
+    this.emit('cycleTxsFinalized', cycleShardValues, receiptMapResults, statsClump, mainHashResults)
+
+    this.dumpAccountDebugData2(mainHashResults) 
+    
+    // pre-allocate the next two cycles if needed
+    for(let i=1; i<=2; i++){
+      let prekey = 'c' + (cycle.counter + i)
+      if(this.partitionObjectsByCycle[prekey] == null){
+        this.partitionObjectsByCycle[prekey] = []
+      }
+      if(this.ourPartitionResultsByCycle[prekey] == null){
+        this.ourPartitionResultsByCycle[prekey] = []
+      }    
+    }
+
+    // Nodes generate the partition result for all partitions they cover.
+    // Nodes broadcast the set of partition results to N adjacent peers on each side; where N is
+    // the number of partitions covered by the node. Uses the /post_partition_results API.
+    await this.broadcastPartitionResults(cycle.counter) // Cycle_number
+
+  } 
+
   async startSyncPartitions () {
     // await this.createInitialAccountBackups() // nm this is now part of regular data sync
     // register our handlers
@@ -8821,71 +8895,65 @@ class StateManager extends EventEmitter {
     //   this.updateShardValues(lastCycle.counter)
     // })
 
+    this.syncPartitionsStarted = true
+
     this._registerListener(this.p2p.state, 'cycle_q2_start', async (lastCycle: Shardus.Cycle, time: number) => {
-      lastCycle = this.p2p.state.getLastCycle()
-      if (lastCycle == null) {
-        return
-      }
-      let lastCycleShardValues = this.shardValuesByCycle.get(lastCycle.counter)
-      if (lastCycleShardValues == null) {
-        return
-      }
-      if(this.currentCycleShardData == null){
-        return
-      }
 
-      if (this.currentCycleShardData.ourNode.status !== 'active') {
-        // dont participate just yet.
-        return
-      }
+      // await this.processPreviousCycleSummaries()
 
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startSyncPartitions:cycle_q2_start cycle: ${lastCycle.counter}`)
-      // this will take temp TXs and make sure they are stored in the correct place for us to generate partitions
-      this.processTempTXs(lastCycle)
-
-      // During the Q2 phase of a cycle, nodes compute the partition hash of the previous cycle for all the partitions covered by the node.
-      // Q2 was chosen so that any transactions submitted with a time stamp that falls in the previous quarter will have been processed and finalized. This could be changed to Q3 if we find that more time is needed.
-      this.generatePartitionObjects(lastCycle)
-
-      let receiptMapResults = this.generateReceiptMapResults(lastCycle)
-
-      if(this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `receiptMapResults: ${stringify(receiptMapResults)}`)
-
-      let statsClump = this.stateManagerStats.getCoveredStatsPartitions(lastCycleShardValues)
-
-
-      // feels like our correctness calc is off by a whole cycle in partition numbers.
-      //really need to think more on if this is the right cycle to compute on
-      // let previousFullCycleNumber = this.currentCycleShardData.cycleNumber-1
-      // if(this.shardValuesByCycle.has(previousFullCycleNumber)){
-
-      //   let previousFullCycleData = this.shardValuesByCycle.get(previousFullCycleNumber)
-      //   if(previousFullCycleData && previousFullCycleData.ourNode.status === 'active'){
-      //     this.stateManagerCache.buildPartitionHashesForNode(previousFullCycleData)    
-      //   }
+      // lastCycle = this.p2p.state.getLastCycle()
+      // if (lastCycle == null) {
+      //   return
       // }
-      //build partition hashes from previous full cycle
-      let mainHashResults:MainHashResults = null
-      if(this.currentCycleShardData && this.currentCycleShardData.ourNode.status === 'active'){
-        mainHashResults = this.stateManagerCache.buildPartitionHashesForNode(this.currentCycleShardData)    
-      }
+      // let lastCycleShardValues = this.shardValuesByCycle.get(lastCycle.counter)
+      // if (lastCycleShardValues == null) {
+      //   return
+      // }
+      // if(this.currentCycleShardData == null){
+      //   return
+      // }
 
-      // Hook for Snapshot module to listen to after partition data is settled
-      this.emit('cycleTxsFinalized', lastCycleShardValues, receiptMapResults, statsClump, mainHashResults)
+      // if (this.currentCycleShardData.ourNode.status !== 'active') {
+      //   // dont participate just yet.
+      //   return
+      // }
 
-      this.dumpAccountDebugData2(mainHashResults) 
+      // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startSyncPartitions:cycle_q2_start cycle: ${lastCycle.counter}`)
+      // // this will take temp TXs and make sure they are stored in the correct place for us to generate partitions
+      // this.processTempTXs(lastCycle)
+
+      // // During the Q2 phase of a cycle, nodes compute the partition hash of the previous cycle for all the partitions covered by the node.
+      // // Q2 was chosen so that any transactions submitted with a time stamp that falls in the previous quarter will have been processed and finalized. This could be changed to Q3 if we find that more time is needed.
+      // this.generatePartitionObjects(lastCycle)
+
+      // let receiptMapResults = this.generateReceiptMapResults(lastCycle)
+
+      // if(this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `receiptMapResults: ${stringify(receiptMapResults)}`)
+
+      // let statsClump = this.stateManagerStats.getCoveredStatsPartitions(lastCycleShardValues)
+
+      // //build partition hashes from previous full cycle
+      // let mainHashResults:MainHashResults = null
+      // if(this.currentCycleShardData && this.currentCycleShardData.ourNode.status === 'active'){
+      //   mainHashResults = this.stateManagerCache.buildPartitionHashesForNode(this.currentCycleShardData)    
+      // }
+
+      // // Hook for Snapshot module to listen to after partition data is settled
+      // this.emit('cycleTxsFinalized', lastCycleShardValues, receiptMapResults, statsClump, mainHashResults)
+
+      // this.dumpAccountDebugData2(mainHashResults) 
       
 
-      // pre-allocate the next cycle data to be safe!
-      let prekey = 'c' + (lastCycle.counter + 1)
-      this.partitionObjectsByCycle[prekey] = []
-      this.ourPartitionResultsByCycle[prekey] = []
+      // // pre-allocate the next cycle data to be safe!
+      // let prekey = 'c' + (lastCycle.counter + 1)
+      // this.partitionObjectsByCycle[prekey] = []
+      // this.ourPartitionResultsByCycle[prekey] = []
 
-      // Nodes generate the partition result for all partitions they cover.
-      // Nodes broadcast the set of partition results to N adjacent peers on each side; where N is
-      // the number of partitions covered by the node. Uses the /post_partition_results API.
+      // // Nodes generate the partition result for all partitions they cover.
+      // // Nodes broadcast the set of partition results to N adjacent peers on each side; where N is
+      // // the number of partitions covered by the node. Uses the /post_partition_results API.
 
-      await this.broadcastPartitionResults(lastCycle.counter) // Cycle_number
+      // await this.broadcastPartitionResults(lastCycle.counter) // Cycle_number
     })
 
     /* this._registerListener(this.p2p.state, 'cycle_q4_start', async (lastCycle, time) => {
