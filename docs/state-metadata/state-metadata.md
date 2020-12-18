@@ -46,11 +46,13 @@ updated with each tx
 
 3. When a Consensor has computed a network level hash for a cycle:
 
-     * that network level hash. Ex: `network_data_hash`
-     * and the partition level hashes used to compute the network hash. Ex:  
+     * the signed network level hash. Ex: `network_data_hash`
+     * and the partition level hashes used to compute that network hash. Ex:  
        `[data_hash_1, data_hash_2, ...]`
 
-   are signed and sent as an update to the Consensors subscribers.
+   are sent as an update to the Consensors subscribers.
+   
+   *NOTE: Having a Consensor sign network level hashes makes them provable using the Cycle Chain*
 
 4. When an Archiver gets a:
 
