@@ -4,7 +4,7 @@ import { getStateHashes, StateHashes, ReceiptHashes, getReceiptHashes, getSummar
 import { validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { crypto, logger, network, io } from './Context'
-import { getCycleChain } from './CycleChain'
+import { getCycleChain, computeCycleMarker } from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import { CycleRecord as Cycle } from './CycleCreator'
 import * as CycleParser from './CycleParser'
@@ -246,13 +246,20 @@ export function sendData() {
           // Identify request type
           const typedRequest = request as DataRequest<NamesToTypes['CYCLE']>
           // Get latest cycles since lastData
-          const data = getCycleChain(typedRequest.lastData + 1)
+          const cycleRecords = getCycleChain(typedRequest.lastData + 1)
+          const cyclesWithMarker = []
+          for (let i = 0; i < cycleRecords.length; i++) {
+            cyclesWithMarker.push({
+              ...cycleRecords[i],
+              marker: computeCycleMarker(cycleRecords[i])
+            })
+          }
           // Update lastData
-          if (data.length > 0) {
-            typedRequest.lastData = data[data.length - 1].counter
+          if (cyclesWithMarker.length > 0) {
+            typedRequest.lastData = cyclesWithMarker[cyclesWithMarker.length - 1].counter
           }
           // Add to responses
-          responses.CYCLE = data
+          responses.CYCLE = cyclesWithMarker
           break
         }
         case TypeNames.STATE_METADATA: {
