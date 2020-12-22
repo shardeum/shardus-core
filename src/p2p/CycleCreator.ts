@@ -16,6 +16,7 @@ import * as Rotation from './Rotation'
 import * as SafetyMode from './SafetyMode'
 import * as Self from './Self'
 import * as Sync from './Sync'
+import * as Snapshot from '../snapshot'
 import { GossipHandler, InternalHandler, SignedObject } from './Types'
 import { compareQuery, Comparison } from './Utils'
 
@@ -61,7 +62,7 @@ export type CycleRecord = BaseRecord &
     lost: string[]
     refuted: string[]
     apoptosized: string[]
-  }
+  } & Snapshot.Record
 
 export type CycleData = CycleRecord & {
   marker: CycleMarker

@@ -20,6 +20,17 @@ import * as partitionGossip from './partition-gossip'
 import * as SnapshotFunctions from './snapshotFunctions'
 /** TYPES */
 
+export interface NetworkHash {
+  cycle: number
+  hash: string
+}
+
+export interface Record {
+  networkDataHash: NetworkHash[]
+  networkReceiptHash: NetworkHash[]
+  networkSummaryHash: NetworkHash[]
+}
+
 export interface StateHashes {
   counter: Cycle['counter']
   partitionHashes: object
@@ -212,7 +223,6 @@ export async function initSafetyModeVals() {
 
 export function startSnapshotting() {
   partitionGossip.initGossip()
-  SnapshotFunctions.generateFakeReceiptMap()
   Context.stateManager.on(
     'cycleTxsFinalized',
     async (shard: CycleShardData, receiptMapResults:ReceiptMapResult[], statsClump:StatsClump) => {

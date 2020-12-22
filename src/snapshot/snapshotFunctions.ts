@@ -76,38 +76,6 @@ export function calculatePartitionBlock (shard) {
   return partitionToReceiptMap
 }
 
-function generateFakeTxId1 (): txId {
-  return Context.crypto.hash({ data: Math.random() * 10000 })
-}
-
-function generateFakeTxId2Array (): txId2[] {
-  return [Context.crypto.hash({ data: Math.random() * 10000 })]
-}
-
-export function generateFakeReceiptMap () {
-  // generate 10 fake txId and save to receipt Map
-  for (let i = 0; i < 5; i++) {
-    fakeReceipMap.set(generateFakeTxId1(), generateFakeTxId2Array())
-  }
-}
-
-export function generateFakeSummaryBlobs(cycle):SummaryBlob[] {
-  let blobs = []
-  for (let i = 0; i < 64; i++) {
-    blobs.push({
-      cycle,
-      partition: i,
-      blob: Context.crypto.hash({data: Math.random() * 10000})
-    })
-  }
-  return blobs
-}
-
-export function generateFakeSummaryHash(blob) {
-  let summaryHashes = Context.crypto.hash(blob)
-  return summaryHashes
-}
-
 export function createNetworkHash (
   hashes: Map<number, string>
 ): NetworkStateHash {

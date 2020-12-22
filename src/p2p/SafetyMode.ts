@@ -1,5 +1,5 @@
 import { Logger } from 'log4js'
-import * as snapshot from '../snapshot'
+import * as Snapshot from '../snapshot'
 import * as Comms from './Comms'
 import * as Context from './Context'
 import * as CycleCreator from './CycleCreator'
@@ -36,6 +36,10 @@ const routes = {
     gossip: gossipRoute,
   },
 }
+
+let cycleNumberForNetworkDataHash: number
+let cycleNumberForNetworkReceiptHash: number
+let cycleNumberForNetworkSummaryHash: number
 
 /** FUNCTIONS */
 
@@ -83,7 +87,7 @@ export function updateRecord(
   // If you're the first node
   if (Self.isFirst) {
     // Get saftey mode field values from snapshot
-    Object.assign(record, snapshot.safetyModeVals)
+    Object.assign(record, Snapshot.safetyModeVals)
   }
   // If you're not the first node
   else {
@@ -103,6 +107,45 @@ export function updateRecord(
     if (prev.active >= prev.safetyNum) {
       record.safetyMode = false
     }
+  }
+
+  const stateHashes = Snapshot.getStateHashes(cycleNumberForNetworkDataHash ? cycleNumberForNetworkDataHash + 1 : record.counter - 1)
+  if (stateHashes && stateHashes.length > 0) {
+    record.networkDataHash = stateHashes.map(stateHash => {
+      return {
+        cycle: stateHash.counter,
+        hash: stateHash.networkHash
+      }
+    })
+    cycleNumberForNetworkDataHash += 1
+  } else {
+    record.networkDataHash = []
+  }
+
+  const receiptHashes = Snapshot.getReceiptHashes(cycleNumberForNetworkReceiptHash ? cycleNumberForNetworkReceiptHash + 1 : record.counter - 1)
+  if (receiptHashes && receiptHashes.length > 0) {
+    record.networkReceiptHash = receiptHashes.map(receiptHash => {
+      return {
+        cycle: receiptHash.counter,
+        hash: receiptHash.networkReceiptHash
+      }
+    })
+    cycleNumberForNetworkReceiptHash += 1
+  } else {
+    record.networkReceiptHash = []
+  }
+
+  const summaryHashes = Snapshot.getSummaryHashes(cycleNumberForNetworkSummaryHash ? cycleNumberForNetworkSummaryHash + 1 : record.counter - 1)
+  if (summaryHashes && summaryHashes.length > 0) {
+    record.networkSummaryHash = summaryHashes.map(stateHash => {
+      return {
+        cycle: stateHash.counter,
+        hash: stateHash.networkSummaryHash
+      }
+    })
+    cycleNumberForNetworkSummaryHash += 1
+  } else {
+    record.networkSummaryHash = []
   }
 }
 
