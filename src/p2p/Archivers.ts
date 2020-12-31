@@ -369,11 +369,11 @@ export function registerRoutes() {
 
     const nodeInfo = archivers.get(dataRequest.publicKey)
 
-    if (!nodeInfo) {
-      const archiverNotFoundErr = 'Archiver not found in list'
-      warn(archiverNotFoundErr)
-      return res.json({ success: false, error: archiverNotFoundErr })
-    }
+    // if (!nodeInfo) {
+    //   const archiverNotFoundErr = 'Archiver not found in list'
+    //   warn(archiverNotFoundErr)
+    //   return res.json({ success: false, error: archiverNotFoundErr })
+    // }
 
     delete dataRequest.publicKey
     delete dataRequest.tag
@@ -415,11 +415,11 @@ export function registerRoutes() {
     info('queryRequest received', JSON.stringify(queryRequest))
   
     const nodeInfo = archivers.get(queryRequest.publicKey)
-    if (!nodeInfo) {
-      const archiverNotFoundErr = 'Archiver not found in list'
-      warn(archiverNotFoundErr)
-      return res.json({ success: false, error: archiverNotFoundErr })
-    }
+    // if (!nodeInfo) {
+    //   const archiverNotFoundErr = 'Archiver not found in list'
+    //   warn(archiverNotFoundErr)
+    //   return res.json({ success: false, error: archiverNotFoundErr })
+    // }
     delete queryRequest.publicKey
     delete queryRequest.tag
     let data
