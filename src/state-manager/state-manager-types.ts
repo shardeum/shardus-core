@@ -783,7 +783,7 @@ type PartitionCycleReportElement = {
 }
 
 type PartitionCycleReport = {
-    res: PartitionCycleReportElement[]
-    cycleNumber : number
+    res?: PartitionCycleReportElement[]
+    cycleNumber? : number
 }
 

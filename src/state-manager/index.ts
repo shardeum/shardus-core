@@ -156,10 +156,13 @@ class StateManager extends EventEmitter {
     feature_receiptMapResults : boolean
     feature_partitionHashes : boolean
     feature_generateStats : boolean
+    feature_useNewParitionReport : boolean // old way uses generatePartitionObjects to build a report
 
     debugFeature_dumpAccountData : boolean
 
     debugFeatureOld_partitionReciepts : boolean // depends on old partition report features.
+
+
 
     nextCycleReportToSend : PartitionCycleReport
 
@@ -310,6 +313,8 @@ class StateManager extends EventEmitter {
     this.feature_receiptMapResults = true
     this.feature_partitionHashes = true
     this.feature_generateStats = true
+
+    this.feature_useNewParitionReport = true
 
     this.debugFeature_dumpAccountData = true
     this.debugFeatureOld_partitionReciepts = true
@@ -7103,7 +7108,7 @@ class StateManager extends EventEmitter {
    */
   // TSConversion todo define partition report. for now use any
   getPartitionReport (consensusOnly:boolean, smallHashes:boolean): PartitionCycleReport {
-    let response = {res:[], cycleNumber:-1}
+    let response = {} // {res:[], cycleNumber:-1}
     if (this.nextCycleReportToSend != null) {
       if (this.lastCycleReported < this.nextCycleReportToSend.cycleNumber || this.partitionReportDirty === true) {
         // consensusOnly hashes
@@ -7157,7 +7162,10 @@ class StateManager extends EventEmitter {
       throw new Error('generatePartitionObjects partitions == null')
     }
 
-    this.nextCycleReportToSend = { res: [], cycleNumber: lastCycle.counter }
+    if(this.feature_useNewParitionReport === false){
+      this.nextCycleReportToSend = { res: [], cycleNumber: lastCycle.counter }
+    }
+
 
     let partitionObjects = []
     let partitionResults = []
@@ -7169,8 +7177,9 @@ class StateManager extends EventEmitter {
       // Nodes sign the partition hash along with the Partition_id, Cycle_number and timestamp to produce a partition result.
       let partitionResult = this.generatePartitionResult(partitionObject)
 
-      this.nextCycleReportToSend.res.push({ i: partitionResult.Partition_id, h: partitionResult.Partition_hash })
-
+      if(this.feature_useNewParitionReport === false){
+        this.nextCycleReportToSend.res.push({ i: partitionResult.Partition_id, h: partitionResult.Partition_hash })
+      }
       // let partitionObjects = [partitionObject]
       // let partitionResults = [partitionResult]
 
@@ -8879,7 +8888,11 @@ class StateManager extends EventEmitter {
     let mainHashResults:MainHashResults = null
     if(this.feature_partitionHashes === true){
       if(cycleShardValues && cycleShardValues.ourNode.status === 'active'){
-        mainHashResults = this.stateManagerCache.buildPartitionHashesForNode(cycleShardValues)    
+        mainHashResults = this.stateManagerCache.buildPartitionHashesForNode(cycleShardValues)   
+        
+        this.updatePartitionReport(cycleShardValues, mainHashResults)
+
+
       }      
     }
 
@@ -8909,6 +8922,37 @@ class StateManager extends EventEmitter {
     }
 
   } 
+
+  /**
+   * updatePartitionReport 
+   * use our MainHashResults from in memory data to create the nextCycleReportToSend that is used by 
+   * getPartitionReport() / reporter module
+   * @param cycleShardData 
+   * @param mainHashResults 
+   */
+  updatePartitionReport(cycleShardData:CycleShardData, mainHashResults: MainHashResults) {
+    if(this.feature_useNewParitionReport === false){
+      return
+    }
+
+    let partitions = cycleShardData.ourConsensusPartitions
+    if (this.repairAllStoredPartitions === true) {
+      partitions = cycleShardData.ourStoredPartitions
+    }
+    if(partitions == null){
+      throw new Error('updatePartitionReport partitions == null')
+    }
+
+    this.nextCycleReportToSend = { res: [], cycleNumber: cycleShardData.cycleNumber }
+  
+    for(let partition of partitions){
+      if(mainHashResults.partitionHashResults.has(partition)){
+        let partitionHashResults = mainHashResults.partitionHashResults.get(partition)
+        this.nextCycleReportToSend.res.push({ i: partition, h: partitionHashResults.hashOfHashes })
+      }
+    }
+  }
+
 
   async startSyncPartitions () {
     // await this.createInitialAccountBackups() // nm this is now part of regular data sync
