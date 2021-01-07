@@ -603,6 +603,8 @@ declare namespace Shardus {
       useNewParitionReport?: boolean
       /** is the old partition checking system enabled */
       oldPartitionSystem?: boolean
+      /** slow old reporting that queries sql for account values */
+      dumpAccountReportFromSQL?: boolean
     }
     /** Options for the statistics module */
     statistics?: {

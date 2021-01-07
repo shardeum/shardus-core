@@ -159,6 +159,7 @@ class StateManager extends EventEmitter {
     feature_useNewParitionReport : boolean // old way uses generatePartitionObjects to build a report
 
     debugFeature_dumpAccountData : boolean
+    debugFeature_dumpAccountDataFromSQL : boolean
 
     debugFeatureOld_partitionReciepts : boolean // depends on old partition report features.
 
@@ -320,6 +321,7 @@ class StateManager extends EventEmitter {
     this.feature_useNewParitionReport = true
 
     this.debugFeature_dumpAccountData = true
+    this.debugFeature_dumpAccountDataFromSQL = false
     this.debugFeatureOld_partitionReciepts = true
 
     this.stateIsGood_txHashsetOld = true
@@ -333,6 +335,8 @@ class StateManager extends EventEmitter {
       this.feature_useNewParitionReport = this.tryGetBoolProperty(this.config.debug, "useNewParitionReport", this.feature_useNewParitionReport)
 
       this.oldFeature_GeneratePartitionReport = this.tryGetBoolProperty(this.config.debug, "oldPartitionSystem", this.oldFeature_GeneratePartitionReport)
+    
+      this.debugFeature_dumpAccountDataFromSQL = this.tryGetBoolProperty(this.config.debug, "dumpAccountReportFromSQL", this.debugFeature_dumpAccountDataFromSQL)
     }  
 
     // the original way this was setup was to reset and apply repair results one partition at a time.
@@ -6643,22 +6647,25 @@ class StateManager extends EventEmitter {
         let partitionShardData = value
         let accountStart = partitionShardData.homeRange.low
         let accountEnd = partitionShardData.homeRange.high
-        let wrappedAccounts = await this.app.getAccountData(accountStart, accountEnd, 10000000)
-        // { accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp }
-        let duplicateCheck = {}
-        for (let wrappedAccount of wrappedAccounts) {
-          if(duplicateCheck[wrappedAccount.accountId] != null){
-            continue
-          }
-          duplicateCheck[wrappedAccount.accountId] = true
-          let v = wrappedAccount.data.balance // hack, todo maybe ask app for a debug value
-          if (this.app.getAccountDebugValue != null) {
-            v = this.app.getAccountDebugValue(wrappedAccount)
-          }
-          partition.accounts.push({ id: wrappedAccount.accountId, hash: wrappedAccount.stateId, v: v })
-        }
 
-        partition.accounts.sort(this._sortByIdAsc)
+        if(this.debugFeature_dumpAccountDataFromSQL === true){
+          let wrappedAccounts = await this.app.getAccountData(accountStart, accountEnd, 10000000)
+          // { accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp }
+          let duplicateCheck = {}
+          for (let wrappedAccount of wrappedAccounts) {
+            if(duplicateCheck[wrappedAccount.accountId] != null){
+              continue
+            }
+            duplicateCheck[wrappedAccount.accountId] = true
+            let v = wrappedAccount.data.balance // hack, todo maybe ask app for a debug value
+            if (this.app.getAccountDebugValue != null) {
+              v = this.app.getAccountDebugValue(wrappedAccount)
+            }
+            partition.accounts.push({ id: wrappedAccount.accountId, hash: wrappedAccount.stateId, v: v })
+          }
+
+          partition.accounts.sort(this._sortByIdAsc)          
+        }
 
         // Take the cache data report and fill out accounts2 and partitionHash2
         if(mainHashResults.partitionHashResults.has(partition.parititionID)){
