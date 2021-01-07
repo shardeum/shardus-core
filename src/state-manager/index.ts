@@ -297,6 +297,9 @@ class StateManager extends EventEmitter {
       }
     }  
 
+
+
+
     this.stateManagerCache = new StateManagerCache(verboseLogs, profiler, app, logger, crypto, config)
 
     //Init Summary Blobs
@@ -307,8 +310,8 @@ class StateManager extends EventEmitter {
 
 
     this.oldFeature_TXHashsetTest = true
-    this.oldFeature_GeneratePartitionReport = true
-    this.oldFeature_BroadCastPartitionReport = true
+    this.oldFeature_GeneratePartitionReport = false
+    this.oldFeature_BroadCastPartitionReport = true // leaving this true since it depends on the above value
 
     this.feature_receiptMapResults = true
     this.feature_partitionHashes = true
@@ -322,6 +325,15 @@ class StateManager extends EventEmitter {
     this.stateIsGood_txHashsetOld = true
     this.stateIsGood_activeRepairs = true
     this.stateIsGood = true
+
+
+    // other debug features
+    if (this.config && this.config.debug) {
+
+      this.feature_useNewParitionReport = this.tryGetBoolProperty(this.config.debug, "useNewParitionReport", this.feature_useNewParitionReport)
+
+      this.oldFeature_GeneratePartitionReport = this.tryGetBoolProperty(this.config.debug, "oldPartitionSystem", this.oldFeature_GeneratePartitionReport)
+    }  
 
     // the original way this was setup was to reset and apply repair results one partition at a time.
     // this could create issue if we have a TX spanning multiple paritions that are locally owned.
@@ -459,6 +471,16 @@ class StateManager extends EventEmitter {
 
   }
 
+  tryGetBoolProperty(parent:any, propertyName:string, defaultValue: boolean){
+    if(parent == null){
+      return defaultValue
+    }
+    let tempValue = parent[propertyName]
+    if(tempValue === true || tempValue === false){
+      return tempValue
+    }
+    return defaultValue
+  }
 
 
   // this clears state data related to the current partion we are syncing.

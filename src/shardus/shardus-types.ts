@@ -599,6 +599,10 @@ declare namespace Shardus {
       failReceiptChance?: number
       /** chance to flip our vote */
       voteFlipChance?: number      
+      /** use the new stats data for partition state reports to monitor server */
+      useNewParitionReport?: boolean
+      /** is the old partition checking system enabled */
+      oldPartitionSystem?: boolean
     }
     /** Options for the statistics module */
     statistics?: {
