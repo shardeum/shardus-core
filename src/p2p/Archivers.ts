@@ -1,10 +1,11 @@
 import deepmerge from 'deepmerge'
+import Crypto from '../crypto'
 import * as http from '../http'
 import { getStateHashes, StateHashes, ReceiptHashes, getReceiptHashes, getSummaryHashes, SummaryHashes, getReceiptMap, getSummaryBlob } from '../snapshot'
 import { validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { crypto, logger, network, io } from './Context'
-import { getCycleChain, computeCycleMarker } from './CycleChain'
+import { getCycleChain, computeCycleMarker, getNewest } from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import { CycleRecord as Cycle } from './CycleCreator'
 import * as CycleParser from './CycleParser'
@@ -83,7 +84,7 @@ export interface Record {
 let p2pLogger
 
 export let archivers: Map<JoinedArchiver['publicKey'], JoinedArchiver>
-let recipients: DataRecipient[]
+let recipients: Map<JoinedArchiver['publicKey'], DataRecipient>
 
 let requests: JoinRequest[]
 
@@ -95,7 +96,7 @@ export function init() {
   p2pLogger = logger.getLogger('p2p')
 
   archivers = new Map()
-  recipients = []
+  recipients = new Map()
 
   reset()
 
@@ -221,21 +222,22 @@ export function addDataRecipient(
     curvePk: crypto.convertPublicKeyToCurve(nodeInfo.publicKey),
   }
   console.log('dataRequests: ', recipient.dataRequests)
-  recipients.push(recipient)
+  recipients.set(nodeInfo.publicKey,recipient)
 }
 
-function removeDataRecipient(publicKey) {
-  let recipient
-  for (let i = recipients.length - 1; i >= 0; i--) {
-    recipient = recipients[i]
-    if (recipient.nodeInfo.publicKey === publicKey) {
-      recipients.splice(i, 1)
-    }
+export function removeDataRecipient(publicKey) {
+  if (recipients.has(publicKey)) {
+    console.log('Removing data recipient', publicKey)
+    recipients.delete(publicKey)
+  } else {
+    console.log(`Data recipient ${publicKey} is already removed`)
   }
 }
 
 export function sendData() {
-  for (const recipient of recipients) {
+  console.log('Recient List before sending data')
+  console.log(recipients)
+  for (let [publicKey, recipient] of recipients) {
     const recipientUrl = `http://${recipient.nodeInfo.ip}:${recipient.nodeInfo.port}/newdata`
 
     const responses: DataResponse['responses'] = {}
@@ -265,6 +267,7 @@ export function sendData() {
         case TypeNames.STATE_METADATA: {
           // Identify request type
           const typedRequest = request as DataRequest<NamesToTypes['STATE_METADATA']>
+          console.log('STATE_METADATA typedRequest', typedRequest)
           // Get latest state hash data since lastData
           const stateHashes = getStateHashes(typedRequest.lastData + 1)
           const receiptHashes = getReceiptHashes(typedRequest.lastData + 1)
@@ -278,8 +281,9 @@ export function sendData() {
             counter: typedRequest.lastData >= 0 ? typedRequest.lastData : 0,
             stateHashes,
             receiptHashes,
-            summaryHashes
+            summaryHashes,
           }
+          console.log('Metadata to send', metadata)
           // Add to responses
           responses.STATE_METADATA = [metadata]
           break
@@ -295,6 +299,13 @@ export function sendData() {
 
     // Tag dataResponse
     const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
+
+    console.log(`Sending data for cycle ${getNewest().counter} to archiver ${recipientUrl}`, recipient.curvePk)
+    console.log(taggedDataResponse)
+    console.log(taggedDataResponse.responses)
+
+    let isAuthenticated = crypto.authenticate(taggedDataResponse, crypto.getPublicKey())
+    console.log('Is authenticated', isAuthenticated)
 
     io.emit('DATA', taggedDataResponse)
 
@@ -358,7 +369,7 @@ export function registerRoutes() {
     // [TODO] Authenticate tag
 
     const dataRequest = req.body
-    info('dataRequest received', dataRequest)
+    info('dataRequest received', JSON.stringify(dataRequest))
     /*
     const invalidTagErr = 'Tag is invalid'
     if (!crypto.authenticate(dataRequest, crypto.getCurvePublicKey(dataRequest.publicKey))) {

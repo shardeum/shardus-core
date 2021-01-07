@@ -23,6 +23,7 @@ import Storage from '../storage'
 import * as utils from '../utils'
 import Profiler from '../utils/profiler'
 import ShardusTypes = require('../shardus/shardus-types')
+import * as Archivers from '../p2p/Archivers'
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
@@ -440,8 +441,19 @@ class Shardus extends EventEmitter {
     // Setup network
     this.io = await this.network.setup(Network.ipInfo) as SocketIO.Server
     Context.setIOContext(this.io)
-    this.io.on('connection', () => {
-      console.log('Archive server has subscribed to this node!')
+    let connectedSockets = {}
+    this.io.on('connection', (socket: any) => {
+      console.log(`Archive server has subscribed to this node with socket id ${socket.id}!`)
+      socket.on('ARCHIVER_PUBLIC_KEY', function(ARCHIVER_PUBLIC_KEY) {
+        console.log('Archiver has registered its public key', ARCHIVER_PUBLIC_KEY)
+        connectedSockets[socket.id] = ARCHIVER_PUBLIC_KEY
+      })
+      socket.on('UNSUBSCRIBE', function(ARCHIVER_PUBLIC_KEY) {
+        console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
+        console.log('connectedSockets', connectedSockets)
+        Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
+        
+      })
     })
     this.network.on('timeout', (node) => {
       console.log('in Shardus got network timeout from', node)
@@ -538,6 +550,8 @@ class Shardus extends EventEmitter {
       : null
 
     this._registerRoutes()
+
+    // this.io.on('disconnect')
 
     // Register listeners for P2P events
     Self.emitter.on('witnessing', async (publicKey) => {
