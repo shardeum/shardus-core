@@ -776,3 +776,14 @@ type MainHashResults = {
     cycle:number
     partitionHashResults: Map<number, PartitionHashResults>;
 }
+
+type PartitionCycleReportElement = {
+    i : number; // partition id
+    h : string; // partition hash
+}
+
+type PartitionCycleReport = {
+    res: PartitionCycleReportElement[]
+    cycleNumber : number
+}
+

@@ -197,7 +197,7 @@ class Reporter {
       let globalSync = null
       if (this.stateManager != null) {
         partitionReport = this.stateManager.getPartitionReport(true, true)
-        globalSync = this.stateManager.stateIsGood
+        globalSync = this.stateManager.isStateGood()
 
         repairsStarted = this.stateManager.dataRepairsStarted
         repairsFinished = this.stateManager.dataRepairsCompleted

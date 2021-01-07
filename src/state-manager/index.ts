@@ -142,6 +142,29 @@ class StateManager extends EventEmitter {
 
     syncPartitionsStarted: boolean
 
+
+    stateIsGood_txHashsetOld : boolean
+    stateIsGood_accountPartitions : boolean
+    stateIsGood_activeRepairs : boolean
+    stateIsGood : boolean
+
+    oldFeature_TXHashsetTest : boolean
+    oldFeature_GeneratePartitionReport : boolean
+    oldFeature_BroadCastPartitionReport : boolean
+    useHashSets: boolean //Old feature but must stay on (uses hash set string vs. older method)
+
+    feature_receiptMapResults : boolean
+    feature_partitionHashes : boolean
+    feature_generateStats : boolean
+
+    debugFeature_dumpAccountData : boolean
+
+    debugFeatureOld_partitionReciepts : boolean // depends on old partition report features.
+
+    nextCycleReportToSend : PartitionCycleReport
+
+
+
   constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage : Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     super()
     this.verboseLogs = verboseLogs
@@ -280,7 +303,21 @@ class StateManager extends EventEmitter {
     this.stateManagerStats.initSummaryBlobs()
 
 
+    this.oldFeature_TXHashsetTest = true
+    this.oldFeature_GeneratePartitionReport = true
+    this.oldFeature_BroadCastPartitionReport = true
+
+    this.feature_receiptMapResults = true
+    this.feature_partitionHashes = true
+    this.feature_generateStats = true
+
+    this.debugFeature_dumpAccountData = true
+    this.debugFeatureOld_partitionReciepts = true
+
+    this.stateIsGood_txHashsetOld = true
+    this.stateIsGood_activeRepairs = true
     this.stateIsGood = true
+
     // the original way this was setup was to reset and apply repair results one partition at a time.
     // this could create issue if we have a TX spanning multiple paritions that are locally owned.
     this.resetAndApplyPerPartition = false
@@ -390,15 +427,6 @@ class StateManager extends EventEmitter {
     // this.lastCycleReported = -1
     // this.partitionReportDirty = false
     // this.nextCycleReportToSend = null
-
-    // this.canDataRepair = false
-    // // this controls the repair portion of data repair.
-    // if (this.config && this.config.debug) {
-    //   this.canDataRepair = this.config.debug.canDataRepair
-    //   if (this.canDataRepair == null) {
-    //     this.canDataRepair = false
-    //   }
-    // }
 
     // this.stateIsGood = true
     // // the original way this was setup was to reset and apply repair results one partition at a time.
@@ -2727,38 +2755,6 @@ class StateManager extends EventEmitter {
       // await respond(result)
       })
 
-    // /post_partition_results (Partition_results)
-    //   Partition_results - array of objects with the fields {Partition_id, Cycle_number, Partition_hash, Node_id, Node_sign}
-    //   Returns nothing
-
-    // this.p2p.registerInternal('post_partition_receipt',
-    //   /**
-    //   * This is how to typedef a callback!
-    //  * @param {PartitionReceipt} payload
-    //  * @param {any} respond
-    //  */
-    //   async (payload, respond) => {
-    //     try {
-    //       if (!payload) {
-    //         if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair post_partition_results: abort no payload`)
-    //         return
-    //       }
-
-    //       let partitionResults = payload.partitionResults
-    //       let cycleKey = 'c' + payload.Cycle_number
-
-    //       let allResponsesByPartition = this.allPartitionResponsesByCycleByPartition[cycleKey]
-    //       if (!allResponsesByPartition) {
-    //         allResponsesByPartition = {}
-    //         this.allPartitionResponsesByCycleByPartition[cycleKey] = allResponsesByPartition
-    //       }
-    //       let ourPartitionResults = this.ourPartitionResultsByCycle[cycleKey]
-
-    //     } finally {
-
-    //     }
-
-    //   })
 
     // /get_transactions_by_list (Tx_ids)
     //   Tx_ids - array of transaction ids
@@ -7106,8 +7102,8 @@ class StateManager extends EventEmitter {
    * @returns {any}
    */
   // TSConversion todo define partition report. for now use any
-  getPartitionReport (consensusOnly:boolean, smallHashes:boolean): any {
-    let response = {}
+  getPartitionReport (consensusOnly:boolean, smallHashes:boolean): PartitionCycleReport {
+    let response = {res:[], cycleNumber:-1}
     if (this.nextCycleReportToSend != null) {
       if (this.lastCycleReported < this.nextCycleReportToSend.cycleNumber || this.partitionReportDirty === true) {
         // consensusOnly hashes
@@ -7380,6 +7376,12 @@ class StateManager extends EventEmitter {
     return { partitionReceipt, topResult, success: true }
   }
 
+
+  isStateGood() {
+
+    return this.stateIsGood
+  }
+
   /**
    * startRepairProcess
    * @param {Cycle} cycle
@@ -7389,7 +7391,7 @@ class StateManager extends EventEmitter {
    */
   async startRepairProcess (cycle:Cycle, topResult:PartitionResult | null, partitionId:number, ourLastResultHash:string) {
     // todo update stateIsGood to follow a new metric based on the new data repair.
-    this.stateIsGood = false
+    this.stateIsGood_txHashsetOld = false
     if (this.canDataRepair === false) {
       // todo fix false negative results.  This may require inserting 
       if (this.verboseLogs) this.mainLogger.error( `data oos detected. (old system) False negative results given if syncing. cycle: ${cycle.counter} partition: ${partitionId} `)
@@ -7403,6 +7405,9 @@ class StateManager extends EventEmitter {
   // possibly have to split this into three functions to make that clean (find our result and the parition checking as sub funcitons... idk)
   /**
    * checkForGoodPartitionReciept
+   * 
+   *  this is part of the old partition tracking and is only used for debugging now.
+   * 
    * @param {number} cycleNumber
    * @param {number} partitionId
    */
@@ -7566,6 +7571,8 @@ class StateManager extends EventEmitter {
         if (this.verboseLogs) this.mainLogger.error(`No active data repair going on tag:${debugTag}`)
       }
       this.stateIsGood = true
+      this.stateIsGood_activeRepairs = true
+      this.stateIsGood_txHashsetOld = true
     }
   }
 
@@ -8844,30 +8851,44 @@ class StateManager extends EventEmitter {
       return
     }
 
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processPreviousCycleSummaries cycle: ${cycle.counter}`)
-    // this will take temp TXs and make sure they are stored in the correct place for us to generate partitions
-    this.processTempTXs(cycle)
+    if(this.oldFeature_GeneratePartitionReport === true){
+      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processPreviousCycleSummaries cycle: ${cycle.counter}`)
+      // this will take temp TXs and make sure they are stored in the correct place for us to generate partitions
+      this.processTempTXs(cycle)
 
-    // During the Q2 phase of a cycle, nodes compute the partition hash of the previous cycle for all the partitions covered by the node.
-    // Q2 was chosen so that any transactions submitted with a time stamp that falls in the previous quarter will have been processed and finalized. This could be changed to Q3 if we find that more time is needed.
-    this.generatePartitionObjects(cycle)
+      // During the Q2 phase of a cycle, nodes compute the partition hash of the previous cycle for all the partitions covered by the node.
+      // Q2 was chosen so that any transactions submitted with a time stamp that falls in the previous quarter will have been processed and finalized. This could be changed to Q3 if we find that more time is needed.
+      this.generatePartitionObjects(cycle)      
+    }
 
-    let receiptMapResults = this.generateReceiptMapResults(cycle)
+    let receiptMapResults = []
 
-    if(this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `receiptMapResults: ${stringify(receiptMapResults)}`)
+    // Get the receipt map to send as a report
+    if(this.feature_receiptMapResults === true) {
+      receiptMapResults = this.generateReceiptMapResults(cycle)
+      if(this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `receiptMapResults: ${stringify(receiptMapResults)}`)      
+    }
 
-    let statsClump = this.stateManagerStats.getCoveredStatsPartitions(cycleShardValues)
+    // Get the stats data to send as a reort
+    let statsClump = {}
+    if(this.feature_generateStats === true){
+      statsClump = this.stateManagerStats.getCoveredStatsPartitions(cycleShardValues)
+    }
 
-    //build partition hashes from previous full cycle
+    // build partition hashes from previous full cycle
     let mainHashResults:MainHashResults = null
-    if(cycleShardValues && cycleShardValues.ourNode.status === 'active'){
-      mainHashResults = this.stateManagerCache.buildPartitionHashesForNode(cycleShardValues)    
+    if(this.feature_partitionHashes === true){
+      if(cycleShardValues && cycleShardValues.ourNode.status === 'active'){
+        mainHashResults = this.stateManagerCache.buildPartitionHashesForNode(cycleShardValues)    
+      }      
     }
 
     // Hook for Snapshot module to listen to after partition data is settled
     this.emit('cycleTxsFinalized', cycleShardValues, receiptMapResults, statsClump, mainHashResults)
 
-    this.dumpAccountDebugData2(mainHashResults) 
+    if(this.debugFeature_dumpAccountData === true) {
+      this.dumpAccountDebugData2(mainHashResults) 
+    }
     
     // pre-allocate the next two cycles if needed
     for(let i=1; i<=2; i++){
@@ -8880,10 +8901,12 @@ class StateManager extends EventEmitter {
       }    
     }
 
-    // Nodes generate the partition result for all partitions they cover.
-    // Nodes broadcast the set of partition results to N adjacent peers on each side; where N is
-    // the number of partitions covered by the node. Uses the /post_partition_results API.
-    await this.broadcastPartitionResults(cycle.counter) // Cycle_number
+    if(this.oldFeature_GeneratePartitionReport === true && this.oldFeature_BroadCastPartitionReport === true){
+      // Nodes generate the partition result for all partitions they cover.
+      // Nodes broadcast the set of partition results to N adjacent peers on each side; where N is
+      // the number of partitions covered by the node. Uses the /post_partition_results API.
+      await this.broadcastPartitionResults(cycle.counter) // Cycle_number
+    }
 
   } 
 
@@ -9039,7 +9062,6 @@ class StateManager extends EventEmitter {
           globalBackupList.push(backupObj) // sort and cleanup later.
 
           if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
-
         }        
       }
 
@@ -9263,6 +9285,7 @@ class StateManager extends EventEmitter {
   // take this tx and create if needed and object for the current cylce that holds a list of passed and failed TXs
   /**
    * recordTXByCycle
+   *   This function is only for building up txList as used by the features: stateIsGood_txHashsetOld, oldFeature_BroadCastPartitionReport, oldFeature_GeneratePartitionReport
    * @param {number} txTS
    * @param {AcceptedTx} acceptedTx
    * @param {boolean} passed
@@ -9465,7 +9488,11 @@ class StateManager extends EventEmitter {
     }
     this.partitionReceiptsByCycleCounter[key].push(partitionReceipt)
 
-    this.trySendAndPurgeReceiptsToArchives(partitionReceipt)
+    if(this.debugFeatureOld_partitionReciepts === true){
+      // this doesnt really send to the archiver but it it does dump reciepts to logs.
+      this.trySendAndPurgeReceiptsToArchives(partitionReceipt)
+    }
+
   }
 
   storeOurPartitionReceipt (cycleNumber:number, partitionReceipt:PartitionReceipt) {
