@@ -35,7 +35,7 @@ const gossipCounterByCycle = new Map()
 let gossipCounterByPartition
 let readyPartitions
 let parititionShardDataMap
-let forwardedGossips = new Map()
+export let forwardedGossips = new Map()
 
 // A class responsible for collecting and processing partition gossip for a given Cycle
 export class Collector extends EventEmitter {

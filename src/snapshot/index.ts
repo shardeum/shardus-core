@@ -388,6 +388,7 @@ export function startSnapshotting() {
       }      
 
       Comms.sendGossip('snapshot_gossip', message)
+      partitionGossip.forwardedGossips.set(message.sender, true)
       collector.process([message])
 
       // Clean partition gossip that's older than 10 cycles
