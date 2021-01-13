@@ -12,7 +12,8 @@ type QueueEntry = {
     acceptedTx: import("../shardus/shardus-types").AcceptedTx;
     txKeys: import("../shardus/shardus-types").TransactionKeys
     collectedData: WrappedResponses;
-    originalData: any;
+    originalData: {[accountID:string]:string}; //serialized to string backups of account data.
+    beforeHashes: {[accountID:string]:string}; //before hashes of account data
     homeNodes: {[accountID:string]:import('./shardFunctionTypes').NodeShardData};
     patchedOnNodes: Map<string, import('./shardFunctionTypes').NodeShardData>; //{[accountID:string]:import('./shardFunctionTypes').NodeShardData};
     hasShardInfo: boolean;
@@ -578,7 +579,7 @@ type GetPartitionTxidsReq = { Partition_id: any; Cycle_number: string }
 type RouteToHomeNodeReq = { txid: any; timestamp: any; acceptedTx: import("../shardus/shardus-types").AcceptedTx }
 
 type RequestStateForTxReq = { txid: string; timestamp: number; keys: any }
-type RequestStateForTxResp = { stateList: import("../shardus/shardus-types").WrappedResponse[]; note: string; success:boolean }
+type RequestStateForTxResp = { stateList: import("../shardus/shardus-types").WrappedResponse[]; beforeHashes: {[accountID:string]:string}; note: string; success:boolean }
 
 type RequestReceiptForTxReq = { txid: string; timestamp: number; }
 type RequestReceiptForTxResp = { receipt:AppliedReceipt ; note: string; success:boolean }

@@ -110,6 +110,10 @@ class Consensus extends EventEmitter {
         }
       }
 
+      if(sourceAddress === null && targetAddress === null){
+        throw new Error(`app.getKeyFromTransaction did not return any keys for the transaction: ${utils.stringifyReduce(shardusTransaction)}`)
+      }
+
       if (this.mainLogs) {
         this.mainLogger.debug(
           `Creating the receipt for the transaction: StateID: ${stateId} short stateID: ${utils.makeShortHash(

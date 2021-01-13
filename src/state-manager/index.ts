@@ -39,6 +39,7 @@ import * as Context from '../p2p/Context'
 
 import StateManagerStats from './state-manager-stats'
 import StateManagerCache from './state-manager-cache'
+import { response } from 'express'
 
 /**
  * StateManager
@@ -2933,7 +2934,7 @@ class StateManager extends EventEmitter {
 
     // p2p ASK
     this.p2p.registerInternal('request_state_for_tx', async (payload: RequestStateForTxReq, respond: (arg0: RequestStateForTxResp) => any) => {
-      let response:RequestStateForTxResp = { stateList: [] , note: "", success: false}
+      let response:RequestStateForTxResp = { stateList: [] , beforeHashes: {}, note: "", success: false}
       // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
       let queueEntry = this.getQueueEntrySafe(payload.txid)// , payload.timestamp)
       if (queueEntry == null) {
@@ -2989,7 +2990,7 @@ class StateManager extends EventEmitter {
 
 
     this.p2p.registerInternal('request_state_for_tx_post', async (payload: RequestStateForTxReqPost, respond: (arg0: RequestStateForTxResp) => any) => {
-      let response:RequestStateForTxResp = { stateList: [] , note: "", success: false}
+      let response:RequestStateForTxResp = { stateList: [] , beforeHashes: {},  note: "", success: false}
       // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
       let queueEntry = this.getQueueEntrySafe(payload.txid)// , payload.timestamp)
       if (queueEntry == null) {
@@ -3025,6 +3026,7 @@ class StateManager extends EventEmitter {
           let wrappedState = wrappedStates[key]
           let accountData = wrappedState
 
+
           if(payload.key !== accountData.accountId ){
             continue; //not this account.
           }
@@ -3035,11 +3037,15 @@ class StateManager extends EventEmitter {
             return
           }
           if (accountData) {
+            //include the before hash
+            response.beforeHashes[key] = queueEntry.beforeHashes[key]
+            //include the data
             response.stateList.push(accountData)
           }
         }
       }
 
+       
    
       response.success = true
       await respond(response)
@@ -4216,6 +4222,7 @@ class StateManager extends EventEmitter {
       noConsensus, 
       collectedData: {}, 
       originalData: {}, 
+      beforeHashes: {},
       homeNodes: {}, 
       patchedOnNodes: new Map(), 
       hasShardInfo: false, 
@@ -4509,6 +4516,7 @@ class StateManager extends EventEmitter {
     queueEntry.dataCollected++
 
     queueEntry.originalData[data.accountId] = stringify(data)
+    queueEntry.beforeHashes[data.accountId] = data.stateId
 
     if (queueEntry.dataCollected === queueEntry.uniqueKeys.length) { //  queueEntry.tx Keys.allKeys.length
       queueEntry.hasAll = true
@@ -4836,6 +4844,7 @@ class StateManager extends EventEmitter {
     let requestObjects: {[id:string]:{appliedVote:AppliedVote, voteIndex:number, accountHash:string, accountId:string, nodeShardInfo:NodeShardData, alternates:string[]}} = {}
     let appliedVotes = queueEntry.appliedReceiptForRepair.appliedVotes
     
+
     //shuffle the array
     utils.shuffleArray(appliedVotes)
 
@@ -5008,7 +5017,7 @@ class StateManager extends EventEmitter {
               }
             }
             if(beforeData == null){
-              this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData data is null ${utils.stringifyReduce(data.accountId)} `)
+              this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData data is null ${utils.stringifyReduce(data.accountId)} WILL CAUSE DATA OOS`) 
             } else {
 
               if(this.stateManagerStats.hasAccountBeenSeenByStats(data.accountId) === false){
@@ -5022,7 +5031,45 @@ class StateManager extends EventEmitter {
                 this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 timstamp had to be corrected from ${data.timestamp} to ${updatedTimestamp} `)
               }
               data.timestamp = updatedTimestamp
+
+              // update stats
               this.stateManagerStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, beforeData, data)
+
+              // record state table data
+              let {timestamp:oldtimestamp, hash:oldhash} = this.app.getTimestampAndHashFromAccount(beforeData)
+              
+              let hashNeededUpdate = oldhash !== result.beforeHashes[data.accountId]
+              oldhash = result.beforeHashes[data.accountId]
+
+              let stateTableResults: Shardus.StateTableObject = {
+                accountId: data.accountId, 
+                txId: queueEntry.acceptedTx.id,
+                stateBefore: oldhash,
+                stateAfter: updatedHash,
+                txTimestamp: `${updatedTimestamp}`  
+              }
+
+              let updateStateTable = true
+              let timeStampMatches = updatedTimestamp === queueEntry.acceptedTx.timestamp
+              let test2 = false
+              if(timeStampMatches === false){
+                if(this.isGlobalAccount(data.accountId)){
+                  updateStateTable = false
+                  test2 = true
+                }
+              }
+              let test3 = false
+              if(this.isGlobalAccount(data.accountId)){
+                if(oldhash === updatedHash){
+                  updateStateTable = false
+                  test3 = true
+                }
+              }
+              if(updateStateTable === true){
+                await this.storage.addAccountStates(stateTableResults)
+              }
+              this.mainLogger.debug(`repairToMatchReceipt: addAccountStates neededUpdate:${hashNeededUpdate} updateStateTable:${updateStateTable} timeStampMatches:${timeStampMatches} test2:${test2} test3:${test3} ${utils.stringifyReduce(stateTableResults)} `)       
+
             }
             
           }
