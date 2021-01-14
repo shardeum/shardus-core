@@ -30,6 +30,11 @@ export enum TypeNames {
   STATE_METADATA = 'STATE_METADATA',
 }
 
+export enum RequestTypes {
+  JOIN = 'JOIN',
+  LEAVE = 'LEAVE',
+}
+
 interface NamesToTypes {
   CYCLE: Cycle
   STATE_METADATA: StateMetaData
@@ -67,16 +72,17 @@ export interface JoinedArchiver {
   curvePk: string
 }
 
-export interface JoinRequest extends SignedObject {
-  nodeInfo: JoinedArchiver
+export interface Request extends SignedObject {
+  nodeInfo: JoinedArchiver,
+  requestType: string
 }
-
 export interface Txs {
-  archivers: JoinRequest[]
+  archivers: Request[]
 }
 
 export interface Record {
   joinedArchivers: JoinedArchiver[]
+  leavingArchivers: JoinedArchiver[]
 }
 
 /** STATE */
@@ -86,20 +92,22 @@ let p2pLogger
 export let archivers: Map<JoinedArchiver['publicKey'], JoinedArchiver>
 let recipients: Map<JoinedArchiver['publicKey'], DataRecipient>
 
-let requests: JoinRequest[]
+let joinRequests: Request[]
+let leaveRequests: Request[]
 
 /** FUNCTIONS */
 
 /** CycleCreator Functions */
 
 export function init() {
+  console.log("init archiver module")
   p2pLogger = logger.getLogger('p2p')
 
   archivers = new Map()
   recipients = new Map()
 
   reset()
-
+  resetLeaveRequests()
   registerRoutes()
 }
 
@@ -109,7 +117,10 @@ export function reset() {
 
 export function getTxs(): Txs {
   // [IMPORTANT] Must return a copy to avoid mutation
-  const requestsCopy = deepmerge({}, requests)
+  const requestsCopy = deepmerge({}, [...joinRequests, ...leaveRequests])
+  console.log('getTxs', {
+    archivers: requestsCopy,
+  })
 
   return {
     archivers: requestsCopy,
@@ -132,18 +143,26 @@ export function validateRecordTypes(rec: Record): string {
 }
 
 export function updateRecord(txs: Txs, record: CycleCreator.CycleRecord) {
-  // Add join requests to the cycle record
-  const joinedArchivers = txs.archivers.map(
-    (joinRequest) => joinRequest.nodeInfo
-  )
+  // Add joining archivers to the cycle record
+  const joinedArchivers = txs.archivers
+    .filter(request => request.requestType === RequestTypes.JOIN)
+    .map(joinRequest => joinRequest.nodeInfo)
+
+  // Add leaving archivers to the cycle record
+  const leavingArchivers = txs.archivers
+    .filter(request => request.requestType === RequestTypes.LEAVE)
+    .map(leaveRequest => leaveRequest.nodeInfo)
+
   record.joinedArchivers = joinedArchivers.sort()
+  record.leavingArchivers = JSON.parse(JSON.stringify(leavingArchivers.sort()))
+  resetLeaveRequests()
 }
 
 export function parseRecord(
   record: CycleCreator.CycleRecord
 ): CycleParser.Change {
   // Update our archivers list
-  updateArchivers(record.joinedArchivers)
+  updateArchivers(record)
 
   // Since we don't touch the NodeList, return an empty Change
   return {
@@ -162,7 +181,11 @@ export function queueRequest() {}
 /** Original Functions */
 
 export function resetJoinRequests() {
-  requests = []
+  joinRequests = []
+}
+
+export function resetLeaveRequests() {
+  leaveRequests = []
 }
 
 export function addJoinRequest(joinRequest, tracker?, gossip = true) {
@@ -191,22 +214,60 @@ export function addJoinRequest(joinRequest, tracker?, gossip = true) {
     warn('addJoinRequest: bad signature')
     return false
   }
-
-  requests.push(joinRequest)
+  joinRequests.push(joinRequest)
   if (gossip === true) {
     Comms.sendGossip('joinarchiver', joinRequest, tracker)
   }
   return true
 }
 
-export function getArchiverUpdates() {
-  return requests
+export function addLeaveRequest(request, tracker?, gossip = true) {
+  // validate input
+  let err = validateTypes(request, { nodeInfo: 'o', sign: 'o' })
+  if (err) {
+    warn('addLeaveRequest: bad leaveRequest ' + err)
+    return false
+  }
+  err = validateTypes(request.nodeInfo, {
+    curvePk: 's',
+    ip: 's',
+    port: 'n',
+    publicKey: 's',
+  })
+  if (err) {
+    warn('addLeaveRequest: bad leaveRequest.nodeInfo ' + err)
+    return false
+  }
+  err = validateTypes(request.sign, { owner: 's', sig: 's' })
+  if (err) {
+    warn('addLeaveRequest: bad leaveRequest.sign ' + err)
+    return false
+  }
+  if (!crypto.verify(request)) {
+    warn('addLeaveRequest: bad signature')
+    return false
+  }
+
+  leaveRequests.push(request)
+  console.log('adding leave requests', leaveRequests)
+  if (gossip === true) {
+    Comms.sendGossip('leavingarchiver', request, tracker)
+  }
+  return true
 }
 
-export function updateArchivers(joinedArchivers) {
+export function getArchiverUpdates() {
+  return joinRequests
+}
+
+export function updateArchivers(record) {
   // Update archiversList
-  for (const nodeInfo of joinedArchivers) {
+  for (const nodeInfo of record.joinedArchivers) {
     archivers.set(nodeInfo.publicKey, nodeInfo)
+  }
+  for (const nodeInfo of record.leavingArchivers) {
+    archivers.delete(nodeInfo.publicKey)
+    removeDataRecipient(nodeInfo.publicKey)
   }
 }
 
@@ -342,12 +403,37 @@ export function registerRoutes() {
     info('Archiver join request accepted!')
   })
 
+  network.registerExternalPost('leavingarchivers', async (req, res) => {
+    const err = validateTypes(req, { body: 'o' })
+    if (err) {
+      warn(`leavingarchivers: bad req ${err}`)
+      return res.json({ success: false, error: err })
+    }
+
+    const leaveRequest = req.body
+    info(`Archiver leave request received: ${JSON.stringify(leaveRequest)}`)
+    res.json({ success: true })
+
+    const accepted = await addLeaveRequest(leaveRequest)
+    if (!accepted) return warn('Archiver leave request not accepted.')
+    info('Archiver leave request accepted!')
+  })
+
   Comms.registerGossipHandler(
     'joinarchiver',
     async (payload, sender, tracker) => {
       const accepted = await addJoinRequest(payload, tracker, false)
       if (!accepted) return warn('Archiver join request not accepted.')
       info('Archiver join request accepted!')
+    }
+  )
+
+  Comms.registerGossipHandler(
+    'leavingarchiver',
+    async (payload, sender, tracker) => {
+      const accepted = await addLeaveRequest(payload, tracker, false)
+      if (!accepted) return warn('Archiver leave request not accepted.')
+      info('Archiver leave request accepted!')
     }
   )
 

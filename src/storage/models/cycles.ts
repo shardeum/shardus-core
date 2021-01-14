@@ -29,6 +29,7 @@ const cycles = [
     expired: { type: Sequelize.BIGINT, allowNull: false },
     joined: { type: Sequelize.JSON, allowNull: false },
     joinedArchivers: { type: Sequelize.JSON, allowNull: false },
+    leavingArchivers: { type: Sequelize.JSON, allowNull: false },
     joinedConsensors: { type: Sequelize.JSON, allowNull: false },
     refreshedArchivers: { type: Sequelize.JSON, allowNull: false },
     refreshedConsensors: { type: Sequelize.JSON, allowNull: false },
