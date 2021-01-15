@@ -58,12 +58,12 @@ export class Collector extends EventEmitter {
     this.summaryHashCounter = new Map()
   }
   process(messages: Message[]) {
-    console.log(`Processing pending ${messages.length} messages`)
+    // console.log(`Processing pending ${messages.length} messages`)
     let cycle
     // Loop through messages and add to hash tally
     for (let messageIndex = 0; messageIndex < messages.length; messageIndex++) {
       let message = messages[messageIndex]
-      console.log(`Processing message ${messageIndex}`, message.sender)
+      // console.log(`Processing message ${messageIndex}`, message.sender)
       let partitionHashData = message.data.partitionHash
       let receiptHashData = message.data.receiptMapHash
       let summaryHashData = message.data.summaryHash

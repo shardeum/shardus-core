@@ -118,7 +118,7 @@ export function reset() {
 export function getTxs(): Txs {
   // [IMPORTANT] Must return a copy to avoid mutation
   const requestsCopy = deepmerge({}, [...joinRequests, ...leaveRequests])
-  console.log('getTxs', {
+  console.log(`getTxs: Cycle ${CycleCreator.currentQuarter}, Quarter: ${CycleCreator.currentQuarter}`, {
     archivers: requestsCopy,
   })
 
@@ -153,8 +153,23 @@ export function updateRecord(txs: Txs, record: CycleCreator.CycleRecord) {
     .filter(request => request.requestType === RequestTypes.LEAVE)
     .map(leaveRequest => leaveRequest.nodeInfo)
 
-  record.joinedArchivers = joinedArchivers.sort()
-  record.leavingArchivers = JSON.parse(JSON.stringify(leavingArchivers.sort()))
+  console.log(`Archiver before updating record: Cycle ${CycleCreator.currentQuarter}, Quarter: ${CycleCreator.currentQuarter}`, joinedArchivers, leavingArchivers)
+
+  record.joinedArchivers = joinedArchivers.sort(
+    (a: JoinedArchiver, b: JoinedArchiver) => (a.publicKey > b.publicKey ? 1 : -1)
+  )
+  record.leavingArchivers = JSON.parse(
+    JSON.stringify(
+      leavingArchivers.sort((a: JoinedArchiver, b: JoinedArchiver) =>
+        a.publicKey > b.publicKey ? 1 : -1
+      )
+    )
+  )
+  console.log(
+    `Archiver after updating record: Cycle ${CycleCreator.currentQuarter}, Quarter: ${CycleCreator.currentQuarter}`,
+    record
+  )
+
   resetLeaveRequests()
 }
 
@@ -215,6 +230,7 @@ export function addJoinRequest(joinRequest, tracker?, gossip = true) {
     return false
   }
   joinRequests.push(joinRequest)
+  console.log(`Join request added in cycle ${CycleCreator.currentCycle}, quarter ${CycleCreator.currentQuarter}`, joinRequest)
   if (gossip === true) {
     Comms.sendGossip('joinarchiver', joinRequest, tracker)
   }
@@ -418,24 +434,44 @@ export function registerRoutes() {
     if (!accepted) return warn('Archiver leave request not accepted.')
     info('Archiver leave request accepted!')
   })
-
-  Comms.registerGossipHandler(
-    'joinarchiver',
-    async (payload, sender, tracker) => {
+Comms.registerGossipHandler(
+  'joinarchiver',
+  async (payload, sender, tracker) => {
+    console.log('Join request gossip received:', payload)
+    let existingJoinRequest = joinRequests.find(
+      j => j.nodeInfo.publicKey === payload.nodeInfo.publicKey
+    )
+    if (!existingJoinRequest) {
+      console.log('This join request is new. Should forward the join request')
       const accepted = await addJoinRequest(payload, tracker, false)
+      console.log('join request gossip accepted', accepted)
       if (!accepted) return warn('Archiver join request not accepted.')
       info('Archiver join request accepted!')
+      Comms.sendGossip('joinarchiver', payload, tracker)
+    } else {
+      console.log('Already received archiver join gossip for this node')
     }
-  )
+  }
+)
 
-  Comms.registerGossipHandler(
-    'leavingarchiver',
-    async (payload, sender, tracker) => {
+Comms.registerGossipHandler(
+  'leavingarchiver',
+  async (payload, sender, tracker) => {
+    console.log('Leave request gossip received:', payload)
+    let existingLeaveRequest = leaveRequests.find(
+      j => j.nodeInfo.publicKey === payload.nodeInfo.publicKey
+    )
+    if (!existingLeaveRequest) {
       const accepted = await addLeaveRequest(payload, tracker, false)
       if (!accepted) return warn('Archiver leave request not accepted.')
       info('Archiver leave request accepted!')
+      Comms.sendGossip('leavingarchiver', payload, tracker)
+    } else {
+      console.log('Already received archiver leave gossip for this node')
     }
-  )
+  }
+)
+
 
   network.registerExternalPost('requestdata', (req, res) => {
     let err = validateTypes(req, { body: 'o' })
