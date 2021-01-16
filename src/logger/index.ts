@@ -206,7 +206,7 @@ class Logger {
     this.playbackLog('', '', 'StateChange', newState, id, desc)
   }
 
-  playbackLogNote(noteCategory, id, desc) {
+  playbackLogNote(noteCategory, id, desc=null) {
     this.playbackLog('', '', 'Note', noteCategory, id, desc)
   }
 }

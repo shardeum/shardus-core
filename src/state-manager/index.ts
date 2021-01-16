@@ -168,7 +168,9 @@ class StateManager extends EventEmitter {
 
     nextCycleReportToSend : PartitionCycleReport
 
+    verboseLogs: boolean
 
+    logger: Logger
 
   constructor (verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage : Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     super()
@@ -472,7 +474,7 @@ class StateManager extends EventEmitter {
     // this.purgeArchiveData = false
     // this.sentReceipts = new Map()
 
-    this.logger.playbackLogNote('canDataRepair', `0`, `canDataRepair: ${this.canDataRepair}  `)
+    if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('canDataRepair', `0`, `canDataRepair: ${this.canDataRepair}  `)
 
   }
 
@@ -520,7 +522,7 @@ class StateManager extends EventEmitter {
   // This is called once per cycle to update to calculate the necessary shard values.
   updateShardValues (cycleNumber: number) {
     if (this.currentCycleShardData == null) {
-      this.logger.playbackLogNote('shrd_sync_firstCycle', `${cycleNumber}`, ` first init `)
+      if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_firstCycle', `${cycleNumber}`, ` first init `)
     }
 
     let cycleShardData = {} as CycleShardData
@@ -542,12 +544,12 @@ class StateManager extends EventEmitter {
     try {
       cycleShardData.ourNode = this.p2p.state.getNode(this.p2p.id) // ugh, I bet there is a nicer way to get our node
     } catch (ex) {
-      this.logger.playbackLogNote('shrd_sync_notactive', `${cycleNumber}`, `  `)
+      if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_notactive', `${cycleNumber}`, `  `)
       return
     }
 
     if (cycleShardData.activeNodes.length === 0) {
-      this.logger.playbackLogNote('shrd_sync_noNodeListAvailable', `${cycleNumber}`, `  `)
+      if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_noNodeListAvailable', `${cycleNumber}`, `  `)
       return // no active nodes so stop calculating values
     }
 
@@ -602,7 +604,7 @@ class StateManager extends EventEmitter {
         cycleShardData.syncingNeighborsTxGroup.push(cycleShardData.ourNode)
         cycleShardData.hasSyncingNeighbors = true
 
-        this.logger.playbackLogNote('shrd_sync_neighbors', `${cycleShardData.cycleNumber}`, ` neighbors: ${utils.stringifyReduce(cycleShardData.syncingNeighbors.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+        if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_neighbors', `${cycleShardData.cycleNumber}`, ` neighbors: ${utils.stringifyReduce(cycleShardData.syncingNeighbors.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
       } else {
         cycleShardData.hasSyncingNeighbors = false
       }
@@ -612,7 +614,7 @@ class StateManager extends EventEmitter {
 
       // if (this.preTXQueue.length > 0) {
       //   for (let tx of this.preTXQueue) {
-      //     this.logger.playbackLogNote('shrd_sync_preTX', ` `, ` ${utils.stringifyReduce(tx)} `)
+      //     if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_preTX', ` `, ` ${utils.stringifyReduce(tx)} `)
       //     this.routeAndQueueAcceptedTransaction(tx, false, null)
       //   }
       //   this.preTXQueue = []
@@ -622,7 +624,7 @@ class StateManager extends EventEmitter {
         for (let i = this.syncTrackers.length - 1; i >= 0; i--) {
           let syncTracker = this.syncTrackers[i]
           if (syncTracker.syncFinished === true) {
-            this.logger.playbackLogNote('shrd_sync_trackerRangeClear', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_trackerRangeClear', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
 
             // allow syncing queue entries to resume!
             for (let queueEntry of syncTracker.queueEntries) {
@@ -641,7 +643,7 @@ class StateManager extends EventEmitter {
 
                   //Restore the TX group, because we only want to know what nodes were in the group at the time of the TX
                   queueEntry.transactionGroup = old
-                  this.logger.playbackLogNote('shrd_sync_wakeupTX_txGroupUpdate', `${queueEntry.acceptedTx.id}`, `new value: ${queueEntry.ourNodeInTransactionGroup}   qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`)
+                  if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_wakeupTX_txGroupUpdate', `${queueEntry.acceptedTx.id}`, `new value: ${queueEntry.ourNodeInTransactionGroup}   qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`)
                 }
                 
                 queueEntry.txGroupDebug = `${before} -> ${queueEntry.ourNodeInTransactionGroup}`
@@ -650,9 +652,9 @@ class StateManager extends EventEmitter {
                   queueEntry.state = 'aging'
                   queueEntry.didWakeup = true
                   this.updateHomeInformation(queueEntry)
-                  this.logger.playbackLogNote('shrd_sync_wakeupTX', `${queueEntry.acceptedTx.id}`, `inTXGrp: ${queueEntry.ourNodeInTransactionGroup} qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`)
+                  if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_wakeupTX', `${queueEntry.acceptedTx.id}`, `inTXGrp: ${queueEntry.ourNodeInTransactionGroup} qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`)
                 // } else {
-                //   this.logger.playbackLogNote('shrd_sync_wakeupTXcancel', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`)
+                //   if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_wakeupTXcancel', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`)
                 //   queueEntry.state = 'canceled'
                 //   queueEntry.didWakeup = true
                 // }
@@ -662,7 +664,7 @@ class StateManager extends EventEmitter {
             this.syncTrackers.splice(i, 1)
           }
         }
-        this.logger.playbackLogNote('shrd_sync_trackerRangeClearFinished', ` `, `num trackers left: ${this.syncTrackers.length} `)
+        if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_trackerRangeClearFinished', ` `, `num trackers left: ${this.syncTrackers.length} `)
 
         
       }
@@ -678,8 +680,10 @@ class StateManager extends EventEmitter {
     let partitions2 = ShardFunctions.getStoredPartitionList(cycleShardData.shardGlobals, cycleShardData.nodeShardData)
     cycleShardData.ourStoredPartitions = partitions2
 
+     
     // this will be a huge log.
-    this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${cycleNumber} data: ${utils.stringifyReduce(cycleShardData)}`)
+    if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${cycleNumber} data: ${utils.stringifyReduce(cycleShardData)}`)
+    
 
     cycleShardData.hasCompleteData = true
   }
@@ -722,7 +726,7 @@ class StateManager extends EventEmitter {
     for (let change of coverageChanges) {
       // log info about the change.
       // ${utils.stringifyReduce(change)}
-      this.logger.playbackLogNote('shrd_sync_change', `${oldShardData.cycleNumber}->${newSharddata.cycleNumber}`, ` ${ShardFunctions.leadZeros8((change.start).toString(16))}->${ShardFunctions.leadZeros8((change.end).toString(16))} `)
+      if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_change', `${oldShardData.cycleNumber}->${newSharddata.cycleNumber}`, ` ${ShardFunctions.leadZeros8((change.start).toString(16))}->${ShardFunctions.leadZeros8((change.end).toString(16))} `)
 
       // create a range object from our coverage change.
  
@@ -766,14 +770,14 @@ class StateManager extends EventEmitter {
           if (syncTracker.syncStarted === false) {
             // let partition = syncTracker.partition
             console.log(`rtsyncTracker start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
-            this.logger.playbackLogNote('rt_shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('rt_shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
 
             syncTracker.syncStarted = true
             startedCount++
             await this.syncStateDataForRange(syncTracker.range)
             syncTracker.syncFinished = true
 
-            this.logger.playbackLogNote('rt_shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('rt_shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
             this.clearPartitionData()
           }
         }
@@ -974,7 +978,7 @@ class StateManager extends EventEmitter {
     while (this.currentCycleShardData == null) {
       this.getCurrentCycleShardData()
       await utils.sleep(1000)
-      this.logger.playbackLogNote('shrd_sync_waitForShardData_firstNode', ``, ` ${utils.stringifyReduce(this.currentCycleShardData)} `)
+      if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_waitForShardData_firstNode', ``, ` ${utils.stringifyReduce(this.currentCycleShardData)} `)
     }
   }
 
@@ -1025,13 +1029,13 @@ class StateManager extends EventEmitter {
       this.getCurrentCycleShardData()
       await utils.sleep(1000)
       if(this.currentCycleShardData == null){
-        this.logger.playbackLogNote('shrd_sync_waitForShardData', ` `, ` ${utils.stringifyReduce(this.currentCycleShardData)} `)
+        if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_waitForShardData', ` `, ` ${utils.stringifyReduce(this.currentCycleShardData)} `)
         hasValidShardData  = false
       } 
       if(this.currentCycleShardData != null){
         if(this.currentCycleShardData.hasCompleteData == false){
           let temp = this.p2p.state.getActiveNodes(null)
-          this.logger.playbackLogNote('shrd_sync_waitForShardData', ` `, `hasCompleteData:${this.currentCycleShardData.hasCompleteData} active:${utils.stringifyReduce(temp)} ${utils.stringifyReduce(this.currentCycleShardData)} `)
+          if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_waitForShardData', ` `, `hasCompleteData:${this.currentCycleShardData.hasCompleteData} active:${utils.stringifyReduce(temp)} ${utils.stringifyReduce(this.currentCycleShardData)} `)
 
         } else {
           hasValidShardData = true
@@ -1218,7 +1222,7 @@ class StateManager extends EventEmitter {
     for (let syncTracker of this.syncTrackers) {
       // let partition = syncTracker.partition
       console.log(`syncTracker start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
-      this.logger.playbackLogNote('shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+      if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
 
       syncTracker.syncStarted = true
 
@@ -1235,18 +1239,18 @@ class StateManager extends EventEmitter {
       //   queueEntry.syncCounter--
       //   if (queueEntry.syncCounter <= 0) {
       //     queueEntry.state = 'aging'
-      //     this.logger.playbackLogNote('shrd_sync_wakeupTX', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
+      //     if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_wakeupTX', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
       //   }
       // }
       // syncTracker.queueEntries = []
 
-      this.logger.playbackLogNote('shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+      if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
       this.clearPartitionData()
     }
 
     // this.syncTrackers = []  //dont clear this untill we get a new cycle!
 
-    // this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, ` qId: ${txQueueEntry.entryID}`)
+    // if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, ` qId: ${txQueueEntry.entryID}`)
 
     // one we have all of the initial data the last thing to do is get caught up on transactions
     // This will await the queue processing up to Date.now()
@@ -1268,7 +1272,7 @@ class StateManager extends EventEmitter {
     this.dataSyncMainPhaseComplete = true
     this.tryStartAcceptedQueue()
 
-    this.logger.playbackLogNote('shrd_sync_mainphaseComplete', ` `, `  `)
+    if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_mainphaseComplete', ` `, `  `)
   }
 
   /**
@@ -3079,7 +3083,7 @@ class StateManager extends EventEmitter {
       for (let data of payload.stateList) {
         this.queueEntryAddData(queueEntry, data)
         if (queueEntry.state === 'syncing') {
-          this.logger.playbackLogNote('shrd_sync_gotBroadcastData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
+          if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_gotBroadcastData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
         }
       }
     })
@@ -3130,12 +3134,12 @@ class StateManager extends EventEmitter {
       let age = Date.now() - timestamp
       if (age > timeM * 0.9) {
         this.fatalLogger.fatal('spread_tx_to_group cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
-        this.logger.playbackLogNote('shrd_spread_tx_to_groupToOld', '', 'spread_tx_to_group working on older tx ' + timestamp + ' age: ' + age)
+        if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_spread_tx_to_groupToOld', '', 'spread_tx_to_group working on older tx ' + timestamp + ' age: ' + age)
         return
       }
       if (age < -1000) {
         this.fatalLogger.fatal('spread_tx_to_group cannot accept tx more than 1 second in future ' + timestamp + ' age: ' + age)
-        this.logger.playbackLogNote('shrd_spread_tx_to_groupToFutrue', '', 'spread_tx_to_group tx too far in future' + timestamp + ' age: ' + age)
+        if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_spread_tx_to_groupToFutrue', '', 'spread_tx_to_group tx too far in future' + timestamp + ' age: ' + age)
         return
       }
 
@@ -4034,7 +4038,7 @@ class StateManager extends EventEmitter {
 
   //   if (!success) {
   //     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction pretest failed: ' + timestamp)
-  //     this.logger.playbackLogNote('tx_apply_rejected 1', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
+  //     if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tx_apply_rejected 1', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
   //     return { success: false, reason: 'applyAcceptedTransaction pretest failed' }
   //   }
 
@@ -4046,9 +4050,9 @@ class StateManager extends EventEmitter {
   //   let applyResult = await this.tryApplyTransaction(acceptedTX, hasStateTableData, false, filter, wrappedStates, localCachedData)
   //   if (applyResult) {
   //     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction SUCCEDED ' + timestamp)
-  //     this.logger.playbackLogNote('tx_applied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
+  //     if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tx_applied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
   //   } else {
-  //     this.logger.playbackLogNote('tx_apply_rejected 3', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
+  //     if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tx_apply_rejected 3', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
   //   }
   //   return { success: applyResult, reason: 'apply result' }
   // }
@@ -4095,7 +4099,7 @@ class StateManager extends EventEmitter {
 
     if (!success) {
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'preApplyAcceptedTransaction pretest failed: ' + timestamp)
-      this.logger.playbackLogNote('tx_preapply_rejected 1', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
+      if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tx_preapply_rejected 1', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
       return { applied: false, passed:false, applyResult:'', reason: 'preApplyAcceptedTransaction pretest failed, TX rejected' }
     }
   
@@ -4105,9 +4109,9 @@ class StateManager extends EventEmitter {
 
     if (preApplyResult) {
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'preApplyAcceptedTransaction SUCCEDED ' + timestamp)
-      this.logger.playbackLogNote('tx_preapplied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
+      if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tx_preapplied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
     } else {
-      this.logger.playbackLogNote('tx_preapply_rejected 3', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
+      if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tx_preapply_rejected 3', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
     }
 
     return { applied: true , passed: preApplyResult.passed, applyResult:preApplyResult.applyResult,  reason: 'apply result', applyResponse: preApplyResult.applyResponse }
@@ -4166,7 +4170,7 @@ class StateManager extends EventEmitter {
         let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
         let relationString = ShardFunctions.getNodeRelation(homeNode, this.currentCycleShardData.ourNode.id)
         // route_to_home_node
-        this.logger.playbackLogNote('shrd_homeNodeSummary', `${txId}`, `account:${utils.makeShortHash(key)} rel:${relationString} summary:${utils.stringifyReduce(summaryObject)}`)
+        if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_homeNodeSummary', `${txId}`, `account:${utils.makeShortHash(key)} rel:${relationString} summary:${utils.stringifyReduce(summaryObject)}`)
       }
 
       txQueueEntry.hasShardInfo = true
@@ -4174,7 +4178,7 @@ class StateManager extends EventEmitter {
   }
 
   debugNodeGroup(key,key2, msg, nodes) {
-    this.logger.playbackLogNote('debugNodeGroup', `${utils.stringifyReduce(key)}_${key2}` , `${msg} ${utils.stringifyReduce(nodes.map((node) => { return { id: node.id, port: node.externalPort } } ))}` )
+    if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('debugNodeGroup', `${utils.stringifyReduce(key)}_${key2}` , `${msg} ${utils.stringifyReduce(nodes.map((node) => { return { id: node.id, port: node.externalPort } } ))}` )
 
   }
 
@@ -4196,7 +4200,7 @@ class StateManager extends EventEmitter {
     //   // this.preTXQueue.push(acceptedTX)
     //   return 'notReady' // it is too early to care about the tx
     // }
-    this.logger.playbackLogNote('routeAndQueueAcceptedTransaction-debug', '', `sendGossip:${sendGossip} globalModification:${globalModification} noConsensus:${noConsensus} this.readyforTXs:${this.readyforTXs} hasshardData:${(this.currentCycleShardData != null)} acceptedTx:${utils.stringifyReduce(acceptedTx)} `)
+    if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('routeAndQueueAcceptedTransaction-debug', '', `sendGossip:${sendGossip} globalModification:${globalModification} noConsensus:${noConsensus} this.readyforTXs:${this.readyforTXs} hasshardData:${(this.currentCycleShardData != null)} acceptedTx:${utils.stringifyReduce(acceptedTx)} `)
     if (this.readyforTXs === false) {
       if (this.verboseLogs) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: this.readyforTXs === false`)
       return 'notReady' // it is too early to care about the tx
@@ -4275,7 +4279,7 @@ class StateManager extends EventEmitter {
     //   let rand = Math.random()
     //   if (this.config.debug.loseTxChance > rand) {
     //     if (this.app.canDebugDropTx(acceptedTx.data)) {
-    //       this.logger.playbackLogNote('tx_dropForTest', txId, 'dropping tx ' + timestamp)
+    //       if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tx_dropForTest', txId, 'dropping tx ' + timestamp)
     //       return 'lost'
     //     }
     //   }
@@ -4300,7 +4304,7 @@ class StateManager extends EventEmitter {
     //   if (this.config.debug.loseTxChance > rand) {
     //     if (this.app.canDebugDropTx(acceptedTx.data)) {
     //       this.mainLogger.error('tx_failReceiptTest fail vote tx  ' + txId + ' ' + timestamp)
-    //       this.logger.playbackLogNote('tx_failReceiptTest', txId, 'fail vote tx ' + timestamp)
+    //       if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tx_failReceiptTest', txId, 'fail vote tx ' + timestamp)
     //       //return 'lost'
     //       txQueueEntry.debugFail_voteFlip = true
     //     }
@@ -4315,7 +4319,7 @@ class StateManager extends EventEmitter {
       if (age > this.queueSitTime * 0.9) {
         this.fatalLogger.fatal('routeAndQueueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
         // TODO consider throwing this out.  right now it is just a warning
-        this.logger.playbackLogNote('shrd_oldQueueInsertion', '', 'routeAndQueueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
+        if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_oldQueueInsertion', '', 'routeAndQueueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
       }
       let keyHash:StringBoolObjectMap = {}
       for (let key of txQueueEntry.txKeys.allKeys) {
@@ -4343,7 +4347,7 @@ class StateManager extends EventEmitter {
         if(globalModification === true){
           // TODO: globalaccounts 
           if(this.globalAccountMap.has(key)){
-            this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - has`)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - has`)
             // indicate that we will have global data in this transaction!
             // I think we do not need to test that here afterall.
           } else {
@@ -4352,7 +4356,7 @@ class StateManager extends EventEmitter {
             //it should be that p2p has already checked the receipt before calling shardus.push with global=true
 
             this.globalAccountMap.set(key, null)
-            this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - set`)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - set`)
 
           }            
         }
@@ -4369,7 +4373,7 @@ class StateManager extends EventEmitter {
           txQueueEntry.syncKeys.push(key) // used later to instruct what local data we should JIT load
           txQueueEntry.localKeys[key] = true // used for the filter
 
-          this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, `${txQueueEntry.logID} qId: ${txQueueEntry.entryID}`)
+          if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, `${txQueueEntry.logID} qId: ${txQueueEntry.entryID}`)
         }
       }
 
@@ -4399,7 +4403,7 @@ class StateManager extends EventEmitter {
               this.debugNodeGroup(txId, timestamp, `share to neighbors`, transactionGroup) 
               this.p2p.sendGossipIn('spread_tx_to_group', acceptedTx, '', sender, transactionGroup)
             }
-          // this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
+          // if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
           } catch (ex) {
             this.fatalLogger.fatal('txQueueEntry: ' + utils.stringifyReduce(txQueueEntry))
           }
@@ -4410,7 +4414,7 @@ class StateManager extends EventEmitter {
           //this.queueEntryGetTransactionGroup(txQueueEntry) // this will compute our involvment
           if (txQueueEntry.ourNodeInTransactionGroup === false && txQueueEntry.globalModification === false) {
             // if globalModification === true then every node is in the group
-            this.logger.playbackLogNote('shrd_notInTxGroup', `${txId}`, ``)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_notInTxGroup', `${txId}`, ``)
             return 'out of range'// we are done, not involved!!!
           } else {
             // let tempList =  // can be returned by the function below
@@ -4422,7 +4426,7 @@ class StateManager extends EventEmitter {
             // or data repair will detect and reject this if we get tricked.  could be an easy attack vector
             if (this.currentCycleShardData.hasSyncingNeighbors === true ) {
               if( txQueueEntry.globalModification === false){
-                this.logger.playbackLogNote('shrd_sync_tx', `${txId}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighborsTxGroup.map(x => x.id))}`)
+                if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_tx', `${txId}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighborsTxGroup.map(x => x.id))}`)
                 this.debugNodeGroup(txId, timestamp, `share to syncing neighbors`, this.currentCycleShardData.syncingNeighborsTxGroup) 
                 this.p2p.sendGossipAll('spread_tx_to_group', acceptedTx, '', sender, this.currentCycleShardData.syncingNeighborsTxGroup)
                 //This was using sendGossipAll, but changed it for a work around.  maybe this just needs to be a tell.                
@@ -4440,7 +4444,7 @@ class StateManager extends EventEmitter {
       // start the queue if needed
       this.tryStartAcceptedQueue()
     } catch (error) {
-      this.logger.playbackLogNote('shrd_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)}`)
+      if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)}`)
       this.fatalLogger.fatal('routeAndQueueAcceptedTransaction failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
       throw new Error(error)
     }
@@ -4465,7 +4469,7 @@ class StateManager extends EventEmitter {
       return
     }
 
-    this.logger.playbackLogNote('_firstTimeQueueAwait', `this.newAcceptedTxQueue.length:${this.newAcceptedTxQueue.length} this.newAcceptedTxQueue.length:${this.newAcceptedTxQueue.length}`)
+    if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('_firstTimeQueueAwait', `this.newAcceptedTxQueue.length:${this.newAcceptedTxQueue.length} this.newAcceptedTxQueue.length:${this.newAcceptedTxQueue.length}`)
 
     await this.processAcceptedTxQueue()
   }
@@ -4535,7 +4539,7 @@ class StateManager extends EventEmitter {
       delete data.localCache
     }
 
-    this.logger.playbackLogNote('shrd_addData', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `key ${utils.makeShortHash(data.accountId)} hash: ${utils.makeShortHash(data.stateId)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}  ${queueEntry.acceptedTx.timestamp}`)
+    if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_addData', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `key ${utils.makeShortHash(data.accountId)} hash: ${utils.makeShortHash(data.stateId)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}  ${queueEntry.acceptedTx.timestamp}`)
   }
 
   queueEntryHasAllData (queueEntry: QueueEntry) {
@@ -4577,7 +4581,7 @@ class StateManager extends EventEmitter {
       }
     }
 
-    this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_start', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
+    if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_start', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
 
     // consensus group should have all the data.. may need to correct this later
     let consensusGroup = this.queueEntryGetConsensusGroup(queueEntry)
@@ -4646,7 +4650,7 @@ class StateManager extends EventEmitter {
           }
 
           let relationString = ShardFunctions.getNodeRelation(homeNodeShardData, this.currentCycleShardData.ourNode.id)
-          this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
+          if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
 
           // Node Precheck!
           if(this.isNodeValidForInternalMessage(node.id, "queueEntryRequestMissingData", true, true) === false){
@@ -4661,12 +4665,12 @@ class StateManager extends EventEmitter {
 
           if(result == null){
             if (this.verboseLogs) { this.mainLogger.error('ASK FAIL request_state_for_tx') }
-            this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
             continue
           }
           if (result.success !== true) { 
             this.mainLogger.error('ASK FAIL queueEntryRequestMissingData 9') 
-            this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry2', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry2', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
             continue;
           }
           let dataCountReturned = 0
@@ -4684,7 +4688,7 @@ class StateManager extends EventEmitter {
             // queueEntry.state = 'failed to get data'
           }
 
-          this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
+          if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
 
           // queueEntry.homeNodes[key] = null
           for (let key2 of allKeys) {
@@ -4722,7 +4726,7 @@ class StateManager extends EventEmitter {
 
     queueEntry.requestingReceipt = true
 
-    this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_start', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID}`)
+    if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_start', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID}`)
 
 
     let consensusGroup = this.queueEntryGetConsensusGroup(queueEntry)
@@ -4788,7 +4792,7 @@ class StateManager extends EventEmitter {
         }
 
         let relationString = ShardFunctions.getNodeRelation(homeNodeShardData, this.currentCycleShardData.ourNode.id)
-        this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+        if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
 
         // Node Precheck!
         if(this.isNodeValidForInternalMessage(node.id, "queueEntryRequestMissingReceipt", true, true) === false){
@@ -4803,7 +4807,7 @@ class StateManager extends EventEmitter {
 
         if(result == null){
           if (this.verboseLogs) { this.mainLogger.error(`ASK FAIL request_receipt_for_tx ${triesLeft} ${utils.makeShortHash(node.id)}`) }
-          this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+          if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
           continue
         }
         if (result.success !== true) { 
@@ -4811,7 +4815,7 @@ class StateManager extends EventEmitter {
           continue
         }
 
-        this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} result: ${utils.stringifyReduce(result)}`)
+        if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} result: ${utils.stringifyReduce(result)}`)
 
         if(result.success === true && result.receipt != null){
           queueEntry.recievedAppliedReceipt = result.receipt
@@ -4858,8 +4862,8 @@ class StateManager extends EventEmitter {
 
     let allKeys = []
 
-    this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `appliedVotes ${utils.stringifyReduce(appliedVotes)}  `)
-    this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `queueEntry.uniqueKeys ${utils.stringifyReduce(queueEntry.uniqueKeys)}`)
+    if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `appliedVotes ${utils.stringifyReduce(appliedVotes)}  `)
+    if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `queueEntry.uniqueKeys ${utils.stringifyReduce(queueEntry.uniqueKeys)}`)
 
     this.mainLogger.debug(`repairToMatchReceipt: ${shortHash} queueEntry.uniqueKeys ${utils.stringifyReduce(queueEntry.uniqueKeys)}`)
 
@@ -4886,11 +4890,11 @@ class StateManager extends EventEmitter {
             coveredKey = true
             if(appliedVote.node_id === this.currentCycleShardData.ourNode.id ){
               //dont reference our own node, should not happen anyway
-              this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `appliedVote.node_id != this.currentCycleShardData.ourNode.id ${utils.stringifyReduce(appliedVote.node_id)} our: ${utils.stringifyReduce(this.currentCycleShardData.ourNode.id)} `)
+              if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `appliedVote.node_id != this.currentCycleShardData.ourNode.id ${utils.stringifyReduce(appliedVote.node_id)} our: ${utils.stringifyReduce(this.currentCycleShardData.ourNode.id)} `)
               continue
             }
             if(this.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === false){
-              this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `this.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === false ${utils.stringifyReduce(appliedVote.node_id)} `)
+              if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `this.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === false ${utils.stringifyReduce(appliedVote.node_id)} `)
               continue
             }
             let nodeShardInfo:NodeShardData = this.currentCycleShardData.nodeShardDataMap.get(appliedVote.node_id)
@@ -4900,11 +4904,11 @@ class StateManager extends EventEmitter {
               continue
             }
             if(ShardFunctions2.testAddressInRange(id, nodeShardInfo.storedPartitions ) == false){
-              this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `address not in range ${utils.stringifyReduce(nodeShardInfo.storedPartitions)}`)
+              if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `address not in range ${utils.stringifyReduce(nodeShardInfo.storedPartitions)}`)
               continue
             }
             let objectToSet = {appliedVote, voteIndex:j, accountHash:hash, accountId:id, nodeShardInfo, alternates:[]}
-            this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `setting key ${utils.stringifyReduce(key)} ${utils.stringifyReduce(objectToSet)} `)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `setting key ${utils.stringifyReduce(key)} ${utils.stringifyReduce(objectToSet)} `)
             requestObjects[key] = objectToSet
             allKeys.push(key)
           } else {
@@ -4914,28 +4918,28 @@ class StateManager extends EventEmitter {
       }
 
       if(coveredKey === false){
-        this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `coveredKey === false`)
+        if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `coveredKey === false`)
         //todo log error on us not finding this key
       }
     }
 
     //let receipt = queueEntry.appliedReceiptForRepair
 
-    this.logger.playbackLogNote('shrd_repairToMatchReceipt_start', `${shortHash}`, `qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}  requestObject:${utils.stringifyReduce(requestObjects)}`)
+    if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_repairToMatchReceipt_start', `${shortHash}`, `qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}  requestObject:${utils.stringifyReduce(requestObjects)}`)
 
     for (let key of queueEntry.uniqueKeys) {
       if ( requestObjects[key] != null) {
         let requestObject = requestObjects[key]
 
         if(requestObject == null){
-          this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `requestObject == null`)
+          if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `requestObject == null`)
           continue
         }
 
         let node = requestObject.nodeShardInfo.node
         if(node == null){
           this.mainLogger.error(`shrd_repairToMatchReceipt node == null ${utils.stringifyReduce(requestObject.accountId)}`)
-          this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `node == null`)
+          if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `node == null`)
           continue
         }
 
@@ -4965,7 +4969,7 @@ class StateManager extends EventEmitter {
           }
 
           let relationString = "" //ShardFunctions.getNodeRelation(homeNodeShardData, this.currentCycleShardData.ourNode.id)
-          this.logger.playbackLogNote('shrd_repairToMatchReceipt_ask', `${shortHash}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
+          if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_repairToMatchReceipt_ask', `${shortHash}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
 
           // Node Precheck!
           if(this.isNodeValidForInternalMessage(node.id, "repairToMatchReceipt", true, true) === false){
@@ -4999,7 +5003,7 @@ class StateManager extends EventEmitter {
           let dataCountReturned = 0
           let accountIdsReturned = []
           for (let data of result.stateList) {
-            this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `write data: ${utils.stringifyReduce(data)}`)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `write data: ${utils.stringifyReduce(data)}`)
             //Commit the data
             let dataToSet = [data]
             let failedHashes = await this.checkAndSetAccountData(dataToSet, 'repairToMatchReceipt', false)
@@ -5089,7 +5093,7 @@ class StateManager extends EventEmitter {
           //   // queueEntry.state = 'failed to get data'
           // }
 
-          this.logger.playbackLogNote('shrd_repairToMatchReceipt_result', `${shortHash}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
+          if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_repairToMatchReceipt_result', `${shortHash}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
 
           // // queueEntry.homeNodes[key] = null
           // for (let key2 of allKeys) {
@@ -5321,7 +5325,7 @@ class StateManager extends EventEmitter {
       if(this.globalAccountMap.has(key)){
         hasKey = true
         isGlobalKey = true
-        this.logger.playbackLogNote('globalAccountMap', `tellCorrespondingNodes - has`)
+        if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('globalAccountMap', `tellCorrespondingNodes - has`)
       }
 
       if(hasKey === false) {
@@ -5358,7 +5362,7 @@ class StateManager extends EventEmitter {
       }
     }
     if(queueEntry.globalModification === true){
-      this.logger.playbackLogNote('tellCorrespondingNodes', `tellCorrespondingNodes - globalModification = true, not telling other nodes`)
+      if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tellCorrespondingNodes', `tellCorrespondingNodes - globalModification = true, not telling other nodes`)
       return
     }
 
@@ -5425,7 +5429,7 @@ class StateManager extends EventEmitter {
             if (correspondingAccNodes.length > 0) {
               let remoteRelation = ShardFunctions.getNodeRelation(remoteHomeNode, this.currentCycleShardData.ourNode.id)
               let localRelation = ShardFunctions.getNodeRelation(localHomeNode, this.currentCycleShardData.ourNode.id)
-              this.logger.playbackLogNote('shrd_tellCorrespondingNodes', `${queueEntry.acceptedTx.id}`, `remoteRel: ${remoteRelation} localrel: ${localRelation} qId: ${queueEntry.entryID} AccountBeingShared: ${utils.makeShortHash(key)} EdgeNodes:${utils.stringifyReduce(edgeNodeIds)} ConsesusNodes${utils.stringifyReduce(consensusNodeIds)}`)
+              if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_tellCorrespondingNodes', `${queueEntry.acceptedTx.id}`, `remoteRel: ${remoteRelation} localrel: ${localRelation} qId: ${queueEntry.entryID} AccountBeingShared: ${utils.makeShortHash(key)} EdgeNodes:${utils.stringifyReduce(edgeNodeIds)} ConsesusNodes${utils.stringifyReduce(consensusNodeIds)}`)
 
               // Filter nodes before we send tell()
               let filteredNodes = this.filterValidNodesForInternalMessage(correspondingAccNodes, "tellCorrespondingNodes", true, true)
@@ -5589,19 +5593,19 @@ class StateManager extends EventEmitter {
             // IT turns out the correct thing to check is didSync flag only report errors if we did not wait on this TX while syncing
             if(txQueueEntry.didSync == false){
               this.fatalLogger.fatal('processAcceptedTxQueue cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
-              this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld1', `${utils.makeShortHash(txQueueEntry.acceptedTx.id)}`, 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
+              if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld1', `${utils.makeShortHash(txQueueEntry.acceptedTx.id)}`, 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
               //txQueueEntry.waitForReceiptOnly = true              
             }
           }
           if (age > timeM) {
-            this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld2', `${utils.makeShortHash(txQueueEntry.acceptedTx.id)}`, 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld2', `${utils.makeShortHash(txQueueEntry.acceptedTx.id)}`, 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
             txQueueEntry.waitForReceiptOnly = true
             txQueueEntry.state = 'consensing'
           }
 
           txQueueEntry.approximateCycleAge = this.currentCycleShardData.cycleNumber
           this.newAcceptedTxQueue.splice(index + 1, 0, txQueueEntry)
-          this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)} indexInserted: ${index + 1}`)
+          if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)} indexInserted: ${index + 1}`)
           this.emit('txQueued', acceptedTx.receipt.txHash)
         }
         this.newAcceptedTxQueueTempInjest = []
@@ -5625,7 +5629,7 @@ class StateManager extends EventEmitter {
 
         if (localRestartCounter < this.queueRestartCounter && lastLog !== this.queueRestartCounter) {
           lastLog = this.queueRestartCounter
-          this.logger.playbackLogNote('queueRestart_error', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  qrstGlobal:${this.queueRestartCounter}}`)
+          if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('queueRestart_error', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  qrstGlobal:${this.queueRestartCounter}}`)
         }
         // // fail the message if older than m3
         // if (queueEntry.hasAll === false && txAge > timeM3) {
@@ -5647,8 +5651,8 @@ class StateManager extends EventEmitter {
             //this.statistics.incrementCounter('txExpired')
             queueEntry.state = 'expired'
             this.removeFromQueue(queueEntry, currentIndex)
-            this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-            this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
 
             continue
           }   
@@ -5656,8 +5660,8 @@ class StateManager extends EventEmitter {
             //this.statistics.incrementCounter('txExpired')
             queueEntry.state = 'expired'
             this.removeFromQueue(queueEntry, currentIndex)
-            this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 2  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
-            this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 2: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 2  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 2: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
 
             continue
           } 
@@ -5666,8 +5670,8 @@ class StateManager extends EventEmitter {
             //this.statistics.incrementCounter('txExpired')
             queueEntry.state = 'expired'
             this.removeFromQueue(queueEntry, currentIndex)
-            this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 3 requestingReceiptFailed  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
-            this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 3 requestingReceiptFailed  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
             continue
           } 
 
@@ -5682,7 +5686,7 @@ class StateManager extends EventEmitter {
           if(txAge > timeM2_5 && queueEntry.didSync === true && queueEntry.requestingReceiptFailed === false){
             if(queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null){
               if(verboseLogs) this.mainLogger.error(`info: tx did sync. ask for receipt now:${shortID} `)
-              this.logger.playbackLogNote('syncNeedsReceipt', `${shortID}`, `syncNeedsReceipt ${shortID}`)
+              if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('syncNeedsReceipt', `${shortID}`, `syncNeedsReceipt ${shortID}`)
               markAccountsSeen(queueEntry)
               this.queueEntryRequestMissingReceipt(queueEntry)
               continue
@@ -5693,7 +5697,7 @@ class StateManager extends EventEmitter {
           if(txAge > timeM2_5 && queueEntry.requestingReceiptFailed === false){
             if(queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null){
               if(verboseLogs) this.mainLogger.error(`txMissingReceipt txid:${shortID} `)
-              this.logger.playbackLogNote('txMissingReceipt', `${shortID}`, `txMissingReceipt ${shortID}`)
+              if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('txMissingReceipt', `${shortID}`, `txMissingReceipt ${shortID}`)
               markAccountsSeen(queueEntry)
               this.queueEntryRequestMissingReceipt(queueEntry)
               continue
@@ -5705,8 +5709,8 @@ class StateManager extends EventEmitter {
             //this.statistics.incrementCounter('txExpired')
             queueEntry.state = 'expired'
             this.removeFromQueue(queueEntry, currentIndex)
-            this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 4  ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-            this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 4: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 4  ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 4: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
             continue
           } 
         }
@@ -5714,7 +5718,7 @@ class StateManager extends EventEmitter {
 
         if(txAge > timeM2_5 && queueEntry.m2TimeoutReached === false && queueEntry.globalModification === false){
           //if(queueEntry.recievedAppliedReceipt != null || queueEntry.appliedReceipt != null){
-            this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld3', `${shortID}`, 'processAcceptedTxQueue working on older tx ' + queueEntry.acceptedTx.timestamp + ' age: ' + txAge)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld3', `${shortID}`, 'processAcceptedTxQueue working on older tx ' + queueEntry.acceptedTx.timestamp + ' age: ' + txAge)
             queueEntry.waitForReceiptOnly = true
             queueEntry.m2TimeoutReached = true
             queueEntry.state = 'consensing'
@@ -5751,7 +5755,7 @@ class StateManager extends EventEmitter {
             try {
               //if(queueEntry.globalModification === false) {
                 await this.tellCorrespondingNodes(queueEntry)
-                if (this.verboseLogs) this.logger.playbackLogNote('shrd_processing', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  values: ${debugAccountData(queueEntry, app)}`)
+                if (this.verboseLogs) if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_processing', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  values: ${debugAccountData(queueEntry, app)}`)
               //}
              } catch (ex) {
               this.mainLogger.debug('processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -5779,7 +5783,7 @@ class StateManager extends EventEmitter {
             markAccountsSeen(queueEntry)
             if (this.queueEntryHasAllData(queueEntry) === true) {
               // I think this can't happen
-              this.logger.playbackLogNote('shrd_hadDataAfterall', `${shortID}`, `This is kind of an error, and should not happen`)
+              if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_hadDataAfterall', `${shortID}`, `This is kind of an error, and should not happen`)
               continue
             }
 
@@ -5806,15 +5810,15 @@ class StateManager extends EventEmitter {
               markAccountsSeen(queueEntry)
 
               // As soon as we have all the data we preApply it and then send out a vote
-              if (this.verboseLogs) this.logger.playbackLogNote('shrd_preApplyTx', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+              if (this.verboseLogs) if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_preApplyTx', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
 
               // TODO sync related need to reconsider how to set this up again
               // if (queueEntry.didSync) {
-              //   this.logger.playbackLogNote('shrd_sync_consensing', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
+              //   if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_consensing', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
               //   // if we did sync it is time to JIT query local data.  alternatively could have other nodes send us this data, but that could be very high bandwidth.
               //   for (let key of queueEntry.syncKeys) {
               //     let wrappedState = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
-              //     this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)} hash:${wrappedState.stateId}`)
+              //     if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)} hash:${wrappedState.stateId}`)
               //     queueEntry.localCachedData[key] = wrappedState.localCache
               //   }
               // }
@@ -5854,7 +5858,7 @@ class StateManager extends EventEmitter {
                   //Broadcast our vote
                   if(queueEntry.noConsensus === true){
                     // not sure about how to share or generate an applied receipt though for a no consensus step
-                    if (this.verboseLogs) this.logger.playbackLogNote('shrd_preApplyTx_noConsensus', `${shortID}`, ``)
+                    if (this.verboseLogs) if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_preApplyTx_noConsensus', `${shortID}`, ``)
 
                     this.mainLogger.debug(`processAcceptedTxQueue2 noConsensus : ${queueEntry.logID} `)
                     
@@ -5867,7 +5871,7 @@ class StateManager extends EventEmitter {
                       
                     // }
                   } else {
-                    if (this.verboseLogs) this.logger.playbackLogNote('shrd_preApplyTx_createAndShareVote', `${shortID}`, ``)
+                    if (this.verboseLogs) if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_preApplyTx_createAndShareVote', `${shortID}`, ``)
                     this.mainLogger.debug(`processAcceptedTxQueue2 createAndShareVote : ${queueEntry.logID} `)
                     await this.createAndShareVote(queueEntry)
                   }
@@ -5881,7 +5885,7 @@ class StateManager extends EventEmitter {
                 this.fatalLogger.fatal('processAcceptedTxQueue2 preApplyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
               } finally {
     
-                if (this.verboseLogs) this.logger.playbackLogNote('shrd_preapplyFinish', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+                if (this.verboseLogs) if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_preapplyFinish', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
               }
             }
             markAccountsSeen(queueEntry)
@@ -5896,7 +5900,7 @@ class StateManager extends EventEmitter {
               let result = this.tryProduceReceipt(queueEntry)
               if(result != null){
                 if(this.hasAppliedReceiptMatchingPreApply(queueEntry, result)){
-                  if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete_madeReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
+                  if (this.verboseLogs) if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_consensingComplete_madeReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
 
                   // Broadcast the receipt
                   await this.shareAppliedReceipt(queueEntry)
@@ -5904,7 +5908,7 @@ class StateManager extends EventEmitter {
                   continue
 
                 } else{
-                  if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch1', `${shortID}`, `qId: ${queueEntry.entryID}  `)
+                  if (this.verboseLogs) if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch1', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                   didNotMatchReceipt = true
                   queueEntry.appliedReceiptForRepair = result
                 }
@@ -5914,11 +5918,11 @@ class StateManager extends EventEmitter {
               // if we got a reciept while waiting see if we should use it
               if(hasReceivedApplyReceipt){
                 if(this.hasAppliedReceiptMatchingPreApply(queueEntry, queueEntry.recievedAppliedReceipt)){
-                  if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${shortID}`, `qId: ${queueEntry.entryID} `)
+                  if (this.verboseLogs) if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${shortID}`, `qId: ${queueEntry.entryID} `)
                   queueEntry.state = 'commiting'
                   continue
                 } else{
-                  if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch2', `${shortID}`, `qId: ${queueEntry.entryID}  `)
+                  if (this.verboseLogs) if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch2', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                   didNotMatchReceipt = true
                   queueEntry.appliedReceiptForRepair = queueEntry.recievedAppliedReceipt
                 }
@@ -5928,7 +5932,7 @@ class StateManager extends EventEmitter {
 
               // we got a receipt but did not match it.
               if(didNotMatchReceipt === true){
-                if (this.verboseLogs) this.logger.playbackLogNote('shrd_consensingComplete_didNotMatchReceipt', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} `)
+                if (this.verboseLogs) if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_consensingComplete_didNotMatchReceipt', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} `)
                 queueEntry.repairFinished = false
                 if(queueEntry.appliedReceiptForRepair.result === true){
                   // need to start repair process and wait
@@ -5947,7 +5951,7 @@ class StateManager extends EventEmitter {
 
           // at this point we are just waiting to see if we applied the data and repaired correctlyl
           if(queueEntry.repairFinished === true){
-            if (this.verboseLogs) this.logger.playbackLogNote('shrd_awaitRepair_repairFinished', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} `)
+            if (this.verboseLogs) if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_awaitRepair_repairFinished', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} `)
             this.removeFromQueue(queueEntry, currentIndex)
             if(queueEntry.appliedReceiptForRepair.result === true){
               queueEntry.state = 'pass'
@@ -5962,17 +5966,17 @@ class StateManager extends EventEmitter {
 
             // TODO STATESHARDING4 Check if we have already commited the data from a receipt we saw earlier
             this.mainLogger.debug(`processAcceptedTxQueue2 commiting : ${queueEntry.logID} `)
-            if (this.verboseLogs) this.logger.playbackLogNote('shrd_commitingTx', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+            if (this.verboseLogs) if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_commitingTx', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
 
             // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processAcceptedTxQueue2. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
 
             // TODO STATESHARDING4 SYNC related need to reconsider how to set this up again
             // if (queueEntry.didSync) {
-            //   this.logger.playbackLogNote('shrd_sync_commiting', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
+            //   if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_commiting', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
             //   // if we did sync it is time to JIT query local data.  alternatively could have other nodes send us this data, but that could be very high bandwidth.
             //   for (let key of queueEntry.syncKeys) {
             //     let wrappedState = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
-            //     this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)} hash:${wrappedState.stateId}`)
+            //     if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)} hash:${wrappedState.stateId}`)
             //     queueEntry.localCachedData[key] = wrappedState.localCache
             //   }
             // }
@@ -6004,7 +6008,7 @@ class StateManager extends EventEmitter {
                 canCommitTX = false
               }
 
-              if (this.verboseLogs) this.logger.playbackLogNote('shrd_commitingTx', `${shortID}`, `canCommitTX: ${canCommitTX} `)
+              if (this.verboseLogs) if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_commitingTx', `${shortID}`, `canCommitTX: ${canCommitTX} `)
               if(canCommitTX){
                 // this.mainLogger.debug(` processAcceptedTxQueue2. applyAcceptedTransaction ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp} queuerestarts: ${localRestartCounter} queueLen: ${this.newAcceptedTxQueue.length}`)
                 let filter:AccountFilter = {}
@@ -6077,7 +6081,7 @@ class StateManager extends EventEmitter {
               }
 
               
-              if (this.verboseLogs) this.logger.playbackLogNote('shrd_commitingTxFinished', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+              if (this.verboseLogs) if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_commitingTxFinished', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
             }
 
             // TODO STATESHARDING4 SYNC related.. need to consider how we will re activate this 
@@ -6097,7 +6101,7 @@ class StateManager extends EventEmitter {
             //   // send data to syncing neighbors.
             //   if (this.currentCycleShardData.syncingNeighbors.length > 0) {
             //     let message = { stateList: dataToSend, txid: queueEntry.acceptedTx.id }
-            //     this.logger.playbackLogNote('shrd_sync_dataTell', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} AccountBeingShared: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)} txid: ${utils.makeShortHash(message.txid)} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighbors.map(x => x.id))}`)
+            //     if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_dataTell', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} AccountBeingShared: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)} txid: ${utils.makeShortHash(message.txid)} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighbors.map(x => x.id))}`)
             //     this.p2p.tell(this.currentCycleShardData.syncingNeighbors, 'broadcast_state', message)
             //   }
             // }
@@ -6131,7 +6135,7 @@ class StateManager extends EventEmitter {
    * @param queueEntry 
    */
   async shareAppliedReceipt (queueEntry: QueueEntry) {
-    if (this.verboseLogs) this.logger.playbackLogNote('shrd_shareAppliedReceipt', `${queueEntry.logID}`, `qId: ${queueEntry.entryID} `)
+    if (this.verboseLogs) if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_shareAppliedReceipt', `${queueEntry.logID}`, `qId: ${queueEntry.entryID} `)
 
     let appliedReceipt = queueEntry.appliedReceipt
 
@@ -6211,7 +6215,7 @@ class StateManager extends EventEmitter {
       }
 
       this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} Good Match`)
-      this.logger.playbackLogNote('hasAppliedReceiptMatchingPreApply', `${queueEntry.logID}`, `  Good Match`)
+      if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('hasAppliedReceiptMatchingPreApply', `${queueEntry.logID}`, `  Good Match`)
 
     }
 
@@ -6318,7 +6322,7 @@ class StateManager extends EventEmitter {
 
     // TODO: possibly need an extra check to make sure all the top hash by ID values match to a single vote (and are not spread between multiple votes)
 
-    this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} `)
+    if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} `)
     this.mainLogger.debug(`tryProduceReceipt canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} `)
 
     let secondTally = 0
@@ -6365,7 +6369,7 @@ class StateManager extends EventEmitter {
       // if a passing vote won then check all the hashes.
       if(passed) {
         if(secondTally < requiredVotes){
-          this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} secondTally:${secondTally}`)
+          if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} secondTally:${secondTally}`)
           this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} secondTally:${secondTally} `)
           return null
         }
@@ -6390,7 +6394,7 @@ class StateManager extends EventEmitter {
    * @param queueEntry 
    */
   async createAndShareVote(queueEntry: QueueEntry) {
-    if (this.verboseLogs) this.logger.playbackLogNote('shrd_createAndShareVote', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} `)
+    if (this.verboseLogs) if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_createAndShareVote', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} `)
 
     // TODO STATESHARDING4 CHECK VOTES PER CONSENSUS GROUP
 
@@ -6405,7 +6409,7 @@ class StateManager extends EventEmitter {
     }
 
     if(queueEntry.debugFail_voteFlip === true){
-      if (this.verboseLogs) this.logger.playbackLogNote('shrd_createAndShareVote_voteFlip', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} `)
+      if (this.verboseLogs) if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_createAndShareVote_voteFlip', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} `)
 
       ourVote.transaction_result = !ourVote.transaction_result
     }
@@ -6457,7 +6461,7 @@ class StateManager extends EventEmitter {
       //this.p2p.sendGossipIn('spread_appliedVote', ourVote, '', sender, consensusGroup)
 
       this.mainLogger.debug(`createAndShareVote numNodes: ${consensusGroup.length} ourVote: ${utils.stringifyReduce(ourVote)} `)
-      this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.id}`, `numNodes: ${consensusGroup.length} ourVote: ${utils.stringifyReduce(ourVote)} `)
+      if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.id}`, `numNodes: ${consensusGroup.length} ourVote: ${utils.stringifyReduce(ourVote)} `)
 
       // Filter nodes before we send tell()
       let filteredNodes = this.filterValidNodesForInternalMessage(consensusGroup, "createAndShareVote", true, true)
@@ -6482,7 +6486,7 @@ class StateManager extends EventEmitter {
   tryAppendVote (queueEntry: QueueEntry, vote:AppliedVote ) : boolean {
     let numVotes = queueEntry.collectedVotes.length
 
-    this.logger.playbackLogNote('tryAppendVote', `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVotes.length}`)
+    if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tryAppendVote', `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVotes.length}`)
     this.mainLogger.debug(`tryAppendVote collectedVotes: ${queueEntry.logID}   ${queueEntry.collectedVotes.length} `)
 
 
@@ -6782,7 +6786,7 @@ class StateManager extends EventEmitter {
     while (this.currentCycleShardData == null) {
       this.getCurrentCycleShardData()
       await utils.sleep(1000)
-      this.logger.playbackLogNote('_waitForShardData', ` `, ` ${utils.stringifyReduce(this.currentCycleShardData)} `)
+      if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('_waitForShardData', ` `, ` ${utils.stringifyReduce(this.currentCycleShardData)} `)
     }
   }
 
@@ -6804,7 +6808,7 @@ class StateManager extends EventEmitter {
     let globalAccount = null
     if(this.globalAccountMap.has(address)){
       globalAccount = this.globalAccountMap.get(address)
-      this.logger.playbackLogNote('globalAccountMap', `getLocalOrRemoteAccount - has`)
+      if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('globalAccountMap', `getLocalOrRemoteAccount - has`)
       if(globalAccount != null){
         return globalAccount
       }
@@ -6901,7 +6905,7 @@ class StateManager extends EventEmitter {
   }
   getAccountFailDump (address: string, message: string) {
     // this.currentCycleShardData
-    this.logger.playbackLogNote('getAccountFailDump', ` `, `${utils.makeShortHash(address)} ${message} `)
+    if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('getAccountFailDump', ` `, `${utils.makeShortHash(address)} ${message} `)
   }
 
 
@@ -7045,7 +7049,7 @@ class StateManager extends EventEmitter {
       if(this.globalAccountMap.has(key)){
         
         if(isGlobalModifyingTX === false){
-          this.logger.playbackLogNote('globalAccountMap', `setAccount - has`)
+          if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('globalAccountMap', `setAccount - has`)
           if (this.verboseLogs) this.mainLogger.debug('setAccount: Not writing global account: ' + utils.makeShortHash(key) )
           continue          
         }
@@ -7337,7 +7341,7 @@ class StateManager extends EventEmitter {
     if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair generatePartitionResult: ${utils.stringifyReduce(partitionResult)}`)
 
     if (partitionObject.Txids && partitionObject.Txids.length > 0) {
-      this.logger.playbackLogNote('partitionObject', 'c' + partitionObject.Cycle_number, partitionObject)
+      if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('partitionObject', 'c' + partitionObject.Cycle_number, partitionObject)
     }
     // nodeid in form of the signer!
     return partitionResult
@@ -7899,7 +7903,7 @@ class StateManager extends EventEmitter {
 
             if (!success) {
               if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs' + utils.stringifyReduce(tx))
-              this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs`)
+              if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs`)
 
               this.fatalLogger.fatal(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs' + utils.stringifyReduce(tx))
 
@@ -8225,7 +8229,7 @@ class StateManager extends EventEmitter {
 
           if (!success) {
             if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs' + utils.stringifyReduce(tx))
-            this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs`)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs`)
             this.fatalLogger.fatal(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis. applyAllPreparedRepairs' + utils.stringifyReduce(tx))
 
             // return
@@ -8248,7 +8252,7 @@ class StateManager extends EventEmitter {
             // }
             //is it global. 
             if(this.isGlobalAccount(wrappedStateKey)){ // wrappedState.accountId)){
-              this.logger.playbackLogNote('globalAccountMap', `applyAllPreparedRepairs - has`, ` ${wrappedState.accountId} ${wrappedStateKey}`)
+              if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('globalAccountMap', `applyAllPreparedRepairs - has`, ` ${wrappedState.accountId} ${wrappedStateKey}`)
               if(wrappedState != null){
                 let globalValueSnapshot = this.getGlobalAccountValueAtTime(wrappedState.accountId, tx.timestamp)           
                 
@@ -8790,7 +8794,7 @@ class StateManager extends EventEmitter {
 
       let shorthash = utils.makeShortHash(partitionResultsToSend.node.id)
       let toNodeStr = shorthash + ':' + partitionResultsToSend.node.externalPort
-      this.logger.playbackLogNote('broadcastPartitionResults', `${cycleNumber}`, `to ${toNodeStr} ${partitionResultsToSend.debugStr} `)
+      if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('broadcastPartitionResults', `${cycleNumber}`, `to ${toNodeStr} ${partitionResultsToSend.debugStr} `)
 
       // Filter nodes before we send tell()
       let filteredNodes = this.filterValidNodesForInternalMessage([partitionResultsToSend.node], "tellCorrespondingNodes", true, true)
@@ -9201,7 +9205,7 @@ class StateManager extends EventEmitter {
     let result:Shardus.AccountsCopy | null = null
     let globalBackupList:Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
     if(globalBackupList == null || globalBackupList.length === 0){
-      this.logger.playbackLogNote('globalBackupList', `applyAllPreparedRepairs - missing value for ${accountId}`)
+      if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('globalBackupList', `applyAllPreparedRepairs - missing value for ${accountId}`)
       return null
     }
 
@@ -10730,7 +10734,7 @@ class StateManager extends EventEmitter {
           // If we do not realized this account is global yet, then set it and log to playback log
           if(this.isGlobalAccount(accountId) === false){
             this.globalAccountMap.set(accountId, null) // we use null. ended up not using the data, only checking for the key is used
-            this.logger.playbackLogNote('globalAccountMap', `set global in _commitAccountCopies accountId:${utils.makeShortHash(accountId)}`)
+            if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('globalAccountMap', `set global in _commitAccountCopies accountId:${utils.makeShortHash(accountId)}`)
           }
 
           let globalBackupList:Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
