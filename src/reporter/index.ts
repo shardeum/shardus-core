@@ -3,6 +3,7 @@ import LoadDetection from '../load-detection'
 import Logger from '../logger'
 import { ipInfo } from '../network'
 import { crypto } from '../p2p/Context'
+import { getDesiredCount } from '../p2p/CycleAutoScale'
 import * as CycleChain from '../p2p/CycleChain'
 import * as NodeList from '../p2p/NodeList'
 import * as Rotation from '../p2p/Rotation'
@@ -170,7 +171,7 @@ class Reporter {
       const cycleMarker = CycleChain.newest.previous || '' // [TODO] Replace with cycle creator
       const cycleCounter = CycleChain.newest.counter
       const nodelistHash = crypto.hash(NodeList.byJoinOrder)
-      const desiredNodes = Rotation.getDesiredCount()
+      const desiredNodes = getDesiredCount()
       const txInjected = this.statistics
         ? this.statistics.getPreviousElement('txInjected')
         : 0

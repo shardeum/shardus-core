@@ -4,6 +4,7 @@ import * as Comms from './Comms'
 import { config, logger } from './Context'
 import { CycleRecord } from './CycleCreator'
 import { Change } from './CycleParser'
+import { getDesiredCount } from './CycleAutoScale'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import * as Types from './Types'
@@ -110,11 +111,6 @@ export function queueRequest(request) {}
 export function sendRequests() {}
 
 /** Module Functions */
-
-export function getDesiredCount() {
-  // config.p2p.maxNodes isn't used until we have autoscaling
-  return config.p2p.minNodes
-}
 
 function getExpiredRemoved(start: CycleRecord['start']) {
   let expired = 0
