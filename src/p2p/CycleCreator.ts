@@ -13,6 +13,7 @@ import * as Lost from './Lost'
 import * as NodeList from './NodeList'
 import * as Refresh from './Refresh'
 import * as Rotation from './Rotation'
+import * as CycleAutoScale from './CycleAutoScale'
 import * as SafetyMode from './SafetyMode'
 import * as Self from './Self'
 import * as Sync from './Sync'
@@ -45,7 +46,8 @@ export type CycleTxs = SafetyMode.Txs &
   Active.Txs &
   Apoptosis.Txs &
   Lost.Txs &
-  Rotation.Txs
+  Rotation.Txs &
+  CycleAutoScale.Txs
 
 // don't forget to add new modules here
 export type CycleRecord = BaseRecord &
@@ -62,7 +64,8 @@ export type CycleRecord = BaseRecord &
     lost: string[]
     refuted: string[]
     apoptosized: string[]
-  } & Snapshot.Record
+  } & Snapshot.Record &
+  CycleAutoScale.Record
 
 export type CycleData = CycleRecord & {
   marker: CycleMarker
@@ -92,6 +95,7 @@ export const submodules = [
   Apoptosis,
   Lost,
   SafetyMode,
+  CycleAutoScale
 ]
 
 export let currentQuarter = -1 // means we have not started creating cycles

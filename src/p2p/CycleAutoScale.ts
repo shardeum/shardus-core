@@ -2,6 +2,7 @@ import { Logger } from 'log4js'
 import { crypto, logger, config } from './Context'
 import * as CycleCreator from './CycleCreator'
 import * as CycleChain from './CycleChain'
+import * as CycleParser from './CycleParser'
 import * as Rotation from './Rotation'
 import * as Self from './Self'
 import * as NodeList from './NodeList'
@@ -10,6 +11,8 @@ import * as Types from './Types'
 import { validateTypes, sleep } from '../utils'
 import * as Comms from './Comms'
 import * as Utils from './Utils'
+import deepmerge from 'deepmerge'
+import { request } from 'express'
 
 /** TYPES */
 enum ScaleType {
@@ -17,11 +20,18 @@ enum ScaleType {
   DOWN = 'down',
 }
 
+export interface Record {
+  desired: number
+}
 export interface ScaleRequest {
   nodeId: string
   timestamp: number
   counter: number
   scale: string
+}
+
+export interface Txs {
+  autoscaling: SignedScaleRequest[]
 }
 
 export type SignedScaleRequest = ScaleRequest & Types.SignedObject
@@ -63,7 +73,7 @@ const gossipScaleRoute: Types.GossipHandler<SignedScaleRequest> = async (
 const routes = {
   internal: {},
   gossip: {
-    'scaling': gossipScaleRoute,
+    scaling: gossipScaleRoute,
   },
 }
 
@@ -86,8 +96,8 @@ export function reset () {
   approvedScalingType = null
 }
 
-export function getDesiredCount() {
-    return desiredCount
+export function getDesiredCount () {
+  return desiredCount
 }
 
 function createScaleRequest (scaleType) {
@@ -172,7 +182,10 @@ function validateScalingRequest (scalingRequest: SignedScaleRequest) {
     return false
   }
   // Check if we are trying to scale either up or down
-  if (scalingRequest.scale !== ScaleType.UP && scalingRequest.scale !== ScaleType.DOWN) {
+  if (
+    scalingRequest.scale !== ScaleType.UP &&
+    scalingRequest.scale !== ScaleType.DOWN
+  ) {
     warn(
       `Invalid scaling request, not a valid scaling type. Request: ${JSON.stringify(
         scalingRequest
@@ -210,9 +223,7 @@ async function _checkScaling () {
   let changed = false
 
   if (approvedScalingType === ScaleType.UP) {
-    warn(
-      'Already set to scale up this cycle. No need to scale up anymore.'
-    )
+    warn('Already set to scale up this cycle. No need to scale up anymore.')
     return
   }
 
@@ -263,56 +274,91 @@ async function _checkScaling () {
   info('newDesired', newDesired)
 }
 
-function getScaleUpRequests() {
-    let requests = []
-    for (let [nodeId, request] of scalingRequestsCollector) {
-        if (request.scale === ScaleType.UP) requests.push(request)
-    }
-    return requests
+export function queueRequest(request) {}
+
+export function sendRequests() {}
+
+export function getTxs(): Txs {
+  // [IMPORTANT] Must return a copy to avoid mutation
+  const requestsCopy = deepmerge({}, [...Object.values(scalingRequestsCollector)])
+  console.log(`getTxs: Cycle ${CycleCreator.currentQuarter}, Quarter: ${CycleCreator.currentQuarter}`, {
+    autoscaling: requestsCopy,
+  })
+
+  return {
+    autoscaling: requestsCopy,
+  }
 }
 
-function getScaleDownRequests() {
-    let requests = []
-    for (let [nodeId, request] of scalingRequestsCollector) {
-        if (request.scale === ScaleType.DOWN) requests.push(request)
-    }
-    return requests
+export function validateRecordTypes(rec: Record): string {
+  let err = validateTypes(rec, { desired: 'n' })
+  if (err) return err
+  return ''
+}
+
+export function updateRecord(txs: Txs, record: CycleCreator.CycleRecord) {
+  record.desired = getDesiredCount()
+  console.log(
+    `Auto-scaling after updating record: Cycle ${CycleCreator.currentQuarter}, Quarter: ${CycleCreator.currentQuarter}`,
+    record
+  )
+  reset()
+}
+
+export function parseRecord(
+  record: CycleCreator.CycleRecord
+): CycleParser.Change {
+  // Since we don't touch the NodeList, return an empty Change
+  return {
+    added: [],
+    removed: [],
+    updated: [],
+  }
+}
+
+function getScaleUpRequests () {
+  let requests = []
+  for (let [nodeId, request] of scalingRequestsCollector) {
+    if (request.scale === ScaleType.UP) requests.push(request)
+  }
+  return requests
+}
+
+function getScaleDownRequests () {
+  let requests = []
+  for (let [nodeId, request] of scalingRequestsCollector) {
+    if (request.scale === ScaleType.DOWN) requests.push(request)
+  }
+  return requests
 }
 
 async function _addToScalingRequests (scalingRequest) {
   switch (scalingRequest.scale) {
     case ScaleType.UP:
       if (requestedScalingType === ScaleType.DOWN) {
-        warn(
-          'Already scaling down this cycle. Cannot add scaling up request.'
-        )
+        warn('Already scaling down this cycle. Cannot add scaling up request.')
         return false
       }
 
       // Check if we have exceeded the limit of scaling requests
       if (getScaleUpRequests().length >= config.p2p.maxScaleReqs) {
-        warn(
-          'Max scale up requests already exceeded. Cannot add request.'
-        )
+        warn('Max scale up requests already exceeded. Cannot add request.')
         return false
       }
       scalingRequestsCollector.set(scalingRequest.nodeId, scalingRequest)
       requestedScalingType = ScaleType.UP
+      console.log(`Added scale request in cycle ${CycleCreator.currentCycle}, quarter ${CycleCreator.currentQuarter}`, requestedScalingType, scalingRequest)
       await _checkScaling()
       return true
     case ScaleType.DOWN:
       // Check if we are already voting scale up, don't add in that case
       if (requestedScalingType === ScaleType.UP) {
-        warn(
-          'Already scaling up this cycle. Cannot add scaling down request.'
-        )
+        warn('Already scaling up this cycle. Cannot add scaling down request.')
         return false
       }
       // Check if we have exceeded the limit of scaling requests
       if (getScaleUpRequests().length >= config.p2p.maxScaleReqs) {
-        warn(
-          'Max scale down requests already exceeded. Cannot add request.'
-        )
+        warn('Max scale down requests already exceeded. Cannot add request.')
         return false
       }
       scalingRequestsCollector.set(scalingRequest.nodeId, scalingRequest)
@@ -344,25 +390,22 @@ async function _addScalingRequest (scalingRequest: SignedScaleRequest) {
   return added
 }
 
-async function _waitUntilEndOfCycle(
+async function _waitUntilEndOfCycle () {
+  console.log('waiting for next cycle start')
+  const currentTime = Date.now()
+  const nextQ1Start = CycleCreator.nextQ1Start
+  info(`Current time is: ${currentTime}`)
+  info(`Next cycle will start at: ${nextQ1Start}`)
 
-  ) {
-    const currentTime = Date.now()
-    const nextQ1Start = CycleCreator.nextQ1Start
-    info(`Current time is: ${currentTime}`)
-    info(`Next cycle will start at: ${nextQ1Start}`)
-
-    let timeToWait
-    if (currentTime < nextQ1Start) {
-      timeToWait = nextQ1Start - currentTime + (config.p2p.queryDelay * 1000) 
-    } else {
-      timeToWait = 0
-    }
-    info(
-      `Waiting for ${timeToWait} ms before next cycle marker creation...`
-    )
-    await sleep(timeToWait)
+  let timeToWait
+  if (currentTime < nextQ1Start) {
+    timeToWait = nextQ1Start - currentTime + config.p2p.queryDelay * 1000
+  } else {
+    timeToWait = 0
   }
+  info(`Waiting for ${timeToWait} ms before next cycle marker creation...`)
+  await sleep(timeToWait)
+}
 
 function info (...msg) {
   const entry = `Active: ${msg.join(' ')}`

@@ -14,7 +14,6 @@ import * as Types from './Types'
 export interface Txs {}
 
 export interface Record {
-  desired: number
   expired: number
   removed: string[]
 }
@@ -62,7 +61,7 @@ export function getTxs(): Txs {
 }
 
 export function validateRecordTypes(rec: Record): string{
-  let err = validateTypes(rec,{desired:'n',expired:'n',removed:'a'})
+  let err = validateTypes(rec,{expired:'n',removed:'a'})
   if (err) return err
   for(const item of rec.removed){
     if (typeof(item) !== 'string') return 'items of removed array must be strings'
@@ -79,7 +78,6 @@ Given the txs and prev cycle record mutate the referenced record
 */
 export function updateRecord(txs: Txs, record: CycleRecord, prev: CycleRecord) {
   if (!prev) {
-    record.desired = config.p2p.minNodes
     record.expired = 0
     record.removed = []
     return
@@ -88,7 +86,6 @@ export function updateRecord(txs: Txs, record: CycleRecord, prev: CycleRecord) {
   // Allow the autoscale module to set this value
   const { expired, removed } = getExpiredRemoved(prev.start)
 
-  record.desired = getDesiredCount() // Need to get this from autoscale module
   record.expired = expired
   record.removed = removed // already sorted
 }
