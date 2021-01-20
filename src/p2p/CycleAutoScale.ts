@@ -1,5 +1,5 @@
 import { Logger } from 'log4js'
-import { crypto, logger, config } from './Context'
+import { crypto, logger, config, network } from './Context'
 import * as CycleCreator from './CycleCreator'
 import * as CycleChain from './CycleChain'
 import * as CycleParser from './CycleParser'
@@ -11,6 +11,7 @@ import * as Types from './Types'
 import { validateTypes, sleep } from '../utils'
 import * as Comms from './Comms'
 import * as Utils from './Utils'
+import * as Network from '../network'
 import deepmerge from 'deepmerge'
 import { request } from 'express'
 
@@ -70,10 +71,25 @@ const gossipScaleRoute: Types.GossipHandler<SignedScaleRequest> = async (
   Comms.sendGossip('scaling', payload, tracker)
 }
 
+const scalingTestRoute: Types.GossipHandler<SignedScaleRequest> = async (
+  payload,
+  sender,
+  tracker
+) => {
+  info(`Got scale test gossip: ${JSON.stringify(payload)}`)
+  if (!payload) {
+    warn('No payload provided for the `scaling` request.')
+    return
+  }
+  Comms.sendGossip('scalingTest', 'UP')
+  requestNetworkUpsize()
+}
+
 const routes = {
   internal: {},
   gossip: {
     scaling: gossipScaleRoute,
+    scalingTest: scalingTestRoute
   },
 }
 
@@ -84,19 +100,34 @@ export function init () {
   desiredCount = config.p2p.minNodes
 
   for (const [name, handler] of Object.entries(routes.gossip)) {
+    console.log(name, handler)
     Comms.registerGossipHandler(name, handler)
   }
+
+  network.registerExternalGet('scale-test', async (req, res) => {
+    const err = validateTypes(req, { body: 'o' })
+    if (err) {
+      warn(`joinarchiver: bad req ${err}`)
+      return res.json({ success: false, error: err })
+    }
+
+    info(`Scale test received`)
+    res.json({ success: true })
+    Comms.sendGossip('scalingTest', 'UP')
+    requestNetworkUpsize()
+  })
 }
 
 export function reset () {
-  console.log('Resetting auto-scale module')
+  console.log('Resetting auto-scale module', `Cycle ${CycleCreator.currentQuarter}, Quarter: ${CycleCreator.currentQuarter}`)
   scalingRequested = false
   scalingRequestsCollector = new Map()
   requestedScalingType = null
   approvedScalingType = null
 }
 
-export function getDesiredCount () {
+export function getDesiredCount (): number {
+  console.log('getting desired count', desiredCount)
   return desiredCount
 }
 
@@ -127,7 +158,7 @@ async function _requestNetworkScaling (upOrDown) {
   if (!Self.isActive || scalingRequested) return
   const request = createScaleRequest(upOrDown)
   console.log('Scale request', request)
-  await _waitUntilEndOfCycle()
+  // await _waitUntilEndOfCycle()
   await addExtScalingRequest(request)
   await Comms.sendGossip('scaling', request)
   scalingRequested = true
@@ -219,8 +250,11 @@ function validateScalingRequest (scalingRequest: SignedScaleRequest) {
 }
 
 async function _checkScaling () {
+  console.log('_checkScaling...')
   // Keep a flag if we have changed our metadata.scaling at all
   let changed = false
+
+  console.log('Scale up reqeust length', getScaleUpRequests().length)
 
   if (approvedScalingType === ScaleType.UP) {
     warn('Already set to scale up this cycle. No need to scale up anymore.')
@@ -257,11 +291,13 @@ async function _checkScaling () {
       newDesired = CycleChain.newest.desired + config.p2p.amountToScale
       // If newDesired more than maxNodes, set newDesired to maxNodes
       if (newDesired > config.p2p.maxNodes) newDesired = config.p2p.maxNodes
+      setDesireCount(newDesired)
       break
     case ScaleType.DOWN:
       newDesired = CycleChain.newest.desired - config.p2p.amountToScale
       // If newDesired less than minNodes, set newDesired to minNodes
       if (newDesired < config.p2p.minNodes) newDesired = config.p2p.minNodes
+      setDesireCount(newDesired)
       break
     default:
       error(
@@ -271,7 +307,14 @@ async function _checkScaling () {
       )
       return
   }
-  info('newDesired', newDesired)
+  console.log('newDesired', newDesired)
+}
+
+function setDesireCount(count: number) {
+  if (count >= config.p2p.minNodes && count <= config.p2p.maxNodes) {
+    console.log('Setting desired count to', count)
+    desiredCount = count
+  }
 }
 
 export function queueRequest(request) {}

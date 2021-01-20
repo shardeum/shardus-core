@@ -25,6 +25,7 @@ import Profiler from '../utils/profiler'
 import ShardusTypes = require('../shardus/shardus-types')
 import * as Archivers from '../p2p/Archivers'
 import * as AutoScaling from '../p2p/CycleAutoScale'
+import { currentCycle, currentQuarter } from '../p2p/CycleCreator'
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
@@ -509,9 +510,11 @@ class Shardus extends EventEmitter {
       this.statistics
     )
     this.loadDetection.on('highLoad', async () => {
+      console.log(`High load detected Cycle ${currentCycle}, Quarter: ${currentQuarter}`)
       await AutoScaling.requestNetworkUpsize()
     })
     this.loadDetection.on('lowLoad', async () => {
+      console.log(`Low load detected Cycle ${currentCycle}, Quarter: ${currentQuarter}`)
       await AutoScaling.requestNetworkDownsize()
     })
 
