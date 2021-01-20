@@ -96,7 +96,7 @@ export function computeCycleMarker(fields) {
   return cycleMarker
 }
 
-const idToPort: { [id: string]: number } = {}
+const idToIpPort: { [id: string]: string } = {}
 
 export function getDebug() {
   const chain = cycles.map((record) => {
@@ -105,31 +105,33 @@ export function getDebug() {
     const rhash = crypto.hash(record).slice(0, 4)
     const actv = record.active
     const exp = record.expired
-    const joind = record.joinedConsensors.map((c) => c.externalPort)
+    const joind = record.joinedConsensors.map(
+      (c) => `${c.externalIp}:${c.externalPort}`
+    )
     const actvd = record.activated.map((id) => {
-      if (idToPort[id]) return idToPort[id]
+      if (idToIpPort[id]) return idToIpPort[id]
       let node = nodes.get(id)
       if(node != null){
-        idToPort[id] = node.externalPort
-        return idToPort[id]
+        idToIpPort[id] = `${node.externalIp}:${node.externalPort}`
+        return idToIpPort[id]
       }
       return -1 // port not found
     })
     //    const rmvd = record.removed.map(id => idToPort[id])
     const rmvd = record.removed.map((id) =>
-      idToPort[id] ? idToPort[id] : 'x' + id.slice(0, 3)
+      idToIpPort[id] ? idToIpPort[id] : 'x' + id.slice(0, 3)
     )
     const lost = record.lost.map((id) =>
-      idToPort[id] ? idToPort[id] : 'x' + id.slice(0, 3)
+      idToIpPort[id] ? idToIpPort[id] : 'x' + id.slice(0, 3)
     )
     const refu = record.refuted.map((id) =>
-      idToPort[id] ? idToPort[id] : 'x' + id.slice(0, 3)
+      idToIpPort[id] ? idToIpPort[id] : 'x' + id.slice(0, 3)
     )
     const apopd = record.apoptosized.map((id) =>
-      idToPort[id] ? idToPort[id] : 'x' + id.slice(0, 3)
+      idToIpPort[id] ? idToIpPort[id] : 'x' + id.slice(0, 3)
     )
     const rfshd = record.refreshedConsensors.map(
-      (c) => `${c.externalPort}:${c.counterRefreshed}`
+      (c) => `${c.externalIp}:${c.externalPort}-${c.counterRefreshed}`
     )
 
     const str = `      ${ctr}:${prev}:${rhash} { actv:${actv}, exp:${exp}, joind:[${joind.join()}], actvd:[${actvd.join()}], lost:[${lost.join()}] refu:[${refu.join()}] apop:[${apopd.join()}] rmvd:[${rmvd.join()}], rfshd:[${rfshd.join()}] }`

@@ -307,7 +307,7 @@ export function addJoinRequest(joinRequest: JoinRequest) {
   }
 
   const node = joinRequest.nodeInfo
-  info(`Got join request for ${node.externalPort}`)
+  info(`Got join request for ${node.externalIp}:${node.externalPort}`)
 
   // Check if this node has already been seen this cycle
   if (seen.has(node.publicKey)) {
@@ -366,7 +366,9 @@ export function addJoinRequest(joinRequest: JoinRequest) {
       ? -1
       : 0
   )
-  info(`Added join request for ${joinRequest.nodeInfo.externalPort}`)
+  info(
+    `Added join request for ${joinRequest.nodeInfo.externalIp}:${joinRequest.nodeInfo.externalPort}`
+  )
 
   // If we have > maxJoinedPerCycle requests, trim them down
   const toAccept = calculateToAccept()

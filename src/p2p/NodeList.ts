@@ -192,15 +192,25 @@ export function getDebug() {
     NODES:
       hash:                  ${crypto.hash(byJoinOrder).slice(0, 5)}
       byJoinOrder:           [${byJoinOrder
-        .map(node => `${node.externalPort}:${node.counterRefreshed}`)
+        .map(
+          (node) =>
+            `${node.externalIp}:${node.externalPort}-${node.counterRefreshed}`
+        )
         .join()}]
       byIdOrder:             [${byIdOrder
-        .map(node => ''+node.externalPort+':x'+idTrim(node.id))
+        .map(
+          (node) =>
+            `${node.externalIp}:${node.externalPort}` + '-x' + idTrim(node.id)
+        )
         .join()}]
-      othersByIdOrder:       [${othersByIdOrder.map(node => node.externalPort)}]
-      activeByIdOrder:       [${activeByIdOrder.map(node => node.externalPort)}]
+      othersByIdOrder:       [${othersByIdOrder.map(
+        (node) => `${node.externalIp}:${node.externalPort}`
+      )}]
+      activeByIdOrder:       [${activeByIdOrder.map(
+        (node) => `${node.externalIp}:${node.externalPort}`
+      )}]
       activeOthersByIdOrder: [${activeOthersByIdOrder.map(
-        node => node.externalPort
+        (node) => `${node.externalIp}:${node.externalPort}`
       )}]
       `
       if (VERBOSE) output += `
