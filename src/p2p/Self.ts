@@ -74,10 +74,11 @@ export async function startup(): Promise<boolean> {
     await utils.sleep(wait)
   }
 
+  let firstTime = true
   let result
   do {
     try {
-      result = await joinOrWitnessForNetwork()
+      result = await joinOrWitnessForNetwork(firstTime)
       if (result.outcome === 'tryAgain') {
         await retryWait(result.wait)
       }
@@ -88,6 +89,7 @@ export async function startup(): Promise<boolean> {
       info('Trying to join/witness again in 2 seconds...')
       await utils.sleep(2000)
     }
+    firstTime = false
   } while (!result || result.outcome === 'tryAgain')
 
   // Set node id and isFirst
@@ -121,7 +123,7 @@ export async function startup(): Promise<boolean> {
   return true
 }
 
-async function joinOrWitnessForNetwork(): Promise<JoinOrWitnessResult> {
+async function joinOrWitnessForNetwork(firstTime:Boolean): Promise<JoinOrWitnessResult> {
   // Get active nodes from Archiver
   const activeNodes = await contactArchiver()
 
@@ -169,6 +171,21 @@ async function joinOrWitnessForNetwork(): Promise<JoinOrWitnessResult> {
     }
   }
 
+  // If this is not the first time to attempt joining, then go ahead and do the joined robust query first
+  // This is because the loops that tests join may early out
+  if(firstTime === false){
+    // Check if joined by trying to set our node ID
+    const id = await Join.fetchJoined(activeNodes)
+    if (id) {
+      return {
+        outcome: 'joined',
+        wait: 0,
+        isFirst,
+        id,
+      }
+    }
+  }
+
   // Create join request from latest cycle
   const request = await Join.createJoinRequest(latestCycle.previous)
 
@@ -186,14 +203,16 @@ async function joinOrWitnessForNetwork(): Promise<JoinOrWitnessResult> {
   // Wait approx. one cycle
   await utils.sleep(Context.config.p2p.cycleDuration * 1000 + 500)
 
-  // Check if joined by trying to set our node ID
-  const id = await Join.fetchJoined(activeNodes)
-  if (id) {
-    return {
-      outcome: 'joined',
-      wait: 0,
-      isFirst,
-      id,
+  if(firstTime === true){
+    // Check if joined by trying to set our node ID
+    const id = await Join.fetchJoined(activeNodes)
+    if (id) {
+      return {
+        outcome: 'joined',
+        wait: 0,
+        isFirst,
+        id,
+      }
     }
   }
 
