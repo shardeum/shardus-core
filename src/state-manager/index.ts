@@ -5441,6 +5441,7 @@ class StateManager extends EventEmitter {
    * @param {number} currentIndex
    */
   removeFromQueue (queueEntry: QueueEntry, currentIndex: number) {
+    this.emit('txPopped', queueEntry.acceptedTx.receipt.txHash)
     this.newAcceptedTxQueue.splice(currentIndex, 1)
     this.archivedQueueEntries.push(queueEntry)
     // period cleanup will usually get rid of these sooner if the list fills up
@@ -5954,7 +5955,6 @@ class StateManager extends EventEmitter {
             // TODO STATESHARDING4 Check if we have already commited the data from a receipt we saw earlier
             this.mainLogger.debug(`processAcceptedTxQueue2 commiting : ${queueEntry.logID} `)
             if (this.verboseLogs) this.logger.playbackLogNote('shrd_commitingTx', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-            this.emit('txPopped', queueEntry.acceptedTx.receipt.txHash)
 
             // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processAcceptedTxQueue2. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
 
@@ -5968,8 +5968,6 @@ class StateManager extends EventEmitter {
             //     queueEntry.localCachedData[key] = wrappedState.localCache
             //   }
             // }
-
-
 
             let wrappedStates = queueEntry.collectedData // Object.values(queueEntry.collectedData)
             let localCachedData = queueEntry.localCachedData
