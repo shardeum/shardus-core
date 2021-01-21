@@ -189,6 +189,8 @@ async function joinOrWitnessForNetwork(firstTime:Boolean): Promise<JoinOrWitness
   // Create join request from latest cycle
   const request = await Join.createJoinRequest(latestCycle.previous)
 
+  // [TODO] [AS] Have the joiner figure out when Q1 is from the latestCycle
+
   // Submit join request to active nodes
   const tryAgain = await Join.submitJoin(activeNodes, request)
   if (tryAgain && tryAgain < Date.now() + Context.config.p2p.cycleDuration * 1000 * 2) {
@@ -203,7 +205,8 @@ async function joinOrWitnessForNetwork(firstTime:Boolean): Promise<JoinOrWitness
   // Wait approx. one cycle
   await utils.sleep(Context.config.p2p.cycleDuration * 1000 + 500)
 
-  if(firstTime === true){
+  // [TODO] [AS] Check if you've already joined the network before trying to send join requests again
+  if (firstTime === true) {
     // Check if joined by trying to set our node ID
     const id = await Join.fetchJoined(activeNodes)
     if (id) {

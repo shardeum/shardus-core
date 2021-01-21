@@ -413,6 +413,7 @@ export async function fetchCycleMarker(nodes) {
 }
 
 export async function submitJoin(nodes, joinRequest) {
+  // [TODO] [AS] Send the join request to a handful of the active node (like 5 or something) all at once instead of one by one
   for (const node of nodes) {
     info(`Sending join request to ${node.ip}:${node.port}`)
     try {
