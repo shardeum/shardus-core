@@ -55,11 +55,11 @@ export function init() {
 export async function startup(): Promise<boolean> {
   const publicKey = Context.crypto.getPublicKey()
 
-  // If startInWitness mode is set to true, start witness mode and end
+  // If startInWitness config is set to true, start witness mode and end
   if (Context.config.p2p.startInWitnessMode) {
     info('Emitting `witnessing` event.')
     emitter.emit('witnessing', publicKey)
-    return
+    return true
   }
 
   // Attempt to join the network until you know if you're first and have an id
@@ -69,28 +69,29 @@ export async function startup(): Promise<boolean> {
   let firstTime = true
   do {
     try {
-      /**
-       * [TODO] [AS] Looks like there's a case to start in witness mode if the
-       * network is full but our node has old data it can share.
-       *
-       * Conditions for starting in witness mode are:
-       *   1. node has old data
-       *   2. network is in safety mode
-       *   3. active nodes = max nodes
-       *
-       * We should continuously try to join the network, until those conditions
-       * are met, at which point we should start in witness mode.
-       */
-      ;({ isFirst, id } = await joinNetwork(firstTime))
+      // Get active nodes from Archiver
+      const activeNodes = await contactArchiver()
+
+      // Start in witness mode if conditions are met
+      if (await witnessConditionsMet(activeNodes)) {
+        info('Emitting `witnessing` event.')
+        emitter.emit('witnessing', publicKey)
+        return true
+      }
+
+      // Otherwise, try to join the network
+      ;({ isFirst, id } = await joinNetwork(activeNodes, firstTime))
     } catch (err) {
       warn('Error while joining network:')
       warn(err)
       warn(err.stack)
-      info('Trying to join again in 2 seconds...')
-      await utils.sleep(2000)
+      info(
+        `Trying to join again in ${Context.config.p2p.cycleDuration} seconds...`
+      )
+      await utils.sleep(Context.config.p2p.cycleDuration * 1000)
     }
     firstTime = false
-  } while (!isFirst || !id)
+  } while (utils.isUndefined(isFirst) || utils.isUndefined(id))
 
   info('Emitting `joined` event.')
   emitter.emit('joined', id, publicKey)
@@ -109,10 +110,22 @@ export async function startup(): Promise<boolean> {
   return true
 }
 
-async function joinNetwork(firstTime: boolean) {
-  // Get active nodes from Archiver
-  const activeNodes = await contactArchiver()
+async function witnessConditionsMet(activeNodes: Types.Node[]) {
+  // 1. node has old data
+  if (snapshot.oldDataPath) {
+    const latestCycle = await Sync.getNewestCycle(activeNodes)
+    // 2. network is in safety mode
+    if (latestCycle.safetyMode === true) {
+      // 3. active nodes >= max nodes
+      if (latestCycle.active >= Context.config.p2p.maxNodes) {
+        return true
+      }
+    }
+  }
+  return false
+}
 
+async function joinNetwork(activeNodes: Types.Node[], firstTime: boolean) {
   // Check if you're the first node
   const isFirst = await discoverNetwork(activeNodes)
   if (isFirst) {
@@ -149,6 +162,7 @@ async function joinNetwork(firstTime: boolean) {
 
   // Figure out when Q1 is from the latestCycle
   const { startQ1 } = calcIncomingTimes(latestCycle)
+  info(`Next cycles Q1 start ${startQ1}; Currently ${Date.now()}`)
 
   // Submit join request to active nodes during Q1
   const untilQ1 = startQ1 - Date.now()
@@ -160,10 +174,17 @@ async function joinNetwork(firstTime: boolean) {
     )
     await utils.sleep(untilQ1 + 500) // Not too early
   }
+
   await Join.submitJoin(activeNodes, request)
 
   // Wait approx. one cycle then check again
+  info('Waiting approx. one cycle then checking again...')
   await utils.sleep(Context.config.p2p.cycleDuration * 1000 + 500)
+
+  return {
+    isFirst: undefined,
+    id: undefined,
+  }
 }
 
 async function syncCycleChain() {
@@ -204,7 +225,9 @@ async function contactArchiver() {
   if (!Context.crypto.verify(activeNodesSigned, archiver.publicKey)) {
     throw Error('Fatal: _getSeedNodes seed list was not signed by archiver!')
   }
-  const joinRequest = activeNodesSigned.joinRequest
+  const joinRequest:
+    | Archivers.Request
+    | undefined = activeNodesSigned.joinRequest as Archivers.Request | undefined
   if (joinRequest) {
     if (Archivers.addJoinRequest(joinRequest) === false) {
       throw Error(
@@ -222,7 +245,7 @@ async function contactArchiver() {
   if (dataRequestStateMetaData) {
     dataRequest.push(dataRequestStateMetaData)
   }
-  if (dataRequest.length > 0) {
+  if (joinRequest && dataRequest.length > 0) {
     Archivers.addDataRecipient(joinRequest.nodeInfo, dataRequest)
   }
   return activeNodesSigned.nodeList

@@ -77,13 +77,6 @@ const joinRoute: Types.Route<Handler> = {
       return
     }
 
-    // If not in quarter 1 of cycle, reply with resubmit time
-    if (CycleCreator.currentQuarter !== 1) {
-      const resubmit = CycleCreator.nextQ1Start
-      res.json(resubmit)
-      return
-    }
-
     //  Validate of joinReq is done in addJoinRequest
     if (addJoinRequest(joinRequest)) {
       Comms.sendGossip('gossip-join', joinRequest)
@@ -426,6 +419,9 @@ export async function submitJoin(
   // Send the join request to a handful of the active node all at once:w
   const selectedNodes = utils.getRandom(nodes, Math.min(nodes.length, 5))
   const promises = []
+  info(
+    `Sending join request to ${selectedNodes.map((n) => `${n.ip}:${n.port}`)}`
+  )
   for (const node of selectedNodes) {
     try {
       promises.push(

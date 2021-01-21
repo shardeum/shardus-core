@@ -4,8 +4,8 @@ import { isDeepStrictEqual } from 'util'
 
 type Comparator<T, E = T> = (a: E, b: T) => number
 
-export const sleep = ms => {
-  return new Promise(resolve => {
+export const sleep = (ms) => {
+  return new Promise((resolve) => {
     setTimeout(resolve, ms)
   })
 }
@@ -25,23 +25,23 @@ export const getTime = (format = 'ms') => {
   return time
 }
 
-export const deepCopy = obj => {
+export const deepCopy = (obj) => {
   if (typeof obj !== 'object') {
     throw Error('Given element is not of type object.')
   }
   return JSON.parse(JSON.stringify(obj))
 }
 
-export const readJson = filename => {
+export const readJson = (filename) => {
   const file = readFileSync(filename).toString()
   const config = JSON.parse(file)
   return config
 }
 
-export const readJsonDir = dir => {
+export const readJsonDir = (dir) => {
   // => filesObj
   const filesObj = {}
-  readdirSync(dir).forEach(fileName => {
+  readdirSync(dir).forEach((fileName) => {
     const name = fileName.split('.')[0]
     filesObj[name] = readJson(join(dir, fileName))
   })
@@ -102,7 +102,6 @@ export function binaryLowest<T>(ar: T[], comparator?: Comparator<T>) {
   return m
 }
 
-
 /**
  * Binary search in JavaScript.
  * Returns the index of of the element in a sorted array or (-n-1) where n is the insertion point for the new element.
@@ -117,12 +116,12 @@ export function binaryLowest<T>(ar: T[], comparator?: Comparator<T>) {
  *       note that el is the element we are searching for and ae is an array element from the sorted array
  * The array may contain duplicate elements. If there are more than one equal elements in the array,
  * the returned value can be the index of any one of the equal elements.
- * 
- * @param arr 
- * @param el 
- * @param comparator 
+ *
+ * @param arr
+ * @param el
+ * @param comparator
  */
-export function binarySearch<T, E=Partial<T>>(
+export function binarySearch<T, E = Partial<T>>(
   arr: T[],
   el: E,
   comparator?: Comparator<T, typeof el>
@@ -130,7 +129,11 @@ export function binarySearch<T, E=Partial<T>>(
   if (comparator == null) {
     // Emulate the default Array.sort() comparator
     comparator = (a, b) => {
-      return a.toString() > b.toString() ? 1 : a.toString() < b.toString() ? -1 : 0
+      return a.toString() > b.toString()
+        ? 1
+        : a.toString() < b.toString()
+        ? -1
+        : 0
     }
   }
   let m = 0
@@ -237,7 +240,7 @@ export const setAlarm = (callback, timestamp) => {
   setTimeout(callback, toWait)
 }
 
-export const isObject = val => {
+export const isObject = (val) => {
   if (val === null) {
     return false
   }
@@ -247,11 +250,11 @@ export const isObject = val => {
   return typeof val === 'function' || typeof val === 'object'
 }
 
-export const isString = x => {
+export const isString = (x) => {
   return Object.prototype.toString.call(x) === '[object String]'
 }
 
-export const isNumeric = x => {
+export const isNumeric = (x) => {
   return isNaN(x) === false
 }
 
@@ -274,10 +277,10 @@ export const makeShortHash = (x, n = 4) => {
 /**
  * short
  * grab the first n (default=4) hex bytes of a string (4 bytes == 8 char hex string)
- * @param x 
- * @param n 
+ * @param x
+ * @param n
  */
-export const short = (x:string, n = 4) => {
+export const short = (x: string, n = 4) => {
   if (!x) {
     return x
   }
@@ -287,7 +290,7 @@ export const short = (x:string, n = 4) => {
 const objToString = Object.prototype.toString
 const objKeys =
   Object.keys ||
-  (obj => {
+  ((obj) => {
     const keys = []
     // tslint:disable-next-line: forin
     for (const name in obj) {
@@ -296,24 +299,23 @@ const objKeys =
     return keys
   })
 
-
 export const reviver = (key, value) => {
-  if(typeof value === 'object' && value !== null) {
+  if (typeof value === 'object' && value !== null) {
     if (value.dataType === 'stringifyReduce_map_2_array') {
-      return new Map(value.value);
+      return new Map(value.value)
     }
   }
-  return value;
+  return value
 }
 export const replacer = (key, value) => {
-  const originalObject = this[key];
-  if(originalObject instanceof Map) {
+  const originalObject = this[key]
+  if (originalObject instanceof Map) {
     return {
       dataType: 'stringifyReduce_map_2_array',
       value: Array.from(originalObject.entries()), // or with spread: value: [...originalObject]
-    };
+    }
   } else {
-    return value;
+    return value
   }
 }
 
@@ -331,7 +333,7 @@ export const stringifyReduce = (val, isArrayProp?: boolean) => {
         return null
       } else if (val.toJSON && typeof val.toJSON === 'function') {
         return stringifyReduce(val.toJSON(), isArrayProp)
-      } else if(val instanceof Map){
+      } else if (val instanceof Map) {
         // let mapContainer = {stringifyReduce_map_2_array:[...val.entries()]}
         // return stringifyReduce(mapContainer)
         let mapContainer = {
@@ -380,7 +382,6 @@ export const stringifyReduce = (val, isArrayProp?: boolean) => {
       const reduced = makeShortHash(val)
       return JSON.stringify(reduced)
     default:
-
       return isFinite(val) ? val : null
   }
 }
@@ -462,9 +463,9 @@ export const stringifyReduceLimit = (
 /**
  * Returns an array of two arrays, one will all resolved promises, and one with all rejected promises
  */
-export const robustPromiseAll = async promises => {
+export const robustPromiseAll = async (promises) => {
   // This is how we wrap a promise to prevent it from rejecting directing in the Promise.all and causing a short circuit
-  const wrapPromise = async promise => {
+  const wrapPromise = async (promise) => {
     // We are trying to await the promise, and catching any rejections
     // We return an array, the first index being resolve, and the second being an error
     try {
@@ -547,7 +548,7 @@ export function removeNodesByID(nodes, ids) {
   if (!Array.isArray(ids)) {
     return nodes
   }
-  return nodes.filter(node => ids.indexOf(node.id) === -1)
+  return nodes.filter((node) => ids.indexOf(node.id) === -1)
 }
 
 // From: https://stackoverflow.com/a/19270021
@@ -619,8 +620,8 @@ export function reversed<T>(thing: Iterable<T>) {
 /**
  * [TODO] Implement an iterator that goes through the array as if it were a ring
  * and starts with a random offset and direction.
- * 
- * @param thing 
+ *
+ * @param thing
  */
 export function randomShifted<T>(thing: Iterable<T>) {
   const arr = Array.isArray(thing) ? thing : Array.from(thing)
@@ -652,30 +653,53 @@ Example of def:
 Returns a string with the first error encountered or and empty string ''.
 Errors are: "[name] is required" or "[name] must be, [type]"
 */
-export function validateTypes(inp, def){
+export function validateTypes(inp, def) {
   if (inp === undefined) return 'input is undefined'
   if (inp === null) return 'input is null'
-  if (typeof(inp) !== 'object') return 'input must be object, not '+typeof(inp)
-  const map = {string:'s',number:'n',boolean:'b',bigint:'B',array:'a',object:'o'}
-  const imap = {s:'string',n:'number',b:'boolean',B:'bigint',a:'array',o:'object'}
+  if (typeof inp !== 'object') return 'input must be object, not ' + typeof inp
+  const map = {
+    string: 's',
+    number: 'n',
+    boolean: 'b',
+    bigint: 'B',
+    array: 'a',
+    object: 'o',
+  }
+  const imap = {
+    s: 'string',
+    n: 'number',
+    b: 'boolean',
+    B: 'bigint',
+    a: 'array',
+    o: 'object',
+  }
   const fields = Object.keys(def)
-  for(let name of fields){
+  for (let name of fields) {
     const types = def[name]
-    const opt = types.substr(-1,1) === '?' ? 1 : 0
-    if (inp[name] === undefined && !opt) return name+' is required'
-    if (inp[name] !== undefined){
-      if (inp[name] === null && !opt) return name+' cannot be null'
+    const opt = types.substr(-1, 1) === '?' ? 1 : 0
+    if (inp[name] === undefined && !opt) return name + ' is required'
+    if (inp[name] !== undefined) {
+      if (inp[name] === null && !opt) return name + ' cannot be null'
       let found = 0
       let be = ''
-      for(let t=0; t<types.length-opt; t++){
-        let it = map[typeof(inp[name])]
+      for (let t = 0; t < types.length - opt; t++) {
+        let it = map[typeof inp[name]]
         it = Array.isArray(inp[name]) ? 'a' : it
-        let is = types.substr(t,1)
-        if (it === is){ found = 1; break}
-        else be += ', '+imap[is]
+        let is = types.substr(t, 1)
+        if (it === is) {
+          found = 1
+          break
+        } else be += ', ' + imap[is]
       }
-      if (!found) return name+' must be'+be
+      if (!found) return name + ' must be' + be
     }
   }
   return ''
+}
+
+/**
+ * Checks whether the given thing is undefined
+ */
+export function isUndefined(thing: unknown) {
+  return typeof thing === 'undefined'
 }
