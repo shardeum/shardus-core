@@ -459,7 +459,9 @@ export const stringifyReduceLimit = (
   }
 }
 
-// Returns an array of two arrays, one will all resolved promises, and one with all rejected promises
+/**
+ * Returns an array of two arrays, one will all resolved promises, and one with all rejected promises
+ */
 export const robustPromiseAll = async promises => {
   // This is how we wrap a promise to prevent it from rejecting directing in the Promise.all and causing a short circuit
   const wrapPromise = async promise => {

@@ -16,15 +16,9 @@ import * as NodeList from './NodeList'
 import * as Sync from './Sync'
 import * as Types from './Types'
 import { readOldCycleRecord } from '../snapshot/snapshotFunctions'
+import { calcIncomingTimes } from './CycleCreator'
 
 /** TYPES */
-
-interface JoinOrWitnessResult {
-  outcome: 'joined' | 'witness' | 'tryAgain'
-  wait: number
-  isFirst: boolean
-  id?: string
-}
 
 /** STATE */
 
@@ -61,76 +55,60 @@ export function init() {
 export async function startup(): Promise<boolean> {
   const publicKey = Context.crypto.getPublicKey()
 
+  // If startInWitness mode is set to true, start witness mode and end
+  if (Context.config.p2p.startInWitnessMode) {
+    info('Emitting `witnessing` event.')
+    emitter.emit('witnessing', publicKey)
+    return
+  }
+
+  // Attempt to join the network until you know if you're first and have an id
   info('Emitting `joining` event.')
   emitter.emit('joining', publicKey)
 
-  // Contact the network and decide to join/witness for it until successful
-  const retryWait = async (time = 0) => {
-    let wait = time - Date.now()
-    if (wait <= 0 || wait > Context.config.p2p.cycleDuration * 1000 * 2) {
-      wait = (Context.config.p2p.cycleDuration * 1000) / 2
-    }
-    info(`Trying to join/witness again in ${wait / 1000} seconds...`)
-    await utils.sleep(wait)
-  }
-
   let firstTime = true
-  let result
   do {
     try {
-      result = await joinOrWitnessForNetwork(firstTime)
-      if (result.outcome === 'tryAgain') {
-        await retryWait(result.wait)
-      }
+      ;({ isFirst, id } = await joinNetwork(firstTime))
     } catch (err) {
-      warn('Error while joining/witnessing for network:')
+      warn('Error while joining network:')
       warn(err)
       warn(err.stack)
-      info('Trying to join/witness again in 2 seconds...')
+      info('Trying to join again in 2 seconds...')
       await utils.sleep(2000)
     }
     firstTime = false
-  } while (!result || result.outcome === 'tryAgain')
+  } while (!isFirst || !id)
 
-  // Set node id and isFirst
-  id = result.id || ''
-  isFirst = result.isFirst
+  info('Emitting `joined` event.')
+  emitter.emit('joined', id, publicKey)
 
-  // Either become a witness or join the network
-  switch (result.outcome) {
-    case 'witness': {
-      info('Emitting `witness` event.')
-      emitter.emit('witness', publicKey)
-      break
-    }
-    case 'joined': {
-      info('Emitting `joined` event.')
-      emitter.emit('joined', id, publicKey)
+  // Sync cycle chain from network
+  await syncCycleChain()
 
-      // Sync cycle chain from network
-      await syncCycleChain()
+  // Enable internal routes
+  Comms.setAcceptInternal(true)
 
-      // Enable internal routes
-      Comms.setAcceptInternal(true)
-
-      // Start creating cycle records
-      await CycleCreator.startCycles()
-      info('Emitting `initialized` event.')
-      emitter.emit('initialized')
-    }
-  }
+  // Start creating cycle records
+  await CycleCreator.startCycles()
+  info('Emitting `initialized` event.')
+  emitter.emit('initialized')
 
   return true
 }
 
-async function joinOrWitnessForNetwork(
-  firstTime: boolean
-): Promise<JoinOrWitnessResult> {
+async function joinNetwork(firstTime: boolean) {
   // Get active nodes from Archiver
   const activeNodes = await contactArchiver()
 
   // Check if you're the first node
   const isFirst = await discoverNetwork(activeNodes)
+  if (isFirst) {
+    // Join your own network and give yourself an ID
+    const id = await Join.firstJoin()
+    // Return id and isFirst
+    return { isFirst, id }
+  }
 
   // Remove yourself from activeNodes if you are present in them
   const ourIdx = activeNodes.findIndex(
@@ -142,95 +120,38 @@ async function joinOrWitnessForNetwork(
     activeNodes.splice(ourIdx, 1)
   }
 
-  if (isFirst) {
-    // Join your own network and give yourself an ID
-    const id = await Join.firstJoin()
-
-    // Return joined
-    return {
-      outcome: 'joined',
-      wait: 0,
-      isFirst,
-      id,
+  // Check joined before trying to join, if not first time
+  if (firstTime === false) {
+    // Check if joined by trying to set our node ID
+    const id = await Join.fetchJoined(activeNodes)
+    if (id) {
+      return { isFirst, id }
     }
   }
 
   // Get latest cycle record from active nodes
   const latestCycle = await Sync.getNewestCycle(activeNodes)
 
-  // Become a witness if we have old data and network conditions are right
-  if (snapshot.oldDataPath) {
-    const oldDataCycleRecord = await readOldCycleRecord()
-    const oldDataNetworkId = oldDataCycleRecord.networkId
-    if (latestCycle.safetyMode && oldDataNetworkId === latestCycle.networkId) {
-      // Return witness
-      return {
-        outcome: 'witness',
-        wait: 0,
-        isFirst,
-        id: undefined,
-      }
-    }
-  }
-
-  // If this is not the first time to attempt joining, then go ahead and do the joined robust query first
-  // This is because the loops that tests join may early out
-  if (firstTime === false) {
-    // Check if joined by trying to set our node ID
-    const id = await Join.fetchJoined(activeNodes)
-    if (id) {
-      return {
-        outcome: 'joined',
-        wait: 0,
-        isFirst,
-        id,
-      }
-    }
-  }
-
   // Create join request from latest cycle
   const request = await Join.createJoinRequest(latestCycle.previous)
 
-  // [TODO] [AS] Have the joiner figure out when Q1 is from the latestCycle
+  // Figure out when Q1 is from the latestCycle
+  const { startQ1 } = calcIncomingTimes(latestCycle)
 
-  // Submit join request to active nodes
-  const tryAgain = await Join.submitJoin(activeNodes, request)
-  if (
-    tryAgain &&
-    tryAgain < Date.now() + Context.config.p2p.cycleDuration * 1000 * 2
-  ) {
-    return {
-      outcome: 'tryAgain',
-      wait: tryAgain,
-      isFirst,
-      id: undefined,
-    }
+  // Submit join request to active nodes during Q1
+  const untilQ1 = startQ1 - Date.now()
+  if (untilQ1 > 0) {
+    info(
+      `Waiting ${untilQ1 + 500} ms until ${
+        startQ1 + 500
+      } for Q1 before sending join...`
+    )
+    await utils.sleep(untilQ1 + 500) // Not too early
   }
+  await Join.submitJoin(activeNodes, request)
 
-  // Wait approx. one cycle
+  // Wait approx. one cycle then check again
   await utils.sleep(Context.config.p2p.cycleDuration * 1000 + 500)
-
-  // [TODO] [AS] Check if you've already joined the network before trying to send join requests again
-  if (firstTime === true) {
-    // Check if joined by trying to set our node ID
-    const id = await Join.fetchJoined(activeNodes)
-    if (id) {
-      return {
-        outcome: 'joined',
-        wait: 0,
-        isFirst,
-        id,
-      }
-    }
-  }
-
-  // Otherwise, try again in approx. one cycle
-  return {
-    outcome: 'tryAgain',
-    wait: Date.now() + Context.config.p2p.cycleDuration * 1000 + 500,
-    isFirst,
-    id: undefined,
-  }
 }
 
 async function syncCycleChain() {
@@ -371,7 +292,9 @@ async function getActiveNodesFromArchiver() {
   const archiver = Context.config.p2p.existingArchivers[0]
   const nodeListUrl = `http://${archiver.ip}:${archiver.port}/nodelist`
   const nodeInfo = getPublicNodeInfo()
-  let seedListSigned
+  let seedListSigned: Types.SignedObject & {
+    nodeList: Types.Node[]
+  }
   try {
     seedListSigned = await http.post(nodeListUrl, {
       nodeInfo,

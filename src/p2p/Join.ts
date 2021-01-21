@@ -15,6 +15,11 @@ import { robustQuery } from './Utils'
 import { validateTypes } from '../utils'
 import { version } from '../../package.json'
 
+/**
+ * [TODO] [AS] Remove nodes that are taking too long to sync after they've joined.
+ * To do this, we probably need to keep track of when they first joined.
+ */
+
 /** TYPES */
 
 export interface JoinedConsensor extends Types.P2PNode {
@@ -27,7 +32,7 @@ export interface JoinRequest {
   nodeInfo: Types.P2PNode
   cycleMarker: CycleCreator.CycleMarker
   proofOfWork: string
-  selectionNum: string,
+  selectionNum: string
   version: string
   sign: Sign
 }
@@ -302,7 +307,9 @@ export function addJoinRequest(joinRequest: JoinRequest) {
   }
 
   if (joinRequest.version !== version) {
-    warn(`version number is different. Our node version is ${version}. Join request node version is ${joinRequest.version}`)
+    warn(
+      `version number is different. Our node version is ${version}. Join request node version is ${joinRequest.version}`
+    )
     return false
   }
 
@@ -338,11 +345,11 @@ export function addJoinRequest(joinRequest: JoinRequest) {
     does not have an advantage by having access to this info and
     is able to create a stronger selectionNum.
   */
-  const selectionNum = crypto.hash({ cycleNumber: CycleChain.newest.counter, address: node.publicKey })
-  if (
-    last &&
-    !crypto.isGreaterHash(selectionNum, last.selectionNum)
-  ) {
+  const selectionNum = crypto.hash({
+    cycleNumber: CycleChain.newest.counter,
+    address: node.publicKey,
+  })
+  if (last && !crypto.isGreaterHash(selectionNum, last.selectionNum)) {
     info('Join request not better than lowest, not added.')
     return false
   }
@@ -359,7 +366,7 @@ export function addJoinRequest(joinRequest: JoinRequest) {
     return false
   }
   // Insert sorted into best list if we made it this far
-  utils.insertSorted(requests, {...joinRequest, selectionNum}, (a, b) =>
+  utils.insertSorted(requests, { ...joinRequest, selectionNum }, (a, b) =>
     a.selectionNum < b.selectionNum
       ? 1
       : a.selectionNum > b.selectionNum
@@ -412,16 +419,23 @@ export async function fetchCycleMarker(nodes) {
   return marker
 }
 
-export async function submitJoin(nodes, joinRequest) {
-  // [TODO] [AS] Send the join request to a handful of the active node (like 5 or something) all at once instead of one by one
-  for (const node of nodes) {
-    info(`Sending join request to ${node.ip}:${node.port}`)
+export async function submitJoin(
+  nodes: Types.Node[],
+  joinRequest: JoinRequest & Types.SignedObject
+) {
+  // Send the join request to a handful of the active node all at once:w
+  const selectedNodes = utils.getRandom(nodes, Math.min(nodes.length, 5))
+  const promises = []
+  for (const node of selectedNodes) {
     try {
-      const resubmit = await http.post(
-        `${node.ip}:${node.port}/join`,
-        joinRequest
+      promises.push(
+        http.post(`${node.ip}:${node.port}/join`, joinRequest).catch((err) => {
+          error(
+            `Join: submitJoin: Error posting join request to ${node.ip}:${node.port}`,
+            err
+          )
+        })
       )
-      if (resubmit) return resubmit
     } catch (err) {
       error(
         `Join: submitJoin: Error posting join request to ${node.ip}:${node.port}`,
@@ -429,6 +443,7 @@ export async function submitJoin(nodes, joinRequest) {
       )
     }
   }
+  await Promise.all(promises)
 }
 
 export async function fetchJoined(activeNodes) {

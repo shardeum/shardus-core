@@ -688,7 +688,7 @@ function currentCycleQuarterByTime(record: CycleRecord) {
  *
  * @param record CycleRecord
  */
-function calcIncomingTimes(record: CycleRecord) {
+export function calcIncomingTimes(record: CycleRecord) {
   const cycleDuration = record.duration * SECOND
   const quarterDuration = cycleDuration / 4
   const start = record.start * SECOND + cycleDuration
