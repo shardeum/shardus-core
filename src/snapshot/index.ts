@@ -547,6 +547,11 @@ async function goActiveIfDataComplete() {
 export async function startWitnessMode() {
   log('Starting in witness mode...')
   const archiver = Context.config.p2p.existingArchivers[0]
+  /**
+   * [TODO] [AS] Instead of an interval, make this get the latest cycle,
+   * calculate timstamp of the next one, and schedule a callback to run at that
+   * time (like how CycleCreator works). That should prove more robust.
+   */
   const witnessInterval = setInterval(async () => {
     try {
       const fullNodesSigned = await Self.getFullNodesFromArchiver()

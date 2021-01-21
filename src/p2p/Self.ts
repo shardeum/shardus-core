@@ -69,6 +69,18 @@ export async function startup(): Promise<boolean> {
   let firstTime = true
   do {
     try {
+      /**
+       * [TODO] [AS] Looks like there's a case to start in witness mode if the
+       * network is full but our node has old data it can share.
+       *
+       * Conditions for starting in witness mode are:
+       *   1. node has old data
+       *   2. network is in safety mode
+       *   3. active nodes = max nodes
+       *
+       * We should continuously try to join the network, until those conditions
+       * are met, at which point we should start in witness mode.
+       */
       ;({ isFirst, id } = await joinNetwork(firstTime))
     } catch (err) {
       warn('Error while joining network:')
