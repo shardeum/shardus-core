@@ -95,7 +95,7 @@ export const submodules = [
   Apoptosis,
   Lost,
   SafetyMode,
-  CycleAutoScale
+  CycleAutoScale,
 ]
 
 export let currentQuarter = -1 // means we have not started creating cycles

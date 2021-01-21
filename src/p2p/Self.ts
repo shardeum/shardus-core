@@ -123,7 +123,9 @@ export async function startup(): Promise<boolean> {
   return true
 }
 
-async function joinOrWitnessForNetwork(firstTime:Boolean): Promise<JoinOrWitnessResult> {
+async function joinOrWitnessForNetwork(
+  firstTime: boolean
+): Promise<JoinOrWitnessResult> {
   // Get active nodes from Archiver
   const activeNodes = await contactArchiver()
 
@@ -173,7 +175,7 @@ async function joinOrWitnessForNetwork(firstTime:Boolean): Promise<JoinOrWitness
 
   // If this is not the first time to attempt joining, then go ahead and do the joined robust query first
   // This is because the loops that tests join may early out
-  if(firstTime === false){
+  if (firstTime === false) {
     // Check if joined by trying to set our node ID
     const id = await Join.fetchJoined(activeNodes)
     if (id) {
@@ -193,7 +195,10 @@ async function joinOrWitnessForNetwork(firstTime:Boolean): Promise<JoinOrWitness
 
   // Submit join request to active nodes
   const tryAgain = await Join.submitJoin(activeNodes, request)
-  if (tryAgain && tryAgain < Date.now() + Context.config.p2p.cycleDuration * 1000 * 2) {
+  if (
+    tryAgain &&
+    tryAgain < Date.now() + Context.config.p2p.cycleDuration * 1000 * 2
+  ) {
     return {
       outcome: 'tryAgain',
       wait: tryAgain,
@@ -317,15 +322,15 @@ async function discoverNetwork(seedNodes) {
 
 /** HELPER FUNCTIONS */
 
-async function calculateTimeDifference () {
-    const response: any = await got.get('https://google.com')
-    const localTime = Date.now()
-    const googleTime = Date.parse(response.headers.date)
-    const timeDiff = Math.abs(localTime - googleTime)
-    info('googleTime', googleTime)
-    info('localTime', localTime)
-    info('Time diff between google.com and local machine', timeDiff)
-    return timeDiff
+async function calculateTimeDifference() {
+  const response: any = await got.get('https://google.com')
+  const localTime = Date.now()
+  const googleTime = Date.parse(response.headers.date)
+  const timeDiff = Math.abs(localTime - googleTime)
+  info('googleTime', googleTime)
+  info('localTime', localTime)
+  info('Time diff between google.com and local machine', timeDiff)
+  return timeDiff
 }
 
 export async function checkTimeSynced(timeServers) {
@@ -343,7 +348,7 @@ export async function checkTimeSynced(timeServers) {
   try {
     const localTimeDiff = await calculateTimeDifference()
     return localTimeDiff <= Context.config.p2p.syncLimit * 1000
-  } catch(e) {
+  } catch (e) {
     warn('local time is out of sync with google time server')
   }
   throw Error('Unable to check local time against time servers.')
