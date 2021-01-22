@@ -1620,6 +1620,10 @@ class StateManager extends EventEmitter {
       //   let result = {combinedHash:"", accounts:[]} as GlobalAccountReportResp
 
     let equalFn = (a:GlobalAccountReportResp, b:GlobalAccountReportResp) => {
+      // these fail cases should not count towards forming an hash consenus
+      if(a.combinedHash == null || a.combinedHash === ''){
+        return false
+      }
       return a.combinedHash === b.combinedHash
     }
     let queryFn = async (node: Shardus.Node) => {
@@ -1718,6 +1722,9 @@ class StateManager extends EventEmitter {
       let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, tsEnd: endTime }
 
       let equalFn = (a:AccountStateHashResp, b:AccountStateHashResp) => {
+        if(a.stateHash == null){
+          return false // fail cases will get skipped so that we try more nodes.
+        }
         return a.stateHash === b.stateHash
       }
       let queryFn = async (node: Shardus.Node) => {
@@ -1784,8 +1791,9 @@ class StateManager extends EventEmitter {
         this.mainLogger.debug(`DATASYNC: got hash ${result.stateHash} from ${utils.stringifyReduce(winners.map( (node:Shardus.Node ) => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
         firstHash = result.stateHash
       } else {
-        this.mainLogger.debug(`DATASYNC: robustQuery get_account_state_hash failed`)
-        throw new Error('FailAndRestartPartition2')
+        let resultStr = utils.stringifyReduce(result)
+        this.mainLogger.debug(`DATASYNC: robustQuery get_account_state_hash failed ${result}`)
+        throw new Error('FailAndRestartPartition2 ' + result)
       }
 
       let moreDataRemaining = true
