@@ -157,6 +157,15 @@ export async function sync(activeNodes: ActiveNode[]) {
   )
 
   // Now that our node list is synced, validate the anchor cycle's cert
+  // [TODO] [AS]
+  /**
+   * Commented this out for now; we need to change the logic to look at the cert
+   * instead of the marker, and to compare:
+   *   (anchor cycle) with (anchor cycle - 1)
+   * instead of:
+   *   (anchor cycle) with (latest cycle)
+   */
+  /*
   let nodesToQuery = squasher.final.added.map(node => ({
     ip: node.externalIp,
     port: node.externalPort,
@@ -174,6 +183,7 @@ export async function sync(activeNodes: ActiveNode[]) {
     warn(`Anchor cycle's cert is different from other nodes in the network`)
     return false
   }
+  */
 
   applyNodeListChange(squasher.final)
 
