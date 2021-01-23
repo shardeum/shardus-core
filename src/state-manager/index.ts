@@ -185,6 +185,7 @@ class StateManager extends EventEmitter {
     this.config = config
     this.profiler = profiler
 
+
     //BLOCK1
     this._listeners = {}
     this.completedPartitions = []
@@ -397,6 +398,10 @@ class StateManager extends EventEmitter {
     this.fatalLogger = logger.getLogger('fatal')
     this.shardLogger = logger.getLogger('shardDump')
 
+    ShardFunctions2.logger = logger
+    ShardFunctions2.fatalLogger = this.fatalLogger
+    ShardFunctions2.mainLogger = this.mainLogger
+    
     // this._listeners = {}
     // this.completedPartitions = []
     // this.mainStartingTs = Date.now()

@@ -1,3 +1,5 @@
+import { Utils } from 'sequelize/types';
+import Logger from '../logger';
 import Shardus = require('../shardus/shardus-types');
 
 const stringify = require('fast-stable-stringify')
@@ -7,6 +9,11 @@ import {ShardGlobals,ShardInfo,StoredPartition,NodeShardData,AddressRange,HomeNo
 
 
 class ShardFunctions2 {
+
+  static logger: Logger = null;
+  static mainLogger: any = null;
+  static fatalLogger: any = null;
+
   /**
    * calculateShardGlobals
    * @param {number} numNodes
@@ -662,7 +669,20 @@ class ShardFunctions2 {
       if (extras.length > 0) {
         //ShardFunctions2.dilateNeighborCoverage(shardGlobals, nodeShardDataMap, parititionShardDataMap, activeNodes, nodeShardData, extras)
         //can get rid of some of the above merge logic if this never shows up in testing
-        throw new Error('computeExtendedNodePartitionData: should never have extras')
+        let message = `computeExtendedNodePartitionData: failed`
+        try{
+          let list1 = nodeShardData.nodeThatStoreOurParition.map((n) => n.id.substring(0,5) )
+          let list2 = nodeShardData.nodeThatStoreOurParition.map((n) => n.id.substring(0,5) )
+          let extraLists = extras.map((n) => n.id.substring(0,5) )    
+          message = `computeExtendedNodePartitionData: should never have extras. node:${nodeShardData.node.id.substring(0,5)} ${stringify({list1,list2,extraLists})}`
+        } catch (ex) {
+          this.fatalLogger.fatal('computeExtendedNodePartitionData: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        }
+        if(ShardFunctions2.fatalLogger){
+          ShardFunctions2.fatalLogger.fatal(message)
+        }
+
+        // throw new Error(message)
       }
       nodeShardData.edgeNodes.sort(ShardFunctions2.nodeSortAsc)
       nodeShardData.consensusNodeForOurNodeFull.sort(ShardFunctions2.nodeSortAsc)
