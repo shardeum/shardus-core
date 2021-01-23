@@ -133,7 +133,7 @@ for(let i = 1; i< 1000; i++){
 
 //testPartitionMath1_new(10)
 
-let maxNodesToTest = 1000
+let maxNodesToTest = 100
 
 // test node counts 1 through maxNodesToTest node networks
 

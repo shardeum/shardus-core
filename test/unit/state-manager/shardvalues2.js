@@ -72,6 +72,11 @@ function isNodeInDistancePartition (shardGlobals, hash, nodeId, distance) {
 
 function isNodeInDistance (shardGlobals, parititionShardDataMap, hash, nodeId, distance) {
   let someNode = ShardFunctions2.findHomeNode(shardGlobals, nodeId, parititionShardDataMap)
+
+  if(someNode == null){
+    ShardFunctions2.findHomeNode(shardGlobals, nodeId, parititionShardDataMap)
+    return false
+  }
   let someNodeIndex = someNode.ourNodeIndex
 
   let homeNode = ShardFunctions2.findHomeNode(shardGlobals, hash, parititionShardDataMap)
@@ -102,10 +107,9 @@ let useHardcodenodes = true
 //c25
 //let hardcodeNodes = ["0ac8x88ef1","21f7x6483c","6f96xae48b","796fxf7e39","8134x3d98c","833ax8a51b","851cxab703","9d26x9011c","c4c2x62e22","d085xb50f6","d49ax34fec","e172xb3af1","ed8fx77d71","fc4bx4d28e"]
 //let hardcodeNodes = ["008cx3f9d4","2f28x55213","3c3ax5395e","4480x93b0c","5d98xe3f67","a314x7b0ba","d5d7x603d3","e23cx83629","eb91x7dfc6","f06axd2445"] 
-let hardcodeNodes = ["08c1xaee9f","0e0bxe46ce","5334xc90ff","7d34x2e15b","f9fbx2cd89"]
-
-
-
+//let hardcodeNodes = ["0333x810a9","0c45xf6a10","0ddcxa2cd1","0fa2x6aef8","15bcx5d8d0","1da7xe7373","1fd1xdd531","2212x13a78","23a4xbb504","2cd0xf0f78","2d05x3d7a5","2ebex22298","3bc6xd57e8","47f9xd7b50","4959xa9b86","5200xcd9d3","538ex9220d","5576x3a33f","5cfex543b5","5d89x635d6","608fxb4b8d","63d4x33ed1","64d1x405c6","67e7xb66c1","7397x5a48c","7cdax3c139","8a64x6e1ad","8ddaxcdd49","94eexc5b1f","95f1x59c6a","9ab9x2c3a7","9df4xd5527","ad2bx2111a","b19cxb3c37","b567xbf269","b617xdb5a7","c31exac883","c964x0edbd","cb64xdad36","cbefx47c54","dda6x4bd87","e0d3x2bae0","e2a7xded5f","e823x637da","ecc3x27529","eeeax0c639","ef75xd7e39","f38cx02feb","f71exe6bb6","fd79x2f90d"]
+//let hardcodeNodes = ["0333x810a9","0779x61773","0842xf6bd1","0973xdcad3","0e99x8fb06","151ex4bf57","16f8xb349c","16f8xb349c","1a4bx38be7","1bc2x33a63","1bc4x34bf5","21c2x81536","2eb4x8ddfa","3140xcf9a7","31ebxf318e","32a1x6dc2d","3638x689f7","36b4x7cee0","37ebx7fac5","42bax847b7","47e0x616c1","4c33x5592f","5128x4ecd9","5198xda9be","5659x93c69","6bf3x0a3c6","6dbax7b9a2","6f6ax2de94","6ffdx17a1a","7367xa22ab","7794xaf572","7acax8ab94","7b39x61040","7feax34716","80cfx0738b","9536x00378","9578x2babb","95c3x639f3","9c78x27f5f","9e6cxe7e5a","a23ax921af","a562xff144","a5dbx407e8","a605x919f4","a94dxac1fe","ad19x5b0a5","ad3cx92a40","add2xf9dcc","b0f3xd0f95","b94ex10864","be0ex5d6e2","bf79x36378","c20bx07dde","d0e6x22bc1","d7a5xaed8d","dddfxc5f35","dfb5x56e42","e2c2x57f69","e471x5b4d1","ed63x693e5","f203x6274e","f6bdx8b9f4","fb5bx2b81d","fd7dx25192","ffa0x89659"]
+let hardcodeNodes = ["0330x000","0770x000","0840x000","0970x000","0e90x000","1510x000","16f0x000","1a40x000","1bc0x000","1bc2x000","21c0x000","2eb0x000","3140x000","31e0x000","32a0x000","3630x000","36b0x000","37e0x000","42b0x000","47e0x000","4c30x000","5120x000","5190x000","5650x000","6bf0x000","6db0x000","6f60x000","6ff0x000","7360x000","7790x000","7ac0x000","7b30x000","7fe0x000","80c0x000","9100x000","9530x000","9570x000","95c0x000","9c70x000","9e60x000","a230x000","a560x000","a5d0x000","a600x000","a940x000","ad10x000","ad30x000","add0x000","b0f0x000","b940x000","be00x000","bf70x000","c200x000","d0e0x000","d7a0x000","ddd0x000","dfb0x000","e2c0x000","e470x000","ed60x000","f200x000","f6b0x000","fb50x000","fd70x000","ffa0x000"]
 
 let hardcodeNodes2 = null
 
@@ -115,8 +119,12 @@ if (useHardcodenodes) {
 if (hardcodeNodes2) {
   numNodes2 = hardcodeNodes2.length
 }
-let debugStartsWith = '08c1' // 21f7 851c '8bc4' // '33d7' //'0692' // '23d5' // 'f211' //'147d' // '2054' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
+
+// Set debugStartsWith to specify what node will be "our node" in the following calculations
+let debugStartsWith = '36b4' // 21f7 851c '8bc4' // '33d7' //'0692' // '23d5' // 'f211' //'147d' // '2054' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
 let debugID = debugStartsWith.slice(0, 4) + '7'.repeat(64 - 4)
+
+// set debugAccount to specify and example address that will get calculations made to it
 let debugAccount = '44dc' + '3'.repeat(60) // 5c43 386e 60b1  60b1 c173
 let debugNode = null
 // 5c43xba41c account test.. need to expand it.

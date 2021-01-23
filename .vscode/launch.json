@@ -65,6 +65,15 @@
             ]
         },     
         {
+            "type": "node",
+            "request": "launch",
+            "name": "functionTests2",
+            "program": "${workspaceFolder}\\test\\unit\\state-manager\\functionTests2.js",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        },        
+        {
             //this seems to work pretty well when other methods are breaking.
             "type": "node",
             "request": "attach",

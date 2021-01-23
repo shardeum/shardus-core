@@ -1,4 +1,7 @@
 
+// @ts-nocheck
+/*eslint-disable*/
+
 var fs = require('fs')
 var path = require('path')
 const StateManager = require('../../../src/state-manager')
@@ -19,7 +22,7 @@ try {
 
 console.count('asdf')
 
-//(repairTracker, ourPartitionObj, ourLastResultHash, ourHashSet,  txListOverride
+// (repairTracker, ourPartitionObj, ourLastResultHash, ourHashSet,  txListOverride
 stateManager._mergeRepairDataIntoLocalState2(testInput.repairTracker, null, null, testInput.ourHashSet,   testInput.txList)
 
 console.count('asdf')
