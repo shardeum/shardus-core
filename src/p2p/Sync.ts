@@ -208,7 +208,7 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
   while (CycleChain.newest.counter < newestCycle.counter) {
     const nextCycles = await getCycles(
       activeNodes,
-      CycleChain.newest.counter, // [TODO] maybe we should +1 so that we don't get the record we already have
+      CycleChain.newest.counter + 1, // [DONE] maybe we should +1 so that we don't get the record we already have
       newestCycle.counter + 1 // not 100% if this will work but the hope is that if we are one cycle behind this may help us digst and get up to date
                               //  perhaps the robust query will be enough to fix the issue.
     )
