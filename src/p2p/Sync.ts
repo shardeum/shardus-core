@@ -209,7 +209,8 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
     const nextCycles = await getCycles(
       activeNodes,
       CycleChain.newest.counter, // [TODO] maybe we should +1 so that we don't get the record we already have
-      newestCycle.counter
+      newestCycle.counter + 1 // not 100% if this will work but the hope is that if we are one cycle behind this may help us digst and get up to date
+                              //  perhaps the robust query will be enough to fix the issue.
     )
     for (const nextCycle of nextCycles) {
       //      CycleChain.validate(CycleChain.newest, newestCycle)
@@ -316,7 +317,12 @@ async function getCycles(
     })
     return resp
   }
-  const { result } = await sequentialQuery(activeNodes, queryFn)
+
+  // This was asking all nodes in order for the cycle data.
+  //const { result } = await sequentialQuery(activeNodes, queryFn)
+  // use robust query so we can ask less nodes to get the cycles
+  const { result } = await robustQuery(activeNodes, queryFn ) // todo: specify custom equality function to be more efficient? (and more nodes to ask)
+  
   // [TODO] Validate whatever came in
   const cycles = result as CycleCreator.CycleRecord[]
   return cycles

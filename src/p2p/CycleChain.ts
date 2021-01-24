@@ -67,6 +67,9 @@ export function validate(prev: CycleRecord, next: CycleRecord): boolean {
 }
 
 export function getCycleChain(start, end = start + 100) {
+  // Limit how many are returned
+  if (end - start > 100) end = start + 100
+
   if (!oldest) return []
   if (end < oldest.counter) return []
   if (start < oldest.counter) start = oldest.counter
@@ -75,9 +78,6 @@ export function getCycleChain(start, end = start + 100) {
   const offset = oldest.counter
   const relStart = start - offset
   const relEnd = end - offset
-
-  // Limit how many are returned
-  if (end - start > 100) end = start + 100
 
   return cycles.slice(relStart, relEnd + 1)
 }
