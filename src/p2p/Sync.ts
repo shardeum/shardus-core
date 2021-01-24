@@ -96,7 +96,7 @@ export async function sync(activeNodes: ActiveNode[]) {
     const end = CycleChain.oldest.counter - 1
     const start = end - cyclesToGet
     info(`Getting cycles ${start} - ${end}...`)
-    const prevCycles = await getCycles(activeNodes, start) // Note that end is autmatically start + 100
+    const prevCycles = await getCycles(activeNodes, start, end)
     info(
       `Got cycles ${JSON.stringify(prevCycles.map((cycle) => cycle.counter))}`
     )
@@ -301,10 +301,9 @@ export async function getNewestCycle(
 // This tries to get the cycles with counter from start to end inclusively.
 async function getCycles(
   activeNodes: SyncNode[],
-  start: number
+  start: number,
+  end: number = start + 100
 ): Promise<CycleCreator.CycleRecord[]> {
-  let end: number = start + 100
-  if (end - start > 100) end = start + 100 // assuming we want this limit similar to getCycleChain.  could be a const?
   if (start < 0) start = 0
   if (end < 0) end = 0
   if (start > end) start = end
