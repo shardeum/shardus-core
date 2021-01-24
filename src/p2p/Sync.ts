@@ -10,6 +10,7 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { Route } from './Types'
 import { robustQuery, sequentialQuery } from './Utils'
+import util from 'util'
 
 /** TYPES */
 
@@ -320,11 +321,15 @@ async function getCycles(
 
   // This was asking all nodes in order for the cycle data.
   //const { result } = await sequentialQuery(activeNodes, queryFn)
+
   // use robust query so we can ask less nodes to get the cycles
-  const { result } = await robustQuery(activeNodes, queryFn ) // todo: specify custom equality function to be more efficient? (and more nodes to ask)
-  
+  let redundancy = 1
+  if (activeNodes.length > 5) redundancy = 2
+  if (activeNodes.length > 10) redundancy = 3
+  const [response, _responders] = await robustQuery(activeNodes, queryFn, util.isDeepStrictEqual, redundancy, true  ) 
+
   // [TODO] Validate whatever came in
-  const cycles = result as CycleCreator.CycleRecord[]
+  const cycles = response as CycleCreator.CycleRecord[]
   return cycles
 }
 
