@@ -110,8 +110,8 @@ export function getDebug() {
     )
     const actvd = record.activated.map((id) => {
       if (idToIpPort[id]) return idToIpPort[id]
-      let node = nodes.get(id)
-      if(node != null){
+      const node = nodes.get(id)
+      if (node !== null) {
         idToIpPort[id] = `${node.externalIp}:${node.externalPort}`
         return idToIpPort[id]
       }

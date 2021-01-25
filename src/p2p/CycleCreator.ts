@@ -1,5 +1,6 @@
 import deepmerge from 'deepmerge'
 import { Logger } from 'log4js'
+import * as Snapshot from '../snapshot'
 import * as utils from '../utils'
 // don't forget to add new modules here
 import * as Active from './Active'
@@ -7,17 +8,16 @@ import * as Apoptosis from './Apoptosis'
 import * as Archivers from './Archivers'
 import * as Comms from './Comms'
 import { config, crypto, logger, storage } from './Context'
+import * as CycleAutoScale from './CycleAutoScale'
 import * as CycleChain from './CycleChain'
 import * as Join from './Join'
 import * as Lost from './Lost'
 import * as NodeList from './NodeList'
 import * as Refresh from './Refresh'
 import * as Rotation from './Rotation'
-import * as CycleAutoScale from './CycleAutoScale'
 import * as SafetyMode from './SafetyMode'
 import * as Self from './Self'
 import * as Sync from './Sync'
-import * as Snapshot from '../snapshot'
 import { GossipHandler, InternalHandler, SignedObject } from './Types'
 import { compareQuery, Comparison } from './Utils'
 
@@ -717,7 +717,7 @@ export function schedule<T, U extends unknown[]>(
   { runEvenIfLateBy = 0 } = {},
   ...args: U
 ) {
-  return new Promise((resolve) => {
+  return new Promise<void>((resolve) => {
     const now = Date.now()
     if (now >= time) {
       if (now - time <= runEvenIfLateBy) {

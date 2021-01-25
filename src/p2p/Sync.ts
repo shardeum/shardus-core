@@ -1,5 +1,6 @@
 import { Handler } from 'express'
 import { Logger } from 'log4js'
+import util from 'util'
 import * as http from '../http'
 import { reversed, validateTypes } from '../utils'
 import { logger, network } from './Context'
@@ -9,8 +10,7 @@ import { Change, ChangeSquasher, parse } from './CycleParser'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { Route } from './Types'
-import { robustQuery, sequentialQuery } from './Utils'
-import util from 'util'
+import { robustQuery } from './Utils'
 
 /** TYPES */
 
@@ -305,10 +305,10 @@ async function getCycles(
   end?: number
 ): Promise<CycleCreator.CycleRecord[]> {
   if (start < 0) start = 0
-  if (end !== undefined){
-      if (start > end) start = end
+  if (end !== undefined) {
+    if (start > end) start = end
   }
-  let data : {start: number, end?: number} = {start}
+  const data: { start: number; end?: number } = { start }
   if (end !== undefined) data.end = end
   const queryFn = async (node: SyncNode) => {
     const ip = node.ip ? node.ip : node.externalIp
@@ -323,7 +323,13 @@ async function getCycles(
   let redundancy = 1
   if (activeNodes.length > 5) redundancy = 2
   if (activeNodes.length > 10) redundancy = 3
-  const [response, _responders] = await robustQuery(activeNodes, queryFn, util.isDeepStrictEqual, redundancy, true  ) 
+  const [response, _responders] = await robustQuery(
+    activeNodes,
+    queryFn,
+    util.isDeepStrictEqual,
+    redundancy,
+    true
+  )
 
   // [TODO] Validate whatever came in
   const cycles = response as CycleCreator.CycleRecord[]

@@ -46,7 +46,7 @@ export let othersByIdOrder: Node[] // used by sendGossipIn
 export let activeByIdOrder: Node[]
 export let activeOthersByIdOrder: Node[]
 
-const VERBOSE = false    // Use to dump complete NodeList and CycleChain data
+const VERBOSE = false // Use to dump complete NodeList and CycleChain data
 
 reset()
 
@@ -112,11 +112,11 @@ export function removeNode(id) {
   let idx
 
   // Omar added this so we don't crash if a node gets remove more than once
-  if (!nodes.has(id)){
+  if (!nodes.has(id)) {
     console.log('Tried to delete a node that is not in the nodes list.', id)
     console.trace()
-    return 
-  } 
+    return
+  }
 
   // Remove from arrays
   idx = binarySearch(activeOthersByIdOrder, { id }, propComparator('id'))
@@ -185,7 +185,9 @@ export function ipPort(ip: string, port: number) {
   return ip + ':' + port
 }
 
-function idTrim(id){ return id.substr(0,4) }
+function idTrim(id) {
+  return id.substr(0, 4)
+}
 
 export function getDebug() {
   let output = `
@@ -213,7 +215,8 @@ export function getDebug() {
         (node) => `${node.externalIp}:${node.externalPort}`
       )}]
       `
-      if (VERBOSE) output += `
+  if (VERBOSE)
+    output += `
     NODELIST:   ${stringify(byJoinOrder)}
     CYCLECHAIN: ${stringify(CycleChain.cycles)}
   `
