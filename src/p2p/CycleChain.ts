@@ -111,11 +111,12 @@ export function getDebug() {
     const actvd = record.activated.map((id) => {
       if (idToIpPort[id]) return idToIpPort[id]
       const node = nodes.get(id)
-      if (node !== null) {
+      if (node && node.externalIp && node.externalPort) {
         idToIpPort[id] = `${node.externalIp}:${node.externalPort}`
         return idToIpPort[id]
+      } else {
+        return `missing-${id.substring(0, 5)}`
       }
-      return -1 // port not found
     })
     //    const rmvd = record.removed.map(id => idToPort[id])
     const rmvd = record.removed.map((id) =>
