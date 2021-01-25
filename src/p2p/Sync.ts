@@ -52,7 +52,7 @@ const cyclesRoute: Route<Handler> = {
       return
     }
     const start = req.body.start | 0
-    const end = req.body.end | 0
+    const end = req.body.end
     // const cycles = p2p.state.getCycles(start, end)
     const cycles = CycleChain.getCycleChain(start, end)
     res.json(cycles)
@@ -302,18 +302,18 @@ export async function getNewestCycle(
 async function getCycles(
   activeNodes: SyncNode[],
   start: number,
-  end: number = start + 100
+  end?: number
 ): Promise<CycleCreator.CycleRecord[]> {
   if (start < 0) start = 0
-  if (end < 0) end = 0
-  if (start > end) start = end
+  if (end !== undefined){
+      if (start > end) start = end
+  }
+  let data : {start: number, end?: number} = {start}
+  if (end !== undefined) data.end = end
   const queryFn = async (node: SyncNode) => {
     const ip = node.ip ? node.ip : node.externalIp
     const port = node.port ? node.port : node.externalPort
-    const resp = await http.post(`${ip}:${port}/sync-cycles`, {
-      start,
-      end,
-    })
+    const resp = await http.post(`${ip}:${port}/sync-cycles`, data)
     return resp
   }
 
