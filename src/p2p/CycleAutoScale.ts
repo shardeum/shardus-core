@@ -100,7 +100,6 @@ export function init () {
   desiredCount = config.p2p.minNodes
 
   for (const [name, handler] of Object.entries(routes.gossip)) {
-    console.log(name, handler)
     Comms.registerGossipHandler(name, handler)
   }
 
@@ -157,7 +156,6 @@ function createScaleRequest (scaleType) {
 async function _requestNetworkScaling (upOrDown) {
   if (!Self.isActive || scalingRequested) return
   const request = createScaleRequest(upOrDown)
-  console.log('Scale request', request)
   // await _waitUntilEndOfCycle()
   await addExtScalingRequest(request)
   await Comms.sendGossip('scaling', request)
@@ -166,7 +164,6 @@ async function _requestNetworkScaling (upOrDown) {
 
 export async function requestNetworkUpsize () {
   if (getDesiredCount() >= config.p2p.maxNodes) {
-    console.log('Desired count is same/larger than maxNodes')
     return
   }
   console.log('DBG', 'UPSIZE!')
@@ -175,7 +172,6 @@ export async function requestNetworkUpsize () {
 
 export async function requestNetworkDownsize () {
   if (getDesiredCount() <= config.p2p.minNodes) {
-    console.log('Desired count is same/lower than minNodes')
     return
   }
   console.log('DBG', 'DOWNSIZE!')
@@ -250,11 +246,8 @@ function validateScalingRequest (scalingRequest: SignedScaleRequest) {
 }
 
 async function _checkScaling () {
-  console.log('_checkScaling...')
   // Keep a flag if we have changed our metadata.scaling at all
   let changed = false
-
-  console.log('Scale up reqeust length', getScaleUpRequests().length)
 
   if (approvedScalingType === ScaleType.UP) {
     warn('Already set to scale up this cycle. No need to scale up anymore.')
@@ -324,10 +317,6 @@ export function sendRequests() {}
 export function getTxs(): Txs {
   // [IMPORTANT] Must return a copy to avoid mutation
   const requestsCopy = deepmerge({}, [...Object.values(scalingRequestsCollector)])
-  console.log(`getTxs: Cycle ${CycleCreator.currentQuarter}, Quarter: ${CycleCreator.currentQuarter}`, {
-    autoscaling: requestsCopy,
-  })
-
   return {
     autoscaling: requestsCopy,
   }
@@ -341,10 +330,6 @@ export function validateRecordTypes(rec: Record): string {
 
 export function updateRecord(txs: Txs, record: CycleCreator.CycleRecord) {
   record.desired = getDesiredCount()
-  console.log(
-    `Auto-scaling after updating record: Cycle ${CycleCreator.currentQuarter}, Quarter: ${CycleCreator.currentQuarter}`,
-    record
-  )
   reset()
 }
 
@@ -390,7 +375,7 @@ async function _addToScalingRequests (scalingRequest) {
       }
       scalingRequestsCollector.set(scalingRequest.nodeId, scalingRequest)
       requestedScalingType = ScaleType.UP
-      console.log(`Added scale request in cycle ${CycleCreator.currentCycle}, quarter ${CycleCreator.currentQuarter}`, requestedScalingType, scalingRequest)
+      // console.log(`Added scale request in cycle ${CycleCreator.currentCycle}, quarter ${CycleCreator.currentQuarter}`, requestedScalingType, scalingRequest)
       await _checkScaling()
       return true
     case ScaleType.DOWN:
@@ -434,7 +419,6 @@ async function _addScalingRequest (scalingRequest: SignedScaleRequest) {
 }
 
 async function _waitUntilEndOfCycle () {
-  console.log('waiting for next cycle start')
   const currentTime = Date.now()
   const nextQ1Start = CycleCreator.nextQ1Start
   info(`Current time is: ${currentTime}`)

@@ -2,7 +2,7 @@ import Log4js from 'log4js'
 import LoadDetection from '../load-detection'
 import Logger from '../logger'
 import { ipInfo } from '../network'
-import { crypto } from '../p2p/Context'
+import { config, crypto } from '../p2p/Context'
 import { getDesiredCount } from '../p2p/CycleAutoScale'
 import * as CycleChain from '../p2p/CycleChain'
 import * as NodeList from '../p2p/NodeList'
@@ -66,7 +66,7 @@ class Reporter {
   }
 
   _calculateAverageTps(txs) {
-    return Math.round(txs / this.config.interval)
+    return Math.round(txs / this.getReportInterval())
   }
 
   async reportJoining(publicKey) {
@@ -158,9 +158,16 @@ class Reporter {
     }
   }
 
-  startReporting() {
-    // Creates and sends a report every `interval` seconds
-    this.reportTimer = setInterval(async () => {
+  getReportInterval(): number {
+    if (NodeList.activeByIdOrder.length >= 5) {
+      return 10 * 1000
+    } else {
+      console.log('this.config', this.config)
+      return this.config.interval * 1000
+    }
+  }
+
+  async report () {
     /* 
     Stop calling getAccountsStateHash() since this is not of use in a sharded network, also expensive to compute.
       let appState = this.stateManager
@@ -187,7 +194,7 @@ class Reporter {
       const txProcessed = this.statistics
         ? this.statistics.getPreviousElement('txProcessed')
         : 0
-      const reportInterval = this.config.interval
+      const reportInterval = this.getReportInterval()
       const nodeIpInfo = ipInfo
 
       let repairsStarted = 0
@@ -259,7 +266,13 @@ class Reporter {
       if (this.doConsoleReport) {
         this.consoleReport()
       }
-    }, this.config.interval * 1000)
+      this.reportTimer = setTimeout(() => { this.report() }, this.getReportInterval())
+    }
+
+  startReporting() {
+    let self = this
+    // Creates and sends a report every `interval` seconds
+    this.reportTimer = setTimeout(() => { this.report() }, this.getReportInterval())
   }
 
   consoleReport() {
@@ -286,7 +299,7 @@ class Reporter {
 
   stopReporting() {
     this.mainLogger.info('Stopping statistics reporting...')
-    clearInterval(this.reportTimer)
+    clearTimeout(this.reportTimer)
   }
 }
 
