@@ -686,8 +686,9 @@ class StateManager extends EventEmitter {
     cycleShardData.ourStoredPartitions = partitions2
 
      
-    // this will be a huge log.
-    if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${cycleNumber} data: ${utils.stringifyReduce(cycleShardData)}`)
+    // this will be a huge log. 
+    // Temp disable for log size
+    // if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${cycleNumber} data: ${utils.stringifyReduce(cycleShardData)}`)
     
 
     cycleShardData.hasCompleteData = true
