@@ -1,8 +1,10 @@
 import deepmerge from 'deepmerge'
 import { Handler } from 'express'
 import { isDeepStrictEqual } from 'util'
+import { version } from '../../package.json'
 import * as http from '../http'
 import * as utils from '../utils'
+import { validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { config, crypto, logger, network } from './Context'
 import * as CycleChain from './CycleChain'
@@ -12,8 +14,6 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import * as Types from './Types'
 import { robustQuery } from './Utils'
-import { validateTypes } from '../utils'
-import { version } from '../../package.json'
 
 /**
  * [TODO] [AS] Remove nodes that are taking too long to sync after they've joined.
@@ -162,12 +162,20 @@ function calculateToAccept() {
       : config.p2p.maxSyncingPerCycle
 
   const canSync = syncMax - syncing
+
   let needed = 0
-  if (active < desired || config.p2p.maxRotatedPerCycle <= 0) {
+
+  // Always set needed to (desired - active) if its positive
+  if (desired > active) {
     needed = desired - active
-  } else {
-    needed = expired
   }
+
+  // If rotation is on, add expired to needed
+  if (config.p2p.maxRotatedPerCycle > 0) {
+    needed += expired
+  }
+
+  // Limit needed by canSync and maxJoin
   if (needed > canSync) {
     needed = canSync
   }
@@ -177,6 +185,7 @@ function calculateToAccept() {
   if (needed < 0) {
     needed = 0
   }
+
   return needed
 }
 
@@ -465,7 +474,7 @@ export async function fetchJoined(activeNodes) {
     const node = response.node as NodeList.Node
     return node.id
   } catch (err) {
-    warn(`Self: fetchNodeId: robustQuery failed: `, err)
+    warn('Self: fetchNodeId: robustQuery failed: ', err)
   }
 }
 
