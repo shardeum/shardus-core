@@ -159,7 +159,7 @@ class Reporter {
   }
 
   getReportInterval(): number {
-    if (NodeList.activeByIdOrder.length >= 5) {
+    if (NodeList.activeByIdOrder.length >= 100) {
       return 10 * 1000
     } else {
       console.log('this.config', this.config)
