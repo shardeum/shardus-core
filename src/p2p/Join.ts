@@ -163,7 +163,7 @@ function calculateToAccept() {
 
   const canSync = syncMax - syncing
   let needed = 0
-  if (active < desired) {
+  if (active < desired || config.p2p.maxRotatedPerCycle <= 0) {
     needed = desired - active
   } else {
     needed = expired
