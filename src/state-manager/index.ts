@@ -6160,7 +6160,7 @@ class StateManager extends EventEmitter {
         }
 
         } finally {
-          this.profiler.profileSectionEnd(`process-${queueEntry.state}`)
+          this.profiler.profileSectionEnd(`process-${pushedProfilerTag}`)
           pushedProfilerTag = null // clear the tag
         }
         // Disabled this because it cant happen..  TXs will time out instead now.
