@@ -22,6 +22,7 @@ import Statistics from '../statistics'
 import Storage from '../storage'
 import * as utils from '../utils'
 import Profiler from '../utils/profiler'
+import NestedCounters from '../utils/nestedCounters'
 import ShardusTypes = require('../shardus/shardus-types')
 import * as Archivers from '../p2p/Archivers'
 import * as AutoScaling from '../p2p/CycleAutoScale'
@@ -45,6 +46,7 @@ Context.setDefaultConfigs(defaultConfigs)
 interface Shardus {
   io: SocketIO.Server
   profiler: Profiler
+  nestedCounters: NestedCounters
   config: ShardusTypes.ShardusConfiguration
   verboseLogs: boolean
   logger: Logger
@@ -89,6 +91,7 @@ class Shardus extends EventEmitter {
     storage: ShardusTypes.StorageConfiguration
   }) {
     super()
+    this.nestedCounters = new NestedCounters()    
     this.profiler = new Profiler()
     this.config = config
     Context.setConfig(this.config)
@@ -202,6 +205,10 @@ class Shardus extends EventEmitter {
       this.mainLogger.info('Shutting down logs...')
       await this.logger.shutdown()
     })
+
+
+    this.profiler.registerEndpoints()
+    this.nestedCounters.registerEndpoints()
 
     this.logger.playbackLogState('constructed', '', '')
   }
@@ -972,10 +979,10 @@ class Shardus extends EventEmitter {
         `${txId}`,
         `Transaction: ${utils.stringifyReduce(tx)}`
       )
-      this.profiler.profileSectionStart('consensusInject')
+      //this.profiler.profileSectionStart('consensusInject')
 
       this.consensus.inject(signedShardusTx, global, noConsensus).then((txReceipt) => {
-        this.profiler.profileSectionEnd('consensusInject')
+      //this.profiler.profileSectionEnd('consensusInject')
         if (this.verboseLogs)
           this.mainLogger.debug(
             `Received Consensus. Receipt: ${utils.stringifyReduce(txReceipt)}`

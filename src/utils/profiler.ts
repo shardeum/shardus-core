@@ -1,31 +1,76 @@
 const NS_PER_SEC = 1e9
 
+import { Utils } from 'sequelize/types';
+import * as Context from '../p2p/Context'
+import * as utils from '../utils'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 // process.hrtime.bigint()
 
 interface Profiler {
   sectionTimes: any
+  // instance: Profiler
 }
 
+export let profilerInstance: Profiler
 class Profiler {
+  sectionTimes: any;
+  eventCounters: Map<string, Map<string,number>>;
+  stackHeight: number;
+
   constructor() {
     this.sectionTimes = {}
+    this.eventCounters = new Map()
+    this.stackHeight = 0
+    profilerInstance = this
+
+    this.profileSectionStart('_total', true)
   }
 
-  profileSectionStart(sectionName) {
+  registerEndpoints (){
+    Context.network.registerExternalGet('perf', (req, res) => {
+      let result = this.printAndClearReport(1)
+      //res.json({result })
+
+      res.write(result)
+      res.end()
+    })
+  }
+
+  profileSectionStart(sectionName, internal = false) {
     let section = this.sectionTimes[sectionName]
+
+    if (section != null && section.started === true) {
+
+      nestedCountersInstance.countEvent('profiler-start-error', sectionName)
+      return
+    }
+
     if (section == null) {
       let t = BigInt(0)
-      section = { name: sectionName, total: t, c: 0 }
+      section = { name: sectionName, total: t, c: 0, internal }
       this.sectionTimes[sectionName] = section
     }
+
+
     section.start = process.hrtime.bigint()
     section.started = true
     section.c++
+
+    if(internal === false){
+      nestedCountersInstance.countEvent('profiler', sectionName)
+
+      this.stackHeight++
+      if(this.stackHeight === 1){
+        this.profileSectionStart('_totalBusy', true)
+      }      
+    }
   }
 
-  profileSectionEnd(sectionName) {
+  profileSectionEnd(sectionName, internal = false) {
     let section = this.sectionTimes[sectionName]
     if (section == null || section.started === false) {
+
+      nestedCountersInstance.countEvent('profiler-end-error', sectionName)
       return
     }
 
@@ -33,6 +78,15 @@ class Profiler {
 
     section.total += section.end - section.start
     section.started = false
+
+    if(internal === false){
+      nestedCountersInstance.countEvent('profiler-end', sectionName)
+
+      this.stackHeight--
+      if(this.stackHeight === 0){
+        this.profileSectionEnd('_totalBusy', true)
+      }  
+    }
   }
 
   cleanInt(x) {
@@ -40,22 +94,61 @@ class Profiler {
     return x >= 0 ? Math.floor(x) : Math.ceil(x)
   }
 
-  printAndClearReport(delta?: number) {
-    let result = 'Profile Sections: '
-    // let d1 = this.cleanInt(delta * NS_PER_SEC)
-    let d1 = this.cleanInt(1e6) // will get us ms
-    let divider = BigInt(d1)
-    // console.log('divider: ' + divider)
+
+  clearTimes(){
     for (let key in this.sectionTimes) {
       if (this.sectionTimes.hasOwnProperty(key)) {
         let section = this.sectionTimes[key]
-        result += `${section.name}: total ${section.total /
-          divider} avg:${section.total / (divider * BigInt(section.c))} ,  ` // ${section.total} :
         section.total = BigInt(0)
       }
     }
-
-    console.log(result)
   }
+
+  printAndClearReport(delta?: number) : string {
+
+    this.profileSectionEnd('_total', true)
+
+
+    let result = 'Profile Sections:\n'
+    let d1 = this.cleanInt(1e6) // will get us ms
+    let divider = BigInt(d1)
+
+    let totalSection = this.sectionTimes['_total']
+    let totalBusySection = this.sectionTimes['_totalBusy']
+
+    let lines = []
+    for (let key in this.sectionTimes) {
+      if (this.sectionTimes.hasOwnProperty(key)) {
+        let section = this.sectionTimes[key]
+        
+        // result += `${section.name}: total ${section.total /
+        //   divider} avg:${section.total / (divider * BigInt(section.c))} ,  ` // ${section.total} :
+
+        let duty = BigInt(0)
+        if(totalSection.total > BigInt(0)){
+          duty = (BigInt(100) * section.total) / totalSection.total
+        }
+        let totalMs = section.total / divider
+        let line = `${section.name} ${duty}% \t total ${totalMs} \t\t c:${section.c}`
+        //section.total = BigInt(0)
+
+        lines.push({line, totalMs})
+      }
+    }
+
+    lines.sort((l1,l2) =>  Number(l2.totalMs - l1.totalMs))
+
+    result = result + lines.map((line)=> line.line).join('\n')
+
+    this.clearTimes()
+
+    this.profileSectionStart('_total', true)
+    return result
+  }
+
+
 }
+
+
+
 export default Profiler

@@ -319,6 +319,21 @@ export const replacer = (key, value) => {
   }
 }
 
+//Figure out certain chunky objects and store them in their own table
+export const stringifyReduceMemoize = (val, isArrayProp?: boolean) => { 
+
+
+}
+
+export const reviverMemoize = (key, value) => {
+  if (typeof value === 'object' && value !== null) {
+    if (value.dataType === 'stringifyReduce_map_2_array') {
+      return new Map(value.value)
+    }
+  }
+  return value
+}
+
 export const stringifyReduce = (val, isArrayProp?: boolean) => {
   let i, max, str, keys, key, propVal, toStr
   if (val === true) {

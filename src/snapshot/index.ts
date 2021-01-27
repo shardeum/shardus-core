@@ -1,5 +1,6 @@
 import * as express from 'express'
 import * as log4js from 'log4js'
+import {profilerInstance} from '../utils/profiler'
 import Crypto from '../crypto'
 import * as http from '../http'
 import * as Active from '../p2p/Active'
@@ -226,6 +227,8 @@ export function startSnapshotting() {
   Context.stateManager.on(
     'cycleTxsFinalized',
     async (shard: CycleShardData, receiptMapResults:ReceiptMapResult[], statsClump:StatsClump, mainHashResults:MainHashResults) => {
+      try{
+      profilerInstance.profileSectionStart('snapshot')
       const debugStrs = []
       // store receiptMap for this cycle number
       partitionBlockMapByCycle.set(shard.cycleNumber, receiptMapResults)
@@ -393,6 +396,10 @@ export function startSnapshotting() {
 
       // Clean partition gossip that's older than 10 cycles
       partitionGossip.cleanOld(shard.cycleNumber, 10)
+    } finally {
+      profilerInstance.profileSectionEnd('snapshot')
+    }
+
     }
   )
 }

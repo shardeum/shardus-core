@@ -3,6 +3,7 @@ import fs from 'fs'
 import { Readable } from 'stream'
 import { EventEmitter } from 'events'
 import * as utils from '../utils'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 interface Statistics {
   intervalDuration: number
@@ -94,6 +95,7 @@ class Statistics extends EventEmitter {
     const counter = this.counters[counterName]
     if (!counter) throw new Error(`Counter '${counterName}' is undefined.`)
     counter.increment()
+    nestedCountersInstance.countEvent('statistics', counterName)
   }
 
   // Returns the current count of the given CounterRing

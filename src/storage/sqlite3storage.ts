@@ -171,6 +171,8 @@ class Sqlite3Storage {
   }
 
   _create(table, object, opts) {
+    try{
+    this.profiler.profileSectionStart('db')
     // console.log('_create2: ' + stringify(object))
     if (Array.isArray(object)) {
       // return table.bulkCreate(values, opts)
@@ -201,9 +203,15 @@ class Sqlite3Storage {
 
     // console.log(queryString + '  VALUES: ' + stringify(inputs))
     return this.run(queryString, inputs)
+    
+    } finally {
+      this.profiler.profileSectionEnd('db')
+    }
   }
 
   async _read(table, params, opts) {
+    try{
+      this.profiler.profileSectionStart('db')
     // return table.findAll({ where, ...opts })
     let queryString = table.selectString
 
@@ -232,8 +240,13 @@ class Sqlite3Storage {
       }
     }
     return results
+    } finally {
+      this.profiler.profileSectionEnd('db')
+    }
   }
   async _readOld(table, params, opts) {
+    try{
+      this.profiler.profileSectionStart('db')
     // return table.findAll({ where, ...opts })
     let queryString = table.selectString
 
@@ -262,9 +275,14 @@ class Sqlite3Storage {
       }
     }
     return results
+    } finally {
+      this.profiler.profileSectionEnd('db')
+    }
   }
 
   _update(table, values, where, opts) {
+    try{
+      this.profiler.profileSectionStart('db')
     // return table.update(values, { where, ...opts })
     let queryString = table.updateString
 
@@ -288,8 +306,13 @@ class Sqlite3Storage {
 
     // console.log(queryString + '  VALUES: ' + stringify(valueArray))
     return this.run(queryString, valueArray)
+    } finally {
+      this.profiler.profileSectionEnd('db')
+    }
   }
   _delete(table, where, opts) {
+    try{
+      this.profiler.profileSectionStart('db')
     // if (!where) {
     //   return table.destroy({ ...opts })
     // }
@@ -307,18 +330,29 @@ class Sqlite3Storage {
 
     // console.log(queryString + '  VALUES: ' + stringify(valueArray))
     return this.run(queryString, valueArray)
+    } finally {
+      this.profiler.profileSectionEnd('db')
+    }
   }
 
   _rawQuery(queryString, valueArray) {
     // return this.sequelize.query(query, { model: table })
-
+    try{
+      this.profiler.profileSectionStart('db')
     return this.all(queryString, valueArray)
+    } finally {
+      this.profiler.profileSectionEnd('db')
+    }
   }
 
   _rawQueryOld(queryString, valueArray) {
     // return this.sequelize.query(query, { model: table })
-
+    try{
+      this.profiler.profileSectionStart('db')
     return this.allOld(queryString, valueArray)
+    } finally {
+      this.profiler.profileSectionEnd('db')
+    }
   }
 
   params2Array(paramsObj, table) {

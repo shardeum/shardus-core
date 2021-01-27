@@ -4,6 +4,8 @@ import * as utils from '../utils'
 import os from 'os'
 import * as http from '../http'
 import Shardus = require('../shardus/shardus-types')
+import { profilerInstance } from '../utils/profiler'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 const stringify = require('fast-stable-stringify')
 const log4jsExtend = require('log4js-extend')
 
@@ -173,6 +175,9 @@ class Logger {
   }
 
   playbackLog(from, to, type, endpoint, id, desc) {
+
+    nestedCountersInstance.countEvent(type, endpoint)
+
     // only log desc if trace..
     // dont log it if debug
     if (!this._playbackTrace && !this._playbackDebug) {

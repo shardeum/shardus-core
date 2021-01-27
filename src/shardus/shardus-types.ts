@@ -605,6 +605,8 @@ declare namespace Shardus {
       oldPartitionSystem?: boolean
       /** slow old reporting that queries sql for account values */
       dumpAccountReportFromSQL?: boolean
+      /** enable the built in profiling */
+      profiler?: boolean
     }
     /** Options for the statistics module */
     statistics?: {

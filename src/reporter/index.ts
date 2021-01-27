@@ -68,7 +68,7 @@ class Reporter {
     this.lastTime = Date.now()
 
     this.doConsoleReport = false
-    if (this.config.console === true) {
+    if (this.config.debug && this.config.debug.profiler) {
       this.doConsoleReport = true
     }
     this.hasRecipient = this.config.recipient != null
@@ -288,9 +288,9 @@ class Reporter {
 
     this.resetStatisticsReport()
 
-    if (this.doConsoleReport) {
-      this.consoleReport()
-    }
+      // if (this.doConsoleReport) {
+      //   this.consoleReport()
+      // }
     this.reportTimer = setTimeout(() => {
       this.report()
     }, this.getReportInterval())

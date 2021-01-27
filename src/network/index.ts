@@ -12,6 +12,7 @@ import Logger from '../logger'
 import { config, defaultConfigs, logger } from '../p2p/Context'
 import NatAPI = require('nat-api')
 import http from 'http'
+import {profilerInstance} from '../utils/profiler'
 
 /** TYPES */
 export interface IPInfo {
@@ -113,9 +114,16 @@ export class NetworkClass extends EventEmitter {
       port: this.ipInfo.internalPort,
     })
     this.intServer = await this.sn.listen(async (data, remote, respond) => {
+      let routeName
       try {
+
         if (!data) throw new Error('No data provided in request...')
         const { route, payload } = data
+
+        profilerInstance.profileSectionStart('net-internl')
+        profilerInstance.profileSectionStart(`net-internl-${route}`) 
+        routeName = route
+
         if (!route) {
           this.mainLogger.debug(
             'Network: ' +
@@ -154,6 +162,9 @@ export class NetworkClass extends EventEmitter {
           'Network: _setupInternal > sn.listen > callback > remote',
           remote
         )
+      } finally {
+        profilerInstance.profileSectionEnd('net-internl')
+        profilerInstance.profileSectionEnd(`net-internl-${routeName}`)
       }
     })
     console.log(
@@ -202,6 +213,10 @@ export class NetworkClass extends EventEmitter {
         id = message.tracker
       }
 
+      try {
+      profilerInstance.profileSectionStart('net-ask')
+      profilerInstance.profileSectionStart(`net-ask-${route}`) 
+
       const data = { route, payload: message }
       const onRes = (res) => {
         if (!logged)
@@ -237,6 +252,12 @@ export class NetworkClass extends EventEmitter {
         this.mainLogger.error('Network: ' + err)
         this.emit('error', node)
       }
+
+      } finally {
+        profilerInstance.profileSectionEnd('net-ask')
+        profilerInstance.profileSectionEnd(`net-ask-${route}`) 
+      }
+
     })
   }
 

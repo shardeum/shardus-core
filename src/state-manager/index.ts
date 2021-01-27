@@ -3836,6 +3836,7 @@ class StateManager extends EventEmitter {
   }
 
   async commitConsensedTransaction (applyResponse:Shardus.ApplyResponse, acceptedTX:AcceptedTx, hasStateTableData:boolean, repairing:boolean, filter:AccountFilter, wrappedStates:WrappedResponses, localCachedData:LocalCachedData ) : Promise<CommitConsensedTransactionResult> {
+    
     let ourLockID = -1
     let accountDataList
     let txTs = 0
@@ -4217,6 +4218,10 @@ class StateManager extends EventEmitter {
       return 'notReady'
     }
 
+    try{
+      this.profiler.profileSectionStart('enqueue')
+
+
     if(this.hasknownGlobals == false){
       if (this.verboseLogs) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: this.hasknownGlobals == false`)
       return 'notReady'
@@ -4453,8 +4458,12 @@ class StateManager extends EventEmitter {
       if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)}`)
       this.fatalLogger.fatal('routeAndQueueAcceptedTransaction failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
       throw new Error(error)
-    }
+    } 
     return true
+
+    } finally {
+      this.profiler.profileSectionEnd('enqueue')
+    }
   }
 
   tryStartAcceptedQueue () {
@@ -4857,6 +4866,9 @@ class StateManager extends EventEmitter {
       throw new Error('repairToMatchReceipt queueEntry.uniqueKeys == null')
     }
 
+    try{
+      this.profiler.profileSectionStart('repair')
+
     let shortHash = utils.makeShortHash(queueEntry.acceptedTx.id)
     // Need to build a list of what accounts we need, what state they should be in and who to get them from
     let requestObjects: {[id:string]:{appliedVote:AppliedVote, voteIndex:number, accountHash:string, accountId:string, nodeShardInfo:NodeShardData, alternates:string[]}} = {}
@@ -5119,6 +5131,9 @@ class StateManager extends EventEmitter {
 
     // Set this when data has been repaired. 
     queueEntry.repairFinished = true
+    } finally {
+      this.profiler.profileSectionEnd('repair')
+    }
   }
 
   /**
@@ -5484,7 +5499,10 @@ class StateManager extends EventEmitter {
   async processAcceptedTxQueue () {
     let seenAccounts: SeenAccounts
     seenAccounts = {}// todo PERF we should be able to support using a variable that we save from one update to the next.  set that up after initial testing
+    let pushedProfilerTag = null
     try {
+      this.profiler.profileSectionStart('processQ')
+      
       if(this.currentCycleShardData == null)
       {
         return
@@ -5514,6 +5532,7 @@ class StateManager extends EventEmitter {
       let timeM3 = timeM * 3
       let currentTime = Date.now() // when to update this?
 
+      
 
       // let seenAccounts2 = new Map()
       // todo move these functions out where they are not constantly regenerate
@@ -5621,7 +5640,15 @@ class StateManager extends EventEmitter {
 
       let lastLog = 0
       currentIndex++ //increment once so we can handle the decrement at the top of the loop and be safe about continue statements
+      
       while (this.newAcceptedTxQueue.length > 0) {
+        //Handle an odd case where the finally did not catch exiting scope.
+        if(pushedProfilerTag != null){
+          this.profiler.profileSectionEnd(`process-${pushedProfilerTag}`)
+          this.profiler.profileSectionEnd(`process-patched1-${pushedProfilerTag}`)
+          pushedProfilerTag = null
+        }
+
         currentIndex--
         if (currentIndex < 0) {
           break
@@ -5748,6 +5775,13 @@ class StateManager extends EventEmitter {
         //     ? would still be waiting on data.
         //     this is not normal.  a node would be really behind.  Just do the data repair like step "B"
         
+        try{
+
+
+        this.profiler.profileSectionStart(`process-${queueEntry.state}`)
+        pushedProfilerTag = queueEntry.state
+        
+
         if (queueEntry.state === 'syncing') { ///////////////////////////////////////////////--syncing--////////////////////////////////////////////////////////////
           markAccountsSeen(queueEntry)
 
@@ -6026,6 +6060,9 @@ class StateManager extends EventEmitter {
                 //queueEntry.acceptedTx.transactionGroup = queueEntry.transactionGroup // Used to not double count txProcessed
                 let hasStateTableData = false
                 let repairing = false
+                //try {
+                this.profiler.profileSectionStart('commit')
+
                 let commitResult = await this.commitConsensedTransaction( 
                   queueEntry.preApplyTXResult.applyResponse,   // TODO STATESHARDING4 ... if we get here from a non standard path may need to get this data from somewhere else
                   queueEntry.acceptedTx, 
@@ -6035,6 +6072,10 @@ class StateManager extends EventEmitter {
                   wrappedStates,
                   localCachedData
                   )
+
+                //} finally {
+                this.profiler.profileSectionEnd('commit')                  
+                //}
 
                 if (commitResult != null && commitResult.success) {
                   
@@ -6117,6 +6158,11 @@ class StateManager extends EventEmitter {
           this.removeFromQueue(queueEntry, currentIndex) 
           this.mainLogger.debug(`processAcceptedTxQueue2 canceled : ${queueEntry.logID} `)
         }
+
+        } finally {
+          this.profiler.profileSectionEnd(`process-${queueEntry.state}`)
+          pushedProfilerTag = null // clear the tag
+        }
         // Disabled this because it cant happen..  TXs will time out instead now.
         // we could consider this as a state when attempting to get missing data fails
         // else if (queueEntry.state === 'failed to get data') {
@@ -6124,6 +6170,14 @@ class StateManager extends EventEmitter {
         // }
       }
     } finally {
+
+      //Handle an odd case where the finally did not catch exiting scope.
+      if(pushedProfilerTag != null){
+        this.profiler.profileSectionEnd(`process-${pushedProfilerTag}`)
+        this.profiler.profileSectionEnd(`process-patched1-${pushedProfilerTag}`)
+        pushedProfilerTag = null
+      }
+
       // restart loop if there are still elements in it
       if (this.newAcceptedTxQueue.length > 0 || this.newAcceptedTxQueueTempInjest.length > 0) {
         setTimeout(() => { this.tryStartAcceptedQueue() }, 15)
@@ -6131,7 +6185,10 @@ class StateManager extends EventEmitter {
 
       this.newAcceptedTxQueueRunning = false
       this.lastSeenAccountsMap = seenAccounts
+
+      this.profiler.profileSectionEnd('processQ')
     }
+
   }
 
 
