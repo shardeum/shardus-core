@@ -27,6 +27,7 @@ import ShardusTypes = require('../shardus/shardus-types')
 import * as Archivers from '../p2p/Archivers'
 import * as AutoScaling from '../p2p/CycleAutoScale'
 import { currentCycle, currentQuarter } from '../p2p/CycleCreator'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
@@ -606,7 +607,8 @@ class Shardus extends EventEmitter {
     Self.emitter.on('error', (e) => {
       console.log(e.message + ' at ' + e.stack)
       this.mainLogger.debug('shardus.start() ' + e.message + ' at ' + e.stack)
-      this.fatalLogger.fatal('shardus.start() ' + e.message + ' at ' + e.stack)
+      // normally fatal error keys should not be variable ut this seems like an ok exception for now
+      this.shardus_fatal(`onError_ex` + e.message + ' at ' + e.stack, 'shardus.start() ' + e.message + ' at ' + e.stack)
       throw new Error(e)
     })
     Self.emitter.on('removed', async () => {
@@ -688,7 +690,7 @@ class Shardus extends EventEmitter {
    */
   _registerListener(emitter, event, callback) {
     if (this._listeners[event]) {
-      this.mainLogger.fatal(
+      this.shardus_fatal(`_registerListener_dupe`,
         'Shardus can only register one listener per event! EVENT: ',
         event
       )
@@ -950,7 +952,7 @@ class Shardus extends EventEmitter {
       // Validate the transaction timestamp
       const timestamp = initValidationResp.txnTimestamp
       if (this._isTransactionTimestampExpired(timestamp)) {
-        this.fatalLogger.fatal(
+        this.shardus_fatal(`put_txExpired`,
           `Transaction Expired: ${utils.stringifyReduce(tx)}`
         )
         this.statistics.incrementCounter('txRejected')
@@ -989,7 +991,7 @@ class Shardus extends EventEmitter {
           )
       })
     } catch (err) {
-      this.fatalLogger.fatal(
+      this.shardus_fatal(`put_ex_` + err.message,
         `Put: Failed to process transaction. Exception: ${err}`
       )
       this.fatalLogger.fatal(
@@ -1487,7 +1489,7 @@ class Shardus extends EventEmitter {
       //txSummaryUpdate: (blob: any, tx: any, wrappedStates: any)
 
     } catch (ex) {
-      this.fatalLogger.fatal(
+      this.shardus_fatal(`getAppInterface_ex`,
         `Required application interface not implemented. Exception: ${ex}`
       )
       this.fatalLogger.fatal(
@@ -1541,7 +1543,7 @@ class Shardus extends EventEmitter {
               ' at ' +
               ex.stack
           )
-          this.fatalLogger.fatal(
+          this.shardus_fatal(`registerExternalPost_ex`,
             'testGlobalAccountTX:' +
               ex.name +
               ': ' +
@@ -1572,7 +1574,7 @@ class Shardus extends EventEmitter {
               ' at ' +
               ex.stack
           )
-          this.fatalLogger.fatal(
+          this.shardus_fatal(`registerExternalPost2_ex`,
             'testGlobalAccountTXSet:' +
               ex.name +
               ': ' +
@@ -1591,7 +1593,7 @@ class Shardus extends EventEmitter {
   registerExceptionHandler() {
     const logFatalAndExit = (err) => {
       console.log('Encountered a fatal error. Check fatal log for details.')
-      this.fatalLogger.fatal('unhandledRejection: ' + err.stack)
+      this.shardus_fatal(`unhandledRejection_ex_`+ err.stack.substring(0,100), 'unhandledRejection: ' + err.stack)
       // this.exitHandler.exitCleanly()
 
       this.exitHandler.exitUncleanly()
@@ -1656,6 +1658,18 @@ class Shardus extends EventEmitter {
   setGlobal(address, value, when, source) {
     GlobalAccounts.setGlobal(address, value, when, source)
   }
+
+  shardus_fatal(key, log, log2=null){
+    nestedCountersInstance.countEvent('fatal-log', key)
+
+    if(log2 != null){
+      this.fatalLogger.fatal(log, log2)
+    } else {
+      this.fatalLogger.fatal(log)
+    }
+    
+  }
+
 }
 
 // tslint:disable-next-line: no-default-export

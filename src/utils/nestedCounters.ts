@@ -3,6 +3,8 @@ const NS_PER_SEC = 1e9
 import { Utils } from 'sequelize/types'
 import * as Context from '../p2p/Context'
 import * as utils from '../utils'
+import Crypto from "../crypto"
+
 // process.hrtime.bigint()
 
 interface NestedCounters {}
@@ -18,11 +20,16 @@ export let nestedCountersInstance: NestedCounters
 
 class NestedCounters {
   eventCounters: Map<string, CounterNode>
+  crypto: Crypto
+  infLoopDebug: boolean
 
   constructor() {
     // this.sectionTimes = {}
     this.eventCounters = new Map()
+    this.crypto = null
     nestedCountersInstance = this
+    this.infLoopDebug = false
+
   }
 
   registerEndpoints() {
@@ -36,11 +43,38 @@ class NestedCounters {
         //   flags: 'w'
         // })
         
+        res.write(`${Date.now()}\n`)
+
         this.printArrayReport(arrayReport, res, 0)
         res.end()
 
       //res.json(utils.stringifyReduce(this.eventCounters))
     })
+
+
+    Context.network.registerExternalGet('debug-inf-loop', (req, res) => {
+        res.write('starting inf loop, goodbye')
+        res.end()
+        let counter = 1
+        this.infLoopDebug = true
+        while(this.infLoopDebug) {
+            let s = "asdf"
+            let s2 = utils.stringifyReduce({test:[s,s,s,s,s,s,s]})
+            let s3 = utils.stringifyReduce({test:[s2,s2,s2,s2,s2,s2,s2]})
+            if(this.crypto != null){
+                this.crypto.hash(s3)
+            }
+            counter++
+        }
+
+    })
+
+    Context.network.registerExternalGet('debug-inf-loop-off', (req, res) => {
+        this.infLoopDebug = false
+        res.write('stopping inf loop, who knows if this is possible')
+        res.end()
+    })
+
   }
 
   countEvent(category1: string, category2: string) {
@@ -98,8 +132,10 @@ class NestedCounters {
     let indentText = '___'.repeat(indent)
     for (let item of arrayReport) {
       let { key, count, subArray, avgLen, logLen } = item
+      let countStr = `${count}`
       stream.write(
-        `${indentText}${key}\tcount:\t${count}\n`
+        //`${indentText}${key.padEnd(40)}\tcount:\t${countStr}\n`
+        `${countStr.padStart(10)} ${indentText} ${key}\n`
       )
 
       if (subArray != null && subArray.length > 0) {

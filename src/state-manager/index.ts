@@ -40,6 +40,7 @@ import * as Context from '../p2p/Context'
 import StateManagerStats from './state-manager-stats'
 import StateManagerCache from './state-manager-cache'
 import { response } from 'express'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 /**
  * StateManager
@@ -790,7 +791,7 @@ class StateManager extends EventEmitter {
       } while (startedCount > 0)
     } catch (ex) {
       this.mainLogger.debug('syncRuntimeTrackers: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      this.fatalLogger.fatal('syncRuntimeTrackers: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.statemanager_fatal(`syncRuntimeTrackers_ex`, 'syncRuntimeTrackers: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
     } finally {
       this.runtimeSyncTrackerSyncing = false
     }
@@ -1332,10 +1333,10 @@ class StateManager extends EventEmitter {
     } catch (error) {
       if (error.message.includes('FailAndRestartPartition')) {
         this.mainLogger.debug(`DATASYNC: Error Failed at: ${error.stack}`)
-        this.fatalLogger.fatal('DATASYNC: FailAndRestartPartition: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+        this.statemanager_fatal(`syncStateDataForRange_ex_failandrestart`, 'DATASYNC: FailAndRestartPartition: ' + error.name + ': ' + error.message + ' at ' + error.stack)
         await this.failandRestart()
       } else {
-        this.fatalLogger.fatal('syncStateDataForPartition failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+        this.statemanager_fatal(`syncStateDataForRange_ex`,'syncStateDataForPartition failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
         this.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + error.name + ': ' + error.message + ' at ' + error.stack)
         await this.failandRestart()
       }
@@ -1527,10 +1528,10 @@ class StateManager extends EventEmitter {
     } catch (error) {
       if (error.message.includes('FailAndRestartPartition')) {
         this.mainLogger.debug(`DATASYNC: syncStateDataGlobals Error Failed at: ${error.stack}`)
-        this.fatalLogger.fatal('DATASYNC: syncStateDataGlobals FailAndRestartPartition: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+        this.statemanager_fatal(`syncStateDataGlobals_ex_failandrestart`,'DATASYNC: syncStateDataGlobals FailAndRestartPartition: ' + error.name + ': ' + error.message + ' at ' + error.stack)
         await this.failandRestart()
       } else {
-        this.fatalLogger.fatal('syncStateDataGlobals failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+        this.statemanager_fatal(`syncStateDataGlobals_ex`,'syncStateDataGlobals failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
         this.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + error.name + ': ' + error.message + ' at ' + error.stack)
         await this.failandRestart()
       }
@@ -1679,12 +1680,12 @@ class StateManager extends EventEmitter {
       }
     } catch (ex) {
       this.mainLogger.debug('getRobustGlobalReport: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      this.fatalLogger.fatal('getRobustGlobalReport: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.statemanager_fatal(`getRobustGlobalReport_ex`,'getRobustGlobalReport: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       throw new Error('FailAndRestartPartition0')
     }
     if (!winners || winners.length === 0) {
       this.mainLogger.debug(`DATASYNC: getRobustGlobalReport no winners, going to throw fail and restart`)
-      this.fatalLogger.fatal(`DATASYNC: getRobustGlobalReport no winners, going to throw fail and restart`) // todo: consider if this is just an error
+      this.statemanager_fatal(`getRobustGlobalReport_noWin`,`DATASYNC: getRobustGlobalReport no winners, going to throw fail and restart`) // todo: consider if this is just an error
       throw new Error('FailAndRestartPartition1')
     }
     this.mainLogger.debug(`DATASYNC: getRobustGlobalReport found a winner.  results: ${utils.stringifyReduce(result)}`)
@@ -1786,7 +1787,7 @@ class StateManager extends EventEmitter {
         [result, winners] = await this.p2p.robustQuery(nodes, queryFn, equalFn, 3, false)
       } catch (ex) {
         this.mainLogger.debug('syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-        this.fatalLogger.fatal('syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        this.statemanager_fatal(`syncStateTableData_robustQ`,'syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         throw new Error('FailAndRestartPartition0')
       }
 
@@ -1794,7 +1795,7 @@ class StateManager extends EventEmitter {
         this.mainLogger.debug(`DATASYNC: robustQuery returned result: ${result.stateHash}`)
         if (!winners || winners.length === 0) {
           this.mainLogger.debug(`DATASYNC: no winners, going to throw fail and restart`)
-          this.fatalLogger.fatal(`DATASYNC: no winners, going to throw fail and restart`) // todo: consider if this is just an error
+          this.statemanager_fatal(`syncStateTableData_noWin`,`DATASYNC: no winners, going to throw fail and restart`) // todo: consider if this is just an error
           throw new Error('FailAndRestartPartition1')
         }
         this.dataSourceNode = winners[0] // Todo random index
@@ -2905,7 +2906,7 @@ class StateManager extends EventEmitter {
 
         }
       } catch (ex) {
-        this.fatalLogger.fatal('get_transactions_by_partition_index failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        this.statemanager_fatal(`get_transactions_by_partition_index_ex`,'get_transactions_by_partition_index failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       } finally {
       }
       // TODO fix pass fail sorting.. it is probably all wrong and out of sync, but currently nothing fails.
@@ -3121,14 +3122,14 @@ class StateManager extends EventEmitter {
 
       if(queueEntry == null){
         // do not gossip this, we are not involved
-        this.fatalLogger.fatal(`spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(payload.id)}` )
+        this.statemanager_fatal(`spread_tx_to_group_noQE`,`spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(payload.id)}` )
         return
       }
 
       //Validation.
       const initValidationResp = this.app.validateTxnFields(queueEntry.acceptedTx.data)
       if(initValidationResp.success !== true){
-        this.fatalLogger.fatal(`spread_tx_to_group validateTxnFields failed: ${utils.stringifyReduce(
+        this.statemanager_fatal(`spread_tx_to_group_validateTX`,`spread_tx_to_group validateTxnFields failed: ${utils.stringifyReduce(
           initValidationResp
         )}`)
         return
@@ -3139,12 +3140,12 @@ class StateManager extends EventEmitter {
       let timestamp = queueEntry.txKeys.timestamp
       let age = Date.now() - timestamp
       if (age > timeM * 0.9) {
-        this.fatalLogger.fatal('spread_tx_to_group cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
+        this.statemanager_fatal(`spread_tx_to_group_OldTx`,'spread_tx_to_group cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
         if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_spread_tx_to_groupToOld', '', 'spread_tx_to_group working on older tx ' + timestamp + ' age: ' + age)
         return
       }
       if (age < -1000) {
-        this.fatalLogger.fatal('spread_tx_to_group cannot accept tx more than 1 second in future ' + timestamp + ' age: ' + age)
+        this.statemanager_fatal(`spread_tx_to_group_tooFuture`,'spread_tx_to_group cannot accept tx more than 1 second in future ' + timestamp + ' age: ' + age)
         if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_spread_tx_to_groupToFutrue', '', 'spread_tx_to_group tx too far in future' + timestamp + ' age: ' + age)
         return
       }
@@ -3539,7 +3540,7 @@ class StateManager extends EventEmitter {
               if (accountEntry == null) {
                 if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress))
                 if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ')
-                this.fatalLogger.fatal(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ') // todo: consider if this is just an error
+                this.statemanager_fatal(`testAccountTimesAndStateTable_noEntry`, this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ') // todo: consider if this is just an error
                 // fail this because we already check if the before state was all zeroes
                 return { success: false, hasStateTableData }
               } else {
@@ -3555,7 +3556,7 @@ class StateManager extends EventEmitter {
         }
       }
     } catch (ex) {
-      this.fatalLogger.fatal('testAccountTimesAndStateTable failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.statemanager_fatal(`testAccountTimesAndStateTable_ex`,'testAccountTimesAndStateTable failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
     }
     return { success: true, hasStateTableData }
   }
@@ -3584,7 +3585,7 @@ class StateManager extends EventEmitter {
         return false
       }
     } catch (ex) {
-      this.fatalLogger.fatal('testAccountTime failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.statemanager_fatal(`testAccountTime-fail_ex`,'testAccountTime failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       return false
     }
     return true // { success: true, hasStateTableData }
@@ -3672,7 +3673,7 @@ class StateManager extends EventEmitter {
       // write the accepted TX to storage
       this.storage.addAcceptedTransactions([acceptedTX])
     } catch (ex) {
-      this.fatalLogger.fatal('tryApplyTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.statemanager_fatal(`tryApplyTransaction_ex`,'tryApplyTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       this.mainLogger.debug(`tryApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
       if(applyResponse){ // && savedSomething){
         // TSConversion do we really want to record this?
@@ -3923,7 +3924,7 @@ class StateManager extends EventEmitter {
       this.app.transactionReceiptPass(acceptedTX.data, wrappedStates, applyResponse)
 
     } catch (ex) {
-      this.fatalLogger.fatal('commitConsensedTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.statemanager_fatal(`commitConsensedTransaction_ex`,'commitConsensedTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       this.mainLogger.debug(`commitConsensedTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
       if(applyResponse){ // && savedSomething){
         // TSConversion do we really want to record this?
@@ -4329,7 +4330,7 @@ class StateManager extends EventEmitter {
     try {
       let age = Date.now() - timestamp
       if (age > this.queueSitTime * 0.9) {
-        this.fatalLogger.fatal('routeAndQueueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
+        this.statemanager_fatal(`routeAndQueueAcceptedTransaction_olderTX`,'routeAndQueueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
         // TODO consider throwing this out.  right now it is just a warning
         if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_oldQueueInsertion', '', 'routeAndQueueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
       }
@@ -4430,7 +4431,7 @@ class StateManager extends EventEmitter {
             }
           // if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
           } catch (ex) {
-            this.fatalLogger.fatal('txQueueEntry: ' + utils.stringifyReduce(txQueueEntry))
+            this.statemanager_fatal(`txQueueEntry_ex`,'txQueueEntry: ' + utils.stringifyReduce(txQueueEntry))
           }
         }
 
@@ -4470,7 +4471,7 @@ class StateManager extends EventEmitter {
       this.tryStartAcceptedQueue()
     } catch (error) {
       if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)}`)
-      this.fatalLogger.fatal('routeAndQueueAcceptedTransaction failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+      this.statemanager_fatal(`routeAndQueueAcceptedTransaction_ex`,'routeAndQueueAcceptedTransaction failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
       throw new Error(error)
     } 
     return true
@@ -4494,7 +4495,7 @@ class StateManager extends EventEmitter {
   }
   async _firstTimeQueueAwait () {
     if (this.newAcceptedTxQueueRunning) {
-      this.fatalLogger.fatal('DATASYNC: newAcceptedTxQueueRunning')
+      this.statemanager_fatal(`queueAlreadyRunning`,'DATASYNC: newAcceptedTxQueueRunning')
       return
     }
 
@@ -4647,7 +4648,7 @@ class StateManager extends EventEmitter {
             node = homeNodeShardData.consensusNodeForOurNodeFull[randomIndex]
             if(maxTries < 0){
               //FAILED
-              this.fatalLogger.fatal(`queueEntryRequestMissingData: unable to find node to ask after 1000 tries tx:${utils.makeShortHash(queueEntry.acceptedTx.id)} key: ${utils.makeShortHash(key)} ${utils.stringifyReduce(homeNodeShardData.consensusNodeForOurNodeFull.map((x)=> (x!=null)? x.id : 'null'))}`)
+              this.statemanager_fatal(`queueEntryRequestMissingData`,`queueEntryRequestMissingData: unable to find node to ask after 1000 tries tx:${utils.makeShortHash(queueEntry.acceptedTx.id)} key: ${utils.makeShortHash(key)} ${utils.stringifyReduce(homeNodeShardData.consensusNodeForOurNodeFull.map((x)=> (x!=null)? x.id : 'null'))}`)
               break
             }
             if(node == null){
@@ -4985,7 +4986,7 @@ class StateManager extends EventEmitter {
             this.mainLogger.error(`shrd_repairToMatchReceipt while(node == null) look for other node txId. idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}`)
             //find alternate
             if(alternateIndex >= requestObject.alternates.length ){
-              this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt failed to find alternate node to ask for receipt. txId. ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}`)
+              this.statemanager_fatal(`repairToMatchReceipt_1`,`ASK FAIL repairToMatchReceipt failed to find alternate node to ask for receipt. txId. ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}`)
               attemptsRemaining = false
               return
             }
@@ -5632,7 +5633,7 @@ class StateManager extends EventEmitter {
           if (age > timeM * 0.9) {
             // IT turns out the correct thing to check is didSync flag only report errors if we did not wait on this TX while syncing
             if(txQueueEntry.didSync == false){
-              this.fatalLogger.fatal('processAcceptedTxQueue cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
+              this.statemanager_fatal(`processAcceptedTxQueue_oldTX.9`,'processAcceptedTxQueue cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
               if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld1', `${utils.makeShortHash(txQueueEntry.acceptedTx.id)}`, 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
               //txQueueEntry.waitForReceiptOnly = true              
             }
@@ -5814,7 +5815,7 @@ class StateManager extends EventEmitter {
               //}
              } catch (ex) {
               this.mainLogger.debug('processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-              this.fatalLogger.fatal('processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+              this.statemanager_fatal(`processAcceptedTxQueue2_ex`,'processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
             } finally {
               queueEntry.state = 'awaiting data'
             }
@@ -5858,7 +5859,7 @@ class StateManager extends EventEmitter {
 
             } catch (ex) {
               this.mainLogger.debug('processAcceptedTxQueue2 queueEntryRequestMissingData:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-              this.fatalLogger.fatal('processAcceptedTxQueue2 queueEntryRequestMissingData:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+              this.statemanager_fatal(`processAcceptedTxQueue2_missingData`,'processAcceptedTxQueue2 queueEntryRequestMissingData:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
             }
           } else if (queueEntry.hasAll) {
             if (accountSeen(queueEntry) === false) {
@@ -5937,7 +5938,7 @@ class StateManager extends EventEmitter {
                 }
               } catch (ex) {
                 this.mainLogger.debug('processAcceptedTxQueue2 preApplyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-                this.fatalLogger.fatal('processAcceptedTxQueue2 preApplyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+                this.statemanager_fatal(`processAcceptedTxQueue2b_ex`,'processAcceptedTxQueue2 preApplyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
               } finally {
     
                 if (this.verboseLogs) if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_preapplyFinish', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
@@ -6107,7 +6108,7 @@ class StateManager extends EventEmitter {
 
             } catch (ex) {
               this.mainLogger.debug('processAcceptedTxQueue2 commiting Transaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-              this.fatalLogger.fatal('processAcceptedTxQueue2 commiting Transaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+              this.statemanager_fatal(`processAcceptedTxQueue2b_ex`,'processAcceptedTxQueue2 commiting Transaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
             } finally {
               clearAccountsSeen(queueEntry)
               this.removeFromQueue(queueEntry, currentIndex)
@@ -7197,7 +7198,7 @@ class StateManager extends EventEmitter {
       thisFifo.queueLocked = false
     } else if (id !== -1) {
       // this should never happen as long as we are careful to use try/finally blocks
-      this.fatalLogger.fatal(`Failed to unlock the fifo ${thisFifo.fifoName}: ${id}`)
+      this.statemanager_fatal(`fifoUnlock`,`Failed to unlock the fifo ${thisFifo.fifoName}: ${id}`)
     }
   }
 
@@ -7215,7 +7216,7 @@ class StateManager extends EventEmitter {
 
   _registerListener (emitter:any, event:string, callback:any) {
     if (this._listeners[event]) {
-      this.mainLogger.fatal('State Manager can only register one listener per event!')
+      this.statemanager_fatal(`_registerListener_dupes`,'State Manager can only register one listener per event!')
       return
     }
     emitter.on(event, callback)
@@ -7983,7 +7984,7 @@ class StateManager extends EventEmitter {
               if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs' + utils.stringifyReduce(tx))
               if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs`)
 
-              this.fatalLogger.fatal(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs' + utils.stringifyReduce(tx))
+              this.statemanager_fatal(`testAccountTime_failed`, this.dataPhaseTag + ' testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs' + utils.stringifyReduce(tx))
 
               // return
               this.p2p.initApoptosis() // todo turn this back on
@@ -8004,7 +8005,7 @@ class StateManager extends EventEmitter {
           }
         } catch (ex) {
           this.mainLogger.debug('_repair: startRepairProcess mergeAndApplyTXRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-          this.fatalLogger.fatal('_repair: startRepairProcess mergeAndApplyTXRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+          this.statemanager_fatal(`mergeAndApplyTXRepairs_ex`,'_repair: startRepairProcess mergeAndApplyTXRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         }
 
         if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
@@ -8158,11 +8159,11 @@ class StateManager extends EventEmitter {
 
       if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair updateTrackingAndPrepareRepairs finished`)
       if (paritionsServiced === 0) {
-        this.fatalLogger.fatal(`_updateTrackingAndPrepareRepairs failed. not partitions serviced: ${debugKey} our consensus:${utils.stringifyReduce(lastCycleShardValues?.ourConsensusPartitions)} `)
+        this.statemanager_fatal(`_updateTrackingAndPrepareRepairs_fail`,`_updateTrackingAndPrepareRepairs failed. not partitions serviced: ${debugKey} our consensus:${utils.stringifyReduce(lastCycleShardValues?.ourConsensusPartitions)} `)
       }
     } catch (ex) {
       this.mainLogger.debug('__updateTrackingAndPrepareRepairs: exception ' + ` ${debugKey} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      this.fatalLogger.fatal('__updateTrackingAndPrepareRepairs: exception ' + ` ${debugKey} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.statemanager_fatal(`_updateTrackingAndPrepareRepairs_ex`,'__updateTrackingAndPrepareRepairs: exception ' + ` ${debugKey} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
     }
   }
 
@@ -8308,7 +8309,7 @@ class StateManager extends EventEmitter {
           if (!success) {
             if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs' + utils.stringifyReduce(tx))
             if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs`)
-            this.fatalLogger.fatal(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis. applyAllPreparedRepairs' + utils.stringifyReduce(tx))
+            this.statemanager_fatal(`applyAllPreparedRepairs_fail`,this.dataPhaseTag + ' testAccountTime failed. calling apoptosis. applyAllPreparedRepairs' + utils.stringifyReduce(tx))
 
             // return
             this.p2p.initApoptosis() // todo turn this back on
@@ -8376,7 +8377,7 @@ class StateManager extends EventEmitter {
         }
       } catch (ex) {
         this.mainLogger.debug('_repair: startRepairProcess applyAllPreparedRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-        this.fatalLogger.fatal('_repair: startRepairProcess applyAllPreparedRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        this.statemanager_fatal(`applyAllPreparedRepairs_fail`,'_repair: startRepairProcess applyAllPreparedRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       }
 
       if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
@@ -8427,7 +8428,7 @@ class StateManager extends EventEmitter {
       seen[accountID] = true
       let ourLockID = ourLocks[i]
       if(ourLockID == -1){
-        this.fatalLogger.fatal(`bulkFifoUnlockAccounts hit placeholder i:${i} ${utils.stringifyReduce({accountIDs, ourLocks})} ` )
+        this.statemanager_fatal(`bulkFifoUnlockAccounts_fail`,`bulkFifoUnlockAccounts hit placeholder i:${i} ${utils.stringifyReduce({accountIDs, ourLocks})} ` )
       }
 
       this.fifoUnlock(accountID, ourLockID)
@@ -8567,7 +8568,7 @@ class StateManager extends EventEmitter {
       await this.storage.clearAccountReplacmentCopies(accountIDs, cycleNumber)
     } catch (ex) {
       this.mainLogger.debug('_repair: _revertAccounts mergeAndApplyTXRepairs ' + ` ${utils.stringifyReduce({ cycleNumber, cycleEnd, cycleStart, accountIDs })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      this.fatalLogger.fatal('_repair: _revertAccounts mergeAndApplyTXRepairs ' + ` ${utils.stringifyReduce({ cycleNumber, cycleEnd, cycleStart, accountIDs })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      this.statemanager_fatal(`_revertAccounts_ex`,'_repair: _revertAccounts mergeAndApplyTXRepairs ' + ` ${utils.stringifyReduce({ cycleNumber, cycleEnd, cycleStart, accountIDs })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
     }
 
     return replacmentAccounts // this is for debugging reference
@@ -10740,7 +10741,7 @@ class StateManager extends EventEmitter {
       if (this.sendArchiveData === true) {
         let paritionObject = this.getPartitionObject(cycleNumber, partitionId) // todo get object
         if(paritionObject == null){
-          this.fatalLogger.fatal(` trySendAndPurgeReceiptsToArchives paritionObject == null ${cycleNumber} ${partitionId}`)
+          this.statemanager_fatal(`trySendAndPurgeReceiptsToArchives`,` trySendAndPurgeReceiptsToArchives paritionObject == null ${cycleNumber} ${partitionId}`)
           throw new Error(`trySendAndPurgeReceiptsToArchives paritionObject == null`)
         }
         this.sendPartitionData(partitionReceipt, paritionObject)
@@ -11046,6 +11047,12 @@ class StateManager extends EventEmitter {
       filteredNodes.push(node)
     }
     return filteredNodes
+  }
+
+  statemanager_fatal(key, log){
+
+    nestedCountersInstance.countEvent('fatal-log', key)
+    this.fatalLogger.fatal(log)
   }
 
 }

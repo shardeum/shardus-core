@@ -129,7 +129,9 @@ class Profiler {
           duty = (BigInt(100) * section.total) / totalSection.total
         }
         let totalMs = section.total / divider
-        let line = `${section.name} ${duty}% \t total ${totalMs} \t\t c:${section.c}`
+        let dutyStr = `${duty}`.padStart(4)
+        let totalStr = `${totalMs}`.padStart(13)
+        let line = `${dutyStr}% ${section.name.padEnd(30)}, ${totalStr}ms, #:${section.c}`
         //section.total = BigInt(0)
 
         lines.push({line, totalMs})
