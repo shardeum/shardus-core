@@ -4276,7 +4276,8 @@ class StateManager extends EventEmitter {
       ourNodeInTransactionGroup:false,
       ourNodeInConsensusGroup:false,
       logID:'',
-      txGroupDebug:''
+      txGroupDebug:'',
+      uniqueWritableKeys: []
      } // age comes from timestamp
 
     // todo faster hash lookup for this maybe?
@@ -4370,7 +4371,7 @@ class StateManager extends EventEmitter {
             if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - set`)
 
           }            
-        }
+        } 
       }
       //let transactionGroup = this.queueEntryGetTransactionGroup(txQueueEntry)
       // if we are syncing this area mark it as good.
@@ -4385,6 +4386,19 @@ class StateManager extends EventEmitter {
           txQueueEntry.localKeys[key] = true // used for the filter
 
           if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, `${txQueueEntry.logID} qId: ${txQueueEntry.entryID}`)
+        }
+      }
+
+      for (let key of txQueueEntry.uniqueKeys) {
+        let isGlobalAcc = this.isGlobalAccount(key)
+
+        // if it is a global modification and global account we can write
+        if(globalModification === true && isGlobalAcc === true){
+          txQueueEntry.uniqueWritableKeys.push(key)
+        }
+        // if it is a normal transaction and non global account we can write
+        if(globalModification === false && isGlobalAcc === false){
+          txQueueEntry.uniqueWritableKeys.push(key)
         }
       }
 
@@ -5553,11 +5567,12 @@ class StateManager extends EventEmitter {
         return false
       }
       let markAccountsSeen = function (queueEntry: QueueEntry) {
-        if(queueEntry.uniqueKeys == null){
+        if(queueEntry.uniqueWritableKeys == null){
           //TSConversion double check if this needs extra logging
           return
         }
-        for (let key of queueEntry.uniqueKeys) {
+        // only mark writeable keys as seen but we will check/clear against all keys
+        for (let key of queueEntry.uniqueWritableKeys) {
           if (seenAccounts[key] == null) {
             seenAccounts[key] = queueEntry
           }
@@ -8925,6 +8940,9 @@ class StateManager extends EventEmitter {
   startShardCalculations () {
     //this.p2p.state.on('cycle_q1_start', async (lastCycle, time) => {
     this._registerListener(this.p2p.state, 'cycle_q1_start', async (lastCycle: Shardus.Cycle, time:number) => {
+      try {
+      this.profiler.profileSectionStart('stateManager_cycle_q1_start')
+
       this.emit('set_queue_partition_gossip')  
       lastCycle = this.p2p.state.getLastCycle()
       if (lastCycle) {
@@ -8949,9 +8967,17 @@ class StateManager extends EventEmitter {
           this.processPreviousCycleSummaries()
         }
       }
+
+      } finally{
+        this.profiler.profileSectionEnd('stateManager_cycle_q1_start')
+      }
+
     })
 
     this._registerListener(this.p2p.state, 'cycle_q3_start', async (lastCycle: Shardus.Cycle, time:number) => {
+
+      try {
+      this.profiler.profileSectionStart('stateManager_cycle_q3_start')
       // moved coverage calculation changes earlier to q1
       // if (this.currentCycleShardData && this.currentCycleShardData.ourNode.status === 'active') {
       //   this.calculateChangeInCoverage()
@@ -8982,6 +9008,9 @@ class StateManager extends EventEmitter {
         if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startSyncPartitions:cycle_q3_start-clean cycle: ${lastCycle.counter}`)
         // clean up cycle data that is more than 10 cycles old.
         this.periodicCycleDataCleanup(lastCycle.counter - 10)
+      }
+      } finally{
+        this.profiler.profileSectionEnd('stateManager_cycle_q3_start')
       }
     })
   }

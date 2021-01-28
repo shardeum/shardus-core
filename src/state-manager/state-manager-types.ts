@@ -40,6 +40,7 @@ type QueueEntry = {
     m2TimeoutReached:boolean; // A flag to track if we have executed the M2 timeout yet.
     waitForReceiptOnly:boolean; // This means dont try to produce a receipt
     uniqueKeys?: string[];
+    uniqueWritableKeys?: string[];
     ourNodeInTransactionGroup: boolean;
     ourNodeInConsensusGroup: boolean;
     transactionGroup?: import("../shardus/shardus-types").Node[];
