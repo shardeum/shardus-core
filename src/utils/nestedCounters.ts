@@ -50,7 +50,13 @@ class NestedCounters {
 
       //res.json(utils.stringifyReduce(this.eventCounters))
     })
+    Context.network.registerExternalGet('counts-reset', (req, res) => {
 
+      this.eventCounters = new Map()
+      res.write(`counts reset ${Date.now()}`)
+      res.end()
+
+  })
 
     Context.network.registerExternalGet('debug-inf-loop', (req, res) => {
         res.write('starting inf loop, goodbye')

@@ -519,10 +519,12 @@ class Shardus extends EventEmitter {
     )
     this.loadDetection.on('highLoad', async () => {
       console.log(`High load detected Cycle ${currentCycle}, Quarter: ${currentQuarter}`)
+      nestedCountersInstance.countEvent('loadRelated','highLoad')
       await AutoScaling.requestNetworkUpsize()
     })
     this.loadDetection.on('lowLoad', async () => {
       console.log(`Low load detected Cycle ${currentCycle}, Quarter: ${currentQuarter}`)
+      nestedCountersInstance.countEvent('loadRelated','lowLoad')
       await AutoScaling.requestNetworkDownsize()
     })
 
@@ -920,6 +922,7 @@ class Shardus extends EventEmitter {
 
     if (this.rateLimiting.isOverloaded()) {
       this.statistics.incrementCounter('txRejected')
+      nestedCountersInstance.countEvent('loadRelated','txRejected')
       return { success: false, reason: 'Maximum load exceeded.' }
     }
 

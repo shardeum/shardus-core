@@ -1,5 +1,7 @@
 import Statistics from '../statistics'
 import { EventEmitter } from 'events'
+import { nestedCountersInstance } from '../utils/nestedCounters'
+import { profilerInstance } from "../utils/profiler"
 
 interface LoadDetection {
   highThreshold: number
@@ -35,6 +37,23 @@ class LoadDetection extends EventEmitter {
     const scaledQueueLength =
       queueLength >= this.queueLimit ? 1 : queueLength / this.queueLimit
 
+    // looking at these counters individually so we can have more detail about load
+    if (scaledTxTimeInQueue > this.highThreshold){
+      nestedCountersInstance.countEvent('loadRelated',`highLoad-scaledTxTimeInQueue ${this.highThreshold}`)      
+    }
+    if (scaledQueueLength > this.highThreshold){
+      nestedCountersInstance.countEvent('loadRelated',`highLoad-scaledQueueLength ${this.highThreshold}`)      
+    }
+    if(profilerInstance != null){
+      let dutyCycleLoad = profilerInstance.getTotalBusyInternal()
+      if (dutyCycleLoad > 0.4){
+        nestedCountersInstance.countEvent('loadRelated','highLoad-dutyCycle 0.4')      
+      }      
+      if (dutyCycleLoad > this.highThreshold){
+        nestedCountersInstance.countEvent('loadRelated',`highLoad-dutyCycle ${this.highThreshold}`)      
+      }   
+    }
+    
     const load = Math.max(scaledTxTimeInQueue, scaledQueueLength)
     if (load > this.highThreshold) this.emit('highLoad')
     if (load < this.lowThreshold) this.emit('lowLoad')

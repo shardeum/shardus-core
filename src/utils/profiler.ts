@@ -24,6 +24,7 @@ class Profiler {
     profilerInstance = this
 
     this.profileSectionStart('_total', true)
+    this.profileSectionStart('_internal_total', true)
   }
 
   registerEndpoints (){
@@ -51,7 +52,6 @@ class Profiler {
       this.sectionTimes[sectionName] = section
     }
 
-
     section.start = process.hrtime.bigint()
     section.started = true
     section.c++
@@ -62,6 +62,7 @@ class Profiler {
       this.stackHeight++
       if(this.stackHeight === 1){
         this.profileSectionStart('_totalBusy', true)
+        this.profileSectionStart('_internal_totalBusy', true)
       }      
     }
   }
@@ -85,6 +86,7 @@ class Profiler {
       this.stackHeight--
       if(this.stackHeight === 0){
         this.profileSectionEnd('_totalBusy', true)
+        this.profileSectionEnd('_internal_totalBusy', true)
       }  
     }
   }
@@ -92,6 +94,21 @@ class Profiler {
   cleanInt(x) {
     x = Number(x)
     return x >= 0 ? Math.floor(x) : Math.ceil(x)
+  }
+
+  getTotalBusyInternal() : Number {
+    this.profileSectionEnd('_internal_total', true)
+    let internalTotalBusy = this.sectionTimes['_internal_totalBusy']
+    let internalTotal = this.sectionTimes['_internal_total']
+    let duty = BigInt(0)
+    if(internalTotalBusy != null && internalTotal != null ) {
+      if(internalTotal.total > BigInt(0)){
+        duty = (BigInt(100) * internalTotalBusy.total) / internalTotal.total
+      }
+    }
+    this.profileSectionStart('_internal_total', true)
+
+    return Number(duty) * 0.01
   }
 
 
