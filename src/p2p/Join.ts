@@ -165,9 +165,9 @@ function calculateToAccept() {
 
   let needed = 0
 
-  // Always set needed to (desired - active) if its positive
-  if (desired > active) {
-    needed = desired - active
+  // Always set needed to (desired - (active + syncing)) if its positive
+  if (desired > active + syncing) {
+    needed = desired - (active + syncing)
   }
 
   // If rotation is on, add expired to needed
