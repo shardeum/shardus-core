@@ -97,6 +97,8 @@ class Profiler {
   }
 
   getTotalBusyInternal() : Number {
+    nestedCountersInstance.countEvent('profiler-note', 'getTotalBusyInternal')
+
     this.profileSectionEnd('_internal_total', true)
     let internalTotalBusy = this.sectionTimes['_internal_totalBusy']
     let internalTotal = this.sectionTimes['_internal_total']
@@ -108,12 +110,21 @@ class Profiler {
     }
     this.profileSectionStart('_internal_total', true)
 
+    //clear these timers
+    internalTotal.total = BigInt(0)
+    internalTotalBusy.total = BigInt(0)
+
     return Number(duty) * 0.01
   }
 
 
   clearTimes(){
     for (let key in this.sectionTimes) {
+      if(key === '_internal_total' || key === '_internal_totalBusy')
+      {
+        continue
+      }
+
       if (this.sectionTimes.hasOwnProperty(key)) {
         let section = this.sectionTimes[key]
         section.total = BigInt(0)
@@ -135,6 +146,11 @@ class Profiler {
 
     let lines = []
     for (let key in this.sectionTimes) {
+      if(key === '_internal_total' || key === '_internal_totalBusy')
+      {
+        continue
+      }
+
       if (this.sectionTimes.hasOwnProperty(key)) {
         let section = this.sectionTimes[key]
         
