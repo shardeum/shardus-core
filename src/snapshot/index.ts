@@ -620,7 +620,7 @@ async function goActiveIfDataComplete() {
     // store account data to new database
     storeDataToNewDB(dataToMigrate)
     // Start state-manager (skip syncing)
-    Context.stateManager.skipSync()
+    Context.stateManager.stateManagerSync.skipSync()
     // Go active
     Active.requestActive()
     await Context.stateManager.startSyncPartitions()

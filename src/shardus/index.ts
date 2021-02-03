@@ -810,7 +810,8 @@ class Shardus extends EventEmitter {
       }
       return
     }
-    if (this.stateManager) await this.stateManager.syncStateData(3)
+    if (this.stateManager) await this.stateManager.stateManagerSync.syncStateData(3)
+    // if (this.stateManager) await this.stateManager.stateManagerSync.syncStateDataFast(3) // fast mode
     console.log('syncAppData')
     if (this.p2p.isFirstSeed) {
       await this.p2p.goActive()
@@ -883,13 +884,15 @@ class Shardus extends EventEmitter {
     if (this.verboseLogs)
       this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(tx)} set:${set} global:${global}`) // not reducing tx here so we can get the long hashes
 
-    if (!this.stateManager.dataSyncMainPhaseComplete) {
+    if (!this.stateManager.stateManagerSync.dataSyncMainPhaseComplete) {
       this.statistics.incrementCounter('txRejected')
+      nestedCountersInstance.countEvent('rejected','!dataSyncMainPhaseComplete')
       return { success: false, reason: 'Node is still syncing.' }
     }
 
     if (!this.stateManager.hasCycleShardData()) {
       this.statistics.incrementCounter('txRejected')
+      nestedCountersInstance.countEvent('rejected','!hasCycleShardData')
       return {
         success: false,
         reason: 'Not ready to accept transactions, shard calculations pending',
@@ -904,6 +907,7 @@ class Shardus extends EventEmitter {
           if (this.verboseLogs) this.mainLogger.debug(`txRejected ${JSON.stringify(tx)} set:${set} global:${global}`)
 
           this.statistics.incrementCounter('txRejected')
+          nestedCountersInstance.countEvent('rejected','!allowTransactions')
           return {
             success: false,
             reason: 'Network conditions to allow transactions are not met.',
@@ -913,6 +917,7 @@ class Shardus extends EventEmitter {
     } else {
       if (!this.p2p.allowSet()) {
         this.statistics.incrementCounter('txRejected')
+        nestedCountersInstance.countEvent('rejected','!allowTransactions2')
         return {
           success: false,
           reason: 'Network conditions to allow app init via set',
@@ -923,11 +928,13 @@ class Shardus extends EventEmitter {
     if (this.rateLimiting.isOverloaded()) {
       this.statistics.incrementCounter('txRejected')
       nestedCountersInstance.countEvent('loadRelated','txRejected')
+      nestedCountersInstance.countEvent('rejected','isOverloaded')
       return { success: false, reason: 'Maximum load exceeded.' }
     }
 
     if (typeof tx !== 'object') {
       this.statistics.incrementCounter('txRejected')
+      nestedCountersInstance.countEvent('rejected','tx !== object')
       return {
         success: false,
         reason: `Invalid Transaction! ${utils.stringifyReduce(tx)}`,
@@ -959,6 +966,7 @@ class Shardus extends EventEmitter {
           `Transaction Expired: ${utils.stringifyReduce(tx)}`
         )
         this.statistics.incrementCounter('txRejected')
+        nestedCountersInstance.countEvent('rejected','_isTransactionTimestampExpired')
         return { success: false, reason: 'Transaction Expired' }
       }
 
