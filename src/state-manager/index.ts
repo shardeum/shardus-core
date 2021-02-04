@@ -5029,6 +5029,18 @@ class StateManager extends EventEmitter {
     return true
   }
 
+
+/***
+ *     ######   #######  ########  ######## 
+ *    ##    ## ##     ## ##     ## ##       
+ *    ##       ##     ## ##     ## ##       
+ *    ##       ##     ## ########  ######   
+ *    ##       ##     ## ##   ##   ##       
+ *    ##    ## ##     ## ##    ##  ##       
+ *     ######   #######  ##     ## ######## 
+ */
+
+
   /**
    * dumpAccountDebugData this is what creats the shardreports
    */
@@ -5630,6 +5642,51 @@ class StateManager extends EventEmitter {
     }
   }
 
+  /**
+   * bulkFifoLockAccounts
+   * @param {string[]} accountIDs
+   */
+  async bulkFifoLockAccounts(accountIDs: string[]) {
+    // lock all the accounts we will modify
+    let wrapperLockId = await this.fifoLock('atomicWrapper')
+    let ourLocks = []
+    let seen: StringBoolObjectMap = {}
+    for (let accountKey of accountIDs) {
+      if (seen[accountKey] === true) {
+        ourLocks.push(-1) //lock skipped, so add a placeholder
+        continue
+      }
+      seen[accountKey] = true
+      let ourLockID = await this.fifoLock(accountKey)
+      ourLocks.push(ourLockID)
+    }
+    this.fifoUnlock('atomicWrapper', wrapperLockId)
+    return ourLocks
+  }
+
+  /**
+   * bulkFifoUnlockAccounts
+   * @param {string[]} accountIDs
+   * @param {number[]} ourLocks
+   */
+  bulkFifoUnlockAccounts(accountIDs: string[], ourLocks: number[]) {
+    let seen: StringBoolObjectMap = {}
+    // unlock the accounts we locked
+    for (let i = 0; i < ourLocks.length; i++) {
+      let accountID = accountIDs[i]
+      if (seen[accountID] === true) {
+        continue
+      }
+      seen[accountID] = true
+      let ourLockID = ourLocks[i]
+      if (ourLockID == -1) {
+        this.statemanager_fatal(`bulkFifoUnlockAccounts_fail`, `bulkFifoUnlockAccounts hit placeholder i:${i} ${utils.stringifyReduce({ accountIDs, ourLocks })} `)
+      }
+
+      this.fifoUnlock(accountID, ourLockID)
+    }
+  }
+
   async _clearState() {
     await this.storage.clearAppRelatedState()
   }
@@ -5679,6 +5736,17 @@ class StateManager extends EventEmitter {
   //  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   //  //////////////////////////////////////////////////          Data Repair                    ///////////////////////////////////////////////////////////
   //  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+/***
+ *    ########     ###    ########  ######## #### ######## ####  #######  ##    ## ########  ######## ########   #######  ########  ########  ######  
+ *    ##     ##   ## ##   ##     ##    ##     ##     ##     ##  ##     ## ###   ## ##     ## ##       ##     ## ##     ## ##     ##    ##    ##    ## 
+ *    ##     ##  ##   ##  ##     ##    ##     ##     ##     ##  ##     ## ####  ## ##     ## ##       ##     ## ##     ## ##     ##    ##    ##       
+ *    ########  ##     ## ########     ##     ##     ##     ##  ##     ## ## ## ## ########  ######   ########  ##     ## ########     ##     ######  
+ *    ##        ######### ##   ##      ##     ##     ##     ##  ##     ## ##  #### ##   ##   ##       ##        ##     ## ##   ##      ##          ## 
+ *    ##        ##     ## ##    ##     ##     ##     ##     ##  ##     ## ##   ### ##    ##  ##       ##        ##     ## ##    ##     ##    ##    ## 
+ *    ##        ##     ## ##     ##    ##    ####    ##    ####  #######  ##    ## ##     ## ######## ##         #######  ##     ##    ##     ######  
+ */
 
   /**
    * getPartitionReport used by reporting (monitor server) to query if there is a partition report ready
@@ -6799,50 +6867,7 @@ class StateManager extends EventEmitter {
     this.applyAllPreparedRepairsRunning = false
   }
 
-  /**
-   * bulkFifoLockAccounts
-   * @param {string[]} accountIDs
-   */
-  async bulkFifoLockAccounts(accountIDs: string[]) {
-    // lock all the accounts we will modify
-    let wrapperLockId = await this.fifoLock('atomicWrapper')
-    let ourLocks = []
-    let seen: StringBoolObjectMap = {}
-    for (let accountKey of accountIDs) {
-      if (seen[accountKey] === true) {
-        ourLocks.push(-1) //lock skipped, so add a placeholder
-        continue
-      }
-      seen[accountKey] = true
-      let ourLockID = await this.fifoLock(accountKey)
-      ourLocks.push(ourLockID)
-    }
-    this.fifoUnlock('atomicWrapper', wrapperLockId)
-    return ourLocks
-  }
 
-  /**
-   * bulkFifoUnlockAccounts
-   * @param {string[]} accountIDs
-   * @param {number[]} ourLocks
-   */
-  bulkFifoUnlockAccounts(accountIDs: string[], ourLocks: number[]) {
-    let seen: StringBoolObjectMap = {}
-    // unlock the accounts we locked
-    for (let i = 0; i < ourLocks.length; i++) {
-      let accountID = accountIDs[i]
-      if (seen[accountID] === true) {
-        continue
-      }
-      seen[accountID] = true
-      let ourLockID = ourLocks[i]
-      if (ourLockID == -1) {
-        this.statemanager_fatal(`bulkFifoUnlockAccounts_fail`, `bulkFifoUnlockAccounts hit placeholder i:${i} ${utils.stringifyReduce({ accountIDs, ourLocks })} `)
-      }
-
-      this.fifoUnlock(accountID, ourLockID)
-    }
-  }
 
   // this.globalAccountRepairBank = {
 
@@ -9333,6 +9358,17 @@ class StateManager extends EventEmitter {
 
     return results
   }
+
+/***
+ *     ######   #######  ########  ########             
+ *    ##    ## ##     ## ##     ## ##                   
+ *    ##       ##     ## ##     ## ##                   
+ *    ##       ##     ## ########  ######               
+ *    ##       ##     ## ##   ##   ##                   
+ *    ##    ## ##     ## ##    ##  ##       ### ### ### 
+ *     ######   #######  ##     ## ######## ### ### ### 
+ */
+
 
   /**
    * getCycleNumberFromTimestamp
