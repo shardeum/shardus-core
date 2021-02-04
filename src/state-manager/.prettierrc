@@ -1,0 +1,14 @@
+# .prettierrc or .prettierrc.yaml
+proseWrap: "never"
+printWidth: 200
+semi: false
+singleQuote: true
+
+# statemanager/index.ts has a bunch of long log lines.  these make the code look much less readable
+# when they are spread from one line to 5+ vertical lines.  only way to get around this for now is with
+# printd witdth but maybe I can find some other solution.
+overrides:
+  - files: "index.ts"
+    options:
+        printWidth: 600
+
