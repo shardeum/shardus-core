@@ -164,16 +164,14 @@ async function joinNetwork(activeNodes: Types.Node[], firstTime: boolean) {
   const { startQ1 } = calcIncomingTimes(latestCycle)
   info(`Next cycles Q1 start ${startQ1}; Currently ${Date.now()}`)
 
-  // Submit join request to active nodes during Q1
-  const untilQ1 = startQ1 - Date.now()
-  if (untilQ1 > 0) {
-    info(
-      `Waiting ${untilQ1 + 500} ms until ${
-        startQ1 + 500
-      } for Q1 before sending join...`
-    )
-    await utils.sleep(untilQ1 + 500) // Not too early
+  // Wait until a Q1 then send join request to active nodes
+  let untilQ1 = startQ1 - Date.now()
+  while (untilQ1 < 0) {
+    untilQ1 += latestCycle.duration * 1000
   }
+
+  info(`Waiting ${untilQ1 + 500} ms for Q1 before sending join...`)
+  await utils.sleep(untilQ1 + 500) // Not too early
 
   await Join.submitJoin(activeNodes, request)
 
@@ -252,19 +250,26 @@ async function contactArchiver() {
 }
 
 async function discoverNetwork(seedNodes) {
+  /**
+   * [AS] [TODO] [2020-02-05]
+   * We don't need this code anymore since we check time sync
+   * at the start of the Shardus.start.
+   *
+   * NOTE: Remove Self.checkTimeSynced too
+   */
   // Check if our time is synced to network time server
-  try {
-    // [TODO] - sometimes this fails due to the timeServers being off
-    //          try another backup method like Omar's timediff script
-    const timeSynced = await checkTimeSynced(Context.config.p2p.timeServers)
-    if (!timeSynced) {
-      warn(
-        'Local time out of sync with time server. Use NTP to keep system time in sync.'
-      )
-    }
-  } catch (e) {
-    warn(e.message)
-  }
+  // try {
+  //   // [TODO] - sometimes this fails due to the timeServers being off
+  //   //          try another backup method like Omar's timediff script
+  //   const timeSynced = await checkTimeSynced(Context.config.p2p.timeServers)
+  //   if (!timeSynced) {
+  //     warn(
+  //       'Local time out of sync with time server. Use NTP to keep system time in sync.'
+  //     )
+  //   }
+  // } catch (e) {
+  //   warn(e.message)
+  // }
 
   // Check if we are first seed node
   const isFirstSeed = checkIfFirstSeedNode(seedNodes)
@@ -289,26 +294,26 @@ async function calculateTimeDifference() {
   return timeDiff
 }
 
-export async function checkTimeSynced(timeServers) {
-  for (const host of timeServers) {
-    try {
-      const time = await Sntp.time({
-        host,
-        timeout: 10000,
-      })
-      return time.t <= Context.config.p2p.syncLimit
-    } catch (e) {
-      warn(`Couldn't fetch ntp time from server at ${host}`)
-    }
-  }
-  try {
-    const localTimeDiff = await calculateTimeDifference()
-    return localTimeDiff <= Context.config.p2p.syncLimit * 1000
-  } catch (e) {
-    warn('local time is out of sync with google time server')
-  }
-  throw Error('Unable to check local time against time servers.')
-}
+// export async function checkTimeSynced(timeServers) {
+//   for (const host of timeServers) {
+//     try {
+//       const time = await Sntp.time({
+//         host,
+//         timeout: 10000,
+//       })
+//       return time.t <= Context.config.p2p.syncLimit
+//     } catch (e) {
+//       warn(`Couldn't fetch ntp time from server at ${host}`)
+//     }
+//   }
+//   try {
+//     const localTimeDiff = await calculateTimeDifference()
+//     return localTimeDiff <= Context.config.p2p.syncLimit * 1000
+//   } catch (e) {
+//     warn('local time is out of sync with google time server')
+//   }
+//   throw Error('Unable to check local time against time servers.')
+// }
 
 function checkIfFirstSeedNode(seedNodes) {
   if (!seedNodes.length) throw new Error('Fatal: No seed nodes in seed list!')

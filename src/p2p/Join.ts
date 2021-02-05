@@ -334,6 +334,9 @@ export function addJoinRequest(joinRequest: JoinRequest) {
     return false
   }
 
+  // Compute how many join request to accept
+  const toAccept = calculateToAccept()
+
   // Check if we are better than the lowest selectionNum
   const last = requests.length > 0 ? requests[requests.length - 1] : undefined
   /*
@@ -351,7 +354,11 @@ export function addJoinRequest(joinRequest: JoinRequest) {
     cycleNumber: CycleChain.newest.counter,
     address: node.publicKey,
   })
-  if (last && !crypto.isGreaterHash(selectionNum, last.selectionNum)) {
+  if (
+    last &&
+    requests.length >= toAccept &&
+    !crypto.isGreaterHash(selectionNum, last.selectionNum)
+  ) {
     info('Join request not better than lowest, not added.')
     return false
   }
@@ -380,7 +387,6 @@ export function addJoinRequest(joinRequest: JoinRequest) {
   )
 
   // If we have > maxJoinedPerCycle requests, trim them down
-  const toAccept = calculateToAccept()
   info(`Requests: ${requests.length}, toAccept: ${toAccept}`)
   if (requests.length > toAccept) {
     const over = requests.length - toAccept
