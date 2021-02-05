@@ -56,7 +56,8 @@ interface DataResponse {
   publicKey: string
   responses: {
     [T in TypeNames]?: NamesToTypes[T][]
-  }
+  },
+  recipient: string
 }
 
 interface DataRecipient {
@@ -372,6 +373,7 @@ export function sendData() {
     const dataResponse: DataResponse = {
       publicKey: crypto.getPublicKey(),
       responses,
+      recipient: publicKey
     }
 
     // Tag dataResponse

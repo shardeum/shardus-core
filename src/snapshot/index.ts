@@ -132,6 +132,8 @@ export function getStateHashes(
   start: Cycle['counter'] = 0,
   end?: Cycle['counter']
 ): StateHashes[] {
+  console.log(`getting state hashes from`, start)
+  console.log(`stateHashesByCycle`, stateHashesByCycle)
   const collector: StateHashes[] = []
   for (const [key] of stateHashesByCycle) {
     if (key >= start) {

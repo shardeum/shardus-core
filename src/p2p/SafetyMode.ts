@@ -37,9 +37,9 @@ const routes = {
   },
 }
 
-let cycleNumberForNetworkDataHash: number
-let cycleNumberForNetworkReceiptHash: number
-let cycleNumberForNetworkSummaryHash: number
+let cycleNumberForNetworkDataHash: number = 0
+let cycleNumberForNetworkReceiptHash: number = 0
+let cycleNumberForNetworkSummaryHash: number = 0
 
 /** FUNCTIONS */
 
@@ -109,7 +109,7 @@ export function updateRecord(
     }
   }
 
-  const stateHashes = Snapshot.getStateHashes(cycleNumberForNetworkDataHash ? cycleNumberForNetworkDataHash + 1 : record.counter - 1)
+  const stateHashes = Snapshot.getStateHashes(cycleNumberForNetworkDataHash)
   if (stateHashes && stateHashes.length > 0) {
     record.networkDataHash = stateHashes.map(stateHash => {
       return {
@@ -117,12 +117,14 @@ export function updateRecord(
         hash: stateHash.networkHash
       }
     })
-    cycleNumberForNetworkDataHash += 1
+    if (record.networkDataHash.length > 0) {
+      cycleNumberForNetworkDataHash = record.networkDataHash[record.networkDataHash.length - 1].cycle + 1
+    }
   } else {
     record.networkDataHash = []
   }
 
-  const receiptHashes = Snapshot.getReceiptHashes(cycleNumberForNetworkReceiptHash ? cycleNumberForNetworkReceiptHash + 1 : record.counter - 1)
+  const receiptHashes = Snapshot.getReceiptHashes(cycleNumberForNetworkReceiptHash)
   if (receiptHashes && receiptHashes.length > 0) {
     record.networkReceiptHash = receiptHashes.map(receiptHash => {
       return {
@@ -130,12 +132,14 @@ export function updateRecord(
         hash: receiptHash.networkReceiptHash
       }
     })
-    cycleNumberForNetworkReceiptHash += 1
+    if (record.networkReceiptHash.length > 0) {
+      cycleNumberForNetworkReceiptHash = record.networkReceiptHash[record.networkReceiptHash.length - 1].cycle + 1
+    }
   } else {
     record.networkReceiptHash = []
   }
 
-  const summaryHashes = Snapshot.getSummaryHashes(cycleNumberForNetworkSummaryHash ? cycleNumberForNetworkSummaryHash + 1 : record.counter - 1)
+  const summaryHashes = Snapshot.getSummaryHashes(cycleNumberForNetworkSummaryHash)
   if (summaryHashes && summaryHashes.length > 0) {
     record.networkSummaryHash = summaryHashes.map(stateHash => {
       return {
@@ -143,7 +147,9 @@ export function updateRecord(
         hash: stateHash.networkSummaryHash
       }
     })
-    cycleNumberForNetworkSummaryHash += 1
+    if (record.networkSummaryHash.length > 0) {
+      cycleNumberForNetworkSummaryHash = record.networkSummaryHash[record.networkSummaryHash.length - 1].cycle + 1
+    }
   } else {
     record.networkSummaryHash = []
   }
