@@ -36,11 +36,19 @@ import * as Context from '../p2p/Context'
 //let shardFunctions = import("./shardFunctions").
 //type foo = ShardFunctionTypes.BasicAddressRange
 
+import { response } from 'express'
+import { nestedCountersInstance } from '../utils/nestedCounters'
+
 import StateManagerStats from './state-manager-stats'
 import StateManagerCache from './state-manager-cache'
 import StateManagerSync from './state-manager-sync'
-import { response } from 'express'
-import { nestedCountersInstance } from '../utils/nestedCounters'
+import AccountGlobals from './AccountGlobals'
+import TransactionQueue from './TransactionQueue'
+import TransactionRepair from './TransactionRepair'
+import TransactionConsenus from './TransactionConsensus'
+import PartitionObjects from './PartitionObjects'
+
+
 
 /**
  * StateManager
@@ -63,7 +71,17 @@ class StateManager extends EventEmitter {
   config: Shardus.ShardusConfiguration
   profiler: Profiler
 
+  //Sub modules
+  stateManagerStats: StateManagerStats
+  stateManagerCache: StateManagerCache
   stateManagerSync: StateManagerSync
+  accountGlobals: AccountGlobals  
+  transactionQueue: TransactionQueue
+  transactionRepair: TransactionRepair
+  transactionConsenus: TransactionConsenus
+  partitionObjects: PartitionObjects
+
+
 
   newAcceptedTxQueue: QueueEntry[]
   newAcceptedTxQueueTempInjest: QueueEntry[]
@@ -107,12 +125,7 @@ class StateManager extends EventEmitter {
 
   globalAccountMap: Map<string, Shardus.WrappedDataFromQueue | null>
 
-  /** Need the ablity to get account copies and use them later when applying a transaction. how to use the right copy or even know when to use this at all? */
-  /** Could go by cycle number. if your cycle matches the one in is list use it? */
-  /** What if the global account is transformed several times durring that cycle. oof. */
-  /** ok best thing to do is to store the account every time it changes for a given period of time. */
-  /** how to handle reparing a global account... yikes that is hard. */
-  globalAccountRepairBank: Map<string, Shardus.AccountsCopy[]>
+
 
   appFinishedSyncing: boolean
 
@@ -127,16 +140,7 @@ class StateManager extends EventEmitter {
   syncSettleTime: number
   debugTXHistory: { [id: string]: string } // need to disable or clean this as it will leak memory
 
-  // summaryBlobByPartition: Map<number, SummaryBlob>;
-  // summaryPartitionCount: number;
-
-  // txSummaryBlobCollections: SummaryBlobCollection[];
-
   // extensiveRangeChecking: boolean; // non required range checks that can show additional errors (should not impact flow control)
-
-  stateManagerStats: StateManagerStats
-
-  stateManagerCache: StateManagerCache
 
   syncPartitionsStarted: boolean
 
@@ -166,6 +170,16 @@ class StateManager extends EventEmitter {
 
   logger: Logger
 
+
+/***
+ *     ######   #######  ##    ##  ######  ######## ########  ##     ##  ######  ########  #######  ########  
+ *    ##    ## ##     ## ###   ## ##    ##    ##    ##     ## ##     ## ##    ##    ##    ##     ## ##     ## 
+ *    ##       ##     ## ####  ## ##          ##    ##     ## ##     ## ##          ##    ##     ## ##     ## 
+ *    ##       ##     ## ## ## ##  ######     ##    ########  ##     ## ##          ##    ##     ## ########  
+ *    ##       ##     ## ##  ####       ##    ##    ##   ##   ##     ## ##          ##    ##     ## ##   ##   
+ *    ##    ## ##     ## ##   ### ##    ##    ##    ##    ##  ##     ## ##    ##    ##    ##     ## ##    ##  
+ *     ######   #######  ##    ##  ######     ##    ##     ##  #######   ######     ##     #######  ##     ## 
+ */
   constructor(verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     super()
     this.verboseLogs = verboseLogs
@@ -234,6 +248,123 @@ class StateManager extends EventEmitter {
     this.partitionReportDirty = false
     this.nextCycleReportToSend = null
 
+    this.configsInit()
+    
+    //INIT our various modules
+
+    this.stateManagerCache = new StateManagerCache(verboseLogs, profiler, app, logger, crypto, config)
+
+    this.stateManagerStats = new StateManagerStats(verboseLogs, profiler, app, logger, crypto, config, this.stateManagerCache)
+    this.stateManagerStats.summaryPartitionCount = 32
+    this.stateManagerStats.initSummaryBlobs()
+
+    this.stateManagerSync = new StateManagerSync(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
+
+    this.accountGlobals = new AccountGlobals(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
+    this.transactionQueue = new TransactionQueue(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
+    this.transactionRepair = new TransactionRepair(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
+    this.transactionConsenus = new TransactionConsenus(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
+    this.partitionObjects = new PartitionObjects(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
+
+
+
+    // feature controls.
+    this.oldFeature_TXHashsetTest = true
+    this.oldFeature_GeneratePartitionReport = false
+    this.oldFeature_BroadCastPartitionReport = true // leaving this true since it depends on the above value
+
+    this.feature_receiptMapResults = true
+    this.feature_partitionHashes = true
+    this.feature_generateStats = true
+
+    this.feature_useNewParitionReport = true
+
+    this.debugFeature_dumpAccountData = true
+    this.debugFeature_dumpAccountDataFromSQL = false
+    this.debugFeatureOld_partitionReciepts = true
+
+    this.stateIsGood_txHashsetOld = true
+    this.stateIsGood_activeRepairs = true
+    this.stateIsGood = true
+
+    // other debug features
+    if (this.config && this.config.debug) {
+      this.feature_useNewParitionReport = this.tryGetBoolProperty(this.config.debug, 'useNewParitionReport', this.feature_useNewParitionReport)
+
+      this.oldFeature_GeneratePartitionReport = this.tryGetBoolProperty(this.config.debug, 'oldPartitionSystem', this.oldFeature_GeneratePartitionReport)
+
+      this.debugFeature_dumpAccountDataFromSQL = this.tryGetBoolProperty(this.config.debug, 'dumpAccountReportFromSQL', this.debugFeature_dumpAccountDataFromSQL)
+    }
+
+    // the original way this was setup was to reset and apply repair results one partition at a time.
+    // this could create issue if we have a TX spanning multiple paritions that are locally owned.
+    this.resetAndApplyPerPartition = false
+    /** @type {RepairTracker[]} */
+    this.dataRepairStack = []
+    /** @type {number} */
+    this.dataRepairsCompleted = 0
+    /** @type {number} */
+    this.dataRepairsStarted = 0
+    this.repairAllStoredPartitions = true
+    this.repairStartedMap = new Map()
+    this.repairCompletedMap = new Map()
+    /** @type {Object.<string, PartitionReceipt[]>} a map of cycle keys to lists of partition receipts.  */
+    this.partitionReceiptsByCycleCounter = {}
+    /** @type {Object.<string, PartitionReceipt>} a map of cycle keys to lists of partition receipts.  */
+    this.ourPartitionReceiptsByCycleCounter = {}
+    this.doDataCleanup = true
+    this.sendArchiveData = false
+    this.purgeArchiveData = false
+    this.sentReceipts = new Map()
+
+
+    //Fifo locks.
+    this.fifoLocks = {}
+
+    // Init data sync structures!
+    this.partitionObjectsByCycle = {}
+    this.ourPartitionResultsByCycle = {}
+    this.repairTrackingByCycleById = {}
+    this.repairUpdateDataByCycle = {}
+    this.applyAllPreparedRepairsRunning = false
+    this.recentPartitionObjectsByCycleByHash = {}
+    this.tempTXRecords = []
+    this.txByCycleByPartition = {}
+    this.allPartitionResponsesByCycleByPartition = {}
+
+    this.globalAccountMap = new Map()
+
+    this.debugTXHistory = {}
+
+    // debug hack
+    if (p2p == null) {
+      return
+    }
+
+    this.mainLogger = logger.getLogger('main')
+    this.fatalLogger = logger.getLogger('fatal')
+    this.shardLogger = logger.getLogger('shardDump')
+
+    ShardFunctions2.logger = logger
+    ShardFunctions2.fatalLogger = this.fatalLogger
+    ShardFunctions2.mainLogger = this.mainLogger
+
+    this.clearPartitionData()
+
+    this.registerEndpoints()
+
+    this.stateManagerSync.isSyncingAcceptedTxs = true // default is true so we will start adding to our tx queue asap
+    this.verboseLogs = false
+    if (this.mainLogger && ['TRACE'].includes(this.mainLogger.level.levelStr)) {
+      this.verboseLogs = true
+    }
+
+    this.startShardCalculations()
+    
+    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('canDataRepair', `0`, `canDataRepair: ${this.canDataRepair}  `)
+  }
+
+  configsInit(){
     this.canDataRepair = false
     // this controls the repair portion of data repair.
     if (this.config && this.config.debug) {
@@ -291,168 +422,20 @@ class StateManager extends EventEmitter {
       }
     }
 
-    this.stateManagerCache = new StateManagerCache(verboseLogs, profiler, app, logger, crypto, config)
 
-    //Init Summary Blobs
-
-    this.stateManagerStats = new StateManagerStats(verboseLogs, profiler, app, logger, crypto, config, this.stateManagerCache)
-    this.stateManagerStats.summaryPartitionCount = 32
-    this.stateManagerStats.initSummaryBlobs()
-
-    this.stateManagerSync = new StateManagerSync(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
-
-    this.oldFeature_TXHashsetTest = true
-    this.oldFeature_GeneratePartitionReport = false
-    this.oldFeature_BroadCastPartitionReport = true // leaving this true since it depends on the above value
-
-    this.feature_receiptMapResults = true
-    this.feature_partitionHashes = true
-    this.feature_generateStats = true
-
-    this.feature_useNewParitionReport = true
-
-    this.debugFeature_dumpAccountData = true
-    this.debugFeature_dumpAccountDataFromSQL = false
-    this.debugFeatureOld_partitionReciepts = true
-
-    this.stateIsGood_txHashsetOld = true
-    this.stateIsGood_activeRepairs = true
-    this.stateIsGood = true
-
-    // other debug features
-    if (this.config && this.config.debug) {
-      this.feature_useNewParitionReport = this.tryGetBoolProperty(this.config.debug, 'useNewParitionReport', this.feature_useNewParitionReport)
-
-      this.oldFeature_GeneratePartitionReport = this.tryGetBoolProperty(this.config.debug, 'oldPartitionSystem', this.oldFeature_GeneratePartitionReport)
-
-      this.debugFeature_dumpAccountDataFromSQL = this.tryGetBoolProperty(this.config.debug, 'dumpAccountReportFromSQL', this.debugFeature_dumpAccountDataFromSQL)
-    }
-
-    // the original way this was setup was to reset and apply repair results one partition at a time.
-    // this could create issue if we have a TX spanning multiple paritions that are locally owned.
-    this.resetAndApplyPerPartition = false
-    /** @type {RepairTracker[]} */
-    this.dataRepairStack = []
-    /** @type {number} */
-    this.dataRepairsCompleted = 0
-    /** @type {number} */
-    this.dataRepairsStarted = 0
-    this.repairAllStoredPartitions = true
-    this.repairStartedMap = new Map()
-    this.repairCompletedMap = new Map()
-    /** @type {Object.<string, PartitionReceipt[]>} a map of cycle keys to lists of partition receipts.  */
-    this.partitionReceiptsByCycleCounter = {}
-    /** @type {Object.<string, PartitionReceipt>} a map of cycle keys to lists of partition receipts.  */
-    this.ourPartitionReceiptsByCycleCounter = {}
-    this.doDataCleanup = true
-    this.sendArchiveData = false
-    this.purgeArchiveData = false
-    this.sentReceipts = new Map()
-
-    this.globalAccountRepairBank = new Map()
-    //Fifo locks.
-    this.fifoLocks = {}
-
-    // Init data sync structures!
-    this.partitionObjectsByCycle = {}
-    this.ourPartitionResultsByCycle = {}
-    this.repairTrackingByCycleById = {}
-    this.repairUpdateDataByCycle = {}
-    this.applyAllPreparedRepairsRunning = false
-    this.recentPartitionObjectsByCycleByHash = {}
-    this.tempTXRecords = []
-    this.txByCycleByPartition = {}
-    this.allPartitionResponsesByCycleByPartition = {}
-
-    this.globalAccountMap = new Map()
-
-    this.debugTXHistory = {}
-
-    // debug hack
-    if (p2p == null) {
-      return
-    }
-
-    this.mainLogger = logger.getLogger('main')
-    this.fatalLogger = logger.getLogger('fatal')
-    this.shardLogger = logger.getLogger('shardDump')
-
-    ShardFunctions2.logger = logger
-    ShardFunctions2.fatalLogger = this.fatalLogger
-    ShardFunctions2.mainLogger = this.mainLogger
-
-    this.clearPartitionData()
-
-    this.registerEndpoints()
-
-    this.stateManagerSync.isSyncingAcceptedTxs = true // default is true so we will start adding to our tx queue asap
-    this.verboseLogs = false
-    if (this.mainLogger && ['TRACE'].includes(this.mainLogger.level.levelStr)) {
-      this.verboseLogs = true
-    }
-
-    // this.useHashSets = true
-    // this.lastActiveNodeCount = 0
-    // this.queueStopped = false
-    // this.extendedRepairLogging = true
-    // this.shardInfo = {}
-    // /** @type {Map<number, CycleShardData>} */
-    // this.shardValuesByCycle = new Map()
-    // this.currentCycleShardData = null as CycleShardData | null
-    // this.syncTrackerIndex = 1 // increments up for each new sync tracker we create gets maped to calls.
-    // this.preTXQueue = []
-    // this.readyforTXs = false
-
-    this.startShardCalculations()
-    // this.sleepInterrupt = undefined
-    // this.lastCycleReported = -1
-    // this.partitionReportDirty = false
-    // this.nextCycleReportToSend = null
-
-    // this.stateIsGood = true
-    // // the original way this was setup was to reset and apply repair results one partition at a time.
-    // // this could create issue if we have a TX spanning multiple paritions that are locally owned.
-    // this.resetAndApplyPerPartition = false
-    // /** @type {RepairTracker[]} */
-    // this.dataRepairStack = []
-    // /** @type {number} */
-    // this.dataRepairsCompleted = 0
-    // /** @type {number} */
-    // this.dataRepairsStarted = 0
-    // this.repairAllStoredPartitions = true
-    // this.repairStartedMap = new Map()
-    // this.repairCompletedMap = new Map()
-    // /** @type {Object.<string, PartitionReceipt[]>} a map of cycle keys to lists of partition receipts.  */
-    // this.partitionReceiptsByCycleCounter = {}
-    // /** @type {Object.<string, PartitionReceipt>} a map of cycle keys to lists of partition receipts.  */
-    // this.ourPartitionReceiptsByCycleCounter = {}
-    // this.doDataCleanup = true
-    // this.sendArchiveData = false
-    // this.purgeArchiveData = false
-    // this.sentReceipts = new Map()
-
-    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('canDataRepair', `0`, `canDataRepair: ${this.canDataRepair}  `)
   }
 
-  tryGetBoolProperty(parent: any, propertyName: string, defaultValue: boolean) {
-    if (parent == null) {
-      return defaultValue
-    }
-    let tempValue = parent[propertyName]
-    if (tempValue === true || tempValue === false) {
-      return tempValue
-    }
-    return defaultValue
-  }
 
-  clearPartitionData() {
-    this.fifoLocks = {}
-  }
 
-  // ////////////////////////////////////////////////////////////////////
-  //   SHARD CALCULATIONS
-  // ////////////////////////////////////////////////////////////////////
-
+/***
+ *     ######  ##     ##    ###    ########  ########         ######     ###    ##        ######   ######  
+ *    ##    ## ##     ##   ## ##   ##     ## ##     ##       ##    ##   ## ##   ##       ##    ## ##    ## 
+ *    ##       ##     ##  ##   ##  ##     ## ##     ##       ##        ##   ##  ##       ##       ##       
+ *     ######  ######### ##     ## ########  ##     ##       ##       ##     ## ##       ##        ######  
+ *          ## ##     ## ######### ##   ##   ##     ##       ##       ######### ##       ##             ## 
+ *    ##    ## ##     ## ##     ## ##    ##  ##     ##       ##    ## ##     ## ##       ##    ## ##    ## 
+ *     ######  ##     ## ##     ## ##     ## ########         ######  ##     ## ########  ######   ######  
+ */
   // This is called once per cycle to update to calculate the necessary shard values.
   updateShardValues(cycleNumber: number) {
     if (this.currentCycleShardData == null) {
@@ -692,6 +675,18 @@ class StateManager extends EventEmitter {
     return Math.floor(Math.random() * Math.floor(max))
   }
 
+  tryGetBoolProperty(parent: any, propertyName: string, defaultValue: boolean) {
+    if (parent == null) {
+      return defaultValue
+    }
+    let tempValue = parent[propertyName]
+    if (tempValue === true || tempValue === false) {
+      return tempValue
+    }
+    return defaultValue
+  }
+
+
   testFailChance(failChance: number, debugName: string, key: string, message: string, verboseRequired: boolean): boolean {
     if (failChance == null) {
       return false
@@ -788,89 +783,6 @@ class StateManager extends EventEmitter {
 
     if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_sync_mainphaseComplete', ` `, `  `)
   }
-
-  // initSummaryBlobs() {
-  //   for (let i = 0; i < this.summaryPartitionCount; i++) {
-  //     this.summaryBlobByPartition.set(i, {})
-  //   }
-  // }
-
-  // initTXSummaryBlobsForCycle(cycleNumber:number):SummaryBlobCollection {
-  //   let summaryBlobCollection = {cycle:cycleNumber, blobsByPartition: new Map()  }
-  //   for (let i = 0; i < this.summaryPartitionCount; i++) {
-  //     summaryBlobCollection.blobsByPartition.set(i, {})
-  //   }
-  //   this.txSummaryBlobCollections.push(summaryBlobCollection)
-  //   return summaryBlobCollection
-  // }
-
-  // getOrCreateTXSummaryBlobCollectionByCycle(cycle:number):SummaryBlobCollection {
-  //   let summaryBlobCollectionToUse = null
-  //   for (let i = this.txSummaryBlobCollections.length-1; i >= 0; i--) {
-  //     let summaryBlobCollection = this.txSummaryBlobCollections[i]
-  //     if(summaryBlobCollection.cycle === cycle){
-  //       summaryBlobCollectionToUse = summaryBlobCollection
-  //     }
-  //   }
-  //   if(summaryBlobCollectionToUse === null){
-  //     summaryBlobCollectionToUse = this.initTXSummaryBlobsForCycle(cycle)
-
-  //   }
-  //   return summaryBlobCollectionToUse
-  // }
-
-  // getSummaryBlobPartition(address:string) : number{
-  //   let addressNum = parseInt(address.slice(0, 8), 16)
-  //   let size = Math.round(4294967296 / this.summaryPartitionCount)
-  //   let preRound = addressNum / size
-  //   let summaryPartition = Math.round(addressNum / size)
-
-  //   if(this.extensiveRangeChecking){
-  //     if(summaryPartition < 0){
-  //       this.mainLogger.error(`getSummaryBlobPartition summaryPartition < 0 ${summaryPartition}`)
-  //     }
-  //     if(summaryPartition > this.summaryPartitionCount){
-  //       this.mainLogger.error(`getSummaryBlobPartition summaryPartition > this.summaryPartitionCount ${summaryPartition}`)
-  //     }
-  //   }
-
-  //   if(summaryPartition === this.summaryPartitionCount){
-  //     summaryPartition = summaryPartition - 1
-  //   }
-  //   return summaryPartition
-  // }
-
-  // getSummaryBlob(address:string) : SummaryBlob{
-  //   let partition = this.getSummaryBlobPartition(address)
-
-  //   let blob:SummaryBlob = this.summaryBlobByPartition.get(partition)
-  //   return blob
-  // }
-
-  // statsDataSummaryInit(accountData:Shardus.WrappedData){
-  //   let blob:SummaryBlob = this.getSummaryBlob(accountData.accountId)
-  //   this.app.dataSummaryInit(blob, accountData.data)
-
-  // }
-
-  // statsDataSummaryUpdate(accountDataBefore:Shardus.WrappedData, accountDataAfter:Shardus.WrappedData){
-  //   let blob:SummaryBlob = this.getSummaryBlob(accountDataBefore.accountId)
-
-  //   this.app.dataSummaryUpdate(blob, accountDataBefore.data, accountDataAfter.data)
-  // }
-
-  // statsTxSummaryUpdate(queueEntry:QueueEntry){
-  //   let partition = this.getSummaryBlobPartition(queueEntry.acceptedTx.id)
-
-  //   let summaryBlobCollection = this.getOrCreateTXSummaryBlobCollectionByCycle(queueEntry.cycleToRecordOn)
-  //   if(summaryBlobCollection != null){
-
-  //     let blob:SummaryBlob = summaryBlobCollection.blobsByPartition.get(partition)
-
-  //     this.app.txSummaryUpdate(blob, queueEntry.acceptedTx.data, null) //todo send data or not?
-  //   }
-
-  // }
 
   // just a placeholder for later
   recordPotentialBadnode() {
@@ -1020,6 +932,34 @@ class StateManager extends EventEmitter {
    *    ##       ##   ### ##     ## ##        ##     ##  ##  ##   ###    ##    ##    ##
    *    ######## ##    ## ########  ##         #######  #### ##    ##    ##     ######
    */
+
+  _registerListener(emitter: any, event: string, callback: any) {
+    if (this._listeners[event]) {
+      this.statemanager_fatal(`_registerListener_dupes`, 'State Manager can only register one listener per event!')
+      return
+    }
+    emitter.on(event, callback)
+    this._listeners[event] = [emitter, callback]
+  }
+
+  _unregisterListener(event: string) {
+    if (!this._listeners[event]) {
+      this.mainLogger.warn(`This event listener doesn't exist! Event: \`${event}\` in StateManager`)
+      return
+    }
+    const entry = this._listeners[event]
+    const [emitter, callback] = entry
+    emitter.removeListener(event, callback)
+    delete this._listeners[event]
+  }
+
+  _cleanupListeners() {
+    for (const event of Object.keys(this._listeners)) {
+      this._unregisterListener(event)
+    }
+  }
+
+
 
   registerEndpoints() {
     // alternatively we would need to query for accepted tx.
@@ -1915,1059 +1855,17 @@ class StateManager extends EventEmitter {
   // //////////////////////////   END Old sync check     //////////////////////////
   // //////////////////////////////////////////////////////////////////////////
 
-  /***
-   *       ###    ########  ########   ######  ########    ###    ######## ########
-   *      ## ##   ##     ## ##     ## ##    ##    ##      ## ##      ##    ##
-   *     ##   ##  ##     ## ##     ## ##          ##     ##   ##     ##    ##
-   *    ##     ## ########  ########   ######     ##    ##     ##    ##    ######
-   *    ######### ##        ##              ##    ##    #########    ##    ##
-   *    ##     ## ##        ##        ##    ##    ##    ##     ##    ##    ##
-   *    ##     ## ##        ##         ######     ##    ##     ##    ##    ########
-   */
 
-  /* -------- APPSTATE Functions ---------- */
 
-  async getAccountsStateHash(accountStart = '0'.repeat(64), accountEnd = 'f'.repeat(64), tsStart = 0, tsEnd = Date.now()) {
-    const accountStates = await this.storage.queryAccountStateTable(accountStart, accountEnd, tsStart, tsEnd, 100000000)
-    const stateHash = this.crypto.hash(accountStates)
-    return stateHash
-  }
-
-  // async testAccountTimesAndStateTable (tx, accountData) {
-  //   let hasStateTableData = false
-
-  //   function tryGetAccountData (accountID) {
-  //     for (let accountEntry of accountData) {
-  //       if (accountEntry.accountId === accountID) {
-  //         return accountEntry
-  //       }
-  //     }
-  //     return null
-  //   }
-
-  //   try {
-  //     let keysResponse = this.app.getKeyFromTransaction(tx)
-  //     let { sourceKeys, targetKeys, timestamp } = keysResponse
-  //     let sourceAddress, targetAddress, sourceState, targetState
-
-  //     // check account age to make sure it is older than the tx
-  //     let failedAgeCheck = false
-  //     for (let accountEntry of accountData) {
-  //       if (accountEntry.timestamp >= timestamp) {
-  //         failedAgeCheck = true
-  //         if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
-  //       }
-  //     }
-  //     if (failedAgeCheck) {
-  //       // if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountTimesAndStateTable accounts have future state ' + timestamp)
-  //       return { success: false, hasStateTableData }
-  //     }
-
-  //     // check state table
-  //     if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
-  //       sourceAddress = sourceKeys[0]
-  //       let accountStates = await this.storage.searchAccountStateTable(sourceAddress, timestamp)
-  //       if (accountStates.length !== 0) {
-  //         let accountEntry = tryGetAccountData(sourceAddress)
-  //         if (accountEntry == null) {
-  //           return { success: false, hasStateTableData }
-  //         }
-  //         sourceState = accountEntry.stateId
-  //         hasStateTableData = true
-  //         if (accountStates.length === 0 || accountStates[0].stateBefore !== sourceState) {
-  //           if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1')
-  //           if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1 stateId: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
-  //           return { success: false, hasStateTableData }
-  //         }
-  //       }
-  //     }
-  //     if (Array.isArray(targetKeys) && targetKeys.length > 0) {
-  //       targetAddress = targetKeys[0]
-  //       let accountStates = await this.storage.searchAccountStateTable(targetAddress, timestamp)
-
-  //       if (accountStates.length !== 0) {
-  //         hasStateTableData = true
-  //         if (accountStates.length !== 0 && accountStates[0].stateBefore !== allZeroes64) {
-  //           let accountEntry = tryGetAccountData(targetAddress)
-
-  //           if (accountEntry == null) {
-  //             if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress))
-  //             if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ' + utils.stringifyReduce(accountData))
-  //             this.fatalLogger.fatal(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ' + utils.stringifyReduce(accountData)) // todo: consider if this is just an error
-  //             // fail this because we already check if the before state was all zeroes
-  //             return { success: false, hasStateTableData }
-  //           } else {
-  //             targetState = accountEntry.stateId
-  //             if (accountStates[0].stateBefore !== targetState) {
-  //               if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2')
-  //               if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2 stateId: ' + utils.makeShortHash(targetState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(targetAddress))
-  //               return { success: false, hasStateTableData }
-  //             }
-  //           }
-  //         }
-  //       }
-  //     }
-  //   } catch (ex) {
-  //     this.fatalLogger.fatal('testAccountTimesAndStateTable failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-  //   }
-  //   return { success: true, hasStateTableData }
-  // }
-
-  async testAccountTimesAndStateTable2(tx: Shardus.OpaqueTransaction, wrappedStates: WrappedStates) {
-    let hasStateTableData = false
-
-    function tryGetAccountData(accountID: string) {
-      return wrappedStates[accountID]
-    }
-
-    try {
-      let keysResponse = this.app.getKeyFromTransaction(tx)
-      let { sourceKeys, targetKeys, timestamp } = keysResponse
-      let sourceAddress, sourceState, targetState
-
-      // check account age to make sure it is older than the tx
-      let failedAgeCheck = false
-
-      let accountKeys = Object.keys(wrappedStates)
-      for (let key of accountKeys) {
-        let accountEntry = tryGetAccountData(key)
-        if (accountEntry.timestamp >= timestamp) {
-          failedAgeCheck = true
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
-        }
-      }
-      if (failedAgeCheck) {
-        // if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountTimesAndStateTable accounts have future state ' + timestamp)
-        return { success: false, hasStateTableData }
-      }
-
-      // check state table
-      if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
-        sourceAddress = sourceKeys[0]
-        let accountStates = await this.storage.searchAccountStateTable(sourceAddress, timestamp)
-        if (accountStates.length !== 0) {
-          let accountEntry = tryGetAccountData(sourceAddress)
-          if (accountEntry == null) {
-            return { success: false, hasStateTableData }
-          }
-          sourceState = accountEntry.stateId
-          hasStateTableData = true
-          if (accountStates.length === 0 || accountStates[0].stateBefore !== sourceState) {
-            if (accountStates[0].stateBefore === '0'.repeat(64)) {
-              //sorta broken security hole.
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + 'bypass state comparision if before state was 00000: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
-            } else {
-              if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1')
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1 stateId: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
-              return { success: false, hasStateTableData }
-            }
-          }
-        }
-      }
-      if (Array.isArray(targetKeys) && targetKeys.length > 0) {
-        // targetAddress = targetKeys[0]
-        for (let targetAddress of targetKeys) {
-          let accountStates = await this.storage.searchAccountStateTable(targetAddress, timestamp)
-
-          if (accountStates.length !== 0) {
-            hasStateTableData = true
-            if (accountStates.length !== 0 && accountStates[0].stateBefore !== allZeroes64) {
-              let accountEntry = tryGetAccountData(targetAddress)
-
-              if (accountEntry == null) {
-                if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress))
-                if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ')
-                this.statemanager_fatal(`testAccountTimesAndStateTable_noEntry`, this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ') // todo: consider if this is just an error
-                // fail this because we already check if the before state was all zeroes
-                return { success: false, hasStateTableData }
-              } else {
-                targetState = accountEntry.stateId
-                if (accountStates[0].stateBefore !== targetState) {
-                  if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2')
-                  if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2 stateId: ' + utils.makeShortHash(targetState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(targetAddress))
-                  return { success: false, hasStateTableData }
-                }
-              }
-            }
-          }
-        }
-      }
-    } catch (ex) {
-      this.statemanager_fatal(`testAccountTimesAndStateTable_ex`, 'testAccountTimesAndStateTable failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-    }
-    return { success: true, hasStateTableData }
-  }
-
-  async testAccountTime(tx: Shardus.OpaqueTransaction, wrappedStates: WrappedStates) {
-    function tryGetAccountData(accountID: string) {
-      return wrappedStates[accountID]
-    }
-
-    try {
-      let keysResponse = this.app.getKeyFromTransaction(tx)
-      let { timestamp } = keysResponse // sourceKeys, targetKeys,
-      // check account age to make sure it is older than the tx
-      let failedAgeCheck = false
-
-      let accountKeys = Object.keys(wrappedStates)
-      for (let key of accountKeys) {
-        let accountEntry = tryGetAccountData(key)
-        if (accountEntry.timestamp >= timestamp) {
-          failedAgeCheck = true
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'testAccountTime account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
-        }
-      }
-      if (failedAgeCheck) {
-        // if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountTimesAndStateTable accounts have future state ' + timestamp)
-        return false
-      }
-    } catch (ex) {
-      this.statemanager_fatal(`testAccountTime-fail_ex`, 'testAccountTime failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      return false
-    }
-    return true // { success: true, hasStateTableData }
-  }
-  // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
-  async tryApplyTransaction(acceptedTX: AcceptedTx, hasStateTableData: boolean, repairing: boolean, filter: AccountFilter, wrappedStates: WrappedResponses, localCachedData: LocalCachedData) {
-    let ourLockID = -1
-    let accountDataList
-    let txTs = 0
-    let accountKeys = []
-    let ourAccountLocks = null
-    let applyResponse: Shardus.ApplyResponse | null = null
-    //have to figure out if this is a global modifying tx, since that impacts if we will write to global account.
-    let isGlobalModifyingTX = false
-    let savedSomething = false
-    try {
-      let tx = acceptedTX.data
-      // let receipt = acceptedTX.receipt
-      let keysResponse = this.app.getKeyFromTransaction(tx)
-      let { timestamp, debugInfo } = keysResponse
-      txTs = timestamp
-
-      let queueEntry = this.getQueueEntry(acceptedTX.id)
-      if (queueEntry != null) {
-        if (queueEntry.globalModification === true) {
-          isGlobalModifyingTX = true
-        }
-      }
-
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
-
-      if (repairing !== true) {
-        // get a list of modified account keys that we will lock
-        let { sourceKeys, targetKeys } = keysResponse
-        for (let accountID of sourceKeys) {
-          accountKeys.push(accountID)
-        }
-        for (let accountID of targetKeys) {
-          accountKeys.push(accountID)
-        }
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
-        ourAccountLocks = await this.bulkFifoLockAccounts(accountKeys)
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
-      }
-
-      ourLockID = await this.fifoLock('accountModification')
-
-      if (this.verboseLogs) console.log(`tryApplyTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
-      // if (this.verboseLogs) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
-      this.applySoftLock = true
-
-      // let replyObject = { stateTableResults: [], txId, txTimestamp, accountData: [] }
-      // let wrappedStatesList = Object.values(wrappedStates)
-
-      // TSConversion need to check how save this cast is for the apply fuction, should probably do more in depth look at the tx param.
-      applyResponse = this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
-      let { stateTableResults, accountData: _accountdata } = applyResponse
-      accountDataList = _accountdata
-
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
-      // wrappedStates are side effected for now
-      savedSomething = await this.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter)
-
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryApplyTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
-
-      this.applySoftLock = false
-      // only write our state table data if we dont already have it in the db
-      if (hasStateTableData === false) {
-        for (let stateT of stateTableResults) {
-          if (this.verboseLogs) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
-        }
-        await this.storage.addAccountStates(stateTableResults)
-      }
-
-      // post validate that state ended up correctly?
-
-      // write the accepted TX to storage
-      this.storage.addAcceptedTransactions([acceptedTX])
-    } catch (ex) {
-      this.statemanager_fatal(`tryApplyTransaction_ex`, 'tryApplyTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      this.mainLogger.debug(`tryApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
-      if (applyResponse) {
-        // && savedSomething){
-        // TSConversion do we really want to record this?
-        // if (!repairing) this.tempRecordTXByCycle(txTs, acceptedTX, false, applyResponse, isGlobalModifyingTX, savedSomething)
-        // record no-op state table fail:
-      } else {
-        // this.fatalLogger.fatal('tryApplyTransaction failed: applyResponse == null')
-      }
-
-      return false
-    } finally {
-      this.fifoUnlock('accountModification', ourLockID)
-      if (repairing !== true) {
-        if (ourAccountLocks != null) {
-          this.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
-        }
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair tryApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
-      }
-    }
-
-    // have to wrestle with the data a bit so we can backup the full account and not jsut the partial account!
-    // let dataResultsByKey = {}
-    let dataResultsFullList = []
-    for (let wrappedData of applyResponse.accountData) {
-      // if (wrappedData.isPartial === false) {
-      //   dataResultsFullList.push(wrappedData.data)
-      // } else {
-      //   dataResultsFullList.push(wrappedData.localCache)
-      // }
-      if (wrappedData.localCache != null) {
-        dataResultsFullList.push(wrappedData)
-      }
-      // dataResultsByKey[wrappedData.accountId] = wrappedData.data
-    }
-
-    // this is just for debug!!!
-    if (dataResultsFullList[0] == null) {
-      for (let wrappedData of applyResponse.accountData) {
-        if (wrappedData.localCache != null) {
-          dataResultsFullList.push(wrappedData)
-        }
-        // dataResultsByKey[wrappedData.accountId] = wrappedData.data
-      }
-    }
-    // if(dataResultsFullList == null){
-    //   throw new Error(`tryApplyTransaction (dataResultsFullList == null  ${txTs} ${utils.stringifyReduce(acceptedTX)} `);
-    // }
-
-    // TSConversion verified that app.setAccount calls shardus.applyResponseAddState  that adds hash and txid to the data and turns it into AccountData
-    let upgradedAccountDataList: Shardus.AccountData[] = (dataResultsFullList as unknown) as Shardus.AccountData[]
-
-    await this.updateAccountsCopyTable(upgradedAccountDataList, repairing, txTs)
-
-    if (!repairing) {
-      // await this.updateAccountsCopyTable(accountDataList)
-      //if(savedSomething){
-      this.tempRecordTXByCycle(txTs, acceptedTX, true, applyResponse, isGlobalModifyingTX, savedSomething)
-      //}
-
-      //WOW this was not good!  had acceptedTX.transactionGroup[0].id
-      //if (this.p2p.getNodeId() === acceptedTX.transactionGroup[0].id) {
-
-      let queueEntry: QueueEntry | null = this.getQueueEntry(acceptedTX.id)
-      if (queueEntry != null && queueEntry.transactionGroup != null && this.p2p.getNodeId() === queueEntry.transactionGroup[0].id) {
-        this.emit('txProcessed')
-      }
-
-      this.emit('txApplied', acceptedTX)
-    }
-
-    return true
-  }
-
-  /**
-   * tryPreApplyTransaction this will try to apply a transaction but will not commit the data
-   * @param acceptedTX
-   * @param hasStateTableData
-   * @param repairing
-   * @param filter
-   * @param wrappedStates
-   * @param localCachedData
-   */
-  async tryPreApplyTransaction(acceptedTX: AcceptedTx, hasStateTableData: boolean, repairing: boolean, filter: AccountFilter, wrappedStates: WrappedResponses, localCachedData: LocalCachedData): Promise<{ passed: boolean; applyResult: string; applyResponse?: Shardus.ApplyResponse }> {
-    let ourLockID = -1
-    let accountDataList
-    let txTs = 0
-    let accountKeys = []
-    let ourAccountLocks = null
-    let applyResponse: Shardus.ApplyResponse | null = null
-    //have to figure out if this is a global modifying tx, since that impacts if we will write to global account.
-    let isGlobalModifyingTX = false
-
-    try {
-      let tx = acceptedTX.data
-      // let receipt = acceptedTX.receipt
-      let keysResponse = this.app.getKeyFromTransaction(tx)
-      let { timestamp, debugInfo } = keysResponse
-      txTs = timestamp
-
-      let queueEntry = this.getQueueEntry(acceptedTX.id)
-      if (queueEntry != null) {
-        if (queueEntry.globalModification === true) {
-          isGlobalModifyingTX = true
-        }
-      }
-
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryPreApplyTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryPreApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryPreApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryPreApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryPreApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
-
-      if (repairing !== true) {
-        // get a list of modified account keys that we will lock
-        let { sourceKeys, targetKeys } = keysResponse
-        for (let accountID of sourceKeys) {
-          accountKeys.push(accountID)
-        }
-        for (let accountID of targetKeys) {
-          accountKeys.push(accountID)
-        }
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` tryPreApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
-        ourAccountLocks = await this.bulkFifoLockAccounts(accountKeys)
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` tryPreApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
-      }
-
-      ourLockID = await this.fifoLock('accountModification')
-
-      if (this.verboseLogs) console.log(`tryPreApplyTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
-      this.applySoftLock = true
-
-      applyResponse = this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
-      let { stateTableResults, accountData: _accountdata } = applyResponse
-      accountDataList = _accountdata
-
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `tryPreApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
-
-      this.applySoftLock = false
-    } catch (ex) {
-      this.mainLogger.error(`tryPreApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}: ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      this.mainLogger.error(`tryPreApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
-
-      return { passed: false, applyResponse, applyResult: ex.message }
-    } finally {
-      this.fifoUnlock('accountModification', ourLockID)
-      if (repairing !== true) {
-        if (ourAccountLocks != null) {
-          this.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
-        }
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` tryPreApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
-      }
-    }
-
-    return { passed: true, applyResponse, applyResult: 'applied' }
-  }
-
-  async commitConsensedTransaction(applyResponse: Shardus.ApplyResponse, acceptedTX: AcceptedTx, hasStateTableData: boolean, repairing: boolean, filter: AccountFilter, wrappedStates: WrappedResponses, localCachedData: LocalCachedData): Promise<CommitConsensedTransactionResult> {
-    let ourLockID = -1
-    let accountDataList
-    let txTs = 0
-    let accountKeys = []
-    let ourAccountLocks = null
-
-    //have to figure out if this is a global modifying tx, since that impacts if we will write to global account.
-    let isGlobalModifyingTX = false
-    let savedSomething = false
-    try {
-      let tx = acceptedTX.data
-      // let receipt = acceptedTX.receipt
-      let keysResponse = this.app.getKeyFromTransaction(tx)
-      let { timestamp, debugInfo } = keysResponse
-      txTs = timestamp
-
-      let queueEntry = this.getQueueEntry(acceptedTX.id)
-      if (queueEntry != null) {
-        if (queueEntry.globalModification === true) {
-          isGlobalModifyingTX = true
-        }
-      }
-
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction  filter: ${utils.stringifyReduce(filter)}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
-
-      if (repairing !== true) {
-        // get a list of modified account keys that we will lock
-        let { sourceKeys, targetKeys } = keysResponse
-        for (let accountID of sourceKeys) {
-          accountKeys.push(accountID)
-        }
-        for (let accountID of targetKeys) {
-          accountKeys.push(accountID)
-        }
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
-        ourAccountLocks = await this.bulkFifoLockAccounts(accountKeys)
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
-      }
-
-      ourLockID = await this.fifoLock('accountModification')
-
-      if (this.verboseLogs) console.log(`commitConsensedTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
-      // if (this.verboseLogs) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
-      this.applySoftLock = true
-
-      let { stateTableResults, accountData: _accountdata } = applyResponse
-      accountDataList = _accountdata
-
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
-      // wrappedStates are side effected for now
-      savedSomething = await this.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter)
-
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction  savedSomething: ${savedSomething}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
-
-      this.applySoftLock = false
-      // only write our state table data if we dont already have it in the db
-      if (hasStateTableData === false) {
-        for (let stateT of stateTableResults) {
-          // we have to correct this because it now gets stomped in the vote
-          let wrappedRespose = wrappedStates[stateT.accountId]
-          stateT.stateBefore = wrappedRespose.prevStateId
-
-          if (this.verboseLogs) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
-        }
-        await this.storage.addAccountStates(stateTableResults)
-      }
-
-      // post validate that state ended up correctly?
-
-      // write the accepted TX to storage
-      this.storage.addAcceptedTransactions([acceptedTX])
-
-      // endpoint to allow dapp to execute something that depends on a transaction being approved.
-      this.app.transactionReceiptPass(acceptedTX.data, wrappedStates, applyResponse)
-    } catch (ex) {
-      this.statemanager_fatal(`commitConsensedTransaction_ex`, 'commitConsensedTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      this.mainLogger.debug(`commitConsensedTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
-      if (applyResponse) {
-        // && savedSomething){
-        // TSConversion do we really want to record this?
-        // if (!repairing) this.tempRecordTXByCycle(txTs, acceptedTX, false, applyResponse, isGlobalModifyingTX, savedSomething)
-        // record no-op state table fail:
-      } else {
-        // this.fatalLogger.fatal('tryApplyTransaction failed: applyResponse == null')
-      }
-
-      return { success: false }
-    } finally {
-      this.fifoUnlock('accountModification', ourLockID)
-      if (repairing !== true) {
-        if (ourAccountLocks != null) {
-          this.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
-        }
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `commitConsensedTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
-      }
-    }
-
-    // have to wrestle with the data a bit so we can backup the full account and not jsut the partial account!
-    // let dataResultsByKey = {}
-    let dataResultsFullList = []
-    for (let wrappedData of applyResponse.accountData) {
-      // if (wrappedData.isPartial === false) {
-      //   dataResultsFullList.push(wrappedData.data)
-      // } else {
-      //   dataResultsFullList.push(wrappedData.localCache)
-      // }
-      if (wrappedData.localCache != null) {
-        dataResultsFullList.push(wrappedData)
-      }
-      // dataResultsByKey[wrappedData.accountId] = wrappedData.data
-    }
-
-    // this is just for debug!!!
-    if (dataResultsFullList[0] == null) {
-      for (let wrappedData of applyResponse.accountData) {
-        if (wrappedData.localCache != null) {
-          dataResultsFullList.push(wrappedData)
-        }
-        // dataResultsByKey[wrappedData.accountId] = wrappedData.data
-      }
-    }
-    // if(dataResultsFullList == null){
-    //   throw new Error(`tryApplyTransaction (dataResultsFullList == null  ${txTs} ${utils.stringifyReduce(acceptedTX)} `);
-    // }
-
-    // TSConversion verified that app.setAccount calls shardus.applyResponseAddState  that adds hash and txid to the data and turns it into AccountData
-    let upgradedAccountDataList: Shardus.AccountData[] = (dataResultsFullList as unknown) as Shardus.AccountData[]
-
-    await this.updateAccountsCopyTable(upgradedAccountDataList, repairing, txTs)
-
-    if (!repairing) {
-      // await this.updateAccountsCopyTable(accountDataList)
-      //if(savedSomething){
-      this.tempRecordTXByCycle(txTs, acceptedTX, true, applyResponse, isGlobalModifyingTX, savedSomething)
-      //}
-
-      //WOW this was not good!  had acceptedTX.transactionGroup[0].id
-      //if (this.p2p.getNodeId() === acceptedTX.transactionGroup[0].id) {
-
-      let queueEntry: QueueEntry | null = this.getQueueEntry(acceptedTX.id)
-      if (queueEntry != null && queueEntry.transactionGroup != null && this.p2p.getNodeId() === queueEntry.transactionGroup[0].id) {
-        this.emit('txProcessed')
-      }
-      this.emit('txApplied', acceptedTX)
-
-      this.stateManagerStats.statsTxSummaryUpdate(queueEntry.cycleToRecordOn, queueEntry)
-      for (let wrappedData of applyResponse.accountData) {
-        //this.stateManagerStats.statsDataSummaryUpdate(wrappedData.prevDataCopy, wrappedData)
-
-        let queueData = queueEntry.collectedData[wrappedData.accountId]
-
-        if (queueData != null) {
-          if (queueData.accountCreated) {
-            //account was created to do a summary init
-            //this.stateManagerStats.statsDataSummaryInit(queueEntry.cycleToRecordOn, queueData);
-            this.stateManagerStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, queueData.accountId, queueData.prevDataCopy)
-          }
-          this.stateManagerStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, queueData.prevDataCopy, wrappedData)
-        } else {
-          this.mainLogger.error(`commitConsensedTransaction failed to get account data for stats ${wrappedData.accountId}`)
-        }
-      }
-    }
-
-    return { success: true }
-  }
-
-  // async applyAcceptedTransaction (acceptedTX:AcceptedTx, wrappedStates:WrappedResponses, localCachedData:LocalCachedData, filter:AccountFilter) {
-  //   if (this.queueStopped) return
-  //   let tx = acceptedTX.data
-  //   let keysResponse = this.app.getKeyFromTransaction(tx)
-  //   let { sourceKeys, targetKeys, timestamp, debugInfo } = keysResponse
-
-  //   if (this.verboseLogs) console.log('applyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
-  //   if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
-
-  //   let allkeys:string[] = []
-  //   allkeys = allkeys.concat(sourceKeys)
-  //   allkeys = allkeys.concat(targetKeys)
-
-  //   for (let key of allkeys) {
-  //     if (wrappedStates[key] == null) {
-  //       if (this.verboseLogs) console.log(`applyAcceptedTransaction missing some account data. timestamp:${timestamp}  key: ${utils.makeShortHash(key)}  debuginfo:${debugInfo}`)
-  //       return { success: false, reason: 'missing some account data' }
-  //     }
-  //   }
-
-  //   // let accountData = await this.app.getAccountDataByList(allkeys) Now that we are sharded we must use the wrapped states instead of asking for account data! (faster anyhow!)
-
-  //   let { success, hasStateTableData } = await this.testAccountTimesAndStateTable2(tx, wrappedStates)
-
-  //   if (!success) {
-  //     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction pretest failed: ' + timestamp)
-  //     if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tx_apply_rejected 1', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
-  //     return { success: false, reason: 'applyAcceptedTransaction pretest failed' }
-  //   }
-
-  //   // Validate transaction through the application. Shardus can see inside the transaction
-  //   this.profiler.profileSectionStart('validateTx')
-  //   // todo add data fetch to the result and pass it into app apply(), include previous hashes
-
-  //   // todo2 refactor the state table data checks out of try apply and calculate them with less effort using results from validate
-  //   let applyResult = await this.tryApplyTransaction(acceptedTX, hasStateTableData, false, filter, wrappedStates, localCachedData)
-  //   if (applyResult) {
-  //     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction SUCCEDED ' + timestamp)
-  //     if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tx_applied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
-  //   } else {
-  //     if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tx_apply_rejected 3', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
-  //   }
-  //   return { success: applyResult, reason: 'apply result' }
-  // }
-
-  /**
-   * preApplyAcceptedTransaction will apply a transaction to the in memory data but will not save the results to the database yet
-   * @param acceptedTX
-   * @param wrappedStates
-   * @param localCachedData
-   * @param filter
-   */
-  async preApplyAcceptedTransaction(acceptedTX: AcceptedTx, wrappedStates: WrappedResponses, localCachedData: LocalCachedData, filter: AccountFilter): Promise<PreApplyAcceptedTransactionResult> {
-    if (this.queueStopped) return
-    let tx = acceptedTX.data
-    let keysResponse = this.app.getKeyFromTransaction(tx)
-    let { sourceKeys, targetKeys, timestamp, debugInfo } = keysResponse
-
-    if (this.verboseLogs) console.log('preApplyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'applyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
-
-    let allkeys: string[] = []
-    allkeys = allkeys.concat(sourceKeys)
-    allkeys = allkeys.concat(targetKeys)
-
-    for (let key of allkeys) {
-      if (wrappedStates[key] == null) {
-        if (this.verboseLogs) console.log(`preApplyAcceptedTransaction missing some account data. timestamp:${timestamp}  key: ${utils.makeShortHash(key)}  debuginfo:${debugInfo}`)
-        return { applied: false, passed: false, applyResult: '', reason: 'missing some account data' }
-      } else {
-        let wrappedState = wrappedStates[key]
-        wrappedState.prevStateId = wrappedState.stateId
-
-        wrappedState.prevDataCopy = utils.deepCopy(wrappedState.data)
-
-        //important to update the wrappedState timestamp here to prevent bad timestamps from propagating the system
-        let { timestamp: updatedTimestamp, hash: updatedHash } = this.app.getTimestampAndHashFromAccount(wrappedState.data)
-        wrappedState.timestamp = updatedTimestamp
-      }
-    }
-
-    // todo review what we are checking here.
-    let { success, hasStateTableData } = await this.testAccountTimesAndStateTable2(tx, wrappedStates)
-
-    if (!success) {
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'preApplyAcceptedTransaction pretest failed: ' + timestamp)
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tx_preapply_rejected 1', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
-      return { applied: false, passed: false, applyResult: '', reason: 'preApplyAcceptedTransaction pretest failed, TX rejected' }
-    }
-
-    // TODO STATESHARDING4 I am not sure if this really needs to be split into a function anymore.
-    // That mattered with data repair in older versions of the code, but that may be the wrong thing to do now
-    let preApplyResult = await this.tryPreApplyTransaction(acceptedTX, hasStateTableData, false, filter, wrappedStates, localCachedData)
-
-    if (preApplyResult) {
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'preApplyAcceptedTransaction SUCCEDED ' + timestamp)
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tx_preapplied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
-    } else {
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tx_preapply_rejected 3', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
-    }
-
-    return { applied: true, passed: preApplyResult.passed, applyResult: preApplyResult.applyResult, reason: 'apply result', applyResponse: preApplyResult.applyResponse }
-  }
-
-  // /////////////////////////////////////////////////////////////////////////////////////////////////////////
-  // ////   Transaction Queue Handling        ////////////////////////////////////////////////////////////////
-  // /////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  updateHomeInformation(txQueueEntry: QueueEntry) {
-    if (this.currentCycleShardData != null && txQueueEntry.hasShardInfo === false) {
-      let txId = txQueueEntry.acceptedTx.receipt.txHash
-      // Init home nodes!
-      for (let key of txQueueEntry.txKeys.allKeys) {
-        if (key == null) {
-          throw new Error(`updateHomeInformation key == null ${key}`)
-        }
-        let homeNode = ShardFunctions.findHomeNode(this.currentCycleShardData.shardGlobals, key, this.currentCycleShardData.parititionShardDataMap)
-        if (homeNode == null) {
-          throw new Error(`updateHomeInformation homeNode == null ${key}`)
-        }
-        txQueueEntry.homeNodes[key] = homeNode
-        if (homeNode == null) {
-          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` routeAndQueueAcceptedTransaction: ${key} `)
-          throw new Error(`updateHomeInformation homeNode == null ${txQueueEntry}`)
-        }
-
-        // calculate the partitions this TX is involved in for the receipt map
-        let isGlobalAccount = this.isGlobalAccount(key)
-        if (isGlobalAccount === true) {
-          txQueueEntry.involvedPartitions.push(homeNode.homePartition)
-          txQueueEntry.involvedGlobalPartitions.push(homeNode.homePartition)
-        } else {
-          txQueueEntry.involvedPartitions.push(homeNode.homePartition)
-        }
-
-        // HOMENODEMATHS Based on home node.. should this be chaned to homepartition?
-        let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
-        let relationString = ShardFunctions.getNodeRelation(homeNode, this.currentCycleShardData.ourNode.id)
-        // route_to_home_node
-        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_homeNodeSummary', `${txId}`, `account:${utils.makeShortHash(key)} rel:${relationString} summary:${utils.stringifyReduce(summaryObject)}`)
-      }
-
-      txQueueEntry.hasShardInfo = true
-    }
-  }
-
-  /***
-   *    ######## ##    ##  #######  ##     ## ######## ##     ## ########
-   *    ##       ###   ## ##     ## ##     ## ##       ##     ## ##
-   *    ##       ####  ## ##     ## ##     ## ##       ##     ## ##
-   *    ######   ## ## ## ##     ## ##     ## ######   ##     ## ######
-   *    ##       ##  #### ##  ## ## ##     ## ##       ##     ## ##
-   *    ##       ##   ### ##    ##  ##     ## ##       ##     ## ##
-   *    ######## ##    ##  ##### ##  #######  ########  #######  ########
-   */
-
-  routeAndQueueAcceptedTransaction(acceptedTx: AcceptedTx, sendGossip: boolean = true, sender: Shardus.Node | null, globalModification: boolean, noConsensus: boolean): string | boolean {
-    // dropping these too early.. hmm  we finished syncing before we had the first shard data.
-    // if (this.currentCycleShardData == null) {
-    //   // this.preTXQueue.push(acceptedTX)
-    //   return 'notReady' // it is too early to care about the tx
-    // }
-    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('routeAndQueueAcceptedTransaction-debug', '', `sendGossip:${sendGossip} globalModification:${globalModification} noConsensus:${noConsensus} this.readyforTXs:${this.stateManagerSync.readyforTXs} hasshardData:${this.currentCycleShardData != null} acceptedTx:${utils.stringifyReduce(acceptedTx)} `)
-    if (this.stateManagerSync.readyforTXs === false) {
-      if (this.verboseLogs) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: this.readyforTXs === false`)
-      return 'notReady' // it is too early to care about the tx
-    }
-    if (this.currentCycleShardData == null) {
-      if (this.verboseLogs) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: this.currentCycleShardData == null`)
-      return 'notReady'
-    }
-
-    try {
-      this.profiler.profileSectionStart('enqueue')
-
-      if (this.hasknownGlobals == false) {
-        if (this.verboseLogs) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: this.hasknownGlobals == false`)
-        return 'notReady'
-      }
-
-      let keysResponse = this.app.getKeyFromTransaction(acceptedTx.data)
-      let timestamp = keysResponse.timestamp
-      let txId = acceptedTx.receipt.txHash
-
-      // This flag turns of consensus for all TXs for debuggging
-      if (this.debugNoTxVoting === true) {
-        noConsensus = true
-      }
-
-      let cycleNumber = this.currentCycleShardData.cycleNumber
-
-      this.queueEntryCounter++
-      let txQueueEntry: QueueEntry = {
-        acceptedTx: acceptedTx,
-        txKeys: keysResponse,
-        noConsensus,
-        collectedData: {},
-        originalData: {},
-        beforeHashes: {},
-        homeNodes: {},
-        patchedOnNodes: new Map(),
-        hasShardInfo: false,
-        state: 'aging',
-        dataCollected: 0,
-        hasAll: false,
-        entryID: this.queueEntryCounter,
-        localKeys: {},
-        localCachedData: {},
-        syncCounter: 0,
-        didSync: false,
-        didWakeup: false,
-        syncKeys: [],
-        logstate: '',
-        requests: {},
-        globalModification: globalModification,
-        collectedVotes: [],
-        waitForReceiptOnly: false,
-        m2TimeoutReached: false,
-        debugFail_voteFlip: false,
-        requestingReceipt: false,
-        cycleToRecordOn: -5,
-        involvedPartitions: [],
-        involvedGlobalPartitions: [],
-        shortReceiptHash: '',
-        requestingReceiptFailed: false,
-        approximateCycleAge: cycleNumber,
-        ourNodeInTransactionGroup: false,
-        ourNodeInConsensusGroup: false,
-        logID: '',
-        txGroupDebug: '',
-        uniqueWritableKeys: [],
-      } // age comes from timestamp
-
-      // todo faster hash lookup for this maybe?
-      let entry = this.getQueueEntrySafe(acceptedTx.id) // , acceptedTx.timestamp)
-      if (entry) {
-        return false // already in our queue, or temp queue
-      }
-
-      txQueueEntry.logID = utils.makeShortHash(acceptedTx.id)
-      // if (this.config.debug != null && this.config.debug.loseTxChance && this.config.debug.loseTxChance > 0) {
-      //   let rand = Math.random()
-      //   if (this.config.debug.loseTxChance > rand) {
-      //     if (this.app.canDebugDropTx(acceptedTx.data)) {
-      //       if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tx_dropForTest', txId, 'dropping tx ' + timestamp)
-      //       return 'lost'
-      //     }
-      //   }
-      // }
-
-      this.debugTXHistory[txQueueEntry.logID] = 'enteredQueue'
-
-      if (this.app.canDebugDropTx(acceptedTx.data)) {
-        if (this.testFailChance(this.loseTxChance, 'loseTxChance', utils.stringifyReduce(acceptedTx.id), '', this.verboseLogs) === true) {
-          return 'lost'
-        }
-
-        if (this.testFailChance(this.voteFlipChance, 'voteFlipChance', utils.stringifyReduce(acceptedTx.id), '', this.verboseLogs) === true) {
-          txQueueEntry.debugFail_voteFlip = true
-        }
-      }
-
-      // if (this.config.debug != null && this.config.debug.loseTxChance && this.config.debug.loseTxChance > 0) {
-      //   let rand = Math.random()
-      //   if (this.config.debug.loseTxChance > rand) {
-      //     if (this.app.canDebugDropTx(acceptedTx.data)) {
-      //       this.mainLogger.error('tx_failReceiptTest fail vote tx  ' + txId + ' ' + timestamp)
-      //       if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tx_failReceiptTest', txId, 'fail vote tx ' + timestamp)
-      //       //return 'lost'
-      //       txQueueEntry.debugFail_voteFlip = true
-      //     }
-      //   }
-      // } else {
-      //   // this.mainLogger.error('tx_failReceiptTest set  ' + this.config.debug.loseTxChance)
-      //   // this.config.debug.loseTxChance = 0
-      // }
-
-      try {
-        let age = Date.now() - timestamp
-        if (age > this.queueSitTime * 0.9) {
-          this.statemanager_fatal(`routeAndQueueAcceptedTransaction_olderTX`, 'routeAndQueueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
-          // TODO consider throwing this out.  right now it is just a warning
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_oldQueueInsertion', '', 'routeAndQueueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
-        }
-        let keyHash: StringBoolObjectMap = {}
-        for (let key of txQueueEntry.txKeys.allKeys) {
-          if (key == null) {
-            // throw new Error(`routeAndQueueAcceptedTransaction key == null ${key}`)
-            if (this.verboseLogs) this.mainLogger.error(`routeAndQueueAcceptedTransaction key == null ${timestamp} not putting tx in queue.`)
-            return false
-          }
-
-          keyHash[key] = true
-        }
-        txQueueEntry.uniqueKeys = Object.keys(keyHash)
-
-        this.updateHomeInformation(txQueueEntry)
-
-        // calculate information needed for receiptmap
-        txQueueEntry.cycleToRecordOn = this.getCycleNumberFromTimestamp(timestamp)
-        if (txQueueEntry.cycleToRecordOn < 0) {
-          if (this.verboseLogs) this.mainLogger.error(`routeAndQueueAcceptedTransaction failed to calculate cycle ${timestamp} error code:${txQueueEntry.cycleToRecordOn}`)
-          return false
-        }
-
-        // Global account keys.
-        for (let key of txQueueEntry.uniqueKeys) {
-          if (globalModification === true) {
-            // TODO: globalaccounts
-            if (this.globalAccountMap.has(key)) {
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - has`)
-              // indicate that we will have global data in this transaction!
-              // I think we do not need to test that here afterall.
-            } else {
-              //this makes the code aware that this key is for a global account.
-              //is setting this here too soon?
-              //it should be that p2p has already checked the receipt before calling shardus.push with global=true
-
-              this.globalAccountMap.set(key, null)
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - set`)
-            }
-          }
-        }
-        //let transactionGroup = this.queueEntryGetTransactionGroup(txQueueEntry)
-        // if we are syncing this area mark it as good.
-        for (let key of txQueueEntry.uniqueKeys) {
-          let syncTracker = this.stateManagerSync.getSyncTracker(key)
-          if (syncTracker != null) {
-            txQueueEntry.state = 'syncing'
-            txQueueEntry.syncCounter++
-            txQueueEntry.didSync = true // mark that this tx had to sync, this flag should never be cleared, we will use it later to not through stuff away.
-            syncTracker.queueEntries.push(txQueueEntry) // same tx may get pushed in multiple times. that's ok.
-            txQueueEntry.syncKeys.push(key) // used later to instruct what local data we should JIT load
-            txQueueEntry.localKeys[key] = true // used for the filter
-
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, `${txQueueEntry.logID} qId: ${txQueueEntry.entryID}`)
-          }
-        }
-
-        for (let key of txQueueEntry.uniqueKeys) {
-          let isGlobalAcc = this.isGlobalAccount(key)
-
-          // if it is a global modification and global account we can write
-          if (globalModification === true && isGlobalAcc === true) {
-            txQueueEntry.uniqueWritableKeys.push(key)
-          }
-          // if it is a normal transaction and non global account we can write
-          if (globalModification === false && isGlobalAcc === false) {
-            txQueueEntry.uniqueWritableKeys.push(key)
-          }
-        }
-
-        //if we had any sync at all flag all non global partitions..
-        if (txQueueEntry.didSync) {
-          for (let key of txQueueEntry.uniqueKeys) {
-            //if(this.globalAccountMap.has(key)){
-            let { homePartition, addressNum } = ShardFunctions.addressToPartition(this.currentCycleShardData.shardGlobals, key)
-            this.currentCycleShardData.partitionsToSkip.set(homePartition, true)
-            //}
-          }
-        }
-
-        if (txQueueEntry.hasShardInfo) {
-          let transactionGroup = this.queueEntryGetTransactionGroup(txQueueEntry)
-          if (txQueueEntry.ourNodeInTransactionGroup || txQueueEntry.didSync === true) {
-            // go ahead and calculate this now if we are in the tx group or we are syncing this range!
-            this.queueEntryGetConsensusGroup(txQueueEntry)
-          }
-          if (sendGossip && txQueueEntry.globalModification === false) {
-            try {
-              //let transactionGroup = this.queueEntryGetTransactionGroup(txQueueEntry)
-
-              if (transactionGroup.length > 1) {
-                // should consider only forwarding in some cases?
-                this.debugNodeGroup(txId, timestamp, `share to neighbors`, transactionGroup)
-                this.p2p.sendGossipIn('spread_tx_to_group', acceptedTx, '', sender, transactionGroup)
-              }
-              // if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
-            } catch (ex) {
-              this.statemanager_fatal(`txQueueEntry_ex`, 'txQueueEntry: ' + utils.stringifyReduce(txQueueEntry))
-            }
-          }
-
-          if (txQueueEntry.didSync === false) {
-            // see if our node shard data covers any of the accounts?
-            //this.queueEntryGetTransactionGroup(txQueueEntry) // this will compute our involvment
-            if (txQueueEntry.ourNodeInTransactionGroup === false && txQueueEntry.globalModification === false) {
-              // if globalModification === true then every node is in the group
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_notInTxGroup', `${txId}`, ``)
-              return 'out of range' // we are done, not involved!!!
-            } else {
-              // let tempList =  // can be returned by the function below
-              if (this.verboseLogs) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: getOrderedSyncingNeighbors`)
-              this.p2p.state.getOrderedSyncingNeighbors(this.currentCycleShardData.ourNode)
-              // TODO: globalaccounts
-              // globalModification  TODO pass on to syncing nodes.   (make it pass on the flag too)
-              // possibly need to send proof to the syncing node or there could be a huge security loophole.  should share the receipt as an extra parameter
-              // or data repair will detect and reject this if we get tricked.  could be an easy attack vector
-              if (this.currentCycleShardData.hasSyncingNeighbors === true) {
-                if (txQueueEntry.globalModification === false) {
-                  if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_sync_tx', `${txId}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighborsTxGroup.map((x) => x.id))}`)
-                  this.debugNodeGroup(txId, timestamp, `share to syncing neighbors`, this.currentCycleShardData.syncingNeighborsTxGroup)
-                  this.p2p.sendGossipAll('spread_tx_to_group', acceptedTx, '', sender, this.currentCycleShardData.syncingNeighborsTxGroup)
-                  //This was using sendGossipAll, but changed it for a work around.  maybe this just needs to be a tell.
-                } else {
-                  if (this.verboseLogs) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: bugfix detected. avoid forwarding txs where globalModification == true`)
-                }
-              }
-            }
-          }
-        } else {
-          throw new Error('missing shard info')
-        }
-        this.newAcceptedTxQueueTempInjest.push(txQueueEntry)
-
-        // start the queue if needed
-        this.tryStartAcceptedQueue()
-      } catch (error) {
-        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)}`)
-        this.statemanager_fatal(`routeAndQueueAcceptedTransaction_ex`, 'routeAndQueueAcceptedTransaction failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
-        throw new Error(error)
-      }
-      return true
-    } finally {
-      this.profiler.profileSectionEnd('enqueue')
-    }
-  }
+/***
+ *     ######   #######  ########  ######## 
+ *    ##    ## ##     ## ##     ## ##       
+ *    ##       ##     ## ##     ## ##       
+ *    ##       ##     ## ########  ######   
+ *    ##       ##     ## ##   ##   ##       
+ *    ##    ## ##     ## ##    ##  ##       
+ *     ######   #######  ##     ## ######## 
+ */
 
   tryStartAcceptedQueue() {
     if (!this.stateManagerSync.dataSyncMainPhaseComplete) {
@@ -2981,6 +1879,7 @@ class StateManager extends EventEmitter {
     //   this.interruptSleepIfNeeded(this.newAcceptedTxQueue[0].timestamp)
     // }
   }
+
   async _firstTimeQueueAwait() {
     if (this.newAcceptedTxQueueRunning) {
       this.statemanager_fatal(`queueAlreadyRunning`, 'DATASYNC: newAcceptedTxQueueRunning')
@@ -2991,2055 +1890,6 @@ class StateManager extends EventEmitter {
 
     await this.processAcceptedTxQueue()
   }
-
-  getQueueEntry(txid: string): QueueEntry | null {
-    // todo perf need an interpolated or binary search on a sorted list
-    for (let queueEntry of this.newAcceptedTxQueue) {
-      if (queueEntry.acceptedTx.id === txid) {
-        return queueEntry
-      }
-    }
-    return null
-  }
-
-  getQueueEntryPending(txid: string): QueueEntry | null {
-    // todo perf need an interpolated or binary search on a sorted list
-    for (let queueEntry of this.newAcceptedTxQueueTempInjest) {
-      if (queueEntry.acceptedTx.id === txid) {
-        return queueEntry
-      }
-    }
-    return null
-  }
-
-  getQueueEntrySafe(txid: string): QueueEntry | null {
-    let queueEntry = this.getQueueEntry(txid)
-    if (queueEntry == null) {
-      return this.getQueueEntryPending(txid)
-    }
-
-    return queueEntry
-  }
-
-  getQueueEntryArchived(txid: string, msg: string): QueueEntry | null {
-    for (let queueEntry of this.archivedQueueEntries) {
-      if (queueEntry.acceptedTx.id === txid) {
-        return queueEntry
-      }
-    }
-    // todo make this and error.
-    this.mainLogger.error(`getQueueEntryArchived failed to find: ${utils.stringifyReduce(txid)} ${msg} dbg:${this.debugTXHistory[utils.stringifyReduce(txid)]}`)
-
-    return null
-  }
-
-  // TODO CODEREVIEW.  need to look at the use of local cache.  also is the early out ok?
-  queueEntryAddData(queueEntry: QueueEntry, data: Shardus.WrappedResponse) {
-    if (queueEntry.collectedData[data.accountId] != null) {
-      return // already have the data
-    }
-    if (queueEntry.uniqueKeys == null) {
-      // cant have all data yet if we dont even have unique keys.
-      throw new Error(`Attempting to add data and uniqueKeys are not available yet: ${utils.stringifyReduceLimit(queueEntry, 200)}`)
-    }
-    queueEntry.collectedData[data.accountId] = data
-    queueEntry.dataCollected++
-
-    queueEntry.originalData[data.accountId] = stringify(data)
-    queueEntry.beforeHashes[data.accountId] = data.stateId
-
-    if (queueEntry.dataCollected === queueEntry.uniqueKeys.length) {
-      //  queueEntry.tx Keys.allKeys.length
-      queueEntry.hasAll = true
-    }
-
-    if (data.localCache) {
-      queueEntry.localCachedData[data.accountId] = data.localCache
-      delete data.localCache
-    }
-
-    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_addData', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `key ${utils.makeShortHash(data.accountId)} hash: ${utils.makeShortHash(data.stateId)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}  ${queueEntry.acceptedTx.timestamp}`)
-  }
-
-  queueEntryHasAllData(queueEntry: QueueEntry) {
-    if (queueEntry.hasAll === true) {
-      return true
-    }
-    if (queueEntry.uniqueKeys == null) {
-      throw new Error(`queueEntryHasAllData (queueEntry.uniqueKeys == null)`)
-    }
-    let dataCollected = 0
-    for (let key of queueEntry.uniqueKeys) {
-      if (queueEntry.collectedData[key] != null) {
-        dataCollected++
-      }
-    }
-    if (dataCollected === queueEntry.uniqueKeys.length) {
-      //  queueEntry.tx Keys.allKeys.length uniqueKeys.length
-      queueEntry.hasAll = true
-      return true
-    }
-    return false
-  }
-
-  async queueEntryRequestMissingData(queueEntry: QueueEntry) {
-    if (this.currentCycleShardData == null) {
-      return
-    }
-    if (!queueEntry.requests) {
-      queueEntry.requests = {}
-    }
-    if (queueEntry.uniqueKeys == null) {
-      throw new Error('queueEntryRequestMissingData queueEntry.uniqueKeys == null')
-    }
-
-    let allKeys = []
-    for (let key of queueEntry.uniqueKeys) {
-      if (queueEntry.collectedData[key] == null) {
-        allKeys.push(key)
-      }
-    }
-
-    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_start', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
-
-    // consensus group should have all the data.. may need to correct this later
-    let consensusGroup = this.queueEntryGetConsensusGroup(queueEntry)
-    //let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry)
-
-    for (let key of queueEntry.uniqueKeys) {
-      if (queueEntry.collectedData[key] == null && queueEntry.requests[key] == null) {
-        let keepTrying = true
-        let triesLeft = 5
-        // let triesLeft = Math.min(5, consensusGroup.length )
-        // let nodeIndex = 0
-        while (keepTrying) {
-          if (triesLeft <= 0) {
-            keepTrying = false
-            break
-          }
-          triesLeft--
-          let homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
-
-          // let node = consensusGroup[nodeIndex]
-          // nodeIndex++
-
-          // find a random node to ask that is not us
-          let node = null
-          let randomIndex
-          let foundValidNode = false
-          let maxTries = 1000
-
-          // todo make this non random!!!
-          while (foundValidNode == false) {
-            maxTries--
-            randomIndex = this.getRandomInt(homeNodeShardData.consensusNodeForOurNodeFull.length - 1)
-            node = homeNodeShardData.consensusNodeForOurNodeFull[randomIndex]
-            if (maxTries < 0) {
-              //FAILED
-              this.statemanager_fatal(`queueEntryRequestMissingData`, `queueEntryRequestMissingData: unable to find node to ask after 1000 tries tx:${utils.makeShortHash(queueEntry.acceptedTx.id)} key: ${utils.makeShortHash(key)} ${utils.stringifyReduce(homeNodeShardData.consensusNodeForOurNodeFull.map((x) => (x != null ? x.id : 'null')))}`)
-              break
-            }
-            if (node == null) {
-              continue
-            }
-            if (node.id === this.currentCycleShardData.nodeShardData.node.id) {
-              continue
-            }
-            foundValidNode = true
-          }
-
-          if (node == null) {
-            continue
-          }
-          if (node.status != 'active') {
-            continue
-          }
-          if (node === this.currentCycleShardData.ourNode) {
-            continue
-          }
-
-          // Todo: expand this to grab a consensus node from any of the involved consensus nodes.
-
-          for (let key2 of allKeys) {
-            queueEntry.requests[key2] = node
-          }
-
-          let relationString = ShardFunctions.getNodeRelation(homeNodeShardData, this.currentCycleShardData.ourNode.id)
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
-
-          // Node Precheck!
-          if (this.isNodeValidForInternalMessage(node.id, 'queueEntryRequestMissingData', true, true) === false) {
-            // if(this.tryNextDataSourceNode('queueEntryRequestMissingData') == false){
-            //   break
-            // }
-            continue
-          }
-
-          let message = { keys: allKeys, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
-          let result: RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx', message)
-
-          if (result == null) {
-            if (this.verboseLogs) {
-              this.mainLogger.error('ASK FAIL request_state_for_tx')
-            }
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
-            continue
-          }
-          if (result.success !== true) {
-            this.mainLogger.error('ASK FAIL queueEntryRequestMissingData 9')
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry2', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
-            continue
-          }
-          let dataCountReturned = 0
-          let accountIdsReturned = []
-          for (let data of result.stateList) {
-            this.queueEntryAddData(queueEntry, data)
-            dataCountReturned++
-            accountIdsReturned.push(utils.makeShortHash(data.accountId))
-          }
-
-          if (queueEntry.hasAll === true) {
-            queueEntry.logstate = 'got all missing data'
-          } else {
-            queueEntry.logstate = 'failed to get data:' + queueEntry.hasAll
-            // queueEntry.state = 'failed to get data'
-          }
-
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
-
-          // queueEntry.homeNodes[key] = null
-          for (let key2 of allKeys) {
-            //consider deleteing these instead?
-            //TSConversion changed to a delete opertaion should double check this
-            //queueEntry.requests[key2] = null
-            delete queueEntry.requests[key2]
-          }
-
-          if (queueEntry.hasAll === true) {
-            break
-          }
-
-          keepTrying = false
-        }
-      }
-    }
-  }
-
-  async queueEntryRequestMissingReceipt(queueEntry: QueueEntry) {
-    if (this.currentCycleShardData == null) {
-      return
-    }
-
-    if (queueEntry.uniqueKeys == null) {
-      throw new Error('queueEntryRequestMissingReceipt queueEntry.uniqueKeys == null')
-    }
-
-    if (queueEntry.requestingReceipt === true) {
-      return
-    }
-
-    queueEntry.requestingReceipt = true
-
-    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_start', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID}`)
-
-    let consensusGroup = this.queueEntryGetConsensusGroup(queueEntry)
-
-    this.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `queueEntryRequestMissingReceipt`, consensusGroup)
-    //let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry)
-    //the outer loop here could just use the transaction group of nodes instead. but already had this working in a similar function
-    //TODO change it to loop the transaction group untill we get a good receipt
-    let gotReceipt = false
-    for (let key of queueEntry.uniqueKeys) {
-      if (gotReceipt === true) {
-        break
-      }
-
-      let keepTrying = true
-      let triesLeft = Math.min(5, consensusGroup.length)
-      let nodeIndex = 0
-      while (keepTrying) {
-        if (triesLeft <= 0) {
-          keepTrying = false
-          break
-        }
-        triesLeft--
-        let homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
-
-        let node = consensusGroup[nodeIndex]
-        nodeIndex++
-        // find a random node to ask that is not us
-        // let node:Shardus.Node = null
-        // let randomIndex
-        // let foundValidNode = false
-        // let maxTries = 1000
-        // while (foundValidNode == false) {
-        //   maxTries--
-        //   randomIndex = this.getRandomInt(homeNodeShardData.consensusNodeForOurNodeFull.length - 1)
-        //   node = homeNodeShardData.consensusNodeForOurNodeFull[randomIndex]
-        //   if(maxTries < 0){
-        //     //FAILED
-        //     this.fatalLogger.fatal(`queueEntryRequestMissingReceipt: unable to find node to ask after 1000 tries tx:${utils.makeShortHash(queueEntry.acceptedTx.id)} key: ${utils.makeShortHash(key)} ${utils.stringifyReduce(homeNodeShardData.consensusNodeForOurNodeFull.map((x)=> (x!=null)? x.id : 'null'))}`)
-        //     break
-        //   }
-        //   if(node == null){
-        //     continue
-        //   }
-        //   if(node.id === this.currentCycleShardData.nodeShardData.node.id){
-        //     continue
-        //   }
-        //   foundValidNode = true
-        // }
-
-        if (node == null) {
-          continue
-        }
-        if (node.status != 'active') {
-          continue
-        }
-        if (node === this.currentCycleShardData.ourNode) {
-          continue
-        }
-
-        let relationString = ShardFunctions.getNodeRelation(homeNodeShardData, this.currentCycleShardData.ourNode.id)
-        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
-
-        // Node Precheck!
-        if (this.isNodeValidForInternalMessage(node.id, 'queueEntryRequestMissingReceipt', true, true) === false) {
-          // if(this.tryNextDataSourceNode('queueEntryRequestMissingReceipt') == false){
-          //   break
-          // }
-          continue
-        }
-
-        let message = { txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
-        let result: RequestReceiptForTxResp = await this.p2p.ask(node, 'request_receipt_for_tx', message) // not sure if we should await this.
-
-        if (result == null) {
-          if (this.verboseLogs) {
-            this.mainLogger.error(`ASK FAIL request_receipt_for_tx ${triesLeft} ${utils.makeShortHash(node.id)}`)
-          }
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
-          continue
-        }
-        if (result.success !== true) {
-          this.mainLogger.error(`ASK FAIL queueEntryRequestMissingReceipt 9 ${triesLeft} ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)} note:${result.note} txid:${queueEntry.logID}`)
-          continue
-        }
-
-        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} result: ${utils.stringifyReduce(result)}`)
-
-        if (result.success === true && result.receipt != null) {
-          queueEntry.recievedAppliedReceipt = result.receipt
-          keepTrying = false
-          gotReceipt = true
-
-          this.mainLogger.error(`queueEntryRequestMissingReceipt got good receipt for: ${utils.makeShortHash(queueEntry.acceptedTx.id)} from: ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)}`)
-        }
-      }
-
-      // break the outer loop after we are done trying.  todo refactor this.
-      if (keepTrying == false) {
-        break
-      }
-    }
-    queueEntry.requestingReceipt = false
-
-    if (gotReceipt === false) {
-      queueEntry.requestingReceiptFailed = true
-    }
-  }
-
-  async repairToMatchReceipt(queueEntry: QueueEntry) {
-    if (this.currentCycleShardData == null) {
-      return
-    }
-    // if (!queueEntry.requests) {
-    //   queueEntry.requests = {}
-    // }
-    if (queueEntry.uniqueKeys == null) {
-      throw new Error('repairToMatchReceipt queueEntry.uniqueKeys == null')
-    }
-
-    try {
-      this.profiler.profileSectionStart('repair')
-
-      let shortHash = utils.makeShortHash(queueEntry.acceptedTx.id)
-      // Need to build a list of what accounts we need, what state they should be in and who to get them from
-      let requestObjects: { [id: string]: { appliedVote: AppliedVote; voteIndex: number; accountHash: string; accountId: string; nodeShardInfo: NodeShardData; alternates: string[] } } = {}
-      let appliedVotes = queueEntry.appliedReceiptForRepair.appliedVotes
-
-      //shuffle the array
-      utils.shuffleArray(appliedVotes)
-
-      let allKeys = []
-
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `appliedVotes ${utils.stringifyReduce(appliedVotes)}  `)
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `queueEntry.uniqueKeys ${utils.stringifyReduce(queueEntry.uniqueKeys)}`)
-
-      this.mainLogger.debug(`repairToMatchReceipt: ${shortHash} queueEntry.uniqueKeys ${utils.stringifyReduce(queueEntry.uniqueKeys)}`)
-
-      for (let key of queueEntry.uniqueKeys) {
-        let coveredKey = false
-        for (let i = 0; i < appliedVotes.length; i++) {
-          let appliedVote = appliedVotes[i]
-          for (let j = 0; j < appliedVote.account_id.length; j++) {
-            let id = appliedVote.account_id[j]
-            let hash = appliedVote.account_state_hash_after[j]
-            if (id === key && hash != null) {
-              if (requestObjects[key] != null) {
-                //todo perf delay these checks for jit.
-                if (appliedVote.node_id !== this.currentCycleShardData.ourNode.id) {
-                  if (this.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === true) {
-                    //build a list of alternates
-                    requestObjects[key].alternates.push(appliedVote.node_id)
-                  }
-                }
-                continue //we already have this request ready to go
-              }
-
-              coveredKey = true
-              if (appliedVote.node_id === this.currentCycleShardData.ourNode.id) {
-                //dont reference our own node, should not happen anyway
-                if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `appliedVote.node_id != this.currentCycleShardData.ourNode.id ${utils.stringifyReduce(appliedVote.node_id)} our: ${utils.stringifyReduce(this.currentCycleShardData.ourNode.id)} `)
-                continue
-              }
-              if (this.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === false) {
-                if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `this.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === false ${utils.stringifyReduce(appliedVote.node_id)} `)
-                continue
-              }
-              let nodeShardInfo: NodeShardData = this.currentCycleShardData.nodeShardDataMap.get(appliedVote.node_id)
-
-              if (nodeShardInfo == null) {
-                this.mainLogger.error(`shrd_repairToMatchReceipt nodeShardInfo == null ${utils.stringifyReduce(appliedVote.node_id)}`)
-                continue
-              }
-              if (ShardFunctions2.testAddressInRange(id, nodeShardInfo.storedPartitions) == false) {
-                if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `address not in range ${utils.stringifyReduce(nodeShardInfo.storedPartitions)}`)
-                continue
-              }
-              let objectToSet = { appliedVote, voteIndex: j, accountHash: hash, accountId: id, nodeShardInfo, alternates: [] }
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `setting key ${utils.stringifyReduce(key)} ${utils.stringifyReduce(objectToSet)} `)
-              requestObjects[key] = objectToSet
-              allKeys.push(key)
-            } else {
-            }
-          }
-        }
-
-        if (coveredKey === false) {
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `coveredKey === false`)
-          //todo log error on us not finding this key
-        }
-      }
-
-      //let receipt = queueEntry.appliedReceiptForRepair
-
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_start', `${shortHash}`, `qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}  requestObject:${utils.stringifyReduce(requestObjects)}`)
-
-      for (let key of queueEntry.uniqueKeys) {
-        if (requestObjects[key] != null) {
-          let requestObject = requestObjects[key]
-
-          if (requestObject == null) {
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `requestObject == null`)
-            continue
-          }
-
-          let node = requestObject.nodeShardInfo.node
-          if (node == null) {
-            this.mainLogger.error(`shrd_repairToMatchReceipt node == null ${utils.stringifyReduce(requestObject.accountId)}`)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `node == null`)
-            continue
-          }
-
-          let alternateIndex = 0
-          let attemptsRemaining = true
-          while (attemptsRemaining === true) {
-            //go down alternates list as needed.
-            while (node == null) {
-              //possibly make this not at an error once verified
-              this.mainLogger.error(`shrd_repairToMatchReceipt while(node == null) look for other node txId. idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}`)
-              //find alternate
-              if (alternateIndex >= requestObject.alternates.length) {
-                this.statemanager_fatal(`repairToMatchReceipt_1`, `ASK FAIL repairToMatchReceipt failed to find alternate node to ask for receipt. txId. ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}`)
-                attemptsRemaining = false
-                return
-              }
-              let altId = requestObject.alternates[alternateIndex]
-              let nodeShardInfo: NodeShardData = this.currentCycleShardData.nodeShardDataMap.get(altId)
-              if (nodeShardInfo != null) {
-                node = nodeShardInfo.node
-                this.mainLogger.error(`shrd_repairToMatchReceipt got alt source node: idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(node.id)}`)
-              } else {
-                this.mainLogger.error(`shrd_repairToMatchReceipt nodeShardInfo == null for ${utils.stringifyReduce(altId)}`)
-              }
-              alternateIndex++
-            }
-
-            let relationString = '' //ShardFunctions.getNodeRelation(homeNodeShardData, this.currentCycleShardData.ourNode.id)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_ask', `${shortHash}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
-
-            // Node Precheck!
-            if (this.isNodeValidForInternalMessage(node.id, 'repairToMatchReceipt', true, true) === false) {
-              // if(this.tryNextDataSourceNode('repairToMatchReceipt') == false){
-              //   break
-              // }
-              node = null
-              continue
-            }
-
-            let message = { key: requestObject.accountId, hash: requestObject.accountHash, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
-            let result: RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx_post', message) // not sure if we should await this.
-
-            if (result == null) {
-              if (this.verboseLogs) {
-                this.mainLogger.error('ASK FAIL repairToMatchReceipt request_state_for_tx_post result == null')
-              }
-              // We shuffle the array of votes each time so hopefully will ask another node next time
-              // TODO more robust limits to this process, maybe a delay?
-              this.mainLogger.error(`ASK FAIL repairToMatchReceipt request_state_for_tx_post no reponse from ${utils.stringifyReduce(node.id)}`)
-              //this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt missing logic to ask a new node! 1 ${utils.stringifyReduce(node.id)}`)
-              node = null
-              continue
-            }
-
-            if (result.success !== true) {
-              this.mainLogger.error('ASK FAIL repairToMatchReceipt result.success === false')
-              //this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt missing logic to ask a new node! 2 ${utils.stringifyReduce(node.id)}`)
-              node = null
-              continue
-            }
-
-            let dataCountReturned = 0
-            let accountIdsReturned = []
-            for (let data of result.stateList) {
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `write data: ${utils.stringifyReduce(data)}`)
-              //Commit the data
-              let dataToSet = [data]
-              let failedHashes = await this.checkAndSetAccountData(dataToSet, 'repairToMatchReceipt', false)
-              await this.writeCombinedAccountDataToBackups(dataToSet, failedHashes)
-              attemptsRemaining = false
-              //update global cache?  that will be obsolete soona anyhow!
-              //need to loop and call update
-              let beforeData = data.prevDataCopy
-
-              if (beforeData == null) {
-                //prevDataCopy
-                let wrappedAccountDataBefore = queueEntry.collectedData[data.accountId]
-                if (wrappedAccountDataBefore != null) {
-                  beforeData = wrappedAccountDataBefore.data
-                }
-              }
-              if (beforeData == null) {
-                let results = await this.app.getAccountDataByList([data.accountId])
-                beforeData = results[0]
-                this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData: had to query for data 1 ${utils.stringifyReduce(data.accountId)} `)
-                if (beforeData == null) {
-                  this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData: had to query for data 1 not found ${utils.stringifyReduce(data.accountId)} `)
-                }
-              }
-              if (beforeData == null) {
-                this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData data is null ${utils.stringifyReduce(data.accountId)} WILL CAUSE DATA OOS`)
-              } else {
-                if (this.stateManagerStats.hasAccountBeenSeenByStats(data.accountId) === false) {
-                  // Init stats because we have not seen this account yet.
-                  this.stateManagerStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, data.accountId, beforeData)
-                }
-
-                // important to update the timestamp.  There are various reasons it could be incorrectly set to 0
-                let { timestamp: updatedTimestamp, hash: updatedHash } = this.app.getTimestampAndHashFromAccount(data.data)
-                if (data.timestamp != updatedTimestamp) {
-                  this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 timstamp had to be corrected from ${data.timestamp} to ${updatedTimestamp} `)
-                }
-                data.timestamp = updatedTimestamp
-
-                // update stats
-                this.stateManagerStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, beforeData, data)
-
-                // record state table data
-                let { timestamp: oldtimestamp, hash: oldhash } = this.app.getTimestampAndHashFromAccount(beforeData)
-
-                let hashNeededUpdate = oldhash !== result.beforeHashes[data.accountId]
-                oldhash = result.beforeHashes[data.accountId]
-
-                let stateTableResults: Shardus.StateTableObject = {
-                  accountId: data.accountId,
-                  txId: queueEntry.acceptedTx.id,
-                  stateBefore: oldhash,
-                  stateAfter: updatedHash,
-                  txTimestamp: `${updatedTimestamp}`,
-                }
-
-                let updateStateTable = true
-                let timeStampMatches = updatedTimestamp === queueEntry.acceptedTx.timestamp
-                let test2 = false
-                if (timeStampMatches === false) {
-                  if (this.isGlobalAccount(data.accountId)) {
-                    updateStateTable = false
-                    test2 = true
-                  }
-                }
-                let test3 = false
-                if (this.isGlobalAccount(data.accountId)) {
-                  if (oldhash === updatedHash) {
-                    updateStateTable = false
-                    test3 = true
-                  }
-                }
-                if (updateStateTable === true) {
-                  await this.storage.addAccountStates(stateTableResults)
-                }
-                this.mainLogger.debug(`repairToMatchReceipt: addAccountStates neededUpdate:${hashNeededUpdate} updateStateTable:${updateStateTable} timeStampMatches:${timeStampMatches} test2:${test2} test3:${test3} ${utils.stringifyReduce(stateTableResults)} `)
-              }
-            }
-
-            // if (queueEntry.hasAll === true) {
-            //   queueEntry.logstate = 'got all missing data'
-            // } else {
-            //   queueEntry.logstate = 'failed to get data:' + queueEntry.hasAll
-            //   // queueEntry.state = 'failed to get data'
-            // }
-
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_result', `${shortHash}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
-
-            // // queueEntry.homeNodes[key] = null
-            // for (let key2 of allKeys) {
-            //   //consider deleteing these instead?
-            //   //TSConversion changed to a delete opertaion should double check this
-            //   //queueEntry.requests[key2] = null
-            //   delete queueEntry.requests[key2]
-            // }
-
-            // if (queueEntry.hasAll === true) {
-            //   break
-            // }
-          }
-        }
-      }
-
-      // Set this when data has been repaired.
-      queueEntry.repairFinished = true
-    } finally {
-      this.profiler.profileSectionEnd('repair')
-    }
-  }
-
-  /**
-   * queueEntryGetTransactionGroup
-   * @param {QueueEntry} queueEntry
-   * @returns {Node[]}
-   */
-  queueEntryGetTransactionGroup(queueEntry: QueueEntry): Shardus.Node[] {
-    if (this.currentCycleShardData == null) {
-      throw new Error('queueEntryGetTransactionGroup: currentCycleShardData == null')
-    }
-    if (queueEntry.uniqueKeys == null) {
-      throw new Error('queueEntryGetTransactionGroup: queueEntry.uniqueKeys == null')
-    }
-    if (queueEntry.transactionGroup != null) {
-      return queueEntry.transactionGroup
-    }
-    let txGroup = []
-    let uniqueNodes: StringNodeObjectMap = {}
-
-    let hasNonGlobalKeys = false
-    for (let key of queueEntry.uniqueKeys) {
-      let homeNode = queueEntry.homeNodes[key]
-      // txGroup = Array.concat(txGroup, homeNode.nodeThatStoreOurParitionFull)
-      if (homeNode == null) {
-        if (this.verboseLogs) this.mainLogger.debug('queueEntryGetTransactionGroup homenode:null')
-      }
-      if (homeNode.extendedData === false) {
-        ShardFunctions.computeExtendedNodePartitionData(this.currentCycleShardData.shardGlobals, this.currentCycleShardData.nodeShardDataMap, this.currentCycleShardData.parititionShardDataMap, homeNode, this.currentCycleShardData.activeNodes)
-      }
-
-      //may need to go back and sync this logic with how we decide what partition to save a record in.
-
-      // If this is not a global TX then skip tracking of nodes for global accounts used as a reference.
-      if (queueEntry.globalModification === false) {
-        if (this.isGlobalAccount(key) === true) {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `queueEntryGetTransactionGroup skipping: ${utils.makeShortHash(key)} tx: ${utils.makeShortHash(queueEntry.acceptedTx.id)}`)
-          continue
-        } else {
-          hasNonGlobalKeys = true
-        }
-      }
-
-      for (let node of homeNode.nodeThatStoreOurParitionFull) {
-        // not iterable!
-        uniqueNodes[node.id] = node
-      }
-
-      let scratch1 = {}
-      for (let node of homeNode.nodeThatStoreOurParitionFull) {
-        // not iterable!
-        scratch1[node.id] = true
-      }
-      // make sure the home node is in there in case we hit and edge case
-      uniqueNodes[homeNode.node.id] = homeNode.node
-
-      // TODO STATESHARDING4 is this next block even needed:
-      // HOMENODEMATHS need to patch in nodes that would cover this partition!
-      // TODO PERF make an optimized version of this in ShardFunctions that is smarter about which node range to check and saves off the calculation
-      // maybe this could go on the partitions.
-      let { homePartition } = ShardFunctions.addressToPartition(this.currentCycleShardData.shardGlobals, key)
-      if (homePartition != homeNode.homePartition) {
-        //loop all nodes for now
-        for (let nodeID of this.currentCycleShardData.nodeShardDataMap.keys()) {
-          let nodeShardData: NodeShardData = this.currentCycleShardData.nodeShardDataMap.get(nodeID)
-          let nodeStoresThisPartition = ShardFunctions.testInRange(homePartition, nodeShardData.storedPartitions)
-          if (nodeStoresThisPartition === true && uniqueNodes[nodeID] == null) {
-            //setting this will cause it to end up in the transactionGroup
-            uniqueNodes[nodeID] = nodeShardData.node
-            queueEntry.patchedOnNodes.set(nodeID, nodeShardData)
-          }
-          // build index for patched nodes based on the home node:
-          if (nodeStoresThisPartition === true) {
-            if (scratch1[nodeID] == null) {
-              homeNode.patchedOnNodes.push(nodeShardData.node)
-              scratch1[nodeID] = true
-            }
-          }
-        }
-      }
-    }
-    queueEntry.ourNodeInTransactionGroup = true
-    if (uniqueNodes[this.currentCycleShardData.ourNode.id] == null) {
-      queueEntry.ourNodeInTransactionGroup = false
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `queueEntryGetTransactionGroup not involved: hasNonG:${hasNonGlobalKeys} tx ${utils.makeShortHash(queueEntry.acceptedTx.id)}`)
-    }
-
-    // make sure our node is included: needed for gossip! - although we may not care about the data!
-    uniqueNodes[this.currentCycleShardData.ourNode.id] = this.currentCycleShardData.ourNode
-
-    let values = Object.values(uniqueNodes)
-    for (let v of values) {
-      txGroup.push(v)
-    }
-    queueEntry.transactionGroup = txGroup
-    return txGroup
-  }
-
-  /**
-   * queueEntryGetConsensusGroup
-   * Gets a merged results of all the consensus nodes for all of the accounts involved in the transaction
-   * Ignores global accounts if globalModification == false and the account is global
-   * @param {QueueEntry} queueEntry
-   * @returns {Node[]}
-   */
-  queueEntryGetConsensusGroup(queueEntry: QueueEntry): Shardus.Node[] {
-    if (this.currentCycleShardData == null) {
-      throw new Error('queueEntryGetConsensusGroup: currentCycleShardData == null')
-    }
-    if (queueEntry.uniqueKeys == null) {
-      throw new Error('queueEntryGetConsensusGroup: queueEntry.uniqueKeys == null')
-    }
-    if (queueEntry.conensusGroup != null) {
-      return queueEntry.conensusGroup
-    }
-    let txGroup = []
-    let uniqueNodes: StringNodeObjectMap = {}
-
-    let hasNonGlobalKeys = false
-    for (let key of queueEntry.uniqueKeys) {
-      let homeNode = queueEntry.homeNodes[key]
-      if (homeNode == null) {
-        if (this.verboseLogs) this.mainLogger.debug('queueEntryGetConsensusGroup homenode:null')
-      }
-      if (homeNode.extendedData === false) {
-        ShardFunctions.computeExtendedNodePartitionData(this.currentCycleShardData.shardGlobals, this.currentCycleShardData.nodeShardDataMap, this.currentCycleShardData.parititionShardDataMap, homeNode, this.currentCycleShardData.activeNodes)
-      }
-
-      // TODO STATESHARDING4 GLOBALACCOUNTS is this next block of logic needed?
-      // If this is not a global TX then skip tracking of nodes for global accounts used as a reference.
-      if (queueEntry.globalModification === false) {
-        if (this.isGlobalAccount(key) === true) {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `queueEntryGetConsensusGroup skipping: ${utils.makeShortHash(key)} tx: ${utils.makeShortHash(queueEntry.acceptedTx.id)}`)
-          continue
-        } else {
-          hasNonGlobalKeys = true
-        }
-      }
-
-      for (let node of homeNode.consensusNodeForOurNodeFull) {
-        uniqueNodes[node.id] = node
-      }
-
-      // make sure the home node is in there in case we hit and edge case
-      uniqueNodes[homeNode.node.id] = homeNode.node
-    }
-    queueEntry.ourNodeInConsensusGroup = true
-    if (uniqueNodes[this.currentCycleShardData.ourNode.id] == null) {
-      queueEntry.ourNodeInConsensusGroup = false
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `queueEntryGetConsensusGroup not involved: hasNonG:${hasNonGlobalKeys} tx ${utils.makeShortHash(queueEntry.acceptedTx.id)}`)
-    }
-
-    // make sure our node is included: needed for gossip! - although we may not care about the data!
-    uniqueNodes[this.currentCycleShardData.ourNode.id] = this.currentCycleShardData.ourNode
-
-    let values = Object.values(uniqueNodes)
-    for (let v of values) {
-      txGroup.push(v)
-    }
-    queueEntry.conensusGroup = txGroup
-    return txGroup
-  }
-
-  // should work even if there are zero nodes to tell and should load data locally into queue entry
-  async tellCorrespondingNodes(queueEntry: QueueEntry) {
-    if (this.currentCycleShardData == null) {
-      throw new Error('tellCorrespondingNodes: currentCycleShardData == null')
-    }
-    if (queueEntry.uniqueKeys == null) {
-      throw new Error('tellCorrespondingNodes: queueEntry.uniqueKeys == null')
-    }
-    // Report data to corresponding nodes
-    let ourNodeData = this.currentCycleShardData.nodeShardData
-    // let correspondingEdgeNodes = []
-    let correspondingAccNodes = []
-    let dataKeysWeHave = []
-    let dataValuesWeHave = []
-    let datas: { [accountID: string]: any } = {}
-    let remoteShardsByKey: { [accountID: string]: NodeShardData } = {} // shard homenodes that we do not have the data for.
-    let loggedPartition = false
-    for (let key of queueEntry.uniqueKeys) {
-      ///   test here
-      // let hasKey = ShardFunctions.testAddressInRange(key, ourNodeData.storedPartitions)
-      // todo : if this works maybe a nicer or faster version could be used
-      let hasKey = false
-      let homeNode = queueEntry.homeNodes[key]
-      if (homeNode.node.id === ourNodeData.node.id) {
-        hasKey = true
-      } else {
-        for (let node of homeNode.nodeThatStoreOurParitionFull) {
-          if (node.id === ourNodeData.node.id) {
-            hasKey = true
-            break
-          }
-        }
-      }
-
-      // HOMENODEMATHS tellCorrespondingNodes patch the value of hasKey
-      // did we get patched in
-      if (queueEntry.patchedOnNodes.has(ourNodeData.node.id)) {
-        hasKey = true
-      }
-
-      // for(let patchedNodeID of queueEntry.patchedOnNodes.values()){
-      // }
-
-      let isGlobalKey = false
-      //intercept that we have this data rather than requesting it.
-      if (this.globalAccountMap.has(key)) {
-        hasKey = true
-        isGlobalKey = true
-        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalAccountMap', `tellCorrespondingNodes - has`)
-      }
-
-      if (hasKey === false) {
-        if (loggedPartition === false) {
-          loggedPartition = true
-          if (this.verboseLogs) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false: ${utils.stringifyReduce(homeNode.nodeThatStoreOurParitionFull.map((v) => v.id))}`)
-          if (this.verboseLogs) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false: full: ${utils.stringifyReduce(homeNode.nodeThatStoreOurParitionFull)}`)
-        }
-        if (this.verboseLogs) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false  key: ${utils.stringifyReduce(key)}`)
-      }
-
-      if (hasKey) {
-        // todo Detect if our node covers this paritition..  need our partition data
-        let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
-        //only queue this up to share if it is not a global account. global accounts dont need to be shared.
-
-        //if this is not freshly created data then we need to make a backup copy of it!!
-        //This prevents us from changing data before the commiting phase
-        if (data.accountCreated == false) {
-          data = utils.deepCopy(data)
-        }
-
-        if (isGlobalKey === false) {
-          datas[key] = data
-          dataKeysWeHave.push(key)
-          dataValuesWeHave.push(data)
-        }
-
-        queueEntry.localKeys[key] = true
-        // add this data to our own queue entry!!
-        this.queueEntryAddData(queueEntry, data)
-      } else {
-        remoteShardsByKey[key] = queueEntry.homeNodes[key]
-      }
-    }
-    if (queueEntry.globalModification === true) {
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tellCorrespondingNodes', `tellCorrespondingNodes - globalModification = true, not telling other nodes`)
-      return
-    }
-
-    let message
-    let edgeNodeIds = []
-    let consensusNodeIds = []
-
-    let nodesToSendTo: StringNodeObjectMap = {}
-    for (let key of queueEntry.uniqueKeys) {
-      if (datas[key] != null) {
-        for (let key2 of queueEntry.uniqueKeys) {
-          if (key !== key2) {
-            let localHomeNode = queueEntry.homeNodes[key]
-            let remoteHomeNode = queueEntry.homeNodes[key2]
-
-            let ourLocalConsensusIndex = localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === ourNodeData.node.id)
-            if (ourLocalConsensusIndex === -1) {
-              continue
-            }
-
-            // must add one to each lookup index!
-            let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.consensusNodeForOurNodeFull.length, ourLocalConsensusIndex + 1)
-            let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.edgeNodes.length, ourLocalConsensusIndex + 1)
-
-            let patchIndicies = []
-            if (remoteHomeNode.patchedOnNodes.length > 0) {
-              patchIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.patchedOnNodes.length, ourLocalConsensusIndex + 1)
-            }
-
-            // HOMENODEMATHS need to work out sending data to our patched range.
-            // let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.edgeNodes.length, ourLocalConsensusIndex + 1)
-
-            // for each remote node lets save it's id
-            for (let index of indicies) {
-              let node = remoteHomeNode.consensusNodeForOurNodeFull[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
-              if (node != null && node.id !== ourNodeData.node.id) {
-                nodesToSendTo[node.id] = node
-                consensusNodeIds.push(node.id)
-              }
-            }
-            for (let index of edgeIndicies) {
-              let node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
-              if (node != null && node.id !== ourNodeData.node.id) {
-                nodesToSendTo[node.id] = node
-                edgeNodeIds.push(node.id)
-              }
-            }
-
-            for (let index of patchIndicies) {
-              let node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
-              if (node != null && node.id !== ourNodeData.node.id) {
-                nodesToSendTo[node.id] = node
-                //edgeNodeIds.push(node.id)
-              }
-            }
-
-            correspondingAccNodes = Object.values(nodesToSendTo)
-            let dataToSend = []
-            dataToSend.push(datas[key]) // only sending just this one key at a time
-            message = { stateList: dataToSend, txid: queueEntry.acceptedTx.id }
-            if (correspondingAccNodes.length > 0) {
-              let remoteRelation = ShardFunctions.getNodeRelation(remoteHomeNode, this.currentCycleShardData.ourNode.id)
-              let localRelation = ShardFunctions.getNodeRelation(localHomeNode, this.currentCycleShardData.ourNode.id)
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_tellCorrespondingNodes', `${queueEntry.acceptedTx.id}`, `remoteRel: ${remoteRelation} localrel: ${localRelation} qId: ${queueEntry.entryID} AccountBeingShared: ${utils.makeShortHash(key)} EdgeNodes:${utils.stringifyReduce(edgeNodeIds)} ConsesusNodes${utils.stringifyReduce(consensusNodeIds)}`)
-
-              // Filter nodes before we send tell()
-              let filteredNodes = this.filterValidNodesForInternalMessage(correspondingAccNodes, 'tellCorrespondingNodes', true, true)
-              if (filteredNodes.length === 0) {
-                this.mainLogger.error('tellCorrespondingNodes: filterValidNodesForInternalMessage no valid nodes left to try')
-                return null
-              }
-              let filterdCorrespondingAccNodes = filteredNodes
-
-              this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_state', message)
-            }
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * removeFromQueue remove an item from the queue and place it in the archivedQueueEntries list for awhile in case we have to access it again
-   * @param {QueueEntry} queueEntry
-   * @param {number} currentIndex
-   */
-  removeFromQueue(queueEntry: QueueEntry, currentIndex: number) {
-    this.emit('txPopped', queueEntry.acceptedTx.receipt.txHash)
-    this.newAcceptedTxQueue.splice(currentIndex, 1)
-    this.archivedQueueEntries.push(queueEntry)
-    // period cleanup will usually get rid of these sooner if the list fills up
-    if (this.archivedQueueEntries.length > this.archivedQueueEntryMaxCount) {
-      this.archivedQueueEntries.shift()
-    }
-  }
-
-  /***
-   *    ########  ########   #######   ######  ########  ######   ######
-   *    ##     ## ##     ## ##     ## ##    ## ##       ##    ## ##    ##
-   *    ##     ## ##     ## ##     ## ##       ##       ##       ##
-   *    ########  ########  ##     ## ##       ######    ######   ######
-   *    ##        ##   ##   ##     ## ##       ##             ##       ##
-   *    ##        ##    ##  ##     ## ##    ## ##       ##    ## ##    ##
-   *    ##        ##     ##  #######   ######  ########  ######   ######
-   */
-  async processAcceptedTxQueue() {
-    let seenAccounts: SeenAccounts
-    seenAccounts = {} // todo PERF we should be able to support using a variable that we save from one update to the next.  set that up after initial testing
-    let pushedProfilerTag = null
-    try {
-      this.profiler.profileSectionStart('processQ')
-
-      if (this.currentCycleShardData == null) {
-        return
-      }
-
-      if (this.newAcceptedTxQueue.length === 0 && this.newAcceptedTxQueueTempInjest.length === 0) {
-        return
-      }
-      if (this.newAcceptedTxQueueRunning === true) {
-        return
-      }
-      if (this.queueRestartCounter == null) {
-        this.queueRestartCounter = 0
-      }
-      this.queueRestartCounter++
-
-      let localRestartCounter = this.queueRestartCounter
-
-      this.newAcceptedTxQueueRunning = true
-
-      let acceptedTXCount = 0
-      let edgeFailDetected = false
-
-      let timeM = this.queueSitTime
-      let timeM2 = timeM * 2
-      let timeM2_5 = timeM * 2.5
-      let timeM3 = timeM * 3
-      let currentTime = Date.now() // when to update this?
-
-      // let seenAccounts2 = new Map()
-      // todo move these functions out where they are not constantly regenerate
-      let accountSeen = function (queueEntry: QueueEntry) {
-        if (queueEntry.uniqueKeys == null) {
-          //TSConversion double check if this needs extra logging
-          return false
-        }
-        for (let key of queueEntry.uniqueKeys) {
-          if (seenAccounts[key] != null) {
-            return true
-          }
-          // if (seenAccounts2.has(key)) {
-          //   this.fatalLogger.fatal('map fail in seenAccounts')
-          //   return true
-          // }
-        }
-        return false
-      }
-      let markAccountsSeen = function (queueEntry: QueueEntry) {
-        if (queueEntry.uniqueWritableKeys == null) {
-          //TSConversion double check if this needs extra logging
-          return
-        }
-        // only mark writeable keys as seen but we will check/clear against all keys
-        for (let key of queueEntry.uniqueWritableKeys) {
-          if (seenAccounts[key] == null) {
-            seenAccounts[key] = queueEntry
-          }
-          // seenAccounts2.set(key, true)
-        }
-      }
-      // if we are the oldest ref to this you can clear it.. only ok because younger refs will still reflag it in time
-      let clearAccountsSeen = function (queueEntry: QueueEntry) {
-        if (queueEntry.uniqueKeys == null) {
-          //TSConversion double check if this needs extra logging
-          return
-        }
-        for (let key of queueEntry.uniqueKeys) {
-          if (seenAccounts[key] === queueEntry) {
-            seenAccounts[key] = null
-          }
-          // seenAccounts2.delete(key)
-        }
-      }
-
-      let app = this.app
-      let verboseLogs = this.verboseLogs
-      let debugAccountData = function (queueEntry: QueueEntry, app: Shardus.App) {
-        let debugStr = ''
-        if (verboseLogs) {
-          if (queueEntry.uniqueKeys == null) {
-            //TSConversion double check if this needs extra logging
-            return utils.makeShortHash(queueEntry.acceptedTx.id) + ' uniqueKeys empty error'
-          }
-          for (let key of queueEntry.uniqueKeys) {
-            if (queueEntry.collectedData[key] != null) {
-              debugStr += utils.makeShortHash(key) + ' : ' + app.getAccountDebugValue(queueEntry.collectedData[key]) + ', '
-            }
-          }
-        }
-        return debugStr
-      }
-
-      // process any new queue entries that were added to the temporary list
-      if (this.newAcceptedTxQueueTempInjest.length > 0) {
-        for (let txQueueEntry of this.newAcceptedTxQueueTempInjest) {
-          let timestamp = txQueueEntry.txKeys.timestamp
-          let acceptedTx = txQueueEntry.acceptedTx
-          let txId = acceptedTx.receipt.txHash
-          // sorted insert = sort by timestamp
-          // todo faster version (binary search? to find where we need to insert)
-          let index = this.newAcceptedTxQueue.length - 1
-          let lastTx = this.newAcceptedTxQueue[index]
-
-          while (index >= 0 && (timestamp > lastTx.txKeys.timestamp || (timestamp === lastTx.txKeys.timestamp && txId < lastTx.acceptedTx.id))) {
-            index--
-            lastTx = this.newAcceptedTxQueue[index]
-          }
-
-          //TODO check time before inserting queueEntry. make sure it is not older than 90% of M
-          let age = Date.now() - timestamp
-          if (age > timeM * 0.9) {
-            // IT turns out the correct thing to check is didSync flag only report errors if we did not wait on this TX while syncing
-            if (txQueueEntry.didSync == false) {
-              this.statemanager_fatal(`processAcceptedTxQueue_oldTX.9`, 'processAcceptedTxQueue cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld1', `${utils.makeShortHash(txQueueEntry.acceptedTx.id)}`, 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
-              //txQueueEntry.waitForReceiptOnly = true
-            }
-          }
-          if (age > timeM) {
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld2', `${utils.makeShortHash(txQueueEntry.acceptedTx.id)}`, 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
-            txQueueEntry.waitForReceiptOnly = true
-            txQueueEntry.state = 'consensing'
-          }
-
-          txQueueEntry.approximateCycleAge = this.currentCycleShardData.cycleNumber
-          this.newAcceptedTxQueue.splice(index + 1, 0, txQueueEntry)
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)} indexInserted: ${index + 1}`)
-          this.emit('txQueued', acceptedTx.receipt.txHash)
-        }
-        this.newAcceptedTxQueueTempInjest = []
-      }
-
-      let currentIndex = this.newAcceptedTxQueue.length - 1
-
-      let lastLog = 0
-      currentIndex++ //increment once so we can handle the decrement at the top of the loop and be safe about continue statements
-
-      while (this.newAcceptedTxQueue.length > 0) {
-        //Handle an odd case where the finally did not catch exiting scope.
-        if (pushedProfilerTag != null) {
-          this.profiler.profileSectionEnd(`process-${pushedProfilerTag}`)
-          this.profiler.profileSectionEnd(`process-patched1-${pushedProfilerTag}`)
-          pushedProfilerTag = null
-        }
-
-        currentIndex--
-        if (currentIndex < 0) {
-          break
-        }
-        let queueEntry: QueueEntry = this.newAcceptedTxQueue[currentIndex]
-        let txTime = queueEntry.txKeys.timestamp
-        let txAge = currentTime - txTime
-        if (txAge < timeM) {
-          break
-        }
-
-        if (localRestartCounter < this.queueRestartCounter && lastLog !== this.queueRestartCounter) {
-          lastLog = this.queueRestartCounter
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('queueRestart_error', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  qrstGlobal:${this.queueRestartCounter}}`)
-        }
-        // // fail the message if older than m3
-        // if (queueEntry.hasAll === false && txAge > timeM3) {
-        //   queueEntry.state = 'failed'
-        //   removeFromQueue(queueEntry, currentIndex)
-        //   continue
-        // }
-
-        this.debugTXHistory[queueEntry.logID] = queueEntry.state
-
-        let hasReceivedApplyReceipt = queueEntry.recievedAppliedReceipt != null
-        let shortID = queueEntry.logID //`${utils.makeShortHash(queueEntry.acceptedTx.id)}`
-
-        if (this.stateManagerSync.dataSyncMainPhaseComplete === true) {
-          //check for TX older than M3 and expire them
-          if (txAge > timeM3 && queueEntry.didSync == false) {
-            //if(queueEntry.didSync == true && queueEntry.didWakeup == )
-            //this.statistics.incrementCounter('txExpired')
-            queueEntry.state = 'expired'
-            this.removeFromQueue(queueEntry, currentIndex)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
-
-            continue
-          }
-          if (txAge > timeM3 * 20 && queueEntry.didSync == true) {
-            //this.statistics.incrementCounter('txExpired')
-            queueEntry.state = 'expired'
-            this.removeFromQueue(queueEntry, currentIndex)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 2  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 2: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
-
-            continue
-          }
-
-          if (txAge > timeM3 && queueEntry.requestingReceiptFailed) {
-            //this.statistics.incrementCounter('txExpired')
-            queueEntry.state = 'expired'
-            this.removeFromQueue(queueEntry, currentIndex)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 3 requestingReceiptFailed  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
-            continue
-          }
-
-          // if we have a pending request for a receipt mark account seen and continue
-          if (queueEntry.requestingReceipt === true) {
-            markAccountsSeen(queueEntry)
-            continue
-          }
-
-          // This was checking at m2 before, but there was a chance that would be too early.
-          // Checking at m2.5 allows the network a chance at a receipt existing
-          if (txAge > timeM2_5 && queueEntry.didSync === true && queueEntry.requestingReceiptFailed === false) {
-            if (queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null) {
-              if (verboseLogs) this.mainLogger.error(`info: tx did sync. ask for receipt now:${shortID} `)
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('syncNeedsReceipt', `${shortID}`, `syncNeedsReceipt ${shortID}`)
-              markAccountsSeen(queueEntry)
-              this.queueEntryRequestMissingReceipt(queueEntry)
-              continue
-            }
-          }
-
-          // have not seen a receipt yet?
-          if (txAge > timeM2_5 && queueEntry.requestingReceiptFailed === false) {
-            if (queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null) {
-              if (verboseLogs) this.mainLogger.error(`txMissingReceipt txid:${shortID} `)
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txMissingReceipt', `${shortID}`, `txMissingReceipt ${shortID}`)
-              markAccountsSeen(queueEntry)
-              this.queueEntryRequestMissingReceipt(queueEntry)
-              continue
-            }
-          }
-        } else {
-          //check for TX older than 10x M3 and expire them
-          if (txAge > timeM3 * 10) {
-            //this.statistics.incrementCounter('txExpired')
-            queueEntry.state = 'expired'
-            this.removeFromQueue(queueEntry, currentIndex)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 4  ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 4: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
-            continue
-          }
-        }
-
-        if (txAge > timeM2_5 && queueEntry.m2TimeoutReached === false && queueEntry.globalModification === false) {
-          //if(queueEntry.recievedAppliedReceipt != null || queueEntry.appliedReceipt != null){
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld3', `${shortID}`, 'processAcceptedTxQueue working on older tx ' + queueEntry.acceptedTx.timestamp + ' age: ' + txAge)
-          queueEntry.waitForReceiptOnly = true
-          queueEntry.m2TimeoutReached = true
-          queueEntry.state = 'consensing'
-          continue
-          //}
-        }
-
-        // TODO STATESHARDING4 Does this queueEntry have a receipt?
-        //
-        //  A: if preapply results match the receipt results
-        //  if we have the data we need to apply it:
-        //       queueEntry.state = 'commiting'
-        //
-        //  B: if they dont match then
-        //     -sync account from another node (based on hash values in receipt)
-        //     Write the data that synced
-        //
-        //  C: if we get a receipt but have not pre applied yet?
-        //     ? would still be waiting on data.
-        //     this is not normal.  a node would be really behind.  Just do the data repair like step "B"
-
-        try {
-          this.profiler.profileSectionStart(`process-${queueEntry.state}`)
-          pushedProfilerTag = queueEntry.state
-
-          if (queueEntry.state === 'syncing') {
-            ///////////////////////////////////////////////--syncing--////////////////////////////////////////////////////////////
-            markAccountsSeen(queueEntry)
-          } else if (queueEntry.state === 'aging') {
-            ///////////////////////////////////////////--aging--////////////////////////////////////////////////////////////////
-            // we know that tx age is greater than M
-            queueEntry.state = 'processing'
-            markAccountsSeen(queueEntry)
-          } else if (queueEntry.state === 'processing') {
-            ////////////////////////////////////////--processing--///////////////////////////////////////////////////////////////////
-            if (accountSeen(queueEntry) === false) {
-              markAccountsSeen(queueEntry)
-              try {
-                //if(queueEntry.globalModification === false) {
-                await this.tellCorrespondingNodes(queueEntry)
-                if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_processing', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  values: ${debugAccountData(queueEntry, app)}`)
-                //}
-              } catch (ex) {
-                this.mainLogger.debug('processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-                this.statemanager_fatal(`processAcceptedTxQueue2_ex`, 'processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-              } finally {
-                queueEntry.state = 'awaiting data'
-              }
-            }
-            markAccountsSeen(queueEntry)
-          } else if (queueEntry.state === 'awaiting data') {
-            ///////////////////////////////////////--awaiting data--////////////////////////////////////////////////////////////////////
-
-            // TODO STATESHARDING4 GLOBALACCOUNTS need to find way to turn this back on..
-            // if(queueEntry.globalModification === true){
-            //   markAccountsSeen(queueEntry)
-            //   // no data to await.
-            //   queueEntry.state = 'applying'
-            //   continue
-            // }
-            // check if we have all accounts
-            if (queueEntry.hasAll === false && txAge > timeM2) {
-              //TODO STATESHARDING4 in theory this shouldn't be able to happen
-
-              markAccountsSeen(queueEntry)
-              if (this.queueEntryHasAllData(queueEntry) === true) {
-                // I think this can't happen
-                if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_hadDataAfterall', `${shortID}`, `This is kind of an error, and should not happen`)
-                continue
-              }
-
-              // if (queueEntry.hasAll === false && txAge > timeM3) {
-              //   queueEntry.state = 'failed'
-              //   removeFromQueue(queueEntry, currentIndex)
-              //   continue
-              // }
-
-              // 7.  Manually request missing state
-              try {
-                // TODO consider if this function should set 'failed to get data'
-                // note this is call is not awaited.  is that ok?
-                //
-                // TODO STATESHARDING4 should we await this.  I think no since this waits on outside nodes to respond
-                this.queueEntryRequestMissingData(queueEntry)
-              } catch (ex) {
-                this.mainLogger.debug('processAcceptedTxQueue2 queueEntryRequestMissingData:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-                this.statemanager_fatal(`processAcceptedTxQueue2_missingData`, 'processAcceptedTxQueue2 queueEntryRequestMissingData:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-              }
-            } else if (queueEntry.hasAll) {
-              if (accountSeen(queueEntry) === false) {
-                markAccountsSeen(queueEntry)
-
-                // As soon as we have all the data we preApply it and then send out a vote
-                if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_preApplyTx', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-
-                // TODO sync related need to reconsider how to set this up again
-                // if (queueEntry.didSync) {
-                //   if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_consensing', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
-                //   // if we did sync it is time to JIT query local data.  alternatively could have other nodes send us this data, but that could be very high bandwidth.
-                //   for (let key of queueEntry.syncKeys) {
-                //     let wrappedState = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
-                //     if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)} hash:${wrappedState.stateId}`)
-                //     queueEntry.localCachedData[key] = wrappedState.localCache
-                //   }
-                // }
-
-                let wrappedStates = queueEntry.collectedData
-                let localCachedData = queueEntry.localCachedData
-                try {
-                  let filter: AccountFilter = {}
-                  // need to convert to map of numbers, could refactor this away later
-                  for (let key of Object.keys(queueEntry.localKeys)) {
-                    filter[key] = queueEntry[key] == true ? 1 : 0
-                  }
-
-                  // Need to go back and thing on how this was supposed to work:
-                  // queueEntry.acceptedTx.transactionGroup = queueEntry.transactionGroup // Used to not double count txProcessed
-                  let txResult = await this.preApplyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates, localCachedData, filter)
-
-                  // TODO STATESHARDING4 evaluate how much of this we still need, does the edge fail stuff still matter
-                  if (txResult != null) {
-                    if (txResult.passed === true) {
-                      acceptedTXCount++
-                    }
-                    // clearAccountsSeen(queueEntry)
-                  } else {
-                    // clearAccountsSeen(queueEntry)
-                    // if (!edgeFailDetected && acceptedTXCount > 0) {
-                    //   edgeFailDetected = true
-                    //   if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-                    //   this.fatalLogger.fatal(this.dataPhaseTag + `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`) // todo: consider if this is just an error
-                    // }
-                  }
-
-                  if (txResult != null && txResult.applied === true) {
-                    queueEntry.state = 'consensing'
-
-                    queueEntry.preApplyTXResult = txResult
-                    //Broadcast our vote
-                    if (queueEntry.noConsensus === true) {
-                      // not sure about how to share or generate an applied receipt though for a no consensus step
-                      if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_preApplyTx_noConsensus', `${shortID}`, ``)
-
-                      this.mainLogger.debug(`processAcceptedTxQueue2 noConsensus : ${queueEntry.logID} `)
-
-                      //await this.createAndShareVote(queueEntry)
-
-                      queueEntry.state = 'commiting'
-
-                      // if(queueEntry.globalModification === false){
-                      //   //Send a special receipt because this is a set command.
-
-                      // }
-                    } else {
-                      if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_preApplyTx_createAndShareVote', `${shortID}`, ``)
-                      this.mainLogger.debug(`processAcceptedTxQueue2 createAndShareVote : ${queueEntry.logID} `)
-                      await this.createAndShareVote(queueEntry)
-                    }
-                  } else {
-                    this.mainLogger.error(`processAcceptedTxQueue2 txResult problem txid:${queueEntry.logID} res: ${utils.stringifyReduce(txResult)} `)
-                    queueEntry.waitForReceiptOnly = true
-                    queueEntry.state = 'consensing'
-                  }
-                } catch (ex) {
-                  this.mainLogger.debug('processAcceptedTxQueue2 preApplyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-                  this.statemanager_fatal(`processAcceptedTxQueue2b_ex`, 'processAcceptedTxQueue2 preApplyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-                } finally {
-                  if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_preapplyFinish', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-                }
-              }
-              markAccountsSeen(queueEntry)
-            }
-          } else if (queueEntry.state === 'consensing') {
-            /////////////////////////////////////////--consensing--//////////////////////////////////////////////////////////////////
-            if (accountSeen(queueEntry) === false) {
-              markAccountsSeen(queueEntry)
-
-              let didNotMatchReceipt = false
-
-              this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`)
-              let result = this.tryProduceReceipt(queueEntry)
-              if (result != null) {
-                if (this.hasAppliedReceiptMatchingPreApply(queueEntry, result)) {
-                  if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_consensingComplete_madeReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
-
-                  // Broadcast the receipt
-                  await this.shareAppliedReceipt(queueEntry)
-                  queueEntry.state = 'commiting'
-                  continue
-                } else {
-                  if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch1', `${shortID}`, `qId: ${queueEntry.entryID}  `)
-                  didNotMatchReceipt = true
-                  queueEntry.appliedReceiptForRepair = result
-                }
-              }
-
-              // if we got a reciept while waiting see if we should use it
-              if (hasReceivedApplyReceipt) {
-                if (this.hasAppliedReceiptMatchingPreApply(queueEntry, queueEntry.recievedAppliedReceipt)) {
-                  if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${shortID}`, `qId: ${queueEntry.entryID} `)
-                  queueEntry.state = 'commiting'
-                  continue
-                } else {
-                  if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch2', `${shortID}`, `qId: ${queueEntry.entryID}  `)
-                  didNotMatchReceipt = true
-                  queueEntry.appliedReceiptForRepair = queueEntry.recievedAppliedReceipt
-                }
-              } else {
-                //just keep waiting.
-              }
-
-              // we got a receipt but did not match it.
-              if (didNotMatchReceipt === true) {
-                if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_consensingComplete_didNotMatchReceipt', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} `)
-                queueEntry.repairFinished = false
-                if (queueEntry.appliedReceiptForRepair.result === true) {
-                  // need to start repair process and wait
-                  this.repairToMatchReceipt(queueEntry)
-                  queueEntry.state = 'await repair'
-                } else {
-                  // we are finished since there is nothing to apply
-                  this.removeFromQueue(queueEntry, currentIndex)
-                  queueEntry.state = 'fail'
-                }
-              }
-            }
-            markAccountsSeen(queueEntry)
-          } else if (queueEntry.state === 'await repair') {
-            ///////////////////////////////////////////--await repair--////////////////////////////////////////////////////////////////
-            markAccountsSeen(queueEntry)
-
-            // at this point we are just waiting to see if we applied the data and repaired correctlyl
-            if (queueEntry.repairFinished === true) {
-              if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_awaitRepair_repairFinished', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} `)
-              this.removeFromQueue(queueEntry, currentIndex)
-              if (queueEntry.appliedReceiptForRepair.result === true) {
-                queueEntry.state = 'pass'
-              } else {
-                // technically should never get here
-                queueEntry.state = 'fail'
-              }
-            }
-          } else if (queueEntry.state === 'commiting') {
-            ///////////////////////////////////////////--commiting--////////////////////////////////////////////////////////////////
-            if (accountSeen(queueEntry) === false) {
-              markAccountsSeen(queueEntry)
-
-              // TODO STATESHARDING4 Check if we have already commited the data from a receipt we saw earlier
-              this.mainLogger.debug(`processAcceptedTxQueue2 commiting : ${queueEntry.logID} `)
-              if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_commitingTx', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-
-              // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processAcceptedTxQueue2. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
-
-              // TODO STATESHARDING4 SYNC related need to reconsider how to set this up again
-              // if (queueEntry.didSync) {
-              //   if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_commiting', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
-              //   // if we did sync it is time to JIT query local data.  alternatively could have other nodes send us this data, but that could be very high bandwidth.
-              //   for (let key of queueEntry.syncKeys) {
-              //     let wrappedState = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
-              //     if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)} hash:${wrappedState.stateId}`)
-              //     queueEntry.localCachedData[key] = wrappedState.localCache
-              //   }
-              // }
-
-              let wrappedStates = queueEntry.collectedData // Object.values(queueEntry.collectedData)
-              let localCachedData = queueEntry.localCachedData
-              try {
-                let canCommitTX = true
-                let hasReceiptFail = false
-                if (queueEntry.noConsensus === true) {
-                  // dont have a receipt for a non consensus TX. not even sure if we want to keep that!
-                  if (queueEntry.preApplyTXResult.passed === false) {
-                    canCommitTX = false
-                  }
-                } else if (queueEntry.appliedReceipt != null) {
-                  // the final state of the queue entry will be pass or fail based on the receipt
-                  if (queueEntry.appliedReceipt.result === false) {
-                    canCommitTX = false
-                    hasReceiptFail = true
-                  }
-                } else if (queueEntry.recievedAppliedReceipt != null) {
-                  // the final state of the queue entry will be pass or fail based on the receipt
-                  if (queueEntry.recievedAppliedReceipt.result === false) {
-                    canCommitTX = false
-                    hasReceiptFail = false
-                  }
-                } else {
-                  canCommitTX = false
-                }
-
-                if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_commitingTx', `${shortID}`, `canCommitTX: ${canCommitTX} `)
-                if (canCommitTX) {
-                  // this.mainLogger.debug(` processAcceptedTxQueue2. applyAcceptedTransaction ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp} queuerestarts: ${localRestartCounter} queueLen: ${this.newAcceptedTxQueue.length}`)
-                  let filter: AccountFilter = {}
-                  // need to convert to map of numbers, could refactor this away later
-                  for (let key of Object.keys(queueEntry.localKeys)) {
-                    filter[key] = queueEntry[key] == true ? 1 : 0
-                  }
-                  // Need to go back and thing on how this was supposed to work:
-                  //queueEntry.acceptedTx.transactionGroup = queueEntry.transactionGroup // Used to not double count txProcessed
-                  let hasStateTableData = false
-                  let repairing = false
-                  //try {
-                  this.profiler.profileSectionStart('commit')
-
-                  let commitResult = await this.commitConsensedTransaction(
-                    queueEntry.preApplyTXResult.applyResponse, // TODO STATESHARDING4 ... if we get here from a non standard path may need to get this data from somewhere else
-                    queueEntry.acceptedTx,
-                    hasStateTableData,
-                    repairing,
-                    filter,
-                    wrappedStates,
-                    localCachedData
-                  )
-
-                  //} finally {
-                  this.profiler.profileSectionEnd('commit')
-                  //}
-
-                  if (commitResult != null && commitResult.success) {
-                  }
-                }
-                if (hasReceiptFail) {
-                  // endpoint to allow dapp to execute something that depends on a transaction failing
-
-                  let applyReponse = queueEntry.preApplyTXResult.applyResponse // TODO STATESHARDING4 ... if we get here from a non standard path may need to get this data from somewhere else
-
-                  this.app.transactionReceiptFail(queueEntry.acceptedTx.data, wrappedStates, applyReponse)
-                }
-              } catch (ex) {
-                this.mainLogger.debug('processAcceptedTxQueue2 commiting Transaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-                this.statemanager_fatal(`processAcceptedTxQueue2b_ex`, 'processAcceptedTxQueue2 commiting Transaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-              } finally {
-                clearAccountsSeen(queueEntry)
-                this.removeFromQueue(queueEntry, currentIndex)
-
-                if (queueEntry.noConsensus === true) {
-                  // dont have a receipt for a non consensus TX. not even sure if we want to keep that!
-                  if (queueEntry.preApplyTXResult.passed === true) {
-                    queueEntry.state = 'pass'
-                  } else {
-                    queueEntry.state = 'fail'
-                  }
-                  this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : noConsensus:${queueEntry.state} ${queueEntry.logID} `)
-                } else if (queueEntry.appliedReceipt != null) {
-                  // the final state of the queue entry will be pass or fail based on the receipt
-                  if (queueEntry.appliedReceipt.result === true) {
-                    queueEntry.state = 'pass'
-                  } else {
-                    queueEntry.state = 'fail'
-                  }
-                  this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : Recpt:${queueEntry.state} ${queueEntry.logID} `)
-                } else if (queueEntry.recievedAppliedReceipt != null) {
-                  // the final state of the queue entry will be pass or fail based on the receipt
-                  if (queueEntry.recievedAppliedReceipt.result === true) {
-                    queueEntry.state = 'pass'
-                  } else {
-                    queueEntry.state = 'fail'
-                  }
-                  this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : recvRecpt:${queueEntry.state} ${queueEntry.logID} `)
-                } else {
-                  queueEntry.state = 'fail'
-
-                  this.mainLogger.error(`processAcceptedTxQueue2 commiting finished : no receipt ${queueEntry.logID} `)
-                }
-
-                if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_commitingTxFinished', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-              }
-
-              // TODO STATESHARDING4 SYNC related.. need to consider how we will re activate this
-              // // do we have any syncing neighbors?
-              // if (this.currentCycleShardData.hasSyncingNeighbors === true && queueEntry.globalModification === false) {
-              // // let dataToSend = Object.values(queueEntry.collectedData)
-              //   let dataToSend = []
-
-              //   let keys = Object.keys(queueEntry.originalData)
-              //   for (let key of keys) {
-              //     dataToSend.push(JSON.parse(queueEntry.originalData[key]))
-              //   }
-
-              //   // maybe have to send localcache over, or require the syncing node to grab this data itself JIT!
-              //   // let localCacheTransport = Object.values(queueEntry.localCachedData)
-
-              //   // send data to syncing neighbors.
-              //   if (this.currentCycleShardData.syncingNeighbors.length > 0) {
-              //     let message = { stateList: dataToSend, txid: queueEntry.acceptedTx.id }
-              //     if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_dataTell', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} AccountBeingShared: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)} txid: ${utils.makeShortHash(message.txid)} nodes:${utils.stringifyReduce(this.currentCycleShardData.syncingNeighbors.map(x => x.id))}`)
-              //     this.p2p.tell(this.currentCycleShardData.syncingNeighbors, 'broadcast_state', message)
-              //   }
-              // }
-            }
-          } else if (queueEntry.state === 'canceled') {
-            ///////////////////////////////////////////////--canceled--////////////////////////////////////////////////////////////
-            clearAccountsSeen(queueEntry)
-            this.removeFromQueue(queueEntry, currentIndex)
-            this.mainLogger.debug(`processAcceptedTxQueue2 canceled : ${queueEntry.logID} `)
-          }
-        } finally {
-          this.profiler.profileSectionEnd(`process-${pushedProfilerTag}`)
-          pushedProfilerTag = null // clear the tag
-        }
-        // Disabled this because it cant happen..  TXs will time out instead now.
-        // we could consider this as a state when attempting to get missing data fails
-        // else if (queueEntry.state === 'failed to get data') {
-        //   this.removeFromQueue(queueEntry, currentIndex)
-        // }
-      }
-    } finally {
-      //Handle an odd case where the finally did not catch exiting scope.
-      if (pushedProfilerTag != null) {
-        this.profiler.profileSectionEnd(`process-${pushedProfilerTag}`)
-        this.profiler.profileSectionEnd(`process-patched1-${pushedProfilerTag}`)
-        pushedProfilerTag = null
-      }
-
-      // restart loop if there are still elements in it
-      if (this.newAcceptedTxQueue.length > 0 || this.newAcceptedTxQueueTempInjest.length > 0) {
-        setTimeout(() => {
-          this.tryStartAcceptedQueue()
-        }, 15)
-      }
-
-      this.newAcceptedTxQueueRunning = false
-      this.lastSeenAccountsMap = seenAccounts
-
-      this.profiler.profileSectionEnd('processQ')
-    }
-  }
-
-  /**
-   * shareAppliedReceipt
-   * gossip the appliedReceipt to the transaction group
-   * @param queueEntry
-   */
-  async shareAppliedReceipt(queueEntry: QueueEntry) {
-    if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_shareAppliedReceipt', `${queueEntry.logID}`, `qId: ${queueEntry.entryID} `)
-
-    let appliedReceipt = queueEntry.appliedReceipt
-
-    // share the appliedReceipt.
-    let sender = null
-    let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry)
-    if (consensusGroup.length > 1) {
-      // should consider only forwarding in some cases?
-      this.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, consensusGroup)
-      this.p2p.sendGossipIn('spread_appliedReceipt', appliedReceipt, '', sender, consensusGroup)
-    }
-  }
-
-  /**
-   * hasAppliedReceiptMatchingPreApply
-   * check if recievedAppliedReceipt matches what we voted for.
-   * this implies that our pre apply had the same result.
-   *
-   * @param queueEntry
-   */
-  hasAppliedReceiptMatchingPreApply(queueEntry: QueueEntry, appliedReceipt: AppliedReceipt): boolean {
-    if (appliedReceipt == null) {
-      return false
-    }
-
-    if (queueEntry.ourVote == null) {
-      this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} ourVote == null`)
-      return false
-    }
-
-    if (appliedReceipt != null) {
-      if (appliedReceipt.result !== queueEntry.ourVote.transaction_result) {
-        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} ${appliedReceipt.result}, ${queueEntry.ourVote.transaction_result} appliedReceipt.result !== queueEntry.ourVote.transaction_result`)
-        return false
-      }
-      if (appliedReceipt.txid !== queueEntry.ourVote.txid) {
-        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.txid !== queueEntry.ourVote.txid`)
-        return false
-      }
-      if (appliedReceipt.appliedVotes.length === 0) {
-        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.appliedVotes.length == 0`)
-        return false
-      }
-
-      if (appliedReceipt.appliedVotes[0].cant_apply === true) {
-        // TODO STATESHARDING4 NEGATIVECASE    need to figure out what to do here
-        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.appliedVotes[0].cant_apply === true`)
-        return false
-      }
-
-      //test our vote against data hashes.
-      let wrappedStates = queueEntry.collectedData
-      let wrappedStateKeys = Object.keys(queueEntry.collectedData)
-      let vote = appliedReceipt.appliedVotes[0] //queueEntry.ourVote
-      for (let j = 0; j < vote.account_id.length; j++) {
-        let id = vote.account_id[j]
-        let hash = vote.account_state_hash_after[j]
-        let found = false
-        for (let key of wrappedStateKeys) {
-          let wrappedState = wrappedStates[key]
-          if (wrappedState.accountId === id) {
-            found = true
-            if (wrappedState.stateId !== hash) {
-              this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} state does not match id:${utils.stringifyReduce(id)} hash:${utils.stringifyReduce(wrappedState.stateId)} votehash:${utils.stringifyReduce(hash)}`)
-              return false
-            }
-          }
-        }
-        if (found === false) {
-          this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} state does not match missing id:${utils.stringifyReduce(id)} `)
-          return false
-        }
-      }
-
-      this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} Good Match`)
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('hasAppliedReceiptMatchingPreApply', `${queueEntry.logID}`, `  Good Match`)
-    }
-
-    return true
-  }
-
-  /**
-   * tryProduceReceipt
-   * try to produce an AppliedReceipt
-   * if we can't do that yet return null
-   *
-   * @param queueEntry
-   */
-  tryProduceReceipt(queueEntry: QueueEntry): AppliedReceipt | null {
-    if (queueEntry.waitForReceiptOnly === true) {
-      return null
-    }
-
-    let passed = false
-    let canProduceReceipt = false
-
-    let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry) // todo use real consensus group!!!
-    let requiredVotes = Math.round(consensusGroup.length * (2 / 3.0))
-
-    let numVotes = queueEntry.collectedVotes.length
-
-    if (numVotes < requiredVotes) {
-      // we need more votes
-      return null
-    }
-
-    let passCount = 0
-    let failCount = 0
-    // tally our votes
-
-    // TODO STATESHARDING4 CHECK VOTES PER CONSENSUS GROUP
-    for (let i = 0; i < numVotes; i++) {
-      let currentVote = queueEntry.collectedVotes[i]
-
-      if (currentVote.transaction_result === true) {
-        passCount++
-      } else {
-        failCount++
-      }
-
-      if (passCount >= requiredVotes) {
-        canProduceReceipt = true
-        passed = true
-      }
-      if (failCount >= requiredVotes) {
-        canProduceReceipt = true
-        passed = false
-      }
-    }
-    // TODO STATESHARDING4 There isn't really an analysis of account_state_hash_after.  seems like we should make sure the hashes match up
-    //   type AppliedVote = {
-    //     txid: string;
-    //     transaction_result: boolean;
-    //     account_id: string[];
-    //     account_state_hash_after: string[];
-    //     cant_apply: boolean;  // indicates that the preapply could not give a pass or fail
-    //     node_id: string; // record the node that is making this vote.. todo could look this up from the sig later
-    //     sign?: import("../shardus/shardus-types").Sign
-    // };
-
-    //big ol fun vote tally
-
-    //idk if we should check passed or not
-    let topHashByID: { [id: string]: { hash: string; count: number } } = {}
-    let topValuesByIDByHash: { [id: string]: { [id: string]: { count: number } } } = {}
-    if (passed && canProduceReceipt) {
-      if (canProduceReceipt === true) {
-        for (let i = 0; i < numVotes; i++) {
-          let currentVote = queueEntry.collectedVotes[i]
-          if (passed === currentVote.transaction_result) {
-            let vote = currentVote
-            for (let j = 0; j < vote.account_id.length; j++) {
-              let id = vote.account_id[j]
-              let hash = vote.account_state_hash_after[j]
-
-              if (topValuesByIDByHash[id] == null) {
-                topValuesByIDByHash[id] = {}
-              }
-              if (topValuesByIDByHash[id][hash] == null) {
-                topValuesByIDByHash[id][hash] = { count: 0 }
-              }
-              let count = topValuesByIDByHash[id][hash].count + 1
-              topValuesByIDByHash[id][hash].count = count
-
-              if (topHashByID[id] == null) {
-                topHashByID[id] = { hash: '', count: 0 }
-              }
-              if (count > topHashByID[id].count) {
-                topHashByID[id].count = count
-                topHashByID[id].hash = hash
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // TODO: possibly need an extra check to make sure all the top hash by ID values match to a single vote (and are not spread between multiple votes)
-
-    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} `)
-    this.mainLogger.debug(`tryProduceReceipt canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} `)
-
-    let secondTally = 0
-    // if we can create a receipt do that now
-    if (canProduceReceipt === true) {
-      let appliedReceipt: AppliedReceipt = {
-        txid: queueEntry.acceptedTx.id,
-        result: passed,
-        appliedVotes: [],
-      }
-
-      // grab just the votes that match the winning pass or fail status
-      for (let i = 0; i < numVotes; i++) {
-        let currentVote = queueEntry.collectedVotes[i]
-        // build a list of applied votes
-        if (passed === true) {
-          if (currentVote.transaction_result === true) {
-            let badVoteMatch = false
-            //Test that state after hash values match with the winning vote hashes
-            for (let j = 0; j < currentVote.account_id.length; j++) {
-              let id = currentVote.account_id[j]
-              let hash = currentVote.account_state_hash_after[j]
-              if (topHashByID[id].hash === hash) {
-                secondTally++
-              } else {
-                badVoteMatch = true
-                break
-              }
-            }
-            if (badVoteMatch) {
-              continue
-            }
-            appliedReceipt.appliedVotes.push(currentVote)
-          }
-        } else if (passed === false) {
-          if (currentVote.transaction_result === false) {
-            //not checking state after hashes since a failed TX can not change account state
-            appliedReceipt.appliedVotes.push(currentVote)
-          }
-        }
-      }
-
-      // if a passing vote won then check all the hashes.
-      if (passed) {
-        if (secondTally < requiredVotes) {
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} secondTally:${secondTally}`)
-          this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} secondTally:${secondTally} `)
-          return null
-        }
-      }
-
-      // recored our generated receipt to the queue entry
-      queueEntry.appliedReceipt = appliedReceipt
-      return appliedReceipt
-    }
-
-    return null
-  }
-
-  sortByAccountId(first, second) {
-    return utils.sortAscProp(first, second, 'accountId')
-  }
-
-  /**
-   * createAndShareVote
-   * create an AppliedVote
-   * gossip the AppliedVote
-   * @param queueEntry
-   */
-  async createAndShareVote(queueEntry: QueueEntry) {
-    if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_createAndShareVote', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} `)
-
-    // TODO STATESHARDING4 CHECK VOTES PER CONSENSUS GROUP
-
-    // create our applied vote
-    let ourVote: AppliedVote = {
-      txid: queueEntry.acceptedTx.id,
-      transaction_result: queueEntry.preApplyTXResult.passed,
-      account_id: [],
-      account_state_hash_after: [],
-      node_id: this.currentCycleShardData.ourNode.id,
-      cant_apply: queueEntry.preApplyTXResult.applied === false,
-    }
-
-    if (queueEntry.debugFail_voteFlip === true) {
-      if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_createAndShareVote_voteFlip', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} `)
-
-      ourVote.transaction_result = !ourVote.transaction_result
-    }
-
-    // fill out the lists of account ids and after states
-    // let applyResponse = queueEntry.preApplyTXResult.applyResponse //as ApplyResponse
-    // if(applyResponse != null){
-    //   //we need to sort this list and doing it in place seems ok
-    //   applyResponse.stateTableResults.sort(this.sortByAccountId )
-    //   for(let stateTableObject of applyResponse.stateTableResults ){
-
-    //     ourVote.account_id.push(stateTableObject.accountId)
-    //     ourVote.account_state_hash_after.push(stateTableObject.stateAfter)
-    //   }
-    // }
-
-    let wrappedStates = queueEntry.collectedData
-
-    if (wrappedStates != null) {
-      //we need to sort this list and doing it in place seems ok
-      //applyResponse.stateTableResults.sort(this.sortByAccountId )
-      for (let key of Object.keys(wrappedStates)) {
-        let wrappedState = wrappedStates[key]
-
-        // note this is going to stomp the hash value for the account
-        // this used to happen in dapp.updateAccountFull  we now have to save off prevStateId on the wrappedResponse
-        //We have to update the hash now! Not sure if this is the greatest place but it needs to be done
-        let updatedHash = this.app.calculateAccountHash(wrappedState.data)
-        wrappedState.stateId = updatedHash
-
-        ourVote.account_id.push(wrappedState.accountId)
-        ourVote.account_state_hash_after.push(wrappedState.stateId)
-      }
-    }
-
-    ourVote = this.crypto.sign(ourVote)
-
-    // save our vote to our queueEntry
-    queueEntry.ourVote = ourVote
-    // also append it to the total list of votes
-    this.tryAppendVote(queueEntry, ourVote)
-    // share the vote via gossip
-    let sender = null
-    let consensusGroup = this.queueEntryGetConsensusGroup(queueEntry)
-    if (consensusGroup.length >= 1) {
-      // should consider only forwarding in some cases?
-      this.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share tx vote to neighbors`, consensusGroup)
-      // TODO STATESHARDING4 ENDPOINTS this needs to change from gossip to a tell
-      //this.p2p.sendGossipIn('spread_appliedVote', ourVote, '', sender, consensusGroup)
-
-      this.mainLogger.debug(`createAndShareVote numNodes: ${consensusGroup.length} ourVote: ${utils.stringifyReduce(ourVote)} `)
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.id}`, `numNodes: ${consensusGroup.length} ourVote: ${utils.stringifyReduce(ourVote)} `)
-
-      // Filter nodes before we send tell()
-      let filteredNodes = this.filterValidNodesForInternalMessage(consensusGroup, 'createAndShareVote', true, true)
-      if (filteredNodes.length === 0) {
-        this.mainLogger.error('createAndShareVote: filterValidNodesForInternalMessage no valid nodes left to try')
-        return null
-      }
-      let filteredConsensusGroup = filteredNodes
-
-      this.p2p.tell(filteredConsensusGroup, 'spread_appliedVote', ourVote)
-    }
-  }
-
-  /**
-   * tryAppendVote
-   * if we have not seen this vote yet search our list of votes and append it in
-   * the correct spot sorted by signer's id
-   * @param queueEntry
-   * @param vote
-   */
-  tryAppendVote(queueEntry: QueueEntry, vote: AppliedVote): boolean {
-    let numVotes = queueEntry.collectedVotes.length
-
-    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tryAppendVote', `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVotes.length}`)
-    this.mainLogger.debug(`tryAppendVote collectedVotes: ${queueEntry.logID}   ${queueEntry.collectedVotes.length} `)
-
-    // just add the vote if we dont have any yet
-    if (numVotes === 0) {
-      queueEntry.collectedVotes.push(vote)
-      return true
-    }
-
-    //compare to existing votes.  keep going until we find that this vote is already in the list or our id is at the right spot to insert sorted
-    for (let i = 0; i < numVotes; i++) {
-      let currentVote = queueEntry.collectedVotes[i]
-
-      if (currentVote.sign.owner === vote.sign.owner) {
-        // already in our list so do nothing and return
-        return false
-      }
-    }
-
-    queueEntry.collectedVotes.push(vote)
-
-    return true
-  }
-
-
-/***
- *     ######   #######  ########  ######## 
- *    ##    ## ##     ## ##     ## ##       
- *    ##       ##     ## ##     ## ##       
- *    ##       ##     ## ########  ######   
- *    ##       ##     ## ##   ##   ##       
- *    ##    ## ##     ## ##    ##  ##       
- *     ######   #######  ##     ## ######## 
- */
-
 
   /**
    * dumpAccountDebugData this is what creats the shardreports
@@ -5422,6 +2272,7 @@ class StateManager extends EventEmitter {
     }
     return null
   }
+
   getAccountFailDump(address: string, message: string) {
     // this.currentCycleShardData
     if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('getAccountFailDump', ` `, `${utils.makeShortHash(address)} ${message} `)
@@ -5502,6 +2353,7 @@ class StateManager extends EventEmitter {
       return 1
     }
   }
+
   getClosestNodesGlobal(hash: string, count: number) {
     let hashNumber = parseInt(hash.slice(0, 7), 16)
     let nodes = this.p2p.state.getActiveNodes()
@@ -5536,6 +2388,41 @@ class StateManager extends EventEmitter {
     }
     return false
   }
+
+  async _clearState() {
+    await this.storage.clearAppRelatedState()
+  }
+
+  _stopQueue() {
+    this.queueStopped = true
+  }
+
+  _clearQueue() {
+    this.newAcceptedTxQueue = []
+  }
+
+
+  async cleanup() {
+    this._stopQueue()
+    this._unregisterEndpoints()
+    this._clearQueue()
+    this._cleanupListeners()
+    await this._clearState()
+  }
+
+  isStateGood() {
+    return this.stateIsGood
+  }
+
+/***
+ *     ######  ######## ########          ###     ######   ######   #######  ##     ## ##    ## ######## 
+ *    ##    ## ##          ##            ## ##   ##    ## ##    ## ##     ## ##     ## ###   ##    ##    
+ *    ##       ##          ##           ##   ##  ##       ##       ##     ## ##     ## ####  ##    ##    
+ *     ######  ######      ##          ##     ## ##       ##       ##     ## ##     ## ## ## ##    ##    
+ *          ## ##          ##          ######### ##       ##       ##     ## ##     ## ##  ####    ##    
+ *    ##    ## ##          ##          ##     ## ##    ## ##    ## ##     ## ##     ## ##   ###    ##    
+ *     ######  ########    ##          ##     ##  ######   ######   #######   #######  ##    ##    ##    
+ */
 
   // TODO WrappedStates
   async setAccount(wrappedStates: WrappedResponses, localCachedData: LocalCachedData, applyResponse: Shardus.ApplyResponse, isGlobalModifyingTX: boolean, accountFilter?: AccountFilter) {
@@ -5589,7 +2476,185 @@ class StateManager extends EventEmitter {
     return savedSomething
   }
 
+
+  /**
+   * updateAccountsCopyTable
+   * originally this only recorder results if we were not repairing but it turns out we need to update our copies any time we apply state.
+   * with the update we will calculate the cycle based on timestamp rather than using the last current cycle counter
+   * @param {any} accountDataList todo need to use wrapped account data here  TSConversion todo non any type
+   * @param {boolean} repairing
+   * @param {number} txTimestamp
+   */
+  async updateAccountsCopyTable(accountDataList: Shardus.AccountData[], repairing: boolean, txTimestamp: number) {
+    let cycleNumber = -1
+
+    let cycle = this.p2p.state.getCycleByTimestamp(txTimestamp + this.syncSettleTime)
+    let cycleOffset = 0
+    // todo review this assumption. seems ok at the moment.  are there times cycle could be null and getting the last cycle is not a valid answer?
+    if (cycle == null) {
+      cycle = this.p2p.state.getLastCycle()
+      // if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable error getting cycle by timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle returned:${cycle.counter} `)
+      cycleOffset = 1
+    }
+    cycleNumber = cycle.counter + cycleOffset
+
+    // extra safety testing
+    // TODO !!!  if cycle durations become variable we need to update this logic
+    let cycleStart = (cycle.start + cycle.duration * cycleOffset) * 1000
+    let cycleEnd = (cycle.start + cycle.duration * (cycleOffset + 1)) * 1000
+    if (txTimestamp + this.syncSettleTime < cycleStart) {
+      if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable time error< ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+    }
+    if (txTimestamp + this.syncSettleTime >= cycleEnd) {
+      // if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+      cycleOffset++
+      cycleNumber = cycle.counter + cycleOffset
+      cycleStart = (cycle.start + cycle.duration * cycleOffset) * 1000
+      cycleEnd = (cycle.start + cycle.duration * (cycleOffset + 1)) * 1000
+      if (txTimestamp + this.syncSettleTime >= cycleEnd) {
+        if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+      }
+    }
+    // TSConversion need to sort out account types!!!
+    // @ts-ignore This has seemed fine in past so not going to sort out a type discrepencie here.  !== would detect and log it anyhow.
+    if (accountDataList.length > 0 && accountDataList[0].timestamp !== txTimestamp) {
+      if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable timestamps do match txts:${txTimestamp} acc.ts:${accountDataList[0].timestamp} `)
+    }
+    if (accountDataList.length === 0) {
+      // need to decide if this matters!
+      if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable empty txts:${txTimestamp}  `)
+    }
+    // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable acc.timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle computed:${cycleNumber} `)
+
+    for (let accountEntry of accountDataList) {
+      let { accountId, data, timestamp, hash } = accountEntry
+      let isGlobal = this.isGlobalAccount(accountId)
+
+      let backupObj: Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
+
+      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+
+      // todo perf. batching?
+      // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'updateAccountsCopyTableA ' + JSON.stringify(accountEntry))
+      // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'updateAccountsCopyTableB ' + JSON.stringify(backupObj))
+
+      // how does this not stop previous results, is it because only the first request gets through.
+
+      // TODO: globalaccounts
+      // intercept the account change here for global accounts and save it to our memory structure.
+      // this structure should have a list. and be sorted by timestamp. eventually we will remove older timestamp copies of the account data.
+
+      // wrappedAccounts.push({ accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp })
+
+      //TODO Perf: / mem   should we only save if there is a hash change?
+      if (this.isGlobalAccount(accountId) && repairing === false) {
+        //make sure it is a global tx.
+        let globalBackupList: Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
+        if (globalBackupList != null) {
+          globalBackupList.push(backupObj) // sort and cleanup later.
+
+          if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+        }
+      }
+
+      //Aha! Saves the last copy per given cycle! this way when you query cycle-1 you get the right data.
+      await this.storage.createOrReplaceAccountCopy(backupObj)
+    }
+  }
+
+
+  /**
+   * _commitAccountCopies
+   * This takes an array of account data and pushes it directly into the system with app.resetAccountData
+   * Account backup copies and in memory global account backups are also updated
+   * you only need to set the true values for the globalAccountKeyMap
+   * @param accountCopies
+   */
+  async _commitAccountCopies(accountCopies: Shardus.AccountsCopy[]) {
+    if (accountCopies.length > 0) {
+      for (let accountData of accountCopies) {
+        // make sure the data is not a json string
+        if (utils.isString(accountData.data)) {
+          accountData.data = JSON.parse(accountData.data)
+        }
+
+        if (accountData == null || accountData.data == null || accountData.accountId == null) {
+          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _commitAccountCopies null account data found: ${accountData.accountId} data: ${utils.stringifyReduce(accountData)}`)
+          continue
+        } else {
+          if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _commitAccountCopies: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} data: ${utils.stringifyReduce(accountData)}`)
+        }
+      }
+      // tell the app to replace the account data
+      await this.app.resetAccountData(accountCopies)
+
+      let globalAccountKeyMap: { [key: string]: boolean } = {}
+
+      //we just have to trust that if we are restoring from data then the globals will be known
+      this.hasknownGlobals = true
+
+      // update the account copies and global backups
+      // it is possible some of this gets to go away eventually
+      for (let accountEntry of accountCopies) {
+        let { accountId, data, timestamp, hash, cycleNumber, isGlobal } = accountEntry
+
+        // check if the is global bit was set and keep local track of it.  Before this was going to be passed in as separate data
+        if (isGlobal == true) {
+          globalAccountKeyMap[accountId] = true
+        }
+
+        // Maybe don't try to calculate the cycle number....
+        // const cycle = this.p2p.state.getCycleByTimestamp(timestamp + this.syncSettleTime)
+        // // find the correct cycle based on timetamp
+        // if (!cycle) {
+        //   this.mainLogger.error(`_commitAccountCopies failed to get cycle for timestamp ${timestamp} accountId:${utils.makeShortHash(accountId)}`)
+        //   continue
+        // }
+        // let cycleNumber = cycle.counter
+
+        let backupObj: Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
+
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `_commitAccountCopies acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+
+        // If the account is global ad it to the global backup list
+        if (globalAccountKeyMap[accountId] === true) {
+          //this.isGlobalAccount(accountId)){
+
+          // If we do not realized this account is global yet, then set it and log to playback log
+          if (this.isGlobalAccount(accountId) === false) {
+            this.globalAccountMap.set(accountId, null) // we use null. ended up not using the data, only checking for the key is used
+            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalAccountMap', `set global in _commitAccountCopies accountId:${utils.makeShortHash(accountId)}`)
+          }
+
+          let globalBackupList: Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
+          if (globalBackupList != null) {
+            globalBackupList.push(backupObj) // sort and cleanup later
+            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `_commitAccountCopies added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+          } else {
+            this.mainLogger.error(`_commitAccountCopies no global backup list found for accountId:${utils.makeShortHash(accountId)}`)
+          }
+        }
+        //Saves the last copy per given cycle! this way when you query cycle-1 you get the right data.
+        await this.storage.createOrReplaceAccountCopy(backupObj)
+      }
+    }
+  }
+
+
   /// /////////////////////////////////////////////////////////
+/***
+ *    ######## #### ########  #######           ##        #######   ######  ##    ##  ######  
+ *    ##        ##  ##       ##     ##          ##       ##     ## ##    ## ##   ##  ##    ## 
+ *    ##        ##  ##       ##     ##          ##       ##     ## ##       ##  ##   ##       
+ *    ######    ##  ######   ##     ##          ##       ##     ## ##       #####     ######  
+ *    ##        ##  ##       ##     ##          ##       ##     ## ##       ##  ##         ## 
+ *    ##        ##  ##       ##     ##          ##       ##     ## ##    ## ##   ##  ##    ## 
+ *    ##       #### ##        #######           ########  #######   ######  ##    ##  ######  
+ */
+  clearPartitionData() {
+    this.fifoLocks = {}
+  }
+
   async fifoLock(fifoName: string): Promise<number> {
     var stack = '' // new Error().stack
     this.mainLogger.debug(`fifoLock: ${fifoName} ${stack}`)
@@ -5687,1321 +2752,7 @@ class StateManager extends EventEmitter {
     }
   }
 
-  async _clearState() {
-    await this.storage.clearAppRelatedState()
-  }
 
-  _stopQueue() {
-    this.queueStopped = true
-  }
-
-  _clearQueue() {
-    this.newAcceptedTxQueue = []
-  }
-
-  _registerListener(emitter: any, event: string, callback: any) {
-    if (this._listeners[event]) {
-      this.statemanager_fatal(`_registerListener_dupes`, 'State Manager can only register one listener per event!')
-      return
-    }
-    emitter.on(event, callback)
-    this._listeners[event] = [emitter, callback]
-  }
-
-  _unregisterListener(event: string) {
-    if (!this._listeners[event]) {
-      this.mainLogger.warn(`This event listener doesn't exist! Event: \`${event}\` in StateManager`)
-      return
-    }
-    const entry = this._listeners[event]
-    const [emitter, callback] = entry
-    emitter.removeListener(event, callback)
-    delete this._listeners[event]
-  }
-
-  _cleanupListeners() {
-    for (const event of Object.keys(this._listeners)) {
-      this._unregisterListener(event)
-    }
-  }
-
-  async cleanup() {
-    this._stopQueue()
-    this._unregisterEndpoints()
-    this._clearQueue()
-    this._cleanupListeners()
-    await this._clearState()
-  }
-
-  //  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  //  //////////////////////////////////////////////////          Data Repair                    ///////////////////////////////////////////////////////////
-  //  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-/***
- *    ########     ###    ########  ######## #### ######## ####  #######  ##    ## ########  ######## ########   #######  ########  ########  ######  
- *    ##     ##   ## ##   ##     ##    ##     ##     ##     ##  ##     ## ###   ## ##     ## ##       ##     ## ##     ## ##     ##    ##    ##    ## 
- *    ##     ##  ##   ##  ##     ##    ##     ##     ##     ##  ##     ## ####  ## ##     ## ##       ##     ## ##     ## ##     ##    ##    ##       
- *    ########  ##     ## ########     ##     ##     ##     ##  ##     ## ## ## ## ########  ######   ########  ##     ## ########     ##     ######  
- *    ##        ######### ##   ##      ##     ##     ##     ##  ##     ## ##  #### ##   ##   ##       ##        ##     ## ##   ##      ##          ## 
- *    ##        ##     ## ##    ##     ##     ##     ##     ##  ##     ## ##   ### ##    ##  ##       ##        ##     ## ##    ##     ##    ##    ## 
- *    ##        ##     ## ##     ##    ##    ####    ##    ####  #######  ##    ## ##     ## ######## ##         #######  ##     ##    ##     ######  
- */
-
-  /**
-   * getPartitionReport used by reporting (monitor server) to query if there is a partition report ready
-   * @param {boolean} consensusOnly
-   * @param {boolean} smallHashes
-   * @returns {any}
-   */
-  // TSConversion todo define partition report. for now use any
-  getPartitionReport(consensusOnly: boolean, smallHashes: boolean): PartitionCycleReport {
-    let response = {} // {res:[], cycleNumber:-1}
-    if (this.nextCycleReportToSend != null) {
-      if (this.lastCycleReported < this.nextCycleReportToSend.cycleNumber || this.partitionReportDirty === true) {
-        // consensusOnly hashes
-        if (smallHashes === true) {
-          for (let r of this.nextCycleReportToSend.res) {
-            r.h = utils.makeShortHash(r.h)
-          }
-        }
-        // Partition_hash: partitionHash, Partition_id:
-        response = this.nextCycleReportToSend
-        this.lastCycleReported = this.nextCycleReportToSend.cycleNumber // update reported cycle
-        this.nextCycleReportToSend = null // clear it because we sent it
-        this.partitionReportDirty = false // not dirty anymore
-
-        this.mainLogger.debug('getPartitionReport: ' + `insync: ${this.stateIsGood} ` + utils.stringifyReduce(response))
-      }
-    }
-    return response
-  }
-
-  /**
-   * @param {PartitionObject} partitionObject
-   */
-  poMicroDebug(partitionObject: PartitionObject) {
-    let header = `c${partitionObject.Cycle_number} p${partitionObject.Partition_id}`
-
-    // need to get a list of compacted TXs in order. also addresses. timestamps?  make it so tools can process easily. (align timestamps view.)
-
-    this.mainLogger.debug('poMicroDebug: ' + header)
-  }
-
-  /**
-   * generatePartitionObjects
-   * @param {Cycle} lastCycle
-   */
-  generatePartitionObjects(lastCycle: Shardus.Cycle) {
-    let lastCycleShardValues = this.shardValuesByCycle.get(lastCycle.counter)
-
-    // let partitions = ShardFunctions.getConsenusPartitions(lastCycleShardValues.shardGlobals, lastCycleShardValues.nodeShardData)
-    // lastCycleShardValues.ourConsensusPartitions = partitions
-
-    if (lastCycleShardValues == null) {
-      throw new Error('generatePartitionObjects lastCycleShardValues == null' + lastCycle.counter)
-    }
-
-    let partitions = lastCycleShardValues.ourConsensusPartitions
-    if (this.repairAllStoredPartitions === true) {
-      partitions = lastCycleShardValues.ourStoredPartitions
-    }
-    if (partitions == null) {
-      throw new Error('generatePartitionObjects partitions == null')
-    }
-
-    if (this.feature_useNewParitionReport === false) {
-      this.nextCycleReportToSend = { res: [], cycleNumber: lastCycle.counter }
-    }
-
-    let partitionObjects = []
-    let partitionResults = []
-    let cycleKey = 'c' + lastCycle.counter
-    for (let partitionNumber of partitions) {
-      // TODO sharding - done.  when we add state sharding need to loop over partitions.
-      let partitionObject = this.generatePartitionObject(lastCycle, partitionNumber)
-
-      // Nodes sign the partition hash along with the Partition_id, Cycle_number and timestamp to produce a partition result.
-      let partitionResult = this.generatePartitionResult(partitionObject)
-
-      if (this.feature_useNewParitionReport === false) {
-        this.nextCycleReportToSend.res.push({ i: partitionResult.Partition_id, h: partitionResult.Partition_hash })
-      }
-      // let partitionObjects = [partitionObject]
-      // let partitionResults = [partitionResult]
-
-      // this.partitionObjectsByCycle[cycleKey] = partitionObjects
-      // this.ourPartitionResultsByCycle[cycleKey] = partitionResults // todo in the future there could be many results (one per covered partition)
-
-      partitionObjects.push(partitionObject)
-      partitionResults.push(partitionResult)
-
-      this.partitionObjectsByCycle[cycleKey] = partitionObjects
-      this.ourPartitionResultsByCycle[cycleKey] = partitionResults
-
-      this.poMicroDebug(partitionObject)
-
-      let partitionResultsByHash = this.recentPartitionObjectsByCycleByHash[cycleKey]
-      if (partitionResultsByHash == null) {
-        partitionResultsByHash = {}
-        this.recentPartitionObjectsByCycleByHash[cycleKey] = partitionResultsByHash
-      }
-      // todo sharding done?  seems ok :   need to loop and put all results in this list
-      // todo perf, need to clean out data from older cycles..
-      partitionResultsByHash[partitionResult.Partition_hash] = partitionObject
-    }
-
-    // outside of the main loop
-    // add our result to the list of all other results
-    let responsesByPartition = this.allPartitionResponsesByCycleByPartition[cycleKey]
-    if (!responsesByPartition) {
-      responsesByPartition = {}
-      this.allPartitionResponsesByCycleByPartition[cycleKey] = responsesByPartition
-    }
-
-    // this part should be good to go for sharding.
-    for (let pResult of partitionResults) {
-      let partitionKey = 'p' + pResult.Partition_id
-      let responses = responsesByPartition[partitionKey]
-      if (!responses) {
-        responses = []
-        responsesByPartition[partitionKey] = responses
-      }
-      let ourID = this.crypto.getPublicKey()
-      // clean out an older response from same node if on exists
-      responses = responses.filter((item) => item.sign && item.sign.owner !== ourID) // if the item is not signed clear it!
-      responsesByPartition[partitionKey] = responses // have to re-assign this since it is a new ref to the array
-      responses.push(pResult)
-    }
-
-    // return [partitionObject, partitionResult]
-  }
-
-  /**
-   * generatePartitionResult
-   * @param {PartitionObject} partitionObject
-   * @returns {PartitionResult}
-   */
-  generatePartitionResult(partitionObject: PartitionObject): PartitionResult {
-    let tempStates = partitionObject.States
-    partitionObject.States = []
-    let partitionHash = /** @type {string} */ this.crypto.hash(partitionObject)
-    partitionObject.States = tempStates //Temp fix. do not record states as part of hash (for now)
-
-    /** @type {PartitionResult} */
-    let partitionResult = { Partition_hash: partitionHash, Partition_id: partitionObject.Partition_id, Cycle_number: partitionObject.Cycle_number, hashSet: '' }
-
-    // let stepSize = cHashSetStepSize
-    if (this.useHashSets) {
-      let hashSet = StateManager.createHashSetString(partitionObject.Txids, partitionObject.States) // TXSTATE_TODO
-      partitionResult.hashSet = hashSet
-    }
-
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair partitionObject: ${utils.stringifyReduce(partitionObject)}`)
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair generatePartitionResult: ${utils.stringifyReduce(partitionResult)}`)
-
-    if (partitionObject.Txids && partitionObject.Txids.length > 0) {
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('partitionObject', 'c' + partitionObject.Cycle_number, partitionObject)
-    }
-    // nodeid in form of the signer!
-    return partitionResult
-  }
-
-  /**
-   * generatePartitionObject
-   * @param {Cycle} lastCycle todo define cycle!!
-   * @param {number} partitionId
-   * @returns {PartitionObject}
-   */
-  generatePartitionObject(lastCycle: Cycle, partitionId: number) {
-    let txList = this.getTXList(lastCycle.counter, partitionId)
-
-    let txSourceData = txList
-    if (txList.newTxList) {
-      // TSConversion this forced us to add processed to newTxList.  probably a good fis for an oversight
-      txSourceData = txList.newTxList
-    }
-
-    /** @type {PartitionObject} */
-    let partitionObject = {
-      Partition_id: partitionId,
-      Partitions: 1,
-      Cycle_number: lastCycle.counter,
-      Cycle_marker: lastCycle.marker,
-      Txids: txSourceData.hashes, // txid1, txid2, …],  - ordered from oldest to recent
-      Status: txSourceData.passed, // [1,0, …],      - ordered corresponding to Txids; 1 for applied; 0 for failed
-      States: txSourceData.states, // array of array of states
-      Chain: [], // [partition_hash_341, partition_hash_342, partition_hash_343, …]
-      // TODO prodution need to implment chain logic.  Chain logic is important for making a block chain out of are partition objects
-    }
-    return partitionObject
-  }
-
-  /**
-   * partitionObjectToTxMaps
-   * @param {PartitionObject} partitionObject
-   * @returns {Object.<string,number>}
-   */
-  partitionObjectToTxMaps(partitionObject: PartitionObject): StatusMap {
-    let statusMap: StatusMap = {}
-    for (let i = 0; i < partitionObject.Txids.length; i++) {
-      let tx = partitionObject.Txids[i]
-      let status = partitionObject.Status[i]
-      statusMap[tx] = status
-    }
-    return statusMap
-  }
-
-  /**
-   * partitionObjectToStateMaps
-   * @param {PartitionObject} partitionObject
-   * @returns {Object.<string,string>}
-   */
-  partitionObjectToStateMaps(partitionObject: PartitionObject): StateMap {
-    let statusMap: StateMap = {}
-    for (let i = 0; i < partitionObject.Txids.length; i++) {
-      let tx = partitionObject.Txids[i]
-      let state = partitionObject.States[i]
-      statusMap[tx] = state
-    }
-    return statusMap
-  }
-
-  /**
-   * tryGeneratePartitionReciept
-   * Generate a receipt if we have consensus
-   * @param {PartitionResult[]} allResults
-   * @param {PartitionResult} ourResult
-   * @param {boolean} [repairPassHack]
-   * @returns {{ partitionReceipt: PartitionReceipt; topResult: PartitionResult; success: boolean }}
-   */
-  tryGeneratePartitionReciept(allResults: PartitionResult[], ourResult: PartitionResult, repairPassHack = false) {
-    let partitionId = ourResult.Partition_id
-    let cycleCounter = ourResult.Cycle_number
-
-    let key = 'c' + cycleCounter
-    let key2 = 'p' + partitionId
-    let debugKey = `rkeys: ${key} ${key2}`
-
-    let repairTracker = this._getRepairTrackerForCycle(cycleCounter, partitionId)
-    repairTracker.busy = true // mark busy so we won't try to start this task again while in the middle of it
-
-    // Tried hashes is not working correctly at the moment, it is an unused parameter. I am not even sure we want to ignore hashes
-    let { topHash, topCount, topResult } = this.findMostCommonResponse(cycleCounter, partitionId, repairTracker.triedHashes)
-
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair  ${debugKey} tryGeneratePartitoinReciept repairTracker: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
-
-    let requiredHalf = Math.max(1, allResults.length / 2)
-    if (this.useHashSets && repairPassHack) {
-      // hack force our node to win:
-      topCount = requiredHalf
-      topHash = ourResult.Partition_hash
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair  ${debugKey} tryGeneratePartitoinReciept hack force win: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
-    }
-
-    let resultsList = []
-    if (topCount >= requiredHalf) {
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair  ${debugKey} tryGeneratePartitoinReciept: top hash wins: ` + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
-      for (let partitionResult of allResults) {
-        if (partitionResult.Partition_hash === topHash) {
-          resultsList.push(partitionResult)
-        }
-      }
-    } else {
-      if (this.useHashSets) {
-        // bail in a way that will cause us to use the hashset strings
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair  ${debugKey} tryGeneratePartitoinReciept: did not win, useHashSets: ` + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
-        return { partitionReceipt: null, topResult: null, success: false }
-      }
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair  ${debugKey} tryGeneratePartitoinReciept: top hash failed: ` + utils.makeShortHash(topHash) + ` ${topCount} / ${requiredHalf}`)
-      return { partitionReceipt: null, topResult, success: false }
-    }
-
-    if (ourResult.Partition_hash !== topHash) {
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair  ${debugKey} tryGeneratePartitoinReciept: our hash does not match: ` + utils.makeShortHash(topHash) + ` our hash: ${ourResult.Partition_hash}`)
-      return { partitionReceipt: null, topResult, success: false }
-    }
-
-    let partitionReceipt = {
-      resultsList,
-    }
-
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair  ${debugKey} tryGeneratePartitoinReciept OK! ${utils.stringifyReduce({ partitionReceipt, topResult })}`)
-
-    return { partitionReceipt, topResult, success: true }
-  }
-
-  isStateGood() {
-    return this.stateIsGood
-  }
-
-  /**
-   * startRepairProcess
-   * @param {Cycle} cycle
-   * @param {PartitionResult} topResult
-   * @param {number} partitionId
-   * @param {string} ourLastResultHash
-   */
-  async startRepairProcess(cycle: Cycle, topResult: PartitionResult | null, partitionId: number, ourLastResultHash: string) {
-    // todo update stateIsGood to follow a new metric based on the new data repair.
-    this.stateIsGood_txHashsetOld = false
-    if (this.canDataRepair === false) {
-      // todo fix false negative results.  This may require inserting
-      if (this.verboseLogs) this.mainLogger.error(`data oos detected. (old system) False negative results given if syncing. cycle: ${cycle.counter} partition: ${partitionId} `)
-      return
-    }
-
-    return
-  }
-
-  // todo refactor some of the duped code in here
-  // possibly have to split this into three functions to make that clean (find our result and the parition checking as sub funcitons... idk)
-  /**
-   * checkForGoodPartitionReciept
-   *
-   *  this is part of the old partition tracking and is only used for debugging now.
-   *
-   * @param {number} cycleNumber
-   * @param {number} partitionId
-   */
-  async checkForGoodPartitionReciept(cycleNumber: number, partitionId: number) {
-    let repairTracker = this._getRepairTrackerForCycle(cycleNumber, partitionId)
-
-    let key = 'c' + cycleNumber
-    let key2 = 'p' + partitionId
-    let debugKey = `rkeys: ${key} ${key2}`
-
-    // get responses
-    let responsesById = this.allPartitionResponsesByCycleByPartition[key]
-    let responses = responsesById[key2]
-
-    // find our result
-    let ourPartitionValues = this.ourPartitionResultsByCycle[key]
-    let ourResult = null
-    for (let obj of ourPartitionValues) {
-      if (obj.Partition_id === partitionId) {
-        ourResult = obj
-        break
-      }
-    }
-    if (ourResult == null) {
-      throw new Error(`checkForGoodPartitionReciept ourResult == null ${debugKey}`)
-    }
-    let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
-    let { partitionReceipt: partitionReceipt3, topResult: topResult3, success: success3 } = receiptResults
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept immediate receipt check. ${debugKey} success:${success3} topResult:${utils.stringifyReduce(topResult3)}  partitionReceipt: ${utils.stringifyReduce({ partitionReceipt3 })}`)
-
-    // see if we already have a winning hash to correct to
-    if (!success3) {
-      if (repairTracker.awaitWinningHash) {
-        if (topResult3 == null) {
-          // if we are awaitWinningHash then wait for a top result before we start repair process again
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept awaitWinningHash:true but topResult == null so keep waiting ${debugKey}`)
-        } else {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept awaitWinningHash:true and we have a top result so start reparing! ${debugKey}`)
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept: tryGeneratePartitionReciept failed start repair process 3 ${debugKey} ${utils.stringifyReduce(receiptResults)}`)
-          let cycle = this.p2p.state.getCycleByCounter(cycleNumber)
-          await utils.sleep(1000)
-          await this.startRepairProcess(cycle, topResult3, partitionId, ourResult.Partition_hash)
-          // we are correcting to another hash.  don't bother sending our hash out
-        }
-      }
-    } else {
-      if (partitionReceipt3 == null) {
-        throw new Error(`checkForGoodPartitionReciept partitionReceipt3 == null ${debugKey}`)
-      }
-      this.storePartitionReceipt(cycleNumber, partitionReceipt3)
-      this.repairTrackerMarkFinished(repairTracker, 'checkForGoodPartitionReciept')
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair checkForGoodPartitionReciept 2 allFinished, final ${debugKey} hash:${utils.stringifyReduce({ topResult3 })}`)
-    }
-  }
-
-  initApoptosisAndQuitSyncing() {
-    console.log('initApoptosisAndQuitSyncing ' + utils.getTime('s'))
-    this.mainLogger.error(this.dataPhaseTag + `initApoptosisAndQuitSyncing `)
-    this.stateManagerSync.failAndDontRestartSync()
-    this.p2p.initApoptosis()
-  }
-
-  // async applyHashSetSolution (solution) {
-  //   // solution.corrections
-  //   // end goal is to fill up the repair entry for the partition with newPendingTXs, newFailedTXs, missingTXIds, and extraTXIds
-  //   //
-  // }
-
-  /**
-   * _getRepairTrackerForCycle
-   * @param {number} counter
-   * @param {number} partition
-   * @returns {RepairTracker}
-   */
-  _getRepairTrackerForCycle(counter: number, partition: number) {
-    let key = 'c' + counter
-    let key2 = 'p' + partition
-    let repairsByPartition = this.repairTrackingByCycleById[key]
-    if (!repairsByPartition) {
-      repairsByPartition = {}
-      this.repairTrackingByCycleById[key] = repairsByPartition
-    }
-    let repairTracker = repairsByPartition[key2]
-    if (!repairTracker) {
-      // triedHashes: Hashes for partition objects that we have tried to reconcile with already
-      // removedTXIds: a list of TXIds that we have removed
-      // repairedTXs: a list of TXIds that we have added in
-      // newPendingTXs: a list of TXs we fetched that are ready to process
-      // newFailedTXs: a list of TXs that we fetched, they had failed so we save them but do not apply them
-      // extraTXIds: a list of TXIds that our partition has that the leading partition does not.  This is what we need to remove
-      // missingTXIds: a list of TXIds that our partition has that the leading partition has that we don't.  We will need to add these in using the list newPendingTXs
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `_getRepairTrackerForCycle: creating for cycle:${counter} partition:${partition}`)
-      repairTracker = {
-        triedHashes: [],
-        numNodes: this.lastActiveNodeCount, // num nodes that we send partition results to
-        counter: counter,
-        partitionId: partition,
-        key: key,
-        key2: key2,
-        removedTXIds: [],
-        repairedTXs: [],
-        newPendingTXs: [],
-        newFailedTXs: [],
-        extraTXIds: [],
-        // extraTXs: [],
-        missingTXIds: [],
-        repairing: false,
-        repairsNeeded: false,
-        busy: false,
-        txRepairComplete: false,
-        txRepairReady: false,
-        evaluationStarted: false,
-        evaluationComplete: false,
-        awaitWinningHash: false,
-        repairsFullyComplete: false,
-      }
-      repairsByPartition[key2] = repairTracker
-
-      // this.dataRepairStack.push(repairTracker)
-      // this.dataRepairsStarted++
-
-      // let combinedKey = key + key2
-      // if (this.repairStartedMap.has(combinedKey)) {
-      //   if (this.verboseLogs) this.mainLogger.error(`Already started repair on ${combinedKey}`)
-      // } else {
-      //   this.repairStartedMap.set(combinedKey, true)
-      // }
-    }
-    return repairTracker
-  }
-
-  /**
-   * repairTrackerMarkFinished
-   * @param {RepairTracker} repairTracker
-   * @param {string} debugTag
-   */
-  repairTrackerMarkFinished(repairTracker: RepairTracker, debugTag: string) {
-    repairTracker.repairsFullyComplete = true
-
-    let combinedKey = repairTracker.key + repairTracker.key2
-    if (this.repairStartedMap.has(combinedKey)) {
-      if (this.repairCompletedMap.has(combinedKey)) {
-        if (this.verboseLogs) this.mainLogger.debug(`repairStats: finished repair ${combinedKey} -alreadyFlagged  tag:${debugTag}`)
-      } else {
-        this.dataRepairsCompleted++
-        this.repairCompletedMap.set(combinedKey, true)
-        if (this.verboseLogs) this.mainLogger.debug(`repairStats: finished repair ${combinedKey} tag:${debugTag}`)
-      }
-    } else {
-      // should be a trace?
-      if (this.verboseLogs) this.mainLogger.debug(`repairStats: Calling complete on a key we dont have ${combinedKey} tag:${debugTag}`)
-    }
-
-    for (let i = this.dataRepairStack.length - 1; i >= 0; i--) {
-      let repairTracker1 = this.dataRepairStack[i]
-      if (repairTracker1 === repairTracker) {
-        this.dataRepairStack.splice(i, 1)
-      }
-    }
-
-    if (this.dataRepairStack.length === 0) {
-      if (this.stateIsGood === false) {
-        if (this.verboseLogs) this.mainLogger.error(`No active data repair going on tag:${debugTag}`)
-      }
-      this.stateIsGood = true
-      this.stateIsGood_activeRepairs = true
-      this.stateIsGood_txHashsetOld = true
-    }
-  }
-
-  /**
-   * repairTrackerClearForNextRepair
-   * @param {RepairTracker} repairTracker
-   */
-  repairTrackerClearForNextRepair(repairTracker: RepairTracker) {
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` repairTrackerClearForNextRepair cycleNumber: ${repairTracker.counter} parition: ${repairTracker.partitionId} `)
-    repairTracker.removedTXIds = []
-    repairTracker.repairedTXs = []
-    repairTracker.newPendingTXs = []
-    repairTracker.newFailedTXs = []
-    repairTracker.extraTXIds = []
-    repairTracker.missingTXIds = []
-  }
-
-  /**
-   * mergeAndApplyTXRepairs
-   * @param {number} cycleNumber
-   * @param {number} specificParition the old version of this would repair all partitions but we had to wait.  this works on just one partition
-   */
-  async mergeAndApplyTXRepairs(cycleNumber: number, specificParition: number) {
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs cycleNumber ${cycleNumber} partition: ${specificParition}`)
-    // walk through all txs for this cycle.
-    // get or create entries for accounts.
-    // track when they have missing txs or wrong txs
-
-    let lastCycleShardValues = this.shardValuesByCycle.get(cycleNumber)
-    if (lastCycleShardValues == null) {
-      throw new Error('mergeAndApplyTXRepairs lastCycleShardValues == null')
-    }
-    if (lastCycleShardValues.ourConsensusPartitions == null) {
-      throw new Error('mergeAndApplyTXRepairs lastCycleShardValues.ourConsensusPartitions')
-    }
-
-    for (let partitionID of lastCycleShardValues.ourConsensusPartitions) {
-      // this is an attempt to just repair one parition.
-      if (partitionID !== specificParition) {
-        continue
-      }
-
-      let allTXsToApply: StringNumberObjectMap = {}
-      let allExtraTXids: StringNumberObjectMap = {}
-      let allAccountsToResetById: StringNumberObjectMap = {}
-      let txIDToAcc: TxIDToSourceTargetObjectMap = {}
-      let allNewTXsById: TxObjectById = {}
-      // get all txs and sort them
-      let repairsByPartition = this.repairTrackingByCycleById['c' + cycleNumber]
-      // let partitionKeys = Object.keys(repairsByPartition)
-      // for (let key of partitionKeys) {
-      let key = 'p' + partitionID
-      let repairEntry = repairsByPartition[key]
-      for (let tx of repairEntry.newPendingTXs) {
-        if (utils.isString(tx.data)) {
-          // @ts-ignore sometimes we have a data field that gets stuck as a string.  would be smarter to fix this upstream.
-          tx.data = JSON.parse(tx.data)
-        }
-        let keysResponse = this.app.getKeyFromTransaction(tx.data)
-
-        if (!keysResponse) {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
-        }
-
-        let { sourceKeys, targetKeys } = keysResponse
-
-        for (let accountID of sourceKeys) {
-          allAccountsToResetById[accountID] = 1
-        }
-        for (let accountID of targetKeys) {
-          allAccountsToResetById[accountID] = 1
-        }
-        allNewTXsById[tx.id] = tx
-        txIDToAcc[tx.id] = { sourceKeys, targetKeys }
-      }
-      for (let tx of repairEntry.missingTXIds) {
-        allTXsToApply[tx] = 1
-      }
-      for (let tx of repairEntry.extraTXIds) {
-        allExtraTXids[tx] = 1
-        // TODO Repair. ugh have to query our data and figure out which accounts need to be reset.
-      }
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs: extra: ${utils.stringifyReduce(allExtraTXids)}  txIDToAcc: ${utils.stringifyReduce(txIDToAcc)}`)
-
-      // todo repair: hmmm also reset accounts have a tx we need to remove.
-      // }
-
-      let txList = this.getTXList(cycleNumber, partitionID) // done todo sharding: pass partition ID
-
-      let txIDToAccCount = 0
-      let txIDResetExtraCount = 0
-      // build a list with our existing txs, but dont include the bad ones
-      if (txList) {
-        for (let i = 0; i < txList.txs.length; i++) {
-          let tx = txList.txs[i]
-          if (allExtraTXids[tx.id]) {
-            // this was a bad tx dont include it.   we have to look up the account associated with this tx and make sure they get reset
-            let keysResponse = this.app.getKeyFromTransaction(tx.data)
-            if (!keysResponse) {
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs problem with keysResp2  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
-            }
-            let { sourceKeys, targetKeys } = keysResponse
-            for (let accountID of sourceKeys) {
-              allAccountsToResetById[accountID] = 1
-              txIDResetExtraCount++
-            }
-            for (let accountID of targetKeys) {
-              allAccountsToResetById[accountID] = 1
-              txIDResetExtraCount++
-            }
-          } else {
-            // a good tx that we had earlier
-            let keysResponse = this.app.getKeyFromTransaction(tx.data)
-            let { sourceKeys, targetKeys } = keysResponse
-            allNewTXsById[tx.id] = tx
-            txIDToAcc[tx.id] = { sourceKeys, targetKeys }
-            txIDToAccCount++
-            // we will only play back the txs on accounts that point to allAccountsToResetById
-          }
-        }
-      } else {
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs txList not found for: cycle: ${cycleNumber} in ${utils.stringifyReduce(this.txByCycleByPartition)}`)
-      }
-
-      // build and sort a list of TXs that we need to apply
-
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs txIDResetExtraCount: ${txIDResetExtraCount} allAccountsToResetById ${utils.stringifyReduce(allAccountsToResetById)}`)
-      // reset accounts
-      let accountKeys = Object.keys(allAccountsToResetById)
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs revert accountKeys ${utils.stringifyReduce(accountKeys)}`)
-
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs FIFO lock outer: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
-      let ourAccountLocks = await this.bulkFifoLockAccounts(accountKeys)
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs FIFO lock inner: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
-
-      // let replacmentAccounts =  //returned by the below function for debug
-      await this._revertAccounts(accountKeys, cycleNumber)
-
-      // todo sharding - done extracted tx list calcs to run just for this partition inside of here. how does this relate to having a shard for every??
-      // convert allNewTXsById map to newTXList list
-      let newTXList = []
-      let txKeys = Object.keys(allNewTXsById)
-      for (let txKey of txKeys) {
-        let tx = allNewTXsById[txKey]
-        newTXList.push(tx)
-      }
-
-      // sort the list by ascending timestamp
-      newTXList.sort(utils.sortTimestampAsc) // (function (a, b) { return a.timestamp - b.timestamp })
-
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs newTXList.length: ${newTXList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
-
-      let applyCount = 0
-      let applyFailCount = 0
-      let hasEffect = false
-
-      let accountValuesByKey: AccountValuesByKey = {}
-      // let wrappedAccountResults = this.app.getAccountDataByList(accountKeys)
-      // for (let wrappedData of wrappedAccountResults) {
-      //   wrappedData.isPartial = false
-      //   accountValuesByKey[wrappedData.accountId] = wrappedData
-      // }
-      // let wrappedAccountResults=[]
-      // for(let key of accountKeys){
-      //   this.app.get
-      // }
-
-      // todo sharding - done  (solved by brining newTX clacs inside of this loop)  does newTXList need to be filtered? we are looping over every partition. could this cause us to duplicate effort? YES allNewTXsById is handled above/outside of this loop
-      for (let tx of newTXList) {
-        let keysFilter = txIDToAcc[tx.id]
-        // need a transform to map all txs that would matter.
-        try {
-          if (keysFilter) {
-            let acountsFilter: AccountFilter = {} // this is a filter of accounts that we want to write to
-            // find which accounts need txs applied.
-            hasEffect = false
-            for (let accountID of keysFilter.sourceKeys) {
-              if (allAccountsToResetById[accountID]) {
-                acountsFilter[accountID] = 1
-                hasEffect = true
-              }
-            }
-            for (let accountID of keysFilter.targetKeys) {
-              if (allAccountsToResetById[accountID]) {
-                acountsFilter[accountID] = 1
-                hasEffect = true
-              }
-            }
-            if (!hasEffect) {
-              // no need to apply this tx because it would do nothing
-              continue
-            }
-
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs apply tx ${utils.makeShortHash(tx.id)} ${tx.timestamp} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
-            let hasStateTableData = false // may or may not have it but not tracking yet
-
-            // TSConversion old way used to do this but seem incorrect to have receipt under data!
-            // HACK!!  receipts sent across the net to us may need to get re parsed
-            // if (utils.isString(tx.data.receipt)) {
-            //   tx.data.receipt = JSON.parse(tx.data.receipt)
-            // }
-
-            if (utils.isString(tx.receipt)) {
-              //@ts-ignore
-              tx.receipt = JSON.parse(tx.receipt)
-            }
-
-            // todo needs wrapped states! and/or localCachedData
-
-            // Need to build up this data.
-            let keysResponse = this.app.getKeyFromTransaction(tx.data)
-            let wrappedStates: WrappedResponses = {}
-            let localCachedData: LocalCachedData = {}
-            for (let key of keysResponse.allKeys) {
-              // build wrapped states
-              // let wrappedState = await this.app.getRelevantData(key, tx.data)
-
-              let wrappedState: Shardus.WrappedResponse = accountValuesByKey[key] // need to init ths data. allAccountsToResetById[key]
-              if (wrappedState == null) {
-                // Theoretically could get this data from when we revert the data above..
-                wrappedState = await this.app.getRelevantData(key, tx.data)
-                accountValuesByKey[key] = wrappedState
-              } else {
-                wrappedState.accountCreated = false // kinda crazy assumption
-              }
-              wrappedStates[key] = wrappedState
-              localCachedData[key] = wrappedState.localCache
-              // delete wrappedState.localCache
-            }
-
-            let success = await this.testAccountTime(tx.data, wrappedStates)
-
-            if (!success) {
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs' + utils.stringifyReduce(tx))
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs`)
-
-              this.statemanager_fatal(`testAccountTime_failed`, this.dataPhaseTag + ' testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs' + utils.stringifyReduce(tx))
-
-              // return
-              this.p2p.initApoptosis() // todo turn this back on
-              // // return { success: false, reason: 'testAccountTime failed' }
-              break
-            }
-
-            let applied = await this.tryApplyTransaction(tx, hasStateTableData, true, acountsFilter, wrappedStates, localCachedData) // TODO app interface changes.. how to get and pass the state wrapped account state in, (maybe simple function right above this
-            // accountValuesByKey = {} // clear this.  it forces more db work but avoids issue with some stale flags
-            if (!applied) {
-              applyFailCount++
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs apply failed`)
-            } else {
-              applyCount++
-            }
-          } else {
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs no for ${tx.id} in ${utils.stringifyReduce(txIDToAcc)}`)
-          }
-        } catch (ex) {
-          this.mainLogger.debug('_repair: startRepairProcess mergeAndApplyTXRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-          this.statemanager_fatal(`mergeAndApplyTXRepairs_ex`, '_repair: startRepairProcess mergeAndApplyTXRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-        }
-
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
-      }
-
-      // unlock the accounts we locked...  todo maybe put this in a finally statement?
-      this.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair mergeAndApplyTXRepairs FIFO unlock: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
-    }
-  }
-
-  /**
-   * updateTrackingAndPrepareChanges
-   * @param {number} cycleNumber
-   * @param {number} specificParition the old version of this would repair all partitions but we had to wait.  this works on just one partition
-   */
-  async updateTrackingAndPrepareRepairs(cycleNumber: number, specificParition: number) {
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair updateTrackingAndPrepareRepairs cycleNumber ${cycleNumber} partition: ${specificParition}`)
-    // walk through all txs for this cycle.
-    // get or create entries for accounts.
-    // track when they have missing txs or wrong txs
-    let debugKey = `c${cycleNumber}p${specificParition}`
-    let lastCycleShardValues = this.shardValuesByCycle.get(cycleNumber)
-    let paritionsServiced = 0
-    try {
-      // this was locking us to consensus only partitions. really just preap anything that is called on this fuciton since other logic may be doing work
-      // on stored partitions.
-
-      // for (let partitionID of lastCycleShardValues.ourConsensusPartitions) {
-      // // this is an attempt to just repair one parition.
-      //   if (partitionID !== specificParition) {
-      //     continue
-      //   }
-      let partitionID = specificParition
-      paritionsServiced++
-      let allTXsToApply: StringNumberObjectMap = {}
-      let allExtraTXids: StringNumberObjectMap = {}
-      /** @type {Object.<string, number>} */
-      let allAccountsToResetById: StringNumberObjectMap = {}
-      /** @type {Object.<string, { sourceKeys:string[], targetKeys:string[] } >} */
-      let txIDToAcc: TxIDToSourceTargetObjectMap = {}
-      let allNewTXsById: TxObjectById = {}
-      // get all txs and sort them
-      let repairsByPartition = this.repairTrackingByCycleById['c' + cycleNumber]
-      // let partitionKeys = Object.keys(repairsByPartition)
-      // for (let key of partitionKeys) {
-      let key = 'p' + partitionID
-      let repairEntry = repairsByPartition[key]
-      for (let tx of repairEntry.newPendingTXs) {
-        if (utils.isString(tx.data)) {
-          // @ts-ignore sometimes we have a data field that gets stuck as a string.  would be smarter to fix this upstream.
-          tx.data = JSON.parse(tx.data)
-        }
-        let keysResponse = this.app.getKeyFromTransaction(tx.data)
-
-        if (!keysResponse) {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair updateTrackingAndPrepareRepairs problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
-        }
-
-        let { sourceKeys, targetKeys } = keysResponse
-
-        for (let accountID of sourceKeys) {
-          allAccountsToResetById[accountID] = 1
-        }
-        for (let accountID of targetKeys) {
-          allAccountsToResetById[accountID] = 1
-        }
-        allNewTXsById[tx.id] = tx
-        txIDToAcc[tx.id] = { sourceKeys, targetKeys }
-      }
-      for (let tx of repairEntry.missingTXIds) {
-        allTXsToApply[tx] = 1
-      }
-      for (let tx of repairEntry.extraTXIds) {
-        allExtraTXids[tx] = 1
-        // TODO Repair. ugh have to query our data and figure out which accounts need to be reset.
-      }
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair updateTrackingAndPrepareRepairs: extra: ${utils.stringifyReduce(allExtraTXids)}  txIDToAcc: ${utils.stringifyReduce(txIDToAcc)}`)
-
-      // todo repair: hmmm also reset accounts have a tx we need to remove.
-      // }
-
-      let txList = this.getTXList(cycleNumber, partitionID) // done todo sharding: pass partition ID
-
-      let txIDToAccCount = 0
-      let txIDResetExtraCount = 0
-      // build a list with our existing txs, but dont include the bad ones
-      if (txList) {
-        for (let i = 0; i < txList.txs.length; i++) {
-          let tx = txList.txs[i]
-          if (allExtraTXids[tx.id]) {
-            // this was a bad tx dont include it.   we have to look up the account associated with this tx and make sure they get reset
-            let keysResponse = this.app.getKeyFromTransaction(tx.data)
-            if (!keysResponse) {
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair updateTrackingAndPrepareRepairs problem with keysResp2  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
-            }
-            let { sourceKeys, targetKeys } = keysResponse
-            for (let accountID of sourceKeys) {
-              allAccountsToResetById[accountID] = 1
-              txIDResetExtraCount++
-            }
-            for (let accountID of targetKeys) {
-              allAccountsToResetById[accountID] = 1
-              txIDResetExtraCount++
-            }
-          } else {
-            // a good tx that we had earlier
-            let keysResponse = this.app.getKeyFromTransaction(tx.data)
-            let { sourceKeys, targetKeys } = keysResponse
-            allNewTXsById[tx.id] = tx
-            txIDToAcc[tx.id] = { sourceKeys, targetKeys }
-            txIDToAccCount++
-            // we will only play back the txs on accounts that point to allAccountsToResetById
-          }
-        }
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair updateTrackingAndPrepareRepairs txIDResetExtraCount:${txIDResetExtraCount} txIDToAccCount: ${txIDToAccCount}`)
-      } else {
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair updateTrackingAndPrepareRepairs txList not found for: cycle: ${cycleNumber} in ${utils.stringifyReduce(this.txByCycleByPartition)}`)
-      }
-
-      // build and sort a list of TXs that we need to apply
-
-      // OLD reset account code was here.
-
-      // todo sharding - done extracted tx list calcs to run just for this partition inside of here. how does this relate to having a shard for every??
-      // convert allNewTXsById map to newTXList list
-      let newTXList = []
-      let txKeys = Object.keys(allNewTXsById)
-      for (let txKey of txKeys) {
-        let tx = allNewTXsById[txKey]
-        newTXList.push(tx)
-      }
-
-      // sort the list by ascending timestamp
-      newTXList.sort(utils.sortTimestampAsc) // function (a, b) { return a.timestamp - b.timestamp })
-
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair updateTrackingAndPrepareRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair updateTrackingAndPrepareRepairs newTXList.length: ${newTXList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
-
-      // Save the results of this computation for later
-      /** @type {UpdateRepairData}  */
-      let updateData: UpdateRepairData = { newTXList, allAccountsToResetById, partitionId: specificParition, txIDToAcc }
-      let ckey = 'c' + cycleNumber
-      if (this.repairUpdateDataByCycle[ckey] == null) {
-        this.repairUpdateDataByCycle[ckey] = []
-      }
-      this.repairUpdateDataByCycle[ckey].push(updateData)
-
-      // how will the partition object get updated though??
-      // }
-
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair updateTrackingAndPrepareRepairs finished`)
-      if (paritionsServiced === 0) {
-        this.statemanager_fatal(`_updateTrackingAndPrepareRepairs_fail`, `_updateTrackingAndPrepareRepairs failed. not partitions serviced: ${debugKey} our consensus:${utils.stringifyReduce(lastCycleShardValues?.ourConsensusPartitions)} `)
-      }
-    } catch (ex) {
-      this.mainLogger.debug('__updateTrackingAndPrepareRepairs: exception ' + ` ${debugKey} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      this.statemanager_fatal(`_updateTrackingAndPrepareRepairs_ex`, '__updateTrackingAndPrepareRepairs: exception ' + ` ${debugKey} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-    }
-  }
-
-  /**
-   * updateTrackingAndPrepareChanges
-   * @param {number} cycleNumber
-   */
-  async applyAllPreparedRepairs(cycleNumber: number) {
-    if (this.applyAllPreparedRepairsRunning === true) {
-      return
-    }
-    this.applyAllPreparedRepairsRunning = true
-
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs cycleNumber ${cycleNumber}`)
-
-    this.mainLogger.debug(`applyAllPreparedRepairs c:${cycleNumber}`)
-
-    let ckey = 'c' + cycleNumber
-    let repairDataList = this.repairUpdateDataByCycle[ckey]
-
-    let txIDToAcc: TxIDToKeyObjectMap = {}
-    let allAccountsToResetById: AccountBoolObjectMap = {}
-    let newTXList: AcceptedTx[] = []
-    for (let repairData of repairDataList) {
-      newTXList = newTXList.concat(repairData.newTXList)
-      allAccountsToResetById = Object.assign(allAccountsToResetById, repairData.allAccountsToResetById)
-      txIDToAcc = Object.assign(txIDToAcc, repairData.txIDToAcc)
-      this.mainLogger.debug(`applyAllPreparedRepairs c${cycleNumber}p${repairData.partitionId} reset:${Object.keys(repairData.allAccountsToResetById).length} txIDToAcc:${Object.keys(repairData.txIDToAcc).length} keys: ${utils.stringifyReduce(Object.keys(repairData.allAccountsToResetById))} `)
-    }
-    this.mainLogger.debug(`applyAllPreparedRepairs total reset:${Object.keys(allAccountsToResetById).length} txIDToAcc:${Object.keys(txIDToAcc).length}`)
-
-    newTXList.sort(utils.sortTimestampAsc) // function (a, b) { return a.timestamp - b.timestamp })
-
-    // build and sort a list of TXs that we need to apply
-
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs allAccountsToResetById ${utils.stringifyReduce(allAccountsToResetById)}`)
-    // reset accounts
-    let accountKeys = Object.keys(allAccountsToResetById)
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs revert accountKeys ${utils.stringifyReduce(accountKeys)}`)
-
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs FIFO lock outer: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
-    let ourAccountLocks = await this.bulkFifoLockAccounts(accountKeys)
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs FIFO lock inner: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
-
-    // let replacmentAccounts =  //returned by the below function for debug
-    await this._revertAccounts(accountKeys, cycleNumber)
-
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs newTXList.length: ${newTXList.length}`)
-
-    let applyCount = 0
-    let applyFailCount = 0
-    let hasEffect = false
-    let hasNonGlobalEffect = false
-
-    // TSConversion WrappedStates issue
-    let accountValuesByKey: WrappedResponses = {}
-
-    let seenTXs: StringBoolObjectMap = {}
-    for (let tx of newTXList) {
-      if (seenTXs[tx.id] === true) {
-        this.mainLogger.debug(`applyAllPreparedRepairs skipped double: ${utils.makeShortHash(tx.id)} ${tx.timestamp} `)
-        continue
-      }
-      seenTXs[tx.id] = true
-
-      let keysFilter = txIDToAcc[tx.id]
-      // need a transform to map all txs that would matter.
-      try {
-        if (keysFilter) {
-          let acountsFilter: AccountFilter = {} // this is a filter of accounts that we want to write to
-          // find which accounts need txs applied.
-          hasEffect = false
-          hasNonGlobalEffect = false
-          for (let accountID of keysFilter.sourceKeys) {
-            if (allAccountsToResetById[accountID]) {
-              acountsFilter[accountID] = 1
-              hasEffect = true
-              if (this.isGlobalAccount(accountID) === false) {
-                hasNonGlobalEffect = true
-              }
-            }
-          }
-          for (let accountID of keysFilter.targetKeys) {
-            if (allAccountsToResetById[accountID]) {
-              acountsFilter[accountID] = 1
-              hasEffect = true
-              if (this.isGlobalAccount(accountID) === false) {
-                hasNonGlobalEffect = true
-              }
-            }
-          }
-          if (!hasEffect) {
-            // no need to apply this tx because it would do nothing
-            continue
-          }
-          if (!hasNonGlobalEffect) {
-            //if only a global account involved then dont reset!
-            continue
-          }
-
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs apply tx ${utils.makeShortHash(tx.id)} ${tx.timestamp} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
-          let hasStateTableData = false // may or may not have it but not tracking yet
-
-          // TSConversion old way used to do this but seem incorrect to have receipt under data!
-          // // HACK!!  receipts sent across the net to us may need to get re parsed
-          // if (utils.isString(tx.data.receipt)) {
-          //   tx.data.receipt = JSON.parse(tx.data.receipt)
-          // }
-          if (utils.isString(tx.receipt)) {
-            //@ts-ignore
-            tx.receipt = JSON.parse(tx.receipt)
-          }
-
-          // todo needs wrapped states! and/or localCachedData
-
-          // Need to build up this data.
-          let keysResponse = this.app.getKeyFromTransaction(tx.data)
-          let wrappedStates: WrappedResponses = {}
-          let localCachedData: LocalCachedData = {}
-          for (let key of keysResponse.allKeys) {
-            // build wrapped states
-            // let wrappedState = await this.app.getRelevantData(key, tx.data)
-
-            let wrappedState: Shardus.WrappedResponse = accountValuesByKey[key] // need to init ths data. allAccountsToResetById[key]
-            if (wrappedState == null) {
-              // Theoretically could get this data from when we revert the data above..
-              wrappedState = await this.app.getRelevantData(key, tx.data)
-              // what to do in failure case.
-              accountValuesByKey[key] = wrappedState
-            } else {
-              wrappedState.accountCreated = false // kinda crazy assumption
-            }
-            wrappedStates[key] = wrappedState
-            localCachedData[key] = wrappedState.localCache
-            // delete wrappedState.localCache
-          }
-
-          let success = await this.testAccountTime(tx.data, wrappedStates)
-
-          if (!success) {
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs' + utils.stringifyReduce(tx))
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs`)
-            this.statemanager_fatal(`applyAllPreparedRepairs_fail`, this.dataPhaseTag + ' testAccountTime failed. calling apoptosis. applyAllPreparedRepairs' + utils.stringifyReduce(tx))
-
-            // return
-            this.p2p.initApoptosis() // todo turn this back on
-            // // return { success: false, reason: 'testAccountTime failed' }
-            break
-          }
-
-          // TODO: globalaccounts  this is where we go through the account state and just in time grab global accounts from the cache we made in the revert section from backup copies.
-          //  TODO Perf probably could prepare of this inforamation above more efficiently but for now this is most simple and self contained.
-
-          //TODO verify that we will even have wrapped states at this point in the repair without doing some extra steps.
-          let wrappedStateKeys = Object.keys(wrappedStates)
-          for (let wrappedStateKey of wrappedStateKeys) {
-            let wrappedState = wrappedStates[wrappedStateKey]
-
-            // if(wrappedState == null) {
-            //   if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair applyAllPreparedRepairs wrappedState == null ${utils.stringifyReduce(wrappedStateKey)} ${tx.timestamp}`)
-            //   //could continue but want to see if there is more we can log.
-            // }
-            //is it global.
-            if (this.isGlobalAccount(wrappedStateKey)) {
-              // wrappedState.accountId)){
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalAccountMap', `applyAllPreparedRepairs - has`, ` ${wrappedState.accountId} ${wrappedStateKey}`)
-              if (wrappedState != null) {
-                let globalValueSnapshot = this.getGlobalAccountValueAtTime(wrappedState.accountId, tx.timestamp)
-
-                if (globalValueSnapshot == null) {
-                  //todo some error?
-                  let globalAccountBackupList = this.getGlobalAccountBackupList(wrappedStateKey)
-                  if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair applyAllPreparedRepairs has global key but no snapshot at time ${tx.timestamp} entries:${globalAccountBackupList.length} ${utils.stringifyReduce(globalAccountBackupList.map((a) => `${a.timestamp}  ${utils.makeShortHash(a.accountId)} `))}  `)
-                  continue
-                }
-                // build a new wrapped response to insert
-                let newWrappedResponse: Shardus.WrappedResponse = { accountCreated: wrappedState.accountCreated, isPartial: false, accountId: wrappedState.accountId, timestamp: wrappedState.timestamp, stateId: globalValueSnapshot.hash, data: globalValueSnapshot.data }
-                //set this new value into our wrapped states.
-                wrappedStates[wrappedStateKey] = newWrappedResponse // update!!
-                // insert thes data into the wrapped states.
-                // yikes probably cant do local cached data at this point.
-                if (this.verboseLogs) {
-                  let globalAccountBackupList = this.getGlobalAccountBackupList(wrappedStateKey)
-                  if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair applyAllPreparedRepairs has global key details ${tx.timestamp} entries:${globalAccountBackupList.length} ${utils.stringifyReduce(globalAccountBackupList.map((a) => `${a.timestamp}  ${utils.makeShortHash(a.accountId)} `))}  `)
-                }
-
-                if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs got global account to repair from: ${utils.stringifyReduce(newWrappedResponse)}`)
-              }
-            } else {
-              if (wrappedState == null) {
-                if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair applyAllPreparedRepairs is not a global account but wrapped state == null ${utils.stringifyReduce(wrappedStateKey)} ${tx.timestamp}`)
-              }
-            }
-          }
-
-          let applied = await this.tryApplyTransaction(tx, hasStateTableData, /** repairing */ true, acountsFilter, wrappedStates, localCachedData) // TODO app interface changes.. how to get and pass the state wrapped account state in, (maybe simple function right above this
-          // accountValuesByKey = {} // clear this.  it forces more db work but avoids issue with some stale flags
-          if (!applied) {
-            applyFailCount++
-            if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs apply failed`)
-          } else {
-            applyCount++
-          }
-        } else {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs no for ${tx.id} in ${utils.stringifyReduce(txIDToAcc)}`)
-        }
-      } catch (ex) {
-        this.mainLogger.debug('_repair: startRepairProcess applyAllPreparedRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-        this.statemanager_fatal(`applyAllPreparedRepairs_fail`, '_repair: startRepairProcess applyAllPreparedRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      }
-
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
-    }
-
-    // unlock the accounts we locked...  todo maybe put this in a finally statement?
-    this.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair applyAllPreparedRepairs FIFO unlock: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
-    // }
-    this.applyAllPreparedRepairsRunning = false
-  }
-
-
-
-  // this.globalAccountRepairBank = {
-
-  // }
-
-  /**
-   * _revertAccounts
-   * @param {string[]} accountIDs
-   * @param {number} cycleNumber
-   */
-  async _revertAccounts(accountIDs: string[], cycleNumber: number) {
-    let cycle = this.p2p.state.getCycleByCounter(cycleNumber)
-    let cycleEnd = (cycle.start + cycle.duration) * 1000
-    let cycleStart = cycle.start * 1000
-    cycleEnd -= this.syncSettleTime // adjust by sync settle time
-    cycleStart -= this.syncSettleTime // adjust by sync settle time
-    let replacmentAccounts: Shardus.AccountsCopy[]
-    let replacmentAccountsMinusGlobals = [] as Shardus.AccountsCopy[]
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts start  numAccounts: ${accountIDs.length} repairing cycle:${cycleNumber}`)
-
-    try {
-      // query our account copies that are less than or equal to this cycle!
-      let prevCycle = cycleNumber - 1
-
-      replacmentAccounts = (await this.storage.getAccountReplacmentCopies(accountIDs, prevCycle)) as Shardus.AccountsCopy[]
-
-      if (replacmentAccounts.length > 0) {
-        for (let accountData of replacmentAccounts) {
-          if (utils.isString(accountData.data)) {
-            accountData.data = JSON.parse(accountData.data)
-            // hack, mode the owner so we can see the rewrite taking place
-            // accountData.data.data.data = { rewrite: cycleNumber }
-          }
-
-          if (accountData == null || accountData.data == null || accountData.accountId == null) {
-            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair _revertAccounts null account data found: ${accountData.accountId} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
-          } else {
-            // todo overkill
-            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts reset: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
-          }
-          // TODO: globalaccounts
-          //this is where we need to no reset a global account, but instead grab the replacment data and cache it
-          /// ////////////////////////
-          //let isGlobalAccount = this.globalAccountMap.has(accountData.accountId )
-
-          //Try not reverting global accounts..
-          if (this.isGlobalAccount(accountData.accountId) === false) {
-            replacmentAccountsMinusGlobals.push(accountData)
-            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts not a global account, add to list ${utils.makeShortHash(accountData.accountId)}`)
-          } else {
-            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts was a global account, do not add to list ${utils.makeShortHash(accountData.accountId)}`)
-          }
-        }
-        // tell the app to replace the account data
-        //await this.app.resetAccountData(replacmentAccounts)
-        await this.app.resetAccountData(replacmentAccountsMinusGlobals)
-        // update local state.
-      } else {
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts No replacment accounts found!!! cycle <= :${prevCycle}`)
-      }
-
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts: ${accountIDs.length} replacmentAccounts ${replacmentAccounts.length} repairing cycle:${cycleNumber} replacmentAccountsMinusGlobals: ${replacmentAccountsMinusGlobals.length}`)
-
-      // TODO prodution. consider if we need a better set of checks before we delete an account!
-      // If we don't have a replacement copy for an account we should try to delete it
-
-      // Find any accountIDs not in resetAccountData
-      let accountsReverted: StringNumberObjectMap = {}
-      let accountsToDelete: string[] = []
-      let debug = []
-      for (let accountData of replacmentAccounts) {
-        accountsReverted[accountData.accountId] = 1
-        if (accountData.cycleNumber > prevCycle) {
-          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair _revertAccounts cycle too new for backup restore: ${accountData.cycleNumber}  cycleNumber:${cycleNumber} timestamp:${accountData.timestamp}`)
-        }
-
-        debug.push({ id: accountData.accountId, cycleNumber: accountData.cycleNumber, timestamp: accountData.timestamp, hash: accountData.hash, accHash: accountData.data.hash, accTs: accountData.data.timestamp })
-      }
-
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts: ${utils.stringifyReduce(debug)}`)
-
-      for (let accountID of accountIDs) {
-        if (accountsReverted[accountID] == null) {
-          accountsToDelete.push(accountID)
-        }
-      }
-      if (accountsToDelete.length > 0) {
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts delete some accounts ${utils.stringifyReduce(accountsToDelete)}`)
-        await this.app.deleteAccountData(accountsToDelete)
-      }
-
-      // mark for kill future txlist stuff for any accounts we nuked
-
-      // make a map to find impacted accounts
-      let accMap: StringNumberObjectMap = {}
-      for (let accid of accountIDs) {
-        accMap[accid] = 1
-      }
-      // check for this.tempTXRecords that involve accounts we are going to clear
-      for (let txRecord of this.tempTXRecords) {
-        // if (txRecord.txTS < cycleEnd) {
-        let keysResponse = this.app.getKeyFromTransaction(txRecord.acceptedTx.data)
-        if (!keysResponse) {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair _revertAccounts problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(txRecord.acceptedTx)}`)
-        }
-        let { sourceKeys, targetKeys } = keysResponse
-        for (let accountID of sourceKeys) {
-          if (accMap[accountID]) {
-            txRecord.redacted = cycleNumber
-          }
-        }
-        for (let accountID of targetKeys) {
-          if (accMap[accountID]) {
-            txRecord.redacted = cycleNumber
-          }
-        }
-        // }
-      }
-
-      // clear out bad state table data!!
-      // add number to clear future state table data too
-      await this.storage.clearAccountStateTableByList(accountIDs, cycleStart, cycleEnd + 1000000)
-
-      // clear replacement copies for this cycle for these accounts!
-
-      // todo clear based on GTE!!!
-      await this.storage.clearAccountReplacmentCopies(accountIDs, cycleNumber)
-    } catch (ex) {
-      this.mainLogger.debug('_repair: _revertAccounts mergeAndApplyTXRepairs ' + ` ${utils.stringifyReduce({ cycleNumber, cycleEnd, cycleStart, accountIDs })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      this.statemanager_fatal(`_revertAccounts_ex`, '_repair: _revertAccounts mergeAndApplyTXRepairs ' + ` ${utils.stringifyReduce({ cycleNumber, cycleEnd, cycleStart, accountIDs })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-    }
-
-    return replacmentAccounts // this is for debugging reference
-  }
 
   /***
    *     ######  ##       ########    ###    ##    ## ##     ## ########
@@ -7319,55 +3070,6 @@ class StateManager extends EventEmitter {
     await Promise.all(promises)
   }
 
-  // initStateSyncData () {
-  //   if (!this.partitionObjectsByCycle) {
-  //     /** @type { Object.<string,PartitionObject[]>} our partition objects by cycle.  index by cycle counter key to get an array */
-  //     this.partitionObjectsByCycle = {}
-  //   }
-  //   if (!this.ourPartitionResultsByCycle) {
-  //     /** @type { Object.<string,PartitionResult[]>} our partition results by cycle.  index by cycle counter key to get an array */
-  //     this.ourPartitionResultsByCycle = {}
-  //   }
-
-  //   if (!this.repairTrackingByCycleById) {
-  //     /** @type {Object.<string, Object.<string,RepairTracker>>} tracks state for repairing partitions. index by cycle counter key to get the repair object, index by parition */
-  //     this.repairTrackingByCycleById = {}
-  //   }
-
-  //   if (!this.repairUpdateDataByCycle) {
-  //     /** @type {Object.<string, UpdateRepairData[]>}  */
-  //     this.repairUpdateDataByCycle = {}
-  //   }
-
-  //   this.applyAllPreparedRepairsRunning = false
-
-  //   if (!this.recentPartitionObjectsByCycleByHash) {
-  //     /** @type {Object.<string, Object.<string,PartitionObject>>} our partition objects by cycle.  index by cycle counter key to get an array */
-  //     this.recentPartitionObjectsByCycleByHash = {}
-  //   }
-
-  //   if (!this.tempTXRecords) {
-  //     /** @type {TempTxRecord[]} temporary store for TXs that we put in a partition object after a cycle is complete. an array that holds any TXs (i.e. from different cycles), code will filter out what it needs @see TempTxRecord */
-  //     this.tempTXRecords = []
-  //   }
-
-  //   if (!this.txByCycleByPartition) {
-  //     // txList = { hashes: [], passed: [], txs: [], processed: false, states: [] }
-  //     // TxTallyList
-  //     /** @type {Object.<string, Object.<string,TxTallyList>>} TxTallyList data indexed by cycle key and partition key. @see TxTallyList */
-  //     this.txByCycleByPartition = {}
-  //   }
-
-  //   // if (!this.txByCycleByPartition) {
-  //   //   this.txByCycleByPartition = {}
-  //   // }
-
-  //   if (!this.allPartitionResponsesByCycleByPartition) {
-  //     /** @type {Object.<string, Object.<string,PartitionResult[]>>} Stores the partition responses that other nodes push to us.  Index by cycle key, then index by partition id */
-  //     this.allPartitionResponsesByCycleByPartition = {}
-  //   }
-  // }
-
   /***
    *     #######     ##                  #######   #######     ##     ##    ###    ##    ## ########  ##       ######## ########   ######
    *    ##     ##  ####                 ##     ## ##     ##    ##     ##   ## ##   ###   ## ##     ## ##       ##       ##     ## ##    ##
@@ -7625,178 +3327,7 @@ class StateManager extends EventEmitter {
     }) */
   }
 
-  /**
-   * updateAccountsCopyTable
-   * originally this only recorder results if we were not repairing but it turns out we need to update our copies any time we apply state.
-   * with the update we will calculate the cycle based on timestamp rather than using the last current cycle counter
-   * @param {any} accountDataList todo need to use wrapped account data here  TSConversion todo non any type
-   * @param {boolean} repairing
-   * @param {number} txTimestamp
-   */
-  async updateAccountsCopyTable(accountDataList: Shardus.AccountData[], repairing: boolean, txTimestamp: number) {
-    let cycleNumber = -1
 
-    let cycle = this.p2p.state.getCycleByTimestamp(txTimestamp + this.syncSettleTime)
-    let cycleOffset = 0
-    // todo review this assumption. seems ok at the moment.  are there times cycle could be null and getting the last cycle is not a valid answer?
-    if (cycle == null) {
-      cycle = this.p2p.state.getLastCycle()
-      // if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable error getting cycle by timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle returned:${cycle.counter} `)
-      cycleOffset = 1
-    }
-    cycleNumber = cycle.counter + cycleOffset
-
-    // extra safety testing
-    // TODO !!!  if cycle durations become variable we need to update this logic
-    let cycleStart = (cycle.start + cycle.duration * cycleOffset) * 1000
-    let cycleEnd = (cycle.start + cycle.duration * (cycleOffset + 1)) * 1000
-    if (txTimestamp + this.syncSettleTime < cycleStart) {
-      if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable time error< ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
-    }
-    if (txTimestamp + this.syncSettleTime >= cycleEnd) {
-      // if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
-      cycleOffset++
-      cycleNumber = cycle.counter + cycleOffset
-      cycleStart = (cycle.start + cycle.duration * cycleOffset) * 1000
-      cycleEnd = (cycle.start + cycle.duration * (cycleOffset + 1)) * 1000
-      if (txTimestamp + this.syncSettleTime >= cycleEnd) {
-        if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
-      }
-    }
-    // TSConversion need to sort out account types!!!
-    // @ts-ignore This has seemed fine in past so not going to sort out a type discrepencie here.  !== would detect and log it anyhow.
-    if (accountDataList.length > 0 && accountDataList[0].timestamp !== txTimestamp) {
-      if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable timestamps do match txts:${txTimestamp} acc.ts:${accountDataList[0].timestamp} `)
-    }
-    if (accountDataList.length === 0) {
-      // need to decide if this matters!
-      if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable empty txts:${txTimestamp}  `)
-    }
-    // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable acc.timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle computed:${cycleNumber} `)
-
-    for (let accountEntry of accountDataList) {
-      let { accountId, data, timestamp, hash } = accountEntry
-      let isGlobal = this.isGlobalAccount(accountId)
-
-      let backupObj: Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
-
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
-
-      // todo perf. batching?
-      // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'updateAccountsCopyTableA ' + JSON.stringify(accountEntry))
-      // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'updateAccountsCopyTableB ' + JSON.stringify(backupObj))
-
-      // how does this not stop previous results, is it because only the first request gets through.
-
-      // TODO: globalaccounts
-      // intercept the account change here for global accounts and save it to our memory structure.
-      // this structure should have a list. and be sorted by timestamp. eventually we will remove older timestamp copies of the account data.
-
-      // wrappedAccounts.push({ accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp })
-
-      //TODO Perf: / mem   should we only save if there is a hash change?
-      if (this.isGlobalAccount(accountId) && repairing === false) {
-        //make sure it is a global tx.
-        let globalBackupList: Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
-        if (globalBackupList != null) {
-          globalBackupList.push(backupObj) // sort and cleanup later.
-
-          if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
-        }
-      }
-
-      //Aha! Saves the last copy per given cycle! this way when you query cycle-1 you get the right data.
-      await this.storage.createOrReplaceAccountCopy(backupObj)
-    }
-  }
-
-  getGlobalAccountValueAtTime(accountId: string, oldestTimestamp: number): Shardus.AccountsCopy | null {
-    let result: Shardus.AccountsCopy | null = null
-    let globalBackupList: Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
-    if (globalBackupList == null || globalBackupList.length === 0) {
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalBackupList', `applyAllPreparedRepairs - missing value for ${accountId}`)
-      return null
-    }
-
-    //else fine the closest time lower than our input time
-    //non binary search, just start at then end and go backwards.
-    //TODO PERF make this a binary search. realistically the lists should be pretty short most of the time
-    if (globalBackupList.length >= 1) {
-      for (let i = globalBackupList.length - 1; i >= 0; i--) {
-        let accountCopy = globalBackupList[i]
-        if (accountCopy.timestamp <= oldestTimestamp) {
-          return accountCopy
-        }
-      }
-    }
-    return null
-  }
-
-  sortByTimestamp(a: any, b: any): number {
-    return utils.sortAscProp(a, b, 'timestamp')
-  }
-
-  sortAndMaintainBackupList(globalBackupList: Shardus.AccountsCopy[], oldestTimestamp: number): void {
-    globalBackupList.sort(utils.sortTimestampAsc) // this.sortByTimestamp)
-    //remove old entries. then bail.
-    // note this loop only runs if there is more than one entry
-    // also it should always keep the last item in the list now matter what (since that is the most current backup)
-    // this means we only start if there are 2 items in the array and we start at index  len-2 (next to last element)
-    if (globalBackupList.length > 1) {
-      for (let i = globalBackupList.length - 2; i >= 0; i--) {
-        let accountCopy = globalBackupList[i]
-        if (accountCopy.timestamp < oldestTimestamp) {
-          globalBackupList.splice(i, 1)
-        }
-      }
-    }
-  }
-
-  // go through all account backups sort/ filter them
-  sortAndMaintainBackups(oldestTimestamp: number): void {
-    let keys = this.globalAccountRepairBank.keys()
-    for (let key of keys) {
-      let globalBackupList = this.globalAccountRepairBank.get(key)
-      if (globalBackupList != null) {
-        this.sortAndMaintainBackupList(globalBackupList, oldestTimestamp)
-      }
-    }
-  }
-
-  //maintian all lists
-  getGlobalAccountBackupList(accountID: string): Shardus.AccountsCopy[] {
-    let results: Shardus.AccountsCopy[] = []
-    if (this.globalAccountRepairBank.has(accountID) === false) {
-      this.globalAccountRepairBank.set(accountID, results) //init list
-    } else {
-      results = this.globalAccountRepairBank.get(accountID)
-    }
-    return results
-  }
-
-  isGlobalAccount(accountID: string): boolean {
-    if (this.stateManagerSync.globalAccountsSynced === false) {
-      return this.knownGlobals[accountID] === true
-    }
-
-    return this.globalAccountMap.has(accountID)
-  }
-
-  // should this be in sync?
-  async getGlobalListEarly() {
-    let globalReport: GlobalAccountReportResp = await this.stateManagerSync.getRobustGlobalReport()
-
-    this.knownGlobals = {}
-    let temp = []
-    for (let report of globalReport.accounts) {
-      this.knownGlobals[report.id] = true
-
-      temp.push(report.id)
-    }
-    this.mainLogger.debug(`DATASYNC: getGlobalListEarly: ${temp}`)
-
-    this.hasknownGlobals = true
-  }
 
   /**
    * tempRecordTXByCycle
@@ -9188,82 +4719,6 @@ class StateManager extends EventEmitter {
     }
   }
 
-  /**
-   * _commitAccountCopies
-   * This takes an array of account data and pushes it directly into the system with app.resetAccountData
-   * Account backup copies and in memory global account backups are also updated
-   * you only need to set the true values for the globalAccountKeyMap
-   * @param accountCopies
-   */
-  async _commitAccountCopies(accountCopies: Shardus.AccountsCopy[]) {
-    if (accountCopies.length > 0) {
-      for (let accountData of accountCopies) {
-        // make sure the data is not a json string
-        if (utils.isString(accountData.data)) {
-          accountData.data = JSON.parse(accountData.data)
-        }
-
-        if (accountData == null || accountData.data == null || accountData.accountId == null) {
-          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _commitAccountCopies null account data found: ${accountData.accountId} data: ${utils.stringifyReduce(accountData)}`)
-          continue
-        } else {
-          if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _commitAccountCopies: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} data: ${utils.stringifyReduce(accountData)}`)
-        }
-      }
-      // tell the app to replace the account data
-      await this.app.resetAccountData(accountCopies)
-
-      let globalAccountKeyMap: { [key: string]: boolean } = {}
-
-      //we just have to trust that if we are restoring from data then the globals will be known
-      this.hasknownGlobals = true
-
-      // update the account copies and global backups
-      // it is possible some of this gets to go away eventually
-      for (let accountEntry of accountCopies) {
-        let { accountId, data, timestamp, hash, cycleNumber, isGlobal } = accountEntry
-
-        // check if the is global bit was set and keep local track of it.  Before this was going to be passed in as separate data
-        if (isGlobal == true) {
-          globalAccountKeyMap[accountId] = true
-        }
-
-        // Maybe don't try to calculate the cycle number....
-        // const cycle = this.p2p.state.getCycleByTimestamp(timestamp + this.syncSettleTime)
-        // // find the correct cycle based on timetamp
-        // if (!cycle) {
-        //   this.mainLogger.error(`_commitAccountCopies failed to get cycle for timestamp ${timestamp} accountId:${utils.makeShortHash(accountId)}`)
-        //   continue
-        // }
-        // let cycleNumber = cycle.counter
-
-        let backupObj: Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
-
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `_commitAccountCopies acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
-
-        // If the account is global ad it to the global backup list
-        if (globalAccountKeyMap[accountId] === true) {
-          //this.isGlobalAccount(accountId)){
-
-          // If we do not realized this account is global yet, then set it and log to playback log
-          if (this.isGlobalAccount(accountId) === false) {
-            this.globalAccountMap.set(accountId, null) // we use null. ended up not using the data, only checking for the key is used
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalAccountMap', `set global in _commitAccountCopies accountId:${utils.makeShortHash(accountId)}`)
-          }
-
-          let globalBackupList: Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
-          if (globalBackupList != null) {
-            globalBackupList.push(backupObj) // sort and cleanup later
-            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `_commitAccountCopies added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
-          } else {
-            this.mainLogger.error(`_commitAccountCopies no global backup list found for accountId:${utils.makeShortHash(accountId)}`)
-          }
-        }
-        //Saves the last copy per given cycle! this way when you query cycle-1 you get the right data.
-        await this.storage.createOrReplaceAccountCopy(backupObj)
-      }
-    }
-  }
 
   /**
    * getReceipt
