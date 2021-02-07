@@ -42,7 +42,6 @@ class StateManagerSync {
   syncTrackerIndex: number
 
   readyforTXs: boolean
-  //hasknownGlobals: boolean moved back to state manager
 
   syncTrackers: SyncTracker[]
 
@@ -169,7 +168,7 @@ class StateManagerSync {
                 //@ts-ignore ourNodeInTransactionGroup is updated by queueEntryGetTransactionGroup
                 // if(queueEntry.ourNodeInTransactionGroup === true){
                 //   queueEntry.conensusGroup = null
-                //   this.queueEntryGetConsensusGroup(queueEntry)
+                //   this.stateManager.transactionQueue.queueEntryGetConsensusGroup(queueEntry)
                 // }
 
                 //Restore the TX group, because we only want to know what nodes were in the group at the time of the TX
@@ -332,7 +331,7 @@ class StateManagerSync {
       this.dataSyncMainPhaseComplete = true
 
       this.globalAccountsSynced = true
-      this.stateManager.hasknownGlobals = true
+      this.stateManager.accountGlobals.hasknownGlobals = true
       this.readyforTXs = true
       this.mainLogger.debug(`DATASYNC: isFirstSeed = true. skipping sync`)
       return
@@ -792,7 +791,7 @@ class StateManagerSync {
             let hash = accountData.stateId
             let isGlobal = this.stateManager.isGlobalAccount(accountId)
             let backupObj: Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
-            //if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+            //if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
             let globalBackupList: Shardus.AccountsCopy[] = this.stateManager.getGlobalAccountBackupList(accountId)
             if (globalBackupList != null) {
               globalBackupList.push(backupObj) // sort and cleanup later.
@@ -804,7 +803,7 @@ class StateManagerSync {
 
       let failedHashes = await this.stateManager.checkAndSetAccountData(dataToSet, 'syncStateDataGlobals', true)
 
-      //this.stateManagerStats.statsDataSummaryInit(dataToSet)
+      //this.stateManager.stateManagerStats.statsDataSummaryInit(dataToSet)
 
       console.log('DBG goodAccounts', goodAccounts)
 
@@ -1525,7 +1524,7 @@ class StateManagerSync {
     // failedHashes is a list of accounts that failed to match the hash reported by the server
     let failedHashes = await this.stateManager.checkAndSetAccountData(goodAccounts, 'syncNonGlobals:processAccountData', true) // repeatable form may need to call this in batches
 
-    //this.stateManagerStats.statsDataSummaryInit(goodAccounts)
+    //this.stateManager.stateManagerStats.statsDataSummaryInit(goodAccounts)
 
     if (failedHashes.length > 1000) {
       this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
@@ -1578,7 +1577,7 @@ class StateManagerSync {
       this.dataSyncMainPhaseComplete = true
 
       this.globalAccountsSynced = true
-      this.stateManager.hasknownGlobals = true
+      this.stateManager.accountGlobals.hasknownGlobals = true
       this.readyforTXs = true
       this.mainLogger.debug(`DATASYNC: isFirstSeed = true. skipping sync`)
       return
@@ -1972,7 +1971,7 @@ class StateManagerSync {
     )
     // failedHashes is a list of accounts that failed to match the hash reported by the server
     let failedHashes = await this.stateManager.checkAndSetAccountData(goodAccounts, 'syncNonGlobals:processAccountData', true) // repeatable form may need to call this in batches
-    //this.stateManagerStats.statsDataSummaryInit(goodAccounts)
+    //this.stateManager.stateManagerStats.statsDataSummaryInit(goodAccounts)
     if (failedHashes.length > 1000) {
       this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
       // state -> try another node. TODO record/eval/report blame?
@@ -2134,7 +2133,7 @@ class StateManagerSync {
             let hash = accountData.stateId
             let isGlobal = this.stateManager.isGlobalAccount(accountId)
             let backupObj: Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
-            //if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+            //if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
             let globalBackupList: Shardus.AccountsCopy[] = this.stateManager.getGlobalAccountBackupList(accountId)
             if (globalBackupList != null) {
               globalBackupList.push(backupObj) // sort and cleanup later.

@@ -13,6 +13,8 @@ import ShardFunctions from './shardFunctions2.js'
 import { time } from 'console'
 import StateManager from '.'
 
+import ShardFunctions2 from './shardFunctions2.js' // oof, need to refactor this!
+
 
 class TransactionRepair {
   app: Shardus.App
@@ -53,7 +55,7 @@ class TransactionRepair {
   }
 
   async repairToMatchReceipt(queueEntry: QueueEntry) {
-    if (this.currentCycleShardData == null) {
+    if (this.stateManager.currentCycleShardData == null) {
       return
     }
     // if (!queueEntry.requests) {
@@ -91,8 +93,8 @@ class TransactionRepair {
             if (id === key && hash != null) {
               if (requestObjects[key] != null) {
                 //todo perf delay these checks for jit.
-                if (appliedVote.node_id !== this.currentCycleShardData.ourNode.id) {
-                  if (this.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === true) {
+                if (appliedVote.node_id !== this.stateManager.currentCycleShardData.ourNode.id) {
+                  if (this.stateManager.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === true) {
                     //build a list of alternates
                     requestObjects[key].alternates.push(appliedVote.node_id)
                   }
@@ -101,16 +103,16 @@ class TransactionRepair {
               }
 
               coveredKey = true
-              if (appliedVote.node_id === this.currentCycleShardData.ourNode.id) {
+              if (appliedVote.node_id === this.stateManager.currentCycleShardData.ourNode.id) {
                 //dont reference our own node, should not happen anyway
-                if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `appliedVote.node_id != this.currentCycleShardData.ourNode.id ${utils.stringifyReduce(appliedVote.node_id)} our: ${utils.stringifyReduce(this.currentCycleShardData.ourNode.id)} `)
+                if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `appliedVote.node_id != this.stateManager.currentCycleShardData.ourNode.id ${utils.stringifyReduce(appliedVote.node_id)} our: ${utils.stringifyReduce(this.stateManager.currentCycleShardData.ourNode.id)} `)
                 continue
               }
-              if (this.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === false) {
-                if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `this.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === false ${utils.stringifyReduce(appliedVote.node_id)} `)
+              if (this.stateManager.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === false) {
+                if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `this.stateManager.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === false ${utils.stringifyReduce(appliedVote.node_id)} `)
                 continue
               }
-              let nodeShardInfo: NodeShardData = this.currentCycleShardData.nodeShardDataMap.get(appliedVote.node_id)
+              let nodeShardInfo: NodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(appliedVote.node_id)
 
               if (nodeShardInfo == null) {
                 this.mainLogger.error(`shrd_repairToMatchReceipt nodeShardInfo == null ${utils.stringifyReduce(appliedVote.node_id)}`)
@@ -169,7 +171,7 @@ class TransactionRepair {
                 return
               }
               let altId = requestObject.alternates[alternateIndex]
-              let nodeShardInfo: NodeShardData = this.currentCycleShardData.nodeShardDataMap.get(altId)
+              let nodeShardInfo: NodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(altId)
               if (nodeShardInfo != null) {
                 node = nodeShardInfo.node
                 this.mainLogger.error(`shrd_repairToMatchReceipt got alt source node: idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(node.id)}`)
@@ -179,11 +181,11 @@ class TransactionRepair {
               alternateIndex++
             }
 
-            let relationString = '' //ShardFunctions.getNodeRelation(homeNodeShardData, this.currentCycleShardData.ourNode.id)
+            let relationString = '' //ShardFunctions.getNodeRelation(homeNodeShardData, this.stateManager.currentCycleShardData.ourNode.id)
             if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_ask', `${shortHash}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
 
             // Node Precheck!
-            if (this.isNodeValidForInternalMessage(node.id, 'repairToMatchReceipt', true, true) === false) {
+            if (this.stateManager.isNodeValidForInternalMessage(node.id, 'repairToMatchReceipt', true, true) === false) {
               // if(this.tryNextDataSourceNode('repairToMatchReceipt') == false){
               //   break
               // }
@@ -219,8 +221,8 @@ class TransactionRepair {
               if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `write data: ${utils.stringifyReduce(data)}`)
               //Commit the data
               let dataToSet = [data]
-              let failedHashes = await this.checkAndSetAccountData(dataToSet, 'repairToMatchReceipt', false)
-              await this.writeCombinedAccountDataToBackups(dataToSet, failedHashes)
+              let failedHashes = await this.stateManager.checkAndSetAccountData(dataToSet, 'repairToMatchReceipt', false)
+              await this.stateManager.writeCombinedAccountDataToBackups(dataToSet, failedHashes)
               attemptsRemaining = false
               //update global cache?  that will be obsolete soona anyhow!
               //need to loop and call update
@@ -244,9 +246,9 @@ class TransactionRepair {
               if (beforeData == null) {
                 this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData data is null ${utils.stringifyReduce(data.accountId)} WILL CAUSE DATA OOS`)
               } else {
-                if (this.stateManagerStats.hasAccountBeenSeenByStats(data.accountId) === false) {
+                if (this.stateManager.stateManagerStats.hasAccountBeenSeenByStats(data.accountId) === false) {
                   // Init stats because we have not seen this account yet.
-                  this.stateManagerStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, data.accountId, beforeData)
+                  this.stateManager.stateManagerStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, data.accountId, beforeData)
                 }
 
                 // important to update the timestamp.  There are various reasons it could be incorrectly set to 0
@@ -257,7 +259,7 @@ class TransactionRepair {
                 data.timestamp = updatedTimestamp
 
                 // update stats
-                this.stateManagerStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, beforeData, data)
+                this.stateManager.stateManagerStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, beforeData, data)
 
                 // record state table data
                 let { timestamp: oldtimestamp, hash: oldhash } = this.app.getTimestampAndHashFromAccount(beforeData)
@@ -277,13 +279,13 @@ class TransactionRepair {
                 let timeStampMatches = updatedTimestamp === queueEntry.acceptedTx.timestamp
                 let test2 = false
                 if (timeStampMatches === false) {
-                  if (this.isGlobalAccount(data.accountId)) {
+                  if (this.stateManager.accountGlobals.isGlobalAccount(data.accountId)) {
                     updateStateTable = false
                     test2 = true
                   }
                 }
                 let test3 = false
-                if (this.isGlobalAccount(data.accountId)) {
+                if (this.stateManager.accountGlobals.isGlobalAccount(data.accountId)) {
                   if (oldhash === updatedHash) {
                     updateStateTable = false
                     test3 = true

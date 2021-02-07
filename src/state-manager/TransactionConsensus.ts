@@ -67,10 +67,10 @@ class TransactionConsenus {
 
     // share the appliedReceipt.
     let sender = null
-    let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry)
+    let consensusGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
     if (consensusGroup.length > 1) {
       // should consider only forwarding in some cases?
-      this.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, consensusGroup)
+      this.stateManager.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, consensusGroup)
       this.p2p.sendGossipIn('spread_appliedReceipt', appliedReceipt, '', sender, consensusGroup)
     }
   }
@@ -158,7 +158,7 @@ class TransactionConsenus {
     let passed = false
     let canProduceReceipt = false
 
-    let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry) // todo use real consensus group!!!
+    let consensusGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry) // todo use real consensus group!!!
     let requiredVotes = Math.round(consensusGroup.length * (2 / 3.0))
 
     let numVotes = queueEntry.collectedVotes.length
@@ -322,7 +322,7 @@ class TransactionConsenus {
       transaction_result: queueEntry.preApplyTXResult.passed,
       account_id: [],
       account_state_hash_after: [],
-      node_id: this.currentCycleShardData.ourNode.id,
+      node_id: this.stateManager.currentCycleShardData.ourNode.id,
       cant_apply: queueEntry.preApplyTXResult.applied === false,
     }
 
@@ -371,10 +371,10 @@ class TransactionConsenus {
     this.tryAppendVote(queueEntry, ourVote)
     // share the vote via gossip
     let sender = null
-    let consensusGroup = this.queueEntryGetConsensusGroup(queueEntry)
+    let consensusGroup = this.stateManager.transactionQueue.queueEntryGetConsensusGroup(queueEntry)
     if (consensusGroup.length >= 1) {
       // should consider only forwarding in some cases?
-      this.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share tx vote to neighbors`, consensusGroup)
+      this.stateManager.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share tx vote to neighbors`, consensusGroup)
       // TODO STATESHARDING4 ENDPOINTS this needs to change from gossip to a tell
       //this.p2p.sendGossipIn('spread_appliedVote', ourVote, '', sender, consensusGroup)
 
@@ -382,7 +382,7 @@ class TransactionConsenus {
       if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.id}`, `numNodes: ${consensusGroup.length} ourVote: ${utils.stringifyReduce(ourVote)} `)
 
       // Filter nodes before we send tell()
-      let filteredNodes = this.filterValidNodesForInternalMessage(consensusGroup, 'createAndShareVote', true, true)
+      let filteredNodes = this.stateManager.filterValidNodesForInternalMessage(consensusGroup, 'createAndShareVote', true, true)
       if (filteredNodes.length === 0) {
         this.mainLogger.error('createAndShareVote: filterValidNodesForInternalMessage no valid nodes left to try')
         return null

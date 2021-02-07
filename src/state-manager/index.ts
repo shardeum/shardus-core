@@ -7,6 +7,7 @@ import { ShardGlobals, ShardInfo, StoredPartition, NodeShardData, AddressRange, 
 import { isNodeDown, isNodeLost } from '../p2p/Lost'
 
 import ShardFunctions from './shardFunctions2.js'
+import ShardFunctions2 from './shardFunctions2.js' // oof, need to refactor this!
 
 const EventEmitter = require('events')
 import * as utils from '../utils'
@@ -15,9 +16,7 @@ const stringify = require('fast-stable-stringify')
 
 const allZeroes64 = '0'.repeat(64)
 
-const cHashSetStepSize = 4
-const cHashSetTXStepSize = 2
-const cHashSetDataStepSize = 2
+
 
 // not sure about this.
 import Consensus from '../consensus'
@@ -27,7 +26,7 @@ import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger from '../logger'
 //import { NodeShardData } from './shardFunctionTypes'
-import ShardFunctions2 from './shardFunctions2.js'
+
 import { throws } from 'assert'
 import * as Context from '../p2p/Context'
 // import { platform } from 'os' //why did this automatically get added?
@@ -47,6 +46,7 @@ import TransactionQueue from './TransactionQueue'
 import TransactionRepair from './TransactionRepair'
 import TransactionConsenus from './TransactionConsensus'
 import PartitionObjects from './PartitionObjects'
+import Depricated from './Depricated'
 
 
 
@@ -54,15 +54,7 @@ import PartitionObjects from './PartitionObjects'
  * StateManager
  */
 class StateManager extends EventEmitter {
-  /**
-   * @param {boolean} verboseLogs
-   * @param {import("../utils/profiler")} profiler
-   * @param {import("../shardus").App} app
-   * @param {import("../consensus")} consensus
-   * @param {import("../p2p")} p2p
-   * @param {import("../crypto")} crypto
-   * @param {any} config
-   */
+//  class StateManager {
 
   app: Shardus.App
   storage: Storage
@@ -70,6 +62,7 @@ class StateManager extends EventEmitter {
   crypto: Crypto
   config: Shardus.ShardusConfiguration
   profiler: Profiler
+  consensus: Consensus
 
   //Sub modules
   stateManagerStats: StateManagerStats
@@ -80,52 +73,31 @@ class StateManager extends EventEmitter {
   transactionRepair: TransactionRepair
   transactionConsenus: TransactionConsenus
   partitionObjects: PartitionObjects
+  depricated: Depricated
 
-
-
-  newAcceptedTxQueue: QueueEntry[]
-  newAcceptedTxQueueTempInjest: QueueEntry[]
-  archivedQueueEntries: QueueEntry[]
   // syncTrackers:SyncTracker[];
   shardValuesByCycle: Map<number, CycleShardData>
   currentCycleShardData: CycleShardData | null
   globalAccountsSynced: boolean
-  knownGlobals: { [id: string]: boolean }
-  hasknownGlobals: boolean
 
-  dataRepairStack: RepairTracker[]
+
+
   dataRepairsCompleted: number
   dataRepairsStarted: number
-  repairAllStoredPartitions: boolean
-  repairStartedMap: Map<string, boolean>
-  repairCompletedMap: Map<string, boolean>
+  useStoredPartitionsForReport: boolean
+
 
   partitionReceiptsByCycleCounter: { [cycleKey: string]: PartitionReceipt[] } //Object.<string, PartitionReceipt[]> // a map of cycle keys to lists of partition receipts.
   ourPartitionReceiptsByCycleCounter: { [cycleKey: string]: PartitionReceipt } //Object.<string, PartitionReceipt> //a map of cycle keys to lists of partition receipts.
 
   fifoLocks: FifoLockObjectMap
 
-  //data sync and data repair structure defined
-  /** partition objects by cycle.  index by cycle counter key to get an array */
-  partitionObjectsByCycle: { [cycleKey: string]: PartitionObject[] }
-  /** our partition Results by cycle.  index by cycle counter key to get an array */
-  ourPartitionResultsByCycle: { [cycleKey: string]: PartitionResult[] }
-  /** tracks state for repairing partitions. index by cycle counter key to get the repair object, index by parition  */
-  repairTrackingByCycleById: { [cycleKey: string]: { [id: string]: RepairTracker } }
-  /** UpdateRepairData by cycle key */
-  repairUpdateDataByCycle: { [cycleKey: string]: UpdateRepairData[] }
-  /** partition objects by cycle by hash.   */
-  recentPartitionObjectsByCycleByHash: { [cycleKey: string]: { [hash: string]: PartitionObject } }
-  /** temporary store for TXs that we put in a partition object after a cycle is complete. an array that holds any TXs (i.e. from different cycles), code will filter out what it needs @see TempTxRecord */
-  tempTXRecords: TempTxRecord[]
-  /** TxTallyList data indexed by cycle key and partition key. @see TxTallyList */
-  txByCycleByPartition: { [cycleKey: string]: { [partitionKey: string]: TxTallyList } }
-  /** Stores the partition responses that other nodes push to us.  Index by cycle key, then index by partition id */
-  allPartitionResponsesByCycleByPartition: { [cycleKey: string]: { [partitionKey: string]: PartitionResult[] } }
-
-  globalAccountMap: Map<string, Shardus.WrappedDataFromQueue | null>
 
 
+
+
+
+  lastSeenAccountsMap: { [accountId: string]: QueueEntry }
 
   appFinishedSyncing: boolean
 
@@ -142,7 +114,6 @@ class StateManager extends EventEmitter {
 
   // extensiveRangeChecking: boolean; // non required range checks that can show additional errors (should not impact flow control)
 
-  syncPartitionsStarted: boolean
 
   stateIsGood_txHashsetOld: boolean
   stateIsGood_accountPartitions: boolean
@@ -164,12 +135,18 @@ class StateManager extends EventEmitter {
 
   debugFeatureOld_partitionReciepts: boolean // depends on old partition report features.
 
-  nextCycleReportToSend: PartitionCycleReport
 
   verboseLogs: boolean
 
   logger: Logger
 
+
+  extendedRepairLogging:boolean
+
+  canDataRepair:boolean // the old repair.. todo depricate further.
+  lastActiveNodeCount: number
+
+  doDataCleanup: boolean
 
 /***
  *     ######   #######  ##    ##  ######  ######## ########  ##     ##  ######  ########  #######  ########  
@@ -198,22 +175,14 @@ class StateManager extends EventEmitter {
     this.completedPartitions = []
     this.mainStartingTs = Date.now()
     this.queueSitTime = 6000 // todo make this a setting. and tie in with the value in consensus
-    // this.syncSettleTime = 8000 // 3 * 10 // an estimate of max transaction settle time. todo make it a config or function of consensus later
     this.syncSettleTime = this.queueSitTime + 2000 // 3 * 10 // an estimate of max transaction settle time. todo make it a config or function of consensus later
-    this.newAcceptedTxQueue = []
-    this.newAcceptedTxQueueTempInjest = []
-    /** @type {QueueEntry[]} */
-    this.archivedQueueEntries = []
-    /** @type {number} archivedQueueEntryMaxCount is a maximum amount of queue entries to store, usually we should never have this many stored since tx age will be used to clean up the list  */
-    this.archivedQueueEntryMaxCount = 50000
-    this.newAcceptedTxQueueRunning = false
-    //this.dataSyncMainPhaseComplete = false
-    this.queueEntryCounter = 0
-    this.queueRestartCounter = 0
+
+
+
     this.lastSeenAccountsMap = null
 
     this.appFinishedSyncing = false
-    this.syncPartitionsStarted = false
+
 
     this.extensiveRangeChecking = true
 
@@ -223,17 +192,16 @@ class StateManager extends EventEmitter {
     // this.runtimeSyncTrackerSyncing = false
 
     //this.globalAccountsSynced = false
-    this.knownGlobals = {}
-    this.hasknownGlobals = false
+
 
     //BLOCK3
     this.dataPhaseTag = 'DATASYNC: '
-    this.applySoftLock = false
+
 
     //BLOCK4
     this.useHashSets = true
     this.lastActiveNodeCount = 0
-    this.queueStopped = false
+
     this.extendedRepairLogging = true
     this.shardInfo = {}
     /** @type {Map<number, CycleShardData>} */
@@ -244,9 +212,7 @@ class StateManager extends EventEmitter {
     //this.readyforTXs = false
 
     this.sleepInterrupt = undefined
-    this.lastCycleReported = -1
-    this.partitionReportDirty = false
-    this.nextCycleReportToSend = null
+
 
     this.configsInit()
     
@@ -265,7 +231,7 @@ class StateManager extends EventEmitter {
     this.transactionRepair = new TransactionRepair(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
     this.transactionConsenus = new TransactionConsenus(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
     this.partitionObjects = new PartitionObjects(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
-
+    this.depricated = new Depricated(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
 
 
     // feature controls.
@@ -281,7 +247,7 @@ class StateManager extends EventEmitter {
 
     this.debugFeature_dumpAccountData = true
     this.debugFeature_dumpAccountDataFromSQL = false
-    this.debugFeatureOld_partitionReciepts = true
+    this.debugFeatureOld_partitionReciepts = false
 
     this.stateIsGood_txHashsetOld = true
     this.stateIsGood_activeRepairs = true
@@ -296,43 +262,27 @@ class StateManager extends EventEmitter {
       this.debugFeature_dumpAccountDataFromSQL = this.tryGetBoolProperty(this.config.debug, 'dumpAccountReportFromSQL', this.debugFeature_dumpAccountDataFromSQL)
     }
 
-    // the original way this was setup was to reset and apply repair results one partition at a time.
-    // this could create issue if we have a TX spanning multiple paritions that are locally owned.
-    this.resetAndApplyPerPartition = false
-    /** @type {RepairTracker[]} */
-    this.dataRepairStack = []
+
+    
+
+ 
     /** @type {number} */
     this.dataRepairsCompleted = 0
     /** @type {number} */
     this.dataRepairsStarted = 0
-    this.repairAllStoredPartitions = true
-    this.repairStartedMap = new Map()
-    this.repairCompletedMap = new Map()
+    this.useStoredPartitionsForReport = true
+
     /** @type {Object.<string, PartitionReceipt[]>} a map of cycle keys to lists of partition receipts.  */
     this.partitionReceiptsByCycleCounter = {}
     /** @type {Object.<string, PartitionReceipt>} a map of cycle keys to lists of partition receipts.  */
     this.ourPartitionReceiptsByCycleCounter = {}
     this.doDataCleanup = true
-    this.sendArchiveData = false
-    this.purgeArchiveData = false
-    this.sentReceipts = new Map()
-
 
     //Fifo locks.
     this.fifoLocks = {}
 
-    // Init data sync structures!
-    this.partitionObjectsByCycle = {}
-    this.ourPartitionResultsByCycle = {}
-    this.repairTrackingByCycleById = {}
-    this.repairUpdateDataByCycle = {}
-    this.applyAllPreparedRepairsRunning = false
-    this.recentPartitionObjectsByCycleByHash = {}
-    this.tempTXRecords = []
-    this.txByCycleByPartition = {}
-    this.allPartitionResponsesByCycleByPartition = {}
 
-    this.globalAccountMap = new Map()
+
 
     this.debugTXHistory = {}
 
@@ -424,6 +374,15 @@ class StateManager extends EventEmitter {
 
 
   }
+
+
+
+
+  // TEMP hack emit events through p2p
+  // emit(event){
+  //   this.p2p.emit(event)
+
+  // }
 
 
 
@@ -551,6 +510,9 @@ class StateManager extends EventEmitter {
     // this will be a huge log.
     // Temp disable for log size
     // if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${cycleNumber} data: ${utils.stringifyReduce(cycleShardData)}`)
+
+
+    this.lastActiveNodeCount = cycleShardData.activeNodes.length
 
     cycleShardData.hasCompleteData = true
   }
@@ -815,7 +777,7 @@ class StateManager extends EventEmitter {
         continue
       }
       // wrappedAccounts.push({ accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp })
-      const isGlobal = this.isGlobalAccount(accountEntry.accountId)
+      const isGlobal = this.accountGlobals.isGlobalAccount(accountEntry.accountId)
       let accountCopy: AccountCopy = {
         accountId: accountEntry.accountId,
         data: accountEntry.data,
@@ -826,7 +788,7 @@ class StateManager extends EventEmitter {
       }
       accountCopies.push(accountCopy)
     }
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'writeCombinedAccountDataToBackups ' + accountCopies.length + ' ' + utils.stringifyReduce(accountCopies))
+    if (this.verboseLogs) this.mainLogger.debug( 'writeCombinedAccountDataToBackups ' + accountCopies.length + ' ' + utils.stringifyReduce(accountCopies))
 
     if (this.verboseLogs) console.log('DBG accountCopies.  (in main log)')
 
@@ -964,22 +926,11 @@ class StateManager extends EventEmitter {
   registerEndpoints() {
     // alternatively we would need to query for accepted tx.
 
-    // This endpoint will likely be a one off thing so that we can test before milesone 15.  after milesone 15 the accepted TX may flow from the consensus coordinator
+    this.accountGlobals.setupHandlers()
 
-    // After joining the network
-    //   Record Joined timestamp
-    //   Even a syncing node will receive accepted transactions
-    //   Starts receiving accepted transaction and saving them to Accepted Tx Table
-    this.p2p.registerGossipHandler('acceptedTx', async (acceptedTX: AcceptedTx, sender: Shardus.Node, tracker: string) => {
-      // docs mention putting this in a table but it seems so far that an in memory queue should be ok
-      // should we filter, or instead rely on gossip in to only give us TXs that matter to us?
+    this.depricated.setupHandlers()
 
-      this.p2p.sendGossipIn('acceptedTx', acceptedTX, tracker, sender)
-
-      let noConsensus = false // this can only be true for a set command which will never come from an endpoint
-      this.routeAndQueueAcceptedTransaction(acceptedTX, /*sendGossip*/ false, sender, /*globalModification*/ false, noConsensus)
-      //Note await not needed so beware if you add code below this.
-    })
+    this.partitionObjects.setupHandlers()
 
     // /get_account_state_hash (Acc_start, Acc_end, Ts_start, Ts_end)
     // Acc_start - get data for accounts starting with this account id; inclusive
@@ -1119,182 +1070,7 @@ class StateManager extends EventEmitter {
       await respond(result)
     })
 
-    // /post_partition_results (Partition_results)
-    //   Partition_results - array of objects with the fields {Partition_id, Cycle_number, Partition_hash, Node_id, Node_sign}
-    //   Returns nothing
 
-    this.p2p.registerInternal(
-      'post_partition_results',
-      /**
-       * This is how to typedef a callback!
-       * @param {{ partitionResults: PartitionResult[]; Cycle_number: number; }} payload
-       * @param {any} respond TSConversion is it ok to just set respond to any?
-       */
-      async (payload: PosPartitionResults, respond: any) => {
-        // let result = {}
-        // let ourLockID = -1
-        try {
-          // ourLockID = await this.fifoLock('accountModification')
-          // accountData = await this.app.getAccountDataByList(payload.accountIds)
-
-          // Nodes collect the partition result from peers.
-          // Nodes may receive partition results for partitions they are not covering and will ignore those messages.
-          // Once a node has collected 50% or more peers giving the same partition result it can combine them to create a partition receipt. The node tries to create a partition receipt for all partitions it covers.
-          // If the partition receipt has a different partition hash than the node, the node needs to ask one of the peers with the majority partition hash for the partition object and determine the transactions it has missed.
-          // If the node is not able to create a partition receipt for a partition, the node needs to ask all peers which have a different partition hash for the partition object and determine the transactions it has missed. Only one peer for each different partition hash needs to be queried. Uses the /get_partition_txids API.
-          // If the node has missed some transactions for a partition, the node needs to get these transactions from peers and apply these transactions to affected accounts starting with a known good copy of the account from the end of the last cycle. Uses the /get_transactions_by_list API.
-          // If the node applied missed transactions to a partition, then it creates a new partition object, partition hash and partition result.
-          // After generating new partition results as needed, the node broadcasts the set of partition results to N adjacent peers on each side; where N is the number of  partitions covered by the node.
-          // After receiving new partition results from peers, the node should be able to collect 50% or more peers giving the same partition result and build a partition receipt.
-          // Any partition for which the node could not generate a partition receipt, should be logged as a fatal error.
-          // Nodes save the partition receipt as proof that the transactions they have applied are correct and were also applied by peers.
-
-          // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results`)
-
-          if (!payload) {
-            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair post_partition_results: abort no payload`)
-            return
-          }
-
-          let partitionResults = payload.partitionResults
-          let cycleKey = 'c' + payload.Cycle_number
-
-          let allResponsesByPartition = this.allPartitionResponsesByCycleByPartition[cycleKey]
-          if (!allResponsesByPartition) {
-            allResponsesByPartition = {}
-            this.allPartitionResponsesByCycleByPartition[cycleKey] = allResponsesByPartition
-          }
-          let ourPartitionResults = this.ourPartitionResultsByCycle[cycleKey]
-
-          if (!payload.partitionResults) {
-            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair post_partition_results: abort, partitionResults == null`)
-            return
-          }
-
-          if (payload.partitionResults.length === 0) {
-            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair post_partition_results: abort, partitionResults.length == 0`)
-            return
-          }
-
-          if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results payload: ${utils.stringifyReduce(payload)}`)
-
-          if (!payload.partitionResults[0].sign) {
-            // TODO security need to check that this is signed by a valid and correct node
-            if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair post_partition_results: abort, no sign object on partition`)
-            return
-          }
-
-          let owner = payload.partitionResults[0].sign.owner
-          // merge results from this message into our colleciton of allResponses
-          for (let partitionResult of partitionResults) {
-            let partitionKey1 = 'p' + partitionResult.Partition_id
-            let responses = allResponsesByPartition[partitionKey1]
-            if (!responses) {
-              responses = []
-              allResponsesByPartition[partitionKey1] = responses
-            }
-            // clean out an older response from same node if on exists
-            responses = responses.filter((item) => item.sign == null || item.sign.owner !== owner)
-            allResponsesByPartition[partitionKey1] = responses // have to re-assign this since it is a new ref to the array
-
-            // add the result ot the list of responses
-            if (partitionResult) {
-              responses.push(partitionResult)
-            } else {
-              if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _repair post_partition_results partitionResult missing`)
-            }
-            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results partition: ${partitionResult.Partition_id} responses.length ${responses.length}  cycle:${payload.Cycle_number}`)
-          }
-
-          var partitionKeys = Object.keys(allResponsesByPartition)
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results partitionKeys: ${partitionKeys.length}`)
-
-          // Loop through all the partition keys and check our progress for each partition covered
-          // todo perf consider only looping through keys of partitions that changed from this update?
-          for (let partitionKey of partitionKeys) {
-            let responses = allResponsesByPartition[partitionKey]
-            // if enough data, and our response is prepped.
-            let repairTracker
-            let partitionId = null // todo sharding ? need to deal with more that one partition response here!!
-            if (responses.length > 0) {
-              partitionId = responses[0].Partition_id
-              repairTracker = this._getRepairTrackerForCycle(payload.Cycle_number, partitionId)
-              if (repairTracker.busy && repairTracker.awaitWinningHash === false) {
-                if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results tracker busy. ${partitionKey} responses: ${responses.length}.  ${utils.stringifyReduce(repairTracker)}`)
-                continue
-              }
-              if (repairTracker.repairsFullyComplete) {
-                if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results repairsFullyComplete = true  cycle:${payload.Cycle_number}`)
-                continue
-              }
-            } else {
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results no responses. ${partitionKey} responses: ${responses.length}. repairTracker: ${utils.stringifyReduce(repairTracker)} responsesById: ${utils.stringifyReduce(allResponsesByPartition)}`)
-              continue
-            }
-
-            let responsesRequired = 3
-            if (this.useHashSets) {
-              responsesRequired = Math.min(1 + Math.ceil(repairTracker.numNodes * 0.9), repairTracker.numNodes - 1) // get responses from 90% of the node we have sent to
-            }
-            // are there enough responses to try generating a receipt?
-            if (responses.length >= responsesRequired && (repairTracker.evaluationStarted === false || repairTracker.awaitWinningHash)) {
-              repairTracker.evaluationStarted = true
-
-              let ourResult = null
-              if (ourPartitionResults != null) {
-                for (let obj of ourPartitionResults) {
-                  if (obj.Partition_id === partitionId) {
-                    ourResult = obj
-                    break
-                  }
-                }
-              }
-              if (ourResult == null) {
-                if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results our result is not computed yet `)
-                // Todo repair : may need to sleep or restart this computation later..
-                return
-              }
-
-              let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
-              let { partitionReceipt, topResult, success } = receiptResults
-              if (!success) {
-                if (repairTracker.awaitWinningHash) {
-                  if (topResult == null) {
-                    // if we are awaitWinningHash then wait for a top result before we start repair process again
-                    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair awaitWinningHash:true but topResult == null so keep waiting `)
-                    continue
-                  } else {
-                    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair awaitWinningHash:true and we have a top result so start reparing! `)
-                  }
-                }
-
-                if (this.resetAndApplyPerPartition === false && repairTracker.txRepairReady === true) {
-                  if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair txRepairReady:true bail here for some strange reason.. not sure aout this yet `)
-                  continue
-                }
-
-                if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results: tryGeneratePartitionReciept failed start repair process 1 ${utils.stringifyReduce(receiptResults)}`)
-                let cycle = this.p2p.state.getCycleByCounter(payload.Cycle_number)
-                await this.startRepairProcess(cycle, topResult, partitionId, ourResult.Partition_hash)
-              } else if (partitionReceipt) {
-                // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results: success store partition receipt`)
-                if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results 3 allFinished, final cycle: ${payload.Cycle_number} hash:${utils.stringifyReduce({ topResult })}`)
-                // do we ever send partition receipt yet?
-                this.storePartitionReceipt(payload.Cycle_number, partitionReceipt)
-                this.repairTrackerMarkFinished(repairTracker, 'post_partition_results')
-              }
-            } else {
-              if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair post_partition_results not enough responses awaitWinningHash: ${repairTracker.awaitWinningHash} resp: ${responses.length}. required:${responsesRequired} repairTracker: ${utils.stringifyReduce(repairTracker)}`)
-            }
-            // End of loop over partitions.  Continue looping if there are other partions that we need to check for completion.
-          }
-        } finally {
-          // this.fifoUnlock('accountModification', ourLockID)
-        }
-        // result.accountData = accountData
-        // await respond(result)
-      }
-    )
 
     // /get_transactions_by_list (Tx_ids)
     //   Tx_ids - array of transaction ids
@@ -1324,7 +1100,7 @@ class StateManager extends EventEmitter {
         let expectedResults = indicies.length
         let returnedResults = 0
         let key = 'c' + cycle
-        let partitionObjectsByHash = this.recentPartitionObjectsByCycleByHash[key]
+        let partitionObjectsByHash = this.partitionObjects.recentPartitionObjectsByCycleByHash[key]
         if (!partitionObjectsByHash) {
           await respond({ success: false })
         }
@@ -1378,7 +1154,7 @@ class StateManager extends EventEmitter {
             }
           }
           let finds = -1
-          let txTally = this.getTXList(cycle, partitionId)
+          let txTally = this.partitionObjects.getTXList(cycle, partitionId)
           let found = []
           if (txTally) {
             finds = 0
@@ -1410,7 +1186,7 @@ class StateManager extends EventEmitter {
       try {
         let id = payload.Partition_id
         let key = 'c' + payload.Cycle_number
-        let partitionObjects = this.partitionObjectsByCycle[key]
+        let partitionObjects = this.partitionObjects.partitionObjectsByCycle[key]
         for (let obj of partitionObjects) {
           if (obj.Partition_id === id) {
             result = obj
@@ -1630,7 +1406,7 @@ class StateManager extends EventEmitter {
 
       // how did this work before??
       // get transaction group. 3 accounds, merge lists.
-      let transactionGroup = this.queueEntryGetTransactionGroup(queueEntry)
+      let transactionGroup = this.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
       if (queueEntry.ourNodeInTransactionGroup === false) {
         return
       }
@@ -1694,7 +1470,7 @@ class StateManager extends EventEmitter {
 
         // share the appliedReceipt.
         let sender = null
-        let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry)
+        let consensusGroup = this.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
         if (consensusGroup.length > 1) {
           // should consider only forwarding in some cases?
           this.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, consensusGroup)
@@ -1732,70 +1508,6 @@ class StateManager extends EventEmitter {
       this.testAccountDataWrapped(accountData)
       // we cast up the array return type because we have attached the seenInQueue memeber to the data.
       result.accountData = accountData as Shardus.WrappedDataFromQueue[]
-      await respond(result)
-    })
-
-    this.p2p.registerInternal('get_globalaccountreport', async (payload: any, respond: (arg0: GlobalAccountReportResp) => any) => {
-      let result = { combinedHash: '', accounts: [], ready: this.appFinishedSyncing } as GlobalAccountReportResp
-
-      //type GlobalAccountReportResp = {combinedHash:string, accounts:{id:string, hash:string, timestamp:number }[]  }
-      //sort by account ids.
-
-      let globalAccountKeys = this.globalAccountMap.keys()
-
-      let toQuery: string[] = []
-
-      // not ready
-      if (this.stateManagerSync.globalAccountsSynced === false) {
-        result.ready = false
-        await respond(result)
-      }
-
-      //TODO: Perf  could do things faster by pulling from cache, but would need extra testing:
-      // let notInCache:string[]
-      // for(let key of globalAccountKeys){
-      //   let report
-      //   if(this.globalAccountRepairBank.has(key)){
-      //     let accountCopyList = this.globalAccountRepairBank.get(key)
-      //     let newestCopy = accountCopyList[accountCopyList.length-1]
-      //     report = {id:key, hash:newestCopy.hash, timestamp:newestCopy.timestamp }
-      //   } else{
-      //     notInCache.push(key)
-      //   }
-      //   result.accounts.push(report)
-      // }
-      for (let key of globalAccountKeys) {
-        toQuery.push(key)
-      }
-
-      let accountData: Shardus.WrappedData[]
-      let ourLockID = -1
-      try {
-        ourLockID = await this.fifoLock('accountModification')
-        accountData = await this.app.getAccountDataByList(toQuery)
-      } finally {
-        this.fifoUnlock('accountModification', ourLockID)
-      }
-      if (accountData != null) {
-        for (let wrappedAccount of accountData) {
-          // let wrappedAccountInQueueRef = wrappedAccount as Shardus.WrappedDataFromQueue
-          // wrappedAccountInQueueRef.seenInQueue = false
-          // if (this.lastSeenAccountsMap != null) {
-          //   let queueEntry = this.lastSeenAccountsMap[wrappedAccountInQueueRef.accountId]
-          //   if (queueEntry != null) {
-          //     wrappedAccountInQueueRef.seenInQueue = true
-          //   }
-          // }
-          let report = { id: wrappedAccount.accountId, hash: wrappedAccount.stateId, timestamp: wrappedAccount.timestamp }
-          result.accounts.push(report)
-        }
-      }
-      //PERF Disiable this in production or performance testing.
-      this.testAccountDataWrapped(accountData)
-      result.accounts.sort(utils.sort_id_Asc)
-      result.combinedHash = this.crypto.hash(result)
-      //this.globalAccountRepairBank
-
       await respond(result)
     })
 
@@ -1871,24 +1583,24 @@ class StateManager extends EventEmitter {
     if (!this.stateManagerSync.dataSyncMainPhaseComplete) {
       return
     }
-    if (!this.newAcceptedTxQueueRunning) {
-      this.processAcceptedTxQueue()
+    if (!this.transactionQueue.newAcceptedTxQueueRunning) {
+      this.transactionQueue.processAcceptedTxQueue()
     }
     // with the way the new lists are setup we lost our ablity to interrupt the timer but i am not sure that matters as much
-    // else if (this.newAcceptedTxQueue.length > 0 || this.newAcceptedTxQueueTempInjest.length > 0) {
-    //   this.interruptSleepIfNeeded(this.newAcceptedTxQueue[0].timestamp)
+    // else if (this.transactionQueue.newAcceptedTxQueue.length > 0 || this.transactionQueue.newAcceptedTxQueueTempInjest.length > 0) {
+    //   this.interruptSleepIfNeeded(this.transactionQueue.newAcceptedTxQueue[0].timestamp)
     // }
   }
 
   async _firstTimeQueueAwait() {
-    if (this.newAcceptedTxQueueRunning) {
+    if (this.transactionQueue.newAcceptedTxQueueRunning) {
       this.statemanager_fatal(`queueAlreadyRunning`, 'DATASYNC: newAcceptedTxQueueRunning')
       return
     }
 
-    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('_firstTimeQueueAwait', `this.newAcceptedTxQueue.length:${this.newAcceptedTxQueue.length} this.newAcceptedTxQueue.length:${this.newAcceptedTxQueue.length}`)
+    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('_firstTimeQueueAwait', `this.transactionQueue.newAcceptedTxQueue.length:${this.transactionQueue.newAcceptedTxQueue.length} this.transactionQueue.newAcceptedTxQueue.length:${this.transactionQueue.newAcceptedTxQueue.length}`)
 
-    await this.processAcceptedTxQueue()
+    await this.transactionQueue.processAcceptedTxQueue()
   }
 
   /**
@@ -1990,7 +1702,7 @@ class StateManager extends EventEmitter {
 
       let globalAccountSummary = []
       for (let globalID in partitionDump.globalAccountIDs) {
-        let backupList: Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(globalID)
+        let backupList: Shardus.AccountsCopy[] = this.accountGlobals.getGlobalAccountBackupList(globalID)
         //let globalAccount = this.globalAccountMap.get(globalID)
         if (backupList != null && backupList.length > 0) {
           let globalAccount = backupList[backupList.length - 1]
@@ -2126,7 +1838,7 @@ class StateManager extends EventEmitter {
 
       let globalAccountSummary = []
       for (let globalID in partitionDump.globalAccountIDs) {
-        let backupList: Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(globalID)
+        let backupList: Shardus.AccountsCopy[] = this.accountGlobals.getGlobalAccountBackupList(globalID)
         //let globalAccount = this.globalAccountMap.get(globalID)
         if (backupList != null && backupList.length > 0) {
           let globalAccount = backupList[backupList.length - 1]
@@ -2394,11 +2106,11 @@ class StateManager extends EventEmitter {
   }
 
   _stopQueue() {
-    this.queueStopped = true
+    this.transactionQueue.queueStopped = true
   }
 
   _clearQueue() {
-    this.newAcceptedTxQueue = []
+    this.transactionQueue.newAcceptedTxQueue = []
   }
 
 
@@ -2443,12 +2155,12 @@ class StateManager extends EventEmitter {
       let wrappedData = wrappedStates[key]
       if (wrappedData == null) {
         // TSConversion todo: harden this. throw exception?
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `setAccount wrappedData == null :${utils.makeShortHash(wrappedData.accountId)}`)
+        if (this.verboseLogs) this.mainLogger.debug( `setAccount wrappedData == null :${utils.makeShortHash(wrappedData.accountId)}`)
         continue
       }
 
       if (canWriteToAccount(wrappedData.accountId) === false) {
-        if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `setAccount canWriteToAccount == false :${utils.makeShortHash(wrappedData.accountId)}`)
+        if (this.verboseLogs) this.mainLogger.debug( `setAccount canWriteToAccount == false :${utils.makeShortHash(wrappedData.accountId)}`)
         continue
       }
 
@@ -2464,7 +2176,7 @@ class StateManager extends EventEmitter {
         if (this.verboseLogs) this.mainLogger.debug('setAccount: writing global account: ' + utils.makeShortHash(key))
       }
 
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `setAccount partial:${wrappedData.isPartial} key:${utils.makeShortHash(key)}`)
+      if (this.verboseLogs) this.mainLogger.debug( `setAccount partial:${wrappedData.isPartial} key:${utils.makeShortHash(key)}`)
       if (wrappedData.isPartial) {
         await this.app.updateAccountPartial(wrappedData, localCachedData[key], applyResponse)
       } else {
@@ -2493,7 +2205,7 @@ class StateManager extends EventEmitter {
     // todo review this assumption. seems ok at the moment.  are there times cycle could be null and getting the last cycle is not a valid answer?
     if (cycle == null) {
       cycle = this.p2p.state.getLastCycle()
-      // if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable error getting cycle by timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle returned:${cycle.counter} `)
+      // if (this.verboseLogs) this.mainLogger.error( `updateAccountsCopyTable error getting cycle by timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle returned:${cycle.counter} `)
       cycleOffset = 1
     }
     cycleNumber = cycle.counter + cycleOffset
@@ -2503,40 +2215,40 @@ class StateManager extends EventEmitter {
     let cycleStart = (cycle.start + cycle.duration * cycleOffset) * 1000
     let cycleEnd = (cycle.start + cycle.duration * (cycleOffset + 1)) * 1000
     if (txTimestamp + this.syncSettleTime < cycleStart) {
-      if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable time error< ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+      if (this.verboseLogs) this.mainLogger.error( `updateAccountsCopyTable time error< ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
     }
     if (txTimestamp + this.syncSettleTime >= cycleEnd) {
-      // if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+      // if (this.verboseLogs) this.mainLogger.error( `updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
       cycleOffset++
       cycleNumber = cycle.counter + cycleOffset
       cycleStart = (cycle.start + cycle.duration * cycleOffset) * 1000
       cycleEnd = (cycle.start + cycle.duration * (cycleOffset + 1)) * 1000
       if (txTimestamp + this.syncSettleTime >= cycleEnd) {
-        if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+        if (this.verboseLogs) this.mainLogger.error( `updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
       }
     }
     // TSConversion need to sort out account types!!!
     // @ts-ignore This has seemed fine in past so not going to sort out a type discrepencie here.  !== would detect and log it anyhow.
     if (accountDataList.length > 0 && accountDataList[0].timestamp !== txTimestamp) {
-      if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable timestamps do match txts:${txTimestamp} acc.ts:${accountDataList[0].timestamp} `)
+      if (this.verboseLogs) this.mainLogger.error( `updateAccountsCopyTable timestamps do match txts:${txTimestamp} acc.ts:${accountDataList[0].timestamp} `)
     }
     if (accountDataList.length === 0) {
       // need to decide if this matters!
-      if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `updateAccountsCopyTable empty txts:${txTimestamp}  `)
+      if (this.verboseLogs) this.mainLogger.error( `updateAccountsCopyTable empty txts:${txTimestamp}  `)
     }
-    // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable acc.timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle computed:${cycleNumber} `)
+    // if (this.verboseLogs) this.mainLogger.debug( `updateAccountsCopyTable acc.timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle computed:${cycleNumber} `)
 
     for (let accountEntry of accountDataList) {
       let { accountId, data, timestamp, hash } = accountEntry
-      let isGlobal = this.isGlobalAccount(accountId)
+      let isGlobal = this.accountGlobals.isGlobalAccount(accountId)
 
       let backupObj: Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
 
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug( `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
 
       // todo perf. batching?
-      // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'updateAccountsCopyTableA ' + JSON.stringify(accountEntry))
-      // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + 'updateAccountsCopyTableB ' + JSON.stringify(backupObj))
+      // if (this.verboseLogs) this.mainLogger.debug( 'updateAccountsCopyTableA ' + JSON.stringify(accountEntry))
+      // if (this.verboseLogs) this.mainLogger.debug( 'updateAccountsCopyTableB ' + JSON.stringify(backupObj))
 
       // how does this not stop previous results, is it because only the first request gets through.
 
@@ -2547,13 +2259,13 @@ class StateManager extends EventEmitter {
       // wrappedAccounts.push({ accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp })
 
       //TODO Perf: / mem   should we only save if there is a hash change?
-      if (this.isGlobalAccount(accountId) && repairing === false) {
+      if (this.accountGlobals.isGlobalAccount(accountId) && repairing === false) {
         //make sure it is a global tx.
-        let globalBackupList: Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
+        let globalBackupList: Shardus.AccountsCopy[] = this.accountGlobals.getGlobalAccountBackupList(accountId)
         if (globalBackupList != null) {
           globalBackupList.push(backupObj) // sort and cleanup later.
 
-          if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `updateAccountsCopyTable added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+          if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug( `updateAccountsCopyTable added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
         }
       }
 
@@ -2579,10 +2291,10 @@ class StateManager extends EventEmitter {
         }
 
         if (accountData == null || accountData.data == null || accountData.accountId == null) {
-          if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + ` _commitAccountCopies null account data found: ${accountData.accountId} data: ${utils.stringifyReduce(accountData)}`)
+          if (this.verboseLogs) this.mainLogger.error( ` _commitAccountCopies null account data found: ${accountData.accountId} data: ${utils.stringifyReduce(accountData)}`)
           continue
         } else {
-          if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _commitAccountCopies: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} data: ${utils.stringifyReduce(accountData)}`)
+          if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug( ` _commitAccountCopies: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} data: ${utils.stringifyReduce(accountData)}`)
         }
       }
       // tell the app to replace the account data
@@ -2591,7 +2303,7 @@ class StateManager extends EventEmitter {
       let globalAccountKeyMap: { [key: string]: boolean } = {}
 
       //we just have to trust that if we are restoring from data then the globals will be known
-      this.hasknownGlobals = true
+      this.accountGlobals.hasknownGlobals = true
 
       // update the account copies and global backups
       // it is possible some of this gets to go away eventually
@@ -2614,22 +2326,22 @@ class StateManager extends EventEmitter {
 
         let backupObj: Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
 
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `_commitAccountCopies acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug( `_commitAccountCopies acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
 
         // If the account is global ad it to the global backup list
         if (globalAccountKeyMap[accountId] === true) {
-          //this.isGlobalAccount(accountId)){
+          //this.accountGlobals.isGlobalAccount(accountId)){
 
           // If we do not realized this account is global yet, then set it and log to playback log
-          if (this.isGlobalAccount(accountId) === false) {
+          if (this.accountGlobals.isGlobalAccount(accountId) === false) {
             this.globalAccountMap.set(accountId, null) // we use null. ended up not using the data, only checking for the key is used
             if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalAccountMap', `set global in _commitAccountCopies accountId:${utils.makeShortHash(accountId)}`)
           }
 
-          let globalBackupList: Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
+          let globalBackupList: Shardus.AccountsCopy[] = this.accountGlobals.getGlobalAccountBackupList(accountId)
           if (globalBackupList != null) {
             globalBackupList.push(backupObj) // sort and cleanup later
-            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `_commitAccountCopies added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug( `_commitAccountCopies added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
           } else {
             this.mainLogger.error(`_commitAccountCopies no global backup list found for accountId:${utils.makeShortHash(accountId)}`)
           }
@@ -2765,6 +2477,7 @@ class StateManager extends EventEmitter {
    */
 
   // could do this every 5 cycles instead to save perf.
+  // TODO refactor period cleanup into sub modules!!!
   periodicCycleDataCleanup(oldestCycle: number) {
     // On a periodic bases older copies of the account data where we have more than 2 copies for the same account can be deleted.
 
@@ -2772,13 +2485,13 @@ class StateManager extends EventEmitter {
       return
     }
 
-    if (this.repairTrackingByCycleById == null) {
+    if (this.depricated.repairTrackingByCycleById == null) {
       return
     }
-    if (this.allPartitionResponsesByCycleByPartition == null) {
+    if (this.partitionObjects.allPartitionResponsesByCycleByPartition == null) {
       return
     }
-    if (this.ourPartitionResultsByCycle == null) {
+    if (this.partitionObjects.ourPartitionResultsByCycle == null) {
       return
     }
     if (this.shardValuesByCycle == null) {
@@ -2801,35 +2514,35 @@ class StateManager extends EventEmitter {
     let removedshardValuesByCycle = 0
     // let oldestCycleKey = 'c' + oldestCycle
     // cleanup old repair trackers
-    for (let cycleKey of Object.keys(this.repairTrackingByCycleById)) {
+    for (let cycleKey of Object.keys(this.depricated.repairTrackingByCycleById)) {
       let cycle = cycleKey.slice(1)
       let cycleNum = parseInt(cycle, 10)
       if (cycleNum < oldestCycle) {
         // delete old cycle
-        delete this.repairTrackingByCycleById[cycleKey]
+        delete this.depricated.repairTrackingByCycleById[cycleKey]
         removedrepairTrackingByCycleById++
       }
     }
 
     // cleanup old partition objects / receipts.
-    // let responsesById = this.allPartitionResponsesByCycleByPartition[key]
-    // let ourPartitionValues = this.ourPartitionResultsByCycle[key]
-    for (let cycleKey of Object.keys(this.allPartitionResponsesByCycleByPartition)) {
+    // let responsesById = this.partitionObjects.allPartitionResponsesByCycleByPartition[key]
+    // let ourPartitionValues = this.partitionObjects.ourPartitionResultsByCycle[key]
+    for (let cycleKey of Object.keys(this.partitionObjects.allPartitionResponsesByCycleByPartition)) {
       let cycle = cycleKey.slice(1)
       let cycleNum = parseInt(cycle, 10)
       if (cycleNum < oldestCycle) {
         // delete old cycle
-        delete this.allPartitionResponsesByCycleByPartition[cycleKey]
+        delete this.partitionObjects.allPartitionResponsesByCycleByPartition[cycleKey]
         removedallPartitionResponsesByCycleByPartition++
       }
     }
 
-    for (let cycleKey of Object.keys(this.ourPartitionResultsByCycle)) {
+    for (let cycleKey of Object.keys(this.partitionObjects.ourPartitionResultsByCycle)) {
       let cycle = cycleKey.slice(1)
       let cycleNum = parseInt(cycle, 10)
       if (cycleNum < oldestCycle) {
         // delete old cycle
-        delete this.ourPartitionResultsByCycle[cycleKey]
+        delete this.partitionObjects.ourPartitionResultsByCycle[cycleKey]
         removedourPartitionResultsByCycle++
       }
     }
@@ -2865,43 +2578,43 @@ class StateManager extends EventEmitter {
     let removedrepairUpdateDataByCycle = 0
     let removedpartitionObjectsByCycle = 0
 
-    // cleanup this.txByCycleByPartition
-    for (let cycleKey of Object.keys(this.txByCycleByPartition)) {
+    // cleanup this.partitionObjects.txByCycleByPartition
+    for (let cycleKey of Object.keys(this.partitionObjects.txByCycleByPartition)) {
       let cycle = cycleKey.slice(1)
       let cycleNum = parseInt(cycle, 10)
       if (cycleNum < oldestCycle) {
         // delete old cycle
-        delete this.txByCycleByPartition[cycleKey]
+        delete this.partitionObjects.txByCycleByPartition[cycleKey]
         removedtxByCycleByPartition++
       }
     }
-    // cleanup this.recentPartitionObjectsByCycleByHash
-    for (let cycleKey of Object.keys(this.recentPartitionObjectsByCycleByHash)) {
+    // cleanup this.partitionObjects.recentPartitionObjectsByCycleByHash
+    for (let cycleKey of Object.keys(this.partitionObjects.recentPartitionObjectsByCycleByHash)) {
       let cycle = cycleKey.slice(1)
       let cycleNum = parseInt(cycle, 10)
       if (cycleNum < oldestCycle) {
         // delete old cycle
-        delete this.recentPartitionObjectsByCycleByHash[cycleKey]
+        delete this.partitionObjects.recentPartitionObjectsByCycleByHash[cycleKey]
         removedrecentPartitionObjectsByCycleByHash++
       }
     }
-    // cleanup this.repairUpdateDataByCycle
-    for (let cycleKey of Object.keys(this.repairUpdateDataByCycle)) {
+    // cleanup this.depricated.repairUpdateDataByCycle
+    for (let cycleKey of Object.keys(this.depricated.repairUpdateDataByCycle)) {
       let cycle = cycleKey.slice(1)
       let cycleNum = parseInt(cycle, 10)
       if (cycleNum < oldestCycle) {
         // delete old cycle
-        delete this.repairUpdateDataByCycle[cycleKey]
+        delete this.depricated.repairUpdateDataByCycle[cycleKey]
         removedrepairUpdateDataByCycle++
       }
     }
-    // cleanup this.partitionObjectsByCycle
-    for (let cycleKey of Object.keys(this.partitionObjectsByCycle)) {
+    // cleanup this.partitionObjects.partitionObjectsByCycle
+    for (let cycleKey of Object.keys(this.partitionObjects.partitionObjectsByCycle)) {
       let cycle = cycleKey.slice(1)
       let cycleNum = parseInt(cycle, 10)
       if (cycleNum < oldestCycle) {
         // delete old cycle
-        delete this.partitionObjectsByCycle[cycleKey]
+        delete this.partitionObjects.partitionObjectsByCycle[cycleKey]
         removedpartitionObjectsByCycle++
       }
     }
@@ -2933,12 +2646,12 @@ class StateManager extends EventEmitter {
     // start at the front of the archivedQueueEntries fifo and remove old entries untill they are current.
     let oldQueueEntries = true
     let archivedEntriesRemoved = 0
-    while (oldQueueEntries && this.archivedQueueEntries.length > 0) {
-      let queueEntry = this.archivedQueueEntries[0]
+    while (oldQueueEntries && this.transactionQueue.archivedQueueEntries.length > 0) {
+      let queueEntry = this.transactionQueue.archivedQueueEntries[0]
       // the time is approximate so make sure it is older than five cycles.
       // added a few more to oldest cycle to keep entries in the queue longer in case syncing nodes need the data
       if (queueEntry.approximateCycleAge < oldestCycle - 3) {
-        this.archivedQueueEntries.shift()
+        this.transactionQueue.archivedQueueEntries.shift()
         archivedEntriesRemoved++
 
         if (this.verboseLogs) this.mainLogger.log(`queue entry removed from archive ${queueEntry.logID} tx cycle: ${queueEntry.approximateCycleAge} cycle: ${this.currentCycleShardData.cycleNumber}`)
@@ -2961,114 +2674,7 @@ class StateManager extends EventEmitter {
     // could do this in two steps
   }
 
-  /***
-   *    ########  ########   #######     ###    ########   ######     ###     ######  ########
-   *    ##     ## ##     ## ##     ##   ## ##   ##     ## ##    ##   ## ##   ##    ##    ##
-   *    ##     ## ##     ## ##     ##  ##   ##  ##     ## ##        ##   ##  ##          ##
-   *    ########  ########  ##     ## ##     ## ##     ## ##       ##     ##  ######     ##
-   *    ##     ## ##   ##   ##     ## ######### ##     ## ##       #########       ##    ##
-   *    ##     ## ##    ##  ##     ## ##     ## ##     ## ##    ## ##     ## ##    ##    ##
-   *    ########  ##     ##  #######  ##     ## ########   ######  ##     ##  ######     ##
-   */
-  /**
-   * broadcastPartitionResults
-   * @param {number} cycleNumber
-   */
-  async broadcastPartitionResults(cycleNumber: number) {
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair broadcastPartitionResults for cycle: ${cycleNumber}`)
-    // per partition need to figure out which node cover it.
-    // then get a list of all the results we need to send to a given node and send them at once.
-    // need a way to do this in semi parallel?
-    let lastCycleShardValues = this.shardValuesByCycle.get(cycleNumber)
-    let partitionResults = this.ourPartitionResultsByCycle['c' + cycleNumber]
-    let partitionResultsByNodeID = new Map() // use a map?
-    let nodesToTell = []
 
-    if (lastCycleShardValues == null) {
-      throw new Error(`broadcastPartitionResults lastCycleShardValues == null  ${cycleNumber}`)
-    }
-    // sign results as needed
-    for (let i = 0; i < partitionResults.length; i++) {
-      /** @type {PartitionResult} */
-      let partitionResult = partitionResults[i]
-      if (!partitionResult.sign) {
-        partitionResult = this.crypto.sign(partitionResult)
-      }
-
-      //check if we are syncing that cycle if so don't send out info on it!
-      // if(this.getSyncTrackerForParition(partitionResult.Partition_id, lastCycleShardValues)) {
-      //   if (this.verboseLogs ) this.mainLogger.debug( `broadcastPartitionResults skipped because parition is syncing ${partitionResult.Partition_id}`)
-      //   continue
-      // }
-
-      // if(lastCycleShardValues.partitionsToSkip.has(partitionResult.Partition_id) === true){
-      //   if (this.verboseLogs ) this.mainLogger.debug( `broadcastPartitionResults skipped because parition is syncing ${partitionResult.Partition_id}`)
-      //   continue
-      // }
-
-      //if there is any tx that gets a slow down need to mark it.
-
-      /** @type {ShardInfo} */
-      let partitionShardData = lastCycleShardValues.parititionShardDataMap.get(partitionResult.Partition_id)
-      // calculate nodes that care about this partition here
-      // since we are using store partitions use storedBy
-      // if we transfer back to covered partitions can switch back to coveredBy
-      let coverCount = 0
-      for (let nodeId in partitionShardData.storedBy) {
-        if (partitionShardData.storedBy.hasOwnProperty(nodeId)) {
-          // Test if node is active!!
-          let possibleNode = partitionShardData.storedBy[nodeId]
-
-          if (possibleNode.status !== 'active') {
-            // don't count non active nodes for participating in the system.
-            continue
-          }
-
-          coverCount++
-          let partitionResultsToSend
-          // If we haven't recorded this node yet create a new results object for it
-          if (partitionResultsByNodeID.has(nodeId) === false) {
-            nodesToTell.push(nodeId)
-            partitionResultsToSend = { results: [], node: partitionShardData.storedBy[nodeId], debugStr: `c${partitionResult.Cycle_number} ` }
-            partitionResultsByNodeID.set(nodeId, partitionResultsToSend)
-          }
-          partitionResultsToSend = partitionResultsByNodeID.get(nodeId)
-          partitionResultsToSend.results.push(partitionResult)
-          partitionResultsToSend.debugStr += `p${partitionResult.Partition_id} `
-        }
-      }
-
-      let repairTracker = this._getRepairTrackerForCycle(cycleNumber, partitionResult.Partition_id)
-      repairTracker.numNodes = coverCount - 1 // todo sharding re-evaluate this and thing of a better perf solution
-    }
-
-    let promises = []
-    for (let nodeId of nodesToTell) {
-      if (nodeId === lastCycleShardValues.ourNode.id) {
-        continue
-      }
-      let partitionResultsToSend = partitionResultsByNodeID.get(nodeId)
-      let payload = { Cycle_number: cycleNumber, partitionResults: partitionResultsToSend.results }
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair broadcastPartitionResults to ${nodeId} debugStr: ${partitionResultsToSend.debugStr} res: ${utils.stringifyReduce(payload)}`)
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair broadcastPartitionResults to ${nodeId} debugStr: ${partitionResultsToSend.debugStr} res: ${utils.stringifyReduce(payload)}`)
-
-      let shorthash = utils.makeShortHash(partitionResultsToSend.node.id)
-      let toNodeStr = shorthash + ':' + partitionResultsToSend.node.externalPort
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('broadcastPartitionResults', `${cycleNumber}`, `to ${toNodeStr} ${partitionResultsToSend.debugStr} `)
-
-      // Filter nodes before we send tell()
-      let filteredNodes = this.filterValidNodesForInternalMessage([partitionResultsToSend.node], 'tellCorrespondingNodes', true, true)
-      if (filteredNodes.length === 0) {
-        this.mainLogger.error('broadcastPartitionResults: filterValidNodesForInternalMessage skipping node')
-        continue //only doing one node at a time in this loop so just skip to next node.
-      }
-
-      let promise = this.p2p.tell([partitionResultsToSend.node], 'post_partition_results', payload)
-      promises.push(promise)
-    }
-
-    await Promise.all(promises)
-  }
 
   /***
    *     #######     ##                  #######   #######     ##     ##    ###    ##    ## ########  ##       ######## ########   ######
@@ -3105,7 +2711,7 @@ class StateManager extends EventEmitter {
             this.calculateChangeInCoverage()
           }
 
-          if (this.syncPartitionsStarted) {
+          if (this.partitionObjects.syncPartitionsStarted) {
             // not certain if we want await
             this.processPreviousCycleSummaries()
           }
@@ -3145,7 +2751,7 @@ class StateManager extends EventEmitter {
         }
 
         if (this.doDataCleanup === true) {
-          if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startSyncPartitions:cycle_q3_start-clean cycle: ${lastCycle.counter}`)
+          if (this.verboseLogs) this.mainLogger.debug( ` _repair startSyncPartitions:cycle_q3_start-clean cycle: ${lastCycle.counter}`)
           // clean up cycle data that is more than 10 cycles old.
           this.periodicCycleDataCleanup(lastCycle.counter - 10)
         }
@@ -3179,7 +2785,7 @@ class StateManager extends EventEmitter {
     }
 
     if (this.oldFeature_GeneratePartitionReport === true) {
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` processPreviousCycleSummaries cycle: ${cycle.counter}`)
+      if (this.verboseLogs) this.mainLogger.debug( ` processPreviousCycleSummaries cycle: ${cycle.counter}`)
       // this will take temp TXs and make sure they are stored in the correct place for us to generate partitions
       this.processTempTXs(cycle)
 
@@ -3193,7 +2799,7 @@ class StateManager extends EventEmitter {
     // Get the receipt map to send as a report
     if (this.feature_receiptMapResults === true) {
       receiptMapResults = this.generateReceiptMapResults(cycle)
-      if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `receiptMapResults: ${stringify(receiptMapResults)}`)
+      if (this.verboseLogs) this.mainLogger.debug( `receiptMapResults: ${stringify(receiptMapResults)}`)
     }
 
     // Get the stats data to send as a reort
@@ -3222,11 +2828,11 @@ class StateManager extends EventEmitter {
     // pre-allocate the next two cycles if needed
     for (let i = 1; i <= 2; i++) {
       let prekey = 'c' + (cycle.counter + i)
-      if (this.partitionObjectsByCycle[prekey] == null) {
-        this.partitionObjectsByCycle[prekey] = []
+      if (this.partitionObjects.partitionObjectsByCycle[prekey] == null) {
+        this.partitionObjects.partitionObjectsByCycle[prekey] = []
       }
-      if (this.ourPartitionResultsByCycle[prekey] == null) {
-        this.ourPartitionResultsByCycle[prekey] = []
+      if (this.partitionObjects.ourPartitionResultsByCycle[prekey] == null) {
+        this.partitionObjects.ourPartitionResultsByCycle[prekey] = []
       }
     }
 
@@ -3238,418 +2844,19 @@ class StateManager extends EventEmitter {
     }
   }
 
-  /**
-   * updatePartitionReport
-   * use our MainHashResults from in memory data to create the nextCycleReportToSend that is used by
-   * getPartitionReport() / reporter module
-   * @param cycleShardData
-   * @param mainHashResults
-   */
-  updatePartitionReport(cycleShardData: CycleShardData, mainHashResults: MainHashResults) {
-    if (this.feature_useNewParitionReport === false) {
-      return
-    }
-
-    let partitions = cycleShardData.ourConsensusPartitions
-    if (this.repairAllStoredPartitions === true) {
-      partitions = cycleShardData.ourStoredPartitions
-    }
-    if (partitions == null) {
-      throw new Error('updatePartitionReport partitions == null')
-    }
-
-    this.nextCycleReportToSend = { res: [], cycleNumber: cycleShardData.cycleNumber }
-
-    for (let partition of partitions) {
-      if (mainHashResults.partitionHashResults.has(partition)) {
-        let partitionHashResults = mainHashResults.partitionHashResults.get(partition)
-        this.nextCycleReportToSend.res.push({ i: partition, h: partitionHashResults.hashOfHashes })
-      }
-    }
-  }
-
-  async startSyncPartitions() {
-    // await this.createInitialAccountBackups() // nm this is now part of regular data sync
-    // register our handlers
-
-    // this._registerListener(this.p2p.state, 'cycle_q1_start', async (lastCycle, time) => {
-    //   this.updateShardValues(lastCycle.counter)
-    // })
-
-    this.syncPartitionsStarted = true
-
-    this._registerListener(this.p2p.state, 'cycle_q2_start', async (lastCycle: Shardus.Cycle, time: number) => {
-      // await this.processPreviousCycleSummaries()
-      // lastCycle = this.p2p.state.getLastCycle()
-      // if (lastCycle == null) {
-      //   return
-      // }
-      // let lastCycleShardValues = this.shardValuesByCycle.get(lastCycle.counter)
-      // if (lastCycleShardValues == null) {
-      //   return
-      // }
-      // if(this.currentCycleShardData == null){
-      //   return
-      // }
-      // if (this.currentCycleShardData.ourNode.status !== 'active') {
-      //   // dont participate just yet.
-      //   return
-      // }
-      // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` _repair startSyncPartitions:cycle_q2_start cycle: ${lastCycle.counter}`)
-      // // this will take temp TXs and make sure they are stored in the correct place for us to generate partitions
-      // this.processTempTXs(lastCycle)
-      // // During the Q2 phase of a cycle, nodes compute the partition hash of the previous cycle for all the partitions covered by the node.
-      // // Q2 was chosen so that any transactions submitted with a time stamp that falls in the previous quarter will have been processed and finalized. This could be changed to Q3 if we find that more time is needed.
-      // this.generatePartitionObjects(lastCycle)
-      // let receiptMapResults = this.generateReceiptMapResults(lastCycle)
-      // if(this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `receiptMapResults: ${stringify(receiptMapResults)}`)
-      // let statsClump = this.stateManagerStats.getCoveredStatsPartitions(lastCycleShardValues)
-      // //build partition hashes from previous full cycle
-      // let mainHashResults:MainHashResults = null
-      // if(this.currentCycleShardData && this.currentCycleShardData.ourNode.status === 'active'){
-      //   mainHashResults = this.stateManagerCache.buildPartitionHashesForNode(this.currentCycleShardData)
-      // }
-      // // Hook for Snapshot module to listen to after partition data is settled
-      // this.emit('cycleTxsFinalized', lastCycleShardValues, receiptMapResults, statsClump, mainHashResults)
-      // this.dumpAccountDebugData2(mainHashResults)
-      // // pre-allocate the next cycle data to be safe!
-      // let prekey = 'c' + (lastCycle.counter + 1)
-      // this.partitionObjectsByCycle[prekey] = []
-      // this.ourPartitionResultsByCycle[prekey] = []
-      // // Nodes generate the partition result for all partitions they cover.
-      // // Nodes broadcast the set of partition results to N adjacent peers on each side; where N is
-      // // the number of partitions covered by the node. Uses the /post_partition_results API.
-      // await this.broadcastPartitionResults(lastCycle.counter) // Cycle_number
-    })
-
-    /* this._registerListener(this.p2p.state, 'cycle_q4_start', async (lastCycle, time) => {
-      // Also we would like the repair process to finish by the end of Q3 and definitely before the start of a new cycle. Otherwise the cycle duration may need to be increased.
-    }) */
-  }
 
 
 
-  /**
-   * tempRecordTXByCycle
-   * we dont have a cycle yet to save these records against so store them in a temp place
-   * @param {number} txTS
-   * @param {AcceptedTx} acceptedTx
-   * @param {boolean} passed
-   * @param {ApplyResponse} applyResponse
-   * @param {boolean} isGlobalModifyingTX
-   */
-  tempRecordTXByCycle(txTS: number, acceptedTx: AcceptedTx, passed: boolean, applyResponse: ApplyResponse, isGlobalModifyingTX: boolean, savedSomething: boolean) {
-    this.tempTXRecords.push({ txTS, acceptedTx, passed, redacted: -1, applyResponse, isGlobalModifyingTX, savedSomething })
-  }
 
-  /**
-   * sortTXRecords
-   * @param {TempTxRecord} a
-   * @param {TempTxRecord} b
-   * @returns {number}
-   */
-  sortTXRecords(a: TempTxRecord, b: TempTxRecord): number {
-    if (a.acceptedTx.timestamp === b.acceptedTx.timestamp) {
-      return utils.sortAsc(a.acceptedTx.id, b.acceptedTx.id)
-    }
-    //return a.acceptedTx.timestamp - b.acceptedTx.timestamp
-    return a.acceptedTx.timestamp > b.acceptedTx.timestamp ? -1 : 1
-  }
-
-  /**
-   * processTempTXs
-   * call this before we start computing partitions so that we can make sure to get the TXs we need out of the temp list
-   * @param {Cycle} cycle
-   */
-  processTempTXs(cycle: Cycle) {
-    if (!this.tempTXRecords) {
-      return
-    }
-    let txsRecorded = 0
-    let txsTemp = 0
-
-    let newTempTX = []
-    let cycleEnd = (cycle.start + cycle.duration) * 1000
-    cycleEnd -= this.syncSettleTime // adjust by sync settle time
-
-    // sort our records before recording them!
-    this.tempTXRecords.sort(this.sortTXRecords)
-
-    //savedSomething
-
-    for (let txRecord of this.tempTXRecords) {
-      if (txRecord.redacted > 0) {
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair recordTXByCycle: ${utils.makeShortHash(txRecord.acceptedTx.id)} cycle: ${cycle.counter} redacted!!! ${txRecord.redacted}`)
-        continue
-      }
-      if (txRecord.txTS < cycleEnd) {
-        this.recordTXByCycle(txRecord.txTS, txRecord.acceptedTx, txRecord.passed, txRecord.applyResponse, txRecord.isGlobalModifyingTX)
-        txsRecorded++
-      } else {
-        newTempTX.push(txRecord)
-        txsTemp++
-      }
-    }
-
-    this.tempTXRecords = newTempTX
-
-    let lastCycleShardValues = this.shardValuesByCycle.get(cycle.counter)
-
-    if (lastCycleShardValues == null) {
-      throw new Error('processTempTXs lastCycleShardValues == null')
-    }
-    if (lastCycleShardValues.ourConsensusPartitions == null) {
-      throw new Error('processTempTXs ourConsensusPartitions == null')
-    }
-    // lastCycleShardValues.ourConsensusPartitions is not iterable
-    for (let partitionID of lastCycleShardValues.ourConsensusPartitions) {
-      let txList = this.getTXList(cycle.counter, partitionID) // todo sharding - done.: pass partition ID
-
-      txList.processed = true
-    }
-
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair processTempTXs txsRecorded: ${txsRecorded} txsTemp: ${txsTemp} `)
-  }
-
-  // TODO sharding  done! need to split this out by partition
-  /**
-   * getTXList
-   * @param {number} cycleNumber
-   * @param {number} partitionId
-   * @returns {TxTallyList}
-   */
-  getTXList(cycleNumber: number, partitionId: number): TxTallyList {
-    let key = 'c' + cycleNumber
-    let txListByPartition = this.txByCycleByPartition[key]
-    let pkey = 'p' + partitionId
-    // now search for the correct partition
-    if (!txListByPartition) {
-      txListByPartition = {}
-      this.txByCycleByPartition[key] = txListByPartition
-    }
-    let txList = txListByPartition[pkey]
-    if (!txList) {
-      txList = { hashes: [], passed: [], txs: [], processed: false, states: [] } // , txById: {}
-      txListByPartition[pkey] = txList
-    }
-    return txList
-  }
-
-  // TODO sharding  done! need to split this out by partition
-  /**
-   * getTXListByKey
-   * just an alternative to getTXList where the calling code has alredy formed the cycle key
-   * @param {string} key the cycle based key c##
-   * @param {number} partitionId
-   * @returns {TxTallyList}
-   */
-  getTXListByKey(key: string, partitionId: number): TxTallyList {
-    // let txList = this.txByCycle[key]
-    // if (!txList) {
-    //   txList = { hashes: [], passed: [], txs: [], processed: false, states: [] } //  ,txById: {}  states may be an array of arraywith account after states
-    //   this.txByCycle[key] = txList
-    // }
-
-    let txListByPartition = this.txByCycleByPartition[key]
-    let pkey = 'p' + partitionId
-    // now search for the correct partition
-    if (!txListByPartition) {
-      txListByPartition = {}
-      this.txByCycleByPartition[key] = txListByPartition
-    }
-    let txList = txListByPartition[pkey]
-    if (!txList) {
-      txList = { hashes: [], passed: [], txs: [], processed: false, states: [] } // , txById: {}
-      txListByPartition[pkey] = txList
-    }
-    return txList
-  }
-
-  // take this tx and create if needed and object for the current cylce that holds a list of passed and failed TXs
-  /**
-   * recordTXByCycle
-   *   This function is only for building up txList as used by the features: stateIsGood_txHashsetOld, oldFeature_BroadCastPartitionReport, oldFeature_GeneratePartitionReport
-   * @param {number} txTS
-   * @param {AcceptedTx} acceptedTx
-   * @param {boolean} passed
-   * @param {ApplyResponse} applyResponse
-   */
-  recordTXByCycle(txTS: number, acceptedTx: AcceptedTx, passed: boolean, applyResponse: ApplyResponse, isGlobalModifyingTX: boolean) {
-    // TODO sharding.  done because it uses getTXList . filter TSs by the partition they belong to. Double check that this is still needed
-
-    // get the cycle that this tx timestamp would belong to.
-    // add in syncSettleTime when selecting which bucket to put a transaction in
-    const cycle = this.p2p.state.getCycleByTimestamp(txTS + this.syncSettleTime)
-
-    if (cycle == null) {
-      this.mainLogger.error(`recordTXByCycle Failed to find cycle that would contain this timestamp txid:${utils.stringifyReduce(acceptedTx.id)} txts1: ${acceptedTx.timestamp} txts: ${txTS}`)
-      return
-    }
-
-    let cycleNumber = cycle.counter
-
-    // for each covered partition..
-
-    let lastCycleShardValues = this.shardValuesByCycle.get(cycle.counter)
-
-    let keysResponse = this.app.getKeyFromTransaction(acceptedTx.data)
-    let { allKeys } = keysResponse
-
-    let seenParitions: StringBoolObjectMap = {}
-    let partitionHasNonGlobal: StringBoolObjectMap = {}
-    // for (let partitionID of lastCycleShardValues.ourConsensusPartitions) {
-    if (lastCycleShardValues == null) {
-      throw new Error(`recordTXByCycle lastCycleShardValues == null`)
-    }
-
-    if (isGlobalModifyingTX) {
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle:  ignore loggging globalTX ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
-      return
-    }
-
-    let globalACC = 0
-    let nonGlobal = 0
-    let storedNonGlobal = 0
-    let storedGlobal = 0
-    //filter out stuff.
-    if (isGlobalModifyingTX === false) {
-      for (let accountKey of allKeys) {
-        // HOMENODEMATHS recordTXByCycle: using partition to decide recording partition
-        let { homePartition } = ShardFunctions.addressToPartition(lastCycleShardValues.shardGlobals, accountKey)
-        let partitionID = homePartition
-        let weStoreThisParition = ShardFunctions.testInRange(partitionID, lastCycleShardValues.nodeShardData.storedPartitions)
-        let key = 'p' + partitionID
-
-        if (this.isGlobalAccount(accountKey)) {
-          globalACC++
-
-          if (weStoreThisParition === true) {
-            storedGlobal++
-          }
-        } else {
-          nonGlobal++
-
-          if (weStoreThisParition === true) {
-            storedNonGlobal++
-            partitionHasNonGlobal[key] = true
-          }
-        }
-      }
-    }
-
-    if (storedNonGlobal === 0 && storedGlobal === 0) {
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle: nothing to save globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
-      return
-    }
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle: globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal}  tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
-
-    for (let accountKey of allKeys) {
-      /** @type {NodeShardData} */
-      let homeNode = ShardFunctions.findHomeNode(lastCycleShardValues.shardGlobals, accountKey, lastCycleShardValues.parititionShardDataMap)
-      if (homeNode == null) {
-        throw new Error(`recordTXByCycle homeNode == null`)
-      }
-      // HOMENODEMATHS recordTXByCycle: this code has moved to use homepartition instead of home node's partition
-      let homeNodepartitionID = homeNode.homePartition
-      let { homePartition } = ShardFunctions.addressToPartition(lastCycleShardValues.shardGlobals, accountKey)
-      let partitionID = homePartition
-      let key = 'p' + partitionID
-
-      if (this.isGlobalAccount(accountKey)) {
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle:  skip partition. dont save due to global: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
-        continue
-      }
-
-      let weStoreThisParition = ShardFunctions.testInRange(partitionID, lastCycleShardValues.nodeShardData.storedPartitions)
-      if (weStoreThisParition === false) {
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle:  skip partition we dont save: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
-
-        continue
-      }
-
-      if (partitionHasNonGlobal[key] === false) {
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle:  skip partition. we store it but only a global ref involved this time: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
-
-        continue
-      }
-      //check if we are only storing this because it is a global account...
-
-      let txList = this.getTXList(cycleNumber, partitionID) // todo sharding - done: pass partition ID
-
-      if (txList.processed) {
-        continue
-        //this.mainLogger.error(`_repair trying to record transaction after we have already finalized our parition object for cycle ${cycle.counter} `)
-      }
-
-      if (seenParitions[key] != null) {
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle: seenParitions[key] != null P: ${partitionID}  homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
-        // skip because this partition already has this TX!
-        continue
-      }
-      seenParitions[key] = true
-
-      txList.hashes.push(acceptedTx.id)
-      txList.passed.push(passed ? 1 : 0)
-      txList.txs.push(acceptedTx)
-
-      let recordedState = false
-      if (applyResponse != null && applyResponse.accountData != null) {
-        let states = []
-        let foundAccountIndex = 0
-        let index = 0
-        for (let accountData of applyResponse.accountData) {
-          if (accountData.accountId === accountKey) {
-            foundAccountIndex = index
-          }
-          //states.push(utils.makeShortHash(accountData.hash)) // TXSTATE_TODO need to get only certain state data!.. hash of local states?
-          // take a look at backup data?
-
-          //TSConversion some uncertainty with around hash being on the data or not.  added logggin.
-          // // @ts-ignore
-          // if(accountData.hash != null){
-          //   // @ts-ignore
-          //   if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug( ` _repair recordTXByCycle:  how is this possible: ${utils.makeShortHash(accountData.accountId)} acc hash: ${utils.makeShortHash(accountData.hash)} acc stateID: ${utils.makeShortHash(accountData.stateId)}`)
-
-          // }
-          // if(accountData.stateId == null){
-          //   // @ts-ignore
-          //   throw new Error(`missing state id for ${utils.makeShortHash(accountData.accountId)} acc hash: ${utils.makeShortHash(accountData.hash)} acc stateID: ${utils.makeShortHash(accountData.stateId)} `)
-          // }
-
-          // account data got upgraded earlier to have hash on it
-
-          //if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + `recordTXByCycle: Pushed! P: ${partitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
-
-          states.push(utils.makeShortHash(((accountData as unknown) as Shardus.AccountData).hash))
-          index++
-          recordedState = true
-        }
-        txList.states.push(states[foundAccountIndex]) // TXSTATE_TODO does this check out?
-      } else {
-        txList.states.push('xxxx')
-      }
-      // txList.txById[acceptedTx.id] = acceptedTx
-      // TODO sharding perf.  need to add some periodic cleanup when we have more cycles than needed stored in this map!!!
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair recordTXByCycle: pushedData P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} recordedState: ${recordedState}`)
-    }
-  }
-
-  /**
-   * getPartitionObject
-   * @param {number} cycleNumber
-   * @param {number} partitionId
-   * @returns {PartitionObject}
-   */
-  getPartitionObject(cycleNumber: number, partitionId: number): PartitionObject | null {
-    let key = 'c' + cycleNumber
-    let partitionObjects = this.partitionObjectsByCycle[key]
-    for (let obj of partitionObjects) {
-      if (obj.Partition_id === partitionId) {
-        return obj
-      }
-    }
-    return null
-  }
+/***
+ *    ########  ########  ######  ######## #### ########  ########  ######  
+ *    ##     ## ##       ##    ## ##        ##  ##     ##    ##    ##    ## 
+ *    ##     ## ##       ##       ##        ##  ##     ##    ##    ##       
+ *    ########  ######   ##       ######    ##  ########     ##     ######  
+ *    ##   ##   ##       ##       ##        ##  ##           ##          ## 
+ *    ##    ##  ##       ##    ## ##        ##  ##           ##    ##    ## 
+ *    ##     ## ########  ######  ######## #### ##           ##     ######  
+ */
 
   /**
    * storePartitionReceipt
@@ -3674,1051 +2881,6 @@ class StateManager extends EventEmitter {
       this.trySendAndPurgeReceiptsToArchives(partitionReceipt)
     }
   }
-
-  storeOurPartitionReceipt(cycleNumber: number, partitionReceipt: PartitionReceipt) {
-    let key = 'c' + cycleNumber
-
-    if (!this.ourPartitionReceiptsByCycleCounter) {
-      this.ourPartitionReceiptsByCycleCounter = {}
-    }
-    this.ourPartitionReceiptsByCycleCounter[key] = partitionReceipt
-  }
-
-  getPartitionReceipt(cycleNumber: number) {
-    let key = 'c' + cycleNumber
-
-    if (!this.ourPartitionReceiptsByCycleCounter) {
-      return null
-    }
-    return this.ourPartitionReceiptsByCycleCounter[key]
-  }
-
-  /**
-   * findMostCommonResponse
-   * @param {number} cycleNumber
-   * @param {number} partitionId
-   * @param {string[]} ignoreList currently unused and broken todo resolve this.
-   * @return {{topHash: string, topCount: number, topResult: PartitionResult}}
-   */
-  findMostCommonResponse(cycleNumber: number, partitionId: number, ignoreList: string[]): { topHash: string | null; topCount: number; topResult: PartitionResult | null } {
-    let key = 'c' + cycleNumber
-    let responsesById = this.allPartitionResponsesByCycleByPartition[key]
-    let key2 = 'p' + partitionId
-    let responses = responsesById[key2]
-
-    let hashCounting: StringNumberObjectMap = {}
-    let topHash = null
-    let topCount = 0
-    let topResult = null
-    if (responses.length > 0) {
-      for (let partitionResult of responses) {
-        let hash = partitionResult.Partition_hash
-        let count = hashCounting[hash] || 0
-        count++
-        hashCounting[hash] = count
-        if (count > topCount) {
-          topCount = count
-          topHash = hash
-          topResult = partitionResult
-        }
-      }
-    }
-    // reaponsesById: ${utils.stringifyReduce(responsesById)}
-    if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(this.dataPhaseTag + ` _repair findMostCommonResponse: retVal: ${utils.stringifyReduce({ topHash, topCount, topResult })}  responses: ${utils.stringifyReduce(responses)} `)
-    return { topHash, topCount, topResult }
-  }
-
-  // vote rate set to 0.5 / 0.8 => 0.625
-  /**
-   * solveHashSets
-   * @param {GenericHashSetEntry[]} hashSetList
-   * @param {number} lookAhead
-   * @param {number} voteRate
-   * @param {string[]} prevOutput
-   * @returns {string[]}
-   */
-  static solveHashSets(hashSetList: GenericHashSetEntry[], lookAhead: number = 10, voteRate: number = 0.625, prevOutput: string[] | null = null): string[] {
-    let output = []
-    let outputVotes = []
-    let solving = true
-    let index = 0
-    let lastOutputCount = 0 // output list length last time we went through the loop
-    let stepSize = cHashSetStepSize
-
-    let totalVotePower = 0
-    for (let hashListEntry of hashSetList) {
-      totalVotePower += hashListEntry.votePower
-    }
-    let votesRequired = voteRate * Math.ceil(totalVotePower)
-
-    let maxElements = 0
-    for (let hashListEntry of hashSetList) {
-      maxElements = Math.max(maxElements, hashListEntry.hashSet.length / stepSize)
-    }
-
-    while (solving) {
-      let votes: StringCountEntryObjectMap = {}
-      let topVote: Vote = { v: '', count: 0, vote: undefined, ec: undefined }
-      let winnerFound = false
-      let totalVotes = 0
-      // Loop through each entry list
-      for (let hashListIndex = 0; hashListIndex < hashSetList.length; hashListIndex++) {
-        // if we are already past the end of this entry list then skip
-        let hashListEntry = hashSetList[hashListIndex]
-        if ((index + hashListEntry.indexOffset + 1) * stepSize > hashListEntry.hashSet.length) {
-          continue
-        }
-        // don't remember what this bail condition was.
-        let sliceStart = (index + hashListEntry.indexOffset) * stepSize
-        let v = hashListEntry.hashSet.slice(sliceStart, sliceStart + stepSize)
-        if (v === '') {
-          continue
-        }
-        // place votes for this value
-        let countEntry: CountEntry = votes[v] || { count: 0, ec: 0, voters: [] }
-        totalVotes += hashListEntry.votePower
-        countEntry.count += hashListEntry.votePower
-        countEntry.voters.push(hashListIndex)
-        votes[v] = countEntry
-        if (countEntry.count > topVote.count) {
-          topVote.count = countEntry.count
-          topVote.v = v
-          topVote.vote = countEntry
-        }
-        hashListEntry.lastValue = v
-      }
-
-      // if totalVotes < votesRequired then we are past hope of approving any more messages... I think.  I guess there are some cases where we could look back and approve one more
-      if (topVote.count === 0 || index > maxElements || totalVotes < votesRequired) {
-        solving = false
-        break
-      }
-      // can we find a winner in a simple way where there was a winner based on the next item to look at in all the arrays.
-      if (topVote.count >= votesRequired) {
-        winnerFound = true
-        output.push(topVote.v)
-        outputVotes.push(topVote)
-        // corrections for chains that do not match our top vote.
-        for (let k = 0; k < hashSetList.length; k++) {
-          let hashListEntryOther = hashSetList[k]
-          if (hashListEntryOther.lastValue === topVote.v) {
-            hashListEntryOther.errorStack = []
-          }
-        }
-      }
-
-      // Leaving this here, because it is a good spot to put a breakpoint when testing a data set where stuf went wrong (hashset.js)
-      // if (index === 123) {
-      //   let foo = 5
-      //   foo++
-      // }
-
-      // for (let hashListEntry of hashSetList) {
-      for (let hashListIndex = 0; hashListIndex < hashSetList.length; hashListIndex++) {
-        let hashListEntry = hashSetList[hashListIndex]
-        // for nodes that did not match the top vote .. or all nodes if no winner yet.
-        if (!winnerFound || hashListEntry.lastValue !== topVote.v) {
-          // consider removing v..  since if we dont have a winner yet then top vote will get updated in this loop
-          hashListEntry.corrections.push({ i: index, tv: topVote, v: topVote.v, t: 'insert', bv: hashListEntry.lastValue, if: lastOutputCount })
-          hashListEntry.errorStack.push({ i: index, tv: topVote, v: topVote.v })
-          hashListEntry.indexOffset -= 1
-
-          if (hashListEntry.waitForIndex > 0 && index < hashListEntry.waitForIndex) {
-            continue
-          }
-
-          if (hashListEntry.waitForIndex > 0 && hashListEntry.waitForIndex === index) {
-            hashListEntry.waitForIndex = -1
-            hashListEntry.waitedForThis = true
-          }
-
-          let alreadyVoted: StringBoolObjectMap = {} // has the given node already EC voted for this key?
-          // +1 look ahead to see if we can get back on track
-          // lookAhead of 0 seems to be more stable
-          // let lookAhead = 10 // hashListEntry.errorStack.length
-          for (let i = 0; i < hashListEntry.errorStack.length + lookAhead; i++) {
-            // using +2 since we just subtracted one from the index offset. anothe r +1 since we want to look ahead of where we just looked
-            let thisIndex = index + hashListEntry.indexOffset + i + 2
-            let sliceStart = thisIndex * stepSize
-            if (sliceStart + 1 > hashListEntry.hashSet.length) {
-              continue
-            }
-            let v = hashListEntry.hashSet.slice(sliceStart, sliceStart + stepSize)
-            if (alreadyVoted[v]) {
-              continue
-            }
-
-            // a hint to stop us from looking ahead too far
-            // if (prevOutput && prevOutput[index + i + 2] === v) {
-            //   break
-            // }
-
-            // scan ahead for other connections
-            if (prevOutput && !hashListEntry.waitedForThis) {
-              let foundMatch = false
-              let searchAhead = 5 // Math.max(10, lookAhead - i)
-              for (let k = 1; k < searchAhead; k++) {
-                let idx = index + k // + 2 + hashListEntry.indexOffset
-                if (prevOutput.length <= idx) {
-                  break
-                }
-                if (prevOutput && prevOutput[idx] === v) {
-                  foundMatch = true
-                  hashListEntry.waitForIndex = index + k
-                  hashListEntry.futureIndex = index + hashListEntry.indexOffset + i + 2
-                  hashListEntry.futureValue = v
-                }
-              }
-              if (foundMatch) {
-                break
-              }
-            }
-
-            alreadyVoted[v] = true
-            let countEntry: CountEntry = votes[v] || { count: 0, ec: 0, voters: [] } // TSConversion added a missing voters[] object here. looks good to my code inspection but need to validate it with tests!
-
-            // only vote 10 spots ahead
-            if (i < 10) {
-              countEntry.ec += hashListEntry.votePower
-            }
-
-            // check for possible winnner due to re arranging things
-            // a nuance here that we require there to be some official votes before in this row before we consider a tx..  will need to analyze this choice
-            if (!winnerFound && countEntry.count > 0 && countEntry.ec + countEntry.count >= votesRequired) {
-              topVote.ec = countEntry.ec
-              topVote.v = v
-              topVote.vote = countEntry
-              winnerFound = true
-              output.push(topVote.v)
-              outputVotes.push(topVote)
-              // todo roll back corrctions where nodes were already voting for the winner.
-              for (let k = 0; k < hashListIndex; k++) {
-                let hashListEntryOther = hashSetList[k]
-                if (hashListEntryOther.lastValue === topVote.v) {
-                  hashListEntryOther.errorStack.pop()
-                  hashListEntryOther.corrections.pop()
-                  hashListEntryOther.indexOffset++
-                }
-              }
-            }
-
-            if (winnerFound) {
-              if (v === topVote.v) {
-                if (hashListEntry.waitedForThis) {
-                  hashListEntry.waitedForThis = false
-                }
-                // delete stuff off stack and bail
-                // +1 because we at least want to delete 1 entry if index i=0 of this loop gets us here
-
-                /** @type {HashSetEntryCorrection[]} */
-                let tempCorrections = []
-                // for (let j = 0; j < i + 1; j++) {
-                //   let correction = null
-                //   //if (i < hashListEntry.errorStack.length)
-                //   {
-                //     hashListEntry.errorStack.pop()
-                //     correction = hashListEntry.corrections.pop()
-                //   }
-                //   tempCorrections.push({ i: index - j, t: 'extra', c: correction })
-                // }
-                let index2 = index + hashListEntry.indexOffset + i + 2
-                let lastIdx = -1
-
-                for (let j = 0; j < i + 1; j++) {
-                  /** @type {HashSetEntryCorrection} */
-                  let correction = null
-                  if (hashListEntry.errorStack.length > 0) {
-                    hashListEntry.errorStack.pop()
-                    correction = hashListEntry.corrections.pop()
-                  }
-                  let extraIdx = j + index2 - (i + 1)
-                  if (correction) {
-                    extraIdx = correction.i - 1
-                    lastIdx = extraIdx
-                  } else if (lastIdx > 0) {
-                    extraIdx = lastIdx
-                  }
-                  // correction to fix problem where we were over deleting stuff.
-                  // a bit more retroactive than I like.  problem happens in certain cases when there are two winners in a row that are not first pass winners
-                  // see 16z for example where this breaks..
-                  // if (hashListEntry.corrections.length > 0) {
-                  //   let nextCorrection = hashListEntry.corrections[hashListEntry.corrections.length - 1]
-                  //   if (nextCorrection && correction && nextCorrection.bv === correction.bv) {
-                  //     if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ` solveHashSets overdelete fix: i:${i} j:${j} index:${index} bv:${nextCorrection.bv}}`)
-                  //     continue
-                  //   }
-                  // }
-
-                  // hashListEntry.indexOffset++
-                  /** @type {HashSetEntryCorrection} */
-
-                  // @ts-ignore  solveHashSets is unused at the moment not going to bother with ts fixup
-                  let tempCorrection: HashSetEntryCorrection = { i: extraIdx, t: 'extra', c: correction, hi: index2 - (j + 1), tv: null, v: null, bv: null, if: -1 } // added tv: null, v: null, bv: null, if: -1
-                  tempCorrections.push(tempCorrection)
-                }
-
-                hashListEntry.corrections = hashListEntry.corrections.concat(tempCorrections)
-                // +2 so we can go from being put one behind and go to 1 + i ahead.
-                hashListEntry.indexOffset += i + 2
-
-                // hashListEntry.indexOffset += (1)
-
-                hashListEntry.errorStack = [] // clear the error stack
-                break
-              } else {
-                // backfil checking
-                // let outputIndex = output.length - 1
-                // let tempV = v
-                // let stepsBack = 1
-                // while (output.length > 0 && outputIndex > 0 && output[outputIndex] === tempV) {
-                //   // work backwards through continuous errors and redact them as long as they match up
-                //   outputIndex--
-                //   stepsBack++
-                // }
-              }
-            }
-          }
-
-          if (hashListEntry.waitedForThis) {
-            hashListEntry.waitedForThis = false
-          }
-        }
-      }
-      index++
-      lastOutputCount = output.length
-    }
-
-    // trailing extras cleanup.
-    for (let hashListIndex = 0; hashListIndex < hashSetList.length; hashListIndex++) {
-      let hashListEntry = hashSetList[hashListIndex]
-
-      let extraIdx = index
-      while ((extraIdx + hashListEntry.indexOffset) * stepSize < hashListEntry.hashSet.length) {
-        let hi = extraIdx + hashListEntry.indexOffset // index2 - (j + 1)
-        // @ts-ignore  solveHashSets is unused at the moment not going to bother with ts fixup
-        hashListEntry.corrections.push({ i: extraIdx, t: 'extra', c: null, hi: hi, tv: null, v: null, bv: null, if: -1 }) // added , tv: null, v: null, bv: null, if: -1
-        extraIdx++
-      }
-    }
-
-    return output // { output, outputVotes }
-  }
-
-  // figures out i A is Greater than B
-  // possibly need an alternate version of this solver
-  // needs to account for vote power!
-  static compareVoteObjects(voteA: ExtendedVote, voteB: ExtendedVote, strict: boolean) {
-    // { winIdx: null, val: v, count: 0, ec: 0, lowestIndex: index, voters: [], voteTally: Array(hashSetList.length) }
-    // { i: index }
-
-    let agtb = 0
-    let bgta = 0
-
-    for (let i = 0; i < voteA.voteTally.length; i++) {
-      let vtA = voteA.voteTally[i]
-      let vtB = voteB.voteTally[i]
-      if (vtA != null && vtB != null) {
-        if (vtA.i > vtB.i) {
-          agtb += vtA.p // vote power.  note A and B are the same node so power will be equal.
-        }
-        if (vtB.i > vtA.i) {
-          bgta += vtB.p // vote power.
-        }
-      }
-    }
-    // what to do with strict.
-    if (strict && agtb > 0) {
-      return 1
-    }
-
-    //return agtb - bgta
-
-    return utils.sortAsc(agtb, bgta)
-
-    // what to return?
-  }
-
-  // static compareVoteObjects2 (voteA, voteB, strict) {
-  //   // return voteB.votesseen - voteA.votesseen
-  //   return voteA.votesseen - voteB.votesseen
-  // }
-
-  // when sorting / computing need to figure out if pinning will short cirquit another vote.
-  // at the moment this seems
-
-  // vote rate set to 0.5 / 0.8 => 0.625
-  /**
-   * solveHashSets
-   * @param {GenericHashSetEntry[]} hashSetList
-   * @param {number} lookAhead
-   * @param {number} voteRate
-   *
-   * @returns {string[]}
-   */
-  static solveHashSets2(hashSetList: GenericHashSetEntry[], lookAhead: number = 10, voteRate: number = 0.625): string[] {
-    let output: string[] = []
-    // let outputVotes = []
-    let solving = true
-    let index = 0
-    let stepSize = cHashSetStepSize
-
-    let totalVotePower = 0
-    for (let hashListEntry of hashSetList) {
-      totalVotePower += hashListEntry.votePower
-      // init the pinIdx
-      hashListEntry.pinIdx = -1
-      hashListEntry.pinObj = null
-    }
-    let votesRequired = voteRate * Math.ceil(totalVotePower)
-
-    let maxElements = 0
-    for (let hashListEntry of hashSetList) {
-      maxElements = Math.max(maxElements, hashListEntry.hashSet.length / stepSize)
-    }
-
-    // todo backtrack each vote. list of what vote cast at each step.
-    // solve this for only one object... or solve for all and compare solvers?
-
-    // map of array of vote entries
-    let votes = {} as { [x: string]: ExtendedVote[] }
-    let votesseen = 0
-    while (solving) {
-      // Loop through each entry list
-      solving = false
-      for (let hashListIndex = 0; hashListIndex < hashSetList.length; hashListIndex++) {
-        // if we are already past the end of this entry list then skip
-        let hashListEntry = hashSetList[hashListIndex]
-        if ((index + 1) * stepSize > hashListEntry.hashSet.length) {
-          continue
-        }
-        // don't remember what this bail condition was.
-        let sliceStart = index * stepSize
-        let v = hashListEntry.hashSet.slice(sliceStart, sliceStart + stepSize)
-        if (v === '') {
-          continue
-        }
-        solving = true // keep it going
-        let votesArray: ExtendedVote[] = votes[v]
-        if (votesArray == null) {
-          votesseen++
-          //TSConversion this was potetially a major bug, v was missing from this structure before!
-          // @ts-ignore TSConversion solveHashSets2 is unused. but need to hold off o fixing up these potential nulls
-          let votObject: ExtendedVote = { winIdx: null, val: v, v, count: 0, ec: 0, lowestIndex: index, voters: [], voteTally: Array(hashSetList.length), votesseen } as ExtendedVote
-          votesArray = [votObject]
-          votes[v] = votesArray
-
-          // hashListEntry.ownVotes.push(votObject)
-        }
-
-        // get lowest value in list that we have not voted on and is not pinned by our best vote.
-        let currentVoteObject: ExtendedVote | null = null
-        for (let voteIndex = votesArray.length - 1; voteIndex >= 0; voteIndex--) {
-          let voteObject = votesArray[voteIndex]
-
-          let ourVoteTally = voteObject.voteTally[hashListIndex]
-          if (ourVoteTally != null) {
-            // we voted
-            break
-          }
-
-          // how to check pinIdx?  do we have to analys neighbor pinIdx?
-          // use pinObj  to see if the last pinObj A is greater than this obj B.
-          if (hashListEntry.pinObj != null && hashListEntry.pinObj !== voteObject) {
-            // if (hashListEntry.pinObj.val === voteObject.val)
-            {
-              let compare = StateManager.compareVoteObjects(hashListEntry.pinObj, voteObject, false)
-              if (compare > 0) {
-                continue // or break;
-              }
-            }
-          }
-          currentVoteObject = voteObject
-        }
-
-        if (currentVoteObject == null) {
-          // create new vote object
-          votesseen++
-          //TSConversion this was potetially a major bug, v was missing from this structure before!
-          // @ts-ignore TSConversion solveHashSets2 is unused. but need to hold off o fixing up these potential nulls
-          currentVoteObject = { winIdx: null, val: v, v, count: 0, ec: 0, lowestIndex: index, voters: [], voteTally: Array(hashSetList.length), votesseen } as ExtendedVote
-          votesArray.push(currentVoteObject)
-          // hashListEntry.ownVotes.push(currentVoteObject)
-        }
-        if (currentVoteObject.voters == null) {
-          throw new Error('solveHashSets2 currentVoteObject.voters == null')
-        }
-        if (hashListEntry == null || hashListEntry.ownVotes == null) {
-          throw new Error(`solveHashSets2 hashListEntry == null ${hashListEntry == null}`)
-        }
-
-        currentVoteObject.voters.push(hashListIndex)
-        currentVoteObject.voteTally[hashListIndex] = { i: index, p: hashListEntry.votePower } // could this be a simple index
-        currentVoteObject.count += hashListEntry.votePower
-        hashListEntry.ownVotes.push(currentVoteObject)
-
-        if (currentVoteObject.winIdx !== null) {
-          // this already won before but we should still update our own pinIdx
-
-          hashListEntry.pinIdx = index
-          hashListEntry.pinObj = currentVoteObject
-        }
-        if (currentVoteObject.count >= votesRequired) {
-          for (let i = 0; i < hashSetList.length; i++) {
-            let tallyObject = currentVoteObject.voteTally[i]
-            if (tallyObject != null) {
-              let tallyHashListEntry = hashSetList[i]
-              tallyHashListEntry.pinIdx = tallyObject.i
-              tallyHashListEntry.pinObj = currentVoteObject
-            }
-          }
-          currentVoteObject.winIdx = index
-        }
-      }
-
-      index++
-    }
-
-    // need backtracking ref for how each list tracks the votses
-
-    // Collect a list of all vodes
-    let allVotes: ExtendedVote[] = []
-    for (const votesArray of Object.values(votes)) {
-      for (let voteObj of votesArray) {
-        allVotes.push(voteObj)
-      }
-    }
-    // apply a partial order sort, n
-    // allVotes.sort(function (a, b) { return StateManager.compareVoteObjects(a, b, false) })
-
-    // generate solutions!
-
-    // count only votes that have won!
-    // when / how is it safe to detect a win?
-
-    let allWinningVotes: ExtendedVote[] = []
-    for (let voteObj of allVotes) {
-      // IF was a a winning vote?
-      if (voteObj.winIdx !== null) {
-        allWinningVotes.push(voteObj)
-      }
-    }
-    allWinningVotes.sort(function (a, b) {
-      return StateManager.compareVoteObjects(a, b, false)
-    })
-    let finalIdx = 0
-    for (let voteObj of allWinningVotes) {
-      // IF was a a winning vote?
-      if (voteObj.winIdx !== null) {
-        // allWinningVotes.push(voteObj)
-        output.push(voteObj.val)
-        voteObj.finalIdx = finalIdx
-        finalIdx++
-      }
-    }
-    // to sort the values we could look at the order things were finalized..
-    // but you could have a case where an earlier message is legitimately finialized later on.
-
-    // let aTest = votes['55403088d5636488d3ff17d7d90c052e'][0]
-    // let bTest = votes['779980ea84b8a5eac2dc3d07013377e5'][0]
-    // console.log(StateManager.compareVoteObjects(aTest, bTest, false))
-    // console.log(StateManager.compareVoteObjects(bTest, aTest, false))
-
-    // correction solver:
-    for (let hashListIndex = 0; hashListIndex < hashSetList.length; hashListIndex++) {
-      // if we are already past the end of this entry list then skip
-      // let hashListIndex = 2
-
-      let hashListEntry = hashSetList[hashListIndex]
-      hashListEntry.corrections = [] // clear this
-      // hashListEntry.instructions = []
-      // console.log(`solution for set ${hashListIndex}  locallen:${hashListEntry.hashSet.length / stepSize} `)
-      let winningVoteIndex = 0
-      for (let voteObj of allWinningVotes) {
-        if (voteObj.voteTally[hashListIndex] == null) {
-          // console.log(`missing @${voteObj.finalIdx} v:${voteObj.val}`)
-          // bv: hashListEntry.lastValue, if: lastOutputCount  are old.
-          // @ts-ignore TSConversion solveHashSets2 is unused. but need to hold off o fixing up these potential nulls
-          hashListEntry.corrections.push({ i: winningVoteIndex, tv: voteObj, v: voteObj.val, t: 'insert', bv: null, if: -1 })
-        }
-        // what if we have it but it is in the wrong spot!!
-        winningVoteIndex++
-      }
-      if (hashListEntry == null || hashListEntry.ownVotes == null) {
-        throw new Error(`solveHashSets2 hashListEntry == null 2 ${hashListEntry == null}`)
-      }
-      for (let voteObj of hashListEntry.ownVotes) {
-        let localIdx = voteObj.voteTally[hashListIndex].i
-        if (voteObj.winIdx == null) {
-          // console.log(`extra @${stringify(voteObj.voteTally[hashListIndex])} v:${voteObj.val}`)
-          // @ts-ignore TSConversion solveHashSets2 is unused. but need to hold off o fixing up these potential nulls
-          hashListEntry.corrections.push({ i: localIdx, t: 'extra', c: null, hi: localIdx, tv: null, v: null, bv: null, if: -1 })
-        }
-        // localIdx++
-      }
-
-      // not so sure about this sort  local vs. global index space.
-      hashListEntry.corrections.sort(utils.sort_i_Asc) // (a, b) => a.i - b.i)
-      winningVoteIndex = 0
-
-      // hashListEntry.allWinningVotes = allWinningVotes
-
-      // build index map now!
-      hashListEntry.indexMap = []
-      hashListEntry.extraMap = []
-
-      for (let voteObj of allWinningVotes) {
-        if (voteObj.voteTally[hashListIndex] == null) {
-          hashListEntry.indexMap.push(-1)
-        } else {
-          hashListEntry.indexMap.push(voteObj.voteTally[hashListIndex].i)
-        }
-      }
-      for (let voteObj of hashListEntry.ownVotes) {
-        let localIdx = voteObj.voteTally[hashListIndex].i
-        if (voteObj.winIdx == null) {
-          hashListEntry.extraMap.push(localIdx)
-        }
-      }
-    }
-
-    // generate corrections for main entry.
-    // hashListEntry.corrections.push({ i: index, tv: topVote, v: topVote.v, t: 'insert', bv: hashListEntry.lastValue, if: lastOutputCount })
-    // hashListEntry.errorStack.push({ i: index, tv: topVote, v: topVote.v })
-    // hashListEntry.indexOffset -= 1
-
-    // trailing extras:
-    // while ((extraIdx + hashListEntry.indexOffset) * stepSize < hashListEntry.hashSet.length) {
-    //   let hi = extraIdx + hashListEntry.indexOffset // index2 - (j + 1)
-    //   hashListEntry.corrections.push({ i: extraIdx, t: 'extra', c: null, hi: hi, tv: null, v: null, bv: null, if: -1 }) // added , tv: null, v: null, bv: null, if: -1
-    //   extraIdx++
-    // }
-
-    return output // { output, outputVotes }
-  }
-
-  /**
-   * expandIndexMapping
-   * efficient transformation to create a lookup to go from answer space index to the local index space of a hashList entry
-   * also creates a list of local indicies of elements to remove
-   * @param {GenericHashSetEntry} hashListEntry
-   * @param {string[]} output This is the output that we got from the general solver
-   */
-  static expandIndexMapping(hashListEntry: GenericHashSetEntry, output: string[]) {
-    // hashListEntry.corrections.sort(function (a, b) { return a.i === b.i ? 0 : a.i < b.i ? -1 : 1 })
-    // // index map is our index to the solution output
-    // hashListEntry.indexMap = []
-    // // extra map is the index in our list that is an extra
-    // hashListEntry.extraMap = []
-    // let readPtr = 0
-    // let writePtr = 0
-    // let correctionIndex = 0
-    // let currentCorrection = null
-    // let extraBits = 0
-    // // This will walk the input and output indicies st that same time
-    // while (writePtr < output.length) {
-    //   // Get the current correction.  We walk this with the correctionIndex
-    //   if (correctionIndex < hashListEntry.corrections.length && hashListEntry.corrections[correctionIndex] != null && hashListEntry.corrections[correctionIndex].t === 'insert' && hashListEntry.corrections[correctionIndex].i <= writePtr) {
-    //     currentCorrection = hashListEntry.corrections[correctionIndex]
-    //     correctionIndex++
-    //   } else if (correctionIndex < hashListEntry.corrections.length && hashListEntry.corrections[correctionIndex] != null && hashListEntry.corrections[correctionIndex].t === 'extra' && hashListEntry.corrections[correctionIndex].hi <= readPtr) {
-    //     currentCorrection = hashListEntry.corrections[correctionIndex]
-    //     correctionIndex++
-    //   } else {
-    //     currentCorrection = null
-    //   }
-    //   // if (extraBits > 0) {
-    //   //   readPtr += extraBits
-    //   //   extraBits = 0
-    //   // }
-    //   // increment pointers based on if there is a correction to write and what type of correction it is
-    //   if (!currentCorrection) {
-    //     // no correction to consider so we just write to the index map and advance the read and write pointer
-    //     hashListEntry.indexMap.push(readPtr)
-    //     writePtr++
-    //     readPtr++
-    //   } else if (currentCorrection.t === 'insert') {
-    //     // insert means the fix for this slot is to insert an item, since we dont have it this will be -1
-    //     hashListEntry.indexMap.push(-1)
-    //     writePtr++
-    //   } else if (currentCorrection.t === 'extra') {
-    //     // hashListEntry.extraMap.push({ i: currentCorrection.i, hi: currentCorrection.hi })
-    //     hashListEntry.extraMap.push(currentCorrection.hi)
-    //     extraBits++
-    //     readPtr++
-    //     // if (currentCorrection.c === null) {
-    //     //   writePtr++
-    //     // }
-    //     continue
-    //   }
-    // }
-    // // final corrections:
-    // while (correctionIndex < hashListEntry.corrections.length) {
-    //   currentCorrection = hashListEntry.corrections[correctionIndex]
-    //   correctionIndex++
-    //   if (currentCorrection.t === 'extra') {
-    //     // hashListEntry.extraMap.push({ i: currentCorrection.i, hi: currentCorrection.hi })
-    //     hashListEntry.extraMap.push(currentCorrection.hi)
-    //     // extraBits++
-    //     continue
-    //   }
-    // }
-  }
-
-  /**
-   * solveHashSetsPrep
-   * todo cleanup.. just sign the partition object asap so we dont have to check if there is a valid sign object throughout the code (but would need to consider perf impact of this)
-   * @param {number} cycleNumber
-   * @param {number} partitionId
-   * @param {string} ourNodeKey
-   * @return {GenericHashSetEntry[]}
-   */
-  solveHashSetsPrep(cycleNumber: number, partitionId: number, ourNodeKey: string): HashSetEntryPartitions[] {
-    let key = 'c' + cycleNumber
-    let responsesById = this.allPartitionResponsesByCycleByPartition[key]
-    let key2 = 'p' + partitionId
-    let responses = responsesById[key2]
-
-    let hashSets = {} as { [hash: string]: HashSetEntryPartitions }
-    let hashSetList: HashSetEntryPartitions[] = []
-    // group identical sets together
-    let hashCounting: StringNumberObjectMap = {}
-    for (let partitionResult of responses) {
-      let hash = partitionResult.Partition_hash
-      let count = hashCounting[hash] || 0
-      if (count === 0) {
-        let owner: string | null = null
-        if (partitionResult.sign) {
-          owner = partitionResult.sign.owner
-        } else {
-          owner = ourNodeKey
-        }
-        //TSConversion had to assert that owner is not null with owner!  seems ok
-        let hashSet: HashSetEntryPartitions = { hash: hash, votePower: 0, hashSet: partitionResult.hashSet, lastValue: '', errorStack: [], corrections: [], indexOffset: 0, owners: [owner!], ourRow: false, waitForIndex: -1, ownVotes: [] }
-        hashSets[hash] = hashSet
-        hashSetList.push(hashSets[hash])
-        // partitionResult.hashSetList = hashSet //Seems like this was only ever used for debugging, going to ax it to be safe!
-      } else {
-        if (partitionResult.sign) {
-          hashSets[hash].owners.push(partitionResult.sign.owner)
-        }
-      }
-      if (partitionResult.sign == null || partitionResult.sign.owner === ourNodeKey) {
-        hashSets[hash].ourRow = true
-        // hashSets[hash].owners.push(ourNodeKey)
-      }
-
-      count++
-      hashCounting[hash] = count
-      hashSets[hash].votePower = count
-    }
-    // NOTE: the fields owners and ourRow are user data for shardus and not known or used by the solving algorithm
-
-    return hashSetList
-  }
-
-  /**
-   * testHashsetSolution
-   * @param {GenericHashSetEntry} ourHashSet
-   * @param {GenericHashSetEntry} solutionHashSet
-   * @returns {boolean}
-   */
-  static testHashsetSolution(ourHashSet: GenericHashSetEntry, solutionHashSet: GenericHashSetEntry, log: boolean = false): boolean {
-    // let payload = { partitionId: partitionId, cycle: cycleNumber, tx_indicies: requestsByHost[i].hostIndex, hash: requestsByHost[i].hash }
-    // repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j] })
-
-    // let txSourceList = txList
-    // if (txList.newTxList) {
-    //   txSourceList = txList.newTxList
-    // }
-
-    // solutionDeltas.sort(function (a, b) {BAD SORT return a.i - b.i }) // why did b - a help us once??
-
-    // let debugSol = []
-    // for (let solution of repairTracker.solutionDeltas) {
-    //   debugSol.push({ i: solution.i, tx: solution.tx.id.slice(0, 4) })  // TXSTATE_TODO
-    // }
-
-    let stepSize = cHashSetStepSize
-    let makeTXArray = function (hashSet: GenericHashSetEntry): string[] {
-      let txArray: string[] = []
-      for (let i = 0; i < hashSet.hashSet.length / stepSize; i++) {
-        let offset = i * stepSize
-        let v = hashSet.hashSet.slice(offset, offset + stepSize)
-        txArray.push(v)
-        // need to slice out state???
-      }
-      return txArray
-    }
-
-    let txSourceList = { hashes: makeTXArray(ourHashSet) }
-    let solutionTxList = { hashes: makeTXArray(solutionHashSet) }
-    let newTxList = { thashes: [], hashes: [], states: [] } as { thashes: string[]; hashes: string[]; states: string[] }
-
-    let solutionList: HashSetEntryCorrection[] = []
-    for (let correction of ourHashSet.corrections) {
-      if (correction.t === 'insert') {
-        solutionList.push(correction)
-      }
-    }
-
-    // hack remove extraneous extras../////////////
-    // let extraMap2 = []
-    // for (let i = 0; i < ourHashSet.extraMap.length; i++) {
-    //   let extraIndex = ourHashSet.extraMap[i]
-    //   let extraNeeded = false
-    //   for (let correction of ourHashSet.corrections) {
-    //     if (correction.i === extraIndex) {
-    //       extraNeeded = true
-    //       break
-    //     }
-    //   }
-    //   if (extraNeeded) {
-    //     continue
-    //   }
-    //   extraMap2.push(extraIndex)
-    // }
-    // ourHashSet.extraMap = extraMap2
-    // ///////////////////////////////////////
-
-    if (ourHashSet.extraMap == null) {
-      if (log) console.log(`testHashsetSolution: ourHashSet.extraMap missing`)
-      return false
-    }
-    if (ourHashSet.indexMap == null) {
-      if (log) console.log(`testHashsetSolution: ourHashSet.indexMap missing`)
-      return false
-    }
-    ourHashSet.extraMap.sort(utils.sortAsc) // function (a, b) { return a - b })
-    solutionList.sort(utils.sort_i_Asc) // function (a, b) { return a.i - b.i })
-
-    let extraIndex = 0
-    for (let i = 0; i < txSourceList.hashes.length; i++) {
-      let extra = -1
-      if (extraIndex < ourHashSet.extraMap.length) {
-        extra = ourHashSet.extraMap[extraIndex]
-      }
-      if (extra === i) {
-        extraIndex++
-        continue
-      }
-      if (extra == null) {
-        if (log) console.log(`testHashsetSolution error extra == null at i: ${i}  extraIndex: ${extraIndex}`)
-        break
-      }
-      if (txSourceList.hashes[i] == null) {
-        if (log) console.log(`testHashsetSolution error null at i: ${i}  extraIndex: ${extraIndex}`)
-        break
-      }
-
-      newTxList.thashes.push(txSourceList.hashes[i])
-      // newTxList.tpassed.push(txSourceList.passed[i])
-      // newTxList.ttxs.push(txSourceList.txs[i])
-    }
-
-    let hashSet = ''
-    // for (let hash of newTxList.thashes) {
-    //   hashSet += hash.slice(0, stepSize)
-
-    //   // todo add in the account state stuff..
-    // }
-    hashSet = StateManager.createHashSetString(newTxList.thashes, newTxList.states) // TXSTATE_TODO
-
-    if (log) console.log(`extras removed: len: ${ourHashSet.indexMap.length}  extraIndex: ${extraIndex} ourPreHashSet: ${hashSet}`)
-
-    // Txids: txSourceData.hashes, // txid1, txid2, …],  - ordered from oldest to recent
-    // Status: txSourceData.passed, // [1,0, …],      - ordered corresponding to Txids; 1 for applied; 0 for failed
-    // build our data while skipping extras.
-
-    // insert corrections in order for each -1 in our local list (or write from our temp lists above)
-    let ourCounter = 0
-    let solutionIndex = 0
-    for (let i = 0; i < ourHashSet.indexMap.length; i++) {
-      let currentIndex = ourHashSet.indexMap[i]
-      if (currentIndex >= 0) {
-        // pull from our list? but we have already removed stuff?
-        newTxList.hashes[i] = txSourceList.hashes[currentIndex] // newTxList.thashes[ourCounter]
-        // newTxList.passed[i] = newTxList.tpassed[ourCounter]
-        // newTxList.txs[i] = newTxList.ttxs[ourCounter]
-
-        if (newTxList.hashes[i] == null) {
-          if (log) console.log(`testHashsetSolution error null at i: ${i} solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
-          return false
-        }
-        ourCounter++
-      } else {
-        // repairTracker.solutionDeltas.push({ i: requestsByHost[i].requests[j], tx: acceptedTX, pf: result.passFail[j] })
-        // let solutionDelta = repairTracker.solutionDeltas[solutionIndex]
-
-        let correction = solutionList[solutionIndex]
-
-        if (correction == null) {
-          continue
-        }
-        // if (!solutionDelta) {
-        //   if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 a error solutionDelta=null  solutionIndex: ${solutionIndex} i:${i} of ${ourHashSet.indexMap.length} deltas: ${utils.stringifyReduce(repairTracker.solutionDeltas)}`)
-        // }
-        // insert the next one
-        newTxList.hashes[i] = solutionTxList.hashes[correction.i] // solutionDelta.tx.id
-
-        // newTxList.states[i] = solutionTxList.states[correction.i] // TXSTATE_TODO
-
-        if (newTxList.hashes[i] == null) {
-          if (log) console.log(`testHashsetSolution error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
-        }
-        // newTxList.passed[i] = solutionDelta.pf
-        // newTxList.txs[i] = solutionDelta.tx
-        solutionIndex++
-        // if (newTxList.hashes[i] == null) {
-        //   if (this.verboseLogs) this.mainLogger.error(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 b error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
-        // }
-      }
-    }
-
-    hashSet = ''
-    // for (let hash of newTxList.hashes) {
-    //   if (!hash) {
-    //     hashSet += 'xx'
-    //     continue
-    //   }
-    //   hashSet += hash.slice(0, stepSize)
-    // }
-    hashSet = StateManager.createHashSetString(newTxList.hashes, null) // TXSTATE_TODO  newTxList.states
-
-    if (solutionHashSet.hashSet !== hashSet) {
-      return false
-    }
-
-    if (log) console.log(`solved set len: ${hashSet.length / stepSize}  : ${hashSet}`)
-    // if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + `_mergeRepairDataIntoLocalState2 c  len: ${ourHashSet.indexMap.length}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter} ourHashSet: ${hashSet}`)
-
-    return true
-  }
-
-  /**
-   * createHashSetString
-   * @param {*} txHashes // todo find correct values
-   * @param {*} dataHashes
-   * @returns {*} //todo correct type
-   */
-  static createHashSetString(txHashes: string[], dataHashes: string[] | null) {
-    let hashSet = ''
-
-    if (dataHashes == null) {
-      for (let i = 0; i < txHashes.length; i++) {
-        let txHash = txHashes[i]
-
-        if (!txHash) {
-          txHash = 'xx'
-        }
-
-        hashSet += txHash.slice(0, cHashSetTXStepSize + cHashSetDataStepSize)
-      }
-      return hashSet
-    } else {
-      for (let i = 0; i < txHashes.length; i++) {
-        let txHash = txHashes[i]
-        let dataHash = dataHashes[i]
-        if (!txHash) {
-          txHash = 'xx'
-        }
-        if (!dataHash) {
-          dataHash = 'xx'
-        }
-        dataHash = 'xx' // temp hack stop tracking data hashes for now.
-        hashSet += txHash.slice(0, cHashSetTXStepSize)
-        hashSet += dataHash.slice(0, cHashSetDataStepSize)
-      }
-    }
-
-    return hashSet
-  }
-
-  /**
-   * sendPartitionData
-   * @param {PartitionReceipt} partitionReceipt
-   * @param {PartitionObject} paritionObject
-   */
-  sendPartitionData(partitionReceipt: PartitionReceipt, paritionObject: PartitionObject) {
-    if (partitionReceipt.resultsList.length === 0) {
-      return
-    }
-    // CombinedPartitionReceipt
-
-    let partitionReceiptCopy = JSON.parse(stringify(partitionReceipt.resultsList[0]))
-
-    /** @type {CombinedPartitionReceipt} */
-    let combinedReciept = { result: partitionReceiptCopy, signatures: partitionReceipt.resultsList.map((a) => a.sign) }
-
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' sendPartitionData ' + utils.stringifyReduceLimit({ combinedReciept, paritionObject }))
-
-    // send it
-    // this.p2p.archivers.sendPartitionData(combinedReciept, paritionObject)
-  }
-
-  sendTransactionData(partitionNumber: number, cycleNumber: number, transactions: AcceptedTx[]) {
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' sendTransactionData ' + utils.stringifyReduceLimit({ partitionNumber, cycleNumber, transactions }))
-
-    // send it
-    // this.p2p.archivers.sendTransactionData(partitionNumber, cycleNumber, transactions)
-  }
-
-  purgeTransactionData() {
-    let tsStart = 0
-    let tsEnd = 0
-    this.storage.clearAcceptedTX(tsStart, tsEnd)
-  }
-
-  purgeStateTableData() {
-    // do this by timestamp maybe..
-    // this happnes on a slower scale.
-    let tsEnd = 0 // todo get newest time to keep
-    this.storage.clearAccountStateTableOlderThan(tsEnd)
-  }
-
-  /**
-   * trySendAndPurgeReciepts
-   * @param {PartitionReceipt} partitionReceipt
-   */
-  trySendAndPurgeReceiptsToArchives(partitionReceipt: PartitionReceipt) {
-    if (partitionReceipt.resultsList.length === 0) {
-      return
-    }
-    let cycleNumber = partitionReceipt.resultsList[0].Cycle_number
-    let partitionId = partitionReceipt.resultsList[0].Partition_id
-    let key = `c${cycleNumber}p${partitionId}`
-    if (this.sentReceipts.has(key)) {
-      return
-    }
-
-    if (this.verboseLogs) this.mainLogger.debug(this.dataPhaseTag + ' trySendAndPurgeReceipts ' + key)
-
-    this.sentReceipts.set(key, true)
-    try {
-      if (this.sendArchiveData === true) {
-        let paritionObject = this.getPartitionObject(cycleNumber, partitionId) // todo get object
-        if (paritionObject == null) {
-          this.statemanager_fatal(`trySendAndPurgeReceiptsToArchives`, ` trySendAndPurgeReceiptsToArchives paritionObject == null ${cycleNumber} ${partitionId}`)
-          throw new Error(`trySendAndPurgeReceiptsToArchives paritionObject == null`)
-        }
-        this.sendPartitionData(partitionReceipt, paritionObject)
-      }
-    } finally {
-    }
-
-    if (this.sendTransactionData) {
-      let txList = this.getTXList(cycleNumber, partitionId)
-
-      this.sendTransactionData(partitionId, cycleNumber, txList.txs)
-    }
-
-    if (this.purgeArchiveData === true) {
-      // alreay sort of doing this in another spot.
-      // check if all partitions for this cycle have been handled!! then clear data in that time range.
-      // need to record time range.
-      // or check for open repairs. older than what we want to clear out.
-    }
-  }
-
 
   /**
    * getReceipt
@@ -4763,7 +2925,7 @@ class StateManager extends EventEmitter {
     }
 
     let queueEntriesToSave: QueueEntry[] = []
-    for (let queueEntry of this.newAcceptedTxQueue) {
+    for (let queueEntry of this.transactionQueue.newAcceptedTxQueue) {
       if (queueEntry.cycleToRecordOn === cycleToSave) {
         // make sure we have a receipt
         let receipt = this.getReceipt(queueEntry)
@@ -4775,7 +2937,7 @@ class StateManager extends EventEmitter {
       }
     }
 
-    for (let queueEntry of this.archivedQueueEntries) {
+    for (let queueEntry of this.transactionQueue.archivedQueueEntries) {
       if (queueEntry.cycleToRecordOn === cycleToSave) {
         // make sure we have a receipt
         let receipt = this.getReceipt(queueEntry)

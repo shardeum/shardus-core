@@ -356,7 +356,7 @@ class Shardus extends EventEmitter {
   //   this.statistics = new Statistics(this.config.baseDir, this.config.statistics, {
   //     counters: ['txInjected', 'txApplied', 'txRejected', 'txExpired', 'txProcessed'],
   //     watchers: {
-  //       queueLength: () => this.stateManager ? this.stateManager.newAcceptedTxQueue.length : 0,
+  //       queueLength: () => this.stateManager ? this.stateManager.transactionQueue.newAcceptedTxQueue.length : 0,
   //       serverLoad: () => this.loadDetection ? this.loadDetection.getCurrentLoad() : 0
   //     },
   //     timers: ['txTimeInQueue']
@@ -503,7 +503,7 @@ class Shardus extends EventEmitter {
         ],
         watchers: {
           queueLength: () =>
-            this.stateManager ? this.stateManager.newAcceptedTxQueue.length : 0,
+            this.stateManager ? this.stateManager.transactionQueue.newAcceptedTxQueue.length : 0,
           serverLoad: () =>
             this.loadDetection ? this.loadDetection.getCurrentLoad() : 0,
         },
