@@ -80,9 +80,9 @@ class StateManager {
   eventEmitter: WrappedEventEmitter
 
   //Sub modules
-  stateManagerStats: PartitionStats
-  stateManagerCache: AccountCache
-  stateManagerSync: AccountSync
+  partitionStats: PartitionStats
+  accountCache: AccountCache
+  accountSync: AccountSync
   accountGlobals: AccountGlobals  
   transactionQueue: TransactionQueue
   transactionRepair: TransactionRepair
@@ -221,13 +221,13 @@ class StateManager {
     
     //INIT our various modules
 
-    this.stateManagerCache = new AccountCache(verboseLogs, profiler, app, logger, crypto, config)
+    this.accountCache = new AccountCache(verboseLogs, profiler, app, logger, crypto, config)
 
-    this.stateManagerStats = new PartitionStats(verboseLogs, profiler, app, logger, crypto, config, this.stateManagerCache)
-    this.stateManagerStats.summaryPartitionCount = 32
-    this.stateManagerStats.initSummaryBlobs()
+    this.partitionStats = new PartitionStats(verboseLogs, profiler, app, logger, crypto, config, this.accountCache)
+    this.partitionStats.summaryPartitionCount = 32
+    this.partitionStats.initSummaryBlobs()
 
-    this.stateManagerSync = new AccountSync(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
+    this.accountSync = new AccountSync(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
 
     this.accountGlobals = new AccountGlobals(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
     this.transactionQueue = new TransactionQueue(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
@@ -306,7 +306,7 @@ class StateManager {
 
     this.registerEndpoints()
 
-    this.stateManagerSync.isSyncingAcceptedTxs = true // default is true so we will start adding to our tx queue asap
+    this.accountSync.isSyncingAcceptedTxs = true // default is true so we will start adding to our tx queue asap
     this.verboseLogs = false
     if (this.mainLogger && ['TRACE'].includes(this.mainLogger.level.levelStr)) {
       this.verboseLogs = true
@@ -498,7 +498,7 @@ class StateManager {
       //   this.preTXQueue = []
       // }
 
-      this.stateManagerSync.updateRuntimeSyncTrackers()
+      this.accountSync.updateRuntimeSyncTrackers()
 
       // this.calculateChangeInCoverage()
     }
@@ -569,11 +569,11 @@ class StateManager {
       range.low = ShardFunctions.leadZeros8(range.startAddr.toString(16)) + '0'.repeat(56)
       range.high = ShardFunctions.leadZeros8(range.endAddr.toString(16)) + 'f'.repeat(56)
       // create sync trackers
-      this.stateManagerSync.createSyncTrackerByRange(range, cycle)
+      this.accountSync.createSyncTrackerByRange(range, cycle)
     }
 
     if (coverageChanges.length > 0) {
-      this.stateManagerSync.syncRuntimeTrackers()
+      this.accountSync.syncRuntimeTrackers()
     }
     // launch sync trackers
     // coverage changes... should have a list of changes
@@ -744,7 +744,7 @@ class StateManager {
 
     // update the debug tag and restart the queue
     this.dataPhaseTag = 'ACTIVE: '
-    this.stateManagerSync.dataSyncMainPhaseComplete = true
+    this.accountSync.dataSyncMainPhaseComplete = true
     this.tryStartAcceptedQueue()
 
     if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_sync_mainphaseComplete', ` `, `  `)
@@ -873,7 +873,7 @@ class StateManager {
           // todo perf, evaluate getCycleNumberFromTimestamp for really old timestamps.
           // the algorithims may run worst case for old cycles.
           let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
-          this.stateManagerStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount)
+          this.partitionStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount)
         }
       } else {
         this.mainLogger.error(`setAccountData hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
@@ -1524,7 +1524,7 @@ class StateManager {
         cycleShardValues = this.shardValuesByCycle.get(cycle)
       }
 
-      let blob = this.stateManagerStats.dumpLogsForCycle(cycle, false, cycleShardValues)
+      let blob = this.partitionStats.dumpLogsForCycle(cycle, false, cycleShardValues)
       res.json({ cycle, blob })
     })
 
@@ -1535,7 +1535,7 @@ class StateManager {
       let cycleShardValues = null
       if (this.shardValuesByCycle.has(cycle)) {
         cycleShardValues = this.shardValuesByCycle.get(cycle)
-        blob = this.stateManagerStats.getCoveredStatsPartitions(cycleShardValues)
+        blob = this.partitionStats.getCoveredStatsPartitions(cycleShardValues)
       }
       res.json({ cycle, blob })
     })
@@ -1584,7 +1584,7 @@ class StateManager {
  */
 
   tryStartAcceptedQueue() {
-    if (!this.stateManagerSync.dataSyncMainPhaseComplete) {
+    if (!this.accountSync.dataSyncMainPhaseComplete) {
       return
     }
     if (!this.transactionQueue.newAcceptedTxQueueRunning) {
@@ -2758,7 +2758,7 @@ class StateManager {
           cycleShardValues = this.shardValuesByCycle.get(lastCycle.counter)
         }
 
-        this.stateManagerStats.dumpLogsForCycle(lastCycle.counter, true, cycleShardValues)
+        this.partitionStats.dumpLogsForCycle(lastCycle.counter, true, cycleShardValues)
 
         // do this every 5 cycles.
         if (lastCycle.counter % 5 !== 0) {
@@ -2820,14 +2820,14 @@ class StateManager {
     // Get the stats data to send as a reort
     let statsClump = {}
     if (this.feature_generateStats === true) {
-      statsClump = this.stateManagerStats.getCoveredStatsPartitions(cycleShardValues)
+      statsClump = this.partitionStats.getCoveredStatsPartitions(cycleShardValues)
     }
 
     // build partition hashes from previous full cycle
     let mainHashResults: MainHashResults = null
     if (this.feature_partitionHashes === true) {
       if (cycleShardValues && cycleShardValues.ourNode.status === 'active') {
-        mainHashResults = this.stateManagerCache.buildPartitionHashesForNode(cycleShardValues)
+        mainHashResults = this.accountCache.buildPartitionHashesForNode(cycleShardValues)
 
         this.partitionObjects.updatePartitionReport(cycleShardValues, mainHashResults)
       }
