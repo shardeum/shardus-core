@@ -16,7 +16,7 @@ import { isNullOrUndefined } from 'util'
 
 const allZeroes64 = '0'.repeat(64)
 
-class StateManagerSync {
+class AccountSync {
   stateManager: StateManager
   app: Shardus.App
   crypto: Crypto
@@ -803,7 +803,7 @@ class StateManagerSync {
 
       let failedHashes = await this.stateManager.checkAndSetAccountData(dataToSet, 'syncStateDataGlobals', true)
 
-      //this.stateManager.stateManagerStats.statsDataSummaryInit(dataToSet)
+      //this.stateManager.partitionStats.statsDataSummaryInit(dataToSet)
 
       console.log('DBG goodAccounts', goodAccounts)
 
@@ -1524,7 +1524,7 @@ class StateManagerSync {
     // failedHashes is a list of accounts that failed to match the hash reported by the server
     let failedHashes = await this.stateManager.checkAndSetAccountData(goodAccounts, 'syncNonGlobals:processAccountData', true) // repeatable form may need to call this in batches
 
-    //this.stateManager.stateManagerStats.statsDataSummaryInit(goodAccounts)
+    //this.stateManager.partitionStats.statsDataSummaryInit(goodAccounts)
 
     if (failedHashes.length > 1000) {
       this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
@@ -1971,7 +1971,7 @@ class StateManagerSync {
     )
     // failedHashes is a list of accounts that failed to match the hash reported by the server
     let failedHashes = await this.stateManager.checkAndSetAccountData(goodAccounts, 'syncNonGlobals:processAccountData', true) // repeatable form may need to call this in batches
-    //this.stateManager.stateManagerStats.statsDataSummaryInit(goodAccounts)
+    //this.stateManager.partitionStats.statsDataSummaryInit(goodAccounts)
     if (failedHashes.length > 1000) {
       this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
       // state -> try another node. TODO record/eval/report blame?
@@ -2169,4 +2169,4 @@ class StateManagerSync {
   }
 }
 
-export default StateManagerSync
+export default AccountSync

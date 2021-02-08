@@ -662,7 +662,7 @@ class PartitionObjects {
   initApoptosisAndQuitSyncing() {
     console.log('initApoptosisAndQuitSyncing ' + utils.getTime('s'))
     this.mainLogger.error( `initApoptosisAndQuitSyncing `)
-    this.stateManager.stateManagerSync.failAndDontRestartSync()
+    this.stateManager.accountSync.failAndDontRestartSync()
     this.p2p.initApoptosis()
   }
 
@@ -1014,11 +1014,11 @@ class PartitionObjects {
       // this.generatePartitionObjects(lastCycle)
       // let receiptMapResults = this.generateReceiptMapResults(lastCycle)
       // if(this.verboseLogs) this.mainLogger.debug( `receiptMapResults: ${stringify(receiptMapResults)}`)
-      // let statsClump = this.stateManagerStats.getCoveredStatsPartitions(lastCycleShardValues)
+      // let statsClump = this.partitionStats.getCoveredStatsPartitions(lastCycleShardValues)
       // //build partition hashes from previous full cycle
       // let mainHashResults:MainHashResults = null
       // if(this.currentCycleShardData && this.currentCycleShardData.ourNode.status === 'active'){
-      //   mainHashResults = this.stateManagerCache.buildPartitionHashesForNode(this.currentCycleShardData)
+      //   mainHashResults = this.accountCache.buildPartitionHashesForNode(this.currentCycleShardData)
       // }
       // // Hook for Snapshot module to listen to after partition data is settled
       // this.emit('cycleTxsFinalized', lastCycleShardValues, receiptMapResults, statsClump, mainHashResults)

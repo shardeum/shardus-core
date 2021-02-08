@@ -12,7 +12,7 @@ import Logger from '../logger'
 import ShardFunctions from './shardFunctions2.js'
 import { time } from 'console'
 
-class StateManagerCache {
+class AccountCache {
   app: Shardus.App
   crypto: Crypto
   config: Shardus.ShardusConfiguration
@@ -622,4 +622,4 @@ class StateManagerCache {
   }
 }
 
-export default StateManagerCache
+export default AccountCache

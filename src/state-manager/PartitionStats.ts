@@ -10,9 +10,9 @@ import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger from '../logger'
 import ShardFunctions2 from './shardFunctions2.js'
-import StateManagerCache from './state-manager-cache'
+import AccountCache from './AccountCache'
 
-class StateManagerStats {
+class PartitionStats {
   app: Shardus.App
   crypto: Crypto
   config: Shardus.ShardusConfiguration
@@ -36,9 +36,9 @@ class StateManagerStats {
   seenCreatedAccounts: Map<string, AccountMemoryCache> // Extra level of safety at the cost of memory to prevent double init.  starting point to have in memory hash of accounts
   useSeenAccountMap: boolean
 
-  stateManagerCache: StateManagerCache
+  accountCache: AccountCache
 
-  constructor(verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger, crypto: Crypto, config: Shardus.ShardusConfiguration, stateManagerCache: StateManagerCache) {
+  constructor(verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger, crypto: Crypto, config: Shardus.ShardusConfiguration, accountCache: AccountCache) {
     this.verboseLogs = verboseLogs
     this.crypto = crypto
     this.app = app
@@ -61,7 +61,7 @@ class StateManagerStats {
     this.useSeenAccountMap = true
     this.seenCreatedAccounts = new Map()
 
-    this.stateManagerCache = stateManagerCache
+    this.accountCache = accountCache
 
     this.initSummaryBlobs()
   }
@@ -144,10 +144,10 @@ class StateManagerStats {
     //     this.seenCreatedAccounts.set(accountData.accountId, accountMemData)
     // }
 
-    if (this.stateManagerCache.hasAccount(accountData.accountId)) {
+    if (this.accountCache.hasAccount(accountData.accountId)) {
       return
     }
-    this.stateManagerCache.updateAccountHash(accountData.accountId, accountData.stateId, accountData.timestamp, cycle)
+    this.accountCache.updateAccountHash(accountData.accountId, accountData.stateId, accountData.timestamp, cycle)
 
     if (accountData.data == null) {
       blob.errorNull++
@@ -167,7 +167,7 @@ class StateManagerStats {
     // }
     // return this.seenCreatedAccounts.has(accountId)
 
-    return this.stateManagerCache.hasAccount(accountId)
+    return this.accountCache.hasAccount(accountId)
   }
 
   statsDataSummaryInitRaw(cycle: number, accountId: string, accountDataRaw: any) {
@@ -189,11 +189,11 @@ class StateManagerStats {
     //     this.seenCreatedAccounts.set(accountId, accountMemData)
     // }
 
-    if (this.stateManagerCache.hasAccount(accountId)) {
+    if (this.accountCache.hasAccount(accountId)) {
       return
     }
     let accountInfo = this.app.getTimestampAndHashFromAccount(accountDataRaw)
-    this.stateManagerCache.updateAccountHash(accountId, accountInfo.hash, accountInfo.timestamp, cycle)
+    this.accountCache.updateAccountHash(accountId, accountInfo.hash, accountInfo.timestamp, cycle)
 
     if (accountDataRaw == null) {
       blob.errorNull++
@@ -245,8 +245,8 @@ class StateManagerStats {
     let timestamp = accountData.timestamp //  this.app.getAccountTimestamp(accountId)
     let hash = accountData.stateId
 
-    if (this.stateManagerCache.hasAccount(accountId)) {
-      let accountMemData: AccountHashCache = this.stateManagerCache.getAccountHash(accountId)
+    if (this.accountCache.hasAccount(accountId)) {
+      let accountMemData: AccountHashCache = this.accountCache.getAccountHash(accountId)
       if (accountMemData.t > timestamp) {
         this.mainLogger.error(`statsDataSummaryUpdate: good error?: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
         return
@@ -254,7 +254,7 @@ class StateManagerStats {
     } else {
       this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account`)
     }
-    this.stateManagerCache.updateAccountHash(accountId, hash, timestamp, cycle)
+    this.accountCache.updateAccountHash(accountId, hash, timestamp, cycle)
 
     if (cycle > blob.latestCycle) {
       blob.latestCycle = cycle
@@ -299,8 +299,8 @@ class StateManagerStats {
     let timestamp = accountDataAfter.timestamp //  this.app.getAccountTimestamp(accountId)
     let hash = accountDataAfter.stateId //this.app.getStateId(accountId)
 
-    if (this.stateManagerCache.hasAccount(accountId)) {
-      let accountMemData: AccountHashCache = this.stateManagerCache.getAccountHash(accountId)
+    if (this.accountCache.hasAccount(accountId)) {
+      let accountMemData: AccountHashCache = this.accountCache.getAccountHash(accountId)
       if (accountMemData.t > timestamp) {
         this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
         return
@@ -308,7 +308,7 @@ class StateManagerStats {
     } else {
       this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account: 2`)
     }
-    this.stateManagerCache.updateAccountHash(accountId, hash, timestamp, cycle)
+    this.accountCache.updateAccountHash(accountId, hash, timestamp, cycle)
 
     if (cycle > blob.latestCycle) {
       blob.latestCycle = cycle
@@ -438,4 +438,4 @@ class StateManagerStats {
   }
 }
 
-export default StateManagerStats
+export default PartitionStats

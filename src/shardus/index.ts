@@ -810,8 +810,8 @@ class Shardus extends EventEmitter {
       }
       return
     }
-    if (this.stateManager) await this.stateManager.stateManagerSync.syncStateData(3)
-    // if (this.stateManager) await this.stateManager.stateManagerSync.syncStateDataFast(3) // fast mode
+    if (this.stateManager) await this.stateManager.accountSync.syncStateData(3)
+    // if (this.stateManager) await this.stateManager.accountSync.syncStateDataFast(3) // fast mode
     console.log('syncAppData')
     if (this.p2p.isFirstSeed) {
       await this.p2p.goActive()
@@ -884,7 +884,7 @@ class Shardus extends EventEmitter {
     if (this.verboseLogs)
       this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(tx)} set:${set} global:${global}`) // not reducing tx here so we can get the long hashes
 
-    if (!this.stateManager.stateManagerSync.dataSyncMainPhaseComplete) {
+    if (!this.stateManager.accountSync.dataSyncMainPhaseComplete) {
       this.statistics.incrementCounter('txRejected')
       nestedCountersInstance.countEvent('rejected','!dataSyncMainPhaseComplete')
       return { success: false, reason: 'Node is still syncing.' }

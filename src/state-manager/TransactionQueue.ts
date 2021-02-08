@@ -417,19 +417,19 @@ class TransactionQueue {
       }
       this.stateManager.eventEmitter.emit('txApplied', acceptedTX)
 
-      this.stateManager.stateManagerStats.statsTxSummaryUpdate(queueEntry.cycleToRecordOn, queueEntry)
+      this.stateManager.partitionStats.statsTxSummaryUpdate(queueEntry.cycleToRecordOn, queueEntry)
       for (let wrappedData of applyResponse.accountData) {
-        //this.stateManager.stateManagerStats.statsDataSummaryUpdate(wrappedData.prevDataCopy, wrappedData)
+        //this.stateManager.partitionStats.statsDataSummaryUpdate(wrappedData.prevDataCopy, wrappedData)
 
         let queueData = queueEntry.collectedData[wrappedData.accountId]
 
         if (queueData != null) {
           if (queueData.accountCreated) {
             //account was created to do a summary init
-            //this.stateManager.stateManagerStats.statsDataSummaryInit(queueEntry.cycleToRecordOn, queueData);
-            this.stateManager.stateManagerStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, queueData.accountId, queueData.prevDataCopy)
+            //this.stateManager.partitionStats.statsDataSummaryInit(queueEntry.cycleToRecordOn, queueData);
+            this.stateManager.partitionStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, queueData.accountId, queueData.prevDataCopy)
           }
-          this.stateManager.stateManagerStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, queueData.prevDataCopy, wrappedData)
+          this.stateManager.partitionStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, queueData.prevDataCopy, wrappedData)
         } else {
           this.mainLogger.error(`commitConsensedTransaction failed to get account data for stats ${wrappedData.accountId}`)
         }
@@ -554,8 +554,8 @@ class TransactionQueue {
     //   // this.preTXQueue.push(acceptedTX)
     //   return 'notReady' // it is too early to care about the tx
     // }
-    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('routeAndQueueAcceptedTransaction-debug', '', `sendGossip:${sendGossip} globalModification:${globalModification} noConsensus:${noConsensus} this.readyforTXs:${this.stateManager.stateManagerSync.readyforTXs} hasshardData:${this.stateManager.currentCycleShardData != null} acceptedTx:${utils.stringifyReduce(acceptedTx)} `)
-    if (this.stateManager.stateManagerSync.readyforTXs === false) {
+    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('routeAndQueueAcceptedTransaction-debug', '', `sendGossip:${sendGossip} globalModification:${globalModification} noConsensus:${noConsensus} this.readyforTXs:${this.stateManager.accountSync.readyforTXs} hasshardData:${this.stateManager.currentCycleShardData != null} acceptedTx:${utils.stringifyReduce(acceptedTx)} `)
+    if (this.stateManager.accountSync.readyforTXs === false) {
       if (this.verboseLogs) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: this.readyforTXs === false`)
       return 'notReady' // it is too early to care about the tx
     }
@@ -718,7 +718,7 @@ class TransactionQueue {
         //let transactionGroup = this.queueEntryGetTransactionGroup(txQueueEntry)
         // if we are syncing this area mark it as good.
         for (let key of txQueueEntry.uniqueKeys) {
-          let syncTracker = this.stateManager.stateManagerSync.getSyncTracker(key)
+          let syncTracker = this.stateManager.accountSync.getSyncTracker(key)
           if (syncTracker != null) {
             txQueueEntry.state = 'syncing'
             txQueueEntry.syncCounter++
@@ -1719,7 +1719,7 @@ class TransactionQueue {
         let hasReceivedApplyReceipt = queueEntry.recievedAppliedReceipt != null
         let shortID = queueEntry.logID //`${utils.makeShortHash(queueEntry.acceptedTx.id)}`
 
-        if (this.stateManager.stateManagerSync.dataSyncMainPhaseComplete === true) {
+        if (this.stateManager.accountSync.dataSyncMainPhaseComplete === true) {
           //check for TX older than M3 and expire them
           if (txAge > timeM3 && queueEntry.didSync == false) {
             //if(queueEntry.didSync == true && queueEntry.didWakeup == )

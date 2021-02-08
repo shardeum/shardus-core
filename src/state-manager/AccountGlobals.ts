@@ -80,7 +80,7 @@ class AccountGlobals {
         let toQuery: string[] = []
   
         // not ready
-        if (this.stateManager.stateManagerSync.globalAccountsSynced === false) {
+        if (this.stateManager.accountSync.globalAccountsSynced === false) {
           result.ready = false
           await respond(result)
         }
@@ -199,7 +199,7 @@ class AccountGlobals {
   }
 
   isGlobalAccount(accountID: string): boolean {
-    if (this.stateManager.stateManagerSync.globalAccountsSynced === false) {
+    if (this.stateManager.accountSync.globalAccountsSynced === false) {
       return this.knownGlobals[accountID] === true
     }
 
@@ -208,7 +208,7 @@ class AccountGlobals {
 
   // should this be in sync?
   async getGlobalListEarly() {
-    let globalReport: GlobalAccountReportResp = await this.stateManager.stateManagerSync.getRobustGlobalReport()
+    let globalReport: GlobalAccountReportResp = await this.stateManager.accountSync.getRobustGlobalReport()
 
     this.knownGlobals = {}
     let temp = []

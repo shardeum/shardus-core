@@ -36,9 +36,9 @@ import * as Context from '../p2p/Context'
 import { response } from 'express'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 
-import StateManagerStats from './state-manager-stats'
-import StateManagerCache from './state-manager-cache'
-import StateManagerSync from './state-manager-sync'
+import PartitionStats from './PartitionStats'
+import AccountCache from './AccountCache'
+import AccountSync from './AccountSync'
 import AccountGlobals from './AccountGlobals'
 import TransactionQueue from './TransactionQueue'
 import TransactionRepair from './TransactionRepair'
@@ -80,9 +80,9 @@ class StateManager {
   eventEmitter: WrappedEventEmitter
 
   //Sub modules
-  stateManagerStats: StateManagerStats
-  stateManagerCache: StateManagerCache
-  stateManagerSync: StateManagerSync
+  stateManagerStats: PartitionStats
+  stateManagerCache: AccountCache
+  stateManagerSync: AccountSync
   accountGlobals: AccountGlobals  
   transactionQueue: TransactionQueue
   transactionRepair: TransactionRepair
@@ -221,13 +221,13 @@ class StateManager {
     
     //INIT our various modules
 
-    this.stateManagerCache = new StateManagerCache(verboseLogs, profiler, app, logger, crypto, config)
+    this.stateManagerCache = new AccountCache(verboseLogs, profiler, app, logger, crypto, config)
 
-    this.stateManagerStats = new StateManagerStats(verboseLogs, profiler, app, logger, crypto, config, this.stateManagerCache)
+    this.stateManagerStats = new PartitionStats(verboseLogs, profiler, app, logger, crypto, config, this.stateManagerCache)
     this.stateManagerStats.summaryPartitionCount = 32
     this.stateManagerStats.initSummaryBlobs()
 
-    this.stateManagerSync = new StateManagerSync(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
+    this.stateManagerSync = new AccountSync(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
 
     this.accountGlobals = new AccountGlobals(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
     this.transactionQueue = new TransactionQueue(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)

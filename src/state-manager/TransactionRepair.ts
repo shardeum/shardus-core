@@ -246,9 +246,9 @@ class TransactionRepair {
               if (beforeData == null) {
                 this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData data is null ${utils.stringifyReduce(data.accountId)} WILL CAUSE DATA OOS`)
               } else {
-                if (this.stateManager.stateManagerStats.hasAccountBeenSeenByStats(data.accountId) === false) {
+                if (this.stateManager.partitionStats.hasAccountBeenSeenByStats(data.accountId) === false) {
                   // Init stats because we have not seen this account yet.
-                  this.stateManager.stateManagerStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, data.accountId, beforeData)
+                  this.stateManager.partitionStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, data.accountId, beforeData)
                 }
 
                 // important to update the timestamp.  There are various reasons it could be incorrectly set to 0
@@ -259,7 +259,7 @@ class TransactionRepair {
                 data.timestamp = updatedTimestamp
 
                 // update stats
-                this.stateManager.stateManagerStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, beforeData, data)
+                this.stateManager.partitionStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, beforeData, data)
 
                 // record state table data
                 let { timestamp: oldtimestamp, hash: oldhash } = this.app.getTimestampAndHashFromAccount(beforeData)
