@@ -733,16 +733,16 @@ class Shardus extends EventEmitter {
    */
   _attemptCreateAppliedListener() {
     if (!this.statistics || !this.stateManager) return
-    this._registerListener(this.stateManager, 'txQueued', (txId) =>
+    this._registerListener(this.stateManager.eventEmitter, 'txQueued', (txId) =>
       this.statistics.startTimer('txTimeInQueue', txId)
     )
-    this._registerListener(this.stateManager, 'txPopped', (txId) =>
+    this._registerListener(this.stateManager.eventEmitter, 'txPopped', (txId) =>
       this.statistics.stopTimer('txTimeInQueue', txId)
     )
-    this._registerListener(this.stateManager, 'txApplied', () =>
+    this._registerListener(this.stateManager.eventEmitter, 'txApplied', () =>
       this.statistics.incrementCounter('txApplied')
     )
-    this._registerListener(this.stateManager, 'txProcessed', () =>
+    this._registerListener(this.stateManager.eventEmitter, 'txProcessed', () =>
       this.statistics.incrementCounter('txProcessed')
     )
   }
@@ -792,7 +792,7 @@ class Shardus extends EventEmitter {
           boolean,
           boolean
         ]
-      ) => this.stateManager.routeAndQueueAcceptedTransaction(...txArgs)
+      ) => this.stateManager.transactionQueue.routeAndQueueAcceptedTransaction(...txArgs)
     )
 
     this.storage.stateManager = this.stateManager
@@ -840,7 +840,7 @@ class Shardus extends EventEmitter {
       // Partition check and data repair (new)
       // disable and compare this.stateManager.startSyncPartitions()
 
-      this.stateManager.startSyncPartitions()
+      this.stateManager.partitionObjects.startSyncPartitions()
     }
   }
 

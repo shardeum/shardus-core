@@ -53,6 +53,8 @@ class StateManagerStats {
     //Init Summary Blobs
     this.summaryPartitionCount = 32
 
+    this.extensiveRangeChecking = true
+
     this.summaryBlobByPartition = new Map()
     this.txSummaryBlobCollections = []
 

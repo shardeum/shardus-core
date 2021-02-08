@@ -16,8 +16,6 @@ const stringify = require('fast-stable-stringify')
 
 const allZeroes64 = '0'.repeat(64)
 
-
-
 // not sure about this.
 import Consensus from '../consensus'
 import Profiler from '../utils/profiler'
@@ -49,11 +47,21 @@ import PartitionObjects from './PartitionObjects'
 import Depricated from './Depricated'
 
 
+/**
+ * WrappedEventEmitter just a default extended WrappedEventEmitter
+ * using EventEmitter was causing issues?
+ */
+class WrappedEventEmitter extends EventEmitter {
+  constructor(){
+    super()
+  }
+}
+
 
 /**
  * StateManager
  */
-class StateManager extends EventEmitter {
+class StateManager {
 //  class StateManager {
 
   app: Shardus.App
@@ -64,6 +72,13 @@ class StateManager extends EventEmitter {
   profiler: Profiler
   consensus: Consensus
 
+  mainLogger: any
+  fatalLogger: any
+  shardLogger: any
+  statsLogger: any
+
+  eventEmitter: WrappedEventEmitter
+
   //Sub modules
   stateManagerStats: StateManagerStats
   stateManagerCache: StateManagerCache
@@ -71,7 +86,7 @@ class StateManager extends EventEmitter {
   accountGlobals: AccountGlobals  
   transactionQueue: TransactionQueue
   transactionRepair: TransactionRepair
-  transactionConsenus: TransactionConsenus
+  transactionConsensus: TransactionConsenus
   partitionObjects: PartitionObjects
   depricated: Depricated
 
@@ -92,11 +107,6 @@ class StateManager extends EventEmitter {
 
   fifoLocks: FifoLockObjectMap
 
-
-
-
-
-
   lastSeenAccountsMap: { [accountId: string]: QueueEntry }
 
   appFinishedSyncing: boolean
@@ -111,9 +121,6 @@ class StateManager extends EventEmitter {
 
   syncSettleTime: number
   debugTXHistory: { [id: string]: string } // need to disable or clean this as it will leak memory
-
-  // extensiveRangeChecking: boolean; // non required range checks that can show additional errors (should not impact flow control)
-
 
   stateIsGood_txHashsetOld: boolean
   stateIsGood_accountPartitions: boolean
@@ -135,11 +142,9 @@ class StateManager extends EventEmitter {
 
   debugFeatureOld_partitionReciepts: boolean // depends on old partition report features.
 
-
   verboseLogs: boolean
 
   logger: Logger
-
 
   extendedRepairLogging:boolean
 
@@ -147,6 +152,15 @@ class StateManager extends EventEmitter {
   lastActiveNodeCount: number
 
   doDataCleanup: boolean
+
+  _listeners: any //Event listners
+
+  queueSitTime: number
+  dataPhaseTag: string
+
+  preTXQueue: AcceptedTx[] // mostly referenced in commented out code for queing up TXs before systems are ready.
+
+  sleepInterrupt: any // see interruptibleSleep.  todo type this, or clean out
 
 /***
  *     ######   #######  ##    ##  ######  ######## ########  ##     ##  ######  ########  #######  ########  
@@ -158,7 +172,7 @@ class StateManager extends EventEmitter {
  *     ######   #######  ##    ##  ######     ##    ##     ##  #######   ######     ##     #######  ##     ## 
  */
   constructor(verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
-    super()
+    //super()
     this.verboseLogs = verboseLogs
 
     this.p2p = p2p
@@ -170,41 +184,30 @@ class StateManager extends EventEmitter {
     this.config = config
     this.profiler = profiler
 
+
+    this.eventEmitter = new WrappedEventEmitter()
+
     //BLOCK1
     this._listeners = {}
-    this.completedPartitions = []
-    this.mainStartingTs = Date.now()
+
     this.queueSitTime = 6000 // todo make this a setting. and tie in with the value in consensus
     this.syncSettleTime = this.queueSitTime + 2000 // 3 * 10 // an estimate of max transaction settle time. todo make it a config or function of consensus later
-
-
 
     this.lastSeenAccountsMap = null
 
     this.appFinishedSyncing = false
 
-
-    this.extensiveRangeChecking = true
-
     //BLOCK2
-    // /** @type {SyncTracker[]} */
-    // this.syncTrackers = []
-    // this.runtimeSyncTrackerSyncing = false
-
-    //this.globalAccountsSynced = false
-
 
     //BLOCK3
     this.dataPhaseTag = 'DATASYNC: '
-
 
     //BLOCK4
     this.useHashSets = true
     this.lastActiveNodeCount = 0
 
     this.extendedRepairLogging = true
-    this.shardInfo = {}
-    /** @type {Map<number, CycleShardData>} */
+  
     this.shardValuesByCycle = new Map()
     this.currentCycleShardData = null as CycleShardData | null
     // this.syncTrackerIndex = 1 // increments up for each new sync tracker we create gets maped to calls.
@@ -229,7 +232,7 @@ class StateManager extends EventEmitter {
     this.accountGlobals = new AccountGlobals(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
     this.transactionQueue = new TransactionQueue(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
     this.transactionRepair = new TransactionRepair(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
-    this.transactionConsenus = new TransactionConsenus(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
+    this.transactionConsensus = new TransactionConsenus(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
     this.partitionObjects = new PartitionObjects(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
     this.depricated = new Depricated(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
 
@@ -379,8 +382,9 @@ class StateManager extends EventEmitter {
 
 
   // TEMP hack emit events through p2p
-  // emit(event){
-  //   this.p2p.emit(event)
+  // had issues with composition
+  // emit(event: string | symbol, ...args: any[]){
+  //   this.p2p.emit(event, args)
 
   // }
 
@@ -489,7 +493,7 @@ class StateManager extends EventEmitter {
       // if (this.preTXQueue.length > 0) {
       //   for (let tx of this.preTXQueue) {
       //     if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_preTX', ` `, ` ${utils.stringifyReduce(tx)} `)
-      //     this.routeAndQueueAcceptedTransaction(tx, false, null)
+      //     this.transactionQueue.routeAndQueueAcceptedTransaction(tx, false, null)
       //   }
       //   this.preTXQueue = []
       // }
@@ -739,7 +743,7 @@ class StateManager extends EventEmitter {
     this.logger.playbackLogState('datasyncComplete', '', '')
 
     // update the debug tag and restart the queue
-    this.dataPhaseTag = 'ACTIVE: ' // 'STATESYNC: '
+    this.dataPhaseTag = 'ACTIVE: '
     this.stateManagerSync.dataSyncMainPhaseComplete = true
     this.tryStartAcceptedQueue()
 
@@ -943,7 +947,7 @@ class StateManager extends EventEmitter {
       let result = {} as AccountStateHashResp
 
       // yikes need to potentially hash only N records at a time and return an array of hashes
-      let stateHash = await this.getAccountsStateHash(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd)
+      let stateHash = await this.transactionQueue.getAccountsStateHash(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd)
       result.stateHash = stateHash
       await respond(result)
     })
@@ -1203,13 +1207,13 @@ class StateManager extends EventEmitter {
     //   // Place tx in queue (if younger than m)
 
     //   // make sure we don't already have it
-    //   let queueEntry = this.getQueueEntrySafe(payload.txid)//, payload.timestamp)
+    //   let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid)//, payload.timestamp)
     //   if (queueEntry) {
     //     return
     //     // already have this in our queue
     //   }
 
-    //   this.routeAndQueueAcceptedTransaction(payload.acceptedTx, true, null, false) // todo pass in sender?
+    //   this.transactionQueue.routeAndQueueAcceptedTransaction(payload.acceptedTx, true, null, false) // todo pass in sender?
 
     //   // no response needed?
     // })
@@ -1218,9 +1222,9 @@ class StateManager extends EventEmitter {
     this.p2p.registerInternal('request_state_for_tx', async (payload: RequestStateForTxReq, respond: (arg0: RequestStateForTxResp) => any) => {
       let response: RequestStateForTxResp = { stateList: [], beforeHashes: {}, note: '', success: false }
       // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
-      let queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+      let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
       if (queueEntry == null) {
-        queueEntry = this.getQueueEntryArchived(payload.txid, 'request_state_for_tx') // , payload.timestamp)
+        queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'request_state_for_tx') // , payload.timestamp)
       }
 
       if (queueEntry == null) {
@@ -1244,9 +1248,9 @@ class StateManager extends EventEmitter {
     // p2p ASK
     this.p2p.registerInternal('request_receipt_for_tx', async (payload: RequestReceiptForTxReq, respond: (arg0: RequestReceiptForTxResp) => any) => {
       let response: RequestReceiptForTxResp = { receipt: null, note: '', success: false }
-      let queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+      let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
       if (queueEntry == null) {
-        queueEntry = this.getQueueEntryArchived(payload.txid, 'request_receipt_for_tx') // , payload.timestamp)
+        queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'request_receipt_for_tx') // , payload.timestamp)
       }
 
       if (queueEntry == null) {
@@ -1271,9 +1275,9 @@ class StateManager extends EventEmitter {
     this.p2p.registerInternal('request_state_for_tx_post', async (payload: RequestStateForTxReqPost, respond: (arg0: RequestStateForTxResp) => any) => {
       let response: RequestStateForTxResp = { stateList: [], beforeHashes: {}, note: '', success: false }
       // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
-      let queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+      let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
       if (queueEntry == null) {
-        queueEntry = this.getQueueEntryArchived(payload.txid, 'request_state_for_tx_post') // , payload.timestamp)
+        queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'request_state_for_tx_post') // , payload.timestamp)
       }
 
       if (queueEntry == null) {
@@ -1334,17 +1338,17 @@ class StateManager extends EventEmitter {
       // this.p2p.tell([correspondingEdgeNode], 'broadcast_state', message)
 
       // make sure we have it
-      let queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+      let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
       if (queueEntry == null) {
         //if we are syncing we need to queue this transaction!
 
-        //this.routeAndQueueAcceptedTransaction (acceptedTx:AcceptedTx, sendGossip:boolean = true, sender: Shardus.Node  |  null, globalModification:boolean)
+        //this.transactionQueue.routeAndQueueAcceptedTransaction (acceptedTx:AcceptedTx, sendGossip:boolean = true, sender: Shardus.Node  |  null, globalModification:boolean)
 
         return
       }
       // add the data in
       for (let data of payload.stateList) {
-        this.queueEntryAddData(queueEntry, data)
+        this.transactionQueue.queueEntryAddData(queueEntry, data)
         if (queueEntry.state === 'syncing') {
           if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_sync_gotBroadcastData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
         }
@@ -1355,7 +1359,7 @@ class StateManager extends EventEmitter {
       //  gossip 'spread_tx_to_group' to transaction group
       // Place tx in queue (if younger than m)
 
-      let queueEntry = this.getQueueEntrySafe(payload.id) // , payload.timestamp)
+      let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.id) // , payload.timestamp)
       if (queueEntry) {
         return
         // already have this in our queue
@@ -1364,7 +1368,7 @@ class StateManager extends EventEmitter {
       //TODO need to check transaction fields.
 
       let noConsensus = false // this can only be true for a set command which will never come from an endpoint
-      let added = this.routeAndQueueAcceptedTransaction(payload, /*sendGossip*/ false, sender, /*globalModification*/ false, noConsensus)
+      let added = this.transactionQueue.routeAndQueueAcceptedTransaction(payload, /*sendGossip*/ false, sender, /*globalModification*/ false, noConsensus)
       if (added === 'lost') {
         return // we are faking that the message got lost so bail here
       }
@@ -1374,7 +1378,7 @@ class StateManager extends EventEmitter {
       if (added === 'notReady') {
         return
       }
-      queueEntry = this.getQueueEntrySafe(payload.id) //, payload.timestamp) // now that we added it to the queue, it should be possible to get the queueEntry now
+      queueEntry = this.transactionQueue.getQueueEntrySafe(payload.id) //, payload.timestamp) // now that we added it to the queue, it should be possible to get the queueEntry now
 
       if (queueEntry == null) {
         // do not gossip this, we are not involved
@@ -1415,13 +1419,13 @@ class StateManager extends EventEmitter {
         this.p2p.sendGossipIn('spread_tx_to_group', payload, tracker, sender, transactionGroup)
       }
 
-      // await this.routeAndQueueAcceptedTransaction(acceptedTX, false, sender)
+      // await this.transactionQueue.routeAndQueueAcceptedTransaction(acceptedTX, false, sender)
     })
 
     // TODO STATESHARDING4 ENDPOINTS ok, I changed this to tell, but we still need to check sender!
     //this.p2p.registerGossipHandler('spread_appliedVote', async (payload, sender, tracker) => {
     this.p2p.registerInternal('spread_appliedVote', async (payload: AppliedVote, respond: any) => {
-      let queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+      let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
       if (queueEntry == null) {
         return
       }
@@ -1429,18 +1433,18 @@ class StateManager extends EventEmitter {
       // TODO STATESHARDING4 ENDPOINTS check payload format
       // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
 
-      if (this.tryAppendVote(queueEntry, newVote)) {
+      if (this.transactionConsensus.tryAppendVote(queueEntry, newVote)) {
         // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
       }
     })
 
     this.p2p.registerGossipHandler('spread_appliedReceipt', async (payload, sender, tracker) => {
       let appliedReceipt = payload as AppliedReceipt
-      let queueEntry = this.getQueueEntrySafe(appliedReceipt.txid) // , payload.timestamp)
+      let queueEntry = this.transactionQueue.getQueueEntrySafe(appliedReceipt.txid) // , payload.timestamp)
       if (queueEntry == null) {
         if (queueEntry == null) {
           // It is ok to search the archive for this.  Not checking this was possibly breaking the gossip chain before
-          queueEntry = this.getQueueEntryArchived(payload.txid, 'spread_appliedReceipt') // , payload.timestamp)
+          queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'spread_appliedReceipt') // , payload.timestamp)
           if (queueEntry != null) {
             // TODO : PERF on a faster version we may just bail if this lives in the arcive list.
             // would need to make sure we send gossip though.
@@ -1691,7 +1695,7 @@ class StateManager extends EventEmitter {
         partitionDump.allNodeIds.push(utils.makeShortHash(node.id))
       }
 
-      partitionDump.globalAccountIDs = Array.from(this.globalAccountMap.keys())
+      partitionDump.globalAccountIDs = Array.from(this.accountGlobals.globalAccountMap.keys())
       partitionDump.globalAccountIDs.sort()
       // dump information about consensus group and edge nodes for each partition
       // for (var [key, value] of this.currentCycleShardData.parititionShardDataMap){
@@ -1703,7 +1707,7 @@ class StateManager extends EventEmitter {
       let globalAccountSummary = []
       for (let globalID in partitionDump.globalAccountIDs) {
         let backupList: Shardus.AccountsCopy[] = this.accountGlobals.getGlobalAccountBackupList(globalID)
-        //let globalAccount = this.globalAccountMap.get(globalID)
+        //let globalAccount = this.accountGlobals.globalAccountMap.get(globalID)
         if (backupList != null && backupList.length > 0) {
           let globalAccount = backupList[backupList.length - 1]
           let summaryObj = { id: globalID, state: globalAccount.hash, ts: globalAccount.timestamp }
@@ -1722,6 +1726,17 @@ class StateManager extends EventEmitter {
     }
 
     this.shardLogger.debug(utils.stringifyReduce(partitionDump))
+  }
+
+  // for debug. need to check it sorts in correcdt direction.
+  _sortByIdAsc(first, second): number {
+    if (first.id < second.id) {
+      return -1
+    }
+    if (first.id > second.id) {
+      return 1
+    }
+    return 0
   }
 
   /**
@@ -1827,7 +1842,7 @@ class StateManager extends EventEmitter {
         partitionDump.allNodeIds.push(utils.makeShortHash(node.id))
       }
 
-      partitionDump.globalAccountIDs = Array.from(this.globalAccountMap.keys())
+      partitionDump.globalAccountIDs = Array.from(this.accountGlobals.globalAccountMap.keys())
       partitionDump.globalAccountIDs.sort()
       // dump information about consensus group and edge nodes for each partition
       // for (var [key, value] of this.currentCycleShardData.parititionShardDataMap){
@@ -1839,7 +1854,7 @@ class StateManager extends EventEmitter {
       let globalAccountSummary = []
       for (let globalID in partitionDump.globalAccountIDs) {
         let backupList: Shardus.AccountsCopy[] = this.accountGlobals.getGlobalAccountBackupList(globalID)
-        //let globalAccount = this.globalAccountMap.get(globalID)
+        //let globalAccount = this.accountGlobals.globalAccountMap.get(globalID)
         if (backupList != null && backupList.length > 0) {
           let globalAccount = backupList[backupList.length - 1]
           let summaryObj = { id: globalID, state: globalAccount.hash, ts: globalAccount.timestamp }
@@ -1885,8 +1900,8 @@ class StateManager extends EventEmitter {
 
     let forceLocalGlobalLookup = false
     let globalAccount = null
-    if (this.globalAccountMap.has(address)) {
-      globalAccount = this.globalAccountMap.get(address)
+    if (this.accountGlobals.globalAccountMap.has(address)) {
+      globalAccount = this.accountGlobals.globalAccountMap.get(address)
       if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalAccountMap', `getLocalOrRemoteAccount - has`)
       if (globalAccount != null) {
         return globalAccount
@@ -2167,7 +2182,7 @@ class StateManager extends EventEmitter {
       let isGlobalKey = false
       //intercept that we have this data rather than requesting it.
       // only if this tx is not a global modifying tx.   if it is a global set then it is ok to save out the global here.
-      if (this.globalAccountMap.has(key)) {
+      if (this.accountGlobals.globalAccountMap.has(key)) {
         if (isGlobalModifyingTX === false) {
           if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalAccountMap', `setAccount - has`)
           if (this.verboseLogs) this.mainLogger.debug('setAccount: Not writing global account: ' + utils.makeShortHash(key))
@@ -2334,7 +2349,7 @@ class StateManager extends EventEmitter {
 
           // If we do not realized this account is global yet, then set it and log to playback log
           if (this.accountGlobals.isGlobalAccount(accountId) === false) {
-            this.globalAccountMap.set(accountId, null) // we use null. ended up not using the data, only checking for the key is used
+            this.accountGlobals.globalAccountMap.set(accountId, null) // we use null. ended up not using the data, only checking for the key is used
             if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalAccountMap', `set global in _commitAccountCopies accountId:${utils.makeShortHash(accountId)}`)
           }
 
@@ -2663,7 +2678,7 @@ class StateManager extends EventEmitter {
 
     // sort and clean up our global account backups:
     if (oldestCycleTimestamp > 0) {
-      this.sortAndMaintainBackups(oldestCycleTimestamp)
+      this.accountGlobals.sortAndMaintainBackups(oldestCycleTimestamp)
     }
 
     this.mainLogger.debug(`Clearing out old data Cleared: ${removedrepairTrackingByCycleById} ${removedallPartitionResponsesByCycleByPartition} ${removedourPartitionResultsByCycle} ${removedshardValuesByCycle} ${removedtxByCycleByPartition} ${removedrecentPartitionObjectsByCycleByHash} ${removedrepairUpdateDataByCycle} ${removedpartitionObjectsByCycle} ${removepartitionReceiptsByCycleCounter} ${removeourPartitionReceiptsByCycleCounter} archQ:${archivedEntriesRemoved}`)
@@ -2692,7 +2707,7 @@ class StateManager extends EventEmitter {
       try {
         this.profiler.profileSectionStart('stateManager_cycle_q1_start')
 
-        this.emit('set_queue_partition_gossip')
+        this.eventEmitter.emit('set_queue_partition_gossip')
         lastCycle = this.p2p.state.getLastCycle()
         if (lastCycle) {
           let ourNode = this.p2p.state.getNode(this.p2p.id)
@@ -2787,11 +2802,11 @@ class StateManager extends EventEmitter {
     if (this.oldFeature_GeneratePartitionReport === true) {
       if (this.verboseLogs) this.mainLogger.debug( ` processPreviousCycleSummaries cycle: ${cycle.counter}`)
       // this will take temp TXs and make sure they are stored in the correct place for us to generate partitions
-      this.processTempTXs(cycle)
+      this.partitionObjects.processTempTXs(cycle)
 
       // During the Q2 phase of a cycle, nodes compute the partition hash of the previous cycle for all the partitions covered by the node.
       // Q2 was chosen so that any transactions submitted with a time stamp that falls in the previous quarter will have been processed and finalized. This could be changed to Q3 if we find that more time is needed.
-      this.generatePartitionObjects(cycle)
+      this.partitionObjects.generatePartitionObjects(cycle)
     }
 
     let receiptMapResults = []
@@ -2814,12 +2829,12 @@ class StateManager extends EventEmitter {
       if (cycleShardValues && cycleShardValues.ourNode.status === 'active') {
         mainHashResults = this.stateManagerCache.buildPartitionHashesForNode(cycleShardValues)
 
-        this.updatePartitionReport(cycleShardValues, mainHashResults)
+        this.partitionObjects.updatePartitionReport(cycleShardValues, mainHashResults)
       }
     }
 
     // Hook for Snapshot module to listen to after partition data is settled
-    this.emit('cycleTxsFinalized', cycleShardValues, receiptMapResults, statsClump, mainHashResults)
+    this.eventEmitter.emit('cycleTxsFinalized', cycleShardValues, receiptMapResults, statsClump, mainHashResults)
 
     if (this.debugFeature_dumpAccountData === true) {
       this.dumpAccountDebugData2(mainHashResults)
@@ -2840,7 +2855,7 @@ class StateManager extends EventEmitter {
       // Nodes generate the partition result for all partitions they cover.
       // Nodes broadcast the set of partition results to N adjacent peers on each side; where N is
       // the number of partitions covered by the node. Uses the /post_partition_results API.
-      await this.broadcastPartitionResults(cycle.counter) // Cycle_number
+      await this.partitionObjects.broadcastPartitionResults(cycle.counter) // Cycle_number
     }
   }
 
@@ -2878,7 +2893,7 @@ class StateManager extends EventEmitter {
 
     if (this.debugFeatureOld_partitionReciepts === true) {
       // this doesnt really send to the archiver but it it does dump reciepts to logs.
-      this.trySendAndPurgeReceiptsToArchives(partitionReceipt)
+      this.depricated.trySendAndPurgeReceiptsToArchives(partitionReceipt)
     }
   }
 

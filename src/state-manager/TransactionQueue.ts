@@ -413,9 +413,9 @@ class TransactionQueue {
 
       let queueEntry: QueueEntry | null = this.getQueueEntry(acceptedTX.id)
       if (queueEntry != null && queueEntry.transactionGroup != null && this.p2p.getNodeId() === queueEntry.transactionGroup[0].id) {
-        this.stateManager.emit('txProcessed')
+        this.stateManager.eventEmitter.emit('txProcessed')
       }
-      this.stateManager.emit('txApplied', acceptedTX)
+      this.stateManager.eventEmitter.emit('txApplied', acceptedTX)
 
       this.stateManager.stateManagerStats.statsTxSummaryUpdate(queueEntry.cycleToRecordOn, queueEntry)
       for (let wrappedData of applyResponse.accountData) {
@@ -1523,7 +1523,7 @@ class TransactionQueue {
    * @param {number} currentIndex
    */
   removeFromQueue(queueEntry: QueueEntry, currentIndex: number) {
-    this.stateManager.emit('txPopped', queueEntry.acceptedTx.receipt.txHash)
+    this.stateManager.eventEmitter.emit('txPopped', queueEntry.acceptedTx.receipt.txHash)
     this.newAcceptedTxQueue.splice(currentIndex, 1)
     this.archivedQueueEntries.push(queueEntry)
     // period cleanup will usually get rid of these sooner if the list fills up
@@ -1674,7 +1674,7 @@ class TransactionQueue {
           txQueueEntry.approximateCycleAge = this.stateManager.currentCycleShardData.cycleNumber
           this.newAcceptedTxQueue.splice(index + 1, 0, txQueueEntry)
           if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)} indexInserted: ${index + 1}`)
-          this.stateManager.emit('txQueued', acceptedTx.receipt.txHash)
+          this.stateManager.eventEmitter.emit('txQueued', acceptedTx.receipt.txHash)
         }
         this.newAcceptedTxQueueTempInjest = []
       }
@@ -1973,13 +1973,13 @@ class TransactionQueue {
               let didNotMatchReceipt = false
 
               this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`)
-              let result = this.stateManager.transactionConsenus.tryProduceReceipt(queueEntry)
+              let result = this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
               if (result != null) {
-                if (this.stateManager.transactionConsenus.hasAppliedReceiptMatchingPreApply(queueEntry, result)) {
+                if (this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, result)) {
                   if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_consensingComplete_madeReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
 
                   // Broadcast the receipt
-                  await this.stateManager.transactionConsenus.shareAppliedReceipt(queueEntry)
+                  await this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)
                   queueEntry.state = 'commiting'
                   continue
                 } else {
@@ -1991,7 +1991,7 @@ class TransactionQueue {
 
               // if we got a reciept while waiting see if we should use it
               if (hasReceivedApplyReceipt) {
-                if (this.stateManager.transactionConsenus.hasAppliedReceiptMatchingPreApply(queueEntry, queueEntry.recievedAppliedReceipt)) {
+                if (this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, queueEntry.recievedAppliedReceipt)) {
                   if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${shortID}`, `qId: ${queueEntry.entryID} `)
                   queueEntry.state = 'commiting'
                   continue

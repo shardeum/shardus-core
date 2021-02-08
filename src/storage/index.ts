@@ -562,7 +562,7 @@ class Storage {
       )
       // stop state manager from syncing?
 
-      this.stateManager.initApoptosisAndQuitSyncing()
+      this.stateManager.partitionObjects.initApoptosisAndQuitSyncing()
     }
   }
 

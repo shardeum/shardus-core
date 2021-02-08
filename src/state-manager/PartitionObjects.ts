@@ -12,7 +12,7 @@ import Logger from '../logger'
 import ShardFunctions from './shardFunctions2.js'
 import { time } from 'console'
 import StateManager from '.'
-
+import Depricated from './Depricated'
 
 class PartitionObjects {
   app: Shardus.App
@@ -439,7 +439,7 @@ class PartitionObjects {
 
     // let stepSize = cHashSetStepSize
     if (this.stateManager.useHashSets) {
-      let hashSet = StateManager.createHashSetString(partitionObject.Txids, partitionObject.States) // TXSTATE_TODO
+      let hashSet = Depricated.createHashSetString(partitionObject.Txids, partitionObject.States) // TXSTATE_TODO
       partitionResult.hashSet = hashSet
     }
 

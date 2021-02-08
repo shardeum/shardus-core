@@ -204,7 +204,7 @@ class Reporter {
     /* 
     Stop calling getAccountsStateHash() since this is not of use in a sharded network, also expensive to compute.
       let appState = this.stateManager
-        ? await this.stateManager.getAccountsStateHash()
+        ? await this.stateManager.transactionQueue.getAccountsStateHash()
         : allZeroes64
     */
     let appState = allZeroes64 // monititor server will set color based on partition report
@@ -227,7 +227,7 @@ class Reporter {
     let partitionReport = null
     let globalSync = null
     if (this.stateManager != null) {
-      partitionReport = this.stateManager.getPartitionReport(true, true)
+      partitionReport = this.stateManager.partitionObjects.getPartitionReport(true, true)
       globalSync = this.stateManager.isStateGood()
 
       repairsStarted = this.stateManager.dataRepairsStarted

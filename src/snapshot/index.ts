@@ -229,7 +229,7 @@ export async function initSafetyModeVals() {
 
 export function startSnapshotting() {
   partitionGossip.initGossip()
-  Context.stateManager.on(
+  Context.stateManager.eventEmitter.on(
     'cycleTxsFinalized',
     async (
       shard: CycleShardData,
@@ -623,7 +623,7 @@ async function goActiveIfDataComplete() {
     Context.stateManager.stateManagerSync.skipSync()
     // Go active
     Active.requestActive()
-    await Context.stateManager.startSyncPartitions()
+    await Context.stateManager.partitionObjects.startSyncPartitions()
   }
 }
 

@@ -93,7 +93,7 @@ class Depricated {
         this.p2p.sendGossipIn('acceptedTx', acceptedTX, tracker, sender)
   
         let noConsensus = false // this can only be true for a set command which will never come from an endpoint
-        this.stateManager.routeAndQueueAcceptedTransaction(acceptedTX, /*sendGossip*/ false, sender, /*globalModification*/ false, noConsensus)
+        this.stateManager.transactionQueue.routeAndQueueAcceptedTransaction(acceptedTX, /*sendGossip*/ false, sender, /*globalModification*/ false, noConsensus)
         //Note await not needed so beware if you add code below this.
       })
 
@@ -537,7 +537,7 @@ class Depricated {
           if (hashListEntry.pinObj != null && hashListEntry.pinObj !== voteObject) {
             // if (hashListEntry.pinObj.val === voteObject.val)
             {
-              let compare = StateManager.compareVoteObjects(hashListEntry.pinObj, voteObject, false)
+              let compare = Depricated.compareVoteObjects(hashListEntry.pinObj, voteObject, false)
               if (compare > 0) {
                 continue // or break;
               }
@@ -599,7 +599,7 @@ class Depricated {
       }
     }
     // apply a partial order sort, n
-    // allVotes.sort(function (a, b) { return StateManager.compareVoteObjects(a, b, false) })
+    // allVotes.sort(function (a, b) { return Depricated.compareVoteObjects(a, b, false) })
 
     // generate solutions!
 
@@ -614,7 +614,7 @@ class Depricated {
       }
     }
     allWinningVotes.sort(function (a, b) {
-      return StateManager.compareVoteObjects(a, b, false)
+      return Depricated.compareVoteObjects(a, b, false)
     })
     let finalIdx = 0
     for (let voteObj of allWinningVotes) {
@@ -631,8 +631,8 @@ class Depricated {
 
     // let aTest = votes['55403088d5636488d3ff17d7d90c052e'][0]
     // let bTest = votes['779980ea84b8a5eac2dc3d07013377e5'][0]
-    // console.log(StateManager.compareVoteObjects(aTest, bTest, false))
-    // console.log(StateManager.compareVoteObjects(bTest, aTest, false))
+    // console.log(Depricated.compareVoteObjects(aTest, bTest, false))
+    // console.log(Depricated.compareVoteObjects(bTest, aTest, false))
 
     // correction solver:
     for (let hashListIndex = 0; hashListIndex < hashSetList.length; hashListIndex++) {
@@ -932,7 +932,7 @@ class Depricated {
 
     //   // todo add in the account state stuff..
     // }
-    hashSet = StateManager.createHashSetString(newTxList.thashes, newTxList.states) // TXSTATE_TODO
+    hashSet = Depricated.createHashSetString(newTxList.thashes, newTxList.states) // TXSTATE_TODO
 
     if (log) console.log(`extras removed: len: ${ourHashSet.indexMap.length}  extraIndex: ${extraIndex} ourPreHashSet: ${hashSet}`)
 
@@ -993,7 +993,7 @@ class Depricated {
     //   }
     //   hashSet += hash.slice(0, stepSize)
     // }
-    hashSet = StateManager.createHashSetString(newTxList.hashes, null) // TXSTATE_TODO  newTxList.states
+    hashSet = Depricated.createHashSetString(newTxList.hashes, null) // TXSTATE_TODO  newTxList.states
 
     if (solutionHashSet.hashSet !== hashSet) {
       return false
@@ -2247,10 +2247,10 @@ class Depricated {
 
       let queueEntry: QueueEntry | null = this.stateManager.transactionQueue.getQueueEntry(acceptedTX.id)
       if (queueEntry != null && queueEntry.transactionGroup != null && this.p2p.getNodeId() === queueEntry.transactionGroup[0].id) {
-        this.stateManager.emit('txProcessed')
+        this.stateManager.eventEmitter.emit('txProcessed')
       }
 
-      this.stateManager.emit('txApplied', acceptedTX)
+      this.stateManager.eventEmitter.emit('txApplied', acceptedTX)
     }
 
     return true

@@ -164,7 +164,7 @@ class StateManagerSync {
               if (queueEntry.ourNodeInTransactionGroup === false) {
                 let old = queueEntry.transactionGroup
                 queueEntry.transactionGroup = null
-                this.stateManager.queueEntryGetTransactionGroup(queueEntry)
+                this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
                 //@ts-ignore ourNodeInTransactionGroup is updated by queueEntryGetTransactionGroup
                 // if(queueEntry.ourNodeInTransactionGroup === true){
                 //   queueEntry.conensusGroup = null
@@ -186,7 +186,7 @@ class StateManagerSync {
               //if(queueEntry.ourNodeInTransactionGroup === true){
               queueEntry.state = 'aging'
               queueEntry.didWakeup = true
-              this.stateManager.updateHomeInformation(queueEntry)
+              this.stateManager.transactionQueue.updateHomeInformation(queueEntry)
               if (this.logger.playbackLogEnabled)
                 this.logger.playbackLogNote(
                   'shrd_sync_wakeupTX',
@@ -540,7 +540,7 @@ class StateManagerSync {
     this.createSyncTrackerByForGlobals(cycle)
 
     // must get a list of globals before we can listen to any TXs, otherwise the isGlobal function returns bad values
-    await this.stateManager.getGlobalListEarly()
+    await this.stateManager.accountGlobals.getGlobalListEarly()
     this.readyforTXs = true
 
     await utils.sleep(8000) // sleep to make sure we are listening to some txs before we sync them
@@ -778,21 +778,21 @@ class StateManagerSync {
         if (accountData != null) {
           dataToSet.push(accountData)
           goodAccounts.push(accountData)
-          if (this.stateManager.globalAccountMap.has(report.id)) {
+          if (this.stateManager.accountGlobals.globalAccountMap.has(report.id)) {
             this.mainLogger.debug(`DATASYNC: syncStateDataGlobals has ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
           } else {
             this.mainLogger.debug(`DATASYNC: syncStateDataGlobals setting ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
             // set the account in our table
-            this.stateManager.globalAccountMap.set(report.id, null)
+            this.stateManager.accountGlobals.globalAccountMap.set(report.id, null)
             // push the time based backup count
             let accountId = report.id
             let data = accountData.data
             let timestamp = accountData.timestamp
             let hash = accountData.stateId
-            let isGlobal = this.stateManager.isGlobalAccount(accountId)
+            let isGlobal = this.stateManager.accountGlobals.isGlobalAccount(accountId)
             let backupObj: Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
             //if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
-            let globalBackupList: Shardus.AccountsCopy[] = this.stateManager.getGlobalAccountBackupList(accountId)
+            let globalBackupList: Shardus.AccountsCopy[] = this.stateManager.accountGlobals.getGlobalAccountBackupList(accountId)
             if (globalBackupList != null) {
               globalBackupList.push(backupObj) // sort and cleanup later.
               this.mainLogger.debug(`DATASYNC: syncStateDataGlobals push backup entry ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
@@ -1738,7 +1738,7 @@ class StateManagerSync {
     this.createSyncTrackerByForGlobals(cycle)
 
     // must get a list of globals before we can listen to any TXs, otherwise the isGlobal function returns bad values
-    await this.stateManager.getGlobalListEarly()
+    await this.stateManager.accountGlobals.getGlobalListEarly()
     this.readyforTXs = true
 
     for (let syncTracker of this.syncTrackers) {
@@ -2120,21 +2120,21 @@ class StateManagerSync {
         if (accountData != null) {
           dataToSet.push(accountData)
           goodAccounts.push(accountData)
-          if (this.stateManager.globalAccountMap.has(report.id)) {
+          if (this.stateManager.accountGlobals.globalAccountMap.has(report.id)) {
             this.mainLogger.debug(`DATASYNC: syncStateDataGlobals has ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
           } else {
             this.mainLogger.debug(`DATASYNC: syncStateDataGlobals setting ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
             // set the account in our table
-            this.stateManager.globalAccountMap.set(report.id, null)
+            this.stateManager.accountGlobals.globalAccountMap.set(report.id, null)
             // push the time based backup count
             let accountId = report.id
             let data = accountData.data
             let timestamp = accountData.timestamp
             let hash = accountData.stateId
-            let isGlobal = this.stateManager.isGlobalAccount(accountId)
+            let isGlobal = this.stateManager.accountGlobals.isGlobalAccount(accountId)
             let backupObj: Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
             //if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
-            let globalBackupList: Shardus.AccountsCopy[] = this.stateManager.getGlobalAccountBackupList(accountId)
+            let globalBackupList: Shardus.AccountsCopy[] = this.stateManager.accountGlobals.getGlobalAccountBackupList(accountId)
             if (globalBackupList != null) {
               globalBackupList.push(backupObj) // sort and cleanup later.
               this.mainLogger.debug(`DATASYNC: syncStateDataGlobals push backup entry ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
