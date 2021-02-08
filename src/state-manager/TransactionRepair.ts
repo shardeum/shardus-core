@@ -15,7 +15,6 @@ import StateManager from '.'
 
 import ShardFunctions2 from './shardFunctions2.js' // oof, need to refactor this!
 
-
 class TransactionRepair {
   app: Shardus.App
   crypto: Crypto
@@ -33,7 +32,7 @@ class TransactionRepair {
   statsLogger: any
   statemanager_fatal: (key: string, log: string) => void
 
-  constructor(stateManager: StateManager, verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger,storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
+  constructor(stateManager: StateManager, verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     this.verboseLogs = verboseLogs
     this.crypto = crypto
     this.app = app
@@ -43,15 +42,12 @@ class TransactionRepair {
     this.p2p = p2p
     this.storage = storage
     this.stateManager = stateManager
-    
 
     this.mainLogger = logger.getLogger('main')
     this.fatalLogger = logger.getLogger('fatal')
     this.shardLogger = logger.getLogger('shardDump')
     this.statsLogger = logger.getLogger('statsDump')
     this.statemanager_fatal = stateManager.statemanager_fatal
-
-
   }
 
   async repairToMatchReceipt(queueEntry: QueueEntry) {
@@ -328,9 +324,6 @@ class TransactionRepair {
       this.profiler.profileSectionEnd('repair')
     }
   }
-
-
-
 }
 
 export default TransactionRepair

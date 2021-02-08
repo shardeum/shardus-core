@@ -13,7 +13,6 @@ import ShardFunctions from './shardFunctions2.js'
 import { time } from 'console'
 import StateManager from '.'
 
-
 class TransactionConsenus {
   app: Shardus.App
   crypto: Crypto
@@ -31,7 +30,7 @@ class TransactionConsenus {
   statsLogger: any
   statemanager_fatal: (key: string, log: string) => void
 
-  constructor(stateManager: StateManager, verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger,storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
+  constructor(stateManager: StateManager, verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     this.verboseLogs = verboseLogs
     this.crypto = crypto
     this.app = app
@@ -41,19 +40,13 @@ class TransactionConsenus {
     this.p2p = p2p
     this.storage = storage
     this.stateManager = stateManager
-   
 
     this.mainLogger = logger.getLogger('main')
     this.fatalLogger = logger.getLogger('fatal')
     this.shardLogger = logger.getLogger('shardDump')
     this.statsLogger = logger.getLogger('statsDump')
     this.statemanager_fatal = stateManager.statemanager_fatal
-
-
   }
-
-
-
 
   /**
    * shareAppliedReceipt
@@ -426,10 +419,6 @@ class TransactionConsenus {
 
     return true
   }
-
-
-
-
 }
 
 export default TransactionConsenus

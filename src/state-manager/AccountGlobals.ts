@@ -13,7 +13,6 @@ import ShardFunctions from './shardFunctions2.js'
 import { time } from 'console'
 import StateManager from '.'
 
-
 class AccountGlobals {
   app: Shardus.App
   crypto: Crypto
@@ -31,7 +30,6 @@ class AccountGlobals {
   statsLogger: any
   statemanager_fatal: (key: string, log: string) => void
 
-
   globalAccountMap: Map<string, Shardus.WrappedDataFromQueue | null>
   knownGlobals: { [id: string]: boolean }
   hasknownGlobals: boolean
@@ -43,8 +41,17 @@ class AccountGlobals {
   /** how to handle reparing a global account... yikes that is hard. */
   globalAccountRepairBank: Map<string, Shardus.AccountsCopy[]>
 
-
-  constructor(stateManager: StateManager, verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger,storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
+  constructor(
+    stateManager: StateManager,
+    verboseLogs: boolean,
+    profiler: Profiler,
+    app: Shardus.App,
+    logger: Logger,
+    storage: Storage,
+    p2p: P2P,
+    crypto: Crypto,
+    config: Shardus.ShardusConfiguration
+  ) {
     this.verboseLogs = verboseLogs
     this.crypto = crypto
     this.app = app
@@ -54,7 +61,7 @@ class AccountGlobals {
     this.p2p = p2p
     this.storage = storage
     this.stateManager = stateManager
-    
+
     this.mainLogger = logger.getLogger('main')
     this.fatalLogger = logger.getLogger('fatal')
     this.shardLogger = logger.getLogger('shardDump')
@@ -67,72 +74,69 @@ class AccountGlobals {
     this.hasknownGlobals = false
   }
 
-
-  setupHandlers(){
+  setupHandlers() {
     this.p2p.registerInternal('get_globalaccountreport', async (payload: any, respond: (arg0: GlobalAccountReportResp) => any) => {
-        let result = { combinedHash: '', accounts: [], ready: this.stateManager.appFinishedSyncing } as GlobalAccountReportResp
-  
-        //type GlobalAccountReportResp = {combinedHash:string, accounts:{id:string, hash:string, timestamp:number }[]  }
-        //sort by account ids.
-  
-        let globalAccountKeys = this.globalAccountMap.keys()
-  
-        let toQuery: string[] = []
-  
-        // not ready
-        if (this.stateManager.accountSync.globalAccountsSynced === false) {
-          result.ready = false
-          await respond(result)
-        }
-  
-        //TODO: Perf  could do things faster by pulling from cache, but would need extra testing:
-        // let notInCache:string[]
-        // for(let key of globalAccountKeys){
-        //   let report
-        //   if(this.globalAccountRepairBank.has(key)){
-        //     let accountCopyList = this.globalAccountRepairBank.get(key)
-        //     let newestCopy = accountCopyList[accountCopyList.length-1]
-        //     report = {id:key, hash:newestCopy.hash, timestamp:newestCopy.timestamp }
-        //   } else{
-        //     notInCache.push(key)
-        //   }
-        //   result.accounts.push(report)
-        // }
-        for (let key of globalAccountKeys) {
-          toQuery.push(key)
-        }
-  
-        let accountData: Shardus.WrappedData[]
-        let ourLockID = -1
-        try {
-          ourLockID = await this.stateManager.fifoLock('accountModification')
-          accountData = await this.app.getAccountDataByList(toQuery)
-        } finally {
-          this.stateManager.fifoUnlock('accountModification', ourLockID)
-        }
-        if (accountData != null) {
-          for (let wrappedAccount of accountData) {
-            // let wrappedAccountInQueueRef = wrappedAccount as Shardus.WrappedDataFromQueue
-            // wrappedAccountInQueueRef.seenInQueue = false
-            // if (this.lastSeenAccountsMap != null) {
-            //   let queueEntry = this.lastSeenAccountsMap[wrappedAccountInQueueRef.accountId]
-            //   if (queueEntry != null) {
-            //     wrappedAccountInQueueRef.seenInQueue = true
-            //   }
-            // }
-            let report = { id: wrappedAccount.accountId, hash: wrappedAccount.stateId, timestamp: wrappedAccount.timestamp }
-            result.accounts.push(report)
-          }
-        }
-        //TODO: PERF Disiable this in production or performance testing.
-        this.stateManager.testAccountDataWrapped(accountData)
-        result.accounts.sort(utils.sort_id_Asc)
-        result.combinedHash = this.crypto.hash(result)
+      let result = { combinedHash: '', accounts: [], ready: this.stateManager.appFinishedSyncing } as GlobalAccountReportResp
+
+      //type GlobalAccountReportResp = {combinedHash:string, accounts:{id:string, hash:string, timestamp:number }[]  }
+      //sort by account ids.
+
+      let globalAccountKeys = this.globalAccountMap.keys()
+
+      let toQuery: string[] = []
+
+      // not ready
+      if (this.stateManager.accountSync.globalAccountsSynced === false) {
+        result.ready = false
         await respond(result)
-      })
+      }
 
+      //TODO: Perf  could do things faster by pulling from cache, but would need extra testing:
+      // let notInCache:string[]
+      // for(let key of globalAccountKeys){
+      //   let report
+      //   if(this.globalAccountRepairBank.has(key)){
+      //     let accountCopyList = this.globalAccountRepairBank.get(key)
+      //     let newestCopy = accountCopyList[accountCopyList.length-1]
+      //     report = {id:key, hash:newestCopy.hash, timestamp:newestCopy.timestamp }
+      //   } else{
+      //     notInCache.push(key)
+      //   }
+      //   result.accounts.push(report)
+      // }
+      for (let key of globalAccountKeys) {
+        toQuery.push(key)
+      }
+
+      let accountData: Shardus.WrappedData[]
+      let ourLockID = -1
+      try {
+        ourLockID = await this.stateManager.fifoLock('accountModification')
+        accountData = await this.app.getAccountDataByList(toQuery)
+      } finally {
+        this.stateManager.fifoUnlock('accountModification', ourLockID)
+      }
+      if (accountData != null) {
+        for (let wrappedAccount of accountData) {
+          // let wrappedAccountInQueueRef = wrappedAccount as Shardus.WrappedDataFromQueue
+          // wrappedAccountInQueueRef.seenInQueue = false
+          // if (this.lastSeenAccountsMap != null) {
+          //   let queueEntry = this.lastSeenAccountsMap[wrappedAccountInQueueRef.accountId]
+          //   if (queueEntry != null) {
+          //     wrappedAccountInQueueRef.seenInQueue = true
+          //   }
+          // }
+          let report = { id: wrappedAccount.accountId, hash: wrappedAccount.stateId, timestamp: wrappedAccount.timestamp }
+          result.accounts.push(report)
+        }
+      }
+      //TODO: PERF Disiable this in production or performance testing.
+      this.stateManager.testAccountDataWrapped(accountData)
+      result.accounts.sort(utils.sort_id_Asc)
+      result.combinedHash = this.crypto.hash(result)
+      await respond(result)
+    })
   }
-
 
   getGlobalAccountValueAtTime(accountId: string, oldestTimestamp: number): Shardus.AccountsCopy | null {
     let result: Shardus.AccountsCopy | null = null
@@ -221,8 +225,6 @@ class AccountGlobals {
 
     this.hasknownGlobals = true
   }
-
-
 }
 
 export default AccountGlobals

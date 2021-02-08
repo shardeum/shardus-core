@@ -38,18 +38,18 @@ class Depricated {
   sendArchiveData: boolean
   purgeArchiveData: boolean
 
-    /** tracks state for repairing partitions. index by cycle counter key to get the repair object, index by parition  */
-    repairTrackingByCycleById: { [cycleKey: string]: { [id: string]: RepairTracker } }
-    /** UpdateRepairData by cycle key */
-    repairUpdateDataByCycle: { [cycleKey: string]: UpdateRepairData[] }
+  /** tracks state for repairing partitions. index by cycle counter key to get the repair object, index by parition  */
+  repairTrackingByCycleById: { [cycleKey: string]: { [id: string]: RepairTracker } }
+  /** UpdateRepairData by cycle key */
+  repairUpdateDataByCycle: { [cycleKey: string]: UpdateRepairData[] }
 
-    applyAllPreparedRepairsRunning:boolean
+  applyAllPreparedRepairsRunning: boolean
 
-    repairStartedMap: Map<string, boolean>
-    repairCompletedMap: Map<string, boolean>
-    dataRepairStack: RepairTracker[]
+  repairStartedMap: Map<string, boolean>
+  repairCompletedMap: Map<string, boolean>
+  dataRepairStack: RepairTracker[]
 
-  constructor(stateManager: StateManager,verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger,storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
+  constructor(stateManager: StateManager, verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     this.verboseLogs = verboseLogs
     this.crypto = crypto
     this.app = app
@@ -66,7 +66,6 @@ class Depricated {
     this.statsLogger = logger.getLogger('statsDump')
     this.statemanager_fatal = stateManager.statemanager_fatal
 
-
     this.sentReceipts = new Map()
 
     this.sendArchiveData = false
@@ -81,26 +80,22 @@ class Depricated {
     this.dataRepairStack = []
   }
 
-  setupHandlers(){
+  setupHandlers() {
     // After joining the network
     //   Record Joined timestamp
     //   Even a syncing node will receive accepted transactions
     //   Starts receiving accepted transaction and saving them to Accepted Tx Table
     this.p2p.registerGossipHandler('acceptedTx', async (acceptedTX: AcceptedTx, sender: Shardus.Node, tracker: string) => {
-        // docs mention putting this in a table but it seems so far that an in memory queue should be ok
-        // should we filter, or instead rely on gossip in to only give us TXs that matter to us?
-  
-        this.p2p.sendGossipIn('acceptedTx', acceptedTX, tracker, sender)
-  
-        let noConsensus = false // this can only be true for a set command which will never come from an endpoint
-        this.stateManager.transactionQueue.routeAndQueueAcceptedTransaction(acceptedTX, /*sendGossip*/ false, sender, /*globalModification*/ false, noConsensus)
-        //Note await not needed so beware if you add code below this.
-      })
+      // docs mention putting this in a table but it seems so far that an in memory queue should be ok
+      // should we filter, or instead rely on gossip in to only give us TXs that matter to us?
 
+      this.p2p.sendGossipIn('acceptedTx', acceptedTX, tracker, sender)
 
+      let noConsensus = false // this can only be true for a set command which will never come from an endpoint
+      this.stateManager.transactionQueue.routeAndQueueAcceptedTransaction(acceptedTX, /*sendGossip*/ false, sender, /*globalModification*/ false, noConsensus)
+      //Note await not needed so beware if you add code below this.
+    })
   }
-
-
 
   // MAYBE WE DO NEED THIS?
 
@@ -135,7 +130,7 @@ class Depricated {
       }
     }
     // reaponsesById: ${utils.stringifyReduce(responsesById)}
-    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair findMostCommonResponse: retVal: ${utils.stringifyReduce({ topHash, topCount, topResult })}  responses: ${utils.stringifyReduce(responses)} `)
+    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair findMostCommonResponse: retVal: ${utils.stringifyReduce({ topHash, topCount, topResult })}  responses: ${utils.stringifyReduce(responses)} `)
     return { topHash, topCount, topResult }
   }
 
@@ -1060,19 +1055,18 @@ class Depricated {
     /** @type {CombinedPartitionReceipt} */
     let combinedReciept = { result: partitionReceiptCopy, signatures: partitionReceipt.resultsList.map((a) => a.sign) }
 
-    if (this.verboseLogs) this.mainLogger.debug( ' sendPartitionData ' + utils.stringifyReduceLimit({ combinedReciept, paritionObject }))
+    if (this.verboseLogs) this.mainLogger.debug(' sendPartitionData ' + utils.stringifyReduceLimit({ combinedReciept, paritionObject }))
 
     // send it
     // this.p2p.archivers.sendPartitionData(combinedReciept, paritionObject)
   }
 
   sendTransactionData(partitionNumber: number, cycleNumber: number, transactions: AcceptedTx[]) {
-    if (this.verboseLogs) this.mainLogger.debug( ' sendTransactionData ' + utils.stringifyReduceLimit({ partitionNumber, cycleNumber, transactions }))
+    if (this.verboseLogs) this.mainLogger.debug(' sendTransactionData ' + utils.stringifyReduceLimit({ partitionNumber, cycleNumber, transactions }))
 
     // send it
     // this.p2p.archivers.sendTransactionData(partitionNumber, cycleNumber, transactions)
   }
-
 
   /**
    * trySendAndPurgeReciepts
@@ -1089,7 +1083,7 @@ class Depricated {
       return
     }
 
-    if (this.verboseLogs) this.mainLogger.debug( ' trySendAndPurgeReceipts ' + key)
+    if (this.verboseLogs) this.mainLogger.debug(' trySendAndPurgeReceipts ' + key)
 
     this.sentReceipts.set(key, true)
     try {
@@ -1136,7 +1130,6 @@ class Depricated {
     return this.stateManager.ourPartitionReceiptsByCycleCounter[key]
   }
 
-
   purgeTransactionData() {
     let tsStart = 0
     let tsEnd = 0
@@ -1167,8 +1160,7 @@ class Depricated {
     return null
   }
 
-
-    // TODO sharding  done! need to split this out by partition
+  // TODO sharding  done! need to split this out by partition
   /**
    * getTXListByKey
    * just an alternative to getTXList where the calling code has alredy formed the cycle key
@@ -1198,7 +1190,6 @@ class Depricated {
     return txList
   }
 
-
   /**
    * _getRepairTrackerForCycle
    * @param {number} counter
@@ -1222,7 +1213,7 @@ class Depricated {
       // newFailedTXs: a list of TXs that we fetched, they had failed so we save them but do not apply them
       // extraTXIds: a list of TXIds that our partition has that the leading partition does not.  This is what we need to remove
       // missingTXIds: a list of TXIds that our partition has that the leading partition has that we don't.  We will need to add these in using the list newPendingTXs
-      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( `_getRepairTrackerForCycle: creating for cycle:${counter} partition:${partition}`)
+      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`_getRepairTrackerForCycle: creating for cycle:${counter} partition:${partition}`)
       repairTracker = {
         triedHashes: [],
         numNodes: this.stateManager.lastActiveNodeCount, // num nodes that we send partition results to
@@ -1261,8 +1252,6 @@ class Depricated {
     }
     return repairTracker
   }
-
-  
 
   /**
    * repairTrackerMarkFinished
@@ -1308,7 +1297,7 @@ class Depricated {
    * @param {RepairTracker} repairTracker
    */
   repairTrackerClearForNextRepair(repairTracker: RepairTracker) {
-    if (this.verboseLogs) this.mainLogger.debug( ` repairTrackerClearForNextRepair cycleNumber: ${repairTracker.counter} parition: ${repairTracker.partitionId} `)
+    if (this.verboseLogs) this.mainLogger.debug(` repairTrackerClearForNextRepair cycleNumber: ${repairTracker.counter} parition: ${repairTracker.partitionId} `)
     repairTracker.removedTXIds = []
     repairTracker.repairedTXs = []
     repairTracker.newPendingTXs = []
@@ -1323,7 +1312,7 @@ class Depricated {
    * @param {number} specificParition the old version of this would repair all partitions but we had to wait.  this works on just one partition
    */
   async mergeAndApplyTXRepairs(cycleNumber: number, specificParition: number) {
-    if (this.verboseLogs) this.mainLogger.debug( ` _repair mergeAndApplyTXRepairs cycleNumber ${cycleNumber} partition: ${specificParition}`)
+    if (this.verboseLogs) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs cycleNumber ${cycleNumber} partition: ${specificParition}`)
     // walk through all txs for this cycle.
     // get or create entries for accounts.
     // track when they have missing txs or wrong txs
@@ -1361,7 +1350,7 @@ class Depricated {
         let keysResponse = this.app.getKeyFromTransaction(tx.data)
 
         if (!keysResponse) {
-          if (this.verboseLogs) this.mainLogger.debug( ` _repair mergeAndApplyTXRepairs problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
+          if (this.verboseLogs) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
         }
 
         let { sourceKeys, targetKeys } = keysResponse
@@ -1382,7 +1371,7 @@ class Depricated {
         allExtraTXids[tx] = 1
         // TODO Repair. ugh have to query our data and figure out which accounts need to be reset.
       }
-      if (this.verboseLogs) this.mainLogger.debug( ` _repair mergeAndApplyTXRepairs: extra: ${utils.stringifyReduce(allExtraTXids)}  txIDToAcc: ${utils.stringifyReduce(txIDToAcc)}`)
+      if (this.verboseLogs) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs: extra: ${utils.stringifyReduce(allExtraTXids)}  txIDToAcc: ${utils.stringifyReduce(txIDToAcc)}`)
 
       // todo repair: hmmm also reset accounts have a tx we need to remove.
       // }
@@ -1399,7 +1388,7 @@ class Depricated {
             // this was a bad tx dont include it.   we have to look up the account associated with this tx and make sure they get reset
             let keysResponse = this.app.getKeyFromTransaction(tx.data)
             if (!keysResponse) {
-              if (this.verboseLogs) this.mainLogger.debug( ` _repair mergeAndApplyTXRepairs problem with keysResp2  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
+              if (this.verboseLogs) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs problem with keysResp2  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
             }
             let { sourceKeys, targetKeys } = keysResponse
             for (let accountID of sourceKeys) {
@@ -1421,19 +1410,19 @@ class Depricated {
           }
         }
       } else {
-        if (this.verboseLogs) this.mainLogger.debug( ` _repair mergeAndApplyTXRepairs txList not found for: cycle: ${cycleNumber} in ${utils.stringifyReduce(this.stateManager.partitionObjects.txByCycleByPartition)}`)
+        if (this.verboseLogs) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs txList not found for: cycle: ${cycleNumber} in ${utils.stringifyReduce(this.stateManager.partitionObjects.txByCycleByPartition)}`)
       }
 
       // build and sort a list of TXs that we need to apply
 
-      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair mergeAndApplyTXRepairs txIDResetExtraCount: ${txIDResetExtraCount} allAccountsToResetById ${utils.stringifyReduce(allAccountsToResetById)}`)
+      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs txIDResetExtraCount: ${txIDResetExtraCount} allAccountsToResetById ${utils.stringifyReduce(allAccountsToResetById)}`)
       // reset accounts
       let accountKeys = Object.keys(allAccountsToResetById)
-      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair mergeAndApplyTXRepairs revert accountKeys ${utils.stringifyReduce(accountKeys)}`)
+      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs revert accountKeys ${utils.stringifyReduce(accountKeys)}`)
 
-      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair mergeAndApplyTXRepairs FIFO lock outer: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs FIFO lock outer: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
       let ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(accountKeys)
-      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair mergeAndApplyTXRepairs FIFO lock inner: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs FIFO lock inner: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
 
       // let replacmentAccounts =  //returned by the below function for debug
       await this._revertAccounts(accountKeys, cycleNumber)
@@ -1450,8 +1439,8 @@ class Depricated {
       // sort the list by ascending timestamp
       newTXList.sort(utils.sortTimestampAsc) // (function (a, b) { return a.timestamp - b.timestamp })
 
-      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair mergeAndApplyTXRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
-      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair mergeAndApplyTXRepairs newTXList.length: ${newTXList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
+      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
+      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs newTXList.length: ${newTXList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
 
       let applyCount = 0
       let applyFailCount = 0
@@ -1494,7 +1483,7 @@ class Depricated {
               continue
             }
 
-            if (this.verboseLogs) this.mainLogger.debug( ` _repair mergeAndApplyTXRepairs apply tx ${utils.makeShortHash(tx.id)} ${tx.timestamp} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
+            if (this.verboseLogs) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs apply tx ${utils.makeShortHash(tx.id)} ${tx.timestamp} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
             let hasStateTableData = false // may or may not have it but not tracking yet
 
             // TSConversion old way used to do this but seem incorrect to have receipt under data!
@@ -1534,10 +1523,10 @@ class Depricated {
             let success = await this.testAccountTime(tx.data, wrappedStates)
 
             if (!success) {
-              if (this.verboseLogs) this.mainLogger.debug( ' testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs' + utils.stringifyReduce(tx))
+              if (this.verboseLogs) this.mainLogger.debug(' testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs' + utils.stringifyReduce(tx))
               if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs`)
 
-              this.statemanager_fatal(`testAccountTime_failed`,  ' testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs' + utils.stringifyReduce(tx))
+              this.statemanager_fatal(`testAccountTime_failed`, ' testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs' + utils.stringifyReduce(tx))
 
               // return
               this.p2p.initApoptosis() // todo turn this back on
@@ -1549,24 +1538,24 @@ class Depricated {
             // accountValuesByKey = {} // clear this.  it forces more db work but avoids issue with some stale flags
             if (!applied) {
               applyFailCount++
-              if (this.verboseLogs) this.mainLogger.debug( ` _repair mergeAndApplyTXRepairs apply failed`)
+              if (this.verboseLogs) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs apply failed`)
             } else {
               applyCount++
             }
           } else {
-            if (this.verboseLogs) this.mainLogger.debug( ` _repair mergeAndApplyTXRepairs no for ${tx.id} in ${utils.stringifyReduce(txIDToAcc)}`)
+            if (this.verboseLogs) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs no for ${tx.id} in ${utils.stringifyReduce(txIDToAcc)}`)
           }
         } catch (ex) {
           this.mainLogger.debug('_repair: startRepairProcess mergeAndApplyTXRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
           this.statemanager_fatal(`mergeAndApplyTXRepairs_ex`, '_repair: startRepairProcess mergeAndApplyTXRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         }
 
-        if (this.verboseLogs) this.mainLogger.debug( ` _repair mergeAndApplyTXRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
+        if (this.verboseLogs) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
       }
 
       // unlock the accounts we locked...  todo maybe put this in a finally statement?
       this.stateManager.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
-      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair mergeAndApplyTXRepairs FIFO unlock: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs FIFO unlock: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
     }
   }
 
@@ -1576,7 +1565,7 @@ class Depricated {
    * @param {number} specificParition the old version of this would repair all partitions but we had to wait.  this works on just one partition
    */
   async updateTrackingAndPrepareRepairs(cycleNumber: number, specificParition: number) {
-    if (this.verboseLogs) this.mainLogger.debug( ` _repair updateTrackingAndPrepareRepairs cycleNumber ${cycleNumber} partition: ${specificParition}`)
+    if (this.verboseLogs) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs cycleNumber ${cycleNumber} partition: ${specificParition}`)
     // walk through all txs for this cycle.
     // get or create entries for accounts.
     // track when they have missing txs or wrong txs
@@ -1615,7 +1604,7 @@ class Depricated {
         let keysResponse = this.app.getKeyFromTransaction(tx.data)
 
         if (!keysResponse) {
-          if (this.verboseLogs) this.mainLogger.debug( ` _repair updateTrackingAndPrepareRepairs problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
+          if (this.verboseLogs) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
         }
 
         let { sourceKeys, targetKeys } = keysResponse
@@ -1636,7 +1625,7 @@ class Depricated {
         allExtraTXids[tx] = 1
         // TODO Repair. ugh have to query our data and figure out which accounts need to be reset.
       }
-      if (this.verboseLogs) this.mainLogger.debug( ` _repair updateTrackingAndPrepareRepairs: extra: ${utils.stringifyReduce(allExtraTXids)}  txIDToAcc: ${utils.stringifyReduce(txIDToAcc)}`)
+      if (this.verboseLogs) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs: extra: ${utils.stringifyReduce(allExtraTXids)}  txIDToAcc: ${utils.stringifyReduce(txIDToAcc)}`)
 
       // todo repair: hmmm also reset accounts have a tx we need to remove.
       // }
@@ -1653,7 +1642,7 @@ class Depricated {
             // this was a bad tx dont include it.   we have to look up the account associated with this tx and make sure they get reset
             let keysResponse = this.app.getKeyFromTransaction(tx.data)
             if (!keysResponse) {
-              if (this.verboseLogs) this.mainLogger.debug( ` _repair updateTrackingAndPrepareRepairs problem with keysResp2  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
+              if (this.verboseLogs) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs problem with keysResp2  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
             }
             let { sourceKeys, targetKeys } = keysResponse
             for (let accountID of sourceKeys) {
@@ -1674,9 +1663,9 @@ class Depricated {
             // we will only play back the txs on accounts that point to allAccountsToResetById
           }
         }
-        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair updateTrackingAndPrepareRepairs txIDResetExtraCount:${txIDResetExtraCount} txIDToAccCount: ${txIDToAccCount}`)
+        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs txIDResetExtraCount:${txIDResetExtraCount} txIDToAccCount: ${txIDToAccCount}`)
       } else {
-        if (this.verboseLogs) this.mainLogger.debug( ` _repair updateTrackingAndPrepareRepairs txList not found for: cycle: ${cycleNumber} in ${utils.stringifyReduce(this.stateManager.partitionObjects.txByCycleByPartition)}`)
+        if (this.verboseLogs) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs txList not found for: cycle: ${cycleNumber} in ${utils.stringifyReduce(this.stateManager.partitionObjects.txByCycleByPartition)}`)
       }
 
       // build and sort a list of TXs that we need to apply
@@ -1695,8 +1684,8 @@ class Depricated {
       // sort the list by ascending timestamp
       newTXList.sort(utils.sortTimestampAsc) // function (a, b) { return a.timestamp - b.timestamp })
 
-      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair updateTrackingAndPrepareRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
-      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair updateTrackingAndPrepareRepairs newTXList.length: ${newTXList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
+      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
+      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs newTXList.length: ${newTXList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
 
       // Save the results of this computation for later
       /** @type {UpdateRepairData}  */
@@ -1710,7 +1699,7 @@ class Depricated {
       // how will the partition object get updated though??
       // }
 
-      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair updateTrackingAndPrepareRepairs finished`)
+      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs finished`)
       if (paritionsServiced === 0) {
         this.statemanager_fatal(`_updateTrackingAndPrepareRepairs_fail`, `_updateTrackingAndPrepareRepairs failed. not partitions serviced: ${debugKey} our consensus:${utils.stringifyReduce(lastCycleShardValues?.ourConsensusPartitions)} `)
       }
@@ -1730,7 +1719,7 @@ class Depricated {
     }
     this.applyAllPreparedRepairsRunning = true
 
-    if (this.verboseLogs) this.mainLogger.debug( ` _repair applyAllPreparedRepairs cycleNumber ${cycleNumber}`)
+    if (this.verboseLogs) this.mainLogger.debug(` _repair applyAllPreparedRepairs cycleNumber ${cycleNumber}`)
 
     this.mainLogger.debug(`applyAllPreparedRepairs c:${cycleNumber}`)
 
@@ -1752,20 +1741,20 @@ class Depricated {
 
     // build and sort a list of TXs that we need to apply
 
-    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair applyAllPreparedRepairs allAccountsToResetById ${utils.stringifyReduce(allAccountsToResetById)}`)
+    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs allAccountsToResetById ${utils.stringifyReduce(allAccountsToResetById)}`)
     // reset accounts
     let accountKeys = Object.keys(allAccountsToResetById)
-    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair applyAllPreparedRepairs revert accountKeys ${utils.stringifyReduce(accountKeys)}`)
+    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs revert accountKeys ${utils.stringifyReduce(accountKeys)}`)
 
-    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair applyAllPreparedRepairs FIFO lock outer: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs FIFO lock outer: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
     let ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(accountKeys)
-    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair applyAllPreparedRepairs FIFO lock inner: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs FIFO lock inner: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
 
     // let replacmentAccounts =  //returned by the below function for debug
     await this._revertAccounts(accountKeys, cycleNumber)
 
-    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair applyAllPreparedRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
-    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair applyAllPreparedRepairs newTXList.length: ${newTXList.length}`)
+    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
+    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs newTXList.length: ${newTXList.length}`)
 
     let applyCount = 0
     let applyFailCount = 0
@@ -1818,7 +1807,7 @@ class Depricated {
             continue
           }
 
-          if (this.verboseLogs) this.mainLogger.debug( ` _repair applyAllPreparedRepairs apply tx ${utils.makeShortHash(tx.id)} ${tx.timestamp} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
+          if (this.verboseLogs) this.mainLogger.debug(` _repair applyAllPreparedRepairs apply tx ${utils.makeShortHash(tx.id)} ${tx.timestamp} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
           let hasStateTableData = false // may or may not have it but not tracking yet
 
           // TSConversion old way used to do this but seem incorrect to have receipt under data!
@@ -1858,9 +1847,9 @@ class Depricated {
           let success = await this.testAccountTime(tx.data, wrappedStates)
 
           if (!success) {
-            if (this.verboseLogs) this.mainLogger.debug( ' applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs' + utils.stringifyReduce(tx))
+            if (this.verboseLogs) this.mainLogger.debug(' applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs' + utils.stringifyReduce(tx))
             if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs`)
-            this.statemanager_fatal(`applyAllPreparedRepairs_fail`,  ' testAccountTime failed. calling apoptosis. applyAllPreparedRepairs' + utils.stringifyReduce(tx))
+            this.statemanager_fatal(`applyAllPreparedRepairs_fail`, ' testAccountTime failed. calling apoptosis. applyAllPreparedRepairs' + utils.stringifyReduce(tx))
 
             // return
             this.p2p.initApoptosis() // todo turn this back on
@@ -1890,7 +1879,7 @@ class Depricated {
                 if (globalValueSnapshot == null) {
                   //todo some error?
                   let globalAccountBackupList = this.stateManager.accountGlobals.getGlobalAccountBackupList(wrappedStateKey)
-                  if (this.verboseLogs) this.mainLogger.error( ` _repair applyAllPreparedRepairs has global key but no snapshot at time ${tx.timestamp} entries:${globalAccountBackupList.length} ${utils.stringifyReduce(globalAccountBackupList.map((a) => `${a.timestamp}  ${utils.makeShortHash(a.accountId)} `))}  `)
+                  if (this.verboseLogs) this.mainLogger.error(` _repair applyAllPreparedRepairs has global key but no snapshot at time ${tx.timestamp} entries:${globalAccountBackupList.length} ${utils.stringifyReduce(globalAccountBackupList.map((a) => `${a.timestamp}  ${utils.makeShortHash(a.accountId)} `))}  `)
                   continue
                 }
                 // build a new wrapped response to insert
@@ -1901,14 +1890,14 @@ class Depricated {
                 // yikes probably cant do local cached data at this point.
                 if (this.verboseLogs) {
                   let globalAccountBackupList = this.stateManager.accountGlobals.getGlobalAccountBackupList(wrappedStateKey)
-                  if (this.verboseLogs) this.mainLogger.error( ` _repair applyAllPreparedRepairs has global key details ${tx.timestamp} entries:${globalAccountBackupList.length} ${utils.stringifyReduce(globalAccountBackupList.map((a) => `${a.timestamp}  ${utils.makeShortHash(a.accountId)} `))}  `)
+                  if (this.verboseLogs) this.mainLogger.error(` _repair applyAllPreparedRepairs has global key details ${tx.timestamp} entries:${globalAccountBackupList.length} ${utils.stringifyReduce(globalAccountBackupList.map((a) => `${a.timestamp}  ${utils.makeShortHash(a.accountId)} `))}  `)
                 }
 
-                if (this.verboseLogs) this.mainLogger.debug( ` _repair applyAllPreparedRepairs got global account to repair from: ${utils.stringifyReduce(newWrappedResponse)}`)
+                if (this.verboseLogs) this.mainLogger.debug(` _repair applyAllPreparedRepairs got global account to repair from: ${utils.stringifyReduce(newWrappedResponse)}`)
               }
             } else {
               if (wrappedState == null) {
-                if (this.verboseLogs) this.mainLogger.error( ` _repair applyAllPreparedRepairs is not a global account but wrapped state == null ${utils.stringifyReduce(wrappedStateKey)} ${tx.timestamp}`)
+                if (this.verboseLogs) this.mainLogger.error(` _repair applyAllPreparedRepairs is not a global account but wrapped state == null ${utils.stringifyReduce(wrappedStateKey)} ${tx.timestamp}`)
               }
             }
           }
@@ -1917,24 +1906,24 @@ class Depricated {
           // accountValuesByKey = {} // clear this.  it forces more db work but avoids issue with some stale flags
           if (!applied) {
             applyFailCount++
-            if (this.verboseLogs) this.mainLogger.debug( ` _repair applyAllPreparedRepairs apply failed`)
+            if (this.verboseLogs) this.mainLogger.debug(` _repair applyAllPreparedRepairs apply failed`)
           } else {
             applyCount++
           }
         } else {
-          if (this.verboseLogs) this.mainLogger.debug( ` _repair applyAllPreparedRepairs no for ${tx.id} in ${utils.stringifyReduce(txIDToAcc)}`)
+          if (this.verboseLogs) this.mainLogger.debug(` _repair applyAllPreparedRepairs no for ${tx.id} in ${utils.stringifyReduce(txIDToAcc)}`)
         }
       } catch (ex) {
         this.mainLogger.debug('_repair: startRepairProcess applyAllPreparedRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         this.statemanager_fatal(`applyAllPreparedRepairs_fail`, '_repair: startRepairProcess applyAllPreparedRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       }
 
-      if (this.verboseLogs) this.mainLogger.debug( ` _repair applyAllPreparedRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
+      if (this.verboseLogs) this.mainLogger.debug(` _repair applyAllPreparedRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
     }
 
     // unlock the accounts we locked...  todo maybe put this in a finally statement?
     this.stateManager.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
-    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair applyAllPreparedRepairs FIFO unlock: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs FIFO unlock: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
     // }
     this.applyAllPreparedRepairsRunning = false
   }
@@ -1952,7 +1941,7 @@ class Depricated {
     cycleStart -= this.stateManager.syncSettleTime // adjust by sync settle time
     let replacmentAccounts: Shardus.AccountsCopy[]
     let replacmentAccountsMinusGlobals = [] as Shardus.AccountsCopy[]
-    if (this.verboseLogs) this.mainLogger.debug( ` _repair _revertAccounts start  numAccounts: ${accountIDs.length} repairing cycle:${cycleNumber}`)
+    if (this.verboseLogs) this.mainLogger.debug(` _repair _revertAccounts start  numAccounts: ${accountIDs.length} repairing cycle:${cycleNumber}`)
 
     try {
       // query our account copies that are less than or equal to this cycle!
@@ -1969,10 +1958,10 @@ class Depricated {
           }
 
           if (accountData == null || accountData.data == null || accountData.accountId == null) {
-            if (this.verboseLogs) this.mainLogger.error( ` _repair _revertAccounts null account data found: ${accountData.accountId} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
+            if (this.verboseLogs) this.mainLogger.error(` _repair _revertAccounts null account data found: ${accountData.accountId} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
           } else {
             // todo overkill
-            if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair _revertAccounts reset: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
+            if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts reset: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
           }
           // TODO: globalaccounts
           //this is where we need to no reset a global account, but instead grab the replacment data and cache it
@@ -1982,9 +1971,9 @@ class Depricated {
           //Try not reverting global accounts..
           if (this.stateManager.accountGlobals.isGlobalAccount(accountData.accountId) === false) {
             replacmentAccountsMinusGlobals.push(accountData)
-            if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair _revertAccounts not a global account, add to list ${utils.makeShortHash(accountData.accountId)}`)
+            if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts not a global account, add to list ${utils.makeShortHash(accountData.accountId)}`)
           } else {
-            if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair _revertAccounts was a global account, do not add to list ${utils.makeShortHash(accountData.accountId)}`)
+            if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts was a global account, do not add to list ${utils.makeShortHash(accountData.accountId)}`)
           }
         }
         // tell the app to replace the account data
@@ -1992,10 +1981,10 @@ class Depricated {
         await this.app.resetAccountData(replacmentAccountsMinusGlobals)
         // update local state.
       } else {
-        if (this.verboseLogs) this.mainLogger.debug( ` _repair _revertAccounts No replacment accounts found!!! cycle <= :${prevCycle}`)
+        if (this.verboseLogs) this.mainLogger.debug(` _repair _revertAccounts No replacment accounts found!!! cycle <= :${prevCycle}`)
       }
 
-      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair _revertAccounts: ${accountIDs.length} replacmentAccounts ${replacmentAccounts.length} repairing cycle:${cycleNumber} replacmentAccountsMinusGlobals: ${replacmentAccountsMinusGlobals.length}`)
+      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts: ${accountIDs.length} replacmentAccounts ${replacmentAccounts.length} repairing cycle:${cycleNumber} replacmentAccountsMinusGlobals: ${replacmentAccountsMinusGlobals.length}`)
 
       // TODO prodution. consider if we need a better set of checks before we delete an account!
       // If we don't have a replacement copy for an account we should try to delete it
@@ -2007,13 +1996,13 @@ class Depricated {
       for (let accountData of replacmentAccounts) {
         accountsReverted[accountData.accountId] = 1
         if (accountData.cycleNumber > prevCycle) {
-          if (this.verboseLogs) this.mainLogger.error( ` _repair _revertAccounts cycle too new for backup restore: ${accountData.cycleNumber}  cycleNumber:${cycleNumber} timestamp:${accountData.timestamp}`)
+          if (this.verboseLogs) this.mainLogger.error(` _repair _revertAccounts cycle too new for backup restore: ${accountData.cycleNumber}  cycleNumber:${cycleNumber} timestamp:${accountData.timestamp}`)
         }
 
         debug.push({ id: accountData.accountId, cycleNumber: accountData.cycleNumber, timestamp: accountData.timestamp, hash: accountData.hash, accHash: accountData.data.hash, accTs: accountData.data.timestamp })
       }
 
-      if (this.verboseLogs) this.mainLogger.debug( ` _repair _revertAccounts: ${utils.stringifyReduce(debug)}`)
+      if (this.verboseLogs) this.mainLogger.debug(` _repair _revertAccounts: ${utils.stringifyReduce(debug)}`)
 
       for (let accountID of accountIDs) {
         if (accountsReverted[accountID] == null) {
@@ -2021,7 +2010,7 @@ class Depricated {
         }
       }
       if (accountsToDelete.length > 0) {
-        if (this.verboseLogs) this.mainLogger.debug( ` _repair _revertAccounts delete some accounts ${utils.stringifyReduce(accountsToDelete)}`)
+        if (this.verboseLogs) this.mainLogger.debug(` _repair _revertAccounts delete some accounts ${utils.stringifyReduce(accountsToDelete)}`)
         await this.app.deleteAccountData(accountsToDelete)
       }
 
@@ -2037,7 +2026,7 @@ class Depricated {
         // if (txRecord.txTS < cycleEnd) {
         let keysResponse = this.app.getKeyFromTransaction(txRecord.acceptedTx.data)
         if (!keysResponse) {
-          if (this.verboseLogs) this.mainLogger.debug( ` _repair _revertAccounts problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(txRecord.acceptedTx)}`)
+          if (this.verboseLogs) this.mainLogger.debug(` _repair _revertAccounts problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(txRecord.acceptedTx)}`)
         }
         let { sourceKeys, targetKeys } = keysResponse
         for (let accountID of sourceKeys) {
@@ -2069,7 +2058,6 @@ class Depricated {
     return replacmentAccounts // this is for debugging reference
   }
 
-
   async testAccountTime(tx: Shardus.OpaqueTransaction, wrappedStates: WrappedStates) {
     function tryGetAccountData(accountID: string) {
       return wrappedStates[accountID]
@@ -2086,7 +2074,7 @@ class Depricated {
         let accountEntry = tryGetAccountData(key)
         if (accountEntry.timestamp >= timestamp) {
           failedAgeCheck = true
-          if (this.verboseLogs) this.mainLogger.debug( 'testAccountTime account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
+          if (this.verboseLogs) this.mainLogger.debug('testAccountTime account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
         }
       }
       if (failedAgeCheck) {
@@ -2099,7 +2087,6 @@ class Depricated {
     }
     return true // { success: true, hasStateTableData }
   }
-
 
   // state ids should be checked before applying this transaction because it may have already been applied while we were still syncing data.
   async tryApplyTransaction(acceptedTX: AcceptedTx, hasStateTableData: boolean, repairing: boolean, filter: AccountFilter, wrappedStates: WrappedResponses, localCachedData: LocalCachedData) {
@@ -2126,11 +2113,11 @@ class Depricated {
         }
       }
 
-      if (this.verboseLogs) this.mainLogger.debug( `tryApplyTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
-      if (this.verboseLogs) this.mainLogger.debug( `tryApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
-      if (this.verboseLogs) this.mainLogger.debug( `tryApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
-      if (this.verboseLogs) this.mainLogger.debug( `tryApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
-      if (this.verboseLogs) this.mainLogger.debug( `tryApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`tryApplyTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
+      if (this.verboseLogs) this.mainLogger.debug(`tryApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`tryApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`tryApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`tryApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
 
       if (repairing !== true) {
         // get a list of modified account keys that we will lock
@@ -2141,9 +2128,9 @@ class Depricated {
         for (let accountID of targetKeys) {
           accountKeys.push(accountID)
         }
-        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair tryApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
+        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair tryApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
         ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(accountKeys)
-        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair tryApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair tryApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
       }
 
       ourLockID = await this.stateManager.fifoLock('accountModification')
@@ -2160,19 +2147,19 @@ class Depricated {
       let { stateTableResults, accountData: _accountdata } = applyResponse
       accountDataList = _accountdata
 
-      if (this.verboseLogs) this.mainLogger.debug( `tryApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`tryApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
       // wrappedStates are side effected for now
       savedSomething = await this.stateManager.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter)
 
-      if (this.verboseLogs) this.mainLogger.debug( `tryApplyTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
-      if (this.verboseLogs) this.mainLogger.debug( `tryApplyTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`tryApplyTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`tryApplyTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
 
       this.stateManager.transactionQueue.applySoftLock = false
       // only write our state table data if we dont already have it in the db
       if (hasStateTableData === false) {
         for (let stateT of stateTableResults) {
           if (this.verboseLogs) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
-          if (this.verboseLogs) this.mainLogger.debug( 'writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
+          if (this.verboseLogs) this.mainLogger.debug('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
         }
         await this.storage.addAccountStates(stateTableResults)
       }
@@ -2200,7 +2187,7 @@ class Depricated {
         if (ourAccountLocks != null) {
           this.stateManager.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
         }
-        if (this.verboseLogs) this.mainLogger.debug( ` _repair tryApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+        if (this.verboseLogs) this.mainLogger.debug(` _repair tryApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
       }
     }
 
@@ -2255,9 +2242,6 @@ class Depricated {
 
     return true
   }
-
-
-
 }
 
 export default Depricated

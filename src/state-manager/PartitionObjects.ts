@@ -33,10 +33,9 @@ class PartitionObjects {
 
   nextCycleReportToSend: PartitionCycleReport
   syncPartitionsStarted: boolean
-  
-  lastCycleReported: number
-  partitionReportDirty:boolean
 
+  lastCycleReported: number
+  partitionReportDirty: boolean
 
   /** partition objects by cycle.  index by cycle counter key to get an array */
   partitionObjectsByCycle: { [cycleKey: string]: PartitionObject[] }
@@ -51,9 +50,9 @@ class PartitionObjects {
   /** Stores the partition responses that other nodes push to us.  Index by cycle key, then index by partition id */
   allPartitionResponsesByCycleByPartition: { [cycleKey: string]: { [partitionKey: string]: PartitionResult[] } }
 
-  resetAndApplyPerPartition:boolean
+  resetAndApplyPerPartition: boolean
 
-  constructor(stateManager: StateManager, verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger,storage: Storage, p2p: P2P,  crypto: Crypto, config: Shardus.ShardusConfiguration) {
+  constructor(stateManager: StateManager, verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     this.verboseLogs = verboseLogs
     this.crypto = crypto
     this.app = app
@@ -63,7 +62,6 @@ class PartitionObjects {
     this.p2p = p2p
     this.storage = storage
     this.stateManager = stateManager
-
 
     this.mainLogger = logger.getLogger('main')
     this.fatalLogger = logger.getLogger('fatal')
@@ -75,9 +73,8 @@ class PartitionObjects {
     this.syncPartitionsStarted = false
 
     this.lastCycleReported = -1
-    
-    this.partitionReportDirty = false
 
+    this.partitionReportDirty = false
 
     this.partitionObjectsByCycle = {}
     this.ourPartitionResultsByCycle = {}
@@ -86,213 +83,203 @@ class PartitionObjects {
     this.txByCycleByPartition = {}
     this.allPartitionResponsesByCycleByPartition = {}
 
-
-
     // the original way this was setup was to reset and apply repair results one partition at a time.
     // this could create issue if we have a TX spanning multiple paritions that are locally owned.
     this.resetAndApplyPerPartition = false
   }
 
-
-
   //  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   //  //////////////////////////////////////////////////          Data Repair                    ///////////////////////////////////////////////////////////
   //  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-  setupHandlers(){
+  setupHandlers() {
     // /post_partition_results (Partition_results)
     //   Partition_results - array of objects with the fields {Partition_id, Cycle_number, Partition_hash, Node_id, Node_sign}
     //   Returns nothing
 
     this.p2p.registerInternal(
-        'post_partition_results',
-        /**
-         * This is how to typedef a callback!
-         * @param {{ partitionResults: PartitionResult[]; Cycle_number: number; }} payload
-         * @param {any} respond TSConversion is it ok to just set respond to any?
-         */
-        async (payload: PosPartitionResults, respond: any) => {
-          // let result = {}
-          // let ourLockID = -1
-          try {
-            // ourLockID = await this.fifoLock('accountModification')
-            // accountData = await this.app.getAccountDataByList(payload.accountIds)
-  
-            // Nodes collect the partition result from peers.
-            // Nodes may receive partition results for partitions they are not covering and will ignore those messages.
-            // Once a node has collected 50% or more peers giving the same partition result it can combine them to create a partition receipt. The node tries to create a partition receipt for all partitions it covers.
-            // If the partition receipt has a different partition hash than the node, the node needs to ask one of the peers with the majority partition hash for the partition object and determine the transactions it has missed.
-            // If the node is not able to create a partition receipt for a partition, the node needs to ask all peers which have a different partition hash for the partition object and determine the transactions it has missed. Only one peer for each different partition hash needs to be queried. Uses the /get_partition_txids API.
-            // If the node has missed some transactions for a partition, the node needs to get these transactions from peers and apply these transactions to affected accounts starting with a known good copy of the account from the end of the last cycle. Uses the /get_transactions_by_list API.
-            // If the node applied missed transactions to a partition, then it creates a new partition object, partition hash and partition result.
-            // After generating new partition results as needed, the node broadcasts the set of partition results to N adjacent peers on each side; where N is the number of  partitions covered by the node.
-            // After receiving new partition results from peers, the node should be able to collect 50% or more peers giving the same partition result and build a partition receipt.
-            // Any partition for which the node could not generate a partition receipt, should be logged as a fatal error.
-            // Nodes save the partition receipt as proof that the transactions they have applied are correct and were also applied by peers.
-  
-            // if (this.verboseLogs) this.mainLogger.debug( ` _repair post_partition_results`)
-  
-            if (!payload) {
-              if (this.verboseLogs) this.mainLogger.error( ` _repair post_partition_results: abort no payload`)
-              return
+      'post_partition_results',
+      /**
+       * This is how to typedef a callback!
+       * @param {{ partitionResults: PartitionResult[]; Cycle_number: number; }} payload
+       * @param {any} respond TSConversion is it ok to just set respond to any?
+       */
+      async (payload: PosPartitionResults, respond: any) => {
+        // let result = {}
+        // let ourLockID = -1
+        try {
+          // ourLockID = await this.fifoLock('accountModification')
+          // accountData = await this.app.getAccountDataByList(payload.accountIds)
+
+          // Nodes collect the partition result from peers.
+          // Nodes may receive partition results for partitions they are not covering and will ignore those messages.
+          // Once a node has collected 50% or more peers giving the same partition result it can combine them to create a partition receipt. The node tries to create a partition receipt for all partitions it covers.
+          // If the partition receipt has a different partition hash than the node, the node needs to ask one of the peers with the majority partition hash for the partition object and determine the transactions it has missed.
+          // If the node is not able to create a partition receipt for a partition, the node needs to ask all peers which have a different partition hash for the partition object and determine the transactions it has missed. Only one peer for each different partition hash needs to be queried. Uses the /get_partition_txids API.
+          // If the node has missed some transactions for a partition, the node needs to get these transactions from peers and apply these transactions to affected accounts starting with a known good copy of the account from the end of the last cycle. Uses the /get_transactions_by_list API.
+          // If the node applied missed transactions to a partition, then it creates a new partition object, partition hash and partition result.
+          // After generating new partition results as needed, the node broadcasts the set of partition results to N adjacent peers on each side; where N is the number of  partitions covered by the node.
+          // After receiving new partition results from peers, the node should be able to collect 50% or more peers giving the same partition result and build a partition receipt.
+          // Any partition for which the node could not generate a partition receipt, should be logged as a fatal error.
+          // Nodes save the partition receipt as proof that the transactions they have applied are correct and were also applied by peers.
+
+          // if (this.verboseLogs) this.mainLogger.debug( ` _repair post_partition_results`)
+
+          if (!payload) {
+            if (this.verboseLogs) this.mainLogger.error(` _repair post_partition_results: abort no payload`)
+            return
+          }
+
+          let partitionResults = payload.partitionResults
+          let cycleKey = 'c' + payload.Cycle_number
+
+          let allResponsesByPartition = this.allPartitionResponsesByCycleByPartition[cycleKey]
+          if (!allResponsesByPartition) {
+            allResponsesByPartition = {}
+            this.allPartitionResponsesByCycleByPartition[cycleKey] = allResponsesByPartition
+          }
+          let ourPartitionResults = this.ourPartitionResultsByCycle[cycleKey]
+
+          if (!payload.partitionResults) {
+            if (this.verboseLogs) this.mainLogger.error(` _repair post_partition_results: abort, partitionResults == null`)
+            return
+          }
+
+          if (payload.partitionResults.length === 0) {
+            if (this.verboseLogs) this.mainLogger.error(` _repair post_partition_results: abort, partitionResults.length == 0`)
+            return
+          }
+
+          if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair post_partition_results payload: ${utils.stringifyReduce(payload)}`)
+
+          if (!payload.partitionResults[0].sign) {
+            // TODO security need to check that this is signed by a valid and correct node
+            if (this.verboseLogs) this.mainLogger.error(` _repair post_partition_results: abort, no sign object on partition`)
+            return
+          }
+
+          let owner = payload.partitionResults[0].sign.owner
+          // merge results from this message into our colleciton of allResponses
+          for (let partitionResult of partitionResults) {
+            let partitionKey1 = 'p' + partitionResult.Partition_id
+            let responses = allResponsesByPartition[partitionKey1]
+            if (!responses) {
+              responses = []
+              allResponsesByPartition[partitionKey1] = responses
             }
-  
-            let partitionResults = payload.partitionResults
-            let cycleKey = 'c' + payload.Cycle_number
-  
-            let allResponsesByPartition = this.allPartitionResponsesByCycleByPartition[cycleKey]
-            if (!allResponsesByPartition) {
-              allResponsesByPartition = {}
-              this.allPartitionResponsesByCycleByPartition[cycleKey] = allResponsesByPartition
+            // clean out an older response from same node if on exists
+            responses = responses.filter((item) => item.sign == null || item.sign.owner !== owner)
+            allResponsesByPartition[partitionKey1] = responses // have to re-assign this since it is a new ref to the array
+
+            // add the result ot the list of responses
+            if (partitionResult) {
+              responses.push(partitionResult)
+            } else {
+              if (this.verboseLogs) this.mainLogger.error(` _repair post_partition_results partitionResult missing`)
             }
-            let ourPartitionResults = this.ourPartitionResultsByCycle[cycleKey]
-  
-            if (!payload.partitionResults) {
-              if (this.verboseLogs) this.mainLogger.error( ` _repair post_partition_results: abort, partitionResults == null`)
-              return
-            }
-  
-            if (payload.partitionResults.length === 0) {
-              if (this.verboseLogs) this.mainLogger.error( ` _repair post_partition_results: abort, partitionResults.length == 0`)
-              return
-            }
-  
-            if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair post_partition_results payload: ${utils.stringifyReduce(payload)}`)
-  
-            if (!payload.partitionResults[0].sign) {
-              // TODO security need to check that this is signed by a valid and correct node
-              if (this.verboseLogs) this.mainLogger.error( ` _repair post_partition_results: abort, no sign object on partition`)
-              return
-            }
-  
-            let owner = payload.partitionResults[0].sign.owner
-            // merge results from this message into our colleciton of allResponses
-            for (let partitionResult of partitionResults) {
-              let partitionKey1 = 'p' + partitionResult.Partition_id
-              let responses = allResponsesByPartition[partitionKey1]
-              if (!responses) {
-                responses = []
-                allResponsesByPartition[partitionKey1] = responses
-              }
-              // clean out an older response from same node if on exists
-              responses = responses.filter((item) => item.sign == null || item.sign.owner !== owner)
-              allResponsesByPartition[partitionKey1] = responses // have to re-assign this since it is a new ref to the array
-  
-              // add the result ot the list of responses
-              if (partitionResult) {
-                responses.push(partitionResult)
-              } else {
-                if (this.verboseLogs) this.mainLogger.error( ` _repair post_partition_results partitionResult missing`)
-              }
-              if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair post_partition_results partition: ${partitionResult.Partition_id} responses.length ${responses.length}  cycle:${payload.Cycle_number}`)
-            }
-  
-            var partitionKeys = Object.keys(allResponsesByPartition)
-            if (this.verboseLogs) this.mainLogger.debug( ` _repair post_partition_results partitionKeys: ${partitionKeys.length}`)
-  
-            // Loop through all the partition keys and check our progress for each partition covered
-            // todo perf consider only looping through keys of partitions that changed from this update?
-            for (let partitionKey of partitionKeys) {
-              let responses = allResponsesByPartition[partitionKey]
-              // if enough data, and our response is prepped.
-              let repairTracker
-              let partitionId = null // todo sharding ? need to deal with more that one partition response here!!
-              if (responses.length > 0) {
-                partitionId = responses[0].Partition_id
-                repairTracker = this.stateManager.depricated._getRepairTrackerForCycle(payload.Cycle_number, partitionId)
-                if (repairTracker.busy && repairTracker.awaitWinningHash === false) {
-                  if (this.verboseLogs) this.mainLogger.debug( ` _repair post_partition_results tracker busy. ${partitionKey} responses: ${responses.length}.  ${utils.stringifyReduce(repairTracker)}`)
-                  continue
-                }
-                if (repairTracker.repairsFullyComplete) {
-                  if (this.verboseLogs) this.mainLogger.debug( ` _repair post_partition_results repairsFullyComplete = true  cycle:${payload.Cycle_number}`)
-                  continue
-                }
-              } else {
-                if (this.verboseLogs) this.mainLogger.debug( ` _repair post_partition_results no responses. ${partitionKey} responses: ${responses.length}. repairTracker: ${utils.stringifyReduce(repairTracker)} responsesById: ${utils.stringifyReduce(allResponsesByPartition)}`)
+            if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair post_partition_results partition: ${partitionResult.Partition_id} responses.length ${responses.length}  cycle:${payload.Cycle_number}`)
+          }
+
+          var partitionKeys = Object.keys(allResponsesByPartition)
+          if (this.verboseLogs) this.mainLogger.debug(` _repair post_partition_results partitionKeys: ${partitionKeys.length}`)
+
+          // Loop through all the partition keys and check our progress for each partition covered
+          // todo perf consider only looping through keys of partitions that changed from this update?
+          for (let partitionKey of partitionKeys) {
+            let responses = allResponsesByPartition[partitionKey]
+            // if enough data, and our response is prepped.
+            let repairTracker
+            let partitionId = null // todo sharding ? need to deal with more that one partition response here!!
+            if (responses.length > 0) {
+              partitionId = responses[0].Partition_id
+              repairTracker = this.stateManager.depricated._getRepairTrackerForCycle(payload.Cycle_number, partitionId)
+              if (repairTracker.busy && repairTracker.awaitWinningHash === false) {
+                if (this.verboseLogs) this.mainLogger.debug(` _repair post_partition_results tracker busy. ${partitionKey} responses: ${responses.length}.  ${utils.stringifyReduce(repairTracker)}`)
                 continue
               }
-  
-              let responsesRequired = 3
-              if (this.stateManager.useHashSets) {
-                responsesRequired = Math.min(1 + Math.ceil(repairTracker.numNodes * 0.9), repairTracker.numNodes - 1) // get responses from 90% of the node we have sent to
+              if (repairTracker.repairsFullyComplete) {
+                if (this.verboseLogs) this.mainLogger.debug(` _repair post_partition_results repairsFullyComplete = true  cycle:${payload.Cycle_number}`)
+                continue
               }
-              // are there enough responses to try generating a receipt?
-              if (responses.length >= responsesRequired && (repairTracker.evaluationStarted === false || repairTracker.awaitWinningHash)) {
-                repairTracker.evaluationStarted = true
-  
-                let ourResult = null
-                if (ourPartitionResults != null) {
-                  for (let obj of ourPartitionResults) {
-                    if (obj.Partition_id === partitionId) {
-                      ourResult = obj
-                      break
-                    }
-                  }
-                }
-                if (ourResult == null) {
-                  if (this.verboseLogs) this.mainLogger.debug( ` _repair post_partition_results our result is not computed yet `)
-                  // Todo repair : may need to sleep or restart this computation later..
-                  return
-                }
-  
-                let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
-                let { partitionReceipt, topResult, success } = receiptResults
-                if (!success) {
-                  if (repairTracker.awaitWinningHash) {
-                    if (topResult == null) {
-                      // if we are awaitWinningHash then wait for a top result before we start repair process again
-                      if (this.verboseLogs) this.mainLogger.debug( ` _repair awaitWinningHash:true but topResult == null so keep waiting `)
-                      continue
-                    } else {
-                      if (this.verboseLogs) this.mainLogger.debug( ` _repair awaitWinningHash:true and we have a top result so start reparing! `)
-                    }
-                  }
-  
-                  if (this.resetAndApplyPerPartition === false && repairTracker.txRepairReady === true) {
-                    if (this.verboseLogs) this.mainLogger.debug( ` _repair txRepairReady:true bail here for some strange reason.. not sure aout this yet `)
-                    continue
-                  }
-  
-                  if (this.verboseLogs) this.mainLogger.debug( ` _repair post_partition_results: tryGeneratePartitionReciept failed start repair process 1 ${utils.stringifyReduce(receiptResults)}`)
-                  let cycle = this.p2p.state.getCycleByCounter(payload.Cycle_number)
-                  await this.startRepairProcess(cycle, topResult, partitionId, ourResult.Partition_hash)
-                } else if (partitionReceipt) {
-                  // if (this.verboseLogs) this.mainLogger.debug( ` _repair post_partition_results: success store partition receipt`)
-                  if (this.verboseLogs) this.mainLogger.debug( ` _repair post_partition_results 3 allFinished, final cycle: ${payload.Cycle_number} hash:${utils.stringifyReduce({ topResult })}`)
-                  // do we ever send partition receipt yet?
-                  this.stateManager.storePartitionReceipt(payload.Cycle_number, partitionReceipt)
-                  this.stateManager.depricated.repairTrackerMarkFinished(repairTracker, 'post_partition_results')
-                }
-              } else {
-                if (this.verboseLogs) this.mainLogger.debug( ` _repair post_partition_results not enough responses awaitWinningHash: ${repairTracker.awaitWinningHash} resp: ${responses.length}. required:${responsesRequired} repairTracker: ${utils.stringifyReduce(repairTracker)}`)
-              }
-              // End of loop over partitions.  Continue looping if there are other partions that we need to check for completion.
+            } else {
+              if (this.verboseLogs) this.mainLogger.debug(` _repair post_partition_results no responses. ${partitionKey} responses: ${responses.length}. repairTracker: ${utils.stringifyReduce(repairTracker)} responsesById: ${utils.stringifyReduce(allResponsesByPartition)}`)
+              continue
             }
-          } finally {
-            // this.fifoUnlock('accountModification', ourLockID)
+
+            let responsesRequired = 3
+            if (this.stateManager.useHashSets) {
+              responsesRequired = Math.min(1 + Math.ceil(repairTracker.numNodes * 0.9), repairTracker.numNodes - 1) // get responses from 90% of the node we have sent to
+            }
+            // are there enough responses to try generating a receipt?
+            if (responses.length >= responsesRequired && (repairTracker.evaluationStarted === false || repairTracker.awaitWinningHash)) {
+              repairTracker.evaluationStarted = true
+
+              let ourResult = null
+              if (ourPartitionResults != null) {
+                for (let obj of ourPartitionResults) {
+                  if (obj.Partition_id === partitionId) {
+                    ourResult = obj
+                    break
+                  }
+                }
+              }
+              if (ourResult == null) {
+                if (this.verboseLogs) this.mainLogger.debug(` _repair post_partition_results our result is not computed yet `)
+                // Todo repair : may need to sleep or restart this computation later..
+                return
+              }
+
+              let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
+              let { partitionReceipt, topResult, success } = receiptResults
+              if (!success) {
+                if (repairTracker.awaitWinningHash) {
+                  if (topResult == null) {
+                    // if we are awaitWinningHash then wait for a top result before we start repair process again
+                    if (this.verboseLogs) this.mainLogger.debug(` _repair awaitWinningHash:true but topResult == null so keep waiting `)
+                    continue
+                  } else {
+                    if (this.verboseLogs) this.mainLogger.debug(` _repair awaitWinningHash:true and we have a top result so start reparing! `)
+                  }
+                }
+
+                if (this.resetAndApplyPerPartition === false && repairTracker.txRepairReady === true) {
+                  if (this.verboseLogs) this.mainLogger.debug(` _repair txRepairReady:true bail here for some strange reason.. not sure aout this yet `)
+                  continue
+                }
+
+                if (this.verboseLogs) this.mainLogger.debug(` _repair post_partition_results: tryGeneratePartitionReciept failed start repair process 1 ${utils.stringifyReduce(receiptResults)}`)
+                let cycle = this.p2p.state.getCycleByCounter(payload.Cycle_number)
+                await this.startRepairProcess(cycle, topResult, partitionId, ourResult.Partition_hash)
+              } else if (partitionReceipt) {
+                // if (this.verboseLogs) this.mainLogger.debug( ` _repair post_partition_results: success store partition receipt`)
+                if (this.verboseLogs) this.mainLogger.debug(` _repair post_partition_results 3 allFinished, final cycle: ${payload.Cycle_number} hash:${utils.stringifyReduce({ topResult })}`)
+                // do we ever send partition receipt yet?
+                this.stateManager.storePartitionReceipt(payload.Cycle_number, partitionReceipt)
+                this.stateManager.depricated.repairTrackerMarkFinished(repairTracker, 'post_partition_results')
+              }
+            } else {
+              if (this.verboseLogs) this.mainLogger.debug(` _repair post_partition_results not enough responses awaitWinningHash: ${repairTracker.awaitWinningHash} resp: ${responses.length}. required:${responsesRequired} repairTracker: ${utils.stringifyReduce(repairTracker)}`)
+            }
+            // End of loop over partitions.  Continue looping if there are other partions that we need to check for completion.
           }
-          // result.accountData = accountData
-          // await respond(result)
+        } finally {
+          // this.fifoUnlock('accountModification', ourLockID)
         }
-      )
-
-
+        // result.accountData = accountData
+        // await respond(result)
+      }
+    )
   }
 
-
-
-
-/***
- *    ########     ###    ########  ######## #### ######## ####  #######  ##    ## ########  ######## ########   #######  ########  ########  ######  
- *    ##     ##   ## ##   ##     ##    ##     ##     ##     ##  ##     ## ###   ## ##     ## ##       ##     ## ##     ## ##     ##    ##    ##    ## 
- *    ##     ##  ##   ##  ##     ##    ##     ##     ##     ##  ##     ## ####  ## ##     ## ##       ##     ## ##     ## ##     ##    ##    ##       
- *    ########  ##     ## ########     ##     ##     ##     ##  ##     ## ## ## ## ########  ######   ########  ##     ## ########     ##     ######  
- *    ##        ######### ##   ##      ##     ##     ##     ##  ##     ## ##  #### ##   ##   ##       ##        ##     ## ##   ##      ##          ## 
- *    ##        ##     ## ##    ##     ##     ##     ##     ##  ##     ## ##   ### ##    ##  ##       ##        ##     ## ##    ##     ##    ##    ## 
- *    ##        ##     ## ##     ##    ##    ####    ##    ####  #######  ##    ## ##     ## ######## ##         #######  ##     ##    ##     ######  
- */
+  /***
+   *    ########     ###    ########  ######## #### ######## ####  #######  ##    ## ########  ######## ########   #######  ########  ########  ######
+   *    ##     ##   ## ##   ##     ##    ##     ##     ##     ##  ##     ## ###   ## ##     ## ##       ##     ## ##     ## ##     ##    ##    ##    ##
+   *    ##     ##  ##   ##  ##     ##    ##     ##     ##     ##  ##     ## ####  ## ##     ## ##       ##     ## ##     ## ##     ##    ##    ##
+   *    ########  ##     ## ########     ##     ##     ##     ##  ##     ## ## ## ## ########  ######   ########  ##     ## ########     ##     ######
+   *    ##        ######### ##   ##      ##     ##     ##     ##  ##     ## ##  #### ##   ##   ##       ##        ##     ## ##   ##      ##          ##
+   *    ##        ##     ## ##    ##     ##     ##     ##     ##  ##     ## ##   ### ##    ##  ##       ##        ##     ## ##    ##     ##    ##    ##
+   *    ##        ##     ## ##     ##    ##    ####    ##    ####  #######  ##    ## ##     ## ######## ##         #######  ##     ##    ##     ######
+   */
 
   /**
    * getPartitionReport used by reporting (monitor server) to query if there is a partition report ready
@@ -443,8 +430,8 @@ class PartitionObjects {
       partitionResult.hashSet = hashSet
     }
 
-    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair partitionObject: ${utils.stringifyReduce(partitionObject)}`)
-    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair generatePartitionResult: ${utils.stringifyReduce(partitionResult)}`)
+    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair partitionObject: ${utils.stringifyReduce(partitionObject)}`)
+    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair generatePartitionResult: ${utils.stringifyReduce(partitionResult)}`)
 
     if (partitionObject.Txids && partitionObject.Txids.length > 0) {
       if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('partitionObject', 'c' + partitionObject.Cycle_number, partitionObject)
@@ -535,19 +522,19 @@ class PartitionObjects {
     // Tried hashes is not working correctly at the moment, it is an unused parameter. I am not even sure we want to ignore hashes
     let { topHash, topCount, topResult } = this.stateManager.depricated.findMostCommonResponse(cycleCounter, partitionId, repairTracker.triedHashes)
 
-    if (this.verboseLogs) this.mainLogger.debug( ` _repair  ${debugKey} tryGeneratePartitoinReciept repairTracker: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
+    if (this.verboseLogs) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept repairTracker: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
 
     let requiredHalf = Math.max(1, allResults.length / 2)
     if (this.stateManager.useHashSets && repairPassHack) {
       // hack force our node to win:
       topCount = requiredHalf
       topHash = ourResult.Partition_hash
-      if (this.verboseLogs) this.mainLogger.debug( ` _repair  ${debugKey} tryGeneratePartitoinReciept hack force win: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
+      if (this.verboseLogs) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept hack force win: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
     }
 
     let resultsList = []
     if (topCount >= requiredHalf) {
-      if (this.verboseLogs) this.mainLogger.debug( ` _repair  ${debugKey} tryGeneratePartitoinReciept: top hash wins: ` + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
+      if (this.verboseLogs) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: top hash wins: ` + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
       for (let partitionResult of allResults) {
         if (partitionResult.Partition_hash === topHash) {
           resultsList.push(partitionResult)
@@ -556,15 +543,15 @@ class PartitionObjects {
     } else {
       if (this.stateManager.useHashSets) {
         // bail in a way that will cause us to use the hashset strings
-        if (this.verboseLogs) this.mainLogger.debug( ` _repair  ${debugKey} tryGeneratePartitoinReciept: did not win, useHashSets: ` + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
+        if (this.verboseLogs) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: did not win, useHashSets: ` + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
         return { partitionReceipt: null, topResult: null, success: false }
       }
-      if (this.verboseLogs) this.mainLogger.debug( ` _repair  ${debugKey} tryGeneratePartitoinReciept: top hash failed: ` + utils.makeShortHash(topHash) + ` ${topCount} / ${requiredHalf}`)
+      if (this.verboseLogs) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: top hash failed: ` + utils.makeShortHash(topHash) + ` ${topCount} / ${requiredHalf}`)
       return { partitionReceipt: null, topResult, success: false }
     }
 
     if (ourResult.Partition_hash !== topHash) {
-      if (this.verboseLogs) this.mainLogger.debug( ` _repair  ${debugKey} tryGeneratePartitoinReciept: our hash does not match: ` + utils.makeShortHash(topHash) + ` our hash: ${ourResult.Partition_hash}`)
+      if (this.verboseLogs) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: our hash does not match: ` + utils.makeShortHash(topHash) + ` our hash: ${ourResult.Partition_hash}`)
       return { partitionReceipt: null, topResult, success: false }
     }
 
@@ -572,12 +559,10 @@ class PartitionObjects {
       resultsList,
     }
 
-    if (this.verboseLogs) this.mainLogger.debug( ` _repair  ${debugKey} tryGeneratePartitoinReciept OK! ${utils.stringifyReduce({ partitionReceipt, topResult })}`)
+    if (this.verboseLogs) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept OK! ${utils.stringifyReduce({ partitionReceipt, topResult })}`)
 
     return { partitionReceipt, topResult, success: true }
   }
-
-
 
   /**
    * startRepairProcess
@@ -632,17 +617,17 @@ class PartitionObjects {
     }
     let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
     let { partitionReceipt: partitionReceipt3, topResult: topResult3, success: success3 } = receiptResults
-    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair checkForGoodPartitionReciept immediate receipt check. ${debugKey} success:${success3} topResult:${utils.stringifyReduce(topResult3)}  partitionReceipt: ${utils.stringifyReduce({ partitionReceipt3 })}`)
+    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair checkForGoodPartitionReciept immediate receipt check. ${debugKey} success:${success3} topResult:${utils.stringifyReduce(topResult3)}  partitionReceipt: ${utils.stringifyReduce({ partitionReceipt3 })}`)
 
     // see if we already have a winning hash to correct to
     if (!success3) {
       if (repairTracker.awaitWinningHash) {
         if (topResult3 == null) {
           // if we are awaitWinningHash then wait for a top result before we start repair process again
-          if (this.verboseLogs) this.mainLogger.debug( ` _repair checkForGoodPartitionReciept awaitWinningHash:true but topResult == null so keep waiting ${debugKey}`)
+          if (this.verboseLogs) this.mainLogger.debug(` _repair checkForGoodPartitionReciept awaitWinningHash:true but topResult == null so keep waiting ${debugKey}`)
         } else {
-          if (this.verboseLogs) this.mainLogger.debug( ` _repair checkForGoodPartitionReciept awaitWinningHash:true and we have a top result so start reparing! ${debugKey}`)
-          if (this.verboseLogs) this.mainLogger.debug( ` _repair checkForGoodPartitionReciept: tryGeneratePartitionReciept failed start repair process 3 ${debugKey} ${utils.stringifyReduce(receiptResults)}`)
+          if (this.verboseLogs) this.mainLogger.debug(` _repair checkForGoodPartitionReciept awaitWinningHash:true and we have a top result so start reparing! ${debugKey}`)
+          if (this.verboseLogs) this.mainLogger.debug(` _repair checkForGoodPartitionReciept: tryGeneratePartitionReciept failed start repair process 3 ${debugKey} ${utils.stringifyReduce(receiptResults)}`)
           let cycle = this.p2p.state.getCycleByCounter(cycleNumber)
           await utils.sleep(1000)
           await this.startRepairProcess(cycle, topResult3, partitionId, ourResult.Partition_hash)
@@ -655,20 +640,16 @@ class PartitionObjects {
       }
       this.stateManager.storePartitionReceipt(cycleNumber, partitionReceipt3)
       this.stateManager.depricated.repairTrackerMarkFinished(repairTracker, 'checkForGoodPartitionReciept')
-      if (this.verboseLogs) this.mainLogger.debug( ` _repair checkForGoodPartitionReciept 2 allFinished, final ${debugKey} hash:${utils.stringifyReduce({ topResult3 })}`)
+      if (this.verboseLogs) this.mainLogger.debug(` _repair checkForGoodPartitionReciept 2 allFinished, final ${debugKey} hash:${utils.stringifyReduce({ topResult3 })}`)
     }
   }
 
   initApoptosisAndQuitSyncing() {
     console.log('initApoptosisAndQuitSyncing ' + utils.getTime('s'))
-    this.mainLogger.error( `initApoptosisAndQuitSyncing `)
+    this.mainLogger.error(`initApoptosisAndQuitSyncing `)
     this.stateManager.accountSync.failAndDontRestartSync()
     this.p2p.initApoptosis()
   }
-
-
-
-
 
   /**
    * tempRecordTXByCycle
@@ -720,7 +701,7 @@ class PartitionObjects {
 
     for (let txRecord of this.tempTXRecords) {
       if (txRecord.redacted > 0) {
-        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair recordTXByCycle: ${utils.makeShortHash(txRecord.acceptedTx.id)} cycle: ${cycle.counter} redacted!!! ${txRecord.redacted}`)
+        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair recordTXByCycle: ${utils.makeShortHash(txRecord.acceptedTx.id)} cycle: ${cycle.counter} redacted!!! ${txRecord.redacted}`)
         continue
       }
       if (txRecord.txTS < cycleEnd) {
@@ -749,7 +730,7 @@ class PartitionObjects {
       txList.processed = true
     }
 
-    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair processTempTXs txsRecorded: ${txsRecorded} txsTemp: ${txsTemp} `)
+    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair processTempTXs txsRecorded: ${txsRecorded} txsTemp: ${txsTemp} `)
   }
 
   // TODO sharding  done! need to split this out by partition
@@ -775,8 +756,6 @@ class PartitionObjects {
     }
     return txList
   }
-
-
 
   // take this tx and create if needed and object for the current cylce that holds a list of passed and failed TXs
   /**
@@ -816,7 +795,7 @@ class PartitionObjects {
     }
 
     if (isGlobalModifyingTX) {
-      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( `recordTXByCycle:  ignore loggging globalTX ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  ignore loggging globalTX ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
       return
     }
 
@@ -851,10 +830,10 @@ class PartitionObjects {
     }
 
     if (storedNonGlobal === 0 && storedGlobal === 0) {
-      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( `recordTXByCycle: nothing to save globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: nothing to save globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
       return
     }
-    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( `recordTXByCycle: globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal}  tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+    if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal}  tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
 
     for (let accountKey of allKeys) {
       /** @type {NodeShardData} */
@@ -869,19 +848,19 @@ class PartitionObjects {
       let key = 'p' + partitionID
 
       if (this.stateManager.accountGlobals.isGlobalAccount(accountKey)) {
-        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( `recordTXByCycle:  skip partition. dont save due to global: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition. dont save due to global: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
         continue
       }
 
       let weStoreThisParition = ShardFunctions.testInRange(partitionID, lastCycleShardValues.nodeShardData.storedPartitions)
       if (weStoreThisParition === false) {
-        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( `recordTXByCycle:  skip partition we dont save: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition we dont save: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
 
         continue
       }
 
       if (partitionHasNonGlobal[key] === false) {
-        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( `recordTXByCycle:  skip partition. we store it but only a global ref involved this time: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition. we store it but only a global ref involved this time: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
 
         continue
       }
@@ -895,7 +874,7 @@ class PartitionObjects {
       }
 
       if (seenParitions[key] != null) {
-        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( `recordTXByCycle: seenParitions[key] != null P: ${partitionID}  homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
+        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: seenParitions[key] != null P: ${partitionID}  homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
         // skip because this partition already has this TX!
         continue
       }
@@ -943,11 +922,9 @@ class PartitionObjects {
       }
       // txList.txById[acceptedTx.id] = acceptedTx
       // TODO sharding perf.  need to add some periodic cleanup when we have more cycles than needed stored in this map!!!
-      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair recordTXByCycle: pushedData P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} recordedState: ${recordedState}`)
+      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair recordTXByCycle: pushedData P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} recordedState: ${recordedState}`)
     }
   }
-
-
 
   /**
    * updatePartitionReport
@@ -1052,7 +1029,7 @@ class PartitionObjects {
    * @param {number} cycleNumber
    */
   async broadcastPartitionResults(cycleNumber: number) {
-    if (this.verboseLogs) this.mainLogger.debug( ` _repair broadcastPartitionResults for cycle: ${cycleNumber}`)
+    if (this.verboseLogs) this.mainLogger.debug(` _repair broadcastPartitionResults for cycle: ${cycleNumber}`)
     // per partition need to figure out which node cover it.
     // then get a list of all the results we need to send to a given node and send them at once.
     // need a way to do this in semi parallel?
@@ -1126,8 +1103,8 @@ class PartitionObjects {
       }
       let partitionResultsToSend = partitionResultsByNodeID.get(nodeId)
       let payload = { Cycle_number: cycleNumber, partitionResults: partitionResultsToSend.results }
-      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair broadcastPartitionResults to ${nodeId} debugStr: ${partitionResultsToSend.debugStr} res: ${utils.stringifyReduce(payload)}`)
-      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair broadcastPartitionResults to ${nodeId} debugStr: ${partitionResultsToSend.debugStr} res: ${utils.stringifyReduce(payload)}`)
+      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair broadcastPartitionResults to ${nodeId} debugStr: ${partitionResultsToSend.debugStr} res: ${utils.stringifyReduce(payload)}`)
+      if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair broadcastPartitionResults to ${nodeId} debugStr: ${partitionResultsToSend.debugStr} res: ${utils.stringifyReduce(payload)}`)
 
       let shorthash = utils.makeShortHash(partitionResultsToSend.node.id)
       let toNodeStr = shorthash + ':' + partitionResultsToSend.node.externalPort
@@ -1146,8 +1123,6 @@ class PartitionObjects {
 
     await Promise.all(promises)
   }
-
-
 }
 
 export default PartitionObjects

@@ -8,7 +8,13 @@ singleQuote: true
 # when they are spread from one line to 5+ vertical lines.  only way to get around this for now is with
 # printd witdth but maybe I can find some other solution.
 overrides:
-  - files: "index.ts"
+  - files:
+    - "index.ts"
+    - "Depricated.ts"
+    - "PartitionObjects.ts"
+    - "TransactionQueue.ts"
+    - "TransactionRepair.ts"
+    - "TransactionConsensus.ts"
     options:
         printWidth: 600
 

@@ -46,23 +46,21 @@ import TransactionConsenus from './TransactionConsensus'
 import PartitionObjects from './PartitionObjects'
 import Depricated from './Depricated'
 
-
 /**
  * WrappedEventEmitter just a default extended WrappedEventEmitter
  * using EventEmitter was causing issues?
  */
 class WrappedEventEmitter extends EventEmitter {
-  constructor(){
+  constructor() {
     super()
   }
 }
-
 
 /**
  * StateManager
  */
 class StateManager {
-//  class StateManager {
+  //  class StateManager {
 
   app: Shardus.App
   storage: Storage
@@ -83,7 +81,7 @@ class StateManager {
   partitionStats: PartitionStats
   accountCache: AccountCache
   accountSync: AccountSync
-  accountGlobals: AccountGlobals  
+  accountGlobals: AccountGlobals
   transactionQueue: TransactionQueue
   transactionRepair: TransactionRepair
   transactionConsensus: TransactionConsenus
@@ -95,12 +93,9 @@ class StateManager {
   currentCycleShardData: CycleShardData | null
   globalAccountsSynced: boolean
 
-
-
   dataRepairsCompleted: number
   dataRepairsStarted: number
   useStoredPartitionsForReport: boolean
-
 
   partitionReceiptsByCycleCounter: { [cycleKey: string]: PartitionReceipt[] } //Object.<string, PartitionReceipt[]> // a map of cycle keys to lists of partition receipts.
   ourPartitionReceiptsByCycleCounter: { [cycleKey: string]: PartitionReceipt } //Object.<string, PartitionReceipt> //a map of cycle keys to lists of partition receipts.
@@ -146,9 +141,9 @@ class StateManager {
 
   logger: Logger
 
-  extendedRepairLogging:boolean
+  extendedRepairLogging: boolean
 
-  canDataRepair:boolean // the old repair.. todo depricate further.
+  canDataRepair: boolean // the old repair.. todo depricate further.
   lastActiveNodeCount: number
 
   doDataCleanup: boolean
@@ -162,15 +157,15 @@ class StateManager {
 
   sleepInterrupt: any // see interruptibleSleep.  todo type this, or clean out
 
-/***
- *     ######   #######  ##    ##  ######  ######## ########  ##     ##  ######  ########  #######  ########  
- *    ##    ## ##     ## ###   ## ##    ##    ##    ##     ## ##     ## ##    ##    ##    ##     ## ##     ## 
- *    ##       ##     ## ####  ## ##          ##    ##     ## ##     ## ##          ##    ##     ## ##     ## 
- *    ##       ##     ## ## ## ##  ######     ##    ########  ##     ## ##          ##    ##     ## ########  
- *    ##       ##     ## ##  ####       ##    ##    ##   ##   ##     ## ##          ##    ##     ## ##   ##   
- *    ##    ## ##     ## ##   ### ##    ##    ##    ##    ##  ##     ## ##    ##    ##    ##     ## ##    ##  
- *     ######   #######  ##    ##  ######     ##    ##     ##  #######   ######     ##     #######  ##     ## 
- */
+  /***
+   *     ######   #######  ##    ##  ######  ######## ########  ##     ##  ######  ########  #######  ########
+   *    ##    ## ##     ## ###   ## ##    ##    ##    ##     ## ##     ## ##    ##    ##    ##     ## ##     ##
+   *    ##       ##     ## ####  ## ##          ##    ##     ## ##     ## ##          ##    ##     ## ##     ##
+   *    ##       ##     ## ## ## ##  ######     ##    ########  ##     ## ##          ##    ##     ## ########
+   *    ##       ##     ## ##  ####       ##    ##    ##   ##   ##     ## ##          ##    ##     ## ##   ##
+   *    ##    ## ##     ## ##   ### ##    ##    ##    ##    ##  ##     ## ##    ##    ##    ##     ## ##    ##
+   *     ######   #######  ##    ##  ######     ##    ##     ##  #######   ######     ##     #######  ##     ##
+   */
   constructor(verboseLogs: boolean, profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     //super()
     this.verboseLogs = verboseLogs
@@ -183,7 +178,6 @@ class StateManager {
     this.logger = logger
     this.config = config
     this.profiler = profiler
-
 
     this.eventEmitter = new WrappedEventEmitter()
 
@@ -207,7 +201,7 @@ class StateManager {
     this.lastActiveNodeCount = 0
 
     this.extendedRepairLogging = true
-  
+
     this.shardValuesByCycle = new Map()
     this.currentCycleShardData = null as CycleShardData | null
     // this.syncTrackerIndex = 1 // increments up for each new sync tracker we create gets maped to calls.
@@ -216,9 +210,8 @@ class StateManager {
 
     this.sleepInterrupt = undefined
 
-
     this.configsInit()
-    
+
     //INIT our various modules
 
     this.accountCache = new AccountCache(verboseLogs, profiler, app, logger, crypto, config)
@@ -235,7 +228,6 @@ class StateManager {
     this.transactionConsensus = new TransactionConsenus(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
     this.partitionObjects = new PartitionObjects(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
     this.depricated = new Depricated(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
-
 
     // feature controls.
     this.oldFeature_TXHashsetTest = true
@@ -265,10 +257,6 @@ class StateManager {
       this.debugFeature_dumpAccountDataFromSQL = this.tryGetBoolProperty(this.config.debug, 'dumpAccountReportFromSQL', this.debugFeature_dumpAccountDataFromSQL)
     }
 
-
-    
-
- 
     /** @type {number} */
     this.dataRepairsCompleted = 0
     /** @type {number} */
@@ -283,9 +271,6 @@ class StateManager {
 
     //Fifo locks.
     this.fifoLocks = {}
-
-
-
 
     this.debugTXHistory = {}
 
@@ -313,11 +298,11 @@ class StateManager {
     }
 
     this.startShardCalculations()
-    
+
     if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('canDataRepair', `0`, `canDataRepair: ${this.canDataRepair}  `)
   }
 
-  configsInit(){
+  configsInit() {
     this.canDataRepair = false
     // this controls the repair portion of data repair.
     if (this.config && this.config.debug) {
@@ -374,12 +359,7 @@ class StateManager {
         this.voteFlipChance = 0
       }
     }
-
-
   }
-
-
-
 
   // TEMP hack emit events through p2p
   // had issues with composition
@@ -388,17 +368,15 @@ class StateManager {
 
   // }
 
-
-
-/***
- *     ######  ##     ##    ###    ########  ########         ######     ###    ##        ######   ######  
- *    ##    ## ##     ##   ## ##   ##     ## ##     ##       ##    ##   ## ##   ##       ##    ## ##    ## 
- *    ##       ##     ##  ##   ##  ##     ## ##     ##       ##        ##   ##  ##       ##       ##       
- *     ######  ######### ##     ## ########  ##     ##       ##       ##     ## ##       ##        ######  
- *          ## ##     ## ######### ##   ##   ##     ##       ##       ######### ##       ##             ## 
- *    ##    ## ##     ## ##     ## ##    ##  ##     ##       ##    ## ##     ## ##       ##    ## ##    ## 
- *     ######  ##     ## ##     ## ##     ## ########         ######  ##     ## ########  ######   ######  
- */
+  /***
+   *     ######  ##     ##    ###    ########  ########         ######     ###    ##        ######   ######
+   *    ##    ## ##     ##   ## ##   ##     ## ##     ##       ##    ##   ## ##   ##       ##    ## ##    ##
+   *    ##       ##     ##  ##   ##  ##     ## ##     ##       ##        ##   ##  ##       ##       ##
+   *     ######  ######### ##     ## ########  ##     ##       ##       ##     ## ##       ##        ######
+   *          ## ##     ## ######### ##   ##   ##     ##       ##       ######### ##       ##             ##
+   *    ##    ## ##     ## ##     ## ##    ##  ##     ##       ##    ## ##     ## ##       ##    ## ##    ##
+   *     ######  ##     ## ##     ## ##     ## ########         ######  ##     ## ########  ######   ######
+   */
   // This is called once per cycle to update to calculate the necessary shard values.
   updateShardValues(cycleNumber: number) {
     if (this.currentCycleShardData == null) {
@@ -514,7 +492,6 @@ class StateManager {
     // this will be a huge log.
     // Temp disable for log size
     // if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${cycleNumber} data: ${utils.stringifyReduce(cycleShardData)}`)
-
 
     this.lastActiveNodeCount = cycleShardData.activeNodes.length
 
@@ -651,7 +628,6 @@ class StateManager {
     }
     return defaultValue
   }
-
 
   testFailChance(failChance: number, debugName: string, key: string, message: string, verboseRequired: boolean): boolean {
     if (failChance == null) {
@@ -792,7 +768,7 @@ class StateManager {
       }
       accountCopies.push(accountCopy)
     }
-    if (this.verboseLogs) this.mainLogger.debug( 'writeCombinedAccountDataToBackups ' + accountCopies.length + ' ' + utils.stringifyReduce(accountCopies))
+    if (this.verboseLogs) this.mainLogger.debug('writeCombinedAccountDataToBackups ' + accountCopies.length + ' ' + utils.stringifyReduce(accountCopies))
 
     if (this.verboseLogs) console.log('DBG accountCopies.  (in main log)')
 
@@ -924,8 +900,6 @@ class StateManager {
       this._unregisterListener(event)
     }
   }
-
-
 
   registerEndpoints() {
     // alternatively we would need to query for accepted tx.
@@ -1073,8 +1047,6 @@ class StateManager {
       result.accountData = accountData
       await respond(result)
     })
-
-
 
     // /get_transactions_by_list (Tx_ids)
     //   Tx_ids - array of transaction ids
@@ -1571,17 +1543,15 @@ class StateManager {
   // //////////////////////////   END Old sync check     //////////////////////////
   // //////////////////////////////////////////////////////////////////////////
 
-
-
-/***
- *     ######   #######  ########  ######## 
- *    ##    ## ##     ## ##     ## ##       
- *    ##       ##     ## ##     ## ##       
- *    ##       ##     ## ########  ######   
- *    ##       ##     ## ##   ##   ##       
- *    ##    ## ##     ## ##    ##  ##       
- *     ######   #######  ##     ## ######## 
- */
+  /***
+   *     ######   #######  ########  ########
+   *    ##    ## ##     ## ##     ## ##
+   *    ##       ##     ## ##     ## ##
+   *    ##       ##     ## ########  ######
+   *    ##       ##     ## ##   ##   ##
+   *    ##    ## ##     ## ##    ##  ##
+   *     ######   #######  ##     ## ########
+   */
 
   tryStartAcceptedQueue() {
     if (!this.accountSync.dataSyncMainPhaseComplete) {
@@ -2128,7 +2098,6 @@ class StateManager {
     this.transactionQueue.newAcceptedTxQueue = []
   }
 
-
   async cleanup() {
     this._stopQueue()
     this._unregisterEndpoints()
@@ -2141,15 +2110,15 @@ class StateManager {
     return this.stateIsGood
   }
 
-/***
- *     ######  ######## ########          ###     ######   ######   #######  ##     ## ##    ## ######## 
- *    ##    ## ##          ##            ## ##   ##    ## ##    ## ##     ## ##     ## ###   ##    ##    
- *    ##       ##          ##           ##   ##  ##       ##       ##     ## ##     ## ####  ##    ##    
- *     ######  ######      ##          ##     ## ##       ##       ##     ## ##     ## ## ## ##    ##    
- *          ## ##          ##          ######### ##       ##       ##     ## ##     ## ##  ####    ##    
- *    ##    ## ##          ##          ##     ## ##    ## ##    ## ##     ## ##     ## ##   ###    ##    
- *     ######  ########    ##          ##     ##  ######   ######   #######   #######  ##    ##    ##    
- */
+  /***
+   *     ######  ######## ########          ###     ######   ######   #######  ##     ## ##    ## ########
+   *    ##    ## ##          ##            ## ##   ##    ## ##    ## ##     ## ##     ## ###   ##    ##
+   *    ##       ##          ##           ##   ##  ##       ##       ##     ## ##     ## ####  ##    ##
+   *     ######  ######      ##          ##     ## ##       ##       ##     ## ##     ## ## ## ##    ##
+   *          ## ##          ##          ######### ##       ##       ##     ## ##     ## ##  ####    ##
+   *    ##    ## ##          ##          ##     ## ##    ## ##    ## ##     ## ##     ## ##   ###    ##
+   *     ######  ########    ##          ##     ##  ######   ######   #######   #######  ##    ##    ##
+   */
 
   // TODO WrappedStates
   async setAccount(wrappedStates: WrappedResponses, localCachedData: LocalCachedData, applyResponse: Shardus.ApplyResponse, isGlobalModifyingTX: boolean, accountFilter?: AccountFilter) {
@@ -2170,12 +2139,12 @@ class StateManager {
       let wrappedData = wrappedStates[key]
       if (wrappedData == null) {
         // TSConversion todo: harden this. throw exception?
-        if (this.verboseLogs) this.mainLogger.debug( `setAccount wrappedData == null :${utils.makeShortHash(wrappedData.accountId)}`)
+        if (this.verboseLogs) this.mainLogger.debug(`setAccount wrappedData == null :${utils.makeShortHash(wrappedData.accountId)}`)
         continue
       }
 
       if (canWriteToAccount(wrappedData.accountId) === false) {
-        if (this.verboseLogs) this.mainLogger.debug( `setAccount canWriteToAccount == false :${utils.makeShortHash(wrappedData.accountId)}`)
+        if (this.verboseLogs) this.mainLogger.debug(`setAccount canWriteToAccount == false :${utils.makeShortHash(wrappedData.accountId)}`)
         continue
       }
 
@@ -2191,7 +2160,7 @@ class StateManager {
         if (this.verboseLogs) this.mainLogger.debug('setAccount: writing global account: ' + utils.makeShortHash(key))
       }
 
-      if (this.verboseLogs) this.mainLogger.debug( `setAccount partial:${wrappedData.isPartial} key:${utils.makeShortHash(key)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`setAccount partial:${wrappedData.isPartial} key:${utils.makeShortHash(key)}`)
       if (wrappedData.isPartial) {
         await this.app.updateAccountPartial(wrappedData, localCachedData[key], applyResponse)
       } else {
@@ -2202,7 +2171,6 @@ class StateManager {
 
     return savedSomething
   }
-
 
   /**
    * updateAccountsCopyTable
@@ -2230,7 +2198,7 @@ class StateManager {
     let cycleStart = (cycle.start + cycle.duration * cycleOffset) * 1000
     let cycleEnd = (cycle.start + cycle.duration * (cycleOffset + 1)) * 1000
     if (txTimestamp + this.syncSettleTime < cycleStart) {
-      if (this.verboseLogs) this.mainLogger.error( `updateAccountsCopyTable time error< ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+      if (this.verboseLogs) this.mainLogger.error(`updateAccountsCopyTable time error< ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
     }
     if (txTimestamp + this.syncSettleTime >= cycleEnd) {
       // if (this.verboseLogs) this.mainLogger.error( `updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
@@ -2239,17 +2207,17 @@ class StateManager {
       cycleStart = (cycle.start + cycle.duration * cycleOffset) * 1000
       cycleEnd = (cycle.start + cycle.duration * (cycleOffset + 1)) * 1000
       if (txTimestamp + this.syncSettleTime >= cycleEnd) {
-        if (this.verboseLogs) this.mainLogger.error( `updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+        if (this.verboseLogs) this.mainLogger.error(`updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
       }
     }
     // TSConversion need to sort out account types!!!
     // @ts-ignore This has seemed fine in past so not going to sort out a type discrepencie here.  !== would detect and log it anyhow.
     if (accountDataList.length > 0 && accountDataList[0].timestamp !== txTimestamp) {
-      if (this.verboseLogs) this.mainLogger.error( `updateAccountsCopyTable timestamps do match txts:${txTimestamp} acc.ts:${accountDataList[0].timestamp} `)
+      if (this.verboseLogs) this.mainLogger.error(`updateAccountsCopyTable timestamps do match txts:${txTimestamp} acc.ts:${accountDataList[0].timestamp} `)
     }
     if (accountDataList.length === 0) {
       // need to decide if this matters!
-      if (this.verboseLogs) this.mainLogger.error( `updateAccountsCopyTable empty txts:${txTimestamp}  `)
+      if (this.verboseLogs) this.mainLogger.error(`updateAccountsCopyTable empty txts:${txTimestamp}  `)
     }
     // if (this.verboseLogs) this.mainLogger.debug( `updateAccountsCopyTable acc.timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle computed:${cycleNumber} `)
 
@@ -2259,7 +2227,7 @@ class StateManager {
 
       let backupObj: Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
 
-      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug( `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+      if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(`updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
 
       // todo perf. batching?
       // if (this.verboseLogs) this.mainLogger.debug( 'updateAccountsCopyTableA ' + JSON.stringify(accountEntry))
@@ -2280,7 +2248,7 @@ class StateManager {
         if (globalBackupList != null) {
           globalBackupList.push(backupObj) // sort and cleanup later.
 
-          if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug( `updateAccountsCopyTable added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+          if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(`updateAccountsCopyTable added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
         }
       }
 
@@ -2288,7 +2256,6 @@ class StateManager {
       await this.storage.createOrReplaceAccountCopy(backupObj)
     }
   }
-
 
   /**
    * _commitAccountCopies
@@ -2306,10 +2273,10 @@ class StateManager {
         }
 
         if (accountData == null || accountData.data == null || accountData.accountId == null) {
-          if (this.verboseLogs) this.mainLogger.error( ` _commitAccountCopies null account data found: ${accountData.accountId} data: ${utils.stringifyReduce(accountData)}`)
+          if (this.verboseLogs) this.mainLogger.error(` _commitAccountCopies null account data found: ${accountData.accountId} data: ${utils.stringifyReduce(accountData)}`)
           continue
         } else {
-          if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug( ` _commitAccountCopies: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} data: ${utils.stringifyReduce(accountData)}`)
+          if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(` _commitAccountCopies: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} data: ${utils.stringifyReduce(accountData)}`)
         }
       }
       // tell the app to replace the account data
@@ -2341,7 +2308,7 @@ class StateManager {
 
         let backupObj: Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
 
-        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug( `_commitAccountCopies acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+        if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(`_commitAccountCopies acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
 
         // If the account is global ad it to the global backup list
         if (globalAccountKeyMap[accountId] === true) {
@@ -2356,7 +2323,7 @@ class StateManager {
           let globalBackupList: Shardus.AccountsCopy[] = this.accountGlobals.getGlobalAccountBackupList(accountId)
           if (globalBackupList != null) {
             globalBackupList.push(backupObj) // sort and cleanup later
-            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug( `_commitAccountCopies added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+            if (this.verboseLogs && this.extendedRepairLogging) this.mainLogger.debug(`_commitAccountCopies added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
           } else {
             this.mainLogger.error(`_commitAccountCopies no global backup list found for accountId:${utils.makeShortHash(accountId)}`)
           }
@@ -2367,17 +2334,16 @@ class StateManager {
     }
   }
 
-
   /// /////////////////////////////////////////////////////////
-/***
- *    ######## #### ########  #######           ##        #######   ######  ##    ##  ######  
- *    ##        ##  ##       ##     ##          ##       ##     ## ##    ## ##   ##  ##    ## 
- *    ##        ##  ##       ##     ##          ##       ##     ## ##       ##  ##   ##       
- *    ######    ##  ######   ##     ##          ##       ##     ## ##       #####     ######  
- *    ##        ##  ##       ##     ##          ##       ##     ## ##       ##  ##         ## 
- *    ##        ##  ##       ##     ##          ##       ##     ## ##    ## ##   ##  ##    ## 
- *    ##       #### ##        #######           ########  #######   ######  ##    ##  ######  
- */
+  /***
+   *    ######## #### ########  #######           ##        #######   ######  ##    ##  ######
+   *    ##        ##  ##       ##     ##          ##       ##     ## ##    ## ##   ##  ##    ##
+   *    ##        ##  ##       ##     ##          ##       ##     ## ##       ##  ##   ##
+   *    ######    ##  ######   ##     ##          ##       ##     ## ##       #####     ######
+   *    ##        ##  ##       ##     ##          ##       ##     ## ##       ##  ##         ##
+   *    ##        ##  ##       ##     ##          ##       ##     ## ##    ## ##   ##  ##    ##
+   *    ##       #### ##        #######           ########  #######   ######  ##    ##  ######
+   */
   clearPartitionData() {
     this.fifoLocks = {}
   }
@@ -2478,8 +2444,6 @@ class StateManager {
       this.fifoUnlock(accountID, ourLockID)
     }
   }
-
-
 
   /***
    *     ######  ##       ########    ###    ##    ## ##     ## ########
@@ -2689,8 +2653,6 @@ class StateManager {
     // could do this in two steps
   }
 
-
-
   /***
    *     #######     ##                  #######   #######     ##     ##    ###    ##    ## ########  ##       ######## ########   ######
    *    ##     ##  ####                 ##     ## ##     ##    ##     ##   ## ##   ###   ## ##     ## ##       ##       ##     ## ##    ##
@@ -2766,7 +2728,7 @@ class StateManager {
         }
 
         if (this.doDataCleanup === true) {
-          if (this.verboseLogs) this.mainLogger.debug( ` _repair startSyncPartitions:cycle_q3_start-clean cycle: ${lastCycle.counter}`)
+          if (this.verboseLogs) this.mainLogger.debug(` _repair startSyncPartitions:cycle_q3_start-clean cycle: ${lastCycle.counter}`)
           // clean up cycle data that is more than 10 cycles old.
           this.periodicCycleDataCleanup(lastCycle.counter - 10)
         }
@@ -2800,7 +2762,7 @@ class StateManager {
     }
 
     if (this.oldFeature_GeneratePartitionReport === true) {
-      if (this.verboseLogs) this.mainLogger.debug( ` processPreviousCycleSummaries cycle: ${cycle.counter}`)
+      if (this.verboseLogs) this.mainLogger.debug(` processPreviousCycleSummaries cycle: ${cycle.counter}`)
       // this will take temp TXs and make sure they are stored in the correct place for us to generate partitions
       this.partitionObjects.processTempTXs(cycle)
 
@@ -2814,7 +2776,7 @@ class StateManager {
     // Get the receipt map to send as a report
     if (this.feature_receiptMapResults === true) {
       receiptMapResults = this.generateReceiptMapResults(cycle)
-      if (this.verboseLogs) this.mainLogger.debug( `receiptMapResults: ${stringify(receiptMapResults)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`receiptMapResults: ${stringify(receiptMapResults)}`)
     }
 
     // Get the stats data to send as a reort
@@ -2859,19 +2821,15 @@ class StateManager {
     }
   }
 
-
-
-
-
-/***
- *    ########  ########  ######  ######## #### ########  ########  ######  
- *    ##     ## ##       ##    ## ##        ##  ##     ##    ##    ##    ## 
- *    ##     ## ##       ##       ##        ##  ##     ##    ##    ##       
- *    ########  ######   ##       ######    ##  ########     ##     ######  
- *    ##   ##   ##       ##       ##        ##  ##           ##          ## 
- *    ##    ##  ##       ##    ## ##        ##  ##           ##    ##    ## 
- *    ##     ## ########  ######  ######## #### ##           ##     ######  
- */
+  /***
+   *    ########  ########  ######  ######## #### ########  ########  ######
+   *    ##     ## ##       ##    ## ##        ##  ##     ##    ##    ##    ##
+   *    ##     ## ##       ##       ##        ##  ##     ##    ##    ##
+   *    ########  ######   ##       ######    ##  ########     ##     ######
+   *    ##   ##   ##       ##       ##        ##  ##           ##          ##
+   *    ##    ##  ##       ##    ## ##        ##  ##           ##    ##    ##
+   *    ##     ## ########  ######  ######## #### ##           ##     ######
+   */
 
   /**
    * storePartitionReceipt
@@ -2991,16 +2949,15 @@ class StateManager {
     return results
   }
 
-/***
- *     ######   #######  ########  ########             
- *    ##    ## ##     ## ##     ## ##                   
- *    ##       ##     ## ##     ## ##                   
- *    ##       ##     ## ########  ######               
- *    ##       ##     ## ##   ##   ##                   
- *    ##    ## ##     ## ##    ##  ##       ### ### ### 
- *     ######   #######  ##     ## ######## ### ### ### 
- */
-
+  /***
+   *     ######   #######  ########  ########
+   *    ##    ## ##     ## ##     ## ##
+   *    ##       ##     ## ##     ## ##
+   *    ##       ##     ## ########  ######
+   *    ##       ##     ## ##   ##   ##
+   *    ##    ## ##     ## ##    ##  ##       ### ### ###
+   *     ######   #######  ##     ## ######## ### ### ###
+   */
 
   /**
    * getCycleNumberFromTimestamp
