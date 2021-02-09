@@ -6,8 +6,7 @@ import { ShardGlobals, ShardInfo, StoredPartition, NodeShardData, AddressRange, 
 
 import { isNodeDown, isNodeLost } from '../p2p/Lost'
 
-import ShardFunctions from './shardFunctions2.js'
-import ShardFunctions2 from './shardFunctions2.js' // oof, need to refactor this!
+import ShardFunctions from './shardFunctions.js'
 
 const EventEmitter = require('events')
 import * as utils from '../utils'
@@ -283,9 +282,9 @@ class StateManager {
     this.fatalLogger = logger.getLogger('fatal')
     this.shardLogger = logger.getLogger('shardDump')
 
-    ShardFunctions2.logger = logger
-    ShardFunctions2.fatalLogger = this.fatalLogger
-    ShardFunctions2.mainLogger = this.mainLogger
+    ShardFunctions.logger = logger
+    ShardFunctions.fatalLogger = this.fatalLogger
+    ShardFunctions.mainLogger = this.mainLogger
 
     this.clearPartitionData()
 

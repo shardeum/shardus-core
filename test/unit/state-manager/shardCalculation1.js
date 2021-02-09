@@ -1,10 +1,10 @@
 // @ts-nocheck
 /*eslint-disable*/
 // const StateManager = require('../../../src/state-manager')
-//const ShardFunctions2 = require('../../../src/state-manager/shardFunctions.js')
-const ShardFunctions2 = require('../../../build/src/state-manager/shardFunctions2.js').default
+//const ShardFunctions = require('../../../src/state-manager/shardFunctions.js')
+const ShardFunctions = require('../../../build/src/state-manager/shardFunctions2.js').default
 // import {ShardGlobals,ShardInfo,StoredPartition,NodeShardData,AddressRange, HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange} from  './shardFunctionTypes'
-// import ShardFunctions2 from './shardFunctions.js'
+// import ShardFunctions from './shardFunctions.js'
 
 const crypto = require('shardus-crypto-utils')
 const utils = require('../../../build/src/utils')
@@ -27,7 +27,7 @@ function logErrorLimited(msg){
 let nodesPerConsenusGroup = 3
 
 function testPartitionMath1_old(numNodes, debugIndex){
-  let shardGlobals = ShardFunctions2.calculateShardGlobals(numNodes, nodesPerConsenusGroup)
+  let shardGlobals = ShardFunctions.calculateShardGlobals(numNodes, nodesPerConsenusGroup)
 
   for(let i=0; i<numNodes; i++ ){
     let partitionStart = i
@@ -36,10 +36,10 @@ function testPartitionMath1_old(numNodes, debugIndex){
       logErrorLimited('debug here')
     }
 
-    let addressRange = ShardFunctions2.partitionToAddressRange2_old(shardGlobals, partitionStart)
+    let addressRange = ShardFunctions.partitionToAddressRange2_old(shardGlobals, partitionStart)
 
-    let lowResult = ShardFunctions2.addressToPartition_old(shardGlobals, addressRange.low)
-    let highResult = ShardFunctions2.addressToPartition_old(shardGlobals, addressRange.high)
+    let lowResult = ShardFunctions.addressToPartition_old(shardGlobals, addressRange.low)
+    let highResult = ShardFunctions.addressToPartition_old(shardGlobals, addressRange.high)
 
     if(partitionStart !== lowResult.homePartition){
       logErrorLimited(`failed partition ${partitionStart} low result: ${lowResult.homePartition}`)
@@ -57,7 +57,7 @@ function testPartitionMath1_old(numNodes, debugIndex){
 }
 
 function testPartitionMath1_new(numNodes, debugIndex){
-  let shardGlobals = ShardFunctions2.calculateShardGlobals(numNodes, nodesPerConsenusGroup)
+  let shardGlobals = ShardFunctions.calculateShardGlobals(numNodes, nodesPerConsenusGroup)
 
   for(let i=0; i<numNodes; i++ ){
     let partitionStart = i
@@ -66,10 +66,10 @@ function testPartitionMath1_new(numNodes, debugIndex){
       logErrorLimited('debug here')
     }
 
-    let addressRange = ShardFunctions2.partitionToAddressRange2(shardGlobals, partitionStart)
+    let addressRange = ShardFunctions.partitionToAddressRange2(shardGlobals, partitionStart)
 
-    let lowResult = ShardFunctions2.addressToPartition(shardGlobals, addressRange.low)
-    let highResult = ShardFunctions2.addressToPartition(shardGlobals, addressRange.high)
+    let lowResult = ShardFunctions.addressToPartition(shardGlobals, addressRange.low)
+    let highResult = ShardFunctions.addressToPartition(shardGlobals, addressRange.high)
 
     if(partitionStart !== lowResult.homePartition){
       logErrorLimited(`failed partition ${partitionStart} low result: ${lowResult.homePartition}`)

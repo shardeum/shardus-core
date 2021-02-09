@@ -9,7 +9,7 @@ import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger from '../logger'
-import ShardFunctions2 from './shardFunctions2.js'
+import ShardFunctions from './shardFunctions.js'
 import AccountCache from './AccountCache'
 
 class PartitionStats {
@@ -341,10 +341,10 @@ class PartitionStats {
       // 2^32  4294967296 or 0xFFFFFFFF + 1
       let addressLowNum = (i / this.summaryPartitionCount) * (0xffffffff + 1)
       let addressHighNum = ((i + 1) / this.summaryPartitionCount) * (0xffffffff + 1) - 1
-      let inRangeLow = ShardFunctions2.testAddressNumberInRange(addressLowNum, cycleShardData.nodeShardData.storedPartitions)
+      let inRangeLow = ShardFunctions.testAddressNumberInRange(addressLowNum, cycleShardData.nodeShardData.storedPartitions)
       let inRangeHigh = false
       if (inRangeLow) {
-        inRangeHigh = ShardFunctions2.testAddressNumberInRange(addressHighNum, cycleShardData.nodeShardData.storedPartitions)
+        inRangeHigh = ShardFunctions.testAddressNumberInRange(addressHighNum, cycleShardData.nodeShardData.storedPartitions)
       }
       if (inRangeLow && inRangeHigh) {
         result.list.push(i)

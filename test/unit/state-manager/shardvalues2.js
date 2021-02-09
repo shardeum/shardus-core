@@ -1,10 +1,10 @@
 // @ts-nocheck
 /*eslint-disable*/
 // const StateManager = require('../../../src/state-manager')
-//const ShardFunctions2 = require('../../../src/state-manager/shardFunctions.js')
-const ShardFunctions2 = require('../../../build/src/state-manager/shardFunctions2.js').default
+//const ShardFunctions = require('../../../src/state-manager/shardFunctions.js')
+const ShardFunctions = require('../../../build/src/state-manager/shardFunctions2.js').default
 // import {ShardGlobals,ShardInfo,StoredPartition,NodeShardData,AddressRange, HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange} from  './shardFunctionTypes'
-// import ShardFunctions2 from './shardFunctions.js'
+// import ShardFunctions from './shardFunctions.js'
 
 const crypto = require('shardus-crypto-utils')
 const utils = require('../../../build/src/utils')
@@ -48,10 +48,10 @@ function getClosestNodes (shardGlobals, parititionShardDataMap, activeNodes, has
   //   throw new Error('getClosestNodes: network not ready')
   // }
   // let cycleShardData = this.currentCycleShardData
-  let homeNode = ShardFunctions2.findHomeNode(shardGlobals, hash, parititionShardDataMap)
+  let homeNode = ShardFunctions.findHomeNode(shardGlobals, hash, parititionShardDataMap)
   let homeNodeIndex = homeNode.ourNodeIndex
   let idToExclude = ''
-  let results = ShardFunctions2.getNodesByProximity(shardGlobals, activeNodes, homeNodeIndex, idToExclude, count, true)
+  let results = ShardFunctions.getNodesByProximity(shardGlobals, activeNodes, homeNodeIndex, idToExclude, count, true)
 
   return results
 }
@@ -61,8 +61,8 @@ function isNodeInDistancePartition (shardGlobals, hash, nodeId, distance) {
   //   throw new Error('isNodeInDistance: network not ready')
   // }
   // let cycleShardData = this.currentCycleShardData
-  let { homePartition } = ShardFunctions2.addressToPartition(shardGlobals, nodeId)
-  let { homePartition: homePartition2 } = ShardFunctions2.addressToPartition(shardGlobals, hash)
+  let { homePartition } = ShardFunctions.addressToPartition(shardGlobals, nodeId)
+  let { homePartition: homePartition2 } = ShardFunctions.addressToPartition(shardGlobals, hash)
   let partitionDistance = Math.abs(homePartition2 - homePartition)
   if (partitionDistance <= distance) {
     return true
@@ -71,15 +71,15 @@ function isNodeInDistancePartition (shardGlobals, hash, nodeId, distance) {
 }
 
 function isNodeInDistance (shardGlobals, parititionShardDataMap, hash, nodeId, distance) {
-  let someNode = ShardFunctions2.findHomeNode(shardGlobals, nodeId, parititionShardDataMap)
+  let someNode = ShardFunctions.findHomeNode(shardGlobals, nodeId, parititionShardDataMap)
 
   if(someNode == null){
-    ShardFunctions2.findHomeNode(shardGlobals, nodeId, parititionShardDataMap)
+    ShardFunctions.findHomeNode(shardGlobals, nodeId, parititionShardDataMap)
     return false
   }
   let someNodeIndex = someNode.ourNodeIndex
 
-  let homeNode = ShardFunctions2.findHomeNode(shardGlobals, hash, parititionShardDataMap)
+  let homeNode = ShardFunctions.findHomeNode(shardGlobals, hash, parititionShardDataMap)
   let homeNodeIndex = homeNode.ourNodeIndex
 
   let partitionDistance = Math.abs(someNodeIndex - homeNodeIndex)
@@ -157,17 +157,17 @@ for (let i = 0; i < testIterations; i++) {
     innerLoopCount = numNodes
   }
 
-  let shardGlobals = ShardFunctions2.calculateShardGlobals(numNodes, nodesPerConsenusGroup)
+  let shardGlobals = ShardFunctions.calculateShardGlobals(numNodes, nodesPerConsenusGroup)
 
   let totalPartitions = numNodes
 
 
-  ShardFunctions2.partitionToAddressRange2(shardGlobals, 5, 17)
+  ShardFunctions.partitionToAddressRange2(shardGlobals, 5, 17)
 
 
   // calculate data for all partitions
   let parititionShardDataMap = new Map()
-  ShardFunctions2.computePartitionShardDataMap(shardGlobals, parititionShardDataMap, 0, totalPartitions)
+  ShardFunctions.computePartitionShardDataMap(shardGlobals, parititionShardDataMap, 0, totalPartitions)
   // calculate data for all nodeds
   let nodeShardDataMap = new Map()
 
@@ -191,34 +191,34 @@ for (let i = 0; i < testIterations; i++) {
 
   if (debugStartsWith != null) {
     // this was the earlier simple way
-    // ShardFunctions2.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, false)
+    // ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, false)
     // for (let node of activeNodes) {
     //   if (node.id.indexOf(debugStartsWith) >= 0) {
-    //     ShardFunctions2.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, [node], parititionShardDataMap, activeNodes, true)
+    //     ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, [node], parititionShardDataMap, activeNodes, true)
     //     debugNode = node
     //   }
     // }
 
     // this is an exact match for the calculations done in the shardus server:
     // generate limited data for all nodes data for all nodes.
-    ShardFunctions2.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, false)
+    ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, false)
     // get extended data for our node
-    nodeShardData = ShardFunctions2.computeNodePartitionData(shardGlobals, ourNode, nodeShardDataMap, parititionShardDataMap, activeNodes, true)
+    nodeShardData = ShardFunctions.computeNodePartitionData(shardGlobals, ourNode, nodeShardDataMap, parititionShardDataMap, activeNodes, true)
     // generate full data for nodes that store our home partition
-    ShardFunctions2.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, nodeShardData.nodeThatStoreOurParitionFull, parititionShardDataMap, activeNodes, true)
+    ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, nodeShardData.nodeThatStoreOurParitionFull, parititionShardDataMap, activeNodes, true)
     // cycleShardData.nodeShardData = cycleShardData.nodeShardDataMap.get(cycleShardData.ourNode.id)
 
     // generate lightweight data for all active nodes  (note that last parameter is false to specify the lightweight data)
     let fullDataForDebug = true // Set this to false for performance reasons!!! setting it to true saves us from having to recalculate stuff when we dump logs.
-    ShardFunctions2.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, fullDataForDebug)
+    ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, fullDataForDebug)
 
     // this is the function that messes up out calculations
-    ShardFunctions2.computeNodePartitionDataMapExt(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes)
+    ShardFunctions.computeNodePartitionDataMapExt(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes)
 
     console.log('storedPartitions' + utils.stringifyReduce(nodeShardData.storedPartitions))
 
     // calc consensus partitions
-    let ourConsensusPartitions = ShardFunctions2.getConsenusPartitionList(shardGlobals, nodeShardData)
+    let ourConsensusPartitions = ShardFunctions.getConsenusPartitionList(shardGlobals, nodeShardData)
     console.log('ourConsensusPartitions ' + utils.stringifyReduce(ourConsensusPartitions) + `  consensusEndPartition: ${nodeShardData.consensusEndPartition} consensusStartPartition ${nodeShardData.consensusStartPartition}`)
 
     let hash = debugAccount // '0'.repeat(64) // debugAccount
@@ -249,66 +249,66 @@ for (let i = 0; i < testIterations; i++) {
         let a = 1
       }
       let nodeData = nodeShardDataMap.get(key)
-      let partitions2 = ShardFunctions2.getStoredPartitionList(shardGlobals, nodeData)
+      let partitions2 = ShardFunctions.getStoredPartitionList(shardGlobals, nodeData)
 
       console.log(`node stored: ${utils.stringifyReduce(partitions2)} ${key}`)
     }
   }
 
-  ShardFunctions2.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, true)
-  ShardFunctions2.computeNodePartitionDataMapExt(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes)
+  ShardFunctions.computeNodePartitionDataMap(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes, true)
+  ShardFunctions.computeNodePartitionDataMapExt(shardGlobals, nodeShardDataMap, activeNodes, parititionShardDataMap, activeNodes)
 
   if (hardcodeNodes2 != null) {
     let totalPartitions2 = numNodes2
-    let shardGlobals2 = ShardFunctions2.calculateShardGlobals(numNodes2, nodesPerConsenusGroup)
-    ShardFunctions2.computePartitionShardDataMap(shardGlobals2, parititionShardDataMap2, 0, totalPartitions2)
-    ShardFunctions2.computeNodePartitionDataMap(shardGlobals2, nodeShardDataMap2, activeNodes2, parititionShardDataMap2, activeNodes2, false)
-    ShardFunctions2.computeNodePartitionDataMap(shardGlobals2, nodeShardDataMap2, activeNodes2, parititionShardDataMap2, activeNodes2, true)
-    ShardFunctions2.computeNodePartitionDataMapExt(shardGlobals2, nodeShardDataMap2, activeNodes2, parititionShardDataMap2, activeNodes2)
+    let shardGlobals2 = ShardFunctions.calculateShardGlobals(numNodes2, nodesPerConsenusGroup)
+    ShardFunctions.computePartitionShardDataMap(shardGlobals2, parititionShardDataMap2, 0, totalPartitions2)
+    ShardFunctions.computeNodePartitionDataMap(shardGlobals2, nodeShardDataMap2, activeNodes2, parititionShardDataMap2, activeNodes2, false)
+    ShardFunctions.computeNodePartitionDataMap(shardGlobals2, nodeShardDataMap2, activeNodes2, parititionShardDataMap2, activeNodes2, true)
+    ShardFunctions.computeNodePartitionDataMapExt(shardGlobals2, nodeShardDataMap2, activeNodes2, parititionShardDataMap2, activeNodes2)
 
     let ourNodeData = nodeShardDataMap.get(debugNode.id)
     let ourNodeData2 = nodeShardDataMap2.get(debugNode.id)
 
-    let coverageChanges = ShardFunctions2.computeCoverageChanges(ourNodeData, ourNodeData2)
+    let coverageChanges = ShardFunctions.computeCoverageChanges(ourNodeData, ourNodeData2)
 
     for (let change of coverageChanges) {
       // log info about the change.
       // ${utils.stringifyReduce(change)}
-      console.log(` ${ShardFunctions2.leadZeros8((change.start).toString(16))}->${ShardFunctions2.leadZeros8((change.end).toString(16))} `)
+      console.log(` ${ShardFunctions.leadZeros8((change.start).toString(16))}->${ShardFunctions.leadZeros8((change.end).toString(16))} `)
 
       // create a range object from our coverage change.
       let range = {}
       range.startAddr = change.start
       range.endAddr = change.end
-      range.low = ShardFunctions2.leadZeros8((range.startAddr).toString(16)) + '0'.repeat(56)
-      range.high = ShardFunctions2.leadZeros8((range.endAddr).toString(16)) + 'f'.repeat(56)
+      range.low = ShardFunctions.leadZeros8((range.startAddr).toString(16)) + '0'.repeat(56)
+      range.high = ShardFunctions.leadZeros8((range.endAddr).toString(16)) + 'f'.repeat(56)
       // create sync trackers
       // this.createSyncTrackerByRange(range, cycle)
     }
   }
 
   if (debugAccount != null) {
-    let homeNode = ShardFunctions2.findHomeNode(shardGlobals, debugAccount, parititionShardDataMap)
+    let homeNode = ShardFunctions.findHomeNode(shardGlobals, debugAccount, parititionShardDataMap)
     // let shardParition = parititionShardDataMap.get(5)
-    let {homePartition, addressNum} = ShardFunctions2.addressToPartition(shardGlobals, debugAccount)
-    //ShardFunctions2.
-    let summaryObject = ShardFunctions2.getHomeNodeSummaryObject(homeNode)
-    let relationString = ShardFunctions2.getNodeRelation(homeNode, debugID)
+    let {homePartition, addressNum} = ShardFunctions.addressToPartition(shardGlobals, debugAccount)
+    //ShardFunctions.
+    let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
+    let relationString = ShardFunctions.getNodeRelation(homeNode, debugID)
 
-    let weStoreThisParition = ShardFunctions2.testInRange(homePartition, nodeShardData.storedPartitions)
+    let weStoreThisParition = ShardFunctions.testInRange(homePartition, nodeShardData.storedPartitions)
 
     console.log(` summary:${utils.stringifyReduce(summaryObject)}`)
     console.log(` relationString:${relationString}`)
     console.log('Home node for debug acc:' + utils.stringifyReduce(homeNode))
     console.log('nodeThatStoreOurParitionFull:' + utils.stringifyReduce(homeNode.nodeThatStoreOurParitionFull))
-    let { homePartition: partition } = ShardFunctions2.addressToPartition(shardGlobals, debugAccount)
+    let { homePartition: partition } = ShardFunctions.addressToPartition(shardGlobals, debugAccount)
 
     let ourNodeData = nodeShardDataMap.get(debugNode.id)
 
-    let inRange = ShardFunctions2.testInRange(partition, ourNodeData.storedPartitions)
+    let inRange = ShardFunctions.testInRange(partition, ourNodeData.storedPartitions)
 
     // homeNode.nodeThatStoreOurParitionFull
-    // let homeNode = ShardFunctions2.findHomeNode(shardGlobals, debugAccount, parititionShardDataMap)
+    // let homeNode = ShardFunctions.findHomeNode(shardGlobals, debugAccount, parititionShardDataMap)
     let hasKey = false
     if (homeNode.node.id === ourNodeData.node.id) {
       hasKey = true
@@ -329,7 +329,7 @@ for (let i = 0; i < testIterations; i++) {
   for (var nodeShardData2 of nodeShardDataMap.values()) {
     extraNodesTotal += nodeShardData2.outOfDefaultRangeNodes.length
 
-    totalPartitionsCovered += ShardFunctions2.getPartitionsCovered(nodeShardData2.storedPartitions)
+    totalPartitionsCovered += ShardFunctions.getPartitionsCovered(nodeShardData2.storedPartitions)
   }
 
   console.log(`test number ${i} partitions covered by a node avg: ${totalPartitionsCovered / innerLoopCount}`)
@@ -338,43 +338,43 @@ for (let i = 0; i < testIterations; i++) {
   for (let j = 0; j < homeNodeQueryTests; ++j) {
     let address = crypto.randomBytes() // '160a' + '7'.repeat(60) //crypto.randomBytes()
 
-    let homeNode = ShardFunctions2.findHomeNode(shardGlobals, address, parititionShardDataMap)
+    let homeNode = ShardFunctions.findHomeNode(shardGlobals, address, parititionShardDataMap)
     if (homeNode == null) {
-      homeNode = ShardFunctions2.findHomeNode(shardGlobals, address, parititionShardDataMap)
+      homeNode = ShardFunctions.findHomeNode(shardGlobals, address, parititionShardDataMap)
       throw new Error('home node not found')
     }
-    let inRange = ShardFunctions2.testAddressInRange(address, homeNode.storedPartitions)
+    let inRange = ShardFunctions.testAddressInRange(address, homeNode.storedPartitions)
     if (inRange === false) {
-      homeNode = ShardFunctions2.findHomeNode(shardGlobals, address, parititionShardDataMap)
-      inRange = ShardFunctions2.testAddressInRange(address, homeNode.storedPartitions)
+      homeNode = ShardFunctions.findHomeNode(shardGlobals, address, parititionShardDataMap)
+      inRange = ShardFunctions.testAddressInRange(address, homeNode.storedPartitions)
       throw new Error('home node not in range 1')
     }
-    let { homePartition, addressNum } = ShardFunctions2.addressToPartition(shardGlobals, address)
-    let addressRangeHome = ShardFunctions2.partitionToAddressRange2(shardGlobals, homePartition)
+    let { homePartition, addressNum } = ShardFunctions.addressToPartition(shardGlobals, address)
+    let addressRangeHome = ShardFunctions.partitionToAddressRange2(shardGlobals, homePartition)
     
     if(addressRangeHome.low > address){
-      let {homePartition2, addressNum2} = ShardFunctions2.addressToPartition(shardGlobals, address)
-      ShardFunctions2.addressToPartition(shardGlobals, address)
+      let {homePartition2, addressNum2} = ShardFunctions.addressToPartition(shardGlobals, address)
+      ShardFunctions.addressToPartition(shardGlobals, address)
       let fail = true
       let asdf = homePartition2
     }
     if(addressRangeHome.high < address){
-      let {homePartition3, addressNum3} = ShardFunctions2.addressToPartition(shardGlobals, address)
-      ShardFunctions2.addressToPartition(shardGlobals, address)
+      let {homePartition3, addressNum3} = ShardFunctions.addressToPartition(shardGlobals, address)
+      ShardFunctions.addressToPartition(shardGlobals, address)
       let asdf = homePartition3
       let fail = true
     }
 
 
-    let inRange2 = ShardFunctions2.testInRange(homePartition, homeNode.storedPartitions)
+    let inRange2 = ShardFunctions.testInRange(homePartition, homeNode.storedPartitions)
     if (inRange2 === false) {
-      homeNode = ShardFunctions2.findHomeNode(shardGlobals, address, parititionShardDataMap)
-      inRange2 = ShardFunctions2.testInRange(homePartition, homeNode.storedPartitions)
+      homeNode = ShardFunctions.findHomeNode(shardGlobals, address, parititionShardDataMap)
+      inRange2 = ShardFunctions.testInRange(homePartition, homeNode.storedPartitions)
       throw new Error('home node not in range 2')
     }
 
     for (let node of homeNode.consensusNodeForOurNode) {
-      let inRange3 = ShardFunctions2.testAddressInRange(node.id, homeNode.storedPartitions)
+      let inRange3 = ShardFunctions.testAddressInRange(node.id, homeNode.storedPartitions)
       if (inRange3 === false) {
         throw new Error('node not in range 1')
       }
@@ -382,7 +382,7 @@ for (let i = 0; i < testIterations; i++) {
 
     // not sure this has to be true:  fails when we use getNodesThatCoverParitionRaw for nodes that store our partition!
     // for (let node of homeNode.nodeThatStoreOurParitionFull) {
-    //   let inRange3 = ShardFunctions2.testAddressInRange(node.id, homeNode.storedPartitions)
+    //   let inRange3 = ShardFunctions.testAddressInRange(node.id, homeNode.storedPartitions)
     //   if (inRange3 === false) {
     //     throw new Error('node not in range 2')
     //   }
@@ -391,15 +391,15 @@ for (let i = 0; i < testIterations; i++) {
     // this is a strange test since some of the nodes in the nodeThatStoreOurParitionFull might cover the home node partiiton but not the test message partition
     for (let node of homeNode.nodeThatStoreOurParitionFull) {
       let nodeData = nodeShardDataMap.get(node.id)
-      let partitionInRange = ShardFunctions2.testInRange(homePartition, nodeData.storedPartitions)
-      let inRange4 = ShardFunctions2.testAddressInRange(address, nodeData.storedPartitions)
+      let partitionInRange = ShardFunctions.testInRange(homePartition, nodeData.storedPartitions)
+      let inRange4 = ShardFunctions.testAddressInRange(address, nodeData.storedPartitions)
       if (partitionInRange && inRange4 === false) {
-        partitionInRange = ShardFunctions2.testInRange(homePartition, nodeData.storedPartitions)
-        inRange4 = ShardFunctions2.testAddressInRange(address, nodeData.storedPartitions)
+        partitionInRange = ShardFunctions.testInRange(homePartition, nodeData.storedPartitions)
+        inRange4 = ShardFunctions.testAddressInRange(address, nodeData.storedPartitions)
 
         if(nodeData.storedPartitions.rangeIsSplit === true){
-          let addressRange1 = ShardFunctions2.partitionToAddressRange2(shardGlobals, nodeData.storedPartitions.partitionStart1)
-          let addressRange2 = ShardFunctions2.partitionToAddressRange2(shardGlobals, nodeData.storedPartitions.partitionEnd1)
+          let addressRange1 = ShardFunctions.partitionToAddressRange2(shardGlobals, nodeData.storedPartitions.partitionStart1)
+          let addressRange2 = ShardFunctions.partitionToAddressRange2(shardGlobals, nodeData.storedPartitions.partitionEnd1)
 
           if(addressRange1.low > address){
             let fail = true
@@ -408,8 +408,8 @@ for (let i = 0; i < testIterations; i++) {
             let fail = true
           }
 
-          let addressRange1b = ShardFunctions2.partitionToAddressRange2(shardGlobals, nodeData.storedPartitions.partitionStart2)
-          let addressRange2b = ShardFunctions2.partitionToAddressRange2(shardGlobals, nodeData.storedPartitions.partitionEnd2)
+          let addressRange1b = ShardFunctions.partitionToAddressRange2(shardGlobals, nodeData.storedPartitions.partitionStart2)
+          let addressRange2b = ShardFunctions.partitionToAddressRange2(shardGlobals, nodeData.storedPartitions.partitionEnd2)
 
           if(addressRange1b.low > address){
             let fail = true
@@ -418,8 +418,8 @@ for (let i = 0; i < testIterations; i++) {
             let fail = true
           }
         } else {
-          let addressRange1 = ShardFunctions2.partitionToAddressRange2(shardGlobals, nodeData.storedPartitions.partitionStart1)
-          let addressRange2 = ShardFunctions2.partitionToAddressRange2(shardGlobals, nodeData.storedPartitions.partitionEnd1)
+          let addressRange1 = ShardFunctions.partitionToAddressRange2(shardGlobals, nodeData.storedPartitions.partitionStart1)
+          let addressRange2 = ShardFunctions.partitionToAddressRange2(shardGlobals, nodeData.storedPartitions.partitionEnd1)
 
           if(addressRange1.low > address){
             let fail = true
@@ -428,7 +428,7 @@ for (let i = 0; i < testIterations; i++) {
             let fail = true
           }
         }
-        //let addressRange = ShardFunctions2.partitionToAddressRange2(shardGlobals, partitionStart)
+        //let addressRange = ShardFunctions.partitionToAddressRange2(shardGlobals, partitionStart)
 
         throw new Error(`address not in range 2. node: ${utils.makeShortHash(node.id)} addr: ${utils.makeShortHash(address)} home: ${utils.makeShortHash(homeNode.node.id)} p:${partitionInRange}`)
       }
@@ -447,7 +447,7 @@ let size1 = 3
 let size2 = 4
 console.log(` size1: ${size1}  size2: ${size2}`)
 for (let i = 1; i <= size1; i++) {
-  let res = ShardFunctions2.fastStableCorrespondingIndicies(size1, size2, i)
+  let res = ShardFunctions.fastStableCorrespondingIndicies(size1, size2, i)
 
   console.log(` index: ${i}  res: ${JSON.stringify(res)}`)
 }

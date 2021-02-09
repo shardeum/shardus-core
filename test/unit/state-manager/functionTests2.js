@@ -7,7 +7,7 @@ var path = require('path')
 // const StateManager = require('../../../src/state-manager')
 // let stateManager = new StateManager(false)
 
-const ShardFunctions2 = require('../../../build/src/state-manager/shardFunctions2.js').default
+const ShardFunctions = require('../../../build/src/state-manager/shardFunctions2.js').default
 
 const crypto = require('shardus-crypto-utils')
 const utils = require('../../../build/src/utils')

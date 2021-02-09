@@ -1,7 +1,7 @@
 // @ts-nocheck
 /*eslint-disable*/
 
-const ShardFunctions2 = require('../../../build/src/state-manager/shardFunctions2.js').default
+const ShardFunctions = require('../../../build/src/state-manager/shardFunctions2.js').default
 
 const crypto = require('shardus-crypto-utils')
 const utils = require('../../../build/src/utils')
@@ -22,7 +22,7 @@ function logErrorLimited(msg){
 let nodesPerConsenusGroup = 3
 
 function testPartitionMath1_old(numNodes, debugIndex){
-  let shardGlobals = ShardFunctions2.calculateShardGlobals(numNodes, nodesPerConsenusGroup)
+  let shardGlobals = ShardFunctions.calculateShardGlobals(numNodes, nodesPerConsenusGroup)
 
   for(let i=0; i<numNodes; i++ ){
     let partitionStart = i
@@ -31,10 +31,10 @@ function testPartitionMath1_old(numNodes, debugIndex){
       logErrorLimited('debug here')
     }
 
-    let addressRange = ShardFunctions2.partitionToAddressRange2_old(shardGlobals, partitionStart)
+    let addressRange = ShardFunctions.partitionToAddressRange2_old(shardGlobals, partitionStart)
 
-    let lowResult = ShardFunctions2.addressToPartition_old(shardGlobals, addressRange.low)
-    let highResult = ShardFunctions2.addressToPartition_old(shardGlobals, addressRange.high)
+    let lowResult = ShardFunctions.addressToPartition_old(shardGlobals, addressRange.low)
+    let highResult = ShardFunctions.addressToPartition_old(shardGlobals, addressRange.high)
 
     if(partitionStart !== lowResult.homePartition){
       logErrorLimited(`failed partition ${partitionStart} low result: ${lowResult.homePartition}`)
@@ -47,7 +47,7 @@ function testPartitionMath1_old(numNodes, debugIndex){
 }
 
 function testPartitionMath1_new(numNodes, debugIndex){
-  let shardGlobals = ShardFunctions2.calculateShardGlobals(numNodes, nodesPerConsenusGroup)
+  let shardGlobals = ShardFunctions.calculateShardGlobals(numNodes, nodesPerConsenusGroup)
 
   let nextAddress = null
   for(let i=0; i<numNodes; i++ ){
@@ -57,12 +57,12 @@ function testPartitionMath1_new(numNodes, debugIndex){
       logErrorLimited('debug here')
     }
 
-    let addressRange = ShardFunctions2.partitionToAddressRange2(shardGlobals, partitionStart)
+    let addressRange = ShardFunctions.partitionToAddressRange2(shardGlobals, partitionStart)
 
-    let lowResult = ShardFunctions2.addressToPartition(shardGlobals, addressRange.low)
-    let highResult = ShardFunctions2.addressToPartition(shardGlobals, addressRange.high)
+    let lowResult = ShardFunctions.addressToPartition(shardGlobals, addressRange.low)
+    let highResult = ShardFunctions.addressToPartition(shardGlobals, addressRange.high)
 
-    let { address1, address2 } = ShardFunctions2.getNextAdjacentAddresses(addressRange.high)
+    let { address1, address2 } = ShardFunctions.getNextAdjacentAddresses(addressRange.high)
     
     //logErrorLimited(`info i:${i}/${numNodes} ${utils.stringifyReduce(addressRange.low)} hi ${utils.stringifyReduce(addressRange.high)}`)
     //logErrorLimited(`info i:${i}/${numNodes} ${(addressRange.low)} hi ${(addressRange.high)}`)
@@ -101,13 +101,13 @@ function computePartitionShardDataMap (shardGlobals, partitionStart, partitionsT
     let fpAdressCenter = ((i + 0.5) / numPartitions)
     let addressPrefix = Math.floor(fpAdressCenter * 0xffffffff)
 
-    let addressPrefixHex = ShardFunctions2.leadZeros8((addressPrefix).toString(16))
+    let addressPrefixHex = ShardFunctions.leadZeros8((addressPrefix).toString(16))
     let address = addressPrefixHex + '7' + 'f'.repeat(55) // 55 + 1 + 8 = 64
 
-    let shardinfo = ShardFunctions2.calculateShardValues(shardGlobals, address)
+    let shardinfo = ShardFunctions.calculateShardValues(shardGlobals, address)
     //parititionShardDataMap.set(i, shardinfo)
     // increment index:
-    let {homePartition, addressNum} = ShardFunctions2.addressToPartition(shardGlobals, address)
+    let {homePartition, addressNum} = ShardFunctions.addressToPartition(shardGlobals, address)
 
     if(homePartition !== i){
       logErrorLimited(`failed computePartitionShardDataMap ${homePartition} != ${i}`)
@@ -125,7 +125,7 @@ function computePartitionShardDataMap (shardGlobals, partitionStart, partitionsT
 console.log(`--------unit test a hacked computePartitionShardDataMap--------------`)
 for(let i = 1; i< 1000; i++){
   let numParitions = i
-  let shardGlobals = ShardFunctions2.calculateShardGlobals(numParitions, nodesPerConsenusGroup)
+  let shardGlobals = ShardFunctions.calculateShardGlobals(numParitions, nodesPerConsenusGroup)
   computePartitionShardDataMap(shardGlobals,0,numParitions)
 
 }

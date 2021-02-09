@@ -9,11 +9,9 @@ import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger from '../logger'
-import ShardFunctions from './shardFunctions2.js'
+import ShardFunctions from './shardFunctions.js'
 import { time } from 'console'
 import StateManager from '.'
-
-import ShardFunctions2 from './shardFunctions2.js' // oof, need to refactor this!
 
 class TransactionRepair {
   app: Shardus.App
@@ -114,7 +112,7 @@ class TransactionRepair {
                 this.mainLogger.error(`shrd_repairToMatchReceipt nodeShardInfo == null ${utils.stringifyReduce(appliedVote.node_id)}`)
                 continue
               }
-              if (ShardFunctions2.testAddressInRange(id, nodeShardInfo.storedPartitions) == false) {
+              if (ShardFunctions.testAddressInRange(id, nodeShardInfo.storedPartitions) == false) {
                 if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `address not in range ${utils.stringifyReduce(nodeShardInfo.storedPartitions)}`)
                 continue
               }
