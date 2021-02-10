@@ -431,10 +431,10 @@ export function startSnapshotting() {
         const summaryDataStatHash = {}
         const summarytxStatsHash = {}
         for (const blob of statsClumpForThisCycle.dataStats) {
-          summaryDataStatHash[blob.partition] = blob
+          summaryDataStatHash[blob.partition] = blob.opaqueBlob
         }
         for (const blob of statsClumpForThisCycle.txStats) {
-          summarytxStatsHash[blob.partition] = blob
+          summarytxStatsHash[blob.partition] = blob.opaqueBlob
         }
 
         for (const partition of statsClumpForThisCycle.covered) {
@@ -447,12 +447,12 @@ export function startSnapshotting() {
               : {},
           }
           message.data.summaryHash[partition] = Context.crypto.hash(summaryObj)
-          // console.log(`Summary Obj for partition ${partition}`, summaryObj)
-          // if (summaryObj) {
-          //   console.log('summaryObj', summaryObj)
-          //   console.log('summaryObj stringified', JSON.stringify(summaryObj))
-          //   console.log('summaryObj hash', Context.crypto.hash(summaryObj))
-          // }
+          console.log(`Summary Obj for partition ${partition}`, summaryObj)
+          if (summaryObj) {
+            console.log('summaryObj', summaryObj)
+            console.log('summaryObj stringified', JSON.stringify(summaryObj))
+            console.log('summaryObj hash', Context.crypto.hash(summaryObj))
+          }
         }
 
         Comms.sendGossip('snapshot_gossip', message)
