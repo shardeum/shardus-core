@@ -909,312 +909,11 @@ class StateManager {
 
     this.partitionObjects.setupHandlers()
 
-    // /get_account_state_hash (Acc_start, Acc_end, Ts_start, Ts_end)
-    // Acc_start - get data for accounts starting with this account id; inclusive
-    // Acc_end - get data for accounts up to this account id; inclusive
-    // Ts_start - get data newer than this timestamp
-    // Ts_end - get data older than this timestamp
-    // Returns a single hash of the data from the Account State Table determined by the input parameters; sort by Tx_ts  then Tx_id before taking the hash
-    // Updated names:  accountStart , accountEnd, tsStart, tsEnd
-    this.p2p.registerInternal('get_account_state_hash', async (payload: AccountStateHashReq, respond: (arg0: AccountStateHashResp) => any) => {
-      let result = {} as AccountStateHashResp
+    this.transactionQueue.setupHandlers()
 
-      // yikes need to potentially hash only N records at a time and return an array of hashes
-      let stateHash = await this.transactionQueue.getAccountsStateHash(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd)
-      result.stateHash = stateHash
-      await respond(result)
-    })
+    this.accountSync.setupHandlers()
 
-    //    /get_account_state (Acc_start, Acc_end, Ts_start, Ts_end)
-    // Acc_start - get data for accounts starting with this account id; inclusive
-    // Acc_end - get data for accounts up to this account id; inclusive
-    // Ts_start - get data newer than this timestamp
-    // Ts_end - get data older than this timestamp
-    // Returns data from the Account State Table determined by the input parameters; limits result to 1000 records (as configured)
-    // Updated names:  accountStart , accountEnd, tsStart, tsEnd
-    this.p2p.registerInternal('get_account_state', async (payload: GetAccountStateReq, respond: (arg0: { accountStates: Shardus.StateTableObject[] }) => any) => {
-      let result = {} as { accountStates: Shardus.StateTableObject[] }
-
-      if (this.config.stateManager == null) {
-        throw new Error('this.config.stateManager == null') //TODO TSConversion  would be nice to eliminate some of these config checks.
-      }
-
-      // max records set artificially low for better test coverage
-      // todo m11: make configs for how many records to query
-      let accountStates = await this.storage.queryAccountStateTable(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, this.config.stateManager.stateTableBucketSize)
-      result.accountStates = accountStates
-      await respond(result)
-    })
-
-    // /get_accepted_transactions (Ts_start, Ts_end)
-    // Ts_start - get data newer than this timestamp
-    // Ts_end - get data older than this timestamp
-    // Returns data from the Accepted Tx Table starting with Ts_start; limits result to 500 records (as configured)
-    // Updated names: tsStart, tsEnd
-    this.p2p.registerInternal('get_accepted_transactions', async (payload: AcceptedTransactionsReq, respond: (arg0: { transactions: Shardus.AcceptedTx[] }) => any) => {
-      let result = {} as { transactions: Shardus.AcceptedTx[] }
-
-      if (!payload.limit) {
-        payload.limit = 10
-      }
-      let transactions = await this.storage.queryAcceptedTransactions(payload.tsStart, payload.tsEnd, payload.limit)
-      result.transactions = transactions
-      await respond(result)
-    })
-
-    // /get_account_data (Acc_start, Acc_end)
-    // Acc_start - get data for accounts starting with this account id; inclusive
-    // Acc_end - get data for accounts up to this account id; inclusive
-    // Returns data from the application Account Table; limits result to 300 records (as configured);
-    // For applications with multiple “Account” tables the returned data is grouped by table name.
-    // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
-    // Updated names:  accountStart , accountEnd
-    this.p2p.registerInternal('get_account_data', async (payload: GetAccountDataReq, respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => any) => {
-      throw new Error('get_account_data endpoint retired')
-
-      // let result = {} as {accountData: Shardus.WrappedData[] | null}//TSConversion  This is complicated !! check app for details.
-      // let accountData = null
-      // let ourLockID = -1
-      // try {
-      //   ourLockID = await this.fifoLock('accountModification')
-      //   accountData = await this.app.getAccountData(payload.accountStart, payload.accountEnd, payload.maxRecords)
-      // } finally {
-      //   this.fifoUnlock('accountModification', ourLockID)
-      // }
-      // //PERF Disiable this in production or performance testing.
-      // this.testAccountDataWrapped(accountData)
-      // result.accountData = accountData
-      // await respond(result)
-    })
-
-    this.p2p.registerInternal('get_account_data2', async (payload: GetAccountData2Req, respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => any) => {
-      let result = {} as { accountData: Shardus.WrappedData[] | null } //TSConversion  This is complicated !!
-      let accountData = null
-      let ourLockID = -1
-      try {
-        ourLockID = await this.fifoLock('accountModification')
-        accountData = await this.app.getAccountDataByRange(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, payload.maxRecords)
-      } finally {
-        this.fifoUnlock('accountModification', ourLockID)
-      }
-      //PERF Disiable this in production or performance testing.
-      this.testAccountDataWrapped(accountData)
-      result.accountData = accountData
-      await respond(result)
-    })
-
-    this.p2p.registerInternal('get_account_data3', async (payload: GetAccountData3Req, respond: (arg0: { data: GetAccountDataByRangeSmart }) => any) => {
-      let result = {} as { data: GetAccountDataByRangeSmart } //TSConversion  This is complicated !!(due to app wrapping)  as {data: Shardus.AccountData[] | null}
-      let accountData: GetAccountDataByRangeSmart | null = null
-      let ourLockID = -1
-      try {
-        ourLockID = await this.fifoLock('accountModification')
-        // returns { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs }
-        //GetAccountDataByRangeSmart
-        accountData = await this.getAccountDataByRangeSmart(payload.accountStart, payload.accountEnd, payload.tsStart, payload.maxRecords)
-      } finally {
-        this.fifoUnlock('accountModification', ourLockID)
-      }
-
-      //PERF Disiable this in production or performance testing.
-      this.testAccountDataWrapped(accountData.wrappedAccounts)
-      //PERF Disiable this in production or performance testing.
-      this.testAccountDataWrapped(accountData.wrappedAccounts2)
-
-      result.data = accountData
-      await respond(result)
-    })
-
-    // /get_account_data_by_list (Acc_ids)
-    // Acc_ids - array of accounts to get
-    // Returns data from the application Account Table for just the given account ids;
-    // For applications with multiple “Account” tables the returned data is grouped by table name.
-    // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
-    // Updated names:  accountIds, max records
-    this.p2p.registerInternal('get_account_data_by_list', async (payload: { accountIds: any }, respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => any) => {
-      let result = {} as { accountData: Shardus.WrappedData[] | null }
-      let accountData = null
-      let ourLockID = -1
-      try {
-        ourLockID = await this.fifoLock('accountModification')
-        accountData = await this.app.getAccountDataByList(payload.accountIds)
-      } finally {
-        this.fifoUnlock('accountModification', ourLockID)
-      }
-      //PERF Disiable this in production or performance testing.
-      this.testAccountDataWrapped(accountData)
-      result.accountData = accountData
-      await respond(result)
-    })
-
-    // /get_transactions_by_list (Tx_ids)
-    //   Tx_ids - array of transaction ids
-    //   Returns data from the Transactions Table for just the given transaction ids
-    this.p2p.registerInternal('get_transactions_by_list', async (payload: GetTransactionsByListReq, respond: (arg0: Shardus.AcceptedTx[]) => any) => {
-      let result = [] as AcceptedTx[]
-      try {
-        result = await this.storage.queryAcceptedTransactionsByIds(payload.Tx_ids)
-      } finally {
-      }
-      await respond(result)
-    })
-
-    this.p2p.registerInternal('get_transactions_by_partition_index', async (payload: TransactionsByPartitionReq, respond: (arg0: TransactionsByPartitionResp) => any) => {
-      // let result = {}
-
-      let passFailList = []
-      let statesList = []
-      let acceptedTXs = null
-      try {
-        // let partitionId = payload.partitionId
-        let cycle = payload.cycle
-        let indicies = payload.tx_indicies
-        let hash = payload.hash
-        let partitionId = payload.partitionId
-
-        let expectedResults = indicies.length
-        let returnedResults = 0
-        let key = 'c' + cycle
-        let partitionObjectsByHash = this.partitionObjects.recentPartitionObjectsByCycleByHash[key]
-        if (!partitionObjectsByHash) {
-          await respond({ success: false })
-        }
-        let partitionObject = partitionObjectsByHash[hash]
-        if (!partitionObject) {
-          await respond({ success: false })
-        }
-        let txIDList = []
-        for (let index of indicies) {
-          let txid = partitionObject.Txids[index]
-          txIDList.push(txid)
-          let passFail = partitionObject.Status[index]
-          passFailList.push(passFail)
-        }
-        for (let index of indicies) {
-          let state = partitionObject.States[index]
-          statesList.push(state)
-          if (state != null) {
-            returnedResults++
-          }
-        }
-
-        if (returnedResults < expectedResults) {
-          if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send ${returnedResults} < ${expectedResults}`)
-        }
-        acceptedTXs = await this.storage.queryAcceptedTransactionsByIds(txIDList)
-
-        // if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send2 `)
-
-        if (acceptedTXs != null && acceptedTXs.length < expectedResults) {
-          if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index results ${utils.stringifyReduce(acceptedTXs)} snippets ${utils.stringifyReduce(payload.debugSnippets)} `)
-          if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index results2:${utils.stringifyReduce(acceptedTXs.map((x: Shardus.AcceptedTx) => x.id))} snippets:${utils.stringifyReduce(payload.debugSnippets)} txid:${utils.stringifyReduce(txIDList)} `)
-
-          let acceptedTXsBefore = 0
-          if (acceptedTXs != null) {
-            acceptedTXsBefore = acceptedTXs.length
-          }
-
-          // find an log missing results:
-          // for(let txid of txIDList)
-          let received: StringBoolObjectMap = {}
-          for (let acceptedTX of acceptedTXs) {
-            received[acceptedTX.id] = true
-          }
-          let missingTXs: string[] = []
-          let missingTXHash: StringBoolObjectMap = {}
-          for (let txid of txIDList) {
-            if (received[txid] !== true) {
-              missingTXs.push(txid)
-              missingTXHash[txid] = true
-            }
-          }
-          let finds = -1
-          let txTally = this.partitionObjects.getTXList(cycle, partitionId)
-          let found = []
-          if (txTally) {
-            finds = 0
-            for (let tx of txTally.txs) {
-              if (missingTXHash[tx.id] === true) {
-                finds++
-                acceptedTXs.push(tx)
-                found.push(tx.id)
-              }
-            }
-          }
-          if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send3 ${acceptedTXsBefore} < ${expectedResults} findsFixed: ${finds}  missing: ${utils.stringifyReduce(missingTXs)} found: ${utils.stringifyReduce(found)} acceptedTXs.length updated: ${acceptedTXs.length}`)
-        } else {
-        }
-      } catch (ex) {
-        this.statemanager_fatal(`get_transactions_by_partition_index_ex`, 'get_transactions_by_partition_index failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      } finally {
-      }
-      // TODO fix pass fail sorting.. it is probably all wrong and out of sync, but currently nothing fails.
-      await respond({ success: true, acceptedTX: acceptedTXs, passFail: passFailList, statesList: statesList })
-    })
-
-    // /get_partition_txids (Partition_id, Cycle_number)
-    //   Partition_id
-    //   Cycle_number
-    //   Returns the partition object which contains the txids along with the status
-    this.p2p.registerInternal('get_partition_txids', async (payload: GetPartitionTxidsReq, respond: (arg0: {}) => any) => {
-      let result = {}
-      try {
-        let id = payload.Partition_id
-        let key = 'c' + payload.Cycle_number
-        let partitionObjects = this.partitionObjects.partitionObjectsByCycle[key]
-        for (let obj of partitionObjects) {
-          if (obj.Partition_id === id) {
-            result = obj
-          }
-        }
-      } finally {
-      }
-      await respond(result)
-    })
-
-    // // p2p TELL
-    // this.p2p.registerInternal('route_to_home_node', async (payload: RouteToHomeNodeReq, respond: any) => {
-    //   // gossip 'spread_tx_to_group' to transaction group
-    //   // Place tx in queue (if younger than m)
-
-    //   // make sure we don't already have it
-    //   let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid)//, payload.timestamp)
-    //   if (queueEntry) {
-    //     return
-    //     // already have this in our queue
-    //   }
-
-    //   this.transactionQueue.routeAndQueueAcceptedTransaction(payload.acceptedTx, true, null, false) // todo pass in sender?
-
-    //   // no response needed?
-    // })
-
-    // p2p ASK
-    this.p2p.registerInternal('request_state_for_tx', async (payload: RequestStateForTxReq, respond: (arg0: RequestStateForTxResp) => any) => {
-      let response: RequestStateForTxResp = { stateList: [], beforeHashes: {}, note: '', success: false }
-      // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
-      let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-      if (queueEntry == null) {
-        queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'request_state_for_tx') // , payload.timestamp)
-      }
-
-      if (queueEntry == null) {
-        response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
-        await respond(response)
-        // TODO ???? if we dont have a queue entry should we do db queries to get the needed data?
-        // my guess is probably not yet
-        return
-      }
-
-      for (let key of payload.keys) {
-        let data = queueEntry.originalData[key] // collectedData
-        if (data) {
-          response.stateList.push(JSON.parse(data))
-        }
-      }
-      response.success = true
-      await respond(response)
-    })
+    this.transactionConsensus.setupHandlers()
 
     // p2p ASK
     this.p2p.registerInternal('request_receipt_for_tx', async (payload: RequestReceiptForTxReq, respond: (arg0: RequestReceiptForTxResp) => any) => {
@@ -1302,96 +1001,6 @@ class StateManager {
       await respond(response)
     })
 
-    // p2p TELL
-    this.p2p.registerInternal('broadcast_state', async (payload: { txid: string; stateList: any[] }, respond: any) => {
-      // Save the wrappedAccountState with the rest our queue data
-      // let message = { stateList: datas, txid: queueEntry.acceptedTX.id }
-      // this.p2p.tell([correspondingEdgeNode], 'broadcast_state', message)
-
-      // make sure we have it
-      let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-      if (queueEntry == null) {
-        //if we are syncing we need to queue this transaction!
-
-        //this.transactionQueue.routeAndQueueAcceptedTransaction (acceptedTx:AcceptedTx, sendGossip:boolean = true, sender: Shardus.Node  |  null, globalModification:boolean)
-
-        return
-      }
-      // add the data in
-      for (let data of payload.stateList) {
-        this.transactionQueue.queueEntryAddData(queueEntry, data)
-        if (queueEntry.state === 'syncing') {
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_sync_gotBroadcastData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
-        }
-      }
-    })
-
-    this.p2p.registerGossipHandler('spread_tx_to_group', async (payload, sender, tracker) => {
-      //  gossip 'spread_tx_to_group' to transaction group
-      // Place tx in queue (if younger than m)
-
-      let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.id) // , payload.timestamp)
-      if (queueEntry) {
-        return
-        // already have this in our queue
-      }
-
-      //TODO need to check transaction fields.
-
-      let noConsensus = false // this can only be true for a set command which will never come from an endpoint
-      let added = this.transactionQueue.routeAndQueueAcceptedTransaction(payload, /*sendGossip*/ false, sender, /*globalModification*/ false, noConsensus)
-      if (added === 'lost') {
-        return // we are faking that the message got lost so bail here
-      }
-      if (added === 'out of range') {
-        return
-      }
-      if (added === 'notReady') {
-        return
-      }
-      queueEntry = this.transactionQueue.getQueueEntrySafe(payload.id) //, payload.timestamp) // now that we added it to the queue, it should be possible to get the queueEntry now
-
-      if (queueEntry == null) {
-        // do not gossip this, we are not involved
-        this.statemanager_fatal(`spread_tx_to_group_noQE`, `spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(payload.id)}`)
-        return
-      }
-
-      //Validation.
-      const initValidationResp = this.app.validateTxnFields(queueEntry.acceptedTx.data)
-      if (initValidationResp.success !== true) {
-        this.statemanager_fatal(`spread_tx_to_group_validateTX`, `spread_tx_to_group validateTxnFields failed: ${utils.stringifyReduce(initValidationResp)}`)
-        return
-      }
-
-      //TODO check time before inserting queueEntry.  1sec future 5 second past max
-      let timeM = this.queueSitTime
-      let timestamp = queueEntry.txKeys.timestamp
-      let age = Date.now() - timestamp
-      if (age > timeM * 0.9) {
-        this.statemanager_fatal(`spread_tx_to_group_OldTx`, 'spread_tx_to_group cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
-        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_spread_tx_to_groupToOld', '', 'spread_tx_to_group working on older tx ' + timestamp + ' age: ' + age)
-        return
-      }
-      if (age < -1000) {
-        this.statemanager_fatal(`spread_tx_to_group_tooFuture`, 'spread_tx_to_group cannot accept tx more than 1 second in future ' + timestamp + ' age: ' + age)
-        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_spread_tx_to_groupToFutrue', '', 'spread_tx_to_group tx too far in future' + timestamp + ' age: ' + age)
-        return
-      }
-
-      // how did this work before??
-      // get transaction group. 3 accounds, merge lists.
-      let transactionGroup = this.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-      if (queueEntry.ourNodeInTransactionGroup === false) {
-        return
-      }
-      if (transactionGroup.length > 1) {
-        this.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `gossip to neighbors`, transactionGroup)
-        this.p2p.sendGossipIn('spread_tx_to_group', payload, tracker, sender, transactionGroup)
-      }
-
-      // await this.transactionQueue.routeAndQueueAcceptedTransaction(acceptedTX, false, sender)
-    })
 
     // TODO STATESHARDING4 ENDPOINTS ok, I changed this to tell, but we still need to check sender!
     //this.p2p.registerGossipHandler('spread_appliedVote', async (payload, sender, tracker) => {
@@ -1409,52 +1018,7 @@ class StateManager {
       }
     })
 
-    this.p2p.registerGossipHandler('spread_appliedReceipt', async (payload, sender, tracker) => {
-      let appliedReceipt = payload as AppliedReceipt
-      let queueEntry = this.transactionQueue.getQueueEntrySafe(appliedReceipt.txid) // , payload.timestamp)
-      if (queueEntry == null) {
-        if (queueEntry == null) {
-          // It is ok to search the archive for this.  Not checking this was possibly breaking the gossip chain before
-          queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'spread_appliedReceipt') // , payload.timestamp)
-          if (queueEntry != null) {
-            // TODO : PERF on a faster version we may just bail if this lives in the arcive list.
-            // would need to make sure we send gossip though.
-          }
-        }
-        if (queueEntry == null) {
-          this.mainLogger.error(`spread_appliedReceipt no queue entry for ${appliedReceipt.txid} dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`)
-          return
-        }
-      }
 
-      if (this.testFailChance(this.ignoreRecieptChance, 'spread_appliedReceipt', utils.stringifyReduce(appliedReceipt.txid), '', this.verboseLogs) === true) {
-        return
-      }
-
-      // TODO STATESHARDING4 ENDPOINTS check payload format
-      // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
-
-      let receiptNotNull = appliedReceipt != null
-
-      if (queueEntry.recievedAppliedReceipt == null) {
-        this.mainLogger.debug(`spread_appliedReceipt update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`)
-
-        queueEntry.recievedAppliedReceipt = appliedReceipt
-
-        // I think we handle the negative cases later by checking queueEntry.recievedAppliedReceipt vs queueEntry.appliedReceipt
-
-        // share the appliedReceipt.
-        let sender = null
-        let consensusGroup = this.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-        if (consensusGroup.length > 1) {
-          // should consider only forwarding in some cases?
-          this.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, consensusGroup)
-          this.p2p.sendGossipIn('spread_appliedReceipt', appliedReceipt, tracker, sender, consensusGroup)
-        }
-      } else {
-        this.mainLogger.debug(`spread_appliedReceipt skipped ${queueEntry.logID} receiptNotNull:${receiptNotNull}`)
-      }
-    })
 
     this.p2p.registerInternal('get_account_data_with_queue_hints', async (payload: { accountIds: string[] }, respond: (arg0: GetAccountDataWithQueueHintsResp) => any) => {
       let result = {} as GetAccountDataWithQueueHintsResp //TSConversion  This is complicated !! check app for details.
@@ -1513,18 +1077,18 @@ class StateManager {
   }
 
   _unregisterEndpoints() {
-    this.p2p.unregisterGossipHandler('acceptedTx')
+    //this.p2p.unregisterGossipHandler('acceptedTx')
     this.p2p.unregisterInternal('get_account_state_hash')
     this.p2p.unregisterInternal('get_account_state')
-    this.p2p.unregisterInternal('get_accepted_transactions')
-    this.p2p.unregisterInternal('get_account_data')
-    this.p2p.unregisterInternal('get_account_data2')
+    //this.p2p.unregisterInternal('get_accepted_transactions')
+    //this.p2p.unregisterInternal('get_account_data')
+    //this.p2p.unregisterInternal('get_account_data2')
     this.p2p.unregisterInternal('get_account_data3')
     this.p2p.unregisterInternal('get_account_data_by_list')
-    this.p2p.unregisterInternal('post_partition_results')
-    this.p2p.unregisterInternal('get_transactions_by_list')
-    this.p2p.unregisterInternal('get_transactions_by_partition_index')
-    this.p2p.unregisterInternal('get_partition_txids')
+    //this.p2p.unregisterInternal('post_partition_results')
+    //this.p2p.unregisterInternal('get_transactions_by_list')
+    //this.p2p.unregisterInternal('get_transactions_by_partition_index')
+    //this.p2p.unregisterInternal('get_partition_txids')
     // new shard endpoints:
     // this.p2p.unregisterInternal('route_to_home_node')
     this.p2p.unregisterInternal('request_state_for_tx')
@@ -2760,15 +2324,15 @@ class StateManager {
       return
     }
 
-    if (this.oldFeature_GeneratePartitionReport === true) {
-      if (this.verboseLogs) this.mainLogger.debug(` processPreviousCycleSummaries cycle: ${cycle.counter}`)
-      // this will take temp TXs and make sure they are stored in the correct place for us to generate partitions
-      this.partitionObjects.processTempTXs(cycle)
+    // if (this.oldFeature_GeneratePartitionReport === true) {
+    //   if (this.verboseLogs) this.mainLogger.debug(` processPreviousCycleSummaries cycle: ${cycle.counter}`)
+    //   // this will take temp TXs and make sure they are stored in the correct place for us to generate partitions
+    //   this.partitionObjects.processTempTXs(cycle)
 
-      // During the Q2 phase of a cycle, nodes compute the partition hash of the previous cycle for all the partitions covered by the node.
-      // Q2 was chosen so that any transactions submitted with a time stamp that falls in the previous quarter will have been processed and finalized. This could be changed to Q3 if we find that more time is needed.
-      this.partitionObjects.generatePartitionObjects(cycle)
-    }
+    //   // During the Q2 phase of a cycle, nodes compute the partition hash of the previous cycle for all the partitions covered by the node.
+    //   // Q2 was chosen so that any transactions submitted with a time stamp that falls in the previous quarter will have been processed and finalized. This could be changed to Q3 if we find that more time is needed.
+    //   this.partitionObjects.generatePartitionObjects(cycle)
+    // }
 
     let receiptMapResults = []
 
@@ -2812,13 +2376,26 @@ class StateManager {
       }
     }
 
-    if (this.oldFeature_GeneratePartitionReport === true && this.oldFeature_BroadCastPartitionReport === true) {
-      // Nodes generate the partition result for all partitions they cover.
-      // Nodes broadcast the set of partition results to N adjacent peers on each side; where N is
-      // the number of partitions covered by the node. Uses the /post_partition_results API.
-      await this.partitionObjects.broadcastPartitionResults(cycle.counter) // Cycle_number
-    }
+    // if (this.oldFeature_GeneratePartitionReport === true && this.oldFeature_BroadCastPartitionReport === true) {
+    //   // Nodes generate the partition result for all partitions they cover.
+    //   // Nodes broadcast the set of partition results to N adjacent peers on each side; where N is
+    //   // the number of partitions covered by the node. Uses the /post_partition_results API.
+    //   await this.partitionObjects.broadcastPartitionResults(cycle.counter) // Cycle_number
+    // }
   }
+
+  /**
+   * initApoptosisAndQuitSyncing
+   * stop syncing and init apoptosis
+   */
+  initApoptosisAndQuitSyncing(logMsg:string) {
+    let log = `initApoptosisAndQuitSyncing ${utils.getTime('s')}  ${logMsg}`
+    console.log(log )
+    this.mainLogger.error(log)
+    this.accountSync.failAndDontRestartSync()
+    this.p2p.initApoptosis()
+  }
+
 
   /***
    *    ########  ########  ######  ######## #### ########  ########  ######
@@ -2848,10 +2425,10 @@ class StateManager {
     }
     this.partitionReceiptsByCycleCounter[key].push(partitionReceipt)
 
-    if (this.debugFeatureOld_partitionReciepts === true) {
-      // this doesnt really send to the archiver but it it does dump reciepts to logs.
-      this.depricated.trySendAndPurgeReceiptsToArchives(partitionReceipt)
-    }
+    // if (this.debugFeatureOld_partitionReciepts === true) {
+    //   // this doesnt really send to the archiver but it it does dump reciepts to logs.
+    //   this.depricated.trySendAndPurgeReceiptsToArchives(partitionReceipt)
+    // }
   }
 
   /**

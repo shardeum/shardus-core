@@ -562,7 +562,7 @@ class Storage {
       )
       // stop state manager from syncing?
 
-      this.stateManager.partitionObjects.initApoptosisAndQuitSyncing()
+      this.stateManager.initApoptosisAndQuitSyncing('addAccountStates')
     }
   }
 

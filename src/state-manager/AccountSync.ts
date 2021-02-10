@@ -137,6 +137,101 @@ class AccountSync {
     this.stateManager.fifoLocks = {}
   }
 
+
+/***
+ *    ##     ##    ###    ##    ## ########  ##       ######## ########   ######  
+ *    ##     ##   ## ##   ###   ## ##     ## ##       ##       ##     ## ##    ## 
+ *    ##     ##  ##   ##  ####  ## ##     ## ##       ##       ##     ## ##       
+ *    ######### ##     ## ## ## ## ##     ## ##       ######   ########   ######  
+ *    ##     ## ######### ##  #### ##     ## ##       ##       ##   ##         ## 
+ *    ##     ## ##     ## ##   ### ##     ## ##       ##       ##    ##  ##    ## 
+ *    ##     ## ##     ## ##    ## ########  ######## ######## ##     ##  ######  
+ */
+
+  setupHandlers(){
+    // /get_account_state_hash (Acc_start, Acc_end, Ts_start, Ts_end)
+    // Acc_start - get data for accounts starting with this account id; inclusive
+    // Acc_end - get data for accounts up to this account id; inclusive
+    // Ts_start - get data newer than this timestamp
+    // Ts_end - get data older than this timestamp
+    // Returns a single hash of the data from the Account State Table determined by the input parameters; sort by Tx_ts  then Tx_id before taking the hash
+    // Updated names:  accountStart , accountEnd, tsStart, tsEnd
+    this.p2p.registerInternal('get_account_state_hash', async (payload: AccountStateHashReq, respond: (arg0: AccountStateHashResp) => any) => {
+      let result = {} as AccountStateHashResp
+
+      // yikes need to potentially hash only N records at a time and return an array of hashes
+      let stateHash = await this.stateManager.transactionQueue.getAccountsStateHash(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd)
+      result.stateHash = stateHash
+      await respond(result)
+    })
+
+    //    /get_account_state (Acc_start, Acc_end, Ts_start, Ts_end)
+    // Acc_start - get data for accounts starting with this account id; inclusive
+    // Acc_end - get data for accounts up to this account id; inclusive
+    // Ts_start - get data newer than this timestamp
+    // Ts_end - get data older than this timestamp
+    // Returns data from the Account State Table determined by the input parameters; limits result to 1000 records (as configured)
+    // Updated names:  accountStart , accountEnd, tsStart, tsEnd
+    this.p2p.registerInternal('get_account_state', async (payload: GetAccountStateReq, respond: (arg0: { accountStates: Shardus.StateTableObject[] }) => any) => {
+      let result = {} as { accountStates: Shardus.StateTableObject[] }
+
+      if (this.config.stateManager == null) {
+        throw new Error('this.config.stateManager == null') //TODO TSConversion  would be nice to eliminate some of these config checks.
+      }
+
+      // max records set artificially low for better test coverage
+      // todo m11: make configs for how many records to query
+      let accountStates = await this.storage.queryAccountStateTable(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, this.config.stateManager.stateTableBucketSize)
+      result.accountStates = accountStates
+      await respond(result)
+    })
+
+    this.p2p.registerInternal('get_account_data3', async (payload: GetAccountData3Req, respond: (arg0: { data: GetAccountDataByRangeSmart }) => any) => {
+      let result = {} as { data: GetAccountDataByRangeSmart } //TSConversion  This is complicated !!(due to app wrapping)  as {data: Shardus.AccountData[] | null}
+      let accountData: GetAccountDataByRangeSmart | null = null
+      let ourLockID = -1
+      try {
+        ourLockID = await this.stateManager.fifoLock('accountModification')
+        // returns { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs }
+        //GetAccountDataByRangeSmart
+        accountData = await this.stateManager.getAccountDataByRangeSmart(payload.accountStart, payload.accountEnd, payload.tsStart, payload.maxRecords)
+      } finally {
+        this.stateManager.fifoUnlock('accountModification', ourLockID)
+      }
+
+      //PERF Disiable this in production or performance testing.
+      this.stateManager.testAccountDataWrapped(accountData.wrappedAccounts)
+      //PERF Disiable this in production or performance testing.
+      this.stateManager.testAccountDataWrapped(accountData.wrappedAccounts2)
+
+      result.data = accountData
+      await respond(result)
+    })
+
+    // /get_account_data_by_list (Acc_ids)
+    // Acc_ids - array of accounts to get
+    // Returns data from the application Account Table for just the given account ids;
+    // For applications with multiple “Account” tables the returned data is grouped by table name.
+    // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
+    // Updated names:  accountIds, max records
+    this.p2p.registerInternal('get_account_data_by_list', async (payload: { accountIds: any }, respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => any) => {
+      let result = {} as { accountData: Shardus.WrappedData[] | null }
+      let accountData = null
+      let ourLockID = -1
+      try {
+        ourLockID = await this.stateManager.fifoLock('accountModification')
+        accountData = await this.app.getAccountDataByList(payload.accountIds)
+      } finally {
+        this.stateManager.fifoUnlock('accountModification', ourLockID)
+      }
+      //PERF Disiable this in production or performance testing.
+      this.stateManager.testAccountDataWrapped(accountData)
+      result.accountData = accountData
+      await respond(result)
+    })
+  }
+
+
   /**
    * Skips app data sync and sets flags to enable external tx processing.
    * Called by snapshot module after data recovery is complete.
@@ -1335,8 +1430,6 @@ class AccountSync {
     // process the new accounts.
     await this.processAccountData()
   }
-
-  // this.p2p.registerInternal('get_account_data2', async (payload, respond) => {
 
   async failandRestart() {
     this.mainLogger.debug(`DATASYNC: failandRestart`)

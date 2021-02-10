@@ -76,6 +76,133 @@ class TransactionQueue {
     this.newAcceptedTxQueueRunning = false
   }
 
+
+  setupHandlers(){
+    // p2p TELL
+    this.p2p.registerInternal('broadcast_state', async (payload: { txid: string; stateList: any[] }, respond: any) => {
+      // Save the wrappedAccountState with the rest our queue data
+      // let message = { stateList: datas, txid: queueEntry.acceptedTX.id }
+      // this.p2p.tell([correspondingEdgeNode], 'broadcast_state', message)
+
+      // make sure we have it
+      let queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+      if (queueEntry == null) {
+        //if we are syncing we need to queue this transaction!
+
+        //this.transactionQueue.routeAndQueueAcceptedTransaction (acceptedTx:AcceptedTx, sendGossip:boolean = true, sender: Shardus.Node  |  null, globalModification:boolean)
+
+        return
+      }
+      // add the data in
+      for (let data of payload.stateList) {
+        this.queueEntryAddData(queueEntry, data)
+        if (queueEntry.state === 'syncing') {
+          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_sync_gotBroadcastData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
+        }
+      }
+    })
+
+    this.p2p.registerGossipHandler('spread_tx_to_group', async (payload, sender, tracker) => {
+      //  gossip 'spread_tx_to_group' to transaction group
+      // Place tx in queue (if younger than m)
+
+      let queueEntry = this.getQueueEntrySafe(payload.id) // , payload.timestamp)
+      if (queueEntry) {
+        return
+        // already have this in our queue
+      }
+
+      //TODO need to check transaction fields.
+
+      let noConsensus = false // this can only be true for a set command which will never come from an endpoint
+      let added = this.routeAndQueueAcceptedTransaction(payload, /*sendGossip*/ false, sender, /*globalModification*/ false, noConsensus)
+      if (added === 'lost') {
+        return // we are faking that the message got lost so bail here
+      }
+      if (added === 'out of range') {
+        return
+      }
+      if (added === 'notReady') {
+        return
+      }
+      queueEntry = this.getQueueEntrySafe(payload.id) //, payload.timestamp) // now that we added it to the queue, it should be possible to get the queueEntry now
+
+      if (queueEntry == null) {
+        // do not gossip this, we are not involved
+        this.statemanager_fatal(`spread_tx_to_group_noQE`, `spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(payload.id)}`)
+        return
+      }
+
+      //Validation.
+      const initValidationResp = this.app.validateTxnFields(queueEntry.acceptedTx.data)
+      if (initValidationResp.success !== true) {
+        this.statemanager_fatal(`spread_tx_to_group_validateTX`, `spread_tx_to_group validateTxnFields failed: ${utils.stringifyReduce(initValidationResp)}`)
+        return
+      }
+
+      //TODO check time before inserting queueEntry.  1sec future 5 second past max
+      let timeM = this.stateManager.queueSitTime
+      let timestamp = queueEntry.txKeys.timestamp
+      let age = Date.now() - timestamp
+      if (age > timeM * 0.9) {
+        this.statemanager_fatal(`spread_tx_to_group_OldTx`, 'spread_tx_to_group cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
+        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_spread_tx_to_groupToOld', '', 'spread_tx_to_group working on older tx ' + timestamp + ' age: ' + age)
+        return
+      }
+      if (age < -1000) {
+        this.statemanager_fatal(`spread_tx_to_group_tooFuture`, 'spread_tx_to_group cannot accept tx more than 1 second in future ' + timestamp + ' age: ' + age)
+        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_spread_tx_to_groupToFutrue', '', 'spread_tx_to_group tx too far in future' + timestamp + ' age: ' + age)
+        return
+      }
+
+      // how did this work before??
+      // get transaction group. 3 accounds, merge lists.
+      let transactionGroup = this.queueEntryGetTransactionGroup(queueEntry)
+      if (queueEntry.ourNodeInTransactionGroup === false) {
+        return
+      }
+      if (transactionGroup.length > 1) {
+        this.stateManager.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `gossip to neighbors`, transactionGroup)
+        this.p2p.sendGossipIn('spread_tx_to_group', payload, tracker, sender, transactionGroup)
+      }
+
+      // await this.transactionQueue.routeAndQueueAcceptedTransaction(acceptedTX, false, sender)
+    })
+
+    /**
+     * request_state_for_tx
+     * used by the transaction queue when a queue entry needs to ask for missing state
+     */
+    this.p2p.registerInternal('request_state_for_tx', async (payload: RequestStateForTxReq, respond: (arg0: RequestStateForTxResp) => any) => {
+      let response: RequestStateForTxResp = { stateList: [], beforeHashes: {}, note: '', success: false }
+      // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
+      let queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+      if (queueEntry == null) {
+        queueEntry = this.getQueueEntryArchived(payload.txid, 'request_state_for_tx') // , payload.timestamp)
+      }
+
+      if (queueEntry == null) {
+        response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
+        await respond(response)
+        // TODO ???? if we dont have a queue entry should we do db queries to get the needed data?
+        // my guess is probably not yet
+        return
+      }
+
+      for (let key of payload.keys) {
+        let data = queueEntry.originalData[key] // collectedData
+        if (data) {
+          response.stateList.push(JSON.parse(data))
+        }
+      }
+      response.success = true
+      await respond(response)
+    })
+
+  }
+
+
+
   /***
    *       ###    ########  ########   ######  ########    ###    ######## ########
    *      ## ##   ##     ## ##     ## ##    ##    ##      ## ##      ##    ##
@@ -402,7 +529,7 @@ class TransactionQueue {
 
     if (!repairing) {
       //if(savedSomething){
-      this.stateManager.partitionObjects.tempRecordTXByCycle(txTs, acceptedTX, true, applyResponse, isGlobalModifyingTX, savedSomething)
+      //this.stateManager.partitionObjects.tempRecordTXByCycle(txTs, acceptedTX, true, applyResponse, isGlobalModifyingTX, savedSomething)
       //}
 
       //WOW this was not good!  had acceptedTX.transactionGroup[0].id
@@ -1343,7 +1470,12 @@ class TransactionQueue {
     return txGroup
   }
 
-  // should work even if there are zero nodes to tell and should load data locally into queue entry
+  /**
+   * tellCorrespondingNodes
+   * @param queueEntry 
+   * -sends account data to the correct involved nodees
+   * -loads locally available data into the queue entry
+   */
   async tellCorrespondingNodes(queueEntry: QueueEntry) {
     if (this.stateManager.currentCycleShardData == null) {
       throw new Error('tellCorrespondingNodes: currentCycleShardData == null')

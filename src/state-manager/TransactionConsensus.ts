@@ -48,6 +48,59 @@ class TransactionConsenus {
     this.statemanager_fatal = stateManager.statemanager_fatal
   }
 
+
+  setupHandlers(){
+    this.p2p.registerGossipHandler('spread_appliedReceipt', async (payload, sender, tracker) => {
+        let appliedReceipt = payload as AppliedReceipt
+        let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(appliedReceipt.txid) // , payload.timestamp)
+        if (queueEntry == null) {
+          if (queueEntry == null) {
+            // It is ok to search the archive for this.  Not checking this was possibly breaking the gossip chain before
+            queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(payload.txid, 'spread_appliedReceipt') // , payload.timestamp)
+            if (queueEntry != null) {
+              // TODO : PERF on a faster version we may just bail if this lives in the arcive list.
+              // would need to make sure we send gossip though.
+            }
+          }
+          if (queueEntry == null) {
+            this.mainLogger.error(`spread_appliedReceipt no queue entry for ${appliedReceipt.txid} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(payload.txid)]}`)
+            return
+          }
+        }
+  
+        if (this.stateManager.testFailChance(this.stateManager.ignoreRecieptChance, 'spread_appliedReceipt', utils.stringifyReduce(appliedReceipt.txid), '', this.verboseLogs) === true) {
+          return
+        }
+  
+        // TODO STATESHARDING4 ENDPOINTS check payload format
+        // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
+  
+        let receiptNotNull = appliedReceipt != null
+  
+        if (queueEntry.recievedAppliedReceipt == null) {
+          this.mainLogger.debug(`spread_appliedReceipt update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`)
+  
+          queueEntry.recievedAppliedReceipt = appliedReceipt
+  
+          // I think we handle the negative cases later by checking queueEntry.recievedAppliedReceipt vs queueEntry.appliedReceipt
+  
+          // share the appliedReceipt.
+          let sender = null
+          let consensusGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+          if (consensusGroup.length > 1) {
+            // should consider only forwarding in some cases?
+            this.stateManager.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, consensusGroup)
+            this.p2p.sendGossipIn('spread_appliedReceipt', appliedReceipt, tracker, sender, consensusGroup)
+          }
+        } else {
+          this.mainLogger.debug(`spread_appliedReceipt skipped ${queueEntry.logID} receiptNotNull:${receiptNotNull}`)
+        }
+      })
+
+
+  }
+
+
   /**
    * shareAppliedReceipt
    * gossip the appliedReceipt to the transaction group
