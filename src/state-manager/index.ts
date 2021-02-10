@@ -1001,7 +1001,6 @@ class StateManager {
       await respond(response)
     })
 
-
     // TODO STATESHARDING4 ENDPOINTS ok, I changed this to tell, but we still need to check sender!
     //this.p2p.registerGossipHandler('spread_appliedVote', async (payload, sender, tracker) => {
     this.p2p.registerInternal('spread_appliedVote', async (payload: AppliedVote, respond: any) => {
@@ -1017,8 +1016,6 @@ class StateManager {
         // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
       }
     })
-
-
 
     this.p2p.registerInternal('get_account_data_with_queue_hints', async (payload: { accountIds: string[] }, respond: (arg0: GetAccountDataWithQueueHintsResp) => any) => {
       let result = {} as GetAccountDataWithQueueHintsResp //TSConversion  This is complicated !! check app for details.
@@ -2388,14 +2385,13 @@ class StateManager {
    * initApoptosisAndQuitSyncing
    * stop syncing and init apoptosis
    */
-  initApoptosisAndQuitSyncing(logMsg:string) {
+  initApoptosisAndQuitSyncing(logMsg: string) {
     let log = `initApoptosisAndQuitSyncing ${utils.getTime('s')}  ${logMsg}`
-    console.log(log )
+    console.log(log)
     this.mainLogger.error(log)
     this.accountSync.failAndDontRestartSync()
     this.p2p.initApoptosis()
   }
-
 
   /***
    *    ########  ########  ######  ######## #### ########  ########  ######

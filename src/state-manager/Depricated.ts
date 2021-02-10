@@ -80,9 +80,8 @@ class Depricated {
     this.dataRepairStack = []
   }
 
-
-//NOT used but seem possibly usefull...
-purgeTransactionData() {
+  //NOT used but seem possibly usefull...
+  purgeTransactionData() {
     let tsStart = 0
     let tsEnd = 0
     this.storage.clearAcceptedTX(tsStart, tsEnd)
@@ -95,20 +94,17 @@ purgeTransactionData() {
     this.storage.clearAccountStateTableOlderThan(tsEnd)
   }
 
-
-/***
- *    ##     ##    ###    ##    ## ########  ##       ######## ########   ######  
- *    ##     ##   ## ##   ###   ## ##     ## ##       ##       ##     ## ##    ## 
- *    ##     ##  ##   ##  ####  ## ##     ## ##       ##       ##     ## ##       
- *    ######### ##     ## ## ## ## ##     ## ##       ######   ########   ######  
- *    ##     ## ######### ##  #### ##     ## ##       ##       ##   ##         ## 
- *    ##     ## ##     ## ##   ### ##     ## ##       ##       ##    ##  ##    ## 
- *    ##     ## ##     ## ##    ## ########  ######## ######## ##     ##  ######  
- */
+  /***
+   *    ##     ##    ###    ##    ## ########  ##       ######## ########   ######
+   *    ##     ##   ## ##   ###   ## ##     ## ##       ##       ##     ## ##    ##
+   *    ##     ##  ##   ##  ####  ## ##     ## ##       ##       ##     ## ##
+   *    ######### ##     ## ## ## ## ##     ## ##       ######   ########   ######
+   *    ##     ## ######### ##  #### ##     ## ##       ##       ##   ##         ##
+   *    ##     ## ##     ## ##   ### ##     ## ##       ##       ##    ##  ##    ##
+   *    ##     ## ##     ## ##    ## ########  ######## ######## ##     ##  ######
+   */
 
   setupHandlers() {
-
-
     // // /get_account_data (Acc_start, Acc_end)
     // // Acc_start - get data for accounts starting with this account id; inclusive
     // // Acc_end - get data for accounts up to this account id; inclusive
@@ -118,7 +114,6 @@ purgeTransactionData() {
     // // Updated names:  accountStart , accountEnd
     // this.p2p.registerInternal('get_account_data', async (payload: GetAccountDataReq, respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => any) => {
     //     throw new Error('get_account_data endpoint retired')
-  
     //     // let result = {} as {accountData: Shardus.WrappedData[] | null}//TSConversion  This is complicated !! check app for details.
     //     // let accountData = null
     //     // let ourLockID = -1
@@ -133,8 +128,6 @@ purgeTransactionData() {
     //     // result.accountData = accountData
     //     // await respond(result)
     //   })
-
-
     // // After joining the network
     // //   Record Joined timestamp
     // //   Even a syncing node will receive accepted transactions
@@ -142,14 +135,11 @@ purgeTransactionData() {
     // this.p2p.registerGossipHandler('acceptedTx', async (acceptedTX: AcceptedTx, sender: Shardus.Node, tracker: string) => {
     //   // docs mention putting this in a table but it seems so far that an in memory queue should be ok
     //   // should we filter, or instead rely on gossip in to only give us TXs that matter to us?
-
     //   this.p2p.sendGossipIn('acceptedTx', acceptedTX, tracker, sender)
-
     //   let noConsensus = false // this can only be true for a set command which will never come from an endpoint
     //   this.stateManager.transactionQueue.routeAndQueueAcceptedTransaction(acceptedTX, /*sendGossip*/ false, sender, /*globalModification*/ false, noConsensus)
     //   //Note await not needed so beware if you add code below this.
     // })
-
     // // /get_accepted_transactions (Ts_start, Ts_end)
     // // Ts_start - get data newer than this timestamp
     // // Ts_end - get data older than this timestamp
@@ -157,7 +147,6 @@ purgeTransactionData() {
     // // Updated names: tsStart, tsEnd
     // this.p2p.registerInternal('get_accepted_transactions', async (payload: AcceptedTransactionsReq, respond: (arg0: { transactions: Shardus.AcceptedTx[] }) => any) => {
     //   let result = {} as { transactions: Shardus.AcceptedTx[] }
-
     //   if (!payload.limit) {
     //     payload.limit = 10
     //   }
@@ -165,7 +154,6 @@ purgeTransactionData() {
     //   result.transactions = transactions
     //   await respond(result)
     // })
-
     // this.p2p.registerInternal('get_account_data2', async (payload: GetAccountData2Req, respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => any) => {
     //     let result = {} as { accountData: Shardus.WrappedData[] | null } //TSConversion  This is complicated !!
     //     let accountData = null
@@ -181,7 +169,6 @@ purgeTransactionData() {
     //     result.accountData = accountData
     //     await respond(result)
     //   })
-
     // // /get_transactions_by_list (Tx_ids)
     // //   Tx_ids - array of transaction ids
     // //   Returns data from the Transactions Table for just the given transaction ids
@@ -193,10 +180,8 @@ purgeTransactionData() {
     //     }
     //     await respond(result)
     //   })
-
     // this.p2p.registerInternal('get_transactions_by_partition_index', async (payload: TransactionsByPartitionReq, respond: (arg0: TransactionsByPartitionResp) => any) => {
     //     // let result = {}
-  
     //     let passFailList = []
     //     let statesList = []
     //     let acceptedTXs = null
@@ -206,7 +191,6 @@ purgeTransactionData() {
     //       let indicies = payload.tx_indicies
     //       let hash = payload.hash
     //       let partitionId = payload.partitionId
-  
     //       let expectedResults = indicies.length
     //       let returnedResults = 0
     //       let key = 'c' + cycle
@@ -232,23 +216,18 @@ purgeTransactionData() {
     //           returnedResults++
     //         }
     //       }
-  
     //       if (returnedResults < expectedResults) {
     //         if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send ${returnedResults} < ${expectedResults}`)
     //       }
     //       acceptedTXs = await this.storage.queryAcceptedTransactionsByIds(txIDList)
-  
     //       // if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send2 `)
-  
     //       if (acceptedTXs != null && acceptedTXs.length < expectedResults) {
     //         if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index results ${utils.stringifyReduce(acceptedTXs)} snippets ${utils.stringifyReduce(payload.debugSnippets)} `)
     //         if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index results2:${utils.stringifyReduce(acceptedTXs.map((x: Shardus.AcceptedTx) => x.id))} snippets:${utils.stringifyReduce(payload.debugSnippets)} txid:${utils.stringifyReduce(txIDList)} `)
-  
     //         let acceptedTXsBefore = 0
     //         if (acceptedTXs != null) {
     //           acceptedTXsBefore = acceptedTXs.length
     //         }
-  
     //         // find an log missing results:
     //         // for(let txid of txIDList)
     //         let received: StringBoolObjectMap = {}
@@ -286,7 +265,6 @@ purgeTransactionData() {
     //     // TODO fix pass fail sorting.. it is probably all wrong and out of sync, but currently nothing fails.
     //     await respond({ success: true, acceptedTX: acceptedTXs, passFail: passFailList, statesList: statesList })
     //   })
-  
     //   // /get_partition_txids (Partition_id, Cycle_number)
     //   //   Partition_id
     //   //   Cycle_number
@@ -306,134 +284,125 @@ purgeTransactionData() {
     //     }
     //     await respond(result)
     //   })
-  
-
-
   }
 
+  /***
+   *    ##     ## ####  ######   ######
+   *    ###   ###  ##  ##    ## ##    ##
+   *    #### ####  ##  ##       ##
+   *    ## ### ##  ##   ######  ##
+   *    ##     ##  ##        ## ##
+   *    ##     ##  ##  ##    ## ##    ##
+   *    ##     ## ####  ######   ######
+   */
 
-/***
- *    ##     ## ####  ######   ######  
- *    ###   ###  ##  ##    ## ##    ## 
- *    #### ####  ##  ##       ##       
- *    ## ### ##  ##   ######  ##       
- *    ##     ##  ##        ## ##       
- *    ##     ##  ##  ##    ## ##    ## 
- *    ##     ## ####  ######   ######  
- */
+  //   /**
+  //    * sendPartitionData
+  //    * @param {PartitionReceipt} partitionReceipt
+  //    * @param {PartitionObject} paritionObject
+  //    */
+  //   sendPartitionData(partitionReceipt: PartitionReceipt, paritionObject: PartitionObject) {
+  //     if (partitionReceipt.resultsList.length === 0) {
+  //       return
+  //     }
+  //     // CombinedPartitionReceipt
 
+  //     let partitionReceiptCopy = JSON.parse(stringify(partitionReceipt.resultsList[0]))
 
+  //     /** @type {CombinedPartitionReceipt} */
+  //     let combinedReciept = { result: partitionReceiptCopy, signatures: partitionReceipt.resultsList.map((a) => a.sign) }
 
-//   /**
-//    * sendPartitionData
-//    * @param {PartitionReceipt} partitionReceipt
-//    * @param {PartitionObject} paritionObject
-//    */
-//   sendPartitionData(partitionReceipt: PartitionReceipt, paritionObject: PartitionObject) {
-//     if (partitionReceipt.resultsList.length === 0) {
-//       return
-//     }
-//     // CombinedPartitionReceipt
+  //     if (this.verboseLogs) this.mainLogger.debug(' sendPartitionData ' + utils.stringifyReduceLimit({ combinedReciept, paritionObject }))
 
-//     let partitionReceiptCopy = JSON.parse(stringify(partitionReceipt.resultsList[0]))
+  //     // send it
+  //     // this.p2p.archivers.sendPartitionData(combinedReciept, paritionObject)
+  //   }
 
-//     /** @type {CombinedPartitionReceipt} */
-//     let combinedReciept = { result: partitionReceiptCopy, signatures: partitionReceipt.resultsList.map((a) => a.sign) }
+  //   sendTransactionData(partitionNumber: number, cycleNumber: number, transactions: AcceptedTx[]) {
+  //     if (this.verboseLogs) this.mainLogger.debug(' sendTransactionData ' + utils.stringifyReduceLimit({ partitionNumber, cycleNumber, transactions }))
 
-//     if (this.verboseLogs) this.mainLogger.debug(' sendPartitionData ' + utils.stringifyReduceLimit({ combinedReciept, paritionObject }))
+  //     // send it
+  //     // this.p2p.archivers.sendTransactionData(partitionNumber, cycleNumber, transactions)
+  //   }
 
-//     // send it
-//     // this.p2p.archivers.sendPartitionData(combinedReciept, paritionObject)
-//   }
+  //   /**
+  //    * trySendAndPurgeReciepts
+  //    * @param {PartitionReceipt} partitionReceipt
+  //    */
+  //   trySendAndPurgeReceiptsToArchives(partitionReceipt: PartitionReceipt) {
+  //     if (partitionReceipt.resultsList.length === 0) {
+  //       return
+  //     }
+  //     let cycleNumber = partitionReceipt.resultsList[0].Cycle_number
+  //     let partitionId = partitionReceipt.resultsList[0].Partition_id
+  //     let key = `c${cycleNumber}p${partitionId}`
+  //     if (this.sentReceipts.has(key)) {
+  //       return
+  //     }
 
-//   sendTransactionData(partitionNumber: number, cycleNumber: number, transactions: AcceptedTx[]) {
-//     if (this.verboseLogs) this.mainLogger.debug(' sendTransactionData ' + utils.stringifyReduceLimit({ partitionNumber, cycleNumber, transactions }))
+  //     if (this.verboseLogs) this.mainLogger.debug(' trySendAndPurgeReceipts ' + key)
 
-//     // send it
-//     // this.p2p.archivers.sendTransactionData(partitionNumber, cycleNumber, transactions)
-//   }
+  //     this.sentReceipts.set(key, true)
+  //     try {
+  //       if (this.sendArchiveData === true) {
+  //         let paritionObject = this.getPartitionObject(cycleNumber, partitionId) // todo get object
+  //         if (paritionObject == null) {
+  //           this.statemanager_fatal(`trySendAndPurgeReceiptsToArchives`, ` trySendAndPurgeReceiptsToArchives paritionObject == null ${cycleNumber} ${partitionId}`)
+  //           throw new Error(`trySendAndPurgeReceiptsToArchives paritionObject == null`)
+  //         }
+  //         this.sendPartitionData(partitionReceipt, paritionObject)
+  //       }
+  //     } finally {
+  //     }
 
-//   /**
-//    * trySendAndPurgeReciepts
-//    * @param {PartitionReceipt} partitionReceipt
-//    */
-//   trySendAndPurgeReceiptsToArchives(partitionReceipt: PartitionReceipt) {
-//     if (partitionReceipt.resultsList.length === 0) {
-//       return
-//     }
-//     let cycleNumber = partitionReceipt.resultsList[0].Cycle_number
-//     let partitionId = partitionReceipt.resultsList[0].Partition_id
-//     let key = `c${cycleNumber}p${partitionId}`
-//     if (this.sentReceipts.has(key)) {
-//       return
-//     }
+  //     if (this.sendTransactionData) {
+  //     //   let txList = this.stateManager.partitionObjects.getTXList(cycleNumber, partitionId)
 
-//     if (this.verboseLogs) this.mainLogger.debug(' trySendAndPurgeReceipts ' + key)
+  //     //   this.sendTransactionData(partitionId, cycleNumber, txList.txs)
+  //     }
 
-//     this.sentReceipts.set(key, true)
-//     try {
-//       if (this.sendArchiveData === true) {
-//         let paritionObject = this.getPartitionObject(cycleNumber, partitionId) // todo get object
-//         if (paritionObject == null) {
-//           this.statemanager_fatal(`trySendAndPurgeReceiptsToArchives`, ` trySendAndPurgeReceiptsToArchives paritionObject == null ${cycleNumber} ${partitionId}`)
-//           throw new Error(`trySendAndPurgeReceiptsToArchives paritionObject == null`)
-//         }
-//         this.sendPartitionData(partitionReceipt, paritionObject)
-//       }
-//     } finally {
-//     }
+  //     if (this.purgeArchiveData === true) {
+  //       // alreay sort of doing this in another spot.
+  //       // check if all partitions for this cycle have been handled!! then clear data in that time range.
+  //       // need to record time range.
+  //       // or check for open repairs. older than what we want to clear out.
+  //     }
+  //   }
 
-//     if (this.sendTransactionData) {
-//     //   let txList = this.stateManager.partitionObjects.getTXList(cycleNumber, partitionId)
+  //   storeOurPartitionReceipt(cycleNumber: number, partitionReceipt: PartitionReceipt) {
+  //     let key = 'c' + cycleNumber
 
-//     //   this.sendTransactionData(partitionId, cycleNumber, txList.txs)
-//     }
+  //     if (!this.stateManager.ourPartitionReceiptsByCycleCounter) {
+  //       this.stateManager.ourPartitionReceiptsByCycleCounter = {}
+  //     }
+  //     this.stateManager.ourPartitionReceiptsByCycleCounter[key] = partitionReceipt
+  //   }
 
-//     if (this.purgeArchiveData === true) {
-//       // alreay sort of doing this in another spot.
-//       // check if all partitions for this cycle have been handled!! then clear data in that time range.
-//       // need to record time range.
-//       // or check for open repairs. older than what we want to clear out.
-//     }
-//   }
+  //   getPartitionReceipt(cycleNumber: number) {
+  //     let key = 'c' + cycleNumber
 
-//   storeOurPartitionReceipt(cycleNumber: number, partitionReceipt: PartitionReceipt) {
-//     let key = 'c' + cycleNumber
+  //     if (!this.stateManager.ourPartitionReceiptsByCycleCounter) {
+  //       return null
+  //     }
+  //     return this.stateManager.ourPartitionReceiptsByCycleCounter[key]
+  //   }
 
-//     if (!this.stateManager.ourPartitionReceiptsByCycleCounter) {
-//       this.stateManager.ourPartitionReceiptsByCycleCounter = {}
-//     }
-//     this.stateManager.ourPartitionReceiptsByCycleCounter[key] = partitionReceipt
-//   }
-
-//   getPartitionReceipt(cycleNumber: number) {
-//     let key = 'c' + cycleNumber
-
-//     if (!this.stateManager.ourPartitionReceiptsByCycleCounter) {
-//       return null
-//     }
-//     return this.stateManager.ourPartitionReceiptsByCycleCounter[key]
-//   }
-
-
-
-
-//   /**
-//    * getPartitionObject
-//    * @param {number} cycleNumber
-//    * @param {number} partitionId
-//    * @returns {PartitionObject}
-//    */
-//   getPartitionObject(cycleNumber: number, partitionId: number): PartitionObject | null {
-//     let key = 'c' + cycleNumber
-//     let partitionObjects = this.stateManager.partitionObjects.partitionObjectsByCycle[key]
-//     for (let obj of partitionObjects) {
-//       if (obj.Partition_id === partitionId) {
-//         return obj
-//       }
-//     }
-//     return null
-//   }
+  //   /**
+  //    * getPartitionObject
+  //    * @param {number} cycleNumber
+  //    * @param {number} partitionId
+  //    * @returns {PartitionObject}
+  //    */
+  //   getPartitionObject(cycleNumber: number, partitionId: number): PartitionObject | null {
+  //     let key = 'c' + cycleNumber
+  //     let partitionObjects = this.stateManager.partitionObjects.partitionObjectsByCycle[key]
+  //     for (let obj of partitionObjects) {
+  //       if (obj.Partition_id === partitionId) {
+  //         return obj
+  //       }
+  //     }
+  //     return null
+  //   }
 
   /***
    *    ##     ##    ###     ######  ##     ##        ######  ######## ########  ######

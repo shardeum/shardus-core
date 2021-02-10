@@ -76,8 +76,7 @@ class TransactionQueue {
     this.newAcceptedTxQueueRunning = false
   }
 
-
-  setupHandlers(){
+  setupHandlers() {
     // p2p TELL
     this.p2p.registerInternal('broadcast_state', async (payload: { txid: string; stateList: any[] }, respond: any) => {
       // Save the wrappedAccountState with the rest our queue data
@@ -198,10 +197,7 @@ class TransactionQueue {
       response.success = true
       await respond(response)
     })
-
   }
-
-
 
   /***
    *       ###    ########  ########   ######  ########    ###    ######## ########
@@ -1472,7 +1468,7 @@ class TransactionQueue {
 
   /**
    * tellCorrespondingNodes
-   * @param queueEntry 
+   * @param queueEntry
    * -sends account data to the correct involved nodees
    * -loads locally available data into the queue entry
    */
