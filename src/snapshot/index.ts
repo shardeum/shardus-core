@@ -1,6 +1,6 @@
 import * as express from 'express'
 import * as log4js from 'log4js'
-import {profilerInstance} from '../utils/profiler'
+import { profilerInstance } from '../utils/profiler'
 import Crypto from '../crypto'
 import * as http from '../http'
 import * as Active from '../p2p/Active'
@@ -75,8 +75,8 @@ export type ReceiptMapHashes = Map<
 >
 
 export interface SummaryBlob {
-  cycle: number,
-  partition: number, 
+  cycle: number
+  partition: number
   blob: unknown
 }
 
@@ -97,7 +97,7 @@ enum offerResponse {
 
 export let oldDataPath: string
 let oldDataMap: Map<PartitionNum, any[]> = new Map()
-let dataToMigrate: Map<PartitionNum, any[]> = new Map()
+const dataToMigrate: Map<PartitionNum, any[]> = new Map()
 const oldPartitionHashMap: Map<PartitionNum, string> = new Map()
 let missingPartitions: PartitionNum[] = []
 const notNeededRepliedNodes: Map<string, true> = new Map()
@@ -105,8 +105,11 @@ const alreadyOfferedNodes = new Map()
 let stateHashesByCycle: Map<Cycle['counter'], StateHashes> = new Map()
 let receiptHashesByCycle: Map<Cycle['counter'], ReceiptHashes> = new Map()
 let summaryHashesByCycle: Map<Cycle['counter'], SummaryHashes> = new Map()
-let partitionBlockMapByCycle: Map<Cycle['counter'], ReceiptMapResult[]> = new Map()
-let statesClumpMapByCycle: Map<Cycle['counter'], StatsClump> = new Map()
+const partitionBlockMapByCycle: Map<
+  Cycle['counter'],
+  ReceiptMapResult[]
+> = new Map()
+const statesClumpMapByCycle: Map<Cycle['counter'], StatsClump> = new Map()
 let safetySyncing = false // to set true when data exchange occurs during safetySync
 
 export const safetyModeVals = {
@@ -132,8 +135,6 @@ export function getStateHashes(
   start: Cycle['counter'] = 0,
   end?: Cycle['counter']
 ): StateHashes[] {
-  console.log(`getting state hashes from`, start)
-  console.log(`stateHashesByCycle`, stateHashesByCycle)
   const collector: StateHashes[] = []
   for (const [key] of stateHashesByCycle) {
     if (key >= start) {
@@ -201,7 +202,9 @@ export function getSummaryBlob(
 }
 
 function hashPartitionBlocks(partitionId, partitionBlocks) {
-  const partitionBlock = partitionBlocks.find(b => b.partition === partitionId)
+  const partitionBlock = partitionBlocks.find(
+    (b) => b.partition === partitionId
+  )
   return Context.crypto.hash(partitionBlock || {})
 }
 
@@ -228,180 +231,241 @@ export function startSnapshotting() {
   partitionGossip.initGossip()
   Context.stateManager.on(
     'cycleTxsFinalized',
-    async (shard: CycleShardData, receiptMapResults:ReceiptMapResult[], statsClump:StatsClump, mainHashResults:MainHashResults) => {
-      try{
-      profilerInstance.profileSectionStart('snapshot')
-      const debugStrs = []
-      // store receiptMap for this cycle number
-      partitionBlockMapByCycle.set(shard.cycleNumber, receiptMapResults)
+    async (
+      shard: CycleShardData,
+      receiptMapResults: ReceiptMapResult[],
+      statsClump: StatsClump,
+      mainHashResults: MainHashResults
+    ) => {
+      try {
+        profilerInstance.profileSectionStart('snapshot')
+        const debugStrs = []
+        // store receiptMap for this cycle number
+        partitionBlockMapByCycle.set(shard.cycleNumber, receiptMapResults)
 
-      // store summary blob map for this cycle
-      const statsClumpForThisCycle: StatsClump = statsClump
-      statesClumpMapByCycle.set(shard.cycleNumber, statsClumpForThisCycle)
+        // store summary blob map for this cycle
+        const statsClumpForThisCycle: StatsClump = statsClump
+        statesClumpMapByCycle.set(shard.cycleNumber, statsClumpForThisCycle)
 
-      // create our own partition hashes for that cycle number
-      const partitionRanges = getPartitionRanges(shard)
-      const partitionHashes = new Map()
-      for (const partition of shard.ourStoredPartitions) {
-        const range = partitionRanges.get(partition)
-        if (range) {
-          const accountsInPartition = await Context.storage.getAccountCopiesByCycleAndRange(
-            shard.cycleNumber,
-            range.low,
-            range.high
-          )
-          snapshotLogger.debug(
-            'Accounts in partition: ',
-            partition,
-            accountsInPartition
-          )
-
-          const hash = Context.crypto.hash(accountsInPartition)
-          partitionHashes.set(partition, hash)
-
-          try {
-            //DBG: Print all accounts in mem
-            const wrappedAccts = await Context.stateManager.app.getAccountData(
+        // create our own partition hashes for that cycle number
+        const partitionRanges = getPartitionRanges(shard)
+        const partitionHashes = new Map()
+        for (const partition of shard.ourStoredPartitions) {
+          const range = partitionRanges.get(partition)
+          if (range) {
+            const accountsInPartition = await Context.storage.getAccountCopiesByCycleAndRange(
+              shard.cycleNumber,
               range.low,
-              range.high,
-              10000000
+              range.high
             )
-            debugStrs.push(
-              `  PARTITION ${partition}\n` +
-                wrappedAccts
-                  .map((acct) => {
-                    const id =
-                      acct.accountId === null
-                        ? 'null'
-                        : acct.accountId.substr(0, 8)
-                    const hash =
-                      acct.stateId === null ? 'null' : acct.stateId.substr(0, 8)
-                    return `    ID: ${id} HASH: ${hash}`
-                  })
-                  .join('\n')
+            snapshotLogger.debug(
+              'Accounts in partition: ',
+              partition,
+              accountsInPartition
             )
-          } catch (e) {
-            console.log(e)
+
+            const hash = Context.crypto.hash(accountsInPartition)
+            partitionHashes.set(partition, hash)
+
+            try {
+              //DBG: Print all accounts in mem
+              const wrappedAccts = await Context.stateManager.app.getAccountData(
+                range.low,
+                range.high,
+                10000000
+              )
+              debugStrs.push(
+                `  PARTITION ${partition}\n` +
+                  wrappedAccts
+                    .map((acct) => {
+                      const id =
+                        acct.accountId === null
+                          ? 'null'
+                          : acct.accountId.substr(0, 8)
+                      const hash =
+                        acct.stateId === null
+                          ? 'null'
+                          : acct.stateId.substr(0, 8)
+                      return `    ID: ${id} HASH: ${hash}`
+                    })
+                    .join('\n')
+              )
+            } catch (e) {
+              console.log(e)
+            }
           }
         }
-      }
 
-      try {
-        snapshotLogger.debug(`
+        try {
+          snapshotLogger.debug(`
         MEM ACCOUNTS C${shard.cycleNumber}:
         ${debugStrs.join('\n')}
         `)
+        } catch (e) {
+          console.log(e)
+        }
+        const globalAccounts = await Context.storage.getGlobalAccountCopies(
+          shard.cycleNumber
+        )
+        const globalAccountHash = Context.crypto.hash(globalAccounts)
+
+        // partition hash for globalAccounts
+        partitionHashes.set(-1, globalAccountHash)
+
+        snapshotLogger.debug('Global Accounts: ', globalAccounts)
+        snapshotLogger.debug('Partition Hashes: ', partitionHashes)
+
+        // process gossip from the queue for that cycle number
+        const collector = partitionGossip.newCollector(shard)
+
+        // registering event handler for 'gotAllHashes'
+        collector.once('gotAllHashes', (allHashes) => {
+          const { partitionHashes, receiptHashes, summaryHashes } = allHashes
+          // create a network state hash once we have all partition hashes for that cycle number
+          const networkStateHash = SnapshotFunctions.createNetworkHash(
+            partitionHashes
+          )
+          const networkReceiptMapHash = SnapshotFunctions.createNetworkHash(
+            receiptHashes
+          )
+          const networkSummaryHash = SnapshotFunctions.createNetworkHash(
+            summaryHashes
+          )
+
+          // log('Got all partition hashes: ', partitionHashes)
+          // log('Got all receipt hashes: ', receiptHashes)
+          // log('Got all summary hashes: ', summaryHashes)
+
+          safetyModeVals.networkStateHash = networkStateHash
+
+          // save the partition and network hashes for that cycle number to the DB
+          SnapshotFunctions.savePartitionAndNetworkHashes(
+            shard,
+            partitionHashes,
+            networkStateHash
+          )
+          SnapshotFunctions.saveReceiptAndNetworkHashes(
+            shard,
+            receiptHashes,
+            networkReceiptMapHash
+          )
+          SnapshotFunctions.saveSummaryAndNetworkHashes(
+            shard,
+            summaryHashes,
+            networkSummaryHash
+          )
+
+          // Update stateHashes by Cycle map
+          const newStateHash: StateHashes = {
+            counter: shard.cycleNumber,
+            partitionHashes,
+            networkHash: networkStateHash,
+          }
+          stateHashesByCycle = SnapshotFunctions.updateStateHashesByCycleMap(
+            shard.cycleNumber,
+            newStateHash,
+            stateHashesByCycle
+          )
+
+          // Update receiptHashes by Cycle map
+          const newReceiptHash: ReceiptHashes = {
+            counter: shard.cycleNumber,
+            receiptMapHashes: receiptHashes,
+            networkReceiptHash: networkReceiptMapHash,
+          }
+          receiptHashesByCycle = SnapshotFunctions.updateReceiptHashesByCycleMap(
+            shard.cycleNumber,
+            newReceiptHash,
+            receiptHashesByCycle
+          )
+
+          // Update summaryHashes by Cycle map
+          const newSummaryHash: SummaryHashes = {
+            counter: shard.cycleNumber,
+            summaryHashes: summaryHashes,
+            networkSummaryHash: networkSummaryHash,
+          }
+          summaryHashesByCycle = SnapshotFunctions.updateSummaryHashesByCycleMap(
+            shard.cycleNumber,
+            newSummaryHash,
+            summaryHashesByCycle
+          )
+
+          // clean up gossip and collector for that cycle number
+          partitionGossip.clean(shard.cycleNumber)
+          log(
+            `Network State Hash for cycle ${shard.cycleNumber}`,
+            networkStateHash
+          )
+          log(
+            `Network Receipt Hash for cycle ${shard.cycleNumber}`,
+            networkReceiptMapHash
+          )
+          log(
+            `Network Summary Hash for cycle ${shard.cycleNumber}`,
+            networkSummaryHash
+          )
+        })
+        partitionGossip.processMessagesInGossipQueue(shard, collector)
+
+        // gossip our partitition hashes and receipt map to the rest of the network with that cycle number
+        const message: partitionGossip.Message = {
+          cycle: shard.cycleNumber,
+          data: {
+            partitionHash: {},
+            receiptMapHash: {},
+            summaryHash: {},
+          },
+          sender: Self.id,
+        }
+        // attach partition and receipt hashes to the message to be gossiped
+        for (const [partitionId, hash] of partitionHashes) {
+          message.data.partitionHash[partitionId] = hash
+          message.data.receiptMapHash[partitionId] = hashPartitionBlocks(
+            partitionId,
+            partitionBlockMapByCycle.get(shard.cycleNumber)
+          )
+        }
+
+        // attach summary hashes to the message to be gossiped
+        const summaryDataStatHash = {}
+        const summarytxStatsHash = {}
+        for (const blob of statsClumpForThisCycle.dataStats) {
+          summaryDataStatHash[blob.partition] = blob
+        }
+        for (const blob of statsClumpForThisCycle.txStats) {
+          summarytxStatsHash[blob.partition] = blob
+        }
+
+        for (const partition of statsClumpForThisCycle.covered) {
+          const summaryObj = {
+            dataStats: summaryDataStatHash[partition]
+              ? summaryDataStatHash[partition]
+              : {},
+            txStats: summarytxStatsHash[partition]
+              ? summarytxStatsHash[partition]
+              : {},
+          }
+          message.data.summaryHash[partition] = Context.crypto.hash(summaryObj)
+          // console.log(`Summary Obj for partition ${partition}`, summaryObj)
+          // if (summaryObj) {
+          //   console.log('summaryObj', summaryObj)
+          //   console.log('summaryObj stringified', JSON.stringify(summaryObj))
+          //   console.log('summaryObj hash', Context.crypto.hash(summaryObj))
+          // }
+        }
+
+        Comms.sendGossip('snapshot_gossip', message)
+        partitionGossip.forwardedGossips.set(message.sender, true)
+        collector.process([message])
+
+        // Clean partition gossip that's older than 10 cycles
+        partitionGossip.cleanOld(shard.cycleNumber, 10)
       } catch (e) {
         console.log(e)
+      } finally {
+        profilerInstance.profileSectionEnd('snapshot')
       }
-      const globalAccounts = await Context.storage.getGlobalAccountCopies(
-        shard.cycleNumber
-      )
-      const globalAccountHash = Context.crypto.hash(globalAccounts)
-
-      // partition hash for globalAccounts
-      partitionHashes.set(-1, globalAccountHash)
-
-      snapshotLogger.debug('Global Accounts: ', globalAccounts)
-      snapshotLogger.debug('Partition Hashes: ', partitionHashes)
-
-      // process gossip from the queue for that cycle number
-      const collector = partitionGossip.newCollector(shard)
-
-      // registering event handler for 'gotAllHashes'
-      collector.once('gotAllHashes', (allHashes) => {
-        const { partitionHashes, receiptHashes, summaryHashes } = allHashes
-        // create a network state hash once we have all partition hashes for that cycle number
-        const networkStateHash = SnapshotFunctions.createNetworkHash(partitionHashes)
-        const networkReceiptMapHash = SnapshotFunctions.createNetworkHash(receiptHashes)
-        const networkSummaryHash = SnapshotFunctions.createNetworkHash(summaryHashes)
-
-        // log('Got all partition hashes: ', partitionHashes)
-        // log('Got all receipt hashes: ', receiptHashes)
-        // log('Got all summary hashes: ', summaryHashes)
-
-        safetyModeVals.networkStateHash = networkStateHash
-
-        // save the partition and network hashes for that cycle number to the DB
-        SnapshotFunctions.savePartitionAndNetworkHashes(shard, partitionHashes, networkStateHash)
-        SnapshotFunctions.saveReceiptAndNetworkHashes(shard, receiptHashes, networkReceiptMapHash)
-        SnapshotFunctions.saveSummaryAndNetworkHashes(shard, summaryHashes, networkSummaryHash)
-
-        // Update stateHashes by Cycle map
-        const newStateHash: StateHashes = {
-          counter: shard.cycleNumber,
-          partitionHashes,
-          networkHash: networkStateHash,
-        }
-        stateHashesByCycle = SnapshotFunctions.updateStateHashesByCycleMap(shard.cycleNumber, newStateHash, stateHashesByCycle)
-
-        // Update receiptHashes by Cycle map
-        const newReceiptHash: ReceiptHashes = {
-          counter: shard.cycleNumber,
-          receiptMapHashes: receiptHashes,
-          networkReceiptHash: networkReceiptMapHash,
-        }
-        receiptHashesByCycle = SnapshotFunctions.updateReceiptHashesByCycleMap(shard.cycleNumber, newReceiptHash, receiptHashesByCycle)
-
-        // Update summaryHashes by Cycle map
-        const newSummaryHash: SummaryHashes = {
-          counter: shard.cycleNumber,
-          summaryHashes: summaryHashes,
-          networkSummaryHash: networkSummaryHash,
-        }
-        summaryHashesByCycle = SnapshotFunctions.updateSummaryHashesByCycleMap(shard.cycleNumber, newSummaryHash, summaryHashesByCycle)
-
-        // clean up gossip and collector for that cycle number
-        partitionGossip.clean(shard.cycleNumber)
-        log(`Network State Hash for cycle ${shard.cycleNumber}`, networkStateHash)
-        log(`Network Receipt Hash for cycle ${shard.cycleNumber}`, networkReceiptMapHash)
-        log(`Network Summary Hash for cycle ${shard.cycleNumber}`, networkSummaryHash)
-      })
-      partitionGossip.processMessagesInGossipQueue(shard, collector)
-
-      // gossip our partitition hashes and receipt map to the rest of the network with that cycle number
-      const message: partitionGossip.Message = {
-        cycle: shard.cycleNumber,
-        data: {
-          partitionHash: {},
-          receiptMapHash: {},
-          summaryHash: {},
-        },
-        sender: Self.id,
-      }
-      // attach partition and receipt hashes to the message to be gossiped
-      for (const [partitionId, hash] of partitionHashes) {
-        message.data.partitionHash[partitionId] = hash
-        message.data.receiptMapHash[partitionId] = hashPartitionBlocks(partitionId, partitionBlockMapByCycle.get(shard.cycleNumber))
-      }
-      
-      // attach summary hashes to the message to be gossiped
-      let summaryDataStatHash = {}
-      let summarytxStatsHash = {}
-      for (const blob of statsClumpForThisCycle.dataStats) {
-        summaryDataStatHash[blob.partition] = blob
-      }
-      for (const blob of statsClumpForThisCycle.txStats) {
-        summarytxStatsHash[blob.partition] = blob
-      }
-
-      for (const partition of statsClumpForThisCycle.covered) {
-        message.data.summaryHash[partition] = Context.crypto.hash({
-          dataStat: summaryDataStatHash[partition],
-          txStats: summarytxStatsHash[partition],
-        })
-      }      
-
-      Comms.sendGossip('snapshot_gossip', message)
-      partitionGossip.forwardedGossips.set(message.sender, true)
-      collector.process([message])
-
-      // Clean partition gossip that's older than 10 cycles
-      partitionGossip.cleanOld(shard.cycleNumber, 10)
-    } finally {
-      profilerInstance.profileSectionEnd('snapshot')
-    }
-
     }
   )
 }
@@ -439,12 +503,23 @@ export async function safetySync() {
   const nodeShardDataMap: shardFunctionTypes.NodeShardDataMap = new Map()
 
   // populate DataToMigrate and oldDataMap
-  oldDataMap = await SnapshotFunctions.calculateOldDataMap(shardGlobals, nodeShardDataMap, oldPartitionHashMap)
+  oldDataMap = await SnapshotFunctions.calculateOldDataMap(
+    shardGlobals,
+    nodeShardDataMap,
+    oldPartitionHashMap
+  )
   SnapshotFunctions.copyOldDataToDataToMigrate(oldDataMap, dataToMigrate)
-  SnapshotFunctions.registerDownloadRoutes(Context.network, oldDataMap, oldPartitionHashMap)
+  SnapshotFunctions.registerDownloadRoutes(
+    Context.network,
+    oldDataMap,
+    oldPartitionHashMap
+  )
 
   // check if we have data for each partition we cover in new network. We will use this array to request data from other nodes
-  missingPartitions = SnapshotFunctions.getMissingPartitions(shardGlobals, oldDataMap)
+  missingPartitions = SnapshotFunctions.getMissingPartitions(
+    shardGlobals,
+    oldDataMap
+  )
 
   safetySyncing = true
 
@@ -456,7 +531,6 @@ export async function safetySync() {
   // Check if we have all old data. Once we get the old data you need, go active
   goActiveIfDataComplete()
 }
-
 
 async function sendOldDataToNodes(
   partitionId: number,
@@ -494,7 +568,7 @@ function createOffer() {
   return {
     networkStateHash: safetyModeVals.networkStateHash,
     partitions: partitionsToOffer,
-    downloadUrl: `http://${Self.ip}:${Self.port}/download-snapshot-data`
+    downloadUrl: `http://${Self.ip}:${Self.port}/download-snapshot-data`,
   }
 }
 
@@ -596,8 +670,16 @@ export async function startWitnessMode() {
           Context.config.sharding.nodesPerConsensusGroup
         )
         const nodeShardDataMap: shardFunctionTypes.NodeShardDataMap = new Map()
-        oldDataMap = await SnapshotFunctions.calculateOldDataMap(shardGlobals, nodeShardDataMap, oldPartitionHashMap)
-        SnapshotFunctions.registerDownloadRoutes(Context.network, oldDataMap, oldPartitionHashMap)
+        oldDataMap = await SnapshotFunctions.calculateOldDataMap(
+          shardGlobals,
+          nodeShardDataMap,
+          oldPartitionHashMap
+        )
+        SnapshotFunctions.registerDownloadRoutes(
+          Context.network,
+          oldDataMap,
+          oldPartitionHashMap
+        )
         const offer = createOffer()
 
         // send offer to each syncing + active nodes unless data is already offered
@@ -680,7 +762,7 @@ function increaseNotNeededNodes(id) {
 }
 
 async function storeDataToNewDB(dataMap) {
-  let currentCycle = CycleChain.getNewest()
+  const currentCycle = CycleChain.getNewest()
   // store data to new DB
   log('Storing data to new DB')
   const accountCopies: shardusTypes.AccountsCopy[] = []
@@ -689,7 +771,7 @@ async function storeDataToNewDB(dataMap) {
       data.forEach((accountData) => {
         accountCopies.push({
           ...accountData,
-          cycleNumber: currentCycle.counter
+          cycleNumber: currentCycle.counter,
         })
       })
     }
@@ -707,19 +789,14 @@ function processDownloadedMissingData(missingData) {
       return {
         accountId: acc.accountId,
         data:
-          typeof acc.data === 'object'
-            ? JSON.stringify(acc.data)
-            : acc.data,
+          typeof acc.data === 'object' ? JSON.stringify(acc.data) : acc.data,
         timestamp: acc.timestamp,
         hash: acc.hash,
         isGlobal: acc.isGlobal,
       }
     })
     const computedHash = Context.crypto.hash(accountsInPartition)
-    log(
-      `Received data for partition ${partitionId} => `,
-      accountsInPartition
-    )
+    log(`Received data for partition ${partitionId} => `, accountsInPartition)
     log(computedHash, partitionData.hash)
     if (computedHash === partitionData.hash) {
       log(
@@ -734,9 +811,7 @@ function processDownloadedMissingData(missingData) {
         goActiveIfDataComplete()
       }
     } else {
-      log(
-        `Computed hash and received hash are DIFFERENT for ${partitionId}`
-      )
+      log(`Computed hash and received hash are DIFFERENT for ${partitionId}`)
     }
   }
 }
@@ -772,8 +847,11 @@ function registerSnapshotRoutes() {
       }
       res.json({ answer })
       if (answer === offerResponse.needed && missingPartitions.length > 0) {
-        const downloadedSnapshotData = await SnapshotFunctions.downloadDataFromNode(offerRequest.downloadUrl)
-        if(downloadedSnapshotData) processDownloadedMissingData(downloadedSnapshotData)
+        const downloadedSnapshotData = await SnapshotFunctions.downloadDataFromNode(
+          offerRequest.downloadUrl
+        )
+        if (downloadedSnapshotData)
+          processDownloadedMissingData(downloadedSnapshotData)
       }
     },
   }
@@ -827,10 +905,7 @@ function registerSnapshotRoutes() {
     },
   }
 
-  const routes = [
-    snapshotDataOfferRoute,
-    snapshotWitnessDataOfferRoute,
-  ]
+  const routes = [snapshotDataOfferRoute, snapshotWitnessDataOfferRoute]
 
   for (const route of routes) {
     Context.network._registerExternal(route.method, route.name, route.handler)
