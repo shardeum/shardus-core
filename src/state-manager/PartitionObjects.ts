@@ -88,9 +88,98 @@ class PartitionObjects {
     this.resetAndApplyPerPartition = false
   }
 
-  //  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  //  //////////////////////////////////////////////////          Data Repair                    ///////////////////////////////////////////////////////////
-  //  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  /***
+   *    ########     ###    ########  ######## #### ######## ####  #######  ##    ## ########  ######## ########   #######  ########  ########  ######
+   *    ##     ##   ## ##   ##     ##    ##     ##     ##     ##  ##     ## ###   ## ##     ## ##       ##     ## ##     ## ##     ##    ##    ##    ##
+   *    ##     ##  ##   ##  ##     ##    ##     ##     ##     ##  ##     ## ####  ## ##     ## ##       ##     ## ##     ## ##     ##    ##    ##
+   *    ########  ##     ## ########     ##     ##     ##     ##  ##     ## ## ## ## ########  ######   ########  ##     ## ########     ##     ######
+   *    ##        ######### ##   ##      ##     ##     ##     ##  ##     ## ##  #### ##   ##   ##       ##        ##     ## ##   ##      ##          ##
+   *    ##        ##     ## ##    ##     ##     ##     ##     ##  ##     ## ##   ### ##    ##  ##       ##        ##     ## ##    ##     ##    ##    ##
+   *    ##        ##     ## ##     ##    ##    ####    ##    ####  #######  ##    ## ##     ## ######## ##         #######  ##     ##    ##     ######
+   */
+
+  /**
+   * getPartitionReport used by reporting (monitor server) to query if there is a partition report ready
+   * @param {boolean} consensusOnly
+   * @param {boolean} smallHashes
+   * @returns {any}
+   */
+  // TSConversion todo define partition report. for now use any
+  getPartitionReport(consensusOnly: boolean, smallHashes: boolean): PartitionCycleReport {
+    let response = {} // {res:[], cycleNumber:-1}
+    if (this.nextCycleReportToSend != null) {
+      if (this.lastCycleReported < this.nextCycleReportToSend.cycleNumber || this.partitionReportDirty === true) {
+        // consensusOnly hashes
+        if (smallHashes === true) {
+          for (let r of this.nextCycleReportToSend.res) {
+            r.h = utils.makeShortHash(r.h)
+          }
+        }
+        // Partition_hash: partitionHash, Partition_id:
+        response = this.nextCycleReportToSend
+        this.lastCycleReported = this.nextCycleReportToSend.cycleNumber // update reported cycle
+        this.nextCycleReportToSend = null // clear it because we sent it
+        this.partitionReportDirty = false // not dirty anymore
+
+        this.mainLogger.debug('getPartitionReport: ' + `insync: ${this.stateManager.stateIsGood} ` + utils.stringifyReduce(response))
+      }
+    }
+    return response
+  }
+
+  /**
+   * updatePartitionReport
+   * use our MainHashResults from in memory data to create the nextCycleReportToSend that is used by
+   * getPartitionReport() / reporter module
+   * @param cycleShardData
+   * @param mainHashResults
+   */
+  updatePartitionReport(cycleShardData: CycleShardData, mainHashResults: MainHashResults) {
+    if (this.stateManager.feature_useNewParitionReport === false) {
+      return
+    }
+
+    let partitions = cycleShardData.ourConsensusPartitions
+    if (this.stateManager.useStoredPartitionsForReport === true) {
+      partitions = cycleShardData.ourStoredPartitions
+    }
+    if (partitions == null) {
+      throw new Error('updatePartitionReport partitions == null')
+    }
+
+    this.nextCycleReportToSend = { res: [], cycleNumber: cycleShardData.cycleNumber }
+
+    for (let partition of partitions) {
+      if (mainHashResults.partitionHashResults.has(partition)) {
+        let partitionHashResults = mainHashResults.partitionHashResults.get(partition)
+        this.nextCycleReportToSend.res.push({ i: partition, h: partitionHashResults.hashOfHashes })
+      }
+    }
+  }
+
+  /**
+   * @param {PartitionObject} partitionObject
+   */
+  poMicroDebug(partitionObject: PartitionObject) {
+    let header = `c${partitionObject.Cycle_number} p${partitionObject.Partition_id}`
+
+    // need to get a list of compacted TXs in order. also addresses. timestamps?  make it so tools can process easily. (align timestamps view.)
+
+    this.mainLogger.debug('poMicroDebug: ' + header)
+  }
+
+
+
+/***
+ *    ######## ##    ## ########        ########   #######  #### ##    ## ########  ######  
+ *    ##       ###   ## ##     ##       ##     ## ##     ##  ##  ###   ##    ##    ##    ## 
+ *    ##       ####  ## ##     ##       ##     ## ##     ##  ##  ####  ##    ##    ##       
+ *    ######   ## ## ## ##     ##       ########  ##     ##  ##  ## ## ##    ##     ######  
+ *    ##       ##  #### ##     ##       ##        ##     ##  ##  ##  ####    ##          ## 
+ *    ##       ##   ### ##     ##       ##        ##     ##  ##  ##   ###    ##    ##    ## 
+ *    ######## ##    ## ########        ##         #######  #### ##    ##    ##     ######  
+ */
 
   setupHandlers() {
     // /post_partition_results (Partition_results)
@@ -250,86 +339,6 @@ class PartitionObjects {
     //     // await respond(result)
     //   }
     // )
-  }
-
-  /***
-   *    ########     ###    ########  ######## #### ######## ####  #######  ##    ## ########  ######## ########   #######  ########  ########  ######
-   *    ##     ##   ## ##   ##     ##    ##     ##     ##     ##  ##     ## ###   ## ##     ## ##       ##     ## ##     ## ##     ##    ##    ##    ##
-   *    ##     ##  ##   ##  ##     ##    ##     ##     ##     ##  ##     ## ####  ## ##     ## ##       ##     ## ##     ## ##     ##    ##    ##
-   *    ########  ##     ## ########     ##     ##     ##     ##  ##     ## ## ## ## ########  ######   ########  ##     ## ########     ##     ######
-   *    ##        ######### ##   ##      ##     ##     ##     ##  ##     ## ##  #### ##   ##   ##       ##        ##     ## ##   ##      ##          ##
-   *    ##        ##     ## ##    ##     ##     ##     ##     ##  ##     ## ##   ### ##    ##  ##       ##        ##     ## ##    ##     ##    ##    ##
-   *    ##        ##     ## ##     ##    ##    ####    ##    ####  #######  ##    ## ##     ## ######## ##         #######  ##     ##    ##     ######
-   */
-
-  /**
-   * getPartitionReport used by reporting (monitor server) to query if there is a partition report ready
-   * @param {boolean} consensusOnly
-   * @param {boolean} smallHashes
-   * @returns {any}
-   */
-  // TSConversion todo define partition report. for now use any
-  getPartitionReport(consensusOnly: boolean, smallHashes: boolean): PartitionCycleReport {
-    let response = {} // {res:[], cycleNumber:-1}
-    if (this.nextCycleReportToSend != null) {
-      if (this.lastCycleReported < this.nextCycleReportToSend.cycleNumber || this.partitionReportDirty === true) {
-        // consensusOnly hashes
-        if (smallHashes === true) {
-          for (let r of this.nextCycleReportToSend.res) {
-            r.h = utils.makeShortHash(r.h)
-          }
-        }
-        // Partition_hash: partitionHash, Partition_id:
-        response = this.nextCycleReportToSend
-        this.lastCycleReported = this.nextCycleReportToSend.cycleNumber // update reported cycle
-        this.nextCycleReportToSend = null // clear it because we sent it
-        this.partitionReportDirty = false // not dirty anymore
-
-        this.mainLogger.debug('getPartitionReport: ' + `insync: ${this.stateManager.stateIsGood} ` + utils.stringifyReduce(response))
-      }
-    }
-    return response
-  }
-
-  /**
-   * updatePartitionReport
-   * use our MainHashResults from in memory data to create the nextCycleReportToSend that is used by
-   * getPartitionReport() / reporter module
-   * @param cycleShardData
-   * @param mainHashResults
-   */
-  updatePartitionReport(cycleShardData: CycleShardData, mainHashResults: MainHashResults) {
-    if (this.stateManager.feature_useNewParitionReport === false) {
-      return
-    }
-
-    let partitions = cycleShardData.ourConsensusPartitions
-    if (this.stateManager.useStoredPartitionsForReport === true) {
-      partitions = cycleShardData.ourStoredPartitions
-    }
-    if (partitions == null) {
-      throw new Error('updatePartitionReport partitions == null')
-    }
-
-    this.nextCycleReportToSend = { res: [], cycleNumber: cycleShardData.cycleNumber }
-
-    for (let partition of partitions) {
-      if (mainHashResults.partitionHashResults.has(partition)) {
-        let partitionHashResults = mainHashResults.partitionHashResults.get(partition)
-        this.nextCycleReportToSend.res.push({ i: partition, h: partitionHashResults.hashOfHashes })
-      }
-    }
-  }
-
-  /**
-   * @param {PartitionObject} partitionObject
-   */
-  poMicroDebug(partitionObject: PartitionObject) {
-    let header = `c${partitionObject.Cycle_number} p${partitionObject.Partition_id}`
-
-    // need to get a list of compacted TXs in order. also addresses. timestamps?  make it so tools can process easily. (align timestamps view.)
-
-    this.mainLogger.debug('poMicroDebug: ' + header)
   }
 
   /***
