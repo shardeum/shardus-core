@@ -1,7 +1,6 @@
 import { ShardusConfiguration } from '../shardus/shardus-types'
 import Shardus = require('../shardus/shardus-types')
 
-//import {ShardGlobals,ShardInfo,StoredPartition,NodeShardData,AddressRange, HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange} from  './shardFunction2Types'
 import { ShardGlobals, ShardInfo, StoredPartition, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from './shardFunctionTypes'
 
 import { isNodeDown, isNodeLost } from '../p2p/Lost'
@@ -121,10 +120,10 @@ class StateManager {
   stateIsGood_activeRepairs: boolean
   stateIsGood: boolean
 
-  oldFeature_TXHashsetTest: boolean
-  oldFeature_GeneratePartitionReport: boolean
-  oldFeature_BroadCastPartitionReport: boolean
-  useHashSets: boolean //Old feature but must stay on (uses hash set string vs. older method)
+  // oldFeature_TXHashsetTest: boolean
+  // oldFeature_GeneratePartitionReport: boolean
+  // oldFeature_BroadCastPartitionReport: boolean
+  // useHashSets: boolean //Old feature but must stay on (uses hash set string vs. older method)
 
   feature_receiptMapResults: boolean
   feature_partitionHashes: boolean
@@ -196,7 +195,7 @@ class StateManager {
     this.dataPhaseTag = 'DATASYNC: '
 
     //BLOCK4
-    this.useHashSets = true
+    //this.useHashSets = true
     this.lastActiveNodeCount = 0
 
     this.extendedRepairLogging = true
@@ -229,9 +228,9 @@ class StateManager {
     this.depricated = new Depricated(this, verboseLogs, profiler, app, logger, storage, p2p, crypto, config)
 
     // feature controls.
-    this.oldFeature_TXHashsetTest = true
-    this.oldFeature_GeneratePartitionReport = false
-    this.oldFeature_BroadCastPartitionReport = true // leaving this true since it depends on the above value
+    // this.oldFeature_TXHashsetTest = true
+    // this.oldFeature_GeneratePartitionReport = false
+    // this.oldFeature_BroadCastPartitionReport = true // leaving this true since it depends on the above value
 
     this.feature_receiptMapResults = true
     this.feature_partitionHashes = true
@@ -251,7 +250,7 @@ class StateManager {
     if (this.config && this.config.debug) {
       this.feature_useNewParitionReport = this.tryGetBoolProperty(this.config.debug, 'useNewParitionReport', this.feature_useNewParitionReport)
 
-      this.oldFeature_GeneratePartitionReport = this.tryGetBoolProperty(this.config.debug, 'oldPartitionSystem', this.oldFeature_GeneratePartitionReport)
+      // this.oldFeature_GeneratePartitionReport = this.tryGetBoolProperty(this.config.debug, 'oldPartitionSystem', this.oldFeature_GeneratePartitionReport)
 
       this.debugFeature_dumpAccountDataFromSQL = this.tryGetBoolProperty(this.config.debug, 'dumpAccountReportFromSQL', this.debugFeature_dumpAccountDataFromSQL)
     }
@@ -2024,9 +2023,9 @@ class StateManager {
       return
     }
 
-    if (this.depricated.repairTrackingByCycleById == null) {
-      return
-    }
+    // if (this.depricated.repairTrackingByCycleById == null) {
+    //   return
+    // }
     if (this.partitionObjects.allPartitionResponsesByCycleByPartition == null) {
       return
     }
@@ -2053,15 +2052,15 @@ class StateManager {
     let removedshardValuesByCycle = 0
     // let oldestCycleKey = 'c' + oldestCycle
     // cleanup old repair trackers
-    for (let cycleKey of Object.keys(this.depricated.repairTrackingByCycleById)) {
-      let cycle = cycleKey.slice(1)
-      let cycleNum = parseInt(cycle, 10)
-      if (cycleNum < oldestCycle) {
-        // delete old cycle
-        delete this.depricated.repairTrackingByCycleById[cycleKey]
-        removedrepairTrackingByCycleById++
-      }
-    }
+    // for (let cycleKey of Object.keys(this.depricated.repairTrackingByCycleById)) {
+    //   let cycle = cycleKey.slice(1)
+    //   let cycleNum = parseInt(cycle, 10)
+    //   if (cycleNum < oldestCycle) {
+    //     // delete old cycle
+    //     delete this.depricated.repairTrackingByCycleById[cycleKey]
+    //     removedrepairTrackingByCycleById++
+    //   }
+    // }
 
     // cleanup old partition objects / receipts.
     // let responsesById = this.partitionObjects.allPartitionResponsesByCycleByPartition[key]
@@ -2137,16 +2136,16 @@ class StateManager {
         removedrecentPartitionObjectsByCycleByHash++
       }
     }
-    // cleanup this.depricated.repairUpdateDataByCycle
-    for (let cycleKey of Object.keys(this.depricated.repairUpdateDataByCycle)) {
-      let cycle = cycleKey.slice(1)
-      let cycleNum = parseInt(cycle, 10)
-      if (cycleNum < oldestCycle) {
-        // delete old cycle
-        delete this.depricated.repairUpdateDataByCycle[cycleKey]
-        removedrepairUpdateDataByCycle++
-      }
-    }
+    // // cleanup this.depricated.repairUpdateDataByCycle
+    // for (let cycleKey of Object.keys(this.depricated.repairUpdateDataByCycle)) {
+    //   let cycle = cycleKey.slice(1)
+    //   let cycleNum = parseInt(cycle, 10)
+    //   if (cycleNum < oldestCycle) {
+    //     // delete old cycle
+    //     delete this.depricated.repairUpdateDataByCycle[cycleKey]
+    //     removedrepairUpdateDataByCycle++
+    //   }
+    // }
     // cleanup this.partitionObjects.partitionObjectsByCycle
     for (let cycleKey of Object.keys(this.partitionObjects.partitionObjectsByCycle)) {
       let cycle = cycleKey.slice(1)

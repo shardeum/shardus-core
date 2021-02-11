@@ -13,9 +13,9 @@ import ShardFunctions from './shardFunctions.js'
 import { time } from 'console'
 import StateManager from '.'
 
-const cHashSetStepSize = 4
-const cHashSetTXStepSize = 2
-const cHashSetDataStepSize = 2
+// const cHashSetStepSize = 4
+// const cHashSetTXStepSize = 2
+// const cHashSetDataStepSize = 2
 
 class Depricated {
   app: Shardus.App
@@ -34,20 +34,20 @@ class Depricated {
   statsLogger: any
   statemanager_fatal: (key: string, log: string) => void
 
-  sentReceipts: Map<string, boolean>
-  sendArchiveData: boolean
-  purgeArchiveData: boolean
+  // sentReceipts: Map<string, boolean>
+  // sendArchiveData: boolean
+  // purgeArchiveData: boolean
 
-  /** tracks state for repairing partitions. index by cycle counter key to get the repair object, index by parition  */
-  repairTrackingByCycleById: { [cycleKey: string]: { [id: string]: RepairTracker } }
-  /** UpdateRepairData by cycle key */
-  repairUpdateDataByCycle: { [cycleKey: string]: UpdateRepairData[] }
+  // /** tracks state for repairing partitions. index by cycle counter key to get the repair object, index by parition  */
+  // repairTrackingByCycleById: { [cycleKey: string]: { [id: string]: RepairTracker } }
+  // /** UpdateRepairData by cycle key */
+  // repairUpdateDataByCycle: { [cycleKey: string]: UpdateRepairData[] }
 
-  applyAllPreparedRepairsRunning: boolean
+  // applyAllPreparedRepairsRunning: boolean
 
-  repairStartedMap: Map<string, boolean>
-  repairCompletedMap: Map<string, boolean>
-  dataRepairStack: RepairTracker[]
+  // repairStartedMap: Map<string, boolean>
+  // repairCompletedMap: Map<string, boolean>
+  // dataRepairStack: RepairTracker[]
 
   constructor(stateManager: StateManager, verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     this.verboseLogs = verboseLogs
@@ -66,18 +66,18 @@ class Depricated {
     this.statsLogger = logger.getLogger('statsDump')
     this.statemanager_fatal = stateManager.statemanager_fatal
 
-    this.sentReceipts = new Map()
+    // this.sentReceipts = new Map()
 
-    this.sendArchiveData = false
-    this.purgeArchiveData = false
+    // this.sendArchiveData = false
+    // this.purgeArchiveData = false
 
-    this.repairTrackingByCycleById = {}
-    this.repairUpdateDataByCycle = {}
-    this.applyAllPreparedRepairsRunning = false
+    // this.repairTrackingByCycleById = {}
+    // this.repairUpdateDataByCycle = {}
+    // this.applyAllPreparedRepairsRunning = false
 
-    this.repairStartedMap = new Map()
-    this.repairCompletedMap = new Map()
-    this.dataRepairStack = []
+    // this.repairStartedMap = new Map()
+    // this.repairCompletedMap = new Map()
+    // this.dataRepairStack = []
   }
 
   //NOT used but seem possibly usefull...
