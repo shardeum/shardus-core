@@ -2933,7 +2933,7 @@ class Depricated {
   //     }
 
   //     if (isGlobalModifyingTX) {
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  ignore loggging globalTX ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  ignore loggging globalTX ${txQueueEntry.logID} cycle: ${cycleNumber}`)
   //       return
   //     }
 
@@ -2968,10 +2968,10 @@ class Depricated {
   //     }
 
   //     if (storedNonGlobal === 0 && storedGlobal === 0) {
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: nothing to save globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: nothing to save globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
   //       return
   //     }
-  //     if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal}  tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+  //     if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal}  tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
 
   //     for (let accountKey of allKeys) {
   //       /** @type {NodeShardData} */
@@ -2986,19 +2986,19 @@ class Depricated {
   //       let key = 'p' + partitionID
 
   //       if (this.stateManager.accountGlobals.isGlobalAccount(accountKey)) {
-  //         if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition. dont save due to global: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+  //         if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition. dont save due to global: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
   //         continue
   //       }
 
   //       let weStoreThisParition = ShardFunctions.testInRange(partitionID, lastCycleShardValues.nodeShardData.storedPartitions)
   //       if (weStoreThisParition === false) {
-  //         if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition we dont save: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+  //         if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition we dont save: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
 
   //         continue
   //       }
 
   //       if (partitionHasNonGlobal[key] === false) {
-  //         if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition. we store it but only a global ref involved this time: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber}`)
+  //         if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition. we store it but only a global ref involved this time: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
 
   //         continue
   //       }
@@ -3012,7 +3012,7 @@ class Depricated {
   //       }
 
   //       if (seenParitions[key] != null) {
-  //         if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: seenParitions[key] != null P: ${partitionID}  homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
+  //         if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: seenParitions[key] != null P: ${partitionID}  homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
   //         // skip because this partition already has this TX!
   //         continue
   //       }
@@ -3048,7 +3048,7 @@ class Depricated {
 
   //           // account data got upgraded earlier to have hash on it
 
-  //           //if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( `recordTXByCycle: Pushed! P: ${partitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
+  //           //if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( `recordTXByCycle: Pushed! P: ${partitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
 
   //           states.push(utils.makeShortHash(((accountData as unknown) as Shardus.AccountData).hash))
   //           index++
@@ -3060,7 +3060,7 @@ class Depricated {
   //       }
   //       // txList.txById[acceptedTx.id] = acceptedTx
   //       // TODO sharding perf.  need to add some periodic cleanup when we have more cycles than needed stored in this map!!!
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair recordTXByCycle: pushedData P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${utils.makeShortHash(acceptedTx.id)} cycle: ${cycleNumber} entries: ${txList.hashes.length} recordedState: ${recordedState}`)
+  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair recordTXByCycle: pushedData P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber} entries: ${txList.hashes.length} recordedState: ${recordedState}`)
   //     }
   //   }
 

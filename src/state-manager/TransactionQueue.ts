@@ -763,11 +763,11 @@ class TransactionQueue {
       this.stateManager.debugTXHistory[txQueueEntry.logID] = 'enteredQueue'
 
       if (this.app.canDebugDropTx(acceptedTx.data)) {
-        if (this.stateManager.testFailChance(this.stateManager.loseTxChance, 'loseTxChance', utils.stringifyReduce(acceptedTx.id), '', this.verboseLogs) === true) {
+        if (this.stateManager.testFailChance(this.stateManager.loseTxChance, 'loseTxChance', txQueueEntry.logID, '', this.verboseLogs) === true) {
           return 'lost'
         }
 
-        if (this.stateManager.testFailChance(this.stateManager.voteFlipChance, 'voteFlipChance', utils.stringifyReduce(acceptedTx.id), '', this.verboseLogs) === true) {
+        if (this.stateManager.testFailChance(this.stateManager.voteFlipChance, 'voteFlipChance', txQueueEntry.logID, '', this.verboseLogs) === true) {
           txQueueEntry.debugFail_voteFlip = true
         }
       }
@@ -820,7 +820,7 @@ class TransactionQueue {
           if (globalModification === true) {
             // TODO: globalaccounts
             if (this.stateManager.accountGlobals.globalAccountMap.has(key)) {
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - has`)
+              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - has account:${utils.stringifyReduce(key)}`)
               // indicate that we will have global data in this transaction!
               // I think we do not need to test that here afterall.
             } else {
@@ -829,7 +829,7 @@ class TransactionQueue {
               //it should be that p2p has already checked the receipt before calling shardus.push with global=true
 
               this.stateManager.accountGlobals.globalAccountMap.set(key, null)
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - set`)
+              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - set account:${utils.stringifyReduce(key)}`)
             }
           }
         }
@@ -923,12 +923,13 @@ class TransactionQueue {
         } else {
           throw new Error('missing shard info')
         }
-        this.newAcceptedTxQueueTempInjest.push(txQueueEntry)
 
+        this.newAcceptedTxQueueTempInjest.push(txQueueEntry)
+        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_txPreQueued', `${txQueueEntry.logID}`, `${txQueueEntry.logID} gm:${txQueueEntry.globalModification}`)
         // start the queue if needed
         this.stateManager.tryStartAcceptedQueue()
       } catch (error) {
-        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)}`)
+        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${txQueueEntry.logID} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)}`)
         this.statemanager_fatal(`routeAndQueueAcceptedTransaction_ex`, 'routeAndQueueAcceptedTransaction failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
         throw new Error(error)
       }
@@ -1794,7 +1795,7 @@ class TransactionQueue {
 
           txQueueEntry.approximateCycleAge = this.stateManager.currentCycleShardData.cycleNumber
           this.newAcceptedTxQueue.splice(index + 1, 0, txQueueEntry)
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${utils.makeShortHash(acceptedTx.id)} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)} indexInserted: ${index + 1}`)
+          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${txQueueEntry.logID} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)} indexInserted: ${index + 1}`)
           this.stateManager.eventEmitter.emit('txQueued', acceptedTx.receipt.txHash)
         }
         this.newAcceptedTxQueueTempInjest = []
