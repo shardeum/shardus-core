@@ -79,6 +79,11 @@ class TransactionRepair {
 
       this.mainLogger.debug(`repairToMatchReceipt: ${shortHash} queueEntry.uniqueKeys ${utils.stringifyReduce(queueEntry.uniqueKeys)}`)
 
+      // Build a request object for each key involved.
+      // once we have a valid request object add in alternate nodes we could use as a backup
+
+      let upToDateAccounts: { [id: string]: boolean }  = {}
+
       for (let key of queueEntry.uniqueKeys) {
         let coveredKey = false
 
@@ -91,6 +96,19 @@ class TransactionRepair {
             let id = appliedVote.account_id[j]
             let hash = appliedVote.account_state_hash_after[j]
             if (id === key && hash != null) {
+
+              if(upToDateAccounts[id] === true){
+                continue
+              }
+
+              let hashObj = this.stateManager.accountCache.getAccountHash(key)
+              if(hashObj != null){
+                if(hashObj.h === hash){
+                  upToDateAccounts[id] = true
+                  break
+                }
+              }    
+              
               if (requestObjects[key] != null) {
                 //todo perf delay these checks for jit.
                 if (appliedVote.node_id !== this.stateManager.currentCycleShardData.ourNode.id) {
@@ -251,7 +269,7 @@ class TransactionRepair {
               let accountIdsReturned = []
               for (let data of result.stateList) {
 
-                let shortKey = utils.stringifyReduce(data.accountId)
+                // let shortKey = utils.stringifyReduce(data.accountId)
 
                 if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `write data: ${utils.stringifyReduce(data)}  acc:${shortKey}`)
                 //Commit the data
@@ -319,17 +337,26 @@ class TransactionRepair {
                       test2 = true
                     }
                   }
+                  
+                  let isGlobal = this.stateManager.accountGlobals.isGlobalAccount(data.accountId)
                   let test3 = false
-                  if (this.stateManager.accountGlobals.isGlobalAccount(data.accountId)) {
+                  if (isGlobal) {
                     if (oldhash === updatedHash) {
                       updateStateTable = false
                       test3 = true
                     }
                   }
+
+                  let test4 = false
+                  if(isGlobal === false){
+                    let hash = this.stateManager.accountCache.getAccountHash(data.accountId)
+                    test4 = hash.h === updatedHash
+                  }
+
                   if (updateStateTable === true) {
                     await this.storage.addAccountStates(stateTableResults)
                   }
-                  this.mainLogger.debug(`repairToMatchReceipt: addAccountStates tx:${shortHash} neededUpdate:${hashNeededUpdate} updateStateTable:${updateStateTable} timeStampMatches:${timeStampMatches} test2:${test2} test3:${test3} ${utils.stringifyReduce(stateTableResults)}  acc:${shortKey}`)
+                  this.mainLogger.debug(`repairToMatchReceipt: addAccountStates tx:${shortHash} neededUpdate:${hashNeededUpdate} updateStateTable:${updateStateTable} timeStampMatches:${timeStampMatches} test2:${test2} test3:${test3} test4:${test4} ${utils.stringifyReduce(stateTableResults)}  acc:${shortKey}`)
                 }
               }
 
@@ -342,9 +369,8 @@ class TransactionRepair {
 
               if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_result', `${shortHash}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
               
-
               if(outerloopCount > 1){
-                this.statemanager_fatal(`repairToMatchReceipt_5ok`, `ASK FAIL repairToMatchReceipt FIX WORKED ${outerloopCount} tx:${shortHash}`)
+                this.statemanager_fatal(`repairToMatchReceipt_5ok`, `ASK FAIL repairToMatchReceipt FIX WORKED ${outerloopCount} tx:${shortHash}  acc:${shortKey}`)
               }
 
               break
@@ -360,11 +386,10 @@ class TransactionRepair {
               // if (queueEntry.hasAll === true) {
               //   break
               // }
-            }
-
-
+            } 
           }
         }
+        // next account
       }
 
       // Set this when data has been repaired.
