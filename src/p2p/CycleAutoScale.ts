@@ -88,8 +88,7 @@ const scalingTestRoute: Types.GossipHandler<SignedScaleRequest> = async (
 const routes = {
   internal: {},
   gossip: {
-    scaling: gossipScaleRoute,
-    scalingTest: scalingTestRoute
+    scaling: gossipScaleRoute
   },
 }
 
@@ -102,19 +101,6 @@ export function init () {
   for (const [name, handler] of Object.entries(routes.gossip)) {
     Comms.registerGossipHandler(name, handler)
   }
-
-  network.registerExternalGet('scale-test', async (req, res) => {
-    const err = validateTypes(req, { body: 'o' })
-    if (err) {
-      warn(`joinarchiver: bad req ${err}`)
-      return res.json({ success: false, error: err })
-    }
-
-    info(`Scale test received`)
-    res.json({ success: true })
-    Comms.sendGossip('scalingTest', 'UP')
-    requestNetworkUpsize()
-  })
 }
 
 export function reset () {
