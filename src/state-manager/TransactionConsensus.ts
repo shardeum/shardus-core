@@ -204,8 +204,9 @@ class TransactionConsenus {
     let passed = false
     let canProduceReceipt = false
 
-    let consensusGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry) // todo use real consensus group!!!
-    let requiredVotes = Math.round(consensusGroup.length * (2 / 3.0))
+    // Design TODO:  should this be the full transaction group or just the consensus group?
+    let votingGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+    let requiredVotes = Math.round(votingGroup.length * (2 / 3.0))
 
     let numVotes = queueEntry.collectedVotes.length
 
@@ -216,9 +217,8 @@ class TransactionConsenus {
 
     let passCount = 0
     let failCount = 0
-    // tally our votes
 
-    // TODO STATESHARDING4 CHECK VOTES PER CONSENSUS GROUP
+    // First Pass: Check if there are enough pass or fail votes to attempt a receipt.
     for (let i = 0; i < numVotes; i++) {
       let currentVote = queueEntry.collectedVotes[i]
 
@@ -248,9 +248,9 @@ class TransactionConsenus {
     //     sign?: import("../shardus/shardus-types").Sign
     // };
 
-    //big ol fun vote tally
 
-    //idk if we should check passed or not
+    // Second Pass: look at the account hashes and find the most common hash per account
+    //let uniqueKeys: {[id: string]: boolean} = {}
     let topHashByID: { [id: string]: { hash: string; count: number } } = {}
     let topValuesByIDByHash: { [id: string]: { [id: string]: { count: number } } } = {}
     if (passed && canProduceReceipt) {
@@ -262,6 +262,8 @@ class TransactionConsenus {
             for (let j = 0; j < vote.account_id.length; j++) {
               let id = vote.account_id[j]
               let hash = vote.account_state_hash_after[j]
+
+              //uniqueKeys[id] = true
 
               if (topValuesByIDByHash[id] == null) {
                 topValuesByIDByHash[id] = {}
@@ -285,13 +287,27 @@ class TransactionConsenus {
       }
     }
 
-    // TODO: possibly need an extra check to make sure all the top hash by ID values match to a single vote (and are not spread between multiple votes)
+    // test to make sure each account has enough votes for the most popular hash
+    if (passed === true) {
+      let tooFewVotes = false
+      let uniqueAccounts = Object.keys(topHashByID)
+      for(let accountID of uniqueAccounts){
+        if (topHashByID[accountID].count < requiredVotes ) {
+          tooFewVotes = true
+          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt: failed. requiredVotes${requiredVotes}  ${utils.stringifyReduce(topHashByID[accountID])}`)
+          this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed. requiredVotes${requiredVotes}  ${utils.stringifyReduce(topHashByID[accountID])}`)
+        }
+      }
+      if(tooFewVotes){
+        return null
+      }
+    }
 
-    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} `)
+    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} requiredVotes${requiredVotes}`)
     this.mainLogger.debug(`tryProduceReceipt canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} `)
 
-    let secondTally = 0
-    // if we can create a receipt do that now
+    let passingAccountVotesTotal = 0
+    // Assemble the receipt from votes that are passing
     if (canProduceReceipt === true) {
       let appliedReceipt: AppliedReceipt = {
         txid: queueEntry.acceptedTx.id,
@@ -311,7 +327,7 @@ class TransactionConsenus {
               let id = currentVote.account_id[j]
               let hash = currentVote.account_state_hash_after[j]
               if (topHashByID[id].hash === hash) {
-                secondTally++
+                passingAccountVotesTotal++
               } else {
                 badVoteMatch = true
                 break
@@ -331,13 +347,23 @@ class TransactionConsenus {
       }
 
       // if a passing vote won then check all the hashes.
-      if (passed) {
-        if (secondTally < requiredVotes) {
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} secondTally:${secondTally}`)
-          this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} secondTally:${secondTally} `)
-          return null
-        }
+      // if (passed) {
+      //   if (passingAccountVotesTotal < requiredVotes) {
+      //     if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal}`)
+      //     this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal} `)
+      //     return null
+      //   }
+      // }
+
+      // one last check to make sure we assembled enough votes.
+      // this is needed because our hash counts could have added up but if a vote could still get discarded if any one of its account hashes are wrong
+      if(passed && appliedReceipt.appliedVotes.length < requiredVotes) {
+        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt:  failed to produce enough votes. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal}`)
+        this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed to produce enough votes: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal} `)
+        return null
       }
+
+      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt: Success. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal} rc:${utils.stringifyReduce(appliedReceipt)}`)
 
       // recored our generated receipt to the queue entry
       queueEntry.appliedReceipt = appliedReceipt

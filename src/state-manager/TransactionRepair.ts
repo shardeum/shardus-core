@@ -307,8 +307,9 @@ class TransactionRepair {
                   // important to update the timestamp.  There are various reasons it could be incorrectly set to 0
                   let { timestamp: updatedTimestamp, hash: updatedHash } = this.app.getTimestampAndHashFromAccount(data.data)
                   if (data.timestamp != updatedTimestamp) {
-                    this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 timstamp had to be corrected from ${data.timestamp} to ${updatedTimestamp}   tx:${shortHash}  acc:${shortKey}`)
+                    this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 timstamp had to be corrected from ${data.timestamp} to ${updatedTimestamp}   tx:${shortHash}  acc:${shortKey} hash:${utils.stringifyReduce(updatedHash)} `)
                   }
+                  // This is correcting the timestamp on the wrapper
                   data.timestamp = updatedTimestamp
 
                   // update stats

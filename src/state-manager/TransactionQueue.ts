@@ -817,7 +817,7 @@ class TransactionQueue {
           return false
         }
 
-        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueInsertion_start', txQueueEntry.logID, `${txQueueEntry.logID} ${utils.stringifyReduce(txQueueEntry.txKeys)} cycleToRecordOn:${cycleToRecordOn}`)
+        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueInsertion_start', txQueueEntry.logID, `${txQueueEntry.logID} ${utils.stringifyReduce(txQueueEntry.txKeys)} cycleToRecordOn:${txQueueEntry.cycleToRecordOn}`)
 
         // Look at our keys and log which are known global accounts.  Set global accounts for keys if this is a globalModification TX
         for (let key of txQueueEntry.uniqueKeys) {
