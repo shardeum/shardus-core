@@ -788,6 +788,8 @@ class TransactionQueue {
       // }
 
       try {
+
+
         let age = Date.now() - timestamp
         if (age > this.stateManager.queueSitTime * 0.9) {
           this.statemanager_fatal(`routeAndQueueAcceptedTransaction_olderTX`, 'routeAndQueueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
@@ -815,7 +817,9 @@ class TransactionQueue {
           return false
         }
 
-        // Global account keys.
+        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueInsertion_start', txQueueEntry.logID, `${txQueueEntry.logID} ${utils.stringifyReduce(txQueueEntry.txKeys)} cycleToRecordOn:${cycleToRecordOn}`)
+
+        // Look at our keys and log which are known global accounts.  Set global accounts for keys if this is a globalModification TX
         for (let key of txQueueEntry.uniqueKeys) {
           if (globalModification === true) {
             // TODO: globalaccounts
@@ -827,14 +831,14 @@ class TransactionQueue {
               //this makes the code aware that this key is for a global account.
               //is setting this here too soon?
               //it should be that p2p has already checked the receipt before calling shardus.push with global=true
-
               this.stateManager.accountGlobals.globalAccountMap.set(key, null)
               if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - set account:${utils.stringifyReduce(key)}`)
             }
           }
         }
-        //let transactionGroup = this.queueEntryGetTransactionGroup(txQueueEntry)
-        // if we are syncing this area mark it as good.
+
+        // Check to see if any keys are inside of a syncing range.
+        // If it is a global key in a non-globalModification TX then we dont care about it
         for (let key of txQueueEntry.uniqueKeys) {
           let syncTracker = this.stateManager.accountSync.getSyncTracker(key)
           // only look at syncing for accounts that are changed.
@@ -850,6 +854,7 @@ class TransactionQueue {
           }
         }
 
+        // Refine our list of which keys will be updated in this transaction : uniqueWritableKeys
         for (let key of txQueueEntry.uniqueKeys) {
           let isGlobalAcc = this.stateManager.accountGlobals.isGlobalAccount(key)
 
@@ -864,14 +869,15 @@ class TransactionQueue {
         }
 
         //if we had any sync at all flag all non global partitions..
-        if (txQueueEntry.didSync) {
-          for (let key of txQueueEntry.uniqueKeys) {
-            //if(this.stateManager.accountGlobals.globalAccountMap.has(key)){
-            let { homePartition, addressNum } = ShardFunctions.addressToPartition(this.stateManager.currentCycleShardData.shardGlobals, key)
-            this.stateManager.currentCycleShardData.partitionsToSkip.set(homePartition, true)
-            //}
-          }
-        }
+        // This was used by broadcast partitions that we don't use anymore
+        // if (txQueueEntry.didSync) {
+        //   for (let key of txQueueEntry.uniqueKeys) {
+        //     //if(this.stateManager.accountGlobals.globalAccountMap.has(key)){
+        //     let { homePartition, addressNum } = ShardFunctions.addressToPartition(this.stateManager.currentCycleShardData.shardGlobals, key)
+        //     this.stateManager.currentCycleShardData.partitionsToSkip.set(homePartition, true)
+        //     //}
+        //   }
+        // }
 
         if (txQueueEntry.hasShardInfo) {
           let transactionGroup = this.queueEntryGetTransactionGroup(txQueueEntry)
@@ -881,8 +887,6 @@ class TransactionQueue {
           }
           if (sendGossip && txQueueEntry.globalModification === false) {
             try {
-              //let transactionGroup = this.queueEntryGetTransactionGroup(txQueueEntry)
-
               if (transactionGroup.length > 1) {
                 // should consider only forwarding in some cases?
                 this.stateManager.debugNodeGroup(txId, timestamp, `share to neighbors`, transactionGroup)
@@ -896,27 +900,21 @@ class TransactionQueue {
 
           if (txQueueEntry.didSync === false) {
             // see if our node shard data covers any of the accounts?
-            //this.queueEntryGetTransactionGroup(txQueueEntry) // this will compute our involvment
             if (txQueueEntry.ourNodeInTransactionGroup === false && txQueueEntry.globalModification === false) {
-              // if globalModification === true then every node is in the group
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_notInTxGroup', `${txId}`, ``)
+              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_notInTxGroup', `${txQueueEntry.logID}`, ``)
               return 'out of range' // we are done, not involved!!!
             } else {
-              // let tempList =  // can be returned by the function below
-              if (this.verboseLogs) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: getOrderedSyncingNeighbors`)
-              this.p2p.state.getOrderedSyncingNeighbors(this.stateManager.currentCycleShardData.ourNode)
-              // TODO: globalaccounts
-              // globalModification  TODO pass on to syncing nodes.   (make it pass on the flag too)
-              // possibly need to send proof to the syncing node or there could be a huge security loophole.  should share the receipt as an extra parameter
-              // or data repair will detect and reject this if we get tricked.  could be an easy attack vector
+              // If we have syncing neighbors forward this TX to them 
               if (this.stateManager.currentCycleShardData.hasSyncingNeighbors === true) {
+                // only send non global modification TXs
                 if (txQueueEntry.globalModification === false) {
-                  if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_sync_tx', `${txId}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(this.stateManager.currentCycleShardData.syncingNeighborsTxGroup.map((x) => x.id))}`)
+                  if (this.verboseLogs) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: spread_tx_to_group ${txQueueEntry.logID}`)
+                  if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_sync_tx', `${txQueueEntry.logID}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(this.stateManager.currentCycleShardData.syncingNeighborsTxGroup.map((x) => x.id))}`)
+                  
                   this.stateManager.debugNodeGroup(txId, timestamp, `share to syncing neighbors`, this.stateManager.currentCycleShardData.syncingNeighborsTxGroup)
                   this.p2p.sendGossipAll('spread_tx_to_group', acceptedTx, '', sender, this.stateManager.currentCycleShardData.syncingNeighborsTxGroup)
-                  //This was using sendGossipAll, but changed it for a work around.  maybe this just needs to be a tell.
                 } else {
-                  if (this.verboseLogs) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: bugfix detected. avoid forwarding txs where globalModification == true`)
+                  if (this.verboseLogs) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: bugfix detected. avoid forwarding txs where globalModification == true ${txQueueEntry.logID}`)
                 }
               }
             }

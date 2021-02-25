@@ -274,7 +274,7 @@ class TransactionRepair {
                 if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `write data: ${utils.stringifyReduce(data)}  acc:${shortKey}`)
                 //Commit the data
                 let dataToSet = [data]
-                let failedHashes = await this.stateManager.checkAndSetAccountData(dataToSet, 'repairToMatchReceipt', false)
+                let failedHashes = await this.stateManager.checkAndSetAccountData(dataToSet, `tx:${shortHash} repairToMatchReceipt`, false)
                 await this.stateManager.writeCombinedAccountDataToBackups(dataToSet, failedHashes)
                 attemptsRemaining = false
                 //update global cache?  that will be obsolete soona anyhow!

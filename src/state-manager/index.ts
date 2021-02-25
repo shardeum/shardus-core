@@ -455,7 +455,13 @@ class StateManager {
       cycleShardData.syncingNeighbors = this.p2p.state.getOrderedSyncingNeighbors(cycleShardData.ourNode)
 
       if (cycleShardData.syncingNeighbors.length > 0) {
+        //old: add all syncing nodes
         cycleShardData.syncingNeighborsTxGroup = [...cycleShardData.syncingNeighbors]
+        //TODO filter syncingNeighborsTxGroup to nodes that would care..(cover our data)
+        // for(let node in cycleShardData.syncingNeighbors){
+
+        //   ShardFunctions.
+        // }
         cycleShardData.syncingNeighborsTxGroup.push(cycleShardData.ourNode)
         cycleShardData.hasSyncingNeighbors = true
 

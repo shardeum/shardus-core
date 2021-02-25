@@ -158,7 +158,7 @@ class Consensus extends EventEmitter {
       receipt: transactionReceipt,
     }
 
-    this.emit('accepted', acceptedTX, true, null, global, noConsensus)
+    this.emit('accepted', acceptedTX,/*send gossip*/ true, null, global, noConsensus)
     this.logger.playbackLogNote(
       'tx_accepted',
       `TransactionId: ${txId}`,
