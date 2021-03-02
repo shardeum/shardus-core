@@ -295,7 +295,7 @@ class TransactionConsenus {
         if (topHashByID[accountID].count < requiredVotes ) {
           tooFewVotes = true
           if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt: failed. requiredVotes${requiredVotes}  ${utils.stringifyReduce(topHashByID[accountID])}`)
-          this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed. requiredVotes${requiredVotes}  ${utils.stringifyReduce(topHashByID[accountID])}`)
+          this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed. requiredVotes:${requiredVotes}  ${utils.stringifyReduce(topHashByID[accountID])}`)
         }
       }
       if(tooFewVotes){

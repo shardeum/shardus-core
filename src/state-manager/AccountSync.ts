@@ -1441,6 +1441,9 @@ class AccountSync {
     //   await this.syncStateDataForPartition(this.currentPartition)
     // }, 1000)
     await utils.sleep(1000)
+    
+    
+    //TODO proper restart not useing global var
     await this.syncStateDataForRange(this.currentRange)
   }
 
@@ -1484,6 +1487,7 @@ class AccountSync {
     let missingTXs = 0
     let handledButOk = 0
     let otherMissingCase = 0
+    let futureStateTableEntry = 0
     let missingButOkAccountIDs: { [id: string]: boolean } = {}
 
     let missingAccountIDs: { [id: string]: boolean } = {}
@@ -1499,14 +1503,26 @@ class AccountSync {
       if (account == null) {
         // make sure we have a transaction that matches this in our queue
         // the state table data we are working with is sufficiently old, so that we should have seen a transaction in our queue by the time we could get here
-        let txRef = this.acceptedTXByHash[stateData.txId]
-        if (txRef == null) {
-          missingTXs++
-          if (stateData.accountId != null) {
-            this.missingAccountData.push(stateData.accountId)
-            missingAccountIDs[stateData.accountId] = true
-          }
-        } else if (stateData.stateBefore === allZeroes64) {
+        
+        // if the account is seend in state table data but this was state table data that was from after time lastStateSyncEndtime
+        // then we wont care about missing this account.  receipt repair should take care of it.
+        // alternatively this could be fixed with more advance logic on the receipt repair side of things.
+        let time = Number(stateData.txTimestamp)
+        if(time > this.lastStateSyncEndtime){
+          futureStateTableEntry++
+          continue
+        }
+        
+        //acceptedTXByHash seems to always be empty so this forces missingTXs
+        // let txRef = this.acceptedTXByHash[stateData.txId]
+        // if (txRef == null) {
+        //   missingTXs++
+        //   if (stateData.accountId != null) {
+        //     this.missingAccountData.push(stateData.accountId)
+        //     missingAccountIDs[stateData.accountId] = true
+        //   }
+        // } else 
+        if (stateData.stateBefore === allZeroes64) {
           // this means we are at the start of a valid state table chain that starts with creating an account
           missingButOkAccountIDs[stateData.accountId] = true
           missingButOkAccounts++
@@ -1612,7 +1628,7 @@ class AccountSync {
     }
 
     this.mainLogger.debug(
-      `DATASYNC: processAccountData saving ${goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase} outOfDateNoTxs: ${outOfDateNoTxs}`
+      `DATASYNC: processAccountData saving ${goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase} outOfDateNoTxs: ${outOfDateNoTxs} futureStateTableEntry:${futureStateTableEntry}`
     )
     // failedHashes is a list of accounts that failed to match the hash reported by the server
     let failedHashes = await this.stateManager.checkAndSetAccountData(goodAccounts, 'syncNonGlobals:processAccountData', true) // repeatable form may need to call this in batches

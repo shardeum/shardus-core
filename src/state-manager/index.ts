@@ -838,8 +838,22 @@ class StateManager {
     let accountsToAdd: any[] = []
     let failedHashes: string[] = []
     for (let wrapedAccount of accountRecords) {
-      let { accountId, stateId, data: recordData } = wrapedAccount
+      let { accountId, stateId, data: recordData, timestamp } = wrapedAccount
       let hash = this.app.calculateAccountHash(recordData)
+
+      //TODO per remove this when we are satisfied with the situation
+      //Additional testing to cache if we try to overrite with older data
+      if (this.accountCache.hasAccount(accountId)) {
+        let accountMemData: AccountHashCache = this.accountCache.getAccountHash(accountId)
+        if (timestamp < accountMemData.t) {
+          this.mainLogger.error(`checkAndSetAccountData older timestamp note:${note} acc: ${utils.makeShortHash(accountId)} timestamp:${timestamp} accountMemData.t:${accountMemData.t} hash: ${utils.makeShortHash(hash)}`)
+          //return //not flagging as a failure case just yet need to observe
+        }
+      } else {
+        // not an error to not have this data yet
+        // this.mainLogger.error(`checkAndSetAccountData: did not find seen account. note:${note} acc: ${utils.makeShortHash(accountId)} hash: ${utils.makeShortHash(hash)}`)
+      }
+
       if (stateId === hash) {
         // if (recordData.owners) recordData.owners = JSON.parse(recordData.owners)
         // if (recordData.data) recordData.data = JSON.parse(recordData.data)
