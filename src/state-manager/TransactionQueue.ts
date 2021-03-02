@@ -335,7 +335,7 @@ class TransactionQueue {
         }
       }
 
-      if (this.verboseLogs) this.mainLogger.debug(`tryPreApplyTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
+      if (this.verboseLogs) this.mainLogger.debug(`tryPreApplyTransaction  txid:${utils.stringifyReduce(acceptedTX.id)} ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
       if (this.verboseLogs) this.mainLogger.debug(`tryPreApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
       if (this.verboseLogs) this.mainLogger.debug(`tryPreApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
       if (this.verboseLogs) this.mainLogger.debug(`tryPreApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
@@ -439,12 +439,18 @@ class TransactionQueue {
       accountDataList = _accountdata
 
       if (this.verboseLogs) this.mainLogger.debug(`commitConsensedTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+      
+      let note = `setAccountData: tx:${queueEntry.logID} in commitConsensedTransaction. `
+      
       // wrappedStates are side effected for now
-      savedSomething = await this.stateManager.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter)
+      savedSomething = await this.stateManager.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter, note)
 
       if (this.verboseLogs) this.mainLogger.debug(`commitConsensedTransaction  savedSomething: ${savedSomething}`)
       if (this.verboseLogs) this.mainLogger.debug(`commitConsensedTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
       if (this.verboseLogs) this.mainLogger.debug(`commitConsensedTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
+
+      
+
 
       this.applySoftLock = false
       // only write our state table data if we dont already have it in the db

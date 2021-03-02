@@ -84,6 +84,8 @@ class TransactionRepair {
 
       let upToDateAccounts: { [id: string]: boolean }  = {}
 
+      let numUpToDateAccounts = 0
+
       for (let key of queueEntry.uniqueKeys) {
         let coveredKey = false
 
@@ -105,6 +107,8 @@ class TransactionRepair {
               if(hashObj != null){
                 if(hashObj.h === hash){
                   upToDateAccounts[id] = true
+                  numUpToDateAccounts++
+                  if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `account ${shortKey} already up to date our: cached:${utils.stringifyReduce(hashObj)}`)
                   break
                 }
               }    
@@ -134,6 +138,7 @@ class TransactionRepair {
 
               if (nodeShardInfo == null) {
                 this.mainLogger.error(`shrd_repairToMatchReceipt nodeShardInfo == null ${utils.stringifyReduce(appliedVote.node_id)} tx:${shortHash} acc:${shortKey}`)
+                if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `nodeShardInfo == null ${utils.stringifyReduce(appliedVote.node_id)}  acc:${shortKey}`)
                 continue
               }
               // if the account is not global check if it is in range.

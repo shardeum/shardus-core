@@ -846,8 +846,8 @@ class StateManager {
       if (this.accountCache.hasAccount(accountId)) {
         let accountMemData: AccountHashCache = this.accountCache.getAccountHash(accountId)
         if (timestamp < accountMemData.t) {
-          this.mainLogger.error(`checkAndSetAccountData older timestamp note:${note} acc: ${utils.makeShortHash(accountId)} timestamp:${timestamp} accountMemData.t:${accountMemData.t} hash: ${utils.makeShortHash(hash)}`)
-          //return //not flagging as a failure case just yet need to observe
+          this.mainLogger.error(`setAccountData: abort. checkAndSetAccountData older timestamp note:${note} acc: ${utils.makeShortHash(accountId)} timestamp:${timestamp} accountMemData.t:${accountMemData.t} hash: ${utils.makeShortHash(hash)} cache:${utils.stringifyReduce(accountMemData)}`)
+          continue //this is a major error need to skip the writing.
         }
       } else {
         // not an error to not have this data yet
@@ -1700,7 +1700,7 @@ class StateManager {
    */
 
   // TODO WrappedStates
-  async setAccount(wrappedStates: WrappedResponses, localCachedData: LocalCachedData, applyResponse: Shardus.ApplyResponse, isGlobalModifyingTX: boolean, accountFilter?: AccountFilter) {
+  async setAccount(wrappedStates: WrappedResponses, localCachedData: LocalCachedData, applyResponse: Shardus.ApplyResponse, isGlobalModifyingTX: boolean, accountFilter?: AccountFilter,  note?:string) {
     // let sourceAddress = inTx.srcAct
     // let targetAddress = inTx.tgtAct
     // let amount = inTx.txnAmt
@@ -1739,7 +1739,7 @@ class StateManager {
         if (this.verboseLogs) this.mainLogger.debug('setAccount: writing global account: ' + utils.makeShortHash(key))
       }
 
-      if (this.verboseLogs) this.mainLogger.debug(`setAccount partial:${wrappedData.isPartial} key:${utils.makeShortHash(key)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`${note} setAccount partial:${wrappedData.isPartial} key:${utils.makeShortHash(key)}`)
       if (wrappedData.isPartial) {
         await this.app.updateAccountPartial(wrappedData, localCachedData[key], applyResponse)
       } else {
