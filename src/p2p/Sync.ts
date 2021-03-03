@@ -308,7 +308,10 @@ async function getCycles(
   if (end !== undefined) {
     if (start > end) start = end
   }
-  const data: { start: number; end?: number } = { start }
+  const data: {
+    start: number
+    end?: number
+  } = { start }
   if (end !== undefined) data.end = end
   const queryFn = async (node: SyncNode) => {
     const ip = node.ip ? node.ip : node.externalIp
@@ -333,7 +336,10 @@ async function getCycles(
 
   // [TODO] Validate whatever came in
   const cycles = response as CycleCreator.CycleRecord[]
-  return cycles
+
+  const valid = validateCycles(cycles)
+  if (valid)
+    return cycles
 }
 
 export function activeNodeCount(cycle: CycleCreator.CycleRecord) {
@@ -369,6 +375,158 @@ export function totalNodeCount(cycle: CycleCreator.CycleRecord) {
     cycle.removed.length -
     cycle.lost.length
   )
+}
+
+function validateCycles(cycles: CycleCreator.CycleRecord[]) {
+  const archiverType = {
+    publicKey: 's',
+    ip: 's',
+    port: 'n',
+    curvePk: 's',
+  }
+  for (const cycleRecord of cycles) {
+    let err = validateTypes(cycleRecord, {
+      safetyMode: 'b',
+      safetyNum: 'n',
+      networkStateHash: 's',
+      refreshedArchivers: 'a',
+      refreshedConsensors: 'a',
+      joinedArchivers: 'a',
+      leavingArchivers: 'a',
+      syncing: 'n',
+      joinedConsensors: 'a',
+      active: 'n',
+      activated: 'a',
+      activatedPublicKeys: 'a',
+      lost: 'a',
+      refuted: 'a',
+      joined: 'a',
+      returned: 'a',
+      apoptosized: 'a',
+      networkDataHash: 'a',
+      networkReceiptHash: 'a',
+      networkSummaryHash: 'a',
+      desired: 'n',
+    })
+    if (err) {
+      warn('Type validation failed for cycleRecord: ' + err)
+    }
+    for (const refreshedArchiver of cycleRecord.refreshedArchivers) {
+      err = validateTypes(refreshedArchiver, archiverType)
+      if (err) {
+        warn('Validation failed for cycleRecord.refreshedArchivers: ' + err)
+        return false
+      }
+    }
+    for (const refreshedConsensor of cycleRecord.refreshedConsensors) {
+      err = validateTypes(refreshedConsensor, {
+        curvePublicKey: 's',
+        status: 's',
+      })
+      if (err) {
+        warn('Validation failed for cycleRecord.refreshedConsensors: ' + err)
+        return false
+      }
+    }
+    for (const joinedArchiver of cycleRecord.joinedArchivers) {
+      err = validateTypes(joinedArchiver, archiverType)
+      if (err) {
+        warn('Validation failed for cycleRecord.joinedArchivers: ' + err)
+        return false
+      }
+    }
+    for (const leavingArchiver of cycleRecord.leavingArchivers) {
+      err = validateTypes(leavingArchiver, archiverType)
+      if (err) {
+        warn('Validation failed for cycleRecord.leavingArchivers: ' + err)
+        return false
+      }
+    }
+    for (const joinedConsensor of cycleRecord.joinedConsensors) {
+      err = validateTypes(joinedConsensor, {
+        cycleJoined: 's',
+        counterRefreshed: 'n',
+        id: 's',
+      })
+      if (err) {
+        warn('Validation failed for cycleRecord.joinedConsensors: ' + err)
+        return false
+      }
+    }
+    for (const nodeId of cycleRecord.activated) {
+      if (typeof nodeId !== 'string') {
+        warn('Validation failed for cycleRecord.refreshedConsensors: ' + err)
+        return false
+      }
+    }
+    for (const activatedPublicKey of cycleRecord.activatedPublicKeys) {
+      if (typeof activatedPublicKey !== 'string') {
+        warn('Validation failed for cycleRecord.activatedPublicKeys: ' + err)
+        return false
+      }
+    }
+    for (const nodeId of cycleRecord.lost) {
+      if (typeof nodeId !== 'string') {
+        warn('Validation failed for cycleRecord.lost: ' + err)
+        return false
+      }
+    }
+    for (const nodeId of cycleRecord.refuted) {
+      if (typeof nodeId !== 'string') {
+        warn('Validation failed for cycleRecord.refuted: ' + err)
+        return false
+      }
+    }
+    for (const nodeId of cycleRecord.joined) {
+      if (typeof nodeId !== 'string') {
+        warn('Validation failed for cycleRecord.joined: ' + err)
+        return false
+      }
+    }
+    for (const nodeId of cycleRecord.returned) {
+      if (typeof nodeId !== 'string') {
+        warn('Validation failed for cycleRecord.returned: ' + err)
+        return false
+      }
+    }
+    for (const nodeId of cycleRecord.apoptosized) {
+      if (typeof nodeId !== 'string') {
+        warn('Validation failed for cycleRecord.apoptosized: ' + err)
+        return false
+      }
+    }
+    for (const networkHash of cycleRecord.networkDataHash) {
+      err = validateTypes(networkHash, {
+        cycle: 'n',
+        hash: 's',
+      })
+      if (err) {
+        warn('Validation failed for cycleRecord.networkDataHash: ' + err)
+        return false
+      }
+    }
+    for (const networkHash of cycleRecord.networkReceiptHash) {
+      err = validateTypes(networkHash, {
+        cycle: 'n',
+        hash: 's',
+      })
+      if (err) {
+        warn('Validation failed for cycleRecord.networkReceiptHash: ' + err)
+        return false
+      }
+    }
+    for (const networkHash of cycleRecord.networkSummaryHash) {
+      err = validateTypes(networkHash, {
+        cycle: 'n',
+        hash: 's',
+      })
+      if (err) {
+        warn('Validation failed for cycleRecord.networkSummaryHash: ' + err)
+        return false
+      }
+    }
+  }
+  return true
 }
 
 function info(...msg) {
