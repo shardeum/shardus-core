@@ -5,6 +5,7 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { InternalHandler, LooseObject } from './Types'
 import { currentCycle } from './CycleCreator'
+import { setIsUpTs } from '../p2p/Lost'
 
 /** TYPES */
 
@@ -570,6 +571,9 @@ export async function handleGossip(payload, sender, tracker = '') {
   }
   gossipedHashesRecv.set(gossipHash, false)    // [TODO] - double check logic; we setTimeout to delete gossipHash if we get it a second time, but not first time ???
   */
+  
+  setIsUpTs(sender)
+  
 
   gossipRecv++
   gossipTypeRecv[type] = gossipTypeRecv[type]  ? gossipTypeRecv[type]+1 : 1

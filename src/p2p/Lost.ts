@@ -77,6 +77,7 @@ let p2pLogger
 let lost: Map<string, LostRecord>
 export let isDown = {}
 let isUp = {}
+let isUpTs = {}
 let stopReporting = {}
 let sendRefute = -1
 
@@ -419,6 +420,18 @@ async function isDownCache(node){
   if (status === 'down') isDown[id] = currentCycle
   else isUp[id] = currentCycle
   return status
+}
+
+export function setIsUpTs(nodeId:string){
+  let timestamp = Date.now()
+  isUpTs[nodeId] = timestamp
+}
+
+export function isNodeUpRecent(nodeId:string, maxAge:number) : {down:boolean, state:string, age:number} {
+  let lastCheck = isUpTs[nodeId]
+  let age = Date.now() - lastCheck
+  if (age < maxAge) return {down:false, state:'up', age} 
+  return {down:false, state:'noLastState', age} 
 }
 
 export function isNodeDown(nodeId:string) : {down:boolean, state:string} {

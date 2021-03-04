@@ -1469,12 +1469,16 @@ class ShardFunctions {
     // if (exclude.length === allNodes.length) {
     //   return results
     // }
-    let expectedNodes = Math.min(allNodes.length - exclude.length, radius * 2)
+
+    //TODO found a bug here. the consensus radius needs to hold one more node!!!
+
+    //let expectedNodes = Math.min(allNodes.length - exclude.length, radius * 2)
 
     //or check radius being geater than max nodes... and do simple loop minus exclude..
-
     let scanAmount = radius * 2 + 1
     let scanCount = 0
+    //this isn't quite perfect, but the only current use of exclude is for a the self node.
+    let expectedNodes = Math.min(allNodes.length - exclude.length, scanAmount - exclude.length)
 
     // if we need to scan all the nodes, just do that here in a simple way
     if (scanAmount >= allNodes.length) {

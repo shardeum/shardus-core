@@ -3,7 +3,7 @@ import Shardus = require('../shardus/shardus-types')
 
 import { ShardGlobals, ShardInfo, StoredPartition, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from './shardFunctionTypes'
 
-import { isNodeDown, isNodeLost } from '../p2p/Lost'
+import { isNodeDown, isNodeLost, isNodeUpRecent } from '../p2p/Lost'
 
 import ShardFunctions from './shardFunctions.js'
 
@@ -1306,9 +1306,16 @@ class StateManager {
 
     // todo port this to a static stard function!
     // check if we are in the consenus group for this partition
-    let minP = ourNodeShardData.consensusStartPartition // storedPartitions.partitionStart
-    let maxP = ourNodeShardData.consensusEndPartition // storedPartitions.partitionEnd
-    partitionDump.rangesCovered = { ipPort: `${ourNodeShardData.node.externalIp}:${ourNodeShardData.node.externalPort}`, id: utils.makeShortHash(ourNodeShardData.node.id), fracID: ourNodeShardData.nodeAddressNum / 0xffffffff, hP: ourNodeShardData.homePartition, cMin: minP, cMax: maxP, stMin: ourNodeShardData.storedPartitions.partitionStart, stMax: ourNodeShardData.storedPartitions.partitionEnd, numP: this.currentCycleShardData.shardGlobals.numPartitions }
+    // let minP = ourNodeShardData.consensusStartPartition // storedPartitions.partitionStart
+    // let maxP = ourNodeShardData.consensusEndPartition // storedPartitions.partitionEnd
+
+    let minP = ourNodeShardData.storedPartitions.partitionStart
+    let maxP = ourNodeShardData.storedPartitions.partitionEnd
+
+    let cMin = ourNodeShardData.consensusStartPartition
+    let cMax = ourNodeShardData.consensusEndPartition
+
+    partitionDump.rangesCovered = { ipPort: `${ourNodeShardData.node.externalIp}:${ourNodeShardData.node.externalPort}`, id: utils.makeShortHash(ourNodeShardData.node.id), fracID: ourNodeShardData.nodeAddressNum / 0xffffffff, hP: ourNodeShardData.homePartition, cMin: cMin, cMax: cMax, stMin: ourNodeShardData.storedPartitions.partitionStart, stMax: ourNodeShardData.storedPartitions.partitionEnd, numP: this.currentCycleShardData.shardGlobals.numPartitions }
 
     // todo print out coverage map by node index
 
@@ -1739,7 +1746,7 @@ class StateManager {
         if (this.verboseLogs) this.mainLogger.debug('setAccount: writing global account: ' + utils.makeShortHash(key))
       }
 
-      if (this.verboseLogs) this.mainLogger.debug(`${note} setAccount partial:${wrappedData.isPartial} key:${utils.makeShortHash(key)}`)
+      if (this.verboseLogs) this.mainLogger.debug(`${note} setAccount partial:${wrappedData.isPartial} key:${utils.makeShortHash(key)} hash:${wrappedData.stateId}`)
       if (wrappedData.isPartial) {
         await this.app.updateAccountPartial(wrappedData, localCachedData[key], applyResponse)
       } else {
@@ -2596,7 +2603,7 @@ class StateManager {
     return -1
   }
 
-  isNodeValidForInternalMessage(nodeId: string, debugMsg: string, checkForNodeDown: boolean = true, checkForNodeLost: boolean = true): boolean {
+  isNodeValidForInternalMessage(nodeId: string, debugMsg: string, checkForNodeDown: boolean = true, checkForNodeLost: boolean = true, checkIsUpRecent: boolean = true): boolean {
     let node: Shardus.Node = this.p2p.state.getNode(nodeId)
     let logErrors = true
     if (node == null) {
@@ -2608,6 +2615,28 @@ class StateManager {
       if (logErrors) this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
       return false
     }
+
+    if(checkIsUpRecent){
+      let { down, state, age } = isNodeUpRecent(nodeId, 5000)
+      if(down === false){
+        if (checkForNodeDown) {
+          let { down, state } = isNodeDown(nodeId)
+          if (down === true) {
+            if (logErrors) this.mainLogger.error(`isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+          }
+        }
+        if (checkForNodeLost) {
+          if (isNodeLost(nodeId) === true) {
+            if (logErrors) this.mainLogger.error(`isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+          }
+        }
+        return true
+      } else {
+        if (logErrors) this.mainLogger.error(`isNodeUpRecentOverride: ${age} no recent TX, but this is not a fail conditions`)
+      }
+    }
+
+
     if (checkForNodeDown) {
       let { down, state } = isNodeDown(nodeId)
       if (down === true) {
@@ -2624,7 +2653,7 @@ class StateManager {
     return true
   }
 
-  filterValidNodesForInternalMessage(nodeList: Shardus.Node[], debugMsg: string, checkForNodeDown: boolean = true, checkForNodeLost: boolean = true): Shardus.Node[] {
+  filterValidNodesForInternalMessage(nodeList: Shardus.Node[], debugMsg: string, checkForNodeDown: boolean = true, checkForNodeLost: boolean = true, checkIsUpRecent: boolean = true): Shardus.Node[] {
     let filteredNodes = []
 
     let logErrors = true
@@ -2640,6 +2669,28 @@ class StateManager {
         if (logErrors) this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
         continue
       }
+      if(checkIsUpRecent){
+        let { down, state, age } = isNodeUpRecent(nodeId, 5000)
+        if(down === false){
+          filteredNodes.push(node)
+
+          if (checkForNodeDown) {
+            let { down, state } = isNodeDown(nodeId)
+            if (down === true) {
+              if (logErrors) this.mainLogger.error(`isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+            }
+          }
+          if (checkForNodeLost) {
+            if (isNodeLost(nodeId) === true) {
+              if (logErrors) this.mainLogger.error(`isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+            }
+          }
+          continue
+        } else {
+          if (logErrors) this.mainLogger.error(`isNodeUpRecentOverride: ${age} no recent TX, but this is not a fail conditions`)
+        }
+      }
+
       if (checkForNodeDown) {
         let { down, state } = isNodeDown(nodeId)
         if (down === true) {
