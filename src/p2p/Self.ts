@@ -336,9 +336,9 @@ async function getActiveNodesFromArchiver() {
     nodeList: Types.Node[]
   }
   try {
-    seedListSigned = await http.post(nodeListUrl, {
-      nodeInfo,
-    })
+    seedListSigned = await http.post(nodeListUrl, Context.crypto.sign({
+        nodeInfo
+    }))
   } catch (e) {
     throw Error(
       `Fatal: Could not get seed list from seed node server ${nodeListUrl}: ` +
