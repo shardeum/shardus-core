@@ -13,6 +13,7 @@ import { config, defaultConfigs, logger } from '../p2p/Context'
 import NatAPI = require('nat-api')
 import http from 'http'
 import {profilerInstance} from '../utils/profiler'
+import * as utils from '../utils'
 
 /** TYPES */
 export interface IPInfo {
@@ -231,7 +232,7 @@ export class NetworkClass extends EventEmitter {
         resolve(res)
       }
       const onTimeout = () => {
-        const err = new Error('Request timed out.')
+        const err = new Error(`Request timed out. ${utils.stringifyReduce(id)}`)
         this.mainLogger.error('Network: ' + err)
         this.mainLogger.error(err.stack)
         this.emit('timeout', node)

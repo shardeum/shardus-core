@@ -868,6 +868,10 @@ class StateManager {
           // the algorithims may run worst case for old cycles.
           let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
           this.partitionStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount)
+        } else {
+          //update accounts cache
+          let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
+          this.accountCache.updateAccountHash(wrapedAccount.accountId, wrapedAccount.stateId, wrapedAccount.timestamp, cycleToRecordOn)
         }
       } else {
         this.mainLogger.error(`setAccountData hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
@@ -1746,7 +1750,7 @@ class StateManager {
         if (this.verboseLogs) this.mainLogger.debug('setAccount: writing global account: ' + utils.makeShortHash(key))
       }
 
-      if (this.verboseLogs) this.mainLogger.debug(`${note} setAccount partial:${wrappedData.isPartial} key:${utils.makeShortHash(key)} hash:${wrappedData.stateId}`)
+      if (this.verboseLogs) this.mainLogger.debug(`${note} setAccount partial:${wrappedData.isPartial} key:${utils.makeShortHash(key)} hash:${utils.makeShortHash(wrappedData.stateId)} ts:${wrappedData.timestamp}`)
       if (wrappedData.isPartial) {
         await this.app.updateAccountPartial(wrappedData, localCachedData[key], applyResponse)
       } else {
