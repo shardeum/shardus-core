@@ -863,15 +863,25 @@ class StateManager {
         this.mainLogger.debug(debugString)
         if (this.verboseLogs) console.log(debugString)
 
-        if (initStats) {
-          // todo perf, evaluate getCycleNumberFromTimestamp for really old timestamps.
-          // the algorithims may run worst case for old cycles.
-          let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
-          this.partitionStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount)
-        } else {
-          //update accounts cache
-          let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
+        // if (initStats) {
+        //   // todo perf, evaluate getCycleNumberFromTimestamp for really old timestamps.
+        //   // the algorithims may run worst case for old cycles.
+        //   let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
+        //   this.partitionStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount)
+        // } else {
+        //   //update accounts cache
+        //   let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
+        //   this.accountCache.updateAccountHash(wrapedAccount.accountId, wrapedAccount.stateId, wrapedAccount.timestamp, cycleToRecordOn)
+        // }
+
+        let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
+        if (this.accountCache.hasAccount(accountId)) {
+          //TODO, need a way to re-init.. dang idk how to do that!
+          //this.partitionStats.statsDataSummaryUpdate2(cycleToRecordOn, null, wrapedAccount)
+
           this.accountCache.updateAccountHash(wrapedAccount.accountId, wrapedAccount.stateId, wrapedAccount.timestamp, cycleToRecordOn)
+        } else {
+          this.partitionStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount)
         }
       } else {
         this.mainLogger.error(`setAccountData hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)

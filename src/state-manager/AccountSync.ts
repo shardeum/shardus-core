@@ -1596,11 +1596,23 @@ class AccountSync {
     let noSyncData = 0
     let noMatches = 0
     let outOfDateNoTxs = 0
+    let unhandledCase = 0
+    let fix1Worked = 0
     for (let account of this.combinedAccountData) {
       if (!account.syncData) {
         // this account was not found in state data
         this.accountsWithStateConflict.push(account)
         noSyncData++
+      } else if (account.syncData.anyMatch === true) {
+        if(account.syncData.missingTX){
+          fix1Worked++
+          this.mainLogger.debug(
+            `DATASYNC: processAccountData FIX WORKED. ${utils.stringifyReduce(account)}  `
+          )
+        }
+        //this is the positive case. We have a match so we can use this account
+        delete account.syncData
+        goodAccounts.push(account)
       } else if (!account.syncData.anyMatch) {
         // this account was in state data but none of the state table stateAfter matched our state
         this.accountsWithStateConflict.push(account)
@@ -1622,13 +1634,12 @@ class AccountSync {
         //     continue
         //   }
         // }
-        delete account.syncData
-        goodAccounts.push(account)
+        unhandledCase++
       }
     }
 
     this.mainLogger.debug(
-      `DATASYNC: processAccountData saving ${goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase} outOfDateNoTxs: ${outOfDateNoTxs} futureStateTableEntry:${futureStateTableEntry}`
+      `DATASYNC: processAccountData saving ${goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase} outOfDateNoTxs: ${outOfDateNoTxs} futureStateTableEntry:${futureStateTableEntry} unhandledCase:${unhandledCase} fix1Worked:${fix1Worked}`
     )
     // failedHashes is a list of accounts that failed to match the hash reported by the server
     let failedHashes = await this.stateManager.checkAndSetAccountData(goodAccounts, 'syncNonGlobals:processAccountData', true) // repeatable form may need to call this in batches
