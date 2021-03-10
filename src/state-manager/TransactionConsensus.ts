@@ -49,6 +49,16 @@ class TransactionConsenus {
   }
 
 
+  /***
+   *    ######## ##    ## ########  ########   #######  #### ##    ## ########  ######
+   *    ##       ###   ## ##     ## ##     ## ##     ##  ##  ###   ##    ##    ##    ##
+   *    ##       ####  ## ##     ## ##     ## ##     ##  ##  ####  ##    ##    ##
+   *    ######   ## ## ## ##     ## ########  ##     ##  ##  ## ## ##    ##     ######
+   *    ##       ##  #### ##     ## ##        ##     ##  ##  ##  ####    ##          ##
+   *    ##       ##   ### ##     ## ##        ##     ##  ##  ##   ###    ##    ##    ##
+   *    ######## ##    ## ########  ##         #######  #### ##    ##    ##     ######
+   */
+
   setupHandlers(){
     this.p2p.registerGossipHandler('spread_appliedReceipt', async (payload, sender, tracker) => {
         let appliedReceipt = payload as AppliedReceipt
@@ -64,6 +74,8 @@ class TransactionConsenus {
           }
           if (queueEntry == null) {
             this.mainLogger.error(`spread_appliedReceipt no queue entry for ${appliedReceipt.txid} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(payload.txid)]}`)
+            // NEW start repair process that will find the TX then apply repairs
+            // this.stateManager.transactionRepair.repairToMatchReceiptWithoutQueueEntry(appliedReceipt)
             return
           }
         }
@@ -86,11 +98,11 @@ class TransactionConsenus {
   
           // share the appliedReceipt.
           let sender = null
-          let consensusGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-          if (consensusGroup.length > 1) {
+          let gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+          if (gossipGroup.length > 1) {
             // should consider only forwarding in some cases?
-            this.stateManager.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, consensusGroup)
-            this.p2p.sendGossipIn('spread_appliedReceipt', appliedReceipt, tracker, sender, consensusGroup)
+            this.stateManager.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, gossipGroup)
+            this.p2p.sendGossipIn('spread_appliedReceipt', appliedReceipt, tracker, sender, gossipGroup)
           }
         } else {
           // we get here if the receipt has already been shared
@@ -114,11 +126,16 @@ class TransactionConsenus {
 
     // share the appliedReceipt.
     let sender = null
-    let consensusGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
-    if (consensusGroup.length > 1) {
+    let gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+
+    // todo only recalc if cycle boundry?
+    // let updatedGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry, true)
+
+
+    if (gossipGroup.length > 1) {
       // should consider only forwarding in some cases?
-      this.stateManager.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, consensusGroup)
-      this.p2p.sendGossipIn('spread_appliedReceipt', appliedReceipt, '', sender, consensusGroup)
+      this.stateManager.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, gossipGroup)
+      this.p2p.sendGossipIn('spread_appliedReceipt', appliedReceipt, '', sender, gossipGroup)
     }
   }
 

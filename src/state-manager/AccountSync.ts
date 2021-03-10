@@ -733,6 +733,19 @@ class AccountSync {
       //   Repeat the “Sync the Account State Table Second Pass” step
       //   Repeat the “Process the Account data” step
       await this.syncFailedAcccounts(lowAddress, highAddress)
+
+      if(this.failedAccountsRemain()){
+        this.mainLogger.debug(`DATASYNC: failedAccountsRemain, wait ${this.stateManager.syncSettleTime}ms and retry ${lowAddress} - ${highAddress}`)
+        await utils.sleep(this.stateManager.syncSettleTime)
+
+        await this.syncFailedAcccounts(lowAddress, highAddress)
+
+        if(this.failedAccountsRemain()){
+          this.statemanager_fatal(`failedAccountsRemain2`, `failedAccountsRemain2: this.accountsWithStateConflict:${utils.stringifyReduce(this.accountsWithStateConflict)} this.missingAccountData:${utils.stringifyReduce(this.missingAccountData)} `)
+        } else {
+          this.mainLogger.debug(`DATASYNC: syncFailedAcccounts FIX WORKED`)
+        }
+      }
     } catch (error) {
       if (error.message.includes('FailAndRestartPartition')) {
         this.mainLogger.debug(`DATASYNC: Error Failed at: ${error.stack}`)
@@ -1360,6 +1373,13 @@ class AccountSync {
     }
   }
 
+  failedAccountsRemain() : boolean{
+    if(this.accountsWithStateConflict.length === 0 && this.missingAccountData.length === 0){
+      return false
+    }
+    return true
+  }
+
   // Sync the failed accounts
   //   Log that some account failed
   //   Use the /get_account_data_by_list API to get the data for the accounts that need to be looked up later from any of the nodes that had a matching hash but different from previously used nodes
@@ -1603,16 +1623,17 @@ class AccountSync {
         // this account was not found in state data
         this.accountsWithStateConflict.push(account)
         noSyncData++
-      } else if (account.syncData.anyMatch === true) {
-        if(account.syncData.missingTX){
-          fix1Worked++
-          this.mainLogger.debug(
-            `DATASYNC: processAccountData FIX WORKED. ${utils.stringifyReduce(account)}  `
-          )
-        }
-        //this is the positive case. We have a match so we can use this account
-        delete account.syncData
-        goodAccounts.push(account)
+        //turning this case back off.
+      // } else if (account.syncData.anyMatch === true) {
+      //   if(account.syncData.missingTX){
+      //     fix1Worked++
+      //     this.mainLogger.debug(
+      //       `DATASYNC: processAccountData FIX WORKED. ${utils.stringifyReduce(account)}  `
+      //     )
+      //   }
+      //   //this is the positive case. We have a match so we can use this account
+      //   delete account.syncData
+      //   goodAccounts.push(account)
       } else if (!account.syncData.anyMatch) {
         // this account was in state data but none of the state table stateAfter matched our state
         this.accountsWithStateConflict.push(account)
@@ -1634,7 +1655,10 @@ class AccountSync {
         //     continue
         //   }
         // }
-        unhandledCase++
+        //unhandledCase++
+
+        delete account.syncData
+        goodAccounts.push(account)
       }
     }
 

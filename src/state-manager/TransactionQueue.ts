@@ -76,6 +76,17 @@ class TransactionQueue {
     this.newAcceptedTxQueueRunning = false
   }
 
+
+  /***
+   *    ######## ##    ## ########  ########   #######  #### ##    ## ########  ######
+   *    ##       ###   ## ##     ## ##     ## ##     ##  ##  ###   ##    ##    ##    ##
+   *    ##       ####  ## ##     ## ##     ## ##     ##  ##  ####  ##    ##    ##
+   *    ######   ## ## ## ##     ## ########  ##     ##  ##  ## ## ##    ##     ######
+   *    ##       ##  #### ##     ## ##        ##     ##  ##  ##  ####    ##          ##
+   *    ##       ##   ### ##     ## ##        ##     ##  ##  ##   ###    ##    ##    ##
+   *    ######## ##    ## ########  ##         #######  #### ##    ##    ##     ######
+   */
+
   setupHandlers() {
     // p2p TELL
     this.p2p.registerInternal('broadcast_state', async (payload: { txid: string; stateList: any[] }, respond: any) => {
@@ -747,6 +758,9 @@ class TransactionQueue {
         logID: '',
         txGroupDebug: '',
         uniqueWritableKeys: [],
+        txGroupCycle: 0,
+        updatedTxGroupCycle: 0,
+        updatedTransactionGroup: null
       } // age comes from timestamp
 
       // todo faster hash lookup for this maybe?
@@ -1210,6 +1224,8 @@ class TransactionQueue {
     //let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry)
     //the outer loop here could just use the transaction group of nodes instead. but already had this working in a similar function
     //TODO change it to loop the transaction group untill we get a good receipt
+
+    //Note: we only need to get one good receipt, the loop on keys is in case we have to try different groups of nodes
     let gotReceipt = false
     for (let key of queueEntry.uniqueKeys) {
       if (gotReceipt === true) {
@@ -1229,29 +1245,7 @@ class TransactionQueue {
 
         let node = consensusGroup[nodeIndex]
         nodeIndex++
-        // find a random node to ask that is not us
-        // let node:Shardus.Node = null
-        // let randomIndex
-        // let foundValidNode = false
-        // let maxTries = 1000
-        // while (foundValidNode == false) {
-        //   maxTries--
-        //   randomIndex = this.stateManager.getRandomInt(homeNodeShardData.consensusNodeForOurNodeFull.length - 1)
-        //   node = homeNodeShardData.consensusNodeForOurNodeFull[randomIndex]
-        //   if(maxTries < 0){
-        //     //FAILED
-        //     this.fatalLogger.fatal(`queueEntryRequestMissingReceipt: unable to find node to ask after 1000 tries tx:${utils.makeShortHash(queueEntry.acceptedTx.id)} key: ${utils.makeShortHash(key)} ${utils.stringifyReduce(homeNodeShardData.consensusNodeForOurNodeFull.map((x)=> (x!=null)? x.id : 'null'))}`)
-        //     break
-        //   }
-        //   if(node == null){
-        //     continue
-        //   }
-        //   if(node.id === this.stateManager.currentCycleShardData.nodeShardData.node.id){
-        //     continue
-        //   }
-        //   foundValidNode = true
-        // }
-
+  
         if (node == null) {
           continue
         }
@@ -1316,16 +1310,23 @@ class TransactionQueue {
    * @param {QueueEntry} queueEntry
    * @returns {Node[]}
    */
-  queueEntryGetTransactionGroup(queueEntry: QueueEntry): Shardus.Node[] {
+  queueEntryGetTransactionGroup(queueEntry: QueueEntry, tryUpdate: boolean = false): Shardus.Node[] {
     if (this.stateManager.currentCycleShardData == null) {
       throw new Error('queueEntryGetTransactionGroup: currentCycleShardData == null')
     }
     if (queueEntry.uniqueKeys == null) {
       throw new Error('queueEntryGetTransactionGroup: queueEntry.uniqueKeys == null')
     }
-    if (queueEntry.transactionGroup != null) {
+    if (queueEntry.transactionGroup != null && tryUpdate != true) {
       return queueEntry.transactionGroup
     }
+
+    if(tryUpdate){
+      if(queueEntry.cycleToRecordOn === this.stateManager.currentCycleShardData.cycleNumber){
+
+      }
+    }
+
     let txGroup = []
     let uniqueNodes: StringNodeObjectMap = {}
 
@@ -1403,7 +1404,29 @@ class TransactionQueue {
     for (let v of values) {
       txGroup.push(v)
     }
-    queueEntry.transactionGroup = txGroup
+
+    if(tryUpdate != true){
+      queueEntry.txGroupCycle = this.stateManager.currentCycleShardData.cycleNumber
+      queueEntry.transactionGroup = txGroup      
+    } else {
+      queueEntry.updatedTxGroupCycle = this.stateManager.currentCycleShardData.cycleNumber
+      queueEntry.transactionGroup = txGroup  
+    }
+
+    // let uniqueNodes = {}
+    // for (let n of gossipGroup) {
+    //   uniqueNodes[n.id] = n
+    // }
+    // for (let n of updatedGroup) {
+    //   uniqueNodes[n.id] = n
+    // }
+    // let values = Object.values(uniqueNodes)    
+    // let finalGossipGroup = 
+    // for (let n of updatedGroup) {
+    //   uniqueNodes[n.id] = n
+    // }
+
+
     return txGroup
   }
 

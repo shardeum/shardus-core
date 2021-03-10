@@ -1034,6 +1034,43 @@ class StateManager {
       await respond(response)
     })
 
+
+    this.p2p.registerInternal('request_tx_and_state', async (payload: string, respond: (arg0: RequestTxResp) => any) => {
+      let response: RequestTxResp = { stateList: [], beforeHashes: {}, note: '', success: false, originalData:{} }
+
+      let txid = payload
+      let queueEntry = this.transactionQueue.getQueueEntrySafe(payload)
+      if (queueEntry == null) {
+        queueEntry = this.transactionQueue.getQueueEntryArchived(payload, 'request_tx_and_state')
+      }
+
+      if (queueEntry == null) {
+        response.note = `failed to find queue entry: ${utils.stringifyReduce(txid)} dbg:${this.debugTXHistory[utils.stringifyReduce(txid)]}`
+        await respond(response)
+        return
+      }
+
+      response.acceptedTX = queueEntry.acceptedTx
+
+      let wrappedStates = queueEntry.collectedData
+      if (wrappedStates != null) {
+        for (let key of Object.keys(wrappedStates)) {
+          let wrappedState = wrappedStates[key]
+          let accountData = wrappedState
+          if (accountData) {
+            //include the before hash
+            response.beforeHashes[key] = queueEntry.beforeHashes[key]
+            //include the data
+            response.stateList.push(accountData)
+          }
+        }
+      }
+
+      response.originalData = queueEntry.originalData
+      response.success = true
+      await respond(response)
+    })
+
     // TODO STATESHARDING4 ENDPOINTS ok, I changed this to tell, but we still need to check sender!
     //this.p2p.registerGossipHandler('spread_appliedVote', async (payload, sender, tracker) => {
     this.p2p.registerInternal('spread_appliedVote', async (payload: AppliedVote, respond: any) => {
@@ -1123,6 +1160,8 @@ class StateManager {
     // this.p2p.unregisterInternal('route_to_home_node')
     this.p2p.unregisterInternal('request_state_for_tx')
     this.p2p.unregisterInternal('request_state_for_tx_post')
+    this.p2p.unregisterInternal('request_tx_and_state')
+  
     this.p2p.unregisterInternal('request_receipt_for_tx')
     this.p2p.unregisterInternal('broadcast_state')
     this.p2p.unregisterGossipHandler('spread_tx_to_group')

@@ -43,8 +43,11 @@ type QueueEntry = {
     uniqueWritableKeys?: string[];
     ourNodeInTransactionGroup: boolean;
     ourNodeInConsensusGroup: boolean;
+    conensusGroup?: import("../shardus/shardus-types").Node[];    
     transactionGroup?: import("../shardus/shardus-types").Node[];
-    conensusGroup?: import("../shardus/shardus-types").Node[];
+    txGroupCycle:number;
+    updatedTransactionGroup?: import("../shardus/shardus-types").Node[];
+    updatedTxGroupCycle:number;
     approximateCycleAge: number;
 
     // Local preapply response
@@ -581,6 +584,9 @@ type RouteToHomeNodeReq = { txid: any; timestamp: any; acceptedTx: import("../sh
 
 type RequestStateForTxReq = { txid: string; timestamp: number; keys: any }
 type RequestStateForTxResp = { stateList: import("../shardus/shardus-types").WrappedResponse[]; beforeHashes: {[accountID:string]:string}; note: string; success:boolean }
+
+type RequestTxResp = { acceptedTX?:import("../shardus/shardus-types").AcceptedTx; stateList: import("../shardus/shardus-types").WrappedResponse[]; beforeHashes: {[accountID:string]:string}; note: string; success:boolean, originalData:{[accountID:string]:string} }
+
 
 type RequestReceiptForTxReq = { txid: string; timestamp: number; }
 type RequestReceiptForTxResp = { receipt:AppliedReceipt ; note: string; success:boolean }
