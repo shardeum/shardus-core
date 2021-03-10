@@ -427,11 +427,16 @@ export function setIsUpTs(nodeId:string){
   isUpTs[nodeId] = timestamp
 }
 
-export function isNodeUpRecent(nodeId:string, maxAge:number) : {down:boolean, state:string, age:number} {
+export function isNodeUpRecent(nodeId:string, maxAge:number) : {upRecent:boolean, state:string, age:number} {
   let lastCheck = isUpTs[nodeId]
   let age = Date.now() - lastCheck
-  if (age < maxAge) return {down:false, state:'up', age} 
-  return {down:false, state:'noLastState', age} 
+
+  if(isNaN(age)){
+    return {upRecent:false, state:'noLastState', age} 
+  }
+
+  if (age < maxAge) return {upRecent:true, state:'up', age} 
+  return {upRecent:false, state:'noLastState', age} 
 }
 
 export function isNodeDown(nodeId:string) : {down:boolean, state:string} {

@@ -409,9 +409,9 @@ class TransactionRepair {
 
 
   // can the repair work if just have the receipt
-  async repairToMatchReceiptWithoutQueueEntry(receipt: AppliedReceipt) {
+  async repairToMatchReceiptWithoutQueueEntry(receipt: AppliedReceipt, refAccountId:string) : Promise<boolean> {
     if (this.stateManager.currentCycleShardData == null) {
-      return
+      return false
     }
 
     let txID = receipt.txid
@@ -423,10 +423,10 @@ class TransactionRepair {
       let shortHash = utils.makeShortHash(txID)
 
       // need to find the TX
-      let txRequestResult = await this.requestMissingTX(txID)
+      let txRequestResult = await this.requestMissingTX(txID, refAccountId)
       if(txRequestResult == null || txRequestResult.success != true){
         this.statemanager_fatal(`repairToMatchReceipt2_a`, `ASK FAIL requestMissingTX   tx:${shortHash} result:${utils.stringifyReduce(txRequestResult)} `)
-        return
+        return false
       }
       timestamp = txRequestResult.acceptedTX.timestamp
 
@@ -450,7 +450,7 @@ class TransactionRepair {
       if(uniqueKeys.length === 0){
         this.mainLogger.error(`shrd_repairToMatchReceipt2: ABORT no covered keys ${utils.stringifyReduce(allKeys)} tx:${shortHash} `)
         if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt_noKeys', `${shortHash}`, `ABORT no covered keys  ${utils.stringifyReduce(allKeys)} tx:${shortHash} `)
-        return
+        return false
       }
 
       this.stateManager.dataRepairsStarted++
@@ -599,7 +599,7 @@ class TransactionRepair {
                   } else {
                     this.mainLogger.error(`repairToMatchReceipt2 FAILED out of attempts #${outerloopCount + 1} tx:${shortHash}  acc:${shortKey}`)
                     this.statemanager_fatal(`repairToMatchReceipt2_3`, `ASK FAIL repairToMatchReceipt FAILED out of attempts   tx:${shortHash}  acc:${shortKey}`)
-                    return
+                    return false
                   }
                   
                 }
@@ -793,13 +793,15 @@ class TransactionRepair {
       // Set this when data has been repaired.
       //queueEntry.repairFinished = true
       this.stateManager.dataRepairsCompleted++ //visible to report
+
+      return true
     } finally {
       this.profiler.profileSectionEnd('repair2')
     }
   }
 
 
-  async requestMissingTX(txID:string) : Promise<RequestTxResp | null> {
+  async requestMissingTX(txID:string, refAccountId:string) : Promise<RequestTxResp | null> {
     if (this.stateManager.currentCycleShardData == null) {
       return null
     }
@@ -813,8 +815,14 @@ class TransactionRepair {
 
     let queryGroup:Shardus.Node[] = []
 
+    // get nodes for address
+    let homeNode = ShardFunctions.findHomeNode(this.stateManager.currentCycleShardData.shardGlobals, refAccountId, this.stateManager.currentCycleShardData.parititionShardDataMap)
+    queryGroup = homeNode.nodeThatStoreOurParitionFull.slice()  
+
     // technically could look at all the keys from a reciept and build a larger list.
-    queryGroup = [...this.stateManager.currentCycleShardData.nodeShardData.nodeThatStoreOurParition]
+    // queryGroup = [...this.stateManager.currentCycleShardData.nodeShardData.nodeThatStoreOurParition]
+
+
 
     this.stateManager.debugNodeGroup(txID, timestamp, `requestMissingTX`, queryGroup)
 
@@ -848,7 +856,7 @@ class TransactionRepair {
         continue
       }
 
-      let message = txID
+      let message = {txid:txID}
       let result: RequestTxResp = await this.p2p.ask(node, 'request_tx_and_state', message)
 
       if (result == null) {
@@ -870,11 +878,91 @@ class TransactionRepair {
         gotReceipt = true
 
         this.mainLogger.error(`requestMissingTX got good receipt for: ${shortID} from: ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)}`)
+
+        return result
       }
     }
     return null
   }
 
+  async requestMissingReceipt(txID:string, timestamp: number, refAccountId:string) : Promise<RequestReceiptForTxResp | null> {
+    if (this.stateManager.currentCycleShardData == null) {
+      return null
+    }
+
+    let shortID = utils.stringifyReduce(txID)
+    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('requestMissingReceipt', txID, ``)
+
+    // will have to just ask node that cover our shard!
+    let queryGroup:Shardus.Node[] = []
+
+    // get nodes for address
+    let homeNode = ShardFunctions.findHomeNode(this.stateManager.currentCycleShardData.shardGlobals, refAccountId, this.stateManager.currentCycleShardData.parititionShardDataMap)
+    queryGroup = homeNode.nodeThatStoreOurParitionFull.slice()  
+
+    // technically could look at all the keys from a reciept and build a larger list.
+    //queryGroup = [...this.stateManager.currentCycleShardData.nodeShardData.nodeThatStoreOurParition]
+
+    this.stateManager.debugNodeGroup(txID, timestamp, `requestMissingReceipt`, queryGroup)
+
+    let gotReceipt = false
+
+    let keepTrying = true
+    let triesLeft = Math.min(5, queryGroup.length)
+    let nodeIndex = 0
+    while (keepTrying) {
+      if (triesLeft <= 0) {
+        keepTrying = false
+        break
+      }
+      triesLeft--
+
+      let node = queryGroup[nodeIndex]
+      nodeIndex++
+
+      if (node == null) {
+        continue
+      }
+      if (node.status != 'active') {
+        continue
+      }
+      if (node === this.stateManager.currentCycleShardData.ourNode) {
+        continue
+      }
+
+      // Node Precheck!
+      if (this.stateManager.isNodeValidForInternalMessage(node.id, 'requestMissingReceipt', true, true) === false) {
+        continue
+      }
+
+      let message = { txid: txID, timestamp }
+      let result: RequestReceiptForTxResp = await this.p2p.ask(node, 'request_receipt_for_tx', message) // not sure if we should await this.
+
+
+      if (result == null) {
+        if (this.verboseLogs) {
+          this.mainLogger.error(`ASK FAIL request_tx_and_state ${triesLeft} ${utils.makeShortHash(node.id)}`)
+        }
+        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_requestMissingReceipt_askfailretry', `${shortID}`, `asking: ${utils.makeShortHash(node.id)}`)
+        continue
+      }
+      if (result.success !== true) {
+        this.mainLogger.error(`ASK FAIL requestMissingReceipt 9 ${triesLeft} ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)} note:${result.note} tx:${shortID}`)
+        continue
+      }
+
+      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_requestMissingReceipt_result', `${shortID}`, `asking: ${utils.makeShortHash(node.id)} result: ${utils.stringifyReduce(result)}`)
+
+      if (result.success === true) {
+        keepTrying = false
+        gotReceipt = true
+
+        this.mainLogger.error(`requestMissingReceipt got good receipt for: ${shortID} from: ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)}`)
+        return result
+      }
+    }
+    return null
+  }
 
 }
 

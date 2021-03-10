@@ -56,6 +56,8 @@ class AccountSync {
   combinedAccountData: Shardus.WrappedData[]
   accountsWithStateConflict: Shardus.WrappedData[] //{address:string}[] //Shardus.WrappedData[];
 
+  stateTableForMissingTXs: { [accountID: string]: Shardus.StateTableObject }
+
   lastStateSyncEndtime: number
 
   failedAccounts: string[]
@@ -735,16 +737,28 @@ class AccountSync {
       await this.syncFailedAcccounts(lowAddress, highAddress)
 
       if(this.failedAccountsRemain()){
-        this.mainLogger.debug(`DATASYNC: failedAccountsRemain, wait ${this.stateManager.syncSettleTime}ms and retry ${lowAddress} - ${highAddress}`)
-        await utils.sleep(this.stateManager.syncSettleTime)
+        this.mainLogger.debug(`DATASYNC: failedAccountsRemain,  ${utils.stringifyReduce(lowAddress)} - ${utils.stringifyReduce(highAddress)} accountsWithStateConflict:${this.accountsWithStateConflict.length} missingAccountData:${this.missingAccountData.length} stateTableForMissingTXs:${Object.keys(this.stateTableForMissingTXs).length}`)
 
-        await this.syncFailedAcccounts(lowAddress, highAddress)
 
-        if(this.failedAccountsRemain()){
-          this.statemanager_fatal(`failedAccountsRemain2`, `failedAccountsRemain2: this.accountsWithStateConflict:${utils.stringifyReduce(this.accountsWithStateConflict)} this.missingAccountData:${utils.stringifyReduce(this.missingAccountData)} `)
-        } else {
-          this.mainLogger.debug(`DATASYNC: syncFailedAcccounts FIX WORKED`)
-        }
+        //This section allows to retry for failed accounts but it greatly slows down the sync process, so I think that is not the right answer
+
+        // this.mainLogger.debug(`DATASYNC: failedAccountsRemain, wait ${this.stateManager.syncSettleTime}ms and retry ${lowAddress} - ${highAddress}`)
+        // await utils.sleep(this.stateManager.syncSettleTime)
+
+        // await this.syncFailedAcccounts(lowAddress, highAddress)
+
+        // if(this.failedAccountsRemain()){
+        //   this.statemanager_fatal(`failedAccountsRemain2`, `failedAccountsRemain2: this.accountsWithStateConflict:${utils.stringifyReduce(this.accountsWithStateConflict)} this.missingAccountData:${utils.stringifyReduce(this.missingAccountData)} `)
+        // } else {
+        //   this.mainLogger.debug(`DATASYNC: syncFailedAcccounts FIX WORKED`)
+        // }
+
+      }
+
+      if(Object.keys(this.stateTableForMissingTXs).length > 0){
+        // alternate repair.
+        this.repairMissingTXs()
+
       }
     } catch (error) {
       if (error.message.includes('FailAndRestartPartition')) {
@@ -757,6 +771,38 @@ class AccountSync {
         await this.failandRestart()
       }
     }
+  }
+
+  async repairMissingTXs(){
+    let keys = Object.keys(this.stateTableForMissingTXs)
+
+    this.mainLogger.debug(`DATASYNC: repairMissingTXs begin: ${keys.length} ${utils.stringifyReduce(keys)}`)
+    for(let key of keys){
+      try{
+        this.profiler.profileSectionStart('repairMissingTX')
+        let stateTableData = this.stateTableForMissingTXs[key]
+
+        this.mainLogger.debug(`DATASYNC: repairMissingTXs start: ${utils.stringifyReduce(stateTableData)}`)
+        //get receipt for txID
+        let result = await this.stateManager.transactionRepair.requestMissingReceipt(stateTableData.txId, Number(stateTableData.txTimestamp), stateTableData.accountId)
+        if(result != null && result.success === true){
+          let repairOk = await this.stateManager.transactionRepair.repairToMatchReceiptWithoutQueueEntry(result.receipt,  stateTableData.accountId)
+          this.mainLogger.debug(`DATASYNC: repairMissingTXs finished: ok:${repairOk} ${utils.stringifyReduce(stateTableData)}`)
+        } else {
+          this.mainLogger.debug(`DATASYNC: repairMissingTXs cant get receipt: ${utils.stringifyReduce(stateTableData)}`)
+          this.statemanager_fatal(`repairMissingTXs_fail`, `repairMissingTXs_fail ${utils.stringifyReduce(stateTableData)} result:${utils.stringifyReduce(result)}` )
+        }
+      }
+      catch (error) {
+        this.statemanager_fatal(`repairMissingTXs_ex`, 'repairMissingTXs ex: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+      } finally {
+        this.profiler.profileSectionEnd('repairMissingTX')
+      }
+    }
+
+
+
+
   }
 
   async syncStateDataGlobals(syncTracker: SyncTracker) {
@@ -1484,6 +1530,7 @@ class AccountSync {
   async processAccountData() {
     this.missingAccountData = []
     this.mapAccountData = {}
+    this.stateTableForMissingTXs = {}
     // create a fast lookup map for the accounts we have.  Perf.  will need to review if this fits into memory.  May need a novel structure.
     let account
     for (let i = 0; i < this.combinedAccountData.length; i++) {
@@ -1573,9 +1620,15 @@ class AccountSync {
         if (stateData.txTimestamp > account.syncData.timestamp) {
           account.syncData.missingTX = false // finding a good match can clear the old error. this relys on things being in order!
           account.syncData.timestamp = stateData.txTimestamp
+
+          //clear the missing reference if we have one
+          delete this.stateTableForMissingTXs[stateData.accountId]
         }
       } else {
         // this state table data does not match up with what we have for the account
+
+        // if the state table TS is newer than our sync data that means the account has changed 
+        // and the data we have for it is not up to date.
         if (stateData.txTimestamp > account.syncData.timestamp) {
           account.syncData.uptodate = false
           // account.syncData.stateData = stateData
@@ -1591,6 +1644,9 @@ class AccountSync {
           }
 
           account.syncData.timestamp = stateData.txTimestamp
+
+          // record this because we may want to repair to it.
+          this.stateTableForMissingTXs[stateData.accountId] = stateData
         }
       }
     }
@@ -1624,16 +1680,16 @@ class AccountSync {
         this.accountsWithStateConflict.push(account)
         noSyncData++
         //turning this case back off.
-      // } else if (account.syncData.anyMatch === true) {
-      //   if(account.syncData.missingTX){
-      //     fix1Worked++
-      //     this.mainLogger.debug(
-      //       `DATASYNC: processAccountData FIX WORKED. ${utils.stringifyReduce(account)}  `
-      //     )
-      //   }
-      //   //this is the positive case. We have a match so we can use this account
-      //   delete account.syncData
-      //   goodAccounts.push(account)
+      } else if (account.syncData.anyMatch === true) {
+        if(account.syncData.missingTX){
+          fix1Worked++
+          this.mainLogger.debug(
+            `DATASYNC: processAccountData FIX WORKED. ${utils.stringifyReduce(account)}  `
+          )
+        }
+        //this is the positive case. We have a match so we can use this account
+        delete account.syncData
+        goodAccounts.push(account)
       } else if (!account.syncData.anyMatch) {
         // this account was in state data but none of the state table stateAfter matched our state
         this.accountsWithStateConflict.push(account)
@@ -1655,10 +1711,10 @@ class AccountSync {
         //     continue
         //   }
         // }
-        //unhandledCase++
+        unhandledCase++
 
-        delete account.syncData
-        goodAccounts.push(account)
+        // delete account.syncData
+        // goodAccounts.push(account)
       }
     }
 

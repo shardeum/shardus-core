@@ -1035,17 +1035,26 @@ class StateManager {
     })
 
 
-    this.p2p.registerInternal('request_tx_and_state', async (payload: string, respond: (arg0: RequestTxResp) => any) => {
+    this.p2p.registerInternal('request_tx_and_state', async (payload: {txid:string}, respond: (arg0: RequestTxResp) => any) => {
       let response: RequestTxResp = { stateList: [], beforeHashes: {}, note: '', success: false, originalData:{} }
 
-      let txid = payload
-      let queueEntry = this.transactionQueue.getQueueEntrySafe(payload)
+      let txid = payload.txid
+
+
+      let queueEntry = this.transactionQueue.getQueueEntrySafe(txid)
       if (queueEntry == null) {
-        queueEntry = this.transactionQueue.getQueueEntryArchived(payload, 'request_tx_and_state')
+        queueEntry = this.transactionQueue.getQueueEntryArchived(txid, 'request_tx_and_state')
       }
+
+      //temp error for debug
+      this.mainLogger.error(`request_tx_and_state NOTE ${utils.stringifyReduce(payload)} got quee entry${queueEntry == null}`)
+
 
       if (queueEntry == null) {
         response.note = `failed to find queue entry: ${utils.stringifyReduce(txid)} dbg:${this.debugTXHistory[utils.stringifyReduce(txid)]}`
+
+        this.mainLogger.error(`request_tx_and_state ${response.note}`)
+
         await respond(response)
         return
       }
@@ -2670,8 +2679,8 @@ class StateManager {
     }
 
     if(checkIsUpRecent){
-      let { down, state, age } = isNodeUpRecent(nodeId, 5000)
-      if(down === false){
+      let { upRecent, state, age } = isNodeUpRecent(nodeId, 5000)
+      if(upRecent === true){
         if (checkForNodeDown) {
           let { down, state } = isNodeDown(nodeId)
           if (down === true) {
@@ -2685,7 +2694,7 @@ class StateManager {
         }
         return true
       } else {
-        if (logErrors) this.mainLogger.error(`isNodeUpRecentOverride: ${age} no recent TX, but this is not a fail conditions`)
+        if (logErrors) this.mainLogger.error(`isNodeUpRecentOverride: ${age} upRecent = false. no recent TX, but this is not a fail conditions`)
       }
     }
 
@@ -2723,8 +2732,8 @@ class StateManager {
         continue
       }
       if(checkIsUpRecent){
-        let { down, state, age } = isNodeUpRecent(nodeId, 5000)
-        if(down === false){
+        let { upRecent, state, age } = isNodeUpRecent(nodeId, 5000)
+        if(upRecent === true){
           filteredNodes.push(node)
 
           if (checkForNodeDown) {
