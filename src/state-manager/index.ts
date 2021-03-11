@@ -2684,17 +2684,17 @@ class StateManager {
         if (checkForNodeDown) {
           let { down, state } = isNodeDown(nodeId)
           if (down === true) {
-            if (logErrors) this.mainLogger.error(`isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+            if (logErrors) this.mainLogger.debug(`isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
           }
         }
         if (checkForNodeLost) {
           if (isNodeLost(nodeId) === true) {
-            if (logErrors) this.mainLogger.error(`isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+            if (logErrors) this.mainLogger.debug(`isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
           }
         }
         return true
       } else {
-        if (logErrors) this.mainLogger.error(`isNodeUpRecentOverride: ${age} upRecent = false. no recent TX, but this is not a fail conditions`)
+        if (logErrors) this.mainLogger.debug(`isNodeUpRecentOverride: ${age} upRecent = false. no recent TX, but this is not a fail conditions`)
       }
     }
 
@@ -2739,17 +2739,17 @@ class StateManager {
           if (checkForNodeDown) {
             let { down, state } = isNodeDown(nodeId)
             if (down === true) {
-              if (logErrors) this.mainLogger.error(`isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+              if (logErrors) this.mainLogger.debug(`isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
             }
           }
           if (checkForNodeLost) {
             if (isNodeLost(nodeId) === true) {
-              if (logErrors) this.mainLogger.error(`isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+              if (logErrors) this.mainLogger.debug(`isNodeUpRecentOverride: ${age} isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
             }
           }
           continue
         } else {
-          if (logErrors) this.mainLogger.error(`isNodeUpRecentOverride: ${age} no recent TX, but this is not a fail conditions`)
+          if (logErrors) this.mainLogger.debug(`isNodeUpRecentOverride: ${age} no recent TX, but this is not a fail conditions`)
         }
       }
 
