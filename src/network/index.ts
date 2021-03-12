@@ -310,18 +310,27 @@ export class NetworkClass extends EventEmitter {
         )
         return handler(req, res)
       }
-      // handler = wrappedHandler
+    }
+    wrappedHandler = async function(req, res) {
+      await handler(req, res)
+      profilerInstance.profileSectionEnd(`net-externl`, false)
+      profilerInstance.profileSectionEnd(`net-externl-${route}`, false)
     }
 
+    const startProfiler = (req, res, next) => {
+      profilerInstance.profileSectionStart(`net-externl`, false)
+      profilerInstance.profileSectionStart(`net-externl-${route}`, false)
+      next()
+    }
     switch (method) {
       case 'GET':
         this.externalRoutes.push((app) => {
-          app.get(formattedRoute, wrappedHandler)
+          app.get(formattedRoute, startProfiler, wrappedHandler)
         })
         break
       case 'POST':
         this.externalRoutes.push((app) => {
-          app.post(formattedRoute, wrappedHandler)
+          app.post(formattedRoute, startProfiler, wrappedHandler)
         })
         break
       case 'PUT':
