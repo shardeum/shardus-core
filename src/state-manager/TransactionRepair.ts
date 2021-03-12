@@ -249,6 +249,16 @@ class TransactionRepair {
                 }
               }
 
+              // if our data is already good no need to ask for it again
+              if (this.stateManager.accountCache.hasAccount(requestObject.accountId)) {
+                let accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(requestObject.accountId)
+                if (accountMemData.h === requestObject.accountHash) {
+                  this.mainLogger.error(`Fix Worked: repairToMatchReceipt. already have latest ${utils.makeShortHash(requestObject.accountId)} cache:${utils.stringifyReduce(accountMemData)}`)
+                  attemptsRemaining = false
+                  continue
+                }
+              }
+
               let message = { key: requestObject.accountId, hash: requestObject.accountHash, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
               let result: RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx_post', message) // not sure if we should await this.
 
@@ -634,6 +644,16 @@ class TransactionRepair {
                 }
               }
 
+              // if our data is already good no need to ask for it again
+              if (this.stateManager.accountCache.hasAccount(requestObject.accountId)) {
+                let accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(requestObject.accountId)
+                if (accountMemData.h === requestObject.accountHash) {
+                  this.mainLogger.error(`Fix Worked: repairToMatchReceipt2. already have latest ${utils.makeShortHash(requestObject.accountId)} cache:${utils.stringifyReduce(accountMemData)}`)
+                  attemptsRemaining = false
+                  continue
+                }
+              }
+
               let message = { key: requestObject.accountId, hash: requestObject.accountHash, txid: txID, timestamp: timestamp }
               let result: RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx_post', message) // not sure if we should await this.
 
@@ -659,7 +679,6 @@ class TransactionRepair {
               let dataCountReturned = 0
               let accountIdsReturned = []
               for (let data of result.stateList) {
-
                 // let shortKey = utils.stringifyReduce(data.accountId)
 
                 if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_repairToMatchReceipt2_note', `${shortHash}`, `write data: ${utils.stringifyReduce(data)}  acc:${shortKey}`)

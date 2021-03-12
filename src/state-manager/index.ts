@@ -1047,7 +1047,7 @@ class StateManager {
       }
 
       //temp error for debug
-      this.mainLogger.error(`request_tx_and_state NOTE ${utils.stringifyReduce(payload)} got quee entry${queueEntry == null}`)
+      // this.mainLogger.error(`request_tx_and_state NOTE ${utils.stringifyReduce(payload)} got queue entry: ${queueEntry != null}`)
 
 
       if (queueEntry == null) {
