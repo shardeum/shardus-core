@@ -423,7 +423,7 @@ export async function fetchCycleMarker(nodes) {
     return equivalent
   }
 
-  const [marker] = await robustQuery(nodes, queryFn)
+  const {topResult:marker} = await robustQuery(nodes, queryFn)
   return marker
 }
 
@@ -464,7 +464,7 @@ export async function fetchJoined(activeNodes) {
     return res
   }
   try {
-    const [response, _responders] = await robustQuery(activeNodes, queryFn)
+    const {topResult:response, winningNodes:_responders} = await robustQuery(activeNodes, queryFn)
     if (!response) return
     if (!response.node) return
     let err = utils.validateTypes(response, { node: 'o' })

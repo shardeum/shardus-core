@@ -280,8 +280,7 @@ export async function getNewestCycle(
   let redundancy = 1
   if (activeNodes.length > 5) redundancy = 2
   if (activeNodes.length > 10) redundancy = 3
-  //const [response, _responders] = await robustQuery(activeNodes, queryFn)
-  const [response, _responders] = await robustQuery(
+  const {topResult:response, winningNodes:_responders} = await robustQuery(
     activeNodes,
     queryFn,
     eqFn,
@@ -326,7 +325,7 @@ async function getCycles(
   let redundancy = 1
   if (activeNodes.length > 5) redundancy = 2
   if (activeNodes.length > 10) redundancy = 3
-  const [response, _responders] = await robustQuery(
+  const {topResult:response, winningNodes:_responders} = await robustQuery(
     activeNodes,
     queryFn,
     util.isDeepStrictEqual,

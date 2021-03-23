@@ -13,6 +13,7 @@ import ShardFunctions from './shardFunctions.js'
 import { time } from 'console'
 import StateManager from '.'
 import { isNullOrUndefined } from 'util'
+import { robustQuery } from '../p2p/Utils'
 
 const allZeroes64 = '0'.repeat(64)
 
@@ -1030,7 +1031,15 @@ class AccountSync {
     let result
     let winners
     try {
-      ;[result, winners] = await this.p2p.robustQuery(nodes, queryFn, equalFn, 3, false)
+      let robustQueryResult = await robustQuery(nodes, queryFn, equalFn, 3, false)
+      result = robustQueryResult.topResult
+      winners = robustQueryResult.winningNodes
+
+      if(robustQueryResult.isRobustResult == false){
+        this.mainLogger.debug('getRobustGlobalReport: robustQuery ')
+        this.statemanager_fatal(`getRobustGlobalReport_nonRobust`, 'getRobustGlobalReport: robustQuery ')
+        throw new Error('FailAndRestartPartition0')
+      }
 
       if (result.ready === false) {
         this.mainLogger.debug(`DATASYNC: getRobustGlobalReport results not ready wait 10 seconds and try again `)
@@ -1039,6 +1048,8 @@ class AccountSync {
         return await this.getRobustGlobalReport()
       }
     } catch (ex) {
+      // NOTE: no longer expecting an exception from robust query in cases where we do not have enough votes or respones!
+      //       but for now if isRobustResult == false then we local code wil throw an exception 
       this.mainLogger.debug('getRobustGlobalReport: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       this.statemanager_fatal(`getRobustGlobalReport_ex`, 'getRobustGlobalReport: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       throw new Error('FailAndRestartPartition0')
@@ -1154,8 +1165,19 @@ class AccountSync {
       let result
       let winners
       try {
-        ;[result, winners] = await this.p2p.robustQuery(nodes, queryFn, equalFn, 3, false)
+        let robustQueryResult = await robustQuery(nodes, queryFn, equalFn, 3, false)
+        result = robustQueryResult.topResult
+        winners = robustQueryResult.winningNodes
+
+        if(robustQueryResult.isRobustResult == false){
+          this.mainLogger.debug('syncStateTableData: robustQuery ')
+          this.statemanager_fatal(`syncStateTableData_nonRobust`, 'syncStateTableData: robustQuery ')
+          throw new Error('FailAndRestartPartition0')
+        }
+
       } catch (ex) {
+        // NOTE: no longer expecting an exception from robust query in cases where we do not have enough votes or respones!
+        //       but for now if isRobustResult == false then we local code wil throw an exception 
         this.mainLogger.debug('syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         this.statemanager_fatal(`syncStateTableData_robustQ`, 'syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         throw new Error('FailAndRestartPartition0')

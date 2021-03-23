@@ -12,6 +12,7 @@ import * as P2PContext from './Context'
 import * as P2PApoptosis from './Apoptosis'
 import * as Sync from './Sync'
 import * as GlobalAccounts from './GlobalAccounts'
+import { robustQuery } from './Utils'
 
 class P2P extends EventEmitter {
   logger: any
@@ -621,81 +622,81 @@ class P2P extends EventEmitter {
     this.sendGossipIn(route, message)
   }
 
-  async _attemptJoin(
-    seedNodes,
-    joinRequest,
-    timeOffset,
-    cycleStart,
-    cycleDuration
-  ) {
-    // TODO: check if we missed join phase
-    const currTime1 = utils.getTime('s') + timeOffset
-    await this._waitUntilUpdatePhase(currTime1, cycleStart, cycleDuration)
-    await this._submitJoin(seedNodes, joinRequest)
-    const currTime2 = utils.getTime('s') + timeOffset
-    // This time we use cycleStart + cycleDuration because we are in the next cycle
-    await this._waitUntilEndOfCycle(
-      currTime2,
-      cycleStart + cycleDuration,
-      cycleDuration
-    )
-    const nodeId = await this._fetchNodeId(seedNodes)
-    return nodeId
-  }
+  // async _attemptJoin(
+  //   seedNodes,
+  //   joinRequest,
+  //   timeOffset,
+  //   cycleStart,
+  //   cycleDuration
+  // ) {
+  //   // TODO: check if we missed join phase
+  //   const currTime1 = utils.getTime('s') + timeOffset
+  //   await this._waitUntilUpdatePhase(currTime1, cycleStart, cycleDuration)
+  //   await this._submitJoin(seedNodes, joinRequest)
+  //   const currTime2 = utils.getTime('s') + timeOffset
+  //   // This time we use cycleStart + cycleDuration because we are in the next cycle
+  //   await this._waitUntilEndOfCycle(
+  //     currTime2,
+  //     cycleStart + cycleDuration,
+  //     cycleDuration
+  //   )
+  //   const nodeId = await this._fetchNodeId(seedNodes)
+  //   return nodeId
+  // }
 
-  async _join(seedNodes) {
-    const localTime = utils.getTime('s')
-    const { currentTime } = await this._fetchCycleMarker(seedNodes)
-    if (!this._checkWithinSyncLimit(localTime, currentTime)) {
-      throw Error('Local time out of sync with network.')
-    }
-    const timeOffset = currentTime - localTime
-    this.mainLogger.debug(`Time offset with selected node: ${timeOffset}`)
-    let nodeId = null
-    let attempts = 2
-    while (!nodeId && attempts > 0) {
-      const {
-        currentCycleMarker,
-        nextCycleMarker,
-        cycleStart,
-        cycleDuration,
-      } = await this._fetchCycleMarker(seedNodes)
-      if (nextCycleMarker) {
-        // Use next cycle marker
-        const joinRequest = await this._createJoinRequest(nextCycleMarker)
-        nodeId = await this._attemptJoin(
-          seedNodes,
-          joinRequest,
-          timeOffset,
-          cycleStart,
-          cycleDuration
-        )
-        if (!nodeId) {
-          const { cycleStart, cycleDuration } = await this._fetchCycleMarker(
-            seedNodes
-          )
-          nodeId = await this._attemptJoin(
-            seedNodes,
-            joinRequest,
-            timeOffset,
-            cycleStart,
-            cycleDuration
-          )
-        }
-      } else {
-        const joinRequest = await this._createJoinRequest(currentCycleMarker)
-        nodeId = await this._attemptJoin(
-          seedNodes,
-          joinRequest,
-          timeOffset,
-          cycleStart,
-          cycleDuration
-        )
-      }
-      attempts--
-    }
-    return nodeId
-  }
+  // async _join(seedNodes) {
+  //   const localTime = utils.getTime('s')
+  //   const { currentTime } = await this._fetchCycleMarker(seedNodes)
+  //   if (!this._checkWithinSyncLimit(localTime, currentTime)) {
+  //     throw Error('Local time out of sync with network.')
+  //   }
+  //   const timeOffset = currentTime - localTime
+  //   this.mainLogger.debug(`Time offset with selected node: ${timeOffset}`)
+  //   let nodeId = null
+  //   let attempts = 2
+  //   while (!nodeId && attempts > 0) {
+  //     const {
+  //       currentCycleMarker,
+  //       nextCycleMarker,
+  //       cycleStart,
+  //       cycleDuration,
+  //     } = await this._fetchCycleMarker(seedNodes)
+  //     if (nextCycleMarker) {
+  //       // Use next cycle marker
+  //       const joinRequest = await this._createJoinRequest(nextCycleMarker)
+  //       nodeId = await this._attemptJoin(
+  //         seedNodes,
+  //         joinRequest,
+  //         timeOffset,
+  //         cycleStart,
+  //         cycleDuration
+  //       )
+  //       if (!nodeId) {
+  //         const { cycleStart, cycleDuration } = await this._fetchCycleMarker(
+  //           seedNodes
+  //         )
+  //         nodeId = await this._attemptJoin(
+  //           seedNodes,
+  //           joinRequest,
+  //           timeOffset,
+  //           cycleStart,
+  //           cycleDuration
+  //         )
+  //       }
+  //     } else {
+  //       const joinRequest = await this._createJoinRequest(currentCycleMarker)
+  //       nodeId = await this._attemptJoin(
+  //         seedNodes,
+  //         joinRequest,
+  //         timeOffset,
+  //         cycleStart,
+  //         cycleDuration
+  //       )
+  //     }
+  //     attempts--
+  //   }
+  //   return nodeId
+  // }
 
   _checkIfFirstSeedNode(seedNodes) {
     if (!seedNodes.length) throw new Error('Fatal: No seed nodes in seed list!')
@@ -755,162 +756,164 @@ class P2P extends EventEmitter {
     return true
   }
 
-  async robustQuery(
-    nodes = [],
-    queryFn,
-    equalityFn?,
-    redundancy = 3,
-    shuffleNodes = true
-  ) {
-    if (nodes.length === 0) throw new Error('No nodes given.')
-    if (typeof queryFn !== 'function') {
-      throw new Error(`Provided queryFn ${queryFn} is not a valid function.`)
-    }
-    if (typeof equalityFn !== 'function') equalityFn = util.isDeepStrictEqual
-    if (redundancy < 1) redundancy = 3
-    if (redundancy > nodes.length) redundancy = nodes.length
+  // async robustQuery(
+  //   nodes = [],
+  //   queryFn,
+  //   equalityFn?,
+  //   redundancy = 3,
+  //   shuffleNodes = true
+  // ) {
+  //   if (nodes.length === 0) throw new Error('No nodes given.')
+  //   if (typeof queryFn !== 'function') {
+  //     throw new Error(`Provided queryFn ${queryFn} is not a valid function.`)
+  //   }
+  //   if (typeof equalityFn !== 'function') equalityFn = util.isDeepStrictEqual
+  //   if (redundancy < 1) redundancy = 3
+  //   if (redundancy > nodes.length) redundancy = nodes.length
 
-    class Tally {
-      winCount: any
-      equalFn: any
-      items: any[]
-      constructor(winCount, equalFn) {
-        this.winCount = winCount
-        this.equalFn = equalFn
-        this.items = []
-      }
-      add(newItem, node) {
-        // We search to see if we've already seen this item before
-        for (const item of this.items) {
-          // If the value of the new item is not equal to the current item, we continue searching
-          if (!this.equalFn(newItem, item.value)) continue
-          // If the new item is equal to the current item in the list,
-          // we increment the current item's counter and add the current node to the list
-          item.count++
-          item.nodes.push(node)
-          // Here we check our win condition if the current item's counter was incremented
-          // If we meet the win requirement, we return an array with the value of the item,
-          // and the list of nodes who voted for that item
-          if (item.count >= this.winCount) {
-            return [item.value, item.nodes]
-          }
-          // Otherwise, if the win condition hasn't been met,
-          // We return null to indicate no winner yet
-          return null
-        }
-        // If we made it through the entire items list without finding a match,
-        // We create a new item and set the count to 1
-        this.items.push({ value: newItem, count: 1, nodes: [node] })
-        // Finally, we check to see if the winCount is 1,
-        // and return the item we just created if that is the case
-        if (this.winCount === 1) return [newItem, [node]]
-      }
-      getHighestCount() {
-        if (!this.items.length) return 0
-        let highestCount = 0
-        for (const item of this.items) {
-          if (item.count > highestCount) {
-            highestCount = item.count
-          }
-        }
-        return highestCount
-      }
-    }
-    const responses = new Tally(redundancy, equalityFn)
-    let errors = 0
+  //   class Tally {
+  //     winCount: any
+  //     equalFn: any
+  //     items: any[]
+  //     constructor(winCount, equalFn) {
+  //       this.winCount = winCount
+  //       this.equalFn = equalFn
+  //       this.items = []
+  //     }
+  //     add(newItem, node) {
+  //       // We search to see if we've already seen this item before
+  //       for (const item of this.items) {
+  //         // If the value of the new item is not equal to the current item, we continue searching
+  //         if (!this.equalFn(newItem, item.value)) continue
+  //         // If the new item is equal to the current item in the list,
+  //         // we increment the current item's counter and add the current node to the list
+  //         item.count++
+  //         item.nodes.push(node)
+  //         // Here we check our win condition if the current item's counter was incremented
+  //         // If we meet the win requirement, we return an array with the value of the item,
+  //         // and the list of nodes who voted for that item
+  //         if (item.count >= this.winCount) {
+  //           return [item.value, item.nodes]
+  //         }
+  //         // Otherwise, if the win condition hasn't been met,
+  //         // We return null to indicate no winner yet
+  //         return null
+  //       }
+  //       // If we made it through the entire items list without finding a match,
+  //       // We create a new item and set the count to 1
+  //       this.items.push({ value: newItem, count: 1, nodes: [node] })
+  //       // Finally, we check to see if the winCount is 1,
+  //       // and return the item we just created if that is the case
+  //       if (this.winCount === 1) return [newItem, [node]]
+  //     }
+  //     getHighestCount() {
+  //       if (!this.items.length) return 0
+  //       let highestCount = 0
+  //       for (const item of this.items) {
+  //         if (item.count > highestCount) {
+  //           highestCount = item.count
+  //         }
+  //       }
+  //       return highestCount
+  //     }
+  //   }
+  //   const responses = new Tally(redundancy, equalityFn)
+  //   let errors = 0
 
-    nodes = [...nodes]
-    if (shuffleNodes === true) {
-      shuffleArray(nodes)
-    }
-    const nodeCount = nodes.length
+  //   nodes = [...nodes]
+  //   if (shuffleNodes === true) {
+  //     shuffleArray(nodes)
+  //   }
+  //   const nodeCount = nodes.length
 
-    const queryNodes = async nodes => {
-      // Wrap the query so that we know which node it's coming from
-      const wrappedQuery = async node => {
-        const response = await queryFn(node)
-        return { response, node }
-      }
+  //   const queryNodes = async nodes => {
+  //     // Wrap the query so that we know which node it's coming from
+  //     const wrappedQuery = async node => {
+  //       const response = await queryFn(node)
+  //       return { response, node }
+  //     }
 
-      // We create a promise for each of the first `redundancy` nodes in the shuffled array
-      const queries = []
-      for (let i = 0; i < nodes.length; i++) {
-        const node = nodes[i]
-        queries.push(wrappedQuery(node))
-      }
-      const [results, errs] = await utils.robustPromiseAll(queries)
+  //     // We create a promise for each of the first `redundancy` nodes in the shuffled array
+  //     const queries = []
+  //     for (let i = 0; i < nodes.length; i++) {
+  //       const node = nodes[i]
+  //       queries.push(wrappedQuery(node))
+  //     }
+  //     const [results, errs] = await utils.robustPromiseAll(queries)
 
-      let finalResult
-      for (const result of results) {
-        const { response, node } = result
-        finalResult = responses.add(response, node)
-        if (finalResult) break
-      }
+  //     let finalResult
+  //     for (const result of results) {
+  //       const { response, node } = result
+  //       finalResult = responses.add(response, node)
+  //       if (finalResult) break
+  //     }
 
-      for (const err of errs) {
-        this.mainLogger.debug(err)
-        errors += 1
-      }
+  //     for (const err of errs) {
+  //       this.mainLogger.debug(err)
+  //       errors += 1
+  //     }
 
-      if (!finalResult) return null
-      return finalResult
-    }
+  //     if (!finalResult) return null
+  //     return finalResult
+  //   }
 
-    let finalResult = null
-    while (!finalResult) {
-      const toQuery = redundancy - responses.getHighestCount()
-      if (nodes.length < toQuery) break
-      const nodesToQuery = nodes.splice(0, toQuery)
-      finalResult = await queryNodes(nodesToQuery)
-    }
-    if (finalResult) {
-      return finalResult
-    }
+  //   let finalResult = null
+  //   while (!finalResult) {
+  //     const toQuery = redundancy - responses.getHighestCount()
+  //     if (nodes.length < toQuery) break
+  //     const nodesToQuery = nodes.splice(0, toQuery)
+  //     finalResult = await queryNodes(nodesToQuery)
+  //   }
+  //   if (finalResult) {
+  //     //return finalResult
 
-    // TODO: Don't throw an error, should just return what had the most
-    throw new Error(
-      `Could not get ${redundancy} ${
-        redundancy > 1 ? 'redundant responses' : 'response'
-      } from ${nodeCount} ${
-        nodeCount !== 1 ? 'nodes' : 'node'
-      }. Encountered ${errors} query errors.`
-    )
-  }
+  //     return { response: finalResult, node : null }
+  //   }
 
-  async _sequentialQuery(nodes, queryFn, verifyFn) {
-    if (typeof verifyFn !== 'function') {
-      verifyFn = result => true
-    }
+  //   // TODO: Don't throw an error, should just return what had the most
+  //   throw new Error(
+  //     `Could not get ${redundancy} ${
+  //       redundancy > 1 ? 'redundant responses' : 'response'
+  //     } from ${nodeCount} ${
+  //       nodeCount !== 1 ? 'nodes' : 'node'
+  //     }. Encountered ${errors} query errors.`
+  //   )
+  // }
 
-    let errors = 0
-    let invalid = 0
+  // async _sequentialQuery(nodes, queryFn, verifyFn) {
+  //   if (typeof verifyFn !== 'function') {
+  //     verifyFn = result => true
+  //   }
 
-    nodes = [...nodes]
-    shuffleArray(nodes)
+  //   let errors = 0
+  //   let invalid = 0
 
-    for (const node of nodes) {
-      try {
-        const result = await queryFn(node)
-        if (!result) throw new Error('Unable to get result from query.')
-        this.mainLogger.debug(
-          `Sequential query result: ${JSON.stringify(result)}`
-        )
-        const verified = verifyFn(result)
-        if (!verified) {
-          this.mainLogger.debug(`Query result failed verification.`)
-          invalid += 1
-          continue
-        }
-        return result
-      } catch (e) {
-        errors += 1
-      }
-    }
+  //   nodes = [...nodes]
+  //   shuffleArray(nodes)
 
-    throw new Error(
-      `Could not get a responses from ${nodes.length} nodes. Encountered ${errors} errors and there were ${invalid} invalid queries.`
-    )
-  }
+  //   for (const node of nodes) {
+  //     try {
+  //       const result = await queryFn(node)
+  //       if (!result) throw new Error('Unable to get result from query.')
+  //       this.mainLogger.debug(
+  //         `Sequential query result: ${JSON.stringify(result)}`
+  //       )
+  //       const verified = verifyFn(result)
+  //       if (!verified) {
+  //         this.mainLogger.debug(`Query result failed verification.`)
+  //         invalid += 1
+  //         continue
+  //       }
+  //       return result
+  //     } catch (e) {
+  //       errors += 1
+  //     }
+  //   }
+
+  //   throw new Error(
+  //     `Could not get a responses from ${nodes.length} nodes. Encountered ${errors} errors and there were ${invalid} invalid queries.`
+  //   )
+  // }
 
   _verifyNodelist(nodelist, nodelistHash) {
     this.mainLogger.debug(`Given nodelist: ${JSON.stringify(nodelist)}`)
@@ -940,62 +943,62 @@ class P2P extends EventEmitter {
     return equivalent
   }
 
-  async _fetchCycleMarker(nodes) {
-    const queryFn = async node => {
-      const cycleMarkerInfo = await http.get(
-        `${node.ip}:${node.port}/cyclemarker`
-      )
-      return cycleMarkerInfo
-    }
-    const [cycleMarkerInfo] = await this.robustQuery(
-      nodes,
-      queryFn,
-      this._isSameCycleMarkerInfo.bind(this)
-    )
-    return cycleMarkerInfo
-  }
+  // async _fetchCycleMarker(nodes) {
+  //   const queryFn = async node => {
+  //     const cycleMarkerInfo = await http.get(
+  //       `${node.ip}:${node.port}/cyclemarker`
+  //     )
+  //     return cycleMarkerInfo
+  //   }
+  //   const [cycleMarkerInfo] = await this.robustQuery(
+  //     nodes,
+  //     queryFn,
+  //     this._isSameCycleMarkerInfo.bind(this)
+  //   )
+  //   return cycleMarkerInfo
+  // }
 
-  async _fetchNodeId(seedNodes) {
-    const { publicKey } = this._getThisNodeInfo()
-    const queryFn = async node => {
-      const { cycleJoined } = await http.get(
-        `${node.ip}:${node.port}/joined/${publicKey}`
-      )
-      return { cycleJoined }
-    }
-    let query
-    let attempts = 2
-    while ((!query || !query[0]) && attempts > 0) {
-      try {
-        query = await this.robustQuery(seedNodes, queryFn)
-      } catch (e) {
-        this.mainLogger.error(e)
-      }
-      attempts--
-    }
-    if (attempts <= 0) {
-      this.mainLogger.info(
-        'Unable to get consistent cycle marker from seednodes.'
-      )
-      return null
-    }
-    const { cycleJoined } = query[0]
-    if (!cycleJoined) {
-      this.mainLogger.info(
-        "Unable to get cycle marker, likely this node's join request was not accepted."
-      )
-      return null
-    }
-    const nodeId = this.state.computeNodeId(publicKey, cycleJoined)
-    return nodeId
-  }
+  // async _fetchNodeId(seedNodes) {
+  //   const { publicKey } = this._getThisNodeInfo()
+  //   const queryFn = async node => {
+  //     const { cycleJoined } = await http.get(
+  //       `${node.ip}:${node.port}/joined/${publicKey}`
+  //     )
+  //     return { cycleJoined }
+  //   }
+  //   let query
+  //   let attempts = 2
+  //   while ((!query || !query[0]) && attempts > 0) {
+  //     try {
+  //       query = await this.robustQuery(seedNodes, queryFn)
+  //     } catch (e) {
+  //       this.mainLogger.error(e)
+  //     }
+  //     attempts--
+  //   }
+  //   if (attempts <= 0) {
+  //     this.mainLogger.info(
+  //       'Unable to get consistent cycle marker from seednodes.'
+  //     )
+  //     return null
+  //   }
+  //   const { cycleJoined } = query[0]
+  //   if (!cycleJoined) {
+  //     this.mainLogger.info(
+  //       "Unable to get cycle marker, likely this node's join request was not accepted."
+  //     )
+  //     return null
+  //   }
+  //   const nodeId = this.state.computeNodeId(publicKey, cycleJoined)
+  //   return nodeId
+  // }
 
   async _fetchCycleMarkerInternal(nodes) {
     const queryFn = async node => {
       const cycleMarkerInfo = await this.ask(node, 'cyclemarker')
       return cycleMarkerInfo
     }
-    const [cycleMarkerInfo] = await this.robustQuery(
+    const {topResult:cycleMarkerInfo} = await robustQuery(
       nodes,
       queryFn,
       this._isSameCycleMarkerInfo.bind(this)
@@ -1003,69 +1006,69 @@ class P2P extends EventEmitter {
     return cycleMarkerInfo
   }
 
-  async _fetchVerifiedCycleChain(nodes, cycleChainHash, start, end) {
-    const queryFn = async node => {
-      const chainAndCerts = await this.ask(node, 'cyclechain', { start, end })
-      return chainAndCerts
-    }
-    const verifyFn = ({ cycleChain }) =>
-      this._verifyCycleChain(cycleChain, cycleChainHash)
-    const chainAndCerts = await this._sequentialQuery(nodes, queryFn, verifyFn)
-    return chainAndCerts
-  }
+  // async _fetchVerifiedCycleChain(nodes, cycleChainHash, start, end) {
+  //   const queryFn = async node => {
+  //     const chainAndCerts = await this.ask(node, 'cyclechain', { start, end })
+  //     return chainAndCerts
+  //   }
+  //   const verifyFn = ({ cycleChain }) =>
+  //     this._verifyCycleChain(cycleChain, cycleChainHash)
+  //   const chainAndCerts = await this._sequentialQuery(nodes, queryFn, verifyFn)
+  //   return chainAndCerts
+  // }
 
-  async _fetchUnfinalizedCycle(nodes) {
-    const queryFn = async node => {
-      const { unfinalizedCycle } = await this.ask(node, 'unfinalized')
-      return { unfinalizedCycle }
-    }
-    const equalFn = (payload1, payload2) => {
-      // Make a copy of the cycle payload and delete the metadata for the hash comparison,
-      // so that we get more consistent results
-      const cycle1 = payload1.unfinalizedCycle.data
-      const cycle2 = payload2.unfinalizedCycle.data
-      const hash1 = this.crypto.hash(cycle1)
-      const hash2 = this.crypto.hash(cycle2)
-      return hash1 === hash2
-    }
-    let unfinalizedCycle
-    try {
-      const [response] = await this.robustQuery(nodes, queryFn, equalFn)
-      ;({ unfinalizedCycle } = response)
-    } catch (e) {
-      this.mainLogger.debug(
-        `Unable to get unfinalized cycle: ${e}. Need to resync cycle chain and try again.`
-      )
-      unfinalizedCycle = null
-    }
-    return unfinalizedCycle
-  }
+  // async _fetchUnfinalizedCycle(nodes) {
+  //   const queryFn = async node => {
+  //     const { unfinalizedCycle } = await this.ask(node, 'unfinalized')
+  //     return { unfinalizedCycle }
+  //   }
+  //   const equalFn = (payload1, payload2) => {
+  //     // Make a copy of the cycle payload and delete the metadata for the hash comparison,
+  //     // so that we get more consistent results
+  //     const cycle1 = payload1.unfinalizedCycle.data
+  //     const cycle2 = payload2.unfinalizedCycle.data
+  //     const hash1 = this.crypto.hash(cycle1)
+  //     const hash2 = this.crypto.hash(cycle2)
+  //     return hash1 === hash2
+  //   }
+  //   let unfinalizedCycle
+  //   try {
+  //     const [response] = await this.robustQuery(nodes, queryFn, equalFn)
+  //     ;({ unfinalizedCycle } = response)
+  //   } catch (e) {
+  //     this.mainLogger.debug(
+  //       `Unable to get unfinalized cycle: ${e}. Need to resync cycle chain and try again.`
+  //     )
+  //     unfinalizedCycle = null
+  //   }
+  //   return unfinalizedCycle
+  // }
 
-  async _fetchNodeByPublicKey(nodes, publicKey) {
-    const queryFn = async target => {
-      const payload = {
-        getBy: 'publicKey',
-        publicKey,
-      }
-      const { node } = await this.ask(target, 'node', payload)
-      return node
-    }
-    const equalFn = (payload1, payload2) => {
-      const hash1 = this.crypto.hash(payload1)
-      const hash2 = this.crypto.hash(payload2)
-      return hash1 === hash2
-    }
-    let node
-    try {
-      ;[node] = await this.robustQuery(nodes, queryFn, equalFn)
-    } catch (e) {
-      this.mainLogger.debug(
-        `Unable to get node: $(e.message). Unable to get consistent response from nodes.`
-      )
-      node = null
-    }
-    return node
-  }
+  // async _fetchNodeByPublicKey(nodes, publicKey) {
+  //   const queryFn = async target => {
+  //     const payload = {
+  //       getBy: 'publicKey',
+  //       publicKey,
+  //     }
+  //     const { node } = await this.ask(target, 'node', payload)
+  //     return node
+  //   }
+  //   const equalFn = (payload1, payload2) => {
+  //     const hash1 = this.crypto.hash(payload1)
+  //     const hash2 = this.crypto.hash(payload2)
+  //     return hash1 === hash2
+  //   }
+  //   let node
+  //   try {
+  //     ;[node] = await this.robustQuery(nodes, queryFn, equalFn)
+  //   } catch (e) {
+  //     this.mainLogger.debug(
+  //       `Unable to get node: $(e.message). Unable to get consistent response from nodes.`
+  //     )
+  //     node = null
+  //   }
+  //   return node
+  // }
 
   async _requestCycleUpdates(nodeId) {
     let node
