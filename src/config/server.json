@@ -54,7 +54,7 @@
     "internalPort": 10001
   },
   "network": {
-    "timeout": 1
+    "timeout": 2
   },
   "reporting": {
     "report": true,
