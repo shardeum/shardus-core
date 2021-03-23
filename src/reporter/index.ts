@@ -6,9 +6,9 @@ import { config, crypto } from '../p2p/Context'
 import * as Context from '../p2p/Context'
 import { getDesiredCount } from '../p2p/CycleAutoScale'
 import * as CycleChain from '../p2p/CycleChain'
+import * as Self from '../p2p/Self'
 import * as NodeList from '../p2p/NodeList'
 import * as Rotation from '../p2p/Rotation'
-import { id } from '../p2p/Self'
 import StateManager from '../state-manager'
 import Statistics from '../statistics'
 import Profiler from '../utils/profiler'
@@ -176,7 +176,7 @@ class Reporter {
     if (!this.hasRecipient) {
       return
     }
-    const nodeId = id
+    const nodeId = Self.id
     if (!nodeId) throw new Error('No node ID available to the Reporter module.')
     const report = {
       nodeId,
@@ -198,6 +198,13 @@ class Reporter {
     } else {
       return this.config.interval * 1000
     }
+  }
+  checkIsNodeLost(nodeId) {
+    const lostNodeIds = CycleChain.getNewest().lost
+    if (lostNodeIds.length === 0) return false
+    let foundId = lostNodeIds.find(lostId => lostId === nodeId)
+    if (foundId) return true
+    return false
   }
 
   async report () {
@@ -253,6 +260,7 @@ class Reporter {
     const queueLength = this.statistics.getPreviousElement('queueLength')
     const txTimeInQueue =
       this.statistics.getPreviousElement('txTimeInQueue') / 1000 // ms to sec
+    const isNodeLost = this.checkIsNodeLost(Self.id)
 
     try {
       await this._sendReport({
@@ -277,6 +285,7 @@ class Reporter {
         currentLoad,
         queueLength,
         txTimeInQueue,
+        isLost: isNodeLost,
         shardusVersion: packageJson.version,
       })
     } catch (e) {
@@ -287,6 +296,7 @@ class Reporter {
     }
 
     this.resetStatisticsReport()
+    this.consoleReport()
 
       // if (this.doConsoleReport) {
       //   this.consoleReport()
@@ -325,7 +335,8 @@ class Reporter {
     console.log(report)
 
     if (this.profiler) {
-      this.profiler.printAndClearReport(delta)
+      console.log(this.profiler.printAndClearReport(delta))
+      console.log("Current load", "counter", CycleChain.newest.counter,this.loadDetection.getCurrentLoad())
     }
   }
 
