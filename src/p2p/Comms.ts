@@ -262,7 +262,7 @@ export function registerInternal(route, handler) {
     // Create wrapped respond function for sending back signed data
     const respondWrapped = async response => {
       const node = NodeList.nodes.get(sender)
-      const signedResponse = _wrapAndTagMessage(response, tracker, node)
+      const signedResponse = _wrapAndTagMessage({...response, isResponse: true}, tracker, node)
       if (verboseLogs) {
         info(
           `The signed wrapped response to send back: ${utils.stringifyReduceLimit(

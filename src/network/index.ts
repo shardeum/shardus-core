@@ -124,7 +124,10 @@ export class NetworkClass extends EventEmitter {
         profilerInstance.profileSectionStart('net-internl')
         profilerInstance.profileSectionStart(`net-internl-${route}`) 
         routeName = route
-
+        if (!route && payload && payload.isResponse) {
+          this.mainLogger.debug('Received response data without any specified route', payload)
+          return
+        }
         if (!route) {
           this.mainLogger.debug(
             'Network: ' +
