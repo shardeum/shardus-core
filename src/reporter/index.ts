@@ -47,7 +47,7 @@ interface Reporter {
   statisticsReport: StatisticsReport
 }
 class Reporter {
-  constructor (
+  constructor(
     config,
     logger,
     statistics,
@@ -75,7 +75,7 @@ class Reporter {
     this.resetStatisticsReport()
   }
 
-  resetStatisticsReport () {
+  resetStatisticsReport() {
     this.statisticsReport = {
       txInjected: 0,
       txApplied: 0,
@@ -85,7 +85,7 @@ class Reporter {
     }
   }
 
-  collectStatisticToReport () {
+  collectStatisticToReport() {
     this.statisticsReport.txInjected += this.statistics
       ? this.statistics.getPreviousElement('txInjected')
       : 0
@@ -103,7 +103,7 @@ class Reporter {
       : 0
   }
 
-  async reportJoining (publicKey) {
+  async reportJoining(publicKey) {
     if (!this.hasRecipient) {
       return
     }
@@ -121,7 +121,7 @@ class Reporter {
     }
   }
 
-  async reportJoined (nodeId, publicKey) {
+  async reportJoined(nodeId, publicKey) {
     if (!this.hasRecipient) {
       return
     }
@@ -140,7 +140,7 @@ class Reporter {
     }
   }
 
-  async reportActive (nodeId) {
+  async reportActive(nodeId) {
     if (!this.hasRecipient) {
       return
     }
@@ -154,7 +154,7 @@ class Reporter {
     }
   }
 
-  async reportRemoved (nodeId) {
+  async reportRemoved(nodeId) {
     if (!this.hasRecipient) {
       return
     }
@@ -172,7 +172,7 @@ class Reporter {
   }
 
   // Sends a report
-  async _sendReport (data) {
+  async _sendReport(data) {
     if (!this.hasRecipient) {
       return
     }
@@ -192,7 +192,7 @@ class Reporter {
     }
   }
 
-  getReportInterval (): number {
+  getReportInterval(): number {
     if (NodeList.activeByIdOrder.length >= 100) {
       return 10 * 1000
     } else {
@@ -202,13 +202,13 @@ class Reporter {
   checkIsNodeLost(nodeId) {
     const lostNodeIds = CycleChain.getNewest().lost
     if (lostNodeIds.length === 0) return false
-    let foundId = lostNodeIds.find(lostId => lostId === nodeId)
+    const foundId = lostNodeIds.find((lostId) => lostId === nodeId)
     if (foundId) return true
     return false
   }
 
-  async report () {
-    /* 
+  async report() {
+    /*
     Stop calling getAccountsStateHash() since this is not of use in a sharded network, also expensive to compute.
       let appState = this.stateManager
         ? await this.stateManager.transactionQueue.getAccountsStateHash()
@@ -234,7 +234,10 @@ class Reporter {
     let partitionReport = null
     let globalSync = null
     if (this.stateManager != null) {
-      partitionReport = this.stateManager.partitionObjects.getPartitionReport(true, true)
+      partitionReport = this.stateManager.partitionObjects.getPartitionReport(
+        true,
+        true
+      )
       globalSync = this.stateManager.isStateGood()
 
       repairsStarted = this.stateManager.dataRepairsStarted
@@ -298,16 +301,16 @@ class Reporter {
     this.resetStatisticsReport()
     this.consoleReport()
 
-      // if (this.doConsoleReport) {
-      //   this.consoleReport()
-      // }
+    // if (this.doConsoleReport) {
+    //   this.consoleReport()
+    // }
     this.reportTimer = setTimeout(() => {
       this.report()
     }, this.getReportInterval())
   }
 
-  startReporting () {
-    let self = this
+  startReporting() {
+    const self = this
     setInterval(() => {
       self.collectStatisticToReport()
     }, 1000)
@@ -317,7 +320,7 @@ class Reporter {
     }, this.getReportInterval())
   }
 
-  consoleReport () {
+  consoleReport() {
     const time = Date.now()
     let delta = time - this.lastTime
     delta = delta * 0.001
@@ -327,20 +330,25 @@ class Reporter {
     const txApplied = this.statistics
       ? this.statistics.getPreviousElement('txApplied')
       : 0
-    const report = `Perf inteval ${delta}    ${txInjected} Injected @${txInjected /
-      delta} per second.    ${txApplied} Applied @${txApplied /
-      delta} per second`
+    const report = `Perf inteval ${delta}    ${txInjected} Injected @${
+      txInjected / delta
+    } per second.    ${txApplied} Applied @${txApplied / delta} per second`
     this.lastTime = time
 
     console.log(report)
 
     if (this.profiler) {
       console.log(this.profiler.printAndClearReport(delta))
-      console.log("Current load", "counter", CycleChain.newest.counter,this.loadDetection.getCurrentLoad())
+      console.log(
+        'Current load',
+        'counter',
+        CycleChain.newest.counter,
+        this.loadDetection.getCurrentLoad()
+      )
     }
   }
 
-  stopReporting () {
+  stopReporting() {
     this.mainLogger.info('Stopping statistics reporting...')
     clearTimeout(this.reportTimer)
   }

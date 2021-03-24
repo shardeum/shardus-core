@@ -10,10 +10,9 @@ import { promisify } from 'util'
 import * as httpModule from '../http'
 import Logger from '../logger'
 import { config, defaultConfigs, logger } from '../p2p/Context'
-import NatAPI = require('nat-api')
-import http from 'http'
-import {profilerInstance} from '../utils/profiler'
 import * as utils from '../utils'
+import { profilerInstance } from '../utils/profiler'
+import NatAPI = require('nat-api')
 
 /** TYPES */
 export interface IPInfo {
@@ -117,15 +116,17 @@ export class NetworkClass extends EventEmitter {
     this.intServer = await this.sn.listen(async (data, remote, respond) => {
       let routeName
       try {
-
         if (!data) throw new Error('No data provided in request...')
         const { route, payload } = data
 
         profilerInstance.profileSectionStart('net-internl')
-        profilerInstance.profileSectionStart(`net-internl-${route}`) 
+        profilerInstance.profileSectionStart(`net-internl-${route}`)
         routeName = route
         if (!route && payload && payload.isResponse) {
-          this.mainLogger.debug('Received response data without any specified route', payload)
+          this.mainLogger.debug(
+            'Received response data without any specified route',
+            payload
+          )
           return
         }
         if (!route) {
@@ -218,50 +219,57 @@ export class NetworkClass extends EventEmitter {
       }
 
       try {
-      profilerInstance.profileSectionStart('net-ask')
-      profilerInstance.profileSectionStart(`net-ask-${route}`) 
+        profilerInstance.profileSectionStart('net-ask')
+        profilerInstance.profileSectionStart(`net-ask-${route}`)
 
-      const data = { route, payload: message }
-      const onRes = (res) => {
+        const data = { route, payload: message }
+        const onRes = (res) => {
+          if (!logged)
+            this.logger.playbackLog(
+              'self',
+              node,
+              'InternalAskResp',
+              route,
+              id,
+              res
+            )
+          resolve(res)
+        }
+        const onTimeout = () => {
+          const err = new Error(
+            `Request timed out. ${utils.stringifyReduce(id)}`
+          )
+          this.mainLogger.error('Network: ' + err)
+          this.mainLogger.error(err.stack)
+          this.emit('timeout', node)
+          reject(err)
+        }
         if (!logged)
           this.logger.playbackLog(
             'self',
             node,
-            'InternalAskResp',
+            'InternalAsk',
             route,
             id,
-            res
+            message
           )
-        resolve(res)
-      }
-      const onTimeout = () => {
-        const err = new Error(`Request timed out. ${utils.stringifyReduce(id)}`)
-        this.mainLogger.error('Network: ' + err)
-        this.mainLogger.error(err.stack)
-        this.emit('timeout', node)
-        reject(err)
-      }
-      if (!logged)
-        this.logger.playbackLog('self', node, 'InternalAsk', route, id, message)
-      try {
-        await this.sn.send(
-          node.internalPort,
-          node.internalIp,
-          data,
-          this.timeout,
-          onRes,
-          onTimeout
-        )
-      } catch (err) {
-        this.mainLogger.error('Network: ' + err)
-        this.emit('error', node)
-      }
-
+        try {
+          await this.sn.send(
+            node.internalPort,
+            node.internalIp,
+            data,
+            this.timeout,
+            onRes,
+            onTimeout
+          )
+        } catch (err) {
+          this.mainLogger.error('Network: ' + err)
+          this.emit('error', node)
+        }
       } finally {
         profilerInstance.profileSectionEnd('net-ask')
-        profilerInstance.profileSectionEnd(`net-ask-${route}`) 
+        profilerInstance.profileSectionEnd(`net-ask-${route}`)
       }
-
     })
   }
 
@@ -287,8 +295,8 @@ export class NetworkClass extends EventEmitter {
     try {
       const promises = []
       if (this.extServer) promises.push(closeServer(this.extServer))
-// [TODO] - need to see why it is taking minutes for stopListening promises to return; for now Omar decided to comment this out
-//      if (this.sn) promises.push(this.sn.stopListening(this.intServer))
+      // [TODO] - need to see why it is taking minutes for stopListening promises to return; for now Omar decided to comment this out
+      //      if (this.sn) promises.push(this.sn.stopListening(this.intServer))
       if (natClient) promises.push(natClient.es6.destroy())
       await Promise.all(promises)
     } catch (e) {
@@ -299,7 +307,7 @@ export class NetworkClass extends EventEmitter {
   _registerExternal(method, route, handler) {
     const formattedRoute = `/${route}`
 
-    let self = this
+    const self = this
     let wrappedHandler = handler
     if (this.logger.playbackLogEnabled) {
       wrappedHandler = function (req, res) {
@@ -314,14 +322,14 @@ export class NetworkClass extends EventEmitter {
         return handler(req, res)
       }
     }
-    wrappedHandler = async function(req, res) {
+    wrappedHandler = async function (req, res) {
       await handler(req, res)
-      profilerInstance.profileSectionEnd(`net-externl`, false)
+      profilerInstance.profileSectionEnd('net-externl', false)
       profilerInstance.profileSectionEnd(`net-externl-${route}`, false)
     }
 
     const startProfiler = (req, res, next) => {
-      profilerInstance.profileSectionStart(`net-externl`, false)
+      profilerInstance.profileSectionStart('net-externl', false)
       profilerInstance.profileSectionStart(`net-externl-${route}`, false)
       next()
     }
@@ -453,7 +461,7 @@ export async function init() {
     internalPort,
   }
 
-  mainLogger.info(`This nodes ipInfo:`)
+  mainLogger.info('This nodes ipInfo:')
   mainLogger.info(JSON.stringify(ipInfo, null, 2))
 }
 
@@ -478,7 +486,7 @@ async function getExternalIp() {
     return ip
   } catch (err) {
     mainLogger.warn(
-      `Failed to get external IP from gateway:`,
+      'Failed to get external IP from gateway:',
       err.message ? err.message : err
     )
 
@@ -487,7 +495,7 @@ async function getExternalIp() {
       return ip
     } catch (err) {
       mainLogger.warn(
-        `Failed to get external IP from IP server:`,
+        'Failed to get external IP from IP server:',
         err.message ? err.message : err
       )
     }

@@ -1,11 +1,10 @@
 import { Logger } from 'log4js'
+import { setIsUpTs } from '../p2p/Lost'
 import * as utils from '../utils'
 import { config, crypto, logger, network } from './Context'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { InternalHandler, LooseObject } from './Types'
-import { currentCycle } from './CycleCreator'
-import { setIsUpTs } from '../p2p/Lost'
 
 /** TYPES */
 
@@ -103,21 +102,34 @@ function _authenticateByNode(message, node) {
 }
 
 function _extractPayload(wrappedPayload, nodeGroup) {
-  let err = utils.validateTypes(wrappedPayload,{error:'s?'})
-  if (err){
-    warn('extractPayload: bad wrappedPayload: '+err+' '+JSON.stringify(wrappedPayload))
+  let err = utils.validateTypes(wrappedPayload, { error: 's?' })
+  if (err) {
+    warn(
+      'extractPayload: bad wrappedPayload: ' +
+        err +
+        ' ' +
+        JSON.stringify(wrappedPayload)
+    )
     return [null]
   }
   if (wrappedPayload.error) {
     const error = wrappedPayload.error
-    warn(
-      `_extractPayload Failed to extract payload. Error: ${error}`
-    )
+    warn(`_extractPayload Failed to extract payload. Error: ${error}`)
     return [null]
   }
-  err = utils.validateTypes(wrappedPayload,{sender:'s',payload:'o',tag:'s',tracker:'s?'})
-  if (err){
-    warn('extractPayload: bad wrappedPayload: '+err+' '+JSON.stringify(wrappedPayload))
+  err = utils.validateTypes(wrappedPayload, {
+    sender: 's',
+    payload: 'o',
+    tag: 's',
+    tracker: 's?',
+  })
+  if (err) {
+    warn(
+      'extractPayload: bad wrappedPayload: ' +
+        err +
+        ' ' +
+        JSON.stringify(wrappedPayload)
+    )
     return [null]
   }
   // Check to see if node is in expected node group
@@ -260,9 +272,13 @@ export function registerInternal(route, handler) {
     }
     let tracker = ''
     // Create wrapped respond function for sending back signed data
-    const respondWrapped = async response => {
+    const respondWrapped = async (response) => {
       const node = NodeList.nodes.get(sender)
-      const signedResponse = _wrapAndTagMessage({...response, isResponse: true}, tracker, node)
+      const signedResponse = _wrapAndTagMessage(
+        { ...response, isResponse: true },
+        tracker,
+        node
+      )
       if (verboseLogs) {
         info(
           `The signed wrapped response to send back: ${utils.stringifyReduceLimit(
@@ -290,9 +306,7 @@ export function registerInternal(route, handler) {
     const [payload, sender] = payloadArray
     tracker = payloadArray[2] || ''
     if (!payload) {
-      warn(
-        'Payload unable to be extracted, possible missing signature...'
-      )
+      warn('Payload unable to be extracted, possible missing signature...')
       return
     }
     if (route !== 'gossip') {
@@ -356,9 +370,9 @@ export async function sendGossip(
 
   // nodes.sort((first, second) => first.id.localeCompare(second.id, 'en', { sensitivity: 'variant' }))
   nodes.sort(sortByID)
-  const nodeIdxs = new Array(nodes.length).fill(0).map((curr, idx) => idx)     // [TODO]  - we need to make sure that we never iterate, or copy the full nodes list. Assume it could be a million nodes.
+  const nodeIdxs = new Array(nodes.length).fill(0).map((curr, idx) => idx) // [TODO]  - we need to make sure that we never iterate, or copy the full nodes list. Assume it could be a million nodes.
   // Find out your own index in the nodes array
-  const myIdx = nodes.findIndex(node => node.id === Self.id)
+  const myIdx = nodes.findIndex((node) => node.id === Self.id)
   if (myIdx < 0) throw new Error('Could not find self in nodes array')
   // Map back recipient idxs to node objects
   const recipientIdxs = utils.getRandomGossipIn(
@@ -366,7 +380,7 @@ export async function sendGossip(
     config.p2p.gossipRecipients,
     myIdx
   )
-  let recipients = recipientIdxs.map(idx => nodes[idx])
+  let recipients = recipientIdxs.map((idx) => nodes[idx])
   if (sender != null) {
     recipients = utils.removeNodesByID(recipients, [sender])
   }
@@ -375,7 +389,7 @@ export async function sendGossip(
       info(
         `GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(
           recipients.map(
-            node => utils.makeShortHash(node.id) + ':' + node.externalPort
+            (node) => utils.makeShortHash(node.id) + ':' + node.externalPort
           )
         )}`
       )
@@ -390,7 +404,7 @@ export async function sendGossip(
         gossipPayload
       )
       gossipSent++
-      gossipTypeSent[type] = gossipTypeSent[type]  ? gossipTypeSent[type]+1 : 1
+      gossipTypeSent[type] = gossipTypeSent[type] ? gossipTypeSent[type] + 1 : 1
     }
     await tell(recipients, 'gossip', gossipPayload, true, tracker)
   } catch (ex) {
@@ -401,9 +415,7 @@ export async function sendGossip(
         )}) Exception => ${ex}`
       )
     }
-    fatal(
-      'sendGossipIn: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack
-    )
+    fatal('sendGossipIn: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
   }
   // gossipedHashesSent.set(gossipHash, currentCycle)    // No longer used
   if (verboseLogs) {
@@ -443,7 +455,7 @@ export async function sendGossipAll(
   nodes.sort(sortByID)
   const nodeIdxs = new Array(nodes.length).fill(0).map((curr, idx) => idx)
   // Find out your own index in the nodes array
-  const myIdx = nodes.findIndex(node => node.id === Self.id)
+  const myIdx = nodes.findIndex((node) => node.id === Self.id)
   if (myIdx < 0) throw new Error('Could not find self in nodes array')
 
   let recipients = nodes
@@ -455,7 +467,7 @@ export async function sendGossipAll(
       p2pLogger.debug(
         `GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(
           recipients.map(
-            node => utils.makeShortHash(node.id) + ':' + node.externalPort
+            (node) => utils.makeShortHash(node.id) + ':' + node.externalPort
           )
         )}`
       )
@@ -498,19 +510,18 @@ export async function handleGossip(payload, sender, tracker = '') {
     info(`Start of handleGossip(${utils.stringifyReduce(payload)})`)
   }
 
-  let err = utils.validateTypes(payload,{type:'s',data:'o'})
-  if (err){
-    warn('handleGossip: bad payload: '+err)
+  const err = utils.validateTypes(payload, { type: 's', data: 'o' })
+  if (err) {
+    warn('handleGossip: bad payload: ' + err)
     return
   }
 
-  // Simulating bad network by dropping received gossip 
+  // Simulating bad network by dropping received gossip
   //   set the propability of dropping to a number between 0 to 1
-  if (Math.random() < 0.00){
+  if (Math.random() < 0.0) {
     warn('Dropped gossip to simulate bad network')
     return
   }
-
 
   const type = payload.type
   const data = payload.data
@@ -548,7 +559,7 @@ export async function handleGossip(payload, sender, tracker = '') {
 .                          logging found that we don't typically send the same gossip message again. So the effort to compute,
 .                          save and delete the hashes is wasted.
   */
- /*
+  /*
   if (gossipedHashesRecv.has(gossipHash)) {
     if (verboseLogs) {
       warn(`Got old gossip: ${gossipHash.substring(0, 5)}`)
@@ -571,12 +582,11 @@ export async function handleGossip(payload, sender, tracker = '') {
   }
   gossipedHashesRecv.set(gossipHash, false)    // [TODO] - double check logic; we setTimeout to delete gossipHash if we get it a second time, but not first time ???
   */
-  
+
   setIsUpTs(sender)
-  
 
   gossipRecv++
-  gossipTypeRecv[type] = gossipTypeRecv[type]  ? gossipTypeRecv[type]+1 : 1
+  gossipTypeRecv[type] = gossipTypeRecv[type] ? gossipTypeRecv[type] + 1 : 1
   logger.playbackLog(sender, 'self', 'GossipRcv', type, tracker, data)
   // [TODO] - maybe we don't need to await the following line
   await gossipHandler(data, sender, tracker)
@@ -609,8 +619,8 @@ export function unregisterGossipHandler(type) {
 }
 
 // We don't need to prune gossip hashes since we are not creating them anymore.
-function pruneGossipHashes(){
-//  warn(`gossipedHashesRecv:${gossipedHashesRecv.size} gossipedHashesSent:${gossipedHashesSent.size}`)
+function pruneGossipHashes() {
+  //  warn(`gossipedHashesRecv:${gossipedHashesRecv.size} gossipedHashesSent:${gossipedHashesSent.size}`)
   info(`Total  gossipSent:${gossipSent} gossipRecv:${gossipRecv}`)
   info(`Sent gossip by type: ${JSON.stringify(gossipTypeSent)}`)
   info(`Recv gossip by type: ${JSON.stringify(gossipTypeRecv)}`)
@@ -635,4 +645,3 @@ function fatal(...msg) {
   const entry = `Comms: ${msg.join(' ')}`
   p2pLogger.fatal(entry)
 }
-
