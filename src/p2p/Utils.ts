@@ -1,6 +1,5 @@
 import util from 'util'
 import * as utils from '../utils'
-import * as Network from '../network'
 
 export type QueryFunction<Node, Response> = (node: Node) => Promise<Response>
 
@@ -14,7 +13,7 @@ export enum Comparison {
   BETTER,
   EQUAL,
   WORSE,
-  ABORT 
+  ABORT,
 }
 
 export interface CompareQueryError<Node> {
@@ -69,7 +68,7 @@ export async function compareQuery<Node = unknown, Response = unknown>(
             // Try the next one
             break
           case Comparison.ABORT:
-            // End everything and return 
+            // End everything and return
             abort = true
             break
           default:
@@ -126,25 +125,23 @@ export async function sequentialQuery<Node = unknown, Response = unknown>(
   }
 }
 
-type TallyItem = 
-{
+type TallyItem = {
   value: any // Response type is from a template
   count: number
   nodes: any[] // Shardus.Node[] Not using this because robustQuery uses a generic Node, maybe it should be non generic?
-};
+}
 
-type RobustQueryResult = 
-{
-  topResult: any;
-  winningNodes: any[];
+type RobustQueryResult = {
+  topResult: any
+  winningNodes: any[]
   isRobustResult: boolean
 }
 
 /**
  * [TODO] robustQuery should handle being given an enourmous node list (Dont copy and shuffle it)
- * 
+ *
  * TODO replace console.log with a specific log funtion.
- * 
+ *
  * Note -
  * robustQuery should NOT be given a node list that includes yourself (Use NodeList.activeOthersByIdOrder).
  * OR
@@ -163,8 +160,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
   redundancy = 3,
   shuffleNodes = true,
   strictRedundancy = false
-) : Promise<RobustQueryResult>
- {
+): Promise<RobustQueryResult> {
   if (nodes.length === 0) throw new Error('No nodes given.')
   if (typeof queryFn !== 'function') {
     throw new Error(`Provided queryFn ${queryFn} is not a valid function.`)
@@ -174,9 +170,11 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     redundancy = 3
   }
   if (redundancy > nodes.length) {
-    if(strictRedundancy){
-      console.log(`robustQuery: isRobustResult=false. not enough nodes to meet strictRedundancy`)
-      return {topResult: null, winningNodes: [], isRobustResult: false}
+    if (strictRedundancy) {
+      console.log(
+        'robustQuery: isRobustResult=false. not enough nodes to meet strictRedundancy'
+      )
+      return { topResult: null, winningNodes: [], isRobustResult: false }
     }
     redundancy = nodes.length
   }
@@ -191,7 +189,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
       this.items = []
     }
 
-    add(response: Response, node: Node) : TallyItem | null  {
+    add(response: Response, node: Node): TallyItem | null {
       if (response === null) return null
       // We search to see if we've already seen this item before
       for (const item of this.items) {
@@ -213,7 +211,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
       }
       // If we made it through the entire items list without finding a match,
       // We create a new item and set the count to 1
-      let newItem = { value: response, count: 1, nodes: [node] }
+      const newItem = { value: response, count: 1, nodes: [node] }
       this.items.push(newItem)
       // Finally, we check to see if the winCount is 1,
       // and return the item we just created if that is the case
@@ -229,7 +227,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
       }
       return highestCount
     }
-    getHighestCountItem() : TallyItem | null {
+    getHighestCountItem(): TallyItem | null {
       if (!this.items.length) return null
       let highestCount = 0
       let highestIndex = 0
@@ -264,7 +262,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
 
   const queryNodes = async (nodes: Node[]): Promise<TallyItem | null> => {
     // Wrap the query so that we know which node it's coming from
-    const wrappedQuery = async node => {
+    const wrappedQuery = async (node) => {
       const response = await queryFn(node)
       return { response, node }
     }
@@ -277,10 +275,10 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     }
     const [results, errs] = await utils.robustPromiseAll(queries)
 
-    let finalResult : TallyItem
+    let finalResult: TallyItem
     for (const result of results) {
       const { response, node } = result
-      if (responses === null) continue  // ignore null response; can be null if we tried to query ourself
+      if (responses === null) continue // ignore null response; can be null if we tried to query ourself
       finalResult = responses.add(response, node)
       if (finalResult) break
     }
@@ -294,53 +292,62 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     return finalResult
   }
 
-  let finalResult : TallyItem = null
+  let finalResult: TallyItem = null
   let tries = 0
   while (!finalResult) {
     tries += 1
     const toQuery = redundancy - responses.getHighestCount()
-    if (nodes.length < toQuery){
+    if (nodes.length < toQuery) {
       console.log('robustQuery: stopping since we ran out of nodes to query.')
       break
     }
     const nodesToQuery = nodes.splice(0, toQuery)
     finalResult = await queryNodes(nodesToQuery)
-    if (tries>=20){
+    if (tries >= 20) {
       console.log('robustQuery: stopping after 20 tries.')
       break
     }
   }
   if (finalResult) {
-    let isRobustResult = finalResult.count >= redundancy
+    const isRobustResult = finalResult.count >= redundancy
     // console.log(`robustQuery: stopping since we got a finalResult:${JSON.stringify(finalResult)}`)
-    return {topResult: finalResult.value, winningNodes: finalResult.nodes, isRobustResult}
-  }
-  else{
-  // Note:  We return the item that had the most nodes reporting it. However, the caller should know
-  //        The calling code can now check isRobustResult to see if a topResult is valid
+    return {
+      topResult: finalResult.value,
+      winningNodes: finalResult.nodes,
+      isRobustResult,
+    }
+  } else {
+    // Note:  We return the item that had the most nodes reporting it. However, the caller should know
+    //        The calling code can now check isRobustResult to see if a topResult is valid
     console.log(
-    `robustQuery: Could not get ${redundancy} ${
-      redundancy > 1 ? 'redundant responses' : 'response'
-    } from ${nodeCount} ${
-      nodeCount !== 1 ? 'nodes' : 'node'
-    }. Encountered ${errors} query errors.`
+      `robustQuery: Could not get ${redundancy} ${
+        redundancy > 1 ? 'redundant responses' : 'response'
+      } from ${nodeCount} ${
+        nodeCount !== 1 ? 'nodes' : 'node'
+      }. Encountered ${errors} query errors.`
     )
     console.trace()
-    let highestCountItem = responses.getHighestCountItem()
-    if(highestCountItem === null){
+    const highestCountItem = responses.getHighestCountItem()
+    if (highestCountItem === null) {
       //if there was no highestCountItem then we had no responses at all
-      console.log(`robustQuery: isRobustResult=false. no responses at all`)
-      return {topResult: null, winningNodes: [], isRobustResult: false}
+      console.log('robustQuery: isRobustResult=false. no responses at all')
+      return { topResult: null, winningNodes: [], isRobustResult: false }
     }
     //this isRobustResult should always be false if we get to this code.
-    let isRobustResult = highestCountItem.count >= redundancy
-    console.log(`robustQuery: isRobustResult=false. returning highest count response`)
-    return {topResult: highestCountItem.value, winningNodes: highestCountItem.nodes, isRobustResult}
+    const isRobustResult = highestCountItem.count >= redundancy
+    console.log(
+      'robustQuery: isRobustResult=false. returning highest count response'
+    )
+    return {
+      topResult: highestCountItem.value,
+      winningNodes: highestCountItem.nodes,
+      isRobustResult,
+    }
   }
 
   // NOTE: this function does not throw errors for situations where we don't have enough responses.
   // instead we return a structured result with enough information about how the query worked.
   // throwing errors was causing problems in past testing.
-  // it is OK to throw errors for stuff that is an unexected code mistake in cases where the code would 
+  // it is OK to throw errors for stuff that is an unexected code mistake in cases where the code would
   //   fail right away.
 }
