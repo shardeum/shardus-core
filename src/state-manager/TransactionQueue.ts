@@ -39,6 +39,7 @@ class TransactionQueue {
   newAcceptedTxQueue: QueueEntry[]
   newAcceptedTxQueueTempInjest: QueueEntry[]
   archivedQueueEntries: QueueEntry[]
+  archivedQueueEntriesByID: Map<string, QueueEntry>
 
   queueStopped: boolean
   queueEntryCounter: number
@@ -72,6 +73,7 @@ class TransactionQueue {
     this.newAcceptedTxQueue = []
     this.newAcceptedTxQueueTempInjest = []
     this.archivedQueueEntries = []
+    this.archivedQueueEntriesByID = new Map()
 
     this.archivedQueueEntryMaxCount = 50000
     this.newAcceptedTxQueueRunning = false
@@ -999,11 +1001,16 @@ class TransactionQueue {
   }
 
   getQueueEntryArchived(txid: string, msg: string): QueueEntry | null {
-    for (let queueEntry of this.archivedQueueEntries) {
-      if (queueEntry.acceptedTx.id === txid) {
-        return queueEntry
-      }
+
+    if(this.archivedQueueEntriesByID.has(txid)){
+      return this.archivedQueueEntriesByID.get(txid)
     }
+
+    // for (let queueEntry of this.archivedQueueEntries) {
+    //   if (queueEntry.acceptedTx.id === txid) {
+    //     return queueEntry
+    //   }
+    // }
     // todo make this and error.
     this.mainLogger.error(`getQueueEntryArchived failed to find: ${utils.stringifyReduce(txid)} ${msg} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(txid)]}`)
 
@@ -1679,8 +1686,11 @@ class TransactionQueue {
     this.stateManager.eventEmitter.emit('txPopped', queueEntry.acceptedTx.receipt.txHash)
     this.newAcceptedTxQueue.splice(currentIndex, 1)
     this.archivedQueueEntries.push(queueEntry)
+
+    this.archivedQueueEntriesByID.set(queueEntry.acceptedTx.id, queueEntry)
     // period cleanup will usually get rid of these sooner if the list fills up
     if (this.archivedQueueEntries.length > this.archivedQueueEntryMaxCount) {
+      this.archivedQueueEntriesByID.delete(this.archivedQueueEntries[0].acceptedTx.id)
       this.archivedQueueEntries.shift()
     }
   }

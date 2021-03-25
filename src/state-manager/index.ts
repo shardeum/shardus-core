@@ -2279,9 +2279,10 @@ class StateManager {
       // added a few more to oldest cycle to keep entries in the queue longer in case syncing nodes need the data
       if (queueEntry.approximateCycleAge < oldestCycle - 3) {
         this.transactionQueue.archivedQueueEntries.shift()
+        this.transactionQueue.archivedQueueEntriesByID.delete(queueEntry.acceptedTx.id)
         archivedEntriesRemoved++
 
-        if (this.verboseLogs) this.mainLogger.log(`queue entry removed from archive ${queueEntry.logID} tx cycle: ${queueEntry.approximateCycleAge} cycle: ${this.currentCycleShardData.cycleNumber}`)
+        //if (this.verboseLogs) this.mainLogger.log(`queue entry removed from archive ${queueEntry.logID} tx cycle: ${queueEntry.approximateCycleAge} cycle: ${this.currentCycleShardData.cycleNumber}`)
       } else {
         oldQueueEntries = false
         break
