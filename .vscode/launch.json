@@ -4,6 +4,7 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
             "type": "node",
             "request": "attach",
@@ -120,6 +121,15 @@
             "request": "launch",
             "name": "shardCalculation2",
             "program": "${workspaceFolder}\\test\\unit\\state-manager\\shardCalculation2.js",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "FastRandomIteratorTest",
+            "program": "${workspaceFolder}\\test\\unit\\utils\\FastRandomIteratorTest.js",
             "skipFiles": [
                 "<node_internals>/**"
             ]
