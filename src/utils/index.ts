@@ -308,7 +308,7 @@ export const reviver = (key, value) => {
   return value
 }
 export const replacer = (key, value) => {
-  const originalObject = this[key]
+  const originalObject = value // this[key] 
   if (originalObject instanceof Map) {
     return {
       dataType: 'stringifyReduce_map_2_array',
