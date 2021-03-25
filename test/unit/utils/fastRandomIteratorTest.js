@@ -46,10 +46,16 @@ function unitTest(){
     console.log("unit test ended")
 }
 
-let perfTestArraySize = 2000
-let sampleTestSize = 3
+unitTest()
+
+
+
+let perfTestArraySize = 5000
+let sampleTestSize = 50
 let randomTestList = new Array(perfTestArraySize)
-randomTestList.fill({ar: new Array(10).fill({foo:"someObject", asdf:1, asdf2:3})})
+//randomTestList.fill({ar: new Array(10).fill({foo:"someObject", asdf:1, asdf2:3})})
+
+randomTestList.fill({a:1})
 
 function RandomShuffle1(){
     let copy = randomTestList.slice()
@@ -57,7 +63,7 @@ function RandomShuffle1(){
 }
 
 function RandomShuffleFast(){
-    let iterate = new FastRandomIterator.default(perfTestArraySize)
+    let iterate = new FastRandomIterator.default(perfTestArraySize, -1 , -1)
     let nextIndex = 0
     for(let i=0; i<sampleTestSize; i++){
         nextIndex = iterate.getNextIndex()
@@ -65,14 +71,36 @@ function RandomShuffleFast(){
 }
 
 function RandomShuffleFastSimple(){
-    let iterate = new FastRandomIterator.default(perfTestArraySize, 1000000)
+    let iterate = new FastRandomIterator.default(perfTestArraySize,-1, 1000000)
     let nextIndex = 0
     for(let i=0; i<sampleTestSize; i++){
         nextIndex = iterate.getNextIndex()
     }
 }
 
-let testLoops = 100
+// par tests.
+let par = sampleTestSize
+let arraySize = perfTestArraySize
+let strideSize = -1
+let minStrideSize = 10
+let maxStrideSize = 100
+if (strideSize < 0) {
+    strideSize = arraySize / 100
+  }
+  if (strideSize < minStrideSize) {
+    strideSize = minStrideSize
+  }
+  if (strideSize > maxStrideSize) {
+    strideSize = maxStrideSize
+  }
+
+this.strideSize = Math.floor(strideSize)
+
+let rating = (par * (strideSize / arraySize))
+console.log(`par:${par} rating:${rating}   ${rating >= 1} `)
+
+//perf tests
+let testLoops = 1000
 profiler.profileSectionStart('RandomShuffle1')
 for(let i=0; i<testLoops; i++){
     RandomShuffle1()
@@ -103,7 +131,6 @@ for(let i=0; i<testLoops; i++){
 }
 profiler.profileSectionEnd('RandomShuffleFastSimple')
 
-unitTest()
 
 profiler.profileSectionEnd('testTotal')
 

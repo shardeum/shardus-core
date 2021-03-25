@@ -3,23 +3,18 @@ const maxStrideSize = 100
 
 class FastRandomIterator {
   strideSize: number
-  indexStrides: Map<number, number[]>
+  indexStrides: any[] //Map<number, number[]>
   arraySize: number
   iteratorIndex: number
 
   indexList: number[] = null
 
-  constructor(arraySize: number, strideSize: number = -1) {
+  constructor(arraySize: number, par: number = -1, strideSize: number = -1) {
     this.iteratorIndex = 0
     this.arraySize = arraySize
 
-    if (arraySize < 100 || strideSize > arraySize) {
-      this.indexList = new Array(arraySize)
-      for (let i = 0; i < arraySize; ++i) {
-        this.indexList[i] = i
-      }
-    } else {
-      this.indexStrides = new Map()
+    let parForcesSimpleMode = false
+    if(par > 0){
       if (strideSize < 0) {
         strideSize = arraySize / 100
       }
@@ -31,6 +26,32 @@ class FastRandomIterator {
       }
 
       this.strideSize = Math.floor(strideSize)
+
+      parForcesSimpleMode =  (par * (strideSize / arraySize)) > 0.1
+    }
+    
+    if (arraySize < 100 || strideSize > arraySize || parForcesSimpleMode) {
+      this.indexList = new Array(arraySize)
+      for (let i = 0; i < arraySize; ++i) {
+        this.indexList[i] = i
+      }
+    } else {
+
+      if(par <= 0){
+        if (strideSize < 0) {
+          strideSize = arraySize / 100
+        }
+        if (strideSize < minStrideSize) {
+          strideSize = minStrideSize
+        }
+        if (strideSize > maxStrideSize) {
+          strideSize = maxStrideSize
+        }
+      }
+
+      this.strideSize = Math.floor(strideSize)
+
+      this.indexStrides = Array(Math.ceil(arraySize/ strideSize)).fill(false) //new Map()
 
       // let firstStride = new Array(this.strideSize)
       // for (let i = 0; i < this.strideSize; ++i) {
@@ -62,7 +83,7 @@ class FastRandomIterator {
 
     } else {
       let currentStrideKey = Math.floor(this.iteratorIndex / this.strideSize)
-      let hasCurrentStride = this.indexStrides.has(currentStrideKey)
+      let hasCurrentStride = this.indexStrides[currentStrideKey] //.has(currentStrideKey)
       let currentStrideStart = currentStrideKey * this.strideSize
 
       let currentStride : number[]
@@ -72,15 +93,15 @@ class FastRandomIterator {
         for (let i = 0; i < this.strideSize; ++i) {
           currentStride[i] = i + currentStrideStart
         }
-        this.indexStrides.set(currentStrideKey, currentStride)
+        this.indexStrides[currentStrideKey] = currentStride// .set(currentStrideKey, currentStride)
       } else {
-        currentStride = this.indexStrides.get(currentStrideKey)
+        currentStride = this.indexStrides[currentStrideKey] //.get(currentStrideKey)
       }
 
 
       let fetchStrideKey = Math.floor(randomFetchIndex / this.strideSize)
       let fetchStrideStart = fetchStrideKey * this.strideSize
-      let hasFetchStride = this.indexStrides.has(fetchStrideKey)
+      let hasFetchStride = this.indexStrides[fetchStrideKey]//.has(fetchStrideKey)
       let fetchStride : number[]
       if (hasFetchStride === false) {
         // fill a new stride
@@ -88,9 +109,9 @@ class FastRandomIterator {
         for (let i = 0; i < this.strideSize; ++i) {
           fetchStride[i] = i + fetchStrideStart
         }
-        this.indexStrides.set(fetchStrideKey, fetchStride)
+        this.indexStrides[fetchStrideKey] = fetchStride//.set(fetchStrideKey, fetchStride)
       } else {
-        fetchStride = this.indexStrides.get(fetchStrideKey)
+        fetchStride = this.indexStrides[fetchStrideKey]//.get(fetchStrideKey)
       }
       
       let fetchStrideLocalDestIndex = randomFetchIndex - fetchStrideStart
