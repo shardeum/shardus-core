@@ -23,6 +23,7 @@ import Storage from '../storage'
 import * as utils from '../utils'
 import Profiler from '../utils/profiler'
 import NestedCounters from '../utils/nestedCounters'
+import MemoryReporting from '../utils/memoryReporting'
 import ShardusTypes = require('../shardus/shardus-types')
 import * as Archivers from '../p2p/Archivers'
 import * as AutoScaling from '../p2p/CycleAutoScale'
@@ -48,6 +49,7 @@ interface Shardus {
   io: SocketIO.Server
   profiler: Profiler
   nestedCounters: NestedCounters
+  memoryReporting: MemoryReporting
   config: ShardusTypes.ShardusConfiguration
   verboseLogs: boolean
   logger: Logger
@@ -93,6 +95,7 @@ class Shardus extends EventEmitter {
   }) {
     super()
     this.nestedCounters = new NestedCounters()    
+    this.memoryReporting = new MemoryReporting(this)
     this.profiler = new Profiler()
     this.config = config
     Context.setConfig(this.config)
@@ -210,6 +213,7 @@ class Shardus extends EventEmitter {
 
     this.profiler.registerEndpoints()
     this.nestedCounters.registerEndpoints()
+    this.memoryReporting.registerEndpoints()
 
     this.logger.playbackLogState('constructed', '', '')
   }
