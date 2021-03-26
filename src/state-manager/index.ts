@@ -863,19 +863,11 @@ class StateManager {
         this.mainLogger.debug(debugString)
         if (this.verboseLogs) console.log(debugString)
 
-        // if (initStats) {
-        //   // todo perf, evaluate getCycleNumberFromTimestamp for really old timestamps.
-        //   // the algorithims may run worst case for old cycles.
-        //   let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
-        //   this.partitionStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount)
-        // } else {
-        //   //update accounts cache
-        //   let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
-        //   this.accountCache.updateAccountHash(wrapedAccount.accountId, wrapedAccount.stateId, wrapedAccount.timestamp, cycleToRecordOn)
-        // }
-
         let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
         if (this.accountCache.hasAccount(accountId)) {
+          //TODO STATS BUG..  this is what can cause one form of stats bug.
+          //we may have covered this account in the past, then not covered it, and now we cover it again.  Stats doesn't know how to repair
+          // this situation.
           //TODO, need a way to re-init.. dang idk how to do that!
           //this.partitionStats.statsDataSummaryUpdate2(cycleToRecordOn, null, wrapedAccount)
 

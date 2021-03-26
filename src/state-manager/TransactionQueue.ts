@@ -85,7 +85,6 @@ class TransactionQueue {
     this.newAcceptedTxQueueRunning = false
   }
 
-
   /***
    *    ######## ##    ## ########  ########   #######  #### ##    ## ########  ######
    *    ##       ###   ## ##     ## ##     ## ##     ##  ##  ###   ##    ##    ##    ##
@@ -459,18 +458,15 @@ class TransactionQueue {
       accountDataList = _accountdata
 
       if (this.verboseLogs) this.mainLogger.debug(`commitConsensedTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
-      
+
       let note = `setAccountData: tx:${queueEntry.logID} in commitConsensedTransaction. `
-      
+
       // wrappedStates are side effected for now
       savedSomething = await this.stateManager.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter, note)
 
       if (this.verboseLogs) this.mainLogger.debug(`commitConsensedTransaction  savedSomething: ${savedSomething}`)
       if (this.verboseLogs) this.mainLogger.debug(`commitConsensedTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
       if (this.verboseLogs) this.mainLogger.debug(`commitConsensedTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
-
-      
-
 
       this.applySoftLock = false
       // only write our state table data if we dont already have it in the db
@@ -769,7 +765,7 @@ class TransactionQueue {
         uniqueWritableKeys: [],
         txGroupCycle: 0,
         updatedTxGroupCycle: 0,
-        updatedTransactionGroup: null
+        updatedTransactionGroup: null,
       } // age comes from timestamp
 
       // todo faster hash lookup for this maybe?
@@ -817,8 +813,6 @@ class TransactionQueue {
       // }
 
       try {
-
-
         let age = Date.now() - timestamp
         if (age > this.stateManager.queueSitTime * 0.9) {
           this.statemanager_fatal(`routeAndQueueAcceptedTransaction_olderTX`, 'routeAndQueueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
@@ -933,13 +927,13 @@ class TransactionQueue {
               if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_notInTxGroup', `${txQueueEntry.logID}`, ``)
               return 'out of range' // we are done, not involved!!!
             } else {
-              // If we have syncing neighbors forward this TX to them 
+              // If we have syncing neighbors forward this TX to them
               if (this.stateManager.currentCycleShardData.hasSyncingNeighbors === true) {
                 // only send non global modification TXs
                 if (txQueueEntry.globalModification === false) {
                   if (this.verboseLogs) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: spread_tx_to_group ${txQueueEntry.logID}`)
                   if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_sync_tx', `${txQueueEntry.logID}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(this.stateManager.currentCycleShardData.syncingNeighborsTxGroup.map((x) => x.id))}`)
-                  
+
                   this.stateManager.debugNodeGroup(txId, timestamp, `share to syncing neighbors`, this.stateManager.currentCycleShardData.syncingNeighborsTxGroup)
                   this.p2p.sendGossipAll('spread_tx_to_group', acceptedTx, '', sender, this.stateManager.currentCycleShardData.syncingNeighborsTxGroup)
                 } else {
@@ -988,7 +982,7 @@ class TransactionQueue {
     // return null
 
     let queueEntry = this.newAcceptedTxQueueByID.get(txid)
-    if(queueEntry === undefined){
+    if (queueEntry === undefined) {
       return null
     }
     return queueEntry
@@ -1003,7 +997,7 @@ class TransactionQueue {
     // return null
 
     let queueEntry = this.newAcceptedTxQueueTempInjestByID.get(txid)
-    if(queueEntry === undefined){
+    if (queueEntry === undefined) {
       return null
     }
     return queueEntry
@@ -1017,9 +1011,9 @@ class TransactionQueue {
     // return queueEntry
 
     let queueEntry = this.newAcceptedTxQueueByID.get(txid)
-    if(queueEntry === undefined){
+    if (queueEntry === undefined) {
       queueEntry = this.newAcceptedTxQueueTempInjestByID.get(txid)
-      if(queueEntry === undefined){
+      if (queueEntry === undefined) {
         return null
       }
     }
@@ -1027,9 +1021,8 @@ class TransactionQueue {
   }
 
   getQueueEntryArchived(txid: string, msg: string): QueueEntry | null {
-
     let queueEntry = this.archivedQueueEntriesByID.get(txid)
-    if(queueEntry != null){
+    if (queueEntry != null) {
       return queueEntry
     }
 
@@ -1280,7 +1273,7 @@ class TransactionQueue {
 
         let node = consensusGroup[nodeIndex]
         nodeIndex++
-  
+
         if (node == null) {
           continue
         }
@@ -1340,8 +1333,6 @@ class TransactionQueue {
     }
   }
 
-
-
   /**
    * queueEntryGetTransactionGroup
    * @param {QueueEntry} queueEntry
@@ -1358,9 +1349,8 @@ class TransactionQueue {
       return queueEntry.transactionGroup
     }
 
-    if(tryUpdate){
-      if(queueEntry.cycleToRecordOn === this.stateManager.currentCycleShardData.cycleNumber){
-
+    if (tryUpdate) {
+      if (queueEntry.cycleToRecordOn === this.stateManager.currentCycleShardData.cycleNumber) {
       }
     }
 
@@ -1406,6 +1396,8 @@ class TransactionQueue {
       // TODO STATESHARDING4 is this next block even needed:
       // HOMENODEMATHS need to patch in nodes that would cover this partition!
       // TODO PERF make an optimized version of this in ShardFunctions that is smarter about which node range to check and saves off the calculation
+      // TODO PERF Update.  this will scale badly with 100s or 1000s of nodes. need a faster solution that can use the list of accounts to 
+      //                    build a list of nodes.
       // maybe this could go on the partitions.
       let { homePartition } = ShardFunctions.addressToPartition(this.stateManager.currentCycleShardData.shardGlobals, key)
       if (homePartition != homeNode.homePartition) {
@@ -1442,12 +1434,12 @@ class TransactionQueue {
       txGroup.push(v)
     }
 
-    if(tryUpdate != true){
+    if (tryUpdate != true) {
       queueEntry.txGroupCycle = this.stateManager.currentCycleShardData.cycleNumber
-      queueEntry.transactionGroup = txGroup      
+      queueEntry.transactionGroup = txGroup
     } else {
       queueEntry.updatedTxGroupCycle = this.stateManager.currentCycleShardData.cycleNumber
-      queueEntry.transactionGroup = txGroup  
+      queueEntry.transactionGroup = txGroup
     }
 
     // let uniqueNodes = {}
@@ -1457,12 +1449,11 @@ class TransactionQueue {
     // for (let n of updatedGroup) {
     //   uniqueNodes[n.id] = n
     // }
-    // let values = Object.values(uniqueNodes)    
-    // let finalGossipGroup = 
+    // let values = Object.values(uniqueNodes)
+    // let finalGossipGroup =
     // for (let n of updatedGroup) {
     //   uniqueNodes[n.id] = n
     // }
-
 
     return txGroup
   }
@@ -1724,6 +1715,7 @@ class TransactionQueue {
     }
   }
 
+
   /***
    *    ########  ########   #######   ######  ########  ######   ######
    *    ##     ## ##     ## ##     ## ##    ## ##       ##    ## ##    ##
@@ -1735,7 +1727,7 @@ class TransactionQueue {
    */
   async processAcceptedTxQueue() {
     let seenAccounts: SeenAccounts
-    seenAccounts = {} // todo PERF we should be able to support using a variable that we save from one update to the next.  set that up after initial testing
+    seenAccounts = {}
     let pushedProfilerTag = null
     try {
       this.profiler.profileSectionStart('processQ')
@@ -1759,8 +1751,8 @@ class TransactionQueue {
 
       this.newAcceptedTxQueueRunning = true
 
-      let acceptedTXCount = 0
-      let edgeFailDetected = false
+      // let acceptedTXCount = 0
+      // let edgeFailDetected = false
 
       let timeM = this.stateManager.queueSitTime
       let timeM2 = timeM * 2
@@ -1768,68 +1760,8 @@ class TransactionQueue {
       let timeM3 = timeM * 3
       let currentTime = Date.now() // when to update this?
 
-      // let seenAccounts2 = new Map()
-      // todo move these functions out where they are not constantly regenerate
-      let accountSeen = function (queueEntry: QueueEntry) {
-        if (queueEntry.uniqueKeys == null) {
-          //TSConversion double check if this needs extra logging
-          return false
-        }
-        for (let key of queueEntry.uniqueKeys) {
-          if (seenAccounts[key] != null) {
-            return true
-          }
-          // if (seenAccounts2.has(key)) {
-          //   this.fatalLogger.fatal('map fail in seenAccounts')
-          //   return true
-          // }
-        }
-        return false
-      }
-      let markAccountsSeen = function (queueEntry: QueueEntry) {
-        if (queueEntry.uniqueWritableKeys == null) {
-          //TSConversion double check if this needs extra logging
-          return
-        }
-        // only mark writeable keys as seen but we will check/clear against all keys
-        for (let key of queueEntry.uniqueWritableKeys) {
-          if (seenAccounts[key] == null) {
-            seenAccounts[key] = queueEntry
-          }
-          // seenAccounts2.set(key, true)
-        }
-      }
-      // if we are the oldest ref to this you can clear it.. only ok because younger refs will still reflag it in time
-      let clearAccountsSeen = function (queueEntry: QueueEntry) {
-        if (queueEntry.uniqueKeys == null) {
-          //TSConversion double check if this needs extra logging
-          return
-        }
-        for (let key of queueEntry.uniqueKeys) {
-          if (seenAccounts[key] === queueEntry) {
-            seenAccounts[key] = null
-          }
-          // seenAccounts2.delete(key)
-        }
-      }
-
       let app = this.app
       let verboseLogs = this.verboseLogs
-      let debugAccountData = function (queueEntry: QueueEntry, app: Shardus.App) {
-        let debugStr = ''
-        if (verboseLogs) {
-          if (queueEntry.uniqueKeys == null) {
-            //TSConversion double check if this needs extra logging
-            return utils.makeShortHash(queueEntry.acceptedTx.id) + ' uniqueKeys empty error'
-          }
-          for (let key of queueEntry.uniqueKeys) {
-            if (queueEntry.collectedData[key] != null) {
-              debugStr += utils.makeShortHash(key) + ' : ' + app.getAccountDebugValue(queueEntry.collectedData[key]) + ', '
-            }
-          }
-        }
-        return debugStr
-      }
 
       // process any new queue entries that were added to the temporary list
       if (this.newAcceptedTxQueueTempInjest.length > 0) {
@@ -1847,7 +1779,6 @@ class TransactionQueue {
             lastTx = this.newAcceptedTxQueue[index]
           }
 
-          //TODO check time before inserting queueEntry. make sure it is not older than 90% of M
           let age = Date.now() - timestamp
           if (age > timeM * 0.9) {
             // IT turns out the correct thing to check is didSync flag only report errors if we did not wait on this TX while syncing
@@ -1924,11 +1855,10 @@ class TransactionQueue {
             //this.statistics.incrementCounter('txExpired')
             queueEntry.state = 'expired'
             this.removeFromQueue(queueEntry, currentIndex)
-            this.statemanager_fatal(`txExpired1`, `txExpired txAge > timeM3 * 20 && queueEntry.didSync == true. ` +
-            `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+            this.statemanager_fatal(`txExpired1`, `txExpired txAge > timeM3 * 20 && queueEntry.didSync == true. ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
             if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
             if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
-            nestedCountersInstance.countEvent('txExpired','txExpired txAge > timeM3 didSync == false')  
+            nestedCountersInstance.countEvent('txExpired', 'txExpired txAge > timeM3 didSync == false')
             continue
           }
 
@@ -1936,11 +1866,10 @@ class TransactionQueue {
             //this.statistics.incrementCounter('txExpired')
             queueEntry.state = 'expired'
             this.removeFromQueue(queueEntry, currentIndex)
-            this.statemanager_fatal(`txExpired2`, `txExpired txAge > timeM3 * 20 && queueEntry.didSync == true. ` +
-            `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+            this.statemanager_fatal(`txExpired2`, `txExpired txAge > timeM3 * 20 && queueEntry.didSync == true. ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
             if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 2  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
             if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 2: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
-            nestedCountersInstance.countEvent('txExpired','txExpired txAge > timeM3 * 20 && queueEntry.didSync == true. ')  
+            nestedCountersInstance.countEvent('txExpired', 'txExpired txAge > timeM3 * 20 && queueEntry.didSync == true. ')
             continue
           }
 
@@ -1948,17 +1877,16 @@ class TransactionQueue {
             //this.statistics.incrementCounter('txExpired')
             queueEntry.state = 'expired'
             this.removeFromQueue(queueEntry, currentIndex)
-            this.statemanager_fatal(`txExpired3`, `txExpired txAge > timeM3 && queueEntry.requestingReceiptFailed`+
-            `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+            this.statemanager_fatal(`txExpired3`, `txExpired txAge > timeM3 && queueEntry.requestingReceiptFailed` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
             if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 3 requestingReceiptFailed  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
             if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
-            nestedCountersInstance.countEvent('txExpired','txExpired txAge > timeM3 && queueEntry.requestingReceiptFailed ')  
+            nestedCountersInstance.countEvent('txExpired', 'txExpired txAge > timeM3 && queueEntry.requestingReceiptFailed ')
             continue
           }
 
           // if we have a pending request for a receipt mark account seen and continue
           if (queueEntry.requestingReceipt === true) {
-            markAccountsSeen(queueEntry)
+            this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
             continue
           }
 
@@ -1966,12 +1894,11 @@ class TransactionQueue {
           // Checking at m2.5 allows the network a chance at a receipt existing
           if (txAge > timeM2_5 && queueEntry.didSync === true && queueEntry.requestingReceiptFailed === false) {
             if (queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null) {
-              if (verboseLogs) this.mainLogger.error(`didSync: txAge > timeM2_5 => ask for receipt now `+
-              `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+              if (verboseLogs) this.mainLogger.error(`didSync: txAge > timeM2_5 => ask for receipt now ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
               if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txMissingReceipt1', `txAge > timeM2_5 ${shortID}`, `syncNeedsReceipt ${shortID}`)
-              markAccountsSeen(queueEntry)
+              this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
               this.queueEntryRequestMissingReceipt(queueEntry)
-              nestedCountersInstance.countEvent('txMissingReceipt','didSync txAge > timeM2_5 => ask for receipt now ')  
+              nestedCountersInstance.countEvent('txMissingReceipt', 'didSync txAge > timeM2_5 => ask for receipt now ')
               continue
             }
           }
@@ -1979,12 +1906,11 @@ class TransactionQueue {
           // have not seen a receipt yet?
           if (txAge > timeM2_5 && queueEntry.didSync === false && queueEntry.requestingReceiptFailed === false) {
             if (queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null) {
-              if (verboseLogs) this.mainLogger.error(`txAge > timeM2_5 => ask for receipt now: `+
-              `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+              if (verboseLogs) this.mainLogger.error(`txAge > timeM2_5 => ask for receipt now: ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
               if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txMissingReceipt2', `txAge > timeM2_5 ${shortID}`, `txMissingReceipt ${shortID}`)
-              markAccountsSeen(queueEntry)
+              this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
               this.queueEntryRequestMissingReceipt(queueEntry)
-              nestedCountersInstance.countEvent('txMissingReceipt','txAge > timeM2_5 => ask for receipt now ') 
+              nestedCountersInstance.countEvent('txMissingReceipt', 'txAge > timeM2_5 => ask for receipt now ')
               continue
             }
           }
@@ -1994,11 +1920,10 @@ class TransactionQueue {
             //this.statistics.incrementCounter('txExpired')
             queueEntry.state = 'expired'
             this.removeFromQueue(queueEntry, currentIndex)
-            this.statemanager_fatal(`txExpired4`, `Still on inital syncing.  txExpired txAge > timeM3 * 10. ` +
-            `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+            this.statemanager_fatal(`txExpired4`, `Still on inital syncing.  txExpired txAge > timeM3 * 10. ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
             if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 4  ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
             if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 4: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
-            nestedCountersInstance.countEvent('txExpired','txExpired txAge > timeM3 * 10. ') 
+            nestedCountersInstance.countEvent('txExpired', 'txExpired txAge > timeM3 * 10. ')
             continue
           }
         }
@@ -2008,9 +1933,8 @@ class TransactionQueue {
           // no receipt yet, and state not committing
           if (queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null && queueEntry.state != 'commiting') {
             if (verboseLogs) this.mainLogger.error(`Wait for reciept only: txAge > timeM2_5 txid:${shortID} `)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txMissingReceipt3', `${shortID}`, `processAcceptedTxQueue `+
-            `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
-            nestedCountersInstance.countEvent('txMissingReceipt',`Wait for reciept only: txAge > timeM2_5 state:${queueEntry.state}`) 
+            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txMissingReceipt3', `${shortID}`, `processAcceptedTxQueue ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+            nestedCountersInstance.countEvent('txMissingReceipt', `Wait for reciept only: txAge > timeM2_5 state:${queueEntry.state}`)
             queueEntry.waitForReceiptOnly = true
             queueEntry.m2TimeoutReached = true
             queueEntry.state = 'consensing'
@@ -2038,20 +1962,20 @@ class TransactionQueue {
 
           if (queueEntry.state === 'syncing') {
             ///////////////////////////////////////////////--syncing--////////////////////////////////////////////////////////////
-            markAccountsSeen(queueEntry)
+            this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
           } else if (queueEntry.state === 'aging') {
             ///////////////////////////////////////////--aging--////////////////////////////////////////////////////////////////
             // we know that tx age is greater than M
             queueEntry.state = 'processing'
-            markAccountsSeen(queueEntry)
+            this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
           } else if (queueEntry.state === 'processing') {
             ////////////////////////////////////////--processing--///////////////////////////////////////////////////////////////////
-            if (accountSeen(queueEntry) === false) {
-              markAccountsSeen(queueEntry)
+            if (this.processQueue_accountSeen(seenAccounts, queueEntry) === false) {
+              this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
               try {
                 //if(queueEntry.globalModification === false) {
                 await this.tellCorrespondingNodes(queueEntry)
-                if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_processing', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  values: ${debugAccountData(queueEntry, app)}`)
+                if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_processing', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  values: ${this.processQueue_debugAccountData(queueEntry, app)}`)
                 //}
               } catch (ex) {
                 this.mainLogger.debug('processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -2060,13 +1984,13 @@ class TransactionQueue {
                 queueEntry.state = 'awaiting data'
               }
             }
-            markAccountsSeen(queueEntry)
+            this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
           } else if (queueEntry.state === 'awaiting data') {
             ///////////////////////////////////////--awaiting data--////////////////////////////////////////////////////////////////////
 
             // TODO STATESHARDING4 GLOBALACCOUNTS need to find way to turn this back on..
             // if(queueEntry.globalModification === true){
-            //   markAccountsSeen(queueEntry)
+            //   markAccountsSeen(seenAccounts, queueEntry)
             //   // no data to await.
             //   queueEntry.state = 'applying'
             //   continue
@@ -2075,7 +1999,7 @@ class TransactionQueue {
             if (queueEntry.hasAll === false && txAge > timeM2) {
               //TODO STATESHARDING4 in theory this shouldn't be able to happen
 
-              markAccountsSeen(queueEntry)
+              this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
               if (this.queueEntryHasAllData(queueEntry) === true) {
                 // I think this can't happen
                 if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_hadDataAfterall', `${shortID}`, `This is kind of an error, and should not happen`)
@@ -2100,11 +2024,11 @@ class TransactionQueue {
                 this.statemanager_fatal(`processAcceptedTxQueue2_missingData`, 'processAcceptedTxQueue2 queueEntryRequestMissingData:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
               }
             } else if (queueEntry.hasAll) {
-              if (accountSeen(queueEntry) === false) {
-                markAccountsSeen(queueEntry)
+              if (this.processQueue_accountSeen(seenAccounts, queueEntry) === false) {
+                this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
 
                 // As soon as we have all the data we preApply it and then send out a vote
-                if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_preApplyTx', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+                if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_preApplyTx', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${this.processQueue_debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
 
                 // TODO sync related need to reconsider how to set this up again
                 // if (queueEntry.didSync) {
@@ -2131,19 +2055,19 @@ class TransactionQueue {
                   let txResult = await this.preApplyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates, localCachedData, filter)
 
                   // TODO STATESHARDING4 evaluate how much of this we still need, does the edge fail stuff still matter
-                  if (txResult != null) {
-                    if (txResult.passed === true) {
-                      acceptedTXCount++
-                    }
-                    // clearAccountsSeen(queueEntry)
-                  } else {
-                    // clearAccountsSeen(queueEntry)
-                    // if (!edgeFailDetected && acceptedTXCount > 0) {
-                    //   edgeFailDetected = true
-                    //   if (this.verboseLogs) this.mainLogger.debug( `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-                    //   this.fatalLogger.fatal( `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`) // todo: consider if this is just an error
-                    // }
-                  }
+                  // if (txResult != null) {
+                  //   if (txResult.passed === true) {
+                  //     acceptedTXCount++
+                  //   }
+                  //   // clearAccountsSeen(seenAccounts, queueEntry)
+                  // } else {
+                  //   // clearAccountsSeen(seenAccounts, queueEntry)
+                  //   // if (!edgeFailDetected && acceptedTXCount > 0) {
+                  //   //   edgeFailDetected = true
+                  //   //   if (this.verboseLogs) this.mainLogger.debug( `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+                  //   //   this.fatalLogger.fatal( `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`) // todo: consider if this is just an error
+                  //   // }
+                  // }
 
                   if (txResult != null && txResult.applied === true) {
                     queueEntry.state = 'consensing'
@@ -2156,13 +2080,11 @@ class TransactionQueue {
 
                       this.mainLogger.debug(`processAcceptedTxQueue2 noConsensus : ${queueEntry.logID} `)
 
-                      //await this.stateManager.transactionConsensus.createAndShareVote(queueEntry)
-
                       queueEntry.state = 'commiting'
 
+                      // TODO Global receipts?  do we want them?
                       // if(queueEntry.globalModification === false){
                       //   //Send a special receipt because this is a set command.
-
                       // }
                     } else {
                       if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_preApplyTx_createAndShareVote', `${shortID}`, ``)
@@ -2178,15 +2100,15 @@ class TransactionQueue {
                   this.mainLogger.debug('processAcceptedTxQueue2 preApplyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
                   this.statemanager_fatal(`processAcceptedTxQueue2b_ex`, 'processAcceptedTxQueue2 preApplyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
                 } finally {
-                  if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_preapplyFinish', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+                  if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_preapplyFinish', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${this.processQueue_debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
                 }
               }
-              markAccountsSeen(queueEntry)
+              this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
             }
           } else if (queueEntry.state === 'consensing') {
             /////////////////////////////////////////--consensing--//////////////////////////////////////////////////////////////////
-            if (accountSeen(queueEntry) === false) {
-              markAccountsSeen(queueEntry)
+            if (this.processQueue_accountSeen(seenAccounts, queueEntry) === false) {
+              this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
 
               let didNotMatchReceipt = false
 
@@ -2237,10 +2159,10 @@ class TransactionQueue {
                 }
               }
             }
-            markAccountsSeen(queueEntry)
+            this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
           } else if (queueEntry.state === 'await repair') {
             ///////////////////////////////////////////--await repair--////////////////////////////////////////////////////////////////
-            markAccountsSeen(queueEntry)
+            this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
 
             // at this point we are just waiting to see if we applied the data and repaired correctlyl
             if (queueEntry.repairFinished === true) {
@@ -2255,12 +2177,12 @@ class TransactionQueue {
             }
           } else if (queueEntry.state === 'commiting') {
             ///////////////////////////////////////////--commiting--////////////////////////////////////////////////////////////////
-            if (accountSeen(queueEntry) === false) {
-              markAccountsSeen(queueEntry)
+            if (this.processQueue_accountSeen(seenAccounts, queueEntry) === false) {
+              this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
 
               // TODO STATESHARDING4 Check if we have already commited the data from a receipt we saw earlier
               this.mainLogger.debug(`processAcceptedTxQueue2 commiting : ${queueEntry.logID} `)
-              if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_commitingTx', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+              if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_commitingTx', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${this.processQueue_debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
 
               // if (this.verboseLogs) this.mainLogger.debug( ` processAcceptedTxQueue2. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
 
@@ -2333,7 +2255,6 @@ class TransactionQueue {
                   if (commitResult != null && commitResult.success) {
                   }
                 } else {
-
                 }
                 if (hasReceiptFail) {
                   // endpoint to allow dapp to execute something that depends on a transaction failing
@@ -2346,7 +2267,7 @@ class TransactionQueue {
                 this.mainLogger.debug('processAcceptedTxQueue2 commiting Transaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
                 this.statemanager_fatal(`processAcceptedTxQueue2b_ex`, 'processAcceptedTxQueue2 commiting Transaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
               } finally {
-                clearAccountsSeen(queueEntry)
+                this.processQueue_clearAccountsSeen(seenAccounts, queueEntry)
                 this.removeFromQueue(queueEntry, currentIndex)
 
                 if (queueEntry.noConsensus === true) {
@@ -2379,7 +2300,7 @@ class TransactionQueue {
                   this.mainLogger.error(`processAcceptedTxQueue2 commiting finished : no receipt ${queueEntry.logID} `)
                 }
 
-                if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_commitingTxFinished', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+                if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_commitingTxFinished', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${this.processQueue_debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
               }
 
               // TODO STATESHARDING4 SYNC related.. need to consider how we will re activate this
@@ -2406,7 +2327,7 @@ class TransactionQueue {
             }
           } else if (queueEntry.state === 'canceled') {
             ///////////////////////////////////////////////--canceled--////////////////////////////////////////////////////////////
-            clearAccountsSeen(queueEntry)
+            this.processQueue_clearAccountsSeen(seenAccounts, queueEntry)
             this.removeFromQueue(queueEntry, currentIndex)
             this.mainLogger.debug(`processAcceptedTxQueue2 canceled : ${queueEntry.logID} `)
           }
@@ -2441,6 +2362,61 @@ class TransactionQueue {
       this.profiler.profileSectionEnd('processQ')
     }
   }
+
+
+  processQueue_accountSeen(seenAccounts: SeenAccounts, queueEntry: QueueEntry): boolean {
+    if (queueEntry.uniqueKeys == null) {
+      //TSConversion double check if this needs extra logging
+      return false
+    }
+    for (let key of queueEntry.uniqueKeys) {
+      if (seenAccounts[key] != null) {
+        return true
+      }
+    }
+    return false
+  }
+
+  processQueue_markAccountsSeen(seenAccounts: SeenAccounts, queueEntry: QueueEntry) {
+    if (queueEntry.uniqueWritableKeys == null) {
+      //TSConversion double check if this needs extra logging
+      return
+    }
+    // only mark writeable keys as seen but we will check/clear against all keys
+    for (let key of queueEntry.uniqueWritableKeys) {
+      if (seenAccounts[key] == null) {
+        seenAccounts[key] = queueEntry
+      }
+    }
+  }
+
+  processQueue_clearAccountsSeen(seenAccounts: SeenAccounts, queueEntry: QueueEntry) {
+    if (queueEntry.uniqueKeys == null) {
+      //TSConversion double check if this needs extra logging
+      return
+    }
+    for (let key of queueEntry.uniqueKeys) {
+      if (seenAccounts[key] === queueEntry) {
+        seenAccounts[key] = null
+      }
+    }
+  }
+  
+  processQueue_debugAccountData(queueEntry: QueueEntry, app: Shardus.App): string {
+    let debugStr = ''
+    //if (verboseLogs) { //this function is always verbose
+    if (queueEntry.uniqueKeys == null) {
+      //TSConversion double check if this needs extra logging
+      return utils.makeShortHash(queueEntry.acceptedTx.id) + ' uniqueKeys empty error'
+    }
+    for (let key of queueEntry.uniqueKeys) {
+      if (queueEntry.collectedData[key] != null) {
+        debugStr += utils.makeShortHash(key) + ' : ' + app.getAccountDebugValue(queueEntry.collectedData[key]) + ', '
+      }
+    }
+    //}
+    return debugStr
+  }  
 }
 
 export default TransactionQueue
