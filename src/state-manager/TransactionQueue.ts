@@ -39,6 +39,9 @@ class TransactionQueue {
   newAcceptedTxQueue: QueueEntry[]
   newAcceptedTxQueueTempInjest: QueueEntry[]
   archivedQueueEntries: QueueEntry[]
+
+  newAcceptedTxQueueByID: Map<string, QueueEntry>
+  newAcceptedTxQueueTempInjestByID: Map<string, QueueEntry>
   archivedQueueEntriesByID: Map<string, QueueEntry>
 
   queueStopped: boolean
@@ -73,6 +76,9 @@ class TransactionQueue {
     this.newAcceptedTxQueue = []
     this.newAcceptedTxQueueTempInjest = []
     this.archivedQueueEntries = []
+
+    this.newAcceptedTxQueueByID = new Map()
+    this.newAcceptedTxQueueTempInjestByID = new Map()
     this.archivedQueueEntriesByID = new Map()
 
     this.archivedQueueEntryMaxCount = 50000
@@ -947,6 +953,8 @@ class TransactionQueue {
         }
 
         this.newAcceptedTxQueueTempInjest.push(txQueueEntry)
+        this.newAcceptedTxQueueTempInjestByID.set(txQueueEntry.acceptedTx.id, txQueueEntry)
+
         if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_txPreQueued', `${txQueueEntry.logID}`, `${txQueueEntry.logID} gm:${txQueueEntry.globalModification}`)
         // start the queue if needed
         this.stateManager.tryStartAcceptedQueue()
@@ -972,38 +980,57 @@ class TransactionQueue {
    */
 
   getQueueEntry(txid: string): QueueEntry | null {
-    // todo perf need an interpolated or binary search on a sorted list
-    for (let queueEntry of this.newAcceptedTxQueue) {
-      if (queueEntry.acceptedTx.id === txid) {
-        return queueEntry
-      }
+    // for (let queueEntry of this.newAcceptedTxQueue) {
+    //   if (queueEntry.acceptedTx.id === txid) {
+    //     return queueEntry
+    //   }
+    // }
+    // return null
+
+    let queueEntry = this.newAcceptedTxQueueByID.get(txid)
+    if(queueEntry === undefined){
+      return null
     }
-    return null
+    return queueEntry
   }
 
   getQueueEntryPending(txid: string): QueueEntry | null {
-    // todo perf need an interpolated or binary search on a sorted list
-    for (let queueEntry of this.newAcceptedTxQueueTempInjest) {
-      if (queueEntry.acceptedTx.id === txid) {
-        return queueEntry
-      }
+    // for (let queueEntry of this.newAcceptedTxQueueTempInjest) {
+    //   if (queueEntry.acceptedTx.id === txid) {
+    //     return queueEntry
+    //   }
+    // }
+    // return null
+
+    let queueEntry = this.newAcceptedTxQueueTempInjestByID.get(txid)
+    if(queueEntry === undefined){
+      return null
     }
-    return null
+    return queueEntry
   }
 
   getQueueEntrySafe(txid: string): QueueEntry | null {
-    let queueEntry = this.getQueueEntry(txid)
-    if (queueEntry == null) {
-      return this.getQueueEntryPending(txid)
-    }
+    // let queueEntry = this.getQueueEntry(txid)
+    // if (queueEntry == null) {
+    //   return this.getQueueEntryPending(txid)
+    // }
+    // return queueEntry
 
+    let queueEntry = this.newAcceptedTxQueueByID.get(txid)
+    if(queueEntry === undefined){
+      queueEntry = this.newAcceptedTxQueueTempInjestByID.get(txid)
+      if(queueEntry === undefined){
+        return null
+      }
+    }
     return queueEntry
   }
 
   getQueueEntryArchived(txid: string, msg: string): QueueEntry | null {
 
-    if(this.archivedQueueEntriesByID.has(txid)){
-      return this.archivedQueueEntriesByID.get(txid)
+    let queueEntry = this.archivedQueueEntriesByID.get(txid)
+    if(queueEntry != null){
+      return queueEntry
     }
 
     // for (let queueEntry of this.archivedQueueEntries) {
@@ -1685,6 +1712,8 @@ class TransactionQueue {
   removeFromQueue(queueEntry: QueueEntry, currentIndex: number) {
     this.stateManager.eventEmitter.emit('txPopped', queueEntry.acceptedTx.receipt.txHash)
     this.newAcceptedTxQueue.splice(currentIndex, 1)
+    this.newAcceptedTxQueueByID.delete(queueEntry.acceptedTx.id)
+
     this.archivedQueueEntries.push(queueEntry)
 
     this.archivedQueueEntriesByID.set(queueEntry.acceptedTx.id, queueEntry)
@@ -1835,11 +1864,15 @@ class TransactionQueue {
           }
 
           txQueueEntry.approximateCycleAge = this.stateManager.currentCycleShardData.cycleNumber
+          //insert this tx into the main queue
           this.newAcceptedTxQueue.splice(index + 1, 0, txQueueEntry)
+          this.newAcceptedTxQueueByID.set(txQueueEntry.acceptedTx.id, txQueueEntry)
+
           if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${txQueueEntry.logID} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)} indexInserted: ${index + 1}`)
           this.stateManager.eventEmitter.emit('txQueued', acceptedTx.receipt.txHash)
         }
         this.newAcceptedTxQueueTempInjest = []
+        this.newAcceptedTxQueueTempInjestByID.clear()
       }
 
       let currentIndex = this.newAcceptedTxQueue.length - 1
