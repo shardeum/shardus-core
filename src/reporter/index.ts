@@ -259,7 +259,8 @@ class Reporter {
     }
 
     // Server load
-    const currentLoad = this.loadDetection.getCurrentLoad()
+    const currentNetworkLoad = this.loadDetection.getCurrentLoad()
+    const currentNodeLoad = this.loadDetection.getCurrentNodeLoad()
     const queueLength = this.statistics.getPreviousElement('queueLength')
     const txTimeInQueue =
       this.statistics.getPreviousElement('txTimeInQueue') / 1000 // ms to sec
@@ -285,7 +286,10 @@ class Reporter {
         globalSync,
         partitions,
         partitionsCovered,
-        currentLoad,
+        currentLoad: {
+          networkLoad: currentNetworkLoad,
+          nodeLoad: currentNodeLoad
+        },
         queueLength,
         txTimeInQueue,
         isLost: isNodeLost,
@@ -299,11 +303,8 @@ class Reporter {
     }
 
     this.resetStatisticsReport()
-    this.consoleReport()
+    //this.consoleReport()
 
-    // if (this.doConsoleReport) {
-    //   this.consoleReport()
-    // }
     this.reportTimer = setTimeout(() => {
       this.report()
     }, this.getReportInterval())
@@ -338,7 +339,7 @@ class Reporter {
     console.log(report)
 
     if (this.profiler) {
-      console.log(this.profiler.printAndClearReport(delta))
+//      console.log(this.profiler.printAndClearReport(delta))
       console.log(
         'Current load',
         'counter',
