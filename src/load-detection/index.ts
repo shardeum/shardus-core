@@ -1,7 +1,7 @@
 import Statistics from '../statistics'
 import { EventEmitter } from 'events'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-import { profilerInstance } from "../utils/profiler"
+import { profilerInstance, NodeLoad} from "../utils/profiler"
 
 interface LoadDetection {
   highThreshold: number
@@ -10,7 +10,9 @@ interface LoadDetection {
   queueLimit: number
   statistics: Statistics
   load: number
+  nodeLoad: NodeLoad
 }
+let lastMeasuredTimestamp = 0
 
 class LoadDetection extends EventEmitter {
   constructor(config, statistics) {
@@ -21,6 +23,10 @@ class LoadDetection extends EventEmitter {
     this.queueLimit = config.queueLimit
     this.statistics = statistics
     this.load = 0
+    this.nodeLoad = {
+      internal: 0,
+      external: 0
+    }
   }
 
   /**
@@ -44,8 +50,15 @@ class LoadDetection extends EventEmitter {
     if (scaledQueueLength > this.highThreshold){
       nestedCountersInstance.countEvent('loadRelated',`highLoad-scaledQueueLength ${this.highThreshold}`)      
     }
-    if(profilerInstance != null){
+    if(profilerInstance != null) {
       let dutyCycleLoad = profilerInstance.getTotalBusyInternal()
+      console.log("dutyCycleLoad", dutyCycleLoad)
+      if (Date.now() - lastMeasuredTimestamp >= 2000) {
+        let nodeLoad = profilerInstance.getNodeLoad()
+        if(nodeLoad) this.nodeLoad = nodeLoad
+        lastMeasuredTimestamp = Date.now()
+        console.log("nodeLoad", nodeLoad)
+      }
       if (dutyCycleLoad > 0.4){
         nestedCountersInstance.countEvent('loadRelated','highLoad-dutyCycle 0.4')      
       }      
@@ -62,6 +75,10 @@ class LoadDetection extends EventEmitter {
 
   getCurrentLoad() {
     return this.load
+  }
+
+  getCurrentNodeLoad() {
+    return this.nodeLoad
   }
 }
 

@@ -79,7 +79,10 @@
   },
   "rateLimiting": {
     "limitRate": true,
-    "loadLimit": 0.5
+    "loadLimit": {
+      "internal": 0.5,
+      "external": 0.4
+     }
   },
   "stateManager": {
     "stateTableBucketSize": 200,

@@ -11,6 +11,11 @@ interface Profiler {
   // instance: Profiler
 }
 
+export interface NodeLoad {
+  internal: number
+  external: number
+}
+
 export let profilerInstance: Profiler
 class Profiler {
   sectionTimes: any;
@@ -117,6 +122,48 @@ class Profiler {
     return Number(duty) * 0.01
   }
 
+  getNodeLoad() : NodeLoad {
+    nestedCountersInstance.countEvent('profiler-note', 'getTotalBusyInternal')
+
+    this.profileSectionEnd('_total', true)
+
+    let netInternalSection = this.sectionTimes['net-internl']
+    let netExternalSection = this.sectionTimes['net-externl']
+    let total = this.sectionTimes['_total']
+    
+    if (!netInternalSection || !netExternalSection) return { internal: 0, external: 0 }
+
+    let d1 = this.cleanInt(1e6) // will get us ms
+    let divider = BigInt(d1)
+    let internalDuty = BigInt(0)
+    let externalDuty = BigInt(0)
+
+    //if (netInternalSection) console.log("netInternalSection", netInternalSection, netInternalSection.total / divider)
+    //if (netExternalSection) console.log("netExternalSection", netExternalSection, netExternalSection.total / divider)
+    //if (total) console.log("total", total, total.total / divider)
+
+    if(netInternalSection != null && total != null ) {
+      if(total.total > BigInt(0)) {
+        internalDuty = (BigInt(100) * netInternalSection.total) / total.total
+      }
+    }
+
+    if(netExternalSection != null && total != null ) {
+      if(total.total > BigInt(0)) {
+        externalDuty = (BigInt(100) * netExternalSection.total) / total.total
+      }
+    }
+    this.profileSectionStart('_total', true)
+
+    total.total = BigInt(0)
+    netInternalSection.total = BigInt(0)
+    netExternalSection.total = BigInt(0)
+
+    return {
+      internal: Number(internalDuty) * 0.01,
+      external: Number(externalDuty) * 0.01
+    }
+  }
 
   clearTimes(){
     for (let key in this.sectionTimes) {
@@ -133,9 +180,7 @@ class Profiler {
   }
 
   printAndClearReport(delta?: number) : string {
-
     this.profileSectionEnd('_total', true)
-
 
     let result = 'Profile Sections:\n'
     let d1 = this.cleanInt(1e6) // will get us ms
@@ -143,6 +188,7 @@ class Profiler {
 
     let totalSection = this.sectionTimes['_total']
     let totalBusySection = this.sectionTimes['_totalBusy']
+    console.log("totalSection from printAndClearReport", totalSection)
 
     let lines = []
     for (let key in this.sectionTimes) {
