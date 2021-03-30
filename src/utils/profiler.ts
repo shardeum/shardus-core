@@ -21,11 +21,15 @@ class Profiler {
   sectionTimes: any;
   eventCounters: Map<string, Map<string,number>>;
   stackHeight: number;
+  netInternalStackHeight: number
+  netExternalStackHeight: number
 
   constructor() {
     this.sectionTimes = {}
     this.eventCounters = new Map()
     this.stackHeight = 0
+    this.netInternalStackHeight = 0
+    this.netExternalStackHeight = 0
     profilerInstance = this
 
     this.profileSectionStart('_total', true)
@@ -69,6 +73,18 @@ class Profiler {
         this.profileSectionStart('_totalBusy', true)
         this.profileSectionStart('_internal_totalBusy', true)
       }      
+      if (sectionName === 'net-internl') {
+        this.netInternalStackHeight++
+        if (this.netInternalStackHeight === 1) {
+          this.profileSectionStart('_internal_net-internl', true)
+        }
+      }
+      if (sectionName === 'net-externl') {
+        this.netExternalStackHeight++
+        if (this.netExternalStackHeight === 1) {
+          this.profileSectionStart('_internal_net-externl', true)
+        }
+      }
     }
   }
 
@@ -93,6 +109,18 @@ class Profiler {
         this.profileSectionEnd('_totalBusy', true)
         this.profileSectionEnd('_internal_totalBusy', true)
       }  
+      if (sectionName === 'net-internl') {
+        this.netInternalStackHeight--
+        if (this.netInternalStackHeight === 0) {
+          this.profileSectionEnd('_internal_net-internl', true)
+        }
+      }
+      if (sectionName === 'net-externl') {
+        this.netExternalStackHeight--
+        if (this.netExternalStackHeight === 0) {
+          this.profileSectionEnd('_internal_net-externl', true)
+        }
+      }
     }
   }
 
@@ -101,16 +129,30 @@ class Profiler {
     return x >= 0 ? Math.floor(x) : Math.ceil(x)
   }
 
-  getTotalBusyInternal() : Number {
+  getTotalBusyInternal() : any {
     nestedCountersInstance.countEvent('profiler-note', 'getTotalBusyInternal')
 
     this.profileSectionEnd('_internal_total', true)
     let internalTotalBusy = this.sectionTimes['_internal_totalBusy']
     let internalTotal = this.sectionTimes['_internal_total']
+    let internalNetInternl = this.sectionTimes['_internal_net-internl']
+    let internalNetExternl = this.sectionTimes['_internal_net-externl']
     let duty = BigInt(0)
+    let netInternlDuty = BigInt(0)
+    let netExternlDuty = BigInt(0)
     if(internalTotalBusy != null && internalTotal != null ) {
       if(internalTotal.total > BigInt(0)){
         duty = (BigInt(100) * internalTotalBusy.total) / internalTotal.total
+      }
+    }
+    if(internalNetInternl != null && internalTotal != null ) {
+      if(internalTotal.total > BigInt(0)){
+        netInternlDuty = (BigInt(100) * internalNetInternl.total) / internalTotal.total
+      }
+    }
+    if(internalNetExternl != null && internalTotal != null ) {
+      if(internalTotal.total > BigInt(0)){
+        netExternlDuty = (BigInt(100) * internalNetExternl.total) / internalTotal.total
       }
     }
     this.profileSectionStart('_internal_total', true)
@@ -118,50 +160,13 @@ class Profiler {
     //clear these timers
     internalTotal.total = BigInt(0)
     internalTotalBusy.total = BigInt(0)
-
-    return Number(duty) * 0.01
-  }
-
-  getNodeLoad() : NodeLoad {
-    nestedCountersInstance.countEvent('profiler-note', 'getTotalBusyInternal')
-
-    this.profileSectionEnd('_total', true)
-
-    let netInternalSection = this.sectionTimes['net-internl']
-    let netExternalSection = this.sectionTimes['net-externl']
-    let total = this.sectionTimes['_total']
-    
-    if (!netInternalSection || !netExternalSection) return { internal: 0, external: 0 }
-
-    let d1 = this.cleanInt(1e6) // will get us ms
-    let divider = BigInt(d1)
-    let internalDuty = BigInt(0)
-    let externalDuty = BigInt(0)
-
-    //if (netInternalSection) console.log("netInternalSection", netInternalSection, netInternalSection.total / divider)
-    //if (netExternalSection) console.log("netExternalSection", netExternalSection, netExternalSection.total / divider)
-    //if (total) console.log("total", total, total.total / divider)
-
-    if(netInternalSection != null && total != null ) {
-      if(total.total > BigInt(0)) {
-        internalDuty = (BigInt(100) * netInternalSection.total) / total.total
-      }
-    }
-
-    if(netExternalSection != null && total != null ) {
-      if(total.total > BigInt(0)) {
-        externalDuty = (BigInt(100) * netExternalSection.total) / total.total
-      }
-    }
-    this.profileSectionStart('_total', true)
-
-    total.total = BigInt(0)
-    netInternalSection.total = BigInt(0)
-    netExternalSection.total = BigInt(0)
+    if (internalNetInternl) internalNetInternl.total = BigInt(0)
+    if (internalNetExternl) internalNetExternl.total = BigInt(0)
 
     return {
-      internal: Number(internalDuty) * 0.01,
-      external: Number(externalDuty) * 0.01
+      duty: Number(duty) * 0.01,
+      netInternlDuty: Number(netInternlDuty) * 0.01,
+      netExternlDuty: Number(netExternlDuty) * 0.01,
     }
   }
 

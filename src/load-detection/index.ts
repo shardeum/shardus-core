@@ -52,19 +52,16 @@ class LoadDetection extends EventEmitter {
     }
     if(profilerInstance != null) {
       let dutyCycleLoad = profilerInstance.getTotalBusyInternal()
-      console.log("dutyCycleLoad", dutyCycleLoad)
-      if (Date.now() - lastMeasuredTimestamp >= 2000) {
-        let nodeLoad = profilerInstance.getNodeLoad()
-        if(nodeLoad) this.nodeLoad = nodeLoad
-        lastMeasuredTimestamp = Date.now()
-        console.log("nodeLoad", nodeLoad)
-      }
-      if (dutyCycleLoad > 0.4){
+      if (dutyCycleLoad.duty > 0.4){
         nestedCountersInstance.countEvent('loadRelated','highLoad-dutyCycle 0.4')      
       }      
-      if (dutyCycleLoad > this.highThreshold){
+      if (dutyCycleLoad.duty > this.highThreshold){
         nestedCountersInstance.countEvent('loadRelated',`highLoad-dutyCycle ${this.highThreshold}`)      
       }   
+      this.nodeLoad = {
+        internal: dutyCycleLoad.netInternlDuty,
+        external: dutyCycleLoad.netExternlDuty,
+      }
     }
     
     const load = Math.max(scaledTxTimeInQueue, scaledQueueLength)
