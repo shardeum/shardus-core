@@ -339,6 +339,9 @@ class Reporter {
     console.log(report)
 
     if (this.profiler) {
+      //Note: turning this log on will make the perf endpoint math get reset
+      //  one option would be to have a flag that gets set if anyone hits the perf endpoint
+      //  if so, then just stop this logging.  for now i will leave this off.
 //      console.log(this.profiler.printAndClearReport(delta))
       console.log(
         'Current load',

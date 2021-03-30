@@ -72,6 +72,22 @@ class MemoryReporting {
       res.end()
     })
 
+    Context.network.registerExternalGet('memory-gc', (req, res) => {
+      
+      res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
+      try {
+        if (global.gc) {
+          global.gc();
+          res.write('garbage collected!');
+        } else {
+          res.write('No access to global.gc.  run with node --expose-gc');
+        }
+      } catch (e) {
+        res.write('ex:No access to global.gc.  run with node --expose-gc');
+      }
+      res.end()
+    })
+
   }
 
 
