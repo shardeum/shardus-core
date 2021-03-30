@@ -172,10 +172,7 @@ class Profiler {
 
   clearTimes(){
     for (let key in this.sectionTimes) {
-      if(key === '_internal_total' || key === '_internal_totalBusy')
-      {
-        continue
-      }
+      if(utils.isStartWith(key, '_internal')) continue
 
       if (this.sectionTimes.hasOwnProperty(key)) {
         let section = this.sectionTimes[key]
@@ -197,10 +194,7 @@ class Profiler {
 
     let lines = []
     for (let key in this.sectionTimes) {
-      if(key === '_internal_total' || key === '_internal_totalBusy')
-      {
-        continue
-      }
+      if(utils.isStartWith(key, '_internal')) continue
 
       if (this.sectionTimes.hasOwnProperty(key)) {
         let section = this.sectionTimes[key]

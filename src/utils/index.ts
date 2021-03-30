@@ -718,3 +718,9 @@ export function validateTypes(inp, def) {
 export function isUndefined(thing: unknown) {
   return typeof thing === 'undefined'
 }
+
+export function isStartWith(inputStr: string, startStr: string) {
+  if (!inputStr) return false
+  if (!startStr) return false
+  return inputStr.indexOf(startStr) === 0
+}
