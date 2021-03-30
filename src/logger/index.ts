@@ -27,13 +27,88 @@ interface Logger {
   _playbackNodeID: string
 }
 
+// default: { appenders: ['out'], level: 'fatal' },
+// app: { appenders: ['app', 'errors'], level: 'trace' },
+// main: { appenders: ['main', 'errors'], level: 'trace' },
+// fatal: { appenders: ['fatal'], level: 'fatal' },
+// net: { appenders: ['net'], level: 'trace' },
+// playback: { appenders: ['playback'], level: 'trace' },
+// shardDump: { appenders: ['shardDump'], level: 'trace' },
+// statsDump: { appenders: ['statsDump'], level: 'trace' },
+
+// OFF	0
+// FATAL	100
+// ERROR	200
+// WARN	300
+// INFO	400
+// DEBUG	500
+// TRACE	600
+// ALL	Integer.MAX_VALUE
+
+/**
+ * The point of LogFlags it to gain max performance when we need to reduce logging, and be able to ajust this in a simple
+ * way when inside of a test.
+ *
+ * This does not not need to have a super amount of detail or permutations, because if logging is enabled to a medium amount
+ * for debugging there will not be much gains or performance to fine grained details.
+ *
+ * verbose flag is still usefull for heavy logs, and playback seems to beneift from levels, so we could expand as needed
+ */
+export type LogFlags = {
+  verbose: boolean
+  fatal: boolean
+  debug: boolean
+
+  playback_trace: boolean
+  playback_debug: boolean
+
+  net_trace: boolean
+  // main:boolean;
+  // main_error:boolean;
+  // main_debug:boolean;
+  // main_trace:boolean;
+
+  // playback:boolean;
+  // playback_verbose:boolean
+
+  // p2p:boolean;
+  // //p2p_info:boolean;
+
+  // snapshot:boolean;
+}
+
+export let logFlags: LogFlags
+
 class Logger {
+  backupLogFlags: LogFlags
+
   constructor(baseDir: string, config: Shardus.LogsConfiguration) {
     this.baseDir = baseDir
     this.config = config
     this.logDir = null
     this.log4Conf = null
     this._setupLogs()
+
+    logFlags = {
+      debug: true,
+      fatal: true,
+      verbose: true,
+
+      playback_trace: false,
+      playback_debug: false,
+      net_trace: false,
+      // main:true,
+      // main_error:true,
+      // main_debug:true,
+      // main_trace:true,
+
+      // playback:true,
+      // playback_verbose:true,
+
+      // p2p:true,
+
+      // snapshot:true,
+    }
   }
 
   // Checks if the configuration has the required components
@@ -89,13 +164,22 @@ class Logger {
     this._playbackTrace = ['TRACE'].includes(
       this._playbackLogger.level.levelStr
     )
+
+    logFlags.playback_trace = this._playbackTrace
+
     // @ts-ignore
     this._playbackDebug = ['DEBUG'].includes(
       this._playbackLogger.level.levelStr
     )
+
+    logFlags.playback_debug = this._playbackDebug
+
     if (this._playbackTrace || this._playbackDebug) {
       this.playbackLogEnabled = true
     }
+
+    this.setupLogControlValues()
+
     this._seenAddresses = {}
     this._shortStrings = {}
     this._playbackOwner_host = os.hostname()
@@ -107,7 +191,7 @@ class Logger {
 
   // Tells this module that the server is shutting down, returns a Promise that resolves when all logs have been written to file, sockets are closed, etc.
   shutdown() {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       log4js.shutdown(() => {
         resolve('done')
       })
@@ -175,7 +259,6 @@ class Logger {
   }
 
   playbackLog(from, to, type, endpoint, id, desc) {
-
     nestedCountersInstance.countEvent(type, endpoint)
 
     // only log desc if trace..
@@ -211,8 +294,47 @@ class Logger {
     this.playbackLog('', '', 'StateChange', newState, id, desc)
   }
 
-  playbackLogNote(noteCategory, id, desc=null) {
+  playbackLogNote(noteCategory, id, desc = null) {
     this.playbackLog('', '', 'Note', noteCategory, id, desc)
+  }
+
+  registerEndpoints(Context) {
+    Context.network.registerExternalGet('logs-fatals', (req, res) => {
+      for (const [key, value] of Object.entries(logFlags)) {
+        logFlags[key] = false
+      }
+      logFlags.fatal = true
+      res.end()
+    })
+    Context.network.registerExternalGet('logs-default', (req, res) => {
+      for (const [key, value] of Object.entries(logFlags)) {
+        logFlags[key] = this.backupLogFlags[key]
+      }
+      res.end()
+    })
+  }
+
+  setupLogControlValues() {
+    logFlags.fatal = true
+
+    let mainLogger = this.getLogger('main')
+    if (mainLogger && ['TRACE'].includes(mainLogger.level)) {
+      logFlags.verbose = true
+      logFlags.debug = true
+    } else if (mainLogger && ['debug'].includes(mainLogger.level)) {
+      logFlags.verbose = false
+      logFlags.debug = false
+    } else {
+      logFlags.verbose = false
+      logFlags.debug = false
+    }
+
+    let netLogger = this.getLogger('net')
+    if (netLogger && ['TRACE'].includes(netLogger.level)) {
+      logFlags.net_trace = true
+    }
+
+    this.backupLogFlags = utils.deepCopy(logFlags)
   }
 }
 
