@@ -8,6 +8,8 @@ import { profilerInstance } from '../utils/profiler'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 const stringify = require('fast-stable-stringify')
 const log4jsExtend = require('log4js-extend')
+import got from 'got'
+import { parse as parseUrl } from 'url'
 
 interface Logger {
   baseDir: string
@@ -284,14 +286,32 @@ class Logger {
     this.playbackLog('', '', 'Note', noteCategory, id, desc)
   }
 
-  registerEndpoints(Context) {
-    Context.network.registerExternalGet('logs-fatals', (req, res) => {
+
+  setFatalFlags(){
       for (const [key, value] of Object.entries(logFlags)) {
         logFlags[key] = false
       }
       logFlags.fatal = true
 
       logFlags.playback = false
+  }
+  setDefaultFlags(){
+    for (const [key, value] of Object.entries(logFlags)) {
+      logFlags[key] = this.backupLogFlags[key]
+    }
+
+    if (logFlags.playback_trace || logFlags.playback_debug) {
+      logFlags.playback = true
+    } else {
+      logFlags.playback = false
+    }
+  }
+
+
+  registerEndpoints(Context) {
+    Context.network.registerExternalGet('logs-fatals', (req, res) => {
+
+      this.setFatalFlags()
 
       for (const [key, value] of Object.entries(logFlags)) {
         res.write(`${key}: ${value}\n`)
@@ -300,36 +320,98 @@ class Logger {
       res.end()
     })
     Context.network.registerExternalGet('logs-default', (req, res) => {
-      for (const [key, value] of Object.entries(logFlags)) {
-        logFlags[key] = this.backupLogFlags[key]
-      }
-
-      if (logFlags.playback_trace || logFlags.playback_debug) {
-        logFlags.playback = true
-      } else {
-        logFlags.playback = false
-      }
+      this.setDefaultFlags()
 
       for (const [key, value] of Object.entries(logFlags)) {
         res.write(`${key}: ${value}\n`)
       }      
       res.end()
     })
+
+
+    //TODO DEBUG DO NOT USE IN LIVE NETWORK
+    Context.network.registerExternalGet('logs-default-all', (req, res) => {
+      this.setDefaultFlags()
+
+      try{
+        let activeNodes = Context.p2p.state.getActiveNodes(null)
+        if(activeNodes){
+          for(let node of activeNodes){
+            this._internalHackGet(`${node.externalIp}:${node.externalPort}/logs-default`)
+            res.write(`${node.externalIp}:${node.externalPort}/logs-default\n`)
+          }        
+        }
+
+        res.write(`sending default logs to all nodes\n`)        
+      } catch(e){
+        res.write(`${e}\n`) 
+      }
+
+      res.end()
+    })
+
+    //TODO DEBUG DO NOT USE IN LIVE NETWORK
+    Context.network.registerExternalGet('logs-fatals-all', (req, res) => {
+      this.setFatalFlags()
+      try{
+        let activeNodes = Context.p2p.state.getActiveNodes(null)
+        if(activeNodes){
+          for(let node of activeNodes){
+            this._internalHackGet(`${node.externalIp}:${node.externalPort}/logs-fatals`)
+            res.write(`${node.externalIp}:${node.externalPort}/logs-fatals\n`)
+          }        
+        }
+        res.write(`sending fatals logs to all nodes\n`)   
+      } catch(e){
+        res.write(`${e}\n`) 
+      }
+      res.end()
+    })    
+
+  }
+
+  _containsProtocol(url: string) {
+    if (!url.match('https?://*')) return false
+    return true
+  }
+  
+  _normalizeUrl(url: string) {
+    let normalized = url
+    if (!this._containsProtocol(url)) normalized = 'http://' + url
+    return normalized
+  }
+  async _internalHackGet(url:string){
+    let normalized = this._normalizeUrl(url)
+    let host = parseUrl(normalized, true)
+    try{
+      await got.get(host, {
+        timeout: 1000,   
+        retry: 0,  
+        json: false, // the whole reason for _internalHackGet was because we dont want the text response to mess things up
+                     //  and as a debug non shipping endpoint did not want to add optional parameters to http module
+      })      
+    } catch(e) {
+
+    }
+
   }
 
   setupLogControlValues() {
     logFlags.fatal = true
 
     let mainLogger = this.getLogger('main')
-    if (mainLogger && ['TRACE','trace'].includes(mainLogger.level)) {
+    // @ts-ignore
+    if (mainLogger && ['TRACE','trace'].includes(mainLogger.level.levelStr)) {
       logFlags.verbose = true
       logFlags.debug = true
       logFlags.info = true
-    } else if (mainLogger && ['DEBUG','debug'].includes(mainLogger.level)) {
+      // @ts-ignore
+    } else if (mainLogger && ['DEBUG','debug'].includes(mainLogger.level.levelStr)) {
       logFlags.verbose = false
       logFlags.debug = true
       logFlags.info = true
-    } else if (mainLogger && ['INFO','info'].includes(mainLogger.level)) {
+      // @ts-ignore
+    } else if (mainLogger && ['INFO','info'].includes(mainLogger.level.levelStr)) {
       logFlags.verbose = false
       logFlags.debug = false
       logFlags.info = true
@@ -340,13 +422,13 @@ class Logger {
       //would still get warn..
     }
 
-    let playbackLogger = this.getLogger('net')
+    let playbackLogger = this.getLogger('playback')
     logFlags.playback = false
     if(playbackLogger){
       // @ts-ignore
-      logFlags.playback_trace = ['TRACE'].includes(playbackLogger.level)
+      logFlags.playback_trace = ['TRACE'].includes(playbackLogger.level.levelStr)
       // @ts-ignore
-      logFlags.playback_debug = ['DEBUG'].includes(playbackLogger.level)
+      logFlags.playback_debug = ['DEBUG'].includes(playbackLogger.level.levelStr)
       if (logFlags.playback_trace || logFlags.playback_debug) {
         logFlags.playback = true
       } else {
@@ -355,12 +437,14 @@ class Logger {
     }
   
     let netLogger = this.getLogger('net')
-    if (netLogger && ['TRACE','trace'].includes(netLogger.level)) {
+    // @ts-ignore
+    if (netLogger && ['TRACE','trace'].includes(netLogger.level.levelStr)) {
       logFlags.net_trace = true
     }
 
     let p2pLogger = this.getLogger('p2p')
-    if (p2pLogger && ['FATAL','fatal'].includes(netLogger.level)) {
+    // @ts-ignore
+    if (p2pLogger && ['FATAL','fatal'].includes(netLogger.level.levelStr)) {
       logFlags.p2pNonFatal = false
     } else {
       logFlags.p2pNonFatal = true
