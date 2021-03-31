@@ -61,6 +61,7 @@ export type LogFlags = {
   fatal: boolean
   debug: boolean
   info: boolean // optional to use this. many info lines seem good to keep and minimal in stringify/frequency
+  error: boolean
 
   console: boolean
 
@@ -89,6 +90,7 @@ export let logFlags: LogFlags = {
   verbose: true,
   info: true,
   console: true,
+  error: true,
 
   playback: false,
   playback_trace: false,
@@ -117,6 +119,7 @@ class Logger {
     this.logDir = null
     this.log4Conf = null
     this._setupLogs()
+
   }
 
   // Checks if the configuration has the required components
@@ -387,7 +390,9 @@ class Logger {
       await got.get(host, {
         timeout: 1000,   
         retry: 0,  
-        json: false, // the whole reason for _internalHackGet was because we dont want the text response to mess things up
+        throwHttpErrors: false,
+        //parseJson: (text:string)=>{},
+        //json: false, // the whole reason for _internalHackGet was because we dont want the text response to mess things up
                      //  and as a debug non shipping endpoint did not want to add optional parameters to http module
       })      
     } catch(e) {
@@ -405,20 +410,30 @@ class Logger {
       logFlags.verbose = true
       logFlags.debug = true
       logFlags.info = true
+      logFlags.error = true
       // @ts-ignore
     } else if (mainLogger && ['DEBUG','debug'].includes(mainLogger.level.levelStr)) {
       logFlags.verbose = false
       logFlags.debug = true
       logFlags.info = true
+      logFlags.error = true
       // @ts-ignore
     } else if (mainLogger && ['INFO','info'].includes(mainLogger.level.levelStr)) {
       logFlags.verbose = false
       logFlags.debug = false
       logFlags.info = true
+      logFlags.error = true
+      // @ts-ignore
+    } else if (mainLogger && ['ERROR','error','WARN','warn'].includes(mainLogger.level.levelStr)) {
+      logFlags.verbose = false
+      logFlags.debug = false
+      logFlags.info = true
+      logFlags.error = true     
     } else {
       logFlags.verbose = false
       logFlags.debug = false
       logFlags.info = false
+      logFlags.error = false
       //would still get warn..
     }
 

@@ -260,7 +260,7 @@ export function startSnapshotting() {
               range.low,
               range.high
             )
-            snapshotLogger.debug(
+            if(logFlags.debug) snapshotLogger.debug(
               'Accounts in partition: ',
               partition,
               accountsInPartition
@@ -299,7 +299,7 @@ export function startSnapshotting() {
         }
 
         try {
-          snapshotLogger.debug(`
+          if(logFlags.debug) snapshotLogger.debug(`
         MEM ACCOUNTS C${shard.cycleNumber}:
         ${debugStrs.join('\n')}
         `)
@@ -314,8 +314,8 @@ export function startSnapshotting() {
         // partition hash for globalAccounts
         partitionHashes.set(-1, globalAccountHash)
 
-        snapshotLogger.debug('Global Accounts: ', globalAccounts)
-        snapshotLogger.debug('Partition Hashes: ', partitionHashes)
+        if(logFlags.debug) snapshotLogger.debug('Global Accounts: ', globalAccounts)
+        if(logFlags.debug) snapshotLogger.debug('Partition Hashes: ', partitionHashes)
 
         // process gossip from the queue for that cycle number
         const collector = partitionGossip.newCollector(shard)

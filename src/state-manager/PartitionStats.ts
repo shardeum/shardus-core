@@ -381,7 +381,7 @@ class PartitionStats {
       }
     }
     if (writeTofile) {
-      this.statsLogger.debug(`logs for cycle ${cycle}: ` + utils.stringifyReduce(statsDump))
+      if(logFlags.debug) this.statsLogger.debug(`logs for cycle ${cycle}: ` + utils.stringifyReduce(statsDump))
     }
 
     return statsDump
