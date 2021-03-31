@@ -141,7 +141,7 @@ class StateManager {
 
   extendedRepairLogging: boolean
 
-  canDataRepair: boolean // the old repair.. todo depricate further.
+  //canDataRepair: boolean // the old repair.. todo depricate further.
   lastActiveNodeCount: number
 
   doDataCleanup: boolean
@@ -293,18 +293,18 @@ class StateManager {
 
     this.startShardCalculations()
 
-    if (logFlags.playback) this.logger.playbackLogNote('canDataRepair', `0`, `canDataRepair: ${this.canDataRepair}  `)
+    //if (logFlags.playback) this.logger.playbackLogNote('canDataRepair', `0`, `canDataRepair: ${this.canDataRepair}  `)
   }
 
   configsInit() {
-    this.canDataRepair = false
-    // this controls the repair portion of data repair.
-    if (this.config && this.config.debug) {
-      this.canDataRepair = this.config.debug.canDataRepair
-      if (this.canDataRepair == null) {
-        this.canDataRepair = false
-      }
-    }
+    //this.canDataRepair = false
+    // this controls the OLD repair portion of data repair.
+    // if (this.config && this.config.debug) {
+    //   this.canDataRepair = this.config.debug.canDataRepair
+    //   if (this.canDataRepair == null) {
+    //     this.canDataRepair = false
+    //   }
+    // }
     this.debugNoTxVoting = false
     // this controls the repair portion of data repair.
     if (this.config && this.config.debug) {

@@ -588,7 +588,7 @@ declare namespace Shardus {
       /** The loseTxChance parameter is a Float specifying a percentage chance to randomly drop a transaction. */
       loseTxChance?: number
       /** The canDataRepair parameter is a boolean that allows dataRepair to be turned on/off by the application (true = on | false = off) */
-      canDataRepair?: boolean
+      //canDataRepair?: boolean
       /** Disable voting consensus for TXs (true = on | false = off) */
       debugNoTxVoting?: boolean
       /** ignore initial incomming receipt */
@@ -607,6 +607,8 @@ declare namespace Shardus {
       dumpAccountReportFromSQL?: boolean
       /** enable the built in profiling */
       profiler?: boolean
+      /** starts the node in fatals mode, use endpoints to turn back on default logs */
+      startInFatalsLogMode?: boolean
     }
     /** Options for the statistics module */
     statistics?: {

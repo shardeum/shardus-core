@@ -100,7 +100,10 @@ class Shardus extends EventEmitter {
     this.config = config
     Context.setConfig(this.config)
     logFlags.verbose = false
-    this.logger = new Logger(config.baseDir, logsConfig)
+
+    let startInFatalsLogMode = (config && config.debug && config.debug.startInFatalsLogMode)?true:false
+
+    this.logger = new Logger(config.baseDir, logsConfig, startInFatalsLogMode)
     Context.setLoggerContext(this.logger)
     Snapshot.initLogger()
 

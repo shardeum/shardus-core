@@ -149,6 +149,17 @@ export function reset() {
   seen = new Set()
 }
 
+export function getNodeRequestingJoin() : Types.P2PNode[] {
+  let nodes: Types.P2PNode[] = []
+  for(let request of requests){
+    if(request && request.nodeInfo){
+      nodes.push(request.nodeInfo)
+    }
+  }
+  return nodes
+}
+
+
 function calculateToAccept() {
   const desired = CycleChain.newest.desired
   const active = CycleChain.newest.active

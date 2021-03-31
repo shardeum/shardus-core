@@ -11,6 +11,8 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import * as Utils from './Utils'
 import {logFlags} from '../logger'
+import {getNodeRequestingJoin} from './Join'
+import { P2PNode } from './Types'
 
 /* p2p functions */
 
@@ -141,6 +143,10 @@ class State extends EventEmitter {
 
   getNodes() {
     return NodeList.nodes
+  }
+
+  getNodesRequestingJoin(): P2PNode[] {
+    return getNodeRequestingJoin()
   }
 
   getNodeByPubKey(pubkey) {

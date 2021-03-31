@@ -113,12 +113,12 @@ export let logFlags: LogFlags = {
 class Logger {
   backupLogFlags: LogFlags
 
-  constructor(baseDir: string, config: Shardus.LogsConfiguration) {
+  constructor(baseDir: string, config: Shardus.LogsConfiguration, startInFatalsLogMode:boolean) {
     this.baseDir = baseDir
     this.config = config
     this.logDir = null
     this.log4Conf = null
-    this._setupLogs()
+    this._setupLogs(startInFatalsLogMode)
 
   }
 
@@ -150,7 +150,7 @@ class Logger {
   }
 
   // Setup the logs with the provided configuration using the base directory provided for relative paths
-  _setupLogs() {
+  _setupLogs(startInFatalsLogMode:boolean) {
     const baseDir = this.baseDir
     const config = this.config
 
@@ -172,6 +172,11 @@ class Logger {
     this._playbackLogger = this.getLogger('playback')
 
     this.setupLogControlValues()
+
+    if(startInFatalsLogMode){
+      console.log('startInFatalsLogMode=true!')
+      this.setFatalFlags()
+    }
 
     this._seenAddresses = {}
     this._shortStrings = {}
@@ -337,9 +342,16 @@ class Logger {
       this.setDefaultFlags()
 
       try{
-        let activeNodes = Context.p2p.state.getActiveNodes(null)
+        let activeNodes = Context.p2p.state.getNodes()
         if(activeNodes){
-          for(let node of activeNodes){
+          for(let node of activeNodes.values()){
+            this._internalHackGet(`${node.externalIp}:${node.externalPort}/logs-default`)
+            res.write(`${node.externalIp}:${node.externalPort}/logs-default\n`)
+          }        
+        }
+        let joiningNodes = Context.p2p.state.getNodesRequestingJoin()
+        if(joiningNodes){
+          for(let node of joiningNodes.values()){
             this._internalHackGet(`${node.externalIp}:${node.externalPort}/logs-default`)
             res.write(`${node.externalIp}:${node.externalPort}/logs-default\n`)
           }        
@@ -357,12 +369,19 @@ class Logger {
     Context.network.registerExternalGet('logs-fatals-all', (req, res) => {
       this.setFatalFlags()
       try{
-        let activeNodes = Context.p2p.state.getActiveNodes(null)
+        let activeNodes = Context.p2p.state.getNodes()
         if(activeNodes){
-          for(let node of activeNodes){
+          for(let node of activeNodes.values()){
             this._internalHackGet(`${node.externalIp}:${node.externalPort}/logs-fatals`)
             res.write(`${node.externalIp}:${node.externalPort}/logs-fatals\n`)
           }        
+        }
+        let joiningNodes = Context.p2p.state.getNodesRequestingJoin()
+        if(joiningNodes){
+          for(let node of joiningNodes.values()){
+            this._internalHackGet(`${node.externalIp}:${node.externalPort}/logs-fatals`)
+            res.write(`${node.externalIp}:${node.externalPort}/logs-fatals\n`)
+          }  
         }
         res.write(`sending fatals logs to all nodes\n`)   
       } catch(e){
