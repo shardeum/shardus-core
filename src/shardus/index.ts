@@ -6,7 +6,7 @@ import Crypto from '../crypto'
 import Debug from '../debug'
 import ExitHandler from '../exit-handler'
 import LoadDetection from '../load-detection'
-import Logger, {logFlags} from '../logger'
+import Logger, {logFlags, LogFlags} from '../logger'
 import * as Network from '../network'
 import * as Context from '../p2p/Context'
 import * as CycleChain from '../p2p/CycleChain'
@@ -754,7 +754,19 @@ class Shardus extends EventEmitter {
    * @param  {...any} data The data to be logged in app.log file
    */
   log(...data: any[]) {
-    this.appLogger.debug(new Date(), ...data)
+    if(logFlags.debug){
+      this.appLogger.debug(new Date(), ...data)
+    }
+  }
+
+/**
+ * Gets log flags. 
+ * use these for to cull out slow log lines with stringify
+ * if you pass comma separated objects to dapp.log you do not need this.
+ * Also good for controlling console logging
+ */
+  getLogFlags(): LogFlags {
+    return logFlags
   }
 
   /**
