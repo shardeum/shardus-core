@@ -8,7 +8,7 @@ import Profiler from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
-import Logger from '../logger'
+import Logger, {logFlags} from '../logger'
 import ShardFunctions from './shardFunctions.js'
 import { time } from 'console'
 import StateManager from '.'
@@ -19,7 +19,7 @@ class PartitionObjects {
   crypto: Crypto
   config: Shardus.ShardusConfiguration
   profiler: Profiler
-  verboseLogs: boolean
+  
   logger: Logger
   p2p: P2P
   storage: Storage
@@ -52,8 +52,8 @@ class PartitionObjects {
 
   resetAndApplyPerPartition: boolean
 
-  constructor(stateManager: StateManager, verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
-    this.verboseLogs = verboseLogs
+  constructor(stateManager: StateManager,  profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
+    
     this.crypto = crypto
     this.app = app
     this.logger = logger
@@ -121,7 +121,7 @@ class PartitionObjects {
         this.nextCycleReportToSend = null // clear it because we sent it
         this.partitionReportDirty = false // not dirty anymore
 
-        this.mainLogger.debug('getPartitionReport: ' + `insync: ${this.stateManager.stateIsGood} ` + utils.stringifyReduce(response))
+        if (logFlags.debug) this.mainLogger.debug('getPartitionReport: ' + `insync: ${this.stateManager.stateIsGood} ` + utils.stringifyReduce(response))
       }
     }
     return response
@@ -165,7 +165,7 @@ class PartitionObjects {
 
     // need to get a list of compacted TXs in order. also addresses. timestamps?  make it so tools can process easily. (align timestamps view.)
 
-    this.mainLogger.debug('poMicroDebug: ' + header)
+    if (logFlags.debug) this.mainLogger.debug('poMicroDebug: ' + header)
   }
 
   /***
@@ -206,9 +206,9 @@ class PartitionObjects {
     //       // After receiving new partition results from peers, the node should be able to collect 50% or more peers giving the same partition result and build a partition receipt.
     //       // Any partition for which the node could not generate a partition receipt, should be logged as a fatal error.
     //       // Nodes save the partition receipt as proof that the transactions they have applied are correct and were also applied by peers.
-    //       // if (this.verboseLogs) this.mainLogger.debug( ` _repair post_partition_results`)
+    //       // if (logFlags.verbose) this.mainLogger.debug( ` _repair post_partition_results`)
     //       if (!payload) {
-    //         if (this.verboseLogs) this.mainLogger.error(` _repair post_partition_results: abort no payload`)
+    //         if (logFlags.verbose) this.mainLogger.error(` _repair post_partition_results: abort no payload`)
     //         return
     //       }
     //       let partitionResults = payload.partitionResults
@@ -220,17 +220,17 @@ class PartitionObjects {
     //       }
     //       let ourPartitionResults = this.ourPartitionResultsByCycle[cycleKey]
     //       if (!payload.partitionResults) {
-    //         if (this.verboseLogs) this.mainLogger.error(` _repair post_partition_results: abort, partitionResults == null`)
+    //         if (logFlags.verbose) this.mainLogger.error(` _repair post_partition_results: abort, partitionResults == null`)
     //         return
     //       }
     //       if (payload.partitionResults.length === 0) {
-    //         if (this.verboseLogs) this.mainLogger.error(` _repair post_partition_results: abort, partitionResults.length == 0`)
+    //         if (logFlags.verbose) this.mainLogger.error(` _repair post_partition_results: abort, partitionResults.length == 0`)
     //         return
     //       }
-    //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair post_partition_results payload: ${utils.stringifyReduce(payload)}`)
+    //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair post_partition_results payload: ${utils.stringifyReduce(payload)}`)
     //       if (!payload.partitionResults[0].sign) {
     //         // TODO security need to check that this is signed by a valid and correct node
-    //         if (this.verboseLogs) this.mainLogger.error(` _repair post_partition_results: abort, no sign object on partition`)
+    //         if (logFlags.verbose) this.mainLogger.error(` _repair post_partition_results: abort, no sign object on partition`)
     //         return
     //       }
     //       let owner = payload.partitionResults[0].sign.owner
@@ -249,12 +249,12 @@ class PartitionObjects {
     //         if (partitionResult) {
     //           responses.push(partitionResult)
     //         } else {
-    //           if (this.verboseLogs) this.mainLogger.error(` _repair post_partition_results partitionResult missing`)
+    //           if (logFlags.verbose) this.mainLogger.error(` _repair post_partition_results partitionResult missing`)
     //         }
-    //         if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair post_partition_results partition: ${partitionResult.Partition_id} responses.length ${responses.length}  cycle:${payload.Cycle_number}`)
+    //         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair post_partition_results partition: ${partitionResult.Partition_id} responses.length ${responses.length}  cycle:${payload.Cycle_number}`)
     //       }
     //       var partitionKeys = Object.keys(allResponsesByPartition)
-    //       if (this.verboseLogs) this.mainLogger.debug(` _repair post_partition_results partitionKeys: ${partitionKeys.length}`)
+    //       if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results partitionKeys: ${partitionKeys.length}`)
     //       // Loop through all the partition keys and check our progress for each partition covered
     //       // todo perf consider only looping through keys of partitions that changed from this update?
     //       for (let partitionKey of partitionKeys) {
@@ -266,15 +266,15 @@ class PartitionObjects {
     //           partitionId = responses[0].Partition_id
     //           repairTracker = this.stateManager.depricated._getRepairTrackerForCycle(payload.Cycle_number, partitionId)
     //           if (repairTracker.busy && repairTracker.awaitWinningHash === false) {
-    //             if (this.verboseLogs) this.mainLogger.debug(` _repair post_partition_results tracker busy. ${partitionKey} responses: ${responses.length}.  ${utils.stringifyReduce(repairTracker)}`)
+    //             if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results tracker busy. ${partitionKey} responses: ${responses.length}.  ${utils.stringifyReduce(repairTracker)}`)
     //             continue
     //           }
     //           if (repairTracker.repairsFullyComplete) {
-    //             if (this.verboseLogs) this.mainLogger.debug(` _repair post_partition_results repairsFullyComplete = true  cycle:${payload.Cycle_number}`)
+    //             if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results repairsFullyComplete = true  cycle:${payload.Cycle_number}`)
     //             continue
     //           }
     //         } else {
-    //           if (this.verboseLogs) this.mainLogger.debug(` _repair post_partition_results no responses. ${partitionKey} responses: ${responses.length}. repairTracker: ${utils.stringifyReduce(repairTracker)} responsesById: ${utils.stringifyReduce(allResponsesByPartition)}`)
+    //           if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results no responses. ${partitionKey} responses: ${responses.length}. repairTracker: ${utils.stringifyReduce(repairTracker)} responsesById: ${utils.stringifyReduce(allResponsesByPartition)}`)
     //           continue
     //         }
     //         let responsesRequired = 3
@@ -294,7 +294,7 @@ class PartitionObjects {
     //             }
     //           }
     //           if (ourResult == null) {
-    //             if (this.verboseLogs) this.mainLogger.debug(` _repair post_partition_results our result is not computed yet `)
+    //             if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results our result is not computed yet `)
     //             // Todo repair : may need to sleep or restart this computation later..
     //             return
     //           }
@@ -304,28 +304,28 @@ class PartitionObjects {
     //             if (repairTracker.awaitWinningHash) {
     //               if (topResult == null) {
     //                 // if we are awaitWinningHash then wait for a top result before we start repair process again
-    //                 if (this.verboseLogs) this.mainLogger.debug(` _repair awaitWinningHash:true but topResult == null so keep waiting `)
+    //                 if (logFlags.verbose) this.mainLogger.debug(` _repair awaitWinningHash:true but topResult == null so keep waiting `)
     //                 continue
     //               } else {
-    //                 if (this.verboseLogs) this.mainLogger.debug(` _repair awaitWinningHash:true and we have a top result so start reparing! `)
+    //                 if (logFlags.verbose) this.mainLogger.debug(` _repair awaitWinningHash:true and we have a top result so start reparing! `)
     //               }
     //             }
     //             if (this.resetAndApplyPerPartition === false && repairTracker.txRepairReady === true) {
-    //               if (this.verboseLogs) this.mainLogger.debug(` _repair txRepairReady:true bail here for some strange reason.. not sure aout this yet `)
+    //               if (logFlags.verbose) this.mainLogger.debug(` _repair txRepairReady:true bail here for some strange reason.. not sure aout this yet `)
     //               continue
     //             }
-    //             if (this.verboseLogs) this.mainLogger.debug(` _repair post_partition_results: tryGeneratePartitionReciept failed start repair process 1 ${utils.stringifyReduce(receiptResults)}`)
+    //             if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results: tryGeneratePartitionReciept failed start repair process 1 ${utils.stringifyReduce(receiptResults)}`)
     //             let cycle = this.p2p.state.getCycleByCounter(payload.Cycle_number)
     //             await this.startRepairProcess(cycle, topResult, partitionId, ourResult.Partition_hash)
     //           } else if (partitionReceipt) {
-    //             // if (this.verboseLogs) this.mainLogger.debug( ` _repair post_partition_results: success store partition receipt`)
-    //             if (this.verboseLogs) this.mainLogger.debug(` _repair post_partition_results 3 allFinished, final cycle: ${payload.Cycle_number} hash:${utils.stringifyReduce({ topResult })}`)
+    //             // if (logFlags.verbose) this.mainLogger.debug( ` _repair post_partition_results: success store partition receipt`)
+    //             if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results 3 allFinished, final cycle: ${payload.Cycle_number} hash:${utils.stringifyReduce({ topResult })}`)
     //             // do we ever send partition receipt yet?
     //             this.stateManager.storePartitionReceipt(payload.Cycle_number, partitionReceipt)
     //             this.stateManager.depricated.repairTrackerMarkFinished(repairTracker, 'post_partition_results')
     //           }
     //         } else {
-    //           if (this.verboseLogs) this.mainLogger.debug(` _repair post_partition_results not enough responses awaitWinningHash: ${repairTracker.awaitWinningHash} resp: ${responses.length}. required:${responsesRequired} repairTracker: ${utils.stringifyReduce(repairTracker)}`)
+    //           if (logFlags.verbose) this.mainLogger.debug(` _repair post_partition_results not enough responses awaitWinningHash: ${repairTracker.awaitWinningHash} resp: ${responses.length}. required:${responsesRequired} repairTracker: ${utils.stringifyReduce(repairTracker)}`)
     //         }
     //         // End of loop over partitions.  Continue looping if there are other partions that we need to check for completion.
     //       }
@@ -368,14 +368,14 @@ class PartitionObjects {
     //   //   // dont participate just yet.
     //   //   return
     //   // }
-    //   // if (this.verboseLogs) this.mainLogger.debug( ` _repair startSyncPartitions:cycle_q2_start cycle: ${lastCycle.counter}`)
+    //   // if (logFlags.verbose) this.mainLogger.debug( ` _repair startSyncPartitions:cycle_q2_start cycle: ${lastCycle.counter}`)
     //   // // this will take temp TXs and make sure they are stored in the correct place for us to generate partitions
     //   // this.processTempTXs(lastCycle)
     //   // // During the Q2 phase of a cycle, nodes compute the partition hash of the previous cycle for all the partitions covered by the node.
     //   // // Q2 was chosen so that any transactions submitted with a time stamp that falls in the previous quarter will have been processed and finalized. This could be changed to Q3 if we find that more time is needed.
     //   // this.generatePartitionObjects(lastCycle)
     //   // let receiptMapResults = this.generateReceiptMapResults(lastCycle)
-    //   // if(this.verboseLogs) this.mainLogger.debug( `receiptMapResults: ${stringify(receiptMapResults)}`)
+    //   // if(logFlags.verbose) this.mainLogger.debug( `receiptMapResults: ${stringify(receiptMapResults)}`)
     //   // let statsClump = this.partitionStats.getCoveredStatsPartitions(lastCycleShardValues)
     //   // //build partition hashes from previous full cycle
     //   // let mainHashResults:MainHashResults = null

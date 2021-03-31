@@ -8,7 +8,7 @@ import * as net from 'net'
 import { Sn } from 'shardus-net'
 import { promisify } from 'util'
 import * as httpModule from '../http'
-import Logger from '../logger'
+import Logger, {logFlags} from '../logger'
 import { config, defaultConfigs, logger } from '../p2p/Context'
 import * as utils from '../utils'
 import { profilerInstance } from '../utils/profiler'
@@ -62,12 +62,6 @@ export class NetworkClass extends EventEmitter {
     this.externalRoutes = []
     this.extServer = null
     this.intServer = null
-
-    this.verboseLogsNet = false
-    if (this.netLogger && ['TRACE'].includes(this.netLogger.level)) {
-      this.verboseLogsNet = true
-    }
-    // console.log('NETWORK LOGGING ' + this.verboseLogsNet + '  ' + this.netLogger.level.levelStr)
 
     this.InternalTellCounter = 1
     this.InternalAskCounter = 1
@@ -123,14 +117,14 @@ export class NetworkClass extends EventEmitter {
         profilerInstance.profileSectionStart(`net-internl-${route}`)
         routeName = route
         if (!route && payload && payload.isResponse) {
-          this.mainLogger.debug(
+          if (logFlags.debug) this.mainLogger.debug(
             'Received response data without any specified route',
             payload
           )
           return
         }
         if (!route) {
-          this.mainLogger.debug(
+          if (logFlags.debug) this.mainLogger.debug(
             'Network: ' +
               `Unable to read request, payload of received message: ${JSON.stringify(
                 data
@@ -146,7 +140,7 @@ export class NetworkClass extends EventEmitter {
           return
         }
         await handler(payload, respond)
-        if (this.verboseLogsNet) {
+        if (logFlags.net_trace) {
           this.netLogger.debug(
             'Internal\t' +
               JSON.stringify({
@@ -309,7 +303,7 @@ export class NetworkClass extends EventEmitter {
 
     const self = this
     let wrappedHandler = handler
-    if (this.logger.playbackLogEnabled) {
+    if (logFlags.playback) {
       wrappedHandler = function (req, res) {
         self.logger.playbackLog(
           req.hostname,
@@ -461,8 +455,10 @@ export async function init() {
     internalPort,
   }
 
-  mainLogger.info('This nodes ipInfo:')
-  mainLogger.info(JSON.stringify(ipInfo, null, 2))
+  if(logFlags.info) {
+    mainLogger.info('This nodes ipInfo:')
+    mainLogger.info(JSON.stringify(ipInfo, null, 2))    
+  }
 }
 
 function initNatClient() {
@@ -513,7 +509,7 @@ async function getNextExternalPort(ip: string) {
     const attempts = [{ enablePMP: false }, { enablePMP: true }]
 
     for (const opts of attempts) {
-      mainLogger.info(
+      if(logFlags.info) mainLogger.info(
         `Forwarding ${port} via ${opts.enablePMP ? 'PMP' : 'UPnP'}...`
       )
 
@@ -524,10 +520,10 @@ async function getNextExternalPort(ip: string) {
             opts
           )
         )
-        mainLogger.info('  Success!')
+        if(logFlags.info) mainLogger.info('  Success!')
         break
       } catch (err) {
-        mainLogger.info('  Error:', err.message)
+        if(logFlags.info) mainLogger.info('  Error:', err.message)
       }
     }
   }
@@ -542,10 +538,11 @@ async function getNextExternalPort(ip: string) {
 }
 
 async function wrapTest(test: ConnectTest) {
-  mainLogger.info(`Testing ${test.ip}...`)
+  if(logFlags.info) mainLogger.info(`Testing ${test.ip}...`)
 
-  test.once('port', (port) =>
-    mainLogger.info(`  Listening on ${port}. Connecting...`)
+  test.once('port', (port) => {
+    if(logFlags.info) mainLogger.info(`  Listening on ${port}. Connecting...`)
+  }
   )
 
   let result: [boolean, number]
@@ -553,9 +550,9 @@ async function wrapTest(test: ConnectTest) {
   try {
     const success = await test.start()
     result = [success, test.port]
-    mainLogger.info('  Success!')
+    if(logFlags.info) mainLogger.info('  Success!')
   } catch (err) {
-    mainLogger.info('  Failed:', err.message ? err.message : err)
+    if(logFlags.info) mainLogger.info('  Failed:', err.message ? err.message : err)
     result = [false, test.port]
   }
 

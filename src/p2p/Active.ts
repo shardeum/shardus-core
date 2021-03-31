@@ -8,6 +8,7 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import * as Types from './Types'
 import { validateTypes } from '../utils'
+import {logFlags} from '../logger'
 
 /** TYPES */
 
@@ -35,7 +36,7 @@ const gossipActiveRoute: Types.GossipHandler<SignedActiveRequest> = (
   payload,
   sender
 ) => {
-  info(`Got active request: ${JSON.stringify(payload)}`)
+  if(logFlags.p2pNonFatal) info(`Got active request: ${JSON.stringify(payload)}`)
   let err = ''
   err = validateTypes(payload, {nodeId:'s',status:'s',timestamp:'n',sign:'o'})
   if (err){ warn('bad input '+err); return }
@@ -167,7 +168,7 @@ export function sendRequests() {
     const activeTx = crypto.sign(queuedRequest)
     queuedRequest = undefined
 
-    info(`Gossiping active request: ${JSON.stringify(activeTx)}`)
+    if(logFlags.p2pNonFatal) info(`Gossiping active request: ${JSON.stringify(activeTx)}`)
     addActiveTx(activeTx)
     Comms.sendGossip('gossip-active', activeTx)
 

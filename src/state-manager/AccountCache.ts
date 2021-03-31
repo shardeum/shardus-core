@@ -8,7 +8,7 @@ import Profiler from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
-import Logger from '../logger'
+import Logger, {logFlags} from '../logger'
 import ShardFunctions from './shardFunctions.js'
 import { time } from 'console'
 
@@ -17,7 +17,7 @@ class AccountCache {
   crypto: Crypto
   config: Shardus.ShardusConfiguration
   profiler: Profiler
-  verboseLogs: boolean
+  
   logger: Logger
 
   mainLogger: any
@@ -35,8 +35,7 @@ class AccountCache {
 
   currentMainHashResults: MainHashResults
 
-  constructor(verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger, crypto: Crypto, config: Shardus.ShardusConfiguration) {
-    this.verboseLogs = verboseLogs
+  constructor( profiler: Profiler, app: Shardus.App, logger: Logger, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     this.crypto = crypto
     this.app = app
     this.logger = logger
@@ -382,7 +381,7 @@ class AccountCache {
 
   // currently a sync function, dont have correct buffers for async
   buildPartitionHashesForNode1(cycleShardData: CycleShardData): MainHashResults {
-    if (this.verboseLogs) this.mainLogger.debug(`accountsHashCache3 ${cycleShardData.cycleNumber}: ${utils.stringifyReduce(this.accountsHashCache3)}`)
+    if (logFlags.verbose) this.mainLogger.debug(`accountsHashCache3 ${cycleShardData.cycleNumber}: ${utils.stringifyReduce(this.accountsHashCache3)}`)
 
     this.accountsHashCache3.currentCalculationCycle = cycleShardData.cycleNumber
 
@@ -493,7 +492,7 @@ class AccountCache {
 
   // currently a sync function, dont have correct buffers for async
   buildPartitionHashesForNode(cycleShardData: CycleShardData): MainHashResults {
-    if (this.verboseLogs) this.mainLogger.debug(`accountsHashCache3 ${cycleShardData.cycleNumber}: ${utils.stringifyReduce(this.accountsHashCache3)}`)
+    if (logFlags.verbose) this.mainLogger.debug(`accountsHashCache3 ${cycleShardData.cycleNumber}: ${utils.stringifyReduce(this.accountsHashCache3)}`)
 
     this.accountsHashCache3.currentCalculationCycle = cycleShardData.cycleNumber
 

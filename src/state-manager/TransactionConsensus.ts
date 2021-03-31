@@ -8,7 +8,7 @@ import Profiler from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
-import Logger from '../logger'
+import Logger, {logFlags} from '../logger'
 import ShardFunctions from './shardFunctions.js'
 import { time } from 'console'
 import StateManager from '.'
@@ -18,7 +18,7 @@ class TransactionConsenus {
   crypto: Crypto
   config: Shardus.ShardusConfiguration
   profiler: Profiler
-  verboseLogs: boolean
+  
   logger: Logger
   p2p: P2P
   storage: Storage
@@ -30,8 +30,8 @@ class TransactionConsenus {
   statsLogger: any
   statemanager_fatal: (key: string, log: string) => void
 
-  constructor(stateManager: StateManager, verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
-    this.verboseLogs = verboseLogs
+  constructor(stateManager: StateManager,  profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
+    
     this.crypto = crypto
     this.app = app
     this.logger = logger
@@ -80,7 +80,7 @@ class TransactionConsenus {
           }
         }
   
-        if (this.stateManager.testFailChance(this.stateManager.ignoreRecieptChance, 'spread_appliedReceipt', utils.stringifyReduce(appliedReceipt.txid), '', this.verboseLogs) === true) {
+        if (this.stateManager.testFailChance(this.stateManager.ignoreRecieptChance, 'spread_appliedReceipt', utils.stringifyReduce(appliedReceipt.txid), '', logFlags.verbose) === true) {
           return
         }
   
@@ -90,7 +90,7 @@ class TransactionConsenus {
         let receiptNotNull = appliedReceipt != null
   
         if (queueEntry.recievedAppliedReceipt == null) {
-          this.mainLogger.debug(`spread_appliedReceipt update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`)
+          if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`)
   
           queueEntry.recievedAppliedReceipt = appliedReceipt
   
@@ -106,7 +106,7 @@ class TransactionConsenus {
           }
         } else {
           // we get here if the receipt has already been shared
-          this.mainLogger.debug(`spread_appliedReceipt skipped ${queueEntry.logID} receiptNotNull:${receiptNotNull} Already Shared`)
+          if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt skipped ${queueEntry.logID} receiptNotNull:${receiptNotNull} Already Shared`)
         }
       })
 
@@ -120,7 +120,7 @@ class TransactionConsenus {
    * @param queueEntry
    */
   async shareAppliedReceipt(queueEntry: QueueEntry) {
-    if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_shareAppliedReceipt', `${queueEntry.logID}`, `qId: ${queueEntry.entryID} `)
+    if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_shareAppliedReceipt', `${queueEntry.logID}`, `qId: ${queueEntry.entryID} `)
 
     let appliedReceipt = queueEntry.appliedReceipt
 
@@ -152,27 +152,27 @@ class TransactionConsenus {
     }
 
     if (queueEntry.ourVote == null) {
-      this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} ourVote == null`)
+      if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} ourVote == null`)
       return false
     }
 
     if (appliedReceipt != null) {
       if (appliedReceipt.result !== queueEntry.ourVote.transaction_result) {
-        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} ${appliedReceipt.result}, ${queueEntry.ourVote.transaction_result} appliedReceipt.result !== queueEntry.ourVote.transaction_result`)
+        if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} ${appliedReceipt.result}, ${queueEntry.ourVote.transaction_result} appliedReceipt.result !== queueEntry.ourVote.transaction_result`)
         return false
       }
       if (appliedReceipt.txid !== queueEntry.ourVote.txid) {
-        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.txid !== queueEntry.ourVote.txid`)
+        if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.txid !== queueEntry.ourVote.txid`)
         return false
       }
       if (appliedReceipt.appliedVotes.length === 0) {
-        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.appliedVotes.length == 0`)
+        if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.appliedVotes.length == 0`)
         return false
       }
 
       if (appliedReceipt.appliedVotes[0].cant_apply === true) {
         // TODO STATESHARDING4 NEGATIVECASE    need to figure out what to do here
-        this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.appliedVotes[0].cant_apply === true`)
+        if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.appliedVotes[0].cant_apply === true`)
         return false
       }
 
@@ -189,19 +189,19 @@ class TransactionConsenus {
           if (wrappedState.accountId === id) {
             found = true
             if (wrappedState.stateId !== hash) {
-              this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} state does not match id:${utils.stringifyReduce(id)} hash:${utils.stringifyReduce(wrappedState.stateId)} votehash:${utils.stringifyReduce(hash)}`)
+              if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} state does not match id:${utils.stringifyReduce(id)} hash:${utils.stringifyReduce(wrappedState.stateId)} votehash:${utils.stringifyReduce(hash)}`)
               return false
             }
           }
         }
         if (found === false) {
-          this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} state does not match missing id:${utils.stringifyReduce(id)} `)
+          if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} state does not match missing id:${utils.stringifyReduce(id)} `)
           return false
         }
       }
 
-      this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} Good Match`)
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('hasAppliedReceiptMatchingPreApply', `${queueEntry.logID}`, `  Good Match`)
+      if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} Good Match`)
+      if (logFlags.playback) this.logger.playbackLogNote('hasAppliedReceiptMatchingPreApply', `${queueEntry.logID}`, `  Good Match`)
     }
 
     return true
@@ -312,8 +312,8 @@ class TransactionConsenus {
       for(let accountID of uniqueAccounts){
         if (topHashByID[accountID].count < requiredVotes ) {
           tooFewVotes = true
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt: failed. requiredVotes${requiredVotes}  ${utils.stringifyReduce(topHashByID[accountID])}`)
-          this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed. requiredVotes:${requiredVotes}  ${utils.stringifyReduce(topHashByID[accountID])}`)
+          if (logFlags.playback) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt: failed. requiredVotes${requiredVotes}  ${utils.stringifyReduce(topHashByID[accountID])}`)
+          if (logFlags.info) this.mainLogger.info(`tryProduceReceipt canProduceReceipt: failed. requiredVotes:${requiredVotes}  ${utils.stringifyReduce(topHashByID[accountID])}`)
         }
       }
       if(tooFewVotes){
@@ -321,8 +321,8 @@ class TransactionConsenus {
       }
     }
 
-    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} requiredVotes${requiredVotes}`)
-    this.mainLogger.debug(`tryProduceReceipt canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} `)
+    if (logFlags.playback) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} requiredVotes${requiredVotes}`)
+    if (logFlags.debug) this.mainLogger.debug(`tryProduceReceipt canProduceReceipt: ${canProduceReceipt} passed: ${passed} passCount: ${passCount} failCount: ${failCount} `)
 
     let passingAccountVotesTotal = 0
     // Assemble the receipt from votes that are passing
@@ -367,7 +367,7 @@ class TransactionConsenus {
       // if a passing vote won then check all the hashes.
       // if (passed) {
       //   if (passingAccountVotesTotal < requiredVotes) {
-      //     if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal}`)
+      //     if (logFlags.playback) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal}`)
       //     this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal} `)
       //     return null
       //   }
@@ -376,12 +376,12 @@ class TransactionConsenus {
       // one last check to make sure we assembled enough votes.
       // this is needed because our hash counts could have added up but if a vote could still get discarded if any one of its account hashes are wrong
       if(passed && appliedReceipt.appliedVotes.length < requiredVotes) {
-        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt:  failed to produce enough votes. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal}`)
+        if (logFlags.playback) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt:  failed to produce enough votes. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal}`)
         this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed to produce enough votes: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal} `)
         return null
       }
 
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt: Success. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal} rc:${utils.stringifyReduce(appliedReceipt)}`)
+      if (logFlags.playback) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt: Success. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal} rc:${utils.stringifyReduce(appliedReceipt)}`)
 
       // recored our generated receipt to the queue entry
       queueEntry.appliedReceipt = appliedReceipt
@@ -402,7 +402,7 @@ class TransactionConsenus {
    * @param queueEntry
    */
   async createAndShareVote(queueEntry: QueueEntry) {
-    if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_createAndShareVote', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} `)
+    if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_createAndShareVote', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} `)
 
     // TODO STATESHARDING4 CHECK VOTES PER CONSENSUS GROUP
 
@@ -417,7 +417,7 @@ class TransactionConsenus {
     }
 
     if (queueEntry.debugFail_voteFlip === true) {
-      if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_createAndShareVote_voteFlip', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} `)
+      if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_createAndShareVote_voteFlip', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} `)
 
       ourVote.transaction_result = !ourVote.transaction_result
     }
@@ -468,8 +468,8 @@ class TransactionConsenus {
       // TODO STATESHARDING4 ENDPOINTS this needs to change from gossip to a tell
       //this.p2p.sendGossipIn('spread_appliedVote', ourVote, '', sender, consensusGroup)
 
-      this.mainLogger.debug(`createAndShareVote numNodes: ${consensusGroup.length} ourVote: ${utils.stringifyReduce(ourVote)} `)
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.id}`, `numNodes: ${consensusGroup.length} ourVote: ${utils.stringifyReduce(ourVote)} `)
+      if (logFlags.debug) this.mainLogger.debug(`createAndShareVote numNodes: ${consensusGroup.length} ourVote: ${utils.stringifyReduce(ourVote)} `)
+      if (logFlags.playback) this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.id}`, `numNodes: ${consensusGroup.length} ourVote: ${utils.stringifyReduce(ourVote)} `)
 
       // Filter nodes before we send tell()
       let filteredNodes = this.stateManager.filterValidNodesForInternalMessage(consensusGroup, 'createAndShareVote', true, true)
@@ -493,8 +493,8 @@ class TransactionConsenus {
   tryAppendVote(queueEntry: QueueEntry, vote: AppliedVote): boolean {
     let numVotes = queueEntry.collectedVotes.length
 
-    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tryAppendVote', `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVotes.length}`)
-    this.mainLogger.debug(`tryAppendVote collectedVotes: ${queueEntry.logID}   ${queueEntry.collectedVotes.length} `)
+    if (logFlags.playback) this.logger.playbackLogNote('tryAppendVote', `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVotes.length}`)
+    if (logFlags.debug) this.mainLogger.debug(`tryAppendVote collectedVotes: ${queueEntry.logID}   ${queueEntry.collectedVotes.length} `)
 
     // just add the vote if we dont have any yet
     if (numVotes === 0) {

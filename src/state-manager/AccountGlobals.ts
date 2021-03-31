@@ -8,7 +8,7 @@ import Profiler from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
-import Logger from '../logger'
+import Logger, {logFlags} from '../logger'
 import ShardFunctions from './shardFunctions.js'
 import { time } from 'console'
 import StateManager from '.'
@@ -18,7 +18,7 @@ class AccountGlobals {
   crypto: Crypto
   config: Shardus.ShardusConfiguration
   profiler: Profiler
-  verboseLogs: boolean
+  
   logger: Logger
   p2p: P2P
   storage: Storage
@@ -43,7 +43,7 @@ class AccountGlobals {
 
   constructor(
     stateManager: StateManager,
-    verboseLogs: boolean,
+    
     profiler: Profiler,
     app: Shardus.App,
     logger: Logger,
@@ -52,7 +52,7 @@ class AccountGlobals {
     crypto: Crypto,
     config: Shardus.ShardusConfiguration
   ) {
-    this.verboseLogs = verboseLogs
+
     this.crypto = crypto
     this.app = app
     this.logger = logger
@@ -142,7 +142,7 @@ class AccountGlobals {
     let result: Shardus.AccountsCopy | null = null
     let globalBackupList: Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
     if (globalBackupList == null || globalBackupList.length === 0) {
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalBackupList', `applyAllPreparedRepairs - missing value for ${accountId}`)
+      if (logFlags.playback) this.logger.playbackLogNote('globalBackupList', `applyAllPreparedRepairs - missing value for ${accountId}`)
       return null
     }
 
@@ -221,7 +221,7 @@ class AccountGlobals {
 
       temp.push(report.id)
     }
-    this.mainLogger.debug(`DATASYNC: getGlobalListEarly: ${temp}`)
+    if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getGlobalListEarly: ${temp}`)
 
     this.hasknownGlobals = true
   }

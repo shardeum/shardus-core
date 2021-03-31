@@ -9,7 +9,7 @@ import Profiler from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
-import Logger from '../logger'
+import Logger, {logFlags} from '../logger'
 import ShardFunctions from './shardFunctions.js'
 import { time } from 'console'
 import StateManager from '.'
@@ -22,7 +22,7 @@ class TransactionQueue {
   crypto: Crypto
   config: Shardus.ShardusConfiguration
   profiler: Profiler
-  verboseLogs: boolean
+  
   logger: Logger
   p2p: P2P
   storage: Storage
@@ -51,8 +51,8 @@ class TransactionQueue {
   archivedQueueEntryMaxCount: number
   newAcceptedTxQueueRunning: boolean //archivedQueueEntryMaxCount is a maximum amount of queue entries to store, usually we should never have this many stored since tx age will be used to clean up the list
 
-  constructor(stateManager: StateManager, verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
-    this.verboseLogs = verboseLogs
+  constructor(stateManager: StateManager,  profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
+    
     this.crypto = crypto
     this.app = app
     this.logger = logger
@@ -115,7 +115,7 @@ class TransactionQueue {
       for (let data of payload.stateList) {
         this.queueEntryAddData(queueEntry, data)
         if (queueEntry.state === 'syncing') {
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_sync_gotBroadcastData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
+          if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
         }
       }
     })
@@ -164,12 +164,12 @@ class TransactionQueue {
       let age = Date.now() - timestamp
       if (age > timeM * 0.9) {
         this.statemanager_fatal(`spread_tx_to_group_OldTx`, 'spread_tx_to_group cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
-        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_spread_tx_to_groupToOld', '', 'spread_tx_to_group working on older tx ' + timestamp + ' age: ' + age)
+        if (logFlags.playback) this.logger.playbackLogNote('shrd_spread_tx_to_groupToOld', '', 'spread_tx_to_group working on older tx ' + timestamp + ' age: ' + age)
         return
       }
       if (age < -1000) {
         this.statemanager_fatal(`spread_tx_to_group_tooFuture`, 'spread_tx_to_group cannot accept tx more than 1 second in future ' + timestamp + ' age: ' + age)
-        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_spread_tx_to_groupToFutrue', '', 'spread_tx_to_group tx too far in future' + timestamp + ' age: ' + age)
+        if (logFlags.playback) this.logger.playbackLogNote('shrd_spread_tx_to_groupToFutrue', '', 'spread_tx_to_group tx too far in future' + timestamp + ' age: ' + age)
         return
       }
 
@@ -256,11 +256,11 @@ class TransactionQueue {
         let accountEntry = tryGetAccountData(key)
         if (accountEntry.timestamp >= timestamp) {
           failedAgeCheck = true
-          if (this.verboseLogs) this.mainLogger.debug('testAccountTimesAndStateTable account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
+          if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
         }
       }
       if (failedAgeCheck) {
-        // if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountTimesAndStateTable accounts have future state ' + timestamp)
+        // if (logFlags.verbose) this.mainLogger.debug('DATASYNC: testAccountTimesAndStateTable accounts have future state ' + timestamp)
         return { success: false, hasStateTableData }
       }
 
@@ -278,10 +278,10 @@ class TransactionQueue {
           if (accountStates.length === 0 || accountStates[0].stateBefore !== sourceState) {
             if (accountStates[0].stateBefore === '0'.repeat(64)) {
               //sorta broken security hole.
-              if (this.verboseLogs) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + 'bypass state comparision if before state was 00000: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
+              if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + 'bypass state comparision if before state was 00000: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
             } else {
-              if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1')
-              if (this.verboseLogs) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1 stateId: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
+              if (logFlags.verbose) if (logFlags.console) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1')
+              if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1 stateId: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
               return { success: false, hasStateTableData }
             }
           }
@@ -298,16 +298,16 @@ class TransactionQueue {
               let accountEntry = tryGetAccountData(targetAddress)
 
               if (accountEntry == null) {
-                if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress))
-                if (this.verboseLogs) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ')
+                if (logFlags.verbose) if (logFlags.console) console.log('testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress))
+                if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ')
                 this.statemanager_fatal(`testAccountTimesAndStateTable_noEntry`, 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ') // todo: consider if this is just an error
                 // fail this because we already check if the before state was all zeroes
                 return { success: false, hasStateTableData }
               } else {
                 targetState = accountEntry.stateId
                 if (accountStates[0].stateBefore !== targetState) {
-                  if (this.verboseLogs) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2')
-                  if (this.verboseLogs) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2 stateId: ' + utils.makeShortHash(targetState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(targetAddress))
+                  if (logFlags.verbose) if (logFlags.console) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2')
+                  if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2 stateId: ' + utils.makeShortHash(targetState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(targetAddress))
                   return { success: false, hasStateTableData }
                 }
               }
@@ -354,11 +354,11 @@ class TransactionQueue {
         }
       }
 
-      if (this.verboseLogs) this.mainLogger.debug(`tryPreApplyTransaction  txid:${utils.stringifyReduce(acceptedTX.id)} ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
-      if (this.verboseLogs) this.mainLogger.debug(`tryPreApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
-      if (this.verboseLogs) this.mainLogger.debug(`tryPreApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
-      if (this.verboseLogs) this.mainLogger.debug(`tryPreApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
-      if (this.verboseLogs) this.mainLogger.debug(`tryPreApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
+      if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  txid:${utils.stringifyReduce(acceptedTX.id)} ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
+      if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
+      if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
+      if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+      if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
 
       if (repairing !== true) {
         // get a list of modified account keys that we will lock
@@ -369,21 +369,21 @@ class TransactionQueue {
         for (let accountID of targetKeys) {
           accountKeys.push(accountID)
         }
-        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` tryPreApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
+        if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` tryPreApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
         ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(accountKeys)
-        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` tryPreApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+        if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` tryPreApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
       }
 
       ourLockID = await this.stateManager.fifoLock('accountModification')
 
-      if (this.verboseLogs) console.log(`tryPreApplyTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
+      if (logFlags.verbose) if (logFlags.console) console.log(`tryPreApplyTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
       this.applySoftLock = true
 
       applyResponse = this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
       let { stateTableResults, accountData: _accountdata } = applyResponse
       accountDataList = _accountdata
 
-      if (this.verboseLogs) this.mainLogger.debug(`tryPreApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+      if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
 
       this.applySoftLock = false
     } catch (ex) {
@@ -397,7 +397,7 @@ class TransactionQueue {
         if (ourAccountLocks != null) {
           this.stateManager.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
         }
-        if (this.verboseLogs) this.mainLogger.debug(` tryPreApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+        if (logFlags.verbose) this.mainLogger.debug(` tryPreApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
       }
     }
 
@@ -428,11 +428,11 @@ class TransactionQueue {
         }
       }
 
-      if (this.verboseLogs) this.mainLogger.debug(`commitConsensedTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
-      if (this.verboseLogs) this.mainLogger.debug(`commitConsensedTransaction  filter: ${utils.stringifyReduce(filter)}`)
-      if (this.verboseLogs) this.mainLogger.debug(`commitConsensedTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
-      if (this.verboseLogs) this.mainLogger.debug(`commitConsensedTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
-      if (this.verboseLogs) this.mainLogger.debug(`commitConsensedTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
+      if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
+      if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  filter: ${utils.stringifyReduce(filter)}`)
+      if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
+      if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+      if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
 
       if (repairing !== true) {
         // get a list of modified account keys that we will lock
@@ -443,30 +443,30 @@ class TransactionQueue {
         for (let accountID of targetKeys) {
           accountKeys.push(accountID)
         }
-        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`commitConsensedTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
+        if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`commitConsensedTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
         ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(accountKeys)
-        if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`commitConsensedTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+        if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`commitConsensedTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
       }
 
       ourLockID = await this.stateManager.fifoLock('accountModification')
 
-      if (this.verboseLogs) console.log(`commitConsensedTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
-      // if (this.verboseLogs) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
+      if (logFlags.verbose) if (logFlags.console) console.log(`commitConsensedTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
+      // if (logFlags.verbose) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
       this.applySoftLock = true
 
       let { stateTableResults, accountData: _accountdata } = applyResponse
       accountDataList = _accountdata
 
-      if (this.verboseLogs) this.mainLogger.debug(`commitConsensedTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+      if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
 
       let note = `setAccountData: tx:${queueEntry.logID} in commitConsensedTransaction. `
 
       // wrappedStates are side effected for now
       savedSomething = await this.stateManager.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter, note)
 
-      if (this.verboseLogs) this.mainLogger.debug(`commitConsensedTransaction  savedSomething: ${savedSomething}`)
-      if (this.verboseLogs) this.mainLogger.debug(`commitConsensedTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
-      if (this.verboseLogs) this.mainLogger.debug(`commitConsensedTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
+      if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  savedSomething: ${savedSomething}`)
+      if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
+      if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
 
       this.applySoftLock = false
       // only write our state table data if we dont already have it in the db
@@ -476,8 +476,8 @@ class TransactionQueue {
           let wrappedRespose = wrappedStates[stateT.accountId]
           stateT.stateBefore = wrappedRespose.prevStateId
 
-          if (this.verboseLogs) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
-          if (this.verboseLogs) this.mainLogger.debug('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
+          if (logFlags.verbose) if (logFlags.console) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
+          if (logFlags.verbose) this.mainLogger.debug('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
         }
         await this.storage.addAccountStates(stateTableResults)
       }
@@ -491,7 +491,7 @@ class TransactionQueue {
       this.app.transactionReceiptPass(acceptedTX.data, wrappedStates, applyResponse)
     } catch (ex) {
       this.statemanager_fatal(`commitConsensedTransaction_ex`, 'commitConsensedTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      this.mainLogger.debug(`commitConsensedTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
+      if (logFlags.debug) this.mainLogger.debug(`commitConsensedTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
       if (applyResponse) {
         // && savedSomething){
         // TSConversion do we really want to record this?
@@ -508,7 +508,7 @@ class TransactionQueue {
         if (ourAccountLocks != null) {
           this.stateManager.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
         }
-        if (this.verboseLogs) this.mainLogger.debug(`commitConsensedTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+        if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
       }
     }
 
@@ -594,8 +594,8 @@ class TransactionQueue {
     let keysResponse = this.app.getKeyFromTransaction(tx)
     let { sourceKeys, targetKeys, timestamp, debugInfo } = keysResponse
 
-    if (this.verboseLogs) console.log('preApplyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
-    if (this.verboseLogs) this.mainLogger.debug('applyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
+    if (logFlags.verbose) if (logFlags.console) console.log('preApplyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
+    if (logFlags.verbose) this.mainLogger.debug('applyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
 
     let allkeys: string[] = []
     allkeys = allkeys.concat(sourceKeys)
@@ -603,7 +603,7 @@ class TransactionQueue {
 
     for (let key of allkeys) {
       if (wrappedStates[key] == null) {
-        if (this.verboseLogs) console.log(`preApplyAcceptedTransaction missing some account data. timestamp:${timestamp}  key: ${utils.makeShortHash(key)}  debuginfo:${debugInfo}`)
+        if (logFlags.verbose) if (logFlags.console) console.log(`preApplyAcceptedTransaction missing some account data. timestamp:${timestamp}  key: ${utils.makeShortHash(key)}  debuginfo:${debugInfo}`)
         return { applied: false, passed: false, applyResult: '', reason: 'missing some account data' }
       } else {
         let wrappedState = wrappedStates[key]
@@ -621,8 +621,8 @@ class TransactionQueue {
     let { success, hasStateTableData } = await this.testAccountTimesAndStateTable2(tx, wrappedStates)
 
     if (!success) {
-      if (this.verboseLogs) this.mainLogger.debug('preApplyAcceptedTransaction pretest failed: ' + timestamp)
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tx_preapply_rejected 1', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
+      if (logFlags.verbose) this.mainLogger.debug('preApplyAcceptedTransaction pretest failed: ' + timestamp)
+      if (logFlags.playback) this.logger.playbackLogNote('tx_preapply_rejected 1', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
       return { applied: false, passed: false, applyResult: '', reason: 'preApplyAcceptedTransaction pretest failed, TX rejected' }
     }
 
@@ -631,10 +631,10 @@ class TransactionQueue {
     let preApplyResult = await this.tryPreApplyTransaction(acceptedTX, hasStateTableData, false, filter, wrappedStates, localCachedData)
 
     if (preApplyResult) {
-      if (this.verboseLogs) this.mainLogger.debug('preApplyAcceptedTransaction SUCCEDED ' + timestamp)
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tx_preapplied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
+      if (logFlags.verbose) this.mainLogger.debug('preApplyAcceptedTransaction SUCCEDED ' + timestamp)
+      if (logFlags.playback) this.logger.playbackLogNote('tx_preapplied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
     } else {
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tx_preapply_rejected 3', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
+      if (logFlags.playback) this.logger.playbackLogNote('tx_preapply_rejected 3', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
     }
 
     return { applied: true, passed: preApplyResult.passed, applyResult: preApplyResult.applyResult, reason: 'apply result', applyResponse: preApplyResult.applyResponse }
@@ -654,7 +654,7 @@ class TransactionQueue {
         }
         txQueueEntry.homeNodes[key] = homeNode
         if (homeNode == null) {
-          if (this.verboseLogs) this.mainLogger.error(` routeAndQueueAcceptedTransaction: ${key} `)
+          if (logFlags.verbose) this.mainLogger.error(` routeAndQueueAcceptedTransaction: ${key} `)
           throw new Error(`updateHomeInformation homeNode == null ${txQueueEntry}`)
         }
 
@@ -671,7 +671,7 @@ class TransactionQueue {
         let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
         let relationString = ShardFunctions.getNodeRelation(homeNode, this.stateManager.currentCycleShardData.ourNode.id)
         // route_to_home_node
-        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_homeNodeSummary', `${txId}`, `account:${utils.makeShortHash(key)} rel:${relationString} summary:${utils.stringifyReduce(summaryObject)}`)
+        if (logFlags.playback) this.logger.playbackLogNote('shrd_homeNodeSummary', `${txId}`, `account:${utils.makeShortHash(key)} rel:${relationString} summary:${utils.stringifyReduce(summaryObject)}`)
       }
 
       txQueueEntry.hasShardInfo = true
@@ -694,13 +694,13 @@ class TransactionQueue {
     //   // this.preTXQueue.push(acceptedTX)
     //   return 'notReady' // it is too early to care about the tx
     // }
-    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('routeAndQueueAcceptedTransaction-debug', '', `sendGossip:${sendGossip} globalModification:${globalModification} noConsensus:${noConsensus} this.readyforTXs:${this.stateManager.accountSync.readyforTXs} hasshardData:${this.stateManager.currentCycleShardData != null} acceptedTx:${utils.stringifyReduce(acceptedTx)} `)
+    if (logFlags.playback) this.logger.playbackLogNote('routeAndQueueAcceptedTransaction-debug', '', `sendGossip:${sendGossip} globalModification:${globalModification} noConsensus:${noConsensus} this.readyforTXs:${this.stateManager.accountSync.readyforTXs} hasshardData:${this.stateManager.currentCycleShardData != null} acceptedTx:${utils.stringifyReduce(acceptedTx)} `)
     if (this.stateManager.accountSync.readyforTXs === false) {
-      if (this.verboseLogs) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: this.readyforTXs === false`)
+      if (logFlags.verbose) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: this.readyforTXs === false`)
       return 'notReady' // it is too early to care about the tx
     }
     if (this.stateManager.currentCycleShardData == null) {
-      if (this.verboseLogs) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: this.stateManager.currentCycleShardData == null`)
+      if (logFlags.verbose) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: this.stateManager.currentCycleShardData == null`)
       return 'notReady'
     }
 
@@ -708,7 +708,7 @@ class TransactionQueue {
       this.profiler.profileSectionStart('enqueue')
 
       if (this.stateManager.accountGlobals.hasknownGlobals == false) {
-        if (this.verboseLogs) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: hasknownGlobals == false`)
+        if (logFlags.verbose) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: hasknownGlobals == false`)
         return 'notReady'
       }
 
@@ -779,7 +779,7 @@ class TransactionQueue {
       //   let rand = Math.random()
       //   if (this.config.debug.loseTxChance > rand) {
       //     if (this.app.canDebugDropTx(acceptedTx.data)) {
-      //       if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tx_dropForTest', txId, 'dropping tx ' + timestamp)
+      //       if (logFlags.playback ) this.logger.playbackLogNote('tx_dropForTest', txId, 'dropping tx ' + timestamp)
       //       return 'lost'
       //     }
       //   }
@@ -788,11 +788,11 @@ class TransactionQueue {
       this.stateManager.debugTXHistory[txQueueEntry.logID] = 'enteredQueue'
 
       if (this.app.canDebugDropTx(acceptedTx.data)) {
-        if (this.stateManager.testFailChance(this.stateManager.loseTxChance, 'loseTxChance', txQueueEntry.logID, '', this.verboseLogs) === true) {
+        if (this.stateManager.testFailChance(this.stateManager.loseTxChance, 'loseTxChance', txQueueEntry.logID, '', logFlags.verbose) === true) {
           return 'lost'
         }
 
-        if (this.stateManager.testFailChance(this.stateManager.voteFlipChance, 'voteFlipChance', txQueueEntry.logID, '', this.verboseLogs) === true) {
+        if (this.stateManager.testFailChance(this.stateManager.voteFlipChance, 'voteFlipChance', txQueueEntry.logID, '', logFlags.verbose) === true) {
           txQueueEntry.debugFail_voteFlip = true
         }
       }
@@ -802,7 +802,7 @@ class TransactionQueue {
       //   if (this.config.debug.loseTxChance > rand) {
       //     if (this.app.canDebugDropTx(acceptedTx.data)) {
       //       this.mainLogger.error('tx_failReceiptTest fail vote tx  ' + txId + ' ' + timestamp)
-      //       if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tx_failReceiptTest', txId, 'fail vote tx ' + timestamp)
+      //       if (logFlags.playback ) this.logger.playbackLogNote('tx_failReceiptTest', txId, 'fail vote tx ' + timestamp)
       //       //return 'lost'
       //       txQueueEntry.debugFail_voteFlip = true
       //     }
@@ -817,13 +817,13 @@ class TransactionQueue {
         if (age > this.stateManager.queueSitTime * 0.9) {
           this.statemanager_fatal(`routeAndQueueAcceptedTransaction_olderTX`, 'routeAndQueueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
           // TODO consider throwing this out.  right now it is just a warning
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_oldQueueInsertion', '', 'routeAndQueueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
+          if (logFlags.playback) this.logger.playbackLogNote('shrd_oldQueueInsertion', '', 'routeAndQueueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
         }
         let keyHash: StringBoolObjectMap = {}
         for (let key of txQueueEntry.txKeys.allKeys) {
           if (key == null) {
             // throw new Error(`routeAndQueueAcceptedTransaction key == null ${key}`)
-            if (this.verboseLogs) this.mainLogger.error(`routeAndQueueAcceptedTransaction key == null ${timestamp} not putting tx in queue.`)
+            if (logFlags.verbose) this.mainLogger.error(`routeAndQueueAcceptedTransaction key == null ${timestamp} not putting tx in queue.`)
             return false
           }
 
@@ -836,18 +836,18 @@ class TransactionQueue {
         // calculate information needed for receiptmap
         txQueueEntry.cycleToRecordOn = this.stateManager.getCycleNumberFromTimestamp(timestamp)
         if (txQueueEntry.cycleToRecordOn < 0) {
-          if (this.verboseLogs) this.mainLogger.error(`routeAndQueueAcceptedTransaction failed to calculate cycle ${timestamp} error code:${txQueueEntry.cycleToRecordOn}`)
+          if (logFlags.verbose) this.mainLogger.error(`routeAndQueueAcceptedTransaction failed to calculate cycle ${timestamp} error code:${txQueueEntry.cycleToRecordOn}`)
           return false
         }
 
-        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueInsertion_start', txQueueEntry.logID, `${txQueueEntry.logID} ${utils.stringifyReduce(txQueueEntry.txKeys)} cycleToRecordOn:${txQueueEntry.cycleToRecordOn}`)
+        if (logFlags.playback) this.logger.playbackLogNote('shrd_queueInsertion_start', txQueueEntry.logID, `${txQueueEntry.logID} ${utils.stringifyReduce(txQueueEntry.txKeys)} cycleToRecordOn:${txQueueEntry.cycleToRecordOn}`)
 
         // Look at our keys and log which are known global accounts.  Set global accounts for keys if this is a globalModification TX
         for (let key of txQueueEntry.uniqueKeys) {
           if (globalModification === true) {
             // TODO: globalaccounts
             if (this.stateManager.accountGlobals.globalAccountMap.has(key)) {
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - has account:${utils.stringifyReduce(key)}`)
+              if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - has account:${utils.stringifyReduce(key)}`)
               // indicate that we will have global data in this transaction!
               // I think we do not need to test that here afterall.
             } else {
@@ -855,7 +855,7 @@ class TransactionQueue {
               //is setting this here too soon?
               //it should be that p2p has already checked the receipt before calling shardus.push with global=true
               this.stateManager.accountGlobals.globalAccountMap.set(key, null)
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - set account:${utils.stringifyReduce(key)}`)
+              if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - set account:${utils.stringifyReduce(key)}`)
             }
           }
         }
@@ -873,7 +873,7 @@ class TransactionQueue {
             syncTracker.queueEntries.push(txQueueEntry) // same tx may get pushed in multiple times. that's ok.
             txQueueEntry.syncKeys.push(key) // used later to instruct what local data we should JIT load
             txQueueEntry.localKeys[key] = true // used for the filter
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.logID}`, `${txQueueEntry.logID} qId: ${txQueueEntry.entryID} account:${utils.stringifyReduce(key)}`)
+            if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.logID}`, `${txQueueEntry.logID} qId: ${txQueueEntry.entryID} account:${utils.stringifyReduce(key)}`)
           }
         }
 
@@ -915,7 +915,7 @@ class TransactionQueue {
                 this.stateManager.debugNodeGroup(txId, timestamp, `share to neighbors`, transactionGroup)
                 this.p2p.sendGossipIn('spread_tx_to_group', acceptedTx, '', sender, transactionGroup)
               }
-              // if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
+              // if (logFlags.playback ) this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
             } catch (ex) {
               this.statemanager_fatal(`txQueueEntry_ex`, 'txQueueEntry: ' + utils.stringifyReduce(txQueueEntry))
             }
@@ -924,20 +924,20 @@ class TransactionQueue {
           if (txQueueEntry.didSync === false) {
             // see if our node shard data covers any of the accounts?
             if (txQueueEntry.ourNodeInTransactionGroup === false && txQueueEntry.globalModification === false) {
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_notInTxGroup', `${txQueueEntry.logID}`, ``)
+              if (logFlags.playback) this.logger.playbackLogNote('shrd_notInTxGroup', `${txQueueEntry.logID}`, ``)
               return 'out of range' // we are done, not involved!!!
             } else {
               // If we have syncing neighbors forward this TX to them
               if (this.stateManager.currentCycleShardData.hasSyncingNeighbors === true) {
                 // only send non global modification TXs
                 if (txQueueEntry.globalModification === false) {
-                  if (this.verboseLogs) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: spread_tx_to_group ${txQueueEntry.logID}`)
-                  if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_sync_tx', `${txQueueEntry.logID}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(this.stateManager.currentCycleShardData.syncingNeighborsTxGroup.map((x) => x.id))}`)
+                  if (logFlags.verbose) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: spread_tx_to_group ${txQueueEntry.logID}`)
+                  if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_tx', `${txQueueEntry.logID}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(this.stateManager.currentCycleShardData.syncingNeighborsTxGroup.map((x) => x.id))}`)
 
                   this.stateManager.debugNodeGroup(txId, timestamp, `share to syncing neighbors`, this.stateManager.currentCycleShardData.syncingNeighborsTxGroup)
                   this.p2p.sendGossipAll('spread_tx_to_group', acceptedTx, '', sender, this.stateManager.currentCycleShardData.syncingNeighborsTxGroup)
                 } else {
-                  if (this.verboseLogs) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: bugfix detected. avoid forwarding txs where globalModification == true ${txQueueEntry.logID}`)
+                  if (logFlags.verbose) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: bugfix detected. avoid forwarding txs where globalModification == true ${txQueueEntry.logID}`)
                 }
               }
             }
@@ -949,11 +949,11 @@ class TransactionQueue {
         this.newAcceptedTxQueueTempInjest.push(txQueueEntry)
         this.newAcceptedTxQueueTempInjestByID.set(txQueueEntry.acceptedTx.id, txQueueEntry)
 
-        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_txPreQueued', `${txQueueEntry.logID}`, `${txQueueEntry.logID} gm:${txQueueEntry.globalModification}`)
+        if (logFlags.playback) this.logger.playbackLogNote('shrd_txPreQueued', `${txQueueEntry.logID}`, `${txQueueEntry.logID} gm:${txQueueEntry.globalModification}`)
         // start the queue if needed
         this.stateManager.tryStartAcceptedQueue()
       } catch (error) {
-        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${txQueueEntry.logID} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)}`)
+        if (logFlags.playback) this.logger.playbackLogNote('shrd_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${txQueueEntry.logID} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)}`)
         this.statemanager_fatal(`routeAndQueueAcceptedTransaction_ex`, 'routeAndQueueAcceptedTransaction failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
         throw new Error(error)
       }
@@ -1062,7 +1062,7 @@ class TransactionQueue {
       delete data.localCache
     }
 
-    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_addData', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `key ${utils.makeShortHash(data.accountId)} hash: ${utils.makeShortHash(data.stateId)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}  ${queueEntry.acceptedTx.timestamp}`)
+    if (logFlags.playback) this.logger.playbackLogNote('shrd_addData', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `key ${utils.makeShortHash(data.accountId)} hash: ${utils.makeShortHash(data.stateId)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}  ${queueEntry.acceptedTx.timestamp}`)
   }
 
   queueEntryHasAllData(queueEntry: QueueEntry) {
@@ -1104,7 +1104,7 @@ class TransactionQueue {
       }
     }
 
-    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_start', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
+    if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_start', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
 
     // consensus group should have all the data.. may need to correct this later
     let consensusGroup = this.queueEntryGetConsensusGroup(queueEntry)
@@ -1169,7 +1169,7 @@ class TransactionQueue {
           }
 
           let relationString = ShardFunctions.getNodeRelation(homeNodeShardData, this.stateManager.currentCycleShardData.ourNode.id)
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
+          if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
 
           // Node Precheck!
           if (this.stateManager.isNodeValidForInternalMessage(node.id, 'queueEntryRequestMissingData', true, true) === false) {
@@ -1183,15 +1183,15 @@ class TransactionQueue {
           let result: RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx', message)
 
           if (result == null) {
-            if (this.verboseLogs) {
+            if (logFlags.verbose) {
               this.mainLogger.error('ASK FAIL request_state_for_tx')
             }
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+            if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
             continue
           }
           if (result.success !== true) {
             this.mainLogger.error('ASK FAIL queueEntryRequestMissingData 9')
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry2', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+            if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry2', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
             continue
           }
           let dataCountReturned = 0
@@ -1209,7 +1209,7 @@ class TransactionQueue {
             // queueEntry.state = 'failed to get data'
           }
 
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
+          if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
 
           // queueEntry.homeNodes[key] = null
           for (let key2 of allKeys) {
@@ -1244,7 +1244,7 @@ class TransactionQueue {
 
     queueEntry.requestingReceipt = true
 
-    if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_start', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID}`)
+    if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_start', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID}`)
 
     let consensusGroup = this.queueEntryGetConsensusGroup(queueEntry)
 
@@ -1285,7 +1285,7 @@ class TransactionQueue {
         }
 
         let relationString = ShardFunctions.getNodeRelation(homeNodeShardData, this.stateManager.currentCycleShardData.ourNode.id)
-        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+        if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_ask', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
 
         // Node Precheck!
         if (this.stateManager.isNodeValidForInternalMessage(node.id, 'queueEntryRequestMissingReceipt', true, true) === false) {
@@ -1299,10 +1299,10 @@ class TransactionQueue {
         let result: RequestReceiptForTxResp = await this.p2p.ask(node, 'request_receipt_for_tx', message) // not sure if we should await this.
 
         if (result == null) {
-          if (this.verboseLogs) {
+          if (logFlags.verbose) {
             this.mainLogger.error(`ASK FAIL request_receipt_for_tx ${triesLeft} ${utils.makeShortHash(node.id)}`)
           }
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+          if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
           continue
         }
         if (result.success !== true) {
@@ -1310,7 +1310,7 @@ class TransactionQueue {
           continue
         }
 
-        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} result: ${utils.stringifyReduce(result)}`)
+        if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} result: ${utils.stringifyReduce(result)}`)
 
         if (result.success === true && result.receipt != null) {
           queueEntry.recievedAppliedReceipt = result.receipt
@@ -1362,7 +1362,7 @@ class TransactionQueue {
       let homeNode = queueEntry.homeNodes[key]
       // txGroup = Array.concat(txGroup, homeNode.nodeThatStoreOurParitionFull)
       if (homeNode == null) {
-        if (this.verboseLogs) this.mainLogger.debug('queueEntryGetTransactionGroup homenode:null')
+        if (logFlags.verbose) this.mainLogger.debug('queueEntryGetTransactionGroup homenode:null')
       }
       if (homeNode.extendedData === false) {
         ShardFunctions.computeExtendedNodePartitionData(this.stateManager.currentCycleShardData.shardGlobals, this.stateManager.currentCycleShardData.nodeShardDataMap, this.stateManager.currentCycleShardData.parititionShardDataMap, homeNode, this.stateManager.currentCycleShardData.activeNodes)
@@ -1373,7 +1373,7 @@ class TransactionQueue {
       // If this is not a global TX then skip tracking of nodes for global accounts used as a reference.
       if (queueEntry.globalModification === false) {
         if (this.stateManager.accountGlobals.isGlobalAccount(key) === true) {
-          if (this.verboseLogs) this.mainLogger.debug(`queueEntryGetTransactionGroup skipping: ${utils.makeShortHash(key)} tx: ${utils.makeShortHash(queueEntry.acceptedTx.id)}`)
+          if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetTransactionGroup skipping: ${utils.makeShortHash(key)} tx: ${utils.makeShortHash(queueEntry.acceptedTx.id)}`)
           continue
         } else {
           hasNonGlobalKeys = true
@@ -1423,7 +1423,7 @@ class TransactionQueue {
     queueEntry.ourNodeInTransactionGroup = true
     if (uniqueNodes[this.stateManager.currentCycleShardData.ourNode.id] == null) {
       queueEntry.ourNodeInTransactionGroup = false
-      if (this.verboseLogs) this.mainLogger.debug(`queueEntryGetTransactionGroup not involved: hasNonG:${hasNonGlobalKeys} tx ${utils.makeShortHash(queueEntry.acceptedTx.id)}`)
+      if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetTransactionGroup not involved: hasNonG:${hasNonGlobalKeys} tx ${utils.makeShortHash(queueEntry.acceptedTx.id)}`)
     }
 
     // make sure our node is included: needed for gossip! - although we may not care about the data!
@@ -1482,7 +1482,7 @@ class TransactionQueue {
     for (let key of queueEntry.uniqueKeys) {
       let homeNode = queueEntry.homeNodes[key]
       if (homeNode == null) {
-        if (this.verboseLogs) this.mainLogger.debug('queueEntryGetConsensusGroup homenode:null')
+        if (logFlags.verbose) this.mainLogger.debug('queueEntryGetConsensusGroup homenode:null')
       }
       if (homeNode.extendedData === false) {
         ShardFunctions.computeExtendedNodePartitionData(this.stateManager.currentCycleShardData.shardGlobals, this.stateManager.currentCycleShardData.nodeShardDataMap, this.stateManager.currentCycleShardData.parititionShardDataMap, homeNode, this.stateManager.currentCycleShardData.activeNodes)
@@ -1492,7 +1492,7 @@ class TransactionQueue {
       // If this is not a global TX then skip tracking of nodes for global accounts used as a reference.
       if (queueEntry.globalModification === false) {
         if (this.stateManager.accountGlobals.isGlobalAccount(key) === true) {
-          if (this.verboseLogs) this.mainLogger.debug(`queueEntryGetConsensusGroup skipping: ${utils.makeShortHash(key)} tx: ${utils.makeShortHash(queueEntry.acceptedTx.id)}`)
+          if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetConsensusGroup skipping: ${utils.makeShortHash(key)} tx: ${utils.makeShortHash(queueEntry.acceptedTx.id)}`)
           continue
         } else {
           hasNonGlobalKeys = true
@@ -1509,7 +1509,7 @@ class TransactionQueue {
     queueEntry.ourNodeInConsensusGroup = true
     if (uniqueNodes[this.stateManager.currentCycleShardData.ourNode.id] == null) {
       queueEntry.ourNodeInConsensusGroup = false
-      if (this.verboseLogs) this.mainLogger.debug(`queueEntryGetConsensusGroup not involved: hasNonG:${hasNonGlobalKeys} tx ${utils.makeShortHash(queueEntry.acceptedTx.id)}`)
+      if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetConsensusGroup not involved: hasNonG:${hasNonGlobalKeys} tx ${utils.makeShortHash(queueEntry.acceptedTx.id)}`)
     }
 
     // make sure our node is included: needed for gossip! - although we may not care about the data!
@@ -1576,16 +1576,16 @@ class TransactionQueue {
       if (this.stateManager.accountGlobals.globalAccountMap.has(key)) {
         hasKey = true
         isGlobalKey = true
-        if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalAccountMap', `tellCorrespondingNodes - has`)
+        if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', `tellCorrespondingNodes - has`)
       }
 
       if (hasKey === false) {
         if (loggedPartition === false) {
           loggedPartition = true
-          if (this.verboseLogs) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false: ${utils.stringifyReduce(homeNode.nodeThatStoreOurParitionFull.map((v) => v.id))}`)
-          if (this.verboseLogs) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false: full: ${utils.stringifyReduce(homeNode.nodeThatStoreOurParitionFull)}`)
+          if (logFlags.verbose) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false: ${utils.stringifyReduce(homeNode.nodeThatStoreOurParitionFull.map((v) => v.id))}`)
+          if (logFlags.verbose) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false: full: ${utils.stringifyReduce(homeNode.nodeThatStoreOurParitionFull)}`)
         }
-        if (this.verboseLogs) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false  key: ${utils.stringifyReduce(key)}`)
+        if (logFlags.verbose) this.mainLogger.debug(`tellCorrespondingNodes hasKey=false  key: ${utils.stringifyReduce(key)}`)
       }
 
       if (hasKey) {
@@ -1613,7 +1613,7 @@ class TransactionQueue {
       }
     }
     if (queueEntry.globalModification === true) {
-      if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('tellCorrespondingNodes', `tellCorrespondingNodes - globalModification = true, not telling other nodes`)
+      if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodes', `tellCorrespondingNodes - globalModification = true, not telling other nodes`)
       return
     }
 
@@ -1677,7 +1677,7 @@ class TransactionQueue {
             if (correspondingAccNodes.length > 0) {
               let remoteRelation = ShardFunctions.getNodeRelation(remoteHomeNode, this.stateManager.currentCycleShardData.ourNode.id)
               let localRelation = ShardFunctions.getNodeRelation(localHomeNode, this.stateManager.currentCycleShardData.ourNode.id)
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_tellCorrespondingNodes', `${queueEntry.acceptedTx.id}`, `remoteRel: ${remoteRelation} localrel: ${localRelation} qId: ${queueEntry.entryID} AccountBeingShared: ${utils.makeShortHash(key)} EdgeNodes:${utils.stringifyReduce(edgeNodeIds)} ConsesusNodes${utils.stringifyReduce(consensusNodeIds)}`)
+              if (logFlags.playback) this.logger.playbackLogNote('shrd_tellCorrespondingNodes', `${queueEntry.acceptedTx.id}`, `remoteRel: ${remoteRelation} localrel: ${localRelation} qId: ${queueEntry.entryID} AccountBeingShared: ${utils.makeShortHash(key)} EdgeNodes:${utils.stringifyReduce(edgeNodeIds)} ConsesusNodes${utils.stringifyReduce(consensusNodeIds)}`)
 
               // Filter nodes before we send tell()
               let filteredNodes = this.stateManager.filterValidNodesForInternalMessage(correspondingAccNodes, 'tellCorrespondingNodes', true, true)
@@ -1761,7 +1761,6 @@ class TransactionQueue {
       let currentTime = Date.now() // when to update this?
 
       let app = this.app
-      let verboseLogs = this.verboseLogs
 
       // process any new queue entries that were added to the temporary list
       if (this.newAcceptedTxQueueTempInjest.length > 0) {
@@ -1784,12 +1783,12 @@ class TransactionQueue {
             // IT turns out the correct thing to check is didSync flag only report errors if we did not wait on this TX while syncing
             if (txQueueEntry.didSync == false) {
               this.statemanager_fatal(`processAcceptedTxQueue_oldTX.9`, 'processAcceptedTxQueue cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld1', `${utils.makeShortHash(txQueueEntry.acceptedTx.id)}`, 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
+              if (logFlags.playback) this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld1', `${utils.makeShortHash(txQueueEntry.acceptedTx.id)}`, 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
               //txQueueEntry.waitForReceiptOnly = true
             }
           }
           if (age > timeM) {
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld2', `${utils.makeShortHash(txQueueEntry.acceptedTx.id)}`, 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
+            if (logFlags.playback) this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld2', `${utils.makeShortHash(txQueueEntry.acceptedTx.id)}`, 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
             txQueueEntry.waitForReceiptOnly = true
             txQueueEntry.state = 'consensing'
           }
@@ -1799,7 +1798,7 @@ class TransactionQueue {
           this.newAcceptedTxQueue.splice(index + 1, 0, txQueueEntry)
           this.newAcceptedTxQueueByID.set(txQueueEntry.acceptedTx.id, txQueueEntry)
 
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${txQueueEntry.logID} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)} indexInserted: ${index + 1}`)
+          if (logFlags.playback) this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${txQueueEntry.logID} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)} indexInserted: ${index + 1}`)
           this.stateManager.eventEmitter.emit('txQueued', acceptedTx.receipt.txHash)
         }
         this.newAcceptedTxQueueTempInjest = []
@@ -1832,7 +1831,7 @@ class TransactionQueue {
 
         if (localRestartCounter < this.queueRestartCounter && lastLog !== this.queueRestartCounter) {
           lastLog = this.queueRestartCounter
-          if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('queueRestart_error', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  qrstGlobal:${this.queueRestartCounter}}`)
+          if (logFlags.playback) this.logger.playbackLogNote('queueRestart_error', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  qrstGlobal:${this.queueRestartCounter}}`)
         }
         // // fail the message if older than m3
         // if (queueEntry.hasAll === false && txAge > timeM3) {
@@ -1856,8 +1855,8 @@ class TransactionQueue {
             queueEntry.state = 'expired'
             this.removeFromQueue(queueEntry, currentIndex)
             this.statemanager_fatal(`txExpired1`, `txExpired txAge > timeM3 * 20 && queueEntry.didSync == true. ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+            if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+            if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
             nestedCountersInstance.countEvent('txExpired', 'txExpired txAge > timeM3 didSync == false')
             continue
           }
@@ -1867,8 +1866,8 @@ class TransactionQueue {
             queueEntry.state = 'expired'
             this.removeFromQueue(queueEntry, currentIndex)
             this.statemanager_fatal(`txExpired2`, `txExpired txAge > timeM3 * 20 && queueEntry.didSync == true. ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 2  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 2: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+            if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 2  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
+            if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 2: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
             nestedCountersInstance.countEvent('txExpired', 'txExpired txAge > timeM3 * 20 && queueEntry.didSync == true. ')
             continue
           }
@@ -1878,8 +1877,8 @@ class TransactionQueue {
             queueEntry.state = 'expired'
             this.removeFromQueue(queueEntry, currentIndex)
             this.statemanager_fatal(`txExpired3`, `txExpired txAge > timeM3 && queueEntry.requestingReceiptFailed` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 3 requestingReceiptFailed  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+            if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 3 requestingReceiptFailed  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
+            if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
             nestedCountersInstance.countEvent('txExpired', 'txExpired txAge > timeM3 && queueEntry.requestingReceiptFailed ')
             continue
           }
@@ -1894,8 +1893,8 @@ class TransactionQueue {
           // Checking at m2.5 allows the network a chance at a receipt existing
           if (txAge > timeM2_5 && queueEntry.didSync === true && queueEntry.requestingReceiptFailed === false) {
             if (queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null) {
-              if (verboseLogs) this.mainLogger.error(`didSync: txAge > timeM2_5 => ask for receipt now ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txMissingReceipt1', `txAge > timeM2_5 ${shortID}`, `syncNeedsReceipt ${shortID}`)
+              if (logFlags.verbose) this.mainLogger.error(`didSync: txAge > timeM2_5 => ask for receipt now ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+              if (logFlags.playback) this.logger.playbackLogNote('txMissingReceipt1', `txAge > timeM2_5 ${shortID}`, `syncNeedsReceipt ${shortID}`)
               this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
               this.queueEntryRequestMissingReceipt(queueEntry)
               nestedCountersInstance.countEvent('txMissingReceipt', 'didSync txAge > timeM2_5 => ask for receipt now ')
@@ -1906,8 +1905,8 @@ class TransactionQueue {
           // have not seen a receipt yet?
           if (txAge > timeM2_5 && queueEntry.didSync === false && queueEntry.requestingReceiptFailed === false) {
             if (queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null) {
-              if (verboseLogs) this.mainLogger.error(`txAge > timeM2_5 => ask for receipt now: ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
-              if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txMissingReceipt2', `txAge > timeM2_5 ${shortID}`, `txMissingReceipt ${shortID}`)
+              if (logFlags.verbose) this.mainLogger.error(`txAge > timeM2_5 => ask for receipt now: ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+              if (logFlags.playback) this.logger.playbackLogNote('txMissingReceipt2', `txAge > timeM2_5 ${shortID}`, `txMissingReceipt ${shortID}`)
               this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
               this.queueEntryRequestMissingReceipt(queueEntry)
               nestedCountersInstance.countEvent('txMissingReceipt', 'txAge > timeM2_5 => ask for receipt now ')
@@ -1921,8 +1920,8 @@ class TransactionQueue {
             queueEntry.state = 'expired'
             this.removeFromQueue(queueEntry, currentIndex)
             this.statemanager_fatal(`txExpired4`, `Still on inital syncing.  txExpired txAge > timeM3 * 10. ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 4  ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 4: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+            if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 4  ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+            if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 4: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
             nestedCountersInstance.countEvent('txExpired', 'txExpired txAge > timeM3 * 10. ')
             continue
           }
@@ -1932,8 +1931,8 @@ class TransactionQueue {
         if (txAge > timeM2_5 && queueEntry.m2TimeoutReached === false && queueEntry.globalModification === false) {
           // no receipt yet, and state not committing
           if (queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null && queueEntry.state != 'commiting') {
-            if (verboseLogs) this.mainLogger.error(`Wait for reciept only: txAge > timeM2_5 txid:${shortID} `)
-            if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('txMissingReceipt3', `${shortID}`, `processAcceptedTxQueue ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+            if (logFlags.verbose) this.mainLogger.error(`Wait for reciept only: txAge > timeM2_5 txid:${shortID} `)
+            if (logFlags.playback) this.logger.playbackLogNote('txMissingReceipt3', `${shortID}`, `processAcceptedTxQueue ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
             nestedCountersInstance.countEvent('txMissingReceipt', `Wait for reciept only: txAge > timeM2_5 state:${queueEntry.state}`)
             queueEntry.waitForReceiptOnly = true
             queueEntry.m2TimeoutReached = true
@@ -1975,10 +1974,10 @@ class TransactionQueue {
               try {
                 //if(queueEntry.globalModification === false) {
                 await this.tellCorrespondingNodes(queueEntry)
-                if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_processing', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  values: ${this.processQueue_debugAccountData(queueEntry, app)}`)
+                if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_processing', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  values: ${this.processQueue_debugAccountData(queueEntry, app)}`)
                 //}
               } catch (ex) {
-                this.mainLogger.debug('processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+                if (logFlags.debug) this.mainLogger.debug('processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
                 this.statemanager_fatal(`processAcceptedTxQueue2_ex`, 'processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
               } finally {
                 queueEntry.state = 'awaiting data'
@@ -2002,7 +2001,7 @@ class TransactionQueue {
               this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
               if (this.queueEntryHasAllData(queueEntry) === true) {
                 // I think this can't happen
-                if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_hadDataAfterall', `${shortID}`, `This is kind of an error, and should not happen`)
+                if (logFlags.playback) this.logger.playbackLogNote('shrd_hadDataAfterall', `${shortID}`, `This is kind of an error, and should not happen`)
                 continue
               }
 
@@ -2020,7 +2019,7 @@ class TransactionQueue {
                 // TODO STATESHARDING4 should we await this.  I think no since this waits on outside nodes to respond
                 this.queueEntryRequestMissingData(queueEntry)
               } catch (ex) {
-                this.mainLogger.debug('processAcceptedTxQueue2 queueEntryRequestMissingData:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+                if (logFlags.debug) this.mainLogger.debug('processAcceptedTxQueue2 queueEntryRequestMissingData:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
                 this.statemanager_fatal(`processAcceptedTxQueue2_missingData`, 'processAcceptedTxQueue2 queueEntryRequestMissingData:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
               }
             } else if (queueEntry.hasAll) {
@@ -2028,15 +2027,15 @@ class TransactionQueue {
                 this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
 
                 // As soon as we have all the data we preApply it and then send out a vote
-                if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_preApplyTx', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${this.processQueue_debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+                if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_preApplyTx', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${this.processQueue_debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
 
                 // TODO sync related need to reconsider how to set this up again
                 // if (queueEntry.didSync) {
-                //   if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_consensing', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
+                //   if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_consensing', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
                 //   // if we did sync it is time to JIT query local data.  alternatively could have other nodes send us this data, but that could be very high bandwidth.
                 //   for (let key of queueEntry.syncKeys) {
                 //     let wrappedState = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
-                //     if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)} hash:${wrappedState.stateId}`)
+                //     if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)} hash:${wrappedState.stateId}`)
                 //     queueEntry.localCachedData[key] = wrappedState.localCache
                 //   }
                 // }
@@ -2064,7 +2063,7 @@ class TransactionQueue {
                   //   // clearAccountsSeen(seenAccounts, queueEntry)
                   //   // if (!edgeFailDetected && acceptedTXCount > 0) {
                   //   //   edgeFailDetected = true
-                  //   //   if (this.verboseLogs) this.mainLogger.debug( `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+                  //   //   if (logFlags.verbose) this.mainLogger.debug( `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
                   //   //   this.fatalLogger.fatal( `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`) // todo: consider if this is just an error
                   //   // }
                   // }
@@ -2076,9 +2075,9 @@ class TransactionQueue {
                     //Broadcast our vote
                     if (queueEntry.noConsensus === true) {
                       // not sure about how to share or generate an applied receipt though for a no consensus step
-                      if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_preApplyTx_noConsensus', `${shortID}`, ``)
+                      if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_preApplyTx_noConsensus', `${shortID}`, ``)
 
-                      this.mainLogger.debug(`processAcceptedTxQueue2 noConsensus : ${queueEntry.logID} `)
+                      if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 noConsensus : ${queueEntry.logID} `)
 
                       queueEntry.state = 'commiting'
 
@@ -2087,8 +2086,8 @@ class TransactionQueue {
                       //   //Send a special receipt because this is a set command.
                       // }
                     } else {
-                      if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_preApplyTx_createAndShareVote', `${shortID}`, ``)
-                      this.mainLogger.debug(`processAcceptedTxQueue2 createAndShareVote : ${queueEntry.logID} `)
+                      if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_preApplyTx_createAndShareVote', `${shortID}`, ``)
+                      if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 createAndShareVote : ${queueEntry.logID} `)
                       await this.stateManager.transactionConsensus.createAndShareVote(queueEntry)
                     }
                   } else {
@@ -2097,10 +2096,10 @@ class TransactionQueue {
                     queueEntry.state = 'consensing'
                   }
                 } catch (ex) {
-                  this.mainLogger.debug('processAcceptedTxQueue2 preApplyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+                  if (logFlags.debug) this.mainLogger.debug('processAcceptedTxQueue2 preApplyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
                   this.statemanager_fatal(`processAcceptedTxQueue2b_ex`, 'processAcceptedTxQueue2 preApplyAcceptedTransaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
                 } finally {
-                  if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_preapplyFinish', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${this.processQueue_debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+                  if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_preapplyFinish', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${this.processQueue_debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
                 }
               }
               this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
@@ -2112,18 +2111,18 @@ class TransactionQueue {
 
               let didNotMatchReceipt = false
 
-              this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`)
+              if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`)
               let result = this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
               if (result != null) {
                 if (this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, result)) {
-                  if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_consensingComplete_madeReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
+                  if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_madeReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
 
                   // Broadcast the receipt
                   await this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)
                   queueEntry.state = 'commiting'
                   continue
                 } else {
-                  if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch1', `${shortID}`, `qId: ${queueEntry.entryID}  `)
+                  if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch1', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                   didNotMatchReceipt = true
                   queueEntry.appliedReceiptForRepair = result
                 }
@@ -2132,11 +2131,11 @@ class TransactionQueue {
               // if we got a reciept while waiting see if we should use it
               if (hasReceivedApplyReceipt) {
                 if (this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, queueEntry.recievedAppliedReceipt)) {
-                  if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${shortID}`, `qId: ${queueEntry.entryID} `)
+                  if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${shortID}`, `qId: ${queueEntry.entryID} `)
                   queueEntry.state = 'commiting'
                   continue
                 } else {
-                  if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch2', `${shortID}`, `qId: ${queueEntry.entryID}  `)
+                  if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch2', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                   didNotMatchReceipt = true
                   queueEntry.appliedReceiptForRepair = queueEntry.recievedAppliedReceipt
                 }
@@ -2146,7 +2145,7 @@ class TransactionQueue {
 
               // we got a receipt but did not match it.
               if (didNotMatchReceipt === true) {
-                if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_consensingComplete_didNotMatchReceipt', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} `)
+                if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_didNotMatchReceipt', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} `)
                 queueEntry.repairFinished = false
                 if (queueEntry.appliedReceiptForRepair.result === true) {
                   // need to start repair process and wait
@@ -2166,7 +2165,7 @@ class TransactionQueue {
 
             // at this point we are just waiting to see if we applied the data and repaired correctlyl
             if (queueEntry.repairFinished === true) {
-              if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_awaitRepair_repairFinished', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} `)
+              if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitRepair_repairFinished', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} `)
               this.removeFromQueue(queueEntry, currentIndex)
               if (queueEntry.appliedReceiptForRepair.result === true) {
                 queueEntry.state = 'pass'
@@ -2181,18 +2180,18 @@ class TransactionQueue {
               this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
 
               // TODO STATESHARDING4 Check if we have already commited the data from a receipt we saw earlier
-              this.mainLogger.debug(`processAcceptedTxQueue2 commiting : ${queueEntry.logID} `)
-              if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_commitingTx', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${this.processQueue_debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+              if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 commiting : ${queueEntry.logID} `)
+              if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_commitingTx', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${this.processQueue_debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
 
-              // if (this.verboseLogs) this.mainLogger.debug( ` processAcceptedTxQueue2. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
+              // if (logFlags.verbose) this.mainLogger.debug( ` processAcceptedTxQueue2. ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp}`)
 
               // TODO STATESHARDING4 SYNC related need to reconsider how to set this up again
               // if (queueEntry.didSync) {
-              //   if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_commiting', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
+              //   if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_commiting', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}`)
               //   // if we did sync it is time to JIT query local data.  alternatively could have other nodes send us this data, but that could be very high bandwidth.
               //   for (let key of queueEntry.syncKeys) {
               //     let wrappedState = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
-              //     if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)} hash:${wrappedState.stateId}`)
+              //     if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_getLocalData', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID}  key:${utils.makeShortHash(key)} hash:${wrappedState.stateId}`)
               //     queueEntry.localCachedData[key] = wrappedState.localCache
               //   }
               // }
@@ -2223,7 +2222,7 @@ class TransactionQueue {
                   canCommitTX = false
                 }
 
-                if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_commitingTx', `${shortID}`, `canCommitTX: ${canCommitTX} `)
+                if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_commitingTx', `${shortID}`, `canCommitTX: ${canCommitTX} `)
                 if (canCommitTX) {
                   // this.mainLogger.debug(` processAcceptedTxQueue2. applyAcceptedTransaction ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp} queuerestarts: ${localRestartCounter} queueLen: ${this.newAcceptedTxQueue.length}`)
                   let filter: AccountFilter = {}
@@ -2264,7 +2263,7 @@ class TransactionQueue {
                   this.app.transactionReceiptFail(queueEntry.acceptedTx.data, wrappedStates, applyReponse)
                 }
               } catch (ex) {
-                this.mainLogger.debug('processAcceptedTxQueue2 commiting Transaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+                if (logFlags.debug) this.mainLogger.debug('processAcceptedTxQueue2 commiting Transaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
                 this.statemanager_fatal(`processAcceptedTxQueue2b_ex`, 'processAcceptedTxQueue2 commiting Transaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
               } finally {
                 this.processQueue_clearAccountsSeen(seenAccounts, queueEntry)
@@ -2277,7 +2276,7 @@ class TransactionQueue {
                   } else {
                     queueEntry.state = 'fail'
                   }
-                  this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : noConsensus:${queueEntry.state} ${queueEntry.logID} `)
+                  if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : noConsensus:${queueEntry.state} ${queueEntry.logID} `)
                 } else if (queueEntry.appliedReceipt != null) {
                   // the final state of the queue entry will be pass or fail based on the receipt
                   if (queueEntry.appliedReceipt.result === true) {
@@ -2285,7 +2284,7 @@ class TransactionQueue {
                   } else {
                     queueEntry.state = 'fail'
                   }
-                  this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : Recpt:${queueEntry.state} ${queueEntry.logID} `)
+                  if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : Recpt:${queueEntry.state} ${queueEntry.logID} `)
                 } else if (queueEntry.recievedAppliedReceipt != null) {
                   // the final state of the queue entry will be pass or fail based on the receipt
                   if (queueEntry.recievedAppliedReceipt.result === true) {
@@ -2293,14 +2292,14 @@ class TransactionQueue {
                   } else {
                     queueEntry.state = 'fail'
                   }
-                  this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : recvRecpt:${queueEntry.state} ${queueEntry.logID} `)
+                  if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 commiting finished : recvRecpt:${queueEntry.state} ${queueEntry.logID} `)
                 } else {
                   queueEntry.state = 'fail'
 
                   this.mainLogger.error(`processAcceptedTxQueue2 commiting finished : no receipt ${queueEntry.logID} `)
                 }
 
-                if (this.verboseLogs) if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('shrd_commitingTxFinished', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${this.processQueue_debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+                if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_commitingTxFinished', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${this.processQueue_debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
               }
 
               // TODO STATESHARDING4 SYNC related.. need to consider how we will re activate this
@@ -2320,7 +2319,7 @@ class TransactionQueue {
               //   // send data to syncing neighbors.
               //   if (this.stateManager.currentCycleShardData.syncingNeighbors.length > 0) {
               //     let message = { stateList: dataToSend, txid: queueEntry.acceptedTx.id }
-              //     if (this.logger.playbackLogEnabled ) this.logger.playbackLogNote('shrd_sync_dataTell', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} AccountBeingShared: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)} txid: ${utils.makeShortHash(message.txid)} nodes:${utils.stringifyReduce(this.stateManager.currentCycleShardData.syncingNeighbors.map(x => x.id))}`)
+              //     if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_dataTell', `${queueEntry.acceptedTx.id}`, ` qId: ${queueEntry.entryID} AccountBeingShared: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)} txid: ${utils.makeShortHash(message.txid)} nodes:${utils.stringifyReduce(this.stateManager.currentCycleShardData.syncingNeighbors.map(x => x.id))}`)
               //     this.p2p.tell(this.stateManager.currentCycleShardData.syncingNeighbors, 'broadcast_state', message)
               //   }
               // }
@@ -2329,7 +2328,7 @@ class TransactionQueue {
             ///////////////////////////////////////////////--canceled--////////////////////////////////////////////////////////////
             this.processQueue_clearAccountsSeen(seenAccounts, queueEntry)
             this.removeFromQueue(queueEntry, currentIndex)
-            this.mainLogger.debug(`processAcceptedTxQueue2 canceled : ${queueEntry.logID} `)
+            if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 canceled : ${queueEntry.logID} `)
           }
         } finally {
           this.profiler.profileSectionEnd(`process-${pushedProfilerTag}`)
@@ -2404,7 +2403,7 @@ class TransactionQueue {
   
   processQueue_debugAccountData(queueEntry: QueueEntry, app: Shardus.App): string {
     let debugStr = ''
-    //if (verboseLogs) { //this function is always verbose
+    //if (logFlags.verbose) { //this function is always verbose
     if (queueEntry.uniqueKeys == null) {
       //TSConversion double check if this needs extra logging
       return utils.makeShortHash(queueEntry.acceptedTx.id) + ' uniqueKeys empty error'

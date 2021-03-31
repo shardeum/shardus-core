@@ -1,5 +1,7 @@
 const http = require('../http')
 
+let {logFlags} = require('../logger')
+
 class P2PArchivers {
   constructor(logger, p2p, state, crypto) {
     this.mainLogger = logger.getLogger('main')
@@ -13,7 +15,7 @@ class P2PArchivers {
   }
 
   logDebug(msg) {
-    this.mainLogger.debug('P2PArchivers: ' + msg)
+    if (logFlags.debug) this.mainLogger.debug('P2PArchivers: ' + msg)
   }
 
   logError(msg) {

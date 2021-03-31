@@ -5,7 +5,7 @@ import fs from 'fs'
 import path from 'path'
 import * as Sequelize from 'sequelize'
 import * as utils from '../utils'
-import Logger from '../logger'
+import Logger, {logFlags} from '../logger'
 
 const Op = Sequelize.Op
 var Sqlite3 = require('better-sqlite3')
@@ -67,12 +67,12 @@ class BetterSqlite3Storage {
         let type = value.type
         if (!type) {
           type = value
-          // console.log(' TYPE MISSING!!!! ' + key)
+          // if (logFlags.console) console.log(' TYPE MISSING!!!! ' + key)
         }
         if (type.toString() === Sequelize.JSON.toString()) {
           modelData.isColumnJSON[key] = true
           modelData.JSONkeys.push(key)
-          // console.log(`JSON column: ${key}`)
+          // if (logFlags.console) console.log(`JSON column: ${key}`)
         } else {
           modelData.isColumnJSON[key] = false
         }
@@ -93,8 +93,8 @@ class BetterSqlite3Storage {
     modelData.updateString = `UPDATE ${modelData.tableName} SET `
     modelData.deleteString = `DELETE FROM ${modelData.tableName} `
 
-    // console.log(`Create model data for table: ${tableName} => ${stringify(modelData)}`)
-    // console.log()
+    // if (logFlags.console) console.log(`Create model data for table: ${tableName} => ${stringify(modelData)}`)
+    // if (logFlags.console) console.log()
     this.storageModels[tableName] = modelData
 
     // todo base this off of models
@@ -150,13 +150,13 @@ class BetterSqlite3Storage {
   }
 
   _create(table, object, opts) {
-    // console.log('_create2: ' + stringify(object))
+    // if (logFlags.console) console.log('_create2: ' + stringify(object))
     if (Array.isArray(object)) {
       // return table.bulkCreate(values, opts)
       // todo transaciton or something else
 
       for (let subObj of object) {
-        // console.log('sub obj: ' + stringify(subObj))
+        // if (logFlags.console) console.log('sub obj: ' + stringify(subObj))
         this._create(table, subObj, opts)
       }
       return
@@ -166,19 +166,19 @@ class BetterSqlite3Storage {
       queryString = table.insertOrReplaceString
     }
     let inputs = []
-    // console.log('columns: ' + stringify(table.columns))
+    // if (logFlags.console) console.log('columns: ' + stringify(table.columns))
     for (let column of table.columns) {
       let value = object[column]
 
       if (table.isColumnJSON[column]) {
         value = stringify(value)
       }
-      // console.log(`column: ${column}  ${value}`)
+      // if (logFlags.console) console.log(`column: ${column}  ${value}`)
       inputs.push(value)
     }
     queryString += this.options2string(opts)
 
-    // console.log(queryString + '  VALUES: ' + stringify(inputs))
+    // if (logFlags.console) console.log(queryString + '  VALUES: ' + stringify(inputs))
     return this.run(queryString, inputs)
   }
 
@@ -198,7 +198,7 @@ class BetterSqlite3Storage {
     queryString += whereString
     queryString += this.options2string(opts)
 
-    // console.log(queryString + '  VALUES: ' + stringify(valueArray))
+    // if (logFlags.console) console.log(queryString + '  VALUES: ' + stringify(valueArray))
 
     let results = await this.all(queryString, valueArray)
     // optionally parse results!
@@ -206,7 +206,7 @@ class BetterSqlite3Storage {
       if (table.JSONkeys.length > 0) {
         // for (let i = 0; i < results.length; i++) {
         //   let result = results[i]
-        //   console.log('todo parse this??? ' + result)
+        //   if (logFlags.console) console.log('todo parse this??? ' + result)
         // }
       }
     }
@@ -234,7 +234,7 @@ class BetterSqlite3Storage {
 
     queryString += this.options2string(opts)
 
-    // console.log(queryString + '  VALUES: ' + stringify(valueArray))
+    // if (logFlags.console) console.log(queryString + '  VALUES: ' + stringify(valueArray))
     return this.run(queryString, valueArray)
   }
   _delete(table, where, opts) {
@@ -253,7 +253,7 @@ class BetterSqlite3Storage {
     queryString += whereString
     queryString += this.options2string(opts)
 
-    // console.log(queryString + '  VALUES: ' + stringify(valueArray))
+    // if (logFlags.console) console.log(queryString + '  VALUES: ' + stringify(valueArray))
     return this.run(queryString, valueArray)
   }
 
@@ -393,8 +393,8 @@ class BetterSqlite3Storage {
         const { lastInsertRowid } = this.db.prepare(sql).run(params)
         resolve({ id: lastInsertRowid })
       } catch (err) {
-        console.log('Error running sql ' + sql)
-        console.log(err)
+        if (logFlags.console) console.log('Error running sql ' + sql)
+        if (logFlags.console) console.log(err)
         reject(err)
       }
     })
@@ -405,8 +405,8 @@ class BetterSqlite3Storage {
         const result = this.db.prepare(sql).get(params)
         resolve(result)
       } catch (err) {
-        console.log('Error running sql: ' + sql)
-        console.log(err)
+        if (logFlags.console) console.log('Error running sql: ' + sql)
+        if (logFlags.console) console.log(err)
         reject(err)
       }
     })
@@ -418,8 +418,8 @@ class BetterSqlite3Storage {
         const rows = this.db.prepare(sql).all(params)
         resolve(rows)
       } catch (err) {
-        console.log('Error running sql: ' + sql)
-        console.log(err)
+        if (logFlags.console) console.log('Error running sql: ' + sql)
+        if (logFlags.console) console.log(err)
         reject(err)
       }
     })

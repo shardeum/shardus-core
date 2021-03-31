@@ -1,5 +1,5 @@
 const utils = require('../utils')
-
+let {logFlags} = require('../logger')
 class P2PLostNodes {
   constructor(logger, p2p, state, crypto) {
     this.mainLogger = logger.getLogger('main')
@@ -29,10 +29,10 @@ class P2PLostNodes {
     // Flag the node, if not already flagged
     const flagged = this._flagLostNode(node)
     if (!flagged) {
-      this.mainLogger.debug(`Lost Detection: ${node.id} has already been flagged as lost`)
+      if (logFlags.debug) this.mainLogger.debug(`Lost Detection: ${node.id} has already been flagged as lost`)
       return false
     }
-    this.mainLogger.debug(`Lost Detection: Flagged ${node.id} as lost. Will report for investigation`)
+    if (logFlags.debug) this.mainLogger.debug(`Lost Detection: Flagged ${node.id} as lost. Will report for investigation`)
     return true
   }
 
@@ -55,7 +55,7 @@ class P2PLostNodes {
       // If target is no longer an active node, unflag it
       if (!activeNodesById[target]) {
         this._unflagLostNode(target)
-        this.mainLogger.debug(`Lost Detection: Unflagged target ${target} because it is no longer active.`)
+        if (logFlags.debug) this.mainLogger.debug(`Lost Detection: Unflagged target ${target} because it is no longer active.`)
         continue
       }
 
@@ -71,12 +71,12 @@ class P2PLostNodes {
           const newLostMsg = this._createLostMessage(target)
           const [added, reason] = this._addLostMessage(newLostMsg, { verify: false })
           if (!added) {
-            this.mainLogger.debug(`Lost Detection: Unable to report ${target}. Created invalid lostMsg: ${reason}: ${JSON.stringify(newLostMsg)}`)
+            if (logFlags.debug) this.mainLogger.debug(`Lost Detection: Unable to report ${target}. Created invalid lostMsg: ${reason}: ${JSON.stringify(newLostMsg)}`)
             break
           }
           const investigatorNode = this.state.getNode(newLostMsg.investigator)
           this.p2p.tell([investigatorNode], 'reportlost', newLostMsg).then(() => {
-            this.mainLogger.debug(`Lost Detection: Reported ${target} for investigation by ${newLostMsg.investigator}`)
+            if (logFlags.debug) this.mainLogger.debug(`Lost Detection: Reported ${target} for investigation by ${newLostMsg.investigator}`)
           })
           break
         }
@@ -85,11 +85,11 @@ class P2PLostNodes {
           const downMsg = this._createDownMsg(lostMsg)
           const [added, reason] = this._addDownMessage(downMsg)
           if (!added) {
-            this.mainLogger.debug(`Lost Detection: Created invalid downMsg: ${reason}: ${JSON.stringify(downMsg)}`)
+            if (logFlags.debug) this.mainLogger.debug(`Lost Detection: Created invalid downMsg: ${reason}: ${JSON.stringify(downMsg)}`)
             break
           }
           this.p2p.sendGossipIn('lostnodedown', downMsg).then(() => {
-            this.mainLogger.debug(`Lost Detection: No response from target ${target}. Gossiped down message for target. Waiting 1 cycle for target to refute...`)
+            if (logFlags.debug) this.mainLogger.debug(`Lost Detection: No response from target ${target}. Gossiped down message for target. Waiting 1 cycle for target to refute...`)
           })
           break
         }
@@ -99,11 +99,11 @@ class P2PLostNodes {
           const upMsg = this._createUpMsg(downMsg)
           const [added, reason] = this._addUpMessage(upMsg)
           if (!added) {
-            this.mainLogger.debug(`Lost Detection: Created invalid upMsg: ${reason}: ${JSON.stringify(upMsg)}`)
+            if (logFlags.debug) this.mainLogger.debug(`Lost Detection: Created invalid upMsg: ${reason}: ${JSON.stringify(upMsg)}`)
             break
           }
           this.p2p.sendGossipIn('lostnodeup', upMsg).then(() => {
-            this.mainLogger.debug(`Lost Detection: Refuted down message from ${lostMsg.investigator} by gossiping up message`)
+            if (logFlags.debug) this.mainLogger.debug(`Lost Detection: Refuted down message from ${lostMsg.investigator} by gossiping up message`)
           })
         }
       }
@@ -129,21 +129,21 @@ class P2PLostNodes {
         case (status === this.statuses.reported && age >= 1): {
           // Unflag target
           this._unflagLostNode(target)
-          this.mainLogger.debug(`Lost Detection: Investigator did not report target ${target} as down. Unflagged target as lost.`)
+          if (logFlags.debug) this.mainLogger.debug(`Lost Detection: Investigator did not report target ${target} as down. Unflagged target as lost.`)
           break
         }
         case (status === this.statuses.down && age >= 2): {
           // Add target to cycle's lost nodes
           this._unflagLostNode(target)
           this.state.addLostMessage(meta.messages.down)
-          this.mainLogger.debug(`Lost Detection: Target ${target} did not refute down status. Added target to this cycle's lost nodes`)
+          if (logFlags.debug) this.mainLogger.debug(`Lost Detection: Target ${target} did not refute down status. Added target to this cycle's lost nodes`)
           break
         }
         case (status === this.statuses.up && age >= 2): {
           // Add target to cycles refuted nodes
           this._unflagLostNode(target)
           this.state.addLostMessage(meta.messages.up)
-          this.mainLogger.debug(`Lost Detection: Target ${target} refuted down status. Added target to this cycle's refuted nodes`)
+          if (logFlags.debug) this.mainLogger.debug(`Lost Detection: Target ${target} refuted down status. Added target to this cycle's refuted nodes`)
           break
         }
       }
@@ -163,10 +163,10 @@ class P2PLostNodes {
       const downMsg = payload
       const [added, reason] = this._addDownMessage(downMsg)
       if (!added) {
-        this.mainLogger.debug(`Lost Detection: Invalid downMsg: ${reason}: ${JSON.stringify(downMsg)}: ${JSON.stringify(downMsg)}`)
+        if (logFlags.debug) this.mainLogger.debug(`Lost Detection: Invalid downMsg: ${reason}: ${JSON.stringify(downMsg)}: ${JSON.stringify(downMsg)}`)
         return
       }
-      this.mainLogger.debug(`Lost Detection: Investigator reported target ${downMsg.lostMessage.target} as down. Waiting 1 cycle for target to refute...`)
+      if (logFlags.debug) this.mainLogger.debug(`Lost Detection: Investigator reported target ${downMsg.lostMessage.target} as down. Waiting 1 cycle for target to refute...`)
       this.p2p.sendGossipIn('lostnodedown', downMsg, tracker)
     })
 
@@ -174,10 +174,10 @@ class P2PLostNodes {
       const upMsg = payload
       const [added, reason] = await this._addUpMessage(upMsg)
       if (!added) {
-        this.mainLogger.debug(`Lost Detection: Invalid upMsg: ${reason}: ${JSON.stringify(upMsg)}: ${JSON.stringify(upMsg)}`)
+        if (logFlags.debug) this.mainLogger.debug(`Lost Detection: Invalid upMsg: ${reason}: ${JSON.stringify(upMsg)}: ${JSON.stringify(upMsg)}`)
         return
       }
-      this.mainLogger.debug(`Lost Detection: Target ${upMsg.downMessage.lostMessage.target} refuted lost status.`)
+      if (logFlags.debug) this.mainLogger.debug(`Lost Detection: Target ${upMsg.downMessage.lostMessage.target} refuted lost status.`)
       this.p2p.sendGossipIn('lostnodeup', upMsg, tracker)
     })
 
@@ -208,12 +208,12 @@ class P2PLostNodes {
     // Validate lostMsg and add target to lostNodesMeta
     const [added, reason] = this._addLostMessage(lostMsg)
     if (!added) {
-      this.mainLogger.debug(`Lost Detection: Got invalid LostMessage: ${reason}: ${JSON.stringify(lostMsg)}`)
+      if (logFlags.debug) this.mainLogger.debug(`Lost Detection: Got invalid LostMessage: ${reason}: ${JSON.stringify(lostMsg)}`)
       return false
     }
     const source = lostMsg.source
     const target = lostMsg.target
-    this.mainLogger.debug(`Lost Detection: Source ${source} requested investigation of target ${target}`)
+    if (logFlags.debug) this.mainLogger.debug(`Lost Detection: Source ${source} requested investigation of target ${target}`)
     // Ping the target
     const targetNode = this.state.getNode(target)
     this.p2p.ask(targetNode, 'ping')
@@ -222,14 +222,14 @@ class P2PLostNodes {
         if (pingResponse) {
           const unflagged = this._unflagLostNode(target)
           if (unflagged) {
-            this.mainLogger.debug(`Lost Detection: Target ${target} responded to ping. Unflagged target as lost`)
+            if (logFlags.debug) this.mainLogger.debug(`Lost Detection: Target ${target} responded to ping. Unflagged target as lost`)
           }
         }
       })
       .catch(err => {
         if (err) this.mainLogger.error('P2PLostNodes: _investigateLostNode: p2p.ask: ' + err)
       })
-    this.mainLogger.debug(`Lost Detection: Marked target ${target} as lost. Pinged target. Waiting 1 cycle for target to respond...`)
+    if (logFlags.debug) this.mainLogger.debug(`Lost Detection: Marked target ${target} as lost. Pinged target. Waiting 1 cycle for target to respond...`)
   }
 
   _flagLostNode(node) {
@@ -425,7 +425,7 @@ class P2PLostNodes {
     const nodes = this.state.getActiveNodes()
     const closestId = utils.getClosestHash(targetHash, nodes.map((node) => node.id))
     if (!closestId) {
-      this.mainLogger.debug(`Could not find node to verify specified lost node. Likely no active nodes were found. Nodes: ${JSON.stringify(nodes)}`)
+      if (logFlags.debug) this.mainLogger.debug(`Could not find node to verify specified lost node. Likely no active nodes were found. Nodes: ${JSON.stringify(nodes)}`)
       return null
     }
     return closestId

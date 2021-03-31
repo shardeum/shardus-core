@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { isDeepStrictEqual } from 'util'
+import {logFlags} from '../logger'
 
 type Comparator<T, E = T> = (a: E, b: T) => number
 
@@ -88,8 +89,8 @@ export function binaryLowest<T>(ar: T[], comparator?: Comparator<T>) {
   while (m <= n) {
     const k = (n + m) >> 1
     const cmp = comparator(ar[m], ar[k])
-    console.log(ar)
-    console.log(m, k, ar[m], ar[k], cmp)
+    if (logFlags.console) console.log(ar)
+    if (logFlags.console) console.log(m, k, ar[m], ar[k], cmp)
     if (cmp > 0) {
       n = k
     } else if (cmp < 0) {

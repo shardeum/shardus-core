@@ -8,7 +8,7 @@ import Profiler from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
-import Logger from '../logger'
+import Logger, {logFlags} from '../logger'
 import ShardFunctions from './shardFunctions.js'
 import { time } from 'console'
 import StateManager from '.'
@@ -22,7 +22,7 @@ class Depricated {
   crypto: Crypto
   config: Shardus.ShardusConfiguration
   profiler: Profiler
-  verboseLogs: boolean
+  
   logger: Logger
   p2p: P2P
   storage: Storage
@@ -49,8 +49,8 @@ class Depricated {
   // repairCompletedMap: Map<string, boolean>
   // dataRepairStack: RepairTracker[]
 
-  constructor(stateManager: StateManager, verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
-    this.verboseLogs = verboseLogs
+  constructor(stateManager: StateManager,  profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
+    
     this.crypto = crypto
     this.app = app
     this.logger = logger
@@ -217,13 +217,13 @@ class Depricated {
     //         }
     //       }
     //       if (returnedResults < expectedResults) {
-    //         if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send ${returnedResults} < ${expectedResults}`)
+    //         if (logFlags.verbose) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send ${returnedResults} < ${expectedResults}`)
     //       }
     //       acceptedTXs = await this.storage.queryAcceptedTransactionsByIds(txIDList)
-    //       // if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send2 `)
+    //       // if (logFlags.verbose) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send2 `)
     //       if (acceptedTXs != null && acceptedTXs.length < expectedResults) {
-    //         if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index results ${utils.stringifyReduce(acceptedTXs)} snippets ${utils.stringifyReduce(payload.debugSnippets)} `)
-    //         if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index results2:${utils.stringifyReduce(acceptedTXs.map((x: Shardus.AcceptedTx) => x.id))} snippets:${utils.stringifyReduce(payload.debugSnippets)} txid:${utils.stringifyReduce(txIDList)} `)
+    //         if (logFlags.verbose) this.mainLogger.error(`get_transactions_by_partition_index results ${utils.stringifyReduce(acceptedTXs)} snippets ${utils.stringifyReduce(payload.debugSnippets)} `)
+    //         if (logFlags.verbose) this.mainLogger.error(`get_transactions_by_partition_index results2:${utils.stringifyReduce(acceptedTXs.map((x: Shardus.AcceptedTx) => x.id))} snippets:${utils.stringifyReduce(payload.debugSnippets)} txid:${utils.stringifyReduce(txIDList)} `)
     //         let acceptedTXsBefore = 0
     //         if (acceptedTXs != null) {
     //           acceptedTXsBefore = acceptedTXs.length
@@ -255,7 +255,7 @@ class Depricated {
     //             }
     //           }
     //         }
-    //         if (this.verboseLogs) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send3 ${acceptedTXsBefore} < ${expectedResults} findsFixed: ${finds}  missing: ${utils.stringifyReduce(missingTXs)} found: ${utils.stringifyReduce(found)} acceptedTXs.length updated: ${acceptedTXs.length}`)
+    //         if (logFlags.verbose) this.mainLogger.error(`get_transactions_by_partition_index failed! returnedResults < expectedResults send3 ${acceptedTXsBefore} < ${expectedResults} findsFixed: ${finds}  missing: ${utils.stringifyReduce(missingTXs)} found: ${utils.stringifyReduce(found)} acceptedTXs.length updated: ${acceptedTXs.length}`)
     //       } else {
     //       }
     //     } catch (ex) {
@@ -312,14 +312,14 @@ class Depricated {
   //     /** @type {CombinedPartitionReceipt} */
   //     let combinedReciept = { result: partitionReceiptCopy, signatures: partitionReceipt.resultsList.map((a) => a.sign) }
 
-  //     if (this.verboseLogs) this.mainLogger.debug(' sendPartitionData ' + utils.stringifyReduceLimit({ combinedReciept, paritionObject }))
+  //     if (logFlags.verbose) this.mainLogger.debug(' sendPartitionData ' + utils.stringifyReduceLimit({ combinedReciept, paritionObject }))
 
   //     // send it
   //     // this.p2p.archivers.sendPartitionData(combinedReciept, paritionObject)
   //   }
 
   //   sendTransactionData(partitionNumber: number, cycleNumber: number, transactions: AcceptedTx[]) {
-  //     if (this.verboseLogs) this.mainLogger.debug(' sendTransactionData ' + utils.stringifyReduceLimit({ partitionNumber, cycleNumber, transactions }))
+  //     if (logFlags.verbose) this.mainLogger.debug(' sendTransactionData ' + utils.stringifyReduceLimit({ partitionNumber, cycleNumber, transactions }))
 
   //     // send it
   //     // this.p2p.archivers.sendTransactionData(partitionNumber, cycleNumber, transactions)
@@ -340,7 +340,7 @@ class Depricated {
   //       return
   //     }
 
-  //     if (this.verboseLogs) this.mainLogger.debug(' trySendAndPurgeReceipts ' + key)
+  //     if (logFlags.verbose) this.mainLogger.debug(' trySendAndPurgeReceipts ' + key)
 
   //     this.sentReceipts.set(key, true)
   //     try {
@@ -445,7 +445,7 @@ class Depricated {
   //       }
   //     }
   //     // reaponsesById: ${utils.stringifyReduce(responsesById)}
-  //     if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair findMostCommonResponse: retVal: ${utils.stringifyReduce({ topHash, topCount, topResult })}  responses: ${utils.stringifyReduce(responses)} `)
+  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair findMostCommonResponse: retVal: ${utils.stringifyReduce({ topHash, topCount, topResult })}  responses: ${utils.stringifyReduce(responses)} `)
   //     return { topHash, topCount, topResult }
   //   }
 
@@ -665,7 +665,7 @@ class Depricated {
   //                   // if (hashListEntry.corrections.length > 0) {
   //                   //   let nextCorrection = hashListEntry.corrections[hashListEntry.corrections.length - 1]
   //                   //   if (nextCorrection && correction && nextCorrection.bv === correction.bv) {
-  //                   //     if (this.verboseLogs) this.mainLogger.debug( ` solveHashSets overdelete fix: i:${i} j:${j} index:${index} bv:${nextCorrection.bv}}`)
+  //                   //     if (logFlags.verbose) this.mainLogger.debug( ` solveHashSets overdelete fix: i:${i} j:${j} index:${index} bv:${nextCorrection.bv}}`)
   //                   //     continue
   //                   //   }
   //                   // }
@@ -941,8 +941,8 @@ class Depricated {
 
   //     // let aTest = votes['55403088d5636488d3ff17d7d90c052e'][0]
   //     // let bTest = votes['779980ea84b8a5eac2dc3d07013377e5'][0]
-  //     // console.log(Depricated.compareVoteObjects(aTest, bTest, false))
-  //     // console.log(Depricated.compareVoteObjects(bTest, aTest, false))
+  //     // if (logFlags.console) console.log(Depricated.compareVoteObjects(aTest, bTest, false))
+  //     // if (logFlags.console) console.log(Depricated.compareVoteObjects(bTest, aTest, false))
 
   //     // correction solver:
   //     for (let hashListIndex = 0; hashListIndex < hashSetList.length; hashListIndex++) {
@@ -952,11 +952,11 @@ class Depricated {
   //       let hashListEntry = hashSetList[hashListIndex]
   //       hashListEntry.corrections = [] // clear this
   //       // hashListEntry.instructions = []
-  //       // console.log(`solution for set ${hashListIndex}  locallen:${hashListEntry.hashSet.length / stepSize} `)
+  //       // if (logFlags.console) console.log(`solution for set ${hashListIndex}  locallen:${hashListEntry.hashSet.length / stepSize} `)
   //       let winningVoteIndex = 0
   //       for (let voteObj of allWinningVotes) {
   //         if (voteObj.voteTally[hashListIndex] == null) {
-  //           // console.log(`missing @${voteObj.finalIdx} v:${voteObj.val}`)
+  //           // if (logFlags.console) console.log(`missing @${voteObj.finalIdx} v:${voteObj.val}`)
   //           // bv: hashListEntry.lastValue, if: lastOutputCount  are old.
   //           // @ts-ignore TSConversion solveHashSets2 is unused. but need to hold off o fixing up these potential nulls
   //           hashListEntry.corrections.push({ i: winningVoteIndex, tv: voteObj, v: voteObj.val, t: 'insert', bv: null, if: -1 })
@@ -970,7 +970,7 @@ class Depricated {
   //       for (let voteObj of hashListEntry.ownVotes) {
   //         let localIdx = voteObj.voteTally[hashListIndex].i
   //         if (voteObj.winIdx == null) {
-  //           // console.log(`extra @${stringify(voteObj.voteTally[hashListIndex])} v:${voteObj.val}`)
+  //           // if (logFlags.console) console.log(`extra @${stringify(voteObj.voteTally[hashListIndex])} v:${voteObj.val}`)
   //           // @ts-ignore TSConversion solveHashSets2 is unused. but need to hold off o fixing up these potential nulls
   //           hashListEntry.corrections.push({ i: localIdx, t: 'extra', c: null, hi: localIdx, tv: null, v: null, bv: null, if: -1 })
   //         }
@@ -1202,11 +1202,11 @@ class Depricated {
   //     // ///////////////////////////////////////
 
   //     if (ourHashSet.extraMap == null) {
-  //       if (log) console.log(`testHashsetSolution: ourHashSet.extraMap missing`)
+  //       if (log) if (logFlags.console) console.log(`testHashsetSolution: ourHashSet.extraMap missing`)
   //       return false
   //     }
   //     if (ourHashSet.indexMap == null) {
-  //       if (log) console.log(`testHashsetSolution: ourHashSet.indexMap missing`)
+  //       if (log) if (logFlags.console) console.log(`testHashsetSolution: ourHashSet.indexMap missing`)
   //       return false
   //     }
   //     ourHashSet.extraMap.sort(utils.sortAsc) // function (a, b) { return a - b })
@@ -1223,11 +1223,11 @@ class Depricated {
   //         continue
   //       }
   //       if (extra == null) {
-  //         if (log) console.log(`testHashsetSolution error extra == null at i: ${i}  extraIndex: ${extraIndex}`)
+  //         if (log) if (logFlags.console) console.log(`testHashsetSolution error extra == null at i: ${i}  extraIndex: ${extraIndex}`)
   //         break
   //       }
   //       if (txSourceList.hashes[i] == null) {
-  //         if (log) console.log(`testHashsetSolution error null at i: ${i}  extraIndex: ${extraIndex}`)
+  //         if (log) if (logFlags.console) console.log(`testHashsetSolution error null at i: ${i}  extraIndex: ${extraIndex}`)
   //         break
   //       }
 
@@ -1244,7 +1244,7 @@ class Depricated {
   //     // }
   //     hashSet = Depricated.createHashSetString(newTxList.thashes, newTxList.states) // TXSTATE_TODO
 
-  //     if (log) console.log(`extras removed: len: ${ourHashSet.indexMap.length}  extraIndex: ${extraIndex} ourPreHashSet: ${hashSet}`)
+  //     if (log) if (logFlags.console) console.log(`extras removed: len: ${ourHashSet.indexMap.length}  extraIndex: ${extraIndex} ourPreHashSet: ${hashSet}`)
 
   //     // Txids: txSourceData.hashes, // txid1, txid2, …],  - ordered from oldest to recent
   //     // Status: txSourceData.passed, // [1,0, …],      - ordered corresponding to Txids; 1 for applied; 0 for failed
@@ -1262,7 +1262,7 @@ class Depricated {
   //         // newTxList.txs[i] = newTxList.ttxs[ourCounter]
 
   //         if (newTxList.hashes[i] == null) {
-  //           if (log) console.log(`testHashsetSolution error null at i: ${i} solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+  //           if (log) if (logFlags.console) console.log(`testHashsetSolution error null at i: ${i} solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
   //           return false
   //         }
   //         ourCounter++
@@ -1276,7 +1276,7 @@ class Depricated {
   //           continue
   //         }
   //         // if (!solutionDelta) {
-  //         //   if (this.verboseLogs) this.mainLogger.error( `_mergeRepairDataIntoLocalState2 a error solutionDelta=null  solutionIndex: ${solutionIndex} i:${i} of ${ourHashSet.indexMap.length} deltas: ${utils.stringifyReduce(repairTracker.solutionDeltas)}`)
+  //         //   if (logFlags.verbose) this.mainLogger.error( `_mergeRepairDataIntoLocalState2 a error solutionDelta=null  solutionIndex: ${solutionIndex} i:${i} of ${ourHashSet.indexMap.length} deltas: ${utils.stringifyReduce(repairTracker.solutionDeltas)}`)
   //         // }
   //         // insert the next one
   //         newTxList.hashes[i] = solutionTxList.hashes[correction.i] // solutionDelta.tx.id
@@ -1284,13 +1284,13 @@ class Depricated {
   //         // newTxList.states[i] = solutionTxList.states[correction.i] // TXSTATE_TODO
 
   //         if (newTxList.hashes[i] == null) {
-  //           if (log) console.log(`testHashsetSolution error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+  //           if (log) if (logFlags.console) console.log(`testHashsetSolution error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
   //         }
   //         // newTxList.passed[i] = solutionDelta.pf
   //         // newTxList.txs[i] = solutionDelta.tx
   //         solutionIndex++
   //         // if (newTxList.hashes[i] == null) {
-  //         //   if (this.verboseLogs) this.mainLogger.error( `_mergeRepairDataIntoLocalState2 b error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
+  //         //   if (logFlags.verbose) this.mainLogger.error( `_mergeRepairDataIntoLocalState2 b error null at i: ${i}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter}`)
   //         // }
   //       }
   //     }
@@ -1309,8 +1309,8 @@ class Depricated {
   //       return false
   //     }
 
-  //     if (log) console.log(`solved set len: ${hashSet.length / stepSize}  : ${hashSet}`)
-  //     // if (this.verboseLogs) this.mainLogger.debug( `_mergeRepairDataIntoLocalState2 c  len: ${ourHashSet.indexMap.length}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter} ourHashSet: ${hashSet}`)
+  //     if (log) if (logFlags.console) console.log(`solved set len: ${hashSet.length / stepSize}  : ${hashSet}`)
+  //     // if (logFlags.verbose) this.mainLogger.debug( `_mergeRepairDataIntoLocalState2 c  len: ${ourHashSet.indexMap.length}  solutionIndex: ${solutionIndex}  ourCounter: ${ourCounter} ourHashSet: ${hashSet}`)
 
   //     return true
   //   }
@@ -1416,7 +1416,7 @@ class Depricated {
   //       // newFailedTXs: a list of TXs that we fetched, they had failed so we save them but do not apply them
   //       // extraTXIds: a list of TXIds that our partition has that the leading partition does not.  This is what we need to remove
   //       // missingTXIds: a list of TXIds that our partition has that the leading partition has that we don't.  We will need to add these in using the list newPendingTXs
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`_getRepairTrackerForCycle: creating for cycle:${counter} partition:${partition}`)
+  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`_getRepairTrackerForCycle: creating for cycle:${counter} partition:${partition}`)
   //       repairTracker = {
   //         triedHashes: [],
   //         numNodes: this.stateManager.lastActiveNodeCount, // num nodes that we send partition results to
@@ -1448,7 +1448,7 @@ class Depricated {
 
   //       // let combinedKey = key + key2
   //       // if (this.repairStartedMap.has(combinedKey)) {
-  //       //   if (this.verboseLogs) this.mainLogger.error(`Already started repair on ${combinedKey}`)
+  //       //   if (logFlags.verbose) this.mainLogger.error(`Already started repair on ${combinedKey}`)
   //       // } else {
   //       //   this.repairStartedMap.set(combinedKey, true)
   //       // }
@@ -1467,15 +1467,15 @@ class Depricated {
   //     let combinedKey = repairTracker.key + repairTracker.key2
   //     if (this.repairStartedMap.has(combinedKey)) {
   //       if (this.repairCompletedMap.has(combinedKey)) {
-  //         if (this.verboseLogs) this.mainLogger.debug(`repairStats: finished repair ${combinedKey} -alreadyFlagged  tag:${debugTag}`)
+  //         if (logFlags.verbose) this.mainLogger.debug(`repairStats: finished repair ${combinedKey} -alreadyFlagged  tag:${debugTag}`)
   //       } else {
   //         this.stateManager.dataRepairsCompleted++
   //         this.repairCompletedMap.set(combinedKey, true)
-  //         if (this.verboseLogs) this.mainLogger.debug(`repairStats: finished repair ${combinedKey} tag:${debugTag}`)
+  //         if (logFlags.verbose) this.mainLogger.debug(`repairStats: finished repair ${combinedKey} tag:${debugTag}`)
   //       }
   //     } else {
   //       // should be a trace?
-  //       if (this.verboseLogs) this.mainLogger.debug(`repairStats: Calling complete on a key we dont have ${combinedKey} tag:${debugTag}`)
+  //       if (logFlags.verbose) this.mainLogger.debug(`repairStats: Calling complete on a key we dont have ${combinedKey} tag:${debugTag}`)
   //     }
 
   //     for (let i = this.dataRepairStack.length - 1; i >= 0; i--) {
@@ -1487,7 +1487,7 @@ class Depricated {
 
   //     if (this.dataRepairStack.length === 0) {
   //       if (this.stateManager.stateIsGood === false) {
-  //         if (this.verboseLogs) this.mainLogger.error(`No active data repair going on tag:${debugTag}`)
+  //         if (logFlags.verbose) this.mainLogger.error(`No active data repair going on tag:${debugTag}`)
   //       }
   //       this.stateManager.stateIsGood = true
   //       this.stateManager.stateIsGood_activeRepairs = true
@@ -1500,7 +1500,7 @@ class Depricated {
   //    * @param {RepairTracker} repairTracker
   //    */
   //   repairTrackerClearForNextRepair(repairTracker: RepairTracker) {
-  //     if (this.verboseLogs) this.mainLogger.debug(` repairTrackerClearForNextRepair cycleNumber: ${repairTracker.counter} parition: ${repairTracker.partitionId} `)
+  //     if (logFlags.verbose) this.mainLogger.debug(` repairTrackerClearForNextRepair cycleNumber: ${repairTracker.counter} parition: ${repairTracker.partitionId} `)
   //     repairTracker.removedTXIds = []
   //     repairTracker.repairedTXs = []
   //     repairTracker.newPendingTXs = []
@@ -1515,7 +1515,7 @@ class Depricated {
   //    * @param {number} specificParition the old version of this would repair all partitions but we had to wait.  this works on just one partition
   //    */
   //   async mergeAndApplyTXRepairs(cycleNumber: number, specificParition: number) {
-  //     if (this.verboseLogs) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs cycleNumber ${cycleNumber} partition: ${specificParition}`)
+  //     if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs cycleNumber ${cycleNumber} partition: ${specificParition}`)
   //     // walk through all txs for this cycle.
   //     // get or create entries for accounts.
   //     // track when they have missing txs or wrong txs
@@ -1553,7 +1553,7 @@ class Depricated {
   //         let keysResponse = this.app.getKeyFromTransaction(tx.data)
 
   //         if (!keysResponse) {
-  //           if (this.verboseLogs) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
+  //           if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
   //         }
 
   //         let { sourceKeys, targetKeys } = keysResponse
@@ -1574,7 +1574,7 @@ class Depricated {
   //         allExtraTXids[tx] = 1
   //         // TODO Repair. ugh have to query our data and figure out which accounts need to be reset.
   //       }
-  //       if (this.verboseLogs) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs: extra: ${utils.stringifyReduce(allExtraTXids)}  txIDToAcc: ${utils.stringifyReduce(txIDToAcc)}`)
+  //       if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs: extra: ${utils.stringifyReduce(allExtraTXids)}  txIDToAcc: ${utils.stringifyReduce(txIDToAcc)}`)
 
   //       // todo repair: hmmm also reset accounts have a tx we need to remove.
   //       // }
@@ -1591,7 +1591,7 @@ class Depricated {
   //             // this was a bad tx dont include it.   we have to look up the account associated with this tx and make sure they get reset
   //             let keysResponse = this.app.getKeyFromTransaction(tx.data)
   //             if (!keysResponse) {
-  //               if (this.verboseLogs) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs problem with keysResp2  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
+  //               if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs problem with keysResp2  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
   //             }
   //             let { sourceKeys, targetKeys } = keysResponse
   //             for (let accountID of sourceKeys) {
@@ -1613,19 +1613,19 @@ class Depricated {
   //           }
   //         }
   //       } else {
-  //         if (this.verboseLogs) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs txList not found for: cycle: ${cycleNumber} in ${utils.stringifyReduce(this.stateManager.partitionObjects.txByCycleByPartition)}`)
+  //         if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs txList not found for: cycle: ${cycleNumber} in ${utils.stringifyReduce(this.stateManager.partitionObjects.txByCycleByPartition)}`)
   //       }
 
   //       // build and sort a list of TXs that we need to apply
 
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs txIDResetExtraCount: ${txIDResetExtraCount} allAccountsToResetById ${utils.stringifyReduce(allAccountsToResetById)}`)
+  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs txIDResetExtraCount: ${txIDResetExtraCount} allAccountsToResetById ${utils.stringifyReduce(allAccountsToResetById)}`)
   //       // reset accounts
   //       let accountKeys = Object.keys(allAccountsToResetById)
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs revert accountKeys ${utils.stringifyReduce(accountKeys)}`)
+  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs revert accountKeys ${utils.stringifyReduce(accountKeys)}`)
 
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs FIFO lock outer: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs FIFO lock outer: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
   //       let ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(accountKeys)
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs FIFO lock inner: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs FIFO lock inner: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
 
   //       // let replacmentAccounts =  //returned by the below function for debug
   //       await this._revertAccounts(accountKeys, cycleNumber)
@@ -1642,8 +1642,8 @@ class Depricated {
   //       // sort the list by ascending timestamp
   //       newTXList.sort(utils.sortTimestampAsc) // (function (a, b) { return a.timestamp - b.timestamp })
 
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs newTXList.length: ${newTXList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
+  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
+  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs newTXList.length: ${newTXList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
 
   //       let applyCount = 0
   //       let applyFailCount = 0
@@ -1686,7 +1686,7 @@ class Depricated {
   //               continue
   //             }
 
-  //             if (this.verboseLogs) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs apply tx ${utils.makeShortHash(tx.id)} ${tx.timestamp} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
+  //             if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs apply tx ${utils.makeShortHash(tx.id)} ${tx.timestamp} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
   //             let hasStateTableData = false // may or may not have it but not tracking yet
 
   //             // TSConversion old way used to do this but seem incorrect to have receipt under data!
@@ -1726,8 +1726,8 @@ class Depricated {
   //             let success = await this.testAccountTime(tx.data, wrappedStates)
 
   //             if (!success) {
-  //               if (this.verboseLogs) this.mainLogger.debug(' testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs' + utils.stringifyReduce(tx))
-  //               if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs`)
+  //               if (logFlags.verbose) this.mainLogger.debug(' testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs' + utils.stringifyReduce(tx))
+  //               if (logFlags.playback) this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs`)
 
   //               this.statemanager_fatal(`testAccountTime_failed`, ' testAccountTime failed. calling apoptosis. mergeAndApplyTXRepairs' + utils.stringifyReduce(tx))
 
@@ -1741,24 +1741,24 @@ class Depricated {
   //             // accountValuesByKey = {} // clear this.  it forces more db work but avoids issue with some stale flags
   //             if (!applied) {
   //               applyFailCount++
-  //               if (this.verboseLogs) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs apply failed`)
+  //               if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs apply failed`)
   //             } else {
   //               applyCount++
   //             }
   //           } else {
-  //             if (this.verboseLogs) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs no for ${tx.id} in ${utils.stringifyReduce(txIDToAcc)}`)
+  //             if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs no for ${tx.id} in ${utils.stringifyReduce(txIDToAcc)}`)
   //           }
   //         } catch (ex) {
   //           this.mainLogger.debug('_repair: startRepairProcess mergeAndApplyTXRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
   //           this.statemanager_fatal(`mergeAndApplyTXRepairs_ex`, '_repair: startRepairProcess mergeAndApplyTXRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
   //         }
 
-  //         if (this.verboseLogs) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
+  //         if (logFlags.verbose) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
   //       }
 
   //       // unlock the accounts we locked...  todo maybe put this in a finally statement?
   //       this.stateManager.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs FIFO unlock: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair mergeAndApplyTXRepairs FIFO unlock: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
   //     }
   //   }
 
@@ -1768,7 +1768,7 @@ class Depricated {
   //    * @param {number} specificParition the old version of this would repair all partitions but we had to wait.  this works on just one partition
   //    */
   //   async updateTrackingAndPrepareRepairs(cycleNumber: number, specificParition: number) {
-  //     if (this.verboseLogs) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs cycleNumber ${cycleNumber} partition: ${specificParition}`)
+  //     if (logFlags.verbose) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs cycleNumber ${cycleNumber} partition: ${specificParition}`)
   //     // walk through all txs for this cycle.
   //     // get or create entries for accounts.
   //     // track when they have missing txs or wrong txs
@@ -1807,7 +1807,7 @@ class Depricated {
   //         let keysResponse = this.app.getKeyFromTransaction(tx.data)
 
   //         if (!keysResponse) {
-  //           if (this.verboseLogs) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
+  //           if (logFlags.verbose) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
   //         }
 
   //         let { sourceKeys, targetKeys } = keysResponse
@@ -1828,7 +1828,7 @@ class Depricated {
   //         allExtraTXids[tx] = 1
   //         // TODO Repair. ugh have to query our data and figure out which accounts need to be reset.
   //       }
-  //       if (this.verboseLogs) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs: extra: ${utils.stringifyReduce(allExtraTXids)}  txIDToAcc: ${utils.stringifyReduce(txIDToAcc)}`)
+  //       if (logFlags.verbose) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs: extra: ${utils.stringifyReduce(allExtraTXids)}  txIDToAcc: ${utils.stringifyReduce(txIDToAcc)}`)
 
   //       // todo repair: hmmm also reset accounts have a tx we need to remove.
   //       // }
@@ -1845,7 +1845,7 @@ class Depricated {
   //             // this was a bad tx dont include it.   we have to look up the account associated with this tx and make sure they get reset
   //             let keysResponse = this.app.getKeyFromTransaction(tx.data)
   //             if (!keysResponse) {
-  //               if (this.verboseLogs) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs problem with keysResp2  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
+  //               if (logFlags.verbose) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs problem with keysResp2  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(tx)}`)
   //             }
   //             let { sourceKeys, targetKeys } = keysResponse
   //             for (let accountID of sourceKeys) {
@@ -1866,9 +1866,9 @@ class Depricated {
   //             // we will only play back the txs on accounts that point to allAccountsToResetById
   //           }
   //         }
-  //         if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs txIDResetExtraCount:${txIDResetExtraCount} txIDToAccCount: ${txIDToAccCount}`)
+  //         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs txIDResetExtraCount:${txIDResetExtraCount} txIDToAccCount: ${txIDToAccCount}`)
   //       } else {
-  //         if (this.verboseLogs) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs txList not found for: cycle: ${cycleNumber} in ${utils.stringifyReduce(this.stateManager.partitionObjects.txByCycleByPartition)}`)
+  //         if (logFlags.verbose) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs txList not found for: cycle: ${cycleNumber} in ${utils.stringifyReduce(this.stateManager.partitionObjects.txByCycleByPartition)}`)
   //       }
 
   //       // build and sort a list of TXs that we need to apply
@@ -1887,8 +1887,8 @@ class Depricated {
   //       // sort the list by ascending timestamp
   //       newTXList.sort(utils.sortTimestampAsc) // function (a, b) { return a.timestamp - b.timestamp })
 
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs newTXList.length: ${newTXList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
+  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
+  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs newTXList.length: ${newTXList.length} txKeys.length: ${txKeys.length} txIDToAccCount: ${txIDToAccCount}`)
 
   //       // Save the results of this computation for later
   //       /** @type {UpdateRepairData}  */
@@ -1902,7 +1902,7 @@ class Depricated {
   //       // how will the partition object get updated though??
   //       // }
 
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs finished`)
+  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair updateTrackingAndPrepareRepairs finished`)
   //       if (paritionsServiced === 0) {
   //         this.statemanager_fatal(`_updateTrackingAndPrepareRepairs_fail`, `_updateTrackingAndPrepareRepairs failed. not partitions serviced: ${debugKey} our consensus:${utils.stringifyReduce(lastCycleShardValues?.ourConsensusPartitions)} `)
   //       }
@@ -1922,7 +1922,7 @@ class Depricated {
   //     }
   //     this.applyAllPreparedRepairsRunning = true
 
-  //     if (this.verboseLogs) this.mainLogger.debug(` _repair applyAllPreparedRepairs cycleNumber ${cycleNumber}`)
+  //     if (logFlags.verbose) this.mainLogger.debug(` _repair applyAllPreparedRepairs cycleNumber ${cycleNumber}`)
 
   //     this.mainLogger.debug(`applyAllPreparedRepairs c:${cycleNumber}`)
 
@@ -1944,20 +1944,20 @@ class Depricated {
 
   //     // build and sort a list of TXs that we need to apply
 
-  //     if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs allAccountsToResetById ${utils.stringifyReduce(allAccountsToResetById)}`)
+  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs allAccountsToResetById ${utils.stringifyReduce(allAccountsToResetById)}`)
   //     // reset accounts
   //     let accountKeys = Object.keys(allAccountsToResetById)
-  //     if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs revert accountKeys ${utils.stringifyReduce(accountKeys)}`)
+  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs revert accountKeys ${utils.stringifyReduce(accountKeys)}`)
 
-  //     if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs FIFO lock outer: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs FIFO lock outer: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
   //     let ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(accountKeys)
-  //     if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs FIFO lock inner: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs FIFO lock inner: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
 
   //     // let replacmentAccounts =  //returned by the below function for debug
   //     await this._revertAccounts(accountKeys, cycleNumber)
 
-  //     if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
-  //     if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs newTXList.length: ${newTXList.length}`)
+  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs newTXList ${utils.stringifyReduce(newTXList)}`)
+  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs newTXList.length: ${newTXList.length}`)
 
   //     let applyCount = 0
   //     let applyFailCount = 0
@@ -2010,7 +2010,7 @@ class Depricated {
   //             continue
   //           }
 
-  //           if (this.verboseLogs) this.mainLogger.debug(` _repair applyAllPreparedRepairs apply tx ${utils.makeShortHash(tx.id)} ${tx.timestamp} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
+  //           if (logFlags.verbose) this.mainLogger.debug(` _repair applyAllPreparedRepairs apply tx ${utils.makeShortHash(tx.id)} ${tx.timestamp} data: ${utils.stringifyReduce(tx)} with filter: ${utils.stringifyReduce(acountsFilter)}`)
   //           let hasStateTableData = false // may or may not have it but not tracking yet
 
   //           // TSConversion old way used to do this but seem incorrect to have receipt under data!
@@ -2050,8 +2050,8 @@ class Depricated {
   //           let success = await this.testAccountTime(tx.data, wrappedStates)
 
   //           if (!success) {
-  //             if (this.verboseLogs) this.mainLogger.debug(' applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs' + utils.stringifyReduce(tx))
-  //             if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs`)
+  //             if (logFlags.verbose) this.mainLogger.debug(' applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs' + utils.stringifyReduce(tx))
+  //             if (logFlags.playback) this.logger.playbackLogNote('testAccountTime_failed', `${tx.id}`, ` applyAllPreparedRepairs testAccountTime failed. calling apoptosis. applyAllPreparedRepairs`)
   //             this.statemanager_fatal(`applyAllPreparedRepairs_fail`, ' testAccountTime failed. calling apoptosis. applyAllPreparedRepairs' + utils.stringifyReduce(tx))
 
   //             // return
@@ -2069,20 +2069,20 @@ class Depricated {
   //             let wrappedState = wrappedStates[wrappedStateKey]
 
   //             // if(wrappedState == null) {
-  //             //   if (this.verboseLogs) this.mainLogger.error( ` _repair applyAllPreparedRepairs wrappedState == null ${utils.stringifyReduce(wrappedStateKey)} ${tx.timestamp}`)
+  //             //   if (logFlags.verbose) this.mainLogger.error( ` _repair applyAllPreparedRepairs wrappedState == null ${utils.stringifyReduce(wrappedStateKey)} ${tx.timestamp}`)
   //             //   //could continue but want to see if there is more we can log.
   //             // }
   //             //is it global.
   //             if (this.stateManager.accountGlobals.isGlobalAccount(wrappedStateKey)) {
   //               // wrappedState.accountId)){
-  //               if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('globalAccountMap', `applyAllPreparedRepairs - has`, ` ${wrappedState.accountId} ${wrappedStateKey}`)
+  //               if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', `applyAllPreparedRepairs - has`, ` ${wrappedState.accountId} ${wrappedStateKey}`)
   //               if (wrappedState != null) {
   //                 let globalValueSnapshot = this.stateManager.accountGlobals.getGlobalAccountValueAtTime(wrappedState.accountId, tx.timestamp)
 
   //                 if (globalValueSnapshot == null) {
   //                   //todo some error?
   //                   let globalAccountBackupList = this.stateManager.accountGlobals.getGlobalAccountBackupList(wrappedStateKey)
-  //                   if (this.verboseLogs) this.mainLogger.error(` _repair applyAllPreparedRepairs has global key but no snapshot at time ${tx.timestamp} entries:${globalAccountBackupList.length} ${utils.stringifyReduce(globalAccountBackupList.map((a) => `${a.timestamp}  ${utils.makeShortHash(a.accountId)} `))}  `)
+  //                   if (logFlags.verbose) this.mainLogger.error(` _repair applyAllPreparedRepairs has global key but no snapshot at time ${tx.timestamp} entries:${globalAccountBackupList.length} ${utils.stringifyReduce(globalAccountBackupList.map((a) => `${a.timestamp}  ${utils.makeShortHash(a.accountId)} `))}  `)
   //                   continue
   //                 }
   //                 // build a new wrapped response to insert
@@ -2091,16 +2091,16 @@ class Depricated {
   //                 wrappedStates[wrappedStateKey] = newWrappedResponse // update!!
   //                 // insert thes data into the wrapped states.
   //                 // yikes probably cant do local cached data at this point.
-  //                 if (this.verboseLogs) {
+  //                 if (logFlags.verbose) {
   //                   let globalAccountBackupList = this.stateManager.accountGlobals.getGlobalAccountBackupList(wrappedStateKey)
-  //                   if (this.verboseLogs) this.mainLogger.error(` _repair applyAllPreparedRepairs has global key details ${tx.timestamp} entries:${globalAccountBackupList.length} ${utils.stringifyReduce(globalAccountBackupList.map((a) => `${a.timestamp}  ${utils.makeShortHash(a.accountId)} `))}  `)
+  //                   if (logFlags.verbose) this.mainLogger.error(` _repair applyAllPreparedRepairs has global key details ${tx.timestamp} entries:${globalAccountBackupList.length} ${utils.stringifyReduce(globalAccountBackupList.map((a) => `${a.timestamp}  ${utils.makeShortHash(a.accountId)} `))}  `)
   //                 }
 
-  //                 if (this.verboseLogs) this.mainLogger.debug(` _repair applyAllPreparedRepairs got global account to repair from: ${utils.stringifyReduce(newWrappedResponse)}`)
+  //                 if (logFlags.verbose) this.mainLogger.debug(` _repair applyAllPreparedRepairs got global account to repair from: ${utils.stringifyReduce(newWrappedResponse)}`)
   //               }
   //             } else {
   //               if (wrappedState == null) {
-  //                 if (this.verboseLogs) this.mainLogger.error(` _repair applyAllPreparedRepairs is not a global account but wrapped state == null ${utils.stringifyReduce(wrappedStateKey)} ${tx.timestamp}`)
+  //                 if (logFlags.verbose) this.mainLogger.error(` _repair applyAllPreparedRepairs is not a global account but wrapped state == null ${utils.stringifyReduce(wrappedStateKey)} ${tx.timestamp}`)
   //               }
   //             }
   //           }
@@ -2109,24 +2109,24 @@ class Depricated {
   //           // accountValuesByKey = {} // clear this.  it forces more db work but avoids issue with some stale flags
   //           if (!applied) {
   //             applyFailCount++
-  //             if (this.verboseLogs) this.mainLogger.debug(` _repair applyAllPreparedRepairs apply failed`)
+  //             if (logFlags.verbose) this.mainLogger.debug(` _repair applyAllPreparedRepairs apply failed`)
   //           } else {
   //             applyCount++
   //           }
   //         } else {
-  //           if (this.verboseLogs) this.mainLogger.debug(` _repair applyAllPreparedRepairs no for ${tx.id} in ${utils.stringifyReduce(txIDToAcc)}`)
+  //           if (logFlags.verbose) this.mainLogger.debug(` _repair applyAllPreparedRepairs no for ${tx.id} in ${utils.stringifyReduce(txIDToAcc)}`)
   //         }
   //       } catch (ex) {
   //         this.mainLogger.debug('_repair: startRepairProcess applyAllPreparedRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
   //         this.statemanager_fatal(`applyAllPreparedRepairs_fail`, '_repair: startRepairProcess applyAllPreparedRepairs apply: ' + ` ${utils.stringifyReduce({ tx, keysFilter })} ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
   //       }
 
-  //       if (this.verboseLogs) this.mainLogger.debug(` _repair applyAllPreparedRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
+  //       if (logFlags.verbose) this.mainLogger.debug(` _repair applyAllPreparedRepairs applyCount ${applyCount} applyFailCount: ${applyFailCount}`)
   //     }
 
   //     // unlock the accounts we locked...  todo maybe put this in a finally statement?
   //     this.stateManager.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
-  //     if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs FIFO unlock: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
+  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair applyAllPreparedRepairs FIFO unlock: ${cycleNumber}   ${utils.stringifyReduce(accountKeys)}`)
   //     // }
   //     this.applyAllPreparedRepairsRunning = false
   //   }
@@ -2144,7 +2144,7 @@ class Depricated {
   //     cycleStart -= this.stateManager.syncSettleTime // adjust by sync settle time
   //     let replacmentAccounts: Shardus.AccountsCopy[]
   //     let replacmentAccountsMinusGlobals = [] as Shardus.AccountsCopy[]
-  //     if (this.verboseLogs) this.mainLogger.debug(` _repair _revertAccounts start  numAccounts: ${accountIDs.length} repairing cycle:${cycleNumber}`)
+  //     if (logFlags.verbose) this.mainLogger.debug(` _repair _revertAccounts start  numAccounts: ${accountIDs.length} repairing cycle:${cycleNumber}`)
 
   //     try {
   //       // query our account copies that are less than or equal to this cycle!
@@ -2161,10 +2161,10 @@ class Depricated {
   //           }
 
   //           if (accountData == null || accountData.data == null || accountData.accountId == null) {
-  //             if (this.verboseLogs) this.mainLogger.error(` _repair _revertAccounts null account data found: ${accountData.accountId} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
+  //             if (logFlags.verbose) this.mainLogger.error(` _repair _revertAccounts null account data found: ${accountData.accountId} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
   //           } else {
   //             // todo overkill
-  //             if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts reset: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
+  //             if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts reset: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} cycle: ${cycleNumber} data: ${utils.stringifyReduce(accountData)}`)
   //           }
   //           // TODO: globalaccounts
   //           //this is where we need to no reset a global account, but instead grab the replacment data and cache it
@@ -2174,9 +2174,9 @@ class Depricated {
   //           //Try not reverting global accounts..
   //           if (this.stateManager.accountGlobals.isGlobalAccount(accountData.accountId) === false) {
   //             replacmentAccountsMinusGlobals.push(accountData)
-  //             if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts not a global account, add to list ${utils.makeShortHash(accountData.accountId)}`)
+  //             if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts not a global account, add to list ${utils.makeShortHash(accountData.accountId)}`)
   //           } else {
-  //             if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts was a global account, do not add to list ${utils.makeShortHash(accountData.accountId)}`)
+  //             if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts was a global account, do not add to list ${utils.makeShortHash(accountData.accountId)}`)
   //           }
   //         }
   //         // tell the app to replace the account data
@@ -2184,10 +2184,10 @@ class Depricated {
   //         await this.app.resetAccountData(replacmentAccountsMinusGlobals)
   //         // update local state.
   //       } else {
-  //         if (this.verboseLogs) this.mainLogger.debug(` _repair _revertAccounts No replacment accounts found!!! cycle <= :${prevCycle}`)
+  //         if (logFlags.verbose) this.mainLogger.debug(` _repair _revertAccounts No replacment accounts found!!! cycle <= :${prevCycle}`)
   //       }
 
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts: ${accountIDs.length} replacmentAccounts ${replacmentAccounts.length} repairing cycle:${cycleNumber} replacmentAccountsMinusGlobals: ${replacmentAccountsMinusGlobals.length}`)
+  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair _revertAccounts: ${accountIDs.length} replacmentAccounts ${replacmentAccounts.length} repairing cycle:${cycleNumber} replacmentAccountsMinusGlobals: ${replacmentAccountsMinusGlobals.length}`)
 
   //       // TODO prodution. consider if we need a better set of checks before we delete an account!
   //       // If we don't have a replacement copy for an account we should try to delete it
@@ -2199,13 +2199,13 @@ class Depricated {
   //       for (let accountData of replacmentAccounts) {
   //         accountsReverted[accountData.accountId] = 1
   //         if (accountData.cycleNumber > prevCycle) {
-  //           if (this.verboseLogs) this.mainLogger.error(` _repair _revertAccounts cycle too new for backup restore: ${accountData.cycleNumber}  cycleNumber:${cycleNumber} timestamp:${accountData.timestamp}`)
+  //           if (logFlags.verbose) this.mainLogger.error(` _repair _revertAccounts cycle too new for backup restore: ${accountData.cycleNumber}  cycleNumber:${cycleNumber} timestamp:${accountData.timestamp}`)
   //         }
 
   //         debug.push({ id: accountData.accountId, cycleNumber: accountData.cycleNumber, timestamp: accountData.timestamp, hash: accountData.hash, accHash: accountData.data.hash, accTs: accountData.data.timestamp })
   //       }
 
-  //       if (this.verboseLogs) this.mainLogger.debug(` _repair _revertAccounts: ${utils.stringifyReduce(debug)}`)
+  //       if (logFlags.verbose) this.mainLogger.debug(` _repair _revertAccounts: ${utils.stringifyReduce(debug)}`)
 
   //       for (let accountID of accountIDs) {
   //         if (accountsReverted[accountID] == null) {
@@ -2213,7 +2213,7 @@ class Depricated {
   //         }
   //       }
   //       if (accountsToDelete.length > 0) {
-  //         if (this.verboseLogs) this.mainLogger.debug(` _repair _revertAccounts delete some accounts ${utils.stringifyReduce(accountsToDelete)}`)
+  //         if (logFlags.verbose) this.mainLogger.debug(` _repair _revertAccounts delete some accounts ${utils.stringifyReduce(accountsToDelete)}`)
   //         await this.app.deleteAccountData(accountsToDelete)
   //       }
 
@@ -2229,7 +2229,7 @@ class Depricated {
   //         // if (txRecord.txTS < cycleEnd) {
   //         let keysResponse = this.app.getKeyFromTransaction(txRecord.acceptedTx.data)
   //         if (!keysResponse) {
-  //           if (this.verboseLogs) this.mainLogger.debug(` _repair _revertAccounts problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(txRecord.acceptedTx)}`)
+  //           if (logFlags.verbose) this.mainLogger.debug(` _repair _revertAccounts problem with keysResp  ${utils.stringifyReduce(keysResponse)}  tx:  ${utils.stringifyReduce(txRecord.acceptedTx)}`)
   //         }
   //         let { sourceKeys, targetKeys } = keysResponse
   //         for (let accountID of sourceKeys) {
@@ -2277,11 +2277,11 @@ class Depricated {
   //         let accountEntry = tryGetAccountData(key)
   //         if (accountEntry.timestamp >= timestamp) {
   //           failedAgeCheck = true
-  //           if (this.verboseLogs) this.mainLogger.debug('testAccountTime account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
+  //           if (logFlags.verbose) this.mainLogger.debug('testAccountTime account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
   //         }
   //       }
   //       if (failedAgeCheck) {
-  //         // if (this.verboseLogs) this.mainLogger.debug('DATASYNC: testAccountTimesAndStateTable accounts have future state ' + timestamp)
+  //         // if (logFlags.verbose) this.mainLogger.debug('DATASYNC: testAccountTimesAndStateTable accounts have future state ' + timestamp)
   //         return false
   //       }
   //     } catch (ex) {
@@ -2316,11 +2316,11 @@ class Depricated {
   //         }
   //       }
 
-  //       if (this.verboseLogs) this.mainLogger.debug(`tryApplyTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
-  //       if (this.verboseLogs) this.mainLogger.debug(`tryApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
-  //       if (this.verboseLogs) this.mainLogger.debug(`tryApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
-  //       if (this.verboseLogs) this.mainLogger.debug(`tryApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
-  //       if (this.verboseLogs) this.mainLogger.debug(`tryApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
+  //       if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
+  //       if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
+  //       if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
+  //       if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+  //       if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
 
   //       if (repairing !== true) {
   //         // get a list of modified account keys that we will lock
@@ -2331,15 +2331,15 @@ class Depricated {
   //         for (let accountID of targetKeys) {
   //           accountKeys.push(accountID)
   //         }
-  //         if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair tryApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
+  //         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair tryApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
   //         ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(accountKeys)
-  //         if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair tryApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+  //         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair tryApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
   //       }
 
   //       ourLockID = await this.stateManager.fifoLock('accountModification')
 
-  //       if (this.verboseLogs) console.log(`tryApplyTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
-  //       // if (this.verboseLogs) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
+  //       if (logFlags.verbose) if (logFlags.console) console.log(`tryApplyTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
+  //       // if (logFlags.verbose) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
   //       this.stateManager.transactionQueue.applySoftLock = true
 
   //       // let replyObject = { stateTableResults: [], txId, txTimestamp, accountData: [] }
@@ -2350,19 +2350,19 @@ class Depricated {
   //       let { stateTableResults, accountData: _accountdata } = applyResponse
   //       accountDataList = _accountdata
 
-  //       if (this.verboseLogs) this.mainLogger.debug(`tryApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+  //       if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
   //       // wrappedStates are side effected for now
   //       savedSomething = await this.stateManager.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter)
 
-  //       if (this.verboseLogs) this.mainLogger.debug(`tryApplyTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
-  //       if (this.verboseLogs) this.mainLogger.debug(`tryApplyTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
+  //       if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
+  //       if (logFlags.verbose) this.mainLogger.debug(`tryApplyTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
 
   //       this.stateManager.transactionQueue.applySoftLock = false
   //       // only write our state table data if we dont already have it in the db
   //       if (hasStateTableData === false) {
   //         for (let stateT of stateTableResults) {
-  //           if (this.verboseLogs) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
-  //           if (this.verboseLogs) this.mainLogger.debug('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
+  //           if (logFlags.verbose) if (logFlags.console) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
+  //           if (logFlags.verbose) this.mainLogger.debug('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
   //         }
   //         await this.storage.addAccountStates(stateTableResults)
   //       }
@@ -2390,7 +2390,7 @@ class Depricated {
   //         if (ourAccountLocks != null) {
   //           this.stateManager.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
   //         }
-  //         if (this.verboseLogs) this.mainLogger.debug(` _repair tryApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+  //         if (logFlags.verbose) this.mainLogger.debug(` _repair tryApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
   //       }
   //     }
 
@@ -2575,11 +2575,11 @@ class Depricated {
   //       partitionResult.hashSet = hashSet
   //     }
 
-  //     if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair partitionObject: ${utils.stringifyReduce(partitionObject)}`)
-  //     if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair generatePartitionResult: ${utils.stringifyReduce(partitionResult)}`)
+  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair partitionObject: ${utils.stringifyReduce(partitionObject)}`)
+  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair generatePartitionResult: ${utils.stringifyReduce(partitionResult)}`)
 
   //     if (partitionObject.Txids && partitionObject.Txids.length > 0) {
-  //       if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('partitionObject', 'c' + partitionObject.Cycle_number, partitionObject)
+  //       if (logFlags.playback) this.logger.playbackLogNote('partitionObject', 'c' + partitionObject.Cycle_number, partitionObject)
   //     }
   //     // nodeid in form of the signer!
   //     return partitionResult
@@ -2667,19 +2667,19 @@ class Depricated {
   //     // Tried hashes is not working correctly at the moment, it is an unused parameter. I am not even sure we want to ignore hashes
   //     let { topHash, topCount, topResult } = this.stateManager.depricated.findMostCommonResponse(cycleCounter, partitionId, repairTracker.triedHashes)
 
-  //     if (this.verboseLogs) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept repairTracker: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
+  //     if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept repairTracker: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
 
   //     let requiredHalf = Math.max(1, allResults.length / 2)
   //     if (this.stateManager.useHashSets && repairPassHack) {
   //       // hack force our node to win:
   //       topCount = requiredHalf
   //       topHash = ourResult.Partition_hash
-  //       if (this.verboseLogs) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept hack force win: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
+  //       if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept hack force win: ${utils.stringifyReduce(repairTracker)} other: ${utils.stringifyReduce({ topHash, topCount, topResult })}`)
   //     }
 
   //     let resultsList = []
   //     if (topCount >= requiredHalf) {
-  //       if (this.verboseLogs) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: top hash wins: ` + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
+  //       if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: top hash wins: ` + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
   //       for (let partitionResult of allResults) {
   //         if (partitionResult.Partition_hash === topHash) {
   //           resultsList.push(partitionResult)
@@ -2688,15 +2688,15 @@ class Depricated {
   //     } else {
   //       if (this.stateManager.useHashSets) {
   //         // bail in a way that will cause us to use the hashset strings
-  //         if (this.verboseLogs) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: did not win, useHashSets: ` + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
+  //         if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: did not win, useHashSets: ` + utils.makeShortHash(topHash) + ` ourResult: ${utils.makeShortHash(ourResult.Partition_hash)}  count/required ${topCount} / ${requiredHalf}`)
   //         return { partitionReceipt: null, topResult: null, success: false }
   //       }
-  //       if (this.verboseLogs) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: top hash failed: ` + utils.makeShortHash(topHash) + ` ${topCount} / ${requiredHalf}`)
+  //       if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: top hash failed: ` + utils.makeShortHash(topHash) + ` ${topCount} / ${requiredHalf}`)
   //       return { partitionReceipt: null, topResult, success: false }
   //     }
 
   //     if (ourResult.Partition_hash !== topHash) {
-  //       if (this.verboseLogs) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: our hash does not match: ` + utils.makeShortHash(topHash) + ` our hash: ${ourResult.Partition_hash}`)
+  //       if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept: our hash does not match: ` + utils.makeShortHash(topHash) + ` our hash: ${ourResult.Partition_hash}`)
   //       return { partitionReceipt: null, topResult, success: false }
   //     }
 
@@ -2704,7 +2704,7 @@ class Depricated {
   //       resultsList,
   //     }
 
-  //     if (this.verboseLogs) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept OK! ${utils.stringifyReduce({ partitionReceipt, topResult })}`)
+  //     if (logFlags.verbose) this.mainLogger.debug(` _repair  ${debugKey} tryGeneratePartitoinReciept OK! ${utils.stringifyReduce({ partitionReceipt, topResult })}`)
 
   //     return { partitionReceipt, topResult, success: true }
   //   }
@@ -2721,7 +2721,7 @@ class Depricated {
   //     this.stateManager.stateIsGood_txHashsetOld = false
   //     if (this.stateManager.canDataRepair === false) {
   //       // todo fix false negative results.  This may require inserting
-  //       if (this.verboseLogs) this.mainLogger.error(`data oos detected. (old system) False negative results given if syncing. cycle: ${cycle.counter} partition: ${partitionId} `)
+  //       if (logFlags.verbose) this.mainLogger.error(`data oos detected. (old system) False negative results given if syncing. cycle: ${cycle.counter} partition: ${partitionId} `)
   //       return
   //     }
   //     return
@@ -2762,17 +2762,17 @@ class Depricated {
   //     }
   //     let receiptResults = this.tryGeneratePartitionReciept(responses, ourResult) // TODO: how to mark block if we are already on a thread for this?
   //     let { partitionReceipt: partitionReceipt3, topResult: topResult3, success: success3 } = receiptResults
-  //     if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair checkForGoodPartitionReciept immediate receipt check. ${debugKey} success:${success3} topResult:${utils.stringifyReduce(topResult3)}  partitionReceipt: ${utils.stringifyReduce({ partitionReceipt3 })}`)
+  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair checkForGoodPartitionReciept immediate receipt check. ${debugKey} success:${success3} topResult:${utils.stringifyReduce(topResult3)}  partitionReceipt: ${utils.stringifyReduce({ partitionReceipt3 })}`)
 
   //     // see if we already have a winning hash to correct to
   //     if (!success3) {
   //     //   if (repairTracker.awaitWinningHash) {
   //     //     if (topResult3 == null) {
   //     //       // if we are awaitWinningHash then wait for a top result before we start repair process again
-  //     //       if (this.verboseLogs) this.mainLogger.debug(` _repair checkForGoodPartitionReciept awaitWinningHash:true but topResult == null so keep waiting ${debugKey}`)
+  //     //       if (logFlags.verbose) this.mainLogger.debug(` _repair checkForGoodPartitionReciept awaitWinningHash:true but topResult == null so keep waiting ${debugKey}`)
   //     //     } else {
-  //     //       if (this.verboseLogs) this.mainLogger.debug(` _repair checkForGoodPartitionReciept awaitWinningHash:true and we have a top result so start reparing! ${debugKey}`)
-  //     //       if (this.verboseLogs) this.mainLogger.debug(` _repair checkForGoodPartitionReciept: tryGeneratePartitionReciept failed start repair process 3 ${debugKey} ${utils.stringifyReduce(receiptResults)}`)
+  //     //       if (logFlags.verbose) this.mainLogger.debug(` _repair checkForGoodPartitionReciept awaitWinningHash:true and we have a top result so start reparing! ${debugKey}`)
+  //     //       if (logFlags.verbose) this.mainLogger.debug(` _repair checkForGoodPartitionReciept: tryGeneratePartitionReciept failed start repair process 3 ${debugKey} ${utils.stringifyReduce(receiptResults)}`)
   //     //       let cycle = this.p2p.state.getCycleByCounter(cycleNumber)
   //     //       await utils.sleep(1000)
   //     //       await this.startRepairProcess(cycle, topResult3, partitionId, ourResult.Partition_hash)
@@ -2785,7 +2785,7 @@ class Depricated {
   //       }
   //       this.stateManager.storePartitionReceipt(cycleNumber, partitionReceipt3)
   //     //   this.stateManager.depricated.repairTrackerMarkFinished(repairTracker, 'checkForGoodPartitionReciept')
-  //       if (this.verboseLogs) this.mainLogger.debug(` _repair checkForGoodPartitionReciept 2 allFinished, final ${debugKey} hash:${utils.stringifyReduce({ topResult3 })}`)
+  //       if (logFlags.verbose) this.mainLogger.debug(` _repair checkForGoodPartitionReciept 2 allFinished, final ${debugKey} hash:${utils.stringifyReduce({ topResult3 })}`)
   //     }
   //   }
 
@@ -2839,7 +2839,7 @@ class Depricated {
 
   //     for (let txRecord of this.tempTXRecords) {
   //       if (txRecord.redacted > 0) {
-  //         if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair recordTXByCycle: ${utils.makeShortHash(txRecord.acceptedTx.id)} cycle: ${cycle.counter} redacted!!! ${txRecord.redacted}`)
+  //         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair recordTXByCycle: ${utils.makeShortHash(txRecord.acceptedTx.id)} cycle: ${cycle.counter} redacted!!! ${txRecord.redacted}`)
   //         continue
   //       }
   //       if (txRecord.txTS < cycleEnd) {
@@ -2868,7 +2868,7 @@ class Depricated {
   //       txList.processed = true
   //     }
 
-  //     if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair processTempTXs txsRecorded: ${txsRecorded} txsTemp: ${txsTemp} `)
+  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair processTempTXs txsRecorded: ${txsRecorded} txsTemp: ${txsTemp} `)
   //   }
 
   //   // TODO sharding  done! need to split this out by partition
@@ -2933,7 +2933,7 @@ class Depricated {
   //     }
 
   //     if (isGlobalModifyingTX) {
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  ignore loggging globalTX ${txQueueEntry.logID} cycle: ${cycleNumber}`)
+  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  ignore loggging globalTX ${txQueueEntry.logID} cycle: ${cycleNumber}`)
   //       return
   //     }
 
@@ -2968,10 +2968,10 @@ class Depricated {
   //     }
 
   //     if (storedNonGlobal === 0 && storedGlobal === 0) {
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: nothing to save globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
+  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: nothing to save globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
   //       return
   //     }
-  //     if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal}  tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
+  //     if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: globalAccounts: ${globalACC} nonGlobal: ${nonGlobal} storedNonGlobal:${storedNonGlobal} storedGlobal: ${storedGlobal}  tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
 
   //     for (let accountKey of allKeys) {
   //       /** @type {NodeShardData} */
@@ -2986,19 +2986,19 @@ class Depricated {
   //       let key = 'p' + partitionID
 
   //       if (this.stateManager.accountGlobals.isGlobalAccount(accountKey)) {
-  //         if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition. dont save due to global: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
+  //         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition. dont save due to global: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
   //         continue
   //       }
 
   //       let weStoreThisParition = ShardFunctions.testInRange(partitionID, lastCycleShardValues.nodeShardData.storedPartitions)
   //       if (weStoreThisParition === false) {
-  //         if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition we dont save: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
+  //         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition we dont save: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
 
   //         continue
   //       }
 
   //       if (partitionHasNonGlobal[key] === false) {
-  //         if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition. we store it but only a global ref involved this time: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
+  //         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle:  skip partition. we store it but only a global ref involved this time: P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber}`)
 
   //         continue
   //       }
@@ -3012,7 +3012,7 @@ class Depricated {
   //       }
 
   //       if (seenParitions[key] != null) {
-  //         if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: seenParitions[key] != null P: ${partitionID}  homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
+  //         if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`recordTXByCycle: seenParitions[key] != null P: ${partitionID}  homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
   //         // skip because this partition already has this TX!
   //         continue
   //       }
@@ -3038,7 +3038,7 @@ class Depricated {
   //           // // @ts-ignore
   //           // if(accountData.hash != null){
   //           //   // @ts-ignore
-  //           //   if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair recordTXByCycle:  how is this possible: ${utils.makeShortHash(accountData.accountId)} acc hash: ${utils.makeShortHash(accountData.hash)} acc stateID: ${utils.makeShortHash(accountData.stateId)}`)
+  //           //   if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug( ` _repair recordTXByCycle:  how is this possible: ${utils.makeShortHash(accountData.accountId)} acc hash: ${utils.makeShortHash(accountData.hash)} acc stateID: ${utils.makeShortHash(accountData.stateId)}`)
 
   //           // }
   //           // if(accountData.stateId == null){
@@ -3048,7 +3048,7 @@ class Depricated {
 
   //           // account data got upgraded earlier to have hash on it
 
-  //           //if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug( `recordTXByCycle: Pushed! P: ${partitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
+  //           //if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug( `recordTXByCycle: Pushed! P: ${partitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber} entries: ${txList.hashes.length} --TX already recorded for cycle`)
 
   //           states.push(utils.makeShortHash(((accountData as unknown) as Shardus.AccountData).hash))
   //           index++
@@ -3060,7 +3060,7 @@ class Depricated {
   //       }
   //       // txList.txById[acceptedTx.id] = acceptedTx
   //       // TODO sharding perf.  need to add some periodic cleanup when we have more cycles than needed stored in this map!!!
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair recordTXByCycle: pushedData P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber} entries: ${txList.hashes.length} recordedState: ${recordedState}`)
+  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair recordTXByCycle: pushedData P: ${partitionID} homeNodepartitionID: ${homeNodepartitionID} acc: ${utils.makeShortHash(accountKey)} tx: ${txQueueEntry.logID} cycle: ${cycleNumber} entries: ${txList.hashes.length} recordedState: ${recordedState}`)
   //     }
   //   }
 
@@ -3078,7 +3078,7 @@ class Depricated {
   //    * @param {number} cycleNumber
   //    */
   //   async broadcastPartitionResults(cycleNumber: number) {
-  //     if (this.verboseLogs) this.mainLogger.debug(` _repair broadcastPartitionResults for cycle: ${cycleNumber}`)
+  //     if (logFlags.verbose) this.mainLogger.debug(` _repair broadcastPartitionResults for cycle: ${cycleNumber}`)
   //     // per partition need to figure out which node cover it.
   //     // then get a list of all the results we need to send to a given node and send them at once.
   //     // need a way to do this in semi parallel?
@@ -3100,12 +3100,12 @@ class Depricated {
 
   //       //check if we are syncing that cycle if so don't send out info on it!
   //       // if(this.getSyncTrackerForParition(partitionResult.Partition_id, lastCycleShardValues)) {
-  //       //   if (this.verboseLogs ) this.mainLogger.debug( `broadcastPartitionResults skipped because parition is syncing ${partitionResult.Partition_id}`)
+  //       //   if (logFlags.verbose ) this.mainLogger.debug( `broadcastPartitionResults skipped because parition is syncing ${partitionResult.Partition_id}`)
   //       //   continue
   //       // }
 
   //       // if(lastCycleShardValues.partitionsToSkip.has(partitionResult.Partition_id) === true){
-  //       //   if (this.verboseLogs ) this.mainLogger.debug( `broadcastPartitionResults skipped because parition is syncing ${partitionResult.Partition_id}`)
+  //       //   if (logFlags.verbose ) this.mainLogger.debug( `broadcastPartitionResults skipped because parition is syncing ${partitionResult.Partition_id}`)
   //       //   continue
   //       // }
 
@@ -3152,12 +3152,12 @@ class Depricated {
   //       }
   //       let partitionResultsToSend = partitionResultsByNodeID.get(nodeId)
   //       let payload = { Cycle_number: cycleNumber, partitionResults: partitionResultsToSend.results }
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair broadcastPartitionResults to ${nodeId} debugStr: ${partitionResultsToSend.debugStr} res: ${utils.stringifyReduce(payload)}`)
-  //       if (this.verboseLogs && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair broadcastPartitionResults to ${nodeId} debugStr: ${partitionResultsToSend.debugStr} res: ${utils.stringifyReduce(payload)}`)
+  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair broadcastPartitionResults to ${nodeId} debugStr: ${partitionResultsToSend.debugStr} res: ${utils.stringifyReduce(payload)}`)
+  //       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` _repair broadcastPartitionResults to ${nodeId} debugStr: ${partitionResultsToSend.debugStr} res: ${utils.stringifyReduce(payload)}`)
 
   //       let shorthash = utils.makeShortHash(partitionResultsToSend.node.id)
   //       let toNodeStr = shorthash + ':' + partitionResultsToSend.node.externalPort
-  //       if (this.logger.playbackLogEnabled) this.logger.playbackLogNote('broadcastPartitionResults', `${cycleNumber}`, `to ${toNodeStr} ${partitionResultsToSend.debugStr} `)
+  //       if (logFlags.playback) this.logger.playbackLogNote('broadcastPartitionResults', `${cycleNumber}`, `to ${toNodeStr} ${partitionResultsToSend.debugStr} `)
 
   //       // Filter nodes before we send tell()
   //       let filteredNodes = this.stateManager.filterValidNodesForInternalMessage([partitionResultsToSend.node], 'tellCorrespondingNodes', true, true)

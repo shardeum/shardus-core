@@ -13,6 +13,7 @@ import * as P2PApoptosis from './Apoptosis'
 import * as Sync from './Sync'
 import * as GlobalAccounts from './GlobalAccounts'
 import { robustQuery } from './Utils'
+import {logFlags} from '../logger'
 
 class P2P extends EventEmitter {
   logger: any
@@ -41,7 +42,7 @@ class P2P extends EventEmitter {
   gossipedHashes: Map<any, any>
   gossipedHashesSent: Map<any, any>
   joinRequestToggle: boolean
-  verboseLogs: boolean
+  
   state: P2PState & EventEmitter
   lostNodes: P2PLostNodes
   archivers: P2PArchivers
@@ -78,11 +79,6 @@ class P2P extends EventEmitter {
     this.gossipedHashesSent = new Map() // TODO Perf: both of these lists need some eventual cleaning.  Perferably keep a sorted list also and periodically remove expired messages from the map and list
 
     this.joinRequestToggle = false
-
-    this.verboseLogs = false
-    if (this.mainLogger && ['TRACE'].includes(this.mainLogger.level.levelStr)) {
-      this.verboseLogs = true
-    }
 
     this.state = new P2PState(
       config,
@@ -234,7 +230,7 @@ class P2P extends EventEmitter {
           e.message
       )
     }
-    this.mainLogger.debug(`Discovered IP: ${ip}`)
+    if (logFlags.debug) this.mainLogger.debug(`Discovered IP: ${ip}`)
     return ip
   }
 
@@ -311,7 +307,7 @@ class P2P extends EventEmitter {
       nodesJoined,
       currentTime,
     }
-    this.mainLogger.debug(
+    if (logFlags.debug) this.mainLogger.debug(
       `Requested cycle marker info: ${JSON.stringify(info)}`
     )
     return info
@@ -323,7 +319,7 @@ class P2P extends EventEmitter {
   }
 
   getCycleChain(start, end) {
-    this.mainLogger.debug(
+    if (logFlags.debug) this.mainLogger.debug(
       `Requested cycle chain from cycle ${start} to ${end}...`
     )
     let cycles
@@ -333,12 +329,12 @@ class P2P extends EventEmitter {
       this.mainLogger.debug(e)
       cycles = null
     }
-    this.mainLogger.debug(`Result of requested cycleChain: ${cycles}`)
+    if (logFlags.debug) this.mainLogger.debug(`Result of requested cycleChain: ${cycles}`)
     return cycles
   }
 
   getCycleMarkerCerts(start, end) {
-    this.mainLogger.debug(
+    if (logFlags.debug) this.mainLogger.debug(
       `Requested cycle marker certificates from cycle ${start} to ${end}...`
     )
     let certs
@@ -348,7 +344,7 @@ class P2P extends EventEmitter {
       this.mainLogger.debug(e)
       certs = null
     }
-    this.mainLogger.debug(`Result of requested cycleChain: ${certs}`)
+    if (logFlags.debug) this.mainLogger.debug(`Result of requested cycleChain: ${certs}`)
     return certs
   }
 
@@ -374,7 +370,7 @@ class P2P extends EventEmitter {
       joinRequestTimestamp,
       activeTimestamp,
     }
-    this.mainLogger.debug(`Node info of this node: ${JSON.stringify(nodeInfo)}`)
+    if (logFlags.debug) this.mainLogger.debug(`Node info of this node: ${JSON.stringify(nodeInfo)}`)
     return nodeInfo
   }
 
@@ -402,7 +398,7 @@ class P2P extends EventEmitter {
   async _checkIfNeedJoin() {
     const id = await this.storage.getProperty('id')
     if (!id) {
-      this.mainLogger.debug('Node needs to join, no node ID found in database.')
+      if (logFlags.debug) this.mainLogger.debug('Node needs to join, no node ID found in database.')
       return true
     }
 
@@ -433,13 +429,13 @@ class P2P extends EventEmitter {
   getNodelistHash() {
     const nodelist = this.state.getAllNodes()
     const nodelistHash = this.crypto.hash({ nodelist })
-    this.mainLogger.debug(`Hash of current nodelist: ${nodelistHash}`)
+    if (logFlags.debug) this.mainLogger.debug(`Hash of current nodelist: ${nodelistHash}`)
     return nodelistHash
   }
 
   async _submitJoin(nodes, joinRequest) {
     for (const node of nodes) {
-      this.mainLogger.debug(`Sending join request to ${node.ip}:${node.port}`)
+      if (logFlags.debug) this.mainLogger.debug(`Sending join request to ${node.ip}:${node.port}`)
       await http.post(`${node.ip}:${node.port}/join`, joinRequest)
     }
   }
@@ -450,13 +446,15 @@ class P2P extends EventEmitter {
     cycleStart = this.state.getCurrentCycleStart(),
     cycleDuration = this.state.getCurrentCycleDuration()
   ) {
-    this.mainLogger.debug(`Current time is: ${currentTime}`)
-    this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
-    this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
-    const startOfUpdatePhase = cycleStart
-    this.mainLogger.debug(`Start of first quarter: ${startOfUpdatePhase}`)
-    const endOfUpdatePhase = cycleStart + Math.ceil(0.25 * cycleDuration)
-    this.mainLogger.debug(`End of first quarter: ${endOfUpdatePhase}`)
+    const startOfUpdatePhase = cycleStart    
+    const endOfUpdatePhase = cycleStart + Math.ceil(0.25 * cycleDuration) 
+    if (logFlags.debug){   
+      this.mainLogger.debug(`Current time is: ${currentTime}`)
+      this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
+      this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
+      this.mainLogger.debug(`Start of first quarter: ${startOfUpdatePhase}`)
+      this.mainLogger.debug(`End of first quarter: ${endOfUpdatePhase}`)
+    }
     if (currentTime < startOfUpdatePhase || currentTime > endOfUpdatePhase) {
       return false
     }
@@ -464,13 +462,15 @@ class P2P extends EventEmitter {
   }
 
   _isInLastPhase(currentTime, cycleStart, cycleDuration) {
-    this.mainLogger.debug(`Current time is: ${currentTime}`)
-    this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
-    this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
     const startOfLastPhase = cycleStart + Math.ceil(0.75 * cycleDuration)
-    this.mainLogger.debug(`Start of last quarter: ${startOfLastPhase}`)
-    const endOfLastPhase = cycleStart + cycleDuration
-    this.mainLogger.debug(`End of last quarter: ${endOfLastPhase}`)
+    const endOfLastPhase = cycleStart + cycleDuration    
+    if (logFlags.debug){
+      this.mainLogger.debug(`Current time is: ${currentTime}`)
+      this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
+      this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
+      this.mainLogger.debug(`Start of last quarter: ${startOfLastPhase}`)
+      this.mainLogger.debug(`End of last quarter: ${endOfLastPhase}`)
+    }
     if (currentTime < startOfLastPhase || currentTime > endOfLastPhase) {
       return false
     }
@@ -485,53 +485,61 @@ class P2P extends EventEmitter {
   ) {
     // If we are already in the update phase, return
     if (this._isInUpdatePhase(currentTime, cycleStart, cycleDuration)) return
-    this.mainLogger.debug(`Current time is: ${currentTime}`)
-    this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
-    this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
     const nextJoinStart = cycleStart + cycleDuration
-    this.mainLogger.debug(`Next join cycle starts at: ${nextJoinStart}`)
-    const timeToWait = (nextJoinStart - currentTime + this.queryDelay) * 1000
-    this.mainLogger.debug(
-      `Waiting for ${timeToWait} ms before next update phase...`
-    )
+    const timeToWait = (nextJoinStart - currentTime + this.queryDelay) * 1000    
+    if (logFlags.debug){
+      this.mainLogger.debug(`Current time is: ${currentTime}`)
+      this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
+      this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
+
+      this.mainLogger.debug(`Next join cycle starts at: ${nextJoinStart}`)
+
+      this.mainLogger.debug(
+        `Waiting for ${timeToWait} ms before next update phase...`
+      )
+    }
     await utils.sleep(timeToWait)
   }
 
   // Wait until middle phase of cycle
   async _waitUntilSecondPhase(currentTime, cycleStart, cycleDuration) {
-    this.mainLogger.debug(`Current time is: ${currentTime}`)
-    this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
-    this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
-    const phaseStart = cycleStart + Math.ceil(0.25 * cycleDuration)
-    this.mainLogger.debug(`Beginning of second phase at: ${phaseStart}`)
+    const phaseStart = cycleStart + Math.ceil(0.25 * cycleDuration)    
     let timeToWait
     if (currentTime < phaseStart) {
       timeToWait = (phaseStart - currentTime + this.queryDelay) * 1000
     } else {
       timeToWait = 0
     }
-    this.mainLogger.debug(
-      `Waiting for ${timeToWait} ms before the second phase...`
-    )
+    if (logFlags.debug){
+      this.mainLogger.debug(`Current time is: ${currentTime}`)
+      this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
+      this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
+      this.mainLogger.debug(`Beginning of second phase at: ${phaseStart}`)
+      this.mainLogger.debug(
+        `Waiting for ${timeToWait} ms before the second phase...`
+      )
+    }
     await utils.sleep(timeToWait)
   }
 
   // Wait until middle phase of cycle
   async _waitUntilThirdPhase(currentTime, cycleStart, cycleDuration) {
-    this.mainLogger.debug(`Current time is: ${currentTime}`)
-    this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
-    this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
     const phaseStart = cycleStart + Math.ceil(0.5 * cycleDuration)
-    this.mainLogger.debug(`Beginning of middle phase at: ${phaseStart}`)
     let timeToWait
     if (currentTime < phaseStart) {
       timeToWait = (phaseStart - currentTime + this.queryDelay) * 1000
     } else {
       timeToWait = 0
     }
-    this.mainLogger.debug(
-      `Waiting for ${timeToWait} ms before the middle phase...`
-    )
+    if (logFlags.debug){
+      this.mainLogger.debug(`Current time is: ${currentTime}`)
+      this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
+      this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
+      this.mainLogger.debug(`Beginning of middle phase at: ${phaseStart}`)
+      this.mainLogger.debug(
+        `Waiting for ${timeToWait} ms before the middle phase...`
+      )
+    }
     await utils.sleep(timeToWait)
   }
 
@@ -541,20 +549,22 @@ class P2P extends EventEmitter {
     cycleStart = this.state.getCurrentCycleStart(),
     cycleDuration = this.state.getCurrentCycleDuration()
   ) {
-    this.mainLogger.debug(`Current time is: ${currentTime}`)
-    this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
-    this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
     const beginningOfLast = cycleStart + Math.ceil(0.75 * cycleDuration)
-    this.mainLogger.debug(`Beginning of last phase at: ${beginningOfLast}`)
     let timeToWait
     if (currentTime < beginningOfLast) {
       timeToWait = (beginningOfLast - currentTime + this.queryDelay) * 1000
     } else {
       timeToWait = 0
     }
-    this.mainLogger.debug(
-      `Waiting for ${timeToWait} ms before the last phase...`
-    )
+    if (logFlags.debug){
+      this.mainLogger.debug(`Current time is: ${currentTime}`)
+      this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
+      this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
+      this.mainLogger.debug(`Beginning of last phase at: ${beginningOfLast}`)
+      this.mainLogger.debug(
+        `Waiting for ${timeToWait} ms before the last phase...`
+      )
+    }
     await utils.sleep(timeToWait)
   }
 
@@ -564,25 +574,27 @@ class P2P extends EventEmitter {
     cycleStart = this.state.getCurrentCycleStart(),
     cycleDuration = this.state.getCurrentCycleDuration()
   ) {
-    this.mainLogger.debug(`Current time is: ${currentTime}`)
-    this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
-    this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
     const endOfCycle = cycleStart + cycleDuration
-    this.mainLogger.debug(`End of cycle at: ${endOfCycle}`)
     let timeToWait
     if (currentTime < endOfCycle) {
       timeToWait = (endOfCycle - currentTime + this.queryDelay) * 1000
     } else {
       timeToWait = 0
     }
-    this.mainLogger.debug(
-      `Waiting for ${timeToWait} ms before next cycle marker creation...`
-    )
+    if (logFlags.debug){
+      this.mainLogger.debug(`Current time is: ${currentTime}`)
+      this.mainLogger.debug(`Current cycle started at: ${cycleStart}`)
+      this.mainLogger.debug(`Current cycle duration: ${cycleDuration}`)
+      this.mainLogger.debug(`End of cycle at: ${endOfCycle}`)
+      this.mainLogger.debug(
+        `Waiting for ${timeToWait} ms before next cycle marker creation...`
+      )
+    }
     await utils.sleep(timeToWait)
   }
 
   async _submitWhenUpdatePhase(route, message) {
-    this.mainLogger.debug(
+    if (logFlags.debug) this.mainLogger.debug(
       `Submitting message: ${JSON.stringify(
         message
       )} on route: ${route} whenever it's not the second quarter of cycle...`
@@ -614,7 +626,7 @@ class P2P extends EventEmitter {
     if (!this._isInUpdatePhase(currentTime, cycleStart, cycleDuration)) {
       await this._waitUntilUpdatePhase(currentTime, cycleStart, cycleDuration)
     }
-    if (this.verboseLogs) {
+    if (logFlags.verbose) {
       this.mainLogger.debug(
         `Gossiping message: ${JSON.stringify(message)} on '${route}'.`
       )
@@ -728,7 +740,7 @@ class P2P extends EventEmitter {
     // version: '0.0.0'
     const joinReq = { nodeInfo, cycleMarker, proofOfWork, selectionNum }
     const signedJoinReq = this.crypto.sign(joinReq)
-    this.mainLogger.debug(
+    if (logFlags.debug) this.mainLogger.debug(
       `Join request created... Join request: ${JSON.stringify(signedJoinReq)}`
     )
     return signedJoinReq
@@ -743,16 +755,16 @@ class P2P extends EventEmitter {
   }
 
   isActive() {
-    this.mainLogger.debug('Checking if active...')
+    if (logFlags.debug) this.mainLogger.debug('Checking if active...')
     const status = this.state.getNodeStatus(this.id)
     const active = status === 'active'
     if (!active) {
-      this.mainLogger.debug(
+      if (logFlags.debug) this.mainLogger.debug(
         `This node is not currently active... Current status: ${status}`
       )
       return false
     }
-    this.mainLogger.debug('This node is active!')
+    if (logFlags.debug) this.mainLogger.debug('This node is active!')
     return true
   }
 
@@ -916,18 +928,22 @@ class P2P extends EventEmitter {
   // }
 
   _verifyNodelist(nodelist, nodelistHash) {
-    this.mainLogger.debug(`Given nodelist: ${JSON.stringify(nodelist)}`)
-    const ourHash = this.crypto.hash(nodelist)
-    this.mainLogger.debug(`Our nodelist hash: ${ourHash}`)
-    this.mainLogger.debug(`Given nodelist hash: ${nodelistHash}`)
+    const ourHash = this.crypto.hash(nodelist)    
+    if (logFlags.debug){
+      this.mainLogger.debug(`Given nodelist: ${JSON.stringify(nodelist)}`)
+      this.mainLogger.debug(`Our nodelist hash: ${ourHash}`)
+      this.mainLogger.debug(`Given nodelist hash: ${nodelistHash}`)
+    }
     return ourHash === nodelistHash
   }
 
   _verifyCycleChain(cycleChain, cycleChainHash) {
-    this.mainLogger.debug(`Given cycle chain: ${JSON.stringify(cycleChain)}`)
-    const ourHash = this.crypto.hash({ cycleChain })
-    this.mainLogger.debug(`Our cycle chain hash: ${ourHash}`)
-    this.mainLogger.debug(`Given cycle chain hash: ${cycleChainHash}`)
+    const ourHash = this.crypto.hash({ cycleChain })   
+    if (logFlags.debug){ 
+      this.mainLogger.debug(`Given cycle chain: ${JSON.stringify(cycleChain)}`)
+      this.mainLogger.debug(`Our cycle chain hash: ${ourHash}`)
+      this.mainLogger.debug(`Given cycle chain hash: ${cycleChainHash}`)
+    }
     return ourHash === cycleChainHash
   }
 
@@ -937,7 +953,7 @@ class P2P extends EventEmitter {
     delete cm1.currentTime
     delete cm2.currentTime
     const equivalent = util.isDeepStrictEqual(cm1, cm2)
-    this.mainLogger.debug(
+    if (logFlags.debug) this.mainLogger.debug(
       `Equivalence of the two compared cycle marker infos: ${equivalent}`
     )
     return equivalent
@@ -1121,7 +1137,7 @@ class P2P extends EventEmitter {
   async addJoinRequest(joinRequest, tracker, fromExternal = true) {
     const valid = this._validateJoinRequest(joinRequest)
     if (!valid) {
-      this.mainLogger.debug(`Join request rejected: Failed validation.`)
+      if (logFlags.debug) this.mainLogger.debug(`Join request rejected: Failed validation.`)
       return false
     }
     let added
@@ -1132,7 +1148,7 @@ class P2P extends EventEmitter {
       added = this.state.addNewJoinRequest(joinRequest)
     }
     if (!added) {
-      this.mainLogger.debug(
+      if (logFlags.debug) this.mainLogger.debug(
         `Join request rejected: Was not added. TODO: Have this fn return reason.`
       )
       return false
@@ -1171,17 +1187,17 @@ class P2P extends EventEmitter {
       const update = this._createStatusUpdate('active')
       this.state.addStatusUpdate(update)
       // Emit the 'active' event after becoming active
-      this.mainLogger.debug('Emitting `active` event.')
+      if (logFlags.debug) this.mainLogger.debug('Emitting `active` event.')
       this.emit('active', this.id)
       return true
     }
     const ensureActive = async () => {
       if (!this.isActive()) {
         const { cycleDuration } = this.getCycleMarkerInfo()
-        this.mainLogger.debug('Not active yet, submitting an active request.')
+        if (logFlags.debug) this.mainLogger.debug('Not active yet, submitting an active request.')
         await this._submitStatusUpdate('active')
         const toWait = cycleDuration * 1000
-        this.mainLogger.debug(
+        if (logFlags.debug) this.mainLogger.debug(
           `Waiting before checking if active, waiting ${toWait} ms...`
         )
         setTimeout(async () => {
@@ -1189,7 +1205,7 @@ class P2P extends EventEmitter {
         }, toWait)
       } else {
         // Emit the 'active' event after becoming active
-        this.mainLogger.debug('Emitting `active` event.')
+        if (logFlags.debug) this.mainLogger.debug('Emitting `active` event.')
         this.emit('active', this.id)
         this.mainLogger.info('Node is now active!')
       }
@@ -1265,14 +1281,14 @@ class P2P extends EventEmitter {
   _findNodeInGroup(nodeId, group) {
     if (!group) {
       const errMsg = 'No group given for _findNodeInGroup()'
-      this.mainLogger.debug(errMsg)
+      if (logFlags.debug) this.mainLogger.debug(errMsg)
       throw new Error(errMsg)
     }
 //    this.mainLogger.debug(`Node ID to find in group: ${nodeId}`)
     for (const node of group) {
       if (node.id === nodeId) return node
     }
-    this.mainLogger.debug(`Node ID not found in group: ${nodeId}`)
+    if (logFlags.debug) this.mainLogger.debug(`Node ID not found in group: ${nodeId}`)
     return false
   }
 
@@ -1281,7 +1297,7 @@ class P2P extends EventEmitter {
     let result
     try {
       if (!node.curvePublicKey) {
-        this.mainLogger.debug(
+        if (logFlags.debug) this.mainLogger.debug(
           'Node object did not contain curve public key for authenticateByNode()!'
         )
         return false
@@ -1289,7 +1305,7 @@ class P2P extends EventEmitter {
 //      this.mainLogger.debug(`Expected publicKey: ${node.curvePublicKey}`)
       result = this.crypto.authenticate(message, node.curvePublicKey)
     } catch (e) {
-      this.mainLogger.debug(
+      if (logFlags.debug) this.mainLogger.debug(
         `Invalid or missing authentication tag on message: ${JSON.stringify(
           message
         )}`
@@ -1302,7 +1318,7 @@ class P2P extends EventEmitter {
   _extractPayload(wrappedPayload, nodeGroup) {
     if (wrappedPayload.error) {
       const error = wrappedPayload.error
-      this.mainLogger.debug(
+      if (logFlags.debug) this.mainLogger.debug(
         `_extractPayload Failed to extract payload. Error: ${error}`
       )
       return [null]
@@ -1310,7 +1326,7 @@ class P2P extends EventEmitter {
     // Check to see if node is in expected node group
     const node = this._findNodeInGroup(wrappedPayload.sender, nodeGroup)
     if (!node) {
-      this.mainLogger.debug(
+      if (logFlags.debug) this.mainLogger.debug(
         `_extractPayload Invalid sender on internal payload. sender: ${
           wrappedPayload.sender
         } payload: ${utils.stringifyReduceLimit(wrappedPayload)}`
@@ -1320,7 +1336,7 @@ class P2P extends EventEmitter {
     const authenticatedByNode = this._authenticateByNode(wrappedPayload, node)
     // Check if actually signed by that node
     if (!authenticatedByNode) {
-      this.mainLogger.debug(
+      if (logFlags.debug) this.mainLogger.debug(
         '_extractPayload Internal payload not authenticated by an expected node.'
       )
       return [null]
@@ -1334,8 +1350,8 @@ class P2P extends EventEmitter {
 
   _wrapAndTagMessage(msg, tracker = '', recipientNode) {
     if (!msg) throw new Error('No message given to wrap and tag!')
-    if (this.verboseLogs) {
-      this.mainLogger.debug(
+    if (logFlags.verbose) {
+      if (logFlags.debug) this.mainLogger.debug(
         `Attaching sender ${
           this.id
         } to the message: ${utils.stringifyReduceLimit(msg)}`
@@ -1384,7 +1400,7 @@ class P2P extends EventEmitter {
     try {
       await Promise.all(promises)
     } catch (err) {
-      this.mainLogger.debug('P2P TELL: failed', err)
+      if (logFlags.debug) this.mainLogger.debug('P2P TELL: failed', err)
     }
   }
 
@@ -1406,7 +1422,7 @@ class P2P extends EventEmitter {
       this.mainLogger.error('P2P: ask: network.ask: ' + err)
       return false
     }
-    this.mainLogger.debug(
+    if (logFlags.debug) this.mainLogger.debug(
       `Result of network-level ask: ${JSON.stringify(signedResponse)}`
     )
     try {
@@ -1431,7 +1447,7 @@ class P2P extends EventEmitter {
       this.InternalRecvCounter++
       // We have internal requests turned off until we have the node list
       if (!this.acceptInternal) {
-        this.mainLogger.debug(
+        if (logFlags.debug) this.mainLogger.debug(
           'We are not currently accepting internal requests...'
         )
         return
@@ -1441,7 +1457,7 @@ class P2P extends EventEmitter {
       const respondWrapped = async response => {
         const node = this.state.getNode(sender)
         const signedResponse = this._wrapAndTagMessage(response, tracker, node)
-        if (this.verboseLogs) {
+        if (logFlags.verbose) {
           this.mainLogger.debug(
             `The signed wrapped response to send back: ${utils.stringifyReduceLimit(
               signedResponse
@@ -1468,7 +1484,7 @@ class P2P extends EventEmitter {
       const [payload, sender] = payloadArray
       tracker = payloadArray[2] || ''
       if (!payload) {
-        this.mainLogger.debug(
+        if (logFlags.debug) this.mainLogger.debug(
           'Payload unable to be extracted, possible missing signature...'
         )
         return
@@ -1509,7 +1525,7 @@ class P2P extends EventEmitter {
       tracker = this.createGossipTracker()
     }
 
-    if (this.verboseLogs) {
+    if (logFlags.verbose) {
       this.mainLogger.debug(
         `Start of sendGossip(${utils.stringifyReduce(payload)})`
       )
@@ -1518,7 +1534,7 @@ class P2P extends EventEmitter {
 
     const gossipHash = this.crypto.hash(gossipPayload)
     if (this.gossipedHashesSent.has(gossipHash)) {
-      if (this.verboseLogs) {
+      if (logFlags.verbose) {
         this.mainLogger.debug(
           `Gossip already sent: ${gossipHash.substring(0, 5)}`
         )
@@ -1532,7 +1548,7 @@ class P2P extends EventEmitter {
       recipients = removeNodesByID(recipients, [sender])
     }
     try {
-      if (this.verboseLogs) {
+      if (logFlags.verbose) {
         this.mainLogger.debug(
           `Gossiping ${type} request to these nodes: ${utils.stringifyReduce(
             recipients.map(
@@ -1553,7 +1569,7 @@ class P2P extends EventEmitter {
       }
       await this.tell(recipients, 'gossip', gossipPayload, true, tracker)
     } catch (ex) {
-      if (this.verboseLogs) {
+      if (logFlags.verbose) {
         this.mainLogger.error(
           `Failed to sendGossip(${utils.stringifyReduce(
             payload
@@ -1565,7 +1581,7 @@ class P2P extends EventEmitter {
       )
     }
     this.gossipedHashesSent.set(gossipHash, false)
-    if (this.verboseLogs) {
+    if (logFlags.verbose) {
       this.mainLogger.debug(
         `End of sendGossip(${utils.stringifyReduce(payload)})`
       )
@@ -1592,7 +1608,7 @@ class P2P extends EventEmitter {
       tracker = this.createGossipTracker()
     }
 
-    if (this.verboseLogs) {
+    if (logFlags.verbose) {
       this.mainLogger.debug(
         `Start of sendGossipIn(${utils.stringifyReduce(payload)})`
       )
@@ -1601,7 +1617,7 @@ class P2P extends EventEmitter {
 
     const gossipHash = this.crypto.hash(gossipPayload)
     if (this.gossipedHashesSent.has(gossipHash)) {
-      if (this.verboseLogs) {
+      if (logFlags.verbose) {
         this.mainLogger.debug(
           `Gossip already sent: ${gossipHash.substring(0, 5)}`
         )
@@ -1625,7 +1641,7 @@ class P2P extends EventEmitter {
       recipients = removeNodesByID(recipients, [sender])
     }
     try {
-      if (this.verboseLogs) {
+      if (logFlags.verbose) {
         this.mainLogger.debug(
           `GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(
             recipients.map(
@@ -1646,7 +1662,7 @@ class P2P extends EventEmitter {
       }
       await this.tell(recipients, 'gossip', gossipPayload, true, tracker)
     } catch (ex) {
-      if (this.verboseLogs) {
+      if (logFlags.verbose) {
         this.mainLogger.error(
           `Failed to sendGossip(${utils.stringifyReduce(
             payload
@@ -1658,7 +1674,7 @@ class P2P extends EventEmitter {
       )
     }
     this.gossipedHashesSent.set(gossipHash, false)
-    if (this.verboseLogs) {
+    if (logFlags.verbose) {
       this.mainLogger.debug(
         `End of sendGossipIn(${utils.stringifyReduce(payload)})`
       )
@@ -1681,7 +1697,7 @@ class P2P extends EventEmitter {
       tracker = this.createGossipTracker()
     }
 
-    if (this.verboseLogs) {
+    if (logFlags.verbose) {
       this.mainLogger.debug(
         `Start of sendGossipIn(${utils.stringifyReduce(payload)})`
       )
@@ -1690,7 +1706,7 @@ class P2P extends EventEmitter {
 
     const gossipHash = this.crypto.hash(gossipPayload)
     if (this.gossipedHashesSent.has(gossipHash)) {
-      if (this.verboseLogs) {
+      if (logFlags.verbose) {
         this.mainLogger.debug(
           `Gossip already sent: ${gossipHash.substring(0, 5)}`
         )
@@ -1706,7 +1722,7 @@ class P2P extends EventEmitter {
       recipients = removeNodesByID(recipients, [sender])
     }
     try {
-      if (this.verboseLogs) {
+      if (logFlags.verbose) {
         this.mainLogger.debug(
           `GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(
             recipients.map(
@@ -1727,7 +1743,7 @@ class P2P extends EventEmitter {
       }
       await this.tell(recipients, 'gossip', gossipPayload, true, tracker)
     } catch (ex) {
-      if (this.verboseLogs) {
+      if (logFlags.verbose) {
         this.mainLogger.error(
           `Failed to sendGossip(${utils.stringifyReduce(
             payload
@@ -1739,7 +1755,7 @@ class P2P extends EventEmitter {
       )
     }
     this.gossipedHashesSent.set(gossipHash, false)
-    if (this.verboseLogs) {
+    if (logFlags.verbose) {
       this.mainLogger.debug(
         `End of sendGossipIn(${utils.stringifyReduce(payload)})`
       )
@@ -1751,7 +1767,7 @@ class P2P extends EventEmitter {
    * Payload: {type: ['receipt', 'trustedTransaction'], data: {}}
    */
   async handleGossip(payload, sender, tracker = '') {
-    if (this.verboseLogs) {
+    if (logFlags.verbose) {
       this.mainLogger.debug(
         `Start of handleGossip(${utils.stringifyReduce(payload)})`
       )
@@ -1761,7 +1777,7 @@ class P2P extends EventEmitter {
 
     const gossipHandler = this.gossipHandlers[type]
     if (!gossipHandler) {
-      this.mainLogger.debug('Gossip Handler not found')
+      if (logFlags.debug) this.mainLogger.debug('Gossip Handler not found')
       return
     }
 
@@ -1771,7 +1787,7 @@ class P2P extends EventEmitter {
     }
 
     if (this.gossipedHashes.has(gossipHash)) {
-      if (this.verboseLogs) {
+      if (logFlags.verbose) {
         this.mainLogger.debug(`Got old gossip: ${gossipHash.substring(0, 5)}`)
       }
       if (!this.gossipedHashes.get(gossipHash)) {
@@ -1780,7 +1796,7 @@ class P2P extends EventEmitter {
           this.gossipTimeout
         )
         this.gossipedHashes.set(gossipHash, true)
-        if (this.verboseLogs) {
+        if (logFlags.verbose) {
           this.mainLogger.debug(
             `Marked old gossip for deletion: ${gossipHash.substring(0, 5)} in ${
               this.gossipTimeout
@@ -1793,7 +1809,7 @@ class P2P extends EventEmitter {
     this.gossipedHashes.set(gossipHash, false)
     this.logger.playbackLog(sender, 'self', 'GossipRcv', type, tracker, data)
     await gossipHandler(data, sender, tracker)
-    if (this.verboseLogs) {
+    if (logFlags.verbose) {
       this.mainLogger.debug(
         `End of handleGossip(${utils.stringifyReduce(payload)})`
       )

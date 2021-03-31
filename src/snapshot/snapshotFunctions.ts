@@ -20,6 +20,8 @@ import { hashMap } from './partition-gossip'
 import got from 'got'
 import stream from 'stream'
 import zlib from 'zlib'
+import {logFlags} from '../logger'
+
 const { Transform } = require('stream')
 /** TYPES */
 
@@ -404,7 +406,7 @@ export function registerDownloadRoutes (
     }
   }
   dataToSend = JSON.stringify(dataToSend)
-  console.log('Registering download route', typeof dataToSend, dataToSend)
+  if (logFlags.console) console.log('Registering download route', typeof dataToSend, dataToSend)
 
   network.registerExternalGet('download-snapshot-data', (req, res) => {
     const readerStream = stream.Readable.from([dataToSend])
@@ -468,5 +470,5 @@ export function convertArrayToObj (inputArr) {
 }
 
 function log (...things) {
-  console.log('DBG', 'SNAPSHOT', ...things)
+  if (logFlags.console) console.log('DBG', 'SNAPSHOT', ...things)
 }

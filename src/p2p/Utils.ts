@@ -1,6 +1,7 @@
 import util from 'util'
 import * as utils from '../utils'
 import FastRandomIterator from '../utils/FastRandomIterator'
+import {logFlags} from '../logger'
 
 export type QueryFunction<Node, Response> = (node: Node) => Promise<Response>
 
@@ -178,7 +179,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
   }
   if (redundancy > nodes.length) {
     if (strictRedundancy) {
-      console.log(
+      if (logFlags.console) console.log(
         'robustQuery: isRobustResult=false. not enough nodes to meet strictRedundancy'
       )
       return { topResult: null, winningNodes: [], isRobustResult: false }
@@ -292,7 +293,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     }
 
     for (const err of errs) {
-      console.log('robustQuery: queryNodes:', err)
+      if (logFlags.console) console.log('robustQuery: queryNodes:', err)
       errors += 1
     }
 
@@ -306,7 +307,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     tries += 1
     const toQuery = redundancy - responses.getHighestCount()
     if (nodes.length < toQuery) {
-      console.log('robustQuery: stopping since we ran out of nodes to query.')
+      if (logFlags.console) console.log('robustQuery: stopping since we ran out of nodes to query.')
       break
     }
     let nodesToQuery:Node[]
@@ -322,13 +323,13 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     }
     finalResult = await queryNodes(nodesToQuery)
     if (tries >= 20) {
-      console.log('robustQuery: stopping after 20 tries.')
+      if (logFlags.console) console.log('robustQuery: stopping after 20 tries.')
       break
     }
   }
   if (finalResult) {
     const isRobustResult = finalResult.count >= redundancy
-    // console.log(`robustQuery: stopping since we got a finalResult:${JSON.stringify(finalResult)}`)
+    // if (logFlags.console) console.log(`robustQuery: stopping since we got a finalResult:${JSON.stringify(finalResult)}`)
     return {
       topResult: finalResult.value,
       winningNodes: finalResult.nodes,
@@ -337,7 +338,7 @@ export async function robustQuery<Node = unknown, Response = unknown>(
   } else {
     // Note:  We return the item that had the most nodes reporting it. However, the caller should know
     //        The calling code can now check isRobustResult to see if a topResult is valid
-    console.log(
+    if (logFlags.console) console.log(
       `robustQuery: Could not get ${redundancy} ${
         redundancy > 1 ? 'redundant responses' : 'response'
       } from ${nodeCount} ${
@@ -348,12 +349,12 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     const highestCountItem = responses.getHighestCountItem()
     if (highestCountItem === null) {
       //if there was no highestCountItem then we had no responses at all
-      console.log('robustQuery: isRobustResult=false. no responses at all')
+      if (logFlags.console) console.log('robustQuery: isRobustResult=false. no responses at all')
       return { topResult: null, winningNodes: [], isRobustResult: false }
     }
     //this isRobustResult should always be false if we get to this code.
     const isRobustResult = highestCountItem.count >= redundancy
-    console.log(
+    if (logFlags.console) console.log(
       'robustQuery: isRobustResult=false. returning highest count response'
     )
     return {

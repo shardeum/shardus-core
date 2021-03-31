@@ -20,7 +20,7 @@ import * as Types from './Types'
 import { nodes, removeNode, byPubKey, activeByIdOrder } from './NodeList'
 import { currentQuarter, currentCycle } from './CycleCreator'
 import { sleep, binarySearch, validateTypes } from '../utils'
-import Logger from '../logger'
+import Logger, {logFlags} from '../logger'
 
 /** TYPES */
 
@@ -275,7 +275,7 @@ export function sendRequests() {
       msg = crypto.sign(msg)
       obj.message = msg
       obj.gossiped = true
-      info(`Gossiping node down message: ${JSON.stringify(msg)}`)
+      if(logFlags.p2pNonFatal) info(`Gossiping node down message: ${JSON.stringify(msg)}`)
       Comms.sendGossip('lost-down', msg)
     }
   }
@@ -283,11 +283,13 @@ export function sendRequests() {
 //   It has to be based on the lost node seeing it's node id in the lost field of the cycle record.
 //   Send refute is set to the cycle counter + 1 of the cycle record where we saw our id in the lost field
 //   We cannot create a message which has the down message since we may not have received that gossip
-  if (sendRefute>0) info(`sendRequest 5  sendRefute:${sendRefute}  currentCycle:${currentCycle}`)
+  if (sendRefute>0) {
+    if(logFlags.p2pNonFatal) info(`sendRequest 5  sendRefute:${sendRefute}  currentCycle:${currentCycle}`)
+  }
   if (sendRefute === currentCycle){
     let msg = {target:Self.id, status:"up", cycle:currentCycle}
     msg = crypto.sign(msg)
-    info(`Gossiping node up message: ${JSON.stringify(msg)}`)
+    if(logFlags.p2pNonFatal) info(`Gossiping node up message: ${JSON.stringify(msg)}`)
     Comms.sendGossip('lost-up', msg)
   }
 }
@@ -296,9 +298,9 @@ export function sendRequests() {
 /* Module functions */
 
 async function killSelf() {
-  info(`In killSelf`)
+  if(logFlags.p2pNonFatal) info(`In killSelf`)
   Self.emitter.emit('apoptosized')
-  info(`I have been killed, will not restart.`)
+  if(logFlags.p2pNonFatal) info(`I have been killed, will not restart.`)
 }
 
 async function killOther() {
@@ -324,7 +326,7 @@ export function reportLost(target, reason){
   let msg:LostReport = {target:target.id, checker:checker.id, reporter:Self.id, cycle:currentCycle}
 // [TODO] - remove the following line after testing killother
   if (allowKillRoute && reason === 'killother') msg.killother = true
-  info(`Sending investigate request: reporter:${Self.port} checker:${checker.externalPort} target:${target.externalPort} `+JSON.stringify(msg))
+  if(logFlags.p2pNonFatal) info(`Sending investigate request: reporter:${Self.port} checker:${checker.externalPort} target:${target.externalPort} `+JSON.stringify(msg))
   msg = crypto.sign(msg)
   lost.set(key, obj)
   Comms.tell([checker], 'lost-report', msg)
@@ -339,13 +341,15 @@ function getCheckerNode(id, cycle){
   const oidx = idx
   if (idx < 0) idx = (-1 - idx)%activeByIdOrder.length
   if (activeByIdOrder[idx].id === id) idx = (idx+1)%activeByIdOrder.length  // skip to next node if the selected node is target
-  info(`in getCheckerNode oidx:${oidx} idx:${idx} near:${near}  cycle:${cycle}  id:${id}`)
-  info(`${JSON.stringify(activeByIdOrder.map(n => n.id))}`)
+  if(logFlags.p2pNonFatal) {
+    info(`in getCheckerNode oidx:${oidx} idx:${idx} near:${near}  cycle:${cycle}  id:${id}`)
+    info(`${JSON.stringify(activeByIdOrder.map(n => n.id))}`)
+  }
   return activeByIdOrder[idx]
 }
 
 async function lostReportHandler (payload, response, sender) {
-  info(`Got investigate request: ${JSON.stringify(payload)} from ${JSON.stringify(sender)}`)
+  if(logFlags.p2pNonFatal) info(`Got investigate request: ${JSON.stringify(payload)} from ${JSON.stringify(sender)}`)
   let err = ''
   err = validateTypes(payload, {target:'s',reporter:'s',checker:'s',cycle:'n',sign:'o'})
   if (err){ warn('bad input '+err); return }
@@ -368,7 +372,7 @@ async function lostReportHandler (payload, response, sender) {
   let result = await isDownCache(nodes.get(payload.target))
   if (allowKillRoute && payload.killother) result = 'down'
   if (obj.status === 'checking') obj.status = result
-  info('Status after checking is '+obj.status)
+  if(logFlags.p2pNonFatal) info('Status after checking is '+obj.status)
   // At start of Q1 of the next cycle sendRequests() will start a gossip if the node was found to be down
 }
 
@@ -482,7 +486,7 @@ function pruneStopReporting(){
 async function isDownCheck(node){
 // Check the internal route
 // The timeout for this is controled by the network.timeout paramater in server.json
-  info(`Checking internal connection for ${node.id}`)
+if(logFlags.p2pNonFatal) info(`Checking internal connection for ${node.id}`)
   const res = await Comms.ask(node, 'apoptosize', {id:'bad'})
   try{
     if (typeof(res.s) !== 'string') return 'down'
@@ -491,7 +495,7 @@ async function isDownCheck(node){
     return 'down'
   }
   if (node.externalIp === node.interalIp) return 'up'
-  info(`Checking external connection for ${node.id}`)
+  if(logFlags.p2pNonFatal) info(`Checking external connection for ${node.id}`)
 // Check the external route if ip is different than internal
   const queryExt = async (node) => {
     const ip = node.ip ? node.ip : node.externalIp
@@ -513,7 +517,7 @@ async function isDownCheck(node){
 }
 
 function downGossipHandler(payload:SignedDownGossipMessage, sender, tracker){
-  info(`Got downGossip: ${JSON.stringify(payload)}`)
+  if(logFlags.p2pNonFatal) info(`Got downGossip: ${JSON.stringify(payload)}`)
   let err = ''
   err = validateTypes(payload, {cycle:'n',report:'o',status:'s',sign:'o'})
   if (err){ warn('bad input '+err); return }
@@ -559,7 +563,7 @@ function checkDownMsg(payload:SignedDownGossipMessage, expectedCycle){
 }
 
 function upGossipHandler(payload, sender, tracker){
-  info(`Got upGossip: ${JSON.stringify(payload)}`)
+  if(logFlags.p2pNonFatal) info(`Got upGossip: ${JSON.stringify(payload)}`)
   let err = ''
   err = validateTypes(payload, {cycle:'n',target:'s',status:'s',sign:'o'})
   if (err){ warn('bad input '+err); return }

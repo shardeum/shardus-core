@@ -4,7 +4,7 @@ import fs from 'fs'
 import path from 'path'
 import { Sequelize } from 'sequelize'
 import Profiler from '../utils/profiler'
-import Logger from '../logger'
+import Logger, {logFlags} from '../logger'
 
 interface SequelizeStorage {
   baseDir: string

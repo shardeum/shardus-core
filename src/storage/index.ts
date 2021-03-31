@@ -2,7 +2,7 @@ import Log4js from 'log4js'
 // const fs = require('fs')
 // const path = require('path')
 import { Op } from 'sequelize'
-import Logger from '../logger'
+import Logger, {logFlags} from '../logger'
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
 import Profiler from '../utils/profiler'
@@ -578,7 +578,7 @@ class Storage {
   //     //   [acceptedTransactions.id, acceptedTransactions.timestamp, acceptedTransactions.data, acceptedTransactions.status, acceptedTransactions.receipt, Date.now(), Date.now()],
   //     //   resolve))
 
-  //     // console.log(' data: ' + JSON.stringify(acceptedTransactions.data))
+  //     // if (logFlags.console) console.log(' data: ' + JSON.stringify(acceptedTransactions.data))
   //     await this.run(`INSERT INTO acceptedTxs (id,timestamp,data,status,receipt,createdAt,updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
   //       [acceptedTransactions.id, acceptedTransactions.timestamp, stringify(acceptedTransactions.data), acceptedTransactions.status, stringify(acceptedTransactions.receipt), Date.now(), Date.now()])
 
@@ -795,7 +795,7 @@ class Storage {
   async createAccountCopies(accountCopies) {
     this._checkInit()
     try {
-      // console.log('createAccountCopies write: ' + JSON.stringify(accountCopies))
+      // if (logFlags.console) console.log('createAccountCopies write: ' + JSON.stringify(accountCopies))
       await this._create(this.storageModels.accountsCopy, accountCopies)
     } catch (e) {
       throw new Error(e)
@@ -805,7 +805,7 @@ class Storage {
   async createOrReplaceAccountCopy(accountCopy) {
     this._checkInit()
     try {
-      // console.log('createOrReplaceAccountCopy write: ' + JSON.stringify(accountCopy))
+      // if (logFlags.console) console.log('createOrReplaceAccountCopy write: ' + JSON.stringify(accountCopy))
       await this._create(this.storageModels.accountsCopy, accountCopy, {
         createOrReplace: true,
       })

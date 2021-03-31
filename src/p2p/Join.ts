@@ -14,6 +14,7 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import * as Types from './Types'
 import { robustQuery } from './Utils'
+import {logFlags} from '../logger'
 
 /**
  * [TODO] [AS] Remove nodes that are taking too long to sync after they've joined.
@@ -273,7 +274,7 @@ export async function createJoinRequest(
   }
   const joinReq = { nodeInfo, cycleMarker, proofOfWork, version }
   const signedJoinReq = crypto.sign(joinReq)
-  info(`Join request created... Join request: ${JSON.stringify(signedJoinReq)}`)
+  if(logFlags.p2pNonFatal) info(`Join request created... Join request: ${JSON.stringify(signedJoinReq)}`)
   return signedJoinReq
 }
 
@@ -316,11 +317,11 @@ export function addJoinRequest(joinRequest: JoinRequest) {
   }
 
   const node = joinRequest.nodeInfo
-  info(`Got join request for ${node.externalIp}:${node.externalPort}`)
+  if(logFlags.p2pNonFatal) info(`Got join request for ${node.externalIp}:${node.externalPort}`)
 
   // Check if this node has already been seen this cycle
   if (seen.has(node.publicKey)) {
-    info('Node has already been seen this cycle. Unable to add join request.')
+    if(logFlags.p2pNonFatal) info('Node has already been seen this cycle. Unable to add join request.')
     return false
   }
 
@@ -330,7 +331,7 @@ export function addJoinRequest(joinRequest: JoinRequest) {
   // Return if we already know about this node
   const ipPort = NodeList.ipPort(node.internalIp, node.internalPort)
   if (NodeList.byIpPort.has(ipPort)) {
-    info('Cannot add join request for this node, already a known node.')
+    if(logFlags.p2pNonFatal) info('Cannot add join request for this node, already a known node.')
     return false
   }
 
@@ -359,7 +360,7 @@ export function addJoinRequest(joinRequest: JoinRequest) {
     requests.length >= toAccept &&
     !crypto.isGreaterHash(selectionNum, last.selectionNum)
   ) {
-    info('Join request not better than lowest, not added.')
+    if(logFlags.p2pNonFatal) info('Join request not better than lowest, not added.')
     return false
   }
 
@@ -382,12 +383,12 @@ export function addJoinRequest(joinRequest: JoinRequest) {
       ? -1
       : 0
   )
-  info(
+  if(logFlags.p2pNonFatal) info(
     `Added join request for ${joinRequest.nodeInfo.externalIp}:${joinRequest.nodeInfo.externalPort}`
   )
 
   // If we have > maxJoinedPerCycle requests, trim them down
-  info(`Requests: ${requests.length}, toAccept: ${toAccept}`)
+  if(logFlags.p2pNonFatal) info(`Requests: ${requests.length}, toAccept: ${toAccept}`)
   if (requests.length > toAccept) {
     const over = requests.length - toAccept
     requests.splice(-over)
@@ -419,7 +420,7 @@ export async function fetchCycleMarker(nodes) {
     delete cm1.currentTime
     delete cm2.currentTime
     const equivalent = isDeepStrictEqual(cm1, cm2)
-    info(`Equivalence of the two compared cycle marker infos: ${equivalent}`)
+    if(logFlags.p2pNonFatal) info(`Equivalence of the two compared cycle marker infos: ${equivalent}`)
     return equivalent
   }
 
@@ -434,7 +435,7 @@ export async function submitJoin(
   // Send the join request to a handful of the active node all at once:w
   const selectedNodes = utils.getRandom(nodes, Math.min(nodes.length, 5))
   const promises = []
-  info(
+  if(logFlags.p2pNonFatal) info(
     `Sending join request to ${selectedNodes.map((n) => `${n.ip}:${n.port}`)}`
   )
   for (const node of selectedNodes) {
@@ -491,10 +492,12 @@ function validateJoinRequest(request: JoinRequest) {
 
 export function computeNodeId(publicKey, cycleMarker) {
   const nodeId = crypto.hash({ publicKey, cycleMarker })
-  info(
+  if(logFlags.p2pNonFatal) {
+    info(
     `Node ID computation: publicKey: ${publicKey}, cycleMarker: ${cycleMarker}`
-  )
-  info(`Node ID is: ${nodeId}`)
+    )
+    info(`Node ID is: ${nodeId}`)
+  }
   return nodeId
 }
 

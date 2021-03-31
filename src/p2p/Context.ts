@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
 import P2P from '.'
 import Crypto from '../crypto'
-import Logger from '../logger'
+import Logger, {logFlags} from '../logger'
 import { NetworkClass } from '../network'
 import Shardus from '../shardus'
 import {

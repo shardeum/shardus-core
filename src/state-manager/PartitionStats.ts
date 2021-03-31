@@ -8,7 +8,7 @@ import Profiler from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
-import Logger from '../logger'
+import Logger, {logFlags} from '../logger'
 import ShardFunctions from './shardFunctions.js'
 import AccountCache from './AccountCache'
 
@@ -17,7 +17,7 @@ class PartitionStats {
   crypto: Crypto
   config: Shardus.ShardusConfiguration
   profiler: Profiler
-  verboseLogs: boolean
+  
   logger: Logger
 
   mainLogger: any
@@ -38,8 +38,8 @@ class PartitionStats {
 
   accountCache: AccountCache
 
-  constructor(verboseLogs: boolean, profiler: Profiler, app: Shardus.App, logger: Logger, crypto: Crypto, config: Shardus.ShardusConfiguration, accountCache: AccountCache) {
-    this.verboseLogs = verboseLogs
+  constructor( profiler: Profiler, app: Shardus.App, logger: Logger, crypto: Crypto, config: Shardus.ShardusConfiguration, accountCache: AccountCache) {
+    
     this.crypto = crypto
     this.app = app
     this.logger = logger

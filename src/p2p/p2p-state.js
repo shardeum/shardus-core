@@ -1,7 +1,7 @@
 const EventEmitter = require('events')
 const utils = require('../utils')
 const Random = require('../random')
-
+let {logFlags} = require('../logger')
 const P2PApoptosis = require('./Apoptosis')
 
 /**
@@ -144,17 +144,17 @@ class P2PState extends EventEmitter {
   }
 
   async clear() {
-    this.mainLogger.info('Clearing P2P state in memory and in database...')
+    if(logFlags.info) this.mainLogger.info('Clearing P2P state in memory and in database...')
     await this.storage.clearP2pState()
     await this.storage.deleteProperty('id')
-    this.mainLogger.info('P2P data cleared from database.')
+    if(logFlags.info) this.mainLogger.info('P2P data cleared from database.')
     this._resetState()
   }
 
   _addJoinRequest(joinRequest) {
     if (!this.cyclesStarted) return false
     if (!this._addToBestJoinRequests(joinRequest)) {
-      this.mainLogger.debug('Join request not added: Was not best request for this cycle.')
+      if (logFlags.debug) this.mainLogger.debug('Join request not added: Was not best request for this cycle.')
       return false
     }
     return true
@@ -162,7 +162,7 @@ class P2PState extends EventEmitter {
 
   addNewJoinRequest(joinRequest) {
     if (!this.acceptChainUpdates) {
-      this.mainLogger.debug('Join request not added: Not accepting chain updates right now.')
+      if (logFlags.debug) this.mainLogger.debug('Join request not added: Not accepting chain updates right now.')
       return false
     }
     return this._addJoinRequest(joinRequest)
@@ -170,7 +170,7 @@ class P2PState extends EventEmitter {
 
   async addExtScalingRequest(scalingRequest) {
     if (!this.acceptChainUpdates) {
-      this.mainLogger.debug('Join request not added: Not accepting chain updates right now.')
+      if (logFlags.debug) this.mainLogger.debug('Join request not added: Not accepting chain updates right now.')
       return false
     }
     const added = await this._addScalingRequest(scalingRequest)
@@ -180,17 +180,17 @@ class P2PState extends EventEmitter {
   validateScalingRequest(scalingRequest) {
     // Check existence of fields
     if (!scalingRequest.node || !scalingRequest.timestamp || !scalingRequest.cycleCounter || !scalingRequest.scale || !scalingRequest.sign) {
-      this.mainLogger.debug(`Invalid scaling request, missing fields. Request: ${JSON.stringify(scalingRequest)}`)
+      if (logFlags.debug) this.mainLogger.debug(`Invalid scaling request, missing fields. Request: ${JSON.stringify(scalingRequest)}`)
       return false
     }
     // Check if cycle counter matches
     if (scalingRequest.cycleCounter !== this.getCycleCounter()) {
-      this.mainLogger.debug(`Invalid scaling request, not for this cycle. Request: ${JSON.stringify(scalingRequest)}`)
+      if (logFlags.debug) this.mainLogger.debug(`Invalid scaling request, not for this cycle. Request: ${JSON.stringify(scalingRequest)}`)
       return false
     }
     // Check if we are trying to scale either up or down
     if (scalingRequest.scale !== 'up' && scalingRequest.scale !== 'down') {
-      this.mainLogger.debug(`Invalid scaling request, not a valid scaling type. Request: ${JSON.stringify(scalingRequest)}`)
+      if (logFlags.debug) this.mainLogger.debug(`Invalid scaling request, not a valid scaling type. Request: ${JSON.stringify(scalingRequest)}`)
       return false
     }
     // Try to get the node who supposedly signed this request
@@ -198,13 +198,13 @@ class P2PState extends EventEmitter {
     try {
       node = this.getNode(scalingRequest.node)
     } catch (e) {
-      this.mainLogger.debug(e)
-      this.mainLogger.debug(`Invalid scaling request, not a known node. Request: ${JSON.stringify(scalingRequest)}`)
+      if (logFlags.debug) this.mainLogger.debug(e)
+      if (logFlags.debug) this.mainLogger.debug(`Invalid scaling request, not a known node. Request: ${JSON.stringify(scalingRequest)}`)
       return false
     }
     // Return false if fails validation for signature
     if (!this.crypto.verify(scalingRequest, node.publicKey)) {
-      this.mainLogger.debug(`Invalid scaling request, signature is not valid. Request: ${JSON.stringify(scalingRequest)}`)
+      if (logFlags.debug) this.mainLogger.debug(`Invalid scaling request, signature is not valid. Request: ${JSON.stringify(scalingRequest)}`)
       return false
     }
     return true
@@ -218,7 +218,7 @@ class P2PState extends EventEmitter {
     let changed = false
 
     if (metadata.scaling === 'up') {
-      this.mainLogger.debug('Already set to scale up this cycle. No need to scale.')
+      if (logFlags.debug) this.mainLogger.debug('Already set to scale up this cycle. No need to scale.')
       return
     }
 
@@ -231,7 +231,7 @@ class P2PState extends EventEmitter {
     // If we haven't changed, check down
     if (!changed) {
       if (metadata.scaling === 'down') {
-        this.mainLogger.debug('Already set to scale down for this cycle. No need to scale.')
+        if (logFlags.debug) this.mainLogger.debug('Already set to scale down for this cycle. No need to scale.')
         return
       }
       if (scalingUpdates.down.length >= this.scaleReqsNeeded) {
@@ -272,7 +272,7 @@ class P2PState extends EventEmitter {
       case 'up':
         // Check if we have exceeded the limit of scaling requests
         if (scalingUpdates.up.length >= this.maxScaleReqs) {
-          this.mainLogger.debug('Max scale up requests already exceeded. Cannot add request.')
+          if (logFlags.debug) this.mainLogger.debug('Max scale up requests already exceeded. Cannot add request.')
           return false
         }
         scalingUpdates.up.push(scalingRequest)
@@ -281,19 +281,19 @@ class P2PState extends EventEmitter {
       case 'down':
         // Check if we are already voting scale up, don't add in that case
         if (this.currentCycle.metadata.scaling === 'up') {
-          this.mainLogger.debug('Already scaling up this cycle. Cannot add scaling down request.')
+          if (logFlags.debug) this.mainLogger.debug('Already scaling up this cycle. Cannot add scaling down request.')
           return false
         }
         // Check if we have exceeded the limit of scaling requests
         if (scalingUpdates.down.length >= this.maxScaleReqs) {
-          this.mainLogger.debug('Max scale down requests already exceeded. Cannot add request.')
+          if (logFlags.debug) this.mainLogger.debug('Max scale down requests already exceeded. Cannot add request.')
           return false
         }
         scalingUpdates.down.push(scalingRequest)
         await this._checkScaling()
         return true
       default:
-        this.mainLogger.debug(`Invalid scaling type in _addToScalingRequests(). Request: ${JSON.stringify(scalingRequest)}`)
+        if (logFlags.debug) this.mainLogger.debug(`Invalid scaling type in _addToScalingRequests(). Request: ${JSON.stringify(scalingRequest)}`)
         return false
     }
   }
@@ -321,10 +321,10 @@ class P2PState extends EventEmitter {
 
   _addJoiningNodes() {
     const joining = this._getBestNodes()
-    this.mainLogger.debug(`Joining nodes: ${JSON.stringify(joining)}`)
+    if (logFlags.debug) this.mainLogger.debug(`Joining nodes: ${JSON.stringify(joining)}`)
     const joined = this.currentCycle.data.joined
     const joinedConsensors = this.currentCycle.data.joinedConsensors
-    this.mainLogger.debug(`Current joined: ${JSON.stringify(joined)}`)
+    if (logFlags.debug) this.mainLogger.debug(`Current joined: ${JSON.stringify(joined)}`)
     joined.length = 0
     joinedConsensors.length = 0
     for (const node of joining) {
@@ -333,7 +333,7 @@ class P2PState extends EventEmitter {
         ...node
       })
     }
-    this.mainLogger.debug(`Joined after update: ${JSON.stringify(joined)}`)
+    if (logFlags.debug) this.mainLogger.debug(`Joined after update: ${JSON.stringify(joined)}`)
   }
 
   // Checks if a given timestamp is during the current cycle
@@ -342,11 +342,11 @@ class P2PState extends EventEmitter {
     const duration = this.getCurrentCycleDuration() * 1000
     const end = start + duration
     if (timestamp < start) {
-      this.mainLogger.debug('Status update timestamp is too old for this cycle.')
+      if (logFlags.debug) this.mainLogger.debug('Status update timestamp is too old for this cycle.')
       return false
     }
     if (timestamp > end) {
-      this.mainLogger.debug('Status update timestamp is too far in the future for this cycle.')
+      if (logFlags.debug) this.mainLogger.debug('Status update timestamp is too far in the future for this cycle.')
       return false
     }
     return true
@@ -354,8 +354,8 @@ class P2PState extends EventEmitter {
 
   computeNodeId(publicKey, cycleMarker) {
     const nodeId = this.crypto.hash({ publicKey, cycleMarker })
-    this.mainLogger.debug(`Node ID computation: publicKey: ${publicKey}, cycleMarker: ${cycleMarker}`)
-    this.mainLogger.debug(`Node ID is: ${nodeId}`)
+    if (logFlags.debug) this.mainLogger.debug(`Node ID computation: publicKey: ${publicKey}, cycleMarker: ${cycleMarker}`)
+    if (logFlags.debug) this.mainLogger.debug(`Node ID is: ${nodeId}`)
     return nodeId
   }
 
@@ -384,42 +384,42 @@ class P2PState extends EventEmitter {
 
     // Validate that all required fields exist
     if (!nodeId) {
-      this.mainLogger.debug('Node ID of node was not provided with status update.')
+      if (logFlags.debug) this.mainLogger.debug('Node ID of node was not provided with status update.')
       return false
     }
     if (!sign) {
-      this.mainLogger.debug('Status update was not signed.')
+      if (logFlags.debug) this.mainLogger.debug('Status update was not signed.')
       return false
     }
     if (!status) {
-      this.mainLogger.debug('No status given with update.')
+      if (logFlags.debug) this.mainLogger.debug('No status given with update.')
       return false
     }
     if (!timestamp) {
-      this.mainLogger.debug('No timestamp given with update.')
+      if (logFlags.debug) this.mainLogger.debug('No timestamp given with update.')
       return false
     }
 
     // Check if node has already been seen for an update for this cycle
     if (this._wasSeenThisCycle(nodeId)) {
-      this.mainLogger.debug(`Node ID ${nodeId} has already been seen this cycle.`)
+      if (logFlags.debug) this.mainLogger.debug(`Node ID ${nodeId} has already been seen this cycle.`)
       return false
     }
     // Check if node status already matches update status
     const currentStatus = this.getNodeStatus(nodeId)
     if (currentStatus === status) {
-      this.mainLogger.debug(`Node status ${currentStatus} already matches requested status of ${status}. Unable to add status update.`)
+      if (logFlags.debug) this.mainLogger.debug(`Node status ${currentStatus} already matches requested status of ${status}. Unable to add status update.`)
       return false
     }
     // Check if the timestamp is valid
     if (!this.isDuringThisCycle(timestamp)) {
-      this.mainLogger.debug(`The timestamp ${timestamp} is not a time during the current cycle. Unable to add status update.`)
+      if (logFlags.debug) this.mainLogger.debug(`The timestamp ${timestamp} is not a time during the current cycle. Unable to add status update.`)
       return false
     }
     // Check if the status update is of a valid type
     const invalidStatusMsg = `Invalid status: ${status}. Unable to add status update to queue.`
     if (!this.validStatuses.includes(status)) {
-      this.mainLogger.debug(invalidStatusMsg)
+      if (logFlags.debug) this.mainLogger.debug(invalidStatusMsg)
       return false
     }
     // Get status type
@@ -427,7 +427,7 @@ class P2PState extends EventEmitter {
     try {
       type = this.statusUpdateType[status]
     } catch (e) {
-      this.mainLogger.debug(invalidStatusMsg)
+      if (logFlags.debug) this.mainLogger.debug(invalidStatusMsg)
       return false
     }
 
@@ -436,21 +436,21 @@ class P2PState extends EventEmitter {
     try {
       ; ({ publicKey } = this.getNode(nodeId))
     } catch (e) {
-      this.mainLogger.debug(e)
+      if (logFlags.debug) this.mainLogger.debug(e)
       publicKey = null
     }
     if (!publicKey) {
-      this.mainLogger.debug('Unknown node ID in status update.')
+      if (logFlags.debug) this.mainLogger.debug('Unknown node ID in status update.')
       return false
     }
     // Check if the status update was signed by the node
     const isSignedByNode = this.crypto.verify(update, publicKey)
     if (!isSignedByNode) {
-      this.mainLogger.debug('Status update was not signed by the expected node.')
+      if (logFlags.debug) this.mainLogger.debug('Status update was not signed by the expected node.')
       return false
     }
 
-    this.mainLogger.debug(`Type of status update: ${type}`)
+    if (logFlags.debug) this.mainLogger.debug(`Type of status update: ${type}`)
 
     // Finally add the update after all validation has passed
     this.currentCycle.updates[status].push(update)
@@ -460,7 +460,7 @@ class P2PState extends EventEmitter {
     }
     // Mark node as seen for this cycle
     this._markNodeAsSeen(nodeId)
-    this.mainLogger.debug(`Node ${nodeId} added to ${type} list for this cycle.`)
+    if (logFlags.debug) this.mainLogger.debug(`Node ${nodeId} added to ${type} list for this cycle.`)
     return true
   }
 
@@ -501,7 +501,7 @@ class P2PState extends EventEmitter {
       const cMarkerAfter = this.getCurrentCertificate().marker
       if (cMarkerBefore === cMarkerAfter) return false
     } catch (err) {
-      console.log(err)
+      if (logFlags.console) console.log(err)
       return false
     }
     return true
@@ -513,7 +513,7 @@ class P2PState extends EventEmitter {
       if (validate) {
         const [validated, reason] = this.lostNodes.validateDownMessage(msg)
         if (!validated) {
-          this.mainLogger.debug(`Lost message not added: Invalid DownMessage: ${reason}: ${JSON.stringify(msg)}.`)
+          if (logFlags.debug) this.mainLogger.debug(`Lost message not added: Invalid DownMessage: ${reason}: ${JSON.stringify(msg)}.`)
           return false
         }
       }
@@ -539,7 +539,7 @@ class P2PState extends EventEmitter {
       if (validate) {
         const [validated, reason] = this.lostNodes.validateUpMessage(msg)
         if (!validated) {
-          this.mainLogger.debug(`Lost message not added: Invalid UpMessage: ${reason}: ${JSON.stringify(msg)}.`)
+          if (logFlags.debug) this.mainLogger.debug(`Lost message not added: Invalid UpMessage: ${reason}: ${JSON.stringify(msg)}.`)
           return false
         }
       }
@@ -581,7 +581,7 @@ class P2PState extends EventEmitter {
     try {
       node = this.getNode(nodeId)
     } catch (e) {
-      this.mainLogger.debug(`${nodeId} is not a valid or known node ID.`)
+      if (logFlags.debug) this.mainLogger.debug(`${nodeId} is not a valid or known node ID.`)
       return false
     }
     // Try to update status for given node
@@ -597,7 +597,7 @@ class P2PState extends EventEmitter {
 
   // Sets a group of nodes to a particular status
   async _setNodesToStatus(nodeIds, status) {
-    this.mainLogger.debug(`Node IDs to be updated to ${status} status: ${JSON.stringify(nodeIds)}`)
+    if (logFlags.debug) this.mainLogger.debug(`Node IDs to be updated to ${status} status: ${JSON.stringify(nodeIds)}`)
     const promises = []
     for (const nodeId of nodeIds) {
       promises.push(this._setNodeStatus(nodeId, status))
@@ -618,12 +618,12 @@ class P2PState extends EventEmitter {
     // Check if we actually know about this node
     const node = this.getNode(nodeId)
     if (!node) {
-      this.mainLogger.debug('Cannot update status of unknown node.')
+      if (logFlags.debug) this.mainLogger.debug('Cannot update status of unknown node.')
       return false
     }
     const invalidStatusMsg = `Invalid status: ${status}. Unable to update status.`
     if (!this.validStatuses.includes(status)) {
-      this.mainLogger.debug(invalidStatusMsg)
+      if (logFlags.debug) this.mainLogger.debug(invalidStatusMsg)
       return false
     }
     await this._updateNodeStatus(node, status, updateDb)
@@ -634,9 +634,9 @@ class P2PState extends EventEmitter {
     if (!this.validStatuses.includes(status)) throw new Error('Invalid node status.')
     if (node.status === status) return true
     const oldStatus = node.status
-    this.mainLogger.debug(`Old status of node: ${oldStatus}`)
+    if (logFlags.debug) this.mainLogger.debug(`Old status of node: ${oldStatus}`)
     node.status = status
-    this.mainLogger.debug(`New status of node: ${node.status}`)
+    if (logFlags.debug) this.mainLogger.debug(`New status of node: ${node.status}`)
     const id = node.id
     // If the node previously had a status, remove it from that index object
     if (oldStatus && this.nodes[oldStatus][id]) delete this.nodes[oldStatus][id]
@@ -653,8 +653,8 @@ class P2PState extends EventEmitter {
     node.cycleJoined = cycleMarker
     await this._updateNodeStatus(node, 'syncing', false)
     await this.addNode(node)
-    this.mainLogger.debug(`Nodelist after adding this node: ${JSON.stringify(this.nodes.current)}`)
-    this.mainLogger.debug(`Ordered nodelist after adding this node: ${JSON.stringify(this.nodes.ordered)}`)
+    if (logFlags.debug) this.mainLogger.debug(`Nodelist after adding this node: ${JSON.stringify(this.nodes.current)}`)
+    if (logFlags.debug) this.mainLogger.debug(`Ordered nodelist after adding this node: ${JSON.stringify(this.nodes.ordered)}`)
   }
 
   async _acceptNodes(nodes, cycleMarker) {
@@ -790,7 +790,7 @@ class P2PState extends EventEmitter {
 
   _removeNodeFromNodelist(node) {
     if (node.id === this.p2p.id) {
-      this.mainLogger.info(`We have been marked for removal from the network. Commencing restart process. Current cycle marker: ${this.getCurrentCycleMarker()}`)
+      if(logFlags.info) this.mainLogger.info(`We have been marked for removal from the network. Commencing restart process. Current cycle marker: ${this.getCurrentCycleMarker()}`)
       // [TODO] We need to make the removal process strictly ordered to prevent undeterministic behavior
       this.emit('removed')
     }
@@ -816,12 +816,14 @@ class P2PState extends EventEmitter {
 
     try {
       if (index === false) {
-        console.log(`getOrderedSyncingNeighbors failed to find ${utils.stringifyReduce(node.id)}`)
+        if (logFlags.console) console.log(`getOrderedSyncingNeighbors failed to find ${utils.stringifyReduce(node.id)}`)
 
         if (this.nodes != null && this.nodes.addressOrdered != null) {
           const ordered = this.nodes.addressOrdered
-          let orderedString = `---orderedNodes ${utils.stringifyReduce(ordered.map((a) => a.id))}`
-          console.log(orderedString)
+          if (logFlags.console) {
+            let orderedString = `---orderedNodes ${utils.stringifyReduce(ordered.map((a) => a.id))}`
+            console.log(orderedString)
+          }
 
           this.mainLogger.error(`getOrderedSyncingNeighbors failed to find ${utils.stringifyReduce(node.id)} nodeList:${orderedString} stack: ${new Error().stack}`)
         } else {
@@ -830,10 +832,10 @@ class P2PState extends EventEmitter {
         return results
       }
     } catch (err) {
-      console.log(err.stack)
+      if (logFlags.console) console.log(err.stack)
     }
     // cycleShardData.activeNodes.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
-    // console.log(`getOrderedSyncingNeighbors find: ${utils.stringifyReduce(node.id)} index: ${index} all:  ${utils.stringifyReduce(this.nodes.addressOrdered.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+    // if (logFlags.console) console.log(`getOrderedSyncingNeighbors find: ${utils.stringifyReduce(node.id)} index: ${index} all:  ${utils.stringifyReduce(this.nodes.addressOrdered.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
 
     // @ts-ignore
     let leftIndex = index - 1
@@ -877,7 +879,7 @@ class P2PState extends EventEmitter {
     }
 
     // if (results.length > 0) {
-    //   console.log(`getOrderedSyncingNeighbors find: our node: ${utils.stringifyReduce(node.id)} syncing neighbors:  ${utils.stringifyReduce(results.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
+    //   if (logFlags.console) console.log(`getOrderedSyncingNeighbors find: our node: ${utils.stringifyReduce(node.id)} syncing neighbors:  ${utils.stringifyReduce(results.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
     // }
 
     // todo what about two nodes syncing next to each other.  should we keep expanding to catch runs of syncing nodes.
@@ -903,7 +905,7 @@ class P2PState extends EventEmitter {
 
   _addNodeToNodelist(node) {
     if (this.nodes.current[node.id]) {
-      console.log(`P2P WARNING: _addNodeToNodelist: Tried to add an existing node: ${node.id}`)
+      if (logFlags.console) console.log(`P2P WARNING: _addNodeToNodelist: Tried to add an existing node: ${node.id}`)
       return
     }
     const status = node.status
@@ -947,9 +949,9 @@ class P2PState extends EventEmitter {
   }
 
   _computeCycleMarker(fields) {
-    this.mainLogger.debug(`Computing cycle marker... Cycle marker fields: ${JSON.stringify(fields)}`)
+    if (logFlags.debug) this.mainLogger.debug(`Computing cycle marker... Cycle marker fields: ${JSON.stringify(fields)}`)
     const cycleMarker = this.crypto.hash(fields)
-    this.mainLogger.debug(`Created cycle marker: ${cycleMarker}`)
+    if (logFlags.debug) this.mainLogger.debug(`Created cycle marker: ${cycleMarker}`)
     return cycleMarker
   }
 
@@ -966,7 +968,7 @@ class P2PState extends EventEmitter {
   startCycles() {
     this.cyclesStarted = true
     this.shouldStop = false
-    this.mainLogger.info('Starting first cycle...')
+    if(logFlags.info) this.mainLogger.info('Starting first cycle...')
     this._startNewCycle()
   }
 
@@ -991,10 +993,10 @@ class P2PState extends EventEmitter {
     this.currentCycle.metadata.startingDesired = this.desiredNodes
     this._setJoinAcceptance()
     this.currentCycle.metadata.toAccept = this._getOpenSlots()
-    this.mainLogger.info(`Starting new cycle of duration ${this.getCurrentCycleDuration()}...`)
-    this.mainLogger.debug(`Last cycle start time: ${lastCycleStart}`)
-    this.mainLogger.debug(`Last cycle duration: ${lastCycleDuration}`)
-    this.mainLogger.debug(`Current time: ${currentTime}`)
+    if(logFlags.info) this.mainLogger.info(`Starting new cycle of duration ${this.getCurrentCycleDuration()}...`)
+    if (logFlags.debug) this.mainLogger.debug(`Last cycle start time: ${lastCycleStart}`)
+    if (logFlags.debug) this.mainLogger.debug(`Last cycle duration: ${lastCycleDuration}`)
+    if (logFlags.debug) this.mainLogger.debug(`Current time: ${currentTime}`)
     const quarterCycle = Math.ceil(this.getCurrentCycleDuration() * 1000 / 4)
     this._startUpdatePhase(this.currentCycle.data.start * 1000, quarterCycle)
   }
@@ -1002,14 +1004,14 @@ class P2PState extends EventEmitter {
   // Q1
   _startUpdatePhase(startTime, phaseLen) {
     if (this.shouldStop) return
-    this.mainLogger.debug(`P2P State: Started C${this.getCycleCounter()} Q1`)
-    this.mainLogger.debug('Starting update phase...')
+    if (logFlags.debug) this.mainLogger.debug(`P2P State: Started C${this.getCycleCounter()} Q1`)
+    if (logFlags.debug) this.mainLogger.debug('Starting update phase...')
     this.acceptChainUpdates = true
     const endTime = startTime + phaseLen
 
     const lastCycle = this.getLastCycle()
     let time = utils.getTime('s')
-    console.log('Q1 ' + time)
+    if (logFlags.console) console.log('Q1 ' + time)
     this.emit('cycle_q1_start', lastCycle, time)
 
     utils.setAlarm(() => {
@@ -1039,7 +1041,7 @@ class P2PState extends EventEmitter {
 
     // Check if this node has already been seen this cycle
     if (this._wasSeenThisCycle(nodeInfo.publicKey)) {
-      this.mainLogger.debug('Node has already been seen this cycle. Unable to add join request.')
+      if (logFlags.debug) this.mainLogger.debug('Node has already been seen this cycle. Unable to add join request.')
       return false
     }
 
@@ -1048,7 +1050,7 @@ class P2PState extends EventEmitter {
 
     // Return if we already know about this node
     if (this._isKnownNode(nodeInfo)) {
-      this.mainLogger.info('Cannot add join request for this node, already a known node.')
+      if(logFlags.info) this.mainLogger.info('Cannot add join request for this node, already a known node.')
       return false
     }
 
@@ -1071,7 +1073,7 @@ class P2PState extends EventEmitter {
 
       // Check if we are better than the lowest best
       if (!this._isBetterThanLowestBest(joinRequest, lowest)) {
-        this.mainLogger.debug(`${joinRequest.selectionNum} is not better than ${lowest.selectionNum}. Node ${joinRequest.nodeInfo.publicKey} not added to this cycle.`)
+        if (logFlags.debug) this.mainLogger.debug(`${joinRequest.selectionNum} is not better than ${lowest.selectionNum}. Node ${joinRequest.nodeInfo.publicKey} not added to this cycle.`)
         return false
       }
     }
@@ -1083,7 +1085,7 @@ class P2PState extends EventEmitter {
     if (competing) {
       const removedRequest = bestRequests.pop()
       const removedNode = removedRequest.nodeInfo
-      this.mainLogger.debug(`Removing the following node from this cycle's join requests: ${JSON.stringify(removedNode)}`)
+      if (logFlags.debug) this.mainLogger.debug(`Removing the following node from this cycle's join requests: ${JSON.stringify(removedNode)}`)
     }
     return true
   }
@@ -1099,21 +1101,21 @@ class P2PState extends EventEmitter {
       const id = this.computeNodeId(joinRequest.nodeInfo.publicKey, prevMarker)
       bestNodes.push({ ...joinRequest.nodeInfo, cycleJoined, id })
     }
-    this.mainLogger.debug(`Best nodes for this cycle: ${JSON.stringify(bestNodes)}`)
+    if (logFlags.debug) this.mainLogger.debug(`Best nodes for this cycle: ${JSON.stringify(bestNodes)}`)
     return bestNodes
   }
 
   // Q2
   _endUpdatePhase(startTime, phaseLen) {
     if (this.shouldStop) return
-    this.mainLogger.debug(`P2P State: Started C${this.getCycleCounter()} Q2`)
-    this.mainLogger.debug('Ending update phase...')
+    if (logFlags.debug) this.mainLogger.debug(`P2P State: Started C${this.getCycleCounter()} Q2`)
+    if (logFlags.debug) this.mainLogger.debug('Ending update phase...')
     this.acceptChainUpdates = false
     const endTime = startTime + phaseLen
 
     const lastCycle = this.getLastCycle()
     let time = utils.getTime('s')
-    console.log('Q2 ' + time)
+    if (logFlags.console) console.log('Q2 ' + time)
     this.emit('cycle_q2_start', lastCycle, time)
 
     utils.setAlarm(() => {
@@ -1124,8 +1126,8 @@ class P2PState extends EventEmitter {
   // Q3
   async _startCycleSync(startTime, phaseLen) {
     if (this.shouldStop) return
-    this.mainLogger.debug(`P2P State: Started C${this.getCycleCounter()} Q3`)
-    this.mainLogger.debug('Starting cycle sync phase...')
+    if (logFlags.debug) this.mainLogger.debug(`P2P State: Started C${this.getCycleCounter()} Q3`)
+    if (logFlags.debug) this.mainLogger.debug('Starting cycle sync phase...')
 
     /**
      * Call submodule hook to add collected proposals to cycle updates and data
@@ -1137,7 +1139,7 @@ class P2PState extends EventEmitter {
 
     const lastCycle = this.getLastCycle()
     let time = utils.getTime('s')
-    console.log('Q3 ' + time)
+    if (logFlags.console) console.log('Q3 ' + time)
     this.emit('cycle_q3_start', lastCycle, time)
 
     utils.setAlarm(() => {
@@ -1148,13 +1150,13 @@ class P2PState extends EventEmitter {
   // Q4
   async _finalizeCycle(startTime, phaseLen) {
     if (this.shouldStop) return
-    this.mainLogger.debug(`P2P State: Started C${this.getCycleCounter()} Q4`)
-    this.mainLogger.debug('Starting cycle finalization phase...')
+    if (logFlags.debug) this.mainLogger.debug(`P2P State: Started C${this.getCycleCounter()} Q4`)
+    if (logFlags.debug) this.mainLogger.debug('Starting cycle finalization phase...')
     const endTime = startTime + phaseLen
 
     const lastCycle = this.getLastCycle()
     let time = utils.getTime('s')
-    console.log('Q4 ' + time)
+    if (logFlags.console) console.log('Q4 ' + time)
     this.emit('cycle_q4_start', lastCycle, time)
 
     utils.setAlarm(async () => {
@@ -1175,15 +1177,15 @@ class P2PState extends EventEmitter {
   }
 
   _createCycleMarker(gossip = true) {
-    this.mainLogger.info('Creating new cycle marker...')
+    if(logFlags.info) this.mainLogger.info('Creating new cycle marker...')
     this._addJoiningNodes()
     this._removeExcessNodes()
 
-    this.mainLogger.debug('Getting cycle info to create cycle marker...')
+    if (logFlags.debug) this.mainLogger.debug('Getting cycle info to create cycle marker...')
     const cycleInfo = this.getCycleInfo(false)
-    this.mainLogger.debug('Computing cycle marker before creating certificate...')
+    if (logFlags.debug) this.mainLogger.debug('Computing cycle marker before creating certificate...')
     const cycleMarker = this._computeCycleMarker(cycleInfo)
-    this.mainLogger.debug('Creating new certificate based on the new computed cycle marker...')
+    if (logFlags.debug) this.mainLogger.debug('Creating new certificate based on the new computed cycle marker...')
     const certificate = this._createCertificate(cycleMarker)
     if (!this.cycles.length) return this.addCertificate({ marker: cycleMarker, signer: '0'.repeat(64) })
     const [added] = this.addCertificate(certificate)
@@ -1199,7 +1201,7 @@ class P2PState extends EventEmitter {
 
   async addUnfinalizedAndStart(cycle) {
     if (!cycle) {
-      this.mainLogger.info('Unable to add unfinalized cycle. Cycle not given.')
+      if(logFlags.info) this.mainLogger.info('Unable to add unfinalized cycle. Cycle not given.')
       return false
     }
     const { data: { start, duration } } = cycle
@@ -1207,9 +1209,9 @@ class P2PState extends EventEmitter {
     const toWait = ((start + duration) - currTime) * 1000
     this.currentCycle = cycle
     await this._createCycle()
-    this.mainLogger.debug(`Waiting ${toWait} ms before starting cycles...`)
+    if (logFlags.debug) this.mainLogger.debug(`Waiting ${toWait} ms before starting cycles...`)
     setTimeout(() => {
-      this.mainLogger.debug('Starting up cycles...')
+      if (logFlags.debug) this.mainLogger.debug('Starting up cycles...')
       this.startCycles()
     }, toWait)
   }
@@ -1239,20 +1241,20 @@ class P2PState extends EventEmitter {
       delete cycles[i].certificate
       this.cycles.push(cycles[i])
     }
-    this.mainLogger.debug(`All cycles after adding given cycles: ${JSON.stringify(this.cycles)}`)
+    if (logFlags.debug) this.mainLogger.debug(`All cycles after adding given cycles: ${JSON.stringify(this.cycles)}`)
   }
 
   async _createCycle() {
-    this.mainLogger.info('Creating new cycle chain entry...')
+    if(logFlags.info) this.mainLogger.info('Creating new cycle chain entry...')
     const cycleInfo = this.getCycleInfo()
-    this.mainLogger.debug(`Cycle info for new cycle: ${JSON.stringify(cycleInfo)}`)
+    if (logFlags.debug) this.mainLogger.debug(`Cycle info for new cycle: ${JSON.stringify(cycleInfo)}`)
     cycleInfo.marker = this.getCurrentCertificate().marker
 
     const bestNodes = this._getBestNodes()
     const prevMarker = this.getPreviousCycleMarker()
     const accepted = this._acceptNodes(bestNodes, prevMarker)
 
-    this.mainLogger.debug(`Nodes to be activated this cycle: ${JSON.stringify(cycleInfo.activated)}`)
+    if (logFlags.debug) this.mainLogger.debug(`Nodes to be activated this cycle: ${JSON.stringify(cycleInfo.activated)}`)
     const activated = this._setNodesToStatus(cycleInfo.activated, 'active')
     this._setNodesActiveTimestamp(cycleInfo.activated, cycleInfo.start)
 
@@ -1278,7 +1280,7 @@ class P2PState extends EventEmitter {
 
     try {
       await Promise.all(promises)
-      this.mainLogger.info('Added cycle chain entry to database successfully!')
+      if(logFlags.info) this.mainLogger.info('Added cycle chain entry to database successfully!')
     } catch (e) {
       this.mainLogger.error('_createCycle: ' + e.name + ': ' + e.message + ' at ' + e.stack)
     }
@@ -1339,7 +1341,7 @@ class P2PState extends EventEmitter {
   }
 
   _createCertificate(cycleMarker) {
-    this.mainLogger.info(`Creating certificate for cycle marker ${cycleMarker}...`)
+    if(logFlags.info) this.mainLogger.info(`Creating certificate for cycle marker ${cycleMarker}...`)
     const signer = this.p2p.id
     const cert = this.crypto.sign({ marker: cycleMarker, signer })
     return cert
@@ -1349,10 +1351,10 @@ class P2PState extends EventEmitter {
     const addCert = (cert, dist) => {
       this.currentCycle.data.certificate = cert
       this.currentCycle.metadata.bestCertDist = dist
-      this.mainLogger.debug('Certificate added!')
+      if (logFlags.debug) this.mainLogger.debug('Certificate added!')
     }
-    this.mainLogger.debug('Attempting to add certificate...')
-    this.mainLogger.debug(`Certificate to be added: ${JSON.stringify(certificate)}`)
+    if (logFlags.debug) this.mainLogger.debug('Attempting to add certificate...')
+    if (logFlags.debug) this.mainLogger.debug(`Certificate to be added: ${JSON.stringify(certificate)}`)
 
     // TODO: verify signer of the certificate and return false plus 'invalid_signer' reason
 
@@ -1372,7 +1374,7 @@ class P2PState extends EventEmitter {
 
     // If the cycle marker is different than what we have
     if (certificate.marker !== this.getCurrentCertificate().marker) {
-      this.mainLogger.debug('The cycle marker from this certificate is different than the one we currently have...')
+      if (logFlags.debug) this.mainLogger.debug('The cycle marker from this certificate is different than the one we currently have...')
       // If its from the network, don't add it
       if (fromNetwork) return [false, 'diff_cm']
       // Otherwise, its ours and we should add it
@@ -1392,9 +1394,9 @@ class P2PState extends EventEmitter {
 
     // If the cert distance for this cert is less than the current best, return false
     if (certDist <= this.currentCycle.metadata.bestCertDist) {
-      this.mainLogger.debug('Certificate not added. Current certificate is better.')
-      this.mainLogger.debug(`Current certificate distance from cycle marker: ${this.currentCycle.metadata.bestCertDist}`)
-      this.mainLogger.debug(`This certificate distance from cycle marker: ${certDist}`)
+      if (logFlags.debug) this.mainLogger.debug('Certificate not added. Current certificate is better.')
+      if (logFlags.debug) this.mainLogger.debug(`Current certificate distance from cycle marker: ${this.currentCycle.metadata.bestCertDist}`)
+      if (logFlags.debug) this.mainLogger.debug(`This certificate distance from cycle marker: ${certDist}`)
       return [false, 'not_better']
     }
 
@@ -1518,7 +1520,7 @@ class P2PState extends EventEmitter {
 
   getActivated() {
     const activated = this.currentCycle.data.activated
-    this.mainLogger.debug(`Result of getActivated: ${JSON.stringify(activated)}`)
+    if (logFlags.debug) this.mainLogger.debug(`Result of getActivated: ${JSON.stringify(activated)}`)
     return activated
   }
 
@@ -1627,7 +1629,7 @@ class P2PState extends EventEmitter {
     const byPubKey = this.nodes.byPubKey
     const node = byPubKey[publicKey]
     if (!node) {
-      this.mainLogger.debug(`Node not found for given public key: ${publicKey}...`)
+      if (logFlags.debug) this.mainLogger.debug(`Node not found for given public key: ${publicKey}...`)
       return null
     }
     return node

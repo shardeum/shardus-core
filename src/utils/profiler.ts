@@ -5,6 +5,7 @@ import * as Context from '../p2p/Context'
 import * as utils from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 // process.hrtime.bigint()
+import {logFlags} from '../logger'
 
 interface Profiler {
   sectionTimes: any

@@ -6,7 +6,7 @@ import Crypto from '../crypto'
 import Debug from '../debug'
 import ExitHandler from '../exit-handler'
 import LoadDetection from '../load-detection'
-import Logger from '../logger'
+import Logger, {logFlags} from '../logger'
 import * as Network from '../network'
 import * as Context from '../p2p/Context'
 import * as CycleChain from '../p2p/CycleChain'
@@ -51,7 +51,7 @@ interface Shardus {
   nestedCounters: NestedCounters
   memoryReporting: MemoryReporting
   config: ShardusTypes.ShardusConfiguration
-  verboseLogs: boolean
+  
   logger: Logger
   mainLogger: Log4js.Logger
   fatalLogger: Log4js.Logger
@@ -99,7 +99,7 @@ class Shardus extends EventEmitter {
     this.profiler = new Profiler()
     this.config = config
     Context.setConfig(this.config)
-    this.verboseLogs = false
+    logFlags.verbose = false
     this.logger = new Logger(config.baseDir, logsConfig)
     Context.setLoggerContext(this.logger)
     Snapshot.initLogger()
@@ -139,21 +139,15 @@ class Shardus extends EventEmitter {
     this.loadDetection = null
     this.rateLimiting = null
 
-    this.mainLogger.info(`Server started with pid: ${process.pid}`)
-
-    this.mainLogger.info('===== Server config: =====')
-    this.mainLogger.info(JSON.stringify(config, null, 2))
-
+    if(logFlags.info) {
+      this.mainLogger.info(`Server started with pid: ${process.pid}`)
+      this.mainLogger.info('===== Server config: =====')
+      this.mainLogger.info(JSON.stringify(config, null, 2))
+    }
     this._listeners = {}
 
     this.heartbeatInterval = config.heartbeatInterval
     this.heartbeatTimer = null
-
-    // levelStr not correctly defined in logger type definition, so ignore it
-    // @ts-ignore
-    if (this.mainLogger && ['TRACE'].includes(this.mainLogger.level.levelStr)) {
-      this.verboseLogs = true
-    }
 
     // alias the network register calls so that an app can get to them
     this.registerExternalGet = (route, handler) =>
@@ -214,110 +208,10 @@ class Shardus extends EventEmitter {
     this.profiler.registerEndpoints()
     this.nestedCounters.registerEndpoints()
     this.memoryReporting.registerEndpoints()
+    this.logger.registerEndpoints(Context)
 
     this.logger.playbackLogState('constructed', '', '')
   }
-
-  // constructor ({ server: config, logs: logsConfig, storage: storageConfig }: {
-  //   server: ShardusTypes.ShardusConfiguration
-  //   logs: ShardusTypes.LogsConfiguration
-  //   storage: ShardusTypes.StorageConfiguration
-  // }) {
-  //   super()
-  //   this.profiler = new Profiler()
-  //   this.config = config
-  //   this.verboseLogs = false
-  //   this.logger = new Logger(config.baseDir, logsConfig)
-  //   setLoggerContext(this.logger)
-
-  //   if (logsConfig.saveConsoleOutput) {
-  //     saveConsoleOutput.startSaving(path.join(config.baseDir, logsConfig.dir))
-  //   }
-
-  //   this.mainLogger = this.logger.getLogger('main')
-  //   this.fatalLogger = this.logger.getLogger('fatal')
-  //   this.appLogger = this.logger.getLogger('app')
-  //   this.exitHandler = new ExitHandler()
-  //   this.storage = new Storage(config.baseDir, storageConfig, this.logger, this.profiler)
-  //   this.crypto = null
-  //   this.network = new Network(config.network, this.logger)
-  //   setNetworkContext(this.network)
-  //   this.p2p = null
-  //   this.debug = null
-  //   this.consensus = null
-  //   this.appProvided = null
-  //   this.app = null
-  //   this.reporter = null
-  //   this.stateManager = null
-  //   this.statistics = null
-  //   this.loadDetection = null
-  //   this.rateLimiting = null
-
-  //   this.mainLogger.info(`Server started with pid: ${process.pid}`)
-
-  //   this.mainLogger.info(`===== Server config: =====`)
-  //   this.mainLogger.info(JSON.stringify(config, null, 2))
-
-  //   this._listeners = {}
-
-  //   this.heartbeatInterval = config.heartbeatInterval
-  //   this.heartbeatTimer = null
-
-  //   // levelStr not correctly defined in logger type definition, so ignore it
-  //   // @ts-ignore
-  //   if (this.mainLogger && ['TRACE'].includes(this.mainLogger.level.levelStr)) {
-  //     this.verboseLogs = true
-  //   }
-
-  //   // alias the network register calls so that an app can get to them
-  //   this.registerExternalGet = (route, handler) => this.network.registerExternalGet(route, handler)
-  //   this.registerExternalPost = (route, handler) => this.network.registerExternalPost(route, handler)
-  //   this.registerExternalPut = (route, handler) => this.network.registerExternalPut(route, handler)
-  //   this.registerExternalDelete = (route, handler) => this.network.registerExternalDelete(route, handler)
-  //   this.registerExternalPatch = (route, handler) => this.network.registerExternalPatch(route, handler)
-
-  //   this.exitHandler.addSigListeners()
-  //   this.exitHandler.registerSync('reporter', () => {
-  //     if (this.reporter) {
-  //       this.reporter.stopReporting()
-  //     }
-  //   })
-  //   this.exitHandler.registerSync('p2p', () => {
-  //     if (this.p2p) {
-  //       this.p2p.cleanupSync()
-  //     }
-  //   })
-  //   this.exitHandler.registerSync('shardus', () => {
-  //     this._stopHeartbeat()
-  //   })
-  //   this.exitHandler.registerSync('crypto', () => {
-  //     this.crypto.stopAllGenerators()
-  //   })
-  //   this.exitHandler.registerAsync('network', async () => {
-  //     this.mainLogger.info('Shutting down networking...')
-  //     await this.network.shutdown()
-  //   })
-  //   this.exitHandler.registerAsync('shardus', async () => {
-  //     this.mainLogger.info('Writing heartbeat to database before exiting...')
-  //     await this._writeHeartbeat()
-  //   })
-  //   this.exitHandler.registerAsync('storage', async () => {
-  //     this.mainLogger.info('Closing Database connections...')
-  //     await this.storage.close()
-  //   })
-  //   this.exitHandler.registerAsync('application', async () => {
-  //     if (this.app && this.app.close) {
-  //       this.mainLogger.info('Shutting down the application...')
-  //       await this.app.close()
-  //     }
-  //   })
-  //   this.exitHandler.registerAsync('logger', async () => {
-  //     this.mainLogger.info('Shutting down logs...')
-  //     await this.logger.shutdown()
-  //   })
-
-  //   this.logger.playbackLogState('constructed', '', '')
-  // }
 
   /**
    * This function is what the app developer uses to setup all the SDK functions used by shardus
@@ -612,7 +506,7 @@ class Shardus extends EventEmitter {
     })
     Self.emitter.on('error', (e) => {
       console.log(e.message + ' at ' + e.stack)
-      this.mainLogger.debug('shardus.start() ' + e.message + ' at ' + e.stack)
+      if (logFlags.debug) this.mainLogger.debug('shardus.start() ' + e.message + ' at ' + e.stack)
       // normally fatal error keys should not be variable ut this seems like an ok exception for now
       this.shardus_fatal(`onError_ex` + e.message + ' at ' + e.stack, 'shardus.start() ' + e.message + ' at ' + e.stack)
       throw new Error(e)
@@ -774,7 +668,6 @@ class Shardus extends EventEmitter {
    */
   _createAndLinkStateManager() {
     this.stateManager = new StateManager(
-      this.verboseLogs,
       this.profiler,
       this.app,
       this.consensus,
@@ -885,7 +778,7 @@ class Shardus extends EventEmitter {
         'Please provide an App object to Shardus.setup before calling Shardus.put'
       )
 
-    if (this.verboseLogs)
+    if (logFlags.verbose)
       this.mainLogger.debug(`Start of injectTransaction ${JSON.stringify(tx)} set:${set} global:${global}`) // not reducing tx here so we can get the long hashes
 
     if (!this.stateManager.accountSync.dataSyncMainPhaseComplete) {
@@ -908,7 +801,7 @@ class Shardus extends EventEmitter {
         if(global === true && this.p2p.allowSet()){
           // This ok because we are initializing a global at the set time period
         } else {
-          if (this.verboseLogs) this.mainLogger.debug(`txRejected ${JSON.stringify(tx)} set:${set} global:${global}`)
+          if (logFlags.verbose) this.mainLogger.debug(`txRejected ${JSON.stringify(tx)} set:${set} global:${global}`)
 
           this.statistics.incrementCounter('txRejected')
           nestedCountersInstance.countEvent('rejected','!allowTransactions')
@@ -947,12 +840,12 @@ class Shardus extends EventEmitter {
 
     try {
       // Perform basic validation of the transaction fields
-      if (this.verboseLogs)
+      if (logFlags.verbose)
         this.mainLogger.debug(
           'Performing initial validation of the transaction'
         )
       const initValidationResp = this.app.validateTxnFields(tx)
-      if (this.verboseLogs)
+      if (logFlags.verbose)
         this.mainLogger.debug(
           `InitialValidationResponse: ${utils.stringifyReduce(
             initValidationResp
@@ -979,7 +872,7 @@ class Shardus extends EventEmitter {
       shardusTx.inTransaction = tx
       const txId = this.crypto.hash(tx)
 
-      if (this.verboseLogs)
+      if (logFlags.verbose)
         this.mainLogger.debug(
           `shardusTx. shortTxID: ${txId} txID: ${utils.makeShortHash(
             txId
@@ -989,7 +882,7 @@ class Shardus extends EventEmitter {
 
       const signedShardusTx = this.crypto.sign(shardusTx)
 
-      if (this.verboseLogs) this.mainLogger.debug('Transaction validated')
+      if (logFlags.verbose) this.mainLogger.debug('Transaction validated')
       this.statistics.incrementCounter('txInjected')
       this.logger.playbackLogNote(
         'tx_injected',
@@ -1000,7 +893,7 @@ class Shardus extends EventEmitter {
 
       this.consensus.inject(signedShardusTx, global, noConsensus).then((txReceipt) => {
       //this.profiler.profileSectionEnd('consensusInject')
-        if (this.verboseLogs)
+        if (logFlags.verbose)
           this.mainLogger.debug(
             `Received Consensus. Receipt: ${utils.stringifyReduce(txReceipt)}`
           )
@@ -1022,7 +915,7 @@ class Shardus extends EventEmitter {
       this.profiler.profileSectionEnd('put')
     }
 
-    if (this.verboseLogs)
+    if (logFlags.verbose)
       this.mainLogger.debug(
         `End of injectTransaction ${utils.stringifyReduce(tx)}`
       )
@@ -1221,7 +1114,7 @@ class Shardus extends EventEmitter {
    * @returns {App}
    */
   _getApplicationInterface(application) {
-    this.mainLogger.debug('Start of _getApplicationInterfaces()')
+    if (logFlags.debug) this.mainLogger.debug('Start of _getApplicationInterfaces()')
     const applicationInterfaceImpl: any = {}
     try {
       if (application == null) {
@@ -1318,7 +1211,7 @@ class Shardus extends EventEmitter {
         ) => application.getStateId(accountAddress, mustExist)
       } else {
         // throw new Error('Missing requried interface function. getStateId()')
-        this.mainLogger.debug('getStateId not used by global server')
+        if (logFlags.debug) this.mainLogger.debug('getStateId not used by global server')
       }
 
       if (typeof application.close === 'function') {
@@ -1517,7 +1410,7 @@ class Shardus extends EventEmitter {
       )
       throw new Error(ex)
     }
-    this.mainLogger.debug('End of _getApplicationInterfaces()')
+    if (logFlags.debug) this.mainLogger.debug('End of _getApplicationInterfaces()')
 
     // hack to force this to the correct answer.. not sure why other type correction methods did not work..
     return /** @type {App} */ /** @type {unknown} */ applicationInterfaceImpl
@@ -1657,7 +1550,7 @@ class Shardus extends EventEmitter {
     const currNodeTimestamp = Date.now()
 
     const txnAge = currNodeTimestamp - timestamp
-    this.mainLogger
+    if(logFlags.debug) this.mainLogger
       .debug(`Transaction Timestamp: ${timestamp} CurrNodeTimestamp: ${currNodeTimestamp}
     txnExprationTime: ${txnExprationTime}   TransactionAge: ${txnAge}`)
 

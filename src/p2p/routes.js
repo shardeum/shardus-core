@@ -1,3 +1,5 @@
+let {logFlags} = require('../logger')
+
 exports.register = function (context) {
   setupRoutes.call(context)
 }
@@ -26,12 +28,16 @@ function setupRoutes() {
     }
 
     const joinRequest = req.body
-    this.mainLogger.debug(`Join request received: ${JSON.stringify(joinRequest)}`)
+    if (logFlags.debug) this.mainLogger.debug(`Join request received: ${JSON.stringify(joinRequest)}`)
     res.json({ success: true })
 
     const accepted = await this.addJoinRequest(joinRequest)
-    if (!accepted) return this.mainLogger.debug('Join request not accepted.')
-    this.mainLogger.debug('Join request accepted!')
+    if (!accepted) {
+      if (logFlags.debug) this.mainLogger.debug('Join request not accepted.')
+      return
+    }
+    
+    if (logFlags.debug) this.mainLogger.debug('Join request accepted!')
   })
 
   this.network.registerExternalGet('nodeinfo', (req, res) => {
@@ -43,7 +49,7 @@ function setupRoutes() {
     const publicKey = req.params.publicKey
     const node = this.state.getNodeByPubKey(publicKey)
     if (!node) {
-      this.mainLogger.debug(`Unable to find node with given public key ${publicKey} for 'joined' route request.`)
+      if (logFlags.debug) this.mainLogger.debug(`Unable to find node with given public key ${publicKey} for 'joined' route request.`)
       return res.json({ joined: false })
     }
     const { cycleJoined } = node
@@ -59,7 +65,7 @@ function setupRoutes() {
 
   this.registerInternal('gossip', async (payload, respond, sender, tracker = '') => {
     await this.handleGossip(payload, sender, tracker)
-    this.mainLogger.debug('Gossip request accepted!')
+    if (logFlags.debug) this.mainLogger.debug('Gossip request accepted!')
   })
 
   this.registerInternal('cyclemarker', async (payload, respond) => {
@@ -79,12 +85,12 @@ function setupRoutes() {
 
   this.registerInternal('cyclechain', async (payload, respond) => {
     if (!payload) {
-      this.mainLogger.debug('No payload provided with `cyclechain` request.')
+      if (logFlags.debug) this.mainLogger.debug('No payload provided with `cyclechain` request.')
       await respond({ cycleChain: null, error: 'no payload; start and end cycle required' })
       return
     }
     if (payload.start === undefined || payload.end === undefined) {
-      this.mainLogger.debug('Start and end for the `cyclechain` request were not both provided.')
+      if (logFlags.debug) this.mainLogger.debug('Start and end for the `cyclechain` request were not both provided.')
       await respond({ cycleChain: null, error: 'start and end required' })
       return
     }
@@ -103,7 +109,7 @@ function setupRoutes() {
 
   this.registerInternal('unfinalized', async (payload, respond) => {
     if (!this.state.unfinalizedReady) {
-      this.mainLogger.debug('Unfinalized cycle not ready to be provided.')
+      if (logFlags.debug) this.mainLogger.debug('Unfinalized cycle not ready to be provided.')
       await respond({ unfinalizedCycle: null })
       return
     }
@@ -116,19 +122,19 @@ function setupRoutes() {
     await respond({ cycleUpdates })
     // Update your cycle and remake a cert if the askers cycleUpdates are better
     if (!payload) {
-      this.mainLogger.debug('No payload provided with `cycleupdates` request.')
+      if (logFlags.debug) this.mainLogger.debug('No payload provided with `cycleupdates` request.')
       return
     }
     const hisCycleUpdates = payload.myCycleUpdates
     const hisCertificate = payload.myCertificate
     if (!hisCycleUpdates || !hisCertificate) {
-      this.mainLogger.debug('Invalid payload provided with `cycleupdates` request.')
+      if (logFlags.debug) this.mainLogger.debug('Invalid payload provided with `cycleupdates` request.')
       return
     }
     const cycleUpdated = await this.state.addCycleUpdates(hisCycleUpdates)
     // TODO: Verify the logic here
     if (cycleUpdated) {
-      this.mainLogger.debug('Updated our cycle data after getting a `cycleupdates` request.')
+      if (logFlags.debug) this.mainLogger.debug('Updated our cycle data after getting a `cycleupdates` request.')
       // Use the askers cert if its better than the one you made
       const [added] = this.state.addCertificate(hisCertificate, true)
       if (!added) {
@@ -142,13 +148,13 @@ function setupRoutes() {
 
   this.registerInternal('node', async (payload, respond) => {
     if (!payload) {
-      this.mainLogger.debug('No payload provided with `node` request.')
+      if (logFlags.debug) this.mainLogger.debug('No payload provided with `node` request.')
       await respond({ node: null })
       return
     }
     const getBy = payload.getBy
     if (!getBy) {
-      this.mainLogger.debug('No query method provided with `node` request.')
+      if (logFlags.debug) this.mainLogger.debug('No query method provided with `node` request.')
       await respond({ node: null })
       return
     }
@@ -157,7 +163,7 @@ function setupRoutes() {
       case 'publicKey':
         const publicKey = payload.publicKey
         if (!publicKey) {
-          this.mainLogger.debug('No public key provided with `node` request to get by public key.')
+          if (logFlags.debug) this.mainLogger.debug('No public key provided with `node` request to get by public key.')
           await respond({ node: null })
           return
         }
@@ -165,7 +171,7 @@ function setupRoutes() {
         await respond({ node })
         break
       default:
-        this.mainLogger.debug('Invalid query method provided with `node` request.')
+        if (logFlags.debug) this.mainLogger.debug('Invalid query method provided with `node` request.')
         await respond({ node: null })
     }
   })
@@ -173,31 +179,40 @@ function setupRoutes() {
   // -------- GOSSIP Routes ----------
 
   this.registerGossipHandler('join', async (payload, sender, tracker) => {
-    if (!this.state.acceptJoinRequests || this.joinRequestToggle === false) return this.mainLogger.debug('Join request not accepted. Not accepting join requests currently.')
+    if (!this.state.acceptJoinRequests || this.joinRequestToggle === false){
+      if (logFlags.debug) this.mainLogger.debug('Join request not accepted. Not accepting join requests currently.')
+      return
+    }
     const accepted = await this.addJoinRequest(payload, tracker, false)
-    if (!accepted) return this.mainLogger.debug('Join request not accepted.')
-    this.mainLogger.debug('Join request accepted!')
+    if (!accepted){
+      if (logFlags.debug) this.mainLogger.debug('Join request not accepted.')
+      return
+    }
+    if (logFlags.debug) this.mainLogger.debug('Join request accepted!')
   })
 
   this.registerGossipHandler('active', async (payload, sender, tracker) => {
     if (!payload) {
-      this.mainLogger.debug('No payload provided with `active` request.')
+      if (logFlags.debug) this.mainLogger.debug('No payload provided with `active` request.')
       return
     }
-    this.mainLogger.debug(`Payload for 'active' request: ${JSON.stringify(payload)}`)
+    if (logFlags.debug) this.mainLogger.debug(`Payload for 'active' request: ${JSON.stringify(payload)}`)
     // Add status update of given node to queue
     const added = await this.state.addStatusUpdate(payload)
-    if (!added) return this.mainLogger.debug(`Status update to active for ${payload.nodeId} not added.`)
+    if (!added){
+      if (logFlags.debug) this.mainLogger.debug(`Status update to active for ${payload.nodeId} not added.`)
+      return
+    } 
     this.sendGossipIn('active', payload, tracker, sender)
   })
 
   this.registerGossipHandler('certificate', async (payload, sender, tracker) => {
     if (!payload) {
-      this.mainLogger.debug('No payload provided for the `certificate` request.')
+      if (logFlags.debug) this.mainLogger.debug('No payload provided for the `certificate` request.')
       return
     }
     const certificate = payload
-    this.mainLogger.debug(`Propagated cycle certificate: ${JSON.stringify(certificate)}`)
+    if (logFlags.debug) this.mainLogger.debug(`Propagated cycle certificate: ${JSON.stringify(certificate)}`)
     const [added, reason] = this.state.addCertificate(certificate, true)
     if (!added) {
       switch (reason) {
@@ -222,7 +237,7 @@ function setupRoutes() {
 
   this.registerGossipHandler('scaling', async (payload, sender, tracker) => {
     if (!payload) {
-      this.mainLogger.debug('No payload provided for the `scaling` request.')
+      if (logFlags.debug) this.mainLogger.debug('No payload provided for the `scaling` request.')
       return
     }
     const added = await this.state.addExtScalingRequest(payload)

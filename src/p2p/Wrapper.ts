@@ -10,6 +10,7 @@ import * as CycleCreator from './CycleCreator'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import * as Utils from './Utils'
+import {logFlags} from '../logger'
 
 /* p2p functions */
 
@@ -144,7 +145,7 @@ class State extends EventEmitter {
 
   getNodeByPubKey(pubkey) {
     if (NodeList.byPubKey.has(pubkey) !== true) {
-      console.log(
+      if (logFlags.console) console.log(
         `getNodeByPubKey cant find ${utils.makeShortHash(
           pubkey
         )} in set: ${utils.stringifyReduce(NodeList.byPubKey.keys)} `

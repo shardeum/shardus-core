@@ -5,6 +5,7 @@ import { config, crypto, logger, network } from './Context'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { InternalHandler, LooseObject } from './Types'
+import {logFlags} from '../logger'
 
 /** TYPES */
 
@@ -29,7 +30,6 @@ const routes = {
 /** STATE */
 
 let p2pLogger: Logger
-let verboseLogs: boolean
 
 let acceptInternal = false
 
@@ -59,10 +59,6 @@ export function init() {
 
   // Catch Q1 start events and log size of hashes
   Self.emitter.on('cycle_q1_start', pruneGossipHashes)
-}
-
-export function setVerboseLogs(enabled: boolean) {
-  verboseLogs = enabled
 }
 
 // Finds a node either in nodelist or in seedNodes list
@@ -158,7 +154,7 @@ function _extractPayload(wrappedPayload, nodeGroup) {
 
 function _wrapAndTagMessage(msg, tracker = '', recipientNode) {
   if (!msg) throw new Error('No message given to wrap and tag!')
-  if (verboseLogs) {
+  if (logFlags.verbose) {
     warn(
       `Attaching sender ${Self.id} to the message: ${utils.stringifyReduceLimit(
         msg
@@ -209,7 +205,7 @@ export async function tell(
   const promises = []
   for (const node of nodes) {
     if (node.id === Self.id) {
-      info('p2p/Comms:tell: Not telling self')
+      if(logFlags.p2pNonFatal) info('p2p/Comms:tell: Not telling self')
       continue
     }
     const signedMessage = _wrapAndTagMessage(message, tracker, node)
@@ -234,7 +230,7 @@ export async function ask(
     tracker = createMsgTracker()
   }
   if (node.id === Self.id) {
-    info('p2p/Comms:ask: Not asking self')
+    if(logFlags.p2pNonFatal) info('p2p/Comms:ask: Not asking self')
     return false
   }
   const signedMessage = _wrapAndTagMessage(message, tracker, node)
@@ -267,7 +263,7 @@ export function registerInternal(route, handler) {
     internalRecvCounter++
     // We have internal requests turned off until we have a node id
     if (!acceptInternal) {
-      info('We are not currently accepting internal requests...')
+      if(logFlags.p2pNonFatal) info('We are not currently accepting internal requests...')
       return
     }
     let tracker = ''
@@ -279,7 +275,7 @@ export function registerInternal(route, handler) {
         tracker,
         node
       )
-      if (verboseLogs) {
+      if (logFlags.verbose) {
         info(
           `The signed wrapped response to send back: ${utils.stringifyReduceLimit(
             signedResponse
@@ -353,7 +349,7 @@ export async function sendGossip(
     tracker = createGossipTracker()
   }
 
-  if (verboseLogs) {
+  if (logFlags.verbose) {
     info(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
   }
   const gossipPayload = { type, data: payload }
@@ -361,7 +357,7 @@ export async function sendGossip(
   /*
   const gossipHash = crypto.hash(gossipPayload)
   if (gossipedHashesSent.has(gossipHash)) {
-    if (verboseLogs) {
+    if (logFlags.verbose) {
       warn(`Gossip already sent: ${gossipHash.substring(0, 5)}`)
     }
     return
@@ -385,7 +381,7 @@ export async function sendGossip(
     recipients = utils.removeNodesByID(recipients, [sender])
   }
   try {
-    if (verboseLogs) {
+    if (logFlags.verbose) {
       info(
         `GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(
           recipients.map(
@@ -408,7 +404,7 @@ export async function sendGossip(
     }
     await tell(recipients, 'gossip', gossipPayload, true, tracker)
   } catch (ex) {
-    if (verboseLogs) {
+    if (logFlags.verbose) {
       error(
         `Failed to sendGossip(${utils.stringifyReduce(
           payload
@@ -418,7 +414,7 @@ export async function sendGossip(
     fatal('sendGossipIn: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
   }
   // gossipedHashesSent.set(gossipHash, currentCycle)    // No longer used
-  if (verboseLogs) {
+  if (logFlags.verbose) {
     info(`End of sendGossipIn(${utils.stringifyReduce(payload)})`)
   }
 }
@@ -439,14 +435,14 @@ export async function sendGossipAll(
     tracker = createGossipTracker()
   }
 
-  if (verboseLogs) {
+  if (logFlags.verbose) {
     p2pLogger.debug(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
   }
   const gossipPayload = { type, data: payload }
 
   const gossipHash = crypto.hash(gossipPayload)
   // if (gossipedHashesSent.has(gossipHash)) {
-  //   if (verboseLogs) {
+  //   if (logFlags.verbose) {
   //     p2pLogger.debug(`Gossip already sent: ${gossipHash.substring(0, 5)}`)
   //   }
   //   return
@@ -463,7 +459,7 @@ export async function sendGossipAll(
     recipients = utils.removeNodesByID(recipients, [sender])
   }
   try {
-    if (verboseLogs) {
+    if (logFlags.verbose) {
       p2pLogger.debug(
         `GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(
           recipients.map(
@@ -484,7 +480,7 @@ export async function sendGossipAll(
     }
     await tell(recipients, 'gossip', gossipPayload, true, tracker)
   } catch (ex) {
-    if (verboseLogs) {
+    if (logFlags.verbose) {
       p2pLogger.error(
         `Failed to sendGossip(${utils.stringifyReduce(
           payload
@@ -496,7 +492,7 @@ export async function sendGossipAll(
     )
   }
   //gossipedHashesSent.set(gossipHash, false)
-  if (verboseLogs) {
+  if (logFlags.verbose) {
     p2pLogger.debug(`End of sendGossipIn(${utils.stringifyReduce(payload)})`)
   }
 }
@@ -506,7 +502,7 @@ export async function sendGossipAll(
  * Payload: {type: ['receipt', 'trustedTransaction'], data: {}}
  */
 export async function handleGossip(payload, sender, tracker = '') {
-  if (verboseLogs) {
+  if (logFlags.verbose) {
     info(`Start of handleGossip(${utils.stringifyReduce(payload)})`)
   }
 
@@ -561,7 +557,7 @@ export async function handleGossip(payload, sender, tracker = '') {
   */
   /*
   if (gossipedHashesRecv.has(gossipHash)) {
-    if (verboseLogs) {
+    if (logFlags.verbose) {
       warn(`Got old gossip: ${gossipHash.substring(0, 5)}`)
     }
     if (!gossipedHashesRecv.get(gossipHash)) {  // [TODO] - double check logic; gossipHash should be gettable here since has() is true; so we never setTimeout()
@@ -570,7 +566,7 @@ export async function handleGossip(payload, sender, tracker = '') {
         config.p2p.gossipTimeout
       )
       gossipedHashesRecv.set(gossipHash, true)
-      if (verboseLogs) {
+      if (logFlags.verbose) {
         warn(
           `Marked old gossip for deletion: ${gossipHash.substring(0, 5)} in ${
             config.p2p.gossipTimeout
@@ -590,7 +586,7 @@ export async function handleGossip(payload, sender, tracker = '') {
   logger.playbackLog(sender, 'self', 'GossipRcv', type, tracker, data)
   // [TODO] - maybe we don't need to await the following line
   await gossipHandler(data, sender, tracker)
-  if (verboseLogs) {
+  if (logFlags.verbose) {
     info(`End of handleGossip(${utils.stringifyReduce(payload)})`)
   }
 }
@@ -621,9 +617,11 @@ export function unregisterGossipHandler(type) {
 // We don't need to prune gossip hashes since we are not creating them anymore.
 function pruneGossipHashes() {
   //  warn(`gossipedHashesRecv:${gossipedHashesRecv.size} gossipedHashesSent:${gossipedHashesSent.size}`)
-  info(`Total  gossipSent:${gossipSent} gossipRecv:${gossipRecv}`)
-  info(`Sent gossip by type: ${JSON.stringify(gossipTypeSent)}`)
-  info(`Recv gossip by type: ${JSON.stringify(gossipTypeRecv)}`)
+  if(logFlags.p2pNonFatal) {
+    info(`Total  gossipSent:${gossipSent} gossipRecv:${gossipRecv}`)
+    info(`Sent gossip by type: ${JSON.stringify(gossipTypeSent)}`)
+    info(`Recv gossip by type: ${JSON.stringify(gossipTypeRecv)}`)
+  }
 }
 
 function info(...msg) {

@@ -14,6 +14,7 @@ import * as Utils from './Utils'
 import * as Network from '../network'
 import deepmerge from 'deepmerge'
 import { request } from 'express'
+import {logFlags} from '../logger'
 
 /** TYPES */
 enum ScaleType {
@@ -61,7 +62,7 @@ const gossipScaleRoute: Types.GossipHandler<SignedScaleRequest> = async (
   sender,
   tracker
 ) => {
-  info(`Got scale request: ${JSON.stringify(payload)}`)
+  if(logFlags.p2pNonFatal) info(`Got scale request: ${JSON.stringify(payload)}`)
   if (!payload) {
     warn('No payload provided for the `scaling` request.')
     return
@@ -76,7 +77,7 @@ const scalingTestRoute: Types.GossipHandler<SignedScaleRequest> = async (
   sender,
   tracker
 ) => {
-  info(`Got scale test gossip: ${JSON.stringify(payload)}`)
+  if(logFlags.p2pNonFatal) info(`Got scale test gossip: ${JSON.stringify(payload)}`)
   if (!payload) {
     warn('No payload provided for the `scaling` request.')
     return
@@ -407,8 +408,8 @@ async function _addScalingRequest (scalingRequest: SignedScaleRequest) {
 async function _waitUntilEndOfCycle () {
   const currentTime = Date.now()
   const nextQ1Start = CycleCreator.nextQ1Start
-  info(`Current time is: ${currentTime}`)
-  info(`Next cycle will start at: ${nextQ1Start}`)
+  if(logFlags.p2pNonFatal) info(`Current time is: ${currentTime}`)
+  if(logFlags.p2pNonFatal) info(`Next cycle will start at: ${nextQ1Start}`)
 
   let timeToWait
   if (currentTime < nextQ1Start) {
@@ -416,7 +417,7 @@ async function _waitUntilEndOfCycle () {
   } else {
     timeToWait = 0
   }
-  info(`Waiting for ${timeToWait} ms before next cycle marker creation...`)
+  if(logFlags.p2pNonFatal) info(`Waiting for ${timeToWait} ms before next cycle marker creation...`)
   await sleep(timeToWait)
 }
 

@@ -14,10 +14,10 @@ interface Logger {
   config: Shardus.LogsConfiguration
   logDir: string
   log4Conf: any
-  playbackLogEnabled: boolean
+  // playbackLogEnabled: boolean
   _playbackLogger: any
-  _playbackTrace: boolean
-  _playbackDebug: boolean
+  // _playbackTrace: boolean
+  // _playbackDebug: boolean
   _seenAddresses: any
   _shortStrings: any
   _playbackOwner_host: any
@@ -58,7 +58,11 @@ export type LogFlags = {
   verbose: boolean
   fatal: boolean
   debug: boolean
+  info: boolean // optional to use this. many info lines seem good to keep and minimal in stringify/frequency
 
+  console: boolean
+
+  playback: boolean
   playback_trace: boolean
   playback_debug: boolean
 
@@ -71,13 +75,36 @@ export type LogFlags = {
   // playback:boolean;
   // playback_verbose:boolean
 
-  // p2p:boolean;
+  p2pNonFatal:boolean;
   // //p2p_info:boolean;
 
   // snapshot:boolean;
 }
 
-export let logFlags: LogFlags
+export let logFlags: LogFlags = {
+  debug: true,
+  fatal: true,
+  verbose: true,
+  info: true,
+  console: true,
+
+  playback: false,
+  playback_trace: false,
+  playback_debug: false,
+  net_trace: false,
+  // main:true,
+  // main_error:true,
+  // main_debug:true,
+  // main_trace:true,
+
+  // playback:true,
+  // playback_verbose:true,
+
+  p2pNonFatal:true,
+
+  // snapshot:true,
+} 
+
 
 class Logger {
   backupLogFlags: LogFlags
@@ -88,27 +115,6 @@ class Logger {
     this.logDir = null
     this.log4Conf = null
     this._setupLogs()
-
-    logFlags = {
-      debug: true,
-      fatal: true,
-      verbose: true,
-
-      playback_trace: false,
-      playback_debug: false,
-      net_trace: false,
-      // main:true,
-      // main_error:true,
-      // main_debug:true,
-      // main_trace:true,
-
-      // playback:true,
-      // playback_verbose:true,
-
-      // p2p:true,
-
-      // snapshot:true,
-    }
   }
 
   // Checks if the configuration has the required components
@@ -158,25 +164,7 @@ class Logger {
     this._configureLogs()
     this.getLogger('main').info('Logger initialized.')
 
-    this.playbackLogEnabled = false
     this._playbackLogger = this.getLogger('playback')
-    // @ts-ignore
-    this._playbackTrace = ['TRACE'].includes(
-      this._playbackLogger.level.levelStr
-    )
-
-    logFlags.playback_trace = this._playbackTrace
-
-    // @ts-ignore
-    this._playbackDebug = ['DEBUG'].includes(
-      this._playbackLogger.level.levelStr
-    )
-
-    logFlags.playback_debug = this._playbackDebug
-
-    if (this._playbackTrace || this._playbackDebug) {
-      this.playbackLogEnabled = true
-    }
 
     this.setupLogControlValues()
 
@@ -259,13 +247,11 @@ class Logger {
   }
 
   playbackLog(from, to, type, endpoint, id, desc) {
-    nestedCountersInstance.countEvent(type, endpoint)
-
-    // only log desc if trace..
-    // dont log it if debug
-    if (!this._playbackTrace && !this._playbackDebug) {
+    if (!logFlags.playback) {
       return
-    }
+    }   
+
+    nestedCountersInstance.countEvent(type, endpoint)
 
     let ts = Date.now()
 
@@ -278,13 +264,13 @@ class Logger {
       id = utils.makeShortHash(id)
     }
 
-    if (this._playbackTrace) {
+    if (logFlags.playback_trace) {
       desc = this.processDesc(desc)
       this._playbackLogger.trace(
         `\t${ts}\t${this._playbackOwner}\t${from}\t${to}\t${type}\t${endpoint}\t${id}\t${desc}`
       )
     }
-    if (this._playbackDebug) {
+    if (logFlags.playback_debug) {
       this._playbackLogger.debug(
         `\t${ts}\t${this._playbackOwner}\t${from}\t${to}\t${type}\t${endpoint}\t${id}`
       )
@@ -304,12 +290,29 @@ class Logger {
         logFlags[key] = false
       }
       logFlags.fatal = true
+
+      logFlags.playback = false
+
+      for (const [key, value] of Object.entries(logFlags)) {
+        res.write(`${key}: ${value}\n`)
+      }
+
       res.end()
     })
     Context.network.registerExternalGet('logs-default', (req, res) => {
       for (const [key, value] of Object.entries(logFlags)) {
         logFlags[key] = this.backupLogFlags[key]
       }
+
+      if (logFlags.playback_trace || logFlags.playback_debug) {
+        logFlags.playback = true
+      } else {
+        logFlags.playback = false
+      }
+
+      for (const [key, value] of Object.entries(logFlags)) {
+        res.write(`${key}: ${value}\n`)
+      }      
       res.end()
     })
   }
@@ -318,23 +321,54 @@ class Logger {
     logFlags.fatal = true
 
     let mainLogger = this.getLogger('main')
-    if (mainLogger && ['TRACE'].includes(mainLogger.level)) {
+    if (mainLogger && ['TRACE','trace'].includes(mainLogger.level)) {
       logFlags.verbose = true
       logFlags.debug = true
-    } else if (mainLogger && ['debug'].includes(mainLogger.level)) {
+      logFlags.info = true
+    } else if (mainLogger && ['DEBUG','debug'].includes(mainLogger.level)) {
+      logFlags.verbose = false
+      logFlags.debug = true
+      logFlags.info = true
+    } else if (mainLogger && ['INFO','info'].includes(mainLogger.level)) {
       logFlags.verbose = false
       logFlags.debug = false
+      logFlags.info = true
     } else {
       logFlags.verbose = false
       logFlags.debug = false
+      logFlags.info = false
+      //would still get warn..
     }
 
+    let playbackLogger = this.getLogger('net')
+    logFlags.playback = false
+    if(playbackLogger){
+      // @ts-ignore
+      logFlags.playback_trace = ['TRACE'].includes(playbackLogger.level)
+      // @ts-ignore
+      logFlags.playback_debug = ['DEBUG'].includes(playbackLogger.level)
+      if (logFlags.playback_trace || logFlags.playback_debug) {
+        logFlags.playback = true
+      } else {
+        logFlags.playback = false
+      }  
+    }
+  
     let netLogger = this.getLogger('net')
-    if (netLogger && ['TRACE'].includes(netLogger.level)) {
+    if (netLogger && ['TRACE','trace'].includes(netLogger.level)) {
       logFlags.net_trace = true
     }
 
+    let p2pLogger = this.getLogger('p2p')
+    if (p2pLogger && ['FATAL','fatal'].includes(netLogger.level)) {
+      logFlags.p2pNonFatal = false
+    } else {
+      logFlags.p2pNonFatal = true
+    }
+
     this.backupLogFlags = utils.deepCopy(logFlags)
+
+    console.log(`logFlags: ` + stringify(logFlags))
   }
 }
 

@@ -1,6 +1,6 @@
 import Log4js from 'log4js'
 import Profiler from '../utils/profiler'
-import Logger from '../logger'
+import Logger, {logFlags} from '../logger'
 import Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
 import Crypto from '../crypto'
@@ -19,7 +19,6 @@ interface Consensus {
   p2p: P2P
   storage: Storage
   pendingTransactions: any
-  mainLogs: boolean
   lastServed: number
 }
 
@@ -44,11 +43,6 @@ class Consensus extends EventEmitter {
 
     this.pendingTransactions = {}
 
-    this.mainLogs = false
-    if (this.mainLogger && ['TRACE', 'debug'].includes(this.mainLogger.level)) {
-      this.mainLogs = true
-    }
-
     this.lastServed = 0
   }
 
@@ -63,7 +57,7 @@ class Consensus extends EventEmitter {
       timestamp = keysResponse.timestamp
       debugInfo = keysResponse.debugInfo
 
-      if (this.mainLogs) {
+      if (logFlags.debug) {
         this.mainLogger.debug(
           `Start of inject(globalModification:${global}  ts: ${timestamp} noConsensus:${noConsensus} dbg: ${debugInfo}  tx: ${utils.stringifyReduce(
             shardusTransaction
@@ -78,7 +72,7 @@ class Consensus extends EventEmitter {
       if (Array.isArray(targetKeys) && targetKeys.length > 0) {
         targetAddress = targetKeys[0]
       }
-      if (this.mainLogs) {
+      if (logFlags.debug) {
         this.mainLogger.debug(
           `sourceAddress: ${utils.makeShortHash(
             sourceAddress
@@ -87,11 +81,11 @@ class Consensus extends EventEmitter {
       }
 
       if (sourceAddress) {
-        if (this.mainLogs) {
+        if (logFlags.debug) {
           this.mainLogger.debug(`get source state id for ${sourceAddress}`)
         }
         stateId = null // await this.app.getStateId(sourceAddress)
-        if (this.mainLogs) {
+        if (logFlags.debug) {
           this.mainLogger.debug(
             `StateID: ${stateId} short stateID: ${utils.makeShortHash(
               stateId
@@ -101,11 +95,11 @@ class Consensus extends EventEmitter {
       }
 
       if (targetAddress) {
-        if (this.mainLogs) {
+        if (logFlags.debug) {
           this.mainLogger.debug(`get target state id for ${targetAddress}`)
         }
         targetStateId = null // await this.app.getStateId(targetAddress, false) // we don't require this to exist
-        if (this.mainLogs) {
+        if (logFlags.debug) {
           this.mainLogger.debug(`targetStateId ${targetStateId}`)
         }
       }
@@ -114,7 +108,7 @@ class Consensus extends EventEmitter {
         throw new Error(`app.getKeyFromTransaction did not return any keys for the transaction: ${utils.stringifyReduce(shardusTransaction)}`)
       }
 
-      if (this.mainLogs) {
+      if (logFlags.debug) {
         this.mainLogger.debug(
           `Creating the receipt for the transaction: StateID: ${stateId} short stateID: ${utils.makeShortHash(
             stateId
@@ -126,7 +120,7 @@ class Consensus extends EventEmitter {
         stateId,
         targetStateId
       )
-      if (this.mainLogs) {
+      if (logFlags.debug) {
         this.mainLogger.debug(
           `Done Creating the receipt for the transaction: StateID: ${stateId} short stateID: ${utils.makeShortHash(
             stateId
@@ -165,7 +159,7 @@ class Consensus extends EventEmitter {
       `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`
     )
 
-    if (this.mainLogs) {
+    if (logFlags.debug) {
       this.mainLogger.debug(
         `End of inject(${timestamp}  debugInfo: ${debugInfo})`
       )

@@ -9,6 +9,7 @@ import * as Snapshot from '../snapshot'
 import * as utils from '../utils'
 import Profiler from '../utils/profiler'
 import { config, crypto, logger } from '../p2p/Context'
+import {logFlags} from '../logger'
 
 const Op = Sequelize.Op
 const sqlite3 = require('sqlite3').verbose()
@@ -67,12 +68,12 @@ class Sqlite3Storage {
         let type = value.type
         if (!type) {
           type = value
-          // console.log(' TYPE MISSING!!!! ' + key)
+          // if (logFlags.console) console.log(' TYPE MISSING!!!! ' + key)
         }
         if (type.toString() === Sequelize.JSON.toString()) {
           modelData.isColumnJSON[key] = true
           modelData.JSONkeys.push(key)
-          // console.log(`JSON column: ${key}`)
+          // if (logFlags.console) console.log(`JSON column: ${key}`)
         } else {
           modelData.isColumnJSON[key] = false
         }
@@ -93,8 +94,8 @@ class Sqlite3Storage {
     modelData.updateString = `UPDATE ${modelData.tableName} SET `
     modelData.deleteString = `DELETE FROM ${modelData.tableName} `
 
-    // console.log(`Create model data for table: ${tableName} => ${stringify(modelData)}`)
-    // console.log()
+    // if (logFlags.console) console.log(`Create model data for table: ${tableName} => ${stringify(modelData)}`)
+    // if (logFlags.console) console.log()
     this.storageModels[tableName] = modelData
 
     // todo base this off of models
@@ -173,13 +174,13 @@ class Sqlite3Storage {
   _create(table, object, opts) {
     try{
     this.profiler.profileSectionStart('db')
-    // console.log('_create2: ' + stringify(object))
+    // if (logFlags.console) console.log('_create2: ' + stringify(object))
     if (Array.isArray(object)) {
       // return table.bulkCreate(values, opts)
       // todo transaciton or something else
 
       for (const subObj of object) {
-        // console.log('sub obj: ' + stringify(subObj))
+        // if (logFlags.console) console.log('sub obj: ' + stringify(subObj))
         this._create(table, subObj, opts)
       }
       return
@@ -189,19 +190,19 @@ class Sqlite3Storage {
       queryString = table.insertOrReplaceString
     }
     const inputs = []
-    // console.log('columns: ' + stringify(table.columns))
+    // if (logFlags.console) console.log('columns: ' + stringify(table.columns))
     for (const column of table.columns) {
       let value = object[column]
 
       if (table.isColumnJSON[column]) {
         value = stringify(value)
       }
-      // console.log(`column: ${column}  ${value}`)
+      // if (logFlags.console) console.log(`column: ${column}  ${value}`)
       inputs.push(value)
     }
     queryString += this.options2string(opts)
 
-    // console.log(queryString + '  VALUES: ' + stringify(inputs))
+    // if (logFlags.console) console.log(queryString + '  VALUES: ' + stringify(inputs))
     return this.run(queryString, inputs)
     
     } finally {
@@ -227,7 +228,7 @@ class Sqlite3Storage {
     queryString += whereString
     queryString += this.options2string(opts)
 
-    // console.log(queryString + '  VALUES: ' + stringify(valueArray))
+    // if (logFlags.console) console.log(queryString + '  VALUES: ' + stringify(valueArray))
 
     const results = await this.all(queryString, valueArray)
     // optionally parse results!
@@ -235,7 +236,7 @@ class Sqlite3Storage {
       if (table.JSONkeys.length > 0) {
         // for (let i = 0; i < results.length; i++) {
         //   let result = results[i]
-        //   console.log('todo parse this??? ' + result)
+        //   if (logFlags.console) console.log('todo parse this??? ' + result)
         // }
       }
     }
@@ -262,7 +263,7 @@ class Sqlite3Storage {
     queryString += whereString
     queryString += this.options2string(opts)
 
-    // console.log(queryString + '  VALUES: ' + stringify(valueArray))
+    // if (logFlags.console) console.log(queryString + '  VALUES: ' + stringify(valueArray))
 
     const results = await this.allOld(queryString, valueArray)
     // optionally parse results!
@@ -270,7 +271,7 @@ class Sqlite3Storage {
       if (table.JSONkeys.length > 0) {
         // for (let i = 0; i < results.length; i++) {
         //   let result = results[i]
-        //   console.log('todo parse this??? ' + result)
+        //   if (logFlags.console) console.log('todo parse this??? ' + result)
         // }
       }
     }
@@ -304,7 +305,7 @@ class Sqlite3Storage {
 
     queryString += this.options2string(opts)
 
-    // console.log(queryString + '  VALUES: ' + stringify(valueArray))
+    // if (logFlags.console) console.log(queryString + '  VALUES: ' + stringify(valueArray))
     return this.run(queryString, valueArray)
     } finally {
       this.profiler.profileSectionEnd('db')
@@ -328,7 +329,7 @@ class Sqlite3Storage {
     queryString += whereString
     queryString += this.options2string(opts)
 
-    // console.log(queryString + '  VALUES: ' + stringify(valueArray))
+    // if (logFlags.console) console.log(queryString + '  VALUES: ' + stringify(valueArray))
     return this.run(queryString, valueArray)
     } finally {
       this.profiler.profileSectionEnd('db')
@@ -487,8 +488,8 @@ class Sqlite3Storage {
     return new Promise((resolve, reject) => {
       this.db.run(sql, params, function (err) {
         if (err) {
-          console.log('Error running sql ' + sql)
-          console.log(err)
+          if (logFlags.console) console.log('Error running sql ' + sql)
+          if (logFlags.console) console.log(err)
           reject(err)
         } else {
           resolve({ id: this.lastID })
@@ -500,8 +501,8 @@ class Sqlite3Storage {
     return new Promise((resolve, reject) => {
       this.db.get(sql, params, (err, result) => {
         if (err) {
-          console.log('Error running sql: ' + sql)
-          console.log(err)
+          if (logFlags.console) console.log('Error running sql: ' + sql)
+          if (logFlags.console) console.log(err)
           reject(err)
         } else {
           resolve(result)
@@ -514,8 +515,8 @@ class Sqlite3Storage {
     return new Promise((resolve, reject) => {
       this.db.all(sql, params, (err, rows) => {
         if (err) {
-          console.log('Error running sql: ' + sql)
-          console.log(err)
+          if (logFlags.console) console.log('Error running sql: ' + sql)
+          if (logFlags.console) console.log(err)
           reject(err)
         } else {
           resolve(rows)
@@ -527,8 +528,8 @@ class Sqlite3Storage {
     return new Promise((resolve, reject) => {
       this.oldDb.all(sql, params, (err, rows) => {
         if (err) {
-          console.log('Error running sql: ' + sql)
-          console.log(err)
+          if (logFlags.console) console.log('Error running sql: ' + sql)
+          if (logFlags.console) console.log(err)
           reject(err)
         } else {
           resolve(rows)

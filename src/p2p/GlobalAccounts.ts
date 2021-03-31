@@ -18,6 +18,7 @@ import {
   Signature,
   SignedObject,
 } from './Types'
+import {logFlags} from '../logger'
 
 /** TYPES */
 
@@ -89,14 +90,14 @@ export function init() {
 
 export function setGlobal(address, value, when, source) {
   /** [TODO] [AS] Replace with Self.id */
-  // console.log(`SETGLOBAL: WE ARE: ${p2p.id.substring(0, 5)}`)
-  console.log(`SETGLOBAL: WE ARE: ${Self.id.substring(0, 5)}`)
+  // if (logFlags.console) console.log(`SETGLOBAL: WE ARE: ${p2p.id.substring(0, 5)}`)
+  if (logFlags.console) console.log(`SETGLOBAL: WE ARE: ${Self.id.substring(0, 5)}`)
 
   // Only do this if you're active
   /** [TODO] [AS] Replace with Self.isActive */
   // if (!p2p.isActive) {
   if (!Self.isActive) {
-    console.log('setGlobal: Not active yet')
+    if (logFlags.console) console.log('setGlobal: Not active yet')
     return
   }
 
@@ -108,14 +109,14 @@ export function setGlobal(address, value, when, source) {
   const signedTx: SignedSetGlobalTx = Context.crypto.sign(tx)
 
   if (Context.stateManager === null) {
-    console.log('setGlobal: stateManager == null')
+    if (logFlags.console) console.log('setGlobal: stateManager == null')
   } else {
-    console.log('setGlobal: stateManager != null')
+    if (logFlags.console) console.log('setGlobal: stateManager != null')
   }
 
   // Get the nodes that tx will be broadcasted to
   if (!Context.stateManager.currentCycleShardData) {
-    console.log('stateManager.currentCycleShardData == null')
+    if (logFlags.console) console.log('stateManager.currentCycleShardData == null')
 
     return
   }
@@ -125,7 +126,7 @@ export function setGlobal(address, value, when, source) {
     Context.stateManager.currentCycleShardData.parititionShardDataMap
   )
   const consensusGroup = [...homeNode.consensusNodeForOurNodeFull]
-  console.log(
+  if (logFlags.console) console.log(
     `SETGLOBAL: CONSENSUS_GROUP: ${consensusGroup.map((n) =>
       n.id.substring(0, 5)
     )}`
@@ -143,7 +144,7 @@ export function setGlobal(address, value, when, source) {
   const handle = createMakeReceiptHandle(txHash)
 
   const onTimeout = () => {
-    console.log(`SETGLOBAL: TIMED OUT: ${txHash}`)
+    if (logFlags.console) console.log(`SETGLOBAL: TIMED OUT: ${txHash}`)
     /** [TODO] [AS] Replace with Self.emitter.removeListener */
     // p2p.removeListener(handle, onReceipt)
     Self.emitter.removeListener(handle, onReceipt)
@@ -152,7 +153,7 @@ export function setGlobal(address, value, when, source) {
   const timer = setTimeout(onTimeout, timeout)
 
   const onReceipt = (receipt) => {
-    console.log(`SETGLOBAL: GOT RECEIPT: ${txHash} ${JSON.stringify(receipt)}`)
+    if (logFlags.console) console.log(`SETGLOBAL: GOT RECEIPT: ${txHash} ${JSON.stringify(receipt)}`)
     clearTimeout(timer)
     // Gossip receipt to every node in network to apply to global account
     if (processReceipt(receipt) === false) return
@@ -182,7 +183,7 @@ export function makeReceipt(
   sender: NodeInfo['id']
 ) {
   if (!Context.stateManager) {
-    console.log('GlobalAccounts: makeReceipt: stateManager not ready')
+    if (logFlags.console) console.log('GlobalAccounts: makeReceipt: stateManager not ready')
     return
   }
 
@@ -203,7 +204,7 @@ export function makeReceipt(
       consensusGroup,
     }
     receipts.set(txHash, receipt)
-    console.log(
+    if (logFlags.console) console.log(
       `SETGLOBAL: MAKERECEIPT CONSENSUS GROUP FOR ${txHash.substring(
         0,
         5
@@ -230,13 +231,13 @@ export function makeReceipt(
   tracker.timestamp = tx.when
 
   // When a majority (%60) is reached, emit the completion event for this txHash
-  console.log(
+  if (logFlags.console) console.log(
     `SETGLOBAL: GOT SIGNED_SET_GLOBAL_TX FROM ${sender.substring(
       0,
       5
     )}: ${txHash} ${JSON.stringify(signedTx)}`
   )
-  console.log(
+  if (logFlags.console) console.log(
     `SETGLOBAL: ${receipt.signs.length} RECEIPTS / ${receipt.consensusGroup.size} CONSENSUS_GROUP`
   )
   if (isReceiptMajority(receipt, receipt.consensusGroup)) {
@@ -253,7 +254,7 @@ export function processReceipt(receipt: Receipt) {
   tracker.timestamp = receipt.tx.when
   if (tracker.gossiped) return false
   Context.shardus.put(receipt.tx.value, false, true)
-  console.log(`Processed set-global receipt: ${JSON.stringify(receipt)}`)
+  if (logFlags.console) console.log(`Processed set-global receipt: ${JSON.stringify(receipt)}`)
   tracker.gossiped = true
   attemptCleanup()
   return true
@@ -275,7 +276,7 @@ export function attemptCleanup() {
 function validateReceipt(receipt: Receipt) {
   if (Context.stateManager.currentCycleShardData === null) {
     // we may get this endpoint way before we are ready, so just log it can exit out
-    console.log(
+    if (logFlags.console) console.log(
       'validateReceipt: unable to validate receipt currentCycleShardData not ready'
     )
     return false
@@ -284,7 +285,7 @@ function validateReceipt(receipt: Receipt) {
   const consensusGroup = new Set(getConsensusGroupIds(receipt.tx.source))
   // Make sure receipt has enough signs
   if (isReceiptMajority(receipt, consensusGroup) === false) {
-    console.log('validateReceipt: Receipt did not have majority')
+    if (logFlags.console) console.log('validateReceipt: Receipt did not have majority')
     return false
   }
   // Make a map of signs that overlap with consensusGroup
@@ -295,13 +296,13 @@ function validateReceipt(receipt: Receipt) {
     const node = NodeList.byPubKey.get(sign.owner)
 
     if (node === null) {
-      console.log(
+      if (logFlags.console) console.log(
         `validateReceipt: node was null or not found ${utils.stringifyReduce(
           sign.owner
         )}`
       )
       /** [TODO] [AS] Replace with NodeList.nodes */
-      console.log(
+      if (logFlags.console) console.log(
         // `validateReceipt: nodes: ${utils.stringifyReduce(p2p.state.getNodes())}`
         `validateReceipt: nodes: ${utils.stringifyReduce(NodeList.nodes)}`
       )
@@ -312,7 +313,7 @@ function validateReceipt(receipt: Receipt) {
     if (consensusGroup.has(id)) {
       signsInConsensusGroup.push(sign)
     } else {
-      console.log(
+      if (logFlags.console) console.log(
         `validateReceipt: consensusGroup does not have id: ${id} ${utils.stringifyReduce(
           consensusGroup
         )}`
@@ -321,7 +322,7 @@ function validateReceipt(receipt: Receipt) {
   }
   // Make sure signs and consensusGroup overlap >= %60
   if ((signsInConsensusGroup.length / consensusGroup.size) * 100 < 60) {
-    console.log(
+    if (logFlags.console) console.log(
       'validateReceipt: Receipt signature owners and consensus group did not overlap enough'
     )
     return false
@@ -333,12 +334,12 @@ function validateReceipt(receipt: Receipt) {
     if (Context.crypto.verify(signedTx)) verified++
   }
   if ((verified / consensusGroup.size) * 100 < 60) {
-    console.log(
+    if (logFlags.console) console.log(
       'validateReceipt: Receipt does not have enough valid signatures'
     )
     return false
   }
-  console.log(`validateReceipt: success! ${utils.stringifyReduce(receipt)}`)
+  if (logFlags.console) console.log(`validateReceipt: success! ${utils.stringifyReduce(receipt)}`)
   return true
 }
 

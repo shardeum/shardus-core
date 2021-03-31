@@ -19,6 +19,8 @@ import * as shardFunctionTypes from '../state-manager/shardFunctionTypes'
 import * as utils from '../utils'
 import * as partitionGossip from './partition-gossip'
 import * as SnapshotFunctions from './snapshotFunctions'
+import {logFlags} from '../logger'
+
 /** TYPES */
 
 export interface NetworkHash {
@@ -447,11 +449,11 @@ export function startSnapshotting() {
               : {},
           }
           message.data.summaryHash[partition] = Context.crypto.hash(summaryObj)
-          console.log(`Summary Obj for partition ${partition}`, summaryObj)
+          if (logFlags.console) console.log(`Summary Obj for partition ${partition}`, summaryObj)
           if (summaryObj) {
-            console.log('summaryObj', summaryObj)
-            console.log('summaryObj stringified', JSON.stringify(summaryObj))
-            console.log('summaryObj hash', Context.crypto.hash(summaryObj))
+            if (logFlags.console) console.log('summaryObj', summaryObj)
+            if (logFlags.console) console.log('summaryObj stringified', JSON.stringify(summaryObj))
+            if (logFlags.console) console.log('summaryObj hash', Context.crypto.hash(summaryObj))
           }
         }
 
@@ -471,7 +473,7 @@ export function startSnapshotting() {
 }
 
 export async function safetySync() {
-  console.log('Doing SafetySync...')
+  if (logFlags.console) console.log('Doing SafetySync...')
   let safetyNum: number
 
   // Register snapshot routes
@@ -486,8 +488,8 @@ export async function safetySync() {
           safetyModeVals.networkStateHash = data.networkStateHash
           safetyModeVals.safetyNum = data.safetyNum
           safetyModeVals.safetyMode = data.safetyMode
-          console.log('Empty local network state hash detected.')
-          console.log('safetyModeVals', safetyModeVals)
+          if (logFlags.console) console.log('Empty local network state hash detected.')
+          if (logFlags.console) console.log('safetyModeVals', safetyModeVals)
         }
         resolve()
       }
@@ -547,7 +549,7 @@ async function sendOldDataToNodes(
   const offer = createOffer()
 
   if (offer.partitions.length === 0) {
-    console.log('No partition data to offer.')
+    if (logFlags.console) console.log('No partition data to offer.')
     return
   }
 
@@ -913,5 +915,5 @@ function registerSnapshotRoutes() {
 }
 
 function log(...things) {
-  console.log('DBG', 'SNAPSHOT', ...things)
+  if (logFlags.console) console.log('DBG', 'SNAPSHOT', ...things)
 }

@@ -3,6 +3,7 @@ import { registerGossipHandler } from '../p2p/Comms'
 import { AddressRange } from '../state-manager/shardFunctionTypes'
 // import { PartitionHashes, ReceiptMapHashes, SummaryHashes } from './index'
 import * as Comm from '../p2p/Comms'
+import {logFlags} from '../logger'
 
 /** TYPES */
 
@@ -58,12 +59,12 @@ export class Collector extends EventEmitter {
     this.summaryHashCounter = new Map()
   }
   process(messages: Message[]) {
-    // console.log(`Processing pending ${messages.length} messages`)
+    // if (logFlags.console) console.log(`Processing pending ${messages.length} messages`)
     let cycle
     // Loop through messages and add to hash tally
     for (let messageIndex = 0; messageIndex < messages.length; messageIndex++) {
       let message = messages[messageIndex]
-      // console.log(`Processing message ${messageIndex}`, message.sender)
+      // if (logFlags.console) console.log(`Processing message ${messageIndex}`, message.sender)
       let partitionHashData = message.data.partitionHash
       let receiptHashData = message.data.receiptMapHash
       let summaryHashData = message.data.summaryHash
@@ -80,7 +81,7 @@ export class Collector extends EventEmitter {
       }
 
       if (!parititionShardDataMap) {
-        console.log('No partition shard data map')
+        if (logFlags.console) console.log('No partition shard data map')
         return
       }
       // Record number of gossip recieved for each partition
@@ -94,13 +95,13 @@ export class Collector extends EventEmitter {
         let partitionId = parseInt(Object.keys(partitionHashData)[i])
           let partitionShardData = parititionShardDataMap.get(partitionId)
         if (!partitionShardData) {
-          // console.log('No partition shard data for partition: ', partitionId)
+          // if (logFlags.console) console.log('No partition shard data for partition: ', partitionId)
           continue
         }
         let coveredBy = partitionShardData.coveredBy
         let isSenderCoverThePartition = coveredBy[message.sender]
         if (!isSenderCoverThePartition) {
-          // console.log(`Sender ${message.sender} does not cover this partition ${partitionId}`)
+          // if (logFlags.console) console.log(`Sender ${message.sender} does not cover this partition ${partitionId}`)
           delete partitionHashData[partitionId]
           continue
         }
@@ -159,9 +160,9 @@ export class Collector extends EventEmitter {
     }
 
     // const numOfGossipReceived = gossipCounterByCycle.get(cycle)
-    // console.log(`Num of gossip received: `, numOfGossipReceived)
-    // console.log(`Gossip counter for each partition (cycle: ${cycle}): `, gossipCounterByPartition)
-    // console.log(`Ready partitions for (cycle: ${cycle}): `, readyPartitions)
+    // if (logFlags.console) console.log(`Num of gossip received: `, numOfGossipReceived)
+    // if (logFlags.console) console.log(`Gossip counter for each partition (cycle: ${cycle}): `, gossipCounterByPartition)
+    // if (logFlags.console) console.log(`Ready partitions for (cycle: ${cycle}): `, readyPartitions)
 
     if (readyPartitions.size >= this.shard.shardGlobals.numPartitions && this.dataHashCounter.size === this.shard.shardGlobals.numPartitions + 1) {
       // +1 is for virtual global partition
@@ -182,7 +183,7 @@ export class Collector extends EventEmitter {
           }
         }
         possibleHashes = possibleHashes.sort()
-        console.log(`DATA HASH COUNTER: Cycle ${cycle}, Partition ${partitionId} => `, counterMap)
+        if (logFlags.console) console.log(`DATA HASH COUNTER: Cycle ${cycle}, Partition ${partitionId} => `, counterMap)
         if (possibleHashes.length > 0) selectedHash = possibleHashes[0]
         if (selectedHash) this.allDataHashes.set(partitionId, selectedHash)
       }
@@ -204,7 +205,7 @@ export class Collector extends EventEmitter {
         }
         possibleHashes = possibleHashes.sort()
     
-        // console.log(`RECEIPT HASH COUNTER: Cycle ${cycle}, Partition ${partitionId} => `, counterMap)
+        // if (logFlags.console) console.log(`RECEIPT HASH COUNTER: Cycle ${cycle}, Partition ${partitionId} => `, counterMap)
         if (possibleHashes.length > 0) selectedHash = possibleHashes[0]
         if (selectedHash) this.allReceiptMapHashes.set(partitionId, selectedHash)
       }
@@ -226,7 +227,7 @@ export class Collector extends EventEmitter {
         }
         possibleHashes = possibleHashes.sort()
         
-        // console.log(`SUMMARY HASH COUNTER: Cycle ${cycle}, Partition ${partitionId} => `, counterMap)
+        // if (logFlags.console) console.log(`SUMMARY HASH COUNTER: Cycle ${cycle}, Partition ${partitionId} => `, counterMap)
         if (possibleHashes.length > 0) selectedHash = possibleHashes[0]
         if (selectedHash) this.allSummaryHashes.set(partitionId, selectedHash)
       }
@@ -243,15 +244,15 @@ export class Collector extends EventEmitter {
 /** FUNCTIONS */
 // Registers partition gossip handler
 export function initGossip() {
-  console.log('registering gossip handler...')
+  if (logFlags.console) console.log('registering gossip handler...')
   registerGossipHandler('snapshot_gossip', (message) => {
     let { cycle } = message
     let collector = collectors.get(cycle)
     if (collector) {
-      // console.log('A collector exists. Processing new incoming message', message.sender)
+      // if (logFlags.console) console.log('A collector exists. Processing new incoming message', message.sender)
       collector.process([message])
     } else {
-      // console.log('No collector found. Adding gossip to queue', message.sender)
+      // if (logFlags.console) console.log('No collector found. Adding gossip to queue', message.sender)
       if (queue.has(cycle)) {
         let messageList = queue.get(cycle)
         messageList.push(message)
@@ -264,7 +265,7 @@ export function initGossip() {
 
 // Make a Collector to handle gossip for the given cycle
 export function newCollector(shard: CycleShardData): Collector {
-  console.log(`Initiating a new collector for cycle ${shard.cycleNumber}`)
+  if (logFlags.console) console.log(`Initiating a new collector for cycle ${shard.cycleNumber}`)
   gossipCounterByPartition = new Map()
   readyPartitions = new Map()
   forwardedGossips = new Map()

@@ -4,6 +4,7 @@ import { logger } from './Context'
 import { CycleRecord } from './CycleCreator'
 import { Change } from './CycleParser'
 import * as Types from './Types'
+import {logFlags} from '../logger'
 
 /** TYPES */
 

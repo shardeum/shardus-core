@@ -1,5 +1,5 @@
 import { Utils } from 'sequelize/types'
-import Logger from '../logger'
+import Logger, {logFlags} from '../logger'
 import Shardus = require('../shardus/shardus-types')
 
 const stringify = require('fast-stable-stringify')
@@ -22,7 +22,7 @@ class ShardFunctions {
 
     if (nodesPerConsenusGroup % 2 === 0) {
       nodesPerConsenusGroup++
-      console.log('upgrading consensus size to odd number: ' + nodesPerConsenusGroup)
+      if (logFlags.console) console.log('upgrading consensus size to odd number: ' + nodesPerConsenusGroup)
     }
     //OLD math before "E" became separate term
     // shardGlobals.numActiveNodes = numNodes

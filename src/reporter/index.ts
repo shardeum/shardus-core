@@ -1,6 +1,6 @@
 import Log4js from 'log4js'
 import LoadDetection from '../load-detection'
-import Logger from '../logger'
+import Logger, {logFlags} from '../logger'
 import { ipInfo } from '../network'
 import { config, crypto } from '../p2p/Context'
 import * as Context from '../p2p/Context'
@@ -336,14 +336,14 @@ class Reporter {
     } per second.    ${txApplied} Applied @${txApplied / delta} per second`
     this.lastTime = time
 
-    console.log(report)
+    if (logFlags.console) console.log(report)
 
     if (this.profiler) {
       //Note: turning this log on will make the perf endpoint math get reset
       //  one option would be to have a flag that gets set if anyone hits the perf endpoint
       //  if so, then just stop this logging.  for now i will leave this off.
-//      console.log(this.profiler.printAndClearReport(delta))
-      console.log(
+//      if (logFlags.console) console.log(this.profiler.printAndClearReport(delta))
+      if (logFlags.console) console.log(
         'Current load',
         'counter',
         CycleChain.newest.counter,
