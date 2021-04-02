@@ -124,7 +124,7 @@ class Shardus extends EventEmitter {
     Context.setStorageContext(this.storage)
     this.crypto = new Crypto(this.config, this.logger, this.storage)
     Context.setCryptoContext(this.crypto)
-    this.network = new Network.NetworkClass(config.network, this.logger)
+    this.network = new Network.NetworkClass(config, this.logger)
     Context.setNetworkContext(this.network)
 
     // Set the old P2P to a Wrapper into the new P2P

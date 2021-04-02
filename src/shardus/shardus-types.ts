@@ -609,6 +609,9 @@ declare namespace Shardus {
       profiler?: boolean
       /** starts the node in fatals mode, use endpoints to turn back on default logs */
       startInFatalsLogMode?: boolean
+      /** fake network delay in ms */
+      fakeNetworkDelay?: number
+
     }
     /** Options for the statistics module */
     statistics?: {

@@ -13,6 +13,8 @@ import { config, defaultConfigs, logger } from '../p2p/Context'
 import * as utils from '../utils'
 import { profilerInstance } from '../utils/profiler'
 import NatAPI = require('nat-api')
+import Shardus from '../shardus'
+import { ShardusConfiguration } from '../shardus/shardus-types'
 
 /** TYPES */
 export interface IPInfo {
@@ -50,14 +52,15 @@ export class NetworkClass extends EventEmitter {
   InternalAskCounter: number
   ipInfo: any
   externalCatchAll: any
-  constructor(config, logger: Logger) {
+  debugNetworkDelay: number
+  constructor(config: ShardusConfiguration, logger: Logger) {
     super()
     this.app = express()
     this.sn = null
     this.logger = logger
     this.mainLogger = logger.getLogger('main')
     this.netLogger = logger.getLogger('net')
-    this.timeout = config.timeout * 1000
+    this.timeout = config.network.timeout * 1000
     this.internalRoutes = {}
     this.externalRoutes = []
     this.extServer = null
@@ -65,6 +68,13 @@ export class NetworkClass extends EventEmitter {
 
     this.InternalTellCounter = 1
     this.InternalAskCounter = 1
+    this.debugNetworkDelay = 0
+
+
+    if(config && config.debug && config.debug.fakeNetworkDelay){
+      this.debugNetworkDelay = config.debug.fakeNetworkDelay
+    }
+
   }
 
   // TODO: Allow for binding to a specified network interface
@@ -113,8 +123,7 @@ export class NetworkClass extends EventEmitter {
         if (!data) throw new Error('No data provided in request...')
         const { route, payload } = data
 
-        profilerInstance.profileSectionStart('net-internl')
-        profilerInstance.profileSectionStart(`net-internl-${route}`)
+
         routeName = route
         if (!route && payload && payload.isResponse) {
           if (logFlags.debug) this.mainLogger.debug(
@@ -134,6 +143,13 @@ export class NetworkClass extends EventEmitter {
         }
         if (!this.internalRoutes[route])
           throw new Error('Unable to handle request, invalid route.')
+
+        if(this.debugNetworkDelay > 0){
+          await utils.sleep(this.debugNetworkDelay)          
+        }
+        profilerInstance.profileSectionStart('net-internl')
+        profilerInstance.profileSectionStart(`net-internl-${route}`)
+
         const handler = this.internalRoutes[route]
         if (!payload) {
           await handler(null, respond)
@@ -213,6 +229,9 @@ export class NetworkClass extends EventEmitter {
       }
 
       try {
+        if(this.debugNetworkDelay > 0){
+          await utils.sleep(this.debugNetworkDelay)          
+        }
         profilerInstance.profileSectionStart('net-ask')
         profilerInstance.profileSectionStart(`net-ask-${route}`)
 

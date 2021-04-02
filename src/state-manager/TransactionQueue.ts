@@ -264,6 +264,9 @@ class TransactionQueue {
         return { success: false, hasStateTableData }
       }
 
+      // TODO: even if we keep the code below this line, we should consider combining keys in a set first so that we dont 
+      // double up on work if a key is a source and target.
+
       // check state table
       if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
         sourceAddress = sourceKeys[0]
@@ -360,6 +363,9 @@ class TransactionQueue {
       if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
       if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
 
+      // TODO ARCH REVIEW:  review use of fifo lock of accountModification and account keys.
+      // I think we need to consider adding reader-writer lock support so that a non written to global account is a "reader" lock: check but dont aquire
+      // consider if it is safe to axe the use of fifolock accountModification.  
       if (repairing !== true) {
         // get a list of modified account keys that we will lock
         let { sourceKeys, targetKeys } = keysResponse
@@ -434,6 +440,7 @@ class TransactionQueue {
       if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
       if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
 
+      // TODO ARCH REVIEW:  review use of fifo lock of accountModification and account keys. (more notes in tryPreApplyTransaction() above )
       if (repairing !== true) {
         // get a list of modified account keys that we will lock
         let { sourceKeys, targetKeys } = keysResponse
@@ -543,6 +550,7 @@ class TransactionQueue {
     // TSConversion verified that app.setAccount calls shardus.applyResponseAddState  that adds hash and txid to the data and turns it into AccountData
     let upgradedAccountDataList: Shardus.AccountData[] = (dataResultsFullList as unknown) as Shardus.AccountData[]
 
+    // TODO ARCH REVIEW:  do we still need this table.  if so do we need to await writing to it?
     await this.stateManager.updateAccountsCopyTable(upgradedAccountDataList, repairing, txTs)
 
     if (!repairing) {
@@ -611,13 +619,14 @@ class TransactionQueue {
 
         wrappedState.prevDataCopy = utils.deepCopy(wrappedState.data)
 
-        //important to update the wrappedState timestamp here to prevent bad timestamps from propagating the system
+        // important to update the wrappedState timestamp here to prevent bad timestamps from propagating the system
         let { timestamp: updatedTimestamp, hash: updatedHash } = this.app.getTimestampAndHashFromAccount(wrappedState.data)
         wrappedState.timestamp = updatedTimestamp
       }
     }
 
-    // todo review what we are checking here.
+    // TODO ARCH REVIEW: the function does some slow stuff in terms of DB access. can we replace this with accounts cache functionality?
+    // old note:  todo review what we are checking here.
     let { success, hasStateTableData } = await this.testAccountTimesAndStateTable2(tx, wrappedStates)
 
     if (!success) {
@@ -1589,7 +1598,10 @@ class TransactionQueue {
       }
 
       if (hasKey) {
-        // todo Detect if our node covers this paritition..  need our partition data
+        // TODO PERF is it possible that this query could be used to update our in memory cache? (this would save us from some slow look ups) later on
+        //    when checking timestamps.. alternatively maybe there is a away we can note the timestamp with what is returned here in the queueEntry data
+        //    and not have to deal with the cache.
+        // todo old: Detect if our node covers this paritition..  need our partition data
         let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
         //only queue this up to share if it is not a global account. global accounts dont need to be shared.
 
