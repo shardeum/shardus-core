@@ -29,6 +29,8 @@ class LoadDetection extends EventEmitter {
       internal: 0,
       external: 0
     }
+    this.scaledTxTimeInQueue = 0
+    this.scaledQueueLength = 0
   }
 
   /**
