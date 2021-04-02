@@ -10,7 +10,9 @@ interface LoadDetection {
   queueLimit: number
   statistics: Statistics
   load: number
-  nodeLoad: NodeLoad
+  nodeLoad: NodeLoad,
+  scaledTxTimeInQueue: number,
+  scaledQueueLength: number,
 }
 let lastMeasuredTimestamp = 0
 
@@ -50,6 +52,10 @@ class LoadDetection extends EventEmitter {
     if (scaledQueueLength > this.highThreshold){
       nestedCountersInstance.countEvent('loadRelated',`highLoad-scaledQueueLength ${this.highThreshold}`)      
     }
+
+    this.scaledTxTimeInQueue = scaledTxTimeInQueue
+    this.scaledQueueLength = scaledQueueLength
+
     if(profilerInstance != null) {
       let dutyCycleLoad = profilerInstance.getTotalBusyInternal()
       if (dutyCycleLoad.duty > 0.4){
@@ -76,6 +82,13 @@ class LoadDetection extends EventEmitter {
 
   getCurrentNodeLoad() {
     return this.nodeLoad
+  }
+
+  getQueueLoad() {
+    return {
+      txTimeInQueue: this.scaledTxTimeInQueue,
+      queueLength: this.scaledQueueLength
+    }
   }
 }
 
