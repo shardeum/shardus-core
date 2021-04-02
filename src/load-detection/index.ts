@@ -48,12 +48,12 @@ class LoadDetection extends EventEmitter {
       queueLength >= this.queueLimit ? 1 : queueLength / this.queueLimit
 
     // looking at these counters individually so we can have more detail about load
-    if (scaledTxTimeInQueue > this.highThreshold){
-      nestedCountersInstance.countEvent('loadRelated',`highLoad-scaledTxTimeInQueue ${this.highThreshold}`)      
-    }
-    if (scaledQueueLength > this.highThreshold){
-      nestedCountersInstance.countEvent('loadRelated',`highLoad-scaledQueueLength ${this.highThreshold}`)      
-    }
+    // if (scaledTxTimeInQueue > this.highThreshold){
+    //   nestedCountersInstance.countEvent('loadRelated',`highLoad-scaledTxTimeInQueue ${this.highThreshold}`)      
+    // }
+    // if (scaledQueueLength > this.highThreshold){
+    //   nestedCountersInstance.countEvent('loadRelated',`highLoad-scaledQueueLength ${this.highThreshold}`)      
+    // }
 
     this.scaledTxTimeInQueue = scaledTxTimeInQueue
     this.scaledQueueLength = scaledQueueLength
@@ -63,8 +63,8 @@ class LoadDetection extends EventEmitter {
       if (dutyCycleLoad.duty > 0.4){
         nestedCountersInstance.countEvent('loadRelated','highLoad-dutyCycle 0.4')      
       }      
-      if (dutyCycleLoad.duty > this.highThreshold){
-        nestedCountersInstance.countEvent('loadRelated',`highLoad-dutyCycle ${this.highThreshold}`)      
+      if (dutyCycleLoad.duty > 0.6){
+        nestedCountersInstance.countEvent('loadRelated',`highLoad-dutyCycle 0.6`)      
       }   
       this.nodeLoad = {
         internal: dutyCycleLoad.netInternlDuty,
