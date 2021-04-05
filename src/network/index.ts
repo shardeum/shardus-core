@@ -15,6 +15,7 @@ import { profilerInstance } from '../utils/profiler'
 import NatAPI = require('nat-api')
 import Shardus from '../shardus'
 import { ShardusConfiguration } from '../shardus/shardus-types'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 /** TYPES */
 export interface IPInfo {
@@ -249,6 +250,7 @@ export class NetworkClass extends EventEmitter {
           resolve(res)
         }
         const onTimeout = () => {
+          nestedCountersInstance.countEvent('network','timeout') 
           const err = new Error(
             `Request timed out. ${utils.stringifyReduce(id)}`
           )
