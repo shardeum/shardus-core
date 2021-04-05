@@ -76,6 +76,8 @@ export class NetworkClass extends EventEmitter {
       this.debugNetworkDelay = config.debug.fakeNetworkDelay
     }
 
+    nestedCountersInstance.countEvent('network','init') 
+
   }
 
   // TODO: Allow for binding to a specified network interface
