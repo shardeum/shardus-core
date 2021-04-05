@@ -1997,6 +1997,10 @@ class StateManager {
     let ourID = thisFifo.queueCounter
     let entry = { id: ourID }
 
+    if(fifoName === 'accountModification'){
+      nestedCountersInstance.countEvent('fifo-backup',`accountModification ${thisFifo.waitingList.length}`) 
+    }
+
     if (thisFifo.waitingList.length > 0 || thisFifo.queueLocked) {
       thisFifo.waitingList.push(entry)
       // wait till we are at the front of the queue, and the queue is not locked
