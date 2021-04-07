@@ -848,7 +848,7 @@ class AccountSync {
       while (hasAllGlobalData === false) {
         maxTries--
         if (maxTries <= 0) {
-          this.mainLogger.error(`DATASYNC: syncStateDataGlobals max tries excceded `)
+          if (logFlags.error) this.mainLogger.error(`DATASYNC: syncStateDataGlobals max tries excceded `)
           return
         }
         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals hasAllGlobalData === false `)
@@ -867,14 +867,14 @@ class AccountSync {
         let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
 
         if (result == null) {
-          if (logFlags.verbose) this.mainLogger.error('ASK FAIL syncStateTableData result == null')
+          if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncStateTableData result == null')
           if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
             break
           }
           continue
         }
         if (result.accountData == null) {
-          if (logFlags.verbose) this.mainLogger.error('ASK FAIL syncStateTableData result.accountData == null')
+          if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncStateTableData result.accountData == null')
           if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
             break
           }
@@ -1002,20 +1002,20 @@ class AccountSync {
 
       let result = await this.p2p.ask(node, 'get_globalaccountreport', {})
       if (result === false) {
-        this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === false node:${utils.stringifyReduce(node.id)}`)
+        if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === false node:${utils.stringifyReduce(node.id)}`)
       }
       if (result === null) {
-        this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === null node:${utils.stringifyReduce(node.id)}`)
+        if (logFlags.error) this.mainLogger.error(`ASK FAIL getRobustGlobalReport result === null node:${utils.stringifyReduce(node.id)}`)
       }
 
       // TODO I dont know the best way to handle a non null network error here, below is something I had before but disabled for some reason
 
       if (result != null && result.accounts == null) {
-        //this.mainLogger.error('ASK FAIL getRobustGlobalReport result.stateHash == null')
+        //if (logFlags.error) this.mainLogger.error('ASK FAIL getRobustGlobalReport result.stateHash == null')
         result = { ready: false, msg: `invalid data format: ${Math.random()}` }
       }
       if (result != null && result.notReady === true) {
-        //this.mainLogger.error('ASK FAIL getRobustGlobalReport result.stateHash == null')
+        //if (logFlags.error) this.mainLogger.error('ASK FAIL getRobustGlobalReport result.stateHash == null')
         result = { ready: false, msg: `not ready: ${Math.random()}` }
       }
       return result
@@ -1116,21 +1116,21 @@ class AccountSync {
         }
         let result = await this.p2p.ask(node, 'get_account_state_hash', message)
         if (result === false) {
-          this.mainLogger.error(`ASK FAIL syncStateTableData result === false node:${utils.stringifyReduce(node.id)}`)
+          if (logFlags.error) this.mainLogger.error(`ASK FAIL syncStateTableData result === false node:${utils.stringifyReduce(node.id)}`)
         }
         if (result == null) {
-          this.mainLogger.error(`ASK FAIL syncStateTableData result == null node:${utils.stringifyReduce(node.id)}`)
+          if (logFlags.error) this.mainLogger.error(`ASK FAIL syncStateTableData result == null node:${utils.stringifyReduce(node.id)}`)
         }
 
         // TODO I dont know the best way to handle a non null network error here, below is an idea
 
         // if (result.stateHash == null) {
-        //   this.mainLogger.error('ASK FAIL syncStateTableData result.stateHash == null')
+        //   if (logFlags.error) this.mainLogger.error('ASK FAIL syncStateTableData result.stateHash == null')
         //   result = null //if we get something back that is not the right data type clear it to null
         // }
         if (result != null && result.stateHash == null) {
           result = { ready: false, msg: `invalid data format: ${Math.random()}` }
-          //this.mainLogger.error('ASK FAIL syncStateTableData result.stateHash == null')
+          //if (logFlags.error) this.mainLogger.error('ASK FAIL syncStateTableData result.stateHash == null')
           result = null //if we get something back that is not the right data type clear it to null
         }
 
@@ -1152,7 +1152,7 @@ class AccountSync {
       )
 
       if (Array.isArray(nodes) === false) {
-        this.mainLogger.error(`syncStateTableData: non array returned ${utils.stringifyReduce(nodes)}`)
+        if (logFlags.error) this.mainLogger.error(`syncStateTableData: non array returned ${utils.stringifyReduce(nodes)}`)
         return // nothing to do
       }
 
@@ -1220,14 +1220,14 @@ class AccountSync {
         let result = await this.p2p.ask(this.dataSourceNode, 'get_account_state', message)
 
         if (result == null) {
-          if (logFlags.verbose) this.mainLogger.error('ASK FAIL syncStateTableData result == null')
+          if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncStateTableData result == null')
           if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
             break
           }
           continue
         }
         if (result.accountStates == null) {
-          if (logFlags.verbose) this.mainLogger.error('ASK FAIL syncStateTableData result.accountStates == null')
+          if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncStateTableData result.accountStates == null')
           if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
             break
           }
@@ -1296,9 +1296,9 @@ class AccountSync {
 
   tryNextDataSourceNode(debugString): boolean {
     this.dataSourceNodeIndex++
-    this.mainLogger.error(`tryNextDataSourceNode ${debugString} try next node: ${this.dataSourceNodeIndex}`)
+    if (logFlags.error) this.mainLogger.error(`tryNextDataSourceNode ${debugString} try next node: ${this.dataSourceNodeIndex}`)
     if (this.dataSourceNodeIndex >= this.dataSourceNodeList.length) {
-      this.mainLogger.error(`tryNextDataSourceNode ${debugString} ran out of nodes ask for data`)
+      if (logFlags.error) this.mainLogger.error(`tryNextDataSourceNode ${debugString} ran out of nodes ask for data`)
       this.dataSourceNodeIndex = 0
       return false
     }
@@ -1344,14 +1344,14 @@ class AccountSync {
       let result: GetAccountData3Resp = r as GetAccountData3Resp
 
       if (result == null) {
-        if (logFlags.verbose) this.mainLogger.error(`ASK FAIL syncAccountData result == null node:${this.dataSourceNode.id}`)
+        if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`ASK FAIL syncAccountData result == null node:${this.dataSourceNode.id}`)
         if (this.tryNextDataSourceNode('syncAccountData') == false) {
           break
         }
         continue
       }
       if (result.data == null) {
-        if (logFlags.verbose) this.mainLogger.error(`ASK FAIL syncAccountData result.data == null node:${this.dataSourceNode.id}`)
+        if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`ASK FAIL syncAccountData result.data == null node:${this.dataSourceNode.id}`)
         if (this.tryNextDataSourceNode('syncAccountData') == false) {
           break
         }
@@ -1491,7 +1491,7 @@ class AccountSync {
     let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
 
     if (result == null) {
-      if (logFlags.verbose) this.mainLogger.error('ASK FAIL syncFailedAcccounts result == null')
+      if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncFailedAcccounts result == null')
       if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
         return
       }
@@ -1500,7 +1500,7 @@ class AccountSync {
       return
     }
     if (result.accountData == null) {
-      if (logFlags.verbose) this.mainLogger.error('ASK FAIL syncFailedAcccounts result.accountData == null')
+      if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncFailedAcccounts result.accountData == null')
       if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
         return
       }
@@ -2039,7 +2039,7 @@ class AccountSync {
       // Node Precheck!
       if (this.dataSourceNode == null || this.stateManager.isNodeValidForInternalMessage(this.dataSourceNode.id, 'syncAccountData', true, true) === false) {
         if (logFlags.verbose && this.dataSourceNode == null) {
-          this.mainLogger.error(`syncAccountDataFast   this.dataSourceNode == null`)
+          if (logFlags.error) this.mainLogger.error(`syncAccountDataFast   this.dataSourceNode == null`)
         }
         if (this.tryNextDataSourceNode('syncAccountData') == false) {
           break
@@ -2055,14 +2055,14 @@ class AccountSync {
       let result: GetAccountData3Resp = r as GetAccountData3Resp
 
       if (result == null) {
-        if (logFlags.verbose) this.mainLogger.error(`ASK FAIL syncAccountData result == null node:${this.dataSourceNode.id}`)
+        if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`ASK FAIL syncAccountData result == null node:${this.dataSourceNode.id}`)
         if (this.tryNextDataSourceNode('syncAccountData') == false) {
           break
         }
         continue
       }
       if (result.data == null) {
-        if (logFlags.verbose) this.mainLogger.error(`ASK FAIL syncAccountData result.data == null node:${this.dataSourceNode.id}`)
+        if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`ASK FAIL syncAccountData result.data == null node:${this.dataSourceNode.id}`)
         if (this.tryNextDataSourceNode('syncAccountData') == false) {
           break
         }
@@ -2263,7 +2263,7 @@ class AccountSync {
       while (hasAllGlobalData === false) {
         maxTries--
         if (maxTries <= 0) {
-          this.mainLogger.error(`DATASYNC: syncStateDataGlobals max tries excceded `)
+          if (logFlags.error) this.mainLogger.error(`DATASYNC: syncStateDataGlobals max tries excceded `)
           return
         }
         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals hasAllGlobalData === false `)
@@ -2280,14 +2280,14 @@ class AccountSync {
         let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
 
         if (result == null) {
-          if (logFlags.verbose) this.mainLogger.error('ASK FAIL syncStateTableData result == null')
+          if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncStateTableData result == null')
           if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
             break
           }
           continue
         }
         if (result.accountData == null) {
-          if (logFlags.verbose) this.mainLogger.error('ASK FAIL syncStateTableData result.accountData == null')
+          if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncStateTableData result.accountData == null')
           if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
             break
           }

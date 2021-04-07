@@ -349,7 +349,7 @@ class Storage {
     // Attempt to add node to the nodeIds list
     const addNodeToList = (node) => {
       if (!node.id) {
-        this.mainLogger.error(
+        if (logFlags.error) this.mainLogger.error(
           `Node attempted to be deleted without ID: ${JSON.stringify(node)}`
         )
         return
@@ -953,7 +953,7 @@ class Storage {
   //     this.mainLogger.debug(`Accounts: ${accounts}`)
   //   } catch (e) {
   //     let errMsg = `Failed to retrieve getLatestAllAccounts() ==> Exception: ${e}`
-  //     this.mainLogger.error(errMsg)
+  //     if (logFlags.error) this.mainLogger.error(errMsg)
   //     throw new Error(errMsg)
   //   }
   //   return accounts

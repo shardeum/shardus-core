@@ -393,8 +393,8 @@ class TransactionQueue {
 
       this.applySoftLock = false
     } catch (ex) {
-      if(logFlags.error) this.mainLogger.error(`tryPreApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}: ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      if(logFlags.error) this.mainLogger.error(`tryPreApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
+      if(logFlags.error) if (logFlags.error) this.mainLogger.error(`tryPreApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}: ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      if(logFlags.error) if (logFlags.error) this.mainLogger.error(`tryPreApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
 
       return { passed: false, applyResponse, applyResult: ex.message }
     } finally {
@@ -581,7 +581,7 @@ class TransactionQueue {
           }
           this.stateManager.partitionStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, queueData.prevDataCopy, wrappedData)
         } else {
-          this.mainLogger.error(`commitConsensedTransaction failed to get account data for stats ${wrappedData.accountId}`)
+          if (logFlags.error) this.mainLogger.error(`commitConsensedTransaction failed to get account data for stats ${wrappedData.accountId}`)
         }
       }
     }
@@ -663,7 +663,7 @@ class TransactionQueue {
         }
         txQueueEntry.homeNodes[key] = homeNode
         if (homeNode == null) {
-          if (logFlags.verbose) this.mainLogger.error(` routeAndQueueAcceptedTransaction: ${key} `)
+          if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(` routeAndQueueAcceptedTransaction: ${key} `)
           throw new Error(`updateHomeInformation homeNode == null ${txQueueEntry}`)
         }
 
@@ -705,11 +705,11 @@ class TransactionQueue {
     // }
     if (logFlags.playback) this.logger.playbackLogNote('routeAndQueueAcceptedTransaction-debug', '', `sendGossip:${sendGossip} globalModification:${globalModification} noConsensus:${noConsensus} this.readyforTXs:${this.stateManager.accountSync.readyforTXs} hasshardData:${this.stateManager.currentCycleShardData != null} acceptedTx:${utils.stringifyReduce(acceptedTx)} `)
     if (this.stateManager.accountSync.readyforTXs === false) {
-      if (logFlags.verbose) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: this.readyforTXs === false`)
+      if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: this.readyforTXs === false`)
       return 'notReady' // it is too early to care about the tx
     }
     if (this.stateManager.currentCycleShardData == null) {
-      if (logFlags.verbose) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: this.stateManager.currentCycleShardData == null`)
+      if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: this.stateManager.currentCycleShardData == null`)
       return 'notReady'
     }
 
@@ -717,7 +717,7 @@ class TransactionQueue {
       this.profiler.profileSectionStart('enqueue')
 
       if (this.stateManager.accountGlobals.hasknownGlobals == false) {
-        if (logFlags.verbose) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: hasknownGlobals == false`)
+        if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`routeAndQueueAcceptedTransaction too early for TX: hasknownGlobals == false`)
         return 'notReady'
       }
 
@@ -810,14 +810,14 @@ class TransactionQueue {
       //   let rand = Math.random()
       //   if (this.config.debug.loseTxChance > rand) {
       //     if (this.app.canDebugDropTx(acceptedTx.data)) {
-      //       this.mainLogger.error('tx_failReceiptTest fail vote tx  ' + txId + ' ' + timestamp)
+      //       if (logFlags.error) this.mainLogger.error('tx_failReceiptTest fail vote tx  ' + txId + ' ' + timestamp)
       //       if (logFlags.playback ) this.logger.playbackLogNote('tx_failReceiptTest', txId, 'fail vote tx ' + timestamp)
       //       //return 'lost'
       //       txQueueEntry.debugFail_voteFlip = true
       //     }
       //   }
       // } else {
-      //   // this.mainLogger.error('tx_failReceiptTest set  ' + this.config.debug.loseTxChance)
+      //   // if (logFlags.error) this.mainLogger.error('tx_failReceiptTest set  ' + this.config.debug.loseTxChance)
       //   // this.config.debug.loseTxChance = 0
       // }
 
@@ -832,7 +832,7 @@ class TransactionQueue {
         for (let key of txQueueEntry.txKeys.allKeys) {
           if (key == null) {
             // throw new Error(`routeAndQueueAcceptedTransaction key == null ${key}`)
-            if (logFlags.verbose) this.mainLogger.error(`routeAndQueueAcceptedTransaction key == null ${timestamp} not putting tx in queue.`)
+            if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`routeAndQueueAcceptedTransaction key == null ${timestamp} not putting tx in queue.`)
             return false
           }
 
@@ -845,7 +845,7 @@ class TransactionQueue {
         // calculate information needed for receiptmap
         txQueueEntry.cycleToRecordOn = this.stateManager.getCycleNumberFromTimestamp(timestamp)
         if (txQueueEntry.cycleToRecordOn < 0) {
-          if (logFlags.verbose) this.mainLogger.error(`routeAndQueueAcceptedTransaction failed to calculate cycle ${timestamp} error code:${txQueueEntry.cycleToRecordOn}`)
+          if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`routeAndQueueAcceptedTransaction failed to calculate cycle ${timestamp} error code:${txQueueEntry.cycleToRecordOn}`)
           return false
         }
 
@@ -1041,7 +1041,7 @@ class TransactionQueue {
     //   }
     // }
     // todo make this and error.
-    this.mainLogger.error(`getQueueEntryArchived failed to find: ${utils.stringifyReduce(txid)} ${msg} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(txid)]}`)
+    if (logFlags.error) this.mainLogger.error(`getQueueEntryArchived failed to find: ${utils.stringifyReduce(txid)} ${msg} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(txid)]}`)
 
     return null
   }
@@ -1193,13 +1193,13 @@ class TransactionQueue {
 
           if (result == null) {
             if (logFlags.verbose) {
-              this.mainLogger.error('ASK FAIL request_state_for_tx')
+              if (logFlags.error) this.mainLogger.error('ASK FAIL request_state_for_tx')
             }
             if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
             continue
           }
           if (result.success !== true) {
-            this.mainLogger.error('ASK FAIL queueEntryRequestMissingData 9')
+            if (logFlags.error) this.mainLogger.error('ASK FAIL queueEntryRequestMissingData 9')
             if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry2', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
             continue
           }
@@ -1309,13 +1309,13 @@ class TransactionQueue {
 
         if (result == null) {
           if (logFlags.verbose) {
-            this.mainLogger.error(`ASK FAIL request_receipt_for_tx ${triesLeft} ${utils.makeShortHash(node.id)}`)
+            if (logFlags.error) this.mainLogger.error(`ASK FAIL request_receipt_for_tx ${triesLeft} ${utils.makeShortHash(node.id)}`)
           }
           if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
           continue
         }
         if (result.success !== true) {
-          this.mainLogger.error(`ASK FAIL queueEntryRequestMissingReceipt 9 ${triesLeft} ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)} note:${result.note} txid:${queueEntry.logID}`)
+          if (logFlags.error) this.mainLogger.error(`ASK FAIL queueEntryRequestMissingReceipt 9 ${triesLeft} ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)} note:${result.note} txid:${queueEntry.logID}`)
           continue
         }
 
@@ -1694,7 +1694,7 @@ class TransactionQueue {
               // Filter nodes before we send tell()
               let filteredNodes = this.stateManager.filterValidNodesForInternalMessage(correspondingAccNodes, 'tellCorrespondingNodes', true, true)
               if (filteredNodes.length === 0) {
-                this.mainLogger.error('tellCorrespondingNodes: filterValidNodesForInternalMessage no valid nodes left to try')
+                if (logFlags.error) this.mainLogger.error('tellCorrespondingNodes: filterValidNodesForInternalMessage no valid nodes left to try')
                 return null
               }
               let filterdCorrespondingAccNodes = filteredNodes
@@ -1905,7 +1905,7 @@ class TransactionQueue {
           // Checking at m2.5 allows the network a chance at a receipt existing
           if (txAge > timeM2_5 && queueEntry.didSync === true && queueEntry.requestingReceiptFailed === false) {
             if (queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null) {
-              if (logFlags.verbose) this.mainLogger.error(`didSync: txAge > timeM2_5 => ask for receipt now ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+              if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`didSync: txAge > timeM2_5 => ask for receipt now ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
               if (logFlags.playback) this.logger.playbackLogNote('txMissingReceipt1', `txAge > timeM2_5 ${shortID}`, `syncNeedsReceipt ${shortID}`)
               this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
               this.queueEntryRequestMissingReceipt(queueEntry)
@@ -1917,7 +1917,7 @@ class TransactionQueue {
           // have not seen a receipt yet?
           if (txAge > timeM2_5 && queueEntry.didSync === false && queueEntry.requestingReceiptFailed === false) {
             if (queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null) {
-              if (logFlags.verbose) this.mainLogger.error(`txAge > timeM2_5 => ask for receipt now: ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+              if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`txAge > timeM2_5 => ask for receipt now: ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
               if (logFlags.playback) this.logger.playbackLogNote('txMissingReceipt2', `txAge > timeM2_5 ${shortID}`, `txMissingReceipt ${shortID}`)
               this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
               this.queueEntryRequestMissingReceipt(queueEntry)
@@ -1943,7 +1943,7 @@ class TransactionQueue {
         if (txAge > timeM2_5 && queueEntry.m2TimeoutReached === false && queueEntry.globalModification === false) {
           // no receipt yet, and state not committing
           if (queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null && queueEntry.state != 'commiting') {
-            if (logFlags.verbose) this.mainLogger.error(`Wait for reciept only: txAge > timeM2_5 txid:${shortID} `)
+            if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`Wait for reciept only: txAge > timeM2_5 txid:${shortID} `)
             if (logFlags.playback) this.logger.playbackLogNote('txMissingReceipt3', `${shortID}`, `processAcceptedTxQueue ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
             nestedCountersInstance.countEvent('txMissingReceipt', `Wait for reciept only: txAge > timeM2_5 state:${queueEntry.state}`)
             queueEntry.waitForReceiptOnly = true
@@ -2103,7 +2103,7 @@ class TransactionQueue {
                       await this.stateManager.transactionConsensus.createAndShareVote(queueEntry)
                     }
                   } else {
-                    this.mainLogger.error(`processAcceptedTxQueue2 txResult problem txid:${queueEntry.logID} res: ${utils.stringifyReduce(txResult)} `)
+                    if (logFlags.error) this.mainLogger.error(`processAcceptedTxQueue2 txResult problem txid:${queueEntry.logID} res: ${utils.stringifyReduce(txResult)} `)
                     queueEntry.waitForReceiptOnly = true
                     queueEntry.state = 'consensing'
                   }
@@ -2308,7 +2308,7 @@ class TransactionQueue {
                 } else {
                   queueEntry.state = 'fail'
 
-                  this.mainLogger.error(`processAcceptedTxQueue2 commiting finished : no receipt ${queueEntry.logID} `)
+                  if (logFlags.error) this.mainLogger.error(`processAcceptedTxQueue2 commiting finished : no receipt ${queueEntry.logID} `)
                 }
 
                 if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_commitingTxFinished', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${this.processQueue_debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)

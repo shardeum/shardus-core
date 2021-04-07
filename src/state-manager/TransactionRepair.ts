@@ -143,7 +143,7 @@ class TransactionRepair {
               let nodeShardInfo: NodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(appliedVote.node_id)
 
               if (nodeShardInfo == null) {
-                this.mainLogger.error(`shrd_repairToMatchReceipt nodeShardInfo == null ${utils.stringifyReduce(appliedVote.node_id)} tx:${shortHash} acc:${shortKey}`)
+                if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt nodeShardInfo == null ${utils.stringifyReduce(appliedVote.node_id)} tx:${shortHash} acc:${shortKey}`)
                 if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `nodeShardInfo == null ${utils.stringifyReduce(appliedVote.node_id)}  acc:${shortKey}`)
                 continue
               }
@@ -183,7 +183,7 @@ class TransactionRepair {
 
           let node = requestObject.nodeShardInfo.node
           if (node == null) {
-            this.mainLogger.error(`shrd_repairToMatchReceipt node == null ${utils.stringifyReduce(requestObject.accountId)}`)
+            if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt node == null ${utils.stringifyReduce(requestObject.accountId)}`)
             if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `node == null  acc:${shortKey}`)
             continue
           }
@@ -201,7 +201,7 @@ class TransactionRepair {
               //go down alternates list as needed.
               while (node == null) {
                 //possibly make this not at an error once verified
-                this.mainLogger.error(`shrd_repairToMatchReceipt while(node == null) look for other node txId. idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}  acc:${shortKey}`)
+                if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt while(node == null) look for other node txId. idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}  acc:${shortKey}`)
                 //find alternate
                 if (alternateIndex >= requestObject.alternates.length) {
                   this.statemanager_fatal(`repairToMatchReceipt_1`, `ASK FAIL repairToMatchReceipt failed to find alternate node to ask for receipt. txId. ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}  acc:${shortKey}`)
@@ -217,7 +217,7 @@ class TransactionRepair {
                     this.statemanager_fatal(`repairToMatchReceipt_2`, `ASK FAIL repairToMatchReceipt making attempt #${outerloopCount + 1}   tx:${shortHash}  acc:${shortKey}`)
                     break              
                   } else {
-                    this.mainLogger.error(`repairToMatchReceipt FAILED out of attempts #${outerloopCount + 1} tx:${shortHash}  acc:${shortKey}`)
+                    if (logFlags.error) this.mainLogger.error(`repairToMatchReceipt FAILED out of attempts #${outerloopCount + 1} tx:${shortHash}  acc:${shortKey}`)
                     this.statemanager_fatal(`repairToMatchReceipt_3`, `ASK FAIL repairToMatchReceipt FAILED out of attempts   tx:${shortHash}  acc:${shortKey}`)
                     return
                   }
@@ -227,9 +227,9 @@ class TransactionRepair {
                 let nodeShardInfo: NodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(altId)
                 if (nodeShardInfo != null) {
                   node = nodeShardInfo.node
-                  this.mainLogger.error(`shrd_repairToMatchReceipt got alt source node: idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(node.id)}  acc:${shortKey}`)
+                  if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt got alt source node: idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(node.id)}  acc:${shortKey}`)
                 } else {
-                  this.mainLogger.error(`shrd_repairToMatchReceipt nodeShardInfo == null for ${utils.stringifyReduce(altId)}  tx:${shortHash}  acc:${shortKey}`)
+                  if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt nodeShardInfo == null for ${utils.stringifyReduce(altId)}  tx:${shortHash}  acc:${shortKey}`)
                 }
                 alternateIndex++
               }
@@ -258,7 +258,7 @@ class TransactionRepair {
               if (this.stateManager.accountCache.hasAccount(requestObject.accountId)) {
                 let accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(requestObject.accountId)
                 if (accountMemData.h === requestObject.accountHash) {
-                  this.mainLogger.error(`Fix Worked: repairToMatchReceipt. already have latest ${utils.makeShortHash(requestObject.accountId)} cache:${utils.stringifyReduce(accountMemData)}`)
+                  if (logFlags.error) this.mainLogger.error(`Fix Worked: repairToMatchReceipt. already have latest ${utils.makeShortHash(requestObject.accountId)} cache:${utils.stringifyReduce(accountMemData)}`)
                   attemptsRemaining = false
                   continue
                 }
@@ -274,18 +274,18 @@ class TransactionRepair {
 
                 if (result == null) {
                   if (logFlags.verbose) {
-                    this.mainLogger.error(`ASK FAIL repairToMatchReceipt request_state_for_tx_post result == null tx:${shortHash}  acc:${shortKey}`)
+                    if (logFlags.error) this.mainLogger.error(`ASK FAIL repairToMatchReceipt request_state_for_tx_post result == null tx:${shortHash}  acc:${shortKey}`)
                   }
                   // We shuffle the array of votes each time so hopefully will ask another node next time
                   // TODO more robust limits to this process, maybe a delay?
-                  this.mainLogger.error(`ASK FAIL repairToMatchReceipt request_state_for_tx_post no reponse from ${utils.stringifyReduce(node.id)}  tx:${shortHash}  acc:${shortKey}`)
+                  if (logFlags.error) this.mainLogger.error(`ASK FAIL repairToMatchReceipt request_state_for_tx_post no reponse from ${utils.stringifyReduce(node.id)}  tx:${shortHash}  acc:${shortKey}`)
                   //this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt missing logic to ask a new node! 1 ${utils.stringifyReduce(node.id)}`)
                   node = null
                   continue
                 }
 
                 if (result.success !== true) {
-                  this.mainLogger.error(`ASK FAIL repairToMatchReceipt result.success === ${result.success}   tx:${shortHash}  acc:${shortKey}`)
+                  if (logFlags.error) this.mainLogger.error(`ASK FAIL repairToMatchReceipt result.success === ${result.success}   tx:${shortHash}  acc:${shortKey}`)
                   //this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt missing logic to ask a new node! 2 ${utils.stringifyReduce(node.id)}`)
                   node = null
                   continue
@@ -323,13 +323,13 @@ class TransactionRepair {
                     nestedCountersInstance.countEvent('repair1', 'getAccountDataByList')
                     let results = await this.app.getAccountDataByList([data.accountId])
                     beforeData = results[0]
-                    this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData: had to query for data 1 ${utils.stringifyReduce(data.accountId)}  tx:${shortHash}  acc:${shortKey}`)
+                    if (logFlags.error) this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData: had to query for data 1 ${utils.stringifyReduce(data.accountId)}  tx:${shortHash}  acc:${shortKey}`)
                     if (beforeData == null) {
-                      this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData: had to query for data 1 not found ${utils.stringifyReduce(data.accountId)}  tx:${shortHash}  acc:${shortKey}`)
+                      if (logFlags.error) this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData: had to query for data 1 not found ${utils.stringifyReduce(data.accountId)}  tx:${shortHash}  acc:${shortKey}`)
                     }
                   }
                   if (beforeData == null) {
-                    this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData data is null ${utils.stringifyReduce(data.accountId)} WILL CAUSE DATA OOS  tx:${shortHash}  acc:${shortKey}`)
+                    if (logFlags.error) this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData data is null ${utils.stringifyReduce(data.accountId)} WILL CAUSE DATA OOS  tx:${shortHash}  acc:${shortKey}`)
                   } else {
                     if (this.stateManager.partitionStats.hasAccountBeenSeenByStats(data.accountId) === false) {
                       // Init stats because we have not seen this account yet.
@@ -339,7 +339,7 @@ class TransactionRepair {
                     // important to update the timestamp.  There are various reasons it could be incorrectly set to 0
                     let { timestamp: updatedTimestamp, hash: updatedHash } = this.app.getTimestampAndHashFromAccount(data.data)
                     if (data.timestamp != updatedTimestamp) {
-                      this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 timstamp had to be corrected from ${data.timestamp} to ${updatedTimestamp}   tx:${shortHash}  acc:${shortKey} hash:${utils.stringifyReduce(updatedHash)} `)
+                      if (logFlags.error) this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 timstamp had to be corrected from ${data.timestamp} to ${updatedTimestamp}   tx:${shortHash}  acc:${shortKey} hash:${utils.stringifyReduce(updatedHash)} `)
                     }
                     // This is correcting the timestamp on the wrapper
                     data.timestamp = updatedTimestamp
@@ -479,7 +479,7 @@ class TransactionRepair {
       uniqueKeys = Object.keys(keyMap)
       
       if(uniqueKeys.length === 0){
-        this.mainLogger.error(`shrd_repairToMatchReceipt2: ABORT no covered keys ${utils.stringifyReduce(allKeys)} tx:${shortHash} `)
+        if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt2: ABORT no covered keys ${utils.stringifyReduce(allKeys)} tx:${shortHash} `)
         if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_noKeys', `${shortHash}`, `ABORT no covered keys  ${utils.stringifyReduce(allKeys)} tx:${shortHash} `)
         return false
       }
@@ -556,7 +556,7 @@ class TransactionRepair {
               let nodeShardInfo: NodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(appliedVote.node_id)
 
               if (nodeShardInfo == null) {
-                this.mainLogger.error(`shrd_repairToMatchReceipt2 nodeShardInfo == null ${utils.stringifyReduce(appliedVote.node_id)} tx:${shortHash} acc:${shortKey}`)
+                if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt2 nodeShardInfo == null ${utils.stringifyReduce(appliedVote.node_id)} tx:${shortHash} acc:${shortKey}`)
                 if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note2', `${shortHash}`, `nodeShardInfo == null ${utils.stringifyReduce(appliedVote.node_id)}  acc:${shortKey}`)
                 continue
               }
@@ -594,7 +594,7 @@ class TransactionRepair {
 
           let node = requestObject.nodeShardInfo.node
           if (node == null) {
-            this.mainLogger.error(`shrd_repairToMatchReceipt2 node == null ${utils.stringifyReduce(requestObject.accountId)}`)
+            if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt2 node == null ${utils.stringifyReduce(requestObject.accountId)}`)
             if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note2', `${shortHash}`, `node == null  acc:${shortKey}`)
             continue
           }
@@ -612,7 +612,7 @@ class TransactionRepair {
               //go down alternates list as needed.
               while (node == null) {
                 //possibly make this not at an error once verified
-                this.mainLogger.error(`shrd_repairToMatchReceipt2 while(node == null) look for other node txId. idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}  acc:${shortKey}`)
+                if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt2 while(node == null) look for other node txId. idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}  acc:${shortKey}`)
                 //find alternate
                 if (alternateIndex >= requestObject.alternates.length) {
                   this.statemanager_fatal(`repairToMatchReceipt2_1`, `ASK FAIL repairToMatchReceipt failed to find alternate node to ask for receipt. txId. ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}  acc:${shortKey}`)
@@ -628,7 +628,7 @@ class TransactionRepair {
                     this.statemanager_fatal(`repairToMatchReceipt2_2`, `ASK FAIL repairToMatchReceipt making attempt #${outerloopCount + 1}   tx:${shortHash}  acc:${shortKey}`)
                     break              
                   } else {
-                    this.mainLogger.error(`repairToMatchReceipt2 FAILED out of attempts #${outerloopCount + 1} tx:${shortHash}  acc:${shortKey}`)
+                    if (logFlags.error) this.mainLogger.error(`repairToMatchReceipt2 FAILED out of attempts #${outerloopCount + 1} tx:${shortHash}  acc:${shortKey}`)
                     this.statemanager_fatal(`repairToMatchReceipt2_3`, `ASK FAIL repairToMatchReceipt FAILED out of attempts   tx:${shortHash}  acc:${shortKey}`)
                     return false
                   }
@@ -638,9 +638,9 @@ class TransactionRepair {
                 let nodeShardInfo: NodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(altId)
                 if (nodeShardInfo != null) {
                   node = nodeShardInfo.node
-                  this.mainLogger.error(`shrd_repairToMatchReceipt2 got alt source node: idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(node.id)}  acc:${shortKey}`)
+                  if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt2 got alt source node: idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(node.id)}  acc:${shortKey}`)
                 } else {
-                  this.mainLogger.error(`shrd_repairToMatchReceipt2 nodeShardInfo == null for ${utils.stringifyReduce(altId)}  tx:${shortHash}  acc:${shortKey}`)
+                  if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt2 nodeShardInfo == null for ${utils.stringifyReduce(altId)}  tx:${shortHash}  acc:${shortKey}`)
                 }
                 alternateIndex++
               }
@@ -669,7 +669,7 @@ class TransactionRepair {
               if (this.stateManager.accountCache.hasAccount(requestObject.accountId)) {
                 let accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(requestObject.accountId)
                 if (accountMemData.h === requestObject.accountHash) {
-                  this.mainLogger.error(`Fix Worked: repairToMatchReceipt2. already have latest ${utils.makeShortHash(requestObject.accountId)} cache:${utils.stringifyReduce(accountMemData)}`)
+                  if (logFlags.error) this.mainLogger.error(`Fix Worked: repairToMatchReceipt2. already have latest ${utils.makeShortHash(requestObject.accountId)} cache:${utils.stringifyReduce(accountMemData)}`)
                   attemptsRemaining = false
                   continue
                 }
@@ -680,18 +680,18 @@ class TransactionRepair {
 
               if (result == null) {
                 if (logFlags.verbose) {
-                  this.mainLogger.error(`ASK FAIL repairToMatchReceipt2 request_state_for_tx_post result == null tx:${shortHash}  acc:${shortKey}`)
+                  if (logFlags.error) this.mainLogger.error(`ASK FAIL repairToMatchReceipt2 request_state_for_tx_post result == null tx:${shortHash}  acc:${shortKey}`)
                 }
                 // We shuffle the array of votes each time so hopefully will ask another node next time
                 // TODO more robust limits to this process, maybe a delay?
-                this.mainLogger.error(`ASK FAIL repairToMatchReceipt2 request_state_for_tx_post no reponse from ${utils.stringifyReduce(node.id)}  tx:${shortHash}  acc:${shortKey}`)
+                if (logFlags.error) this.mainLogger.error(`ASK FAIL repairToMatchReceipt2 request_state_for_tx_post no reponse from ${utils.stringifyReduce(node.id)}  tx:${shortHash}  acc:${shortKey}`)
                 //this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt missing logic to ask a new node! 1 ${utils.stringifyReduce(node.id)}`)
                 node = null
                 continue
               }
 
               if (result.success !== true) {
-                this.mainLogger.error(`ASK FAIL repairToMatchReceipt2 result.success === ${result.success}   tx:${shortHash}  acc:${shortKey}`)
+                if (logFlags.error) this.mainLogger.error(`ASK FAIL repairToMatchReceipt2 result.success === ${result.success}   tx:${shortHash}  acc:${shortKey}`)
                 //this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt missing logic to ask a new node! 2 ${utils.stringifyReduce(node.id)}`)
                 node = null
                 continue
@@ -728,13 +728,13 @@ class TransactionRepair {
                 if (beforeData == null) {
                   let results = await this.app.getAccountDataByList([data.accountId])
                   beforeData = results[0]
-                  this.mainLogger.error(`repairToMatchReceipt2: statsDataSummaryUpdate2 beforeData: had to query for data 1 ${utils.stringifyReduce(data.accountId)}  tx:${shortHash}  acc:${shortKey}`)
+                  if (logFlags.error) this.mainLogger.error(`repairToMatchReceipt2: statsDataSummaryUpdate2 beforeData: had to query for data 1 ${utils.stringifyReduce(data.accountId)}  tx:${shortHash}  acc:${shortKey}`)
                   if (beforeData == null) {
-                    this.mainLogger.error(`repairToMatchReceipt2: statsDataSummaryUpdate2 beforeData: had to query for data 1 not found ${utils.stringifyReduce(data.accountId)}  tx:${shortHash}  acc:${shortKey}`)
+                    if (logFlags.error) this.mainLogger.error(`repairToMatchReceipt2: statsDataSummaryUpdate2 beforeData: had to query for data 1 not found ${utils.stringifyReduce(data.accountId)}  tx:${shortHash}  acc:${shortKey}`)
                   }
                 }
                 if (beforeData == null) {
-                  this.mainLogger.error(`repairToMatchReceipt2: statsDataSummaryUpdate2 beforeData data is null ${utils.stringifyReduce(data.accountId)} WILL CAUSE DATA OOS  tx:${shortHash}  acc:${shortKey}`)
+                  if (logFlags.error) this.mainLogger.error(`repairToMatchReceipt2: statsDataSummaryUpdate2 beforeData data is null ${utils.stringifyReduce(data.accountId)} WILL CAUSE DATA OOS  tx:${shortHash}  acc:${shortKey}`)
                 } else {
                   if (this.stateManager.partitionStats.hasAccountBeenSeenByStats(data.accountId) === false) {
                     // Init stats because we have not seen this account yet.
@@ -744,7 +744,7 @@ class TransactionRepair {
                   // important to update the timestamp.  There are various reasons it could be incorrectly set to 0
                   let { timestamp: updatedTimestamp, hash: updatedHash } = this.app.getTimestampAndHashFromAccount(data.data)
                   if (data.timestamp != updatedTimestamp) {
-                    this.mainLogger.error(`repairToMatchReceipt2: statsDataSummaryUpdate2 timstamp had to be corrected from ${data.timestamp} to ${updatedTimestamp}   tx:${shortHash}  acc:${shortKey} hash:${utils.stringifyReduce(updatedHash)} `)
+                    if (logFlags.error) this.mainLogger.error(`repairToMatchReceipt2: statsDataSummaryUpdate2 timstamp had to be corrected from ${data.timestamp} to ${updatedTimestamp}   tx:${shortHash}  acc:${shortKey} hash:${utils.stringifyReduce(updatedHash)} `)
                   }
                   // This is correcting the timestamp on the wrapper
                   data.timestamp = updatedTimestamp
@@ -901,13 +901,13 @@ class TransactionRepair {
 
       if (result == null) {
         if (logFlags.verbose) {
-          this.mainLogger.error(`ASK FAIL request_tx_and_state ${triesLeft} ${utils.makeShortHash(node.id)}`)
+          if (logFlags.error) this.mainLogger.error(`ASK FAIL request_tx_and_state ${triesLeft} ${utils.makeShortHash(node.id)}`)
         }
         if (logFlags.playback) this.logger.playbackLogNote('shrd_requestMissingTX_askfailretry', `${shortID}`, `asking: ${utils.makeShortHash(node.id)}`)
         continue
       }
       if (result.success !== true) {
-        this.mainLogger.error(`ASK FAIL requestMissingTX 9 ${triesLeft} ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)} note:${result.note} tx:${shortID}`)
+        if (logFlags.error) this.mainLogger.error(`ASK FAIL requestMissingTX 9 ${triesLeft} ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)} note:${result.note} tx:${shortID}`)
         continue
       }
 
@@ -917,7 +917,7 @@ class TransactionRepair {
         keepTrying = false
         gotReceipt = true
 
-        this.mainLogger.error(`requestMissingTX got good receipt for: ${shortID} from: ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)}`)
+        if (logFlags.error) this.mainLogger.error(`requestMissingTX got good receipt for: ${shortID} from: ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)}`)
 
         return result
       }
@@ -981,13 +981,13 @@ class TransactionRepair {
 
       if (result == null) {
         if (logFlags.verbose) {
-          this.mainLogger.error(`ASK FAIL request_tx_and_state ${triesLeft} ${utils.makeShortHash(node.id)}`)
+          if (logFlags.error) this.mainLogger.error(`ASK FAIL request_tx_and_state ${triesLeft} ${utils.makeShortHash(node.id)}`)
         }
         if (logFlags.playback) this.logger.playbackLogNote('shrd_requestMissingReceipt_askfailretry', `${shortID}`, `asking: ${utils.makeShortHash(node.id)}`)
         continue
       }
       if (result.success !== true) {
-        this.mainLogger.error(`ASK FAIL requestMissingReceipt 9 ${triesLeft} ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)} note:${result.note} tx:${shortID}`)
+        if (logFlags.error) this.mainLogger.error(`ASK FAIL requestMissingReceipt 9 ${triesLeft} ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)} note:${result.note} tx:${shortID}`)
         continue
       }
 
@@ -997,7 +997,7 @@ class TransactionRepair {
         keepTrying = false
         gotReceipt = true
 
-        this.mainLogger.error(`requestMissingReceipt got good receipt for: ${shortID} from: ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)}`)
+        if (logFlags.error) this.mainLogger.error(`requestMissingReceipt got good receipt for: ${shortID} from: ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)}`)
         return result
       }
     }

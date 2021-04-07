@@ -816,15 +816,15 @@ class StateManager {
       let { accountId, stateId, data: recordData } = wrappedData
       //stateId = wrappedData.stateId
       if (stateId != wrappedData.stateId) {
-        this.mainLogger.error(`testAccountDataWrapped what is going on!!:  ${utils.makeShortHash(wrappedData.stateId)}  stateId: ${utils.makeShortHash(stateId)} `)
+        if (logFlags.error) this.mainLogger.error(`testAccountDataWrapped what is going on!!:  ${utils.makeShortHash(wrappedData.stateId)}  stateId: ${utils.makeShortHash(stateId)} `)
       }
       let hash = this.app.calculateAccountHash(recordData)
       if (stateId !== hash) {
-        this.mainLogger.error(`testAccountDataWrapped hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
-        this.mainLogger.error('testAccountDataWrapped hash test failed: details: ' + stringify(recordData))
-        this.mainLogger.error('testAccountDataWrapped hash test failed: wrappedData.stateId: ' + utils.makeShortHash(wrappedData.stateId))
+        if (logFlags.error) this.mainLogger.error(`testAccountDataWrapped hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
+        if (logFlags.error) this.mainLogger.error('testAccountDataWrapped hash test failed: details: ' + stringify(recordData))
+        if (logFlags.error) this.mainLogger.error('testAccountDataWrapped hash test failed: wrappedData.stateId: ' + utils.makeShortHash(wrappedData.stateId))
         var stack = new Error().stack
-        this.mainLogger.error(`stack: ${stack}`)
+        if (logFlags.error) this.mainLogger.error(`stack: ${stack}`)
       }
     }
   }
@@ -842,12 +842,12 @@ class StateManager {
       if (this.accountCache.hasAccount(accountId)) {
         let accountMemData: AccountHashCache = this.accountCache.getAccountHash(accountId)
         if (timestamp < accountMemData.t) {
-          this.mainLogger.error(`setAccountData: abort. checkAndSetAccountData older timestamp note:${note} acc: ${utils.makeShortHash(accountId)} timestamp:${timestamp} accountMemData.t:${accountMemData.t} hash: ${utils.makeShortHash(hash)} cache:${utils.stringifyReduce(accountMemData)}`)
+          if (logFlags.error) this.mainLogger.error(`setAccountData: abort. checkAndSetAccountData older timestamp note:${note} acc: ${utils.makeShortHash(accountId)} timestamp:${timestamp} accountMemData.t:${accountMemData.t} hash: ${utils.makeShortHash(hash)} cache:${utils.stringifyReduce(accountMemData)}`)
           continue //this is a major error need to skip the writing.
         }
       } else {
         // not an error to not have this data yet
-        // this.mainLogger.error(`checkAndSetAccountData: did not find seen account. note:${note} acc: ${utils.makeShortHash(accountId)} hash: ${utils.makeShortHash(hash)}`)
+        // if (logFlags.error) this.mainLogger.error(`checkAndSetAccountData: did not find seen account. note:${note} acc: ${utils.makeShortHash(accountId)} hash: ${utils.makeShortHash(hash)}`)
       }
 
       if (stateId === hash) {
@@ -872,8 +872,8 @@ class StateManager {
           this.partitionStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount)
         }
       } else {
-        this.mainLogger.error(`setAccountData hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
-        this.mainLogger.error('setAccountData hash test failed: details: ' + utils.stringifyReduce(recordData))
+        if (logFlags.error) this.mainLogger.error(`setAccountData hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
+        if (logFlags.error) this.mainLogger.error('setAccountData hash test failed: details: ' + utils.stringifyReduce(recordData))
         if (logFlags.verbose) console.log(`setAccountData hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
         if (logFlags.verbose) console.log('setAccountData hash test failed: details: ' + utils.stringifyReduce(recordData))
         failedHashes.push(accountId)
@@ -1035,13 +1035,13 @@ class StateManager {
       }
 
       //temp error for debug
-      // this.mainLogger.error(`request_tx_and_state NOTE ${utils.stringifyReduce(payload)} got queue entry: ${queueEntry != null}`)
+      // if (logFlags.error) this.mainLogger.error(`request_tx_and_state NOTE ${utils.stringifyReduce(payload)} got queue entry: ${queueEntry != null}`)
 
 
       if (queueEntry == null) {
         response.note = `failed to find queue entry: ${utils.stringifyReduce(txid)} dbg:${this.debugTXHistory[utils.stringifyReduce(txid)]}`
 
-        this.mainLogger.error(`request_tx_and_state ${response.note}`)
+        if (logFlags.error) this.mainLogger.error(`request_tx_and_state ${response.note}`)
 
         await respond(response)
         return
@@ -1553,7 +1553,7 @@ class StateManager {
       let message = { accountIds: [address] }
       let r: GetAccountDataWithQueueHintsResp | boolean = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
       if (r === false) {
-        this.mainLogger.error('ASK FAIL getLocalOrRemoteAccount r === false')
+        if (logFlags.error) this.mainLogger.error('ASK FAIL getLocalOrRemoteAccount r === false')
       }
 
       let result = r as GetAccountDataWithQueueHintsResp
@@ -1632,17 +1632,17 @@ class StateManager {
       //   break
       // }
       // throw new Error(`getRemoteAccount: not retry yet`)
-      this.mainLogger.error('getRemoteAccount: isNodeValidForInternalMessage failed, no retry yet')
+      if (logFlags.error) this.mainLogger.error('getRemoteAccount: isNodeValidForInternalMessage failed, no retry yet')
       return null
     }
 
     let message = { accountIds: [address] }
     let result = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
     if (result === false) {
-      this.mainLogger.error('ASK FAIL getRemoteAccount result === false')
+      if (logFlags.error) this.mainLogger.error('ASK FAIL getRemoteAccount result === false')
     }
     if (result === null) {
-      this.mainLogger.error('ASK FAIL getRemoteAccount result === null')
+      if (logFlags.error) this.mainLogger.error('ASK FAIL getRemoteAccount result === null')
     }
     if (result != null && result.accountData != null && result.accountData.length > 0) {
       wrappedAccount = result.accountData[0]
@@ -1824,7 +1824,7 @@ class StateManager {
     // todo review this assumption. seems ok at the moment.  are there times cycle could be null and getting the last cycle is not a valid answer?
     if (cycle == null) {
       cycle = this.p2p.state.getLastCycle()
-      // if (logFlags.verbose) this.mainLogger.error( `updateAccountsCopyTable error getting cycle by timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle returned:${cycle.counter} `)
+      // if (logFlags.verbose) if (logFlags.error) this.mainLogger.error( `updateAccountsCopyTable error getting cycle by timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle returned:${cycle.counter} `)
       cycleOffset = 1
     }
     cycleNumber = cycle.counter + cycleOffset
@@ -1834,26 +1834,26 @@ class StateManager {
     let cycleStart = (cycle.start + cycle.duration * cycleOffset) * 1000
     let cycleEnd = (cycle.start + cycle.duration * (cycleOffset + 1)) * 1000
     if (txTimestamp + this.syncSettleTime < cycleStart) {
-      if (logFlags.verbose) this.mainLogger.error(`updateAccountsCopyTable time error< ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+      if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`updateAccountsCopyTable time error< ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
     }
     if (txTimestamp + this.syncSettleTime >= cycleEnd) {
-      // if (logFlags.verbose) this.mainLogger.error( `updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+      // if (logFlags.verbose) if (logFlags.error) this.mainLogger.error( `updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
       cycleOffset++
       cycleNumber = cycle.counter + cycleOffset
       cycleStart = (cycle.start + cycle.duration * cycleOffset) * 1000
       cycleEnd = (cycle.start + cycle.duration * (cycleOffset + 1)) * 1000
       if (txTimestamp + this.syncSettleTime >= cycleEnd) {
-        if (logFlags.verbose) this.mainLogger.error(`updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+        if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
       }
     }
     // TSConversion need to sort out account types!!!
     // @ts-ignore This has seemed fine in past so not going to sort out a type discrepencie here.  !== would detect and log it anyhow.
     if (accountDataList.length > 0 && accountDataList[0].timestamp !== txTimestamp) {
-      if (logFlags.verbose) this.mainLogger.error(`updateAccountsCopyTable timestamps do match txts:${txTimestamp} acc.ts:${accountDataList[0].timestamp} `)
+      if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`updateAccountsCopyTable timestamps do match txts:${txTimestamp} acc.ts:${accountDataList[0].timestamp} `)
     }
     if (accountDataList.length === 0) {
       // need to decide if this matters!
-      if (logFlags.verbose) this.mainLogger.error(`updateAccountsCopyTable empty txts:${txTimestamp}  `)
+      if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`updateAccountsCopyTable empty txts:${txTimestamp}  `)
     }
     // if (logFlags.verbose) this.mainLogger.debug( `updateAccountsCopyTable acc.timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle computed:${cycleNumber} `)
 
@@ -1909,7 +1909,7 @@ class StateManager {
         }
 
         if (accountData == null || accountData.data == null || accountData.accountId == null) {
-          if (logFlags.verbose) this.mainLogger.error(` _commitAccountCopies null account data found: ${accountData.accountId} data: ${utils.stringifyReduce(accountData)}`)
+          if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(` _commitAccountCopies null account data found: ${accountData.accountId} data: ${utils.stringifyReduce(accountData)}`)
           continue
         } else {
           if (logFlags.verbose && this.extendedRepairLogging) this.mainLogger.debug(` _commitAccountCopies: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} data: ${utils.stringifyReduce(accountData)}`)
@@ -1937,7 +1937,7 @@ class StateManager {
         // const cycle = this.p2p.state.getCycleByTimestamp(timestamp + this.syncSettleTime)
         // // find the correct cycle based on timetamp
         // if (!cycle) {
-        //   this.mainLogger.error(`_commitAccountCopies failed to get cycle for timestamp ${timestamp} accountId:${utils.makeShortHash(accountId)}`)
+        //   if (logFlags.error) this.mainLogger.error(`_commitAccountCopies failed to get cycle for timestamp ${timestamp} accountId:${utils.makeShortHash(accountId)}`)
         //   continue
         // }
         // let cycleNumber = cycle.counter
@@ -1961,7 +1961,7 @@ class StateManager {
             globalBackupList.push(backupObj) // sort and cleanup later
             if (logFlags.verbose && this.extendedRepairLogging) this.mainLogger.debug(`_commitAccountCopies added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
           } else {
-            this.mainLogger.error(`_commitAccountCopies no global backup list found for accountId:${utils.makeShortHash(accountId)}`)
+            if (logFlags.error) this.mainLogger.error(`_commitAccountCopies no global backup list found for accountId:${utils.makeShortHash(accountId)}`)
           }
         }
         //Saves the last copy per given cycle! this way when you query cycle-1 you get the right data.
@@ -2469,7 +2469,7 @@ class StateManager {
   initApoptosisAndQuitSyncing(logMsg: string) {
     let log = `initApoptosisAndQuitSyncing ${utils.getTime('s')}  ${logMsg}`
     if (logFlags.console) console.log(log)
-    this.mainLogger.error(log)
+    if (logFlags.error) this.mainLogger.error(log)
     this.accountSync.failAndDontRestartSync()
     this.p2p.initApoptosis()
   }
@@ -2556,7 +2556,7 @@ class StateManager {
         // make sure we have a receipt
         let receipt = this.getReceipt(queueEntry)
         if (receipt == null) {
-          if(logFlags.error) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in newAcceptedTxQueue. ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+          if(logFlags.error) if (logFlags.error) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in newAcceptedTxQueue. ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
         } else {
           queueEntriesToSave.push(queueEntry)
         }
@@ -2568,7 +2568,7 @@ class StateManager {
         // make sure we have a receipt
         let receipt = this.getReceipt(queueEntry)
         if (receipt == null) {
-          if(logFlags.error) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in archivedQueueEntries. ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+          if(logFlags.error) if (logFlags.error) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in archivedQueueEntries. ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
         } else {
           queueEntriesToSave.push(queueEntry)
         }
@@ -2635,11 +2635,11 @@ class StateManager {
       if (offsetTimestamp < endOfNextCycle + this.syncSettleTime) {
         return this.currentCycleShardData.cycleNumber + 1
       } else if (offsetTimestamp < endOfNextCycle + this.syncSettleTime + cycle.duration * 1000) {
-        this.mainLogger.error(`getCycleNumberFromTimestamp fail2: endOfNextCycle:${endOfNextCycle} offsetTimestamp:${offsetTimestamp} timestamp:${timestamp}`)
+        if (logFlags.error) this.mainLogger.error(`getCycleNumberFromTimestamp fail2: endOfNextCycle:${endOfNextCycle} offsetTimestamp:${offsetTimestamp} timestamp:${timestamp}`)
 
         return this.currentCycleShardData.cycleNumber + 2
       } else {
-        this.mainLogger.error(`getCycleNumberFromTimestamp fail: endOfNextCycle:${endOfNextCycle} offsetTimestamp:${offsetTimestamp} timestamp:${timestamp}`)
+        if (logFlags.error) this.mainLogger.error(`getCycleNumberFromTimestamp fail: endOfNextCycle:${endOfNextCycle} offsetTimestamp:${offsetTimestamp} timestamp:${timestamp}`)
 
         //too far in the future
         return -2
@@ -2662,12 +2662,12 @@ class StateManager {
     let node: Shardus.Node = this.p2p.state.getNode(nodeId)
     let logErrors = logFlags.debug
     if (node == null) {
-      if (logErrors) this.mainLogger.error(`isNodeValidForInternalMessage node == null ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+      if (logErrors) if (logFlags.error) this.mainLogger.error(`isNodeValidForInternalMessage node == null ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
       return false
     }
     let nodeStatus = node.status
     if (nodeStatus != 'active') {
-      if (logErrors) this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+      if (logErrors) if (logFlags.error) this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
       return false
     }
 
@@ -2695,13 +2695,13 @@ class StateManager {
     if (checkForNodeDown) {
       let { down, state } = isNodeDown(nodeId)
       if (down === true) {
-        if (logErrors) this.mainLogger.error(`isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+        if (logErrors) if (logFlags.error) this.mainLogger.error(`isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
         return false
       }
     }
     if (checkForNodeLost) {
       if (isNodeLost(nodeId) === true) {
-        if (logErrors) this.mainLogger.error(`isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+        if (logErrors) if (logFlags.error) this.mainLogger.error(`isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
         return false
       }
     }
@@ -2716,12 +2716,12 @@ class StateManager {
       let nodeId = node.id
 
       if (node == null) {
-        if (logErrors) this.mainLogger.error(`isNodeValidForInternalMessage node == null ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+        if (logErrors) if (logFlags.error) this.mainLogger.error(`isNodeValidForInternalMessage node == null ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
         continue
       }
       let nodeStatus = node.status
       if (nodeStatus != 'active') {
-        if (logErrors) this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+        if (logErrors) if (logFlags.error) this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
         continue
       }
       if(checkIsUpRecent){
@@ -2749,13 +2749,13 @@ class StateManager {
       if (checkForNodeDown) {
         let { down, state } = isNodeDown(nodeId)
         if (down === true) {
-          if (logErrors) this.mainLogger.error(`isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+          if (logErrors) if (logFlags.error) this.mainLogger.error(`isNodeValidForInternalMessage isNodeDown == true state:${state} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
           continue
         }
       }
       if (checkForNodeLost) {
         if (isNodeLost(nodeId) === true) {
-          if (logErrors) this.mainLogger.error(`isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
+          if (logErrors) if (logFlags.error) this.mainLogger.error(`isNodeValidForInternalMessage isNodeLost == true ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
           continue
         }
       }

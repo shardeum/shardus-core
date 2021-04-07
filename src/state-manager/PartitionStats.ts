@@ -112,10 +112,10 @@ class PartitionStats {
 
     if (this.extensiveRangeChecking) {
       if (summaryPartition < 0) {
-        this.mainLogger.error(`getSummaryBlobPartition summaryPartition < 0 ${summaryPartition}`)
+        if (logFlags.error) this.mainLogger.error(`getSummaryBlobPartition summaryPartition < 0 ${summaryPartition}`)
       }
       if (summaryPartition > this.summaryPartitionCount) {
-        this.mainLogger.error(`getSummaryBlobPartition summaryPartition > this.summaryPartitionCount ${summaryPartition}`)
+        if (logFlags.error) this.mainLogger.error(`getSummaryBlobPartition summaryPartition > this.summaryPartitionCount ${summaryPartition}`)
       }
     }
 
@@ -136,7 +136,7 @@ class PartitionStats {
     blob.counter++
 
     // if(this.useSeenAccountMap === true && this.seenCreatedAccounts.has(accountData.accountId)){
-    //     // this.mainLogger.error(`statsDataSummaryInit seenCreatedAccounts dupe: ${utils.stringifyReduce(accountData.accountId)}`)
+    //     // if (logFlags.error) this.mainLogger.error(`statsDataSummaryInit seenCreatedAccounts dupe: ${utils.stringifyReduce(accountData.accountId)}`)
     //     return
     // }
     // if(this.useSeenAccountMap === true){
@@ -151,7 +151,7 @@ class PartitionStats {
 
     if (accountData.data == null) {
       blob.errorNull++
-      this.mainLogger.error(`statsDataSummaryInit errorNull`)
+      if (logFlags.error) this.mainLogger.error(`statsDataSummaryInit errorNull`)
       return
     }
     if (cycle > blob.latestCycle) {
@@ -162,7 +162,7 @@ class PartitionStats {
 
   hasAccountBeenSeenByStats(accountId) {
     // if(this.useSeenAccountMap === false){
-    //     this.mainLogger.error(`hasAccountBeenSeenByStats disabled`)
+    //     if (logFlags.error) this.mainLogger.error(`hasAccountBeenSeenByStats disabled`)
     //     return false
     // }
     // return this.seenCreatedAccounts.has(accountId)
@@ -175,7 +175,7 @@ class PartitionStats {
     blob.counter++
 
     // if(this.useSeenAccountMap === true && this.seenCreatedAccounts.has(accountId)){
-    //     // this.mainLogger.error(`statsDataSummaryInitRaw seenCreatedAccounts dupe: ${utils.stringifyReduce(accountId)}`)
+    //     // if (logFlags.error) this.mainLogger.error(`statsDataSummaryInitRaw seenCreatedAccounts dupe: ${utils.stringifyReduce(accountId)}`)
     //     return
     // }
     // if(this.useSeenAccountMap === true){
@@ -197,7 +197,7 @@ class PartitionStats {
 
     if (accountDataRaw == null) {
       blob.errorNull++
-      this.mainLogger.error(`statsDataSummaryInitRaw errorNull`)
+      if (logFlags.error) this.mainLogger.error(`statsDataSummaryInitRaw errorNull`)
       return
     }
     if (cycle > blob.latestCycle) {
@@ -213,12 +213,12 @@ class PartitionStats {
     blob.counter++
     if (accountData.data == null) {
       blob.errorNull += 10000
-      this.mainLogger.error(`statsDataSummaryUpdate errorNull 1`)
+      if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate errorNull 1`)
       return
     }
     if (accountData.prevDataCopy == null) {
       blob.errorNull += 1000000
-      this.mainLogger.error(`statsDataSummaryUpdate errorNull 2`)
+      if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate errorNull 2`)
       return
     }
 
@@ -230,11 +230,11 @@ class PartitionStats {
     //     if(this.seenCreatedAccounts.has(accountId)){
     //         let accountMemData:AccountMemoryCache = this.seenCreatedAccounts.get(accountId)
     //         if(accountMemData.t > timestamp){
-    //             this.mainLogger.error(`statsDataSummaryUpdate: good error?: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
+    //             if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
     //             return
     //         }
     //     } else {
-    //         this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account`)
+    //         if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account`)
     //     }
 
     //     let accountMemDataUpdate:AccountMemoryCache = {t:timestamp, h:hash}
@@ -248,11 +248,11 @@ class PartitionStats {
     if (this.accountCache.hasAccount(accountId)) {
       let accountMemData: AccountHashCache = this.accountCache.getAccountHash(accountId)
       if (accountMemData.t > timestamp) {
-        this.mainLogger.error(`statsDataSummaryUpdate: good error?: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
+        if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
         return
       }
     } else {
-      this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account`)
+      if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account`)
     }
     this.accountCache.updateAccountHash(accountId, hash, timestamp, cycle)
 
@@ -267,12 +267,12 @@ class PartitionStats {
     blob.counter++
     if (accountDataAfter.data == null) {
       blob.errorNull += 100000000
-      this.mainLogger.error(`statsDataSummaryUpdate2 errorNull 1`)
+      if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate2 errorNull 1`)
       return
     }
     if (accountDataBefore == null) {
       blob.errorNull += 10000000000
-      this.mainLogger.error(`statsDataSummaryUpdate2 errorNull 2`)
+      if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate2 errorNull 2`)
       return
     }
 
@@ -284,11 +284,11 @@ class PartitionStats {
     //     if(this.seenCreatedAccounts.has(accountId)){
     //         let accountMemData:AccountMemoryCache = this.seenCreatedAccounts.get(accountId)
     //         if(accountMemData.t > timestamp){
-    //             this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
+    //             if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
     //             return
     //         }
     //     } else {
-    //         this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account: 2`)
+    //         if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account: 2`)
     //     }
 
     //     let accountMemDataUpdate:AccountMemoryCache = {t:timestamp, h:hash}
@@ -302,11 +302,11 @@ class PartitionStats {
     if (this.accountCache.hasAccount(accountId)) {
       let accountMemData: AccountHashCache = this.accountCache.getAccountHash(accountId)
       if (accountMemData.t > timestamp) {
-        this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
+        if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
         return
       }
     } else {
-      this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account: 2`)
+      if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account: 2`)
     }
     this.accountCache.updateAccountHash(accountId, hash, timestamp, cycle)
 
@@ -329,7 +329,7 @@ class PartitionStats {
       this.app.txSummaryUpdate(blob.opaqueBlob, queueEntry.acceptedTx.data, null) //todo send data or not?
       blob.counter++
     } else {
-      this.mainLogger.error(`statsTxSummaryUpdate no collection for ${cycle}`)
+      if (logFlags.error) this.mainLogger.error(`statsTxSummaryUpdate no collection for ${cycle}`)
     }
   }
 
@@ -394,7 +394,7 @@ class PartitionStats {
     let coveredParitionCount = 0
     let skippedParitionCount = 0
     if (cycleShardData == null) {
-      this.mainLogger.error(`getCoveredStatsPartitions missing cycleShardData`)
+      if (logFlags.error) this.mainLogger.error(`getCoveredStatsPartitions missing cycleShardData`)
       statsDump.error = true
       return statsDump
     }

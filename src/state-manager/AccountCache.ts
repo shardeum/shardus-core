@@ -515,12 +515,12 @@ class AccountCache {
         index++
       }
       if (index >= accountCacheHistory.accountHashList.length) {
-        this.mainLogger.error(`buildPartitionHashesForNode: indexToohigh :${index} `)
+        if (logFlags.error) this.mainLogger.error(`buildPartitionHashesForNode: indexToohigh :${index} `)
       }
 
       let entry = accountCacheHistory.accountHashList[index]
       if (entry == null) {
-        this.mainLogger.error(
+        if (logFlags.error) this.mainLogger.error(
           `buildPartitionHashesForNode: entry==null :${index} cycle: ${cycleShardData.cycleNumber} key:${utils.stringifyReduce(key)}:  ${utils.stringifyReduce(accountCacheHistory)}`
         )
         continue
@@ -593,7 +593,7 @@ class AccountCache {
       let accountID = this.accountsHashCache3.futureHistoryList.accountIDs[index]
 
       if (this.accountsHashCache3.accountHashMap.has(accountID) == false) {
-        this.mainLogger.error(`buildPartitionHashesForNode: missing accountID:${accountID} index:${index} len:${this.accountsHashCache3.futureHistoryList.accountHashesSorted.length}`)
+        if (logFlags.error) this.mainLogger.error(`buildPartitionHashesForNode: missing accountID:${accountID} index:${index} len:${this.accountsHashCache3.futureHistoryList.accountHashesSorted.length}`)
         continue
       }
 

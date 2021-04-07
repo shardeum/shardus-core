@@ -613,7 +613,7 @@ class P2P extends EventEmitter {
           this.archiverActiveNodes
         )
       } catch (err) {
-        this.mainLogger.error(
+        if (logFlags.error) this.mainLogger.error(
           '_submitWhenUpdatePhase could not get cycleMarker from seedNodes. Exiting... ' +
             err
         )
@@ -988,7 +988,7 @@ class P2P extends EventEmitter {
   //     try {
   //       query = await this.robustQuery(seedNodes, queryFn)
   //     } catch (e) {
-  //       this.mainLogger.error(e)
+  //       if (logFlags.error) this.mainLogger.error(e)
   //     }
   //     attempts--
   //   }
@@ -1091,8 +1091,8 @@ class P2P extends EventEmitter {
     try {
       node = this.state.getNode(nodeId)
     } catch (e) {
-      this.mainLogger.error(e)
-      this.mainLogger.error(`Received certificate from unknown node: ${nodeId}`)
+      if (logFlags.error) this.mainLogger.error(e)
+      if (logFlags.error) this.mainLogger.error(`Received certificate from unknown node: ${nodeId}`)
       return false
     }
     const myCycleUpdates = this.state.currentCycle.updates
@@ -1107,7 +1107,7 @@ class P2P extends EventEmitter {
   async _requestUpdatesAndAdd(nodeId) {
     const updates = await this._requestCycleUpdates(nodeId)
     if (!updates) {
-      this.mainLogger.error(
+      if (logFlags.error) this.mainLogger.error(
         'Unable to add updates, no updates were able to be retrieved.'
       )
       return
@@ -1419,7 +1419,7 @@ class P2P extends EventEmitter {
         logged
       )
     } catch (err) {
-      this.mainLogger.error('P2P: ask: network.ask: ' + err)
+      if (logFlags.error) this.mainLogger.error('P2P: ask: network.ask: ' + err)
       return false
     }
     if (logFlags.debug) this.mainLogger.debug(
@@ -1436,7 +1436,7 @@ class P2P extends EventEmitter {
       }
       return response
     } catch (err) {
-      this.mainLogger.error('P2P: ask: _extractPayload: ' + err)
+      if (logFlags.error) this.mainLogger.error('P2P: ask: _extractPayload: ' + err)
       return false
     }
   }
@@ -1570,7 +1570,7 @@ class P2P extends EventEmitter {
       await this.tell(recipients, 'gossip', gossipPayload, true, tracker)
     } catch (ex) {
       if (logFlags.verbose) {
-        this.mainLogger.error(
+        if (logFlags.error) this.mainLogger.error(
           `Failed to sendGossip(${utils.stringifyReduce(
             payload
           )}) Exception => ${ex}`
@@ -1663,7 +1663,7 @@ class P2P extends EventEmitter {
       await this.tell(recipients, 'gossip', gossipPayload, true, tracker)
     } catch (ex) {
       if (logFlags.verbose) {
-        this.mainLogger.error(
+        if (logFlags.error) this.mainLogger.error(
           `Failed to sendGossip(${utils.stringifyReduce(
             payload
           )}) Exception => ${ex}`
@@ -1744,7 +1744,7 @@ class P2P extends EventEmitter {
       await this.tell(recipients, 'gossip', gossipPayload, true, tracker)
     } catch (ex) {
       if (logFlags.verbose) {
-        this.mainLogger.error(
+        if (logFlags.error) this.mainLogger.error(
           `Failed to sendGossip(${utils.stringifyReduce(
             payload
           )}) Exception => ${ex}`

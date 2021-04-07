@@ -317,7 +317,7 @@ class Logger {
 
 
   registerEndpoints(Context) {
-    Context.network.registerExternalGet('logs-fatals', (req, res) => {
+    Context.network.registerExternalGet('log-fatal', (req, res) => {
 
       this.setFatalFlags()
 
@@ -327,7 +327,7 @@ class Logger {
 
       res.end()
     })
-    Context.network.registerExternalGet('logs-default', (req, res) => {
+    Context.network.registerExternalGet('log-default', (req, res) => {
       this.setDefaultFlags()
 
       for (const [key, value] of Object.entries(logFlags)) {
@@ -338,22 +338,23 @@ class Logger {
 
 
     //TODO DEBUG DO NOT USE IN LIVE NETWORK
-    Context.network.registerExternalGet('logs-default-all', (req, res) => {
+    Context.network.registerExternalGet('log-default-all', (req, res) => {
       this.setDefaultFlags()
 
       try{
         let activeNodes = Context.p2p.state.getNodes()
         if(activeNodes){
           for(let node of activeNodes.values()){
-            this._internalHackGet(`${node.externalIp}:${node.externalPort}/logs-default`)
-            res.write(`${node.externalIp}:${node.externalPort}/logs-default\n`)
+            this._internalHackGet(`${node.externalIp}:${node.externalPort}/log-default`)
+            res.write(`${node.externalIp}:${node.externalPort}/log-default\n`)
           }        
         }
+        res.write(`joining nodes...\n`)  
         let joiningNodes = Context.p2p.state.getNodesRequestingJoin()
         if(joiningNodes){
           for(let node of joiningNodes.values()){
-            this._internalHackGet(`${node.externalIp}:${node.externalPort}/logs-default`)
-            res.write(`${node.externalIp}:${node.externalPort}/logs-default\n`)
+            this._internalHackGet(`${node.externalIp}:${node.externalPort}/log-default`)
+            res.write(`${node.externalIp}:${node.externalPort}/log-default\n`)
           }        
         }
 
@@ -366,24 +367,25 @@ class Logger {
     })
 
     //TODO DEBUG DO NOT USE IN LIVE NETWORK
-    Context.network.registerExternalGet('logs-fatals-all', (req, res) => {
+    Context.network.registerExternalGet('log-fatal-all', (req, res) => {
       this.setFatalFlags()
       try{
         let activeNodes = Context.p2p.state.getNodes()
         if(activeNodes){
           for(let node of activeNodes.values()){
-            this._internalHackGet(`${node.externalIp}:${node.externalPort}/logs-fatals`)
-            res.write(`${node.externalIp}:${node.externalPort}/logs-fatals\n`)
+            this._internalHackGet(`${node.externalIp}:${node.externalPort}/log-fatal`)
+            res.write(`${node.externalIp}:${node.externalPort}/log-fatal\n`)
           }        
         }
+        res.write(`joining nodes...\n`)  
         let joiningNodes = Context.p2p.state.getNodesRequestingJoin()
         if(joiningNodes){
           for(let node of joiningNodes.values()){
-            this._internalHackGet(`${node.externalIp}:${node.externalPort}/logs-fatals`)
-            res.write(`${node.externalIp}:${node.externalPort}/logs-fatals\n`)
+            this._internalHackGet(`${node.externalIp}:${node.externalPort}/log-fatal`)
+            res.write(`${node.externalIp}:${node.externalPort}/log-fatal\n`)
           }  
         }
-        res.write(`sending fatals logs to all nodes\n`)   
+        res.write(`sending fatal logs to all nodes\n`)   
       } catch(e){
         res.write(`${e}\n`) 
       }

@@ -114,7 +114,7 @@ class Reporter {
         nodeIpInfo,
       })
     } catch (e) {
-      this.mainLogger.error(
+      if (logFlags.error) this.mainLogger.error(
         'reportJoining: ' + e.name + ': ' + e.message + ' at ' + e.stack
       )
       console.error(e)
@@ -133,7 +133,7 @@ class Reporter {
         nodeIpInfo,
       })
     } catch (e) {
-      this.mainLogger.error(
+      if (logFlags.error) this.mainLogger.error(
         'reportJoined: ' + e.name + ': ' + e.message + ' at ' + e.stack
       )
       console.error(e)
@@ -147,7 +147,7 @@ class Reporter {
     try {
       await http.post(`${this.config.recipient}/active`, { nodeId })
     } catch (e) {
-      this.mainLogger.error(
+      if (logFlags.error) this.mainLogger.error(
         'reportActive: ' + e.name + ': ' + e.message + ' at ' + e.stack
       )
       console.error(e)
@@ -161,7 +161,7 @@ class Reporter {
     try {
       await http.post(`${this.config.recipient}/removed`, { nodeId })
     } catch (e) {
-      this.mainLogger.error(
+      if (logFlags.error) this.mainLogger.error(
         'reportRemoved: ' + e.name + ': ' + e.message + ' at ' + e.stack
       )
       console.error(e)
@@ -185,7 +185,7 @@ class Reporter {
     try {
       await http.post(`${this.config.recipient}/heartbeat`, report)
     } catch (e) {
-      this.mainLogger.error(
+      if (logFlags.error) this.mainLogger.error(
         '_sendReport: ' + e.name + ': ' + e.message + ' at ' + e.stack
       )
       console.error(e)
@@ -296,7 +296,7 @@ class Reporter {
         shardusVersion: packageJson.version,
       })
     } catch (e) {
-      this.mainLogger.error(
+      if (logFlags.error) this.mainLogger.error(
         'startReporting: ' + e.name + ': ' + e.message + ' at ' + e.stack
       )
       console.error(e)

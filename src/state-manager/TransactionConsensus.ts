@@ -73,7 +73,7 @@ class TransactionConsenus {
             }
           }
           if (queueEntry == null) {
-            this.mainLogger.error(`spread_appliedReceipt no queue entry for ${appliedReceipt.txid} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(payload.txid)]}`)
+            if (logFlags.error) this.mainLogger.error(`spread_appliedReceipt no queue entry for ${appliedReceipt.txid} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(payload.txid)]}`)
             // NEW start repair process that will find the TX then apply repairs
             // this.stateManager.transactionRepair.repairToMatchReceiptWithoutQueueEntry(appliedReceipt)
             return
@@ -368,7 +368,7 @@ class TransactionConsenus {
       // if (passed) {
       //   if (passingAccountVotesTotal < requiredVotes) {
       //     if (logFlags.playback) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.acceptedTx.id}`, `canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal}`)
-      //     this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal} `)
+      //     if (logFlags.error) this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed second tally. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal} `)
       //     return null
       //   }
       // }
@@ -377,7 +377,7 @@ class TransactionConsenus {
       // this is needed because our hash counts could have added up but if a vote could still get discarded if any one of its account hashes are wrong
       if(passed && appliedReceipt.appliedVotes.length < requiredVotes) {
         if (logFlags.playback) this.logger.playbackLogNote('tryProduceReceipt', `${queueEntry.logID}`, `canProduceReceipt:  failed to produce enough votes. passed: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal}`)
-        this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed to produce enough votes: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal} `)
+        if (logFlags.error) this.mainLogger.error(`tryProduceReceipt canProduceReceipt: failed to produce enough votes: ${passed} passCount: ${passCount} failCount: ${failCount} passingAccountVotesTotal:${passingAccountVotesTotal} `)
         return null
       }
 
@@ -474,7 +474,7 @@ class TransactionConsenus {
       // Filter nodes before we send tell()
       let filteredNodes = this.stateManager.filterValidNodesForInternalMessage(consensusGroup, 'createAndShareVote', true, true)
       if (filteredNodes.length === 0) {
-        this.mainLogger.error('createAndShareVote: filterValidNodesForInternalMessage no valid nodes left to try')
+        if (logFlags.error) this.mainLogger.error('createAndShareVote: filterValidNodesForInternalMessage no valid nodes left to try')
         return null
       }
       let filteredConsensusGroup = filteredNodes

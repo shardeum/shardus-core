@@ -169,13 +169,13 @@ export class NetworkClass extends EventEmitter {
           )
         }
       } catch (err) {
-        this.mainLogger.error('Network: _setupInternal: ', err)
-        this.mainLogger.error(
+        if (logFlags.error) this.mainLogger.error('Network: _setupInternal: ', err)
+        if (logFlags.error) this.mainLogger.error(
           'DBG',
           'Network: _setupInternal > sn.listen > callback > data',
           data
         )
-        this.mainLogger.error(
+        if (logFlags.error) this.mainLogger.error(
           'DBG',
           'Network: _setupInternal > sn.listen > callback > remote',
           remote
@@ -210,8 +210,8 @@ export class NetworkClass extends EventEmitter {
       this.InternalTellCounter++
       const promise = this.sn.send(node.internalPort, node.internalIp, data)
       promise.catch((err) => {
-        this.mainLogger.error('Network: ' + err)
-        this.mainLogger.error(err.stack)
+        if (logFlags.error) this.mainLogger.error('Network: ' + err)
+        if (logFlags.error) this.mainLogger.error(err.stack)
         this.emit('error', node)
       })
       promises.push(promise)
@@ -219,7 +219,7 @@ export class NetworkClass extends EventEmitter {
     try {
       await Promise.all(promises)
     } catch (err) {
-      this.mainLogger.error('Network: ' + err)
+      if (logFlags.error) this.mainLogger.error('Network: ' + err)
     }
   }
 
@@ -256,8 +256,8 @@ export class NetworkClass extends EventEmitter {
           const err = new Error(
             `Request timed out. ${utils.stringifyReduce(id)}`
           )
-          this.mainLogger.error('Network: ' + err)
-          this.mainLogger.error(err.stack)
+          if (logFlags.error) this.mainLogger.error('Network: ' + err)
+          if (logFlags.error) this.mainLogger.error(err.stack)
           this.emit('timeout', node)
           reject(err)
         }
@@ -280,7 +280,7 @@ export class NetworkClass extends EventEmitter {
             onTimeout
           )
         } catch (err) {
-          this.mainLogger.error('Network: ' + err)
+          if (logFlags.error) this.mainLogger.error('Network: ' + err)
           this.emit('error', node)
         }
       } finally {
