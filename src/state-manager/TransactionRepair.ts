@@ -270,7 +270,7 @@ class TransactionRepair {
                 nestedCountersInstance.countEvent('repair1', 'asking')
               
                 let message = { key: requestObject.accountId, hash: requestObject.accountHash, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
-                let result: RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx_post', message) // not sure if we should await this.
+                result = await this.p2p.ask(node, 'request_state_for_tx_post', message) // not sure if we should await this.
 
                 if (result == null) {
                   if (logFlags.verbose) {
