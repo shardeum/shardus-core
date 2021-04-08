@@ -199,10 +199,19 @@ class Reporter {
       return this.config.interval * 1000
     }
   }
+
   checkIsNodeLost(nodeId) {
     const lostNodeIds = CycleChain.getNewest().lost
     if (lostNodeIds.length === 0) return false
     const foundId = lostNodeIds.find((lostId) => lostId === nodeId)
+    if (foundId) return true
+    return false
+  }
+
+  checkIsNodeRefuted(nodeId) {
+    const refutedNodeIds = CycleChain.getNewest().refuted
+    if (refutedNodeIds.length === 0) return false
+    const foundId = refutedNodeIds.find((refutedId) => refutedId === nodeId)
     if (foundId) return true
     return false
   }
@@ -265,6 +274,7 @@ class Reporter {
     const txTimeInQueue =
       this.statistics.getPreviousElement('txTimeInQueue') / 1000 // ms to sec
     const isNodeLost = this.checkIsNodeLost(Self.id)
+    const isNodeRefuted = this.checkIsNodeRefuted(Self.id)
 
     try {
       await this._sendReport({
@@ -293,6 +303,7 @@ class Reporter {
         queueLength,
         txTimeInQueue,
         isLost: isNodeLost,
+        isRefuted: isNodeRefuted,
         shardusVersion: packageJson.version,
       })
     } catch (e) {

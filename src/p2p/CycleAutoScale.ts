@@ -113,7 +113,6 @@ export function reset () {
 }
 
 export function getDesiredCount (): number {
-  console.log('getting desired count', desiredCount)
   return desiredCount
 }
 
