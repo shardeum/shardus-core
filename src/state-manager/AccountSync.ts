@@ -258,6 +258,28 @@ class AccountSync {
           for (let queueEntry of syncTracker.queueEntries) {
             queueEntry.syncCounter--
             if (queueEntry.syncCounter <= 0) {
+
+              // dont adjust a 
+              let found = this.stateManager.transactionQueue.getQueueEntry(queueEntry.acceptedTx.id)
+              if(!found){
+                this.logger.playbackLogNote(
+                  'shrd_sync_wakeupTX_skip1',
+                  `${queueEntry.acceptedTx.id}`,
+                  `not in active queue qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`
+                )
+                continue
+              }
+              // todo other stats to not mess with?
+              if(queueEntry.state != 'syncing'){
+                this.logger.playbackLogNote(
+                  'shrd_sync_wakeupTX_skip2',
+                  `${queueEntry.acceptedTx.id}`,
+                  `state!=syncing ${queueEntry.state} qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`
+                )
+                continue
+              }
+
+
               let before = queueEntry.ourNodeInTransactionGroup
               if (queueEntry.ourNodeInTransactionGroup === false) {
                 let old = queueEntry.transactionGroup
