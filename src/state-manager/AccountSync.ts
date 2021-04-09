@@ -1443,7 +1443,7 @@ class AccountSync {
       if (lastUpdateNeeded || (accountData2.length === 0 && accountData.length === 0)) {
         moreDataRemaining = false
         if (logFlags.debug) this.mainLogger.debug(
-          `DATASYNC: syncAccountData3 got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lowTimeQuery} highestTS1: ${result.data.highestTs}`
+          `DATASYNC: syncAccountData3 got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lowTimeQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta}`
         )
         if (accountData.length > 0) {
           this.combinedAccountData = this.combinedAccountData.concat(accountData)
@@ -1453,7 +1453,7 @@ class AccountSync {
         }
       } else {
         if (logFlags.debug) this.mainLogger.debug(
-          `DATASYNC: syncAccountData3b got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lowTimeQuery} highestTS1: ${result.data.highestTs}`
+          `DATASYNC: syncAccountData3b got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lowTimeQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta}`
         )
         this.combinedAccountData = this.combinedAccountData.concat(accountData)
         loopCount++

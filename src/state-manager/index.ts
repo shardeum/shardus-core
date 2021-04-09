@@ -788,6 +788,7 @@ class StateManager {
     let lastUpdateNeeded = false
     let wrappedAccounts2: WrappedStateArray = []
     let highestTs = 0
+    let delta = 0
     // do we need more updates
     if (wrappedAccounts.length === 0) {
       lastUpdateNeeded = true
@@ -799,18 +800,19 @@ class StateManager {
           highestTs = account.timestamp
         }
       }
-      let delta = tsEnd - highestTs
+      delta = tsEnd - highestTs
       // if the data we go was close enough to current time then we are done
       // may have to be carefull about how we tune this value relative to the rate that we make this query
       // we should try to make this query more often then the delta.
       if (logFlags.verbose) console.log('delta ' + delta)
-      if (delta < this.queueSitTime) {
+      // increased allowed delta to allow for a better chance to catch up  
+      if (delta < this.queueSitTime * 2) {
         let tsStart2 = highestTs
         wrappedAccounts2 = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart2, Date.now(), 10000000)
         lastUpdateNeeded = true
       }
     }
-    return { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs }
+    return { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs, delta }
   }
 
   testAccountDataWrapped(accountDataList: Shardus.WrappedData[]) {

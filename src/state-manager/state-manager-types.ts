@@ -644,7 +644,7 @@ type AccountValuesByKey = {[accountId:string]:any }
 // repair related
 type StatusMap = {[txid:string]:number}
 type StateMap = {[txid:string]:string}
-type GetAccountDataByRangeSmart =  { wrappedAccounts:WrappedStateArray, lastUpdateNeeded:boolean, wrappedAccounts2:WrappedStateArray, highestTs:number }
+type GetAccountDataByRangeSmart =  { wrappedAccounts:WrappedStateArray, lastUpdateNeeded:boolean, wrappedAccounts2:WrappedStateArray, highestTs:number, delta:number }
 
 //generic relocate?
 type SignedObject = {sign: {owner:string}}
