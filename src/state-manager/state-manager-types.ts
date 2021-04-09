@@ -69,8 +69,10 @@ type QueueEntry = {
     appliedReceiptFinal?: AppliedReceipt;
 
     repairFinished?: boolean;
+    repairFailed: boolean;
 
     requestingReceipt: boolean;
+    receiptEverRequested: boolean;
 
     //calculate this data early to make the receipt map easy to calculate
     cycleToRecordOn: number;

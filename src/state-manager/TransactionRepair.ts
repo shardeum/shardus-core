@@ -434,6 +434,11 @@ class TransactionRepair {
       queueEntry.repairFinished = true
       this.stateManager.dataRepairsCompleted++ //visible to report
     } finally {
+
+      if(queueEntry.repairFinished !== true){
+        queueEntry.repairFailed = true
+      }
+
       this.profiler.profileSectionEnd('repair')
     }
   }

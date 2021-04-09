@@ -721,6 +721,11 @@ class StateManager {
     // update the debug tag and restart the queue
     this.dataPhaseTag = 'ACTIVE: '
     this.accountSync.dataSyncMainPhaseComplete = true
+
+
+    //update sync trackers.  This may put some things back in the queue
+    //this.accountSync.updateRuntimeSyncTrackers()  //edit maybe better to wait until th next cycle when we are fully in the network.
+
     this.tryStartAcceptedQueue()
 
     if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_mainphaseComplete', ` `, `  `)
@@ -2369,7 +2374,7 @@ class StateManager {
         }
 
         if (this.doDataCleanup === true) {
-          if (logFlags.verbose) this.mainLogger.debug(` _repair startSyncPartitions:cycle_q3_start-clean cycle: ${lastCycle.counter}`)
+          if (logFlags.verbose) this.mainLogger.debug(`cycle_q3_start-clean cycle: ${lastCycle.counter}`)
           // clean up cycle data that is more than 10 cycles old.
           this.periodicCycleDataCleanup(lastCycle.counter - 10)
         }
