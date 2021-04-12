@@ -1782,14 +1782,11 @@ class TransactionQueue {
 
       this.newAcceptedTxQueueRunning = true
 
-      // let acceptedTXCount = 0
-      // let edgeFailDetected = false
-
       let timeM = this.stateManager.queueSitTime
       let timeM2 = timeM * 2
       let timeM2_5 = timeM * 2.5
       let timeM3 = timeM * 3
-      let currentTime = Date.now() // when to update this?
+      let currentTime = Date.now()
 
       let app = this.app
 
@@ -1799,11 +1796,11 @@ class TransactionQueue {
           let timestamp = txQueueEntry.txKeys.timestamp
           let acceptedTx = txQueueEntry.acceptedTx
           let txId = acceptedTx.receipt.txHash
-          // sorted insert = sort by timestamp
+          // Find the time sorted spot in our queue to insert this TX into
+          // reverse loop because the news (largest timestamp) values are at the end of the array
           // todo faster version (binary search? to find where we need to insert)
           let index = this.newAcceptedTxQueue.length - 1
           let lastTx = this.newAcceptedTxQueue[index]
-
           while (index >= 0 && (timestamp > lastTx.txKeys.timestamp || (timestamp === lastTx.txKeys.timestamp && txId < lastTx.acceptedTx.id))) {
             index--
             lastTx = this.newAcceptedTxQueue[index]
@@ -1842,6 +1839,9 @@ class TransactionQueue {
       currentIndex++ //increment once so we can handle the decrement at the top of the loop and be safe about continue statements
 
       while (this.newAcceptedTxQueue.length > 0) {
+        // update current time with each pass through the loop
+        currentTime = Date.now()
+
         //Handle an odd case where the finally did not catch exiting scope.
         if (pushedProfilerTag != null) {
           this.profiler.profileSectionEnd(`process-${pushedProfilerTag}`)
@@ -1856,6 +1856,7 @@ class TransactionQueue {
         let queueEntry: QueueEntry = this.newAcceptedTxQueue[currentIndex]
         let txTime = queueEntry.txKeys.timestamp
         let txAge = currentTime - txTime
+        // current queue entry is younger than timeM, so nothing to do yet.
         if (txAge < timeM) {
           break
         }
@@ -1870,6 +1871,8 @@ class TransactionQueue {
         let hasReceivedApplyReceipt = queueEntry.recievedAppliedReceipt != null
         let shortID = queueEntry.logID //`${utils.makeShortHash(queueEntry.acceptedTx.id)}`
 
+        // on the off chance we are here with a pass of fail state remove this from the queue.
+        // log fatal because we do not want to get to this situation.
         if(queueEntry.state === 'pass' || queueEntry.state === 'fail'){
           this.statemanager_fatal(`pass or fail entry should not be in queue`, `txid: ${shortID} state: ${queueEntry.state} receiptEverRequested:${queueEntry.receiptEverRequested} age:${txAge}`)
           this.removeFromQueue(queueEntry, currentIndex)
