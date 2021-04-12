@@ -1060,7 +1060,7 @@ class AccountSync {
       if(robustQueryResult.isRobustResult == false){
         if (logFlags.debug) this.mainLogger.debug('getRobustGlobalReport: robustQuery ')
         this.statemanager_fatal(`getRobustGlobalReport_nonRobust`, 'getRobustGlobalReport: robustQuery ')
-        throw new Error('FailAndRestartPartition0')
+        throw new Error('FailAndRestartPartition_globalReport_A')
       }
 
       if (result.ready === false) {
@@ -1074,12 +1074,12 @@ class AccountSync {
       //       but for now if isRobustResult == false then we local code wil throw an exception 
       if (logFlags.debug) this.mainLogger.debug('getRobustGlobalReport: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       this.statemanager_fatal(`getRobustGlobalReport_ex`, 'getRobustGlobalReport: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      throw new Error('FailAndRestartPartition0')
+      throw new Error('FailAndRestartPartition_globalReport_B')
     }
     if (!winners || winners.length === 0) {
       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getRobustGlobalReport no winners, going to throw fail and restart`)
       this.statemanager_fatal(`getRobustGlobalReport_noWin`, `DATASYNC: getRobustGlobalReport no winners, going to throw fail and restart`) // todo: consider if this is just an error
-      throw new Error('FailAndRestartPartition1')
+      throw new Error('FailAndRestartPartition_globalReport_noWin')
     }
     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getRobustGlobalReport found a winner.  results: ${utils.stringifyReduce(result)}`)
     this.dataSourceNodeIndex = 0
@@ -1194,7 +1194,7 @@ class AccountSync {
         if(robustQueryResult.isRobustResult == false){
           if (logFlags.debug) this.mainLogger.debug('syncStateTableData: robustQuery ')
           this.statemanager_fatal(`syncStateTableData_nonRobust`, 'syncStateTableData: robustQuery ')
-          throw new Error('FailAndRestartPartition0')
+          throw new Error('FailAndRestartPartition_stateTable_A')
         }
 
       } catch (ex) {
@@ -1202,7 +1202,7 @@ class AccountSync {
         //       but for now if isRobustResult == false then we local code wil throw an exception 
         if (logFlags.debug) this.mainLogger.debug('syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         this.statemanager_fatal(`syncStateTableData_robustQ`, 'syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-        throw new Error('FailAndRestartPartition0')
+        throw new Error('FailAndRestartPartition_stateTable_B')
       }
 
       if (result && result.stateHash) {
@@ -1210,7 +1210,7 @@ class AccountSync {
         if (!winners || winners.length === 0) {
           if (logFlags.debug) this.mainLogger.debug(`DATASYNC: no winners, going to throw fail and restart`)
           this.statemanager_fatal(`syncStateTableData_noWin`, `DATASYNC: no winners, going to throw fail and restart`) // todo: consider if this is just an error
-          throw new Error('FailAndRestartPartition1')
+          throw new Error('FailAndRestartPartition_stateTable_C')
         }
         this.dataSourceNode = winners[0] // Todo random index
         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: got hash ${result.stateHash} from ${utils.stringifyReduce(winners.map((node: Shardus.Node) => utils.makeShortHash(node.id) + ':' + node.externalPort))}`)
@@ -1218,7 +1218,7 @@ class AccountSync {
       } else {
         let resultStr = utils.stringifyReduce(result)
         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: robustQuery get_account_state_hash failed ${result}`)
-        throw new Error('FailAndRestartPartition2 ' + result)
+        throw new Error('FailAndRestartPartition_stateTable_D ' + result)
       }
 
       let moreDataRemaining = true
@@ -1306,7 +1306,7 @@ class AccountSync {
         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateTableData finished downloading the requested data but the hash does not match`)
         // Failed again back through loop! TODO ? record/eval/report blame?
         this.stateManager.recordPotentialBadnode()
-        throw new Error('FailAndRestartPartition')
+        throw new Error('FailAndRestartPartition_stateTable_E')
       }
 
       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateTableData saving ${this.combinedAccountStateData.length} records to db`)
@@ -1774,7 +1774,7 @@ class AccountSync {
       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
       // state -> try another node. TODO record/eval/report blame?
       this.stateManager.recordPotentialBadnode()
-      throw new Error('FailAndRestartPartition')
+      throw new Error('FailAndRestartPartition_processAccountData_A')
     }
     if (failedHashes.length > 0) {
       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes:  ${failedHashes.length} will have to download them again`)
@@ -2220,7 +2220,7 @@ class AccountSync {
       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
       // state -> try another node. TODO record/eval/report blame?
       this.stateManager.recordPotentialBadnode()
-      throw new Error('FailAndRestartPartition')
+      throw new Error('FailAndRestartPartition_processAccountDataFast_A')
     }
     if (failedHashes.length > 0) {
       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes:  ${failedHashes.length} will have to download them again`)
