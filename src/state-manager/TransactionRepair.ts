@@ -61,6 +61,13 @@ class TransactionRepair {
       throw new Error('repairToMatchReceipt queueEntry.uniqueKeys == null')
     }
 
+    let requestObjectCount = 0
+    let requestsMade = 0
+    let responseFails = 0
+    let dataRecieved = 0
+    let dataApplied = 0
+    let failedHash = 0
+
     try {
       this.stateManager.dataRepairsStarted++
 
@@ -92,6 +99,8 @@ class TransactionRepair {
 
       this.profiler.profileSectionEnd('repair_init')
 
+      // STEP 1
+      // Build a list of request objects
       for (let key of queueEntry.uniqueKeys) {
         let coveredKey = false
 
@@ -156,6 +165,7 @@ class TransactionRepair {
               if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `setting key ${utils.stringifyReduce(key)} ${utils.stringifyReduce(objectToSet)}  acc:${shortKey}`)
               requestObjects[key] = objectToSet
               allKeys.push(key)
+              requestObjectCount++
             } else {
             }
           }
@@ -167,10 +177,10 @@ class TransactionRepair {
         }
       }
 
-      //let receipt = queueEntry.appliedReceiptForRepair
-
       if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_start', `${shortHash}`, `qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}  requestObject:${utils.stringifyReduce(requestObjects)}`)
 
+      // STEP 2
+      // repair each unique key, if needed by asking an appropirate node for account state
       for (let key of queueEntry.uniqueKeys) {
         let shortKey = utils.stringifyReduce(key)
         if (requestObjects[key] != null) {
@@ -198,7 +208,7 @@ class TransactionRepair {
           while (outerloopCount <= 2) {
             outerloopCount++
             while (attemptsRemaining === true) {
-              //go down alternates list as needed.
+              //if node == null, find a node to request data from. go down alternates list as needed.
               while (node == null) {
                 //possibly make this not at an error once verified
                 if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt while(node == null) look for other node txId. idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}  acc:${shortKey}`)
@@ -206,7 +216,6 @@ class TransactionRepair {
                 if (alternateIndex >= requestObject.alternates.length) {
                   this.statemanager_fatal(`repairToMatchReceipt_1`, `ASK FAIL repairToMatchReceipt failed to find alternate node to ask for receipt. txId. ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}  acc:${shortKey}`)
                   attemptsRemaining = false
-
 
                   if(outerloopCount <= 2){
                     //retry one more time but with out checking down or lost
@@ -269,6 +278,7 @@ class TransactionRepair {
                 this.profiler.profileSectionStart('repair_asking_for_data')
                 nestedCountersInstance.countEvent('repair1', 'asking')
               
+                requestsMade++
                 let message = { key: requestObject.accountId, hash: requestObject.accountHash, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
                 result = await this.p2p.ask(node, 'request_state_for_tx_post', message) // not sure if we should await this.
 
@@ -281,6 +291,7 @@ class TransactionRepair {
                   if (logFlags.error) this.mainLogger.error(`ASK FAIL repairToMatchReceipt request_state_for_tx_post no reponse from ${utils.stringifyReduce(node.id)}  tx:${shortHash}  acc:${shortKey}`)
                   //this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt missing logic to ask a new node! 1 ${utils.stringifyReduce(node.id)}`)
                   node = null
+                  responseFails++
                   continue
                 }
 
@@ -288,6 +299,7 @@ class TransactionRepair {
                   if (logFlags.error) this.mainLogger.error(`ASK FAIL repairToMatchReceipt result.success === ${result.success}   tx:${shortHash}  acc:${shortKey}`)
                   //this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt missing logic to ask a new node! 2 ${utils.stringifyReduce(node.id)}`)
                   node = null
+                  responseFails++
                   continue
                 }
               } finally{
@@ -297,6 +309,7 @@ class TransactionRepair {
               let accountIdsReturned = []
               for (let data of result.stateList) {
                 try{
+                  dataRecieved++
                   this.profiler.profileSectionStart('repair_saving_account_data')
                   nestedCountersInstance.countEvent('repair1', 'saving')
                   // let shortKey = utils.stringifyReduce(data.accountId)
@@ -305,6 +318,14 @@ class TransactionRepair {
                   //Commit the data
                   let dataToSet = [data]
                   let failedHashes = await this.stateManager.checkAndSetAccountData(dataToSet, `tx:${shortHash} repairToMatchReceipt`, false)
+
+                  if(failedHashes.length === 0){
+                    dataApplied++
+                  } else {
+                    failedHash++
+                    this.statemanager_fatal(`repairToMatchReceipt_failedhash`, ` tx:${shortHash}  failed:${failedHashes[0]} acc:${shortKey}`)
+                  }
+
                   nestedCountersInstance.countEvent('repair1', 'writeCombinedAccountDataToBackups')
                   await this.stateManager.writeCombinedAccountDataToBackups(dataToSet, failedHashes)
                   attemptsRemaining = false
@@ -437,6 +458,8 @@ class TransactionRepair {
 
       if(queueEntry.repairFinished !== true){
         queueEntry.repairFailed = true
+
+        this.statemanager_fatal(`repairToMatchReceipt_failed`, `tx:${queueEntry.logID} counters:${utils.stringifyReduce({requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash})} `)
       }
 
       this.profiler.profileSectionEnd('repair')
@@ -455,10 +478,21 @@ class TransactionRepair {
     let timestamp = 0
     let cycleToRecordOn = 0
 
+    let repairFinished = false
+
+    let missingTXFound = 0
+    let requestObjectCount = 0
+    let requestsMade = 0
+    let responseFails = 0
+    let dataRecieved = 0
+    let dataApplied = 0
+    let failedHash = 0
+
+
     try {
       let shortHash = utils.makeShortHash(txID)
 
-      // need to find the TX
+      // STEP 0: need to find the TX
       let txRequestResult = await this.requestMissingTX(txID, refAccountId)
       if(txRequestResult == null || txRequestResult.success != true){
         this.statemanager_fatal(`repairToMatchReceipt2_a`, `ASK FAIL requestMissingTX   tx:${shortHash} result:${utils.stringifyReduce(txRequestResult)} `)
@@ -471,6 +505,8 @@ class TransactionRepair {
       cycleToRecordOn = this.stateManager.getCycleNumberFromTimestamp(timestamp)
 
       let originalData = txRequestResult.originalData
+
+      missingTXFound++
 
       let keyMap = {}
       for (let key of allKeys) {
@@ -510,6 +546,7 @@ class TransactionRepair {
 
       let numUpToDateAccounts = 0
 
+      // STEP 1: build a list of request objects
       for (let key of uniqueKeys) {
         let coveredKey = false
 
@@ -573,6 +610,7 @@ class TransactionRepair {
               let objectToSet = { appliedVote, voteIndex: j, accountHash: hash, accountId: id, nodeShardInfo, alternates: [] }
               if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note2', `${shortHash}`, `setting key ${utils.stringifyReduce(key)} ${utils.stringifyReduce(objectToSet)}  acc:${shortKey}`)
               requestObjects[key] = objectToSet
+              requestObjectCount++
               allKeys.push(key)
             } else {
             }
@@ -587,6 +625,7 @@ class TransactionRepair {
 
       if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_start2', `${shortHash}`, ` AccountsMissing:${utils.stringifyReduce(allKeys)}  requestObject:${utils.stringifyReduce(requestObjects)}`)
 
+      // STEP 2: repear account if needed
       for (let key of uniqueKeys) {
         let shortKey = utils.stringifyReduce(key)
         if (requestObjects[key] != null) {
@@ -680,6 +719,7 @@ class TransactionRepair {
                 }
               }
 
+              requestsMade++
               let message = { key: requestObject.accountId, hash: requestObject.accountHash, txid: txID, timestamp: timestamp }
               let result: RequestStateForTxResp = await this.p2p.ask(node, 'request_state_for_tx_post', message) // not sure if we should await this.
 
@@ -692,6 +732,7 @@ class TransactionRepair {
                 if (logFlags.error) this.mainLogger.error(`ASK FAIL repairToMatchReceipt2 request_state_for_tx_post no reponse from ${utils.stringifyReduce(node.id)}  tx:${shortHash}  acc:${shortKey}`)
                 //this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt missing logic to ask a new node! 1 ${utils.stringifyReduce(node.id)}`)
                 node = null
+                responseFails++
                 continue
               }
 
@@ -699,6 +740,7 @@ class TransactionRepair {
                 if (logFlags.error) this.mainLogger.error(`ASK FAIL repairToMatchReceipt2 result.success === ${result.success}   tx:${shortHash}  acc:${shortKey}`)
                 //this.fatalLogger.fatal(`ASK FAIL repairToMatchReceipt missing logic to ask a new node! 2 ${utils.stringifyReduce(node.id)}`)
                 node = null
+                responseFails++
                 continue
               }
 
@@ -706,11 +748,20 @@ class TransactionRepair {
               let accountIdsReturned = []
               for (let data of result.stateList) {
                 // let shortKey = utils.stringifyReduce(data.accountId)
+                dataRecieved++
 
                 if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt2_note', `${shortHash}`, `write data: ${utils.stringifyReduce(data)}  acc:${shortKey}`)
                 //Commit the data
                 let dataToSet = [data]
                 let failedHashes = await this.stateManager.checkAndSetAccountData(dataToSet, `tx:${shortHash} repairToMatchReceipt2`, false)
+
+                if(failedHashes.length === 0){
+                  dataApplied++
+                } else {
+                  failedHash++
+                  this.statemanager_fatal(`repairToMatchReceipt_failedhash`, ` tx:${shortHash}  failed:${failedHashes[0]} acc:${shortKey}`)
+                }
+
                 await this.stateManager.writeCombinedAccountDataToBackups(dataToSet, failedHashes)
                 attemptsRemaining = false
                 //update global cache?  that will be obsolete soona anyhow!
@@ -841,6 +892,12 @@ class TransactionRepair {
 
       return true
     } finally {
+
+      if(repairFinished == false){
+
+        this.statemanager_fatal(`repairToMatchReceiptNoRecipt_failed`, `counters:${utils.stringifyReduce({missingTXFound, requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash})} `)
+      }
+      
       this.profiler.profileSectionEnd('repair2')
     }
   }
