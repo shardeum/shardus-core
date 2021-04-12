@@ -822,10 +822,6 @@ class AccountSync {
         this.profiler.profileSectionEnd('repairMissingTX')
       }
     }
-
-
-
-
   }
 
   async syncStateDataGlobals(syncTracker: SyncTracker) {

@@ -1076,7 +1076,7 @@ class TransactionQueue {
     if (logFlags.playback) this.logger.playbackLogNote('shrd_addData', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `key ${utils.makeShortHash(data.accountId)} hash: ${utils.makeShortHash(data.stateId)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}  ${queueEntry.acceptedTx.timestamp}`)
   }
 
-  queueEntryHasAllData(queueEntry: QueueEntry) {
+  queueEntryHasAllData(queueEntry: QueueEntry) : boolean {
     if (queueEntry.hasAll === true) {
       return true
     }
@@ -1101,6 +1101,9 @@ class TransactionQueue {
     if (this.stateManager.currentCycleShardData == null) {
       return
     }
+
+    nestedCountersInstance.countEvent('processing', 'queueEntryRequestMissingData-start')
+
     if (!queueEntry.requests) {
       queueEntry.requests = {}
     }
@@ -1217,7 +1220,7 @@ class TransactionQueue {
             queueEntry.logstate = 'got all missing data'
           } else {
             queueEntry.logstate = 'failed to get data:' + queueEntry.hasAll
-            // queueEntry.state = 'failed to get data'
+            //This will time out and go to reciept repair mode if it does not get more data sent to it.
           }
 
           if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_result', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
@@ -1237,6 +1240,12 @@ class TransactionQueue {
           keepTrying = false
         }
       }
+    }
+
+    if (queueEntry.hasAll === true) {
+      nestedCountersInstance.countEvent('processing', 'queueEntryRequestMissingData-success')
+    } else {
+      nestedCountersInstance.countEvent('processing', 'queueEntryRequestMissingData-failed')
     }
   }
 
@@ -1867,8 +1876,11 @@ class TransactionQueue {
           continue
         }
 
-        // Everything in here is after we finish our initial sync
+        // TIME OUT / EXPIRATION CHECKS
+        // Check if transactions have expired and failed, or if they have timed out and ne need to request receipts.
         if (this.stateManager.accountSync.dataSyncMainPhaseComplete === true) {
+          // Everything in here is after we finish our initial sync
+
           // didSync: refers to the syncing process.  True is for TXs that we were notified of
           //          but had to delay action on because the initial or a runtime thread was busy syncing on.
           
@@ -1921,6 +1933,8 @@ class TransactionQueue {
           }
 
           // This is the expiry case where repairFailed
+          //     TODO.  I think as soon as a repair as marked as failed we can expire and remove it from the queue
+          //            But I am leaving this optimizaiton out for now since we really don't want to plan on repairs failing
           if (txAge > timeM3 && queueEntry.repairFailed) {
             //this.statistics.incrementCounter('txExpired')
             queueEntry.state = 'expired'
@@ -1986,37 +2000,35 @@ class TransactionQueue {
           }
         }
 
-        // TODO STATESHARDING4 Does this queueEntry have a receipt?
-        //
-        //  A: if preapply results match the receipt results
-        //  if we have the data we need to apply it:
-        //       queueEntry.state = 'commiting'
-        //
-        //  B: if they dont match then
-        //     -sync account from another node (based on hash values in receipt)
-        //     Write the data that synced
-        //
-        //  C: if we get a receipt but have not pre applied yet?
-        //     ? would still be waiting on data.
-        //     this is not normal.  a node would be really behind.  Just do the data repair like step "B"
-
+        // HANDLE TX logic based on state.
         try {
           this.profiler.profileSectionStart(`process-${queueEntry.state}`)
           pushedProfilerTag = queueEntry.state
 
           if (queueEntry.state === 'syncing') {
             ///////////////////////////////////////////////--syncing--////////////////////////////////////////////////////////////
+            // a queueEntry will be put in syncing state if it is queue up while we are doing initial syncing or if 
+            // we are syncing a range of new edge partition data.
+            // we hold it in limbo until the syncing operation is complete.  When complete all of these TXs are popped
+            // and put back into the queue.  If it has been too long they will go into a repair to receipt mode.
+            // IMPORTANT thing is that we mark the accounts as seen, because we cant use this account data
+            //   in TXs that happen after until this is resolved.
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
           } else if (queueEntry.state === 'aging') {
             ///////////////////////////////////////////--aging--////////////////////////////////////////////////////////////////
-            // we know that tx age is greater than M
+            // We wait in the aging phase, and mark accounts as seen to prevent a TX that is after this from using or changing data
+            // on the accounts in this TX
             queueEntry.state = 'processing'
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
           } else if (queueEntry.state === 'processing') {
             ////////////////////////////////////////--processing--///////////////////////////////////////////////////////////////////
             if (this.processQueue_accountSeen(seenAccounts, queueEntry) === false) {
+              // Processing is when we start doing real work.  the task is to read and share the correct account data to the correct
+              // corresponding nodes and then move into awaiting data phase
+
               this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
               try {
+                // TODO re-evaluate if it is correct for us to share info for a global modifing TX.
                 //if(queueEntry.globalModification === false) {
                 await this.tellCorrespondingNodes(queueEntry)
                 if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_processing', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  values: ${this.processQueue_debugAccountData(queueEntry, app)}`)
@@ -2032,42 +2044,33 @@ class TransactionQueue {
           } else if (queueEntry.state === 'awaiting data') {
             ///////////////////////////////////////--awaiting data--////////////////////////////////////////////////////////////////////
 
-            // TODO STATESHARDING4 GLOBALACCOUNTS need to find way to turn this back on..
-            // if(queueEntry.globalModification === true){
-            //   markAccountsSeen(seenAccounts, queueEntry)
-            //   // no data to await.
-            //   queueEntry.state = 'applying'
-            //   continue
-            // }
+            // Wait for all data to be aquired. 
+            // Once we have all the data we need we can move to consensing phase.
+            // IF this is a global account it will go strait to commiting phase since the data was shared by other means.
+
+
             // check if we have all accounts
             if (queueEntry.hasAll === false && txAge > timeM2) {
-              //TODO STATESHARDING4 in theory this shouldn't be able to happen
-
               this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
+
               if (this.queueEntryHasAllData(queueEntry) === true) {
                 // I think this can't happen
+                nestedCountersInstance.countEvent('processing', 'data missing at t>M2. but not really. investigate further')
                 if (logFlags.playback) this.logger.playbackLogNote('shrd_hadDataAfterall', `${shortID}`, `This is kind of an error, and should not happen`)
                 continue
               }
 
-              // if (queueEntry.hasAll === false && txAge > timeM3) {
-              //   queueEntry.state = 'failed'
-              //   removeFromQueue(queueEntry, currentIndex)
-              //   continue
-              // }
-
               // 7.  Manually request missing state
               try {
-                // TODO consider if this function should set 'failed to get data'
-                // note this is call is not awaited.  is that ok?
-                //
-                // TODO STATESHARDING4 should we await this.  I think no since this waits on outside nodes to respond
+                nestedCountersInstance.countEvent('processing', 'data missing at t>M2. request data')
+                // Await note: current thinking is that is is best to not await this call.
                 this.queueEntryRequestMissingData(queueEntry)
               } catch (ex) {
                 if (logFlags.debug) this.mainLogger.debug('processAcceptedTxQueue2 queueEntryRequestMissingData:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
                 this.statemanager_fatal(`processAcceptedTxQueue2_missingData`, 'processAcceptedTxQueue2 queueEntryRequestMissingData:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
               }
             } else if (queueEntry.hasAll) {
+              // we have all the data, but we need to make sure there are no upstream TXs using accounts we need first.
               if (this.processQueue_accountSeen(seenAccounts, queueEntry) === false) {
                 this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
 
@@ -2094,25 +2097,7 @@ class TransactionQueue {
                     filter[key] = queueEntry[key] == true ? 1 : 0
                   }
 
-                  // Need to go back and thing on how this was supposed to work:
-                  // queueEntry.acceptedTx.transactionGroup = queueEntry.transactionGroup // Used to not double count txProcessed
                   let txResult = await this.preApplyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates, localCachedData, filter)
-
-                  // TODO STATESHARDING4 evaluate how much of this we still need, does the edge fail stuff still matter
-                  // if (txResult != null) {
-                  //   if (txResult.passed === true) {
-                  //     acceptedTXCount++
-                  //   }
-                  //   // clearAccountsSeen(seenAccounts, queueEntry)
-                  // } else {
-                  //   // clearAccountsSeen(seenAccounts, queueEntry)
-                  //   // if (!edgeFailDetected && acceptedTXCount > 0) {
-                  //   //   edgeFailDetected = true
-                  //   //   if (logFlags.verbose) this.mainLogger.debug( `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
-                  //   //   this.fatalLogger.fatal( `processAcceptedTxQueue edgeFail ${utils.stringifyReduce(queueEntry.acceptedTx)}`) // todo: consider if this is just an error
-                  //   // }
-                  // }
-
                   if (txResult != null && txResult.applied === true) {
                     queueEntry.state = 'consensing'
 
@@ -2136,6 +2121,9 @@ class TransactionQueue {
                       await this.stateManager.transactionConsensus.createAndShareVote(queueEntry)
                     }
                   } else {
+                    //There was some sort of error when we tried to apply the TX
+                    //Go directly into 'consensing' state, because we need to wait for a receipt that is good.
+                    nestedCountersInstance.countEvent('processing', `txResult apply error. applied: ${txResult?.applied}`)
                     if (logFlags.error) this.mainLogger.error(`processAcceptedTxQueue2 txResult problem txid:${queueEntry.logID} res: ${utils.stringifyReduce(txResult)} `)
                     queueEntry.waitForReceiptOnly = true
                     queueEntry.state = 'consensing'
@@ -2148,6 +2136,9 @@ class TransactionQueue {
                 }
               }
               this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
+            } else {
+              // mark accounts as seen while we are waiting for data
+              this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
             }
           } else if (queueEntry.state === 'consensing') {
             /////////////////////////////////////////--consensing--//////////////////////////////////////////////////////////////////
@@ -2156,6 +2147,7 @@ class TransactionQueue {
 
               let didNotMatchReceipt = false
 
+              // try to produce a receipt
               if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`)
               let result = this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
               if (result != null) {
@@ -2173,7 +2165,7 @@ class TransactionQueue {
                 }
               }
 
-              // if we got a reciept while waiting see if we should use it
+              // if we got a reciept while waiting see if we should use it (if our own vote matches)
               if (hasReceivedApplyReceipt) {
                 if (this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, queueEntry.recievedAppliedReceipt)) {
                   if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${shortID}`, `qId: ${queueEntry.entryID} `)
@@ -2185,7 +2177,7 @@ class TransactionQueue {
                   queueEntry.appliedReceiptForRepair = queueEntry.recievedAppliedReceipt
                 }
               } else {
-                //just keep waiting.
+                //just keep waiting for a reciept
               }
 
               // we got a receipt but did not match it.
@@ -2194,9 +2186,11 @@ class TransactionQueue {
                 queueEntry.repairFinished = false
                 if (queueEntry.appliedReceiptForRepair.result === true) {
                   // need to start repair process and wait
+                  //await note: it is best to not await this.  it should be an async operation.
                   this.stateManager.transactionRepair.repairToMatchReceipt(queueEntry)
                   queueEntry.state = 'await repair'
                 } else {
+                  // We got a reciept, but the consensus is that this TX was not applied.
                   if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_finishedFailReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                   // we are finished since there is nothing to apply
                   this.removeFromQueue(queueEntry, currentIndex)
@@ -2209,14 +2203,14 @@ class TransactionQueue {
             ///////////////////////////////////////////--await repair--////////////////////////////////////////////////////////////////
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
 
-            // at this point we are just waiting to see if we applied the data and repaired correctlyl
+            // Special state that we are put in if we are waiting for a repair to receipt operation to conclude
             if (queueEntry.repairFinished === true) {
               if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitRepair_repairFinished', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} `)
               this.removeFromQueue(queueEntry, currentIndex)
               if (queueEntry.appliedReceiptForRepair.result === true) {
                 queueEntry.state = 'pass'
               } else {
-                // technically should never get here
+                // technically should never get here, because we dont need to repair to a receipt when the network did not apply the TX
                 queueEntry.state = 'fail'
               }
             }
@@ -2293,6 +2287,13 @@ class TransactionQueue {
                     localCachedData
                   )
 
+                  if(queueEntry.repairFinished){
+                    // saw a TODO comment above and befor I axe it want to confirm what is happening after we repair a receipt.
+                    // shouldn't get here putting this in to catch if we do
+                    this.statemanager_fatal(`processAcceptedTxQueue_commitingRepairedReceipt`, `${shortID} `)
+                    nestedCountersInstance.countEvent('processing', 'commiting a repaired TX...')
+                  }
+
                   //} finally {
                   this.profiler.profileSectionEnd('commit')
                   //}
@@ -2300,6 +2301,7 @@ class TransactionQueue {
                   if (commitResult != null && commitResult.success) {
                   }
                 } else {
+
                 }
                 if (hasReceiptFail) {
                   // endpoint to allow dapp to execute something that depends on a transaction failing
@@ -2380,11 +2382,6 @@ class TransactionQueue {
           this.profiler.profileSectionEnd(`process-${pushedProfilerTag}`)
           pushedProfilerTag = null // clear the tag
         }
-        // Disabled this because it cant happen..  TXs will time out instead now.
-        // we could consider this as a state when attempting to get missing data fails
-        // else if (queueEntry.state === 'failed to get data') {
-        //   this.removeFromQueue(queueEntry, currentIndex)
-        // }
       }
     } finally {
       //Handle an odd case where the finally did not catch exiting scope.
