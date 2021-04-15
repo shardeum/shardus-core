@@ -695,10 +695,10 @@ type StatsClump = {
 }
 
 // cache 
-type AccountMemoryCache = {
-    t: number;  //timestamp
-    h: string;  //hash.  todo, a compact form acceptable?
-}
+// type AccountMemoryCache = {
+//     t: number;  //timestamp
+//     h: string;  //hash.  todo, a compact form acceptable?
+// }
 
 type AccountHashCache = {
     t: number;  //timestamp

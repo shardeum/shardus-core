@@ -11,6 +11,7 @@ import Crypto from '../crypto'
 import Logger, {logFlags} from '../logger'
 import ShardFunctions from './shardFunctions.js'
 import AccountCache from './AccountCache'
+import StateManager from '.'
 
 class PartitionStats {
   app: Shardus.App
@@ -33,12 +34,14 @@ class PartitionStats {
   // add cycle then , never delete one from previous cycle.
   //     quick lookup
   //
-  seenCreatedAccounts: Map<string, AccountMemoryCache> // Extra level of safety at the cost of memory to prevent double init.  starting point to have in memory hash of accounts
-  useSeenAccountMap: boolean
+  // seenCreatedAccounts: Map<string, AccountMemoryCache> // Extra level of safety at the cost of memory to prevent double init.  starting point to have in memory hash of accounts
+  // useSeenAccountMap: boolean
 
   accountCache: AccountCache
 
-  constructor( profiler: Profiler, app: Shardus.App, logger: Logger, crypto: Crypto, config: Shardus.ShardusConfiguration, accountCache: AccountCache) {
+  statemanager_fatal: (key: string, log: string) => void
+
+  constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, crypto: Crypto, config: Shardus.ShardusConfiguration, accountCache: AccountCache) {
     
     this.crypto = crypto
     this.app = app
@@ -50,6 +53,8 @@ class PartitionStats {
     this.fatalLogger = logger.getLogger('fatal')
     this.shardLogger = logger.getLogger('shardDump')
     this.statsLogger = logger.getLogger('statsDump')
+    this.statemanager_fatal = stateManager.statemanager_fatal
+    
     //Init Summary Blobs
     this.summaryPartitionCount = 32
 
@@ -58,8 +63,8 @@ class PartitionStats {
     this.summaryBlobByPartition = new Map()
     this.txSummaryBlobCollections = []
 
-    this.useSeenAccountMap = true
-    this.seenCreatedAccounts = new Map()
+    // this.useSeenAccountMap = true
+    // this.seenCreatedAccounts = new Map()
 
     this.accountCache = accountCache
 

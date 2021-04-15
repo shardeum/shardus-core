@@ -212,9 +212,9 @@ class StateManager {
 
     //INIT our various modules
 
-    this.accountCache = new AccountCache( profiler, app, logger, crypto, config)
+    this.accountCache = new AccountCache(this, profiler, app, logger, crypto, config)
 
-    this.partitionStats = new PartitionStats( profiler, app, logger, crypto, config, this.accountCache)
+    this.partitionStats = new PartitionStats(this, profiler, app, logger, crypto, config, this.accountCache)
     this.partitionStats.summaryPartitionCount = 32
     this.partitionStats.initSummaryBlobs()
 
@@ -2654,14 +2654,15 @@ class StateManager {
     }
     if (allowOlder === true) {
       //cycle is in the past, by process of elimination
-      let offsetSeconds = Math.floor(offsetTimestamp * 0.001)
-      const cycle = this.p2p.state.getCycleByTimestamp(offsetSeconds)
+      // let offsetSeconds = Math.floor(offsetTimestamp * 0.001)
+      const cycle = this.p2p.state.getCycleByTimestamp(offsetTimestamp)
       if (cycle != null) {
         return cycle.cycleNumber
       }
     }
 
     //failed to match, return -1
+    this.statemanager_fatal('getCycleNumberFromTimestamp failed', 'getCycleNumberFromTimestamp failed')
     return -1
   }
 
@@ -2773,7 +2774,7 @@ class StateManager {
 
   statemanager_fatal(key, log) {
     nestedCountersInstance.countEvent('fatal-log', key)
-    this.fatalLogger.fatal(log)
+    this.fatalLogger.fatal(key + ' ' + log)
   }
 }
 

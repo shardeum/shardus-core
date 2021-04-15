@@ -419,13 +419,6 @@ class TransactionRepair {
                 }
               }
 
-              // if (queueEntry.hasAll === true) {
-              //   queueEntry.logstate = 'got all missing data'
-              // } else {
-              //   queueEntry.logstate = 'failed to get data:' + queueEntry.hasAll
-              //   // queueEntry.state = 'failed to get data'
-              // }
-
               if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_result', `${shortHash}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
               
               if(outerloopCount > 1){
@@ -487,11 +480,12 @@ class TransactionRepair {
     let dataRecieved = 0
     let dataApplied = 0
     let failedHash = 0
+    let needUpdateAccounts: { [id: string]: boolean }  = {}
+    let upToDateAccounts: { [id: string]: boolean }  = {}
+    let updatedAccounts: { [id: string]: boolean }  = {}
 
-
+    let shortHash = utils.makeShortHash(txID)
     try {
-      let shortHash = utils.makeShortHash(txID)
-
       // STEP 0: need to find the TX
       let txRequestResult = await this.requestMissingTX(txID, refAccountId)
       if(txRequestResult == null || txRequestResult.success != true){
@@ -542,9 +536,9 @@ class TransactionRepair {
 
       // Build a request object for each key involved.
       // once we have a valid request object add in alternate nodes we could use as a backup
-      let upToDateAccounts: { [id: string]: boolean }  = {}
 
-      let numUpToDateAccounts = 0
+
+      //let numUpToDateAccounts = 0
 
       // STEP 1: build a list of request objects
       for (let key of uniqueKeys) {
@@ -568,9 +562,11 @@ class TransactionRepair {
               if(hashObj != null){
                 if(hashObj.h === hash){
                   upToDateAccounts[id] = true
-                  numUpToDateAccounts++
+                  //numUpToDateAccounts++
                   if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note2', `${shortHash}`, `account ${shortKey} already up to date our: cached:${utils.stringifyReduce(hashObj)}`)
                   break
+                } else {
+                  needUpdateAccounts[id] = true
                 }
               }    
               
@@ -747,6 +743,12 @@ class TransactionRepair {
               let dataCountReturned = 0
               let accountIdsReturned = []
               for (let data of result.stateList) {
+
+                if(updatedAccounts[data.accountId]){
+                  //already updated so skip
+                  continue
+                }
+
                 // let shortKey = utils.stringifyReduce(data.accountId)
                 dataRecieved++
 
@@ -757,6 +759,7 @@ class TransactionRepair {
 
                 if(failedHashes.length === 0){
                   dataApplied++
+                  updatedAccounts[data.accountId] = true
                 } else {
                   failedHash++
                   this.statemanager_fatal(`repairToMatchReceipt_failedhash`, ` tx:${shortHash}  failed:${failedHashes[0]} acc:${shortKey}`)
@@ -854,13 +857,6 @@ class TransactionRepair {
                 }
               }
 
-              // if (queueEntry.hasAll === true) {
-              //   queueEntry.logstate = 'got all missing data'
-              // } else {
-              //   queueEntry.logstate = 'failed to get data:' + queueEntry.hasAll
-              //   // queueEntry.state = 'failed to get data'
-              // }
-
               if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt2_result', `${shortHash}`, `r:${relationString}   result: dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)}   AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
               
               if(outerloopCount > 1){
@@ -893,9 +889,17 @@ class TransactionRepair {
       return true
     } finally {
 
-      if(repairFinished == false){
+      let neededUpdate = Object.keys(needUpdateAccounts ?? {}).length
+      let upToDateCount = Object.keys(upToDateAccounts ?? {}).length
+      let updatedAccountsCount = Object.keys(updatedAccounts ?? {}).length
+      if(neededUpdate === updatedAccountsCount){
+        repairFinished = true
+      }
 
-        this.statemanager_fatal(`repairToMatchReceiptNoRecipt_failed`, `counters:${utils.stringifyReduce({missingTXFound, requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash})} `)
+      if(repairFinished == false){
+        this.statemanager_fatal(`repairToMatchReceiptNoRecipt_failed`, `counters:${utils.stringifyReduce({missingTXFound, requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash,neededUpdate,upToDateCount,updatedAccountsCount})} `)
+      } else {
+        if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt2_success', `tx:${shortHash} keys:${utils.stringifyReduce(Object.keys(needUpdateAccounts) )} counters:${utils.stringifyReduce({missingTXFound, requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash,neededUpdate,upToDateCount,updatedAccountsCount})}`)
       }
       
       this.profiler.profileSectionEnd('repair2')
