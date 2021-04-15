@@ -364,6 +364,7 @@ class TransactionRepair {
                     }
                     // This is correcting the timestamp on the wrapper
                     data.timestamp = updatedTimestamp
+                    
 
                     // update stats
                     this.stateManager.partitionStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, beforeData, data)
@@ -411,6 +412,10 @@ class TransactionRepair {
                       nestedCountersInstance.countEvent('repair1', 'addAccountStates')
                       await this.storage.addAccountStates(stateTableResults)
                     }
+
+                    //update hash
+                    data.stateId = updatedHash
+
                     if (logFlags.debug) this.mainLogger.debug(`repairToMatchReceipt: addAccountStates tx:${shortHash} neededUpdate:${hashNeededUpdate} updateStateTable:${updateStateTable} timeStampMatches:${timeStampMatches} test2:${test2} test3:${test3} test4:${test4} ${utils.stringifyReduce(stateTableResults)}  acc:${shortKey}`)
                   }
 
@@ -449,10 +454,13 @@ class TransactionRepair {
       this.stateManager.dataRepairsCompleted++ //visible to report
     } finally {
 
-      if(queueEntry.repairFinished !== true){
-        queueEntry.repairFailed = true
+      if(queueEntry.repairFinished === true){
 
-        this.statemanager_fatal(`repairToMatchReceipt_failed`, `tx:${queueEntry.logID} counters:${utils.stringifyReduce({requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash})} `)
+
+        queueEntry.hasValidFinalData = true
+      } else {
+        queueEntry.repairFailed = true
+        this.statemanager_fatal(`repairToMatchReceipt_failed`, `tx:${queueEntry.logID} counters:${utils.stringifyReduce({requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash})} `)        
       }
 
       this.profiler.profileSectionEnd('repair')

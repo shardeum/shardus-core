@@ -642,6 +642,8 @@ class TransactionQueue {
     if (preApplyResult) {
       if (logFlags.verbose) this.mainLogger.debug('preApplyAcceptedTransaction SUCCEDED ' + timestamp)
       if (logFlags.playback) this.logger.playbackLogNote('tx_preapplied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
+
+
     } else {
       if (logFlags.playback) this.logger.playbackLogNote('tx_preapply_rejected 3', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
     }
@@ -777,6 +779,7 @@ class TransactionQueue {
         updatedTransactionGroup: null,
         receiptEverRequested: false,
         repairFailed: false,
+        hasValidFinalData: false
       } // age comes from timestamp
 
       // todo faster hash lookup for this maybe?
@@ -1617,6 +1620,11 @@ class TransactionQueue {
         let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
         //only queue this up to share if it is not a global account. global accounts dont need to be shared.
 
+        // not sure if it is correct to update timestamp like this.
+        // if(data.timestamp === 0){
+        //   data.timestamp = queueEntry.acceptedTx.timestamp
+        // }
+
         //if this is not freshly created data then we need to make a backup copy of it!!
         //This prevents us from changing data before the commiting phase
         if (data.accountCreated == false) {
@@ -2105,6 +2113,21 @@ class TransactionQueue {
                     queueEntry.state = 'consensing'
 
                     queueEntry.preApplyTXResult = txResult
+
+                    // make sure our data wrappers are upt to date with the correct hash and timstamp
+                    for(let key of Object.keys(queueEntry.collectedData))  {
+                      let wrappedAccount = queueEntry.collectedData[key]
+                      let {timestamp, hash} = this.app.getTimestampAndHashFromAccount(wrappedAccount.data)
+                      if(wrappedAccount.timestamp != timestamp){
+                        wrappedAccount.timestamp = timestamp
+                        nestedCountersInstance.countEvent('transactionQueue', 'correctedTimestamp')
+                      }
+                      if(wrappedAccount.stateId != hash){
+                        wrappedAccount.stateId = hash
+                        nestedCountersInstance.countEvent('transactionQueue', 'correctedHash')
+                      }
+                    } 
+            
                     //Broadcast our vote
                     if (queueEntry.noConsensus === true) {
                       // not sure about how to share or generate an applied receipt though for a no consensus step
@@ -2114,6 +2137,7 @@ class TransactionQueue {
 
                       queueEntry.state = 'commiting'
 
+                      queueEntry.hasValidFinalData = true
                       // TODO Global receipts?  do we want them?
                       // if(queueEntry.globalModification === false){
                       //   //Send a special receipt because this is a set command.
@@ -2173,6 +2197,7 @@ class TransactionQueue {
                 if (this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, queueEntry.recievedAppliedReceipt)) {
                   if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${shortID}`, `qId: ${queueEntry.entryID} `)
                   queueEntry.state = 'commiting'
+                  queueEntry.hasValidFinalData = true
                   continue
                 } else {
                   if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch2', `${shortID}`, `qId: ${queueEntry.entryID}  `)
@@ -2296,6 +2321,13 @@ class TransactionQueue {
                     this.statemanager_fatal(`processAcceptedTxQueue_commitingRepairedReceipt`, `${shortID} `)
                     nestedCountersInstance.countEvent('processing', 'commiting a repaired TX...')
                   }
+
+                  nestedCountersInstance.countEvent('stateManager', 'committed tx')
+                  if(queueEntry.hasValidFinalData === false){
+                    nestedCountersInstance.countEvent('stateManager', 'commit state fix FinalDataFlag')
+                    queueEntry.hasValidFinalData = true
+                  }
+
 
                   //} finally {
                   this.profiler.profileSectionEnd('commit')

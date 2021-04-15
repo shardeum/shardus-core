@@ -862,9 +862,16 @@ class StateManager {
         // if (recordData.data) recordData.data = JSON.parse(recordData.data)
         // if (recordData.txs) recordData.txs = JSON.parse(recordData.txs) // dont parse this, since it is already the string form we need to write it.
         accountsToAdd.push(recordData)
-        let debugString = `setAccountData: note:${note} acc: ${utils.makeShortHash(accountId)} hash: ${utils.makeShortHash(hash)}`
+        let debugString = `setAccountData: note:${note} acc: ${utils.makeShortHash(accountId)} hash: ${utils.makeShortHash(hash)} ts:${wrapedAccount.timestamp}`
         if (logFlags.debug) this.mainLogger.debug(debugString)
         if (logFlags.verbose) console.log(debugString)
+
+
+        if(wrapedAccount.timestamp === 0){
+          let stack = new Error().stack
+
+          this.statemanager_fatal(`checkAndSetAccountData ts=0`, `checkAndSetAccountData ts=0 ${debugString}    ${stack}` )
+        }
 
         let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
         if (this.accountCache.hasAccount(accountId)) {
@@ -980,6 +987,14 @@ class StateManager {
 
       if (queueEntry == null) {
         response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
+        nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post cant find queue entry')
+        await respond(response)
+        return
+      }
+
+      if(queueEntry.hasValidFinalData === false){
+        response.note = `has queue entry but not final data: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
+        nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post hasValidFinalData==false')
         await respond(response)
         return
       }
@@ -1013,6 +1028,7 @@ class StateManager {
 
           if (accountData.stateId != payload.hash) {
             response.note = `failed accountData.stateId != payload.hash txid: ${utils.makeShortHash(payload.txid)}  ts:${payload.timestamp} hash:${utils.makeShortHash(accountData.stateId)}`
+            nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post failed accountData.stateId != payload.hash txid')
             await respond(response)
             return
           }
@@ -1025,6 +1041,7 @@ class StateManager {
         }
       }
 
+      nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post success')
       response.success = true
       await respond(response)
     })
@@ -2627,8 +2644,14 @@ class StateManager {
    *
    * returns a negative number code if we can not determine the cycle
    */
-  getCycleNumberFromTimestamp(timestamp, allowOlder: boolean = true): number {
+  getCycleNumberFromTimestamp(timestamp : number, allowOlder: boolean = true): number {
     let offsetTimestamp = timestamp + this.syncSettleTime
+
+    if(timestamp < 1){
+      let stack = new Error().stack
+      this.statemanager_fatal(`getCycleNumberFromTimestamp ${timestamp}`, `getCycleNumberFromTimestamp ${timestamp} ,  ${stack}`)
+    }
+
 
     //currentCycleShardData
     if (this.currentCycleShardData.timestamp <= offsetTimestamp && offsetTimestamp < this.currentCycleShardData.timestampEndCycle) {
@@ -2658,6 +2681,10 @@ class StateManager {
       const cycle = this.p2p.state.getCycleByTimestamp(offsetTimestamp)
       if (cycle != null) {
         return cycle.cycleNumber
+      } else {
+        //debug only!!!
+        let cycle2 = this.p2p.state.getCycleByTimestamp(offsetTimestamp)
+
       }
     }
 

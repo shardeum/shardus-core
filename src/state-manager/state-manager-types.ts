@@ -91,6 +91,9 @@ type QueueEntry = {
     debugFail_voteFlip:boolean;
     //short log id
     logID:string;
+
+    //true once our data matches the receipt
+    hasValidFinalData:boolean
 };
 
 type SyncTracker = {
