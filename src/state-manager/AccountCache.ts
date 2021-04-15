@@ -94,10 +94,16 @@ class AccountCache {
       this.statemanager_fatal('updateAccountHash hash=null', 'updateAccountHash hash=null' + stack)
 
     }
-    if(cycle < 0){
+    if(cycle < 0 || cycle == null){
       let stack = new Error().stack
       this.statemanager_fatal(`updateAccountHash cycle == ${cycle}`, `updateAccountHash cycle == ${cycle} ${stack}`)
     }
+
+    //do not leave this on!  spammy!
+    let stack = new Error().stack
+    this.mainLogger.debug(`updateAccountHash: ${utils.stringifyReduce({accountId, hash, timestamp, cycle})}  ${stack}`)
+
+    nestedCountersInstance.countEvent('cache', 'updateAccountHash: start') 
 
     let accountHashCacheHistory: AccountHashCacheHistory
     if (this.accountsHashCache3.accountHashMap.has(accountId) === false) {
@@ -135,6 +141,7 @@ class AccountCache {
 
     if (accountHashList.length === 0) {
       accountHashList.push(accountHashData)
+      nestedCountersInstance.countEvent('cache', 'updateAccountHash: push as first entry') 
     } else {
       if (accountHashList.length > 0) {
         //0 is the most current entry, older entries for older cycles are after that
@@ -147,7 +154,8 @@ class AccountCache {
             current.h = hash
             current.t = timestamp
 
-            updateIsNewerHash = true            
+            updateIsNewerHash = true  
+            nestedCountersInstance.countEvent('cache', 'updateAccountHash: same cycle update')          
           } else {
             nestedCountersInstance.countEvent('cache', 'updateAccountHash: same cycle older timestamp')
           }
@@ -160,6 +168,7 @@ class AccountCache {
             //remove from end.  but only if the data older than the current working cycle
             accountHashList.pop()
           }
+          nestedCountersInstance.countEvent('cache', 'updateAccountHash: new cycle update')  
           updateIsNewerHash = true
         } else {
           // if the cycle is older?
@@ -186,6 +195,9 @@ class AccountCache {
           }
           if(doInsert){
             accountHashList.splice(idx, 0, accountHashData)
+            nestedCountersInstance.countEvent('cache', 'updateAccountHash: old cycle update')  
+          } else {
+            nestedCountersInstance.countEvent('cache', 'updateAccountHash: old cycle no update')  
           }
         }
       }
@@ -261,9 +273,11 @@ class AccountCache {
     if (index === accountHashesSorted.length - 1) {
       accountHashesSorted.push(accountHashData)
       accountIDs.push(accountId)
+      nestedCountersInstance.countEvent('cache', 'insertIntoHistoryList: at end')
     } else {
       accountHashesSorted.splice(index + 1, 0, accountHashData)
       accountIDs.splice(index + 1, 0, accountId)
+      nestedCountersInstance.countEvent('cache', 'insertIntoHistoryList: splice')
     }
     return index
   }
@@ -300,7 +314,7 @@ class AccountCache {
   }
 
   // currently a sync function, dont have correct buffers for async
-  buildPartitionHashesForNode_slow(cycleShardData: CycleShardData): MainHashResults {
+  buildPartitionHashesForNode(cycleShardData: CycleShardData): MainHashResults {
     if (logFlags.verbose) this.mainLogger.debug(`accountsHashCache3 ${cycleShardData.cycleNumber}: ${utils.stringifyReduce(this.accountsHashCache3)}`)
     
     let cycleToProcess = cycleShardData.cycleNumber
@@ -482,7 +496,7 @@ class AccountCache {
 
   // not quite ready what happens when we update a hash value 
   // currently a sync function, dont have correct buffers for async
-  buildPartitionHashesForNode(cycleShardData: CycleShardData): MainHashResults {
+  buildPartitionHashesForNode_fast(cycleShardData: CycleShardData): MainHashResults {
     if (logFlags.verbose) this.mainLogger.debug(`accountsHashCache3 ${cycleShardData.cycleNumber}: ${utils.stringifyReduce(this.accountsHashCache3)}`)
     
     let cycleToProcess = cycleShardData.cycleNumber

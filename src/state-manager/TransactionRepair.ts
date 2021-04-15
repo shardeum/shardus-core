@@ -314,6 +314,8 @@ class TransactionRepair {
                   nestedCountersInstance.countEvent('repair1', 'saving')
                   // let shortKey = utils.stringifyReduce(data.accountId)
 
+                  //cycleToRecordOn = this.stateManager.getCycleNumberFromTimestamp(timestamp)
+
                   if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `write data: ${utils.stringifyReduce(data)}  acc:${shortKey}`)
                   //Commit the data
                   let dataToSet = [data]

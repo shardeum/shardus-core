@@ -492,7 +492,8 @@ class StateManager {
     // this will be a huge log.
     // Temp disable for log size
     // if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${cycleNumber} data: ${utils.stringifyReduce(cycleShardData)}`)
-
+    if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${this.currentCycleShardData.cycleNumber} `)
+    
     this.lastActiveNodeCount = cycleShardData.activeNodes.length
 
     cycleShardData.hasCompleteData = true
@@ -843,12 +844,19 @@ class StateManager {
     for (let wrapedAccount of accountRecords) {
       let { accountId, stateId, data: recordData, timestamp } = wrapedAccount
       let hash = this.app.calculateAccountHash(recordData)
-
+      let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
+      if(cycleToRecordOn == null){
+        this.statemanager_fatal(`checkAndSetAccountData cycleToRecordOn==null`, `checkAndSetAccountData cycleToRecordOn==null ${wrapedAccount.timestamp}` )
+      }
       //TODO per remove this when we are satisfied with the situation
       //Additional testing to cache if we try to overrite with older data
       if (this.accountCache.hasAccount(accountId)) {
         let accountMemData: AccountHashCache = this.accountCache.getAccountHash(accountId)
         if (timestamp < accountMemData.t) {
+          //should update cache anyway (older value may be needed)
+          
+          this.accountCache.updateAccountHash(wrapedAccount.accountId, wrapedAccount.stateId, wrapedAccount.timestamp, cycleToRecordOn)
+
           if (logFlags.error) this.mainLogger.error(`setAccountData: abort. checkAndSetAccountData older timestamp note:${note} acc: ${utils.makeShortHash(accountId)} timestamp:${timestamp} accountMemData.t:${accountMemData.t} hash: ${utils.makeShortHash(hash)} cache:${utils.stringifyReduce(accountMemData)}`)
           continue //this is a major error need to skip the writing.
         }
@@ -873,7 +881,7 @@ class StateManager {
           this.statemanager_fatal(`checkAndSetAccountData ts=0`, `checkAndSetAccountData ts=0 ${debugString}    ${stack}` )
         }
 
-        let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
+        //let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
         if (this.accountCache.hasAccount(accountId)) {
           //TODO STATS BUG..  this is what can cause one form of stats bug.
           //we may have covered this account in the past, then not covered it, and now we cover it again.  Stats doesn't know how to repair
@@ -2647,30 +2655,58 @@ class StateManager {
   getCycleNumberFromTimestamp(timestamp : number, allowOlder: boolean = true): number {
     let offsetTimestamp = timestamp + this.syncSettleTime
 
-    if(timestamp < 1){
+    if(timestamp < 1 || timestamp == null){
       let stack = new Error().stack
       this.statemanager_fatal(`getCycleNumberFromTimestamp ${timestamp}`, `getCycleNumberFromTimestamp ${timestamp} ,  ${stack}`)
     }
 
+    // const cycle = this.p2p.state.getCycleByTimestamp(offsetTimestamp)
+    // if (cycle != null && cycle.counter != null) {
+    //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'first lookup')
+    //   return cycle.counter
+    // }
 
     //currentCycleShardData
     if (this.currentCycleShardData.timestamp <= offsetTimestamp && offsetTimestamp < this.currentCycleShardData.timestampEndCycle) {
-      return this.currentCycleShardData.cycleNumber
+      if(this.currentCycleShardData.cycleNumber == null){
+        this.statemanager_fatal('getCycleNumberFromTimestamp failed. cycleNumber == null', 'this.currentCycleShardData.cycleNumber == null')
+        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber fail')
+        const cycle = this.p2p.state.getCycleByTimestamp(offsetTimestamp)
+        if (cycle != null) {
+          this.statemanager_fatal('getCycleNumberFromTimestamp failed fatal redeemed', 'this.currentCycleShardData.cycleNumber == null, fatal redeemed')
+          nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber redeemed')
+          return cycle.counter
+        } else {
+          //debug only!!!
+          let cycle2 = this.p2p.state.getCycleByTimestamp(offsetTimestamp)
+          this.statemanager_fatal('getCycleNumberFromTimestamp failed fatal not redeemed', 'getCycleByTimestamp cycleNumber == null not redeemed')
+          nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber failed to redeem')
+        }
+      } else {
+        return this.currentCycleShardData.cycleNumber
+      }
+    }
+
+    if(this.currentCycleShardData.cycleNumber == null){
+      nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'this.currentCycleShardData.cycleNumber == null')
+      this.statemanager_fatal('getCycleNumberFromTimestamp: currentCycleShardData.cycleNumber == null',`getCycleNumberFromTimestamp: currentCycleShardData.cycleNumber == null ${this.currentCycleShardData.cycleNumber} timestamp:${timestamp}`)
+
     }
 
     //is it in the future
-    if (this.currentCycleShardData.timestampEndCycle <= offsetTimestamp) {
+    if (offsetTimestamp >= this.currentCycleShardData.timestampEndCycle) {
       let cycle: Shardus.Cycle = this.p2p.state.getLastCycle()
       let endOfNextCycle = this.currentCycleShardData.timestampEndCycle + cycle.duration * 1000
-      if (offsetTimestamp < endOfNextCycle + this.syncSettleTime) {
+      if (offsetTimestamp < endOfNextCycle /*+ this.syncSettleTime*/) {
+        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', '+1')
         return this.currentCycleShardData.cycleNumber + 1
-      } else if (offsetTimestamp < endOfNextCycle + this.syncSettleTime + cycle.duration * 1000) {
+      } else if (offsetTimestamp < endOfNextCycle + /*this.syncSettleTime +*/ cycle.duration * 1000) {
+        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', '+2')
         if (logFlags.error) this.mainLogger.error(`getCycleNumberFromTimestamp fail2: endOfNextCycle:${endOfNextCycle} offsetTimestamp:${offsetTimestamp} timestamp:${timestamp}`)
-
         return this.currentCycleShardData.cycleNumber + 2
       } else {
-        if (logFlags.error) this.mainLogger.error(`getCycleNumberFromTimestamp fail: endOfNextCycle:${endOfNextCycle} offsetTimestamp:${offsetTimestamp} timestamp:${timestamp}`)
-
+        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'too far')
+        this.statemanager_fatal('getCycleNumberFromTimestamp: too far in future',`getCycleNumberFromTimestamp fail: too far in future. endOfNextCycle:${endOfNextCycle} offsetTimestamp:${offsetTimestamp} timestamp:${timestamp}`)
         //too far in the future
         return -2
       }
@@ -2680,16 +2716,23 @@ class StateManager {
       // let offsetSeconds = Math.floor(offsetTimestamp * 0.001)
       const cycle = this.p2p.state.getCycleByTimestamp(offsetTimestamp)
       if (cycle != null) {
-        return cycle.cycleNumber
+        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup')
+        if(cycle.counter == null){
+          this.statemanager_fatal('getCycleNumberFromTimestamp  unexpected cycle.cycleNumber == null', 'getCycleNumberFromTimestamp unexpected cycle.cycleNumber == null')
+          nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `getCycleNumberFromTimestamp unexpected cycle.cycleNumber == null  ${timestamp}`)
+        }
+
+        return cycle.counter
       } else {
+        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail')
         //debug only!!!
         let cycle2 = this.p2p.state.getCycleByTimestamp(offsetTimestamp)
-
+        this.statemanager_fatal('getCycleNumberFromTimestamp getCycleByTimestamp failed', 'getCycleByTimestamp getCycleByTimestamp failed')
       }
     }
 
     //failed to match, return -1
-    this.statemanager_fatal('getCycleNumberFromTimestamp failed', 'getCycleNumberFromTimestamp failed')
+    this.statemanager_fatal('getCycleNumberFromTimestamp failed final', `getCycleNumberFromTimestamp failed final ${timestamp}`)
     return -1
   }
 

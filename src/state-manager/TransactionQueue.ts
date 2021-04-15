@@ -853,6 +853,9 @@ class TransactionQueue {
           if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`routeAndQueueAcceptedTransaction failed to calculate cycle ${timestamp} error code:${txQueueEntry.cycleToRecordOn}`)
           return false
         }
+        if(txQueueEntry.cycleToRecordOn == null){
+          this.statemanager_fatal(`routeAndQueueAcceptedTransaction cycleToRecordOn==null`, `routeAndQueueAcceptedTransaction cycleToRecordOn==null  ${txQueueEntry.logID} ${timestamp}` )
+        }
 
         if (logFlags.playback) this.logger.playbackLogNote('shrd_queueInsertion_start', txQueueEntry.logID, `${txQueueEntry.logID} ${utils.stringifyReduce(txQueueEntry.txKeys)} cycleToRecordOn:${txQueueEntry.cycleToRecordOn}`)
 
@@ -2184,6 +2187,7 @@ class TransactionQueue {
                   // Broadcast the receipt
                   await this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)
                   queueEntry.state = 'commiting'
+                  queueEntry.hasValidFinalData = true
                   continue
                 } else {
                   if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch1', `${shortID}`, `qId: ${queueEntry.entryID}  `)

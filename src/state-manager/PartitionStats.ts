@@ -54,7 +54,7 @@ class PartitionStats {
     this.shardLogger = logger.getLogger('shardDump')
     this.statsLogger = logger.getLogger('statsDump')
     this.statemanager_fatal = stateManager.statemanager_fatal
-    
+
     //Init Summary Blobs
     this.summaryPartitionCount = 32
 
@@ -149,6 +149,7 @@ class PartitionStats {
     //     this.seenCreatedAccounts.set(accountData.accountId, accountMemData)
     // }
 
+    
     if (this.accountCache.hasAccount(accountData.accountId)) {
       return
     }
