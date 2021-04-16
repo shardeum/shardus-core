@@ -68,16 +68,6 @@ class AccountCache {
     this.currentMainHashResults = null
   }
 
-
-  //TODO need a way to give currentCalculationCycle an initial good value!
-
-  // setShardGlobalMap( shardValuesByCycle: Map<number, CycleShardData>) {
-  //   this.shardValuesByCycle = shardValuesByCycle
-  //   // if(this.accountsHashCache3.currentCalculationCycle === -1){
-  //   //   this.accountsHashCache3.currentCalculationCycle = 
-  //   // }
-  // }
-
   ////////////////////////////////
   /**
      * updateAccountHash
@@ -126,8 +116,6 @@ class AccountCache {
       }
     }
 
-    // todo what to do about cycle == -1 !!!!
-    
     let updateIsNewerHash = false
     let onFutureCycle = cycle > this.accountsHashCache3.currentCalculationCycle
     accountHashCacheHistory.lastSeenCycle = cycle
@@ -232,7 +220,9 @@ class AccountCache {
   //question2: queueIndex does not get cleared is that ok? what about when future becomes current should we set lastSeenSortIndex
         // fixes applied.  it ok that it is not clear because we check the cycle the index was set on before using it
   //question3: what is up with currentCalculationCycle, and is it updated in the right spot?
-        // yes this is correct
+        // yes this is correct.  buildPartitionHashesForNode gets called with the last cycle data not the active cycle
+        // at the end of buildPartitionHashesForNode gets set to the working/current cycle.
+        // if TXs come in that are newer they get put in the future list and are not part of the parition hash report yet
 
   insertIntoHistoryList(accountId: string, accountHashData: AccountHashCache, historyList: AccountHashCacheList, lastIndex: number): number {
     let accountHashesSorted: AccountHashCache[] = historyList.accountHashesSorted
@@ -319,17 +309,12 @@ class AccountCache {
     
     let cycleToProcess = cycleShardData.cycleNumber
     let nextCycleToProcess = cycleToProcess + 1
-    //this.accountsHashCache3.currentCalculationCycle = cycleToProcess
 
     let mainHashResults: MainHashResults = {
       cycle: cycleToProcess,
       partitionHashResults: new Map(),
     }
 
-    // let nextWorkingList: AccountHashCacheList = {
-    //   accountHashesSorted: [],
-    //   accountIDs: [],
-    // }
     let nextFutureList: AccountHashCacheList = {
       accountHashesSorted: [],
       accountIDs: [],
@@ -379,7 +364,6 @@ class AccountCache {
 
       let accountHashCacheHistory: AccountHashCacheHistory = this.accountsHashCache3.accountHashMap.get(entry.id)
       accountHashCacheHistory.lastSeenSortIndex = newIndex
-      //accountHashCacheHistory.queueIndex = { id: -1, idx: -1 } 
       newIndex++
     }
 
@@ -420,23 +404,6 @@ class AccountCache {
       partitionHashResults.ids.push(accountID)
       partitionHashResults.hashes.push(accountHashData.h)
       partitionHashResults.timestamps.push(accountHashData.t)
-
-      // //???? is the working list suppose to have everything... I think so
-      // if(accountHashData.c <= nextCycleToProcess){
-      //   //
-      //   //build up our next list
-      //   nextWorkingList.accountHashesSorted.push(accountHashData)
-      //   nextWorkingList.accountIDs.push(accountID)
-
-      //   // TODO is the correct spot to set the index?
-      //   // need to update the lastSeenSortIndex.  This way updates to the list can quickly clear out this spot in the list
-      //   // remember this is the newly formed this.accountsHashCache3.workingHistoryList
-      //   let accountHashCacheHistory: AccountHashCacheHistory = this.accountsHashCache3.accountHashMap.get(accountID)
-      //   accountHashCacheHistory.lastSeenSortIndex = newIndex
-      //   newIndex++
-      // } else{
-      //   nestedCountersInstance.countEvent('cache', 'un-expected future list')
-      // }
     }
 
     // build a hash over all the data hashes per partition
@@ -470,13 +437,6 @@ class AccountCache {
       let accountHashCacheHistory: AccountHashCacheHistory = this.accountsHashCache3.accountHashMap.get(accountID)
       accountHashCacheHistory.queueIndex = { id: accountHashData.c, idx: newIndex} 
       newIndex++
-      // need to update the list index
-      // build up our next list
-      // nextWorkingList.accountHashesSorted.push(accountHashData)
-      // nextWorkingList.accountIDs.push(accountID)
-      // let accountHashCacheHistory: AccountHashCacheHistory = this.accountsHashCache3.accountHashMap.get(accountID)
-      // accountHashCacheHistory.lastSeenSortIndex = newIndex
-      // newIndex++
     }
 
     // update the cycle we are tracking now
@@ -484,18 +444,16 @@ class AccountCache {
 
     this.accountsHashCache3.futureHistoryList = nextFutureList
     // set our new working list and future list.
-    // this.accountsHashCache3.workingHistoryList = nextWorkingList
-    // this.accountsHashCache3.futureHistoryList = {
-    //   accountHashesSorted: [],
-    //   accountIDs: [],
-    // }
     this.currentMainHashResults = mainHashResults
     return mainHashResults
   }
 
 
-  // not quite ready what happens when we update a hash value 
-  // currently a sync function, dont have correct buffers for async
+  // fast version of what is above.  This is what we really need for production
+  // it should be pretty close to working now that other issues with timestamps were fixed.
+  // should test and re-enable it.
+  //    This function is important because it scales much much better than the above as the number
+  //    of accounts gets large.
   buildPartitionHashesForNode_fast(cycleShardData: CycleShardData): MainHashResults {
     if (logFlags.verbose) this.mainLogger.debug(`accountsHashCache3 ${cycleShardData.cycleNumber}: ${utils.stringifyReduce(this.accountsHashCache3)}`)
     
