@@ -83,7 +83,7 @@ class NestedCounters {
 
   }
 
-  countEvent(category1: string, category2: string) {
+  countEvent(category1: string, category2: string, count:number = 1) {
     let counterMap:CounterMap = this.eventCounters
 
     let nextNode:CounterNode = null
@@ -93,7 +93,7 @@ class NestedCounters {
     } else {
       nextNode = counterMap.get(category1)
     }
-    nextNode.count++
+    nextNode.count += count
     counterMap = nextNode.subCounters
 
     //unrolled loop to avoid memory alloc
@@ -104,7 +104,7 @@ class NestedCounters {
       } else {
         nextNode = counterMap.get(category1)
       }
-      nextNode.count++
+      nextNode.count += count
       counterMap = nextNode.subCounters
   }
 

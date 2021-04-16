@@ -1235,6 +1235,20 @@ class StateManager {
 
     if (logFlags.playback) this.logger.playbackLogNote('_firstTimeQueueAwait', `this.transactionQueue.newAcceptedTxQueue.length:${this.transactionQueue.newAcceptedTxQueue.length} this.transactionQueue.newAcceptedTxQueue.length:${this.transactionQueue.newAcceptedTxQueue.length}`)
 
+    // process and keep only TXs that will change local data.
+    let newList = []
+    if (this.transactionQueue.newAcceptedTxQueueTempInjest.length > 0) {
+      for (let txQueueEntry of this.transactionQueue.newAcceptedTxQueueTempInjest) {
+        if(this.transactionQueue.txWillChangeLocalData(txQueueEntry) === true){
+          newList.push(txQueueEntry)
+          nestedCountersInstance.countEvent('stateManager', '_firstTimeQueueAwait kept TX' )
+        } else {
+          nestedCountersInstance.countEvent('stateManager', '_firstTimeQueueAwait discard TX' )
+        }
+      }
+    }  
+    this.transactionQueue.newAcceptedTxQueueTempInjest = newList
+
     await this.transactionQueue.processAcceptedTxQueue()
   }
 
@@ -2702,7 +2716,7 @@ class StateManager {
         return this.currentCycleShardData.cycleNumber + 1
       } else if (offsetTimestamp < endOfNextCycle + /*this.syncSettleTime +*/ cycle.duration * 1000) {
         nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', '+2')
-        if (logFlags.error) this.mainLogger.error(`getCycleNumberFromTimestamp fail2: endOfNextCycle:${endOfNextCycle} offsetTimestamp:${offsetTimestamp} timestamp:${timestamp}`)
+        //if (logFlags.error) this.mainLogger.error(`getCycleNumberFromTimestamp fail2: endOfNextCycle:${endOfNextCycle} offsetTimestamp:${offsetTimestamp} timestamp:${timestamp}`)
         return this.currentCycleShardData.cycleNumber + 2
       } else {
         nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'too far')

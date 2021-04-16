@@ -1804,6 +1804,14 @@ class TransactionQueue {
       // process any new queue entries that were added to the temporary list
       if (this.newAcceptedTxQueueTempInjest.length > 0) {
         for (let txQueueEntry of this.newAcceptedTxQueueTempInjest) {
+
+          if(this.txWillChangeLocalData(txQueueEntry) === true){
+            nestedCountersInstance.countEvent('stateManager', 'processAcceptedTxQueue injest: kept TX' )
+          } else {
+            nestedCountersInstance.countEvent('stateManager', 'processAcceptedTxQueue injest: discard TX' )
+            continue
+          }
+
           let timestamp = txQueueEntry.txKeys.timestamp
           let acceptedTx = txQueueEntry.acceptedTx
           let txId = acceptedTx.receipt.txHash
@@ -2498,6 +2506,48 @@ class TransactionQueue {
     //}
     return debugStr
   }  
+
+  txWillChangeLocalData(queueEntry:QueueEntry) : boolean{
+    if(queueEntry.globalModification){
+      return true
+    }
+    let timestamp = queueEntry.acceptedTx.timestamp
+    let ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
+    for(let key of queueEntry.uniqueWritableKeys){
+
+      if(this.stateManager.accountGlobals.isGlobalAccount(key)){
+        //ignore globals in non global mod tx.
+        continue
+      }
+
+      let hasKey = false
+      let { homePartition } = ShardFunctions.addressToPartition(this.stateManager.currentCycleShardData.shardGlobals, key)
+      let nodeStoresThisPartition = ShardFunctions.testInRange(homePartition, ourNodeData.storedPartitions)
+      // if (queueEntry.patchedOnNodes.has(ourNodeData.node.id)) {
+      //   hasKey = true
+      // }
+      hasKey = nodeStoresThisPartition
+
+      //if(queueEntry.localKeys[key] === true){
+      if(hasKey){
+        let accountHash = this.stateManager.accountCache.getAccountHash(key)
+        if(accountHash != null){
+          // if the timestamp of the TX is newer than any local writeable keys then this tx will change local data
+          if(timestamp > accountHash.t){
+            return true
+          }          
+        } else {
+          //no cache entry means it will do something
+          return true
+        }
+
+      }
+    }
+    return false
+  }
+
+
+
 }
 
 export default TransactionQueue

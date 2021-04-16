@@ -14,6 +14,7 @@ import { time } from 'console'
 import StateManager from '.'
 import { isNullOrUndefined } from 'util'
 import { robustQuery } from '../p2p/Utils'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 const allZeroes64 = '0'.repeat(64)
 
@@ -1476,6 +1477,10 @@ class AccountSync {
       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncFailedAcccounts no failed hashes to sync`)
       return
     }
+
+    nestedCountersInstance.countEvent('sync','syncFailedAcccounts')
+    
+
     if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: syncFailedAcccounts start`)
     let addressList: string[] = []
     for (let accountEntry of this.accountsWithStateConflict) {
@@ -1507,6 +1512,8 @@ class AccountSync {
 
     let message = { accountIds: addressList }
     let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
+
+    nestedCountersInstance.countEvent('sync','syncFailedAcccounts accountsFailed', addressList.length)
 
     if (result == null) {
       if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncFailedAcccounts result == null')
@@ -1548,7 +1555,7 @@ class AccountSync {
     // }, 1000)
     await utils.sleep(1000)
     
-    
+    nestedCountersInstance.countEvent('sync', 'fail and restart')
     //TODO proper restart not useing global var
     await this.syncStateDataForRange(this.currentRange)
   }

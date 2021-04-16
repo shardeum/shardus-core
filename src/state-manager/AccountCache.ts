@@ -100,8 +100,8 @@ class AccountCache {
     }
 
     //do not leave this on!  spammy!
-    let stack = new Error().stack
-    this.mainLogger.debug(`updateAccountHash: ${utils.stringifyReduce({accountId, hash, timestamp, cycle})}  ${stack}`)
+    // let stack = new Error().stack
+    // this.mainLogger.debug(`updateAccountHash: ${utils.stringifyReduce({accountId, hash, timestamp, cycle})}  ${stack}`)
 
     nestedCountersInstance.countEvent('cache', 'updateAccountHash: start') 
 
