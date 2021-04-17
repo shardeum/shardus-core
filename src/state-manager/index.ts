@@ -2738,10 +2738,17 @@ class StateManager {
 
         return cycle.counter
       } else {
-        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail')
+        //nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle')
         //debug only!!!
-        let cycle2 = this.p2p.state.getCycleByTimestamp(offsetTimestamp)
-        this.statemanager_fatal('getCycleNumberFromTimestamp getCycleByTimestamp failed', 'getCycleByTimestamp getCycleByTimestamp failed')
+        //let cycle2 = this.p2p.state.getCycleByTimestamp(offsetTimestamp)
+        //this.statemanager_fatal('getCycleNumberFromTimestamp getCycleByTimestamp failed', 'getCycleByTimestamp getCycleByTimestamp failed')
+        let cycle: Shardus.Cycle = this.p2p.state.getLastCycle()
+        let cycleEstimate = this.currentCycleShardData.cycleNumber - Math.ceil((this.currentCycleShardData.timestampEndCycle - offsetTimestamp) / (cycle.duration * 1000))
+        if(cycleEstimate < 1){
+          cycleEstimate = 1
+        }
+        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle: ' + cycleEstimate)
+        return cycleEstimate
       }
     }
 

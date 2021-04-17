@@ -73,7 +73,12 @@ class TransactionRepair {
 
       this.profiler.profileSectionStart('repair')
       this.profiler.profileSectionStart('repair_init')
-      nestedCountersInstance.countEvent('repair1', 'init')
+
+      if(queueEntry.didSync){
+        nestedCountersInstance.countEvent('repair1', 'init-didSync')
+      } else {
+        nestedCountersInstance.countEvent('repair1', 'init-normal')
+      }
 
       let shortHash = utils.makeShortHash(queueEntry.acceptedTx.id)
       // Need to build a list of what accounts we need, what state they should be in and who to get them from

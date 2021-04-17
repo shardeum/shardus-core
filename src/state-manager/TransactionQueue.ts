@@ -147,7 +147,9 @@ class TransactionQueue {
 
       if (queueEntry == null) {
         // do not gossip this, we are not involved
-        this.statemanager_fatal(`spread_tx_to_group_noQE`, `spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(payload.id)}`)
+        // downgrading, this does not seem to be fatal, but may need further logs/testing
+        //this.statemanager_fatal(`spread_tx_to_group_noQE`, `spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(payload.id)}`)
+        if (logFlags.playback) this.logger.playbackLogNote('spread_tx_to_group_noQE', '', `spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(payload.id)}`)
         return
       }
 

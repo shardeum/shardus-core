@@ -806,6 +806,15 @@ class AccountSync {
         this.profiler.profileSectionStart('repairMissingTX')
         let stateTableData = this.stateTableForMissingTXs[key]
 
+        if(stateTableData == null){
+          nestedCountersInstance.countEvent('sync','repairMissingTXs stateTableData == null')
+          continue
+        }
+        if(stateTableData.txId == null){
+          nestedCountersInstance.countEvent('sync','repairMissingTXs stateTableData.txId == null')
+          continue
+        }
+
         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: repairMissingTXs start: ${utils.stringifyReduce(stateTableData)}`)
         //get receipt for txID
         let result = await this.stateManager.transactionRepair.requestMissingReceipt(stateTableData.txId, Number(stateTableData.txTimestamp), stateTableData.accountId)
