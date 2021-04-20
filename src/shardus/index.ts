@@ -463,6 +463,7 @@ class Shardus extends EventEmitter {
           this.loadDetection
         )
       : null
+    Context.setReporterContext(this.reporter)
 
     this._registerRoutes()
 

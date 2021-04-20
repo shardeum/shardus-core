@@ -11,6 +11,7 @@ import {
 } from '../shardus/shardus-types'
 import StateManager from '../state-manager'
 import Storage from '../storage'
+import Reporter from '../reporter'
 
 export type P2PModuleContext = P2P & EventEmitter
 
@@ -28,6 +29,7 @@ export let defaultConfigs: {
   logs: LogsConfiguration
   storage: StorageConfiguration
 }
+export let reporter: Reporter
 
 export function setP2pContext(context: P2PModuleContext) {
   p2p = context
@@ -59,6 +61,10 @@ export function setStorageContext(context) {
 
 export function setIOContext(context) {
   io = context
+}
+
+export function setReporterContext(context) {
+  reporter = context
 }
 
 export function setConfig(conf) {

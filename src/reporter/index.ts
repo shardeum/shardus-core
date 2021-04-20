@@ -154,6 +154,20 @@ class Reporter {
     }
   }
 
+  async reportSyncStatement(nodeId, syncStatement) {
+    if (!this.hasRecipient) {
+      return
+    }
+    try {
+      await http.post(`${this.config.recipient}/sync-statement`, { nodeId, syncStatement })
+    } catch (e) {
+      if (logFlags.error) this.mainLogger.error(
+        'reportSyncStatement: ' + e.name + ': ' + e.message + ' at ' + e.stack
+      )
+      console.error(e)
+    }
+  }
+
   async reportRemoved(nodeId) {
     if (!this.hasRecipient) {
       return

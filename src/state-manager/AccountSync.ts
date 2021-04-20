@@ -17,6 +17,7 @@ import { robustQuery } from '../p2p/Utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import * as Context from '../p2p/Context'
 import * as Wrapper from '../p2p/Wrapper'
+import * as Self from '../p2p/Self'
 
 const allZeroes64 = '0'.repeat(64)
 
@@ -103,6 +104,7 @@ class AccountSync {
   combinedAccountStateData: Shardus.StateTableObject[]
 
   syncStatement:SyncStatment
+  isSyncStatementCompleted: boolean
 
   constructor(
     stateManager: StateManager,
@@ -171,13 +173,15 @@ class AccountSync {
 
       internalFlag:false
     }
+    this.isSyncStatementCompleted = false
 
+    console.log("this.p2p", this.p2p)
   }
   // ////////////////////////////////////////////////////////////////////
   //   DATASYNC
   // ////////////////////////////////////////////////////////////////////
 
-  // this clears state data related to the current partion we are syncing.
+  // this clears state data related to the current partion we are syncinge
   clearSyncData() {
     // These are all for the given partition
     this.addressRange = null
@@ -290,8 +294,7 @@ class AccountSync {
       await respond(result)
     })
 
-
-    this.p2p.network.registerExternalGet('sync-statement', (req, res) => {
+    Context.network.registerExternalGet('sync-statement', (req, res) => {
  
       res.write(`${utils.stringifyReduce(this.syncStatement)}\n`)
      
@@ -300,30 +303,34 @@ class AccountSync {
 
 
     //TODO DEBUG DO NOT USE IN LIVE NETWORK
-    this.p2p.network.registerExternalGet('sync-statement-all', (req, res) => {
+    Context.network.registerExternalGet('sync-statement-all',async (req, res) => {
       res.write(`oops did not work out\n`)    
-      // try{
-      //   //wow, why does Context.p2p not work..
-      //   let activeNodes = Wrapper.p2p.state.getNodes()
-      //   if(activeNodes){
-      //     for(let node of activeNodes.values()){
-      //       let getResp = await this.logger._internalHackGetWithResp(`${node.externalIp}:${node.externalPort}/sync-statement`)
-      //       //res.write(`${node.externalIp}:${node.externalPort}/sync-statement\n`)
-      //     }        
-      //   }
-      //   res.write(`joining nodes...\n`)  
-      //   let joiningNodes = Wrapper.p2p.state.getNodesRequestingJoin()
-      //   if(joiningNodes){
-      //     for(let node of joiningNodes.values()){
-      //       let getResp = await this.logger._internalHackGetWithResp(`${node.externalIp}:${node.externalPort}/sync-statement`)
-      //       //res.write(`${node.externalIp}:${node.externalPort}/sync-statement\n`)
-      //     }        
-      //   }
+      try{
+         //wow, why does Context.p2p not work..
+         let activeNodes = Wrapper.p2p.state.getNodes()
+         if(activeNodes){
+           for(let node of activeNodes.values()){
+             let getResp = await this.logger._internalHackGetWithResp(`${node.externalIp}:${node.externalPort}/sync-statement`)
+             console.log("getResp active", getResp.body)
+             res.write(`${node.externalIp}:${node.externalPort}/sync-statement\n`)
+             res.write(getResp.body ? getResp.body : 'no data')
+           }        
+         }
+         res.write(`joining nodes...\n`)  
+         let joiningNodes = Wrapper.p2p.state.getNodesRequestingJoin()
+         if(joiningNodes){
+           for(let node of joiningNodes.values()){
+             let getResp = await this.logger._internalHackGetWithResp(`${node.externalIp}:${node.externalPort}/sync-statement`)
+             console.log("getResp syncing", getResp.body)
+             res.write(`${node.externalIp}:${node.externalPort}/sync-statement\n`)
+             res.write(getResp.body ? getResp.body : 'no data')
+           }        
+         }
 
-      //   res.write(`sending default logs to all nodes\n`)        
-      // } catch(e){
-      //   res.write(`${e}\n`) 
-      // }
+         res.write(`sending default logs to all nodes\n`)        
+       } catch(e){
+         res.write(`${e}\n`) 
+       }
 
       res.end()
     })
@@ -575,8 +582,6 @@ class AccountSync {
 
       return
     }
-
-
 
     this.isSyncingAcceptedTxs = true
 
@@ -1950,6 +1955,9 @@ class AccountSync {
 
   syncStatmentIsComplete(){
     // place to hook in and read or send the sync statement
+    this.isSyncStatementCompleted = true
+    Context.reporter.reportSyncStatement(Self.id, this.syncStatement)
+
 
   }
 
