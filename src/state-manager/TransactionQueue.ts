@@ -755,6 +755,7 @@ class TransactionQueue {
         localCachedData: {},
         syncCounter: 0,
         didSync: false,
+        queuedBeforeMainSyncComplete:false,
         didWakeup: false,
         syncKeys: [],
         logstate: '',
@@ -830,11 +831,7 @@ class TransactionQueue {
 
       try {
         let age = Date.now() - timestamp
-        if (age > this.stateManager.queueSitTime * 0.9) {
-          this.statemanager_fatal(`routeAndQueueAcceptedTransaction_olderTX`, 'routeAndQueueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
-          // TODO consider throwing this out.  right now it is just a warning
-          if (logFlags.playback) this.logger.playbackLogNote('shrd_oldQueueInsertion', '', 'routeAndQueueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
-        }
+
         let keyHash: StringBoolObjectMap = {}
         for (let key of txQueueEntry.txKeys.allKeys) {
           if (key == null) {
@@ -852,6 +849,7 @@ class TransactionQueue {
         // calculate information needed for receiptmap
         txQueueEntry.cycleToRecordOn = this.stateManager.getCycleNumberFromTimestamp(timestamp)
         if (txQueueEntry.cycleToRecordOn < 0) {
+          nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'caused Enqueue fail')
           if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`routeAndQueueAcceptedTransaction failed to calculate cycle ${timestamp} error code:${txQueueEntry.cycleToRecordOn}`)
           return false
         }
@@ -879,6 +877,12 @@ class TransactionQueue {
           }
         }
 
+        // slightly different flag that didsync.  This is less about if our address range was done syncing (which can happen any time)
+        // and just a simple check to see if this was queued before the main sync phase.
+        // for now, just used for more detailed logging so we can sort out if problem TXs were from shortly before we were fully done
+        // but after a sync range was finished, (used shortly below in the age check)
+        txQueueEntry.queuedBeforeMainSyncComplete = this.stateManager.accountSync.dataSyncMainPhaseComplete 
+
         // Check to see if any keys are inside of a syncing range.
         // If it is a global key in a non-globalModification TX then we dont care about it
         for (let key of txQueueEntry.uniqueKeys) {
@@ -893,6 +897,20 @@ class TransactionQueue {
             txQueueEntry.syncKeys.push(key) // used later to instruct what local data we should JIT load
             txQueueEntry.localKeys[key] = true // used for the filter
             if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.logID}`, `${txQueueEntry.logID} qId: ${txQueueEntry.entryID} account:${utils.stringifyReduce(key)}`)
+          }
+        }
+
+        if (age > this.stateManager.queueSitTime * 0.9) {
+          if(txQueueEntry.didSync === true){
+            nestedCountersInstance.countEvent('stateManager', `enqueue old TX didSync === true queuedBeforeMainSyncComplete:${txQueueEntry.queuedBeforeMainSyncComplete}`)
+          } else {
+            nestedCountersInstance.countEvent('stateManager', `enqueue old TX didSync === false queuedBeforeMainSyncComplete:${txQueueEntry.queuedBeforeMainSyncComplete}`)
+            if(txQueueEntry.queuedBeforeMainSyncComplete){
+              //only a fatal if it was after the main sync phase was complete.
+              this.statemanager_fatal(`routeAndQueueAcceptedTransaction_olderTX`, 'routeAndQueueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
+              // TODO consider throwing this out.  right now it is just a warning
+              if (logFlags.playback) this.logger.playbackLogNote('shrd_oldQueueInsertion', '', 'routeAndQueueAcceptedTransaction working on older tx ' + timestamp + ' age: ' + age)
+            }
           }
         }
 

@@ -722,10 +722,23 @@ class StateManager {
     // update the debug tag and restart the queue
     this.dataPhaseTag = 'ACTIVE: '
     this.accountSync.dataSyncMainPhaseComplete = true
+    //update sync statement
+    this.accountSync.syncStatement.syncComplete = true
+    this.accountSync.syncStatement.cycleEnded = this.currentCycleShardData.cycleNumber
+    this.accountSync.syncStatement.numCycles = this.accountSync.syncStatement.cycleEnded - this.accountSync.syncStatement.cycleStarted
 
 
-    //update sync trackers.  This may put some things back in the queue
-    //this.accountSync.updateRuntimeSyncTrackers()  //edit maybe better to wait until th next cycle when we are fully in the network.
+    this.accountSync.syncStatement.syncEndTime = Date.now()
+    this.accountSync.syncStatement.syncSeconds = (this.accountSync.syncStatement.syncEndTime - this.accountSync.syncStatement.syncStartTime) / 1000
+
+    nestedCountersInstance.countEvent('sync', `sync comlete numCycles: ${this.accountSync.syncStatement.numCycles} start:${this.accountSync.syncStatement.cycleStarted} end:${this.accountSync.syncStatement.cycleEnded}`)
+    if(this.accountSync.syncStatement.internalFlag === true){
+      if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_syncStatement', ` `, `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
+      this.statemanager_fatal('shrd_sync_syncStatement-tempdebug', `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
+      this.accountSync.syncStatmentIsComplete()
+    } else{
+      this.accountSync.syncStatement.internalFlag = true
+    }
 
     this.tryStartAcceptedQueue()
 
@@ -1242,14 +1255,24 @@ class StateManager {
         if(this.transactionQueue.txWillChangeLocalData(txQueueEntry) === true){
           newList.push(txQueueEntry)
           nestedCountersInstance.countEvent('stateManager', '_firstTimeQueueAwait kept TX' )
+          this.accountSync.syncStatement.nonDiscardedTXs++
         } else {
           nestedCountersInstance.countEvent('stateManager', '_firstTimeQueueAwait discard TX' )
+          this.accountSync.syncStatement.discardedTXs++
         }
       }
     }  
     this.transactionQueue.newAcceptedTxQueueTempInjest = newList
 
     await this.transactionQueue.processAcceptedTxQueue()
+
+    if(this.accountSync.syncStatement.internalFlag === true){
+      if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_syncStatement', ` `, `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
+      this.statemanager_fatal('shrd_sync_syncStatement-tempdebug', `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
+      this.accountSync.syncStatmentIsComplete()
+    } else{
+      this.accountSync.syncStatement.internalFlag = true
+    }
   }
 
   /**

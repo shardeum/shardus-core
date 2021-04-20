@@ -15,9 +15,36 @@ import StateManager from '.'
 import { isNullOrUndefined } from 'util'
 import { robustQuery } from '../p2p/Utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import * as Context from '../p2p/Context'
+import * as Wrapper from '../p2p/Wrapper'
 
 const allZeroes64 = '0'.repeat(64)
 
+type SyncStatment = {
+  cycleStarted:number;
+  cycleEnded:number;
+  numCycles:number;
+  syncComplete:boolean;
+  numNodesOnStart:number;
+
+  syncStartTime:number;
+  syncEndTime:number;
+  syncSeconds:number;
+
+  failedAccountLoops:number;
+  failedAccounts:number;
+  failAndRestart:number;
+  discardedTXs:number;
+  nonDiscardedTXs:number;
+
+  numSyncedState:number;
+  numAccounts:number;
+  numGlobalAccounts:number;
+
+
+
+  internalFlag:boolean; // makes sure we dont write logs until two sections of async code have both been hit
+}
 class AccountSync {
   stateManager: StateManager
   app: Shardus.App
@@ -75,6 +102,8 @@ class AccountSync {
 
   combinedAccountStateData: Shardus.StateTableObject[]
 
+  syncStatement:SyncStatment
+
   constructor(
     stateManager: StateManager,
     
@@ -116,6 +145,33 @@ class AccountSync {
     this.acceptedTXByHash = {}
 
     this.clearSyncData()
+
+
+    this.syncStatement = {
+      cycleStarted:-1,
+      cycleEnded:-1,
+      numCycles:-1,
+      syncComplete:false,  
+      numNodesOnStart:0,    
+      
+      syncStartTime:0,
+      syncEndTime:0,
+      syncSeconds:0,
+
+      failedAccountLoops:0,
+      failedAccounts:0,
+      failAndRestart:0,
+
+      discardedTXs:0,
+      nonDiscardedTXs:0,
+
+      numSyncedState:0,
+      numAccounts:0,
+      numGlobalAccounts:0,
+
+      internalFlag:false
+    }
+
   }
   // ////////////////////////////////////////////////////////////////////
   //   DATASYNC
@@ -233,6 +289,46 @@ class AccountSync {
       result.accountData = accountData
       await respond(result)
     })
+
+
+    this.p2p.network.registerExternalGet('sync-statement', (req, res) => {
+ 
+      res.write(`${utils.stringifyReduce(this.syncStatement)}\n`)
+     
+      res.end()
+    })
+
+
+    //TODO DEBUG DO NOT USE IN LIVE NETWORK
+    this.p2p.network.registerExternalGet('sync-statement-all', (req, res) => {
+      res.write(`oops did not work out\n`)    
+      // try{
+      //   //wow, why does Context.p2p not work..
+      //   let activeNodes = Wrapper.p2p.state.getNodes()
+      //   if(activeNodes){
+      //     for(let node of activeNodes.values()){
+      //       let getResp = await this.logger._internalHackGetWithResp(`${node.externalIp}:${node.externalPort}/sync-statement`)
+      //       //res.write(`${node.externalIp}:${node.externalPort}/sync-statement\n`)
+      //     }        
+      //   }
+      //   res.write(`joining nodes...\n`)  
+      //   let joiningNodes = Wrapper.p2p.state.getNodesRequestingJoin()
+      //   if(joiningNodes){
+      //     for(let node of joiningNodes.values()){
+      //       let getResp = await this.logger._internalHackGetWithResp(`${node.externalIp}:${node.externalPort}/sync-statement`)
+      //       //res.write(`${node.externalIp}:${node.externalPort}/sync-statement\n`)
+      //     }        
+      //   }
+
+      //   res.write(`sending default logs to all nodes\n`)        
+      // } catch(e){
+      //   res.write(`${e}\n`) 
+      // }
+
+      res.end()
+    })
+
+
   }
 
 
@@ -242,9 +338,11 @@ class AccountSync {
    */
   skipSync() {
     this.dataSyncMainPhaseComplete = true
+    this.syncStatement.syncComplete = true
 
     this.readyforTXs = true
     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: isFirstSeed = true. skipping sync`)
+
     return
   }
 
@@ -450,13 +548,35 @@ class AccountSync {
     // Dont sync if first node
     if (this.p2p.isFirstSeed) {
       this.dataSyncMainPhaseComplete = true
+      this.syncStatement.syncComplete = true
 
       this.globalAccountsSynced = true
       this.stateManager.accountGlobals.hasknownGlobals = true
       this.readyforTXs = true
       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: isFirstSeed = true. skipping sync`)
+
+      // various sync statement stats are zeroed out because we are the first node and dont sync
+      this.syncStatement.cycleStarted = 0
+      this.syncStatement.cycleEnded = 0
+      this.syncStatement.numCycles = 1
+      
+
+      this.syncStatement.syncSeconds = 0
+      this.syncStatement.syncStartTime = Date.now()
+      this.syncStatement.syncEndTime = this.syncStatement.syncStartTime
+      this.syncStatement.numNodesOnStart = 0
+
+      nestedCountersInstance.countEvent('sync', `sync comlete numCycles: ${this.syncStatement.numCycles} start:${this.syncStatement.cycleStarted} end:${this.syncStatement.cycleEnded}`)
+      
+      if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_syncStatement', ` `, `${utils.stringifyReduce(this.syncStatement)}`)
+      this.statemanager_fatal('shrd_sync_syncStatement-tempdebug', `${utils.stringifyReduce(this.syncStatement)}`)
+      
+      this.syncStatmentIsComplete()
+
       return
     }
+
+
 
     this.isSyncingAcceptedTxs = true
 
@@ -495,6 +615,11 @@ class AccountSync {
         }
       }
     }
+
+    this.syncStatement.cycleStarted = this.stateManager.currentCycleShardData.cycleNumber
+    this.syncStatement.syncStartTime = Date.now()
+    this.syncStatement.numNodesOnStart = this.stateManager.currentCycleShardData.activeNodes.length
+
     let nodeShardData = this.stateManager.currentCycleShardData.nodeShardData
     if (logFlags.console) console.log('GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
 
@@ -986,7 +1111,7 @@ class AccountSync {
 
       let failedHashes = await this.stateManager.checkAndSetAccountData(dataToSet, 'syncStateDataGlobals', true)
 
-      //this.stateManager.partitionStats.statsDataSummaryInit(dataToSet)
+      this.syncStatement.numGlobalAccounts += dataToSet.length
 
       if (logFlags.console) console.log('DBG goodAccounts', goodAccounts)
 
@@ -1319,6 +1444,8 @@ class AccountSync {
       // If the hash matches then update our Account State Table with the data
       await this.storage.addAccountStates(this.combinedAccountStateData) // keep in memory copy for faster processing...
       this.inMemoryStateTableData = this.inMemoryStateTableData.concat(this.combinedAccountStateData)
+
+      this.syncStatement.numSyncedState += this.combinedAccountStateData.length
     }
   }
 
@@ -1488,7 +1615,7 @@ class AccountSync {
     }
 
     nestedCountersInstance.countEvent('sync','syncFailedAcccounts')
-    
+    this.syncStatement.failedAccountLoops++
 
     if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: syncFailedAcccounts start`)
     let addressList: string[] = []
@@ -1523,6 +1650,7 @@ class AccountSync {
     let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
 
     nestedCountersInstance.countEvent('sync','syncFailedAcccounts accountsFailed', addressList.length)
+    this.syncStatement.failedAccounts += addressList.length
 
     if (result == null) {
       if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncFailedAcccounts result == null')
@@ -1565,6 +1693,8 @@ class AccountSync {
     await utils.sleep(1000)
     
     nestedCountersInstance.countEvent('sync', 'fail and restart')
+    this.syncStatement.failAndRestart++
+
     //TODO proper restart not useing global var
     await this.syncStateDataForRange(this.currentRange)
   }
@@ -1782,6 +1912,8 @@ class AccountSync {
 
     //this.stateManager.partitionStats.statsDataSummaryInit(goodAccounts)
 
+    this.syncStatement.numAccounts += goodAccounts.length
+
     if (failedHashes.length > 1000) {
       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
       // state -> try another node. TODO record/eval/report blame?
@@ -1816,6 +1948,12 @@ class AccountSync {
     this.combinedAccountData = [] // we can clear this now.
   }
 
+  syncStatmentIsComplete(){
+    // place to hook in and read or send the sync statement
+
+  }
+
+
   /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   /***
    *    ##    ## ######## ##      ##       ########    ###     ######  ########        ######  ##    ## ##    ##  ######
@@ -1831,7 +1969,7 @@ class AccountSync {
     // Dont sync if first node
     if (this.p2p.isFirstSeed) {
       this.dataSyncMainPhaseComplete = true
-
+      this.syncStatement.syncComplete = true
       this.globalAccountsSynced = true
       this.stateManager.accountGlobals.hasknownGlobals = true
       this.readyforTXs = true

@@ -415,9 +415,29 @@ class Logger {
         //parseJson: (text:string)=>{},
         //json: false, // the whole reason for _internalHackGet was because we dont want the text response to mess things up
                      //  and as a debug non shipping endpoint did not want to add optional parameters to http module
-      })      
+      })   
+      
     } catch(e) {
 
+    }
+
+  }
+  async _internalHackGetWithResp(url:string){
+    let normalized = this._normalizeUrl(url)
+    let host = parseUrl(normalized, true)
+    try{
+      const res = await got.get(host, {
+        timeout: 7000,   
+        retry: 0,  
+        throwHttpErrors: false,
+        //parseJson: (text:string)=>{},
+        //json: false, // the whole reason for _internalHackGet was because we dont want the text response to mess things up
+                     //  and as a debug non shipping endpoint did not want to add optional parameters to http module
+      })   
+      
+      return res
+    } catch(e) {
+      return null
     }
 
   }

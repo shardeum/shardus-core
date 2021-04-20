@@ -30,6 +30,7 @@ type QueueEntry = {
     localCachedData: any;
     syncCounter: number;
     didSync: boolean;
+    queuedBeforeMainSyncComplete: boolean; // todo debug related, so we may want to remove it to save mememory eventually
     didWakeup: boolean;
     txGroupDebug: string;
     syncKeys: any[];
