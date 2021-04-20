@@ -94,7 +94,9 @@ type QueueEntry = {
     logID:string;
 
     //true once our data matches the receipt
-    hasValidFinalData:boolean
+    hasValidFinalData:boolean;
+
+    pendingDataRequest:boolean;
 };
 
 type SyncTracker = {

@@ -782,7 +782,8 @@ class TransactionQueue {
         updatedTransactionGroup: null,
         receiptEverRequested: false,
         repairFailed: false,
-        hasValidFinalData: false
+        hasValidFinalData: false,
+        pendingDataRequest: false
       } // age comes from timestamp
 
       // todo faster hash lookup for this maybe?
@@ -1128,6 +1129,11 @@ class TransactionQueue {
       return
     }
 
+    if(queueEntry.pendingDataRequest === true){
+      return
+    }
+    queueEntry.pendingDataRequest = true
+
     nestedCountersInstance.countEvent('processing', 'queueEntryRequestMissingData-start')
 
     if (!queueEntry.requests) {
@@ -1272,6 +1278,10 @@ class TransactionQueue {
       nestedCountersInstance.countEvent('processing', 'queueEntryRequestMissingData-success')
     } else {
       nestedCountersInstance.countEvent('processing', 'queueEntryRequestMissingData-failed')
+
+      //give up and wait for receipt
+      queueEntry.waitForReceiptOnly = true
+      queueEntry.state = 'consensing'
     }
   }
 
@@ -2094,6 +2104,11 @@ class TransactionQueue {
             // check if we have all accounts
             if (queueEntry.hasAll === false && txAge > timeM2) {
               this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
+
+              if(queueEntry.pendingDataRequest === true){
+                //early out after marking seen, because we are already asking for data
+                continue
+              }
 
               if (this.queueEntryHasAllData(queueEntry) === true) {
                 // I think this can't happen
