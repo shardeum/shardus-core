@@ -1948,7 +1948,9 @@ class AccountSync {
       }
     }
 
-    await this.stateManager.writeCombinedAccountDataToBackups(goodAccounts, failedHashes)
+    let accountsSaved = await this.stateManager.writeCombinedAccountDataToBackups(goodAccounts, failedHashes)
+
+    nestedCountersInstance.countEvent('sync',`accounts written`, accountsSaved)
 
     this.combinedAccountData = [] // we can clear this now.
   }

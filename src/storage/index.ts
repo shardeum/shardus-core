@@ -19,6 +19,7 @@ import P2PApoptosis = require('../p2p/Apoptosis')
 interface Storage {
   profiler: Profiler
   mainLogger: Log4js.Logger
+  fatalLogger: Log4js.Logger
   storage: Sqlite3Storage
   stateManager: StateManager
   storageModels: any
@@ -42,6 +43,7 @@ class Storage {
     this.profiler = profiler
 
     this.mainLogger = logger.getLogger('main')
+    this.fatalLogger = logger.getLogger('fatal')
     // this.storage = new SequelizeStorage(models, config, logger, baseDir, this.profiler)
 
     // this.storage = new BetterSqlite3Storage(models, config, logger, baseDir, this.profiler)
@@ -551,17 +553,10 @@ class Storage {
       await this._create(this.storageModels.accountStates, accountStates, {
         createOrReplace: true,
       })
-
-      // throw new Error('test failue. fake')
     } catch (e) {
-      // this.mainLogger.fatal('addAccountStates error ' + JSON.stringify(e))
-      // throw new Error(e)
-
-      this.mainLogger.fatal(
+      this.fatalLogger.fatal(
         'addAccountStates db failure.  start apoptosis ' + JSON.stringify(e)
       )
-      // stop state manager from syncing?
-
       this.stateManager.initApoptosisAndQuitSyncing('addAccountStates')
     }
   }

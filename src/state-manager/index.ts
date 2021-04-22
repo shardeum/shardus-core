@@ -756,10 +756,10 @@ class StateManager {
    * writeCombinedAccountDataToBackups
    * @param failedHashes This is a list of hashes that failed and should be ignored in the write operation.
    */
-  async writeCombinedAccountDataToBackups(goodAccounts: Shardus.WrappedData[], failedHashes: string[]) {
+  async writeCombinedAccountDataToBackups(goodAccounts: Shardus.WrappedData[], failedHashes: string[]) : Promise<number> {
     // ?:{[id:string]: boolean}
     if (failedHashes.length === 0 && goodAccounts.length === 0) {
-      return // nothing to do yet
+      return 0 // nothing to do yet
     }
 
     let failedAccountsById: { [id: string]: boolean } = {}
@@ -793,6 +793,8 @@ class StateManager {
 
     // await this.storage.createAccountCopies(accountCopies)
     await this.storage.createOrReplaceAccountCopy(accountCopies)
+
+    return accountCopies.length
   }
 
   // This will make calls to app.getAccountDataByRange but if we are close enough to real time it will query any newer data and return lastUpdateNeeded = true
@@ -2539,6 +2541,10 @@ class StateManager {
     let log = `initApoptosisAndQuitSyncing ${utils.getTime('s')}  ${logMsg}`
     if (logFlags.console) console.log(log)
     if (logFlags.error) this.mainLogger.error(log)
+
+    let stack = new Error().stack
+    this.statemanager_fatal('initApoptosisAndQuitSyncing', `initApoptosisAndQuitSyncing ${logMsg} ${stack}` )
+
     this.accountSync.failAndDontRestartSync()
     this.p2p.initApoptosis()
   }
@@ -2743,7 +2749,8 @@ class StateManager {
         return this.currentCycleShardData.cycleNumber + 2
       } else {
         nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'too far')
-        this.statemanager_fatal('getCycleNumberFromTimestamp: too far in future',`getCycleNumberFromTimestamp fail: too far in future. endOfNextCycle:${endOfNextCycle} offsetTimestamp:${offsetTimestamp} timestamp:${timestamp}`)
+        this.statemanager_fatal('getCycleNumberFromTimestamp: too far in future',`getCycleNumberFromTimestamp fail: too far in future. endOfNextCycle:${endOfNextCycle} 
+          offsetTimestamp:${offsetTimestamp} timestamp:${timestamp} now:${Date.now()} end of cycle age: ${(Date.now() - endOfNextCycle)/1000}`)
         //too far in the future
         return -2
       }
