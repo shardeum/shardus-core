@@ -2739,21 +2739,28 @@ class StateManager {
     //is it in the future
     if (offsetTimestamp >= this.currentCycleShardData.timestampEndCycle) {
       let cycle: Shardus.Cycle = this.p2p.state.getLastCycle()
-      let endOfNextCycle = this.currentCycleShardData.timestampEndCycle + cycle.duration * 1000
-      if (offsetTimestamp < endOfNextCycle /*+ this.syncSettleTime*/) {
-        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', '+1')
-        return this.currentCycleShardData.cycleNumber + 1
-      } else if (offsetTimestamp < endOfNextCycle + /*this.syncSettleTime +*/ cycle.duration * 1000) {
-        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', '+2')
-        //if (logFlags.error) this.mainLogger.error(`getCycleNumberFromTimestamp fail2: endOfNextCycle:${endOfNextCycle} offsetTimestamp:${offsetTimestamp} timestamp:${timestamp}`)
-        return this.currentCycleShardData.cycleNumber + 2
-      } else {
-        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'too far')
-        this.statemanager_fatal('getCycleNumberFromTimestamp: too far in future',`getCycleNumberFromTimestamp fail: too far in future. endOfNextCycle:${endOfNextCycle} 
-          offsetTimestamp:${offsetTimestamp} timestamp:${timestamp} now:${Date.now()} end of cycle age: ${(Date.now() - endOfNextCycle)/1000}`)
-        //too far in the future
-        return -2
-      }
+
+      let timePastCurrentCycle = offsetTimestamp - this.currentCycleShardData.timestampEndCycle
+      let cyclesAhead = Math.ceil(timePastCurrentCycle / (cycle.duration * 1000))
+      nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `+${cyclesAhead}`)
+
+      return this.currentCycleShardData.cycleNumber + cyclesAhead
+
+      // let endOfNextCycle = this.currentCycleShardData.timestampEndCycle + cycle.duration * 1000
+      // if (offsetTimestamp < endOfNextCycle /*+ this.syncSettleTime*/) {
+      //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', '+1')
+      //   return this.currentCycleShardData.cycleNumber + 1
+      // } else if (offsetTimestamp < endOfNextCycle + /*this.syncSettleTime +*/ cycle.duration * 1000) {
+      //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', '+2')
+      //   //if (logFlags.error) this.mainLogger.error(`getCycleNumberFromTimestamp fail2: endOfNextCycle:${endOfNextCycle} offsetTimestamp:${offsetTimestamp} timestamp:${timestamp}`)
+      //   return this.currentCycleShardData.cycleNumber + 2
+      // } else {
+      //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'too far')
+      //   this.statemanager_fatal('getCycleNumberFromTimestamp: too far in future',`getCycleNumberFromTimestamp fail: too far in future. endOfNextCycle:${endOfNextCycle} 
+      //     offsetTimestamp:${offsetTimestamp} timestamp:${timestamp} now:${Date.now()} end of cycle age: ${(Date.now() - endOfNextCycle)/1000}`)
+      //   //too far in the future
+      //   return -2
+      // }
     }
     if (allowOlder === true) {
       //cycle is in the past, by process of elimination
