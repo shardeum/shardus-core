@@ -155,6 +155,8 @@ class StateManager {
 
   sleepInterrupt: any // see interruptibleSleep.  todo type this, or clean out
 
+  lastShardCalculationTS: number
+
   /***
    *     ######   #######  ##    ##  ######  ######## ########  ##     ##  ######  ########  #######  ########
    *    ##    ## ##     ## ###   ## ##    ##    ##    ##     ## ##     ## ##    ##    ##    ##     ## ##     ##
@@ -291,6 +293,8 @@ class StateManager {
 
     this.accountSync.isSyncingAcceptedTxs = true // default is true so we will start adding to our tx queue asap
 
+    this.lastShardCalculationTS = -1
+
     this.startShardCalculations()
 
     //if (logFlags.playback) this.logger.playbackLogNote('canDataRepair', `0`, `canDataRepair: ${this.canDataRepair}  `)
@@ -378,6 +382,28 @@ class StateManager {
     }
 
     let cycleShardData = {} as CycleShardData
+
+    // lets make sure shard calculation are happening at a consistent interval
+    let calculationTime = Date.now()
+    if(this.lastShardCalculationTS > 0){
+      let delay = calculationTime - this.lastShardCalculationTS
+
+      if(delay > 5000){
+        this.statemanager_fatal(`updateShardValues-delay > 5s ${delay/1000}`, `updateShardValues-delay ${delay/1000}`)
+      }
+      else if(delay > 4000){
+        nestedCountersInstance.countEvent('stateManager', 'updateShardValues delay > 4s')
+      }      
+      else if(delay > 3000){
+        nestedCountersInstance.countEvent('stateManager', 'updateShardValues delay > 3s')
+      }
+      else if(delay > 2000){
+        nestedCountersInstance.countEvent('stateManager', 'updateShardValues delay > 2s')
+      }
+
+      cycleShardData.calculationTime = calculationTime
+    }
+    this.lastShardCalculationTS = calculationTime
 
     // todo get current cycle..  store this by cycle?
     cycleShardData.nodeShardDataMap = new Map()
@@ -1290,7 +1316,9 @@ class StateManager {
 
     let ourNodeShardData: NodeShardData = this.currentCycleShardData.nodeShardData
     // partittions:
-    let partitionDump: DebugDumpPartitions = { partitions: [], cycle: 0, rangesCovered: {} as DebugDumpRangesCovered, nodesCovered: {} as DebugDumpNodesCovered, allNodeIds: [], globalAccountIDs: [], globalAccountSummary: [], globalStateHash: '' }
+    let partitionDump: DebugDumpPartitions = { partitions: [], cycle: 0, rangesCovered: {} as DebugDumpRangesCovered, 
+    nodesCovered: {} as DebugDumpNodesCovered, allNodeIds: [], globalAccountIDs: [], globalAccountSummary: [], 
+    globalStateHash: '', calculationTime: this.currentCycleShardData.calculationTime }
     partitionDump.cycle = this.currentCycleShardData.cycleNumber
 
     // todo port this to a static stard function!
@@ -1422,7 +1450,9 @@ class StateManager {
 
     let ourNodeShardData: NodeShardData = this.currentCycleShardData.nodeShardData
     // partittions:
-    let partitionDump: DebugDumpPartitions = { partitions: [], cycle: 0, rangesCovered: {} as DebugDumpRangesCovered, nodesCovered: {} as DebugDumpNodesCovered, allNodeIds: [], globalAccountIDs: [], globalAccountSummary: [], globalStateHash: '' }
+    let partitionDump: DebugDumpPartitions = { partitions: [], cycle: 0, rangesCovered: {} as DebugDumpRangesCovered, 
+    nodesCovered: {} as DebugDumpNodesCovered, allNodeIds: [], globalAccountIDs: [], globalAccountSummary: [], 
+    globalStateHash: '', calculationTime: this.currentCycleShardData.calculationTime }
     partitionDump.cycle = this.currentCycleShardData.cycleNumber
 
     // todo port this to a static stard function!

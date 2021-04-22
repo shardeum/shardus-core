@@ -146,6 +146,8 @@ type CycleShardData = {
      * list of stored parititions
      */
     ourStoredPartitions?: number[];
+
+    calculationTime:number;
 };
 /**
  * a partition object
