@@ -233,6 +233,12 @@ class TransactionConsenus {
       return null
     }
 
+    // be smart an only recalculate votes when we see a new vote show up.
+    if(queueEntry.newVotes === false){
+      return null
+    }
+    queueEntry.newVotes = false
+
     let passCount = 0
     let failCount = 0
 
@@ -255,6 +261,7 @@ class TransactionConsenus {
         passed = false
       }
     }
+
     // TODO STATESHARDING4 There isn't really an analysis of account_state_hash_after.  seems like we should make sure the hashes match up
     //   type AppliedVote = {
     //     txid: string;
@@ -499,6 +506,7 @@ class TransactionConsenus {
     // just add the vote if we dont have any yet
     if (numVotes === 0) {
       queueEntry.collectedVotes.push(vote)
+      queueEntry.newVotes = true
       return true
     }
 
@@ -513,6 +521,7 @@ class TransactionConsenus {
     }
 
     queueEntry.collectedVotes.push(vote)
+    queueEntry.newVotes = true
 
     return true
   }

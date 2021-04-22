@@ -57,6 +57,7 @@ type QueueEntry = {
     // Consensus tracking:
     ourVote? : AppliedVote;
     collectedVotes : AppliedVote[];
+    newVotes : boolean
     // receipt that we created
     appliedReceipt?: AppliedReceipt;
     

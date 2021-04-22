@@ -783,7 +783,8 @@ class TransactionQueue {
         receiptEverRequested: false,
         repairFailed: false,
         hasValidFinalData: false,
-        pendingDataRequest: false
+        pendingDataRequest: false,
+        newVotes: false,
       } // age comes from timestamp
 
       // todo faster hash lookup for this maybe?
