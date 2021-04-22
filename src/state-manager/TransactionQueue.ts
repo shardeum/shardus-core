@@ -1798,10 +1798,11 @@ class TransactionQueue {
    *    ##        ##    ##  ##     ## ##    ## ##       ##    ## ##    ##
    *    ##        ##     ##  #######   ######  ########  ######   ######
    */
-  async processAcceptedTxQueue() {
+  async processAcceptedTxQueue(firstTime:boolean = false) {
     let seenAccounts: SeenAccounts
     seenAccounts = {}
     let pushedProfilerTag = null
+    let startTime = Date.now()
     try {
       this.profiler.profileSectionStart('processQ')
 
@@ -2472,6 +2473,21 @@ class TransactionQueue {
         this.profiler.profileSectionEnd(`process-${pushedProfilerTag}`)
         this.profiler.profileSectionEnd(`process-patched1-${pushedProfilerTag}`)
         pushedProfilerTag = null
+      }
+
+      let processTime = Date.now() - startTime
+      if(processTime > 10000){
+        nestedCountersInstance.countEvent('stateManager', 'processTime > 10s')
+        this.statemanager_fatal(`processAcceptedTxQueue excceded time ${processTime/1000} firstTime:${firstTime}`, `processAcceptedTxQueue excceded time ${processTime/1000} firstTime:${firstTime}`)
+      }
+      else if(processTime > 5000){
+        nestedCountersInstance.countEvent('stateManager', 'processTime > 5s')
+      }      
+      else if(processTime > 5000){
+        nestedCountersInstance.countEvent('stateManager', 'processTime > 2s')
+      }
+      else if(processTime > 1000){
+        nestedCountersInstance.countEvent('stateManager', 'processTime > 1s')
       }
 
       // restart loop if there are still elements in it

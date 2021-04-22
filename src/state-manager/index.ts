@@ -386,7 +386,7 @@ class StateManager {
     // lets make sure shard calculation are happening at a consistent interval
     let calculationTime = Date.now()
     if(this.lastShardCalculationTS > 0){
-      let delay = calculationTime - this.lastShardCalculationTS
+      let delay = (calculationTime - this.lastShardCalculationTS) - (this.config.p2p.cycleDuration * 1000)
 
       if(delay > 5000){
         this.statemanager_fatal(`updateShardValues-delay > 5s ${delay/1000}`, `updateShardValues-delay ${delay/1000}`)
@@ -1292,7 +1292,7 @@ class StateManager {
     }  
     this.transactionQueue.newAcceptedTxQueueTempInjest = newList
 
-    await this.transactionQueue.processAcceptedTxQueue()
+    await this.transactionQueue.processAcceptedTxQueue(true)
 
     if(this.accountSync.syncStatement.internalFlag === true){
       if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_syncStatement', ` `, `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
