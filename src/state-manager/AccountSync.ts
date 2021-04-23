@@ -106,6 +106,8 @@ class AccountSync {
   syncStatement:SyncStatment
   isSyncStatementCompleted: boolean
 
+  
+
   constructor(
     stateManager: StateManager,
     
@@ -928,6 +930,9 @@ class AccountSync {
   }
 
   async repairMissingTXs(){
+
+    nestedCountersInstance.countEvent('sync','repairMissingTXs')
+
     let keys = Object.keys(this.stateTableForMissingTXs)
 
     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: repairMissingTXs begin: ${keys.length} ${utils.stringifyReduce(keys)}`)
@@ -1602,6 +1607,12 @@ class AccountSync {
   }
 
   failedAccountsRemain() : boolean{
+
+    // clean out account conflicts based on what TXs we we have in the queue that we can repair.
+    // also mark tx for scheduled repair..  
+
+    // failed counts went way down after fixing liberdus end of things so putting this optimization on hold.
+
     if(this.accountsWithStateConflict.length === 0 && this.missingAccountData.length === 0){
       return false
     }

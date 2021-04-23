@@ -824,8 +824,48 @@ class StateManager {
   }
 
   // This will make calls to app.getAccountDataByRange but if we are close enough to real time it will query any newer data and return lastUpdateNeeded = true
+  async getAccountDataByRangeSmart_App(accountStart: string, accountEnd: string, tsStart: number, maxRecords: number): Promise<GetAccountDataByRangeSmart> {
+    let tsEnd = Date.now()
+    let wrappedAccounts = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart, tsEnd, maxRecords)
+    let lastUpdateNeeded = false
+    let wrappedAccounts2: WrappedStateArray = []
+    let highestTs = 0
+    let delta = 0
+    // do we need more updates
+    if (wrappedAccounts.length === 0) {
+      lastUpdateNeeded = true
+    } else {
+      // see if our newest record is new enough
+      highestTs = 0
+      for (let account of wrappedAccounts) {
+        if (account.timestamp > highestTs) {
+          highestTs = account.timestamp
+        }
+      }
+      delta = tsEnd - highestTs
+      // if the data we go was close enough to current time then we are done
+      // may have to be carefull about how we tune this value relative to the rate that we make this query
+      // we should try to make this query more often then the delta.
+      if (logFlags.verbose) console.log('delta ' + delta)
+      // increased allowed delta to allow for a better chance to catch up  
+      if (delta < this.queueSitTime * 2) {
+        let tsStart2 = highestTs
+        wrappedAccounts2 = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart2, Date.now(), 10000000)
+        lastUpdateNeeded = true
+      }
+    }
+    return { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs, delta }
+  }
+
+  // This will make calls to app.getAccountDataByRange but if we are close enough to real time it will query any newer data and return lastUpdateNeeded = true
   async getAccountDataByRangeSmart(accountStart: string, accountEnd: string, tsStart: number, maxRecords: number): Promise<GetAccountDataByRangeSmart> {
     let tsEnd = Date.now()
+
+    // todo convert this to use account backup data, then compare perf vs app as num accounts grows past 10k
+
+    // alternate todo: query it all from the app then create a smart streaming wrapper that persists between calls and even
+    // handles updates to day by putting updated data at the end of the list with updated data wrappers.
+
     let wrappedAccounts = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart, tsEnd, maxRecords)
     let lastUpdateNeeded = false
     let wrappedAccounts2: WrappedStateArray = []

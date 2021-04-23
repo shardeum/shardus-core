@@ -489,6 +489,11 @@ class TransactionQueue {
           if (logFlags.verbose) this.mainLogger.debug('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
         }
         await this.storage.addAccountStates(stateTableResults)
+        //want to confirm that we pretty much alway take this branch
+        //pretty sure we would not have this data now
+        nestedCountersInstance.countEvent('stateManager', 'txCommit hasOldStateTable = false')
+      } else {
+        nestedCountersInstance.countEvent('stateManager', 'txCommit hasOldStateTable = true')
       }
 
       // post validate that state ended up correctly?
