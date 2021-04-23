@@ -1894,9 +1894,25 @@ class TransactionQueue {
       let lastLog = 0
       currentIndex++ //increment once so we can handle the decrement at the top of the loop and be safe about continue statements
 
+      let lastRest = Date.now()
       while (this.newAcceptedTxQueue.length > 0) {
         // update current time with each pass through the loop
         currentTime = Date.now()
+
+        if(currentTime - lastRest > 1000){
+          //add a brief sleep if we have been in this loop for a long time
+          nestedCountersInstance.countEvent('processing','forcedSleep')
+          await utils.sleep(5) //5ms sleep
+          lastRest = currentTime
+
+          if(currentTime - this.stateManager.currentCycleShardData.calculationTime > ((this.config.p2p.cycleDuration * 1000) + 5000)){
+            nestedCountersInstance.countEvent('processing','old cycle data >5s past due')
+          }       
+          if(currentTime - this.stateManager.currentCycleShardData.calculationTime > ((this.config.p2p.cycleDuration * 1000) + 11000)){
+            nestedCountersInstance.countEvent('processing','very old cycle data >11s past due')
+            return //loop will restart.
+          }    
+        }
 
         //Handle an odd case where the finally did not catch exiting scope.
         if (pushedProfilerTag != null) {
@@ -2488,7 +2504,7 @@ class TransactionQueue {
       else if(processTime > 5000){
         nestedCountersInstance.countEvent('stateManager', 'processTime > 5s')
       }      
-      else if(processTime > 5000){
+      else if(processTime > 2000){
         nestedCountersInstance.countEvent('stateManager', 'processTime > 2s')
       }
       else if(processTime > 1000){
