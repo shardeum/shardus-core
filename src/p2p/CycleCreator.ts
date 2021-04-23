@@ -1,5 +1,6 @@
 import deepmerge from 'deepmerge'
 import { Logger } from 'log4js'
+import { logFlags } from '../logger'
 import * as Snapshot from '../snapshot'
 import * as utils from '../utils'
 // don't forget to add new modules here
@@ -20,7 +21,6 @@ import * as Self from './Self'
 import * as Sync from './Sync'
 import { GossipHandler, InternalHandler, SignedObject } from './Types'
 import { compareQuery, Comparison } from './Utils'
-import {logFlags} from '../logger'
 
 /** TYPES */
 
@@ -121,6 +121,10 @@ const timers = {}
 
 // Keeps track of the last saved record in the DB in order to update it
 let lastSavedData: CycleRecord
+
+// Keeps track of consecutive fetchLatestCycle fails to initiate apoptosis if it happens too many times
+let fetchLatestRecordFails = 0
+const maxFetchLatestRecordFails = 5
 
 /** ROUTES */
 
@@ -251,7 +255,7 @@ async function cycleCreator() {
   // Set current quater to 0 while we are setting up the previous record
   //   Routes should use this to not process and just single-forward gossip
   currentQuarter = 0
-  if(logFlags.p2pNonFatal){
+  if (logFlags.p2pNonFatal) {
     info(`C${currentCycle} Q${currentQuarter}`)
     info(`madeCycle: ${madeCycle} bestMarker: ${bestMarker}`)
   }
@@ -336,10 +340,10 @@ async function cycleCreator() {
 function runQ1() {
   currentQuarter = 1
   Self.emitter.emit('cycle_q1_start')
-  if(logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
+  if (logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
 
   // Tell submodules to sign and send their requests
-  if(logFlags.p2pNonFatal) info('Triggering submodules to send requests...')
+  if (logFlags.p2pNonFatal) info('Triggering submodules to send requests...')
   for (const submodule of submodules) submodule.sendRequests()
 }
 
@@ -349,7 +353,7 @@ function runQ1() {
 function runQ2() {
   currentQuarter = 2
   Self.emitter.emit('cycle_q2_start')
-  if(logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
+  if (logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
 }
 
 /**
@@ -396,7 +400,7 @@ function runQ2() {
 async function runQ3() {
   currentQuarter = 3
   Self.emitter.emit('cycle_q3_start')
-  if(logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
+  if (logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
 
   // Get txs and create this cycle's record, marker, and cert
   txs = collectCycleTxs()
@@ -447,7 +451,7 @@ async function runQ3() {
  */
 async function runQ4() {
   currentQuarter = 4
-  if(logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
+  if (logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
 
   // Don't do cert comparison if you didn't make the cycle
   // [TODO] - maybe we should still compare if we have bestCert since we may have got it from gossip
@@ -474,7 +478,8 @@ async function runQ4() {
     }
   } while (!matched)
 
-  if(logFlags.p2pNonFatal) info(`
+  if (logFlags.p2pNonFatal)
+    info(`
     Certified cycle record: ${JSON.stringify(record)}
     Certified cycle marker: ${JSON.stringify(marker)}
     Certified cycle cert: ${JSON.stringify(cert)}
@@ -542,7 +547,7 @@ function makeCycleCert(marker: CycleMarker): CycleCert {
 }
 
 async function compareCycleMarkers(myC: number, myQ: number, desired: number) {
-  if(logFlags.p2pNonFatal) info('Comparing cycle markers...')
+  if (logFlags.p2pNonFatal) info('Comparing cycle markers...')
 
   // Init vars
   let matches = 0
@@ -655,12 +660,19 @@ async function fetchLatestRecord(): Promise<CycleRecord> {
     if (CycleChain.newest.counter <= oldCounter) {
       // We didn't actually sync
       warn('CycleCreator: fetchLatestRecord: synced record not newer')
+      fetchLatestRecordFails++
+      if (fetchLatestRecordFails > maxFetchLatestRecordFails)
+        Apoptosis.apoptosizeSelf()
       return null
     }
   } catch (err) {
     warn('CycleCreator: fetchLatestRecord: syncNewCycles failed:', err)
+    fetchLatestRecordFails++
+    if (fetchLatestRecordFails > maxFetchLatestRecordFails)
+      Apoptosis.apoptosizeSelf()
     return null
   }
+  fetchLatestRecordFails = 0
   return CycleChain.newest
 }
 
@@ -1078,11 +1090,11 @@ async function gossipMyCycleCert() {
 
   // We may have already received certs from other other nodes so gossip only if our cert improves it
   // madeCert = true  // not used
-  if(logFlags.p2pNonFatal) info('About to improveBestCert with our cert...')
+  if (logFlags.p2pNonFatal) info('About to improveBestCert with our cert...')
   if (improveBestCert([cert], record)) {
     // don't need the following line anymore since improveBestCert sets bestRecord if it improved
     // bestRecord = record
-    if(logFlags.p2pNonFatal) info('bestRecord was set to our record')
+    if (logFlags.p2pNonFatal) info('bestRecord was set to our record')
     await gossipCycleCert()
   }
 }

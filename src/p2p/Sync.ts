@@ -206,11 +206,19 @@ type SyncNode = Partial<
 export async function syncNewCycles(activeNodes: SyncNode[]) {
   let newestCycle = await getNewestCycle(activeNodes)
   warn(`myNewest=${CycleChain.newest.counter} netNewest=${newestCycle.counter}`)
+
+  const progressHistory = 5
+  const maxAttempts = 10
+  let progress = []
+  let attempt = 0
+
   while (CycleChain.newest.counter < newestCycle.counter) {
     const nextCycles = await getCycles(
       activeNodes,
       CycleChain.newest.counter + 1 // [DONE] maybe we should +1 so that we don't get the record we already have
     )
+
+    const oldCounter = CycleChain.newest.counter
     for (const nextCycle of nextCycles) {
       //      CycleChain.validate(CycleChain.newest, newestCycle)
       if (CycleChain.validate(CycleChain.newest, nextCycle))
@@ -225,6 +233,20 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
       //        a timeout to run syncNewCycles function again. Maybe also through away
       //        the most recent record we have in case it was bad.
     }
+    const newCounter = CycleChain.newest.counter
+
+    // Check progress history and number of attempts to stop tight loops
+    progress[attempt % progressHistory] = newCounter - oldCounter
+    if (progress.reduce((prev, curr) => prev + curr, 0) <= 0) {
+      warn(`syncNewCycles: no progress in the last ${progressHistory} attempts`)
+      return
+    }
+    if (attempt >= maxAttempts - 1) {
+      warn(`syncNewCycles: exceeded max ${maxAttempts} attempts`)
+      return
+    }
+
+    attempt++
     newestCycle = await getNewestCycle(activeNodes)
   }
 }
@@ -280,7 +302,7 @@ export async function getNewestCycle(
   let redundancy = 1
   if (activeNodes.length > 5) redundancy = 2
   if (activeNodes.length > 10) redundancy = 3
-  const {topResult:response, winningNodes:_responders} = await robustQuery(
+  const { topResult: response, winningNodes: _responders } = await robustQuery(
     activeNodes,
     queryFn,
     eqFn,
@@ -325,7 +347,7 @@ async function getCycles(
   let redundancy = 1
   if (activeNodes.length > 5) redundancy = 2
   if (activeNodes.length > 10) redundancy = 3
-  const {topResult:response, winningNodes:_responders} = await robustQuery(
+  const { topResult: response, winningNodes: _responders } = await robustQuery(
     activeNodes,
     queryFn,
     util.isDeepStrictEqual,
@@ -337,8 +359,7 @@ async function getCycles(
   const cycles = response as CycleCreator.CycleRecord[]
 
   const valid = validateCycles(cycles)
-  if (valid)
-    return cycles
+  if (valid) return cycles
 }
 
 export function activeNodeCount(cycle: CycleCreator.CycleRecord) {
