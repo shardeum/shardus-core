@@ -581,6 +581,16 @@ class AccountSync {
     if (logFlags.console) console.log('syncStateData end' + '   time:' + Date.now())
   }
 
+  /***
+   *     ######  ##    ## ##    ##  ######   ######  ########    ###    ######## ######## ########     ###    ########    ###    ########  #######  ########  ########     ###    ##    ##  ######   ########
+   *    ##    ##  ##  ##  ###   ## ##    ## ##    ##    ##      ## ##      ##    ##       ##     ##   ## ##      ##      ## ##   ##       ##     ## ##     ## ##     ##   ## ##   ###   ## ##    ##  ##
+   *    ##         ####   ####  ## ##       ##          ##     ##   ##     ##    ##       ##     ##  ##   ##     ##     ##   ##  ##       ##     ## ##     ## ##     ##  ##   ##  ####  ## ##        ##
+   *     ######     ##    ## ## ## ##        ######     ##    ##     ##    ##    ######   ##     ## ##     ##    ##    ##     ## ######   ##     ## ########  ########  ##     ## ## ## ## ##   #### ######
+   *          ##    ##    ##  #### ##             ##    ##    #########    ##    ##       ##     ## #########    ##    ######### ##       ##     ## ##   ##   ##   ##   ######### ##  #### ##    ##  ##
+   *    ##    ##    ##    ##   ### ##    ## ##    ##    ##    ##     ##    ##    ##       ##     ## ##     ##    ##    ##     ## ##       ##     ## ##    ##  ##    ##  ##     ## ##   ### ##    ##  ##
+   *     ######     ##    ##    ##  ######   ######     ##    ##     ##    ##    ######## ########  ##     ##    ##    ##     ## ##        #######  ##     ## ##     ## ##     ## ##    ##  ######   ########
+   */
+
   /**
    * syncStateDataForRange
    * syncs accountData with the help of stateTable data for a given address range
@@ -671,6 +681,20 @@ class AccountSync {
     }
   }
 
+  /***
+   *     ######  ##    ## ##    ##  ######   ######  ########    ###    ######## ######## ########     ###    ########    ###     ######   ##        #######  ########     ###    ##        ######
+   *    ##    ##  ##  ##  ###   ## ##    ## ##    ##    ##      ## ##      ##    ##       ##     ##   ## ##      ##      ## ##   ##    ##  ##       ##     ## ##     ##   ## ##   ##       ##    ##
+   *    ##         ####   ####  ## ##       ##          ##     ##   ##     ##    ##       ##     ##  ##   ##     ##     ##   ##  ##        ##       ##     ## ##     ##  ##   ##  ##       ##
+   *     ######     ##    ## ## ## ##        ######     ##    ##     ##    ##    ######   ##     ## ##     ##    ##    ##     ## ##   #### ##       ##     ## ########  ##     ## ##        ######
+   *          ##    ##    ##  #### ##             ##    ##    #########    ##    ##       ##     ## #########    ##    ######### ##    ##  ##       ##     ## ##     ## ######### ##             ##
+   *    ##    ##    ##    ##   ### ##    ## ##    ##    ##    ##     ##    ##    ##       ##     ## ##     ##    ##    ##     ## ##    ##  ##       ##     ## ##     ## ##     ## ##       ##    ##
+   *     ######     ##    ##    ##  ######   ######     ##    ##     ##    ##    ######## ########  ##     ##    ##    ##     ##  ######   ########  #######  ########  ##     ## ########  ######
+   */
+
+  /**
+   * syncStateDataGlobals
+   * @param syncTracker
+   */
   async syncStateDataGlobals(syncTracker: SyncTracker) {
     try {
       let partition = 'globals!'
@@ -849,6 +873,19 @@ class AccountSync {
     this.globalAccountsSynced = true
   }
 
+  /***
+   *     ######   ######## ######## ########   #######  ########  ##     ##  ######  ########  ######   ##        #######  ########     ###    ##       ########  ######## ########   #######  ########  ########
+   *    ##    ##  ##          ##    ##     ## ##     ## ##     ## ##     ## ##    ##    ##    ##    ##  ##       ##     ## ##     ##   ## ##   ##       ##     ## ##       ##     ## ##     ## ##     ##    ##
+   *    ##        ##          ##    ##     ## ##     ## ##     ## ##     ## ##          ##    ##        ##       ##     ## ##     ##  ##   ##  ##       ##     ## ##       ##     ## ##     ## ##     ##    ##
+   *    ##   #### ######      ##    ########  ##     ## ########  ##     ##  ######     ##    ##   #### ##       ##     ## ########  ##     ## ##       ########  ######   ########  ##     ## ########     ##
+   *    ##    ##  ##          ##    ##   ##   ##     ## ##     ## ##     ##       ##    ##    ##    ##  ##       ##     ## ##     ## ######### ##       ##   ##   ##       ##        ##     ## ##   ##      ##
+   *    ##    ##  ##          ##    ##    ##  ##     ## ##     ## ##     ## ##    ##    ##    ##    ##  ##       ##     ## ##     ## ##     ## ##       ##    ##  ##       ##        ##     ## ##    ##     ##
+   *     ######   ########    ##    ##     ##  #######  ########   #######   ######     ##     ######   ########  #######  ########  ##     ## ######## ##     ## ######## ##         #######  ##     ##    ##
+   */
+  /**
+   * getRobustGlobalReport
+   *
+   */
   async getRobustGlobalReport(): Promise<GlobalAccountReportResp> {
     // this.p2p.registerInternal('get_globalaccountreport', async (payload:any, respond: (arg0: GlobalAccountReportResp) => any) => {
     //   let result = {combinedHash:"", accounts:[]} as GlobalAccountReportResp
@@ -932,6 +969,22 @@ class AccountSync {
     return result as GlobalAccountReportResp
   }
 
+  /***
+   *     ######  ##    ## ##    ##  ######   ######  ########    ###    ######## ######## ########    ###    ########  ##       ######## ########     ###    ########    ###
+   *    ##    ##  ##  ##  ###   ## ##    ## ##    ##    ##      ## ##      ##    ##          ##      ## ##   ##     ## ##       ##       ##     ##   ## ##      ##      ## ##
+   *    ##         ####   ####  ## ##       ##          ##     ##   ##     ##    ##          ##     ##   ##  ##     ## ##       ##       ##     ##  ##   ##     ##     ##   ##
+   *     ######     ##    ## ## ## ##        ######     ##    ##     ##    ##    ######      ##    ##     ## ########  ##       ######   ##     ## ##     ##    ##    ##     ##
+   *          ##    ##    ##  #### ##             ##    ##    #########    ##    ##          ##    ######### ##     ## ##       ##       ##     ## #########    ##    #########
+   *    ##    ##    ##    ##   ### ##    ## ##    ##    ##    ##     ##    ##    ##          ##    ##     ## ##     ## ##       ##       ##     ## ##     ##    ##    ##     ##
+   *     ######     ##    ##    ##  ######   ######     ##    ##     ##    ##    ########    ##    ##     ## ########  ######## ######## ########  ##     ##    ##    ##     ##
+   */
+  /**
+   * syncStateTableData
+   * @param lowAddress
+   * @param highAddress
+   * @param startTime
+   * @param endTime
+   */
   async syncStateTableData(lowAddress: string, highAddress: string, startTime: number, endTime: number) {
     let searchingForGoodData = true
 
@@ -1166,6 +1219,20 @@ class AccountSync {
     }
   }
 
+  /***
+   *     ######  ##    ## ##    ##  ######     ###     ######   ######   #######  ##     ## ##    ## ######## ########     ###    ########    ###
+   *    ##    ##  ##  ##  ###   ## ##    ##   ## ##   ##    ## ##    ## ##     ## ##     ## ###   ##    ##    ##     ##   ## ##      ##      ## ##
+   *    ##         ####   ####  ## ##        ##   ##  ##       ##       ##     ## ##     ## ####  ##    ##    ##     ##  ##   ##     ##     ##   ##
+   *     ######     ##    ## ## ## ##       ##     ## ##       ##       ##     ## ##     ## ## ## ##    ##    ##     ## ##     ##    ##    ##     ##
+   *          ##    ##    ##  #### ##       ######### ##       ##       ##     ## ##     ## ##  ####    ##    ##     ## #########    ##    #########
+   *    ##    ##    ##    ##   ### ##    ## ##     ## ##    ## ##    ## ##     ## ##     ## ##   ###    ##    ##     ## ##     ##    ##    ##     ##
+   *     ######     ##    ##    ##  ######  ##     ##  ######   ######   #######   #######  ##    ##    ##    ########  ##     ##    ##    ##     ##
+   */
+  /**
+   * syncAccountData
+   * @param lowAddress
+   * @param highAddress
+   */
   async syncAccountData(lowAddress: string, highAddress: string) {
     // Sync the Account data
     //   Use the /get_account_data API to get the data from the Account Table using any of the nodes that had a matching hash
@@ -1302,13 +1369,15 @@ class AccountSync {
     }
   }
 
-  // Process the Account data
-  //   For each account in the Account data make sure the entry in the Account State Table has the same State_after value; if not remove the record from the Account data
-  //   For each account in the Account State Table make sure the entry in Account data has the same State_after value; if not save the account id to be looked up later
-  //   Use the App.set_account_data function with the Account data to save the data to the application Accounts Table; if any failed accounts are returned save the account id to be looked up later
-
-  // State data = {accountId, txId, txTimestamp, stateBefore, stateAfter}
-  // accountData is in the form [{accountId, stateId, data}] for n accounts.
+  /**
+   * processAccountData
+   *   // Process the Account data
+   * //   For each account in the Account data make sure the entry in the Account State Table has the same State_after value; if not remove the record from the Account data
+   * //   For each account in the Account State Table make sure the entry in Account data has the same State_after value; if not save the account id to be looked up later
+   * //   Use the App.set_account_data function with the Account data to save the data to the application Accounts Table; if any failed accounts are returned save the account id to be looked up later
+   * // State data = {accountId, txId, txTimestamp, stateBefore, stateAfter}
+   * // accountData is in the form [{accountId, stateId, data}] for n accounts.
+   */
   async processAccountData() {
     this.missingAccountData = []
     this.mapAccountData = {}
@@ -1548,6 +1617,18 @@ class AccountSync {
     this.combinedAccountData = [] // we can clear this now.
   }
 
+  /***
+   *    ########  ########   #######   ######  ########  ######   ######     ###     ######   ######   #######  ##     ## ##    ## ######## ########     ###    ########    ###
+   *    ##     ## ##     ## ##     ## ##    ## ##       ##    ## ##    ##   ## ##   ##    ## ##    ## ##     ## ##     ## ###   ##    ##    ##     ##   ## ##      ##      ## ##
+   *    ##     ## ##     ## ##     ## ##       ##       ##       ##        ##   ##  ##       ##       ##     ## ##     ## ####  ##    ##    ##     ##  ##   ##     ##     ##   ##
+   *    ########  ########  ##     ## ##       ######    ######   ######  ##     ## ##       ##       ##     ## ##     ## ## ## ##    ##    ##     ## ##     ##    ##    ##     ##
+   *    ##        ##   ##   ##     ## ##       ##             ##       ## ######### ##       ##       ##     ## ##     ## ##  ####    ##    ##     ## #########    ##    #########
+   *    ##        ##    ##  ##     ## ##    ## ##       ##    ## ##    ## ##     ## ##    ## ##    ## ##     ## ##     ## ##   ###    ##    ##     ## ##     ##    ##    ##     ##
+   *    ##        ##     ##  #######   ######  ########  ######   ######  ##     ##  ######   ######   #######   #######  ##    ##    ##    ########  ##     ##    ##    ##     ##
+   */
+  /**
+   * failedAccountsRemain
+   */
   failedAccountsRemain(): boolean {
     // clean out account conflicts based on what TXs we we have in the queue that we can repair.
     // also mark tx for scheduled repair..
@@ -1560,11 +1641,26 @@ class AccountSync {
     return true
   }
 
-  // Sync the failed accounts
-  //   Log that some account failed
-  //   Use the /get_account_data_by_list API to get the data for the accounts that need to be looked up later from any of the nodes that had a matching hash but different from previously used nodes
-  //   Repeat the “Sync the Account State Table Second Pass” step
-  //   Repeat the “Process the Account data” step
+  /***
+   *     ######  ##    ## ##    ##  ######  ########    ###    #### ##       ######## ########     ###     ######   ######   ######   #######  ##     ## ##    ## ########  ######
+   *    ##    ##  ##  ##  ###   ## ##    ## ##         ## ##    ##  ##       ##       ##     ##   ## ##   ##    ## ##    ## ##    ## ##     ## ##     ## ###   ##    ##    ##    ##
+   *    ##         ####   ####  ## ##       ##        ##   ##   ##  ##       ##       ##     ##  ##   ##  ##       ##       ##       ##     ## ##     ## ####  ##    ##    ##
+   *     ######     ##    ## ## ## ##       ######   ##     ##  ##  ##       ######   ##     ## ##     ## ##       ##       ##       ##     ## ##     ## ## ## ##    ##     ######
+   *          ##    ##    ##  #### ##       ##       #########  ##  ##       ##       ##     ## ######### ##       ##       ##       ##     ## ##     ## ##  ####    ##          ##
+   *    ##    ##    ##    ##   ### ##    ## ##       ##     ##  ##  ##       ##       ##     ## ##     ## ##    ## ##    ## ##    ## ##     ## ##     ## ##   ###    ##    ##    ##
+   *     ######     ##    ##    ##  ######  ##       ##     ## #### ######## ######## ########  ##     ##  ######   ######   ######   #######   #######  ##    ##    ##     ######
+   */
+  /**
+   * syncFailedAcccounts
+   *   // Sync the failed accounts
+   * //   Log that some account failed
+   * //   Use the /get_account_data_by_list API to get the data for the accounts that need to be looked up later from any of the nodes that had a matching hash but different from previously used nodes
+   * //   Repeat the “Sync the Account State Table Second Pass” step
+   * //   Repeat the “Process the Account data” step
+   *
+   * @param lowAddress
+   * @param highAddress
+   */
   async syncFailedAcccounts(lowAddress: string, highAddress: string) {
     if (this.accountsWithStateConflict.length === 0 && this.missingAccountData.length === 0) {
       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncFailedAcccounts no failed hashes to sync`)
@@ -1638,6 +1734,15 @@ class AccountSync {
     await this.processAccountData()
   }
 
+  /***
+   *    ########  ######## ########     ###    #### ########  ##     ## ####  ######   ######  #### ##    ##  ######   ######## ##     ##  ######
+   *    ##     ## ##       ##     ##   ## ##    ##  ##     ## ###   ###  ##  ##    ## ##    ##  ##  ###   ## ##    ##     ##     ##   ##  ##    ##
+   *    ##     ## ##       ##     ##  ##   ##   ##  ##     ## #### ####  ##  ##       ##        ##  ####  ## ##           ##      ## ##   ##
+   *    ########  ######   ########  ##     ##  ##  ########  ## ### ##  ##   ######   ######   ##  ## ## ## ##   ####    ##       ###     ######
+   *    ##   ##   ##       ##        #########  ##  ##   ##   ##     ##  ##        ##       ##  ##  ##  #### ##    ##     ##      ## ##         ##
+   *    ##    ##  ##       ##        ##     ##  ##  ##    ##  ##     ##  ##  ##    ## ##    ##  ##  ##   ### ##    ##     ##     ##   ##  ##    ##
+   *    ##     ## ######## ##        ##     ## #### ##     ## ##     ## ####  ######   ######  #### ##    ##  ######      ##    ##     ##  ######
+   */
   /**
    * repairMissingTXs
    *
@@ -1680,6 +1785,9 @@ class AccountSync {
     }
   }
 
+  /**
+   * failandRestart
+   */
   async failandRestart() {
     this.mainLogger.info(`DATASYNC: failandRestart`)
     this.logger.playbackLogState('datasyncFail', '', '')
@@ -1698,6 +1806,9 @@ class AccountSync {
     await this.syncStateDataForRange(this.currentRange)
   }
 
+  /**
+   * failAndDontRestartSync
+   */
   failAndDontRestartSync() {
     this.mainLogger.info(`DATASYNC: failAndDontRestartSync`)
     // need to clear more?
@@ -1705,6 +1816,10 @@ class AccountSync {
     this.syncTrackers = []
   }
 
+  /**
+   * tryNextDataSourceNode
+   * @param debugString
+   */
   tryNextDataSourceNode(debugString): boolean {
     this.dataSourceNodeIndex++
     if (logFlags.error) this.mainLogger.error(`tryNextDataSourceNode ${debugString} try next node: ${this.dataSourceNodeIndex}`)
