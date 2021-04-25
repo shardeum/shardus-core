@@ -3172,6 +3172,618 @@ class Depricated {
 
   //     await Promise.all(promises)
   //   }
+
+
+  /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  /***
+   *    ##    ## ######## ##      ##       ########    ###     ######  ########        ######  ##    ## ##    ##  ######
+   *    ###   ## ##       ##  ##  ##       ##         ## ##   ##    ##    ##          ##    ##  ##  ##  ###   ## ##    ##
+   *    ####  ## ##       ##  ##  ##       ##        ##   ##  ##          ##          ##         ####   ####  ## ##
+   *    ## ## ## ######   ##  ##  ##       ######   ##     ##  ######     ##           ######     ##    ## ## ## ##
+   *    ##  #### ##       ##  ##  ##       ##       #########       ##    ##                ##    ##    ##  #### ##
+   *    ##   ### ##       ##  ##  ##       ##       ##     ## ##    ##    ##          ##    ##    ##    ##   ### ##    ##
+   *    ##    ## ########  ###  ###        ##       ##     ##  ######     ##           ######     ##    ##    ##  ######
+   */
+  /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  // async syncStateDataFast(requiredNodeCount: number) {
+  //   // Dont sync if first node
+  //   if (this.p2p.isFirstSeed) {
+  //     this.dataSyncMainPhaseComplete = true
+  //     this.syncStatement.syncComplete = true
+  //     this.globalAccountsSynced = true
+  //     this.stateManager.accountGlobals.hasknownGlobals = true
+  //     this.readyforTXs = true
+  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: isFirstSeed = true. skipping sync`)
+  //     return
+  //   }
+
+  //   this.isSyncingAcceptedTxs = true
+
+  //   //await utils.sleep(5000) // Temporary delay to make it easier to attach a debugger
+  //   if (logFlags.console) console.log('syncStateData start')
+  //   // delete and re-create some tables before we sync:
+  //   await this.storage.clearAppRelatedState()
+  //   await this.app.deleteLocalAccountData()
+
+  //   if (logFlags.debug) this.mainLogger.debug(`DATASYNC: starting syncStateDataFast`)
+
+  //   this.requiredNodeCount = requiredNodeCount
+
+  //   let hasValidShardData = this.stateManager.currentCycleShardData != null
+  //   if (this.stateManager.currentCycleShardData != null) {
+  //     hasValidShardData = this.stateManager.currentCycleShardData.hasCompleteData
+  //   }
+  //   while (hasValidShardData === false) {
+  //     this.stateManager.getCurrentCycleShardData()
+  //     await utils.sleep(1000)
+  //     if (this.stateManager.currentCycleShardData == null) {
+  //       if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_waitForShardData', ` `, ` ${utils.stringifyReduce(this.stateManager.currentCycleShardData)} `)
+  //       hasValidShardData = false
+  //     }
+  //     if (this.stateManager.currentCycleShardData != null) {
+  //       if (this.stateManager.currentCycleShardData.hasCompleteData == false) {
+  //         let temp = this.p2p.state.getActiveNodes(null)
+  //         if (logFlags.playback)
+  //           this.logger.playbackLogNote(
+  //             'shrd_sync_waitForShardData',
+  //             ` `,
+  //             `hasCompleteData:${this.stateManager.currentCycleShardData.hasCompleteData} active:${utils.stringifyReduce(temp)} ${utils.stringifyReduce(this.stateManager.currentCycleShardData)} `
+  //           )
+  //       } else {
+  //         hasValidShardData = true
+  //       }
+  //     }
+  //   }
+  //   let nodeShardData = this.stateManager.currentCycleShardData.nodeShardData
+  //   if (logFlags.console) console.log('GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
+
+  //   let rangesToSync = [] as AddressRange[]
+
+  //   let cycle = this.stateManager.currentCycleShardData.cycleNumber
+
+  //   let homePartition = nodeShardData.homePartition
+
+  //   if (logFlags.console) console.log(`homePartition: ${homePartition} storedPartitions: ${utils.stringifyReduce(nodeShardData.storedPartitions)}`)
+
+  //   let chunksGuide = 4
+  //   let syncRangeGoal = Math.max(1, Math.min(chunksGuide, Math.floor(this.stateManager.currentCycleShardData.shardGlobals.numPartitions / chunksGuide)))
+  //   let partitionsCovered = 0
+  //   let partitionsPerRange = 1
+
+  //   if (nodeShardData.storedPartitions.rangeIsSplit === true) {
+  //     partitionsCovered = nodeShardData.storedPartitions.partitionEnd1 - nodeShardData.storedPartitions.partitionStart1
+  //     partitionsCovered += nodeShardData.storedPartitions.partitionEnd2 - nodeShardData.storedPartitions.partitionStart2
+  //     partitionsPerRange = Math.max(Math.floor(partitionsCovered / syncRangeGoal), 1)
+  //     if (logFlags.console) console.log(
+  //       `syncRangeGoal ${syncRangeGoal}  chunksGuide:${chunksGuide} numPartitions:${this.stateManager.currentCycleShardData.shardGlobals.numPartitions} partitionsPerRange:${partitionsPerRange}`
+  //     )
+
+  //     let start = nodeShardData.storedPartitions.partitionStart1
+  //     let end = nodeShardData.storedPartitions.partitionEnd1
+  //     let currentStart = start
+  //     let currentEnd = 0
+  //     let nextLowAddress: string | null = null
+  //     let i = 0
+  //     while (currentEnd < end) {
+  //       currentEnd = Math.min(currentStart + partitionsPerRange, end)
+  //       let range = ShardFunctions.partitionToAddressRange2(this.stateManager.currentCycleShardData.shardGlobals, currentStart, currentEnd)
+
+  //       let { address1, address2 } = ShardFunctions.getNextAdjacentAddresses(range.high)
+  //       range.high = address1
+
+  //       if (nextLowAddress != null) {
+  //         range.low = nextLowAddress
+  //       }
+  //       if (logFlags.console) console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition}  a1: ${range.low} a2: ${range.high}`)
+  //       nextLowAddress = address2
+  //       currentStart = currentEnd
+  //       i++
+  //       rangesToSync.push(range)
+  //     }
+
+  //     start = nodeShardData.storedPartitions.partitionStart2
+  //     end = nodeShardData.storedPartitions.partitionEnd2
+  //     currentStart = start
+  //     currentEnd = 0
+  //     nextLowAddress = null
+
+  //     while (currentEnd < end) {
+  //       currentEnd = Math.min(currentStart + partitionsPerRange, end)
+  //       let range = ShardFunctions.partitionToAddressRange2(this.stateManager.currentCycleShardData.shardGlobals, currentStart, currentEnd)
+
+  //       let { address1, address2 } = ShardFunctions.getNextAdjacentAddresses(range.high)
+  //       range.high = address1
+
+  //       if (nextLowAddress != null) {
+  //         range.low = nextLowAddress
+  //       }
+  //       if (logFlags.console) console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition} a1: ${range.low} a2: ${range.high}`)
+
+  //       nextLowAddress = address2
+  //       currentStart = currentEnd
+  //       i++
+  //       rangesToSync.push(range)
+  //     }
+  //   } else {
+  //     partitionsCovered = nodeShardData.storedPartitions.partitionEnd - nodeShardData.storedPartitions.partitionStart
+  //     partitionsPerRange = Math.max(Math.floor(partitionsCovered / syncRangeGoal), 1)
+  //     if (logFlags.console) console.log(
+  //       `syncRangeGoal ${syncRangeGoal}  chunksGuide:${chunksGuide} numPartitions:${this.stateManager.currentCycleShardData.shardGlobals.numPartitions} partitionsPerRange:${partitionsPerRange}`
+  //     )
+
+  //     let start = nodeShardData.storedPartitions.partitionStart
+  //     let end = nodeShardData.storedPartitions.partitionEnd
+
+  //     let currentStart = start
+  //     let currentEnd = 0
+  //     let nextLowAddress: string | null = null
+  //     let i = 0
+  //     while (currentEnd < end) {
+  //       currentEnd = Math.min(currentStart + partitionsPerRange, end)
+  //       let range = ShardFunctions.partitionToAddressRange2(this.stateManager.currentCycleShardData.shardGlobals, currentStart, currentEnd)
+
+  //       let { address1, address2 } = ShardFunctions.getNextAdjacentAddresses(range.high)
+  //       range.high = address1
+
+  //       if (nextLowAddress != null) {
+  //         range.low = nextLowAddress
+  //       }
+  //       if (logFlags.console) console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition}  a1: ${range.low} a2: ${range.high}`)
+  //       nextLowAddress = address2
+  //       currentStart = currentEnd
+  //       i++
+  //       rangesToSync.push(range)
+  //     }
+  //   }
+
+  //   // if we don't have a range to sync yet manually sync the whole range.
+  //   if (rangesToSync.length === 0) {
+  //     if (logFlags.console) console.log(`syncStateData ranges: pushing full range, no ranges found`)
+  //     let range = ShardFunctions.partitionToAddressRange2(this.stateManager.currentCycleShardData.shardGlobals, 0, this.stateManager.currentCycleShardData.shardGlobals.numPartitions - 1)
+  //     rangesToSync.push(range)
+  //   }
+  //   if (logFlags.console) console.log(`syncStateData ranges: ${utils.stringifyReduce(rangesToSync)}}`)
+
+  //   for (let range of rangesToSync) {
+  //     // let nodes = ShardFunctions.getNodesThatCoverRange(this.stateManager.currentCycleShardData.shardGlobals, range.low, range.high, this.stateManager.currentCycleShardData.ourNode, this.stateManager.currentCycleShardData.activeNodes)
+  //     this.createSyncTrackerByRange(range, cycle)
+  //   }
+
+  //   this.createSyncTrackerByForGlobals(cycle)
+
+  //   // must get a list of globals before we can listen to any TXs, otherwise the isGlobal function returns bad values
+  //   await this.stateManager.accountGlobals.getGlobalListEarly()
+  //   this.readyforTXs = true
+
+  //   for (let syncTracker of this.syncTrackers) {
+  //     // let partition = syncTracker.partition
+  //     if (logFlags.console) console.log(`syncTracker start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
+  //     if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+
+  //     syncTracker.syncStarted = true
+
+  //     if (syncTracker.isGlobalSyncTracker === false) {
+  //       await this.syncStateDataForRangeFast(syncTracker.range)
+  //     } else {
+  //       if (logFlags.console) console.log(`syncTracker syncStateDataGlobals start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
+  //       await this.syncStateDataGlobalsFast(syncTracker)
+  //     }
+  //     syncTracker.syncFinished = true
+  //     if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+  //     this.clearSyncData()
+  //   }
+  //   if (logFlags.console) console.log('syncStateData end' + '   time:' + Date.now())
+  // }
+
+  // async syncStateDataForRangeFast(range: SimpleRange) {
+  //   try {
+  //     let partition = 'notUsed'
+  //     this.currentRange = range
+  //     this.addressRange = range // this.partitionToAddressRange(partition)
+
+  //     this.partitionStartTimeStamp = Date.now()
+
+  //     let lowAddress = this.addressRange.low
+  //     let highAddress = this.addressRange.high
+
+  //     partition = `${utils.stringifyReduce(lowAddress)} - ${utils.stringifyReduce(highAddress)}`
+
+  //     this.readyforTXs = true // open the floodgates of queuing stuffs.
+
+  //     await this.syncAccountDataFast(lowAddress, highAddress)
+  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: partition: ${partition}, syncAccountData done.`)
+
+  //     await this.processAccountDataFast()
+  //   } catch (error) {
+  //     if (error.message.includes('FailAndRestartPartition')) {
+  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: Error Failed at: ${error.stack}`)
+  //       this.statemanager_fatal(`syncStateDataForRange_ex_failandrestart`, 'DATASYNC: FailAndRestartPartition: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+  //       await this.failandRestart()
+  //     } else {
+  //       this.statemanager_fatal(`syncStateDataForRange_ex`, 'syncStateDataForPartition failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + error.name + ': ' + error.message + ' at ' + error.stack)
+  //       await this.failandRestart()
+  //     }
+  //   }
+  // }
+
+  // async syncAccountDataFast(lowAddress: string, highAddress: string) {
+  //   // Sync the Account data
+  //   //   Use the /get_account_data API to get the data from the Account Table using any of the nodes that had a matching hash
+  //   if (logFlags.console) console.log(`syncAccountData3` + '   time:' + Date.now())
+
+  //   if (this.config.stateManager == null) {
+  //     throw new Error('this.config.stateManager == null')
+  //   }
+
+  //   let queryLow = lowAddress
+  //   let queryHigh = highAddress
+
+  //   let moreDataRemaining = true
+
+  //   this.combinedAccountData = []
+  //   let loopCount = 0
+
+  //   let startTime = 0
+  //   let lowTimeQuery = startTime
+  //   // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
+  //   while (moreDataRemaining) {
+  //     // Node Precheck!
+  //     if (this.dataSourceNode == null || this.stateManager.isNodeValidForInternalMessage(this.dataSourceNode.id, 'syncAccountData', true, true) === false) {
+  //       if (logFlags.verbose && this.dataSourceNode == null) {
+  //         if (logFlags.error) this.mainLogger.error(`syncAccountDataFast   this.dataSourceNode == null`)
+  //       }
+  //       if (this.tryNextDataSourceNode('syncAccountData') == false) {
+  //         break
+  //       }
+  //       continue
+  //     }
+
+  //     // max records artificially low to make testing coverage better.  todo refactor: make it a config or calculate based on data size
+  //     let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, maxRecords: this.config.stateManager.accountBucketSize }
+  //     let r: GetAccountData3Resp | boolean = await this.p2p.ask(this.dataSourceNode, 'get_account_data3', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
+
+  //     // TSConversion need to consider better error handling here!
+  //     let result: GetAccountData3Resp = r as GetAccountData3Resp
+
+  //     if (result == null) {
+  //       if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`ASK FAIL syncAccountData result == null node:${this.dataSourceNode.id}`)
+  //       if (this.tryNextDataSourceNode('syncAccountData') == false) {
+  //         break
+  //       }
+  //       continue
+  //     }
+  //     if (result.data == null) {
+  //       if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`ASK FAIL syncAccountData result.data == null node:${this.dataSourceNode.id}`)
+  //       if (this.tryNextDataSourceNode('syncAccountData') == false) {
+  //         break
+  //       }
+  //       continue
+  //     }
+  //     // accountData is in the form [{accountId, stateId, data}] for n accounts.
+  //     let accountData = result.data.wrappedAccounts
+
+  //     let lastUpdateNeeded = result.data.lastUpdateNeeded
+
+  //     // get the timestamp of the last account data received so we can use it as the low timestamp for our next query
+  //     if (accountData.length > 0) {
+  //       let lastAccount = accountData[accountData.length - 1]
+  //       if (lastAccount.timestamp > lowTimeQuery) {
+  //         lowTimeQuery = lastAccount.timestamp
+  //         startTime = lowTimeQuery
+  //       }
+  //     }
+
+  //     // If this is a repeated query, clear out any dupes from the new list we just got.
+  //     // There could be many rows that use the stame timestamp so we will search and remove them
+  //     let dataDuplicated = true
+  //     if (loopCount > 0) {
+  //       while (accountData.length > 0 && dataDuplicated) {
+  //         let stateData = accountData[0]
+  //         dataDuplicated = false
+  //         for (let i = this.combinedAccountData.length - 1; i >= 0; i--) {
+  //           let existingStateData = this.combinedAccountData[i]
+  //           if (existingStateData.timestamp === stateData.timestamp && existingStateData.accountId === stateData.accountId) {
+  //             dataDuplicated = true
+  //             break
+  //           }
+  //           // once we get to an older timestamp we can stop looking, the outer loop will be done also
+  //           if (existingStateData.timestamp < stateData.timestamp) {
+  //             break
+  //           }
+  //         }
+  //         if (dataDuplicated) {
+  //           accountData.shift()
+  //         }
+  //       }
+  //     }
+
+  //     // if we have any accounts in wrappedAccounts2
+  //     let accountData2 = result.data.wrappedAccounts2
+  //     if (accountData2.length > 0) {
+  //       while (accountData.length > 0 && dataDuplicated) {
+  //         let stateData = accountData2[0]
+  //         dataDuplicated = false
+  //         for (let i = this.combinedAccountData.length - 1; i >= 0; i--) {
+  //           let existingStateData = this.combinedAccountData[i]
+  //           if (existingStateData.timestamp === stateData.timestamp && existingStateData.accountId === stateData.accountId) {
+  //             dataDuplicated = true
+  //             break
+  //           }
+  //           // once we get to an older timestamp we can stop looking, the outer loop will be done also
+  //           if (existingStateData.timestamp < stateData.timestamp) {
+  //             break
+  //           }
+  //         }
+  //         if (dataDuplicated) {
+  //           accountData2.shift()
+  //         }
+  //       }
+  //     }
+
+  //     if (lastUpdateNeeded || (accountData2.length === 0 && accountData.length === 0)) {
+  //       moreDataRemaining = false
+  //       if (logFlags.debug) this.mainLogger.debug(
+  //         `DATASYNC: syncAccountData3 got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lowTimeQuery} highestTS1: ${result.data.highestTs}`
+  //       )
+  //       if (accountData.length > 0) {
+  //         this.combinedAccountData = this.combinedAccountData.concat(accountData)
+  //       }
+  //       if (accountData2.length > 0) {
+  //         this.combinedAccountData = this.combinedAccountData.concat(accountData2)
+  //       }
+  //     } else {
+  //       if (logFlags.debug) this.mainLogger.debug(
+  //         `DATASYNC: syncAccountData3b got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lowTimeQuery} highestTS1: ${result.data.highestTs}`
+  //       )
+  //       this.combinedAccountData = this.combinedAccountData.concat(accountData)
+  //       loopCount++
+  //       // await utils.sleep(500)
+  //     }
+  //     await utils.sleep(200)
+  //   }
+  // }
+
+  // async processAccountDataFast() {
+  //   this.missingAccountData = []
+  //   this.mapAccountData = {}
+  //   // create a fast lookup map for the accounts we have.  Perf.  will need to review if this fits into memory.  May need a novel structure.
+  //   let account
+  //   for (let i = 0; i < this.combinedAccountData.length; i++) {
+  //     account = this.combinedAccountData[i]
+  //     this.mapAccountData[account.accountId] = account
+  //   }
+
+  //   let accountKeys = Object.keys(this.mapAccountData)
+  //   let uniqueAccounts = accountKeys.length
+  //   let initialCombinedAccountLength = this.combinedAccountData.length
+  //   if (uniqueAccounts < initialCombinedAccountLength) {
+  //     // keep only the newest copies of each account:
+  //     // we need this if using a time based datasync
+  //     this.combinedAccountData = []
+  //     for (let accountID of accountKeys) {
+  //       this.combinedAccountData.push(this.mapAccountData[accountID])
+  //     }
+  //   }
+
+  //   let missingTXs = 0
+  //   let handledButOk = 0
+  //   let otherMissingCase = 0
+
+  //   //   For each account in the Account State Table make sure the entry in Account data has the same State_after value; if not save the account id to be looked up later
+  //   this.accountsWithStateConflict = []
+  //   let goodAccounts: Shardus.WrappedData[] = []
+  //   let noSyncData = 0
+  //   let noMatches = 0
+  //   let outOfDateNoTxs = 0
+  //   for (let account of this.combinedAccountData) {
+  //     delete account.syncData
+  //     goodAccounts.push(account)
+  //   }
+  //   if (logFlags.debug) this.mainLogger.debug(
+  //     `DATASYNC: processAccountData saving ${goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase} outOfDateNoTxs: ${outOfDateNoTxs}`
+  //   )
+  //   // failedHashes is a list of accounts that failed to match the hash reported by the server
+  //   let failedHashes = await this.stateManager.checkAndSetAccountData(goodAccounts, 'syncNonGlobals:processAccountData', true) // repeatable form may need to call this in batches
+  //   //this.stateManager.partitionStats.statsDataSummaryInit(goodAccounts)
+  //   if (failedHashes.length > 1000) {
+  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
+  //     // state -> try another node. TODO record/eval/report blame?
+  //     this.stateManager.recordPotentialBadnode()
+  //     throw new Error('FailAndRestartPartition_processAccountDataFast_A')
+  //   }
+  //   if (failedHashes.length > 0) {
+  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes:  ${failedHashes.length} will have to download them again`)
+  //     // TODO ? record/eval/report blame?
+  //     this.stateManager.recordPotentialBadnode()
+  //     this.failedAccounts = this.failedAccounts.concat(failedHashes)
+  //     for (let accountId of failedHashes) {
+  //       account = this.mapAccountData[accountId]
+
+  //       if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData ${accountId}  data: ${utils.stringifyReduce(account)}`)
+
+  //       if (account != null) {
+  //         if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData adding account to list`)
+  //         this.accountsWithStateConflict.push(account)
+  //       } else {
+  //         if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData cant find data: ${accountId}`)
+  //         if (accountId) {
+  //           //this.accountsWithStateConflict.push({ address: accountId,  }) //NOTE: fixed with refactor
+  //           this.accountsWithStateConflict.push({ accountId: accountId, data: null, stateId: null, timestamp: 0 })
+  //         }
+  //       }
+  //     }
+  //   }
+
+  //   await this.stateManager.writeCombinedAccountDataToBackups(goodAccounts, failedHashes)
+
+  //   this.combinedAccountData = [] // we can clear this now.
+  // }
+
+  // async syncStateDataGlobalsFast(syncTracker: SyncTracker) {
+  //   try {
+  //     let partition = 'globals!'
+
+  //     let globalAccounts = []
+  //     let remainingAccountsToSync = []
+  //     this.partitionStartTimeStamp = Date.now()
+
+  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals partition: ${partition} `)
+
+  //     this.readyforTXs = true
+
+  //     let globalReport: GlobalAccountReportResp = await this.getRobustGlobalReport()
+
+  //     let hasAllGlobalData = false
+
+  //     if (globalReport.accounts.length === 0) {
+  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC:  syncStateDataGlobals no global accounts `)
+  //       return // no global accounts
+  //     }
+  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC:  syncStateDataGlobals globalReport: ${utils.stringifyReduce(globalReport)} `)
+
+  //     let accountReportsByID: { [id: string]: { id: string; hash: string; timestamp: number } } = {}
+  //     for (let report of globalReport.accounts) {
+  //       remainingAccountsToSync.push(report.id)
+
+  //       accountReportsByID[report.id] = report
+  //     }
+  //     let accountData: Shardus.WrappedData[] = []
+  //     let accountDataById: { [id: string]: Shardus.WrappedData } = {}
+  //     let globalReport2: GlobalAccountReportResp = { ready: false, combinedHash: '', accounts: [] }
+  //     let maxTries = 10
+  //     while (hasAllGlobalData === false) {
+  //       maxTries--
+  //       if (maxTries <= 0) {
+  //         if (logFlags.error) this.mainLogger.error(`DATASYNC: syncStateDataGlobals max tries excceded `)
+  //         return
+  //       }
+  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals hasAllGlobalData === false `)
+
+  //       // Node Precheck!
+  //       if (this.dataSourceNode == null || this.stateManager.isNodeValidForInternalMessage(this.dataSourceNode.id, 'syncStateDataGlobals', true, true) === false) {
+  //         if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
+  //           break
+  //         }
+  //         continue
+  //       }
+
+  //       let message = { accountIds: remainingAccountsToSync }
+  //       let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
+
+  //       if (result == null) {
+  //         if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncStateTableData result == null')
+  //         if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
+  //           break
+  //         }
+  //         continue
+  //       }
+  //       if (result.accountData == null) {
+  //         if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncStateTableData result.accountData == null')
+  //         if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
+  //           break
+  //         }
+  //         continue
+  //       }
+
+  //       accountData = accountData.concat(result.accountData)
+
+  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals get_account_data_by_list ${utils.stringifyReduce(result)} `)
+
+  //       globalReport2 = await this.getRobustGlobalReport()
+  //       let accountReportsByID2: { [id: string]: { id: string; hash: string; timestamp: number } } = {}
+  //       for (let report of globalReport2.accounts) {
+  //         accountReportsByID2[report.id] = report
+  //       }
+
+  //       hasAllGlobalData = true
+  //       remainingAccountsToSync = []
+  //       for (let account of accountData) {
+  //         accountDataById[account.accountId] = account
+  //         //newer copies will overwrite older ones in this map
+  //       }
+  //       //check the full report for any missing data
+  //       for (let report of globalReport2.accounts) {
+  //         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals loop globalReport2.accounts `)
+  //         let data = accountDataById[report.id]
+  //         if (data == null) {
+  //           //we dont have the data
+  //           hasAllGlobalData = false
+  //           remainingAccountsToSync.push(report.id)
+  //           if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals remainingAccountsToSync data===null ${utils.makeShortHash(report.id)} `)
+  //         } else if (data.stateId !== report.hash) {
+  //           //we have the data but he hash is wrong
+  //           hasAllGlobalData = false
+  //           remainingAccountsToSync.push(report.id)
+  //           if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals remainingAccountsToSync data.stateId !== report.hash ${utils.makeShortHash(report.id)} `)
+  //         }
+  //       }
+  //       //set this report to the last report and continue.
+  //       accountReportsByID = accountReportsByID2
+  //     }
+
+  //     let dataToSet = []
+  //     let cycleNumber = this.stateManager.currentCycleShardData.cycleNumber // Math.max(1, this.stateManager.currentCycleShardData.cycleNumber-1 ) //kinda hacky?
+
+  //     let goodAccounts: Shardus.WrappedData[] = []
+
+  //     //Write the data! and set global memory data!.  set accounts copy data too.
+  //     for (let report of globalReport2.accounts) {
+  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals loop globalReport2.accounts 2`)
+  //       let accountData = accountDataById[report.id]
+  //       if (accountData != null) {
+  //         dataToSet.push(accountData)
+  //         goodAccounts.push(accountData)
+  //         if (this.stateManager.accountGlobals.globalAccountMap.has(report.id)) {
+  //           if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals has ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
+  //         } else {
+  //           if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals setting ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
+  //           // set the account in our table
+  //           this.stateManager.accountGlobals.globalAccountMap.set(report.id, null)
+  //           // push the time based backup count
+  //           let accountId = report.id
+  //           let data = accountData.data
+  //           let timestamp = accountData.timestamp
+  //           let hash = accountData.stateId
+  //           let isGlobal = this.stateManager.accountGlobals.isGlobalAccount(accountId)
+  //           let backupObj: Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
+  //           //if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug( `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+  //           let globalBackupList: Shardus.AccountsCopy[] = this.stateManager.accountGlobals.getGlobalAccountBackupList(accountId)
+  //           if (globalBackupList != null) {
+  //             globalBackupList.push(backupObj) // sort and cleanup later.
+  //             if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals push backup entry ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
+  //           }
+  //         }
+  //       }
+  //     }
+
+  //     let failedHashes = await this.stateManager.checkAndSetAccountData(dataToSet, 'syncStateDataGlobals', true)
+
+  //     if (logFlags.console) console.log('DBG goodAccounts', goodAccounts)
+
+  //     await this.stateManager.writeCombinedAccountDataToBackups(goodAccounts, failedHashes)
+
+  //     if (failedHashes && failedHashes.length > 0) {
+  //       throw new Error('setting data falied no error handling for this yet')
+  //     }
+  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals complete synced ${dataToSet.length} accounts `)
+  //   } catch (error) {
+  //     if (error.message.includes('FailAndRestartPartition')) {
+  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals Error Failed at: ${error.stack}`)
+  //       this.statemanager_fatal(`syncStateDataGlobals_ex_failandrestart`, 'DATASYNC: syncStateDataGlobals FailAndRestartPartition: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+  //       await this.failandRestart()
+  //     } else {
+  //       this.statemanager_fatal(`syncStateDataGlobals_ex`, 'syncStateDataGlobals failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + error.name + ': ' + error.message + ' at ' + error.stack)
+  //       await this.failandRestart()
+  //     }
+  //   }
+
+  //   this.globalAccountsSynced = true
+  // }
+
+
+
 }
 
 export default Depricated
