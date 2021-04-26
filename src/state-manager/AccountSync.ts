@@ -31,6 +31,7 @@ type SyncStatment = {
   syncStartTime: number
   syncEndTime: number
   syncSeconds: number
+  syncRanges: number
 
   failedAccountLoops: number
   failedAccounts: number
@@ -107,6 +108,7 @@ class AccountSync {
 
   softSync_earlyOut: boolean // exit inital sync early after globals are synced
   softSync_noSyncDelay: boolean // don't delay or TXs let them try to execute
+  softSync_checkInitialFlag: boolean // check initalSyncFinished before we give hash reports on sync table data
 
   initalSyncFinished: boolean // track when we have completed our inital data sync.
 
@@ -162,6 +164,7 @@ class AccountSync {
       syncStartTime: 0,
       syncEndTime: 0,
       syncSeconds: 0,
+      syncRanges: 0,
 
       failedAccountLoops: 0,
       failedAccounts: 0,
@@ -178,8 +181,9 @@ class AccountSync {
     }
     this.isSyncStatementCompleted = false
 
-    this.softSync_earlyOut = true
-    this.softSync_noSyncDelay = true
+    this.softSync_earlyOut = false
+    this.softSync_noSyncDelay = false
+    this.softSync_checkInitialFlag = false
 
     this.initalSyncFinished = false
     this.initalSyncRemaining = 0
@@ -232,7 +236,7 @@ class AccountSync {
     this.p2p.registerInternal('get_account_state_hash', async (payload: AccountStateHashReq, respond: (arg0: AccountStateHashResp) => any) => {
       let result = {} as AccountStateHashResp
 
-      if(this.initalSyncFinished === false){
+      if(this.softSync_checkInitialFlag && this.initalSyncFinished === false){
         //not ready?
         result.ready = false
         result.stateHash = this.stateManager.currentCycleShardData.ourNode.id
@@ -454,6 +458,10 @@ class AccountSync {
 
     if (logFlags.console) console.log(`homePartition: ${homePartition} storedPartitions: ${utils.stringifyReduce(nodeShardData.storedPartitions)}`)
 
+    // syncRangeGoal helps us calculate how many partitions per range we need to get our data in chunksGuide number of chunks.
+    // chunksGuide === 4, would mean that in a network with many nodes most of the time we would have 4 ranges to sync.
+    // there could be less ranges if the network is smaller.
+    // TODO review that this is up to spec.
     let chunksGuide = 4
     let syncRangeGoal = Math.max(1, Math.min(chunksGuide, Math.floor(this.stateManager.currentCycleShardData.shardGlobals.numPartitions / chunksGuide)))
     let partitionsCovered = 0
@@ -561,6 +569,8 @@ class AccountSync {
     }
 
     this.createSyncTrackerByForGlobals(cycle, true)
+
+    this.syncStatement.syncRanges = rangesToSync.length
 
     // must get a list of globals before we can listen to any TXs, otherwise the isGlobal function returns bad values
     await this.stateManager.accountGlobals.getGlobalListEarly()
@@ -1225,6 +1235,9 @@ class AccountSync {
               `DATASYNC: syncStateTableData got ${accountStateData.length} more records from ${utils.makeShortHash(this.dataSourceNode.id) + ':' + this.dataSourceNode.externalPort}`
             )
           this.combinedAccountStateData = this.combinedAccountStateData.concat(accountStateData)
+
+          nestedCountersInstance.countEvent('sync', `statetable written`, accountStateData.length)
+
           loopCount++
         }
       }
