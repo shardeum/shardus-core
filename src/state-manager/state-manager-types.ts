@@ -110,6 +110,7 @@ type SyncTracker = {
 
     isGlobalSyncTracker:boolean;
     globalAddressMap: {[address:string]:boolean};
+    isPartOfInitialSync:boolean;
 };
 
 
@@ -566,7 +567,7 @@ type AccountAddressAndTimeRange = {accountStart:string, accountEnd:string, tsSta
 type AccountRangeAndLimit = {accountStart:string, accountEnd:string, maxRecords:number}
 
 type AccountStateHashReq = AccountAddressAndTimeRange
-type AccountStateHashResp = {stateHash: string};
+type AccountStateHashResp = {stateHash: string, ready:boolean};
 
 type GossipAcceptedTxRecv = {acceptedTX: AcceptedTx, sender: import("../shardus/shardus-types").Node, tracker: string}
 

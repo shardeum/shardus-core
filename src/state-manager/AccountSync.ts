@@ -68,6 +68,7 @@ class AccountSync {
   runtimeSyncTrackerSyncing: boolean
 
   syncTrackerIndex: number
+  initalSyncRemaining: number
 
   readyforTXs: boolean
 
@@ -177,10 +178,11 @@ class AccountSync {
     }
     this.isSyncStatementCompleted = false
 
-    this.softSync_earlyOut = false
-    this.softSync_noSyncDelay = false
+    this.softSync_earlyOut = true
+    this.softSync_noSyncDelay = true
 
     this.initalSyncFinished = false
+    this.initalSyncRemaining = 0
 
     console.log('this.p2p', this.p2p)
   }
@@ -206,6 +208,7 @@ class AccountSync {
     this.mapAccountData = {}
 
     this.stateManager.fifoLocks = {}
+
   }
 
   /***
@@ -229,9 +232,18 @@ class AccountSync {
     this.p2p.registerInternal('get_account_state_hash', async (payload: AccountStateHashReq, respond: (arg0: AccountStateHashResp) => any) => {
       let result = {} as AccountStateHashResp
 
+      if(this.initalSyncFinished === false){
+        //not ready?
+        result.ready = false
+        result.stateHash = this.stateManager.currentCycleShardData.ourNode.id
+        await respond(result)
+        return
+      } 
+
       // yikes need to potentially hash only N records at a time and return an array of hashes
       let stateHash = await this.stateManager.transactionQueue.getAccountsStateHash(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd)
       result.stateHash = stateHash
+      result.ready = true
       await respond(result)
     })
 
@@ -362,6 +374,7 @@ class AccountSync {
     if (this.p2p.isFirstSeed) {
       this.dataSyncMainPhaseComplete = true
       this.syncStatement.syncComplete = true
+      this.initalSyncFinished = true
 
       this.globalAccountsSynced = true
       this.stateManager.accountGlobals.hasknownGlobals = true
@@ -544,10 +557,10 @@ class AccountSync {
 
     for (let range of rangesToSync) {
       // let nodes = ShardFunctions.getNodesThatCoverRange(this.stateManager.currentCycleShardData.shardGlobals, range.low, range.high, this.stateManager.currentCycleShardData.ourNode, this.stateManager.currentCycleShardData.activeNodes)
-      this.createSyncTrackerByRange(range, cycle)
+      this.createSyncTrackerByRange(range, cycle, true)
     }
 
-    this.createSyncTrackerByForGlobals(cycle)
+    this.createSyncTrackerByForGlobals(cycle, true)
 
     // must get a list of globals before we can listen to any TXs, otherwise the isGlobal function returns bad values
     await this.stateManager.accountGlobals.getGlobalListEarly()
@@ -564,6 +577,7 @@ class AccountSync {
 
       if (syncTracker.isGlobalSyncTracker === false) {
         if (this.softSync_earlyOut === true) {
+          // do nothing realtime sync will work on this later
         } else {
           await this.syncStateDataForRange(syncTracker.range)
         }
@@ -1053,6 +1067,10 @@ class AccountSync {
           result = null //if we get something back that is not the right data type clear it to null
         }
 
+        if (result != null && result.ready === false) {
+          result = { ready: false, msg: `nodeNotReady` }
+          result = null
+        }
         return result
       }
 
@@ -1089,11 +1107,23 @@ class AccountSync {
         result = robustQueryResult.topResult
         winners = robustQueryResult.winningNodes
 
+        let tries = 3
+        while(result && result.ready === false && tries > 0){
+          nestedCountersInstance.countEvent('sync','majority of nodes not ready, wait and retry')
+          //too many nodes not ready
+          await utils.sleep(30000) //wait 30 seconds and try again
+          robustQueryResult = await robustQuery(nodes, queryFn, equalFn, 3, false)
+          result = robustQueryResult.topResult
+          winners = robustQueryResult.winningNodes
+          tries--
+        }
+
         if (robustQueryResult.isRobustResult == false) {
           if (logFlags.debug) this.mainLogger.debug('syncStateTableData: robustQuery ')
           this.statemanager_fatal(`syncStateTableData_nonRobust`, 'syncStateTableData: robustQuery ')
           throw new Error('FailAndRestartPartition_stateTable_A')
         }
+
       } catch (ex) {
         // NOTE: no longer expecting an exception from robust query in cases where we do not have enough votes or respones!
         //       but for now if isRobustResult == false then we local code wil throw an exception
@@ -1843,10 +1873,21 @@ class AccountSync {
    *    ##     ##  #######  ##    ##    ##    #### ##     ## ########     ######     ##    ##    ##  ######  ##     ## ##     ## ##    ## ########  ######## ######## ##     ##  ######
    */
 
+   /**
+    * updateRuntimeSyncTrackers
+    * 
+    * called in update shard values to handle sync trackers that have finished and need to restar TXs
+    */
   updateRuntimeSyncTrackers() {
+    let initalSyncRemaining = 0
     if (this.syncTrackers != null) {
       for (let i = this.syncTrackers.length - 1; i >= 0; i--) {
         let syncTracker = this.syncTrackers[i]
+
+        if(syncTracker.isPartOfInitialSync){
+          initalSyncRemaining++
+        }
+
         if (syncTracker.syncFinished === true) {
           if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeClear', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
 
@@ -1921,9 +1962,29 @@ class AccountSync {
         }
       }
       if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeClearFinished', ` `, `num trackers left: ${this.syncTrackers.length} `)
+
+      if(this.initalSyncRemaining > 0 && initalSyncRemaining === 0){
+        this.initalSyncFinished = true        
+        this.initalSyncRemaining = 0
+        if (logFlags.debug) this.mainLogger.debug(`DATASYNC: initalSyncFinished.`)
+        nestedCountersInstance.countEvent('sync',`initialSyncFinished ${this.stateManager.currentCycleShardData.cycleNumber}`)
+      }
     }
   }
 
+/***
+ *     ######  ##    ## ##    ##  ######  ########  ##     ## ##    ## ######## #### ##     ## ######## ######## ########     ###     ######  ##    ## ######## ########   ######  
+ *    ##    ##  ##  ##  ###   ## ##    ## ##     ## ##     ## ###   ##    ##     ##  ###   ### ##          ##    ##     ##   ## ##   ##    ## ##   ##  ##       ##     ## ##    ## 
+ *    ##         ####   ####  ## ##       ##     ## ##     ## ####  ##    ##     ##  #### #### ##          ##    ##     ##  ##   ##  ##       ##  ##   ##       ##     ## ##       
+ *     ######     ##    ## ## ## ##       ########  ##     ## ## ## ##    ##     ##  ## ### ## ######      ##    ########  ##     ## ##       #####    ######   ########   ######  
+ *          ##    ##    ##  #### ##       ##   ##   ##     ## ##  ####    ##     ##  ##     ## ##          ##    ##   ##   ######### ##       ##  ##   ##       ##   ##         ## 
+ *    ##    ##    ##    ##   ### ##    ## ##    ##  ##     ## ##   ###    ##     ##  ##     ## ##          ##    ##    ##  ##     ## ##    ## ##   ##  ##       ##    ##  ##    ## 
+ *     ######     ##    ##    ##  ######  ##     ##  #######  ##    ##    ##    #### ##     ## ########    ##    ##     ## ##     ##  ######  ##    ## ######## ##     ##  ######  
+ */
+
+  /**
+   * syncRuntimeTrackers
+   */
   async syncRuntimeTrackers(): Promise<void> {
     // await utils.sleep(8000) // sleep to make sure we are listening to some txs before we sync them // I think we can skip this.
 
@@ -1981,26 +2042,34 @@ class AccountSync {
    * @param {number} cycle
    * @return {SyncTracker}
    */
-  createSyncTrackerByRange(range: BasicAddressRange, cycle: number): SyncTracker {
+  createSyncTrackerByRange(range: BasicAddressRange, cycle: number, initalSync: boolean = false): SyncTracker {
     // let partition = -1
     let index = this.syncTrackerIndex++
-    let syncTracker = { range, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false, isGlobalSyncTracker: false, globalAddressMap: {} } as SyncTracker // partition,
+    let syncTracker = { range, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false, isGlobalSyncTracker: false, globalAddressMap: {}, isPartOfInitialSync:initalSync } as SyncTracker // partition,
     syncTracker.syncStarted = false
     syncTracker.syncFinished = false
 
     this.syncTrackers.push(syncTracker) // we should maintain this order.
+
+    if(initalSync){
+      this.initalSyncRemaining++
+    }
 
     return syncTracker
   }
 
-  createSyncTrackerByForGlobals(cycle: number): SyncTracker {
+  createSyncTrackerByForGlobals(cycle: number, initalSync: boolean = false): SyncTracker {
     // let partition = -1
     let index = this.syncTrackerIndex++
-    let syncTracker = { range: {}, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false, isGlobalSyncTracker: true, globalAddressMap: {} } as SyncTracker // partition,
+    let syncTracker = { range: {}, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false, isGlobalSyncTracker: true, globalAddressMap: {}, isPartOfInitialSync:initalSync } as SyncTracker // partition,
     syncTracker.syncStarted = false
     syncTracker.syncFinished = false
 
     this.syncTrackers.push(syncTracker) // we should maintain this order.
+
+    if(initalSync){
+      this.initalSyncRemaining++
+    }
 
     return syncTracker
   }

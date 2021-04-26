@@ -897,10 +897,15 @@ class TransactionQueue {
           // only look at syncing for accounts that are changed.
           // if the sync range is for globals and the tx is not a global modifier then skip it!
           if (syncTracker != null && (syncTracker.isGlobalSyncTracker === false || txQueueEntry.globalModification === true)) {
-            txQueueEntry.state = 'syncing'
-            txQueueEntry.syncCounter++
+            if(this.stateManager.accountSync.softSync_noSyncDelay === true){
+              //no delay means that don't pause the TX in state = 'syncing'
+            } else {
+              txQueueEntry.state = 'syncing'
+              txQueueEntry.syncCounter++    
+              syncTracker.queueEntries.push(txQueueEntry) // same tx may get pushed in multiple times. that's ok.                   
+            }
+             
             txQueueEntry.didSync = true // mark that this tx had to sync, this flag should never be cleared, we will use it later to not through stuff away.
-            syncTracker.queueEntries.push(txQueueEntry) // same tx may get pushed in multiple times. that's ok.
             txQueueEntry.syncKeys.push(key) // used later to instruct what local data we should JIT load
             txQueueEntry.localKeys[key] = true // used for the filter
             if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.logID}`, `${txQueueEntry.logID} qId: ${txQueueEntry.entryID} account:${utils.stringifyReduce(key)}`)
