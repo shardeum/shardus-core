@@ -107,7 +107,7 @@ class ShardFunctions {
    * @param {StoredPartition} storedPartitions
    */
   static calculateStoredPartitions2Ranges(shardGlobals: ShardGlobals, storedPartitions: StoredPartition) {
-    storedPartitions.partitionRangeVector = { start: storedPartitions.partitionStart, dist: 2 * shardGlobals.nodesPerConsenusGroup, end: storedPartitions.partitionEnd }
+    storedPartitions.partitionRangeVector = { start: storedPartitions.partitionStart, dist: 1 + 2 * shardGlobals.nodesPerConsenusGroup, end: storedPartitions.partitionEnd }
     storedPartitions.rangeIsSplit = false
 
     storedPartitions.partitionsCovered = 0
@@ -139,6 +139,16 @@ class ShardFunctions {
       storedPartitions.partitionEnd2 = shardGlobals.numPartitions - 1
       storedPartitions.partitionRangeVector.end = storedPartitions.partitionEnd1
       storedPartitions.partitionEnd = storedPartitions.partitionRangeVector.end
+    }
+
+    // need to collapse a split range that covers all partitions?
+    if(storedPartitions.rangeIsSplit === true && storedPartitions.partitionEnd1 + 1 === storedPartitions.partitionStart2){
+      storedPartitions.rangeIsSplit = false
+      storedPartitions.partitionStart = 0
+      storedPartitions.partitionEnd = shardGlobals.numPartitions - 1 
+
+      storedPartitions.partitionRangeVector = { start: storedPartitions.partitionStart, dist: 1 + 2 * shardGlobals.nodesPerConsenusGroup, end: storedPartitions.partitionEnd }
+
     }
 
     // alias to start and end 1 in the simple case.  sync code expects values for these
@@ -923,6 +933,7 @@ class ShardFunctions {
         // Test overlaps first, need permutations
         // Then can get differences.
         // If no overlap then entire value is a difference.
+
         if (ShardFunctions.setOverlap(oldStart1, oldEnd1, newStart1, newEnd1)) {
           if (ShardFunctions.setEpandedLeft(oldStart1, oldEnd1, newStart1, newEnd1)) {
             coverageChanges.push({ start: newStart1, end: oldStart1 })
@@ -931,6 +942,8 @@ class ShardFunctions {
             coverageChanges.push({ start: oldEnd1, end: newEnd1 })
           }
         } else if (ShardFunctions.setOverlap(oldStart2, oldEnd2, newStart1, newEnd1)) {
+          // TODO I am not sure if else-if is correct also these calculations can make results that overlap the old range.
+          // the overlap gets corrected in the post process, because that was a faster way to feel certain
           if (ShardFunctions.setEpandedLeft(oldStart2, oldEnd2, newStart1, newEnd1)) {
             coverageChanges.push({ start: newStart1, end: oldStart2 })
           }
@@ -1020,7 +1033,48 @@ class ShardFunctions {
       }
     }
 
-    return coverageChanges
+    if(coverageChanges.length === 0){
+      return coverageChanges
+    }
+
+    let oldStart1 = oldStoredPartitions.partitionRange.startAddr
+    let oldEnd1 = oldStoredPartitions.partitionRange.endAddr
+    let oldStart2 = oldStoredPartitions.partitionRange2?.startAddr
+    let oldEnd2 = oldStoredPartitions.partitionRange2?.endAddr
+
+    let finalChanges = []
+    // post process our coverage changes.  If any of our old range overlaps subtract out the old range
+    for(let coverageChange of coverageChanges){
+
+      if (ShardFunctions.setOverlap(oldStart1, oldEnd1, coverageChange.start, coverageChange.end)){
+        if(oldStart1 <= coverageChange.start){
+          coverageChange.start = oldEnd1
+        }
+        if(oldEnd1 >= coverageChange.end){
+          coverageChange.end = oldStart1
+        }
+        if(coverageChange.start >= coverageChange.end){
+          continue
+        }
+      }
+      if(oldStoredPartitions.rangeIsSplit){
+        if (ShardFunctions.setOverlap(oldStart2, oldEnd2, coverageChange.start, coverageChange.end)){
+          if(oldStart2 <= coverageChange.start){
+            coverageChange.start = oldEnd2
+          }
+          if(oldEnd2 >= coverageChange.end){
+            coverageChange.end = oldStart2
+          }
+          if(coverageChange.start >= coverageChange.end){
+            continue
+          }
+        }      
+      }
+
+      finalChanges.push(coverageChange)
+    }
+
+    return finalChanges
     // this needs to understande address ranges.
 
     // should it also understand changed in what partitions are covered.

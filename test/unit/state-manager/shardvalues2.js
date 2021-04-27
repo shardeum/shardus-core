@@ -111,9 +111,9 @@ let useHardcodenodes = true
 //let hardcodeNodes = ["0333x810a9","0779x61773","0842xf6bd1","0973xdcad3","0e99x8fb06","151ex4bf57","16f8xb349c","16f8xb349c","1a4bx38be7","1bc2x33a63","1bc4x34bf5","21c2x81536","2eb4x8ddfa","3140xcf9a7","31ebxf318e","32a1x6dc2d","3638x689f7","36b4x7cee0","37ebx7fac5","42bax847b7","47e0x616c1","4c33x5592f","5128x4ecd9","5198xda9be","5659x93c69","6bf3x0a3c6","6dbax7b9a2","6f6ax2de94","6ffdx17a1a","7367xa22ab","7794xaf572","7acax8ab94","7b39x61040","7feax34716","80cfx0738b","9536x00378","9578x2babb","95c3x639f3","9c78x27f5f","9e6cxe7e5a","a23ax921af","a562xff144","a5dbx407e8","a605x919f4","a94dxac1fe","ad19x5b0a5","ad3cx92a40","add2xf9dcc","b0f3xd0f95","b94ex10864","be0ex5d6e2","bf79x36378","c20bx07dde","d0e6x22bc1","d7a5xaed8d","dddfxc5f35","dfb5x56e42","e2c2x57f69","e471x5b4d1","ed63x693e5","f203x6274e","f6bdx8b9f4","fb5bx2b81d","fd7dx25192","ffa0x89659"]
 //let hardcodeNodes = ["0330xf2ac9","0492x0706c","15a4x326bb","1ceex2c48c","1d18x3f597","2628x75899","2a03xc663d","32e3x7b545","3856x1fda0","50f1xc65ba","5ad7xa47f8","5bb8x94d0e","5cbfx87149","67eaxf347d","7022xab7ae","765fx27d81","7ffcx03660","808axc9e17","8ab0x74e5c","8b39x3f077","92a9x25208","a5ccx48267","c8f7x1c83e","d7f4xf885f","d96cx48916","e66cx8f00b","ea5fx09f98","edbax5c26f","f4e0xedff4","f621x04f4c"] 
 
-let hardcodeNodes =["0330xf2ac9","0492x0706c","15a4x326bb","1ceex2c48c","1d18x3f597","2628x75899","2a03xc663d","32e3x7b545","3856x1fda0","50f1xc65ba","5ad7xa47f8","5bb8x94d0e","5cbfx87149","67eaxf347d","7022xab7ae","765fx27d81","7ffcx03660","808axc9e17","8ab0x74e5c","8b39x3f077","a5ccx48267","c8f7x1c83e","d7f4xf885f","d96cx48916","e66cx8f00b","ea5fx09f98","edbax5c26f","f4e0xedff4","f621x04f4c"]
+let hardcodeNodes =["0e40x3c26a","4ff1x2b9ca","5affx9895c","6131x2ec9f","72cdx17f7b","7aa7x3e984","90aex40605","9c61x618c6","9ccax31926","a18bx19435","d93dx37bb6"] 
 
-let hardcodeNodes2 = null
+let hardcodeNodes2 = ["0e40x3c26a","4ff1x2b9ca","5affx9895c","6131x2ec9f","72cdx17f7b","7aa7x3e984","8f83x1e0f8","90aex40605","9c61x618c6","9ccax31926","a18bx19435","d93dx37bb6"] 
 
 if (useHardcodenodes) {
   numNodes = hardcodeNodes.length
@@ -123,7 +123,7 @@ if (hardcodeNodes2) {
 }
 
 // Set debugStartsWith to specify what node will be "our node" in the following calculations
-let debugStartsWith = '8b39' // 21f7 851c '8bc4' // '33d7' //'0692' // '23d5' // 'f211' //'147d' // '2054' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
+let debugStartsWith = '8f83' // 21f7 851c '8bc4' // '33d7' //'0692' // '23d5' // 'f211' //'147d' // '2054' // '2512'  // '7459' // '5c42' // '37ae' // '37ae' '6eb5' // 97da 5d07 'dc16'  '0683'  'ed93' ac3c 3d28
 let debugID = debugStartsWith.slice(0, 4) + '7'.repeat(64 - 4)
 
 // set debugAccount to specify and example address that will get calculations made to it
