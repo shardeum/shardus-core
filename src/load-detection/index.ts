@@ -2,6 +2,7 @@ import Statistics from '../statistics'
 import { EventEmitter } from 'events'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance, NodeLoad } from '../utils/profiler'
+import * as Context from '../p2p/Context'
 
 interface LoadDetection {
   highThreshold: number
@@ -13,6 +14,7 @@ interface LoadDetection {
   nodeLoad: NodeLoad
   scaledTxTimeInQueue: number
   scaledQueueLength: number
+  dbg: boolean
 }
 let lastMeasuredTimestamp = 0
 
@@ -31,54 +33,86 @@ class LoadDetection extends EventEmitter {
     }
     this.scaledTxTimeInQueue = 0
     this.scaledQueueLength = 0
+
+    this.dbg = false
+
+    /**
+     * Sets load to DESIRED_LOAD (should be between 0 and 1)
+     * 
+     * Usage: http://<NODE_IP>:<NODE_EXT_PORT>/loadset?load=<DESIRED_LOAD>
+     */
+    Context.network.registerExternalGet('loadset', (req, res) => {
+      if (req.query.load == null) return
+      this.dbg = true
+      this.load = Number(req.query.load)
+      console.log(`set load to ${this.load}`)
+      res.send(`set load to ${this.load}`)
+    })
+    /**
+     * Resets load detection to normal behavior
+     * 
+     * Usage: http://<NODE_IP>:<NODE_EXT_PORT>/loadreset
+     */
+    Context.network.registerExternalGet('loadreset', (req, res) => {
+      this.dbg = false
+      console.log('reset load detection to normal behavior')
+      res.send('reset load detection to normal behavior')
+    })
   }
 
   /**
    * Returns a number between 0 and 1 indicating the current load.
    */
   updateLoad() {
-    const txTimeInQueue = this.statistics.getAverage('txTimeInQueue') / 1000
-    const scaledTxTimeInQueue =
-      txTimeInQueue >= this.desiredTxTime
-        ? 1
-        : txTimeInQueue / this.desiredTxTime
+    let load
 
-    const queueLength = this.statistics.getWatcherValue('queueLength')
-    const scaledQueueLength =
-      queueLength >= this.queueLimit ? 1 : queueLength / this.queueLimit
+    if (this.dbg) {
+      load = this.load
+    } else {
+      const txTimeInQueue = this.statistics.getAverage('txTimeInQueue') / 1000
+      const scaledTxTimeInQueue =
+        txTimeInQueue >= this.desiredTxTime
+          ? 1
+          : txTimeInQueue / this.desiredTxTime
 
-    // looking at these counters individually so we can have more detail about load
-    // if (scaledTxTimeInQueue > this.highThreshold){
-    //   nestedCountersInstance.countEvent('loadRelated',`highLoad-scaledTxTimeInQueue ${this.highThreshold}`)
-    // }
-    // if (scaledQueueLength > this.highThreshold){
-    //   nestedCountersInstance.countEvent('loadRelated',`highLoad-scaledQueueLength ${this.highThreshold}`)
-    // }
+      const queueLength = this.statistics.getWatcherValue('queueLength')
+      const scaledQueueLength =
+        queueLength >= this.queueLimit ? 1 : queueLength / this.queueLimit
 
-    this.scaledTxTimeInQueue = scaledTxTimeInQueue
-    this.scaledQueueLength = scaledQueueLength
+      // looking at these counters individually so we can have more detail about load
+      // if (scaledTxTimeInQueue > this.highThreshold){
+      //   nestedCountersInstance.countEvent('loadRelated',`highLoad-scaledTxTimeInQueue ${this.highThreshold}`)
+      // }
+      // if (scaledQueueLength > this.highThreshold){
+      //   nestedCountersInstance.countEvent('loadRelated',`highLoad-scaledQueueLength ${this.highThreshold}`)
+      // }
 
-    if (profilerInstance != null) {
-      let dutyCycleLoad = profilerInstance.getTotalBusyInternal()
-      if (dutyCycleLoad.duty > 0.4) {
-        nestedCountersInstance.countEvent(
-          'loadRelated',
-          'highLoad-dutyCycle 0.4'
-        )
+      this.scaledTxTimeInQueue = scaledTxTimeInQueue
+      this.scaledQueueLength = scaledQueueLength
+
+      if (profilerInstance != null) {
+        let dutyCycleLoad = profilerInstance.getTotalBusyInternal()
+        if (dutyCycleLoad.duty > 0.4) {
+          nestedCountersInstance.countEvent(
+            'loadRelated',
+            'highLoad-dutyCycle 0.4'
+          )
+        }
+        if (dutyCycleLoad.duty > 0.6) {
+          nestedCountersInstance.countEvent(
+            'loadRelated',
+            `highLoad-dutyCycle 0.6`
+          )
+        }
+        this.nodeLoad = {
+          internal: dutyCycleLoad.netInternlDuty,
+          external: dutyCycleLoad.netExternlDuty,
+        }
       }
-      if (dutyCycleLoad.duty > 0.6) {
-        nestedCountersInstance.countEvent(
-          'loadRelated',
-          `highLoad-dutyCycle 0.6`
-        )
-      }
-      this.nodeLoad = {
-        internal: dutyCycleLoad.netInternlDuty,
-        external: dutyCycleLoad.netExternlDuty,
-      }
+
+      load = Math.max(scaledTxTimeInQueue, scaledQueueLength)
     }
 
-    const load = Math.max(scaledTxTimeInQueue, scaledQueueLength)
     if (load > this.highThreshold) this.emit('highLoad')
     if (load < this.lowThreshold) this.emit('lowLoad')
     this.load = load
