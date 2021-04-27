@@ -308,6 +308,25 @@ export const reviver = (key, value) => {
   }
   return value
 }
+
+export const reviverExpander = (key, value) => {
+  if (typeof value === 'object' && value !== null) {
+    if (value.dataType === 'stringifyReduce_map_2_array') {
+      return new Map(value.value)
+    }
+  }
+  if(typeof value === 'string' && value.length === 10 && value[4] === 'x'){
+    let res =  value.slice(0,4) + '0'.repeat(55) + value.slice(5,5+5)
+    return res
+  }
+  return value
+}
+
+export const debugExpand = (value: string) => {
+  let res =  value.slice(0,4) + '0'.repeat(55) + value.slice(5,5+5)
+  return res
+}
+
 export const replacer = (key, value) => {
   const originalObject = value // this[key] 
   if (originalObject instanceof Map) {

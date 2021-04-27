@@ -134,5 +134,14 @@
                 "<node_internals>/**"
             ]
         },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "accountCache",
+            "program": "${workspaceFolder}\\test\\unit\\state-manager\\accountCache.js",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        },
     ]
 }

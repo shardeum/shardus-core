@@ -47,6 +47,12 @@ class AccountCache {
     this.config = config
     this.profiler = profiler
 
+
+    if(logger == null){
+      
+      return // for debug
+    }
+
     this.mainLogger = logger.getLogger('main')
     this.fatalLogger = logger.getLogger('fatal')
     this.shardLogger = logger.getLogger('shardDump')
@@ -304,7 +310,13 @@ class AccountCache {
   }
 
   // currently a sync function, dont have correct buffers for async
-  buildPartitionHashesForNode(cycleShardData: CycleShardData): MainHashResults {
+  buildPartitionHashesForNode(cycleShardData: CycleShardData, debugAC3: AccountHashCacheMain3 = null, debugAccount:string = null ): MainHashResults {
+    
+    // OFFLINE DEBUGGING
+    // if(debugAC3 != null){
+    //   this.accountsHashCache3 = debugAC3
+    // }
+    
     if (logFlags.verbose) this.mainLogger.debug(`accountsHashCache3 ${cycleShardData.cycleNumber}: ${utils.stringifyReduce(this.accountsHashCache3)}`)
     
     let cycleToProcess = cycleShardData.cycleNumber
@@ -327,6 +339,13 @@ class AccountCache {
     for (let key of this.accountsHashCache3.accountHashMap.keys()) {
       let accountCacheHistory = this.accountsHashCache3.accountHashMap.get(key)
       let index = 0
+
+      // OFFLINE DEBUGGING
+      // if(debugAccount === key){
+      //   let ii = 0
+      //   ii++
+      // }
+
       //if index 0 entry is not for this cycle then look through the list for older cycles. 
       while (index < accountCacheHistory.accountHashList.length - 1 && accountCacheHistory.accountHashList[index].c > cycleToProcess) {
         index++
@@ -382,6 +401,12 @@ class AccountCache {
         `buildPartitionHashesForNode: accountID==null unexpected:${utils.stringifyReduce(accountHashData)} `)
         continue
       }
+
+      // OFFLINE DEBUGGING
+      // if(debugAccount === accountID){
+      //   let ii = 0
+      //   ii++
+      // }
       //Start building the mainHashResults structure
 
       //split data into partitions.  Get the partition for this account
@@ -422,6 +447,12 @@ class AccountCache {
       }
       let accountID = this.accountsHashCache3.futureHistoryList.accountIDs[index]
 
+      // OFFLINE DEBUGGING
+      // if(debugAccount === accountID){
+      //   let ii = 0
+      //   ii++
+      // }
+
       if (this.accountsHashCache3.accountHashMap.has(accountID) == false) {
         if (logFlags.error) this.mainLogger.error(`buildPartitionHashesForNode: missing accountID:${accountID} index:${index} len:${this.accountsHashCache3.futureHistoryList.accountHashesSorted.length}`)
         continue
@@ -429,7 +460,7 @@ class AccountCache {
 
       if(accountHashData.c <= cycleToProcess){
         //did not need this from future list.
-        nestedCountersInstance.countEvent('cache', 'un-needed future list')
+        // nestedCountersInstance.countEvent('cache', 'un-needed future list')
         continue
       }
       nextFutureList.accountHashesSorted.push(accountHashData)

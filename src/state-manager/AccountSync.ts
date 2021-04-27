@@ -638,6 +638,8 @@ class AccountSync {
       await this.syncStateTableData(lowAddress, highAddress, 0, Date.now() - this.stateManager.syncSettleTime)
       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: partition: ${partition}, syncStateTableData 1st pass done.`)
 
+      nestedCountersInstance.countEvent('sync', `sync partition: ${partition} start: ${this.stateManager.currentCycleShardData.cycleNumber}`)
+
       this.readyforTXs = true // open the floodgates of queuing stuffs.
 
       await this.syncAccountData(lowAddress, highAddress)
@@ -688,10 +690,14 @@ class AccountSync {
         // }
       }
 
-      if (Object.keys(this.stateTableForMissingTXs).length > 0) {
+      let keysToRepair = Object.keys(this.stateTableForMissingTXs).length
+      if (keysToRepair > 0) {
         // alternate repair.
         this.repairMissingTXs()
       }
+
+      nestedCountersInstance.countEvent('sync', `sync partition: ${partition} end: ${this.stateManager.currentCycleShardData.cycleNumber} missing tx to repair: ${keysToRepair}`)
+
     } catch (error) {
       if (error.message.includes('FailAndRestartPartition')) {
         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: Error Failed at: ${error.stack}`)
