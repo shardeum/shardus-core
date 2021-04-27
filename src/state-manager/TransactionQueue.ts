@@ -51,6 +51,9 @@ class TransactionQueue {
   archivedQueueEntryMaxCount: number
   newAcceptedTxQueueRunning: boolean //archivedQueueEntryMaxCount is a maximum amount of queue entries to store, usually we should never have this many stored since tx age will be used to clean up the list
 
+  processingLastRunTime: number
+  processingMinRunBreak: number
+
   constructor(stateManager: StateManager,  profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     
     this.crypto = crypto
@@ -83,6 +86,9 @@ class TransactionQueue {
 
     this.archivedQueueEntryMaxCount = 50000
     this.newAcceptedTxQueueRunning = false
+
+    this.processingLastRunTime = 0
+    this.processingMinRunBreak = 100
   }
 
   /***
@@ -1814,6 +1820,19 @@ class TransactionQueue {
     let pushedProfilerTag = null
     let startTime = Date.now()
     try {
+      if (this.newAcceptedTxQueueRunning === true) {
+        return
+      }
+      this.newAcceptedTxQueueRunning = true
+
+      // ensure there is some rest between processing loops
+      let timeSinceLastRun = startTime - this.processingLastRunTime
+      if(timeSinceLastRun < this.processingMinRunBreak){
+        let sleepTime = Math.max(5, this.processingMinRunBreak - timeSinceLastRun )
+        await utils.sleep(sleepTime)
+        nestedCountersInstance.countEvent('processing', 'resting')
+      }
+
       this.profiler.profileSectionStart('processQ')
 
       if (this.stateManager.currentCycleShardData == null) {
@@ -1823,17 +1842,13 @@ class TransactionQueue {
       if (this.newAcceptedTxQueue.length === 0 && this.newAcceptedTxQueueTempInjest.length === 0) {
         return
       }
-      if (this.newAcceptedTxQueueRunning === true) {
-        return
-      }
+
       if (this.queueRestartCounter == null) {
         this.queueRestartCounter = 0
       }
       this.queueRestartCounter++
 
       let localRestartCounter = this.queueRestartCounter
-
-      this.newAcceptedTxQueueRunning = true
 
       let timeM = this.stateManager.queueSitTime
       let timeM2 = timeM * 2
@@ -2524,6 +2539,7 @@ class TransactionQueue {
       }
 
       this.newAcceptedTxQueueRunning = false
+      this.processingLastRunTime = Date.now()
       this.stateManager.lastSeenAccountsMap = seenAccounts
 
       this.profiler.profileSectionEnd('processQ')
