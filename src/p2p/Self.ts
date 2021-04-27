@@ -112,16 +112,20 @@ export async function startup(): Promise<boolean> {
 }
 
 async function witnessConditionsMet(activeNodes: Types.Node[]) {
-  // 1. node has old data
-  if (snapshot.oldDataPath) {
-    const latestCycle = await Sync.getNewestCycle(activeNodes)
-    // 2. network is in safety mode
-    if (latestCycle.safetyMode === true) {
-      // 3. active nodes >= max nodes
-      if (latestCycle.active >= Context.config.p2p.maxNodes) {
-        return true
+  try {
+    // 1. node has old data
+    if (snapshot.oldDataPath) {
+      const latestCycle = await Sync.getNewestCycle(activeNodes)
+      // 2. network is in safety mode
+      if (latestCycle.safetyMode === true) {
+        // 3. active nodes >= max nodes
+        if (latestCycle.active >= Context.config.p2p.maxNodes) {
+          return true
+        }
       }
     }
+  } catch(e) {
+    warn(e)
   }
   return false
 }
@@ -139,8 +143,8 @@ async function joinNetwork(activeNodes: Types.Node[], firstTime: boolean) {
   // Remove yourself from activeNodes if you are present in them
   const ourIdx = activeNodes.findIndex(
     (node) =>
-      node.ip === network.ipInfo.externalIp &&
-      node.port === network.ipInfo.externalPort
+    node.ip === network.ipInfo.externalIp &&
+    node.port === network.ipInfo.externalPort
   )
   if (ourIdx > -1) {
     activeNodes.splice(ourIdx, 1)
@@ -200,8 +204,8 @@ async function syncCycleChain() {
       // Remove yourself from activeNodes if you are present in them
       const ourIdx = activeNodes.findIndex(
         (node) =>
-          node.ip === network.ipInfo.externalIp &&
-          node.port === network.ipInfo.externalPort
+        node.ip === network.ipInfo.externalIp &&
+        node.port === network.ipInfo.externalPort
       )
       if (ourIdx > -1) {
         activeNodes.splice(ourIdx, 1)
@@ -225,7 +229,7 @@ async function contactArchiver() {
     throw Error('Fatal: _getSeedNodes seed list was not signed by archiver!')
   }
   const joinRequest:
-    | Archivers.Request
+  | Archivers.Request
     | undefined = activeNodesSigned.joinRequest as Archivers.Request | undefined
   if (joinRequest) {
     if (Archivers.addJoinRequest(joinRequest) === false) {
@@ -338,12 +342,12 @@ async function getActiveNodesFromArchiver() {
   }
   try {
     seedListSigned = await http.post(nodeListUrl, Context.crypto.sign({
-        nodeInfo
+      nodeInfo
     }))
   } catch (e) {
     throw Error(
       `Fatal: Could not get seed list from seed node server ${nodeListUrl}: ` +
-        e.message
+      e.message
     )
   }
   if(logFlags.p2pNonFatal) info(`Got signed seed list: ${JSON.stringify(seedListSigned)}`)
@@ -359,7 +363,7 @@ export async function getFullNodesFromArchiver() {
   } catch (e) {
     throw Error(
       `Fatal: Could not get seed list from seed node server ${nodeListUrl}: ` +
-        e.message
+      e.message
     )
   }
   if(logFlags.p2pNonFatal) info(`Got signed full node list: ${JSON.stringify(fullNodeList)}`)
