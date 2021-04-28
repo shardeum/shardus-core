@@ -25,7 +25,7 @@ let p2pLogger: Logger
 /** ROUTES */
 
 // [TODO] - since we don't have any routes, no need to create and register this emply function
-const gossipRoute: Types.GossipHandler = payload => {}
+const gossipRoute: Types.GossipHandler = (payload) => {}
 
 const routes = {
   internal: {},
@@ -60,11 +60,12 @@ export function getTxs(): Txs {
   return {}
 }
 
-export function validateRecordTypes(rec: Record): string{
-  let err = validateTypes(rec,{expired:'n',removed:'a'})
+export function validateRecordTypes(rec: Record): string {
+  let err = validateTypes(rec, { expired: 'n', removed: 'a' })
   if (err) return err
-  for(const item of rec.removed){
-    if (typeof(item) !== 'string') return 'items of removed array must be strings'
+  for (const item of rec.removed) {
+    if (typeof item !== 'string')
+      return 'items of removed array must be strings'
   }
   return ''
 }
@@ -125,6 +126,12 @@ function getExpiredRemoved(start: CycleRecord['start']) {
   let maxRemove = config.p2p.maxRotatedPerCycle
   if (maxRemove > active - desired) maxRemove = active - desired
 
+  if (config.p2p.maxRotatedPerCycle < 1) {
+    if (active - desired > 0) maxRemove = active - desired
+    if (maxRemove > config.p2p.amountToScale)
+      maxRemove = config.p2p.amountToScale
+  }
+
   // Oldest node has index 0
   for (const node of NodeList.byJoinOrder) {
     // Don't count syncing nodes in your expired count
@@ -134,11 +141,10 @@ function getExpiredRemoved(start: CycleRecord['start']) {
     // Count the expired node
     expired++
     // Add it to removed if it isn't full
-    if (removed.length < maxRemove){
+    if (removed.length < maxRemove) {
       insertSorted(removed, node.id)
       node.status = Types.NodeStatus.REMOVED
     }
-     
   }
 
   return { expired, removed }
