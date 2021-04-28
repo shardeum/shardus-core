@@ -109,8 +109,10 @@ type SyncTracker = {
     queueEntries: QueueEntry[];
 
     isGlobalSyncTracker:boolean;
-    globalAddressMap: {[address:string]:boolean};
+    globalAddressMap: {[address:string]:boolean}; //this appears to be unused?
     isPartOfInitialSync:boolean;
+
+    keys: {[address:string]:boolean};
 };
 
 

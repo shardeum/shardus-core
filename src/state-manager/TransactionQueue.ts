@@ -902,13 +902,16 @@ class TransactionQueue {
           let syncTracker = this.stateManager.accountSync.getSyncTracker(key)
           // only look at syncing for accounts that are changed.
           // if the sync range is for globals and the tx is not a global modifier then skip it!
+
+          // todo take another look at this condition and syncTracker.globalAddressMap
           if (syncTracker != null && (syncTracker.isGlobalSyncTracker === false || txQueueEntry.globalModification === true)) {
             if(this.stateManager.accountSync.softSync_noSyncDelay === true){
               //no delay means that don't pause the TX in state = 'syncing'
             } else {
               txQueueEntry.state = 'syncing'
               txQueueEntry.syncCounter++    
-              syncTracker.queueEntries.push(txQueueEntry) // same tx may get pushed in multiple times. that's ok.                   
+              syncTracker.queueEntries.push(txQueueEntry) // same tx may get pushed in multiple times. that's ok.    
+              syncTracker.keys[key] = true  //mark this key for fast testing later              
             }
              
             txQueueEntry.didSync = true // mark that this tx had to sync, this flag should never be cleared, we will use it later to not through stuff away.
@@ -1987,7 +1990,7 @@ class TransactionQueue {
           if (txAge > timeM3 * 2 && queueEntry.didSync == false) {
             //this.statistics.incrementCounter('txExpired')
 
-            this.statemanager_fatal(`txExpired1 > M3 * 2. NormalTX Timed out.`, `txExpired txAge > timeM3*2 && queueEntry.didSync == false. ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} hasReceivedApplyReceiptForRepair:${hasReceivedApplyReceiptForRepair} receiptEverRequested:${queueEntry.receiptEverRequested} age:${txAge}`)
+            this.statemanager_fatal(`txExpired1 > M3 * 2. NormalTX Timed out.`, `txExpired txAge > timeM3*2 && queueEntry.didSync == false. ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} hasReceivedApplyReceiptForRepair:${hasReceivedApplyReceiptForRepair} receiptEverRequested:${queueEntry.receiptEverRequested} age:${txAge} ${utils.stringifyReduce(queueEntry.uniqueWritableKeys)}`)
             if(queueEntry.receiptEverRequested && queueEntry.globalModification === false){
               this.statemanager_fatal(`txExpired1 > M3 * 2 -!receiptEverRequested`, `txExpired txAge > timeM3*2 && queueEntry.didSync == false. !receiptEverRequested ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} hasReceivedApplyReceiptForRepair:${hasReceivedApplyReceiptForRepair} receiptEverRequested:${queueEntry.receiptEverRequested} age:${txAge}`)
             }
@@ -2007,7 +2010,7 @@ class TransactionQueue {
           if (txAge > timeM3 * 50 && queueEntry.didSync == true) {
             //this.statistics.incrementCounter('txExpired')
 
-            this.statemanager_fatal(`txExpired2 > M3 * 50. SyncedTX Timed out.`, `txExpired txAge > timeM3 * 50 && queueEntry.didSync == true. ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+            this.statemanager_fatal(`txExpired2 > M3 * 50. SyncedTX Timed out.`, `txExpired txAge > timeM3 * 50 && queueEntry.didSync == true. ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} hasReceivedApplyReceiptForRepair:${hasReceivedApplyReceiptForRepair} receiptEverRequested:${queueEntry.receiptEverRequested} age:${txAge} syncCounter${queueEntry.syncCounter} ${utils.stringifyReduce(queueEntry.uniqueWritableKeys)}`)
             if(queueEntry.globalModification){
               this.statemanager_fatal(`txExpired2 > M3 * 50. SyncedTX -GlobalModification!!`, `txExpired txAge > timeM3*2 && queueEntry.didSync == false. !receiptEverRequested ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} hasReceivedApplyReceiptForRepair:${hasReceivedApplyReceiptForRepair} receiptEverRequested:${queueEntry.receiptEverRequested} age:${txAge}`)
             }
@@ -2120,6 +2123,16 @@ class TransactionQueue {
             // and put back into the queue.  If it has been too long they will go into a repair to receipt mode.
             // IMPORTANT thing is that we mark the accounts as seen, because we cant use this account data
             //   in TXs that happen after until this is resolved.
+
+            //the syncing process is not fully reliable when popping synced TX.  this is a backup check to see if we can get out of syncing state
+            if (queueEntry.syncCounter <= 0) {
+              nestedCountersInstance.countEvent('sync', 'syncing state needs bump')
+
+              queueEntry.waitForReceiptOnly = true
+              queueEntry.state = 'consensing'
+            }
+
+
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
           } else if (queueEntry.state === 'aging') {
             ///////////////////////////////////////////--aging--////////////////////////////////////////////////////////////////

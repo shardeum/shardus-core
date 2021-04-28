@@ -1022,6 +1022,9 @@ class AccountSync {
       return
     }
 
+
+    let debugRange = ` ${utils.stringifyReduce(lowAddress)} - ${utils.stringifyReduce(highAddress)}`
+
     if (logFlags.console) console.log(`syncStateTableData startTime: ${startTime} endTime: ${endTime}` + '   time:' + Date.now())
     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateTableData startTime: ${startTime} endTime: ${endTime} low: ${lowAddress} high: ${highAddress} `)
     // todo m11: this loop will try three more random nodes, this is slightly different than described how to handle failure in the doc. this should be corrected but will take more code
@@ -1136,24 +1139,24 @@ class AccountSync {
 
         if (robustQueryResult.isRobustResult == false) {
           if (logFlags.debug) this.mainLogger.debug('syncStateTableData: robustQuery ')
-          this.statemanager_fatal(`syncStateTableData_nonRobust`, 'syncStateTableData: robustQuery ')
-          throw new Error('FailAndRestartPartition_stateTable_A')
+          this.statemanager_fatal(`syncStateTableData_nonRobust`, 'syncStateTableData: robustQuery ' + debugRange)
+          throw new Error('FailAndRestartPartition_stateTable_A' + debugRange)
         }
 
       } catch (ex) {
         // NOTE: no longer expecting an exception from robust query in cases where we do not have enough votes or respones!
         //       but for now if isRobustResult == false then we local code wil throw an exception
         if (logFlags.debug) this.mainLogger.debug('syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-        this.statemanager_fatal(`syncStateTableData_robustQ`, 'syncStateTableData: robustQuery ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-        throw new Error('FailAndRestartPartition_stateTable_B')
+        this.statemanager_fatal(`syncStateTableData_robustQ`, 'syncStateTableData: robustQuery ' + debugRange + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+        throw new Error('FailAndRestartPartition_stateTable_B' + debugRange)
       }
 
       if (result && result.stateHash) {
         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: robustQuery returned result: ${result.stateHash}`)
         if (!winners || winners.length === 0) {
           if (logFlags.debug) this.mainLogger.debug(`DATASYNC: no winners, going to throw fail and restart`)
-          this.statemanager_fatal(`syncStateTableData_noWin`, `DATASYNC: no winners, going to throw fail and restart`) // todo: consider if this is just an error
-          throw new Error('FailAndRestartPartition_stateTable_C')
+          this.statemanager_fatal(`syncStateTableData_noWin`, `DATASYNC: no winners, going to throw fail and restart` + debugRange) // todo: consider if this is just an error
+          throw new Error('FailAndRestartPartition_stateTable_C' + debugRange)
         }
         this.dataSourceNode = winners[0] // Todo random index
         if (logFlags.debug)
@@ -1161,8 +1164,8 @@ class AccountSync {
         firstHash = result.stateHash
       } else {
         let resultStr = utils.stringifyReduce(result)
-        if (logFlags.debug) this.mainLogger.debug(`DATASYNC: robustQuery get_account_state_hash failed ${result}`)
-        throw new Error('FailAndRestartPartition_stateTable_D ' + result)
+        if (logFlags.debug) this.mainLogger.debug(`DATASYNC: robustQuery get_account_state_hash failed ${result} `  + debugRange)
+        throw new Error('FailAndRestartPartition_stateTable_D ' + result + debugRange)
       }
 
       let moreDataRemaining = true
@@ -1256,7 +1259,7 @@ class AccountSync {
         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateTableData finished downloading the requested data but the hash does not match`)
         // Failed again back through loop! TODO ? record/eval/report blame?
         this.stateManager.recordPotentialBadnode()
-        throw new Error('FailAndRestartPartition_stateTable_E')
+        throw new Error('FailAndRestartPartition_stateTable_E' + debugRange)
       }
 
       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateTableData saving ${this.combinedAccountStateData.length} records to db`)
@@ -1912,7 +1915,15 @@ class AccountSync {
 
           // allow syncing queue entries to resume!
           for (let queueEntry of syncTracker.queueEntries) {
-            queueEntry.syncCounter--
+
+            //need to decrement this per key
+            for(let key of queueEntry.uniqueKeys){
+              if(syncTracker.keys[key] === true){
+                queueEntry.syncCounter--
+              }
+            }
+            //queueEntry.syncCounter--
+
             if (queueEntry.syncCounter <= 0) {
               // dont adjust a
               let found = this.stateManager.transactionQueue.getQueueEntry(queueEntry.acceptedTx.id)
@@ -2064,7 +2075,7 @@ class AccountSync {
   createSyncTrackerByRange(range: BasicAddressRange, cycle: number, initalSync: boolean = false): SyncTracker {
     // let partition = -1
     let index = this.syncTrackerIndex++
-    let syncTracker = { range, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false, isGlobalSyncTracker: false, globalAddressMap: {}, isPartOfInitialSync:initalSync } as SyncTracker // partition,
+    let syncTracker = { range, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false, isGlobalSyncTracker: false, globalAddressMap: {}, isPartOfInitialSync:initalSync, keys:{}  } as SyncTracker // partition,
     syncTracker.syncStarted = false
     syncTracker.syncFinished = false
 
@@ -2080,7 +2091,7 @@ class AccountSync {
   createSyncTrackerByForGlobals(cycle: number, initalSync: boolean = false): SyncTracker {
     // let partition = -1
     let index = this.syncTrackerIndex++
-    let syncTracker = { range: {}, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false, isGlobalSyncTracker: true, globalAddressMap: {}, isPartOfInitialSync:initalSync } as SyncTracker // partition,
+    let syncTracker = { range: {}, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false, isGlobalSyncTracker: true, globalAddressMap: {}, isPartOfInitialSync:initalSync, keys:{} } as SyncTracker // partition,
     syncTracker.syncStarted = false
     syncTracker.syncFinished = false
 
