@@ -58,6 +58,7 @@ class TransactionRepair {
     //   queueEntry.requests = {}
     // }
     if (queueEntry.uniqueKeys == null) {
+      nestedCountersInstance.countEvent('repair1', 'queueEntry.uniqueKeys == null')
       throw new Error('repairToMatchReceipt queueEntry.uniqueKeys == null')
     }
 
@@ -468,6 +469,7 @@ class TransactionRepair {
       } else {
         queueEntry.repairFailed = true
         this.statemanager_fatal(`repairToMatchReceipt_failed`, `tx:${queueEntry.logID} counters:${utils.stringifyReduce({requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash})} `)        
+        nestedCountersInstance.countEvent('repair1', 'failed')
       }
 
       this.profiler.profileSectionEnd('repair')
@@ -504,6 +506,7 @@ class TransactionRepair {
       // STEP 0: need to find the TX
       let txRequestResult = await this.requestMissingTX(txID, refAccountId)
       if(txRequestResult == null || txRequestResult.success != true){
+        nestedCountersInstance.countEvent('repair2', `txRequestResult.success == ${txRequestResult?.success}`)
         this.statemanager_fatal(`repairToMatchReceipt2_a`, `ASK FAIL requestMissingTX   tx:${shortHash} result:${utils.stringifyReduce(txRequestResult)} `)
         return false
       }
@@ -529,6 +532,7 @@ class TransactionRepair {
       uniqueKeys = Object.keys(keyMap)
       
       if(uniqueKeys.length === 0){
+        nestedCountersInstance.countEvent('repair2', `ABORT no covered keys`)
         if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt2: ABORT no covered keys ${utils.stringifyReduce(allKeys)} tx:${shortHash} `)
         if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_noKeys', `${shortHash}`, `ABORT no covered keys  ${utils.stringifyReduce(allKeys)} tx:${shortHash} `)
         return false
@@ -913,6 +917,7 @@ class TransactionRepair {
 
       if(repairFinished == false){
         this.statemanager_fatal(`repairToMatchReceiptNoRecipt_failed`, `counters:${utils.stringifyReduce({missingTXFound, requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash,neededUpdate,upToDateCount,updatedAccountsCount})} `)
+        nestedCountersInstance.countEvent('repair2', 'failed')
       } else {
         if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt2_success', `tx:${shortHash} keys:${utils.stringifyReduce(Object.keys(needUpdateAccounts) )} counters:${utils.stringifyReduce({missingTXFound, requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash,neededUpdate,upToDateCount,updatedAccountsCount})}`)
       }
