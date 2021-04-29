@@ -88,7 +88,7 @@ class TransactionQueue {
     this.newAcceptedTxQueueRunning = false
 
     this.processingLastRunTime = 0
-    this.processingMinRunBreak = 100
+    this.processingMinRunBreak = 200 //200ms breaks between processing loops
   }
 
   /***
@@ -796,6 +796,7 @@ class TransactionQueue {
         hasValidFinalData: false,
         pendingDataRequest: false,
         newVotes: false,
+        fromClient: sendGossip,
       } // age comes from timestamp
 
       // todo faster hash lookup for this maybe?
@@ -1889,7 +1890,7 @@ class TransactionQueue {
           if (age > timeM * 0.9) {
             // IT turns out the correct thing to check is didSync flag only report errors if we did not wait on this TX while syncing
             if (txQueueEntry.didSync == false) {
-              this.statemanager_fatal(`processAcceptedTxQueue_oldTX.9`, 'processAcceptedTxQueue cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
+              this.statemanager_fatal(`processAcceptedTxQueue_oldTX.9 fromClient:${txQueueEntry.fromClient}`, `processAcceptedTxQueue cannot accept tx older than 0.9M ${timestamp} age: ${age} fromClient:${txQueueEntry.fromClient}`)
               if (logFlags.playback) this.logger.playbackLogNote('shrd_processAcceptedTxQueueTooOld1', `${utils.makeShortHash(txQueueEntry.acceptedTx.id)}`, 'processAcceptedTxQueue working on older tx ' + timestamp + ' age: ' + age)
               //txQueueEntry.waitForReceiptOnly = true
             }

@@ -98,6 +98,8 @@ type QueueEntry = {
     hasValidFinalData:boolean;
 
     pendingDataRequest:boolean;
+
+    fromClient:boolean; //from a client, or from another node in the network
 };
 
 type SyncTracker = {
