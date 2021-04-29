@@ -124,12 +124,12 @@ function getExpiredRemoved(start: CycleRecord['start']) {
   if (expireTimestamp < 0) expireTimestamp = 0
 
   let maxRemove = config.p2p.maxRotatedPerCycle
-  if (maxRemove > active - desired) maxRemove = active - desired
-
-  if (config.p2p.maxRotatedPerCycle < 1) {
+  if (maxRemove < 1) {
     if (active - desired > 0) maxRemove = active - desired
     if (maxRemove > config.p2p.amountToScale)
       maxRemove = config.p2p.amountToScale
+  } else {
+    if (maxRemove > active - desired) maxRemove = active - desired
   }
 
   // Oldest node has index 0
