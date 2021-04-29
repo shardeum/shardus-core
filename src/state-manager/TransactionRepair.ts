@@ -69,6 +69,7 @@ class TransactionRepair {
     let dataApplied = 0
     let failedHash = 0
 
+    let allKeys = []
     try {
       this.stateManager.dataRepairsStarted++
 
@@ -89,7 +90,7 @@ class TransactionRepair {
       //shuffle the array
       utils.shuffleArray(appliedVotes)
 
-      let allKeys = []
+
 
       if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `appliedVotes ${utils.stringifyReduce(appliedVotes)}  `)
       if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `queueEntry.uniqueKeys ${utils.stringifyReduce(queueEntry.uniqueKeys)}`)
@@ -468,7 +469,7 @@ class TransactionRepair {
         queueEntry.hasValidFinalData = true
       } else {
         queueEntry.repairFailed = true
-        this.statemanager_fatal(`repairToMatchReceipt_failed`, `tx:${queueEntry.logID} counters:${utils.stringifyReduce({requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash})} `)        
+        this.statemanager_fatal(`repairToMatchReceipt_failed`, `tx:${queueEntry.logID} counters:${utils.stringifyReduce({requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash})}  keys ${utils.stringifyReduce(allKeys)}  `)        
         nestedCountersInstance.countEvent('repair1', 'failed')
       }
 
@@ -502,7 +503,10 @@ class TransactionRepair {
     let updatedAccounts: { [id: string]: boolean }  = {}
 
     let shortHash = utils.makeShortHash(txID)
+    let allKeys
     try {
+      nestedCountersInstance.countEvent('repair2', `init`)
+
       // STEP 0: need to find the TX
       let txRequestResult = await this.requestMissingTX(txID, refAccountId)
       if(txRequestResult == null || txRequestResult.success != true){
@@ -513,7 +517,7 @@ class TransactionRepair {
       timestamp = txRequestResult.acceptedTX.timestamp
 
       let keysResponse = this.app.getKeyFromTransaction(txRequestResult.acceptedTX.data)
-      let { allKeys } = keysResponse
+      allKeys = keysResponse.allKeys
       cycleToRecordOn = this.stateManager.getCycleNumberFromTimestamp(timestamp)
 
       let originalData = txRequestResult.originalData
@@ -525,18 +529,28 @@ class TransactionRepair {
         //filter only keys that we cover up here.
         let isStored = ShardFunctions.testAddressInRange(key, this.stateManager.currentCycleShardData.nodeShardData.storedPartitions)
         if(isStored != true){
-          continue
+          // continue
+          nestedCountersInstance.countEvent('repair2', `non stored key?`)
         }
+
         keyMap[key] = true
       }
       uniqueKeys = Object.keys(keyMap)
       
-      if(uniqueKeys.length === 0){
-        nestedCountersInstance.countEvent('repair2', `ABORT no covered keys`)
-        if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt2: ABORT no covered keys ${utils.stringifyReduce(allKeys)} tx:${shortHash} `)
-        if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_noKeys', `${shortHash}`, `ABORT no covered keys  ${utils.stringifyReduce(allKeys)} tx:${shortHash} `)
-        return false
-      }
+      // if(uniqueKeys.length === 0){
+
+      //   this.statemanager_fatal('ABORT no covered keys', `ABORT no covered keys  ${utils.stringifyReduce(allKeys)} tx:${shortHash} ${utils.stringifyReduce(this.stateManager.currentCycleShardData.nodeShardData.storedPartitions)} cycle:${this.stateManager.currentCycleShardData.cycleNumber}`)
+      //   nestedCountersInstance.countEvent('repair2', `ABORT no covered keys  ${utils.stringifyReduce(allKeys)} tx:${shortHash} ${utils.stringifyReduce(this.stateManager.currentCycleShardData.nodeShardData.storedPartitions)} cycle:${this.stateManager.currentCycleShardData.cycleNumber}`)
+      //   if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt2: ABORT no covered keys ${utils.stringifyReduce(allKeys)} tx:${shortHash} `)
+      //   if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_noKeys', `${shortHash}`, `ABORT no covered keys  ${utils.stringifyReduce(allKeys)} tx:${shortHash} `)
+
+      //   // hack?  pick all the keys
+      //   for (let key of allKeys) {
+      //     keyMap[key] = true
+      //   }
+      //   uniqueKeys = Object.keys(keyMap)
+      //   //return false
+      // }
 
       this.stateManager.dataRepairsStarted++
       this.profiler.profileSectionStart('repair2')
@@ -620,7 +634,9 @@ class TransactionRepair {
               // if the account is not global check if it is in range.
               if (isGlobal === false && ShardFunctions.testAddressInRange(id, nodeShardInfo.storedPartitions) == false) {
                 if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note2', `${shortHash}`, `address not in range ${utils.stringifyReduce(nodeShardInfo.storedPartitions)}  acc:${shortKey}`)
-                continue
+                //continue
+                nestedCountersInstance.countEvent('repair2', `dont skip account for repair..`)
+
               }
               let objectToSet = { appliedVote, voteIndex: j, accountHash: hash, accountId: id, nodeShardInfo, alternates: [] }
               if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note2', `${shortHash}`, `setting key ${utils.stringifyReduce(key)} ${utils.stringifyReduce(objectToSet)}  acc:${shortKey}`)
@@ -639,6 +655,11 @@ class TransactionRepair {
       }
 
       if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_start2', `${shortHash}`, ` AccountsMissing:${utils.stringifyReduce(allKeys)}  requestObject:${utils.stringifyReduce(requestObjects)}`)
+
+      if(requestObjectCount === 0){
+        nestedCountersInstance.countEvent('repair2', `ABORT no covered keys  ${utils.stringifyReduce(allKeys)} tx:${shortHash} cycle:${this.stateManager.currentCycleShardData.cycleNumber}`)
+      }
+
 
       // STEP 2: repear account if needed
       for (let key of uniqueKeys) {
@@ -915,11 +936,27 @@ class TransactionRepair {
         repairFinished = true
       }
 
+      let skippedKeys = []
+      if(updatedAccounts != null){
+        for(let key of allKeys){
+          if(updatedAccounts[key] != true){
+            skippedKeys.push(key)
+          }
+        }        
+      } else {
+        skippedKeys = allKeys
+      }
+
+      if(Object.keys(skippedKeys).length > 0){
+        this.statemanager_fatal(`repairToMatchReceiptNoRecipt_tempSkippedKeys`, `counters:${utils.stringifyReduce({missingTXFound, requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash,neededUpdate,upToDateCount,updatedAccountsCount})} keys ${utils.stringifyReduce(allKeys)} skipped ${utils.stringifyReduce(skippedKeys)}  `)
+      }
+
       if(repairFinished == false){
-        this.statemanager_fatal(`repairToMatchReceiptNoRecipt_failed`, `counters:${utils.stringifyReduce({missingTXFound, requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash,neededUpdate,upToDateCount,updatedAccountsCount})} `)
-        nestedCountersInstance.countEvent('repair2', 'failed')
+        this.statemanager_fatal(`repairToMatchReceiptNoRecipt_failed`, `counters:${utils.stringifyReduce({missingTXFound, requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash,neededUpdate,upToDateCount,updatedAccountsCount})} keys ${utils.stringifyReduce(allKeys)}  skipped ${utils.stringifyReduce(skippedKeys)} `)
+        nestedCountersInstance.countEvent('repair2', 'complete-failed')
       } else {
         if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt2_success', `tx:${shortHash} keys:${utils.stringifyReduce(Object.keys(needUpdateAccounts) )} counters:${utils.stringifyReduce({missingTXFound, requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash,neededUpdate,upToDateCount,updatedAccountsCount})}`)
+        nestedCountersInstance.countEvent('repair2', `complete-ok`)
       }
       
       this.profiler.profileSectionEnd('repair2')
