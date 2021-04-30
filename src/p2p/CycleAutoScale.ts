@@ -14,7 +14,7 @@ import * as Utils from './Utils'
 import * as Network from '../network'
 import deepmerge from 'deepmerge'
 import { request } from 'express'
-import {logFlags} from '../logger'
+import { logFlags } from '../logger'
 
 /** TYPES */
 enum ScaleType {
@@ -62,7 +62,8 @@ const gossipScaleRoute: Types.GossipHandler<SignedScaleRequest> = async (
   sender,
   tracker
 ) => {
-  if(logFlags.p2pNonFatal) info(`Got scale request: ${JSON.stringify(payload)}`)
+  if (logFlags.p2pNonFatal)
+    info(`Got scale request: ${JSON.stringify(payload)}`)
   if (!payload) {
     warn('No payload provided for the `scaling` request.')
     return
@@ -77,7 +78,8 @@ const scalingTestRoute: Types.GossipHandler<SignedScaleRequest> = async (
   sender,
   tracker
 ) => {
-  if(logFlags.p2pNonFatal) info(`Got scale test gossip: ${JSON.stringify(payload)}`)
+  if (logFlags.p2pNonFatal)
+    info(`Got scale test gossip: ${JSON.stringify(payload)}`)
   if (!payload) {
     warn('No payload provided for the `scaling` request.')
     return
@@ -89,13 +91,13 @@ const scalingTestRoute: Types.GossipHandler<SignedScaleRequest> = async (
 const routes = {
   internal: {},
   gossip: {
-    scaling: gossipScaleRoute
+    scaling: gossipScaleRoute,
   },
 }
 
 /** FUNCTIONS */
 
-export function init () {
+export function init() {
   p2pLogger = logger.getLogger('p2p')
   desiredCount = config.p2p.minNodes
 
@@ -104,19 +106,22 @@ export function init () {
   }
 }
 
-export function reset () {
-  console.log('Resetting auto-scale module', `Cycle ${CycleCreator.currentQuarter}, Quarter: ${CycleCreator.currentQuarter}`)
+export function reset() {
+  console.log(
+    'Resetting auto-scale module',
+    `Cycle ${CycleCreator.currentQuarter}, Quarter: ${CycleCreator.currentQuarter}`
+  )
   scalingRequested = false
   scalingRequestsCollector = new Map()
   requestedScalingType = null
   approvedScalingType = null
 }
 
-export function getDesiredCount (): number {
+export function getDesiredCount(): number {
   return desiredCount
 }
 
-function createScaleRequest (scaleType) {
+function createScaleRequest(scaleType) {
   const request: ScaleRequest = {
     nodeId: Self.id,
     timestamp: Date.now(),
@@ -139,7 +144,7 @@ function createScaleRequest (scaleType) {
   return signedReq
 }
 
-async function _requestNetworkScaling (upOrDown) {
+async function _requestNetworkScaling(upOrDown) {
   if (!Self.isActive || scalingRequested) return
   const request = createScaleRequest(upOrDown)
   // await _waitUntilEndOfCycle()
@@ -148,7 +153,7 @@ async function _requestNetworkScaling (upOrDown) {
   scalingRequested = true
 }
 
-export async function requestNetworkUpsize () {
+export async function requestNetworkUpsize() {
   if (getDesiredCount() >= config.p2p.maxNodes) {
     return
   }
@@ -156,7 +161,7 @@ export async function requestNetworkUpsize () {
   await _requestNetworkScaling(ScaleType.UP)
 }
 
-export async function requestNetworkDownsize () {
+export async function requestNetworkDownsize() {
   if (getDesiredCount() <= config.p2p.minNodes) {
     return
   }
@@ -164,12 +169,12 @@ export async function requestNetworkDownsize () {
   await _requestNetworkScaling(ScaleType.DOWN)
 }
 
-async function addExtScalingRequest (scalingRequest) {
+async function addExtScalingRequest(scalingRequest) {
   const added = await _addScalingRequest(scalingRequest)
   return added
 }
 
-function validateScalingRequest (scalingRequest: SignedScaleRequest) {
+function validateScalingRequest(scalingRequest: SignedScaleRequest) {
   // Check existence of fields
   if (
     !scalingRequest.nodeId ||
@@ -231,7 +236,7 @@ function validateScalingRequest (scalingRequest: SignedScaleRequest) {
   return true
 }
 
-async function _checkScaling () {
+async function _checkScaling() {
   // Keep a flag if we have changed our metadata.scaling at all
   let changed = false
 
@@ -302,7 +307,9 @@ export function sendRequests() {}
 
 export function getTxs(): Txs {
   // [IMPORTANT] Must return a copy to avoid mutation
-  const requestsCopy = deepmerge({}, [...Object.values(scalingRequestsCollector)])
+  const requestsCopy = deepmerge({}, [
+    ...Object.values(scalingRequestsCollector),
+  ])
   return {
     autoscaling: requestsCopy,
   }
@@ -330,7 +337,7 @@ export function parseRecord(
   }
 }
 
-function getScaleUpRequests () {
+function getScaleUpRequests() {
   let requests = []
   for (let [nodeId, request] of scalingRequestsCollector) {
     if (request.scale === ScaleType.UP) requests.push(request)
@@ -338,7 +345,7 @@ function getScaleUpRequests () {
   return requests
 }
 
-function getScaleDownRequests () {
+function getScaleDownRequests() {
   let requests = []
   for (let [nodeId, request] of scalingRequestsCollector) {
     if (request.scale === ScaleType.DOWN) requests.push(request)
@@ -346,7 +353,7 @@ function getScaleDownRequests () {
   return requests
 }
 
-async function _addToScalingRequests (scalingRequest) {
+async function _addToScalingRequests(scalingRequest) {
   switch (scalingRequest.scale) {
     case ScaleType.UP:
       if (requestedScalingType === ScaleType.DOWN) {
@@ -389,7 +396,7 @@ async function _addToScalingRequests (scalingRequest) {
   }
 }
 
-async function _addScalingRequest (scalingRequest: SignedScaleRequest) {
+async function _addScalingRequest(scalingRequest: SignedScaleRequest) {
   // Check existence of node
   if (!scalingRequest.nodeId) return
 
@@ -404,11 +411,11 @@ async function _addScalingRequest (scalingRequest: SignedScaleRequest) {
   return added
 }
 
-async function _waitUntilEndOfCycle () {
+async function _waitUntilEndOfCycle() {
   const currentTime = Date.now()
   const nextQ1Start = CycleCreator.nextQ1Start
-  if(logFlags.p2pNonFatal) info(`Current time is: ${currentTime}`)
-  if(logFlags.p2pNonFatal) info(`Next cycle will start at: ${nextQ1Start}`)
+  if (logFlags.p2pNonFatal) info(`Current time is: ${currentTime}`)
+  if (logFlags.p2pNonFatal) info(`Next cycle will start at: ${nextQ1Start}`)
 
   let timeToWait
   if (currentTime < nextQ1Start) {
@@ -416,21 +423,22 @@ async function _waitUntilEndOfCycle () {
   } else {
     timeToWait = 0
   }
-  if(logFlags.p2pNonFatal) info(`Waiting for ${timeToWait} ms before next cycle marker creation...`)
+  if (logFlags.p2pNonFatal)
+    info(`Waiting for ${timeToWait} ms before next cycle marker creation...`)
   await sleep(timeToWait)
 }
 
-function info (...msg) {
+function info(...msg) {
   const entry = `Active: ${msg.join(' ')}`
   p2pLogger.info(entry)
 }
 
-function warn (...msg) {
+function warn(...msg) {
   const entry = `Active: ${msg.join(' ')}`
   p2pLogger.warn(entry)
 }
 
-function error (...msg) {
+function error(...msg) {
   const entry = `Active: ${msg.join(' ')}`
   p2pLogger.error(entry)
 }
