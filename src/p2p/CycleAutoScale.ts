@@ -224,6 +224,14 @@ function validateScalingRequest(scalingRequest: SignedScaleRequest) {
     )
     return false
   }
+  if (node == null) {
+    warn(
+      `Invalid scaling request, not a known node. Request: ${JSON.stringify(
+        scalingRequest
+      )}`
+    )
+    return false
+  }
   // Return false if fails validation for signature
   if (!crypto.verify(scalingRequest, node.publicKey)) {
     warn(
