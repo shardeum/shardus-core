@@ -89,11 +89,15 @@ class TransactionConsenus {
   
         let receiptNotNull = appliedReceipt != null
   
-        if (queueEntry.recievedAppliedReceipt == null) {
+        if (queueEntry.gossipedReceipt === false){
+          queueEntry.gossipedReceipt = true
           if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`)
   
-          queueEntry.recievedAppliedReceipt = appliedReceipt
-  
+
+          if(queueEntry.archived === false){
+            queueEntry.recievedAppliedReceipt = appliedReceipt            
+          }
+
           // I think we handle the negative cases later by checking queueEntry.recievedAppliedReceipt vs queueEntry.appliedReceipt
   
           // share the appliedReceipt.

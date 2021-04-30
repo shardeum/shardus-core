@@ -218,7 +218,8 @@ class TransactionQueue {
       for (let key of payload.keys) {
         let data = queueEntry.originalData[key] // collectedData
         if (data) {
-          response.stateList.push(JSON.parse(data))
+          //response.stateList.push(JSON.parse(data))
+          response.stateList.push(data)
         }
       }
       response.success = true
@@ -797,6 +798,8 @@ class TransactionQueue {
         pendingDataRequest: false,
         newVotes: false,
         fromClient: sendGossip,
+        gossipedReceipt: false,
+        archived: false,
       } // age comes from timestamp
 
       // todo faster hash lookup for this maybe?
@@ -1108,7 +1111,8 @@ class TransactionQueue {
     queueEntry.collectedData[data.accountId] = data
     queueEntry.dataCollected++
 
-    queueEntry.originalData[data.accountId] = stringify(data)
+    //make a deep copy of the data
+    queueEntry.originalData[data.accountId] = JSON.parse(stringify(data))
     queueEntry.beforeHashes[data.accountId] = data.stateId
 
     if (queueEntry.dataCollected === queueEntry.uniqueKeys.length) {
@@ -1791,6 +1795,24 @@ class TransactionQueue {
     this.newAcceptedTxQueue.splice(currentIndex, 1)
     this.newAcceptedTxQueueByID.delete(queueEntry.acceptedTx.id)
 
+    queueEntry.archived = true
+    //compact the queue entry before we push it!
+    queueEntry.ourVote = null
+    queueEntry.collectedVotes = null
+    
+    // coalesce the receipts into applied receipt. maybe not as descriptive, but save memory.
+    queueEntry.appliedReceipt = queueEntry.appliedReceipt ?? queueEntry.recievedAppliedReceipt ?? queueEntry.appliedReceiptForRepair ?? queueEntry.appliedReceiptFinal
+    queueEntry.recievedAppliedReceipt = null
+    queueEntry.appliedReceiptForRepair = null
+    queueEntry.appliedReceiptFinal = queueEntry.appliedReceipt
+
+    delete queueEntry.recievedAppliedReceipt
+    delete queueEntry.appliedReceiptForRepair
+    //delete queueEntry.appliedReceiptFinal
+
+    delete queueEntry.preApplyTXResult
+
+
     this.archivedQueueEntries.push(queueEntry)
 
     this.archivedQueueEntriesByID.set(queueEntry.acceptedTx.id, queueEntry)
@@ -2360,13 +2382,14 @@ class TransactionQueue {
             // Special state that we are put in if we are waiting for a repair to receipt operation to conclude
             if (queueEntry.repairFinished === true) {
               if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitRepair_repairFinished', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} `)
-              this.removeFromQueue(queueEntry, currentIndex)
               if (queueEntry.appliedReceiptForRepair.result === true) {
                 queueEntry.state = 'pass'
               } else {
                 // technically should never get here, because we dont need to repair to a receipt when the network did not apply the TX
                 queueEntry.state = 'fail'
               }
+              // most remove from queue at the end because it compacts the queue entry
+              this.removeFromQueue(queueEntry, currentIndex)              
             }
           } else if (queueEntry.state === 'commiting') {
             ///////////////////////////////////////////--commiting--////////////////////////////////////////////////////////////////
@@ -2476,8 +2499,7 @@ class TransactionQueue {
                 this.statemanager_fatal(`processAcceptedTxQueue2b_ex`, 'processAcceptedTxQueue2 commiting Transaction:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
               } finally {
                 this.processQueue_clearAccountsSeen(seenAccounts, queueEntry)
-                this.removeFromQueue(queueEntry, currentIndex)
-
+                
                 if (queueEntry.noConsensus === true) {
                   // dont have a receipt for a non consensus TX. not even sure if we want to keep that!
                   if (queueEntry.preApplyTXResult.passed === true) {
@@ -2509,6 +2531,9 @@ class TransactionQueue {
                 }
 
                 if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_commitingTxFinished', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${this.processQueue_debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+
+                //moved to end of finally because this does some compacting on the queue entry
+                this.removeFromQueue(queueEntry, currentIndex)
               }
 
               // TODO STATESHARDING4 SYNC related.. need to consider how we will re activate this

@@ -1176,7 +1176,7 @@ class StateManager {
         }
       }
 
-      response.originalData = queueEntry.originalData
+      response.originalData = stringify(queueEntry.originalData)
       response.success = true
       await respond(response)
     })

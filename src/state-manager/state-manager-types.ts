@@ -12,7 +12,7 @@ type QueueEntry = {
     acceptedTx: import("../shardus/shardus-types").AcceptedTx;
     txKeys: import("../shardus/shardus-types").TransactionKeys
     collectedData: WrappedResponses;
-    originalData: {[accountID:string]:string}; //serialized to string backups of account data.
+    originalData: WrappedResponses;//{[accountID:string]:string}; //serialized to string backups of account data.
     beforeHashes: {[accountID:string]:string}; //before hashes of account data
     homeNodes: {[accountID:string]:import('./shardFunctionTypes').NodeShardData};
     patchedOnNodes: Map<string, import('./shardFunctionTypes').NodeShardData>; //{[accountID:string]:import('./shardFunctionTypes').NodeShardData};
@@ -61,6 +61,7 @@ type QueueEntry = {
     // receipt that we created
     appliedReceipt?: AppliedReceipt;
     
+    gossipedReceipt: boolean;
     // receipt that we got from gossip
     recievedAppliedReceipt?: AppliedReceipt;
 
@@ -100,6 +101,8 @@ type QueueEntry = {
     pendingDataRequest:boolean;
 
     fromClient:boolean; //from a client, or from another node in the network
+
+    archived:boolean
 };
 
 type SyncTracker = {
