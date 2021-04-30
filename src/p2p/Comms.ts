@@ -269,6 +269,14 @@ export function registerInternal(route, handler) {
     let tracker = ''
     // Create wrapped respond function for sending back signed data
     const respondWrapped = async (response) => {
+      /**
+       * [TODO] [AS]
+       * If sender is not found in nodelist, _wrapAndTagMessage will try to access
+       * a property of undefined and error out. This might cause some trouble for 
+       * registerInternal handlers that use the respond fn handed to their callbacks
+       * to reply to requests. They might have to be try/catched to avoid crashing
+       * shardus
+       */
       const node = NodeList.nodes.get(sender)
       const signedResponse = _wrapAndTagMessage(
         { ...response, isResponse: true },
