@@ -144,33 +144,33 @@ function createScaleRequest(scaleType) {
   return signedReq
 }
 
-async function _requestNetworkScaling(upOrDown) {
+function _requestNetworkScaling(upOrDown) {
   if (!Self.isActive || scalingRequested) return
   const request = createScaleRequest(upOrDown)
   // await _waitUntilEndOfCycle()
-  await addExtScalingRequest(request)
-  await Comms.sendGossip('scaling', request)
+  addExtScalingRequest(request)
+  Comms.sendGossip('scaling', request)
   scalingRequested = true
 }
 
-export async function requestNetworkUpsize() {
+export function requestNetworkUpsize() {
   if (getDesiredCount() >= config.p2p.maxNodes) {
     return
   }
   console.log('DBG', 'UPSIZE!')
-  await _requestNetworkScaling(ScaleType.UP)
+  _requestNetworkScaling(ScaleType.UP)
 }
 
-export async function requestNetworkDownsize() {
+export function requestNetworkDownsize() {
   if (getDesiredCount() <= config.p2p.minNodes) {
     return
   }
   console.log('DBG', 'DOWNSIZE!')
-  await _requestNetworkScaling(ScaleType.DOWN)
+  _requestNetworkScaling(ScaleType.DOWN)
 }
 
-async function addExtScalingRequest(scalingRequest) {
-  const added = await _addScalingRequest(scalingRequest)
+function addExtScalingRequest(scalingRequest) {
+  const added = _addScalingRequest(scalingRequest)
   return added
 }
 
@@ -244,7 +244,7 @@ function validateScalingRequest(scalingRequest: SignedScaleRequest) {
   return true
 }
 
-async function _checkScaling() {
+function _checkScaling() {
   // Keep a flag if we have changed our metadata.scaling at all
   let changed = false
 
@@ -361,7 +361,7 @@ function getScaleDownRequests() {
   return requests
 }
 
-async function _addToScalingRequests(scalingRequest) {
+function _addToScalingRequests(scalingRequest) {
   switch (scalingRequest.scale) {
     case ScaleType.UP:
       if (requestedScalingType === ScaleType.DOWN) {
@@ -377,7 +377,7 @@ async function _addToScalingRequests(scalingRequest) {
       scalingRequestsCollector.set(scalingRequest.nodeId, scalingRequest)
       requestedScalingType = ScaleType.UP
       // console.log(`Added scale request in cycle ${CycleCreator.currentCycle}, quarter ${CycleCreator.currentQuarter}`, requestedScalingType, scalingRequest)
-      await _checkScaling()
+      _checkScaling()
       return true
     case ScaleType.DOWN:
       // Check if we are already voting scale up, don't add in that case
@@ -392,7 +392,7 @@ async function _addToScalingRequests(scalingRequest) {
       }
       scalingRequestsCollector.set(scalingRequest.nodeId, scalingRequest)
       requestedScalingType = ScaleType.DOWN
-      await _checkScaling()
+      _checkScaling()
       return true
     default:
       warn(
@@ -404,7 +404,7 @@ async function _addToScalingRequests(scalingRequest) {
   }
 }
 
-async function _addScalingRequest(scalingRequest: SignedScaleRequest) {
+function _addScalingRequest(scalingRequest: SignedScaleRequest) {
   // Check existence of node
   if (!scalingRequest.nodeId) return
 
@@ -415,7 +415,7 @@ async function _addScalingRequest(scalingRequest: SignedScaleRequest) {
   if (!valid) return false
 
   // If we pass validation, add to current cycle
-  const added = await _addToScalingRequests(scalingRequest)
+  const added = _addToScalingRequests(scalingRequest)
   return added
 }
 
