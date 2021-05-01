@@ -447,6 +447,12 @@ class AccountSync {
     this.syncStatement.syncStartTime = Date.now()
     this.syncStatement.numNodesOnStart = this.stateManager.currentCycleShardData.activeNodes.length
 
+    // //DO NOT CHECK IN
+    // if(this.syncStatement.numNodesOnStart >= 15) {
+    //   nestedCountersInstance.countEvent('hack', 'force default logs on')
+    //   this.logger.setDefaultFlags()
+    // }
+
     let nodeShardData = this.stateManager.currentCycleShardData.nodeShardData
     if (logFlags.console) console.log('GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
 

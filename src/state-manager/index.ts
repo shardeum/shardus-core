@@ -157,6 +157,8 @@ class StateManager {
 
   lastShardCalculationTS: number
 
+  firstTimeToRuntimeSync: boolean
+
   /***
    *     ######   #######  ##    ##  ######  ######## ########  ##     ##  ######  ########  #######  ########
    *    ##    ## ##     ## ###   ## ##    ##    ##    ##     ## ##     ## ##    ##    ##    ##     ## ##     ##
@@ -296,6 +298,8 @@ class StateManager {
     this.lastShardCalculationTS = -1
 
     this.startShardCalculations()
+
+    this.firstTimeToRuntimeSync = true
 
     //if (logFlags.playback) this.logger.playbackLogNote('canDataRepair', `0`, `canDataRepair: ${this.canDataRepair}  `)
   }
@@ -550,7 +554,22 @@ class StateManager {
       return
     }
 
-    let oldShardData = this.shardValuesByCycle.get(newSharddata.cycleNumber - 1)
+    let cycleToCompareTo = newSharddata.cycleNumber - 1
+    
+    //if this is our first time to sync we should attempt to compare to an older cycle
+    if(this.firstTimeToRuntimeSync === true){
+      this.firstTimeToRuntimeSync = false
+
+      //make sure the cycle started is an older one
+      if(this.accountSync.syncStatement.cycleStarted < cycleToCompareTo){
+        cycleToCompareTo = this.accountSync.syncStatement.cycleStarted
+      } else {
+
+        //in theory we could just return but I dont want to change that side of the branch yet.
+      }
+    }
+
+    let oldShardData = this.shardValuesByCycle.get(cycleToCompareTo)
 
     if (oldShardData == null) {
       // log ?
