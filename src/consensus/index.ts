@@ -85,7 +85,8 @@ class Consensus extends EventEmitter {
         )
       }
 
-      // TODO INJECT: seems to just make sure there is a source and target address..
+      // TODO INJECT: seems to just log errors if the address is missing.  I think we do still want some form of these
+      // logs to help dapp developers quickly catch the mistakes.   
       if (sourceAddress) {
         if (logFlags.debug) {
           this.mainLogger.debug(`get source state id for ${sourceAddress}`)
