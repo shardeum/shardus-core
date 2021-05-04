@@ -883,6 +883,7 @@ class Shardus extends EventEmitter {
         return { success: false, reason: 'Transaction Expired' }
       }
 
+      // TODO INJECT: we hash the TX and use this non typed structure
       const shardusTx: any = {}
       shardusTx.receivedTimestamp = Date.now()
       shardusTx.inTransaction = tx
@@ -896,6 +897,7 @@ class Shardus extends EventEmitter {
         )
       this.profiler.profileSectionStart('put')
 
+      // TODO INJECT: we sign the TX, is this signature ever used?
       const signedShardusTx = this.crypto.sign(shardusTx)
 
       if (logFlags.verbose) this.mainLogger.debug('Transaction validated')
@@ -907,6 +909,8 @@ class Shardus extends EventEmitter {
       )
       //this.profiler.profileSectionStart('consensusInject')
 
+      // TODO INJECT: this is old consensus, and idea for a swapable system, but it does very little work now and the name 
+      //              seems to add complexity
       this.consensus.inject(signedShardusTx, global, noConsensus).then((txReceipt) => {
       //this.profiler.profileSectionEnd('consensusInject')
         if (logFlags.verbose)

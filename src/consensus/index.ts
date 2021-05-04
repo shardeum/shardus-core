@@ -46,12 +46,17 @@ class Consensus extends EventEmitter {
     this.lastServed = 0
   }
 
+  // TODO INJECT: I think we can consider refactoring this code into something else, and eliminate consensus/index.ts
+  //              We also need to consider getting rid of some of the duplicate or unsed efforts here
   async inject(shardusTransaction, global, noConsensus) {
     let transactionReceipt
     const inTransaction = shardusTransaction.inTransaction
     let timestamp = 0
     let debugInfo = ''
     try {
+
+      // TODO INJECT: state manager inject will run getKeyFromTransaction it seems we still need this to create the acceptedTX,
+      //              but the subsequent validation of source and target address seem out of place
       const keysResponse = this.app.getKeyFromTransaction(inTransaction)
       const { sourceKeys, targetKeys } = keysResponse
       timestamp = keysResponse.timestamp
@@ -80,6 +85,7 @@ class Consensus extends EventEmitter {
         )
       }
 
+      // TODO INJECT: seems to just make sure there is a source and target address..
       if (sourceAddress) {
         if (logFlags.debug) {
           this.mainLogger.debug(`get source state id for ${sourceAddress}`)
@@ -115,6 +121,9 @@ class Consensus extends EventEmitter {
           )} `
         )
       }
+
+      // TODO INJECT: this is an old receipt, or a reciept that we got the TX, note that the TX passed in here is also signed, 
+      //              at the most seems like we only need to wrap up and sign the TX once
       transactionReceipt = this.createReceipt(
         inTransaction,
         stateId,
@@ -142,6 +151,7 @@ class Consensus extends EventEmitter {
       throw new Error(ex)
     }
 
+    // TODO INJECT: Creating the accepted TX. I guess we do need this, not sure about he status or the receipt.
     const txStatus = 1 // todo real values for tx status. this is just a stand in
     const txId = transactionReceipt.txHash
     const acceptedTX = {
@@ -152,6 +162,7 @@ class Consensus extends EventEmitter {
       receipt: transactionReceipt,
     }
 
+    // TODO INJECT: we do need to keep this. the arguments are important here.
     this.emit('accepted', acceptedTX,/*send gossip*/ true, null, global, noConsensus)
     this.logger.playbackLogNote(
       'tx_accepted',
