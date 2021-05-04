@@ -34,8 +34,6 @@ class TransactionQueue {
   statsLogger: any
   statemanager_fatal: (key: string, log: string) => void
 
-  applySoftLock: boolean
-
   newAcceptedTxQueue: QueueEntry[]
   newAcceptedTxQueueTempInjest: QueueEntry[]
   archivedQueueEntries: QueueEntry[]
@@ -71,7 +69,6 @@ class TransactionQueue {
     this.statsLogger = logger.getLogger('statsDump')
     this.statemanager_fatal = stateManager.statemanager_fatal
 
-    this.applySoftLock = false
     this.queueStopped = false
     this.queueEntryCounter = 0
     this.queueRestartCounter = 0
@@ -210,8 +207,7 @@ class TransactionQueue {
       if (queueEntry == null) {
         response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
         await respond(response)
-        // TODO ???? if we dont have a queue entry should we do db queries to get the needed data?
-        // my guess is probably not yet
+        // TODO archivedQueueEntries / Memory:  If we keep archived queue entries for less time we need a backup to get thid data in another way
         return
       }
 
@@ -245,7 +241,14 @@ class TransactionQueue {
     return stateHash
   }
 
-  async preApplyTransaction(queueEntry:QueueEntry, filter: AccountFilter): Promise<PreApplyAcceptedTransactionResult> {
+  /**
+   * preApplyTransaction
+   * call into the app code to apply a transaction on our in memory copies of data.
+   * the results will be used for voting/consensus (if non-global)
+   * when a receipt is formed commitConsensedTransaction will actually commit a the data
+   * @param queueEntry 
+   */
+  async preApplyTransaction(queueEntry:QueueEntry): Promise<PreApplyAcceptedTransactionResult> {
     if (this.queueStopped) return
 
     let acceptedTX = queueEntry.acceptedTx
@@ -256,7 +259,13 @@ class TransactionQueue {
     let { sourceKeys, targetKeys, timestamp, debugInfo } = keysResponse
     let uniqueKeys = queueEntry.uniqueKeys
     let accountTimestampsAreOK = true
-    
+    let ourLockID = -1
+    let ourAccountLocks = null
+    let applyResponse: Shardus.ApplyResponse | null = null
+    let isGlobalModifyingTX = (queueEntry.globalModification === true)
+    let passedApply: boolean = false
+    let applyResult: string
+
     if (logFlags.verbose) if (logFlags.console) console.log('preApplyTransaction ' + timestamp + ' debugInfo:' + debugInfo)
     if (logFlags.verbose) this.mainLogger.debug('preApplyTransaction ' + timestamp + ' debugInfo:' + debugInfo)
 
@@ -287,24 +296,10 @@ class TransactionQueue {
       return { applied: false, passed: false, applyResult: '', reason: 'preApplyTransaction pretest failed, TX rejected' }
     }
 
-    /////////////
-    let ourLockID = -1
-    let ourAccountLocks = null
-    let applyResponse: Shardus.ApplyResponse | null = null
-    //have to figure out if this is a global modifying tx, since that impacts if we will write to global account.
-    let isGlobalModifyingTX = false
-
-    let passedApply: boolean = false
-    let applyResult: string
-
     try {
-      if (queueEntry.globalModification === true) {
-        isGlobalModifyingTX = true
-      }
-
       if (logFlags.verbose) {
         this.mainLogger.debug(`preApplyTransaction  txid:${utils.stringifyReduce(acceptedTX.id)} ts:${timestamp} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
-        this.mainLogger.debug(`preApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
+        this.mainLogger.debug(`preApplyTransaction  filter: ${utils.stringifyReduce(queueEntry.localKeys)}`)
         this.mainLogger.debug(`preApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
         this.mainLogger.debug(`preApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
         this.mainLogger.debug(`preApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
@@ -320,21 +315,15 @@ class TransactionQueue {
     
       ourLockID = await this.stateManager.fifoLock('accountModification')
 
-      // if (logFlags.verbose) if (logFlags.console) console.log(`tryPreApplyTransaction  ts:${timestamp} Applying!`)
-      this.applySoftLock = true
-
       applyResponse = this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
-
       if(applyResponse == null){
         throw Error('null response from app.apply')
       }
-
       passedApply = true
       applyResult = 'applied'
 
       if (logFlags.verbose) this.mainLogger.debug(`preApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
 
-      this.applySoftLock = false
     } catch (ex) {
       if(logFlags.error) if (logFlags.error) this.mainLogger.error(`preApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}: ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       if(logFlags.error) if (logFlags.error) this.mainLogger.error(`preApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
@@ -357,30 +346,31 @@ class TransactionQueue {
     return { applied: true, passed: passedApply, applyResult: applyResult, reason: 'apply result', applyResponse: applyResponse }
   }
 
-
-  async commitConsensedTransaction(queueEntry: QueueEntry, filter: AccountFilter): Promise<CommitConsensedTransactionResult> {
+/**
+ * commitConsensedTransaction
+ * This works with our in memory copies of data that have had a TX applied.
+ * This calls into the app to save data and also updates:
+ *    acceptedTransactions, stateTableData and accountsCopies DB tables
+ *    accountCache and accountStats
+ * @param queueEntry 
+ */
+  async commitConsensedTransaction(queueEntry: QueueEntry): Promise<CommitConsensedTransactionResult> {
     let ourLockID = -1
     let accountDataList
     let uniqueKeys = []
     let ourAccountLocks = null
-
     let acceptedTX = queueEntry.acceptedTx
-    let wrappedStates = queueEntry.collectedData // Object.values(queueEntry.collectedData)
+    let wrappedStates = queueEntry.collectedData
     let localCachedData = queueEntry.localCachedData
     let keysResponse = queueEntry.txKeys
     let { timestamp, sourceKeys, targetKeys, debugInfo } = keysResponse
     let applyResponse = queueEntry.preApplyTXResult.applyResponse
-    //have to figure out if this is a global modifying tx, since that impacts if we will write to global account.
-    let isGlobalModifyingTX = false
+    let isGlobalModifyingTX = (queueEntry.globalModification === true)
     let savedSomething = false
     try {
-      if (queueEntry.globalModification === true) {
-        isGlobalModifyingTX = true
-      }
-      
       if (logFlags.verbose){
         this.mainLogger.debug(`commitConsensedTransaction  ts:${timestamp} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
-        this.mainLogger.debug(`commitConsensedTransaction  filter: ${utils.stringifyReduce(filter)}`)
+        this.mainLogger.debug(`commitConsensedTransaction  filter: ${utils.stringifyReduce(queueEntry.localKeys)}`)
         this.mainLogger.debug(`commitConsensedTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
         this.mainLogger.debug(`commitConsensedTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
         this.mainLogger.debug(`commitConsensedTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
@@ -398,7 +388,6 @@ class TransactionQueue {
 
       if (logFlags.verbose) if (logFlags.console) console.log(`commitConsensedTransaction  ts:${timestamp} Applying!`)
       // if (logFlags.verbose) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
-      this.applySoftLock = true
 
       let { stateTableResults, accountData: _accountdata } = applyResponse
       accountDataList = _accountdata
@@ -407,6 +396,13 @@ class TransactionQueue {
 
       let note = `setAccountData: tx:${queueEntry.logID} in commitConsensedTransaction. `
 
+      // set a filter based so we only save data for local accounts.  The filter is a slightly different structure than localKeys
+      // decided not to try and merge them just yet, but did accomplish some cleanup of the filter logic
+      let filter: AccountFilter = {}
+      for (let key of Object.keys(queueEntry.localKeys)) {
+        filter[key] = 1
+      }
+
       // wrappedStates are side effected for now
       savedSomething = await this.stateManager.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter, note)
 
@@ -414,11 +410,9 @@ class TransactionQueue {
       if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
       if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
 
-      this.applySoftLock = false
-
       for (let stateT of stateTableResults) {
-        // we have to correct this because it now gets stomped in the vote
         let wrappedRespose = wrappedStates[stateT.accountId]
+        // we have to correct stateBefore because it now gets stomped in the vote, TODO cleaner fix?
         stateT.stateBefore = wrappedRespose.prevStateId
 
         if (logFlags.verbose) if (logFlags.console) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
@@ -434,15 +428,6 @@ class TransactionQueue {
     } catch (ex) {
       this.statemanager_fatal(`commitConsensedTransaction_ex`, 'commitConsensedTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       if (logFlags.debug) this.mainLogger.debug(`commitConsensedTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
-      if (applyResponse) {
-        // && savedSomething){
-        // TSConversion do we really want to record this?
-        // if (!repairing) this.stateManager.partitionObjects.tempRecordTXByCycle(txTs, acceptedTX, false, applyResponse, isGlobalModifyingTX, savedSomething)
-        // record no-op state table fail:
-      } else {
-        // this.fatalLogger.fatal('tryApplyTransaction failed: applyResponse == null')
-      }
-
       return { success: false }
     } finally {
       this.stateManager.fifoUnlock('accountModification', ourLockID)
@@ -451,13 +436,13 @@ class TransactionQueue {
         this.stateManager.bulkFifoUnlockAccounts(uniqueKeys, ourAccountLocks)
       }
       if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction FIFO unlock inner: ${utils.stringifyReduce(uniqueKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
-    
     }
 
-    // have to wrestle with the data a bit so we can backup the full account and not jsut the partial account!
+    // have to wrestle with the data a bit so we can backup the full account and not just the partial account!
     // let dataResultsByKey = {}
     let dataResultsFullList = []
     for (let wrappedData of applyResponse.accountData) {
+      // TODO Before I clean this out, need to test a TX that uses localcache and partital data!!
       // if (wrappedData.isPartial === false) {
       //   dataResultsFullList.push(wrappedData.data)
       // } else {
@@ -469,24 +454,11 @@ class TransactionQueue {
       // dataResultsByKey[wrappedData.accountId] = wrappedData.data
     }
 
-    // this is just for debug!!!
-    if (dataResultsFullList[0] == null) {
-      for (let wrappedData of applyResponse.accountData) {
-        if (wrappedData.localCache != null) {
-          dataResultsFullList.push(wrappedData)
-        }
-        // dataResultsByKey[wrappedData.accountId] = wrappedData.data
-      }
-    }
-    // if(dataResultsFullList == null){
-    //   throw new Error(`tryApplyTransaction (dataResultsFullList == null  ${txTs} ${utils.stringifyReduce(acceptedTX)} `);
-    // }
-
     // TSConversion verified that app.setAccount calls shardus.applyResponseAddState  that adds hash and txid to the data and turns it into AccountData
     let upgradedAccountDataList: Shardus.AccountData[] = (dataResultsFullList as unknown) as Shardus.AccountData[]
 
     let repairing = false
-    // TODO ARCH REVIEW:  do we still need this table.  if so do we need to await writing to it?
+    // TODO ARCH REVIEW:  do we still need this table (answer: yes for sync. for now.).  do we need to await writing to it?
     await this.stateManager.updateAccountsCopyTable(upgradedAccountDataList, repairing, timestamp)
 
     //the first node in the TX group will emit txProcessed.  I think this it to prevent over reporting (one node per tx group will report)
@@ -495,12 +467,11 @@ class TransactionQueue {
     }
     this.stateManager.eventEmitter.emit('txApplied', acceptedTX)
 
+    // STATS update
     this.stateManager.partitionStats.statsTxSummaryUpdate(queueEntry.cycleToRecordOn, queueEntry)
     for (let wrappedData of applyResponse.accountData) {
       //this.stateManager.partitionStats.statsDataSummaryUpdate(wrappedData.prevDataCopy, wrappedData)
-
       let queueData = queueEntry.collectedData[wrappedData.accountId]
-
       if (queueData != null) {
         if (queueData.accountCreated) {
           //account was created to do a summary init
@@ -512,11 +483,8 @@ class TransactionQueue {
         if (logFlags.error) this.mainLogger.error(`commitConsensedTransaction failed to get account data for stats ${wrappedData.accountId}`)
       }
     }
-  
     return { success: true }
   }
-
-
 
   updateHomeInformation(txQueueEntry: QueueEntry) {
     if (this.stateManager.currentCycleShardData != null && txQueueEntry.hasShardInfo === false) {
@@ -2097,17 +2065,8 @@ class TransactionQueue {
                 //   }
                 // }
 
-                let wrappedStates = queueEntry.collectedData
-                let localCachedData = queueEntry.localCachedData
                 try {
-                  let filter: AccountFilter = {}
-                  // need to convert to map of numbers, could refactor this away later
-                  for (let key of Object.keys(queueEntry.localKeys)) {
-                    filter[key] = queueEntry[key] == true ? 1 : 0
-                  }
-
-                  //let txResult = await this.preApplyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates, localCachedData, filter)
-                  let txResult = await this.preApplyTransaction(queueEntry, filter)
+                  let txResult = await this.preApplyTransaction(queueEntry)
                   if (txResult != null && txResult.applied === true) {
                     queueEntry.state = 'consensing'
 
@@ -2295,20 +2254,14 @@ class TransactionQueue {
                 if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_commitingTx', `${shortID}`, `canCommitTX: ${canCommitTX} `)
                 if (canCommitTX) {
                   // this.mainLogger.debug(` processAcceptedTxQueue2. applyAcceptedTransaction ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp} queuerestarts: ${localRestartCounter} queueLen: ${this.newAcceptedTxQueue.length}`)
-                  let filter: AccountFilter = {}
 
-                  //  this filter is always settings 0... seem late in the process to figure out the filter now, should know this earlie
-                  // need to convert to map of numbers, could refactor this away later
-                  for (let key of Object.keys(queueEntry.localKeys)) {
-                    filter[key] = queueEntry[key] == true ? 1 : 0   //this is always 0 but fortunately filter is checking for undefined
-                  }
                   // Need to go back and thing on how this was supposed to work:
                   //queueEntry.acceptedTx.transactionGroup = queueEntry.transactionGroup // Used to not double count txProcessed
 
                   //try {
                   this.profiler.profileSectionStart('commit')
                   
-                  let commitResult = await this.commitConsensedTransaction(queueEntry, filter)
+                  let commitResult = await this.commitConsensedTransaction(queueEntry)
 
                   if(queueEntry.repairFinished){
                     // saw a TODO comment above and befor I axe it want to confirm what is happening after we repair a receipt.
