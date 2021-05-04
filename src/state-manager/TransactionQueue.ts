@@ -245,228 +245,158 @@ class TransactionQueue {
     return stateHash
   }
 
-  async testAccountTimesAndStateTable2(tx: Shardus.OpaqueTransaction, wrappedStates: WrappedStates) {
-    let hasStateTableData = false
+  async preApplyTransaction(queueEntry:QueueEntry, filter: AccountFilter): Promise<PreApplyAcceptedTransactionResult> {
+    if (this.queueStopped) return
 
-    function tryGetAccountData(accountID: string) {
-      return wrappedStates[accountID]
+    let acceptedTX = queueEntry.acceptedTx
+    let wrappedStates = queueEntry.collectedData
+    let localCachedData = queueEntry.localCachedData
+    let tx = acceptedTX.data
+    let keysResponse = queueEntry.txKeys
+    let { sourceKeys, targetKeys, timestamp, debugInfo } = keysResponse
+    let uniqueKeys = queueEntry.uniqueKeys
+    let accountTimestampsAreOK = true
+    
+    if (logFlags.verbose) if (logFlags.console) console.log('preApplyTransaction ' + timestamp + ' debugInfo:' + debugInfo)
+    if (logFlags.verbose) this.mainLogger.debug('preApplyTransaction ' + timestamp + ' debugInfo:' + debugInfo)
+
+    for (let key of uniqueKeys) {
+      if (wrappedStates[key] == null) {
+        if (logFlags.verbose) if (logFlags.console) console.log(`preApplyTransaction missing some account data. timestamp:${timestamp}  key: ${utils.makeShortHash(key)}  debuginfo:${debugInfo}`)
+        return { applied: false, passed: false, applyResult: '', reason: 'missing some account data' }
+      } else {
+        let wrappedState = wrappedStates[key]
+        wrappedState.prevStateId = wrappedState.stateId
+        wrappedState.prevDataCopy = utils.deepCopy(wrappedState.data)
+
+        // important to update the wrappedState timestamp here to prevent bad timestamps from propagating the system
+        let { timestamp: updatedTimestamp, hash: updatedHash } = this.app.getTimestampAndHashFromAccount(wrappedState.data)
+        wrappedState.timestamp = updatedTimestamp
+
+        // check if current account timestamp is too new for this TX
+        if(wrappedState.timestamp >= timestamp){
+          accountTimestampsAreOK = false
+          break;
+        }
+      }
     }
 
-    try {
-      let keysResponse = this.app.getKeyFromTransaction(tx)
-      let { sourceKeys, targetKeys, timestamp } = keysResponse
-      let sourceAddress, sourceState, targetState
-
-      // check account age to make sure it is older than the tx
-      let failedAgeCheck = false
-
-      let accountKeys = Object.keys(wrappedStates)
-      for (let key of accountKeys) {
-        let accountEntry = tryGetAccountData(key)
-        if (accountEntry.timestamp >= timestamp) {
-          failedAgeCheck = true
-          if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable account has future state.  id: ' + utils.makeShortHash(accountEntry.accountId) + ' time: ' + accountEntry.timestamp + ' txTime: ' + timestamp + ' delta: ' + (timestamp - accountEntry.timestamp))
-        }
-      }
-      if (failedAgeCheck) {
-        // if (logFlags.verbose) this.mainLogger.debug('DATASYNC: testAccountTimesAndStateTable accounts have future state ' + timestamp)
-        return { success: false, hasStateTableData }
-      }
-
-      // TODO: even if we keep the code below this line, we should consider combining keys in a set first so that we dont 
-      // double up on work if a key is a source and target.
-
-      // check state table
-      if (Array.isArray(sourceKeys) && sourceKeys.length > 0) {
-        sourceAddress = sourceKeys[0]
-        let accountStates = await this.storage.searchAccountStateTable(sourceAddress, timestamp)
-        if (accountStates.length !== 0) {
-          let accountEntry = tryGetAccountData(sourceAddress)
-          if (accountEntry == null) {
-            return { success: false, hasStateTableData }
-          }
-          sourceState = accountEntry.stateId
-          hasStateTableData = true
-          if (accountStates.length === 0 || accountStates[0].stateBefore !== sourceState) {
-            if (accountStates[0].stateBefore === '0'.repeat(64)) {
-              //sorta broken security hole.
-              if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + 'bypass state comparision if before state was 00000: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
-            } else {
-              if (logFlags.verbose) if (logFlags.console) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1')
-              if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 1 stateId: ' + utils.makeShortHash(sourceState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(sourceAddress))
-              return { success: false, hasStateTableData }
-            }
-          }
-        }
-      }
-      if (Array.isArray(targetKeys) && targetKeys.length > 0) {
-        // targetAddress = targetKeys[0]
-        for (let targetAddress of targetKeys) {
-          let accountStates = await this.storage.searchAccountStateTable(targetAddress, timestamp)
-
-          if (accountStates.length !== 0) {
-            hasStateTableData = true
-            if (accountStates.length !== 0 && accountStates[0].stateBefore !== allZeroes64) {
-              let accountEntry = tryGetAccountData(targetAddress)
-
-              if (accountEntry == null) {
-                if (logFlags.verbose) if (logFlags.console) console.log('testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress))
-                if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ')
-                this.statemanager_fatal(`testAccountTimesAndStateTable_noEntry`, 'testAccountTimesAndStateTable ' + timestamp + ' target state does not exist. address: ' + utils.makeShortHash(targetAddress) + ' accountDataList: ') // todo: consider if this is just an error
-                // fail this because we already check if the before state was all zeroes
-                return { success: false, hasStateTableData }
-              } else {
-                targetState = accountEntry.stateId
-                if (accountStates[0].stateBefore !== targetState) {
-                  if (logFlags.verbose) if (logFlags.console) console.log('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2')
-                  if (logFlags.verbose) this.mainLogger.debug('testAccountTimesAndStateTable ' + timestamp + ' cant apply state 2 stateId: ' + utils.makeShortHash(targetState) + ' stateTable: ' + utils.makeShortHash(accountStates[0].stateBefore) + ' address: ' + utils.makeShortHash(targetAddress))
-                  return { success: false, hasStateTableData }
-                }
-              }
-            }
-          }
-        }
-      }
-    } catch (ex) {
-      this.statemanager_fatal(`testAccountTimesAndStateTable_ex`, 'testAccountTimesAndStateTable failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+    if (!accountTimestampsAreOK) {
+      if (logFlags.verbose) this.mainLogger.debug('preApplyTransaction pretest failed: ' + timestamp)
+      if (logFlags.playback) this.logger.playbackLogNote('tx_preapply_rejected 1', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
+      return { applied: false, passed: false, applyResult: '', reason: 'preApplyTransaction pretest failed, TX rejected' }
     }
-    return { success: true, hasStateTableData }
-  }
 
-  /**
-   * tryPreApplyTransaction this will try to apply a transaction but will not commit the data
-   * @param acceptedTX
-   * @param hasStateTableData
-   * @param repairing
-   * @param filter
-   * @param wrappedStates
-   * @param localCachedData
-   */
-  async tryPreApplyTransaction(acceptedTX: AcceptedTx, hasStateTableData: boolean, repairing: boolean, filter: AccountFilter, wrappedStates: WrappedResponses, localCachedData: LocalCachedData): Promise<{ passed: boolean; applyResult: string; applyResponse?: Shardus.ApplyResponse }> {
+    /////////////
     let ourLockID = -1
-    let accountDataList
-    let txTs = 0
-    let accountKeys = []
     let ourAccountLocks = null
     let applyResponse: Shardus.ApplyResponse | null = null
     //have to figure out if this is a global modifying tx, since that impacts if we will write to global account.
     let isGlobalModifyingTX = false
 
-    try {
-      let tx = acceptedTX.data
-      // let receipt = acceptedTX.receipt
-      let keysResponse = this.app.getKeyFromTransaction(tx)
-      let { timestamp, debugInfo } = keysResponse
-      txTs = timestamp
+    let passedApply: boolean = false
+    let applyResult: string
 
-      let queueEntry = this.getQueueEntry(acceptedTX.id)
-      if (queueEntry != null) {
-        if (queueEntry.globalModification === true) {
-          isGlobalModifyingTX = true
-        }
+    try {
+      if (queueEntry.globalModification === true) {
+        isGlobalModifyingTX = true
       }
 
-      if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  txid:${utils.stringifyReduce(acceptedTX.id)} ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
-      if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
-      if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
-      if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
-      if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
+      if (logFlags.verbose) {
+        this.mainLogger.debug(`preApplyTransaction  txid:${utils.stringifyReduce(acceptedTX.id)} ts:${timestamp} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
+        this.mainLogger.debug(`preApplyTransaction  filter: ${utils.stringifyReduce(filter)}`)
+        this.mainLogger.debug(`preApplyTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
+        this.mainLogger.debug(`preApplyTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+        this.mainLogger.debug(`preApplyTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
+      }
 
       // TODO ARCH REVIEW:  review use of fifo lock of accountModification and account keys.
       // I think we need to consider adding reader-writer lock support so that a non written to global account is a "reader" lock: check but dont aquire
       // consider if it is safe to axe the use of fifolock accountModification.  
-      if (repairing !== true) {
-        // get a list of modified account keys that we will lock
-        let { sourceKeys, targetKeys } = keysResponse
-        for (let accountID of sourceKeys) {
-          accountKeys.push(accountID)
-        }
-        for (let accountID of targetKeys) {
-          accountKeys.push(accountID)
-        }
-        if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` tryPreApplyTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
-        ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(accountKeys)
-        if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` tryPreApplyTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
-      }
-
+      
+      if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` preApplyTransaction FIFO lock outer: ${utils.stringifyReduce(uniqueKeys)} `)
+      ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(uniqueKeys)
+      if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(` preApplyTransaction FIFO lock inner: ${utils.stringifyReduce(uniqueKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+    
       ourLockID = await this.stateManager.fifoLock('accountModification')
 
-      if (logFlags.verbose) if (logFlags.console) console.log(`tryPreApplyTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
+      // if (logFlags.verbose) if (logFlags.console) console.log(`tryPreApplyTransaction  ts:${timestamp} Applying!`)
       this.applySoftLock = true
 
       applyResponse = this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
-      let { stateTableResults, accountData: _accountdata } = applyResponse
-      accountDataList = _accountdata
 
-      if (logFlags.verbose) this.mainLogger.debug(`tryPreApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+      if(applyResponse == null){
+        throw Error('null response from app.apply')
+      }
+
+      passedApply = true
+      applyResult = 'applied'
+
+      if (logFlags.verbose) this.mainLogger.debug(`preApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
 
       this.applySoftLock = false
     } catch (ex) {
-      if(logFlags.error) if (logFlags.error) this.mainLogger.error(`tryPreApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}: ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      if(logFlags.error) if (logFlags.error) this.mainLogger.error(`tryPreApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
+      if(logFlags.error) if (logFlags.error) this.mainLogger.error(`preApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}: ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      if(logFlags.error) if (logFlags.error) this.mainLogger.error(`preApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
 
-      return { passed: false, applyResponse, applyResult: ex.message }
+      passedApply = false
+      applyResult = ex.message
+
     } finally {
       this.stateManager.fifoUnlock('accountModification', ourLockID)
-      if (repairing !== true) {
-        if (ourAccountLocks != null) {
-          this.stateManager.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
-        }
-        if (logFlags.verbose) this.mainLogger.debug(` tryPreApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+      
+      if (ourAccountLocks != null) {
+        this.stateManager.bulkFifoUnlockAccounts(uniqueKeys, ourAccountLocks)
       }
+      if (logFlags.verbose) this.mainLogger.debug(` preApplyTransaction FIFO unlock inner: ${utils.stringifyReduce(uniqueKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
     }
 
-    return { passed: true, applyResponse, applyResult: 'applied' }
+    if (logFlags.playback) this.logger.playbackLogNote('tx_preapplied', `${acceptedTX.id}`, `preApplyTransaction ${timestamp} `)
+    if (logFlags.verbose) this.mainLogger.debug(`preApplyTransaction ${timestamp }`)
+
+    return { applied: true, passed: passedApply, applyResult: applyResult, reason: 'apply result', applyResponse: applyResponse }
   }
 
-  async commitConsensedTransaction(applyResponse: Shardus.ApplyResponse, acceptedTX: AcceptedTx, hasStateTableData: boolean, repairing: boolean, filter: AccountFilter, wrappedStates: WrappedResponses, localCachedData: LocalCachedData): Promise<CommitConsensedTransactionResult> {
+
+  async commitConsensedTransaction(queueEntry: QueueEntry, filter: AccountFilter): Promise<CommitConsensedTransactionResult> {
     let ourLockID = -1
     let accountDataList
-    let txTs = 0
-    let accountKeys = []
+    let uniqueKeys = []
     let ourAccountLocks = null
 
+    let acceptedTX = queueEntry.acceptedTx
+    let wrappedStates = queueEntry.collectedData // Object.values(queueEntry.collectedData)
+    let localCachedData = queueEntry.localCachedData
+    let keysResponse = queueEntry.txKeys
+    let { timestamp, sourceKeys, targetKeys, debugInfo } = keysResponse
+    let applyResponse = queueEntry.preApplyTXResult.applyResponse
     //have to figure out if this is a global modifying tx, since that impacts if we will write to global account.
     let isGlobalModifyingTX = false
     let savedSomething = false
     try {
-      let tx = acceptedTX.data
-      // let receipt = acceptedTX.receipt
-      let keysResponse = this.app.getKeyFromTransaction(tx)
-      let { timestamp, debugInfo } = keysResponse
-      txTs = timestamp
-
-      let queueEntry = this.getQueueEntry(acceptedTX.id)
-      if (queueEntry != null) {
-        if (queueEntry.globalModification === true) {
-          isGlobalModifyingTX = true
-        }
+      if (queueEntry.globalModification === true) {
+        isGlobalModifyingTX = true
       }
-
-      if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  ts:${timestamp} repairing:${repairing} hasStateTableData:${hasStateTableData} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
-      if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  filter: ${utils.stringifyReduce(filter)}`)
-      if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
-      if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
-      if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
-
+      
+      if (logFlags.verbose){
+        this.mainLogger.debug(`commitConsensedTransaction  ts:${timestamp} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
+        this.mainLogger.debug(`commitConsensedTransaction  filter: ${utils.stringifyReduce(filter)}`)
+        this.mainLogger.debug(`commitConsensedTransaction  acceptedTX: ${utils.stringifyReduce(acceptedTX)}`)
+        this.mainLogger.debug(`commitConsensedTransaction  wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+        this.mainLogger.debug(`commitConsensedTransaction  localCachedData: ${utils.stringifyReduce(localCachedData)}`)
+      }
       // TODO ARCH REVIEW:  review use of fifo lock of accountModification and account keys. (more notes in tryPreApplyTransaction() above )
-      if (repairing !== true) {
-        // get a list of modified account keys that we will lock
-        let { sourceKeys, targetKeys } = keysResponse
-        for (let accountID of sourceKeys) {
-          accountKeys.push(accountID)
-        }
-        for (let accountID of targetKeys) {
-          accountKeys.push(accountID)
-        }
-        if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`commitConsensedTransaction FIFO lock outer: ${utils.stringifyReduce(accountKeys)} `)
-        ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(accountKeys)
-        if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`commitConsensedTransaction FIFO lock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
-      }
+      
+      uniqueKeys = queueEntry.uniqueKeys
+
+      if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`commitConsensedTransaction FIFO lock outer: ${utils.stringifyReduce(uniqueKeys)} `)
+      ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(uniqueKeys)
+      if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`commitConsensedTransaction FIFO lock inner: ${utils.stringifyReduce(uniqueKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+    
 
       ourLockID = await this.stateManager.fifoLock('accountModification')
 
-      if (logFlags.verbose) if (logFlags.console) console.log(`commitConsensedTransaction  ts:${timestamp} repairing:${repairing}  Applying!`)
+      if (logFlags.verbose) if (logFlags.console) console.log(`commitConsensedTransaction  ts:${timestamp} Applying!`)
       // if (logFlags.verbose) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
       this.applySoftLock = true
 
@@ -485,25 +415,16 @@ class TransactionQueue {
       if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
 
       this.applySoftLock = false
-      // only write our state table data if we dont already have it in the db
-      if (hasStateTableData === false) {
-        for (let stateT of stateTableResults) {
-          // we have to correct this because it now gets stomped in the vote
-          let wrappedRespose = wrappedStates[stateT.accountId]
-          stateT.stateBefore = wrappedRespose.prevStateId
 
-          if (logFlags.verbose) if (logFlags.console) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
-          if (logFlags.verbose) this.mainLogger.debug('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
-        }
-        await this.storage.addAccountStates(stateTableResults)
-        //want to confirm that we pretty much alway take this branch
-        //pretty sure we would not have this data now
-        nestedCountersInstance.countEvent('stateManager', 'txCommit hasOldStateTable = false')
-      } else {
-        nestedCountersInstance.countEvent('stateManager', 'txCommit hasOldStateTable = true')
+      for (let stateT of stateTableResults) {
+        // we have to correct this because it now gets stomped in the vote
+        let wrappedRespose = wrappedStates[stateT.accountId]
+        stateT.stateBefore = wrappedRespose.prevStateId
+
+        if (logFlags.verbose) if (logFlags.console) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
+        if (logFlags.verbose) this.mainLogger.debug('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
       }
-
-      // post validate that state ended up correctly?
+      await this.storage.addAccountStates(stateTableResults)
 
       // write the accepted TX to storage
       this.storage.addAcceptedTransactions([acceptedTX])
@@ -525,12 +446,12 @@ class TransactionQueue {
       return { success: false }
     } finally {
       this.stateManager.fifoUnlock('accountModification', ourLockID)
-      if (repairing !== true) {
-        if (ourAccountLocks != null) {
-          this.stateManager.bulkFifoUnlockAccounts(accountKeys, ourAccountLocks)
-        }
-        if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction FIFO unlock inner: ${utils.stringifyReduce(accountKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+      
+      if (ourAccountLocks != null) {
+        this.stateManager.bulkFifoUnlockAccounts(uniqueKeys, ourAccountLocks)
       }
+      if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction FIFO unlock inner: ${utils.stringifyReduce(uniqueKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
+    
     }
 
     // have to wrestle with the data a bit so we can backup the full account and not jsut the partial account!
@@ -564,106 +485,38 @@ class TransactionQueue {
     // TSConversion verified that app.setAccount calls shardus.applyResponseAddState  that adds hash and txid to the data and turns it into AccountData
     let upgradedAccountDataList: Shardus.AccountData[] = (dataResultsFullList as unknown) as Shardus.AccountData[]
 
+    let repairing = false
     // TODO ARCH REVIEW:  do we still need this table.  if so do we need to await writing to it?
-    await this.stateManager.updateAccountsCopyTable(upgradedAccountDataList, repairing, txTs)
+    await this.stateManager.updateAccountsCopyTable(upgradedAccountDataList, repairing, timestamp)
 
-    if (!repairing) {
-      //if(savedSomething){
-      //this.stateManager.partitionObjects.tempRecordTXByCycle(txTs, acceptedTX, true, applyResponse, isGlobalModifyingTX, savedSomething)
-      //}
+    //the first node in the TX group will emit txProcessed.  I think this it to prevent over reporting (one node per tx group will report)
+    if (queueEntry != null && queueEntry.transactionGroup != null && this.p2p.getNodeId() === queueEntry.transactionGroup[0].id) {
+      this.stateManager.eventEmitter.emit('txProcessed')
+    }
+    this.stateManager.eventEmitter.emit('txApplied', acceptedTX)
 
-      //WOW this was not good!  had acceptedTX.transactionGroup[0].id
-      //if (this.p2p.getNodeId() === acceptedTX.transactionGroup[0].id) {
+    this.stateManager.partitionStats.statsTxSummaryUpdate(queueEntry.cycleToRecordOn, queueEntry)
+    for (let wrappedData of applyResponse.accountData) {
+      //this.stateManager.partitionStats.statsDataSummaryUpdate(wrappedData.prevDataCopy, wrappedData)
 
-      let queueEntry: QueueEntry | null = this.getQueueEntry(acceptedTX.id)
-      if (queueEntry != null && queueEntry.transactionGroup != null && this.p2p.getNodeId() === queueEntry.transactionGroup[0].id) {
-        this.stateManager.eventEmitter.emit('txProcessed')
-      }
-      this.stateManager.eventEmitter.emit('txApplied', acceptedTX)
+      let queueData = queueEntry.collectedData[wrappedData.accountId]
 
-      this.stateManager.partitionStats.statsTxSummaryUpdate(queueEntry.cycleToRecordOn, queueEntry)
-      for (let wrappedData of applyResponse.accountData) {
-        //this.stateManager.partitionStats.statsDataSummaryUpdate(wrappedData.prevDataCopy, wrappedData)
-
-        let queueData = queueEntry.collectedData[wrappedData.accountId]
-
-        if (queueData != null) {
-          if (queueData.accountCreated) {
-            //account was created to do a summary init
-            //this.stateManager.partitionStats.statsDataSummaryInit(queueEntry.cycleToRecordOn, queueData);
-            this.stateManager.partitionStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, queueData.accountId, queueData.prevDataCopy)
-          }
-          this.stateManager.partitionStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, queueData.prevDataCopy, wrappedData)
-        } else {
-          if (logFlags.error) this.mainLogger.error(`commitConsensedTransaction failed to get account data for stats ${wrappedData.accountId}`)
+      if (queueData != null) {
+        if (queueData.accountCreated) {
+          //account was created to do a summary init
+          //this.stateManager.partitionStats.statsDataSummaryInit(queueEntry.cycleToRecordOn, queueData);
+          this.stateManager.partitionStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, queueData.accountId, queueData.prevDataCopy)
         }
+        this.stateManager.partitionStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, queueData.prevDataCopy, wrappedData)
+      } else {
+        if (logFlags.error) this.mainLogger.error(`commitConsensedTransaction failed to get account data for stats ${wrappedData.accountId}`)
       }
     }
-
+  
     return { success: true }
   }
 
-  /**
-   * preApplyAcceptedTransaction will apply a transaction to the in memory data but will not save the results to the database yet
-   * @param acceptedTX
-   * @param wrappedStates
-   * @param localCachedData
-   * @param filter
-   */
-  async preApplyAcceptedTransaction(acceptedTX: AcceptedTx, wrappedStates: WrappedResponses, localCachedData: LocalCachedData, filter: AccountFilter): Promise<PreApplyAcceptedTransactionResult> {
-    if (this.queueStopped) return
-    let tx = acceptedTX.data
-    let keysResponse = this.app.getKeyFromTransaction(tx)
-    let { sourceKeys, targetKeys, timestamp, debugInfo } = keysResponse
 
-    if (logFlags.verbose) if (logFlags.console) console.log('preApplyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
-    if (logFlags.verbose) this.mainLogger.debug('applyAcceptedTransaction ' + timestamp + ' debugInfo:' + debugInfo)
-
-    let allkeys: string[] = []
-    allkeys = allkeys.concat(sourceKeys)
-    allkeys = allkeys.concat(targetKeys)
-
-    for (let key of allkeys) {
-      if (wrappedStates[key] == null) {
-        if (logFlags.verbose) if (logFlags.console) console.log(`preApplyAcceptedTransaction missing some account data. timestamp:${timestamp}  key: ${utils.makeShortHash(key)}  debuginfo:${debugInfo}`)
-        return { applied: false, passed: false, applyResult: '', reason: 'missing some account data' }
-      } else {
-        let wrappedState = wrappedStates[key]
-        wrappedState.prevStateId = wrappedState.stateId
-
-        wrappedState.prevDataCopy = utils.deepCopy(wrappedState.data)
-
-        // important to update the wrappedState timestamp here to prevent bad timestamps from propagating the system
-        let { timestamp: updatedTimestamp, hash: updatedHash } = this.app.getTimestampAndHashFromAccount(wrappedState.data)
-        wrappedState.timestamp = updatedTimestamp
-      }
-    }
-
-    // TODO ARCH REVIEW: the function does some slow stuff in terms of DB access. can we replace this with accounts cache functionality?
-    // old note:  todo review what we are checking here.
-    let { success, hasStateTableData } = await this.testAccountTimesAndStateTable2(tx, wrappedStates)
-
-    if (!success) {
-      if (logFlags.verbose) this.mainLogger.debug('preApplyAcceptedTransaction pretest failed: ' + timestamp)
-      if (logFlags.playback) this.logger.playbackLogNote('tx_preapply_rejected 1', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
-      return { applied: false, passed: false, applyResult: '', reason: 'preApplyAcceptedTransaction pretest failed, TX rejected' }
-    }
-
-    // TODO STATESHARDING4 I am not sure if this really needs to be split into a function anymore.
-    // That mattered with data repair in older versions of the code, but that may be the wrong thing to do now
-    let preApplyResult = await this.tryPreApplyTransaction(acceptedTX, hasStateTableData, false, filter, wrappedStates, localCachedData)
-
-    if (preApplyResult) {
-      if (logFlags.verbose) this.mainLogger.debug('preApplyAcceptedTransaction SUCCEDED ' + timestamp)
-      if (logFlags.playback) this.logger.playbackLogNote('tx_preapplied', `${acceptedTX.id}`, `AcceptedTransaction: ${utils.stringifyReduce(acceptedTX)}`)
-
-
-    } else {
-      if (logFlags.playback) this.logger.playbackLogNote('tx_preapply_rejected 3', `${acceptedTX.id}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
-    }
-
-    return { applied: true, passed: preApplyResult.passed, applyResult: preApplyResult.applyResult, reason: 'apply result', applyResponse: preApplyResult.applyResponse }
-  }
 
   updateHomeInformation(txQueueEntry: QueueEntry) {
     if (this.stateManager.currentCycleShardData != null && txQueueEntry.hasShardInfo === false) {
@@ -825,7 +678,6 @@ class TransactionQueue {
         if (this.stateManager.testFailChance(this.stateManager.loseTxChance, 'loseTxChance', txQueueEntry.logID, '', logFlags.verbose) === true) {
           return 'lost'
         }
-
         if (this.stateManager.testFailChance(this.stateManager.voteFlipChance, 'voteFlipChance', txQueueEntry.logID, '', logFlags.verbose) === true) {
           txQueueEntry.debugFail_voteFlip = true
         }
@@ -2254,7 +2106,8 @@ class TransactionQueue {
                     filter[key] = queueEntry[key] == true ? 1 : 0
                   }
 
-                  let txResult = await this.preApplyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates, localCachedData, filter)
+                  //let txResult = await this.preApplyAcceptedTransaction(queueEntry.acceptedTx, wrappedStates, localCachedData, filter)
+                  let txResult = await this.preApplyTransaction(queueEntry, filter)
                   if (txResult != null && txResult.applied === true) {
                     queueEntry.state = 'consensing'
 
@@ -2443,26 +2296,19 @@ class TransactionQueue {
                 if (canCommitTX) {
                   // this.mainLogger.debug(` processAcceptedTxQueue2. applyAcceptedTransaction ${queueEntry.entryID} timestamp: ${queueEntry.txKeys.timestamp} queuerestarts: ${localRestartCounter} queueLen: ${this.newAcceptedTxQueue.length}`)
                   let filter: AccountFilter = {}
+
+                  //  this filter is always settings 0... seem late in the process to figure out the filter now, should know this earlie
                   // need to convert to map of numbers, could refactor this away later
                   for (let key of Object.keys(queueEntry.localKeys)) {
-                    filter[key] = queueEntry[key] == true ? 1 : 0
+                    filter[key] = queueEntry[key] == true ? 1 : 0   //this is always 0 but fortunately filter is checking for undefined
                   }
                   // Need to go back and thing on how this was supposed to work:
                   //queueEntry.acceptedTx.transactionGroup = queueEntry.transactionGroup // Used to not double count txProcessed
-                  let hasStateTableData = false
-                  let repairing = false
+
                   //try {
                   this.profiler.profileSectionStart('commit')
-
-                  let commitResult = await this.commitConsensedTransaction(
-                    queueEntry.preApplyTXResult.applyResponse, // TODO STATESHARDING4 ... if we get here from a non standard path may need to get this data from somewhere else
-                    queueEntry.acceptedTx,
-                    hasStateTableData,
-                    repairing,
-                    filter,
-                    wrappedStates,
-                    localCachedData
-                  )
+                  
+                  let commitResult = await this.commitConsensedTransaction(queueEntry, filter)
 
                   if(queueEntry.repairFinished){
                     // saw a TODO comment above and befor I axe it want to confirm what is happening after we repair a receipt.
@@ -2476,7 +2322,6 @@ class TransactionQueue {
                     nestedCountersInstance.countEvent('stateManager', 'commit state fix FinalDataFlag')
                     queueEntry.hasValidFinalData = true
                   }
-
 
                   //} finally {
                   this.profiler.profileSectionEnd('commit')
