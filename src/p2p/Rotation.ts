@@ -85,7 +85,7 @@ export function updateRecord(txs: Txs, record: CycleRecord, prev: CycleRecord) {
   }
 
   // Allow the autoscale module to set this value
-  const { expired, removed } = getExpiredRemoved(prev.start)
+  const { expired, removed } = getExpiredRemoved(prev.start, prev.desired)
 
   record.expired = expired
   record.removed = removed // already sorted
@@ -110,7 +110,7 @@ export function sendRequests() {}
 
 /** Module Functions */
 
-function getExpiredRemoved(start: CycleRecord['start']) {
+export function getExpiredRemoved(start: CycleRecord['start'], desired: CycleRecord['desired']) {
   let expired = 0
   const removed = []
 
@@ -118,7 +118,7 @@ function getExpiredRemoved(start: CycleRecord['start']) {
   if (config.p2p.nodeExpiryAge < 0) return { expired, removed }
 
   const active = NodeList.activeByIdOrder.length
-  const desired = getDesiredCount()
+  // const desired = getDesiredCount()
 
   let expireTimestamp = (start - config.p2p.nodeExpiryAge) * 1000
   if (expireTimestamp < 0) expireTimestamp = 0
@@ -143,7 +143,6 @@ function getExpiredRemoved(start: CycleRecord['start']) {
     // Add it to removed if it isn't full
     if (removed.length < maxRemove) {
       insertSorted(removed, node.id)
-      node.status = Types.NodeStatus.REMOVED
     }
   }
 

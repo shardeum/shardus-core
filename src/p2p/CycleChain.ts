@@ -105,6 +105,7 @@ export function getDebug() {
     const rhash = crypto.hash(record).slice(0, 4)
     const actv = record.active
     const exp = record.expired
+    const desr = record.desired
     const joind = record.joinedConsensors.map(
       (c) => `${c.externalIp}:${c.externalPort}`
     )
@@ -135,7 +136,7 @@ export function getDebug() {
       (c) => `${c.externalIp}:${c.externalPort}-${c.counterRefreshed}`
     )
 
-    const str = `      ${ctr}:${prev}:${rhash} { actv:${actv}, exp:${exp}, joind:[${joind.join()}], actvd:[${actvd.join()}], lost:[${lost.join()}] refu:[${refu.join()}] apop:[${apopd.join()}] rmvd:[${rmvd.join()}], rfshd:[${rfshd.join()}] }`
+    const str = `      ${ctr}:${prev}:${rhash} { actv:${actv}, exp:${exp}, desr:${desr}, joind:[${joind.join()}], actvd:[${actvd.join()}], lost:[${lost.join()}] refu:[${refu.join()}] apop:[${apopd.join()}] rmvd:[${rmvd.join()}], rfshd:[${rfshd.join()}] }`
 
     return str
   })

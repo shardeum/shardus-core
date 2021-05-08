@@ -261,12 +261,14 @@ export function digestCycle(cycle: CycleCreator.CycleRecord) {
     return
   }
 
-  applyNodeListChange(parse(cycle))
+  const changes = parse(cycle)
+  applyNodeListChange(changes)
   CycleChain.append(cycle)
 
   info(`
     Digested C${cycle.counter}
       cycle record: ${JSON.stringify(cycle)}
+      cycle changes: ${JSON.stringify(changes)}
       node list: ${JSON.stringify([...NodeList.nodes.values()])}
       active nodes: ${JSON.stringify(NodeList.activeByIdOrder)}
   `)
