@@ -18,6 +18,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import * as Context from '../p2p/Context'
 import * as Wrapper from '../p2p/Wrapper'
 import * as Self from '../p2p/Self'
+import { potentiallyRemoved } from '../p2p/NodeList'
 
 const allZeroes64 = '0'.repeat(64)
 
@@ -1113,6 +1114,8 @@ class AccountSync {
         40
       )
 
+      nodes = nodes.filter(this.removePotentiallyRemovedNodes)
+
       if (Array.isArray(nodes) === false) {
         if (logFlags.error) this.mainLogger.error(`syncStateTableData: non array returned ${utils.stringifyReduce(nodes)}`)
         return // nothing to do
@@ -2185,6 +2188,10 @@ class AccountSync {
     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: isFirstSeed = true. skipping sync`)
 
     return
+  }
+
+  removePotentiallyRemovedNodes(node){
+    return potentiallyRemoved.has(node.id) != true
   }
 }
 

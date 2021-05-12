@@ -14,6 +14,7 @@ import { time } from 'console'
 import StateManager from '.'
 import { json } from 'sequelize/types'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { potentiallyRemoved } from '../p2p/NodeList'
 
 class TransactionRepair {
   app: Shardus.App
@@ -947,7 +948,7 @@ class TransactionRepair {
         skippedKeys = allKeys
       }
 
-      if(Object.keys(skippedKeys).length > 0){
+      if(Object.keys(skippedKeys).length > 0 && (dataApplied < neededUpdate)){
         this.statemanager_fatal(`repairToMatchReceiptNoRecipt_tempSkippedKeys`, `counters:${utils.stringifyReduce({missingTXFound, requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash,neededUpdate,upToDateCount,updatedAccountsCount})} keys ${utils.stringifyReduce(allKeys)} skipped ${utils.stringifyReduce(skippedKeys)}  `)
       }
 
@@ -1007,7 +1008,7 @@ class TransactionRepair {
       if (node == null) {
         continue
       }
-      if (node.status != 'active') {
+      if (node.status != 'active' || potentiallyRemoved.has(node.id)) {
         continue
       }
       if (node === this.stateManager.currentCycleShardData.ourNode) {
@@ -1086,7 +1087,7 @@ class TransactionRepair {
       if (node == null) {
         continue
       }
-      if (node.status != 'active') {
+      if (node.status != 'active' || potentiallyRemoved.has(node.id)) {
         continue
       }
       if (node === this.stateManager.currentCycleShardData.ourNode) {

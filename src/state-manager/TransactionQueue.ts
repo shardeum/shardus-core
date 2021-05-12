@@ -13,6 +13,7 @@ import Logger, {logFlags} from '../logger'
 import ShardFunctions from './shardFunctions.js'
 import { time } from 'console'
 import StateManager from '.'
+import { potentiallyRemoved } from '../p2p/NodeList'
 
 const http = require('../http')
 const allZeroes64 = '0'.repeat(64)
@@ -1046,7 +1047,7 @@ class TransactionQueue {
           if (node == null) {
             continue
           }
-          if (node.status != 'active') {
+          if (node.status != 'active' || potentiallyRemoved.has(node.id)) {
             continue
           }
           if (node === this.stateManager.currentCycleShardData.ourNode) {
@@ -1179,7 +1180,7 @@ class TransactionQueue {
         if (node == null) {
           continue
         }
-        if (node.status != 'active') {
+        if (node.status != 'active' || potentiallyRemoved.has(node.id)) {
           continue
         }
         if (node === this.stateManager.currentCycleShardData.ourNode) {

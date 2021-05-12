@@ -21,19 +21,11 @@ import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger, {logFlags} from '../logger'
-//import { NodeShardData } from './shardFunctionTypes'
-
 import { throws } from 'assert'
 import * as Context from '../p2p/Context'
-// import { platform } from 'os' //why did this automatically get added?
-//import NodeList from "../p2p/NodeList"
-
-//let shardFunctions = import("./shardFunctions").
-//type foo = ShardFunctionTypes.BasicAddressRange
-
+import { potentiallyRemoved } from '../p2p/NodeList'
 import { response } from 'express'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-
 import PartitionStats from './PartitionStats'
 import AccountCache from './AccountCache'
 import AccountSync from './AccountSync'
@@ -2891,7 +2883,7 @@ class StateManager {
       return false
     }
     let nodeStatus = node.status
-    if (nodeStatus != 'active') {
+    if (nodeStatus != 'active' || potentiallyRemoved.has(node.id)) {
       if (logErrors) if (logFlags.error) this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
       return false
     }
@@ -2945,7 +2937,7 @@ class StateManager {
         continue
       }
       let nodeStatus = node.status
-      if (nodeStatus != 'active') {
+      if (nodeStatus != 'active' || potentiallyRemoved.has(node.id)) {
         if (logErrors) if (logFlags.error) this.mainLogger.error(`isNodeValidForInternalMessage node not active. ${nodeStatus} ${utils.stringifyReduce(nodeId)} ${debugMsg}`)
         continue
       }
