@@ -45,6 +45,7 @@ export let byIdOrder: Node[]
 export let othersByIdOrder: Node[] // used by sendGossipIn
 export let activeByIdOrder: Node[]
 export let activeOthersByIdOrder: Node[]
+export let potentiallyRemoved: Set<Node['id']>
 
 const VERBOSE = false // Use to dump complete NodeList and CycleChain data
 
@@ -65,6 +66,7 @@ export function reset() {
   othersByIdOrder = []
   activeByIdOrder = []
   activeOthersByIdOrder = []
+  potentiallyRemoved = new Set()
 }
 
 export function addNode(node: Node) {

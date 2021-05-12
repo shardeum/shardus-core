@@ -113,6 +113,7 @@ export function sendRequests() {}
 export function getExpiredRemoved(start: CycleRecord['start'], desired: CycleRecord['desired']) {
   let expired = 0
   const removed = []
+  NodeList.potentiallyRemoved.clear()
 
   // Don't expire/remove any if nodeExpiryAge is negative
   if (config.p2p.nodeExpiryAge < 0) return { expired, removed }
@@ -142,6 +143,7 @@ export function getExpiredRemoved(start: CycleRecord['start'], desired: CycleRec
     expired++
     // Add it to removed if it isn't full
     if (removed.length < maxRemove) {
+      NodeList.potentiallyRemoved.add(node.id)
       insertSorted(removed, node.id)
     }
   }
