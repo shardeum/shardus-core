@@ -22,7 +22,11 @@ import Crypto from '../crypto'
 import Logger, {logFlags} from '../logger'
 import { throws } from 'assert'
 import * as Context from '../p2p/Context'
-import { potentiallyRemoved } from '../p2p/NodeList'
+import { potentiallyRemoved, activeByIdOrder, activeOthersByIdOrder } from '../p2p/NodeList'
+import * as Self from '../p2p/Self'
+import * as NodeList from '../p2p/NodeList'
+import * as CycleChain from '../p2p/CycleChain'
+import * as Comms from '../p2p/Comms'
 import { response } from 'express'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import PartitionStats from './PartitionStats'
@@ -405,18 +409,13 @@ class StateManager {
     cycleShardData.nodeShardDataMap = new Map()
     cycleShardData.parititionShardDataMap = new Map()
 
-    //this.p2p.state.getActiveNodes(null)
-    cycleShardData.activeNodes = this.p2p.state.getActiveNodes(null) //this.p2p.getActiveNodes(null)  //this.p2p.state.getActiveNodes(null)
-    // cycleShardData.activeNodes.sort(utils.sort_id_Asc) // function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
-
+    cycleShardData.activeNodes = activeByIdOrder
     cycleShardData.cycleNumber = cycleNumber
-
     cycleShardData.partitionsToSkip = new Map()
-
     cycleShardData.hasCompleteData = false
 
     try {
-      cycleShardData.ourNode = this.p2p.state.getNode(this.p2p.id) // ugh, I bet there is a nicer way to get our node
+      cycleShardData.ourNode = NodeList.nodes.get(Self.id)
     } catch (ex) {
       if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_notactive', `${cycleNumber}`, `  `)
       return
@@ -427,17 +426,17 @@ class StateManager {
       return // no active nodes so stop calculating values
     }
 
-    if (this.config == null || this.config.sharding == null) {
-      throw new Error('this.config.sharding == null')
+    if (this.config === null || this.config.sharding === null) {
+      throw new Error('this.config.sharding === null')
     }
 
-    let cycle = this.p2p.state.getLastCycle()
-    if (cycle != null) {
+    const cycle = CycleChain.getNewest()
+    if (cycle !== null && cycle !== undefined) {
       cycleShardData.timestamp = cycle.start * 1000
       cycleShardData.timestampEndCycle = (cycle.start + cycle.duration) * 1000
     }
 
-    let edgeNodes = this.config.sharding.nodesPerConsensusGroup as number
+    const edgeNodes = this.config.sharding.nodesPerConsensusGroup as number
 
     // save this per cycle?
     cycleShardData.shardGlobals = ShardFunctions.calculateShardGlobals(cycleShardData.activeNodes.length, this.config.sharding.nodesPerConsensusGroup as number, edgeNodes)
@@ -599,8 +598,8 @@ class StateManager {
 
   getCurrentCycleShardData(): CycleShardData | null {
     if (this.currentCycleShardData === null) {
-      let cycle = this.p2p.state.getLastCycle()
-      if (cycle == null) {
+      const cycle = CycleChain.getNewest()
+      if (cycle === null || cycle === undefined) {
         return null
       }
       this.updateShardValues(cycle.counter)
@@ -708,7 +707,7 @@ class StateManager {
 
   // todo need a faster more scalable version of this if we get past afew hundred nodes.
   // getActiveNodesInRange (lowAddress: string, highAddress: string, exclude = []): Shardus.Node[] {
-  //   let allNodes = this.p2p.state.getActiveNodes(this.p2p.id) as Shardus.Node[]
+  //   let allNodes = activeByIdOrder
   //   this.lastActiveNodeCount = allNodes.length
   //   let results = [] as Shardus.Node[]
   //   let count = allNodes.length
@@ -727,7 +726,7 @@ class StateManager {
 
   // todo refactor: move to p2p?
   getRandomNodesInRange(count: number, lowAddress: string, highAddress: string, exclude: string[]): Shardus.Node[] {
-    let allNodes = this.p2p.state.getActiveNodes(this.p2p.id)
+    const allNodes = activeOthersByIdOrder
     this.lastActiveNodeCount = allNodes.length
     this.shuffleArray(allNodes)
     let results = [] as Shardus.Node[]
@@ -804,7 +803,7 @@ class StateManager {
       failedAccountsById[hash] = true
     }
 
-    const lastCycle = this.p2p.state.getLastCycle()
+    const lastCycle = CycleChain.getNewest()
     let cycleNumber = lastCycle.counter
     let accountCopies: AccountCopy[] = []
     for (let accountEntry of goodAccounts) {
@@ -1051,7 +1050,7 @@ class StateManager {
     this.transactionConsensus.setupHandlers()
 
     // p2p ASK
-    this.p2p.registerInternal('request_receipt_for_tx', async (payload: RequestReceiptForTxReq, respond: (arg0: RequestReceiptForTxResp) => any) => {
+    Comms.registerInternal('request_receipt_for_tx', async (payload: RequestReceiptForTxReq, respond: (arg0: RequestReceiptForTxResp) => any) => {
       let response: RequestReceiptForTxResp = { receipt: null, note: '', success: false }
       let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
       if (queueEntry == null) {
@@ -1077,7 +1076,7 @@ class StateManager {
       await respond(response)
     })
 
-    this.p2p.registerInternal('request_state_for_tx_post', async (payload: RequestStateForTxReqPost, respond: (arg0: RequestStateForTxResp) => any) => {
+    Comms.registerInternal('request_state_for_tx_post', async (payload: RequestStateForTxReqPost, respond: (arg0: RequestStateForTxResp) => any) => {
       let response: RequestStateForTxResp = { stateList: [], beforeHashes: {}, note: '', success: false }
       // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
       let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
@@ -1147,7 +1146,7 @@ class StateManager {
     })
 
 
-    this.p2p.registerInternal('request_tx_and_state', async (payload: {txid:string}, respond: (arg0: RequestTxResp) => any) => {
+    Comms.registerInternal('request_tx_and_state', async (payload: {txid:string}, respond: (arg0: RequestTxResp) => any) => {
       let response: RequestTxResp = { stateList: [], beforeHashes: {}, note: '', success: false, originalData:{} }
 
       let txid = payload.txid
@@ -1194,7 +1193,7 @@ class StateManager {
 
     // TODO STATESHARDING4 ENDPOINTS ok, I changed this to tell, but we still need to check sender!
     //this.p2p.registerGossipHandler('spread_appliedVote', async (payload, sender, tracker) => {
-    this.p2p.registerInternal('spread_appliedVote', async (payload: AppliedVote, respond: any) => {
+    Comms.registerInternal('spread_appliedVote', async (payload: AppliedVote, respond: any) => {
       let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
       if (queueEntry == null) {
         return
@@ -1208,7 +1207,7 @@ class StateManager {
       }
     })
 
-    this.p2p.registerInternal('get_account_data_with_queue_hints', async (payload: { accountIds: string[] }, respond: (arg0: GetAccountDataWithQueueHintsResp) => any) => {
+    Comms.registerInternal('get_account_data_with_queue_hints', async (payload: { accountIds: string[] }, respond: (arg0: GetAccountDataWithQueueHintsResp) => any) => {
       let result = {} as GetAccountDataWithQueueHintsResp //TSConversion  This is complicated !! check app for details.
       let accountData = null
       let ourLockID = -1
@@ -1265,31 +1264,31 @@ class StateManager {
   }
 
   _unregisterEndpoints() {
-    //this.p2p.unregisterGossipHandler('acceptedTx')
-    this.p2p.unregisterInternal('get_account_state_hash')
-    this.p2p.unregisterInternal('get_account_state')
-    //this.p2p.unregisterInternal('get_accepted_transactions')
-    //this.p2p.unregisterInternal('get_account_data')
-    //this.p2p.unregisterInternal('get_account_data2')
-    this.p2p.unregisterInternal('get_account_data3')
-    this.p2p.unregisterInternal('get_account_data_by_list')
-    //this.p2p.unregisterInternal('post_partition_results')
-    //this.p2p.unregisterInternal('get_transactions_by_list')
-    //this.p2p.unregisterInternal('get_transactions_by_partition_index')
-    //this.p2p.unregisterInternal('get_partition_txids')
+    //Comms.unregisterGossipHandler('acceptedTx')
+    Comms.unregisterInternal('get_account_state_hash')
+    Comms.unregisterInternal('get_account_state')
+    //Comms.unregisterInternal('get_accepted_transactions')
+    //Comms.unregisterInternal('get_account_data')
+    //Comms.unregisterInternal('get_account_data2')
+    Comms.unregisterInternal('get_account_data3')
+    Comms.unregisterInternal('get_account_data_by_list')
+    //Comms.unregisterInternal('post_partition_results')
+    //Comms.unregisterInternal('get_transactions_by_list')
+    //Comms.unregisterInternal('get_transactions_by_partition_index')
+    //Comms.unregisterInternal('get_partition_txids')
     // new shard endpoints:
-    // this.p2p.unregisterInternal('route_to_home_node')
-    this.p2p.unregisterInternal('request_state_for_tx')
-    this.p2p.unregisterInternal('request_state_for_tx_post')
-    this.p2p.unregisterInternal('request_tx_and_state')
+    // Comms.unregisterInternal('route_to_home_node')
+    Comms.unregisterInternal('request_state_for_tx')
+    Comms.unregisterInternal('request_state_for_tx_post')
+    Comms.unregisterInternal('request_tx_and_state')
   
-    this.p2p.unregisterInternal('request_receipt_for_tx')
-    this.p2p.unregisterInternal('broadcast_state')
-    this.p2p.unregisterGossipHandler('spread_tx_to_group')
-    this.p2p.unregisterInternal('get_account_data_with_queue_hints')
-    this.p2p.unregisterInternal('get_globalaccountreport')
-    this.p2p.unregisterInternal('spread_appliedVote')
-    this.p2p.unregisterGossipHandler('spread_appliedReceipt')
+    Comms.unregisterInternal('request_receipt_for_tx')
+    Comms.unregisterInternal('broadcast_state')
+    Comms.unregisterGossipHandler('spread_tx_to_group')
+    Comms.unregisterInternal('get_account_data_with_queue_hints')
+    Comms.unregisterInternal('get_globalaccountreport')
+    Comms.unregisterInternal('spread_appliedVote')
+    Comms.unregisterGossipHandler('spread_appliedReceipt')
   }
 
   // //////////////////////////////////////////////////////////////////////////
@@ -1703,7 +1702,7 @@ class StateManager {
       }
 
       let message = { accountIds: [address] }
-      let r: GetAccountDataWithQueueHintsResp | boolean = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
+      let r: GetAccountDataWithQueueHintsResp | boolean = await Comms.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
       if (r === false) {
         if (logFlags.error) this.mainLogger.error('ASK FAIL getLocalOrRemoteAccount r === false')
       }
@@ -1789,7 +1788,7 @@ class StateManager {
     }
 
     let message = { accountIds: [address] }
-    let result = await this.p2p.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
+    let result = await Comms.ask(homeNode.node, 'get_account_data_with_queue_hints', message)
     if (result === false) {
       if (logFlags.error) this.mainLogger.error('ASK FAIL getRemoteAccount result === false')
     }
@@ -1841,7 +1840,7 @@ class StateManager {
 
   getClosestNodesGlobal(hash: string, count: number) {
     let hashNumber = parseInt(hash.slice(0, 7), 16)
-    let nodes = this.p2p.state.getActiveNodes()
+    let nodes = activeByIdOrder
     let nodeDistMap: { id: string; distance: number }[] = nodes.map((node) => ({ id: node.id, distance: Math.abs(hashNumber - parseInt(node.id.slice(0, 7), 16)) }))
     nodeDistMap.sort(this._distanceSortAsc) ////(a, b) => a.distance < b.distance)
     //if (logFlags.console) console.log('SORTED NODES BY DISTANCE', nodes)
@@ -1975,7 +1974,7 @@ class StateManager {
     let cycleOffset = 0
     // todo review this assumption. seems ok at the moment.  are there times cycle could be null and getting the last cycle is not a valid answer?
     if (cycle == null) {
-      cycle = this.p2p.state.getLastCycle()
+      cycle = CycleChain.getNewest()
       // if (logFlags.verbose) if (logFlags.error) this.mainLogger.error( `updateAccountsCopyTable error getting cycle by timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle returned:${cycle.counter} `)
       cycleOffset = 1
     }
@@ -2463,11 +2462,11 @@ class StateManager {
         this.profiler.profileSectionStart('stateManager_cycle_q1_start')
 
         this.eventEmitter.emit('set_queue_partition_gossip')
-        lastCycle = this.p2p.state.getLastCycle()
+        lastCycle = CycleChain.getNewest()
         if (lastCycle) {
-          let ourNode = this.p2p.state.getNode(this.p2p.id)
+          const ourNode = NodeList.nodes.get(Self.id)
 
-          if (ourNode == null) {
+          if (ourNode === null || ourNode === undefined) {
             //dont attempt more calculations we may be shutting down
             return
           }
@@ -2498,7 +2497,7 @@ class StateManager {
         // if (this.currentCycleShardData && this.currentCycleShardData.ourNode.status === 'active') {
         //   this.calculateChangeInCoverage()
         // }
-        lastCycle = this.p2p.state.getLastCycle()
+        lastCycle = CycleChain.getNewest()
         if (lastCycle == null) {
           return
         }
@@ -2532,7 +2531,7 @@ class StateManager {
   }
 
   async processPreviousCycleSummaries() {
-    let lastCycle = this.p2p.state.getLastCycle()
+    let lastCycle = CycleChain.getNewest()
     if (lastCycle == null) {
       return
     }
@@ -2549,6 +2548,7 @@ class StateManager {
     if (cycleShardValues.ourNode.status !== 'active') {
       return
     }
+    // TODO: better to use getCycleChain() from CycleChain module
     let cycle = this.p2p.state.getCycleByCounter(cycleShardValues.cycleNumber)
     if (cycle == null) {
       return
@@ -2819,7 +2819,7 @@ class StateManager {
 
     //is it in the future
     if (offsetTimestamp >= this.currentCycleShardData.timestampEndCycle) {
-      let cycle: Shardus.Cycle = this.p2p.state.getLastCycle()
+      let cycle: Shardus.Cycle = CycleChain.getNewest()
 
       let timePastCurrentCycle = offsetTimestamp - this.currentCycleShardData.timestampEndCycle
       let cyclesAhead = Math.ceil(timePastCurrentCycle / (cycle.duration * 1000))
@@ -2860,7 +2860,7 @@ class StateManager {
         //debug only!!!
         //let cycle2 = this.p2p.state.getCycleByTimestamp(offsetTimestamp)
         //this.statemanager_fatal('getCycleNumberFromTimestamp getCycleByTimestamp failed', 'getCycleByTimestamp getCycleByTimestamp failed')
-        let cycle: Shardus.Cycle = this.p2p.state.getLastCycle()
+        let cycle: Shardus.Cycle = CycleChain.getNewest()
         let cycleEstimate = this.currentCycleShardData.cycleNumber - Math.ceil((this.currentCycleShardData.timestampEndCycle - offsetTimestamp) / (cycle.duration * 1000))
         if(cycleEstimate < 1){
           cycleEstimate = 1
