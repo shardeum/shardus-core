@@ -110,7 +110,10 @@ export function sendRequests() {}
 
 /** Module Functions */
 
-export function getExpiredRemoved(start: CycleRecord['start'], desired: CycleRecord['desired']) {
+export function getExpiredRemoved(
+  start: CycleRecord['start'],
+  desired: CycleRecord['desired']
+) {
   let expired = 0
   const removed = []
   NodeList.potentiallyRemoved.clear()
