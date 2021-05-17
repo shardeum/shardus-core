@@ -280,13 +280,13 @@ function _checkScaling() {
   let newDesired
   switch (approvedScalingType) {
     case ScaleType.UP:
-      newDesired = CycleChain.newest.desired + config.p2p.amountToScale
+      newDesired = CycleChain.newest.desired + config.p2p.amountToGrow
       // If newDesired more than maxNodes, set newDesired to maxNodes
       if (newDesired > config.p2p.maxNodes) newDesired = config.p2p.maxNodes
       setDesireCount(newDesired)
       break
     case ScaleType.DOWN:
-      newDesired = CycleChain.newest.desired - config.p2p.amountToScale
+      newDesired = CycleChain.newest.desired - config.p2p.amountToGrow
       // If newDesired less than minNodes, set newDesired to minNodes
       if (newDesired < config.p2p.minNodes) newDesired = config.p2p.minNodes
       setDesireCount(newDesired)

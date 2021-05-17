@@ -125,10 +125,12 @@ export function getExpiredRemoved(start: CycleRecord['start'], desired: CycleRec
   if (expireTimestamp < 0) expireTimestamp = 0
 
   let maxRemove = config.p2p.maxRotatedPerCycle
+
+  // Allows the network to scale down even if node rotation is turned off
   if (maxRemove < 1) {
     if (active - desired > 0) maxRemove = active - desired
-    if (maxRemove > config.p2p.amountToScale)
-      maxRemove = config.p2p.amountToScale
+    if (maxRemove > config.p2p.amountToShrink)
+      maxRemove = config.p2p.amountToShrink
   } else {
     if (maxRemove > active - desired) maxRemove = active - desired
   }

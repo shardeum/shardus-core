@@ -549,8 +549,10 @@ declare namespace Shardus {
       scaleReqsNeeded?: number
       /** The maxScaleReqs parameter is an Integer specifying the maximum number of scaling requests the network will process before scaling up or down. */
       maxScaleReqs?: number
-      /** The amountToScale parameter is an Integer specifying the amount of nodes to add or remove from the number of desired nodes the network wants. */
-      amountToScale?: number
+      /** The amountToGrow parameter is an Integer specifying the amount of nodes to ADD to the number of desired nodes the network wants. */
+      amountToGrow?: number
+      /** The amountToShrink parameter is an Integer specifying the amount of nodes to REMOVE from the number of desired nodes the network wants. */
+      amountToShrink?: number
       /** If witenss mode is true, node will not join the network but help other nodes to sync the data */
       startInWitnessMode?: boolean
     }

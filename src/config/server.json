@@ -44,7 +44,8 @@
     "maxPercentOfDelta": 40,
     "scaleReqsNeeded": 5,
     "maxScaleReqs": 10,
-    "amountToScale": 1,
+    "amountToGrow": 1,
+    "amountToShrink": 1,
     "startInWitnessMode": false
   },
   "ip": {
