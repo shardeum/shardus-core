@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events'
-import P2P from '.'
+import {p2p as P2P} from './Wrapper'
 import Crypto from '../crypto'
 import Logger, {logFlags} from '../logger'
 import { NetworkClass } from '../network'
@@ -13,7 +13,7 @@ import StateManager from '../state-manager'
 import Storage from '../storage'
 import Reporter from '../reporter'
 
-export type P2PModuleContext = P2P & EventEmitter
+export type P2PModuleContext = typeof P2P
 
 export let p2p: P2PModuleContext
 export let logger: Logger

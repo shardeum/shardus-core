@@ -84,7 +84,7 @@ class P2P extends EventEmitter {
     return Self.id
   }
 
-  initApoptosis(nodes) {
+  initApoptosis() {
     // [TODO] - we need to change apoptosizeSelf
     //          currently it tell all the nodes in the network that it is leaving; not practical in large networks
     //          we should gossip this, but origninal gossip is only allowed in Q1 and the node cannot
@@ -115,7 +115,7 @@ class P2P extends EventEmitter {
   */
 
   goActive() {
-    const activePromise = new Promise((resolve, reject) => {
+    const activePromise = new Promise<void>((resolve, reject) => {
       Self.emitter.on('active', () => resolve())
     })
     Active.requestActive()
@@ -166,7 +166,7 @@ class State extends EventEmitter {
     return getSubsetOfNodeList(NodeList.activeByIdOrder, id)
   }
 
-  getActiveNodes(id) {
+  getActiveNodes(id?) {
     if (id) {
       return Object.values(NodeList.activeOthersByIdOrder)
     } else {
