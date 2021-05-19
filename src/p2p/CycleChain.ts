@@ -1,8 +1,9 @@
 import { Logger } from 'log4js'
-import { crypto, logger } from './Context'
+import { crypto, logger, stateManager } from './Context'
 import { CycleRecord } from './CycleCreator'
 import { nodes } from './NodeList'
 import { LooseObject } from './Types'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 /** TYPES */
 
@@ -81,6 +82,97 @@ export function getCycleChain(start, end = start + 100) {
 
   return cycles.slice(relStart, relEnd + 1)
 }
+export function getCycleByTimestamp(timestamp) {
+  let secondsTs = Math.floor(timestamp * 0.001)
+  // search from end, to improve normal case perf
+  for (let i = cycles.length - 1; i >= 0; i--) {
+    let cycle = cycles[i]
+    if (cycle.start <= secondsTs && cycle.start + cycle.duration > secondsTs) {
+      return cycle
+    }
+  }
+  return null
+}
+
+export function getCycleNumberFromTimestamp(timestamp : number, allowOlder: boolean = true) {
+    let currentCycleShardData = stateManager.getCurrentCycleShardData()
+    let offsetTimestamp = timestamp + stateManager.syncSettleTime
+
+    if(timestamp < 1 || timestamp == null){
+      let stack = new Error().stack
+      stateManager.statemanager_fatal(`getCycleNumberFromTimestamp ${timestamp}`, `getCycleNumberFromTimestamp ${timestamp} ,  ${stack}`)
+    }
+
+    //currentCycleShardData
+    if (currentCycleShardData.timestamp <= offsetTimestamp && offsetTimestamp < currentCycleShardData.timestampEndCycle) {
+      if(currentCycleShardData.cycleNumber == null){
+        stateManager.statemanager_fatal('getCycleNumberFromTimestamp failed. cycleNumber == null', 'currentCycleShardData.cycleNumber == null')
+        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber fail')
+        const cycle = getCycleByTimestamp(offsetTimestamp)
+        console.log("CycleChain.getCycleByTimestamp",cycle)
+        if (cycle != null) {
+          stateManager.statemanager_fatal('getCycleNumberFromTimestamp failed fatal redeemed', 'currentCycleShardData.cycleNumber == null, fatal redeemed')
+          nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber redeemed')
+          return cycle.counter
+        } else {
+          //debug only!!!
+          let cycle2 = getCycleByTimestamp(offsetTimestamp)
+          stateManager.statemanager_fatal('getCycleNumberFromTimestamp failed fatal not redeemed', 'getCycleByTimestamp cycleNumber == null not redeemed')
+          nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber failed to redeem')
+        }
+      } else {
+        return currentCycleShardData.cycleNumber
+      }
+    }
+
+    if(currentCycleShardData.cycleNumber == null){
+      nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber == null')
+      stateManager.statemanager_fatal('getCycleNumberFromTimestamp: currentCycleShardData.cycleNumber == null',`getCycleNumberFromTimestamp: currentCycleShardData.cycleNumber == null ${currentCycleShardData.cycleNumber} timestamp:${timestamp}`)
+
+    }
+
+    //is it in the future
+    if (offsetTimestamp >= currentCycleShardData.timestampEndCycle) {
+      let cycle: CycleRecord = getNewest()
+
+      let timePastCurrentCycle = offsetTimestamp - currentCycleShardData.timestampEndCycle
+      let cyclesAhead = Math.ceil(timePastCurrentCycle / (cycle.duration * 1000))
+      nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `+${cyclesAhead}`)
+
+      return currentCycleShardData.cycleNumber + cyclesAhead
+    }
+    if (allowOlder === true) {
+      //cycle is in the past, by process of elimination
+      // let offsetSeconds = Math.floor(offsetTimestamp * 0.001)
+      const cycle = getCycleByTimestamp(offsetTimestamp)
+      if (cycle != null) {
+        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup')
+        if(cycle.counter == null){
+          stateManager.statemanager_fatal('getCycleNumberFromTimestamp  unexpected cycle.cycleNumber == null', 'getCycleNumberFromTimestamp unexpected cycle.cycleNumber == null')
+          nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `getCycleNumberFromTimestamp unexpected cycle.cycleNumber == null  ${timestamp}`)
+        }
+
+        return cycle.counter
+      } else {
+        //nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle')
+        //debug only!!!
+        //let cycle2 = CycleChain.getCycleByTimestamp(offsetTimestamp)
+        //stateManager.statemanager_fatal('getCycleNumberFromTimestamp getCycleByTimestamp failed', 'getCycleByTimestamp getCycleByTimestamp failed')
+        let cycle: CycleRecord = getNewest()
+        let cycleEstimate = currentCycleShardData.cycleNumber - Math.ceil((currentCycleShardData.timestampEndCycle - offsetTimestamp) / (cycle.duration * 1000))
+        if(cycleEstimate < 1){
+          cycleEstimate = 1
+        }
+        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle: ' + cycleEstimate)
+        return cycleEstimate
+      }
+    }
+
+    //failed to match, return -1
+    stateManager.statemanager_fatal('getCycleNumberFromTimestamp failed final', `getCycleNumberFromTimestamp failed final ${timestamp}`)
+    return -1
+
+}
 
 export function prune(keep: number) {
   const drop = cycles.length - keep
@@ -144,7 +236,7 @@ export function getDebug() {
   const output = `
     DIGESTED:   ${newest ? newest.counter : newest}
     CHAIN:
-${chain.join('\n')}`
+  ${chain.join('\n')}`
 
   return output
 }

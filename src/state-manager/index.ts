@@ -935,7 +935,8 @@ class StateManager {
     for (let wrapedAccount of accountRecords) {
       let { accountId, stateId, data: recordData, timestamp } = wrapedAccount
       let hash = this.app.calculateAccountHash(recordData)
-      let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
+      //let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
+      let cycleToRecordOn = CycleChain.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
       if(cycleToRecordOn == null){
         this.statemanager_fatal(`checkAndSetAccountData cycleToRecordOn==null`, `checkAndSetAccountData cycleToRecordOn==null ${wrapedAccount.timestamp}` )
       }
@@ -1970,7 +1971,9 @@ class StateManager {
   async updateAccountsCopyTable(accountDataList: Shardus.AccountData[], repairing: boolean, txTimestamp: number) {
     let cycleNumber = -1
 
-    let cycle = this.p2p.state.getCycleByTimestamp(txTimestamp + this.syncSettleTime)
+    let cycle = CycleChain.getCycleByTimestamp(txTimestamp + this.syncSettleTime)
+        console.log("CycleChain.getCycleByTimestamp",cycle)
+        console.log("OLD CycleChain.getCycleByTimestamp", this.p2p.state.getCycleByTimestamp(txTimestamp + this.syncSettleTime))
     let cycleOffset = 0
     // todo review this assumption. seems ok at the moment.  are there times cycle could be null and getting the last cycle is not a valid answer?
     if (cycle == null) {
@@ -2085,7 +2088,7 @@ class StateManager {
         }
 
         // Maybe don't try to calculate the cycle number....
-        // const cycle = this.p2p.state.getCycleByTimestamp(timestamp + this.syncSettleTime)
+        // const cycle = CycleChain.getCycleByTimestamp(timestamp + this.syncSettleTime)
         // // find the correct cycle based on timetamp
         // if (!cycle) {
         //   if (logFlags.error) this.mainLogger.error(`_commitAccountCopies failed to get cycle for timestamp ${timestamp} accountId:${utils.makeShortHash(accountId)}`)
@@ -2548,9 +2551,9 @@ class StateManager {
     if (cycleShardValues.ourNode.status !== 'active') {
       return
     }
-    // TODO: better to use getCycleChain() from CycleChain module
-    let cycle = this.p2p.state.getCycleByCounter(cycleShardValues.cycleNumber)
-    if (cycle == null) {
+
+    let cycle = CycleChain.getCycleChain(cycleShardValues.cycleNumber, cycleShardValues.cycleNumber)[0]
+    if (cycle === null || cycle === undefined) {
       return
     }
 
@@ -2784,7 +2787,7 @@ class StateManager {
       this.statemanager_fatal(`getCycleNumberFromTimestamp ${timestamp}`, `getCycleNumberFromTimestamp ${timestamp} ,  ${stack}`)
     }
 
-    // const cycle = this.p2p.state.getCycleByTimestamp(offsetTimestamp)
+    // const cycle = CycleChain.getCycleByTimestamp(offsetTimestamp)
     // if (cycle != null && cycle.counter != null) {
     //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'first lookup')
     //   return cycle.counter
@@ -2795,14 +2798,15 @@ class StateManager {
       if(this.currentCycleShardData.cycleNumber == null){
         this.statemanager_fatal('getCycleNumberFromTimestamp failed. cycleNumber == null', 'this.currentCycleShardData.cycleNumber == null')
         nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber fail')
-        const cycle = this.p2p.state.getCycleByTimestamp(offsetTimestamp)
+        const cycle = CycleChain.getCycleByTimestamp(offsetTimestamp)
+        console.log("CycleChain.getCycleByTimestamp",cycle)
         if (cycle != null) {
           this.statemanager_fatal('getCycleNumberFromTimestamp failed fatal redeemed', 'this.currentCycleShardData.cycleNumber == null, fatal redeemed')
           nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber redeemed')
           return cycle.counter
         } else {
           //debug only!!!
-          let cycle2 = this.p2p.state.getCycleByTimestamp(offsetTimestamp)
+          let cycle2 = CycleChain.getCycleByTimestamp(offsetTimestamp)
           this.statemanager_fatal('getCycleNumberFromTimestamp failed fatal not redeemed', 'getCycleByTimestamp cycleNumber == null not redeemed')
           nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber failed to redeem')
         }
@@ -2846,7 +2850,7 @@ class StateManager {
     if (allowOlder === true) {
       //cycle is in the past, by process of elimination
       // let offsetSeconds = Math.floor(offsetTimestamp * 0.001)
-      const cycle = this.p2p.state.getCycleByTimestamp(offsetTimestamp)
+      const cycle = CycleChain.getCycleByTimestamp(offsetTimestamp)
       if (cycle != null) {
         nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup')
         if(cycle.counter == null){
@@ -2858,7 +2862,7 @@ class StateManager {
       } else {
         //nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle')
         //debug only!!!
-        //let cycle2 = this.p2p.state.getCycleByTimestamp(offsetTimestamp)
+        //let cycle2 = CycleChain.getCycleByTimestamp(offsetTimestamp)
         //this.statemanager_fatal('getCycleNumberFromTimestamp getCycleByTimestamp failed', 'getCycleByTimestamp getCycleByTimestamp failed')
         let cycle: Shardus.Cycle = CycleChain.getNewest()
         let cycleEstimate = this.currentCycleShardData.cycleNumber - Math.ceil((this.currentCycleShardData.timestampEndCycle - offsetTimestamp) / (cycle.duration * 1000))

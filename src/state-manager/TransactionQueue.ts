@@ -13,6 +13,7 @@ import ShardFunctions from './shardFunctions.js'
 import { time } from 'console'
 import StateManager from '.'
 import { potentiallyRemoved } from '../p2p/NodeList'
+import * as CycleChain from '../p2p/CycleChain'
 import { QueueEntry, RequestStateForTxReq, RequestStateForTxResp, PreApplyAcceptedTransactionResult, CommitConsensedTransactionResult, AccountFilter, AcceptedTx, StringBoolObjectMap, RequestReceiptForTxResp, StringNodeObjectMap, SeenAccounts } from './state-manager-types'
 
 const http = require('../http')
@@ -685,7 +686,9 @@ class TransactionQueue {
         this.updateHomeInformation(txQueueEntry)
 
         // calculate information needed for receiptmap
-        txQueueEntry.cycleToRecordOn = this.stateManager.getCycleNumberFromTimestamp(timestamp)
+        //txQueueEntry.cycleToRecordOn = this.stateManager.getCycleNumberFromTimestamp(timestamp)
+        txQueueEntry.cycleToRecordOn = CycleChain.getCycleNumberFromTimestamp(timestamp)
+        console.log("Cycle number from timestamp", timestamp, txQueueEntry.cycleToRecordOn)
         if (txQueueEntry.cycleToRecordOn < 0) {
           nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'caused Enqueue fail')
           if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`routeAndQueueAcceptedTransaction failed to calculate cycle ${timestamp} error code:${txQueueEntry.cycleToRecordOn}`)
