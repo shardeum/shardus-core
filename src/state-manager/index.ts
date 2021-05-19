@@ -2699,7 +2699,6 @@ class StateManager {
    */
 
 
-
   isNodeValidForInternalMessage(nodeId: string, debugMsg: string, checkForNodeDown: boolean = true, checkForNodeLost: boolean = true, checkIsUpRecent: boolean = true): boolean {
     let node: Shardus.Node = this.p2p.state.getNode(nodeId)
     let logErrors = logFlags.debug
