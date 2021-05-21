@@ -36,10 +36,10 @@ function testPartitionMath1_old(numNodes, debugIndex){
       logErrorLimited('debug here')
     }
 
-    let addressRange = ShardFunctions.partitionToAddressRange2_old(shardGlobals, partitionStart)
+    let addressRange = ShardFunctions.partitionToAddressRange2(shardGlobals, partitionStart)
 
-    let lowResult = ShardFunctions.addressToPartition_old(shardGlobals, addressRange.low)
-    let highResult = ShardFunctions.addressToPartition_old(shardGlobals, addressRange.high)
+    let lowResult = ShardFunctions.addressToPartition(shardGlobals, addressRange.low)
+    let highResult = ShardFunctions.addressToPartition(shardGlobals, addressRange.high)
 
     if(partitionStart !== lowResult.homePartition){
       logErrorLimited(`failed partition ${partitionStart} low result: ${lowResult.homePartition}`)

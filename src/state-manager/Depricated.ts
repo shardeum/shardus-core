@@ -4253,7 +4253,581 @@ class Depricated {
   //   return { success: true }
   // }
 
+//     /**
+//      * @param {ShardGlobals} shardGlobals
+//      * @param {number} s1 stored partition left lower bound (always 0)
+//      * @param {number} e1 stored partition left upper bound
+//      * @param {number} s2 stored partition right lower bound
+//      * @param {number} e2 stored partition right upper bound (always highest parition)
+//      * @param {number} start start of consensus range
+//      * @param {number} end end of consensus range
+//      * @returns {{s1:number; e1: number; s2: number; e2: number; split: boolean; changed: boolean }}
+//      */
+//     static mergeDiverseRanges(shardGlobals: ShardGlobals, s1: number, e1: number, s2: number, e2: number, start: number, end: number): MergeResults {
+//         let results = { s1, e1, s2, e2, split: true, changed: false }
 
+//         //These refer to the consensus range haning off the edge of the stored range.  i.e. consenus going further than stored.
+//         let leftOverlap = false
+//         let rightOverlap = false
+//         let leftOverhang = false
+//         let rightOverhang = false
+
+//         let nonSplitConsensusRange = start <= end
+
+//         let storedfullyOverlapsConsensus = false
+
+//         // check overlap in simple case where consensus does not wrap
+//         if (nonSplitConsensusRange) {
+//             // left overlap.  Really this means that there is some overlap of consenus and the left side range of stored partitions
+//             if (s1 <= start && e1 >= start) {
+//                 // number = partition id.   s = stored partition c = consensus partition  ^ = where the test point or points are
+//                 // 0123456789
+//                 // sss      s
+//                 //  ccc
+//                 //  ^
+//                 leftOverlap = true
+//             }
+//             // right overlap  Really this means that there is some overlap of consenus and the right side range of stored partitions
+//             if (s2 <= end && e2 >= end) {
+//                 // 0123456789
+//                 // s      sss
+//                 //       ccc
+//                 //         ^
+//                 rightOverlap = true
+//             }
+
+//             // full overlap left
+//             if (s1 <= start && e1 >= end) {
+//                 // 0123456789
+//                 // sssss    s
+//                 //   ccc
+//                 //   ^ ^
+//                 storedfullyOverlapsConsensus = true
+//             }
+//             // full overlap right
+//             if (s2 <= start && e2 >= end) {
+//                 // 0123456789
+//                 // s    sssss
+//                 //       ccc
+//                 //       ^ ^
+//                 storedfullyOverlapsConsensus = true
+//             }
+//         }
+
+//         // If the consensus range wraps across our ranges then we need to check additional cases
+//         if (nonSplitConsensusRange === false) {
+//             if (s1 <= end && e1 >= end && s2 <= start && e2 >= start) {
+//                 // 0123456789
+//                 // ssss    ss
+//                 // ccc      c
+//                 // ^ ^      ^
+//                 storedfullyOverlapsConsensus = true
+//             }
+
+//             //cases not caught yet?
+//             // 0123456789
+//             // ss     sss
+//             // c     cccc
+//             //
+
+//             // 0123456789
+//             // ss     sss
+//             // ccc     cc
+//             //
+
+//             if (end > e1 && end < s2) {
+//                 // 0123456789
+//                 // ss     sss
+//                 // ccc     cc
+//                 //   ^
+//                 leftOverhang = true
+//             }
+//             // right overlap  Really this means that there is some overlap of consenus and the right side range of stored partitions
+//             if (start < s2 && start > e1) {
+//                 // number = partition id.   s = stored partition c = consensus partition  ^ = where the test point or points are
+//                 // 0123456789
+//                 // ss     sss
+//                 // c     cccc
+//                 //       ^
+//                 rightOverhang = true
+//             }
+//         }
+
+//         // nothing to do ther is full overlap
+//         if (storedfullyOverlapsConsensus === true) {
+//             return results
+//         }
+
+//         if (leftOverlap === false && rightOverlap === false && nonSplitConsensusRange === true) {
+//             let partitionDistanceStart = ShardFunctions.circularDistance(start, e1, shardGlobals.numPartitions)
+//             let partitionDistanceEnd = ShardFunctions.circularDistance(end, s2, shardGlobals.numPartitions)
+
+//             if (partitionDistanceStart < partitionDistanceEnd) {
+//                 // 0123456789
+//                 // ss      ss
+//                 //    cc
+//                 // rrrrr   rr  r= result range
+//                 if (results.e1 < end) {
+//                     results.e1 = end
+//                     results.changed = true
+//                     return results
+//                 }
+//             } else {
+//                 // 0123456789
+//                 // ss      ss
+//                 //      cc
+//                 // rr   rrrrr  r= result range
+//                 if (results.s2 > start) {
+//                     results.s2 = start
+//                     results.changed = true
+//                     return results
+//                 }
+//             }
+//         }
+
+//         if (leftOverlap === true && rightOverlap === true && nonSplitConsensusRange === true) {
+//             // if left and right overlap then all partitions are stored:
+//             // 0123456789
+//             // ss     sss
+//             //  ccccccc
+//             // rrrrrrrrrr  r= result range
+//             if (results.e1 !== results.e2) {
+//                 results.split = false
+//                 results.e1 = results.e2 // s1 -> e1 covers entire range
+//                 results.changed = true
+//                 return results
+//             }
+//         }
+
+//         if (leftOverlap) {
+//             // 0123456789
+//             // sss      s
+//             //  ccc
+//             // rrrr     r
+//             if (results.e1 < end) {
+//                 results.e1 = end
+//                 results.changed = true
+//             }
+//         }
+//         if (rightOverlap) {
+//             // 0123456789
+//             // sss      s
+//             //  ccc
+//             // rrrr     r
+//             if (results.s2 > start) {
+//                 results.s2 = start
+//                 results.changed = true
+//             }
+//         }
+
+//         if (leftOverhang) {
+//             // 0123456789
+//             // ss     sss
+//             // ccc     cc
+//             // rrr    rrr  r= result range
+//             if (results.e1 < end) {
+//                 results.e1 = end
+//                 results.changed = true
+//             }
+//         }
+//         if (rightOverhang) {
+//             // 0123456789
+//             // s      sss
+//             //       ccc
+//             // r     rrrr  r= result range
+//             if (results.s2 > start) {
+//                 results.s2 = start
+//                 results.changed = true
+//             }
+//         }
+
+//         return results
+//     }
+
+//     //TODO TSConversion  get a better output type than any.. switch to an object maybe.
+//     static addressToPartition_old(shardGlobals: ShardGlobals, address: string): { homePartition: number; addressNum: number } {
+//         let numPartitions = shardGlobals.numPartitions
+//         let addressNum = parseInt(address.slice(0, 8), 16)
+//         let homePartition = Math.floor(numPartitions * (addressNum / 0xffffffff))
+//         return { homePartition, addressNum }
+//     }
+
+
+//     // todo memoize this per cycle!!!
+//     // TODO TSConversion partitionMax was equal to null before as optional param. what to do now?
+//     static partitionToAddressRange2_old(shardGlobals: ShardGlobals, partition: number, paritionMax?: number): AddressRange {
+//         let result = {} as AddressRange
+//         result.partition = partition
+//         let startAddr = 0xffffffff * (partition / shardGlobals.numPartitions)
+//         startAddr = Math.ceil(startAddr)
+
+//         result.p_low = partition
+//         //result.p_high = paritionMax // was a TS error
+
+//         let endPartition = partition + 1
+//         if (paritionMax) {
+//             result.p_high = paritionMax
+//             endPartition = paritionMax + 1
+//         } else {
+//             //result.p_high = partition
+//         }
+//         result.partitionEnd = endPartition
+//         let endAddr = 0xffffffff * (endPartition / shardGlobals.numPartitions)
+//         endAddr = Math.ceil(endAddr)
+
+//         // if(endAddr > 0){
+//         //   endAddr = endAddr - 1
+//         // }
+
+//         // it seems we dont need/want this code:
+//         // if (paritionMax === null) {
+//         //   endAddr-- // - 1 // subtract 1 so we don't go into the nex partition
+//         // }
+
+//         result.startAddr = startAddr
+//         result.endAddr = endAddr
+
+//         result.low = ('00000000' + startAddr.toString(16)).slice(-8) + '0'.repeat(56)
+//         result.high = ('00000000' + endAddr.toString(16)).slice(-8) + 'f'.repeat(56)
+
+//         return result
+//     }
+
+//     // TSConversion  fix up any[]
+//     static getNodesThatCoverRange(shardGlobals: ShardGlobals, lowAddress: string, highAddress: string, exclude: string[], activeNodes: Shardus.Node[]) {
+//         // calculate each nodes address position.
+//         // calculate if the nodes reach would cover our full range listed.
+//         // could we use start + delete to avoid wrapping?
+
+//         let circularDistance = function (a: number, b: number, max: number): number {
+//             let directDist = Math.abs(a - b)
+
+//             let wrapDist = directDist
+//             // if (a < b) {
+//             //   wrapDist = Math.abs(a + (max - b))
+//             // } else if (b < a) {
+//             //   wrapDist = Math.abs(b + (max - a))
+//             // }
+
+//             let wrapDist1 = Math.abs(a + (max - b))
+//             let wrapDist2 = Math.abs(b + (max - a))
+//             wrapDist = Math.min(wrapDist1, wrapDist2)
+
+//             return Math.min(directDist, wrapDist)
+//         }
+
+//         let numPartitions = shardGlobals.numPartitions
+//         let nodeLookRange = shardGlobals.nodeLookRange
+
+//         let range = [] as any[]
+
+//         let lowAddressNum = parseInt(lowAddress.slice(0, 8), 16) // assume trailing 0s
+//         let highAddressNum = parseInt(highAddress.slice(0, 8), 16) + 1 // assume trailng fffs
+
+//         // todo start and end loop at smarter areas for efficieny reasones!
+//         let distLow = 0
+//         let distHigh = 0
+
+//         // This isn't a great loop to have for effiency reasons.
+//         for (let i = 0; i < activeNodes.length; i++) {
+//             let node = activeNodes[i]
+//             if (exclude.includes(node.id)) {
+//                 continue
+//             }
+
+//             // could look up node by address??
+
+//             // calculate node middle address..
+//             let nodeAddressNum = parseInt(node.id.slice(0, 8), 16)
+//             // Fix this the center of a partition boundry??
+//             let homePartition = Math.floor(numPartitions * (nodeAddressNum / 0xffffffff))
+//             let centeredAddress = Math.floor(((homePartition + 0.5) * 0xffffffff) / numPartitions)
+
+//             // Math.min(Math.abs(centeredAddress - lowAddressNum), Math.abs(centeredAddress - lowAddressNum))
+
+//             distLow = circularDistance(centeredAddress, lowAddressNum, 0xffffffff) - nodeLookRange
+//             distHigh = circularDistance(centeredAddress, highAddressNum, 0xffffffff) - nodeLookRange
+//             // if (circularDistance(centeredAddress, lowAddressNum, 0xffffffff) > nodeLookRange) {
+//             //   continue
+//             // }
+//             // if (circularDistance(centeredAddress, highAddressNum, 0xffffffff) > nodeLookRange) {
+//             //   continue
+//             // }
+
+//             if (distLow > 0 && distHigh > 0) {
+//                 continue
+//             }
+
+//             // if (Math.abs(centeredAddress - lowAddressNum) > nodeLookRange) {
+//             //   continue
+//             // }
+//             // if (Math.abs(centeredAddress - highAddressNum) > nodeLookRange) {
+//             //   continue
+//             // }
+//             // we are in range!
+//             range.push(node)
+//         }
+//         return range
+//     }
+
+//     /**
+// * This will find two address that are close to what we want
+// * @param {string} address
+// * @returns {{address1:string; address2:string}}
+// *
+// */
+//     static getNextAdjacentAddresses_wip(address: string) {
+//         let addressNum = parseInt(address.slice(0, 8), 16)
+
+//         let addressPrefixHex = ShardFunctions.leadZeros8(addressNum.toString(16))
+
+//         let trail = address.slice(8, 64)
+
+//         if (trail === 'f'.repeat(56)) {
+//             //If we are not at the end look one ahead
+//             if (addressNum < 4294967295) {
+//                 addressNum = addressNum + 1
+//             }
+
+//             let addressPrefixHex2 = ShardFunctions.leadZeros8(addressNum.toString(16))
+
+//             let address1 = addressPrefixHex + 'f'.repeat(56)
+//             let address2 = addressPrefixHex2 + '0'.repeat(56)
+//             return { address1, address2 }
+//         } else {
+//             // if(trail === '0'.repeat(56)){
+//             //If we are not at the end look one ahead
+//             let addressPrefixHex2 = ShardFunctions.leadZeros8(addressNum.toString(16))
+
+//             let address1 = addressPrefixHex + '0'.repeat(56)
+//             let address2 = addressPrefixHex2 + '0'.repeat(55) + '1'
+//             return { address1, address2 }
+//         }
+//         //else real math.
+//     }
+
+//     /**
+//    * getShardDataForCycle
+//    * @param {number} cycleNumber
+//    * @returns {CycleShardData}
+//    */
+//     getShardDataForCycle(cycleNumber: number): CycleShardData | null {
+//         if (this.shardValuesByCycle == null) {
+//             return null
+//         }
+//         let shardData = this.shardValuesByCycle.get(cycleNumber)
+//         //kind of silly but dealing with undefined response from get TSConversion: todo investigate merit of |null vs. |undefined conventions
+//         if (shardData != null) {
+//             return shardData
+//         }
+//         return null
+//     }
+
+//     interruptibleSleep(ms: number, targetTime: number) {
+//         let resolveFn: any = null //TSConversion just setting this to any for now.
+//         let promise = new Promise((resolve) => {
+//             resolveFn = resolve
+//             setTimeout(resolve, ms)
+//         })
+//         return { promise, resolveFn, targetTime }
+//     }
+
+
+//     interruptSleepIfNeeded(targetTime: number) {
+//         if (this.sleepInterrupt) {
+//             if (targetTime < this.sleepInterrupt.targetTime) {
+//                 this.sleepInterrupt.resolveFn()
+//             }
+//         }
+//     }
+
+//     // todo refactor: move to p2p?
+//     getRandomNodesInRange(count: number, lowAddress: string, highAddress: string, exclude: string[]): Shardus.Node[] {
+//         const allNodes = activeOthersByIdOrder
+//         this.lastActiveNodeCount = allNodes.length
+//         utils.shuffleArray(allNodes)
+//         let results = [] as Shardus.Node[]
+//         if (allNodes.length <= count) {
+//             count = allNodes.length
+//         }
+//         for (const node of allNodes) {
+//             if (node.id >= lowAddress && node.id <= highAddress) {
+//                 if (exclude.includes(node.id) === false) {
+//                     results.push(node)
+//                     if (results.length >= count) {
+//                         return results
+//                     }
+//                 }
+//             }
+//         }
+//         return results
+//     }
+
+//     // This will make calls to app.getAccountDataByRange but if we are close enough to real time it will query any newer data and return lastUpdateNeeded = true
+//     async getAccountDataByRangeSmart_App(accountStart: string, accountEnd: string, tsStart: number, maxRecords: number): Promise<GetAccountDataByRangeSmart> {
+//         let tsEnd = Date.now()
+//         let wrappedAccounts = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart, tsEnd, maxRecords)
+//         let lastUpdateNeeded = false
+//         let wrappedAccounts2: WrappedStateArray = []
+//         let highestTs = 0
+//         let delta = 0
+//         // do we need more updates
+//         if (wrappedAccounts.length === 0) {
+//             lastUpdateNeeded = true
+//         } else {
+//             // see if our newest record is new enough
+//             highestTs = 0
+//             for (let account of wrappedAccounts) {
+//                 if (account.timestamp > highestTs) {
+//                     highestTs = account.timestamp
+//                 }
+//             }
+//             delta = tsEnd - highestTs
+//             // if the data we go was close enough to current time then we are done
+//             // may have to be carefull about how we tune this value relative to the rate that we make this query
+//             // we should try to make this query more often then the delta.
+//             if (logFlags.verbose) console.log('delta ' + delta)
+//             // increased allowed delta to allow for a better chance to catch up  
+//             if (delta < this.queueSitTime * 2) {
+//                 let tsStart2 = highestTs
+//                 wrappedAccounts2 = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart2, Date.now(), 10000000)
+//                 lastUpdateNeeded = true
+//             }
+//         }
+//         return { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs, delta }
+//     }
+
+//     /**
+// * storePartitionReceipt
+// * TODO sharding perf.  may need to do periodic cleanup of this and other maps so we can remove data from very old cycles
+// * TODO production need to do something with this data
+// * @param {number} cycleNumber
+// * @param {PartitionReceipt} partitionReceipt
+// */
+//     storePartitionReceipt(cycleNumber: number, partitionReceipt: PartitionReceipt) {
+//         let key = 'c' + cycleNumber
+
+//         if (!this.partitionReceiptsByCycleCounter) {
+//             this.partitionReceiptsByCycleCounter = {}
+//         }
+//         if (!this.partitionReceiptsByCycleCounter[key]) {
+//             this.partitionReceiptsByCycleCounter[key] = []
+//         }
+//         this.partitionReceiptsByCycleCounter[key].push(partitionReceipt)
+
+//         // if (this.debugFeatureOld_partitionReciepts === true) {
+//         //   // this doesnt really send to the archiver but it it does dump reciepts to logs.
+//         //   this.depricated.trySendAndPurgeReceiptsToArchives(partitionReceipt)
+//         // }
+//     }
+
+//     /**
+//    * getCycleNumberFromTimestamp
+//    * cycle numbers are calculated from the queue entry timestamp, but an offset is needed so that we can
+//    * finalize cycles in time. when you start a new cycle there could still be unfinished transactions for
+//    * syncSettleTime milliseconds.
+//    *
+//    * returns a negative number code if we can not determine the cycle
+//    */
+//     getCycleNumberFromTimestamp(timestamp: number, allowOlder: boolean = true): number {
+//         let offsetTimestamp = timestamp + this.syncSettleTime
+
+//         if (timestamp < 1 || timestamp == null) {
+//             let stack = new Error().stack
+//             this.statemanager_fatal(`getCycleNumberFromTimestamp ${timestamp}`, `getCycleNumberFromTimestamp ${timestamp} ,  ${stack}`)
+//         }
+
+//         // const cycle = CycleChain.getCycleByTimestamp(offsetTimestamp)
+//         // if (cycle != null && cycle.counter != null) {
+//         //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'first lookup')
+//         //   return cycle.counter
+//         // }
+
+//         //currentCycleShardData
+//         if (this.currentCycleShardData.timestamp <= offsetTimestamp && offsetTimestamp < this.currentCycleShardData.timestampEndCycle) {
+//             if (this.currentCycleShardData.cycleNumber == null) {
+//                 this.statemanager_fatal('getCycleNumberFromTimestamp failed. cycleNumber == null', 'this.currentCycleShardData.cycleNumber == null')
+//                 nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber fail')
+//                 const cycle = CycleChain.getCycleByTimestamp(offsetTimestamp)
+//                 console.log("CycleChain.getCycleByTimestamp", cycle)
+//                 if (cycle != null) {
+//                     this.statemanager_fatal('getCycleNumberFromTimestamp failed fatal redeemed', 'this.currentCycleShardData.cycleNumber == null, fatal redeemed')
+//                     nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber redeemed')
+//                     return cycle.counter
+//                 } else {
+//                     //debug only!!!
+//                     let cycle2 = CycleChain.getCycleByTimestamp(offsetTimestamp)
+//                     this.statemanager_fatal('getCycleNumberFromTimestamp failed fatal not redeemed', 'getCycleByTimestamp cycleNumber == null not redeemed')
+//                     nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber failed to redeem')
+//                 }
+//             } else {
+//                 return this.currentCycleShardData.cycleNumber
+//             }
+//         }
+
+//         if (this.currentCycleShardData.cycleNumber == null) {
+//             nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'this.currentCycleShardData.cycleNumber == null')
+//             this.statemanager_fatal('getCycleNumberFromTimestamp: currentCycleShardData.cycleNumber == null', `getCycleNumberFromTimestamp: currentCycleShardData.cycleNumber == null ${this.currentCycleShardData.cycleNumber} timestamp:${timestamp}`)
+
+//         }
+
+//         //is it in the future
+//         if (offsetTimestamp >= this.currentCycleShardData.timestampEndCycle) {
+//             let cycle: Shardus.Cycle = CycleChain.getNewest()
+
+//             let timePastCurrentCycle = offsetTimestamp - this.currentCycleShardData.timestampEndCycle
+//             let cyclesAhead = Math.ceil(timePastCurrentCycle / (cycle.duration * 1000))
+//             nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `+${cyclesAhead}`)
+
+//             return this.currentCycleShardData.cycleNumber + cyclesAhead
+
+//             // let endOfNextCycle = this.currentCycleShardData.timestampEndCycle + cycle.duration * 1000
+//             // if (offsetTimestamp < endOfNextCycle /*+ this.syncSettleTime*/) {
+//             //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', '+1')
+//             //   return this.currentCycleShardData.cycleNumber + 1
+//             // } else if (offsetTimestamp < endOfNextCycle + /*this.syncSettleTime +*/ cycle.duration * 1000) {
+//             //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', '+2')
+//             //   //if (logFlags.error) this.mainLogger.error(`getCycleNumberFromTimestamp fail2: endOfNextCycle:${endOfNextCycle} offsetTimestamp:${offsetTimestamp} timestamp:${timestamp}`)
+//             //   return this.currentCycleShardData.cycleNumber + 2
+//             // } else {
+//             //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'too far')
+//             //   this.statemanager_fatal('getCycleNumberFromTimestamp: too far in future',`getCycleNumberFromTimestamp fail: too far in future. endOfNextCycle:${endOfNextCycle} 
+//             //     offsetTimestamp:${offsetTimestamp} timestamp:${timestamp} now:${Date.now()} end of cycle age: ${(Date.now() - endOfNextCycle)/1000}`)
+//             //   //too far in the future
+//             //   return -2
+//             // }
+//         }
+//         if (allowOlder === true) {
+//             //cycle is in the past, by process of elimination
+//             // let offsetSeconds = Math.floor(offsetTimestamp * 0.001)
+//             const cycle = CycleChain.getCycleByTimestamp(offsetTimestamp)
+//             if (cycle != null) {
+//                 nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup')
+//                 if (cycle.counter == null) {
+//                     this.statemanager_fatal('getCycleNumberFromTimestamp  unexpected cycle.cycleNumber == null', 'getCycleNumberFromTimestamp unexpected cycle.cycleNumber == null')
+//                     nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `getCycleNumberFromTimestamp unexpected cycle.cycleNumber == null  ${timestamp}`)
+//                 }
+
+//                 return cycle.counter
+//             } else {
+//                 //nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle')
+//                 //debug only!!!
+//                 //let cycle2 = CycleChain.getCycleByTimestamp(offsetTimestamp)
+//                 //this.statemanager_fatal('getCycleNumberFromTimestamp getCycleByTimestamp failed', 'getCycleByTimestamp getCycleByTimestamp failed')
+//                 let cycle: Shardus.Cycle = CycleChain.getNewest()
+//                 let cycleEstimate = this.currentCycleShardData.cycleNumber - Math.ceil((this.currentCycleShardData.timestampEndCycle - offsetTimestamp) / (cycle.duration * 1000))
+//                 if (cycleEstimate < 1) {
+//                     cycleEstimate = 1
+//                 }
+//                 nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle: ' + cycleEstimate)
+//                 return cycleEstimate
+//             }
+//         }
+
+//         //failed to match, return -1
+//         this.statemanager_fatal('getCycleNumberFromTimestamp failed final', `getCycleNumberFromTimestamp failed final ${timestamp}`)
+//         return -1
+//     }
 }
 
 export default Depricated

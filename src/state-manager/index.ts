@@ -520,23 +520,6 @@ class StateManager {
     cycleShardData.hasCompleteData = true
   }
 
-  /**
-   * getShardDataForCycle
-   * @param {number} cycleNumber
-   * @returns {CycleShardData}
-   */
-  getShardDataForCycle(cycleNumber: number): CycleShardData | null {
-    if (this.shardValuesByCycle == null) {
-      return null
-    }
-    let shardData = this.shardValuesByCycle.get(cycleNumber)
-    //kind of silly but dealing with undefined response from get TSConversion: todo investigate merit of |null vs. |undefined conventions
-    if (shardData != null) {
-      return shardData
-    }
-    return null
-  }
-
   calculateChangeInCoverage(): void {
     // maybe this should be a shard function so we can run unit tests on it for expanding or shrinking networks!
     let newSharddata = this.currentCycleShardData
@@ -629,14 +612,6 @@ class StateManager {
    *    ##     ##    ##     ##  ##       ##    ##
    *     #######     ##    #### ########  ######
    */
-  // todo refactor: this into a util, grabbed it from p2p
-  // From: https://stackoverflow.com/a/12646864
-  shuffleArray(array: any[]) {
-    for (let i = array.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1))
-      ;[array[i], array[j]] = [array[j], array[i]]
-    }
-  }
 
   debugNodeGroup(key, key2, msg, nodes) {
     if (logFlags.playback)
@@ -683,22 +658,6 @@ class StateManager {
     return false
   }
 
-  interruptibleSleep(ms: number, targetTime: number) {
-    let resolveFn: any = null //TSConversion just setting this to any for now.
-    let promise = new Promise((resolve) => {
-      resolveFn = resolve
-      setTimeout(resolve, ms)
-    })
-    return { promise, resolveFn, targetTime }
-  }
-
-  interruptSleepIfNeeded(targetTime: number) {
-    if (this.sleepInterrupt) {
-      if (targetTime < this.sleepInterrupt.targetTime) {
-        this.sleepInterrupt.resolveFn()
-      }
-    }
-  }
 
   // getRandomIndex (list: any[]) {
   //   let max = list.length - 1
@@ -723,28 +682,6 @@ class StateManager {
   //   }
   //   return results
   // }
-
-  // todo refactor: move to p2p?
-  getRandomNodesInRange(count: number, lowAddress: string, highAddress: string, exclude: string[]): Shardus.Node[] {
-    const allNodes = activeOthersByIdOrder
-    this.lastActiveNodeCount = allNodes.length
-    this.shuffleArray(allNodes)
-    let results = [] as Shardus.Node[]
-    if (allNodes.length <= count) {
-      count = allNodes.length
-    }
-    for (const node of allNodes) {
-      if (node.id >= lowAddress && node.id <= highAddress) {
-        if (exclude.includes(node.id) === false) {
-          results.push(node)
-          if (results.length >= count) {
-            return results
-          }
-        }
-      }
-    }
-    return results
-  }
 
   async startCatchUpQueue() {
     await this._firstTimeQueueAwait()
@@ -834,40 +771,6 @@ class StateManager {
   }
 
   // This will make calls to app.getAccountDataByRange but if we are close enough to real time it will query any newer data and return lastUpdateNeeded = true
-  async getAccountDataByRangeSmart_App(accountStart: string, accountEnd: string, tsStart: number, maxRecords: number): Promise<GetAccountDataByRangeSmart> {
-    let tsEnd = Date.now()
-    let wrappedAccounts = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart, tsEnd, maxRecords)
-    let lastUpdateNeeded = false
-    let wrappedAccounts2: WrappedStateArray = []
-    let highestTs = 0
-    let delta = 0
-    // do we need more updates
-    if (wrappedAccounts.length === 0) {
-      lastUpdateNeeded = true
-    } else {
-      // see if our newest record is new enough
-      highestTs = 0
-      for (let account of wrappedAccounts) {
-        if (account.timestamp > highestTs) {
-          highestTs = account.timestamp
-        }
-      }
-      delta = tsEnd - highestTs
-      // if the data we go was close enough to current time then we are done
-      // may have to be carefull about how we tune this value relative to the rate that we make this query
-      // we should try to make this query more often then the delta.
-      if (logFlags.verbose) console.log('delta ' + delta)
-      // increased allowed delta to allow for a better chance to catch up  
-      if (delta < this.queueSitTime * 2) {
-        let tsStart2 = highestTs
-        wrappedAccounts2 = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart2, Date.now(), 10000000)
-        lastUpdateNeeded = true
-      }
-    }
-    return { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs, delta }
-  }
-
-  // This will make calls to app.getAccountDataByRange but if we are close enough to real time it will query any newer data and return lastUpdateNeeded = true
   async getAccountDataByRangeSmart(accountStart: string, accountEnd: string, tsStart: number, maxRecords: number): Promise<GetAccountDataByRangeSmart> {
     let tsEnd = Date.now()
 
@@ -935,7 +838,6 @@ class StateManager {
     for (let wrapedAccount of accountRecords) {
       let { accountId, stateId, data: recordData, timestamp } = wrapedAccount
       let hash = this.app.calculateAccountHash(recordData)
-      //let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
       let cycleToRecordOn = CycleChain.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
       if(cycleToRecordOn == null){
         this.statemanager_fatal(`checkAndSetAccountData cycleToRecordOn==null`, `checkAndSetAccountData cycleToRecordOn==null ${wrapedAccount.timestamp}` )
@@ -973,7 +875,6 @@ class StateManager {
           this.statemanager_fatal(`checkAndSetAccountData ts=0`, `checkAndSetAccountData ts=0 ${debugString}    ${stack}` )
         }
 
-        //let cycleToRecordOn = this.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
         if (this.accountCache.hasAccount(accountId)) {
           //TODO STATS BUG..  this is what can cause one form of stats bug.
           //we may have covered this account in the past, then not covered it, and now we cover it again.  Stats doesn't know how to repair
@@ -2643,29 +2544,6 @@ class StateManager {
    *    ##     ## ########  ######  ######## #### ##           ##     ######
    */
 
-  /**
-   * storePartitionReceipt
-   * TODO sharding perf.  may need to do periodic cleanup of this and other maps so we can remove data from very old cycles
-   * TODO production need to do something with this data
-   * @param {number} cycleNumber
-   * @param {PartitionReceipt} partitionReceipt
-   */
-  storePartitionReceipt(cycleNumber: number, partitionReceipt: PartitionReceipt) {
-    let key = 'c' + cycleNumber
-
-    if (!this.partitionReceiptsByCycleCounter) {
-      this.partitionReceiptsByCycleCounter = {}
-    }
-    if (!this.partitionReceiptsByCycleCounter[key]) {
-      this.partitionReceiptsByCycleCounter[key] = []
-    }
-    this.partitionReceiptsByCycleCounter[key].push(partitionReceipt)
-
-    // if (this.debugFeatureOld_partitionReciepts === true) {
-    //   // this doesnt really send to the archiver but it it does dump reciepts to logs.
-    //   this.depricated.trySendAndPurgeReceiptsToArchives(partitionReceipt)
-    // }
-  }
 
   /**
    * getReceipt
@@ -2771,113 +2649,7 @@ class StateManager {
    *     ######   #######  ##     ## ######## ### ### ###
    */
 
-  /**
-   * getCycleNumberFromTimestamp
-   * cycle numbers are calculated from the queue entry timestamp, but an offset is needed so that we can
-   * finalize cycles in time. when you start a new cycle there could still be unfinished transactions for
-   * syncSettleTime milliseconds.
-   *
-   * returns a negative number code if we can not determine the cycle
-   */
-  getCycleNumberFromTimestamp(timestamp : number, allowOlder: boolean = true): number {
-    let offsetTimestamp = timestamp + this.syncSettleTime
 
-    if(timestamp < 1 || timestamp == null){
-      let stack = new Error().stack
-      this.statemanager_fatal(`getCycleNumberFromTimestamp ${timestamp}`, `getCycleNumberFromTimestamp ${timestamp} ,  ${stack}`)
-    }
-
-    // const cycle = CycleChain.getCycleByTimestamp(offsetTimestamp)
-    // if (cycle != null && cycle.counter != null) {
-    //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'first lookup')
-    //   return cycle.counter
-    // }
-
-    //currentCycleShardData
-    if (this.currentCycleShardData.timestamp <= offsetTimestamp && offsetTimestamp < this.currentCycleShardData.timestampEndCycle) {
-      if(this.currentCycleShardData.cycleNumber == null){
-        this.statemanager_fatal('getCycleNumberFromTimestamp failed. cycleNumber == null', 'this.currentCycleShardData.cycleNumber == null')
-        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber fail')
-        const cycle = CycleChain.getCycleByTimestamp(offsetTimestamp)
-        console.log("CycleChain.getCycleByTimestamp",cycle)
-        if (cycle != null) {
-          this.statemanager_fatal('getCycleNumberFromTimestamp failed fatal redeemed', 'this.currentCycleShardData.cycleNumber == null, fatal redeemed')
-          nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber redeemed')
-          return cycle.counter
-        } else {
-          //debug only!!!
-          let cycle2 = CycleChain.getCycleByTimestamp(offsetTimestamp)
-          this.statemanager_fatal('getCycleNumberFromTimestamp failed fatal not redeemed', 'getCycleByTimestamp cycleNumber == null not redeemed')
-          nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber failed to redeem')
-        }
-      } else {
-        return this.currentCycleShardData.cycleNumber
-      }
-    }
-
-    if(this.currentCycleShardData.cycleNumber == null){
-      nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'this.currentCycleShardData.cycleNumber == null')
-      this.statemanager_fatal('getCycleNumberFromTimestamp: currentCycleShardData.cycleNumber == null',`getCycleNumberFromTimestamp: currentCycleShardData.cycleNumber == null ${this.currentCycleShardData.cycleNumber} timestamp:${timestamp}`)
-
-    }
-
-    //is it in the future
-    if (offsetTimestamp >= this.currentCycleShardData.timestampEndCycle) {
-      let cycle: Shardus.Cycle = CycleChain.getNewest()
-
-      let timePastCurrentCycle = offsetTimestamp - this.currentCycleShardData.timestampEndCycle
-      let cyclesAhead = Math.ceil(timePastCurrentCycle / (cycle.duration * 1000))
-      nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `+${cyclesAhead}`)
-
-      return this.currentCycleShardData.cycleNumber + cyclesAhead
-
-      // let endOfNextCycle = this.currentCycleShardData.timestampEndCycle + cycle.duration * 1000
-      // if (offsetTimestamp < endOfNextCycle /*+ this.syncSettleTime*/) {
-      //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', '+1')
-      //   return this.currentCycleShardData.cycleNumber + 1
-      // } else if (offsetTimestamp < endOfNextCycle + /*this.syncSettleTime +*/ cycle.duration * 1000) {
-      //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', '+2')
-      //   //if (logFlags.error) this.mainLogger.error(`getCycleNumberFromTimestamp fail2: endOfNextCycle:${endOfNextCycle} offsetTimestamp:${offsetTimestamp} timestamp:${timestamp}`)
-      //   return this.currentCycleShardData.cycleNumber + 2
-      // } else {
-      //   nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'too far')
-      //   this.statemanager_fatal('getCycleNumberFromTimestamp: too far in future',`getCycleNumberFromTimestamp fail: too far in future. endOfNextCycle:${endOfNextCycle} 
-      //     offsetTimestamp:${offsetTimestamp} timestamp:${timestamp} now:${Date.now()} end of cycle age: ${(Date.now() - endOfNextCycle)/1000}`)
-      //   //too far in the future
-      //   return -2
-      // }
-    }
-    if (allowOlder === true) {
-      //cycle is in the past, by process of elimination
-      // let offsetSeconds = Math.floor(offsetTimestamp * 0.001)
-      const cycle = CycleChain.getCycleByTimestamp(offsetTimestamp)
-      if (cycle != null) {
-        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup')
-        if(cycle.counter == null){
-          this.statemanager_fatal('getCycleNumberFromTimestamp  unexpected cycle.cycleNumber == null', 'getCycleNumberFromTimestamp unexpected cycle.cycleNumber == null')
-          nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', `getCycleNumberFromTimestamp unexpected cycle.cycleNumber == null  ${timestamp}`)
-        }
-
-        return cycle.counter
-      } else {
-        //nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle')
-        //debug only!!!
-        //let cycle2 = CycleChain.getCycleByTimestamp(offsetTimestamp)
-        //this.statemanager_fatal('getCycleNumberFromTimestamp getCycleByTimestamp failed', 'getCycleByTimestamp getCycleByTimestamp failed')
-        let cycle: Shardus.Cycle = CycleChain.getNewest()
-        let cycleEstimate = this.currentCycleShardData.cycleNumber - Math.ceil((this.currentCycleShardData.timestampEndCycle - offsetTimestamp) / (cycle.duration * 1000))
-        if(cycleEstimate < 1){
-          cycleEstimate = 1
-        }
-        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle: ' + cycleEstimate)
-        return cycleEstimate
-      }
-    }
-
-    //failed to match, return -1
-    this.statemanager_fatal('getCycleNumberFromTimestamp failed final', `getCycleNumberFromTimestamp failed final ${timestamp}`)
-    return -1
-  }
 
   isNodeValidForInternalMessage(nodeId: string, debugMsg: string, checkForNodeDown: boolean = true, checkForNodeLost: boolean = true, checkIsUpRecent: boolean = true): boolean {
     let node: Shardus.Node = this.p2p.state.getNode(nodeId)
