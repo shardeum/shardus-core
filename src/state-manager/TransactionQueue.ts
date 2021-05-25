@@ -125,7 +125,7 @@ class TransactionQueue {
       }
     })
 
-    this.p2p.registerGossipHandler('spread_tx_to_group', async (payload, sender, tracker) => {
+    this.p2p.registerGossipHandler('spread_tx_to_group', async (payload, sender, tracker, hop) => {
       //  gossip 'spread_tx_to_group' to transaction group
       // Place tx in queue (if younger than m)
 
@@ -188,7 +188,7 @@ class TransactionQueue {
       }
       if (transactionGroup.length > 1) {
         this.stateManager.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `gossip to neighbors`, transactionGroup)
-        this.p2p.sendGossipIn('spread_tx_to_group', payload, tracker, sender, transactionGroup)
+        this.p2p.sendGossipIn('spread_tx_to_group', payload, tracker, sender, transactionGroup, hop)
       }
 
       // await this.transactionQueue.routeAndQueueAcceptedTransaction(acceptedTX, false, sender)

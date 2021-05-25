@@ -15,9 +15,10 @@ const gossipInternalRoute: InternalHandler<GossipReq> = async (
   payload,
   _respond,
   sender,
-  tracker
+  tracker,
+  hop
 ) => {
-  await handleGossip(payload, sender, tracker)
+  await handleGossip(payload, sender, tracker, hop)
 }
 
 const routes = {
@@ -147,10 +148,11 @@ function _extractPayload(wrappedPayload, nodeGroup) {
   const payload = wrappedPayload.payload
   const sender = wrappedPayload.sender
   const tracker = wrappedPayload.tracker
-  return [payload, sender, tracker]
+  const hop = wrappedPayload.hop
+  return [payload, sender, tracker, hop]
 }
 
-function _wrapAndTagMessage(msg, tracker = '', recipientNode) {
+function _wrapAndTagMessage(msg, tracker = '', recipientNode, hop = null) {
   if (!msg) throw new Error('No message given to wrap and tag!')
   if (logFlags.verbose) {
     warn(
@@ -163,6 +165,7 @@ function _wrapAndTagMessage(msg, tracker = '', recipientNode) {
     payload: msg,
     sender: Self.id,
     tracker,
+    hop
   }
   const tagged = crypto.tag(wrapped, recipientNode.curvePublicKey)
   return tagged
@@ -195,7 +198,8 @@ export async function tell(
   route,
   message,
   logged = false,
-  tracker = ''
+  tracker = '',
+  hop = 0
 ) {
   if (tracker === '') {
     tracker = createMsgTracker()
@@ -206,7 +210,8 @@ export async function tell(
       if(logFlags.p2pNonFatal) info('p2p/Comms:tell: Not telling self')
       continue
     }
-    const signedMessage = _wrapAndTagMessage(message, tracker, node)
+    const signedMessage = _wrapAndTagMessage(message, tracker, node, hop)
+    info(`signed and tagged gossip`, signedMessage)
     promises.push(network.tell([node], route, signedMessage, logged))
   }
   try {
@@ -258,6 +263,7 @@ export async function ask(
 export function registerInternal(route, handler) {
   // Create function that wraps handler function
   const wrappedHandler = async (wrappedPayload, respond) => {
+    info("registerInternal wrappedPayload", utils.stringifyReduceLimit(wrappedPayload))
     internalRecvCounter++
     // We have internal requests turned off until we have a node id
     if (!acceptInternal) {
@@ -306,6 +312,7 @@ export function registerInternal(route, handler) {
       NodeList.byIdOrder // [TODO] Maybe this should be othersByIdOrder
     )
     const [payload, sender] = payloadArray
+    const hop = payloadArray[3]
     tracker = payloadArray[2] || ''
     if (!payload) {
       warn('Payload unable to be extracted, possible missing signature...')
@@ -321,7 +328,7 @@ export function registerInternal(route, handler) {
         payload
       )
     }
-    await handler(payload, respondWrapped, sender, tracker)
+    await handler(payload, respondWrapped, sender, tracker, hop)
   }
   // Include that in the handler function that is passed
   network.registerInternal(route, wrappedHandler)
@@ -344,7 +351,8 @@ export async function sendGossip(
   payload,
   tracker = '',
   sender = null,
-  inpNodes = NodeList.byIdOrder // Joining nodes need gossip too; we don't send to ourself
+  inpNodes = NodeList.byIdOrder, // Joining nodes need gossip too; we don't send to ourself
+  hop = null
 ) {
   // [TODO] Don't copy the node list once sorted lists are passed in
   const nodes = [...inpNodes]
@@ -355,9 +363,16 @@ export async function sendGossip(
     tracker = createGossipTracker()
   }
 
+  if (hop && hop > 0) {
+    hop += 1
+  } else {
+    hop = 1
+  }
+
   if (logFlags.verbose) {
     info(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
   }
+  info(`Gossip hop`, hop)
   const gossipPayload = { type, data: payload }
 
   /*
@@ -383,8 +398,10 @@ export async function sendGossip(
   // Map back recipient idxs to node objects
   const recipientIdxs = utils.getRandomGossipIn(
     nodeIdxs,
-    config.p2p.gossipRecipients,
-    myIdx
+    startingSeedCount,
+    myIdx,
+    seedFalloff,
+    hop
   )
   let recipients = recipientIdxs.map((idx) => nodes[idx])
   if (sender != null) {
@@ -412,7 +429,7 @@ export async function sendGossip(
       gossipSent++
       gossipTypeSent[type] = gossipTypeSent[type] ? gossipTypeSent[type] + 1 : 1
     }
-    await tell(recipients, 'gossip', gossipPayload, true, tracker)
+    await tell(recipients, 'gossip', gossipPayload, true, tracker, hop)
   } catch (ex) {
     if (logFlags.verbose) {
       error(
@@ -511,7 +528,7 @@ export async function sendGossipAll(
  * Handle Goosip Transactions
  * Payload: {type: ['receipt', 'trustedTransaction'], data: {}}
  */
-export async function handleGossip(payload, sender, tracker = '') {
+export async function handleGossip(payload, sender, tracker = '', hop) {
   if (logFlags.verbose) {
     info(`Start of handleGossip(${utils.stringifyReduce(payload)})`)
   }
@@ -595,7 +612,7 @@ export async function handleGossip(payload, sender, tracker = '') {
   gossipTypeRecv[type] = gossipTypeRecv[type] ? gossipTypeRecv[type] + 1 : 1
   logger.playbackLog(sender, 'self', 'GossipRcv', type, tracker, data)
   // [TODO] - maybe we don't need to await the following line
-  await gossipHandler(data, sender, tracker)
+  await gossipHandler(data, sender, tracker, hop)
   if (logFlags.verbose) {
     info(`End of handleGossip(${utils.stringifyReduce(payload)})`)
   }

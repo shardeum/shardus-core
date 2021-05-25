@@ -602,24 +602,19 @@ export function getRandom<T>(arr: T[], n: number): T[] {
   return result
 }
 
-export function getRandomGossipIn(nodeIdxs, fanOut, myIdx) {
-  const nn = nodeIdxs.length
-  if (fanOut >= nn) {
-    fanOut = nn - 1
+export function getRandomGossipIn(nodeIdxs, startingSeed, myIdx, seedFalloff, hop = 1) {
+  const nodeCount = nodeIdxs.length
+  if (startingSeed >= nodeCount) {
+    startingSeed = nodeCount - 1
   }
-  if (fanOut < 1) {
+  if (startingSeed < 1) {
     return []
   }
-  const results = [(myIdx + 1) % nn]
-  if (fanOut < 2) {
-    return results
-  }
-  results.push((myIdx + nn - 1) % nn)
-  if (fanOut < 3) {
-    return results
-  }
-  while (results.length < fanOut) {
-    const r = Math.floor(Math.random() * nn)
+  let gossipToCount =  startingSeed - ((hop - 1) * seedFalloff )
+  if (gossipToCount <= 0) return []
+  let results = []
+  while (results.length < gossipToCount) {
+    const r = Math.floor(Math.random() * nodeCount)
     if (r === myIdx) {
       continue
     }
@@ -635,6 +630,39 @@ export function getRandomGossipIn(nodeIdxs, fanOut, myIdx) {
   }
   return results
 }
+// export function getRandomGossipIn(nodeIdxs, fanOut, myIdx) {
+//   const nn = nodeIdxs.length
+//   if (fanOut >= nn) {
+//     fanOut = nn - 1
+//   }
+//   if (fanOut < 1) {
+//     return []
+//   }
+//   const results = [(myIdx + 1) % nn]
+//   if (fanOut < 2) {
+//     return results
+//   }
+//   results.push((myIdx + nn - 1) % nn)
+//   if (fanOut < 3) {
+//     return results
+//   }
+//   while (results.length < fanOut) {
+//     const r = Math.floor(Math.random() * nn)
+//     if (r === myIdx) {
+//       continue
+//     }
+//     let k = 0
+//     for (; k < results.length; k++) {
+//       if (r === results[k]) {
+//         break
+//       }
+//     }
+//     if (k === results.length) {
+//       results.push(r)
+//     }
+//   }
+//   return results
+// }
 
 export function reversed<T>(thing: Iterable<T>) {
   const arr = Array.isArray(thing) ? thing : Array.from(thing)

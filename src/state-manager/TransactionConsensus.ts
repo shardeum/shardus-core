@@ -9,7 +9,7 @@ import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger, {logFlags} from '../logger'
 import ShardFunctions from './shardFunctions.js'
-import { time } from 'console'
+import { info, time } from 'console'
 import StateManager from '.'
 import { AppliedReceipt, QueueEntry, AppliedVote } from './state-manager-types'
 
@@ -60,7 +60,7 @@ class TransactionConsenus {
    */
 
   setupHandlers(){
-    this.p2p.registerGossipHandler('spread_appliedReceipt', async (payload, sender, tracker) => {
+    this.p2p.registerGossipHandler('spread_appliedReceipt', async (payload, sender, tracker, hop) => {
         let appliedReceipt = payload as AppliedReceipt
         let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(appliedReceipt.txid) // , payload.timestamp)
         if (queueEntry == null) {
@@ -106,7 +106,7 @@ class TransactionConsenus {
           if (gossipGroup.length > 1) {
             // should consider only forwarding in some cases?
             this.stateManager.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, gossipGroup)
-            this.p2p.sendGossipIn('spread_appliedReceipt', appliedReceipt, tracker, sender, gossipGroup)
+            this.p2p.sendGossipIn('spread_appliedReceipt', appliedReceipt, tracker, sender, gossipGroup, hop)
           }
         } else {
           // we get here if the receipt has already been shared
