@@ -22,7 +22,9 @@ import { Node } from '../shared-types/p2p/NodeListTypes'
 
 const gossipActiveRoute: Types.GossipHandler<SignedActiveRequest> = (
   payload,
-  sender
+  sender,
+  tracker,
+  hop
 ) => {
   if (logFlags.p2pNonFatal)
     info(`Got active request: ${JSON.stringify(payload)}`)
@@ -55,7 +57,7 @@ const gossipActiveRoute: Types.GossipHandler<SignedActiveRequest> = (
   // Do not forward gossip after quarter 2
   if (!isOrig && CycleCreator.currentQuarter > 2) return
 
-  if (addActiveTx(payload)) Comms.sendGossip('gossip-active', payload)
+  if (addActiveTx(payload)) Comms.sendGossip('gossip-active', payload, tracker, sender, NodeList.byIdOrder, hop)
 }
 
 const routes = {

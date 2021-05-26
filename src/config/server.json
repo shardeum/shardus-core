@@ -31,6 +31,8 @@
     "difficulty": 2,
     "queryDelay": 1,
     "gossipRecipients": 8,
+    "gossipStartSeed": 8,
+    "gossipSeedFallof": 2,
     "gossipTimeout": 180,
     "maxSeedNodes": 10,
     "minNodesToAllowTxs": 3,

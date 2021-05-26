@@ -44,7 +44,8 @@ reset()
 const gossipScaleRoute: Types.GossipHandler<SignedScaleRequest> = async (
   payload,
   sender,
-  tracker
+  tracker,
+  hop
 ) => {
   if (logFlags.p2pNonFatal)
     info(`Got scale request: ${JSON.stringify(payload)}`)
@@ -54,22 +55,7 @@ const gossipScaleRoute: Types.GossipHandler<SignedScaleRequest> = async (
   }
   const added = await addExtScalingRequest(payload)
   if (!added) return
-  Comms.sendGossip('scaling', payload, tracker)
-}
-
-const scalingTestRoute: Types.GossipHandler<SignedScaleRequest> = async (
-  payload,
-  sender,
-  tracker
-) => {
-  if (logFlags.p2pNonFatal)
-    info(`Got scale test gossip: ${JSON.stringify(payload)}`)
-  if (!payload) {
-    warn('No payload provided for the `scaling` request.')
-    return
-  }
-  Comms.sendGossip('scalingTest', 'UP')
-  requestNetworkUpsize()
+  Comms.sendGossip('scaling', payload, tracker, sender, NodeList.byIdOrder, hop)
 }
 
 const routes = {

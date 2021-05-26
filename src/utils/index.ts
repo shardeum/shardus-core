@@ -602,7 +602,7 @@ export function getRandom<T>(arr: T[], n: number): T[] {
   return result
 }
 
-export function getRandomGossipIn(nodeIdxs, startingSeed, myIdx, seedFalloff, hop = 1) {
+export function getRandomGossipIn(nodeIdxs, startingSeed, myIdx, seedFalloff, hop = 0) {
   const nodeCount = nodeIdxs.length
   if (startingSeed >= nodeCount) {
     startingSeed = nodeCount - 1
@@ -610,7 +610,7 @@ export function getRandomGossipIn(nodeIdxs, startingSeed, myIdx, seedFalloff, ho
   if (startingSeed < 1) {
     return []
   }
-  let gossipToCount =  startingSeed - ((hop - 1) * seedFalloff )
+  let gossipToCount =  startingSeed - (hop * seedFalloff)
   if (gossipToCount <= 0) return []
   let results = []
   while (results.length < gossipToCount) {

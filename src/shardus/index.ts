@@ -419,12 +419,12 @@ class Shardus extends EventEmitter {
       this.statistics
     )
     this.loadDetection.on('highLoad', () => {
-      console.log(`High load detected Cycle ${currentCycle}, Quarter: ${currentQuarter}`)
+      // console.log(`High load detected Cycle ${currentCycle}, Quarter: ${currentQuarter}`)
       nestedCountersInstance.countEvent('loadRelated','highLoad')
       AutoScaling.requestNetworkUpsize()
     })
     this.loadDetection.on('lowLoad', () => {
-      console.log(`Low load detected Cycle ${currentCycle}, Quarter: ${currentQuarter}`)
+      // console.log(`Low load detected Cycle ${currentCycle}, Quarter: ${currentQuarter}`)
       nestedCountersInstance.countEvent('loadRelated','lowLoad')
       AutoScaling.requestNetworkDownsize()
     })

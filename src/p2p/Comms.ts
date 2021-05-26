@@ -363,15 +363,16 @@ export async function sendGossip(
     tracker = createGossipTracker()
   }
 
-  if (hop && hop > 0) {
+  if (hop !== null && hop >= 0) {
     hop += 1
   } else {
-    hop = 1
+    hop = 0
   }
 
   if (logFlags.verbose) {
     info(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
   }
+  info(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
   info(`Gossip hop`, hop)
   const gossipPayload = { type, data: payload }
 

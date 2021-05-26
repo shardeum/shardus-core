@@ -8,6 +8,7 @@ import {
 } from '../snapshot'
 import { validateTypes } from '../utils'
 import * as Comms from './Comms'
+import * as NodeList from './NodeList'
 import { crypto, logger, network, io } from './Context'
 import { getCycleChain, computeCycleMarker, getNewest } from './CycleChain'
 import * as CycleCreator from './CycleCreator'
@@ -394,7 +395,7 @@ export function registerRoutes() {
   })
   Comms.registerGossipHandler(
     'joinarchiver',
-    async (payload, sender, tracker) => {
+    async (payload, sender, tracker, hop) => {
       if(logFlags.console) console.log('Join request gossip received:', payload)
       const existingJoinRequest = joinRequests.find(
         (j) => j.nodeInfo.publicKey === payload.nodeInfo.publicKey
@@ -407,7 +408,7 @@ export function registerRoutes() {
         }
         if (!accepted) return warn('Archiver join request not accepted.')
         if(logFlags.p2pNonFatal) info('Archiver join request accepted!')
-        Comms.sendGossip('joinarchiver', payload, tracker)
+        Comms.sendGossip('joinarchiver', payload, tracker, sender, NodeList.byIdOrder, hop)
       } else {
         if(logFlags.console) console.log('Already received archiver join gossip for this node')
       }
@@ -416,7 +417,7 @@ export function registerRoutes() {
 
   Comms.registerGossipHandler(
     'leavingarchiver',
-    async (payload, sender, tracker) => {
+    async (payload, sender, tracker, hop) => {
       if(logFlags.console) console.log('Leave request gossip received:', payload)
       const existingLeaveRequest = leaveRequests.find(
         (j) => j.nodeInfo.publicKey === payload.nodeInfo.publicKey
@@ -425,7 +426,7 @@ export function registerRoutes() {
         const accepted = await addLeaveRequest(payload, tracker, false)
         if (!accepted) return warn('Archiver leave request not accepted.')
         if(logFlags.p2pNonFatal) info('Archiver leave request accepted!')
-        Comms.sendGossip('leavingarchiver', payload, tracker)
+        Comms.sendGossip('leavingarchiver', payload, tracker, sender, NodeList.byIdOrder, hop)
       } else {
         if(logFlags.console) console.log('Already received archiver leave gossip for this node')
       }
