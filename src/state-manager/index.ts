@@ -38,6 +38,7 @@ import TransactionRepair from './TransactionRepair'
 import TransactionConsenus from './TransactionConsensus'
 import PartitionObjects from './PartitionObjects'
 import Depricated from './Depricated'
+import AccountPatcher from './AccountPatcher'
 import { CycleShardData, PartitionReceipt, FifoLockObjectMap, QueueEntry, AcceptedTx, AccountCopy, GetAccountDataByRangeSmart, WrappedStateArray, AccountHashCache, RequestReceiptForTxReq, RequestReceiptForTxResp, RequestStateForTxReqPost, RequestStateForTxResp, RequestTxResp, AppliedVote, GetAccountDataWithQueueHintsResp, DebugDumpPartitions, DebugDumpRangesCovered, DebugDumpNodesCovered, DebugDumpPartition, DebugDumpPartitionSkip, MainHashResults, SimpleDistanceObject, WrappedResponses, LocalCachedData, AccountFilter, StringBoolObjectMap, AppliedReceipt, ReceiptMapResult } from './state-manager-types'
 
 /**
@@ -80,6 +81,7 @@ class StateManager {
   transactionRepair: TransactionRepair
   transactionConsensus: TransactionConsenus
   partitionObjects: PartitionObjects
+  accountPatcher: AccountPatcher
   depricated: Depricated
 
   // syncTrackers:SyncTracker[];
@@ -226,6 +228,7 @@ class StateManager {
     this.transactionConsensus = new TransactionConsenus(this,  profiler, app, logger, storage, p2p, crypto, config)
     this.partitionObjects = new PartitionObjects(this,  profiler, app, logger, storage, p2p, crypto, config)
     this.depricated = new Depricated(this,  profiler, app, logger, storage, p2p, crypto, config)
+    this.accountPatcher = new AccountPatcher(this, profiler, app, logger, p2p, crypto, config)
 
     // feature controls.
     // this.oldFeature_TXHashsetTest = true
@@ -951,6 +954,8 @@ class StateManager {
 
     this.transactionConsensus.setupHandlers()
 
+    this.accountPatcher.setupHandlers()
+
     // p2p ASK
     Comms.registerInternal('request_receipt_for_tx', async (payload: RequestReceiptForTxReq, respond: (arg0: RequestReceiptForTxResp) => any) => {
       let response: RequestReceiptForTxResp = { receipt: null, note: '', success: false }
@@ -1191,6 +1196,10 @@ class StateManager {
     Comms.unregisterInternal('get_globalaccountreport')
     Comms.unregisterInternal('spread_appliedVote')
     Comms.unregisterGossipHandler('spread_appliedReceipt')
+
+    Comms.unregisterInternal('get_trie_hashes')
+    Comms.unregisterInternal('sync_trie_hashes')
+    
   }
 
   // //////////////////////////////////////////////////////////////////////////

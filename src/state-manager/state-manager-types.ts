@@ -1,5 +1,7 @@
 //import { AccountData } from "../shardus/shardus-types";
 
+// import { Node } from "../p2p/NodeList";
+
 //import { WrappedResponse } from "../shardus/shardus-types";
 
 //import { ShardGlobals } from "./shardFunctionTypes";
@@ -817,3 +819,101 @@ export type PartitionCycleReport = {
     cycleNumber? : number
 }
 
+
+
+// account hash trie.
+
+type TrieAccount = {
+    accountID:string;
+    hash:string;
+    //cycle:number;
+    //timestamp:number
+    //todo merge with cache structures at some point
+}
+
+type HashTrieNode = {
+    radix: string; //node key
+    hash: string;
+    childHashes: string[]; //len16 array of child hashes       
+    children: HashTrieNode[]; // len 16  not on leaf nodes.
+
+    isIncomplete: boolean;
+    updated: boolean; // has this trie node or its children been updated
+
+    accounts?: TrieAccount[]; //any length, sorted by id.  only on leaf nodes    
+    accountTempMap?: Map<string, TrieAccount>; //only on leaf nodes    
+
+    nonSparseChildCount:number
+}
+
+type ShardedHashTrie = {
+    layerMaps: Map<string, HashTrieNode>[]
+}
+
+type HashTrieSyncConsensus = {
+    cycle: number;
+    radixHashVotes: Map<string, {
+        allVotes:Map<string, {
+            count:number, 
+            voters:import("../shardus/shardus-types").Node[]
+        }>, 
+        bestHash:string, 
+        bestVotes:number
+
+        }>;
+
+    coverageMap: Map<string, HashTrieRadixCoverage>
+    //repairByRadix //some info on who is helping with repairs.
+}
+
+type HashTrieRadixCoverage = {
+    firstChoice:import("../shardus/shardus-types").Node, 
+    fullList: import("../shardus/shardus-types").Node[], 
+    refuted: Set<string>;
+}
+
+type HashTrieReq = { 
+    radixList: string[]
+}
+
+type HashTrieResp = {
+    nodeHashes: RadixAndHash[] //{radix:string, hash:string}[]
+
+};
+
+type RadixAndHash = {
+    radix:string;
+    hash:string;
+}
+type AccountIDAndHash = {
+    accountID:string;
+    hash:string;
+}
+
+type HashTrieSyncTell = { 
+    cycle: number
+    nodeHashes: {radix:string, hash:string}[]
+}
+
+type RadixAndChildHashes = {
+    radix:string
+    childAccounts:AccountIDAndHash[]
+}
+
+type HashTrieAccountsResp = {
+    nodeChildHashes: RadixAndChildHashes[]
+};
+
+
+
+type HashTrieUpdateStats = {
+    leafsUpdated: number
+    leafsCreated: number
+    updatedNodesPerLevel: number[]
+    hashedChildrenPerLevel:  number[]
+    totalHashes: number
+    //totalObjectsHashed: 0,
+    totalNodesHashed: number
+    totalAccountsHashed: number
+    totalLeafs: number
+  }
