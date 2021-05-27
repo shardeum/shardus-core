@@ -602,19 +602,58 @@ export function getRandom<T>(arr: T[], n: number): T[] {
   return result
 }
 
-export function getRandomGossipIn(nodeIdxs, startingSeed, myIdx, seedFalloff, hop = 0) {
+export function getLinearSeededGossip(nodeIdxs, myIdx, gossipFactor, startingSeed, seedFalloff, hop = 0) {
   const nodeCount = nodeIdxs.length
-  if (startingSeed >= nodeCount) {
-    startingSeed = nodeCount - 1
+  let unique = []
+  let gossipToList = []
+  for (let i = 0; i < gossipFactor; i++) {
+    gossipToList[i] = (gossipFactor * myIdx + i + 1) % nodeCount;
   }
-  if (startingSeed < 1) {
+  let extraFactor =  startingSeed - (hop * seedFalloff)
+  extraFactor   =  Math.min(extraFactor, nodeCount / 2)
+  if (extraFactor > 0) {
+    let i = 0
+    let addedNode = 0
+    while (addedNode < extraFactor && i < 2 * nodeCount) {
+      let randomId = Math.floor(Math.random() * nodeCount)
+      if (!gossipToList.includes(randomId)) {
+        gossipToList.push(randomId)
+        addedNode += 1
+      }
+      i += 1
+    }
+  }
+  for (let i = 0; i < gossipToList.length; i++) {
+    var next = gossipToList[i];
+    if (next === myIdx) {
+      continue;
+    } // make sure we don't send to self
+    if (unique.includes(next)) {
+      continue;
+    } // make sure we send only once
+    unique.push(next);
+  }
+  return unique
+}
+
+export function getRandomGossipIn(nodeIdxs, fanOut, myIdx) {
+  const nn = nodeIdxs.length
+  if (fanOut >= nn) {
+    fanOut = nn - 1
+  }
+  if (fanOut < 1) {
     return []
   }
-  let gossipToCount =  startingSeed - (hop * seedFalloff)
-  if (gossipToCount <= 0) return []
-  let results = []
-  while (results.length < gossipToCount) {
-    const r = Math.floor(Math.random() * nodeCount)
+  const results = [(myIdx + 1) % nn]
+  if (fanOut < 2) {
+    return results
+  }
+  results.push((myIdx + nn - 1) % nn)
+  if (fanOut < 3) {
+    return results
+  }
+  while (results.length < fanOut) {
+    const r = Math.floor(Math.random() * nn)
     if (r === myIdx) {
       continue
     }
@@ -630,39 +669,6 @@ export function getRandomGossipIn(nodeIdxs, startingSeed, myIdx, seedFalloff, ho
   }
   return results
 }
-// export function getRandomGossipIn(nodeIdxs, fanOut, myIdx) {
-//   const nn = nodeIdxs.length
-//   if (fanOut >= nn) {
-//     fanOut = nn - 1
-//   }
-//   if (fanOut < 1) {
-//     return []
-//   }
-//   const results = [(myIdx + 1) % nn]
-//   if (fanOut < 2) {
-//     return results
-//   }
-//   results.push((myIdx + nn - 1) % nn)
-//   if (fanOut < 3) {
-//     return results
-//   }
-//   while (results.length < fanOut) {
-//     const r = Math.floor(Math.random() * nn)
-//     if (r === myIdx) {
-//       continue
-//     }
-//     let k = 0
-//     for (; k < results.length; k++) {
-//       if (r === results[k]) {
-//         break
-//       }
-//     }
-//     if (k === results.length) {
-//       results.push(r)
-//     }
-//   }
-//   return results
-// }
 
 export function reversed<T>(thing: Iterable<T>) {
   const arr = Array.isArray(thing) ? thing : Array.from(thing)
@@ -715,7 +721,7 @@ Example of def:
 ---
 Returns a string with the first error encountered or and empty string ''.
 Errors are: "[name] is required" or "[name] must be, [type]"
-*/
+ */
 export function validateTypes(inp, def) {
   if (inp === undefined) return 'input is undefined'
   if (inp === null) return 'input is null'

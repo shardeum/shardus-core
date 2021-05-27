@@ -391,16 +391,16 @@ export async function sendGossip(
   const nodeIdxs = new Array(nodes.length).fill(0).map((curr, idx) => idx) // [TODO]  - we need to make sure that we never iterate, or copy the full nodes list. Assume it could be a million nodes.
   // Find out your own index in the nodes array
   const myIdx = nodes.findIndex((node) => node.id === Self.id)
-  if (myIdx < 0) {
-    // throw new Error('Could not find self in nodes array')
-    error(`Failed to sendGossip. Could not find self in nodes array`)
-    return
-  }
+  if (myIdx < 0) throw new Error('Could not find self in nodes array')
+  const startingSeedCount = config.p2p.gossipStartSeed || config.p2p.gossipRecipients
+  const seedFalloff = config.p2p.gossipSeedFallof
+  const gossipFactor = config.p2p.gossipFactor
   // Map back recipient idxs to node objects
-  const recipientIdxs = utils.getRandomGossipIn(
+  const recipientIdxs = utils.getLinearSeededGossip(
     nodeIdxs,
-    startingSeedCount,
     myIdx,
+    gossipFactor,
+    startingSeedCount,
     seedFalloff,
     hop
   )
