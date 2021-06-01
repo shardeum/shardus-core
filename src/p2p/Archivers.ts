@@ -440,33 +440,32 @@ export function registerRoutes() {
       return res.json({ success: false, error: err })
     }
     err = validateTypes(req.body, {
-      publicKey: 's',
-      tag: 's',
-      nodeInfo: 'o',
+      tag: 's'
     })
     if (err) {
       warn(`requestdata: bad req.body ${err}`)
       return res.json({ success: false, error: err })
     }
-    // [TODO] Authenticate tag
 
     const dataRequest = req.body
     if(logFlags.p2pNonFatal) info('dataRequest received', JSON.stringify(dataRequest))
-    /*
+
+    const foundArchiver = archivers.get(dataRequest.publicKey)
+
+    if (!foundArchiver) {
+      const archiverNotFoundErr = 'Archiver not found in list'
+      warn(archiverNotFoundErr)
+      return res.json({ success: false, error: archiverNotFoundErr })
+    }
+    
     const invalidTagErr = 'Tag is invalid'
-    if (!crypto.authenticate(dataRequest, crypto.getCurvePublicKey(dataRequest.publicKey))) {
+    const archiverCurvePk = crypto.convertPublicKeyToCurve(foundArchiver.publicKey)
+    if (!crypto.authenticate(dataRequest, archiverCurvePk)) {
       warn(invalidTagErr)
       return res.json({ success: false, error: invalidTagErr })
     }
-    */
 
-    const nodeInfo = archivers.get(dataRequest.publicKey)
-
-    // if (!nodeInfo) {
-    //   const archiverNotFoundErr = 'Archiver not found in list'
-    //   warn(archiverNotFoundErr)
-    //   return res.json({ success: false, error: archiverNotFoundErr })
-    // }
+    info('Tag in data request is valid')
 
     delete dataRequest.publicKey
     delete dataRequest.tag
@@ -507,12 +506,12 @@ export function registerRoutes() {
     const queryRequest = req.body
     if(logFlags.p2pNonFatal) info('queryRequest received', JSON.stringify(queryRequest))
 
-    const nodeInfo = archivers.get(queryRequest.publicKey)
-    // if (!nodeInfo) {
-    //   const archiverNotFoundErr = 'Archiver not found in list'
-    //   warn(archiverNotFoundErr)
-    //   return res.json({ success: false, error: archiverNotFoundErr })
-    // }
+    const foundArchiver = archivers.get(queryRequest.publicKey)
+    if (!foundArchiver) {
+      const archiverNotFoundErr = 'Archiver not found in list'
+      warn(archiverNotFoundErr)
+      return res.json({ success: false, error: archiverNotFoundErr })
+    }
     delete queryRequest.publicKey
     delete queryRequest.tag
     let data
