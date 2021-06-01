@@ -1199,6 +1199,8 @@ class StateManager {
 
     Comms.unregisterInternal('get_trie_hashes')
     Comms.unregisterInternal('sync_trie_hashes')
+    Comms.unregisterInternal('get_trie_accountHashes')
+    Comms.unregisterInternal('get_account_data_by_hashes')
     
   }
 
@@ -2498,6 +2500,9 @@ class StateManager {
         mainHashResults = this.accountCache.buildPartitionHashesForNode(cycleShardValues)
 
         this.partitionObjects.updatePartitionReport(cycleShardValues, mainHashResults)
+
+
+        this.accountPatcher.updateTrieAndBroadCast(lastCycle.counter)
       }
     }
 
@@ -2525,6 +2530,12 @@ class StateManager {
     //   // the number of partitions covered by the node. Uses the /post_partition_results API.
     //   await this.partitionObjects.broadcastPartitionResults(cycle.counter) // Cycle_number
     // }
+
+    //this funciton is not awaited so we should be able to sleep and then 
+
+    await utils.sleep(10000) //wait 10 seconds
+
+    await this.accountPatcher.testAndPatchAccounts(lastCycle.counter)
   }
 
   /**

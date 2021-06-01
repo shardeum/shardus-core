@@ -949,6 +949,12 @@ class ShardFunctions {
     return result
   }
 
+  static getPartitionFromRadix(shardGlobals: ShardGlobals, radix:string){
+    let filledAddress = radix + '7'.repeat(64 - radix.length)
+    let partition = ShardFunctions.addressToPartition(shardGlobals, filledAddress)
+    return partition
+  }
+
   static addressToPartition(shardGlobals: ShardGlobals, address: string): { homePartition: number; addressNum: number } {
     let numPartitions = shardGlobals.numPartitions
     let addressNum = parseInt(address.slice(0, 8), 16)

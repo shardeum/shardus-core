@@ -429,6 +429,9 @@ class AccountCache {
       partitionHashResults.ids.push(accountID)
       partitionHashResults.hashes.push(accountHashData.h)
       partitionHashResults.timestamps.push(accountHashData.t)
+
+      
+      this.stateManager.accountPatcher.updateAccountHash(accountID, accountHashData.h)
     }
 
     // build a hash over all the data hashes per partition

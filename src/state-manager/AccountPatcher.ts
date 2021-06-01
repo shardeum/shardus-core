@@ -45,9 +45,13 @@ class AccountPatcher {
 
   totalAccounts: number
 
+  //accountUpdateQueueByCycle: Map<number, TrieAccount[]>
   accountUpdateQueue: TrieAccount[]
+  accountUpdateQueueFuture: TrieAccount[]
 
   hashTrieSyncConsensusByCycle: Map<number, HashTrieSyncConsensus>
+
+  incompleteNodes: HashTrieNode[]
 
   constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     this.crypto = crypto
@@ -84,6 +88,8 @@ class AccountPatcher {
     this.totalAccounts = 0
 
     this.hashTrieSyncConsensusByCycle = new Map()
+
+    this.incompleteNodes = []
   }
 
   hashObj(value:any){
@@ -190,6 +196,44 @@ class AccountPatcher {
       await respond(result)
     })
 
+    Comms.registerInternal('get_account_data_by_hashes', async (payload: HashTrieAccountDataRequest, respond: (arg0: HashTrieAccountDataResponse) => any) => {
+
+      //nodeChildHashes: {radix:string, childAccounts:{accountID:string, hash:string}[]}[]
+      let result:HashTrieAccountDataResponse = {accounts:[]}
+
+      let hashMap = new Map()
+      let accountIDs = []
+      for(let accountHashEntry of payload.accounts){
+        // let radix = accountHashEntry.accountID.substr(0, this.treeMaxDepth)
+        // let layerMap = this.shardTrie.layerMaps[this.treeMaxDepth]
+        // let hashTrieNode = layerMap.get(radix)
+
+        hashMap[accountHashEntry.accountID] = accountHashEntry.hash
+        accountIDs.push(accountHashEntry.accountID)
+      }
+
+      let accountData = await this.app.getAccountDataByList(accountIDs)
+
+      // if (accountData != null) {
+      //   for (let wrappedAccount of accountData) {
+      //     let wrappedAccountInQueueRef = wrappedAccount as Shardus.WrappedDataFromQueue
+      //     wrappedAccountInQueueRef.seenInQueue = false
+
+      //     if (this.stateManager.lastSeenAccountsMap != null) {
+      //       let queueEntry = this.stateManager.lastSeenAccountsMap[wrappedAccountInQueueRef.accountId]
+      //       if (queueEntry != null) {
+      //         wrappedAccountInQueueRef.seenInQueue = true
+      //       }
+      //     }
+      //   }
+      // }
+      //PERF could disable this for more perf?
+      this.stateManager.testAccountDataWrapped(accountData)
+
+      result.accounts = accountData
+      await respond(result)
+    })
+
   }
 
 /***
@@ -202,9 +246,9 @@ class AccountPatcher {
  *     #######  ##        ##     ##    ##    ########  ######  ##     ## ##     ## ##     ## ########     ##    ##     ## #### ######## 
  */
 
-  upateShardTrie() : HashTrieUpdateStats {
+  upateShardTrie(cycle:number) : HashTrieUpdateStats {
     let currentLayer = this.treeMaxDepth
-    let treeNodeQueue = []  
+    let treeNodeQueue: HashTrieNode[] = []  
 
     let updateStats = {
       leafsUpdated: 0,
@@ -218,6 +262,8 @@ class AccountPatcher {
       totalLeafs: 0,
     }
 
+    this.markIncompeteNodes(cycle)
+
     //feed account data into lowest layer, generates list of treeNodes
     let currentMap = this.shardTrie.layerMaps[currentLayer] 
     if(currentMap == null){
@@ -225,6 +271,7 @@ class AccountPatcher {
       this.shardTrie.layerMaps[currentLayer] = currentMap
     }
 
+    //let accountUpdateQueue = this.accountUpdateQueueByCycle.get(cycle)
     for(let i =0; i< this.accountUpdateQueue.length; i++){
       let tx = this.accountUpdateQueue[i]
       let key = tx.accountID.slice(0,currentLayer)
@@ -249,6 +296,10 @@ class AccountPatcher {
         
       }
       treeNode.updated= true
+    }
+
+    for(let treeNode of this.incompleteNodes){
+      treeNodeQueue.push(treeNode)
     }
 
     //sort accounts
@@ -313,6 +364,16 @@ class AccountPatcher {
           parentTreeNodeQueue.push(parentTreeNode)
           parentTreeNode.updated = true
         }
+
+        if(treeNode.isIncomplete){
+          // if(parentTreeNode.isIncomplete === false && parentTreeNode.updated === false ){
+          //   parentTreeNode.updated = true
+          //   parentTreeNodeQueue.push(parentTreeNode)
+          // }
+          parentTreeNode.isIncomplete = true
+        }
+
+        treeNode.updated = false //finished update of this node.
       }
 
       updateStats.updatedNodesPerLevel[i] = parentTreeNodeQueue.length
@@ -338,6 +399,119 @@ class AccountPatcher {
     return updateStats
   }
 
+
+
+/***
+ *    ##     ##    ###    ########  ##    ## #### ##    ##  ######   #######  ##     ## ########  ######## ######## ######## ##    ##  #######  ########  ########  ######  
+ *    ###   ###   ## ##   ##     ## ##   ##   ##  ###   ## ##    ## ##     ## ###   ### ##     ## ##          ##    ##       ###   ## ##     ## ##     ## ##       ##    ## 
+ *    #### ####  ##   ##  ##     ## ##  ##    ##  ####  ## ##       ##     ## #### #### ##     ## ##          ##    ##       ####  ## ##     ## ##     ## ##       ##       
+ *    ## ### ## ##     ## ########  #####     ##  ## ## ## ##       ##     ## ## ### ## ########  ######      ##    ######   ## ## ## ##     ## ##     ## ######    ######  
+ *    ##     ## ######### ##   ##   ##  ##    ##  ##  #### ##       ##     ## ##     ## ##        ##          ##    ##       ##  #### ##     ## ##     ## ##             ## 
+ *    ##     ## ##     ## ##    ##  ##   ##   ##  ##   ### ##    ## ##     ## ##     ## ##        ##          ##    ##       ##   ### ##     ## ##     ## ##       ##    ## 
+ *    ##     ## ##     ## ##     ## ##    ## #### ##    ##  ######   #######  ##     ## ##        ########    ##    ######## ##    ##  #######  ########  ########  ######  
+ */
+markIncompeteNodes(cycle:number){
+  //clear incomplete child nodes from last time.
+  for(let treeNode of this.incompleteNodes){
+    treeNode.isIncomplete = false
+
+    //clear incomplete flag for all parents.
+    let nextNode = treeNode
+    for(let i = nextNode.radix.length-1; i>=0; i--){
+      let parent = this.shardTrie.layerMaps[i].get(nextNode.radix.substr(0,i))
+      if(parent == null){
+        break
+      }
+      parent.isIncomplete = false
+      nextNode = parent
+    }
+  }
+
+  //get the min and max non covered area
+  let shardValues = this.stateManager.shardValuesByCycle.get(cycle)
+
+  let consensusStartPartition = shardValues.nodeShardData.consensusStartPartition
+  let consensusEndPartition = shardValues.nodeShardData.consensusEndPartition
+  
+  let shardGlobals = shardValues.shardGlobals as ShardGlobals
+  let numPartitions = shardGlobals.numPartitions
+
+  if(consensusStartPartition === 0 && consensusEndPartition === numPartitions - 1){
+    //nothing to mark incomplete our node covers the whole range with its consensus
+    return
+  }
+
+  let incompeteAddresses = []
+  if(consensusStartPartition > consensusEndPartition){
+    //consensus range like this  <CCCC---------CCC>  
+    //incompletePartition:            1       2
+
+    //we may have two ranges to mark
+    let incompletePartition1 = consensusEndPartition + 1 // get the start of this
+    let incompletePartition2 = consensusStartPartition - 1 //get the end of this
+
+    let partition1 = shardValues.parititionShardDataMap.get(incompletePartition1)
+    incompeteAddresses.push(partition1.homeRange.low)
+
+    let partition2 = shardValues.parititionShardDataMap.get(incompletePartition2)
+    incompeteAddresses.push(partition2.homeRange.high)
+
+  } else if(consensusEndPartition > consensusStartPartition) {
+    //consensus range like this  <-----CCCCC------> or <-----------CCCCC> or <CCCCC----------->
+    //incompletePartition:            1     2           2          1               2         1
+    //   not needed:                                    x                                    x
+
+    //we may have two ranges to mark
+    let incompletePartition1 = consensusStartPartition - 1 //get the end of this
+    let incompletePartition2 = consensusEndPartition + 1 // get the start of this
+
+    let use1 = true
+    let use2 = true
+    if(consensusStartPartition === 0){
+      //incompletePartition1 = numPartitions - 1 //special case, we stil want the start
+      use1 = false
+    }
+    if(consensusEndPartition === numPartitions - 1){
+      //incompletePartition2 = 0 //special case, we stil want the start
+      use2 = false
+    }
+
+    if(use1){
+      let partition1 = shardValues.parititionShardDataMap.get(incompletePartition1)
+      incompeteAddresses.push(partition1.homeRange.high)
+    }
+    if(use2){
+      let partition2 = shardValues.parititionShardDataMap.get(incompletePartition2)   
+      incompeteAddresses.push(partition2.homeRange.low)
+    }
+  }
+
+  //set new nodes as incomplete.
+  for(let incompleteAddress of incompeteAddresses){
+    let radix = incompleteAddress.substr(0, this.treeMaxDepth)
+    let treeNode = this.shardTrie.layerMaps[radix.length].get(radix)
+
+    if(treeNode == null){
+      treeNode = {radix, children:[], childHashes:[], accounts:[], hash:'', accountTempMap:new Map(), updated:true, isIncomplete: false, nonSparseChildCount:0}
+      this.shardTrie.layerMaps[radix.length].set(radix, treeNode)
+    }
+    treeNode.updated = true
+    treeNode.isIncomplete = true
+  }
+}
+
+
+
+
+/***
+ *    ########  #### ######## ########  ######   #######  ##    ##  ######  ######## ##    ## ##     ##  ######  
+ *    ##     ##  ##  ##       ##       ##    ## ##     ## ###   ## ##    ## ##       ###   ## ##     ## ##    ## 
+ *    ##     ##  ##  ##       ##       ##       ##     ## ####  ## ##       ##       ####  ## ##     ## ##       
+ *    ##     ##  ##  ######   ######   ##       ##     ## ## ## ##  ######  ######   ## ## ## ##     ##  ######  
+ *    ##     ##  ##  ##       ##       ##       ##     ## ##  ####       ## ##       ##  #### ##     ##       ## 
+ *    ##     ##  ##  ##       ##       ##    ## ##     ## ##   ### ##    ## ##       ##   ### ##     ## ##    ## 
+ *    ########  #### ##       ##        ######   #######  ##    ##  ######  ######## ##    ##  #######   ######  
+ */
   diffConsenus(consensusArray, mapB) : {radix:string, hash:string}[] {
     //map 
     let toFix = []
@@ -356,7 +530,15 @@ class AccountPatcher {
     return toFix
   }
 
-
+/***
+ *     ######   #######  ##     ## ########  ##     ## ######## ########  ######   #######  ##     ## ######## ########     ###     ######   ######## 
+ *    ##    ## ##     ## ###   ### ##     ## ##     ##    ##    ##       ##    ## ##     ## ##     ## ##       ##     ##   ## ##   ##    ##  ##       
+ *    ##       ##     ## #### #### ##     ## ##     ##    ##    ##       ##       ##     ## ##     ## ##       ##     ##  ##   ##  ##        ##       
+ *    ##       ##     ## ## ### ## ########  ##     ##    ##    ######   ##       ##     ## ##     ## ######   ########  ##     ## ##   #### ######   
+ *    ##       ##     ## ##     ## ##        ##     ##    ##    ##       ##       ##     ##  ##   ##  ##       ##   ##   ######### ##    ##  ##       
+ *    ##    ## ##     ## ##     ## ##        ##     ##    ##    ##       ##    ## ##     ##   ## ##   ##       ##    ##  ##     ## ##    ##  ##       
+ *     ######   #######  ##     ## ##         #######     ##    ########  ######   #######     ###    ######## ##     ## ##     ##  ######   ######## 
+ */
   computeCoverage(cycle:number){
     let hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
 
@@ -384,6 +566,17 @@ class AccountPatcher {
     //  have fallback optoins
   }
 
+
+/***
+ *     ######   ######## ######## ##    ##  #######  ########  ######## ########  #######  ########   #######  ##     ## ######## ########  ##    ## 
+ *    ##    ##  ##          ##    ###   ## ##     ## ##     ## ##       ##       ##     ## ##     ## ##     ## ##     ## ##       ##     ##  ##  ##  
+ *    ##        ##          ##    ####  ## ##     ## ##     ## ##       ##       ##     ## ##     ## ##     ## ##     ## ##       ##     ##   ####   
+ *    ##   #### ######      ##    ## ## ## ##     ## ##     ## ######   ######   ##     ## ########  ##     ## ##     ## ######   ########     ##    
+ *    ##    ##  ##          ##    ##  #### ##     ## ##     ## ##       ##       ##     ## ##   ##   ##  ## ## ##     ## ##       ##   ##      ##    
+ *    ##    ##  ##          ##    ##   ### ##     ## ##     ## ##       ##       ##     ## ##    ##  ##    ##  ##     ## ##       ##    ##     ##    
+ *     ######   ########    ##    ##    ##  #######  ########  ######## ##        #######  ##     ##  ##### ##  #######  ######## ##     ##    ##    
+ */
+  //error handling.. what if we cand find a node or run out?
   getNodeForQuery(radix:string, cycle:number, nextNode:boolean = false){
     let hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
     let parentRadix = radix.substr(0, this.treeSyncDepth)
@@ -462,6 +655,15 @@ class AccountPatcher {
     return nodeChildHashes
   }
 
+/***
+ *    ####  ######  #### ##    ##  ######  ##    ## ##    ##  ######  
+ *     ##  ##    ##  ##  ###   ## ##    ##  ##  ##  ###   ## ##    ## 
+ *     ##  ##        ##  ####  ## ##         ####   ####  ## ##       
+ *     ##   ######   ##  ## ## ##  ######     ##    ## ## ## ##       
+ *     ##        ##  ##  ##  ####       ##    ##    ##  #### ##       
+ *     ##  ##    ##  ##  ##   ### ##    ##    ##    ##   ### ##    ## 
+ *    ####  ######  #### ##    ##  ######     ##    ##    ##  ######  
+ */
   isInSync(cycle){
     let hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
 
@@ -570,7 +772,15 @@ class AccountPatcher {
   //big todo .. be able to test changes on a temp tree and validate the hashed before we commit updates
   //also need to actually update the full account data and not just our tree!!
 
-
+/***
+ *    ##     ## ########  ########     ###    ######## ########    ###     ######   ######   #######  ##     ## ##    ## ######## ##     ##    ###     ######  ##     ## 
+ *    ##     ## ##     ## ##     ##   ## ##      ##    ##         ## ##   ##    ## ##    ## ##     ## ##     ## ###   ##    ##    ##     ##   ## ##   ##    ## ##     ## 
+ *    ##     ## ##     ## ##     ##  ##   ##     ##    ##        ##   ##  ##       ##       ##     ## ##     ## ####  ##    ##    ##     ##  ##   ##  ##       ##     ## 
+ *    ##     ## ########  ##     ## ##     ##    ##    ######   ##     ## ##       ##       ##     ## ##     ## ## ## ##    ##    ######### ##     ##  ######  ######### 
+ *    ##     ## ##        ##     ## #########    ##    ##       ######### ##       ##       ##     ## ##     ## ##  ####    ##    ##     ## #########       ## ##     ## 
+ *    ##     ## ##        ##     ## ##     ##    ##    ##       ##     ## ##    ## ##    ## ##     ## ##     ## ##   ###    ##    ##     ## ##     ## ##    ## ##     ## 
+ *     #######  ##        ########  ##     ##    ##    ######## ##     ##  ######   ######   #######   #######  ##    ##    ##    ##     ## ##     ##  ######  ##     ## 
+ */
   updateAccountHash(accountID:string, hash:string){
 
     //todo do we need to look at cycle or timestamp and have a future vs. next queue?
@@ -579,21 +789,114 @@ class AccountPatcher {
     this.accountUpdateQueue.push(accountData)
   }
 
-  applyRepair(accountsToFix:AccountIDAndHash[]){
-    //todo do we need to look at cycle or timestamp and have a future vs. next queue?
-    for(let account of accountsToFix){
-      //need proper tx injestion.
-      //this.txCommit(node, account)
-      //updateAccountHash
+  // applyRepair(accountsToFix:AccountIDAndHash[]){
+  //   //todo do we need to look at cycle or timestamp and have a future vs. next queue?
+  //   for(let account of accountsToFix){
+  //     //need proper tx injestion.
+  //     //this.txCommit(node, account)
+  //     this.updateAccountHash(account.accountID, account.hash)
+  //   }
+  // }
+
+
+  //test if radix is covered by our node.. that is tricky...
+  //need isincomplete logic integrated with trie generation.
+  //will be 1 or 2 values only
+
+  // type HashTrieSyncTell = { 
+  //   cycle: number
+  //   nodeHashes: {radix:string, hash:string}[]
+  // }
+
+
+/***
+ *    ########  ########   #######     ###    ########   ######     ###     ######  ########  ######  ##    ## ##    ##  ######  ##     ##    ###     ######  ##     ## ########  ######  
+ *    ##     ## ##     ## ##     ##   ## ##   ##     ## ##    ##   ## ##   ##    ##    ##    ##    ##  ##  ##  ###   ## ##    ## ##     ##   ## ##   ##    ## ##     ## ##       ##    ## 
+ *    ##     ## ##     ## ##     ##  ##   ##  ##     ## ##        ##   ##  ##          ##    ##         ####   ####  ## ##       ##     ##  ##   ##  ##       ##     ## ##       ##       
+ *    ########  ########  ##     ## ##     ## ##     ## ##       ##     ##  ######     ##     ######     ##    ## ## ## ##       ######### ##     ##  ######  ######### ######    ######  
+ *    ##     ## ##   ##   ##     ## ######### ##     ## ##       #########       ##    ##          ##    ##    ##  #### ##       ##     ## #########       ## ##     ## ##             ## 
+ *    ##     ## ##    ##  ##     ## ##     ## ##     ## ##    ## ##     ## ##    ##    ##    ##    ##    ##    ##   ### ##    ## ##     ## ##     ## ##    ## ##     ## ##       ##    ## 
+ *    ########  ##     ##  #######  ##     ## ########   ######  ##     ##  ######     ##     ######     ##    ##    ##  ######  ##     ## ##     ##  ######  ##     ## ########  ######  
+ */
+
+  async broadcastSyncHashes(cycle){
+    let syncLayer = this.shardTrie.layerMaps[this.treeSyncDepth]
+
+    let shardGlobals = this.stateManager.currentCycleShardData.shardGlobals
+
+    let messageToNodeMap:Map<string, {node: Shardus.Node, message: HashTrieSyncTell}> = new Map()
+
+    for(let treeNode of syncLayer.values()){
+      if(treeNode.isIncomplete === false){
+        let partition = ShardFunctions.getPartitionFromRadix(shardGlobals, treeNode.radix)
+        let shardInfo = this.stateManager.currentCycleShardData.parititionShardDataMap.get(partition.homePartition)
+        for(let [key, value] of Object.entries(shardInfo.coveredBy)){
+          let messagePair = messageToNodeMap.get(value.id)
+          if(messagePair == null){
+            messagePair = {node: value, message: {cycle, nodeHashes: []}}
+            messageToNodeMap.set(value.id, messagePair)
+          }
+          messagePair.message.nodeHashes.push({radix:treeNode.radix, hash: treeNode.hash})
+        }
+      }
     }
+    
+    let promises = []
+    for(let messageEntry of messageToNodeMap.values()){
+      let promise = this.p2p.tell([messageEntry.node], 'sync_trie_hashes', messageEntry.message)
+      promises.push(promise)
+    }
+    await Promise.all(promises)
   }
 
-  //TODO save off last stats and put them on an endpoint for debugging/confirmation
-  async update(cycle){
 
-    let updateStats = this.upateShardTrie()
+
+/***
+ *    ##     ## ########  ########     ###    ######## ######## ######## ########  #### ########    ###    ##    ## ########  ########  ########   #######     ###    ########   ######     ###     ######  ######## 
+ *    ##     ## ##     ## ##     ##   ## ##      ##    ##          ##    ##     ##  ##  ##         ## ##   ###   ## ##     ## ##     ## ##     ## ##     ##   ## ##   ##     ## ##    ##   ## ##   ##    ##    ##    
+ *    ##     ## ##     ## ##     ##  ##   ##     ##    ##          ##    ##     ##  ##  ##        ##   ##  ####  ## ##     ## ##     ## ##     ## ##     ##  ##   ##  ##     ## ##        ##   ##  ##          ##    
+ *    ##     ## ########  ##     ## ##     ##    ##    ######      ##    ########   ##  ######   ##     ## ## ## ## ##     ## ########  ########  ##     ## ##     ## ##     ## ##       ##     ##  ######     ##    
+ *    ##     ## ##        ##     ## #########    ##    ##          ##    ##   ##    ##  ##       ######### ##  #### ##     ## ##     ## ##   ##   ##     ## ######### ##     ## ##       #########       ##    ##    
+ *    ##     ## ##        ##     ## ##     ##    ##    ##          ##    ##    ##   ##  ##       ##     ## ##   ### ##     ## ##     ## ##    ##  ##     ## ##     ## ##     ## ##    ## ##     ## ##    ##    ##    
+ *     #######  ##        ########  ##     ##    ##    ########    ##    ##     ## #### ######## ##     ## ##    ## ########  ########  ##     ##  #######  ##     ## ########   ######  ##     ##  ######     ##    
+ */
+  async updateTrieAndBroadCast(cycle){
+
+    //calculate sync levels!! 
+    let shardValues = this.stateManager.shardValuesByCycle.get(cycle)
+    let shardGlobals = shardValues.shardGlobals as ShardGlobals
+
+    let syncDepthRaw = Math.log(16 * shardGlobals.numPartitions / shardGlobals.consensusRadius) / Math.log(16)
+    syncDepthRaw = Math.max(1, syncDepthRaw) // at least 1
+    syncDepthRaw = Math.round(syncDepthRaw)
+
+    this.treeSyncDepth = syncDepthRaw
+    this.treeMaxDepth = this.treeSyncDepth + 3 //todo the "+3" should be based on total number of stored accounts pre node (in a consensed way, needs to be on cycle chain)
+
+
+    let updateStats = this.upateShardTrie(cycle)
 
     nestedCountersInstance.countEvent(`accountPatcher`, `totalAccountsHashed`, updateStats.totalAccountsHashed)
+
+    //broadcast sync 
+    await this.broadcastSyncHashes(cycle)
+  }
+
+  /***
+ *    ######## ########  ######  ########    ###    ##    ## ########  ########     ###    ########  ######  ##     ##    ###     ######   ######   #######  ##     ## ##    ## ########  ######  
+ *       ##    ##       ##    ##    ##      ## ##   ###   ## ##     ## ##     ##   ## ##      ##    ##    ## ##     ##   ## ##   ##    ## ##    ## ##     ## ##     ## ###   ##    ##    ##    ## 
+ *       ##    ##       ##          ##     ##   ##  ####  ## ##     ## ##     ##  ##   ##     ##    ##       ##     ##  ##   ##  ##       ##       ##     ## ##     ## ####  ##    ##    ##       
+ *       ##    ######    ######     ##    ##     ## ## ## ## ##     ## ########  ##     ##    ##    ##       ######### ##     ## ##       ##       ##     ## ##     ## ## ## ##    ##     ######  
+ *       ##    ##             ##    ##    ######### ##  #### ##     ## ##        #########    ##    ##       ##     ## ######### ##       ##       ##     ## ##     ## ##  ####    ##          ## 
+ *       ##    ##       ##    ##    ##    ##     ## ##   ### ##     ## ##        ##     ##    ##    ##    ## ##     ## ##     ## ##    ## ##    ## ##     ## ##     ## ##   ###    ##    ##    ## 
+ *       ##    ########  ######     ##    ##     ## ##    ## ########  ##        ##     ##    ##     ######  ##     ## ##     ##  ######   ######   #######   #######  ##    ##    ##     ######  
+ */
+  //TODO save off last stats and put them on an endpoint for debugging/confirmation
+  async testAndPatchAccounts(cycle){
+
+    // let updateStats = this.upateShardTrie(cycle)
+
+    // nestedCountersInstance.countEvent(`accountPatcher`, `totalAccountsHashed`, updateStats.totalAccountsHashed)
 
     if(this.isInSync(cycle) === false){
 
@@ -601,11 +904,33 @@ class AccountPatcher {
       nestedCountersInstance.countEvent(`accountPatcher`, `badAccounts ${cycle} `, results.badAccounts.length)
       nestedCountersInstance.countEvent(`accountPatcher`, `accountHashesChecked ${cycle}`, results.accountHashesChecked)
 
-      //Start fixes
+      // local test patches.//debug only feature
+
+
 
       //request data for the list of bad accounts then update. this can live in account repair?
+      
+      let wrappedDataList = await this.getAccountRepairData(cycle, results.badAccounts )
+
+      //do some work so ave the data
+      let failedHashes = await this.stateManager.checkAndSetAccountData(wrappedDataList, `testAndPatchAccounts`, false)
+      let failedHashesSet = new Set(failedHashes)
+      if(failedHashes.length != 0){
+        nestedCountersInstance.countEvent('accountPatcher', 'checkAndSetAccountData failed hashes', failedHashes.length)
+      }
+      nestedCountersInstance.countEvent('accountPatcher', 'writeCombinedAccountDataToBackups', wrappedDataList.length - failedHashes.length)
+      await this.stateManager.writeCombinedAccountDataToBackups(wrappedDataList, failedHashes)
 
       //apply repair account data and update shard trie
+
+      // get list of accounts that were fixed.
+      for(let wrappedData of wrappedDataList){
+        if(failedHashesSet.has(wrappedData.accountId) === false){
+
+          //need good way to update trie..  just insert and let it happen next round!
+          this.updateAccountHash(wrappedData.accountId, wrappedData.stateId)
+        }
+      }
 
       //check again if we are in sync
 
@@ -614,6 +939,65 @@ class AccountPatcher {
     }
 
   }
+
+
+
+
+
+
+/***
+ *     ######   ######## ########    ###     ######   ######   #######  ##     ## ##    ## ######## ########  ######## ########     ###    #### ########  ########     ###    ########    ###    
+ *    ##    ##  ##          ##      ## ##   ##    ## ##    ## ##     ## ##     ## ###   ##    ##    ##     ## ##       ##     ##   ## ##    ##  ##     ## ##     ##   ## ##      ##      ## ##   
+ *    ##        ##          ##     ##   ##  ##       ##       ##     ## ##     ## ####  ##    ##    ##     ## ##       ##     ##  ##   ##   ##  ##     ## ##     ##  ##   ##     ##     ##   ##  
+ *    ##   #### ######      ##    ##     ## ##       ##       ##     ## ##     ## ## ## ##    ##    ########  ######   ########  ##     ##  ##  ########  ##     ## ##     ##    ##    ##     ## 
+ *    ##    ##  ##          ##    ######### ##       ##       ##     ## ##     ## ##  ####    ##    ##   ##   ##       ##        #########  ##  ##   ##   ##     ## #########    ##    ######### 
+ *    ##    ##  ##          ##    ##     ## ##    ## ##    ## ##     ## ##     ## ##   ###    ##    ##    ##  ##       ##        ##     ##  ##  ##    ##  ##     ## ##     ##    ##    ##     ## 
+ *     ######   ########    ##    ##     ##  ######   ######   #######   #######  ##    ##    ##    ##     ## ######## ##        ##     ## #### ##     ## ########  ##     ##    ##    ##     ## 
+ */
+  //todo test the tree to see if repairs will work.   not simple to do efficiently
+  //todo robust query the hashes?  technically if we repair to bad data it will just get detected and fixed again!!!
+  async getAccountRepairData(cycle:number, badAccounts:AccountIDAndHash[] ): Promise<Shardus.WrappedData[]> {
+    //pick which nodes to ask! /    //build up requests
+    let nodesBySyncRadix:Map<string, {node:Shardus.Node, request:{cycle, accounts:AccountIDAndHash[]} }> = new Map()
+    for(let accountEntry of badAccounts){
+      let syncRadix = accountEntry.accountID.substr(0, this.treeSyncDepth)
+      let requestEntry = nodesBySyncRadix.get(syncRadix)
+      if(requestEntry == null){
+        //minor layer of security, we will ask a different node for the account than the one that gave us the hash
+        let nodeToAsk = this.getNodeForQuery(accountEntry.accountID, cycle, true) 
+
+        requestEntry = {node:nodeToAsk, request:{cycle, accounts:[]}}
+        nodesBySyncRadix.set(syncRadix, requestEntry)
+      } 
+      requestEntry.request.accounts.push(accountEntry)
+    }
+
+    let promises = []
+    for(let requestEntry of nodesBySyncRadix.values()){
+      // look at responses.. we may not get all accounts back.
+      let promise = this.p2p.tell([requestEntry.node], 'get_account_data_by_hashes', requestEntry.request)
+      promises.push(promise)
+
+    }
+
+    let wrappedDataList:Shardus.WrappedData[] = []
+
+    let results = await Promise.all(promises)
+    for(let result of results){
+      //HashTrieAccountDataResponse
+      if(result != null && result.accounts != null && result.accounts.length > 0){
+        wrappedDataList = wrappedDataList.concat(result.accounts)        
+      }
+    }
+
+    return wrappedDataList
+  }
+
+
+//how about marking our incomplete areas so that sharding works!!
+// find min and max non covered partition
+// then get the min and max values. and flag for non edge partitions .  partition 0 and partition max dont need flagging.
+
 
 }
 

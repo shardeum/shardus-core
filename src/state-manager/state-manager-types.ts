@@ -1,5 +1,7 @@
 //import { AccountData } from "../shardus/shardus-types";
 
+//import { WrappedData } from "../shardus/shardus-types";
+
 // import { Node } from "../p2p/NodeList";
 
 //import { WrappedResponse } from "../shardus/shardus-types";
@@ -904,6 +906,13 @@ type HashTrieAccountsResp = {
     nodeChildHashes: RadixAndChildHashes[]
 };
 
+type HashTrieAccountDataRequest = {
+    cycle: number;
+    accounts:AccountIDAndHash[];
+}
+type HashTrieAccountDataResponse = {
+    accounts:import("../shardus/shardus-types").WrappedData[];
+}
 
 
 type HashTrieUpdateStats = {
