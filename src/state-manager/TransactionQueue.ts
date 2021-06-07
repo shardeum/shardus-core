@@ -600,6 +600,7 @@ class TransactionQueue {
         waitForReceiptOnly: false,
         m2TimeoutReached: false,
         debugFail_voteFlip: false,
+        debugFail_failNoRepair: false,
         requestingReceipt: false,
         cycleToRecordOn: -5,
         involvedPartitions: [],
@@ -650,6 +651,10 @@ class TransactionQueue {
         }
         if (this.stateManager.testFailChance(this.stateManager.voteFlipChance, 'voteFlipChance', txQueueEntry.logID, '', logFlags.verbose) === true) {
           txQueueEntry.debugFail_voteFlip = true
+        }
+
+        if (globalModification === false && this.stateManager.testFailChance(this.stateManager.failNoRepairTxChance, 'failNoRepairTxChance', txQueueEntry.logID, '', logFlags.verbose) === true) {
+          txQueueEntry.debugFail_failNoRepair = true
         }
       }
 
@@ -2173,6 +2178,16 @@ class TransactionQueue {
 
               // we got a receipt but did not match it.
               if (didNotMatchReceipt === true) {
+
+                if(queueEntry.debugFail_failNoRepair){
+                  queueEntry.state = 'fail'
+                  this.removeFromQueue(queueEntry, currentIndex)
+                  nestedCountersInstance.countEvent('stateManager', 'debugFail_failNoRepair')
+                  this.statemanager_fatal(`processAcceptedTxQueue_debugFail_failNoRepair2`, `processAcceptedTxQueue_debugFail_failNoRepair2 tx: ${shortID} cycle:${queueEntry.cycleToRecordOn}  accountkeys: ${utils.stringifyReduce(queueEntry.uniqueWritableKeys)}`)
+                  this.processQueue_clearAccountsSeen(seenAccounts, queueEntry)
+                  continue
+                }
+
                 if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_didNotMatchReceipt', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} `)
                 queueEntry.repairFinished = false
                 if (queueEntry.appliedReceiptForRepair.result === true) {
@@ -2228,6 +2243,15 @@ class TransactionQueue {
               //     queueEntry.localCachedData[key] = wrappedState.localCache
               //   }
               // }
+
+              if(queueEntry.debugFail_failNoRepair){
+                queueEntry.state = 'fail'
+                this.removeFromQueue(queueEntry, currentIndex)
+                nestedCountersInstance.countEvent('stateManager', 'debugFail_failNoRepair')
+                this.statemanager_fatal(`processAcceptedTxQueue_debugFail_failNoRepair`, `processAcceptedTxQueue_debugFail_failNoRepair tx: ${shortID} cycle:${queueEntry.cycleToRecordOn}  accountkeys: ${utils.stringifyReduce(queueEntry.uniqueWritableKeys)}`)
+                this.processQueue_clearAccountsSeen(seenAccounts, queueEntry)
+                continue
+              }
 
               let wrappedStates = queueEntry.collectedData // Object.values(queueEntry.collectedData)
               let localCachedData = queueEntry.localCachedData

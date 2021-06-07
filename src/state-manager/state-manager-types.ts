@@ -99,6 +99,8 @@ export type QueueEntry = {
 
     //collectedData for repair
     debugFail_voteFlip:boolean;
+
+    debugFail_failNoRepair:Boolean;
     //short log id
     logID:string;
 

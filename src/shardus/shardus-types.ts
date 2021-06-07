@@ -601,6 +601,8 @@ export interface ShardusConfiguration {
     failReceiptChance?: number
     /** chance to flip our vote */
     voteFlipChance?: number
+      /** chance to fail a TX and the TX repair */
+      failNoRepairTxChance?:number
     /** use the new stats data for partition state reports to monitor server */
     useNewParitionReport?: boolean
     /** is the old partition checking system enabled */

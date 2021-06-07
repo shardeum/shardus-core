@@ -109,6 +109,7 @@ class StateManager {
   loseTxChance: number
   failReceiptChance: number
   voteFlipChance: number
+  failNoRepairTxChance: number
 
   syncSettleTime: number
   debugTXHistory: { [id: string]: string } // need to disable or clean this as it will leak memory
@@ -360,6 +361,16 @@ class StateManager {
         this.voteFlipChance = 0
       }
     }
+
+    this.failNoRepairTxChance = 0
+    if (this.config && this.config.debug) {
+      this.failNoRepairTxChance = this.config.debug.failNoRepairTxChance
+      if (this.failNoRepairTxChance == null) {
+        this.failNoRepairTxChance = 0
+      }
+    }
+
+    
   }
 
   // TEMP hack emit events through p2p
