@@ -1,6 +1,6 @@
 import * as Shardus from '../shardus/shardus-types'
 
-import { ShardGlobals, ShardInfo, StoredPartition, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from './shardFunctionTypes'
+import { ShardGlobals, ShardInfo, WrappableParitionRange, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from './shardFunctionTypes'
 
 import { isNodeDown, isNodeLost, isNodeUpRecent } from '../p2p/Lost'
 
@@ -1431,11 +1431,11 @@ class StateManager {
 
     // todo port this to a static stard function!
     // check if we are in the consenus group for this partition
-    // let minP = ourNodeShardData.consensusStartPartition // storedPartitions.partitionStart
-    // let maxP = ourNodeShardData.consensusEndPartition // storedPartitions.partitionEnd
+    let minP = ourNodeShardData.consensusStartPartition // storedPartitions.partitionStart
+    let maxP = ourNodeShardData.consensusEndPartition // storedPartitions.partitionEnd
 
-    let minP = ourNodeShardData.storedPartitions.partitionStart
-    let maxP = ourNodeShardData.storedPartitions.partitionEnd
+    // let minP = ourNodeShardData.storedPartitions.partitionStart
+    // let maxP = ourNodeShardData.storedPartitions.partitionEnd
 
     let cMin = ourNodeShardData.consensusStartPartition
     let cMax = ourNodeShardData.consensusEndPartition

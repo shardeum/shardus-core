@@ -3,7 +3,7 @@
 // const StateManager = require('../../../src/state-manager')
 //const ShardFunctions = require('../../../src/state-manager/shardFunctions.js')
 const ShardFunctions = require('../../../build/src/state-manager/shardFunctions.js').default
-// import {ShardGlobals,ShardInfo,StoredPartition,NodeShardData,AddressRange, HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange} from  './shardFunctionTypes'
+// import {ShardGlobals,ShardInfo,WrappableParitionRange,NodeShardData,AddressRange, HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange} from  './shardFunctionTypes'
 // import ShardFunctions from './shardFunctions.js'
 
 const crypto = require('shardus-crypto-utils')

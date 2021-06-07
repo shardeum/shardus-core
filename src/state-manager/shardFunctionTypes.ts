@@ -76,9 +76,9 @@ type ShardInfo = {
   }
 }
 /**
- * Data for a StoredPartition
+ * Data for a WrappableParitionRange was WrappableParitionRange
  */
-type StoredPartition = {
+type WrappableParitionRange = {
   /**
    * range for the home partition
    */
@@ -169,7 +169,7 @@ type NodeShardData = {
      * consenus radius (number of nodes to each side of us that hold consensus data)
     property {Map<string,Node>} coveredBy the nodes that cover us for consenus // removed not sure this goes here
      */
-  storedPartitions: StoredPartition
+  storedPartitions: WrappableParitionRange
   nodeThatStoreOurParition: Shardus.Node[]
   nodeThatStoreOurParitionFull: Shardus.Node[]
   consensusNodeForOurNode: Shardus.Node[]
@@ -270,4 +270,4 @@ interface BasicAddressRange {
   high: string
 }
 
-export { ShardGlobals, ShardInfo, StoredPartition, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange }
+export { ShardGlobals, ShardInfo, WrappableParitionRange as WrappableParitionRange, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange }

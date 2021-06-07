@@ -4,8 +4,8 @@ import * as Shardus from '../shardus/shardus-types'
 
 const stringify = require('fast-stable-stringify')
 
-//import {ShardGlobals,ShardInfo,StoredPartition,NodeShardData,AddressRange,HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange } from  './shardFunction2Types'
-import { ShardGlobals, ShardInfo, StoredPartition, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from './shardFunctionTypes'
+//import {ShardGlobals,ShardInfo,WrappableParitionRange,NodeShardData,AddressRange,HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange } from  './shardFunction2Types'
+import { ShardGlobals, ShardInfo, WrappableParitionRange, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from './shardFunctionTypes'
 
 class ShardFunctions {
   static logger: Logger = null
@@ -75,169 +75,185 @@ class ShardFunctions {
     return shardinfo
   }
 
-  static calculateStoredPartitions2(shardGlobals: ShardGlobals, homePartition: number): StoredPartition {
-    let storedPartitions = {} as StoredPartition
-
-    storedPartitions.homeRange = ShardFunctions.partitionToAddressRange2(shardGlobals, homePartition)
-    // test if we will cover the full range by default
-    if (shardGlobals.numPartitions / 2 <= shardGlobals.nodesPerConsenusGroup) {
-      storedPartitions.rangeIsSplit = false
-      storedPartitions.partitionStart = 0
-      storedPartitions.partitionEnd = shardGlobals.numPartitions - 1
-
-      ShardFunctions.calculateStoredPartitions2Ranges(shardGlobals, storedPartitions)
-      return storedPartitions
-    }
-
-    let x = shardGlobals.nodesPerConsenusGroup
-    let n = homePartition
-    storedPartitions.x = x // for debug
-    storedPartitions.n = n
-
-    storedPartitions.partitionStart = n - x
-    storedPartitions.partitionEnd = n + x
-
-    ShardFunctions.calculateStoredPartitions2Ranges(shardGlobals, storedPartitions)
-
-    return storedPartitions
+  /**
+   * calculateStoredPartitions2
+   * gets the WrappableParitionRange for a node's stored partitions
+   * this uses nodesPerConsenusGroup as the radius to include, so we will end up with 1 + 2*nodesPerConsenusGroup stored partitions 
+   * @param shardGlobals 
+   * @param homePartition 
+   */
+  static calculateStoredPartitions2(shardGlobals: ShardGlobals, homePartition: number): WrappableParitionRange {
+    return ShardFunctions.calculateParitionRange(shardGlobals, homePartition, shardGlobals.nodesPerConsenusGroup)
   }
 
   /**
-   * @param {ShardGlobals} shardGlobals
-   * @param {StoredPartition} storedPartitions
+   * calculateParitionRange
+   * give a center parition and the radius to calculate a WrappableParitionRange
+   * @param shardGlobals 
+   * @param homePartition 
+   * @param paritionRadius 
    */
-  static calculateStoredPartitions2Ranges(shardGlobals: ShardGlobals, storedPartitions: StoredPartition) {
-    storedPartitions.partitionRangeVector = { start: storedPartitions.partitionStart, dist: 1 + 2 * shardGlobals.nodesPerConsenusGroup, end: storedPartitions.partitionEnd }
-    storedPartitions.rangeIsSplit = false
+  static calculateParitionRange(shardGlobals: ShardGlobals, homePartition: number, paritionRadius: number): WrappableParitionRange {
+    let wrappableParitionRange = {} as WrappableParitionRange
 
-    storedPartitions.partitionsCovered = 0
-    if (storedPartitions.partitionStart < 0) {
-      storedPartitions.rangeIsSplit = true
-      storedPartitions.partitionStart2 = storedPartitions.partitionStart + shardGlobals.numPartitions
-      storedPartitions.partitionEnd2 = shardGlobals.numPartitions - 1
-      storedPartitions.partitionStart1 = 0
-      storedPartitions.partitionEnd1 = storedPartitions.partitionEnd
-      storedPartitions.partitionRangeVector.start = storedPartitions.partitionStart2
-      storedPartitions.partitionStart = storedPartitions.partitionRangeVector.start
-    }
-    if (storedPartitions.partitionEnd >= shardGlobals.numPartitions) {
-      storedPartitions.rangeIsSplit = true
-      storedPartitions.partitionEnd1 = storedPartitions.partitionEnd - shardGlobals.numPartitions
-      storedPartitions.partitionStart1 = 0
-      storedPartitions.partitionStart2 = storedPartitions.partitionStart
-      storedPartitions.partitionEnd2 = shardGlobals.numPartitions - 1
-      storedPartitions.partitionRangeVector.end = storedPartitions.partitionEnd1
-      storedPartitions.partitionEnd = storedPartitions.partitionRangeVector.end
+    wrappableParitionRange.homeRange = ShardFunctions.partitionToAddressRange2(shardGlobals, homePartition)
+    // test if we will cover the full range by default
+    if (shardGlobals.numPartitions / 2 <= paritionRadius) {
+      wrappableParitionRange.rangeIsSplit = false
+      wrappableParitionRange.partitionStart = 0
+      wrappableParitionRange.partitionEnd = shardGlobals.numPartitions - 1
+
+      ShardFunctions.calculatePartitionRangeInternal(shardGlobals, wrappableParitionRange, paritionRadius)
+      return wrappableParitionRange
     }
 
-    if (storedPartitions.partitionEnd < storedPartitions.partitionStart) {
-      storedPartitions.rangeIsSplit = true
+    let x = paritionRadius
+    let n = homePartition
+    wrappableParitionRange.x = x // for debug
+    wrappableParitionRange.n = n
 
-      storedPartitions.partitionEnd1 = storedPartitions.partitionEnd
-      storedPartitions.partitionStart1 = 0
-      storedPartitions.partitionStart2 = storedPartitions.partitionStart
-      storedPartitions.partitionEnd2 = shardGlobals.numPartitions - 1
-      storedPartitions.partitionRangeVector.end = storedPartitions.partitionEnd1
-      storedPartitions.partitionEnd = storedPartitions.partitionRangeVector.end
+    wrappableParitionRange.partitionStart = n - x
+    wrappableParitionRange.partitionEnd = n + x
+
+    ShardFunctions.calculatePartitionRangeInternal(shardGlobals, wrappableParitionRange, paritionRadius)
+
+    return wrappableParitionRange
+  }
+
+  /**
+   * calculatePartitionRangeInternal
+   * additional calculations required to fill out a WrappableParitionRange and make sure the wrapping is correct
+   * @param {ShardGlobals} shardGlobals
+   * @param {WrappableParitionRange} wrappableParitionRange
+   */
+  static calculatePartitionRangeInternal(shardGlobals: ShardGlobals, wrappableParitionRange: WrappableParitionRange, paritionRadius: number) {
+    wrappableParitionRange.partitionRangeVector = { start: wrappableParitionRange.partitionStart, dist: 1 + 2 * shardGlobals.nodesPerConsenusGroup, end: wrappableParitionRange.partitionEnd }
+    wrappableParitionRange.rangeIsSplit = false
+
+    wrappableParitionRange.partitionsCovered = 0
+    if (wrappableParitionRange.partitionStart < 0) {
+      wrappableParitionRange.rangeIsSplit = true
+      wrappableParitionRange.partitionStart2 = wrappableParitionRange.partitionStart + shardGlobals.numPartitions
+      wrappableParitionRange.partitionEnd2 = shardGlobals.numPartitions - 1
+      wrappableParitionRange.partitionStart1 = 0
+      wrappableParitionRange.partitionEnd1 = wrappableParitionRange.partitionEnd
+      wrappableParitionRange.partitionRangeVector.start = wrappableParitionRange.partitionStart2
+      wrappableParitionRange.partitionStart = wrappableParitionRange.partitionRangeVector.start
+    }
+    if (wrappableParitionRange.partitionEnd >= shardGlobals.numPartitions) {
+      wrappableParitionRange.rangeIsSplit = true
+      wrappableParitionRange.partitionEnd1 = wrappableParitionRange.partitionEnd - shardGlobals.numPartitions
+      wrappableParitionRange.partitionStart1 = 0
+      wrappableParitionRange.partitionStart2 = wrappableParitionRange.partitionStart
+      wrappableParitionRange.partitionEnd2 = shardGlobals.numPartitions - 1
+      wrappableParitionRange.partitionRangeVector.end = wrappableParitionRange.partitionEnd1
+      wrappableParitionRange.partitionEnd = wrappableParitionRange.partitionRangeVector.end
+    }
+
+    if (wrappableParitionRange.partitionEnd < wrappableParitionRange.partitionStart) {
+      wrappableParitionRange.rangeIsSplit = true
+
+      wrappableParitionRange.partitionEnd1 = wrappableParitionRange.partitionEnd
+      wrappableParitionRange.partitionStart1 = 0
+      wrappableParitionRange.partitionStart2 = wrappableParitionRange.partitionStart
+      wrappableParitionRange.partitionEnd2 = shardGlobals.numPartitions - 1
+      wrappableParitionRange.partitionRangeVector.end = wrappableParitionRange.partitionEnd1
+      wrappableParitionRange.partitionEnd = wrappableParitionRange.partitionRangeVector.end
     }
 
     // need to collapse a split range that covers all partitions?
-    if(storedPartitions.rangeIsSplit === true && storedPartitions.partitionEnd1 + 1 === storedPartitions.partitionStart2){
-      storedPartitions.rangeIsSplit = false
-      storedPartitions.partitionStart = 0
-      storedPartitions.partitionEnd = shardGlobals.numPartitions - 1 
+    if(wrappableParitionRange.rangeIsSplit === true && wrappableParitionRange.partitionEnd1 + 1 === wrappableParitionRange.partitionStart2){
+      wrappableParitionRange.rangeIsSplit = false
+      wrappableParitionRange.partitionStart = 0
+      wrappableParitionRange.partitionEnd = shardGlobals.numPartitions - 1 
 
-      storedPartitions.partitionRangeVector = { start: storedPartitions.partitionStart, dist: 1 + 2 * shardGlobals.nodesPerConsenusGroup, end: storedPartitions.partitionEnd }
+      wrappableParitionRange.partitionRangeVector = { start: wrappableParitionRange.partitionStart, dist: 1 + 2 * paritionRadius, end: wrappableParitionRange.partitionEnd }
 
     }
 
     // alias to start and end 1 in the simple case.  sync code expects values for these
-    if (storedPartitions.rangeIsSplit === false) {
-      storedPartitions.partitionStart1 = storedPartitions.partitionStart
-      storedPartitions.partitionEnd1 = storedPartitions.partitionEnd
+    if (wrappableParitionRange.rangeIsSplit === false) {
+      wrappableParitionRange.partitionStart1 = wrappableParitionRange.partitionStart
+      wrappableParitionRange.partitionEnd1 = wrappableParitionRange.partitionEnd
     }
 
     // did we wrap to cover the entire range, that should have early outed at the top of the function
-    if (storedPartitions.rangeIsSplit === true && (storedPartitions.partitionStart1 === storedPartitions.partitionEnd2 || storedPartitions.partitionStart2 === storedPartitions.partitionEnd1)) {
-      throw new Error('this should never happen: ' + stringify(storedPartitions) + 'globals: ' + stringify(shardGlobals))
+    if (wrappableParitionRange.rangeIsSplit === true && (wrappableParitionRange.partitionStart1 === wrappableParitionRange.partitionEnd2 || wrappableParitionRange.partitionStart2 === wrappableParitionRange.partitionEnd1)) {
+      throw new Error('this should never happen: ' + stringify(wrappableParitionRange) + 'globals: ' + stringify(shardGlobals))
     }
-    if (storedPartitions.rangeIsSplit) {
-      if (storedPartitions.partitionStart2 >= 0 && storedPartitions.partitionEnd2 >= 0) {
-        storedPartitions.partitionRange = ShardFunctions.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart1, storedPartitions.partitionEnd1)
-        storedPartitions.partitionRange2 = ShardFunctions.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart2, storedPartitions.partitionEnd2)
-        storedPartitions.partitionsCovered = 2 + (storedPartitions.partitionEnd1 - storedPartitions.partitionStart1) + (storedPartitions.partitionEnd2 - storedPartitions.partitionStart2)
+    if (wrappableParitionRange.rangeIsSplit) {
+      if (wrappableParitionRange.partitionStart2 >= 0 && wrappableParitionRange.partitionEnd2 >= 0) {
+        wrappableParitionRange.partitionRange = ShardFunctions.partitionToAddressRange2(shardGlobals, wrappableParitionRange.partitionStart1, wrappableParitionRange.partitionEnd1)
+        wrappableParitionRange.partitionRange2 = ShardFunctions.partitionToAddressRange2(shardGlobals, wrappableParitionRange.partitionStart2, wrappableParitionRange.partitionEnd2)
+        wrappableParitionRange.partitionsCovered = 2 + (wrappableParitionRange.partitionEnd1 - wrappableParitionRange.partitionStart1) + (wrappableParitionRange.partitionEnd2 - wrappableParitionRange.partitionStart2)
       } else {
-        throw new Error('missing ranges in storedPartitions 1')
+        throw new Error('missing ranges in partitionRange 1')
       }
     } else {
-      storedPartitions.partitionRange = ShardFunctions.partitionToAddressRange2(shardGlobals, storedPartitions.partitionStart, storedPartitions.partitionEnd)
-      if (storedPartitions.partitionStart1 >= 0 && storedPartitions.partitionEnd1 >= 0) {
-        storedPartitions.partitionsCovered = 1 + (storedPartitions.partitionEnd1 - storedPartitions.partitionStart1)
+      wrappableParitionRange.partitionRange = ShardFunctions.partitionToAddressRange2(shardGlobals, wrappableParitionRange.partitionStart, wrappableParitionRange.partitionEnd)
+      if (wrappableParitionRange.partitionStart1 >= 0 && wrappableParitionRange.partitionEnd1 >= 0) {
+        wrappableParitionRange.partitionsCovered = 1 + (wrappableParitionRange.partitionEnd1 - wrappableParitionRange.partitionStart1)
       } else {
         // throw new Error('missing ranges in storedPartitions 2')
-        throw new Error(`missing ranges in storedPartitions 2b  ${storedPartitions.partitionStart1} ${storedPartitions.partitionEnd1} ${stringify(storedPartitions)}`)
+        throw new Error(`missing ranges in partitionRange 2b  ${wrappableParitionRange.partitionStart1} ${wrappableParitionRange.partitionEnd1} ${stringify(wrappableParitionRange)}`)
       }
     }
-    // if (storedPartitions.partitionsCovered <= 2) {
-    //   let a = 1
-    //   a++
-    // }
   }
 
-  static testAddressInRange(address: string, storedPartitions: StoredPartition): boolean {
-    if (storedPartitions.rangeIsSplit) {
+  static testAddressInRange(address: string, wrappableParitionRange: WrappableParitionRange): boolean {
+    if (wrappableParitionRange.rangeIsSplit) {
       if (
-        (address >= storedPartitions.partitionRange.low && address <= storedPartitions.partitionRange.high) ||
-        (address >= storedPartitions.partitionRange2.low && address <= storedPartitions.partitionRange2.high)
+        (address >= wrappableParitionRange.partitionRange.low && address <= wrappableParitionRange.partitionRange.high) ||
+        (address >= wrappableParitionRange.partitionRange2.low && address <= wrappableParitionRange.partitionRange2.high)
       ) {
         return true
       }
     } else {
-      if (address >= storedPartitions.partitionRange.low && address <= storedPartitions.partitionRange.high) {
+      if (address >= wrappableParitionRange.partitionRange.low && address <= wrappableParitionRange.partitionRange.high) {
         return true
       }
     }
     return false
   }
 
-  static testAddressNumberInRange(address: number, storedPartitions: StoredPartition): boolean {
-    if (storedPartitions.rangeIsSplit) {
+  static testAddressNumberInRange(address: number, wrappableParitionRange: WrappableParitionRange): boolean {
+    if (wrappableParitionRange.rangeIsSplit) {
       if (
-        (address >= storedPartitions.partitionRange.startAddr && address <= storedPartitions.partitionRange.endAddr) ||
-        (address >= storedPartitions.partitionRange2.startAddr && address <= storedPartitions.partitionRange2.endAddr)
+        (address >= wrappableParitionRange.partitionRange.startAddr && address <= wrappableParitionRange.partitionRange.endAddr) ||
+        (address >= wrappableParitionRange.partitionRange2.startAddr && address <= wrappableParitionRange.partitionRange2.endAddr)
       ) {
         return true
       }
     } else {
-      if (address >= storedPartitions.partitionRange.startAddr && address <= storedPartitions.partitionRange.endAddr) {
+      if (address >= wrappableParitionRange.partitionRange.startAddr && address <= wrappableParitionRange.partitionRange.endAddr) {
         return true
       }
     }
     return false
   }
 
-  static testInRange(partition: number, storedPartitions: StoredPartition): boolean {
-    if (storedPartitions.rangeIsSplit) {
+  static testInRange(partition: number, wrappableParitionRange: WrappableParitionRange): boolean {
+    if (wrappableParitionRange.rangeIsSplit) {
       if (
-        (partition >= storedPartitions.partitionStart1 && partition <= storedPartitions.partitionEnd1) ||
-        (partition >= storedPartitions.partitionStart2 && partition <= storedPartitions.partitionEnd2)
+        (partition >= wrappableParitionRange.partitionStart1 && partition <= wrappableParitionRange.partitionEnd1) ||
+        (partition >= wrappableParitionRange.partitionStart2 && partition <= wrappableParitionRange.partitionEnd2)
       ) {
         return true
       }
     } else {
-      if (partition >= storedPartitions.partitionStart && partition <= storedPartitions.partitionEnd) {
+      if (partition >= wrappableParitionRange.partitionStart && partition <= wrappableParitionRange.partitionEnd) {
         return true
       }
     }
     return false
   }
 
-  static getPartitionsCovered(storedPartitions: StoredPartition): number {
+  static getPartitionsCovered(wrappableParitionRange: WrappableParitionRange): number {
     let covered = 0
-    if (storedPartitions.rangeIsSplit === true) {
-      covered = 2 + (storedPartitions.partitionEnd2 - storedPartitions.partitionStart2) + (storedPartitions.partitionEnd1 - storedPartitions.partitionStart1)
+    if (wrappableParitionRange.rangeIsSplit === true) {
+      covered = 2 + (wrappableParitionRange.partitionEnd2 - wrappableParitionRange.partitionStart2) + (wrappableParitionRange.partitionEnd1 - wrappableParitionRange.partitionStart1)
     } else {
-      covered = 1 + storedPartitions.partitionEnd - storedPartitions.partitionStart
+      covered = 1 + wrappableParitionRange.partitionEnd - wrappableParitionRange.partitionStart
     }
     if (covered < 20) {
       covered += 0
@@ -954,6 +970,9 @@ class ShardFunctions {
     let partition = ShardFunctions.addressToPartition(shardGlobals, filledAddress)
     return partition
   }
+
+
+
 
   static addressToPartition(shardGlobals: ShardGlobals, address: string): { homePartition: number; addressNum: number } {
     let numPartitions = shardGlobals.numPartitions

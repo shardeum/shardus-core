@@ -1,5 +1,5 @@
 import * as Shardus from '../shardus/shardus-types'
-import { ShardGlobals, ShardInfo, StoredPartition, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from './shardFunctionTypes'
+import { ShardGlobals, ShardInfo, WrappableParitionRange, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from './shardFunctionTypes'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
 import { nestedCountersInstance } from '../utils/nestedCounters'
@@ -515,11 +515,13 @@ class TransactionQueue {
           txQueueEntry.involvedPartitions.push(homeNode.homePartition)
         }
 
-        // HOMENODEMATHS Based on home node.. should this be chaned to homepartition?
-        let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
-        let relationString = ShardFunctions.getNodeRelation(homeNode, this.stateManager.currentCycleShardData.ourNode.id)
-        // route_to_home_node
-        if (logFlags.playback) this.logger.playbackLogNote('shrd_homeNodeSummary', `${txId}`, `account:${utils.makeShortHash(key)} rel:${relationString} summary:${utils.stringifyReduce(summaryObject)}`)
+        if (logFlags.playback){
+          // HOMENODEMATHS Based on home node.. should this be chaned to homepartition?
+          let summaryObject = ShardFunctions.getHomeNodeSummaryObject(homeNode)
+          let relationString = ShardFunctions.getNodeRelation(homeNode, this.stateManager.currentCycleShardData.ourNode.id)
+          // route_to_home_node
+          this.logger.playbackLogNote('shrd_homeNodeSummary', `${txId}`, `account:${utils.makeShortHash(key)} rel:${relationString} summary:${utils.stringifyReduce(summaryObject)}`)
+        }
       }
 
       txQueueEntry.hasShardInfo = true

@@ -1,5 +1,5 @@
 import * as Shardus from '../shardus/shardus-types'
-import { ShardGlobals, ShardInfo, StoredPartition, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from './shardFunctionTypes'
+import { ShardGlobals, ShardInfo, WrappableParitionRange, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from './shardFunctionTypes'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
 
@@ -106,8 +106,16 @@ class PartitionObjects {
    */
   // TSConversion todo define partition report. for now use any
   getPartitionReport(consensusOnly: boolean, smallHashes: boolean): PartitionCycleReport {
-    let response = {} // {res:[], cycleNumber:-1}
+    let response: PartitionCycleReport = {} // {res:[], cycleNumber:-1}
     if (this.nextCycleReportToSend != null) {
+
+      let shardValues = this.stateManager.shardValuesByCycle.get(this.nextCycleReportToSend.cycleNumber)
+      let shardGlobals = shardValues.shardGlobals as ShardGlobals
+      let consensusStartPartition = shardValues.nodeShardData.consensusStartPartition
+      let consensusEndPartition = shardValues.nodeShardData.consensusEndPartition
+      
+
+      response = {res:[], cycleNumber:this.nextCycleReportToSend.cycleNumber}
       if (this.lastCycleReported < this.nextCycleReportToSend.cycleNumber || this.partitionReportDirty === true) {
         // consensusOnly hashes
         if (smallHashes === true) {
@@ -115,8 +123,18 @@ class PartitionObjects {
             r.h = utils.makeShortHash(r.h)
           }
         }
+        for (let r of this.nextCycleReportToSend.res) {
+          if(consensusOnly){
+            //check if partition is in our range!
+            if(ShardFunctions.partitionInConsensusRange(r.i, consensusStartPartition, consensusEndPartition)){
+              response.res.push(r)
+            }
+          } else{
+            response.res.push(r)
+          }
+        }
         // Partition_hash: partitionHash, Partition_id:
-        response = this.nextCycleReportToSend
+        //response = this.nextCycleReportToSend
         this.lastCycleReported = this.nextCycleReportToSend.cycleNumber // update reported cycle
         this.nextCycleReportToSend = null // clear it because we sent it
         this.partitionReportDirty = false // not dirty anymore
