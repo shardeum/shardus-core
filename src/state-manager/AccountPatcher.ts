@@ -994,20 +994,35 @@ markIncompeteNodes(cycle:number){
 
     let messageToNodeMap:Map<string, {node: Shardus.Node, message: HashTrieSyncTell}> = new Map()
 
+    let radixUsed: Map<string, Set<string>> = new Map()
+
     for(let treeNode of syncLayer.values()){
       if(treeNode.isIncomplete === false){
-        let partition = ShardFunctions.getPartitionFromRadix(shardGlobals, treeNode.radix)
-        let shardInfo = this.stateManager.currentCycleShardData.parititionShardDataMap.get(partition.homePartition)
-        for(let [key, value] of Object.entries(shardInfo.coveredBy)){
-          let messagePair = messageToNodeMap.get(value.id)
-          if(messagePair == null){
-            messagePair = {node: value, message: {cycle, nodeHashes: []}}
-            messageToNodeMap.set(value.id, messagePair)
-          }
-          //extra safety step! todo remove for perf.
-          treeNode.hash = this.hashObj(treeNode.childHashes)
-          messagePair.message.nodeHashes.push({radix:treeNode.radix, hash: treeNode.hash})
+        let partitionRange = ShardFunctions.getPartitionRangeFromRadix(shardGlobals, treeNode.radix)
+        for(let i=partitionRange.low; i<=partitionRange.high; i++){
+          let shardInfo = this.stateManager.currentCycleShardData.parititionShardDataMap.get(i)
+          for(let [key, value] of Object.entries(shardInfo.coveredBy)){
+            let messagePair = messageToNodeMap.get(value.id)
+            if(messagePair == null){
+              messagePair = {node: value, message: {cycle, nodeHashes: []}}
+              messageToNodeMap.set(value.id, messagePair)
+            }
+            // todo done send duplicate node hashes to the same node?
+
+            let radixSeenSet = radixUsed.get(value.id)
+            if(radixSeenSet == null){
+              radixSeenSet = new Set()
+              radixUsed.set(value.id, radixSeenSet)
+            }
+            if(radixSeenSet.has(treeNode.radix) === false){
+              //extra safety step! todo remove for perf.
+              treeNode.hash = this.hashObj(treeNode.childHashes)
+              messagePair.message.nodeHashes.push({radix:treeNode.radix, hash: treeNode.hash})
+              radixSeenSet.add(treeNode.radix)
+            }
+          }          
         }
+
       }
     }
     

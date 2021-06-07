@@ -1598,7 +1598,7 @@ class StateManager {
     let maxP = ourNodeShardData.consensusEndPartition
     // HOMENODEMATHS this seems good.  making sure our node covers this partition
     let { homePartition } = ShardFunctions.addressToPartition(this.currentCycleShardData.shardGlobals, address)
-    accountIsRemote = ShardFunctions.partitionInConsensusRange(homePartition, minP, maxP) === false
+    accountIsRemote = ShardFunctions.partitionInWrappingRange(homePartition, minP, maxP) === false
 
     // hack to say we have all the data
     if (this.currentCycleShardData.activeNodes.length <= this.currentCycleShardData.shardGlobals.consensusRadius) {

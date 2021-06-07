@@ -126,7 +126,7 @@ class PartitionObjects {
         for (let r of this.nextCycleReportToSend.res) {
           if(consensusOnly){
             //check if partition is in our range!
-            if(ShardFunctions.partitionInConsensusRange(r.i, consensusStartPartition, consensusEndPartition)){
+            if(ShardFunctions.partitionInWrappingRange(r.i, consensusStartPartition, consensusEndPartition)){
               response.res.push(r)
             }
           } else{

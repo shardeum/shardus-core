@@ -965,13 +965,22 @@ class ShardFunctions {
     return result
   }
 
-  static getPartitionFromRadix(shardGlobals: ShardGlobals, radix:string){
-    let filledAddress = radix + '7'.repeat(64 - radix.length)
+  // static getPartitionFromRadix(shardGlobals: ShardGlobals, radix:string){
+  //   let filledAddress = radix + '7'.repeat(64 - radix.length)
+  //   let partition = ShardFunctions.addressToPartition(shardGlobals, filledAddress)
+  //   return partition
+  // }
+
+  //TODO this must be get partition range from radix.
+  static getPartitionRangeFromRadix(shardGlobals: ShardGlobals, radix:string){
+    let filledAddress = radix + '0'.repeat(64 - radix.length)
     let partition = ShardFunctions.addressToPartition(shardGlobals, filledAddress)
-    return partition
+
+    let filledAddress2 = radix + 'f'.repeat(64 - radix.length)
+    let partition2 = ShardFunctions.addressToPartition(shardGlobals, filledAddress2)
+
+    return {low:partition.homePartition, high:partition2.homePartition}
   }
-
-
 
 
   static addressToPartition(shardGlobals: ShardGlobals, address: string): { homePartition: number; addressNum: number } {
@@ -1449,11 +1458,15 @@ class ShardFunctions {
   }
 
   /**
+   * partitionInWrappingRange
+   * test if partition i is in the range of min and max P
+   * This function understands wrapping, so that the min boundary can be
+   * a higher number than the max boundary that wraps around back to 0
    * @param {number} i
    * @param {number} minP
    * @param {number} maxP
    */
-  static partitionInConsensusRange(i: number, minP: number, maxP: number): boolean {
+  static partitionInWrappingRange(i: number, minP: number, maxP: number): boolean {
     let key = i
     if (minP === maxP) {
       if (i !== minP) {
