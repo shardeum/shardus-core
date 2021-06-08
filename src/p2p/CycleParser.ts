@@ -1,7 +1,7 @@
 import deepmerge from 'deepmerge'
 import * as CycleCreator from './CycleCreator'
-import { CycleRecord } from './CycleCreator'
-import { JoinedConsensor } from './Join'
+import { CycleRecord } from "../shared-types/Cycle/CycleCreatorTypes"
+import { JoinedConsensor } from "../shared-types/Cycle/JoinTypes"
 import { Node, Update } from './NodeList'
 import { reversed } from '../utils'
 

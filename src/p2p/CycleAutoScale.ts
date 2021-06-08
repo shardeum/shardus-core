@@ -6,8 +6,8 @@ import * as CycleParser from './CycleParser'
 import * as Rotation from './Rotation'
 import * as Self from './Self'
 import * as NodeList from './NodeList'
-import { LooseObject } from './Types'
-import * as Types from './Types'
+import { LooseObject } from '../shared-types/P2PTypes'
+import * as Types from '../shared-types/P2PTypes'
 import { validateTypes, sleep } from '../utils'
 import * as Comms from './Comms'
 import * as Utils from './Utils'
@@ -15,32 +15,15 @@ import * as Network from '../network'
 import deepmerge from 'deepmerge'
 import { request } from 'express'
 import { logFlags } from '../logger'
+import {
+  ScaleRequest,
+  SignedScaleRequest,
+  ScaleType,
+  Txs,
+  Record,
+} from '../shared-types/Cycle/CycleAutoScaleTypes'
+import { CycleRecord } from '../shared-types/Cycle/CycleCreatorTypes'
 
-/** TYPES */
-enum ScaleType {
-  UP = 'up',
-  DOWN = 'down',
-}
-
-export interface Record {
-  desired: number
-}
-export interface ScaleRequest {
-  nodeId: string
-  timestamp: number
-  counter: number
-  scale: string
-}
-
-export interface Txs {
-  autoscaling: SignedScaleRequest[]
-}
-
-export type SignedScaleRequest = ScaleRequest & Types.SignedObject
-
-interface ScaleRequestMap {
-  [nodeId: string]: SignedScaleRequest
-}
 /** STATE */
 
 let p2pLogger: Logger
@@ -333,14 +316,12 @@ export function validateRecordTypes(rec: Record): string {
   return ''
 }
 
-export function updateRecord(txs: Txs, record: CycleCreator.CycleRecord) {
+export function updateRecord(txs: Txs, record: CycleRecord) {
   record.desired = getDesiredCount()
   reset()
 }
 
-export function parseRecord(
-  record: CycleCreator.CycleRecord
-): CycleParser.Change {
+export function parseRecord(record: CycleRecord): CycleParser.Change {
   // Since we don't touch the NodeList, return an empty Change
   return {
     added: [],

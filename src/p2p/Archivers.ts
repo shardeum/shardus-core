@@ -16,86 +16,11 @@ import * as Comms from './Comms'
 import { crypto, logger, network, io } from './Context'
 import { getCycleChain, computeCycleMarker, getNewest } from './CycleChain'
 import * as CycleCreator from './CycleCreator'
-import { CycleRecord as Cycle } from './CycleCreator'
+import { CycleRecord as Cycle, CycleRecord } from "../shared-types/Cycle/CycleCreatorTypes"
 import * as CycleParser from './CycleParser'
-import {logFlags} from '../logger'
-import { SignedObject } from './Types'
-
-/** TYPES */
-
-export interface Transaction {
-  id: string
-}
-
-export interface StateMetaData {
-  counter: Cycle['counter']
-  stateHashes: StateHashes[]
-  receiptHashes: ReceiptHashes[]
-  summaryHashes: SummaryHashes[]
-}
-
-export type ValidTypes = Cycle | StateMetaData
-
-export enum TypeNames {
-  CYCLE = 'CYCLE',
-  STATE_METADATA = 'STATE_METADATA',
-}
-
-export enum RequestTypes {
-  JOIN = 'JOIN',
-  LEAVE = 'LEAVE',
-}
-
-interface NamesToTypes {
-  CYCLE: Cycle
-  STATE_METADATA: StateMetaData
-}
-
-export type TypeName<T extends ValidTypes> = T extends Cycle
-  ? TypeNames.CYCLE
-  : TypeNames.STATE_METADATA
-
-export type TypeIndex<T extends ValidTypes> = T extends Cycle
-  ? Cycle['counter']
-  : StateMetaData['counter']
-export interface DataRequest<T extends ValidTypes> {
-  type: TypeName<T>
-  lastData: TypeIndex<T>
-}
-
-interface DataResponse {
-  publicKey: string
-  responses: {
-    [T in TypeNames]?: NamesToTypes[T][]
-  }
-  recipient: string
-}
-
-interface DataRecipient {
-  nodeInfo: JoinedArchiver
-  dataRequests: DataRequest<Cycle | StateMetaData>[]
-  curvePk: string
-}
-
-export interface JoinedArchiver {
-  publicKey: string
-  ip: string
-  port: number
-  curvePk: string
-}
-
-export interface Request extends SignedObject {
-  nodeInfo: JoinedArchiver
-  requestType: string
-}
-export interface Txs {
-  archivers: Request[]
-}
-
-export interface Record {
-  joinedArchivers: JoinedArchiver[]
-  leavingArchivers: JoinedArchiver[]
-}
+import { logFlags } from '../logger'
+import { StateMetaData, TypeNames, DataRequest } from './StateParser'
+import { JoinedArchiver, DataRecipient, Request, Txs, Record, RequestTypes, DataResponse, NamesToTypes } from '../shared-types/Cycle/ArchiversTypes'
 
 /** STATE */
 
@@ -157,7 +82,7 @@ export function validateRecordTypes(rec: Record): string {
   return ''
 }
 
-export function updateRecord(txs: Txs, record: CycleCreator.CycleRecord) {
+export function updateRecord(txs: Txs, record: CycleRecord) {
   // Add joining archivers to the cycle record
   const joinedArchivers = txs.archivers
     .filter((request) => request.requestType === RequestTypes.JOIN)
@@ -194,7 +119,7 @@ export function updateRecord(txs: Txs, record: CycleCreator.CycleRecord) {
 }
 
 export function parseRecord(
-  record: CycleCreator.CycleRecord
+  record: CycleRecord
 ): CycleParser.Change {
   // Update our archivers list
   updateArchivers(record)

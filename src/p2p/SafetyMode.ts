@@ -5,22 +5,9 @@ import * as Context from './Context'
 import * as CycleCreator from './CycleCreator'
 import * as CycleParser from './CycleParser'
 import * as Self from './Self'
-import * as Types from './Types'
-
-/** TYPES */
-
-// No TXs for this module
-export interface Txs {
-  safetyMode: []
-  safetyNum: []
-  networkStateHash: []
-}
-
-export interface Record {
-  safetyMode: boolean
-  safetyNum: number
-  networkStateHash: string
-}
+import { Txs, Record } from '../shared-types/Cycle/SafetyModeTypes'
+import * as Types from '../shared-types/P2PTypes'
+import { CycleRecord } from '../shared-types/Cycle/CycleCreatorTypes'
 
 /** STATE */
 
@@ -81,8 +68,8 @@ Given the txs and prev cycle record mutate the referenced record
 */
 export function updateRecord(
   txs: Txs,
-  record: CycleCreator.CycleRecord,
-  prev: CycleCreator.CycleRecord
+  record: CycleRecord,
+  prev: CycleRecord
 ) {
   // If you're the first node
   if (Self.isFirst) {
@@ -161,7 +148,7 @@ export function validateRecordTypes(rec: Record): string {
 }
 
 export function parseRecord(
-  record: CycleCreator.CycleRecord
+  record: CycleRecord
 ): CycleParser.Change {
   return {
     added: [],

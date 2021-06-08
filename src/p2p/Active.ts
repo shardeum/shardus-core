@@ -6,29 +6,16 @@ import * as CycleCreator from './CycleCreator'
 import { Change } from './CycleParser'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
-import * as Types from './Types'
+import * as Types from '../shared-types/P2PTypes'
 import { validateTypes } from '../utils'
-import {logFlags} from '../logger'
-
-/** TYPES */
-
-export interface ActiveRequest {
-  nodeId: string
-  status: string
-  timestamp: number
-}
-
-export type SignedActiveRequest = ActiveRequest & Types.SignedObject
-
-export interface Txs {
-  active: SignedActiveRequest[]
-}
-
-export interface Record {
-  active: number
-  activated: string[]
-  activatedPublicKeys: string[]
-}
+import { logFlags } from '../logger'
+import {
+  SignedActiveRequest,
+  ActiveRequest,
+  Txs,
+  Record,
+} from '../shared-types/Cycle/ActiveTypes'
+import { CycleRecord } from '../shared-types/Cycle/CycleCreatorTypes'
 
 /** ROUTES */
 
@@ -36,12 +23,24 @@ const gossipActiveRoute: Types.GossipHandler<SignedActiveRequest> = (
   payload,
   sender
 ) => {
-  if(logFlags.p2pNonFatal) info(`Got active request: ${JSON.stringify(payload)}`)
+  if (logFlags.p2pNonFatal)
+    info(`Got active request: ${JSON.stringify(payload)}`)
   let err = ''
-  err = validateTypes(payload, {nodeId:'s',status:'s',timestamp:'n',sign:'o'})
-  if (err){ warn('bad input '+err); return }
-  err = validateTypes(payload.sign, {owner:'s',sig:'s'})
-  if (err){ warn('bad input sign '+err); return }
+  err = validateTypes(payload, {
+    nodeId: 's',
+    status: 's',
+    timestamp: 'n',
+    sign: 'o',
+  })
+  if (err) {
+    warn('bad input ' + err)
+    return
+  }
+  err = validateTypes(payload.sign, { owner: 's', sig: 's' })
+  if (err) {
+    warn('bad input sign ' + err)
+    return
+  }
 
   const signer = NodeList.byPubKey.get(payload.sign.owner)
   if (!signer) {
@@ -102,27 +101,33 @@ export function getTxs(): Txs {
   }
 }
 
-export function validateRecordTypes(rec: Record): string{
-  let err = validateTypes(rec,{active:'n',activated:'a',activatedPublicKeys:'a'})
+export function validateRecordTypes(rec: Record): string {
+  let err = validateTypes(rec, {
+    active: 'n',
+    activated: 'a',
+    activatedPublicKeys: 'a',
+  })
   if (err) return err
-  for(const item of rec.activated){
-    if (typeof(item) !== 'string') return 'items of activated array must be strings'
+  for (const item of rec.activated) {
+    if (typeof item !== 'string')
+      return 'items of activated array must be strings'
   }
-  for(const item of rec.activatedPublicKeys ){
-    if (typeof(item) !== 'string') return 'items of activatedPublicKeys array must be strings'
+  for (const item of rec.activatedPublicKeys) {
+    if (typeof item !== 'string')
+      return 'items of activatedPublicKeys array must be strings'
   }
   return ''
 }
 
 export function dropInvalidTxs(txs: Txs): Txs {
-  const active = txs.active.filter(request => validateActiveRequest(request))
+  const active = txs.active.filter((request) => validateActiveRequest(request))
   return { active }
 }
 
 export function updateRecord(
   txs: Txs,
-  record: CycleCreator.CycleRecord,
-  _prev: CycleCreator.CycleRecord
+  record: CycleRecord,
+  _prev: CycleRecord
 ) {
   const active = NodeList.activeByIdOrder.length
   const activated = []
@@ -142,7 +147,7 @@ export function updateRecord(
   record.activatedPublicKeys = activatedPublicKeys.sort()
 }
 
-export function parseRecord(record: CycleCreator.CycleRecord): Change {
+export function parseRecord(record: CycleRecord): Change {
   // Look at the activated id's and make Self emit 'active' if your own id is there
   if (record.activated.includes(Self.id)) {
     Self.setActive()
@@ -150,7 +155,7 @@ export function parseRecord(record: CycleCreator.CycleRecord): Change {
   }
 
   // For all nodes described by activated, make an update to change their status to active
-  const updated = record.activated.map(id => ({
+  const updated = record.activated.map((id) => ({
     id,
     activeTimestamp: record.start,
     status: Types.NodeStatus.ACTIVE,
@@ -168,7 +173,8 @@ export function sendRequests() {
     const activeTx = crypto.sign(queuedRequest)
     queuedRequest = undefined
 
-    if(logFlags.p2pNonFatal) info(`Gossiping active request: ${JSON.stringify(activeTx)}`)
+    if (logFlags.p2pNonFatal)
+      info(`Gossiping active request: ${JSON.stringify(activeTx)}`)
     addActiveTx(activeTx)
     Comms.sendGossip('gossip-active', activeTx)
 

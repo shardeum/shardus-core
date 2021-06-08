@@ -14,10 +14,11 @@ import * as GlobalAccounts from './GlobalAccounts'
 import * as Join from './Join'
 import * as NodeList from './NodeList'
 import * as Sync from './Sync'
-import * as Types from './Types'
+import * as Types from '../shared-types/P2PTypes'
 import { readOldCycleRecord } from '../snapshot/snapshotFunctions'
 import { calcIncomingTimes } from './CycleCreator'
-import {logFlags} from '../logger'
+import { logFlags } from '../logger'
+import * as ArchiversTypes from '../shared-types/Cycle/ArchiversTypes'
 
 /** TYPES */
 
@@ -58,13 +59,13 @@ export async function startup(): Promise<boolean> {
 
   // If startInWitness config is set to true, start witness mode and end
   if (Context.config.p2p.startInWitnessMode) {
-    if(logFlags.p2pNonFatal) info('Emitting `witnessing` event.')
+    if (logFlags.p2pNonFatal) info('Emitting `witnessing` event.')
     emitter.emit('witnessing', publicKey)
     return true
   }
 
   // Attempt to join the network until you know if you're first and have an id
-  if(logFlags.p2pNonFatal) info('Emitting `joining` event.')
+  if (logFlags.p2pNonFatal) info('Emitting `joining` event.')
   emitter.emit('joining', publicKey)
 
   let firstTime = true
@@ -75,7 +76,7 @@ export async function startup(): Promise<boolean> {
 
       // Start in witness mode if conditions are met
       if (await witnessConditionsMet(activeNodes)) {
-        if(logFlags.p2pNonFatal) info('Emitting `witnessing` event.')
+        if (logFlags.p2pNonFatal) info('Emitting `witnessing` event.')
         emitter.emit('witnessing', publicKey)
         return true
       }
@@ -86,15 +87,16 @@ export async function startup(): Promise<boolean> {
       warn('Error while joining network:')
       warn(err)
       warn(err.stack)
-      if(logFlags.p2pNonFatal) info(
-        `Trying to join again in ${Context.config.p2p.cycleDuration} seconds...`
-      )
+      if (logFlags.p2pNonFatal)
+        info(
+          `Trying to join again in ${Context.config.p2p.cycleDuration} seconds...`
+        )
       await utils.sleep(Context.config.p2p.cycleDuration * 1000)
     }
     firstTime = false
   } while (utils.isUndefined(isFirst) || utils.isUndefined(id))
 
-  if(logFlags.p2pNonFatal) info('Emitting `joined` event.')
+  if (logFlags.p2pNonFatal) info('Emitting `joined` event.')
   emitter.emit('joined', id, publicKey)
 
   // Sync cycle chain from network
@@ -105,7 +107,7 @@ export async function startup(): Promise<boolean> {
 
   // Start creating cycle records
   await CycleCreator.startCycles()
-  if(logFlags.p2pNonFatal) info('Emitting `initialized` event.')
+  if (logFlags.p2pNonFatal) info('Emitting `initialized` event.')
   emitter.emit('initialized')
 
   return true
@@ -124,7 +126,7 @@ async function witnessConditionsMet(activeNodes: Types.Node[]) {
         }
       }
     }
-  } catch(e) {
+  } catch (e) {
     warn(e)
   }
   return false
@@ -143,8 +145,8 @@ async function joinNetwork(activeNodes: Types.Node[], firstTime: boolean) {
   // Remove yourself from activeNodes if you are present in them
   const ourIdx = activeNodes.findIndex(
     (node) =>
-    node.ip === network.ipInfo.externalIp &&
-    node.port === network.ipInfo.externalPort
+      node.ip === network.ipInfo.externalIp &&
+      node.port === network.ipInfo.externalPort
   )
   if (ourIdx > -1) {
     activeNodes.splice(ourIdx, 1)
@@ -167,7 +169,8 @@ async function joinNetwork(activeNodes: Types.Node[], firstTime: boolean) {
 
   // Figure out when Q1 is from the latestCycle
   const { startQ1 } = calcIncomingTimes(latestCycle)
-  if(logFlags.p2pNonFatal) info(`Next cycles Q1 start ${startQ1}; Currently ${Date.now()}`)
+  if (logFlags.p2pNonFatal)
+    info(`Next cycles Q1 start ${startQ1}; Currently ${Date.now()}`)
 
   // Wait until a Q1 then send join request to active nodes
   let untilQ1 = startQ1 - Date.now()
@@ -175,13 +178,15 @@ async function joinNetwork(activeNodes: Types.Node[], firstTime: boolean) {
     untilQ1 += latestCycle.duration * 1000
   }
 
-  if(logFlags.p2pNonFatal) info(`Waiting ${untilQ1 + 500} ms for Q1 before sending join...`)
+  if (logFlags.p2pNonFatal)
+    info(`Waiting ${untilQ1 + 500} ms for Q1 before sending join...`)
   await utils.sleep(untilQ1 + 500) // Not too early
 
   await Join.submitJoin(activeNodes, request)
 
   // Wait approx. one cycle then check again
-  if(logFlags.p2pNonFatal) info('Waiting approx. one cycle then checking again...')
+  if (logFlags.p2pNonFatal)
+    info('Waiting approx. one cycle then checking again...')
   await utils.sleep(Context.config.p2p.cycleDuration * 1000 + 500)
 
   return {
@@ -198,25 +203,26 @@ async function syncCycleChain() {
   while (!synced) {
     // Once joined, sync to the network
     try {
-      if(logFlags.p2pNonFatal) info('Getting activeNodes from archiver to sync to network...')
+      if (logFlags.p2pNonFatal)
+        info('Getting activeNodes from archiver to sync to network...')
       const activeNodes = await contactArchiver()
 
       // Remove yourself from activeNodes if you are present in them
       const ourIdx = activeNodes.findIndex(
         (node) =>
-        node.ip === network.ipInfo.externalIp &&
-        node.port === network.ipInfo.externalPort
+          node.ip === network.ipInfo.externalIp &&
+          node.port === network.ipInfo.externalPort
       )
       if (ourIdx > -1) {
         activeNodes.splice(ourIdx, 1)
       }
 
-      if(logFlags.p2pNonFatal) info('Attempting to sync to network...')
+      if (logFlags.p2pNonFatal) info('Attempting to sync to network...')
       synced = await Sync.sync(activeNodes)
     } catch (err) {
       synced = false
       warn(err)
-      if(logFlags.p2pNonFatal) info('Trying again in 2 sec...')
+      if (logFlags.p2pNonFatal) info('Trying again in 2 sec...')
       await utils.sleep(2000)
     }
   }
@@ -229,8 +235,10 @@ async function contactArchiver() {
     throw Error('Fatal: _getSeedNodes seed list was not signed by archiver!')
   }
   const joinRequest:
-  | Archivers.Request
-    | undefined = activeNodesSigned.joinRequest as Archivers.Request | undefined
+    | ArchiversTypes.Request
+    | undefined = activeNodesSigned.joinRequest as
+    | ArchiversTypes.Request
+    | undefined
   if (joinRequest) {
     if (Archivers.addJoinRequest(joinRequest) === false) {
       throw Error(
@@ -279,10 +287,10 @@ async function discoverNetwork(seedNodes) {
   // Check if we are first seed node
   const isFirstSeed = checkIfFirstSeedNode(seedNodes)
   if (!isFirstSeed) {
-    if(logFlags.p2pNonFatal) info('You are not the first seed node...')
+    if (logFlags.p2pNonFatal) info('You are not the first seed node...')
     return false
   }
-  if(logFlags.p2pNonFatal) info('You are the first seed node!')
+  if (logFlags.p2pNonFatal) info('You are the first seed node!')
   return true
 }
 
@@ -293,9 +301,10 @@ async function calculateTimeDifference() {
   const localTime = Date.now()
   const googleTime = Date.parse(response.headers.date)
   const timeDiff = Math.abs(localTime - googleTime)
-  if(logFlags.p2pNonFatal) info('googleTime', googleTime)
-  if(logFlags.p2pNonFatal) info('localTime', localTime)
-  if(logFlags.p2pNonFatal) info('Time diff between google.com and local machine', timeDiff)
+  if (logFlags.p2pNonFatal) info('googleTime', googleTime)
+  if (logFlags.p2pNonFatal) info('localTime', localTime)
+  if (logFlags.p2pNonFatal)
+    info('Time diff between google.com and local machine', timeDiff)
   return timeDiff
 }
 
@@ -341,16 +350,20 @@ async function getActiveNodesFromArchiver() {
     nodeList: Types.Node[]
   }
   try {
-    seedListSigned = await http.post(nodeListUrl, Context.crypto.sign({
-      nodeInfo
-    }))
+    seedListSigned = await http.post(
+      nodeListUrl,
+      Context.crypto.sign({
+        nodeInfo,
+      })
+    )
   } catch (e) {
     throw Error(
       `Fatal: Could not get seed list from seed node server ${nodeListUrl}: ` +
-      e.message
+        e.message
     )
   }
-  if(logFlags.p2pNonFatal) info(`Got signed seed list: ${JSON.stringify(seedListSigned)}`)
+  if (logFlags.p2pNonFatal)
+    info(`Got signed seed list: ${JSON.stringify(seedListSigned)}`)
   return seedListSigned
 }
 
@@ -363,10 +376,11 @@ export async function getFullNodesFromArchiver() {
   } catch (e) {
     throw Error(
       `Fatal: Could not get seed list from seed node server ${nodeListUrl}: ` +
-      e.message
+        e.message
     )
   }
-  if(logFlags.p2pNonFatal) info(`Got signed full node list: ${JSON.stringify(fullNodeList)}`)
+  if (logFlags.p2pNonFatal)
+    info(`Got signed full node list: ${JSON.stringify(fullNodeList)}`)
   return fullNodeList
 }
 
@@ -405,7 +419,8 @@ export function getThisNodeInfo() {
     joinRequestTimestamp,
     activeTimestamp,
   }
-  if(logFlags.p2pNonFatal) info(`Node info of this node: ${JSON.stringify(nodeInfo)}`)
+  if (logFlags.p2pNonFatal)
+    info(`Node info of this node: ${JSON.stringify(nodeInfo)}`)
   return nodeInfo
 }
 

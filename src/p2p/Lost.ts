@@ -7,65 +7,20 @@ The lost node detection process is described in the "Lost Node Detection" Google
 internal documents.
 */
 
-import { CycleRecord } from './CycleCreator'
+import { CycleRecord } from "../shared-types/Cycle/CycleCreatorTypes"
 import { Handler, request } from 'express'
 import * as http from '../http'
-import { GossipHandler, InternalHandler, LooseObject, Route } from './Types'
+import { GossipHandler, InternalHandler, LooseObject, Route } from '../shared-types/P2PTypes'
 import * as Comms from './Comms'
 import * as Self from './Self'
 import { Change } from './CycleParser'
 import {logger, network, crypto } from './Context'
-import { SignedObject } from './Types'
-import * as Types from './Types'
+import * as Types from '../shared-types/P2PTypes'
 import { nodes, removeNode, byPubKey, activeByIdOrder } from './NodeList'
 import { currentQuarter, currentCycle } from './CycleCreator'
 import { sleep, binarySearch, validateTypes } from '../utils'
 import Logger, {logFlags} from '../logger'
-
-/** TYPES */
-
-interface LostReport {
-  target: string,
-  checker: string,
-  reporter: string,
-  cycle: number,
-  killother?: boolean
-}
-
-interface DownGossipMessage {
-  report: SignedLostReport,
-  status: string,
-  cycle: number
-}
-
-interface UpGossipMessage {
-  target: string,
-  status: string,
-  cycle: number
-}
-
-type SignedLostReport = LostReport & SignedObject
-type SignedDownGossipMessage = DownGossipMessage & SignedObject
-type SignedUpGossipMessage = UpGossipMessage & SignedObject
-
-interface LostRecord {
-  target: string,
-  cycle: number
-  status: string  // reported, checking, down, up
-//  message?: SignedLostReport & SignedDownGossipMessage & SignedUpGossipMessage
-  message?: any
-  gossiped?: boolean
-}
-
-export interface Txs {
-  lost: SignedDownGossipMessage[],
-  refuted: SignedUpGossipMessage[]
-}
-
-export interface Record {
-  lost: string[],
-  refuted: string[]
-}
+import { LostRecord, SignedLostReport, SignedDownGossipMessage, SignedUpGossipMessage, Txs, Record, LostReport } from "../shared-types/Cycle/LostTypes"
 
 /** STATE */
 

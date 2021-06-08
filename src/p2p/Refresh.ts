@@ -19,16 +19,9 @@ import * as CycleCreator from './CycleCreator'
 import * as CycleParser from './CycleParser'
 import * as NodeList from './NodeList'
 import { activeNodeCount, totalNodeCount, showNodeCount } from './Sync'
-import * as Types from './Types'
-
-/** TYPES */
-
-export interface Txs {}
-
-export interface Record {
-  refreshedArchivers: Archivers.JoinedArchiver[]
-  refreshedConsensors: NodeList.Node[]
-}
+import { Txs, Record } from '../shared-types/Cycle/RefreshTypes'
+import * as Types from '../shared-types/P2PTypes'
+import { CycleRecord } from '../shared-types/Cycle/CycleCreatorTypes'
 
 /** STATE */
 
@@ -78,15 +71,15 @@ Given the txs and prev cycle record mutate the referenced record
 */
 export function updateRecord(
   txs: Txs,
-  record: CycleCreator.CycleRecord,
-  prev: CycleCreator.CycleRecord
+  record: CycleRecord,
+  prev: CycleRecord
 ) {
   record.refreshedArchivers = refreshArchivers() // This returns a copy of the objects
   record.refreshedConsensors = refreshConsensors() // This returns a copy of the objects
 }
 
 export function parseRecord(
-  record: CycleCreator.CycleRecord
+  record: CycleRecord
 ): CycleParser.Change {
   // If Archivers.archivers doesn't have a refreshedArchiver, put it in
   for (const refreshed of record.refreshedArchivers) {

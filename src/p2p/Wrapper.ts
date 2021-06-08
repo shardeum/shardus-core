@@ -12,7 +12,7 @@ import * as Self from './Self'
 import * as Utils from './Utils'
 import {logFlags} from '../logger'
 import {getNodeRequestingJoin} from './Join'
-import { P2PNode } from './Types'
+import { P2PNode } from '../shared-types/P2PTypes'
 
 /* p2p functions */
 

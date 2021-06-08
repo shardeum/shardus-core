@@ -8,9 +8,9 @@ import {
 } from '../utils'
 import { crypto, logger } from './Context'
 import * as CycleChain from './CycleChain'
-import { JoinedConsensor } from './Join'
+import { JoinedConsensor } from "../shared-types/Cycle/JoinTypes"
 import { id } from './Self'
-import { NodeStatus } from './Types'
+import { NodeStatus } from '../shared-types/P2PTypes'
 import deepmerge = require('deepmerge')
 
 /** TYPES */

@@ -1,7 +1,6 @@
 import deepmerge from 'deepmerge'
 import { Logger } from 'log4js'
 import { logFlags } from '../logger'
-import * as Snapshot from '../snapshot'
 import * as utils from '../utils'
 // don't forget to add new modules here
 import * as Active from './Active'
@@ -11,6 +10,7 @@ import * as Comms from './Comms'
 import { config, crypto, logger, storage } from './Context'
 import * as CycleAutoScale from './CycleAutoScale'
 import * as CycleChain from './CycleChain'
+import { CycleTxs, CycleRecord, CycleMarker, CycleCert, CycleData, BaseRecord } from '../shared-types/Cycle/CycleCreatorTypes'
 import * as Join from './Join'
 import * as Lost from './Lost'
 import * as NodeList from './NodeList'
@@ -19,59 +19,8 @@ import * as Rotation from './Rotation'
 import * as SafetyMode from './SafetyMode'
 import * as Self from './Self'
 import * as Sync from './Sync'
-import { GossipHandler, InternalHandler, SignedObject } from './Types'
+import { GossipHandler, InternalHandler } from '../shared-types/P2PTypes'
 import { compareQuery, Comparison } from './Utils'
-
-/** TYPES */
-
-export type CycleMarker = string
-
-export interface CycleCert extends SignedObject {
-  marker: CycleMarker
-  score?: number
-}
-
-interface BaseRecord {
-  networkId: string
-  counter: number
-  previous: string
-  start: number
-  duration: number
-}
-
-// don't forget to add new modules here
-export type CycleTxs = SafetyMode.Txs &
-  Refresh.Txs &
-  Archivers.Txs &
-  Join.Txs &
-  Active.Txs &
-  Apoptosis.Txs &
-  Lost.Txs &
-  Rotation.Txs &
-  CycleAutoScale.Txs
-
-// don't forget to add new modules here
-export type CycleRecord = BaseRecord &
-  SafetyMode.Record &
-  Refresh.Record &
-  Archivers.Record &
-  Join.Record &
-  Active.Record &
-  Apoptosis.Record &
-  Lost.Record &
-  Rotation.Record & {
-    joined: string[]
-    returned: string[]
-    lost: string[]
-    refuted: string[]
-    apoptosized: string[]
-  } & Snapshot.Record &
-  CycleAutoScale.Record
-
-export type CycleData = CycleRecord & {
-  marker: CycleMarker
-  certificate: CycleCert
-}
 
 /** CONSTANTS */
 

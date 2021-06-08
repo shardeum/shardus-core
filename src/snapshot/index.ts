@@ -7,12 +7,12 @@ import * as Active from '../p2p/Active'
 import * as Archivers from '../p2p/Archivers'
 import * as Comms from '../p2p/Comms'
 import * as Context from '../p2p/Context'
-import * as CycleCreator from '../p2p/CycleCreator'
+import * as CycleCreator from '../shared-types/Cycle/CycleCreatorTypes'
 import * as CycleChain from '../p2p/CycleChain'
 import * as NodeList from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
 import * as Sync from '../p2p/Sync'
-import * as Types from '../p2p/Types'
+import * as Types from '../shared-types/P2PTypes'
 import * as ShardusTypes from '../shardus/shardus-types'
 import ShardFunctions from '../state-manager/shardFunctions'
 import * as shardFunctionTypes from '../state-manager/shardFunctionTypes'
@@ -21,80 +21,8 @@ import * as partitionGossip from './partition-gossip'
 import * as SnapshotFunctions from './snapshotFunctions'
 import {logFlags} from '../logger'
 import { Cycle, ReceiptMapResult, StatsClump, CycleShardData, MainHashResults } from '../state-manager/state-manager-types'
-
-/** TYPES */
-
-export interface NetworkHash {
-  cycle: number
-  hash: string
-}
-
-export interface Record {
-  networkDataHash: NetworkHash[]
-  networkReceiptHash: NetworkHash[]
-  networkSummaryHash: NetworkHash[]
-}
-
-export interface StateHashes {
-  counter: Cycle['counter']
-  partitionHashes: object
-  networkHash: NetworkStateHash
-}
-
-export interface ReceiptHashes {
-  counter: Cycle['counter']
-  receiptMapHashes: object
-  networkReceiptHash: NetworkReceiptHash
-}
-export interface SummaryHashes {
-  counter: Cycle['counter']
-  summaryHashes: object
-  networkSummaryHash: NetworkSummarytHash
-}
-
-interface Account {
-  accountId: string
-  hash: string
-}
-
-type PartitionRanges = Map<
-  shardFunctionTypes.AddressRange['partition'],
-  shardFunctionTypes.AddressRange
->
-
-type PartitionAccounts = Map<
-  shardFunctionTypes.AddressRange['partition'],
-  Account[]
->
-
-export type PartitionHashes = Map<
-  shardFunctionTypes.AddressRange['partition'],
-  string
->
-
-export type ReceiptMapHashes = Map<
-  shardFunctionTypes.AddressRange['partition'],
-  string
->
-
-export interface SummaryBlob {
-  cycle: number
-  partition: number
-  blob: unknown
-}
-
-export type NetworkStateHash = string
-export type NetworkReceiptHash = string
-export type NetworkSummarytHash = string
-
-type PartitionNum = number
-
-enum offerResponse {
-  needed = 'needed',
-  notNeeded = 'not_needed',
-  tryLater = 'try_later',
-  sendTo = 'send_to',
-}
+import { StateHashes, ReceiptHashes, SummaryHashes } from '../p2p/StateParser'
+import { PartitionNum, PartitionRanges, offerResponse } from '../shared-types/Cycle/SnapshotTypes'
 
 /** STATE */
 

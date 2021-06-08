@@ -2,21 +2,13 @@ import { Logger } from 'log4js'
 import { insertSorted, validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { config, logger } from './Context'
-import { CycleRecord } from './CycleCreator'
+import { CycleRecord } from "../shared-types/Cycle/CycleCreatorTypes"
 import { Change } from './CycleParser'
 import { getDesiredCount } from './CycleAutoScale'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
-import * as Types from './Types'
-
-/** TYPES */
-
-export interface Txs {}
-
-export interface Record {
-  expired: number
-  removed: string[]
-}
+import * as Types from '../shared-types/P2PTypes'
+import { Txs, Record } from '../shared-types/Cycle/RotationTypes'
 
 /** STATE */
 

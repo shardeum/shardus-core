@@ -1,9 +1,9 @@
 import { Logger } from 'log4js'
 import * as Comms from './Comms'
 import { logger } from './Context'
-import { CycleRecord } from './CycleCreator'
+import { CycleRecord } from "../shared-types/Cycle/CycleCreatorTypes"
 import { Change } from './CycleParser'
-import * as Types from './Types'
+import * as Types from '../shared-types/P2PTypes'
 import {logFlags} from '../logger'
 
 /** TYPES */

@@ -9,8 +9,9 @@ import * as CycleCreator from './CycleCreator'
 import { Change, ChangeSquasher, parse } from './CycleParser'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
-import { Route } from './Types'
+import { Route } from '../shared-types/P2PTypes'
 import { robustQuery } from './Utils'
+import { CycleRecord } from '../shared-types/Cycle/CycleCreatorTypes'
 
 /** TYPES */
 
@@ -251,7 +252,7 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
   }
 }
 
-export function digestCycle(cycle: CycleCreator.CycleRecord) {
+export function digestCycle(cycle: CycleRecord) {
   const marker = CycleCreator.makeCycleMarker(cycle)
   if (CycleChain.cyclesByMarker[marker]) {
     warn(
@@ -282,7 +283,7 @@ function applyNodeListChange(change: Change) {
 
 export async function getNewestCycle(
   activeNodes: SyncNode[]
-): Promise<CycleCreator.CycleRecord> {
+): Promise<CycleRecord> {
   const queryFn = async (node: SyncNode) => {
     const ip = node.ip ? node.ip : node.externalIp
     const port = node.port ? node.port : node.externalPort
@@ -317,7 +318,7 @@ export async function getNewestCycle(
   if (!response) throw new Error('Bad response')
   if (!response.newestCycle) throw new Error('Bad response')
 
-  const newestCycle = response.newestCycle as CycleCreator.CycleRecord
+  const newestCycle = response.newestCycle as CycleRecord
   return newestCycle
 }
 
@@ -326,7 +327,7 @@ async function getCycles(
   activeNodes: SyncNode[],
   start: number,
   end?: number
-): Promise<CycleCreator.CycleRecord[]> {
+): Promise<CycleRecord[]> {
   if (start < 0) start = 0
   if (end !== undefined) {
     if (start > end) start = end
@@ -358,13 +359,13 @@ async function getCycles(
   )
 
   // [TODO] Validate whatever came in
-  const cycles = response as CycleCreator.CycleRecord[]
+  const cycles = response as CycleRecord[]
 
   const valid = validateCycles(cycles)
   if (valid) return cycles
 }
 
-export function activeNodeCount(cycle: CycleCreator.CycleRecord) {
+export function activeNodeCount(cycle: CycleRecord) {
   return (
     cycle.active +
     cycle.activated.length -
@@ -374,7 +375,7 @@ export function activeNodeCount(cycle: CycleCreator.CycleRecord) {
   )
 }
 
-export function showNodeCount(cycle: CycleCreator.CycleRecord) {
+export function showNodeCount(cycle: CycleRecord) {
   warn(` syncing + joined + active - apop - rem - lost
     ${cycle.syncing} +
     ${cycle.joinedConsensors.length} +
@@ -387,7 +388,7 @@ export function showNodeCount(cycle: CycleCreator.CycleRecord) {
   //    ${cycle.activated.length} -
 }
 
-export function totalNodeCount(cycle: CycleCreator.CycleRecord) {
+export function totalNodeCount(cycle: CycleRecord) {
   return (
     cycle.syncing +
     cycle.joinedConsensors.length +
@@ -399,7 +400,7 @@ export function totalNodeCount(cycle: CycleCreator.CycleRecord) {
   )
 }
 
-function validateCycles(cycles: CycleCreator.CycleRecord[]) {
+function validateCycles(cycles: CycleRecord[]) {
   const archiverType = {
     publicKey: 's',
     ip: 's',

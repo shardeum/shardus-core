@@ -17,7 +17,7 @@ import {
   Route,
   Signature,
   SignedObject,
-} from './Types'
+} from '../shared-types/P2PTypes'
 import {logFlags} from '../logger'
 
 /** TYPES */

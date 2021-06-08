@@ -12,41 +12,11 @@ import * as CycleCreator from './CycleCreator'
 import { Change } from './CycleParser'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
-import * as Types from './Types'
+import * as Types from '../shared-types/P2PTypes'
 import { robustQuery } from './Utils'
 import {logFlags} from '../logger'
-import { Sign } from '../state-manager/state-manager-types'
-
-/**
- * [TODO] [AS] Remove nodes that are taking too long to sync after they've joined.
- * To do this, we probably need to keep track of when they first joined.
- */
-
-/** TYPES */
-
-export interface JoinedConsensor extends Types.P2PNode {
-  cycleJoined: CycleCreator.CycleMarker
-  counterRefreshed: CycleCreator.CycleRecord['counter']
-  id: string
-}
-
-export interface JoinRequest {
-  nodeInfo: Types.P2PNode
-  cycleMarker: CycleCreator.CycleMarker
-  proofOfWork: string
-  selectionNum: string
-  version: string
-  sign: Sign
-}
-
-export interface Txs {
-  join: JoinRequest[]
-}
-
-export interface Record {
-  syncing: number
-  joinedConsensors: JoinedConsensor[]
-}
+import { JoinRequest, Txs, Record } from '../shared-types/Cycle/JoinTypes'
+import { CycleRecord } from '../shared-types/Cycle/CycleCreatorTypes'
 
 /** STATE */
 
@@ -241,8 +211,8 @@ export function dropInvalidTxs(txs: Txs): Txs {
 
 export function updateRecord(
   txs: Txs,
-  record: CycleCreator.CycleRecord,
-  _prev: CycleCreator.CycleRecord
+  record: CycleRecord,
+  _prev: CycleRecord
 ) {
   const joinedConsensors = txs.join.map((joinRequest) => {
     const { nodeInfo, cycleMarker: cycleJoined } = joinRequest
@@ -255,7 +225,7 @@ export function updateRecord(
   record.joinedConsensors = joinedConsensors.sort()
 }
 
-export function parseRecord(record: CycleCreator.CycleRecord): Change {
+export function parseRecord(record: CycleRecord): Change {
   const added = record.joinedConsensors
   return {
     added,

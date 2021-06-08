@@ -4,7 +4,7 @@ import * as utils from '../utils'
 import { config, crypto, logger, network } from './Context'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
-import { InternalHandler, LooseObject } from './Types'
+import { InternalHandler, LooseObject } from '../shared-types/P2PTypes'
 import {logFlags} from '../logger'
 
 /** TYPES */
