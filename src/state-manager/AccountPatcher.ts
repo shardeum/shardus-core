@@ -1292,15 +1292,57 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
 
       //return //todo dont want to test full stack yet
       
-      //do some work so ave the data
-      let failedHashes = await this.stateManager.checkAndSetAccountData(wrappedDataList, `testAndPatchAccounts`, false)
-      let failedHashesSet = new Set(failedHashes)
+      //need to validate TS we are trying to write
+      //it is possible the majority voters could send us account data that is older than what we have.
+      //todo must sort out if we can go backwards...  (I had dropped some pre validation earlier, but need to rethink that)
+      let wrappedDataListFiltered:Shardus.WrappedData[] = []
+      let noChange = new Set()
+      let updateTooOld = new Set()
+      for(let wrappedData of wrappedDataList){
+        if (this.stateManager.accountCache.hasAccount(wrappedData.accountId)) {
+          let accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(wrappedData.accountId)
+          if (wrappedData.timestamp < accountMemData.t) {
+            updateTooOld.add(wrappedData.accountId)
+            nestedCountersInstance.countEvent('accountPatcher', `checkAndSetAccountData updateTooOld c:${cycle}`)
+            this.statemanager_fatal('checkAndSetAccountData updateTooOld',`checkAndSetAccountData updateTooOld ${cycle}: acc:${utils.stringifyReduce(wrappedData.accountId)} updateTS:${wrappedData.timestamp} updateHash:${utils.stringifyReduce(wrappedData.stateId)}  cacheTS:${accountMemData.t} cacheHash:${utils.stringifyReduce(accountMemData.h)}`)
+            continue
+          }
+          if(wrappedData.timestamp === accountMemData.t) {
+            noChange.add(wrappedData.accountId)
+            nestedCountersInstance.countEvent('accountPatcher', `checkAndSetAccountData updateSameTS c:${cycle}`)
+            continue
+          }
+          //we can proceed with the update
+          wrappedDataListFiltered.push(wrappedData)
+        } else {
+          //dont have a cache entry so take the update
+          wrappedDataListFiltered.push(wrappedData)
+        }
+      }
+
+
+
+
+      //do some work so ave the data  
+      let failedHashes = await this.stateManager.checkAndSetAccountData(wrappedDataListFiltered, `testAndPatchAccounts`, false)
+
       if(failedHashes.length != 0){
         nestedCountersInstance.countEvent('accountPatcher', 'checkAndSetAccountData failed hashes', failedHashes.length)
         this.statemanager_fatal('isInSync = false, failed hashes',`isInSync = false cycle:${cycle}:  failed hashes:${failedHashes.length}`)
       }
-      nestedCountersInstance.countEvent('accountPatcher', 'writeCombinedAccountDataToBackups', Math.max(0,wrappedDataList.length - failedHashes.length))
-      await this.stateManager.writeCombinedAccountDataToBackups(wrappedDataList, failedHashes)
+      nestedCountersInstance.countEvent('accountPatcher', 'writeCombinedAccountDataToBackups', Math.max(0,wrappedDataListFiltered.length - failedHashes.length))
+
+      //This extracts accounts that have failed hashes but I forgot writeCombinedAccountDataToBackups does that already
+      //let failedHashesSet = new Set(failedHashes)
+      // let wrappedDataUpdated = []
+      // for(let wrappedData of wrappedDataListFiltered){
+      //   if(failedHashesSet.has(wrappedData.accountId )){
+      //     continue
+      //   }
+      //   wrappedDataUpdated.push(wrappedData)
+      // }
+
+      await this.stateManager.writeCombinedAccountDataToBackups(wrappedDataListFiltered, failedHashes)
 
       //apply repair account data and update shard trie
 
