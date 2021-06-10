@@ -236,7 +236,7 @@ export function addDataRecipient(
   nodeInfo: JoinedArchiver,
   dataRequests: DataRequest<Cycle | StateMetaData>[]
 ) {
-  if(logFlags.console) console.log('Adding data recipient..')
+  if(logFlags.console) console.log('Adding data recipient..', arguments)
   const recipient = {
     nodeInfo,
     // TODO: dataRequest should be an array
@@ -326,10 +326,6 @@ export function sendData() {
 
     // Tag dataResponse
     const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
-    const isAuthenticated = crypto.authenticate(
-      taggedDataResponse,
-      crypto.getPublicKey()
-    )
 
     if(logFlags.console) {
       console.log(
@@ -338,9 +334,6 @@ export function sendData() {
         } to archiver ${recipientUrl}`,
         recipient.curvePk
       )
-      console.log(taggedDataResponse)
-      console.log(taggedDataResponse.responses)
-      console.log('Is authenticated', isAuthenticated)
     }
 
     io.emit('DATA', taggedDataResponse)
