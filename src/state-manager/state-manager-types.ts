@@ -894,6 +894,18 @@ type AccountIDAndHash = {
     hash:string;
 }
 
+enum PreTestStatus {
+    Valid = 1,
+    CantValidate,
+    ValidationFailed,
+  }
+
+type AccountPreTest = {
+    accountID:string;
+    hash:string;
+    preTestStatus:PreTestStatus
+}
+
 type HashTrieSyncTell = { 
     cycle: number
     nodeHashes: {radix:string, hash:string}[]

@@ -1308,8 +1308,11 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
 
       // local test patches.//debug only feature
 
+      //todo use this list to skip certain repairs or require a robust query on account hash values.
+      let preTestResults = this.simulateRepairs(cycle, results.badAccounts )
+
+
       //request data for the list of bad accounts then update. this can live in account repair?
-      
       let wrappedDataList = await this.getAccountRepairData(cycle, results.badAccounts )
 
       this.statemanager_fatal('isInSync = false',`bad accounts cycle:${cycle} bad:${results.badAccounts.length} received:${wrappedDataList} details: ${utils.stringifyReduce(results.badAccounts)}`)
@@ -1390,6 +1393,22 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
   }
 
 
+  simulateRepairs(cycle:number, badAccounts:AccountIDAndHash[] ) : AccountPreTest[] {
+    let results = []
+
+    for(let badAccount of badAccounts){
+
+      let preTestResult = {
+        accountID:badAccount.accountID,
+        hash:badAccount.hash,
+        preTestStatus:PreTestStatus.Valid
+       }
+      results.push(preTestResult)
+
+      //todo run test that can change the pretestStatus value!
+    }
+    return results
+  }
 
 
 
@@ -1408,13 +1427,15 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
   async getAccountRepairData(cycle:number, badAccounts:AccountIDAndHash[] ): Promise<Shardus.WrappedData[]> {
     //pick which nodes to ask! /    //build up requests
     let nodesBySyncRadix:Map<string, {node:Shardus.Node, request:{cycle, accounts:AccountIDAndHash[]} }> = new Map()
+    let accountHashMap = new Map()
     for(let accountEntry of badAccounts){
       let syncRadix = accountEntry.accountID.substr(0, this.treeSyncDepth)
       let requestEntry = nodesBySyncRadix.get(syncRadix)
+
+      accountHashMap.set(accountEntry.accountID, accountEntry.hash)
       if(requestEntry == null){
         //minor layer of security, we will ask a different node for the account than the one that gave us the hash
         let nodeToAsk = this.getNodeForQuery(accountEntry.accountID, cycle, true) 
-
         requestEntry = {node:nodeToAsk, request:{cycle, accounts:[]}}
         nodesBySyncRadix.set(syncRadix, requestEntry)
       } 
@@ -1431,14 +1452,23 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
 
     let wrappedDataList:Shardus.WrappedData[] = []
 
-    let results = await Promise.all(promises)
+    let results = await Promise.all(promises) as HashTrieAccountDataResponse[]
     for(let result of results){
       //HashTrieAccountDataResponse
       if(result != null && result.accounts != null && result.accounts.length > 0){
-        wrappedDataList = wrappedDataList.concat(result.accounts)        
+        //wrappedDataList = wrappedDataList.concat(result.accounts)        
+        for(let wrappedAccount of result.accounts){
+          let desiredHash = accountHashMap.get(wrappedAccount.accountId)
+          if(desiredHash != wrappedAccount.stateId){
+            //got account back but has the wrong stateID
+            //nestedCountersInstance.countEvent('accountPatcher', 'getAccountRepairData wrong hash')
+            this.statemanager_fatal('getAccountRepairData wrong hash',`getAccountRepairData wrong hash ${utils.stringifyReduce(wrappedAccount.accountId)}`)
+            continue
+          }
+          wrappedDataList.push(wrappedAccount)
+        }
       }
     }
-
     return wrappedDataList
   }
 
