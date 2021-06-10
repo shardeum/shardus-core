@@ -50,6 +50,8 @@ class AccountPatcher {
   accountUpdateQueue: TrieAccount[]
   accountUpdateQueueFuture: TrieAccount[]
 
+  accountRemovalQueue: string[]
+
   hashTrieSyncConsensusByCycle: Map<number, HashTrieSyncConsensus>
 
   incompleteNodes: HashTrieNode[]
@@ -96,6 +98,7 @@ class AccountPatcher {
 
     this.accountUpdateQueue = []
     this.accountUpdateQueueFuture = []
+    this.accountRemovalQueue = []
 
     this.debug_ignoreUpdates = false
   }
@@ -361,6 +364,24 @@ class AccountPatcher {
       treeNode.updated= true
     }
 
+    let removedAccounts = 0
+    for(let i =0; i< this.accountRemovalQueue.length; i++){
+      let accountID = this.accountRemovalQueue[i]
+
+      let key = accountID.slice(0,currentLayer)
+      let treeNode = currentMap.get(key)
+      if(treeNode == null){
+        continue //already gone!
+      }  
+
+      treeNode.updated = true
+      treeNode.accountTempMap.delete(key)
+      removedAccounts++
+    }
+    if(removedAccounts > 0){
+      nestedCountersInstance.countEvent(`accountPatcher`, `removedAccounts c:${cycle}`, removedAccounts) 
+    }
+    
     // for(let treeNode of this.incompleteNodes){
     //   treeNodeQueue.push(treeNode)
     // }
@@ -1069,6 +1090,11 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
     this.accountUpdateQueue.push(accountData)
   }
 
+
+  removeAccountHash(accountID:string){
+
+    this.accountRemovalQueue.push(accountID)
+  }
   // applyRepair(accountsToFix:AccountIDAndHash[]){
   //   //todo do we need to look at cycle or timestamp and have a future vs. next queue?
   //   for(let account of accountsToFix){

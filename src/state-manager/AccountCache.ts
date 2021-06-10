@@ -412,6 +412,14 @@ class AccountCache {
       //split data into partitions.  Get the partition for this account
       let partitionHashResults: PartitionHashResults = null
       let { homePartition: partition } = ShardFunctions.addressToPartition(cycleShardData.shardGlobals, accountID)
+
+      //if we do not store this partition then dont put it in a report.  tell the trie to remove it.
+      //TODO perf, will need something more efficient.
+      if(ShardFunctions.testInRange(partitionHashResults.partition, cycleShardData.nodeShardData.storedPartitions) === false){
+        this.stateManager.accountPatcher.removeAccountHash(accountID)
+        continue
+      }
+
       if (mainHashResults.partitionHashResults.has(partition) === false) {
         //if we dont have an entry for this partition yet initilize one
         partitionHashResults = {
@@ -440,6 +448,9 @@ class AccountCache {
 
       partitionHashResults.hashOfHashes = this.crypto.hash(partitionHashResults.hashes)
     }
+
+
+    //this.filterOutNonStoredData(mainHashResults)
 
     newIndex = 0
     //rebuild our future working list.
@@ -483,6 +494,23 @@ class AccountCache {
   }
 
 
+  filterOutNonStoredData(mainHashResults:MainHashResults){
+
+    let cycle = mainHashResults.cycle
+    let shardValues = this.stateManager.shardValuesByCycle.get(cycle)
+    let shardGlobals = shardValues.shardGlobals as ShardGlobals
+
+    for (let partition of mainHashResults.partitionHashResults.keys()) {
+      let partitionHashResults: PartitionHashResults = mainHashResults.partitionHashResults.get(partition)
+      if(ShardFunctions.testInRange(partitionHashResults.partition, shardValues.nodeShardData.storedPartitions) === false){
+
+      }
+      
+    }
+  }
+
+
+
   // fast version of what is above.  This is what we really need for production
   // it should be pretty close to working now that other issues with timestamps were fixed.
   // should test and re-enable it.
@@ -511,7 +539,7 @@ class AccountCache {
     for (let index = 0; index < this.accountsHashCache3.futureHistoryList.accountHashesSorted.length; index++) {
       let accountHashData: AccountHashCache = this.accountsHashCache3.futureHistoryList.accountHashesSorted[index]
       if (accountHashData == null) {
-        holes++
+        //holes++
         continue
       }
       let accountID = this.accountsHashCache3.futureHistoryList.accountIDs[index]
@@ -526,6 +554,14 @@ class AccountCache {
         this.accountsHashCache3.workingHistoryList.accountHashesSorted.push(accountHashData)
         this.accountsHashCache3.workingHistoryList.accountIDs.push(accountID)
 
+
+        // tricky part here.. we need to clear this entry out of the earlier spot in the working list
+        // this was not something we could do earlier since we were in the future list
+        if(accountHashCacheHistory.lastSeenSortIndex > -1){
+          this.accountsHashCache3.workingHistoryList.accountHashesSorted[accountHashCacheHistory.lastSeenSortIndex] = null
+          this.accountsHashCache3.workingHistoryList.accountIDs[accountHashCacheHistory.lastSeenSortIndex] = null
+        }
+
         accountHashCacheHistory.lastSeenSortIndex = nextWorkingIndex
         accountHashCacheHistory.queueIndex.id = -1
         accountHashCacheHistory.queueIndex.idx = -1
@@ -538,12 +574,12 @@ class AccountCache {
         accountHashCacheHistory.queueIndex.idx = nextFutureIndex
         nextFutureIndex++
 
-        // tricky part here.. we need to clear this entry out of the earlier spot in the working list
-        // this was not something we could do earlier since we were in the future list
-        if(accountHashCacheHistory.lastSeenSortIndex > -1){
-          this.accountsHashCache3.workingHistoryList.accountHashesSorted[accountHashCacheHistory.lastSeenSortIndex] = null
-          this.accountsHashCache3.workingHistoryList.accountIDs[accountHashCacheHistory.lastSeenSortIndex] = null
-        }
+        // // tricky part here.. we need to clear this entry out of the earlier spot in the working list
+        // // this was not something we could do earlier since we were in the future list
+        // if(accountHashCacheHistory.lastSeenSortIndex > -1){
+        //   this.accountsHashCache3.workingHistoryList.accountHashesSorted[accountHashCacheHistory.lastSeenSortIndex] = null
+        //   this.accountsHashCache3.workingHistoryList.accountIDs[accountHashCacheHistory.lastSeenSortIndex] = null
+        // }
       }
     }
 
@@ -552,6 +588,7 @@ class AccountCache {
       let accountHashData: AccountHashCache = this.accountsHashCache3.workingHistoryList.accountHashesSorted[index]
       if (accountHashData == null) {
         //if this is null then it is blank entry (by design how we remove from the array at run time and retain perf)
+        holes++
         continue
       }
       let accountID = this.accountsHashCache3.workingHistoryList.accountIDs[index]
