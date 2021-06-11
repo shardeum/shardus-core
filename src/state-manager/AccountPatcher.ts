@@ -287,8 +287,18 @@ class AccountPatcher {
       }
       res.end()
     })
+    Context.network.registerExternalGet('debug-patcher-dumpTree', (req, res) => {
+      try{
+        this.statemanager_fatal('debug shardTrie',`temp shardTrie ${utils.stringifyReduce(this.shardTrie.layerMaps[0].values().next().value)}`)
+        res.write(`${utils.stringifyReduce(this.shardTrie.layerMaps[0].values().next().value)}\n`)  
+      } catch(e){
+        res.write(`${e}\n`) 
+      }
+      res.end()
+    })
 
 
+    
   }
 
 /***
@@ -381,6 +391,7 @@ class AccountPatcher {
     if(removedAccounts > 0){
       nestedCountersInstance.countEvent(`accountPatcher`, `removedAccounts c:${cycle}`, removedAccounts) 
     }
+    this.accountRemovalQueue = []
     
     // for(let treeNode of this.incompleteNodes){
     //   treeNodeQueue.push(treeNode)
@@ -860,6 +871,7 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
     } else {
       return coverageEntry.firstChoice
     }
+    return null
   }
 
   async getChildrenOf(radixHashEntries:RadixAndHash[], cycle:number) : Promise<RadixAndHash[]> {
@@ -1288,7 +1300,8 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
 
     if(logFlags.debug){
       
-      this.statemanager_fatal('debug shardTrie',`temp shardTrie ${cycle}: ${utils.stringifyReduce(this.shardTrie.layerMaps[0].values().next().value)}`)
+      //moved this to manual endpoint, it was way too much data!
+      //this.statemanager_fatal('debug shardTrie',`temp shardTrie ${cycle}: ${utils.stringifyReduce(this.shardTrie.layerMaps[0].values().next().value)}`)
 
       let hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
 
@@ -1315,7 +1328,7 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
       //request data for the list of bad accounts then update. this can live in account repair?
       let wrappedDataList = await this.getAccountRepairData(cycle, results.badAccounts )
 
-      this.statemanager_fatal('isInSync = false',`bad accounts cycle:${cycle} bad:${results.badAccounts.length} received:${wrappedDataList} details: ${utils.stringifyReduce(results.badAccounts)}`)
+      this.statemanager_fatal('isInSync = false',`bad accounts cycle:${cycle} bad:${results.badAccounts.length} received:${wrappedDataList.length} details: ${utils.stringifyReduce(results.badAccounts)}`)
       this.statemanager_fatal('isInSync = false',`isInSync = false ${cycle}: `)
       //this.statemanager_fatal('debug shardTrie',`temp shardTrie ${cycle}: ${utils.stringifyReduce(this.shardTrie.layerMaps[0].values())}`)
 
@@ -1337,6 +1350,14 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
             continue
           }
           if(wrappedData.timestamp === accountMemData.t) {
+
+            //This is not great. if we got here make sure to update the last seen cycle in case the cache needs to know it has current enough data
+            let accountHashCacheHistory: AccountHashCacheHistory = this.stateManager.accountCache.accountsHashCache3.accountHashMap.get(wrappedData.accountId)
+            if(accountHashCacheHistory != null && accountHashCacheHistory.lastStaleCycle >= accountHashCacheHistory.lastSeenCycle ){
+              nestedCountersInstance.countEvent('accountPatcher', `checkAndSetAccountData updateSameTS update lastSeenCycle c:${cycle}`)
+              accountHashCacheHistory.lastSeenCycle = cycle
+            }
+
             noChange.add(wrappedData.accountId)
             nestedCountersInstance.countEvent('accountPatcher', `checkAndSetAccountData updateSameTS c:${cycle}`)
             continue
@@ -1348,9 +1369,6 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
           wrappedDataListFiltered.push(wrappedData)
         }
       }
-
-
-
 
       //do some work so ave the data  
       let failedHashes = await this.stateManager.checkAndSetAccountData(wrappedDataListFiltered, `testAndPatchAccounts`, false)
@@ -1401,7 +1419,7 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
       let preTestResult = {
         accountID:badAccount.accountID,
         hash:badAccount.hash,
-        preTestStatus:PreTestStatus.Valid
+        preTestStatus: 1 /*PreTestStatus.Valid*/
        }
       results.push(preTestResult)
 
@@ -1436,6 +1454,13 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
       if(requestEntry == null){
         //minor layer of security, we will ask a different node for the account than the one that gave us the hash
         let nodeToAsk = this.getNodeForQuery(accountEntry.accountID, cycle, true) 
+
+        if(nodeToAsk == null){
+
+          this.statemanager_fatal('getAccountRepairData no node avail',`getAccountRepairData no node avail ${cycle}`)
+          continue
+        }
+
         requestEntry = {node:nodeToAsk, request:{cycle, accounts:[]}}
         nodesBySyncRadix.set(syncRadix, requestEntry)
       } 

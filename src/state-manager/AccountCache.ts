@@ -103,7 +103,7 @@ class AccountCache {
 
     let accountHashCacheHistory: AccountHashCacheHistory
     if (this.accountsHashCache3.accountHashMap.has(accountId) === false) {
-      accountHashCacheHistory = { lastSeenCycle: -1, lastSeenSortIndex: -1, queueIndex: { id: -1, idx: -1 }, accountHashList: [] }
+      accountHashCacheHistory = { lastSeenCycle: -1, lastSeenSortIndex: -1, queueIndex: { id: -1, idx: -1 }, accountHashList: [], lastStaleCycle:-1 }
       this.accountsHashCache3.accountHashMap.set(accountId, accountHashCacheHistory)
     } else {
       accountHashCacheHistory = this.accountsHashCache3.accountHashMap.get(accountId)
@@ -334,6 +334,7 @@ class AccountCache {
 
     let tempList1: {id:string, t:number, entry: AccountHashCache}[] = []
 
+    let staleAccountsSkipped = 0
     // I think we could speed this up by just walking the future list and adding what is needed to the working list!
     // look at each account key and build a temp list with the AccountCacheHash for this cycle 
     for (let key of this.accountsHashCache3.accountHashMap.keys()) {
@@ -345,6 +346,13 @@ class AccountCache {
       //   let ii = 0
       //   ii++
       // }
+
+      if(accountCacheHistory.lastStaleCycle > accountCacheHistory.lastSeenCycle){
+        //dont use this in a report if it was recently stale
+        staleAccountsSkipped++
+        continue
+      }
+
 
       //if index 0 entry is not for this cycle then look through the list for older cycles. 
       while (index < accountCacheHistory.accountHashList.length - 1 && accountCacheHistory.accountHashList[index].c > cycleToProcess) {
@@ -372,6 +380,10 @@ class AccountCache {
       }
     }
     tempList1.sort(this.sortByTimestampIdAsc)
+
+    if(staleAccountsSkipped > 0){
+      nestedCountersInstance.countEvent('cache', 'staleAccountsSkipped', staleAccountsSkipped)  
+    }
 
     //rebuild the working list with out selected data from the map
     this.accountsHashCache3.workingHistoryList.accountHashesSorted = []
@@ -415,8 +427,14 @@ class AccountCache {
 
       //if we do not store this partition then dont put it in a report.  tell the trie to remove it.
       //TODO perf, will need something more efficient.
-      if(ShardFunctions.testInRange(partitionHashResults.partition, cycleShardData.nodeShardData.storedPartitions) === false){
+      if(ShardFunctions.testInRange(partition, cycleShardData.nodeShardData.storedPartitions) === false){
         this.stateManager.accountPatcher.removeAccountHash(accountID)
+
+        let accountHashCacheHistory: AccountHashCacheHistory = this.accountsHashCache3.accountHashMap.get(accountID)
+        if(cycleToProcess > accountHashCacheHistory.lastStaleCycle){
+          accountHashCacheHistory.lastStaleCycle = cycleToProcess
+        }
+        
         continue
       }
 

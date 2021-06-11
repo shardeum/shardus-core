@@ -746,6 +746,7 @@ export type AccountHashCacheHistory = {
     lastSeenSortIndex: number;
     queueIndex: SafeIndex;
     accountHashList: AccountHashCache[]
+    lastStaleCycle: number;
 }
 
 export type SafeIndex = {
