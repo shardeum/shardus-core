@@ -133,6 +133,9 @@ class TransactionRepair {
                   upToDateAccounts[id] = true
                   numUpToDateAccounts++
                   if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `account ${shortKey} already up to date our: cached:${utils.stringifyReduce(hashObj)}`)
+
+                  
+
                   break
                 }
               }    
@@ -600,6 +603,10 @@ class TransactionRepair {
                   upToDateAccounts[id] = true
                   //numUpToDateAccounts++
                   if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note2', `${shortHash}`, `account ${shortKey} already up to date our: cached:${utils.stringifyReduce(hashObj)}`)
+
+                  //update cache state.
+
+
                   break
                 } else {
                   needUpdateAccounts[id] = true

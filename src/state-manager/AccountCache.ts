@@ -103,7 +103,7 @@ class AccountCache {
 
     let accountHashCacheHistory: AccountHashCacheHistory
     if (this.accountsHashCache3.accountHashMap.has(accountId) === false) {
-      accountHashCacheHistory = { lastSeenCycle: -1, lastSeenSortIndex: -1, queueIndex: { id: -1, idx: -1 }, accountHashList: [], lastStaleCycle:-1 }
+      accountHashCacheHistory = { lastSeenCycle: -1, lastSeenSortIndex: -1, queueIndex: { id: -1, idx: -1 }, accountHashList: [], lastStaleCycle:-1, lastUpdateCycle:-1 }
       this.accountsHashCache3.accountHashMap.set(accountId, accountHashCacheHistory)
     } else {
       accountHashCacheHistory = this.accountsHashCache3.accountHashMap.get(accountId)
@@ -124,7 +124,17 @@ class AccountCache {
 
     let updateIsNewerHash = false
     let onFutureCycle = cycle > this.accountsHashCache3.currentCalculationCycle
-    accountHashCacheHistory.lastSeenCycle = cycle
+
+    if(accountHashCacheHistory.lastStaleCycle > 0 && accountHashCacheHistory.lastStaleCycle > accountHashCacheHistory.lastSeenCycle){
+      //temp debug... todo make this not fatal.
+        this.statemanager_fatal(`debug Reinstate c${this.stateManager.currentCycleShardData.cycleNumber}`, 
+        `debug Reinstate c${this.stateManager.currentCycleShardData.cycleNumber} acc:${utils.stringifyReduce(accountId)} lastStale:${accountHashCacheHistory.lastStaleCycle}`)
+    }
+
+    accountHashCacheHistory.lastSeenCycle = this.accountsHashCache3.currentCalculationCycle
+    if(cycle > accountHashCacheHistory.lastUpdateCycle){
+      accountHashCacheHistory.lastUpdateCycle = cycle
+    }
 
     let accountHashList: AccountHashCache[] = accountHashCacheHistory.accountHashList
 
@@ -350,6 +360,8 @@ class AccountCache {
       if(accountCacheHistory.lastStaleCycle > accountCacheHistory.lastSeenCycle){
         //dont use this in a report if it was recently stale
         staleAccountsSkipped++
+
+
         continue
       }
 
@@ -434,7 +446,6 @@ class AccountCache {
         if(cycleToProcess > accountHashCacheHistory.lastStaleCycle){
           accountHashCacheHistory.lastStaleCycle = cycleToProcess
         }
-        
         continue
       }
 

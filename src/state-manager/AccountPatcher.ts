@@ -375,6 +375,12 @@ class AccountPatcher {
     }
 
     let removedAccounts = 0
+    let removedAccountsFailed = 0
+
+    if(this.accountRemovalQueue.length > 0){
+      this.statemanager_fatal(`temp accountRemovalQueue`,`accountRemovalQueue c:${cycle} ${utils.stringifyReduce(this.accountRemovalQueue)}`)
+    }
+
     for(let i =0; i< this.accountRemovalQueue.length; i++){
       let accountID = this.accountRemovalQueue[i]
 
@@ -384,12 +390,27 @@ class AccountPatcher {
         continue //already gone!
       }  
 
+      if(treeNode.updated === false){
+        treeNodeQueue.push(treeNode)
+      }
       treeNode.updated = true
-      treeNode.accountTempMap.delete(key)
-      removedAccounts++
+      if(treeNode.accountTempMap != null){
+        let removed = treeNode.accountTempMap.delete(accountID)
+        if(removed){
+          removedAccounts++        
+        } else {
+          removedAccountsFailed++
+        }
+      } else {
+        //no op?
+      }
+
     }
-    if(removedAccounts > 0){
+    if(removedAccounts > 0 ){
       nestedCountersInstance.countEvent(`accountPatcher`, `removedAccounts c:${cycle}`, removedAccounts) 
+    }
+    if(removedAccountsFailed > 0 ){
+      nestedCountersInstance.countEvent(`accountPatcher`, `removedAccountsFailed c:${cycle}`, removedAccountsFailed) 
     }
     this.accountRemovalQueue = []
     
