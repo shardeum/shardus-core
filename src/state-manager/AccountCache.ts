@@ -163,7 +163,7 @@ class AccountCache {
           } else {
             nestedCountersInstance.countEvent('cache', 'updateAccountHash: same cycle older timestamp')
           }
-        } else if (cycle > current.c) {
+        } else if (cycle > current.c || timestamp > current.t) {
           //push new entry to head
           accountHashList.unshift(accountHashData)
           //clean up list if is too long
@@ -173,6 +173,13 @@ class AccountCache {
             accountHashList.pop()
           }
           nestedCountersInstance.countEvent('cache', 'updateAccountHash: new cycle update')  
+
+          if (cycle < current.c && timestamp > current.t){
+            nestedCountersInstance.countEvent('cache', 'updateAccountHash: older cycle but newer timestamp')  
+            this.statemanager_fatal('updateAccountHash: cycleCalcOff', 
+            `updateAccountHash: older cycle but newer timestamp :${cycle} < ${current.c} && ${timestamp} > ${current.t} `)
+          }
+
           updateIsNewerHash = true
         } else {
           // if the cycle is older?

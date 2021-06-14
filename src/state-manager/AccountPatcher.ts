@@ -394,17 +394,19 @@ class AccountPatcher {
         treeNodeQueue.push(treeNode)
       }
       treeNode.updated = true
-      if(treeNode.accountTempMap != null){
-        let removed = treeNode.accountTempMap.delete(accountID)
-        if(removed){
-          removedAccounts++        
-        } else {
-          removedAccountsFailed++
-        }
-      } else {
-        //no op?
-      }
 
+      if(treeNode.accountTempMap == null){
+        treeNode.accountTempMap = new Map()
+      }
+      if(treeNode.accounts == null){
+        treeNode.accounts = []
+      }
+      let removed = treeNode.accountTempMap.delete(accountID)
+      if(removed){
+        removedAccounts++        
+      } else {
+        removedAccountsFailed++
+      }
     }
     if(removedAccounts > 0 ){
       nestedCountersInstance.countEvent(`accountPatcher`, `removedAccounts c:${cycle}`, removedAccounts) 
@@ -426,7 +428,6 @@ class AccountPatcher {
         treeNode.accounts = Array.from(treeNode.accountTempMap.values())
         
         //delete treeNode.accountTempMap ... keeping it for now.
-
         //sort treeNode.accounts by accountID
         treeNode.accounts.sort(this.sortByAccountID)
         //compute treenode hash of accounts
@@ -444,9 +445,6 @@ class AccountPatcher {
     let parentTreeNodeQueue = []
     //treenode queue has updated treeNodes from each loop, gets fed into next loop
     for(let i = currentLayer-1; i >= 0; i--){
-
-
-
       currentMap = this.shardTrie.layerMaps[i] 
       if(currentMap == null){
         currentMap = new Map()
