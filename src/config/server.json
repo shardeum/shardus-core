@@ -31,7 +31,7 @@
     "difficulty": 2,
     "queryDelay": 1,
     "gossipRecipients": 8,
-    "gossipFactor": 2,
+    "gossipFactor": 4,
     "gossipStartSeed": 15,
     "gossipSeedFallof": 15,
     "gossipTimeout": 180,
