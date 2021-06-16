@@ -116,7 +116,7 @@ const apoptosisInternalRoute: Route<InternalHandler<SignedApoptosisProposal>> = 
 }
 
 const apoptosisGossipRoute: GossipHandler<SignedApoptosisProposal> = 
-   (payload, sender, tracker, hop) => {
+   (payload, sender, tracker) => {
   info(`Got Apoptosis gossip: ${JSON.stringify(payload)}`)
   let err = ''
   err = validateTypes(payload, {when:'n',id:'s',sign:'o'})
@@ -126,7 +126,7 @@ const apoptosisGossipRoute: GossipHandler<SignedApoptosisProposal> =
   if ([1,2].includes(currentQuarter)){  
     if (addProposal(payload)) {
 //    p2p.sendGossipIn(gossipRouteName, payload, tracker, sender)
-      Comms.sendGossip(gossipRouteName, payload, tracker, Self.id, NodeList.byIdOrder, hop) // use Self.id so we don't gossip to ourself
+      Comms.sendGossip(gossipRouteName, payload, tracker, Self.id, NodeList.byIdOrder, false) // use Self.id so we don't gossip to ourself
     }
   }
 }
@@ -231,7 +231,7 @@ export function sendRequests() {
     // make sure node is still in the network, since it might
     //   have already been removed
     if (nodes.get(id)){  
-      Comms.sendGossip(gossipRouteName, proposals[id])
+      Comms.sendGossip(gossipRouteName, proposals[id], '', null, NodeList.byIdOrder, true)
     }
   }
 }

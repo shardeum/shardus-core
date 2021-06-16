@@ -177,7 +177,7 @@ export function addJoinRequest(joinRequest, tracker?, gossip = true) {
     joinRequest
   )
   if (gossip === true) {
-    Comms.sendGossip('joinarchiver', joinRequest, tracker)
+    Comms.sendGossip('joinarchiver', joinRequest, tracker, null, NodeList.byIdOrder, true)
   }
   return true
 }
@@ -212,7 +212,7 @@ export function addLeaveRequest(request, tracker?, gossip = true) {
   leaveRequests.push(request)
   if(logFlags.console) console.log('adding leave requests', leaveRequests)
   if (gossip === true) {
-    Comms.sendGossip('leavingarchiver', request, tracker)
+    Comms.sendGossip('leavingarchiver', request, tracker, null, NodeList.byIdOrder, true)
   }
   return true
 }
@@ -388,7 +388,7 @@ export function registerRoutes() {
   })
   Comms.registerGossipHandler(
     'joinarchiver',
-    async (payload, sender, tracker, hop) => {
+    async (payload, sender, tracker) => {
       if(logFlags.console) console.log('Join request gossip received:', payload)
       const existingJoinRequest = joinRequests.find(
         (j) => j.nodeInfo.publicKey === payload.nodeInfo.publicKey
@@ -401,7 +401,7 @@ export function registerRoutes() {
         }
         if (!accepted) return warn('Archiver join request not accepted.')
         if(logFlags.p2pNonFatal) info('Archiver join request accepted!')
-        Comms.sendGossip('joinarchiver', payload, tracker, sender, NodeList.byIdOrder, hop)
+        Comms.sendGossip('joinarchiver', payload, tracker, sender, NodeList.byIdOrder, false)
       } else {
         if(logFlags.console) console.log('Already received archiver join gossip for this node')
       }
@@ -410,7 +410,7 @@ export function registerRoutes() {
 
   Comms.registerGossipHandler(
     'leavingarchiver',
-    async (payload, sender, tracker, hop) => {
+    async (payload, sender, tracker) => {
       if(logFlags.console) console.log('Leave request gossip received:', payload)
       const existingLeaveRequest = leaveRequests.find(
         (j) => j.nodeInfo.publicKey === payload.nodeInfo.publicKey
@@ -419,7 +419,7 @@ export function registerRoutes() {
         const accepted = await addLeaveRequest(payload, tracker, false)
         if (!accepted) return warn('Archiver leave request not accepted.')
         if(logFlags.p2pNonFatal) info('Archiver leave request accepted!')
-        Comms.sendGossip('leavingarchiver', payload, tracker, sender, NodeList.byIdOrder, hop)
+        Comms.sendGossip('leavingarchiver', payload, tracker, sender, NodeList.byIdOrder, false)
       } else {
         if(logFlags.console) console.log('Already received archiver leave gossip for this node')
       }

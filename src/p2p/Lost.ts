@@ -67,12 +67,12 @@ const lostReportRoute: Route<InternalHandler<SignedLostReport>> = {
   handler: lostReportHandler
 }
 
-const lostDownRoute: Types.GossipHandler = (payload:SignedDownGossipMessage, sender, tracker, hop) => {
-  downGossipHandler(payload, sender, tracker, hop)
+const lostDownRoute: Types.GossipHandler = (payload:SignedDownGossipMessage, sender, tracker) => {
+  downGossipHandler(payload, sender, tracker)
 }
 
-const lostUpRoute: Types.GossipHandler = (payload:SignedUpGossipMessage, sender, tracker, hop) => {
-  upGossipHandler(payload, sender, tracker, hop)
+const lostUpRoute: Types.GossipHandler = (payload:SignedUpGossipMessage, sender, tracker) => {
+  upGossipHandler(payload, sender, tracker)
 }
 
 const routes = {
@@ -231,7 +231,7 @@ export function sendRequests() {
       obj.message = msg
       obj.gossiped = true
       if(logFlags.p2pNonFatal) info(`Gossiping node down message: ${JSON.stringify(msg)}`)
-      Comms.sendGossip('lost-down', msg)
+      Comms.sendGossip('lost-down', msg, '', null, NodeList.byIdOrder, true)
     }
   }
 // We cannot count on the lost node seeing the gossip and refuting based on that.
@@ -245,7 +245,7 @@ export function sendRequests() {
     let msg = {target:Self.id, status:"up", cycle:currentCycle}
     msg = crypto.sign(msg)
     if(logFlags.p2pNonFatal) info(`Gossiping node up message: ${JSON.stringify(msg)}`)
-    Comms.sendGossip('lost-up', msg)
+    Comms.sendGossip('lost-up', msg, '', null, NodeList.byIdOrder, true)
   }
 }
 
@@ -471,7 +471,7 @@ if(logFlags.p2pNonFatal) info(`Checking internal connection for ${node.id}`)
   return 'up'
 }
 
-function downGossipHandler(payload:SignedDownGossipMessage, sender, tracker, hop){
+function downGossipHandler(payload:SignedDownGossipMessage, sender, tracker){
   if(logFlags.p2pNonFatal) info(`Got downGossip: ${JSON.stringify(payload)}`)
   let err = ''
   err = validateTypes(payload, {cycle:'n',report:'o',status:'s',sign:'o'})
@@ -499,7 +499,7 @@ function downGossipHandler(payload:SignedDownGossipMessage, sender, tracker, hop
   }
   let obj:LostRecord = {target:payload.report.target, cycle:payload.report.cycle, status:'down', message:payload }
   lost.set(key, obj)
-  Comms.sendGossip('lost-down', payload, tracker, Self.id, NodeList.byIdOrder, hop)
+  Comms.sendGossip('lost-down', payload, tracker, Self.id, NodeList.byIdOrder, false)
 // After message has been gossiped in Q1 and Q2 we wait for getTxs() to be invoked in Q3
 }
 
@@ -517,7 +517,7 @@ function checkDownMsg(payload:SignedDownGossipMessage, expectedCycle){
   return [true, '']
 }
 
-function upGossipHandler(payload, sender, tracker, hop){
+function upGossipHandler(payload, sender, tracker){
   if(logFlags.p2pNonFatal) info(`Got upGossip: ${JSON.stringify(payload)}`)
   let err = ''
   err = validateTypes(payload, {cycle:'n',target:'s',status:'s',sign:'o'})
@@ -543,7 +543,7 @@ function upGossipHandler(payload, sender, tracker, hop){
   }
   let obj = {target:payload.target, status:'up', cycle:payload.cycle, message:payload}
   lost.set(key, obj)
-  Comms.sendGossip('lost-up', payload, tracker, Self.id, NodeList.byIdOrder, hop)
+  Comms.sendGossip('lost-up', payload, tracker, Self.id, NodeList.byIdOrder, false)
 // the getTxs() function will loop through the lost object to make txs in Q3 and build the cycle record from them
 }
 

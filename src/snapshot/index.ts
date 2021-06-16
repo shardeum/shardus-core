@@ -385,7 +385,7 @@ export function startSnapshotting() {
           }
         }
 
-        Comms.sendGossip('snapshot_gossip', message)
+        Comms.sendGossip('snapshot_gossip', message, '', null, NodeList.byIdOrder, true)
         partitionGossip.forwardedGossips.set(message.sender, true)
         collector.process([message])
 

@@ -15,10 +15,9 @@ const gossipInternalRoute: InternalHandler<GossipReq> = async (
   payload,
   _respond,
   sender,
-  tracker,
-  hop
+  tracker
 ) => {
-  await handleGossip(payload, sender, tracker, hop)
+  await handleGossip(payload, sender, tracker)
 }
 
 const routes = {
@@ -148,11 +147,10 @@ function _extractPayload(wrappedPayload, nodeGroup) {
   const payload = wrappedPayload.payload
   const sender = wrappedPayload.sender
   const tracker = wrappedPayload.tracker
-  const hop = wrappedPayload.hop
-  return [payload, sender, tracker, hop]
+  return [payload, sender, tracker]
 }
 
-function _wrapAndTagMessage(msg, tracker = '', recipientNode, hop = null) {
+function _wrapAndTagMessage(msg, tracker = '', recipientNode) {
   if (!msg) throw new Error('No message given to wrap and tag!')
   if (logFlags.verbose) {
     warn(
@@ -164,8 +162,7 @@ function _wrapAndTagMessage(msg, tracker = '', recipientNode, hop = null) {
   const wrapped = {
     payload: msg,
     sender: Self.id,
-    tracker,
-    hop
+    tracker
   }
   const tagged = crypto.tag(wrapped, recipientNode.curvePublicKey)
   return tagged
@@ -199,7 +196,6 @@ export async function tell(
   message,
   logged = false,
   tracker = '',
-  hop = 0
 ) {
   if (tracker === '') {
     tracker = createMsgTracker()
@@ -210,7 +206,7 @@ export async function tell(
       if(logFlags.p2pNonFatal) info('p2p/Comms:tell: Not telling self')
       continue
     }
-    const signedMessage = _wrapAndTagMessage(message, tracker, node, hop)
+    const signedMessage = _wrapAndTagMessage(message, tracker, node)
     info(`signed and tagged gossip`, signedMessage)
     promises.push(network.tell([node], route, signedMessage, logged))
   }
@@ -312,7 +308,6 @@ export function registerInternal(route, handler) {
       NodeList.byIdOrder // [TODO] Maybe this should be othersByIdOrder
     )
     const [payload, sender] = payloadArray
-    const hop = payloadArray[3]
     tracker = payloadArray[2] || ''
     if (!payload) {
       warn('Payload unable to be extracted, possible missing signature...')
@@ -328,7 +323,7 @@ export function registerInternal(route, handler) {
         payload
       )
     }
-    await handler(payload, respondWrapped, sender, tracker, hop)
+    await handler(payload, respondWrapped, sender, tracker)
   }
   // Include that in the handler function that is passed
   network.registerInternal(route, wrappedHandler)
@@ -352,7 +347,7 @@ export async function sendGossip(
   tracker = '',
   sender = null,
   inpNodes = NodeList.byIdOrder, // Joining nodes need gossip too; we don't send to ourself
-  hop = null
+  isOrigin = false
 ) {
   // [TODO] Don't copy the node list once sorted lists are passed in
   const nodes = [...inpNodes]
@@ -363,17 +358,10 @@ export async function sendGossip(
     tracker = createGossipTracker()
   }
 
-  if (hop !== null && hop >= 0) {
-    hop += 1
-  } else {
-    hop = 0
-  }
-
   if (logFlags.verbose) {
     info(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
   }
   info(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
-  info(`Gossip hop`, hop)
   const gossipPayload = { type, data: payload }
 
   /*
@@ -392,18 +380,9 @@ export async function sendGossip(
   // Find out your own index in the nodes array
   const myIdx = nodes.findIndex((node) => node.id === Self.id)
   if (myIdx < 0) throw new Error('Could not find self in nodes array')
-  const startingSeedCount = config.p2p.gossipStartSeed || config.p2p.gossipRecipients
-  const seedFalloff = config.p2p.gossipSeedFallof
   const gossipFactor = config.p2p.gossipFactor
   // Map back recipient idxs to node objects
-  const recipientIdxs = utils.getLinearSeededGossip(
-    nodeIdxs,
-    myIdx,
-    gossipFactor,
-    startingSeedCount,
-    seedFalloff,
-    hop
-  )
+  const recipientIdxs = utils.getLinearGossipList(nodeIdxs.length, gossipFactor, myIdx, isOrigin)
   let recipients = recipientIdxs.map((idx) => nodes[idx])
   if (sender != null) {
     recipients = utils.removeNodesByID(recipients, [sender])
@@ -430,7 +409,7 @@ export async function sendGossip(
       gossipSent++
       gossipTypeSent[type] = gossipTypeSent[type] ? gossipTypeSent[type] + 1 : 1
     }
-    await tell(recipients, 'gossip', gossipPayload, true, tracker, hop)
+    await tell(recipients, 'gossip', gossipPayload, true, tracker)
   } catch (ex) {
     if (logFlags.verbose) {
       error(
@@ -529,7 +508,7 @@ export async function sendGossipAll(
  * Handle Goosip Transactions
  * Payload: {type: ['receipt', 'trustedTransaction'], data: {}}
  */
-export async function handleGossip(payload, sender, tracker = '', hop) {
+export async function handleGossip(payload, sender, tracker = '') {
   if (logFlags.verbose) {
     info(`Start of handleGossip(${utils.stringifyReduce(payload)})`)
   }
@@ -613,7 +592,7 @@ export async function handleGossip(payload, sender, tracker = '', hop) {
   gossipTypeRecv[type] = gossipTypeRecv[type] ? gossipTypeRecv[type] + 1 : 1
   logger.playbackLog(sender, 'self', 'GossipRcv', type, tracker, data)
   // [TODO] - maybe we don't need to await the following line
-  await gossipHandler(data, sender, tracker, hop)
+  await gossipHandler(data, sender, tracker)
   if (logFlags.verbose) {
     info(`End of handleGossip(${utils.stringifyReduce(payload)})`)
   }

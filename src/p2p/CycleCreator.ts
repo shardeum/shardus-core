@@ -115,10 +115,9 @@ const compareCertRoute: InternalHandler<
 const gossipCertRoute: GossipHandler<CompareCertReq, Node['id']> = (
   payload,
   sender,
-  tracker,
-  hop
+  tracker
 ) => {
-  gossipHandlerCycleCert(payload, sender, tracker, hop)
+  gossipHandlerCycleCert(payload, sender, tracker)
 }
 
 const routes = {
@@ -1053,7 +1052,8 @@ async function gossipMyCycleCert() {
 
 function gossipHandlerCycleCert(
   inp: CompareCertReq,
-  sender: Node['id']
+  sender: Node['id'],
+  tracker: string
 ) {
   if (!validateCertsRecordTypes(inp, 'gossipHandlerCycleCert')) return
   // [TODO] - submodules need to validate their part of the record
@@ -1064,21 +1064,20 @@ function gossipHandlerCycleCert(
   if (improveBestCert(inpCerts, inpRecord)) {
     // don't need the following line anymore since improveBestCert sets bestRecord if it improved
     // bestRecord = inpRecord
-    gossipCycleCert(sender, tracker, hop)
+    gossipCycleCert(sender, tracker)
   }
 }
 
 // This gossips the best cert we have
 async function gossipCycleCert(
   sender: NodeList.Node['id'],
-  tracker?: string,
-  hop?: number
+  tracker?: string
 ) {
   const certGossip: CompareCertReq = {
     certs: bestCycleCert.get(bestMarker),
     record: bestRecord,
   }
-  Comms.sendGossip('gossip-cert', certGossip, tracker, sender, NodeList.byIdOrder, hop)
+  Comms.sendGossip('gossip-cert', certGossip, tracker, sender, NodeList.byIdOrder, true)
 }
 
 function pruneCycleChain() {

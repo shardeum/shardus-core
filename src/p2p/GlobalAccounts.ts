@@ -36,12 +36,12 @@ const makeReceiptRoute: Route<InternalHandler<
 
 const setGlobalGossipRoute: Route<GossipHandler<Receipt>> = {
   name: 'set-global',
-  handler: (payload, sender, tracker, hop) => {
+  handler: (payload, sender, tracker) => {
     if (validateReceipt(payload) === false) return
     if (processReceipt(payload) === false) return
     /** [TODO] [AS] Replace with Comms.sendGossip() */
     // p2p.sendGossipIn('set-global', payload)
-    Comms.sendGossip('set-global', payload, tracker, sender, NodeList.byIdOrder, hop)
+    Comms.sendGossip('set-global', payload, tracker, sender, NodeList.byIdOrder, false)
   },
 }
 
@@ -134,7 +134,7 @@ export function setGlobal(address, value, when, source) {
     if (processReceipt(receipt) === false) return
     /** [TODO] [AS] Replace with Comms.sendGossip */
     // p2p.sendGossipIn('set-global', receipt)
-    Comms.sendGossip('set-global', receipt)
+    Comms.sendGossip('set-global', receipt, '', null, NodeList.byIdOrder, true)
   }
   /** [TODO] [AS] Replace with Self.emitter.on() */
   // p2p.on(handle, onReceipt)

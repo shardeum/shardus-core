@@ -58,13 +58,11 @@ export type InternalHandler<
   payload: Payload,
   respond: (response?: Response) => void,
   sender: Sender,
-  tracker: string,
-  hop: number
+  tracker: string
 ) => void
 
 export type GossipHandler<Payload = unknown, Sender = unknown> = (
   payload: Payload,
   sender: Sender,
-  tracker: string,
-  hop: number
+  tracker: string
 ) => void

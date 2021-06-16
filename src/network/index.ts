@@ -625,18 +625,19 @@ class ConnectTest extends EventEmitter {
 }
 
 export async function checkTimeSynced(timeServers) {
-  for (const host of timeServers) {
-    try {
-      const time = await Sntp.time({
-        host,
-        timeout: 10000,
-      })
-      return time.t <= config.p2p.syncLimit
-    } catch (e) {
-      mainLogger.warn(`Couldn't fetch ntp time from server at ${host}`)
-    }
-  }
-  throw Error('Unable to check local time against time servers.')
+  return true
+  // for (const host of timeServers) {
+  //   try {
+  //     const time = await Sntp.time({
+  //       host,
+  //       timeout: 10000,
+  //     })
+  //     return time.t <= config.p2p.syncLimit
+  //   } catch (e) {
+  //     mainLogger.warn(`Couldn't fetch ntp time from server at ${host}`)
+  //   }
+  // }
+  // throw Error('Unable to check local time against time servers.')
 }
 
 async function discoverExternalIp(server: string) {

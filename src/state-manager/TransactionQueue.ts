@@ -125,7 +125,7 @@ class TransactionQueue {
       }
     })
 
-    this.p2p.registerGossipHandler('spread_tx_to_group', async (payload, sender, tracker, hop) => {
+    this.p2p.registerGossipHandler('spread_tx_to_group', async (payload, sender, tracker) => {
       //  gossip 'spread_tx_to_group' to transaction group
       // Place tx in queue (if younger than m)
 
@@ -188,7 +188,7 @@ class TransactionQueue {
       }
       if (transactionGroup.length > 1) {
         this.stateManager.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `gossip to neighbors`, transactionGroup)
-        this.p2p.sendGossipIn('spread_tx_to_group', payload, tracker, sender, transactionGroup, hop)
+        this.p2p.sendGossipIn('spread_tx_to_group', payload, tracker, sender, transactionGroup, false)
       }
 
       // await this.transactionQueue.routeAndQueueAcceptedTransaction(acceptedTX, false, sender)
@@ -806,7 +806,7 @@ class TransactionQueue {
               if (transactionGroup.length > 1) {
                 // should consider only forwarding in some cases?
                 this.stateManager.debugNodeGroup(txId, timestamp, `share to neighbors`, transactionGroup)
-                this.p2p.sendGossipIn('spread_tx_to_group', acceptedTx, '', sender, transactionGroup)
+                this.p2p.sendGossipIn('spread_tx_to_group', acceptedTx, '', sender, transactionGroup, true)
               }
               // if (logFlags.playback ) this.logger.playbackLogNote('tx_homeGossip', `${txId}`, `AcceptedTransaction: ${acceptedTX}`)
             } catch (ex) {

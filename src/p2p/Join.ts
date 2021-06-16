@@ -52,7 +52,7 @@ const joinRoute: Types.Route<Handler> = {
 
     //  Validate of joinReq is done in addJoinRequest
     if (addJoinRequest(joinRequest)) {
-      Comms.sendGossip('gossip-join', joinRequest)
+      Comms.sendGossip('gossip-join', joinRequest, '', null, NodeList.byIdOrder, true)
     }
     res.end()
   },
@@ -82,14 +82,13 @@ const joinedRoute: Types.Route<Handler> = {
 const gossipJoinRoute: Types.GossipHandler<JoinRequest, Node['id']> = (
   payload,
   sender,
-  tracker,
-  hop
+  tracker
 ) => {
   // Do not forward gossip after quarter 2
   if (CycleCreator.currentQuarter >= 3) return
 
   //  Validate of payload is done in addJoinRequest
-  if (addJoinRequest(payload)) Comms.sendGossip('gossip-join', payload, tracker, sender, NodeList.byIdOrder, hop)
+  if (addJoinRequest(payload)) Comms.sendGossip('gossip-join', payload, tracker, sender, NodeList.byIdOrder, false)
 }
 
 const routes = {

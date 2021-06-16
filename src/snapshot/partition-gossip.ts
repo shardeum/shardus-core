@@ -3,6 +3,7 @@ import { registerGossipHandler } from '../p2p/Comms'
 import { AddressRange } from '../state-manager/shardFunctionTypes'
 // import { PartitionHashes, ReceiptMapHashes, SummaryHashes } from './index'
 import * as Comm from '../p2p/Comms'
+import * as NodeList from '../p2p/NodeList'
 import {logFlags} from '../logger'
 import { CycleShardData } from '../state-manager/state-manager-types'
 
@@ -74,7 +75,7 @@ export class Collector extends EventEmitter {
       // forward snapshot gossip if gossip cycle is same as current cycle
       if (this.shard.cycleNumber === message.cycle) {
         if (!forwardedGossips.has(message.sender)) {
-          Comm.sendGossip('snapshot_gossip', message)
+          Comm.sendGossip('snapshot_gossip', message, '', null, NodeList.byIdOrder, false)
           forwardedGossips.set(message.sender, true)
         } else if (forwardedGossips.has(message.sender)) {
           continue

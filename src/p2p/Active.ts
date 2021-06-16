@@ -23,8 +23,7 @@ import { Node } from '../shared-types/p2p/NodeListTypes'
 const gossipActiveRoute: Types.GossipHandler<SignedActiveRequest> = (
   payload,
   sender,
-  tracker,
-  hop
+  tracker
 ) => {
   if (logFlags.p2pNonFatal)
     info(`Got active request: ${JSON.stringify(payload)}`)
@@ -57,7 +56,7 @@ const gossipActiveRoute: Types.GossipHandler<SignedActiveRequest> = (
   // Do not forward gossip after quarter 2
   if (!isOrig && CycleCreator.currentQuarter > 2) return
 
-  if (addActiveTx(payload)) Comms.sendGossip('gossip-active', payload, tracker, sender, NodeList.byIdOrder, hop)
+  if (addActiveTx(payload)) Comms.sendGossip('gossip-active', payload, tracker, sender, NodeList.byIdOrder, false)
 }
 
 const routes = {
@@ -179,7 +178,7 @@ export function sendRequests() {
     if (logFlags.p2pNonFatal)
       info(`Gossiping active request: ${JSON.stringify(activeTx)}`)
     addActiveTx(activeTx)
-    Comms.sendGossip('gossip-active', activeTx)
+    Comms.sendGossip('gossip-active', activeTx, '', null, NodeList.byIdOrder, true)
 
     // Check if we went active and try again if we didn't in 1 cycle duration
     const activeTimeout = setTimeout(
