@@ -651,38 +651,19 @@ export function getLinearGossipList(numberOfNodes, gossipFactor, myIdx, isOrigin
 
   if (isOrigin) { // isOrigin is true if we are originating the gossip
     let originFactor: number = Math.floor(3 * Math.log2(numberOfNodes))
-    let extraAddedNode = 0
     if (originFactor + gossipFactor > numberOfNodes) {
-      originFactor = numberOfNodes - gossipFactor
+      originFactor = numberOfNodes - gossipFactor - 1
     }
     if (originFactor > 20) { originFactor = 20 }
-    
-    let n = 0
-    while (extraAddedNode < originFactor && n < 2 * numberOfNodes) {
-      nodeIdx = mod((myIdx - n), numberOfNodes)
-      if (nodeIdx == myIdx) {
-        n += 1
-        continue
-      }
-      if (!list.includes(nodeIdx)) {
+
+    let offIdx = (gossipFactor*myIdx + 1) % numberOfNodes
+    for (let k = 1; k <= originFactor; k++) {
+        let nodeIdx = mod((offIdx - k), numberOfNodes)
+        if (myIdx === nodeIdx) { continue }
         list.push(nodeIdx)
-        extraAddedNode += 1
-      }
-      n += 1
     }
   }
-  let unique = []
-  for (let i = 0; i < list.length; i++) {
-    let next = list[i];
-    if (next === myIdx) {
-      continue;
-    } // make sure we don't send to self
-    if (unique.includes(next)) {
-      continue;
-    } // make sure we send only once
-    unique.push(next);
-  }
-  return unique
+  return list
 }
 
 export function getRandomGossipIn(nodeIdxs, fanOut, myIdx) {
