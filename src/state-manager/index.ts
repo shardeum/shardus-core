@@ -158,6 +158,8 @@ class StateManager {
 
   firstTimeToRuntimeSync: boolean
 
+  lastShardReport: string
+
   /***
    *     ######   #######  ##    ##  ######  ######## ########  ##     ##  ######  ########  #######  ########
    *    ##    ## ##     ## ###   ## ##    ##    ##    ##     ## ##     ## ##    ##    ##    ##     ## ##     ##
@@ -301,6 +303,7 @@ class StateManager {
 
     this.firstTimeToRuntimeSync = true
 
+    this.lastShardReport = ''
     //if (logFlags.playback) this.logger.playbackLogNote('canDataRepair', `0`, `canDataRepair: ${this.canDataRepair}  `)
   }
 
@@ -1397,7 +1400,8 @@ class StateManager {
       }
     }
 
-    this.shardLogger.debug(utils.stringifyReduce(partitionDump))
+    this.lastShardReport = utils.stringifyReduce(partitionDump)
+    this.shardLogger.debug(this.lastShardReport)
   }
 
   // for debug. need to check it sorts in correcdt direction.
@@ -1553,7 +1557,9 @@ class StateManager {
       }
     }
 
-    this.shardLogger.debug(utils.stringifyReduce(partitionDump))
+    this.lastShardReport = utils.stringifyReduce(partitionDump)
+    this.shardLogger.debug(this.lastShardReport)
+    //this.shardLogger.debug(utils.stringifyReduce(partitionDump))
   }
 
   async waitForShardData() {

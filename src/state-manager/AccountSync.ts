@@ -325,7 +325,6 @@ class AccountSync {
 
     //TODO DEBUG DO NOT USE IN LIVE NETWORK
     Context.network.registerExternalGet('sync-statement-all', async (req, res) => {
-      res.write(`oops did not work out\n`)
       try {
         //wow, why does Context.p2p not work..
         let activeNodes = Wrapper.p2p.state.getNodes()

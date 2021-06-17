@@ -15,6 +15,7 @@ import * as NodeList from '../p2p/NodeList'
 
 import * as Comms from '../p2p/Comms'
 import * as Context from '../p2p/Context'
+import * as Wrapper from '../p2p/Wrapper'
 import { AccountHashCache, AccountHashCacheHistory, AccountIDAndHash, AccountPreTest, HashTrieAccountDataRequest, HashTrieAccountDataResponse, HashTrieAccountsResp, HashTrieNode, HashTrieRadixCoverage, HashTrieReq, HashTrieResp, HashTrieSyncConsensus, HashTrieSyncTell, HashTrieUpdateStats, RadixAndChildHashes, RadixAndHash, ShardedHashTrie, TrieAccount } from './state-manager-types'
 //import { all } from 'deepmerge'
 //import { Node } from '../p2p/Types'
@@ -56,6 +57,8 @@ class AccountPatcher {
   incompleteNodes: HashTrieNode[]
 
   debug_ignoreUpdates: boolean
+
+  failedLastTrieSync: boolean
 
   constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     this.crypto = crypto
@@ -100,6 +103,8 @@ class AccountPatcher {
     this.accountRemovalQueue = []
 
     this.debug_ignoreUpdates = false
+
+    this.failedLastTrieSync = false
   }
 
   hashObj(value:any){
@@ -296,9 +301,171 @@ class AccountPatcher {
       res.end()
     })
 
+    Context.network.registerExternalGet('get-tree-last-insync', (req, res) => {
+      res.write(`${this.failedLastTrieSync === false}\n`)
+
+      res.end()
+    })
+
+    //TODO DEBUG DO NOT USE IN LIVE NETWORK
+    Context.network.registerExternalGet('get-tree-last-insync-all', async (req, res) => {
+      try {
+        //wow, why does Context.p2p not work..
+        let oosCount = 0
+        let activeNodes = Wrapper.p2p.state.getNodes()
+        if (activeNodes) {
+          for (let node of activeNodes.values()) {
+            let getResp = await this.logger._internalHackGetWithResp(`${node.externalIp}:${node.externalPort}/get-tree-last-insync`)
+            if(getResp.body && getResp.body.includes('false')){
+              oosCount++
+            }
+            res.write(`${node.externalIp}:${node.externalPort}/get-tree-last-insync\n`)
+            res.write(getResp.body ? getResp.body : 'no data')
+          }
+        }
+
+        res.write(`this node in sync:${this.failedLastTrieSync} totalOOS:${oosCount} \n`)
+      } catch (e) {
+        res.write(`${e}\n`)
+      }
+
+      res.end()
+    })
+  
+    //
+    Context.network.registerExternalGet('get-shard-dump', (req, res) => {
+      res.write(`${this.stateManager.lastShardReport}\n`)
+
+      res.end()
+    })
+
+    //TODO DEBUG DO NOT USE IN LIVE NETWORK
+    Context.network.registerExternalGet('get-shard-dump-all', async (req, res) => {
+      try {
+        //wow, why does Context.p2p not work..
+        res.write(`last shard reports \n`)
+        let activeNodes = Wrapper.p2p.state.getNodes()
+        if (activeNodes) {
+          for (let node of activeNodes.values()) {
+            let getResp = await this.logger._internalHackGetWithResp(`${node.externalIp}:${node.externalPort}/get-shard-dump`)
+            res.write(`${node.externalIp}:${node.externalPort}; `)
+            res.write( getResp.body ? getResp.body : '')
+            res.write( '\n')
+          }
+        }
+        //res.write(`this node in sync:${this.failedLastTrieSync} \n`)
+      } catch (e) {
+        res.write(`${e}\n`)
+      }
+      res.end()
+    })
+
+    Context.network.registerExternalGet('get-shard-report-all', async (req, res) => {
+      try {
+        //wow, why does Context.p2p not work..
+        res.write(`building shard report \n`)
+        let activeNodes = Wrapper.p2p.state.getNodes()
+        let lines = []
+        if (activeNodes) {
+          for (let node of activeNodes.values()) {
+            let getResp = await this.logger._internalHackGetWithResp(`${node.externalIp}:${node.externalPort}/get-shard-dump`)
+            if(getResp.body != null && getResp.body != ''){
+              lines.push({raw: getResp.body})
+            }
+          }
+          this.processShardDump(res, lines)
+        }
+        //res.write(`this node in sync:${this.failedLastTrieSync} \n`)
+      } catch (e) {
+        res.write(`${e}\n`)
+      }
+      res.end()
+    })
+
+    /**
+     * 
+     * 
+     * Usage: http://<NODE_IP>:<NODE_EXT_PORT>/account-report?id=<accountID>
+     */
+    Context.network.registerExternalGet('account-report', async (req, res) => {
+      if (req.query.id == null) return
+      let id = req.query.id
+      res.write(`report for: ${id} \n`)
+      try {
+
+
+        if(id.length === 10){
+          //short form..
+          let found = false
+          let prefix = id.substr(0,4)
+          let low = prefix + '0'.repeat(60)
+          let high = prefix + 'f'.repeat(60)
+
+          let suffix = id.substr(5,5)
+          let possibleAccounts = await this.app.getAccountDataByRange(low, high, 0 , Date.now(), 100)
+
+          res.write(`searching ${possibleAccounts.length} accounts \n`)
+
+          for(let account of possibleAccounts ){
+
+            if(account.accountId.endsWith(suffix)){
+              res.write(`found full account ${id} => ${account.accountId} \n`)
+              id = account.accountId
+              found = true
+              
+              break 
+            }
+
+          }
+
+          if(found == false){
+            res.write(`could not find account\n`)
+            res.end()
+            return
+          }
+        }
+
+
+
+        let trieAccount = this.getAccountTreeInfo(id)
+        let accountHash = this.stateManager.accountCache.getAccountHash(id)
+        let accountHashFull = this.stateManager.accountCache.accountsHashCache3.accountHashMap.get(id)
+        let accountData = await this.app.getAccountDataByList([id])     
+
+        res.write(`trieAccount: ${JSON.stringify(trieAccount)} \n`)
+        res.write(`accountHash: ${JSON.stringify(accountHash)} \n`)
+        res.write(`accountHashFull: ${JSON.stringify(accountHashFull)} \n`)
+        res.write(`accountData: ${JSON.stringify(accountData)} \n\n`)
+        res.write(`tests: \n`)
+        if(accountData != null && accountData.length === 1 && accountHash != null ){
+          res.write(`accountData hash matches cache ${accountData[0].stateId === accountHash.h } \n`)
+        }
+        if(accountData != null && accountData.length === 1 && trieAccount != null ){
+          res.write(`accountData matches trieAccount ${accountData[0].stateId === trieAccount.hash } \n`)
+        }        
+
+      } catch (e) {
+        res.write(`${e}\n`)
+      }
+      res.end()
+    })
 
     
   }
+
+
+  getAccountTreeInfo(accountID:string) : TrieAccount {
+
+    let radix = accountID.substr(0, this.treeMaxDepth)
+
+    let treeNode = this.shardTrie.layerMaps[this.treeMaxDepth].get(radix)
+    if(treeNode == null || treeNode.accountTempMap == null){
+      return null
+    }
+    return treeNode.accountTempMap.get(accountID)
+  }
+
+
 
 /***
  *    ##     ## ########     ###    ######## ########  ######  ##     ##    ###    ########  ########  ######## ########  #### ######## 
@@ -1315,6 +1482,7 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
     // let updateStats = this.upateShardTrie(cycle)
 
     // nestedCountersInstance.countEvent(`accountPatcher`, `totalAccountsHashed`, updateStats.totalAccountsHashed)
+    this.failedLastTrieSync = false
 
     if(logFlags.debug){
       
@@ -1422,6 +1590,7 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
 
       //check again if we are in sync
 
+      this.failedLastTrieSync = true
     } else {
       nestedCountersInstance.countEvent(`accountPatcher`, `inSync`)
     }
@@ -1519,6 +1688,264 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
 //how about marking our incomplete areas so that sharding works!!
 // find min and max non covered partition
 // then get the min and max values. and flag for non edge partitions .  partition 0 and partition max dont need flagging.
+
+
+//debug:
+
+processShardDump (stream, lines) {
+
+  let dataByParition = new Map()
+
+  let rangesCovered = []
+  let nodesListsCovered = []
+  let nodeLists = []
+  let numNodes = 0
+  let newestCycle = -1
+  let partitionObjects = []
+  for (let line of lines) {
+    let index = line.raw.indexOf('{"allNodeIds')
+    if (index >= 0) {
+      let string = line.raw.slice(index)
+      //this.generalLog(string)
+      let partitionObj = JSON.parse(string)
+
+      if(newestCycle > 0 &&  partitionObj.cycle != newestCycle){
+        stream.write(`wrong cycle for node: ${line.raw.substr(0,20)} reportCycle:${newestCycle} thisNode:${partitionObj.cycle} \n`)
+      }
+      partitionObjects.push(partitionObj)
+
+      if (partitionObj.cycle > newestCycle) {
+        newestCycle = partitionObj.cycle
+      }
+      partitionObj.owner = line.raw.slice(0, index)
+    }
+  }
+
+  for (let partitionObj of partitionObjects) {
+    // we only want data for nodes that were active in the latest cycle.
+    if (partitionObj.cycle === newestCycle) {
+      for (let partition of partitionObj.partitions) {
+        let results = dataByParition.get(partition.parititionID)
+        if (results == null) {
+          results = []
+          dataByParition.set(partition.parititionID, results)
+        }
+        results.push({
+          owner: partitionObj.owner,
+          accounts: partition.accounts,
+          ownerId: partitionObj.rangesCovered.id,
+          accounts2: partition.accounts2,
+          partitionHash2: partition.partitionHash2 })
+      }
+      rangesCovered.push(partitionObj.rangesCovered)
+      nodesListsCovered.push(partitionObj.nodesCovered)
+      nodeLists.push(partitionObj.allNodeIds)
+      numNodes = partitionObj.allNodeIds.length
+    }
+  }
+
+  // need to only count stuff from the newestCycle.
+
+  // /////////////////////////////////////////////////
+  // compare partition data: old system with data manual queried from app
+  let allPassed = true
+  // let uniqueVotesByPartition = new Array(numNodes).fill(0)
+  for (var [key, value] of dataByParition) {
+    let results = value
+    let votes = {}
+    for (let entry of results) {
+      if (entry.accounts.length === 0) {
+        // new settings allow for not using accounts from sql
+        continue
+      }
+      entry.accounts.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
+      let string = utils.stringifyReduce(entry.accounts)
+      let voteEntry = votes[string]
+      if (voteEntry == null) {
+        voteEntry = {}
+        voteEntry.voteCount = 0
+        voteEntry.ownerIds = []
+        votes[string] = voteEntry
+      }
+      voteEntry.voteCount++
+      votes[string] = voteEntry
+
+      voteEntry.ownerIds.push(entry.ownerId)
+    }
+    for (let key2 of Object.keys(votes)) {
+      let voteEntry = votes[key2]
+      let voters = ''
+      if (key2 !== '[]') {
+        voters = `---voters:${JSON.stringify(voteEntry.ownerIds)}`
+      }
+
+      stream.write(`partition: ${key}  votes: ${voteEntry.voteCount} values: ${key2} \t\t\t${voters}\n`)
+      // stream.write(`            ---voters: ${JSON.stringify(voteEntry.ownerIds)}\n`)
+    }
+    let numUniqueVotes = Object.keys(votes).length
+    if (numUniqueVotes > 2 || (numUniqueVotes > 1 && (votes['[]'] == null))) {
+      allPassed = false
+      stream.write(`partition: ${key} failed.  Too many different version of data: ${numUniqueVotes} \n`)
+    }
+  }
+  stream.write(`partition tests all passed: ${allPassed}\n`)
+  // rangesCovered
+
+  // /////////////////////////////////////////////////
+  // compare partition data 2: new system using the state manager cache
+  let allPassed2 = true
+  // let uniqueVotesByPartition = new Array(numNodes).fill(0)
+  for ([key, value] of dataByParition) {
+    let results = value
+    let votes = {}
+    for (let entry of results) {
+      // no account sort, we expect this to have a time sort!
+      // entry.accounts.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
+      let fullString = utils.stringifyReduce(entry.accounts2)
+      let string = entry.partitionHash2
+      if (string === undefined) {
+        string = '[]'
+      }
+
+      let voteEntry = votes[string]
+      if (voteEntry == null) {
+        voteEntry = {}
+        voteEntry.voteCount = 0
+        voteEntry.ownerIds = []
+        voteEntry.fullString = fullString
+        votes[string] = voteEntry
+      }
+      voteEntry.voteCount++
+      votes[string] = voteEntry
+
+      voteEntry.ownerIds.push(entry.ownerId)
+    }
+    for (let key2 of Object.keys(votes)) {
+      let voteEntry = votes[key2]
+      let voters = ''
+      if (key2 !== '[]') {
+        voters = `---voters:${JSON.stringify(voteEntry.ownerIds)}`
+      }
+
+      stream.write(`partition: ${key}  votes: ${voteEntry.voteCount} values: ${key2} \t\t\t${voters}\t -details:${voteEntry.fullString}   \n`)
+      // stream.write(`            ---voters: ${JSON.stringify(voteEntry.ownerIds)}\n`)
+    }
+    let numUniqueVotes = Object.keys(votes).length
+    if (numUniqueVotes > 2 || (numUniqueVotes > 1 && (votes['[]'] == null))) {
+      allPassed2 = false
+      stream.write(`partition: ${key} failed.  Too many different version of data: ${numUniqueVotes} \n`)
+    }
+  }
+
+  stream.write(`partition tests all passed: ${allPassed2}\n`)
+
+  rangesCovered.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
+
+  let isStored = function (i, rangeCovered) {
+    let key = i
+    let minP = rangeCovered.stMin
+    let maxP = rangeCovered.stMax
+    if (minP === maxP) {
+      if (i !== minP) {
+        return false
+      }
+    } else if (maxP > minP) {
+      // are we outside the min to max range
+      if (key < minP || key > maxP) {
+        return false
+      }
+    } else {
+      // are we inside the min to max range (since the covered rage is inverted)
+      if (key > maxP && key < minP) {
+        return false
+      }
+    }
+    return true
+  }
+  let isConsensus = function (i, rangeCovered) {
+    let key = i
+    let minP = rangeCovered.cMin
+    let maxP = rangeCovered.cMax
+    if (minP === maxP) {
+      if (i !== minP) {
+        return false
+      }
+    } else if (maxP > minP) {
+      // are we outside the min to max range
+      if (key < minP || key > maxP) {
+        return false
+      }
+    } else {
+      // are we inside the min to max range (since the covered rage is inverted)
+      if (key > maxP && key < minP) {
+        return false
+      }
+    }
+    return true
+  }
+
+  for (let range of rangesCovered) {
+    let partitionGraph = ''
+    for (let i = 0; i < range.numP; i++) {
+      let isC = isConsensus(i, range)
+      let isSt = isStored(i, range)
+
+      if (i === range.hP) {
+        partitionGraph += 'H'
+      } else if (isC && isSt) {
+        partitionGraph += 'C'
+      } else if (isC) {
+        partitionGraph += '!'
+      } else if (isSt) {
+        partitionGraph += 'e'
+      } else {
+        partitionGraph += '_'
+      }
+    }
+
+    stream.write(`node: ${range.id} ${range.ipPort}\tgraph: ${partitionGraph}\thome: ${range.hP}   data:${JSON.stringify(range)}\n`)
+  }
+  stream.write(`\n\n`)
+  nodesListsCovered.sort(function (a, b) { return a.id === b.id ? 0 : a.id < b.id ? -1 : 1 })
+  for (let nodesCovered of nodesListsCovered) {
+    let partitionGraph = ''
+    let consensusMap = {}
+    let storedMap = {}
+    for (let entry of nodesCovered.consensus) {
+      consensusMap[entry.idx] = { hp: entry.hp }
+    }
+    for (let entry of nodesCovered.stored) {
+      storedMap[entry.idx] = { hp: entry.hp }
+    }
+
+    for (let i = 0; i < nodesCovered.numP; i++) {
+      let isC = consensusMap[i] != null
+      let isSt = storedMap[i] != null
+      if (i === nodesCovered.idx) {
+        partitionGraph += 'O'
+      } else if (isC && isSt) {
+        partitionGraph += 'C'
+      } else if (isC) {
+        partitionGraph += '!'
+      } else if (isSt) {
+        partitionGraph += 'e'
+      } else {
+        partitionGraph += '_'
+      }
+    }
+
+    stream.write(`node: ${nodesCovered.id} ${nodesCovered.ipPort}\tgraph: ${partitionGraph}\thome: ${nodesCovered.hP} data:${JSON.stringify(nodesCovered)}\n`)
+  }
+  stream.write(`\n\n`)
+  for (let list of nodeLists) {
+    stream.write(`${JSON.stringify(list)} \n`)
+  }
+
+  return { allPassed, allPassed2 }
+}
+
+
+
 
 
 }

@@ -506,6 +506,7 @@ class Shardus extends EventEmitter {
       this.emit('active', nodeId)
     })
     Self.emitter.on('failed', () => {
+      this.mainLogger.info('shutdown: on failed event')
       this.shutdown(true)
     })
     Self.emitter.on('error', (e) => {
@@ -538,6 +539,7 @@ class Shardus extends EventEmitter {
       // Shutdown cleanly
       process.exit()
 */
+      this.mainLogger.info(`exitCleanly: removed`)
       if (this.reporter) {
         this.reporter.stopReporting()
         await this.reporter.reportRemoved(Self.id)
@@ -568,6 +570,7 @@ class Shardus extends EventEmitter {
         'Shardus: caught apoptosized event; finished clean up'
       )
 */
+      this.mainLogger.info('exitCleanly: apoptosized')
       if (this.reporter) {
         this.reporter.stopReporting()
         await this.reporter.reportRemoved(Self.id)
@@ -1120,6 +1123,7 @@ class Shardus extends EventEmitter {
    */
   async shutdown(exitProcess = true) {
     try {
+      this.mainLogger.info('exitCleanly: shutdown')
       await this.exitHandler.exitCleanly(exitProcess)
       // consider if we want this.  it can help for debugging:
       // await this.exitHandler.exitUncleanly()
@@ -1524,6 +1528,7 @@ class Shardus extends EventEmitter {
       this.shardus_fatal(`unhandledRejection_ex_`+ err.stack.substring(0,100), 'unhandledRejection: ' + err.stack)
       // this.exitHandler.exitCleanly()
 
+      this.mainLogger.info(`exitUncleanly: logFatalAndExit`)
       this.exitHandler.exitUncleanly()
     }
     process.on('uncaughtException', (err) => {

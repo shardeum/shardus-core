@@ -149,7 +149,11 @@ function _requestNetworkScaling(upOrDown) {
   const request = createScaleRequest(upOrDown)
   // await _waitUntilEndOfCycle()
   addExtScalingRequest(request)
-  Comms.sendGossip('scaling', request)
+  try{
+    Comms.sendGossip('scaling', request) 
+  } catch (error){
+     
+  }
   scalingRequested = true
 }
 
