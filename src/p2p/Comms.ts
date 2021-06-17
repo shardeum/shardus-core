@@ -380,9 +380,24 @@ export async function sendGossip(
   // Find out your own index in the nodes array
   const myIdx = nodes.findIndex((node) => node.id === Self.id)
   if (myIdx < 0) throw new Error('Could not find self in nodes array')
+  
   const gossipFactor = config.p2p.gossipFactor
+  let recipientIdxs
+  let originNode
+  let originIdx
+
+  if (payload.sign) {
+    originNode = NodeList.byPubKey.get(payload.sign.owner)
+    if(originNode) originIdx = nodes.findIndex((node) => node.id === originNode.id)
+  }
+  
+  if (originIdx !== undefined && originIdx >= 0) { // If it is protocol tx signed by a node in the network
+    recipientIdxs = utils.getLinearGossipBurstList(nodeIdxs.length, gossipFactor, myIdx, originIdx)
+  } else { // If it is app tx which is not signed by a node in the network
+    recipientIdxs = utils.getLinearGossipList(nodeIdxs.length, gossipFactor, myIdx, isOrigin)
+  }
+
   // Map back recipient idxs to node objects
-  const recipientIdxs = utils.getLinearGossipList(nodeIdxs.length, gossipFactor, myIdx, isOrigin)
   let recipients = recipientIdxs.map((idx) => nodes[idx])
   if (sender != null) {
     recipients = utils.removeNodesByID(recipients, [sender])

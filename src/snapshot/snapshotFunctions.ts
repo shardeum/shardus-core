@@ -287,8 +287,8 @@ export async function calculateOldDataMap (
           }
         )
         const computedHash = Context.crypto.hash(oldAccountsWithoutCycleNumber)
-        // log(`old accounts in partition: ${partitionId}: `, oldAccountCopiesInPartition)
-        // log(computedHash, existingHash)
+        log(`old accounts in partition: ${partitionId}: `, oldAccountCopiesInPartition)
+        log(computedHash, existingHash)
         log('partition: ', partitionId)
         log('existing hash: ', existingHash)
         log('computed hash: ', computedHash)

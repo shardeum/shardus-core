@@ -640,9 +640,63 @@ export function getLinearSeededGossip(nodeIdxs, myIdx, gossipFactor, startingSee
   return unique
 }
 
+function gossip_factor(n, f, i) {
+  let fb, r
+  fb = Math.floor(3 * Math.log2(n))
+  if (fb + f > n) { fb = n - f - 0 }
+  if (fb > 20) { fb = 20 }
+  r = n - i * fb
+  if (r < fb) { fb = r }
+  if (fb < 0) { fb = 0 }
+  fb += f - 1
+  return fb
+}
+
+function gossip_offset(n, f, i) {
+  let fb, r, j
+  if (n < 2) { return i }
+  fb = Math.floor(3 * Math.log2(n))
+  if (fb + f > n) { fb = n - f - 0 }
+  if (fb > 20) { fb = 20 }
+  j = Math.floor(n / fb)
+  if (i <= j) {
+    r = i * fb + i * (f - 1)
+  }
+  else {
+    r = n + i * (f - 1)
+  }
+  return r
+}
+
+export function getLinearGossipBurstList(numberOfNodes, gossipFactor, myIdx, originIdx) {
+  let list = []
+  let distance, factor0, offset, nodeIdx
+
+  if (gossipFactor >= numberOfNodes) { gossipFactor = numberOfNodes - 1 }
+
+  distance = mod((myIdx - originIdx), numberOfNodes)
+  factor0 = gossip_factor(numberOfNodes, gossipFactor, distance)
+  offset = gossip_offset(numberOfNodes, gossipFactor, distance)
+  offset = (originIdx + offset + 1) % numberOfNodes
+
+  for (let i = 0; i < factor0; i++) {
+    nodeIdx = (offset + i) % numberOfNodes
+    // if (nodeIdx == myIdx) { continue }
+    if (nodeIdx == myIdx) {
+      offset += 1
+      nodeIdx = (nodeIdx + 1) % numberOfNodes
+    }
+    list.push(nodeIdx)
+  }
+  return list
+}
+
 export function getLinearGossipList(numberOfNodes, gossipFactor, myIdx, isOrigin) {
   let list = []
   let nodeIdx
+  if (gossipFactor >= numberOfNodes) {
+    gossipFactor = numberOfNodes - 1 
+  }
   for (let k = 1; k <= gossipFactor; k++) {
     nodeIdx = (gossipFactor * myIdx + k) % numberOfNodes
     if (nodeIdx == myIdx) { continue }
@@ -658,9 +712,9 @@ export function getLinearGossipList(numberOfNodes, gossipFactor, myIdx, isOrigin
 
     let offIdx = (gossipFactor*myIdx + 1) % numberOfNodes
     for (let k = 1; k <= originFactor; k++) {
-        let nodeIdx = mod((offIdx - k), numberOfNodes)
-        if (myIdx === nodeIdx) { continue }
-        list.push(nodeIdx)
+      let nodeIdx = mod((offIdx - k), numberOfNodes)
+      if (myIdx === nodeIdx) { continue }
+      list.push(nodeIdx)
     }
   }
   return list

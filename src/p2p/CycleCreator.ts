@@ -1077,7 +1077,8 @@ async function gossipCycleCert(
     certs: bestCycleCert.get(bestMarker),
     record: bestRecord,
   }
-  Comms.sendGossip('gossip-cert', certGossip, tracker, sender, NodeList.byIdOrder, true)
+  const signedCertGossip = crypto.sign(certGossip)
+  Comms.sendGossip('gossip-cert', signedCertGossip, tracker, sender, NodeList.byIdOrder, true)
 }
 
 function pruneCycleChain() {

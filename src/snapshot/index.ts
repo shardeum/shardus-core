@@ -385,7 +385,9 @@ export function startSnapshotting() {
           }
         }
 
-        Comms.sendGossip('snapshot_gossip', message, '', null, NodeList.byIdOrder, true)
+        const signedMessage = Context.crypto.sign(message)
+
+        Comms.sendGossip('snapshot_gossip', signedMessage, '', null, NodeList.byIdOrder, true)
         partitionGossip.forwardedGossips.set(message.sender, true)
         collector.process([message])
 
