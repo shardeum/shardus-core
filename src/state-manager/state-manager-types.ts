@@ -829,7 +829,7 @@ export type PartitionCycleReport = {
 
 // account hash trie.
 
-type TrieAccount = {
+export type TrieAccount = {
     accountID:string;
     hash:string;
     //cycle:number;
@@ -837,7 +837,7 @@ type TrieAccount = {
     //todo merge with cache structures at some point
 }
 
-type HashTrieNode = {
+export type HashTrieNode = {
     radix: string; //node key
     hash: string;
     childHashes: string[]; //len16 array of child hashes       
@@ -852,16 +852,16 @@ type HashTrieNode = {
     nonSparseChildCount:number
 }
 
-type ShardedHashTrie = {
+export type ShardedHashTrie = {
     layerMaps: Map<string, HashTrieNode>[]
 }
 
-type HashTrieSyncConsensus = {
+export type HashTrieSyncConsensus = {
     cycle: number;
     radixHashVotes: Map<string, {
         allVotes:Map<string, {
             count:number, 
-            voters:import("../shardus/shardus-types").Node[]
+            voters:Shardus.Node[]
         }>, 
         bestHash:string, 
         bestVotes:number
@@ -872,66 +872,67 @@ type HashTrieSyncConsensus = {
     //repairByRadix //some info on who is helping with repairs.
 }
 
-type HashTrieRadixCoverage = {
-    firstChoice:import("../shardus/shardus-types").Node, 
-    fullList: import("../shardus/shardus-types").Node[], 
+export type HashTrieRadixCoverage = {
+    firstChoice:Shardus.Node, 
+    fullList: Shardus.Node[], 
     refuted: Set<string>;
 }
 
-type HashTrieReq = { 
+export type HashTrieReq = { 
     radixList: string[]
 }
 
-type HashTrieResp = {
+export type HashTrieResp = {
     nodeHashes: RadixAndHash[] //{radix:string, hash:string}[]
 
 };
 
-type RadixAndHash = {
+export type RadixAndHash = {
     radix:string;
     hash:string;
 }
-type AccountIDAndHash = {
+export type AccountIDAndHash = {
     accountID:string;
     hash:string;
 }
 
-enum PreTestStatus {
+//todo figure out why this failed
+export enum PreTestStatus {
     Valid = 1,
     CantValidate,
     ValidationFailed,
   }
 
-type AccountPreTest = {
+export type AccountPreTest = {
     accountID:string;
     hash:string;
     preTestStatus:PreTestStatus
 }
 
-type HashTrieSyncTell = { 
+export type HashTrieSyncTell = { 
     cycle: number
     nodeHashes: {radix:string, hash:string}[]
 }
 
-type RadixAndChildHashes = {
+export type RadixAndChildHashes = {
     radix:string
     childAccounts:AccountIDAndHash[]
 }
 
-type HashTrieAccountsResp = {
+export type HashTrieAccountsResp = {
     nodeChildHashes: RadixAndChildHashes[]
 };
 
-type HashTrieAccountDataRequest = {
+export type HashTrieAccountDataRequest = {
     cycle: number;
     accounts:AccountIDAndHash[];
 }
-type HashTrieAccountDataResponse = {
-    accounts:import("../shardus/shardus-types").WrappedData[];
+export type HashTrieAccountDataResponse = {
+    accounts:Shardus.WrappedData[];
 }
 
 
-type HashTrieUpdateStats = {
+export type HashTrieUpdateStats = {
     leafsUpdated: number
     leafsCreated: number
     updatedNodesPerLevel: number[]

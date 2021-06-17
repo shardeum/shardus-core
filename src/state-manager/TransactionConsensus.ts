@@ -274,7 +274,7 @@ class TransactionConsenus {
     //     account_state_hash_after: string[];
     //     cant_apply: boolean;  // indicates that the preapply could not give a pass or fail
     //     node_id: string; // record the node that is making this vote.. todo could look this up from the sig later
-    //     sign?: import("../shardus/shardus-types").Sign
+    //     sign?: Shardus.Sign
     // };
 
 

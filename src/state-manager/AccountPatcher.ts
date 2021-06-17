@@ -1,9 +1,7 @@
-import { ShardusConfiguration } from '../shardus/shardus-types'
-import Shardus = require('../shardus/shardus-types')
+import * as Shardus from '../shardus/shardus-types'
 import { ShardGlobals, ShardInfo, WrappableParitionRange, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from './shardFunctionTypes'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
-
 import Profiler from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
@@ -17,6 +15,7 @@ import * as NodeList from '../p2p/NodeList'
 
 import * as Comms from '../p2p/Comms'
 import * as Context from '../p2p/Context'
+import { AccountHashCache, AccountHashCacheHistory, AccountIDAndHash, AccountPreTest, HashTrieAccountDataRequest, HashTrieAccountDataResponse, HashTrieAccountsResp, HashTrieNode, HashTrieRadixCoverage, HashTrieReq, HashTrieResp, HashTrieSyncConsensus, HashTrieSyncTell, HashTrieUpdateStats, RadixAndChildHashes, RadixAndHash, ShardedHashTrie, TrieAccount } from './state-manager-types'
 //import { all } from 'deepmerge'
 //import { Node } from '../p2p/Types'
 
