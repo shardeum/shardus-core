@@ -4,11 +4,7 @@ import Crypto from '../crypto'
 import Logger, {logFlags} from '../logger'
 import { NetworkClass } from '../network'
 import Shardus from '../shardus'
-import {
-  LogsConfiguration,
-  ShardusConfiguration,
-  StorageConfiguration,
-} from '../shardus/shardus-types'
+import * as ShardusTypes from '../shardus/shardus-types'
 import StateManager from '../state-manager'
 import Storage from '../storage'
 import Reporter from '../reporter'
@@ -23,11 +19,11 @@ export let shardus: Shardus
 export let stateManager: StateManager
 export let storage: Storage
 export let io
-export let config: ShardusConfiguration
+export let config: ShardusTypes.ShardusConfiguration
 export let defaultConfigs: {
-  server: ShardusConfiguration
-  logs: LogsConfiguration
-  storage: StorageConfiguration
+  server: ShardusTypes.ShardusConfiguration
+  logs: ShardusTypes.LogsConfiguration
+  storage: ShardusTypes.StorageConfiguration
 }
 export let reporter: Reporter
 

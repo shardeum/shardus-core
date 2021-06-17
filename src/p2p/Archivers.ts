@@ -19,6 +19,7 @@ import * as CycleCreator from './CycleCreator'
 import { CycleRecord as Cycle } from './CycleCreator'
 import * as CycleParser from './CycleParser'
 import {logFlags} from '../logger'
+import { SignedObject } from './Types'
 
 /** TYPES */
 

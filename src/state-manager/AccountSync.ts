@@ -1,5 +1,4 @@
-import { ShardusConfiguration } from '../shardus/shardus-types'
-import Shardus = require('../shardus/shardus-types')
+import * as Shardus from '../shardus/shardus-types'
 import { ShardGlobals, ShardInfo, StoredPartition, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from './shardFunctionTypes'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
@@ -19,6 +18,7 @@ import * as Context from '../p2p/Context'
 import * as Wrapper from '../p2p/Wrapper'
 import * as Self from '../p2p/Self'
 import { potentiallyRemoved } from '../p2p/NodeList'
+import { SyncTracker, SimpleRange, AccountStateHashReq, AccountStateHashResp, GetAccountStateReq, GetAccountData3Req, GetAccountDataByRangeSmart, GlobalAccountReportResp, GetAccountData3Resp, CycleShardData } from './state-manager-types'
 
 const allZeroes64 = '0'.repeat(64)
 

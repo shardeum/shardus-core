@@ -15,6 +15,7 @@ import * as Self from './Self'
 import * as Types from './Types'
 import { robustQuery } from './Utils'
 import {logFlags} from '../logger'
+import { Sign } from '../state-manager/state-manager-types'
 
 /**
  * [TODO] [AS] Remove nodes that are taking too long to sync after they've joined.

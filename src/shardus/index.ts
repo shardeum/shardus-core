@@ -24,7 +24,7 @@ import * as utils from '../utils'
 import Profiler from '../utils/profiler'
 import NestedCounters from '../utils/nestedCounters'
 import MemoryReporting from '../utils/memoryReporting'
-import ShardusTypes = require('../shardus/shardus-types')
+import * as ShardusTypes from '../shardus/shardus-types'
 import * as Archivers from '../p2p/Archivers'
 import * as AutoScaling from '../p2p/CycleAutoScale'
 import { currentCycle, currentQuarter } from '../p2p/CycleCreator'

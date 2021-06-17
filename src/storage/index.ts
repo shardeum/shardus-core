@@ -6,7 +6,7 @@ import Logger, {logFlags} from '../logger'
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
 import Profiler from '../utils/profiler'
-import ShardusTypes from './../shardus/shardus-types'
+import * as ShardusTypes from './../shardus/shardus-types'
 import models from './models'
 // const stringify = require('fast-stable-stringify')
 // const utils = require('../utils')

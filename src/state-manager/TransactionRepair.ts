@@ -1,5 +1,4 @@
-import { ShardusConfiguration } from '../shardus/shardus-types'
-import Shardus = require('../shardus/shardus-types')
+import * as Shardus from '../shardus/shardus-types'
 import { ShardGlobals, ShardInfo, StoredPartition, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from './shardFunctionTypes'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
@@ -15,6 +14,7 @@ import StateManager from '.'
 import { json } from 'sequelize/types'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { potentiallyRemoved } from '../p2p/NodeList'
+import { QueueEntry, AppliedVote, AccountHashCache, RequestStateForTxResp, AppliedReceipt, RequestTxResp, RequestReceiptForTxResp } from './state-manager-types'
 
 class TransactionRepair {
   app: Shardus.App

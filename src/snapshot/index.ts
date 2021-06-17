@@ -13,13 +13,14 @@ import * as NodeList from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
 import * as Sync from '../p2p/Sync'
 import * as Types from '../p2p/Types'
-import * as shardusTypes from '../shardus/shardus-types'
+import * as ShardusTypes from '../shardus/shardus-types'
 import ShardFunctions from '../state-manager/shardFunctions'
 import * as shardFunctionTypes from '../state-manager/shardFunctionTypes'
 import * as utils from '../utils'
 import * as partitionGossip from './partition-gossip'
 import * as SnapshotFunctions from './snapshotFunctions'
 import {logFlags} from '../logger'
+import { Cycle, ReceiptMapResult, StatsClump, CycleShardData, MainHashResults } from '../state-manager/state-manager-types'
 
 /** TYPES */
 
@@ -540,7 +541,7 @@ async function sendOldDataToNodes(
   nodeShardDataMap: shardFunctionTypes.NodeShardDataMap
 ) {
   // calcuate all nodes that covers a particular partitions
-  const nodesToSendData: shardusTypes.Node[] = getNodesThatCoverPartition(
+  const nodesToSendData: ShardusTypes.Node[] = getNodesThatCoverPartition(
     partitionId,
     shardGlobals,
     nodeShardDataMap
@@ -578,8 +579,8 @@ function getNodesThatCoverPartition(
   partitionId,
   shardGlobals: shardFunctionTypes.ShardGlobals,
   nodeShardDataMap: shardFunctionTypes.NodeShardDataMap
-): shardusTypes.Node[] {
-  const nodesInPartition: shardusTypes.Node[] = []
+): ShardusTypes.Node[] {
+  const nodesInPartition: ShardusTypes.Node[] = []
   if (partitionId === -1) {
     nodeShardDataMap.forEach((data, nodeId) => {
       if (nodeId === Self.id) return
@@ -767,7 +768,7 @@ async function storeDataToNewDB(dataMap) {
   const currentCycle = CycleChain.getNewest()
   // store data to new DB
   log('Storing data to new DB')
-  const accountCopies: shardusTypes.AccountsCopy[] = []
+  const accountCopies: ShardusTypes.AccountsCopy[] = []
   for (const [, data] of dataMap) {
     if (data && data.length > 0) {
       data.forEach((accountData) => {

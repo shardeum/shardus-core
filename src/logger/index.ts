@@ -3,7 +3,7 @@ import { existsSync, mkdirSync } from 'fs'
 import * as utils from '../utils'
 import os from 'os'
 import * as http from '../http'
-import Shardus = require('../shardus/shardus-types')
+import * as Shardus from '../shardus/shardus-types'
 import { profilerInstance } from '../utils/profiler'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 const stringify = require('fast-stable-stringify')

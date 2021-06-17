@@ -1,5 +1,4 @@
-import { ShardusConfiguration } from '../shardus/shardus-types'
-import Shardus = require('../shardus/shardus-types')
+import * as Shardus from '../shardus/shardus-types'
 
 import { ShardGlobals, ShardInfo, StoredPartition, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from './shardFunctionTypes'
 
@@ -35,6 +34,7 @@ import TransactionRepair from './TransactionRepair'
 import TransactionConsenus from './TransactionConsensus'
 import PartitionObjects from './PartitionObjects'
 import Depricated from './Depricated'
+import { CycleShardData, PartitionReceipt, FifoLockObjectMap, QueueEntry, AcceptedTx, AccountCopy, GetAccountDataByRangeSmart, WrappedStateArray, AccountHashCache, RequestReceiptForTxReq, RequestReceiptForTxResp, RequestStateForTxReqPost, RequestStateForTxResp, RequestTxResp, AppliedVote, GetAccountDataWithQueueHintsResp, DebugDumpPartitions, DebugDumpRangesCovered, DebugDumpNodesCovered, DebugDumpPartition, DebugDumpPartitionSkip, MainHashResults, SimpleDistanceObject, WrappedResponses, LocalCachedData, AccountFilter, StringBoolObjectMap, AppliedReceipt, ReceiptMapResult } from './state-manager-types'
 
 /**
  * WrappedEventEmitter just a default extended WrappedEventEmitter

@@ -1,5 +1,4 @@
-import { ShardusConfiguration } from '../shardus/shardus-types'
-import Shardus = require('../shardus/shardus-types')
+import * as Shardus from '../shardus/shardus-types'
 import { ShardGlobals, ShardInfo, StoredPartition, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from './shardFunctionTypes'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
@@ -13,6 +12,7 @@ import ShardFunctions from './shardFunctions.js'
 import { time } from 'console'
 import StateManager from '.'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { AccountHashCache, AccountHashCacheMain, AccountHashCacheMain3, CycleShardData, MainHashResults, AccountHashCacheHistory, AccountHashCacheList, PartitionHashResults } from './state-manager-types'
 
 class AccountCache {
   app: Shardus.App

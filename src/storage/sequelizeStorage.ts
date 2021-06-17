@@ -1,5 +1,5 @@
 import Log4js from 'log4js'
-import Shardus from '../shardus/shardus-types'
+import * as Shardus from '../shardus/shardus-types'
 import fs from 'fs'
 import path from 'path'
 import { Sequelize } from 'sequelize'

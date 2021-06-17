@@ -4,6 +4,7 @@ import { AddressRange } from '../state-manager/shardFunctionTypes'
 // import { PartitionHashes, ReceiptMapHashes, SummaryHashes } from './index'
 import * as Comm from '../p2p/Comms'
 import {logFlags} from '../logger'
+import { CycleShardData } from '../state-manager/state-manager-types'
 
 /** TYPES */
 

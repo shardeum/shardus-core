@@ -13,8 +13,7 @@ import { config, defaultConfigs, logger } from '../p2p/Context'
 import * as utils from '../utils'
 import { profilerInstance } from '../utils/profiler'
 import NatAPI = require('nat-api')
-import Shardus from '../shardus'
-import { ShardusConfiguration } from '../shardus/shardus-types'
+import * as Shardus from '../shardus/shardus-types'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 
 /** TYPES */
@@ -54,7 +53,7 @@ export class NetworkClass extends EventEmitter {
   ipInfo: any
   externalCatchAll: any
   debugNetworkDelay: number
-  constructor(config: ShardusConfiguration, logger: Logger) {
+  constructor(config: Shardus.ShardusConfiguration, logger: Logger) {
     super()
     this.app = express()
     this.sn = null
@@ -659,7 +658,7 @@ async function discoverExternalIp(server: string) {
 }
 
 function closeServer(server) {
-  return new Promise((resolve) => {
+  return new Promise<void>((resolve) => {
     server.close()
     server.unref()
     resolve()

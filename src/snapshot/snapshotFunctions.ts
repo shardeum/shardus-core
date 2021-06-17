@@ -10,7 +10,7 @@ import * as NodeList from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
 import * as Sync from '../p2p/Sync'
 import * as Types from '../p2p/Types'
-import * as shardusTypes from '../shardus/shardus-types'
+import * as ShardusTypes from '../shardus/shardus-types'
 import ShardFunctions from '../state-manager/shardFunctions'
 import * as shardFunctionTypes from '../state-manager/shardFunctionTypes'
 import * as utils from '../utils'
@@ -21,6 +21,7 @@ import got from 'got'
 import stream from 'stream'
 import zlib from 'zlib'
 import {logFlags} from '../logger'
+import { Cycle, CycleShardData } from '../state-manager/state-manager-types'
 
 const { Transform } = require('stream')
 /** TYPES */
@@ -262,7 +263,7 @@ export async function calculateOldDataMap (
    * [NOTE] [AS] Need to do this because type of 'cycleJoined' field differs
    * between ShardusTypes.Node (number) and P2P/NodeList.Node (string)
    */
-  const nodes = (NodeList.byIdOrder as unknown) as shardusTypes.Node[]
+  const nodes = (NodeList.byIdOrder as unknown) as ShardusTypes.Node[]
 
   ShardFunctions.computeNodePartitionDataMap(
     shardGlobals,

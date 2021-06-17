@@ -1,7 +1,7 @@
 import Log4js from 'log4js'
 import Profiler from '../utils/profiler'
 import Logger, {logFlags} from '../logger'
-import Shardus from '../shardus/shardus-types'
+import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
 import Crypto from '../crypto'
 import * as utils from '../utils'

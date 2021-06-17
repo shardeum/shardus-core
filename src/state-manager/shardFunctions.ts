@@ -1,6 +1,6 @@
 import { Utils } from 'sequelize/types'
 import Logger, {logFlags} from '../logger'
-import Shardus = require('../shardus/shardus-types')
+import * as Shardus from '../shardus/shardus-types'
 
 const stringify = require('fast-stable-stringify')
 
