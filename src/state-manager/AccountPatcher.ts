@@ -1528,8 +1528,7 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
       //request data for the list of bad accounts then update. this can live in account repair?
       let wrappedDataList = await this.getAccountRepairData(cycle, results.badAccounts )
 
-      this.statemanager_fatal('isInSync = false',`bad accounts cycle:${cycle} bad:${results.badAccounts.length} received:${wrappedDataList.length} details: ${utils.stringifyReduce(results.badAccounts)}`)
-      this.statemanager_fatal('isInSync = false',`isInSync = false ${cycle}: `)
+
       //this.statemanager_fatal('debug shardTrie',`temp shardTrie ${cycle}: ${utils.stringifyReduce(this.shardTrie.layerMaps[0].values())}`)
 
       //return //todo dont want to test full stack yet
@@ -1578,6 +1577,10 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
         this.statemanager_fatal('isInSync = false, failed hashes',`isInSync = false cycle:${cycle}:  failed hashes:${failedHashes.length}`)
       }
       nestedCountersInstance.countEvent('accountPatcher', 'writeCombinedAccountDataToBackups', Math.max(0,wrappedDataListFiltered.length - failedHashes.length))
+      nestedCountersInstance.countEvent('accountPatcher', `p.repair applied cycle:${cycle}`, Math.max(0,wrappedDataListFiltered.length - failedHashes.length))
+
+      this.statemanager_fatal('isInSync = false',`bad accounts cycle:${cycle} bad:${results.badAccounts.length} received:${wrappedDataList.length} filtered:${wrappedDataListFiltered.length} failed: ${failedHashes.length} details: ${utils.stringifyReduce(results.badAccounts)}`)
+      this.statemanager_fatal('isInSync = false',`isInSync = false ${cycle}: `)
 
       //This extracts accounts that have failed hashes but I forgot writeCombinedAccountDataToBackups does that already
       //let failedHashesSet = new Set(failedHashes)

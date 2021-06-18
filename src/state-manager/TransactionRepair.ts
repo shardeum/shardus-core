@@ -335,6 +335,7 @@ class TransactionRepair {
 
                   if(failedHashes.length === 0){
                     dataApplied++
+                    nestedCountersInstance.countEvent('repair1', `q.repair applied cycle: ${this.stateManager.currentCycleShardData.cycleNumber}`)
                   } else {
                     failedHash++
                     this.statemanager_fatal(`repairToMatchReceipt_failedhash`, ` tx:${shortHash}  failed:${failedHashes[0]} acc:${shortKey}`)
@@ -967,6 +968,7 @@ class TransactionRepair {
       } else {
         if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt2_success', `tx:${shortHash} keys:${utils.stringifyReduce(Object.keys(needUpdateAccounts) )} counters:${utils.stringifyReduce({missingTXFound, requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash,neededUpdate,upToDateCount,updatedAccountsCount})}`)
         nestedCountersInstance.countEvent('repair2', `complete-ok`)
+        nestedCountersInstance.countEvent('repair2', `s.repair applied cycle: ${this.stateManager.currentCycleShardData.cycleNumber}`)
       }
       
       this.profiler.profileSectionEnd('repair2')
