@@ -239,29 +239,42 @@ class AccountPatcher {
         // let layerMap = this.shardTrie.layerMaps[this.treeMaxDepth]
         // let hashTrieNode = layerMap.get(radix)
 
-        hashMap[accountHashEntry.accountID] = accountHashEntry.hash
+        hashMap.set(accountHashEntry.accountID, accountHashEntry.hash)
         accountIDs.push(accountHashEntry.accountID)
       }
 
       let accountData = await this.app.getAccountDataByList(accountIDs)
 
-      // if (accountData != null) {
-      //   for (let wrappedAccount of accountData) {
-      //     let wrappedAccountInQueueRef = wrappedAccount as Shardus.WrappedDataFromQueue
-      //     wrappedAccountInQueueRef.seenInQueue = false
+      //only return results that match the requested hash!
+      let accountDataFinal: Shardus.WrappedData[] = []
+      if (accountData != null) {
+        for (let wrappedAccount of accountData) {
 
-      //     if (this.stateManager.lastSeenAccountsMap != null) {
-      //       let queueEntry = this.stateManager.lastSeenAccountsMap[wrappedAccountInQueueRef.accountId]
-      //       if (queueEntry != null) {
-      //         wrappedAccountInQueueRef.seenInQueue = true
-      //       }
-      //     }
-      //   }
-      // }
+          let { accountId, stateId, data: recordData } = wrappedAccount
+          let hash = this.app.calculateAccountHash(recordData)
+          if (stateId !== hash) {
+
+            continue
+          }
+
+          if(hashMap.get(accountId) === wrappedAccount.stateId){
+            accountDataFinal.push(wrappedAccount)
+          } 
+          // let wrappedAccountInQueueRef = wrappedAccount as Shardus.WrappedDataFromQueue
+          // wrappedAccountInQueueRef.seenInQueue = false
+
+          // if (this.stateManager.lastSeenAccountsMap != null) {
+          //   let queueEntry = this.stateManager.lastSeenAccountsMap[wrappedAccountInQueueRef.accountId]
+          //   if (queueEntry != null) {
+          //     wrappedAccountInQueueRef.seenInQueue = true
+          //   }
+          // }
+        }
+      }
       //PERF could disable this for more perf?
-      this.stateManager.testAccountDataWrapped(accountData)
+      //this.stateManager.testAccountDataWrapped(accountDataFinal)
 
-      result.accounts = accountData
+      result.accounts = accountDataFinal
       await respond(result)
     })
 
