@@ -70,7 +70,7 @@ class LoadDetection extends EventEmitter {
       load = this.load
     } else {
       const txTimeInQueue = this.statistics.getAverage('txTimeInQueue') / 1000
-      const scaledTxTimeInQueue =
+      let scaledTxTimeInQueue =
         txTimeInQueue >= this.desiredTxTime
           ? 1
           : txTimeInQueue / this.desiredTxTime
@@ -86,6 +86,20 @@ class LoadDetection extends EventEmitter {
       // if (scaledQueueLength > this.highThreshold){
       //   nestedCountersInstance.countEvent('loadRelated',`highLoad-scaledQueueLength ${this.highThreshold}`)
       // }
+
+      
+
+      //need 20 samples in the queue before we start worrying about them being there too long
+      if(queueLength < 20){
+
+        if(scaledTxTimeInQueue > this.highThreshold){
+          nestedCountersInstance.countEvent(
+            'loadRelated',
+            `scaled time fix`
+          )
+        }
+        scaledTxTimeInQueue = 0
+      }
 
       this.scaledTxTimeInQueue = scaledTxTimeInQueue
       this.scaledQueueLength = scaledQueueLength
@@ -111,6 +125,20 @@ class LoadDetection extends EventEmitter {
       }
 
       load = Math.max(scaledTxTimeInQueue, scaledQueueLength)
+
+
+      if(scaledQueueLength > this.highThreshold){
+        nestedCountersInstance.countEvent(
+          'loadRelated',
+          'scaledQueueLength past highThreshold'
+        )
+      }
+      if(scaledTxTimeInQueue > this.highThreshold){
+        nestedCountersInstance.countEvent(
+          'loadRelated',
+          'scaledTxTimeInQueue past highThreshold'
+        )
+      }
     }
 
     if (load > this.highThreshold) this.emit('highLoad')
