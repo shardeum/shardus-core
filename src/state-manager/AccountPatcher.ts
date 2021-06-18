@@ -1240,10 +1240,11 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
       let badTreeNode = badLayerMap.get(radixAndChildHash.radix)
       if(badTreeNode != null){
         let accMap = new Map()
-        for(let i=0; i<badTreeNode.accounts.length; i++ ){
-          accMap.set(badTreeNode.accounts[i].accountID,badTreeNode.accounts[i])
+        if(badTreeNode.accounts != null){
+          for(let i=0; i<badTreeNode.accounts.length; i++ ){
+            accMap.set(badTreeNode.accounts[i].accountID,badTreeNode.accounts[i])
+          }          
         }
-
         for(let i=0; i<radixAndChildHash.childAccounts.length; i++ ){
           let potentalGoodAcc = radixAndChildHash.childAccounts[i]
           let potentalBadAcc = accMap.get(potentalGoodAcc.accountID)
