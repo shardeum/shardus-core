@@ -467,6 +467,7 @@ class StateManager {
     // get extended data for our node
     cycleShardData.nodeShardData = ShardFunctions.computeNodePartitionData(cycleShardData.shardGlobals, cycleShardData.ourNode, cycleShardData.nodeShardDataMap, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true)
 
+    // TODO perf scalability  need to generate this as needed in very large networks with millions of nodes.
     // generate full data for nodes that store our home partition
     ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.nodeShardData.nodeThatStoreOurParitionFull, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true)
 
@@ -899,7 +900,16 @@ class StateManager {
           //TODO, need a way to re-init.. dang idk how to do that!
           //this.partitionStats.statsDataSummaryUpdate2(cycleToRecordOn, null, wrapedAccount)
 
-          this.accountCache.updateAccountHash(wrapedAccount.accountId, wrapedAccount.stateId, wrapedAccount.timestamp, cycleToRecordOn)
+          let tryToCorrectStats = true
+          if(tryToCorrectStats){
+            let accounts = await this.app.getAccountDataByList([wrapedAccount.accountId])
+            if(accounts != null && accounts.length === 1){
+              this.partitionStats.statsDataSummaryUpdate2(cycleToRecordOn, accounts[0].data, wrapedAccount)  
+            }
+          } else {
+            //old way
+            this.accountCache.updateAccountHash(wrapedAccount.accountId, wrapedAccount.stateId, wrapedAccount.timestamp, cycleToRecordOn)
+          }
         } else {
           this.partitionStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount)
         }
@@ -969,6 +979,8 @@ class StateManager {
     this.transactionConsensus.setupHandlers()
 
     this.accountPatcher.setupHandlers()
+
+    this.partitionStats.setupHandlers()
 
     // p2p ASK
     Comms.registerInternal('request_receipt_for_tx', async (payload: RequestReceiptForTxReq, respond: (arg0: RequestReceiptForTxResp) => any) => {

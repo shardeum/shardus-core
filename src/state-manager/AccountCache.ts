@@ -367,11 +367,8 @@ class AccountCache {
       if(accountCacheHistory.lastStaleCycle > accountCacheHistory.lastSeenCycle){
         //dont use this in a report if it was recently stale
         staleAccountsSkipped++
-
-
         continue
       }
-
 
       //if index 0 entry is not for this cycle then look through the list for older cycles. 
       while (index < accountCacheHistory.accountHashList.length - 1 && accountCacheHistory.accountHashList[index].c > cycleToProcess) {

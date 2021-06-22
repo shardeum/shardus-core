@@ -348,7 +348,6 @@ class AccountPatcher {
     //
     Context.network.registerExternalGet('get-shard-dump', (req, res) => {
       res.write(`${this.stateManager.lastShardReport}\n`)
-
       res.end()
     })
 
@@ -383,7 +382,7 @@ class AccountPatcher {
           for (let node of activeNodes.values()) {
             let getResp = await this.logger._internalHackGetWithResp(`${node.externalIp}:${node.externalPort}/get-shard-dump`)
             if(getResp.body != null && getResp.body != ''){
-              lines.push({raw: getResp.body})
+              lines.push({raw: getResp.body, file:{owner: `${node.externalIp}:${node.externalPort}`}})
             }
           }
           this.processShardDump(res, lines)
@@ -405,8 +404,6 @@ class AccountPatcher {
       let id = req.query.id
       res.write(`report for: ${id} \n`)
       try {
-
-
         if(id.length === 10){
           //short form..
           let found = false
@@ -437,8 +434,6 @@ class AccountPatcher {
             return
           }
         }
-
-
 
         let trieAccount = this.getAccountTreeInfo(id)
         let accountHash = this.stateManager.accountCache.getAccountHash(id)
@@ -700,160 +695,6 @@ class AccountPatcher {
 
     return updateStats
   }
-
-
-
-/***
- *    ##     ##    ###    ########  ##    ## #### ##    ##  ######   #######  ##     ## ########  ######## ######## ######## ##    ##  #######  ########  ########  ######  
- *    ###   ###   ## ##   ##     ## ##   ##   ##  ###   ## ##    ## ##     ## ###   ### ##     ## ##          ##    ##       ###   ## ##     ## ##     ## ##       ##    ## 
- *    #### ####  ##   ##  ##     ## ##  ##    ##  ####  ## ##       ##     ## #### #### ##     ## ##          ##    ##       ####  ## ##     ## ##     ## ##       ##       
- *    ## ### ## ##     ## ########  #####     ##  ## ## ## ##       ##     ## ## ### ## ########  ######      ##    ######   ## ## ## ##     ## ##     ## ######    ######  
- *    ##     ## ######### ##   ##   ##  ##    ##  ##  #### ##       ##     ## ##     ## ##        ##          ##    ##       ##  #### ##     ## ##     ## ##             ## 
- *    ##     ## ##     ## ##    ##  ##   ##   ##  ##   ### ##    ## ##     ## ##     ## ##        ##          ##    ##       ##   ### ##     ## ##     ## ##       ##    ## 
- *    ##     ## ##     ## ##     ## ##    ## #### ##    ##  ######   #######  ##     ## ##        ########    ##    ######## ##    ##  #######  ########  ########  ######  
- */
-// markIncompeteNodes(cycle:number){
-//   //clear incomplete child nodes from last time.
-//   for(let treeNode of this.incompleteNodes){
-//     treeNode.isIncomplete = false
-
-//     //clear incomplete flag for all parents.
-//     let nextNode = treeNode
-//     for(let i = nextNode.radix.length-1; i>=0; i--){
-//       let parent = this.shardTrie.layerMaps[i].get(nextNode.radix.substr(0,i))
-//       if(parent == null){
-//         break
-//       }
-//       parent.isIncomplete = false
-//       nextNode = parent
-//     }
-//   }
-
-//   //get the min and max non covered area
-//   let shardValues = this.stateManager.shardValuesByCycle.get(cycle)
-
-//   let consensusStartPartition = shardValues.nodeShardData.consensusStartPartition
-//   let consensusEndPartition = shardValues.nodeShardData.consensusEndPartition
-  
-//   let shardGlobals = shardValues.shardGlobals as ShardGlobals
-//   let numPartitions = shardGlobals.numPartitions
-
-//   if(consensusStartPartition === 0 && consensusEndPartition === numPartitions - 1){
-//     //nothing to mark incomplete our node covers the whole range with its consensus
-//     return
-//   }
-
-//   let incompeteAddresses = []
-//   if(consensusStartPartition > consensusEndPartition){
-//     //consensus range like this  <CCCC---------CCC>  
-//     //incompletePartition:            1       2
-
-//     //we may have two ranges to mark
-//     let incompletePartition1 = consensusEndPartition + 1 // get the start of this
-//     let incompletePartition2 = consensusStartPartition - 1 //get the end of this
-
-//     // let partition1 = shardValues.parititionShardDataMap.get(incompletePartition1)
-//     // incompeteAddresses.push(partition1.homeRange.low)
-
-//     // let partition2 = shardValues.parititionShardDataMap.get(incompletePartition2)
-//     // incompeteAddresses.push(partition2.homeRange.high)
-
-//     //flag more as incomplete!
-//     for(let idx = incompletePartition1; idx<=incompletePartition2; idx++ ){
-//       let partitionI = shardValues.parititionShardDataMap.get(idx)
-//       incompeteAddresses.push(partitionI.homeRange.low)
-//       incompeteAddresses.push(partitionI.homeRange.high)
-//     }
-
-//   } else if(consensusEndPartition > consensusStartPartition) {
-//     //consensus range like this  <-----CCCCC------> or <-----------CCCCC> or <CCCCC----------->
-//     //incompletePartition:            1     2           2         1                2         1
-//     //   not needed:                                    x                                    x
-
-//     //we may have two ranges to mark
-//     let incompletePartition1 = consensusStartPartition - 1 //get the end of this
-//     let incompletePartition2 = consensusEndPartition + 1 // get the start of this
-
-//     let use1 = true
-//     let use2 = true
-//     if(consensusStartPartition === 0){
-//       //incompletePartition1 = numPartitions - 1 //special case, we stil want the start
-//       incompletePartition1 = numPartitions - 1
-//       use1 = false
-//     }
-//     if(consensusEndPartition === numPartitions - 1){
-//       //incompletePartition2 = 0 //special case, we stil want the start
-//       incompletePartition2 = 0
-//       use2 = false
-//     }
-
-//     // if(use1){
-//     //   let partition1 = shardValues.parititionShardDataMap.get(incompletePartition1)
-//     //   incompeteAddresses.push(partition1.homeRange.high)
-//     // }
-//     // if(use2){
-//     //   let partition2 = shardValues.parititionShardDataMap.get(incompletePartition2)   
-//     //   incompeteAddresses.push(partition2.homeRange.low)
-//     // }
-
-//     if(incompletePartition1 < incompletePartition2){
-//       for(let idx = 0; idx<=incompletePartition1; idx++ ){
-//         let partitionI = shardValues.parititionShardDataMap.get(idx)
-//         incompeteAddresses.push(partitionI.homeRange.low)
-//         incompeteAddresses.push(partitionI.homeRange.high)
-//       }
-//       for(let idx = incompletePartition2; idx<numPartitions; idx++ ){
-//         let partitionI = shardValues.parititionShardDataMap.get(idx)
-//         incompeteAddresses.push(partitionI.homeRange.low)
-//         incompeteAddresses.push(partitionI.homeRange.high)
-//       }
-//     } else {
-//       for(let idx = incompletePartition2; idx<=incompletePartition1; idx++ ){
-//         let partitionI = shardValues.parititionShardDataMap.get(idx)
-//         incompeteAddresses.push(partitionI.homeRange.low)
-//         incompeteAddresses.push(partitionI.homeRange.high)
-//       }
-//     }
-//   }
-
-//   // //set new nodes as incomplete.
-//   // for(let incompleteAddress of incompeteAddresses){
-//   //   let radix = incompleteAddress.substr(0, this.treeMaxDepth)
-//   //   let treeNode = this.shardTrie.layerMaps[radix.length].get(radix)
-
-//   //   if(treeNode == null){
-//   //     treeNode = {radix, children:[], childHashes:[], accounts:[], hash:'', accountTempMap:new Map(), updated:true, isIncomplete: false, nonSparseChildCount:0}
-//   //     this.shardTrie.layerMaps[radix.length].set(radix, treeNode)
-//   //   }
-//   //   treeNode.updated = true
-//   //   treeNode.isIncomplete = true
-//   // }
-
-//     // //set new nodes as incomplete.
-//   this.incompleteNodes = []
-//   let seenRadix = new Set()
-//   for(let incompleteAddress of incompeteAddresses){
-//     let radix = incompleteAddress.substr(0, this.treeSyncDepth)
-//     let treeNode = this.shardTrie.layerMaps[radix.length].get(radix)
-
-//     if(treeNode == null){
-//       //treeNode = {radix, children:[], childHashes:[], accounts:[], hash:'', accountTempMap:new Map(), updated:true, isIncomplete: false, nonSparseChildCount:0}
-//       treeNode = {radix, children:new Array(16), childHashes:new Array(16), accounts:[], hash:'', accountTempMap:new Map(), updated:true, isIncomplete: false, nonSparseChildCount:0}
-//       this.shardTrie.layerMaps[radix.length].set(radix, treeNode)
-//     }
-//     treeNode.updated = true
-//     treeNode.isIncomplete = true
-
-//     if(seenRadix.has(radix) === false){
-//       //this.incompleteNodes.push(treeNode)
-//       seenRadix.add(radix)
-//       //UTG!!!
-//       treeNode.hash = this.hashObj(treeNode.childHashes)
-//     } 
-
-    
-//   }
-// }
 
 getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
 
@@ -1701,14 +1542,15 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
     return wrappedDataList
   }
 
-
-//how about marking our incomplete areas so that sharding works!!
-// find min and max non covered partition
-// then get the min and max values. and flag for non edge partitions .  partition 0 and partition max dont need flagging.
-
-
-//debug:
-
+/***
+ *    ########  ########   #######   ######  ########  ######   ######   ######  ##     ##    ###    ########  ########  ########  ##     ## ##     ## ########  
+ *    ##     ## ##     ## ##     ## ##    ## ##       ##    ## ##    ## ##    ## ##     ##   ## ##   ##     ## ##     ## ##     ## ##     ## ###   ### ##     ## 
+ *    ##     ## ##     ## ##     ## ##       ##       ##       ##       ##       ##     ##  ##   ##  ##     ## ##     ## ##     ## ##     ## #### #### ##     ## 
+ *    ########  ########  ##     ## ##       ######    ######   ######   ######  ######### ##     ## ########  ##     ## ##     ## ##     ## ## ### ## ########  
+ *    ##        ##   ##   ##     ## ##       ##             ##       ##       ## ##     ## ######### ##   ##   ##     ## ##     ## ##     ## ##     ## ##        
+ *    ##        ##    ##  ##     ## ##    ## ##       ##    ## ##    ## ##    ## ##     ## ##     ## ##    ##  ##     ## ##     ## ##     ## ##     ## ##        
+ *    ##        ##     ##  #######   ######  ########  ######   ######   ######  ##     ## ##     ## ##     ## ########  ########   #######  ##     ## ##        
+ */
 processShardDump (stream, lines) {
 
   let dataByParition = new Map()
@@ -1727,14 +1569,15 @@ processShardDump (stream, lines) {
       let partitionObj = JSON.parse(string)
 
       if(newestCycle > 0 &&  partitionObj.cycle != newestCycle){
-        stream.write(`wrong cycle for node: ${line.raw.substr(0,20)} reportCycle:${newestCycle} thisNode:${partitionObj.cycle} \n`)
+        stream.write(`wrong cycle for node: ${line.file.owner} reportCycle:${newestCycle} thisNode:${partitionObj.cycle} \n`)
+        continue
       }
       partitionObjects.push(partitionObj)
 
       if (partitionObj.cycle > newestCycle) {
         newestCycle = partitionObj.cycle
       }
-      partitionObj.owner = line.raw.slice(0, index)
+      partitionObj.owner = line.file.owner //line.raw.slice(0, index)
     }
   }
 

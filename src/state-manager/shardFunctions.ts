@@ -38,6 +38,11 @@ class ShardFunctions {
     shardGlobals.nodesPerConsenusGroup = nodesPerConsenusGroup
     shardGlobals.numPartitions = shardGlobals.numActiveNodes
 
+    //make sure nodesPerConsenusGroup is an odd number >= 3
+    if((nodesPerConsenusGroup % 2) === 0 || nodesPerConsenusGroup < 3){
+      throw new Error(`nodesPerConsenusGroup:${nodesPerConsenusGroup} must be odd and >= 3`)
+    }
+    
     shardGlobals.consensusRadius = Math.floor((nodesPerConsenusGroup - 1) / 2)
 
     // NOT ready for using nodes per edge as an input, so we will force it to a procedural value
@@ -84,6 +89,10 @@ class ShardFunctions {
    */
   static calculateStoredPartitions2(shardGlobals: ShardGlobals, homePartition: number): WrappableParitionRange {
     return ShardFunctions.calculateParitionRange(shardGlobals, homePartition, shardGlobals.nodesPerConsenusGroup)
+  }
+
+  static calculateConsensusPartitions(shardGlobals: ShardGlobals, homePartition: number): WrappableParitionRange {
+    return ShardFunctions.calculateParitionRange(shardGlobals, homePartition, shardGlobals.consensusRadius)
   }
 
   /**
@@ -449,6 +458,10 @@ class ShardFunctions {
     if (nodeShardData.storedPartitions == null) {
       nodeShardData.storedPartitions = ShardFunctions.calculateStoredPartitions2(shardGlobals, nodeShardData.homePartition)
     }
+    if (nodeShardData.consensusPartitions == null) {
+      nodeShardData.consensusPartitions = ShardFunctions.calculateConsensusPartitions(shardGlobals, nodeShardData.homePartition)
+    }
+    
 
     let nodeIsActive = nodeShardData.ourNodeIndex !== -1
     let exclude = [nodeShardData.node.id]

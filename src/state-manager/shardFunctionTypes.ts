@@ -170,6 +170,7 @@ type NodeShardData = {
     property {Map<string,Node>} coveredBy the nodes that cover us for consenus // removed not sure this goes here
      */
   storedPartitions: WrappableParitionRange
+  consensusPartitions: WrappableParitionRange
   nodeThatStoreOurParition: Shardus.Node[]
   nodeThatStoreOurParitionFull: Shardus.Node[]
   consensusNodeForOurNode: Shardus.Node[]
