@@ -1,5 +1,5 @@
 import * as Shardus from '../shardus/shardus-types'
-import { ShardGlobals, ShardInfo, WrappableParitionRange, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from '../types/state-manager/shardFunctionTypes'
+import { StateManager as StateManagerTypes } from '../types'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
 import { nestedCountersInstance } from '../utils/nestedCounters'
@@ -1316,7 +1316,7 @@ class TransactionQueue {
       if (homePartition != homeNode.homePartition) {
         //loop all nodes for now
         for (let nodeID of this.stateManager.currentCycleShardData.nodeShardDataMap.keys()) {
-          let nodeShardData: NodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(nodeID)
+          let nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(nodeID)
           let nodeStoresThisPartition = ShardFunctions.testInRange(homePartition, nodeShardData.storedPartitions)
           if (nodeStoresThisPartition === true && uniqueNodes[nodeID] == null) {
             //setting this will cause it to end up in the transactionGroup
@@ -1456,7 +1456,7 @@ class TransactionQueue {
     let dataKeysWeHave = []
     let dataValuesWeHave = []
     let datas: { [accountID: string]: any } = {}
-    let remoteShardsByKey: { [accountID: string]: NodeShardData } = {} // shard homenodes that we do not have the data for.
+    let remoteShardsByKey: { [accountID: string]: StateManagerTypes.shardFunctionTypes.NodeShardData } = {} // shard homenodes that we do not have the data for.
     let loggedPartition = false
     for (let key of queueEntry.uniqueKeys) {
       ///   test here

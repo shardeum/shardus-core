@@ -16,6 +16,7 @@ import * as SafetyModeTypes_ from './p2p/SafetyModeTypes'
 import * as SnapshotTypes_ from './p2p/SnapshotTypes'
 import * as SyncTypes_ from './p2p/SyncTypes'
 import * as TemplateTypes_ from './p2p/TemplateTypes'
+import * as shardFunctionTypes_ from './state-manager/shardFunctionTypes'
 
 export namespace P2P {
   export import ActiveTypes = ActiveTypes_
@@ -38,3 +39,6 @@ export namespace P2P {
   export import TemplateTypes = TemplateTypes_
 }
 
+export namespace StateManager {
+  export import shardFunctionTypes = shardFunctionTypes_
+}

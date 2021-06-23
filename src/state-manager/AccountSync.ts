@@ -1,5 +1,5 @@
 import * as Shardus from '../shardus/shardus-types'
-import { ShardGlobals, ShardInfo, WrappableParitionRange, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from '../types/state-manager/shardFunctionTypes'
+import { StateManager as StateManagerTypes } from '../types'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
 
@@ -456,7 +456,7 @@ class AccountSync {
     let nodeShardData = this.stateManager.currentCycleShardData.nodeShardData
     if (logFlags.console) console.log('GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
 
-    let rangesToSync = [] as AddressRange[]
+    let rangesToSync = [] as StateManagerTypes.shardFunctionTypes.AddressRange[]
 
     let cycle = this.stateManager.currentCycleShardData.cycleNumber
 
@@ -2076,11 +2076,11 @@ class AccountSync {
 
   /**
    * createSyncTrackerByRange
-   * @param {BasicAddressRange} range
+   * @param {StateManagerTypes.shardFunctionTypes.BasicAddressRange} range
    * @param {number} cycle
    * @return {SyncTracker}
    */
-  createSyncTrackerByRange(range: BasicAddressRange, cycle: number, initalSync: boolean = false): SyncTracker {
+  createSyncTrackerByRange(range: StateManagerTypes.shardFunctionTypes.BasicAddressRange, cycle: number, initalSync: boolean = false): SyncTracker {
     // let partition = -1
     let index = this.syncTrackerIndex++
     let syncTracker = { range, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false, isGlobalSyncTracker: false, globalAddressMap: {}, isPartOfInitialSync:initalSync, keys:{}  } as SyncTracker // partition,
@@ -2137,7 +2137,7 @@ class AccountSync {
     if (cycleShardData == null) {
       return null
     }
-    let partitionShardData: ShardInfo = cycleShardData.parititionShardDataMap.get(partitionID)
+    let partitionShardData: StateManagerTypes.shardFunctionTypes.ShardInfo = cycleShardData.parititionShardDataMap.get(partitionID)
 
     let addressLow = partitionShardData.homeRange.low
     let addressHigh = partitionShardData.homeRange.high

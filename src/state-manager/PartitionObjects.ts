@@ -1,5 +1,5 @@
 import * as Shardus from '../shardus/shardus-types'
-import { ShardGlobals, ShardInfo, WrappableParitionRange, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from '../types/state-manager/shardFunctionTypes'
+import { StateManager as StateManagerTypes } from '../types'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
 
@@ -110,7 +110,7 @@ class PartitionObjects {
     if (this.nextCycleReportToSend != null) {
 
       let shardValues = this.stateManager.shardValuesByCycle.get(this.nextCycleReportToSend.cycleNumber)
-      let shardGlobals = shardValues.shardGlobals as ShardGlobals
+      let shardGlobals = shardValues.shardGlobals as StateManagerTypes.shardFunctionTypes.ShardGlobals
       let consensusStartPartition = shardValues.nodeShardData.consensusStartPartition
       let consensusEndPartition = shardValues.nodeShardData.consensusEndPartition
       

@@ -1,5 +1,5 @@
 import * as Shardus from '../shardus/shardus-types'
-import { ShardGlobals, ShardInfo, WrappableParitionRange, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from '../types/state-manager/shardFunctionTypes'
+import { StateManager as StateManagerTypes} from '../types'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
 
@@ -531,7 +531,7 @@ class AccountCache {
 
     let cycle = mainHashResults.cycle
     let shardValues = this.stateManager.shardValuesByCycle.get(cycle)
-    let shardGlobals = shardValues.shardGlobals as ShardGlobals
+    let shardGlobals = shardValues.shardGlobals as StateManagerTypes.shardFunctionTypes.ShardGlobals
 
     for (let partition of mainHashResults.partitionHashResults.keys()) {
       let partitionHashResults: PartitionHashResults = mainHashResults.partitionHashResults.get(partition)

@@ -15,7 +15,7 @@ import * as Sync from '../p2p/Sync'
 import * as Types from '../types/p2p/P2PTypes'
 import * as ShardusTypes from '../shardus/shardus-types'
 import ShardFunctions from '../state-manager/shardFunctions'
-import * as shardFunctionTypes from '../types/state-manager/shardFunctionTypes'
+import { StateManager } from '../types'
 import * as utils from '../utils'
 import * as partitionGossip from './partition-gossip'
 import * as SnapshotFunctions from './snapshotFunctions'
@@ -432,7 +432,7 @@ export async function safetySync() {
     Context.config.sharding.nodesPerConsensusGroup,
     Context.config.sharding.nodesPerConsensusGroup
   )
-  const nodeShardDataMap: shardFunctionTypes.NodeShardDataMap = new Map()
+  const nodeShardDataMap: StateManager.shardFunctionTypes.NodeShardDataMap = new Map()
 
   // populate DataToMigrate and oldDataMap
   oldDataMap = await SnapshotFunctions.calculateOldDataMap(
@@ -466,8 +466,8 @@ export async function safetySync() {
 
 async function sendOldDataToNodes(
   partitionId: number,
-  shardGlobals: shardFunctionTypes.ShardGlobals,
-  nodeShardDataMap: shardFunctionTypes.NodeShardDataMap
+  shardGlobals: StateManager.shardFunctionTypes.ShardGlobals,
+  nodeShardDataMap: StateManager.shardFunctionTypes.NodeShardDataMap
 ) {
   // calcuate all nodes that covers a particular partitions
   const nodesToSendData: ShardusTypes.Node[] = getNodesThatCoverPartition(
@@ -506,8 +506,8 @@ function createOffer() {
 
 function getNodesThatCoverPartition(
   partitionId,
-  shardGlobals: shardFunctionTypes.ShardGlobals,
-  nodeShardDataMap: shardFunctionTypes.NodeShardDataMap
+  shardGlobals: StateManager.shardFunctionTypes.ShardGlobals,
+  nodeShardDataMap: StateManager.shardFunctionTypes.NodeShardDataMap
 ): ShardusTypes.Node[] {
   const nodesInPartition: ShardusTypes.Node[] = []
   if (partitionId === -1) {
@@ -601,7 +601,7 @@ export async function startWitnessMode() {
           Context.config.sharding.nodesPerConsensusGroup,
           Context.config.sharding.nodesPerConsensusGroup
         )
-        const nodeShardDataMap: shardFunctionTypes.NodeShardDataMap = new Map()
+        const nodeShardDataMap: StateManager.shardFunctionTypes.NodeShardDataMap = new Map()
         oldDataMap = await SnapshotFunctions.calculateOldDataMap(
           shardGlobals,
           nodeShardDataMap,

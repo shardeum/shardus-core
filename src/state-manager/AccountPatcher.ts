@@ -1,5 +1,5 @@
 import * as Shardus from '../shardus/shardus-types'
-import { ShardGlobals, ShardInfo, WrappableParitionRange, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from '../types/state-manager/shardFunctionTypes'
+import { StateManager as StateManagerTypes } from '../types'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
 import Profiler from '../utils/profiler'
@@ -706,7 +706,7 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
   let consensusStartPartition = shardValues.nodeShardData.consensusStartPartition
   let consensusEndPartition = shardValues.nodeShardData.consensusEndPartition
   
-  let shardGlobals = shardValues.shardGlobals as ShardGlobals
+  let shardGlobals = shardValues.shardGlobals as StateManagerTypes.shardFunctionTypes.ShardGlobals
   let numPartitions = shardGlobals.numPartitions
 
   if(consensusStartPartition === 0 && consensusEndPartition === numPartitions - 1){
@@ -1252,7 +1252,7 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
 
     //calculate sync levels!! 
     let shardValues = this.stateManager.shardValuesByCycle.get(cycle)
-    let shardGlobals = shardValues.shardGlobals as ShardGlobals
+    let shardGlobals = shardValues.shardGlobals as StateManagerTypes.shardFunctionTypes.ShardGlobals
 
     let minHashesPerRange = 4
     // y = floor(log16((minHashesPerRange * max(1, x/consensusRange   ))))

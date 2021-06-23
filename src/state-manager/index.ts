@@ -1,6 +1,6 @@
 import * as Shardus from '../shardus/shardus-types'
 
-import { ShardGlobals, ShardInfo, WrappableParitionRange, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from '../types/state-manager/shardFunctionTypes'
+import {StateManager as StateManagerTypes } from '../types'
 
 import { isNodeDown, isNodeLost, isNodeUpRecent } from '../p2p/Lost'
 
@@ -578,7 +578,7 @@ class StateManager {
 
       // create a range object from our coverage change.
 
-      let range = { startAddr: 0, endAddr: 0, low: '', high: '' } as BasicAddressRange // this init is a somewhat wastefull way to allow the type to be happy.
+      let range = { startAddr: 0, endAddr: 0, low: '', high: '' } as StateManagerTypes.shardFunctionTypes.BasicAddressRange // this init is a somewhat wastefull way to allow the type to be happy.
       range.startAddr = change.start
       range.endAddr = change.end
       range.low = ShardFunctions.leadZeros8(range.startAddr.toString(16)) + '0'.repeat(56)
@@ -1303,7 +1303,7 @@ class StateManager {
     // hmm how to deal with data that is changing... it cant!!
     let partitionMap = this.currentCycleShardData.parititionShardDataMap
 
-    let ourNodeShardData: NodeShardData = this.currentCycleShardData.nodeShardData
+    let ourNodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData = this.currentCycleShardData.nodeShardData
     // partittions:
     let partitionDump: DebugDumpPartitions = { partitions: [], cycle: 0, rangesCovered: {} as DebugDumpRangesCovered, 
     nodesCovered: {} as DebugDumpNodesCovered, allNodeIds: [], globalAccountIDs: [], globalAccountSummary: [], 
@@ -1438,7 +1438,7 @@ class StateManager {
     // hmm how to deal with data that is changing... it cant!!
     let partitionMap = this.currentCycleShardData.parititionShardDataMap
 
-    let ourNodeShardData: NodeShardData = this.currentCycleShardData.nodeShardData
+    let ourNodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData = this.currentCycleShardData.nodeShardData
     // partittions:
     let partitionDump: DebugDumpPartitions = { partitions: [], cycle: 0, rangesCovered: {} as DebugDumpRangesCovered, 
     nodesCovered: {} as DebugDumpNodesCovered, allNodeIds: [], globalAccountIDs: [], globalAccountSummary: [], 
@@ -1790,7 +1790,7 @@ class StateManager {
   }
 
   // TSConversion todo see if we need to log any of the new early exits.
-  isNodeInDistance(shardGlobals: ShardGlobals, parititionShardDataMap: ParititionShardDataMap, hash: string, nodeId: string, distance: number) {
+  isNodeInDistance(shardGlobals: StateManagerTypes.shardFunctionTypes.ShardGlobals, parititionShardDataMap: StateManagerTypes.shardFunctionTypes.ParititionShardDataMap, hash: string, nodeId: string, distance: number) {
     let cycleShardData = this.currentCycleShardData
     if (cycleShardData == null) {
       return false

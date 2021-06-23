@@ -1,6 +1,5 @@
 import { EventEmitter } from 'events'
 import { registerGossipHandler } from '../p2p/Comms'
-import { AddressRange } from '../types/state-manager/shardFunctionTypes'
 // import { PartitionHashes, ReceiptMapHashes, SummaryHashes } from './index'
 import * as Comm from '../p2p/Comms'
 import * as NodeList from '../p2p/NodeList'

@@ -8,7 +8,7 @@ import * as Self from '../p2p/Self'
 import * as ShardusTypes from '../shardus/shardus-types'
 import { NetworkSummarytHash, ReceiptHashes, StateHashes, SummaryHashes } from "../types/p2p/SnapshotTypes"
 import ShardFunctions from '../state-manager/shardFunctions'
-import * as shardFunctionTypes from '../types/state-manager/shardFunctionTypes'
+import { StateManager } from '../types'
 import { Cycle, CycleShardData } from '../state-manager/state-manager-types'
 import { safetyModeVals, snapshotLogger } from './index'
 import { hashMap } from './partition-gossip'
@@ -34,12 +34,12 @@ interface Account {
 }
 
 type PartitionRanges = Map<
-  shardFunctionTypes.AddressRange['partition'],
-  shardFunctionTypes.AddressRange
+  StateManager.shardFunctionTypes.AddressRange['partition'],
+  StateManager.shardFunctionTypes.AddressRange
 >
 
 type PartitionAccounts = Map<
-  shardFunctionTypes.AddressRange['partition'],
+  StateManager.shardFunctionTypes.AddressRange['partition'],
   Account[]
 >
 
@@ -236,11 +236,11 @@ export async function readOldPartitionHashes () {
 }
 
 export async function calculateOldDataMap (
-  shardGlobals: shardFunctionTypes.ShardGlobals,
-  nodeShardDataMap: shardFunctionTypes.NodeShardDataMap,
+  shardGlobals: StateManager.shardFunctionTypes.ShardGlobals,
+  nodeShardDataMap: StateManager.shardFunctionTypes.NodeShardDataMap,
   oldPartitionHashMap
 ) {
-  const partitionShardDataMap: shardFunctionTypes.ParititionShardDataMap = new Map()
+  const partitionShardDataMap: StateManager.shardFunctionTypes.ParititionShardDataMap = new Map()
   const oldDataMap: Map<PartitionNum, any[]> = new Map()
   ShardFunctions.computePartitionShardDataMap(
     shardGlobals,
@@ -340,7 +340,7 @@ export function copyOldDataToDataToMigrate (oldDataMap, dataToMigrate) {
 }
 
 export function getMissingPartitions (
-  shardGlobals: shardFunctionTypes.ShardGlobals,
+  shardGlobals: StateManager.shardFunctionTypes.ShardGlobals,
   oldDataMap
 ) {
   log('Checking missing partitions...')

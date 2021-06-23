@@ -11,6 +11,7 @@
 //import { WrappedData } from "../shardus/shardus-types";
 //imports up top break the export, boo.
 import * as Shardus from '../shardus/shardus-types'
+import { StateManager } from '../types'
 export { App, Cycle, Sign, AcceptedTx, ApplyResponse } from '../shardus/shardus-types'
 
 export type WrappedStateArray = Shardus.WrappedData[]
@@ -21,8 +22,8 @@ export type QueueEntry = {
     collectedData: WrappedResponses;
     originalData: WrappedResponses;//{[accountID:string]:string}; //serialized to string backups of account data.
     beforeHashes: {[accountID:string]:string}; //before hashes of account data
-    homeNodes: {[accountID:string]:import('../types/state-manager/shardFunctionTypes').NodeShardData};
-    patchedOnNodes: Map<string, import('../types/state-manager/shardFunctionTypes').NodeShardData>; //{[accountID:string]:import('./shardFunctionTypes').NodeShardData};
+    homeNodes: {[accountID:string]:StateManager.shardFunctionTypes.NodeShardData};
+    patchedOnNodes: Map<string, StateManager.shardFunctionTypes.NodeShardData>; //{[accountID:string]:import('./shardFunctionTypes').NodeShardData};
     hasShardInfo: boolean;
     state: string;
     dataCollected: number;
@@ -137,9 +138,9 @@ export type CycleShardData = {
     /**
      * our node's node shard data
      */
-    nodeShardData: import('../types/state-manager/shardFunctionTypes').NodeShardData;
-    nodeShardDataMap: Map<string, import('../types/state-manager/shardFunctionTypes').NodeShardData>;
-    parititionShardDataMap: Map<number, import('../types/state-manager/shardFunctionTypes').ShardInfo>;
+    nodeShardData: StateManager.shardFunctionTypes.NodeShardData;
+    nodeShardDataMap: Map<string, StateManager.shardFunctionTypes.NodeShardData>;
+    parititionShardDataMap: Map<number, StateManager.shardFunctionTypes.ShardInfo>;
     activeNodes: Shardus.Node[];
     syncingNeighbors: Shardus.Node[];
     syncingNeighborsTxGroup: Shardus.Node[];
