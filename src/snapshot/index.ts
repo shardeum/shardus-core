@@ -21,8 +21,7 @@ import * as partitionGossip from './partition-gossip'
 import * as SnapshotFunctions from './snapshotFunctions'
 import {logFlags} from '../logger'
 import { Cycle, ReceiptMapResult, StatsClump, CycleShardData, MainHashResults } from '../state-manager/state-manager-types'
-import { StateHashes, ReceiptHashes, SummaryHashes } from '../p2p/StateParser'
-import { PartitionNum, PartitionRanges, offerResponse } from '../shared-types/Cycle/SnapshotTypes'
+import { StateHashes, ReceiptHashes, SummaryHashes, PartitionNum, PartitionRanges, offerResponse } from '../shared-types/Cycle/SnapshotTypes'
 
 /** STATE */
 

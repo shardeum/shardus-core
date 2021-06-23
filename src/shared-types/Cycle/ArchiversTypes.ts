@@ -1,5 +1,5 @@
 import { CycleRecord as Cycle } from "./CycleCreatorTypes";
-import { StateMetaData, TypeNames, DataRequest } from '../../p2p/StateParser';
+import { NamesToTypes, StateMetaData, TypeIndex, TypeName, TypeNames, ValidTypes } from '../Cycle/SnapshotTypes';
 import { SignedObject } from '../P2PTypes';
 
 /** TYPES */
@@ -8,10 +8,12 @@ export enum RequestTypes {
   JOIN = 'JOIN',
   LEAVE = 'LEAVE'
 }
-export interface NamesToTypes {
-  CYCLE: Cycle;
-  STATE_METADATA: StateMetaData;
+
+export interface DataRequest<T extends ValidTypes> {
+  type: TypeName<T>
+  lastData: TypeIndex<T>
 }
+
 export interface DataResponse {
   publicKey: string;
   responses: {

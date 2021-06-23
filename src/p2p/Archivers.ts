@@ -1,13 +1,8 @@
 import deepmerge from 'deepmerge'
-import Crypto from '../crypto'
-import * as http from '../http'
 import {
   getStateHashes,
-  StateHashes,
-  ReceiptHashes,
   getReceiptHashes,
   getSummaryHashes,
-  SummaryHashes,
   getReceiptMap,
   getSummaryBlob,
 } from '../snapshot'
@@ -19,8 +14,8 @@ import * as CycleCreator from './CycleCreator'
 import { CycleRecord as Cycle, CycleRecord } from "../shared-types/Cycle/CycleCreatorTypes"
 import * as CycleParser from './CycleParser'
 import { logFlags } from '../logger'
-import { StateMetaData, TypeNames, DataRequest } from './StateParser'
-import { JoinedArchiver, DataRecipient, Request, Txs, Record, RequestTypes, DataResponse, NamesToTypes } from '../shared-types/Cycle/ArchiversTypes'
+import { StateMetaData, TypeNames, NamesToTypes } from '../shared-types/Cycle/SnapshotTypes'
+import { JoinedArchiver, DataRecipient, Request, Txs, Record, RequestTypes, DataResponse, DataRequest } from '../shared-types/Cycle/ArchiversTypes'
 
 /** STATE */
 
