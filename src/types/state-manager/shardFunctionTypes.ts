@@ -1,4 +1,4 @@
-import * as Shardus from '../../shardus/shardus-types'
+import { Node } from "../p2p/NodeListTypes"
 
 type ShardGlobals = {
   /**
@@ -66,13 +66,13 @@ type ShardInfo = {
    * the nodes that cover us for consenus.
    */
   coveredBy: {
-    [address: string]: Shardus.Node
+    [address: string]: Node
   }
   /**
    * the nodes that cover us for storage.
    */
   storedBy: {
-    [address: string]: Shardus.Node
+    [address: string]: Node
   }
 }
 /**
@@ -138,7 +138,7 @@ type NodeShardData = {
   /**
    * our node
    */
-  node: Shardus.Node
+  node: Node
   /**
    * numeric address prefix
    */
@@ -171,14 +171,14 @@ type NodeShardData = {
      */
   storedPartitions: WrappableParitionRange
   consensusPartitions: WrappableParitionRange
-  nodeThatStoreOurParition: Shardus.Node[]
-  nodeThatStoreOurParitionFull: Shardus.Node[]
-  consensusNodeForOurNode: Shardus.Node[]
-  consensusNodeForOurNodeFull: Shardus.Node[]
-  edgeNodes: Shardus.Node[]
-  c2NodeForOurNode: Shardus.Node[]
-  outOfDefaultRangeNodes: Shardus.Node[]
-  patchedOnNodes: Shardus.Node[]
+  nodeThatStoreOurParition: Node[]
+  nodeThatStoreOurParitionFull: Node[]
+  consensusNodeForOurNode: Node[]
+  consensusNodeForOurNodeFull: Node[]
+  edgeNodes: Node[]
+  c2NodeForOurNode: Node[]
+  outOfDefaultRangeNodes: Node[]
+  patchedOnNodes: Node[]
 }
 /**
  * A range of addresses
