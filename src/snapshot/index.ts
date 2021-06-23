@@ -15,7 +15,7 @@ import * as Sync from '../p2p/Sync'
 import * as Types from '../shared-types/p2p/P2PTypes'
 import * as ShardusTypes from '../shardus/shardus-types'
 import ShardFunctions from '../state-manager/shardFunctions'
-import * as shardFunctionTypes from '../state-manager/shardFunctionTypes'
+import * as shardFunctionTypes from '../shared-types/state-manager/shardFunctionTypes'
 import * as utils from '../utils'
 import * as partitionGossip from './partition-gossip'
 import * as SnapshotFunctions from './snapshotFunctions'
@@ -410,7 +410,7 @@ export async function safetySync() {
   registerSnapshotRoutes()
 
   // Wait until safetyNum of nodes have joined the network
-  await new Promise((resolve) => {
+  await new Promise<void>((resolve) => {
     Self.emitter.on('new_cycle_data', (data: CycleCreator.CycleData) => {
       if (data.syncing >= data.safetyNum) {
         safetyNum = data.safetyNum

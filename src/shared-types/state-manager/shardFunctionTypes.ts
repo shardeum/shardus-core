@@ -1,4 +1,4 @@
-import * as Shardus from '../shardus/shardus-types'
+import * as Shardus from '../../shardus/shardus-types'
 
 type ShardGlobals = {
   /**

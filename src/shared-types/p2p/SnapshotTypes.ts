@@ -1,4 +1,4 @@
-import * as shardFunctionTypes from '../../state-manager/shardFunctionTypes'
+import * as shardFunctionTypes from '../state-manager/shardFunctionTypes'
 import { CycleRecord } from '../p2p/CycleCreatorTypes'
 
 /** TYPES */
