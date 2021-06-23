@@ -19,9 +19,10 @@ import * as CycleCreator from './CycleCreator'
 import * as CycleParser from './CycleParser'
 import * as NodeList from './NodeList'
 import { activeNodeCount, totalNodeCount, showNodeCount } from './Sync'
-import { Txs, Record } from '../shared-types/Cycle/RefreshTypes'
-import * as Types from '../shared-types/P2PTypes'
-import { CycleRecord } from '../shared-types/Cycle/CycleCreatorTypes'
+import { Txs, Record } from '../shared-types/p2p/RefreshTypes'
+import * as Types from '../shared-types/p2p/P2PTypes'
+import { CycleRecord } from '../shared-types/p2p/CycleCreatorTypes'
+import { Change } from '../shared-types/p2p/CycleParserTypes'
 
 /** STATE */
 
@@ -80,7 +81,7 @@ export function updateRecord(
 
 export function parseRecord(
   record: CycleRecord
-): CycleParser.Change {
+): Change {
   // If Archivers.archivers doesn't have a refreshedArchiver, put it in
   for (const refreshed of record.refreshedArchivers) {
     if (Archivers.archivers.has(refreshed.publicKey) === false) {
@@ -92,8 +93,8 @@ export function parseRecord(
    * A refreshedConsensor results in either an added or update, depending on
    * whether or not we have the refreshedConsensor in our node list or not.
    */
-  const added: CycleParser.Change['added'] = []
-  const updated: CycleParser.Change['updated'] = []
+  const added: Change['added'] = []
+  const updated: Change['updated'] = []
   for (const refreshed of record.refreshedConsensors) {
     const node = NodeList.nodes.get(refreshed.id)
     if (node) {

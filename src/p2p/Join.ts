@@ -9,14 +9,15 @@ import * as Comms from './Comms'
 import { config, crypto, logger, network } from './Context'
 import * as CycleChain from './CycleChain'
 import * as CycleCreator from './CycleCreator'
-import { Change } from './CycleParser'
+import { Change } from "../shared-types/p2p/CycleParserTypes"
 import * as NodeList from './NodeList'
 import * as Self from './Self'
-import * as Types from '../shared-types/P2PTypes'
+import * as Types from '../shared-types/p2p/P2PTypes'
 import { robustQuery } from './Utils'
 import {logFlags} from '../logger'
-import { JoinRequest, Txs, Record } from '../shared-types/Cycle/JoinTypes'
-import { CycleRecord } from '../shared-types/Cycle/CycleCreatorTypes'
+import { JoinRequest, Txs, Record } from '../shared-types/p2p/JoinTypes'
+import { CycleRecord } from '../shared-types/p2p/CycleCreatorTypes'
+import { Node } from '../shared-types/p2p/NodeListTypes'
 
 /** STATE */
 
@@ -78,7 +79,7 @@ const joinedRoute: Types.Route<Handler> = {
   },
 }
 
-const gossipJoinRoute: Types.GossipHandler<JoinRequest, NodeList.Node['id']> = (
+const gossipJoinRoute: Types.GossipHandler<JoinRequest, Node['id']> = (
   payload,
   _sender
 ) => {
@@ -460,7 +461,7 @@ export async function fetchJoined(activeNodes) {
       warn('fetchJoined invalid response response.node.id' + err)
       return
     }
-    const node = response.node as NodeList.Node
+    const node = response.node as Node
     return node.id
   } catch (err) {
     warn('Self: fetchNodeId: robustQuery failed: ', err)

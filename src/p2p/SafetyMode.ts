@@ -5,9 +5,10 @@ import * as Context from './Context'
 import * as CycleCreator from './CycleCreator'
 import * as CycleParser from './CycleParser'
 import * as Self from './Self'
-import { Txs, Record } from '../shared-types/Cycle/SafetyModeTypes'
-import * as Types from '../shared-types/P2PTypes'
-import { CycleRecord } from '../shared-types/Cycle/CycleCreatorTypes'
+import { Txs, Record } from '../shared-types/p2p/SafetyModeTypes'
+import * as Types from '../shared-types/p2p/P2PTypes'
+import { CycleRecord } from '../shared-types/p2p/CycleCreatorTypes'
+import { Change } from '../shared-types/p2p/CycleParserTypes'
 
 /** STATE */
 
@@ -149,7 +150,7 @@ export function validateRecordTypes(rec: Record): string {
 
 export function parseRecord(
   record: CycleRecord
-): CycleParser.Change {
+): Change {
   return {
     added: [],
     removed: [],

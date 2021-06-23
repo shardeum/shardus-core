@@ -16,34 +16,9 @@ import {
   NodeInfo,
   Route,
   Signature,
-  SignedObject,
-} from '../shared-types/P2PTypes'
+} from '../shared-types/p2p/P2PTypes'
 import {logFlags} from '../logger'
-
-/** TYPES */
-
-export interface SetGlobalTx {
-  address: string
-  value: unknown
-  when: number
-  source: string
-}
-
-export interface Receipt {
-  signs: Signature[]
-  tx: SetGlobalTx
-  consensusGroup: Set<NodeInfo['id']>
-}
-
-export interface Tracker {
-  seen: Set<NodeInfo['publicKey']>
-  timestamp: number
-  gossiped: boolean
-}
-
-export type TxHash = string
-
-export type SignedSetGlobalTx = SetGlobalTx & SignedObject
+import { SignedSetGlobalTx, Receipt, TxHash, Tracker, SetGlobalTx } from '../shared-types/p2p/GlobalAccountsTypes'
 
 /** ROUTES */
 // [TODO] - need to add validattion of types to the routes

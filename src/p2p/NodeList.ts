@@ -8,30 +8,11 @@ import {
 } from '../utils'
 import { crypto, logger } from './Context'
 import * as CycleChain from './CycleChain'
-import { JoinedConsensor } from "../shared-types/Cycle/JoinTypes"
+import { JoinedConsensor } from "../shared-types/p2p/JoinTypes"
 import { id } from './Self'
-import { NodeStatus } from '../shared-types/P2PTypes'
+import { NodeStatus } from '../shared-types/p2p/P2PTypes'
 import deepmerge = require('deepmerge')
-
-/** TYPES */
-
-type Diff<T, U> = T extends U ? never : T
-
-type OptionalExceptFor<T, TRequired extends keyof T> = Partial<T> &
-  Pick<T, TRequired>
-
-type RequiredExceptFor<T, TOptional extends keyof T> = Pick<
-  T,
-  Diff<keyof T, TOptional>
-> &
-  Partial<T>
-
-export interface Node extends JoinedConsensor {
-  curvePublicKey: string
-  status: NodeStatus
-}
-
-export type Update = OptionalExceptFor<Node, 'id'>
+import { Node, Update } from '../shared-types/p2p/NodeListTypes'
 
 /** STATE */
 

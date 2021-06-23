@@ -1,20 +1,11 @@
 import { Logger } from 'log4js'
 import * as Comms from './Comms'
 import { logger } from './Context'
-import { CycleRecord } from "../shared-types/Cycle/CycleCreatorTypes"
-import { Change } from './CycleParser'
-import * as Types from '../shared-types/P2PTypes'
+import { CycleRecord } from "../shared-types/p2p/CycleCreatorTypes"
+import { Change } from "../shared-types/p2p/CycleParserTypes"
+import * as Types from '../shared-types/p2p/P2PTypes'
 import {logFlags} from '../logger'
-
-/** TYPES */
-
-export interface Txs {
-  field: []
-}
-
-export interface Record {
-  field: string
-}
+import { Txs } from '../shared-types/p2p/TemplateTypes'
 
 /** STATE */
 

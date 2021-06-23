@@ -3,10 +3,10 @@ import * as utils from '../utils'
 import * as Comms from './Comms'
 import { config, crypto, logger } from './Context'
 import * as CycleCreator from './CycleCreator'
-import { Change } from './CycleParser'
+import { Change } from "../shared-types/p2p/CycleParserTypes"
 import * as NodeList from './NodeList'
 import * as Self from './Self'
-import * as Types from '../shared-types/P2PTypes'
+import * as Types from '../shared-types/p2p/P2PTypes'
 import { validateTypes } from '../utils'
 import { logFlags } from '../logger'
 import {
@@ -14,8 +14,9 @@ import {
   ActiveRequest,
   Txs,
   Record,
-} from '../shared-types/Cycle/ActiveTypes'
-import { CycleRecord } from '../shared-types/Cycle/CycleCreatorTypes'
+} from '../shared-types/p2p/ActiveTypes'
+import { CycleRecord } from '../shared-types/p2p/CycleCreatorTypes'
+import { Node } from '../shared-types/p2p/NodeListTypes'
 
 /** ROUTES */
 
@@ -68,7 +69,7 @@ const routes = {
 
 let p2pLogger: Logger
 
-let activeRequests: Map<NodeList.Node['publicKey'], SignedActiveRequest>
+let activeRequests: Map<Node['publicKey'], SignedActiveRequest>
 let queuedRequest: ActiveRequest
 
 /** FUNCTIONS */

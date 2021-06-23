@@ -1,6 +1,5 @@
-import { Sign } from '../../state-manager/state-manager-types'
-import * as Types from '../P2PTypes'
 import * as CycleCreator from './CycleCreatorTypes'
+import * as Types from './P2PTypes'
 
 /**
  * [TODO] [AS] Remove nodes that are taking too long to sync after they've joined.
@@ -20,7 +19,7 @@ export interface JoinRequest {
   proofOfWork: string
   selectionNum: string
   version: string
-  sign: Sign
+  sign: Types.Signature
 }
 
 export interface Txs {

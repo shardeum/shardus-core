@@ -1,4 +1,4 @@
-import { SignedObject } from '../P2PTypes'
+import { SignedObject } from './P2PTypes'
 
 /** TYPES */
 export interface LostReport {

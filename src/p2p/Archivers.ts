@@ -11,11 +11,12 @@ import * as Comms from './Comms'
 import { crypto, logger, network, io } from './Context'
 import { getCycleChain, computeCycleMarker, getNewest } from './CycleChain'
 import * as CycleCreator from './CycleCreator'
-import { CycleRecord as Cycle, CycleRecord } from "../shared-types/Cycle/CycleCreatorTypes"
+import { CycleRecord as Cycle, CycleRecord } from "../shared-types/p2p/CycleCreatorTypes"
 import * as CycleParser from './CycleParser'
 import { logFlags } from '../logger'
-import { StateMetaData, TypeNames, NamesToTypes } from '../shared-types/Cycle/SnapshotTypes'
-import { JoinedArchiver, DataRecipient, Request, Txs, Record, RequestTypes, DataResponse, DataRequest } from '../shared-types/Cycle/ArchiversTypes'
+import { StateMetaData, TypeNames, NamesToTypes } from '../shared-types/p2p/SnapshotTypes'
+import { JoinedArchiver, DataRecipient, Request, Txs, Record, RequestTypes, DataResponse, DataRequest } from '../shared-types/p2p/ArchiversTypes'
+import { Change } from '../shared-types/p2p/CycleParserTypes'
 
 /** STATE */
 
@@ -115,7 +116,7 @@ export function updateRecord(txs: Txs, record: CycleRecord) {
 
 export function parseRecord(
   record: CycleRecord
-): CycleParser.Change {
+): Change {
   // Update our archivers list
   updateArchivers(record)
 

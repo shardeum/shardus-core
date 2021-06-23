@@ -1,17 +1,8 @@
 import { Logger } from 'log4js'
 import { crypto, logger, stateManager } from './Context'
-import { CycleRecord } from "../shared-types/Cycle/CycleCreatorTypes"
+import { CycleRecord } from "../shared-types/p2p/CycleCreatorTypes"
 import { nodes } from './NodeList'
-import { LooseObject } from '../shared-types/P2PTypes'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-
-/** TYPES */
-
-export interface UnfinshedCycle {
-  metadata: LooseObject
-  updates: LooseObject
-  data: CycleRecord
-}
 
 /** STATE */
 

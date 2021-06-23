@@ -1,4 +1,4 @@
-import * as Types from '../P2PTypes'
+import * as Types from './P2PTypes'
 
 /** TYPES */
 export enum ScaleType {

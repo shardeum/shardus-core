@@ -1,7 +1,7 @@
 import { start } from 'repl'
 import { Certificate } from 'crypto'
-export { Node } from '../p2p/NodeList'
-export {CycleRecord as Cycle} from "../shared-types/Cycle/CycleCreatorTypes"
+export { Node } from '../shared-types/p2p/NodeListTypes'
+export {CycleRecord as Cycle} from "../shared-types/p2p/CycleCreatorTypes"
 //import { RequestHandler } from "express"; //express was causing problems.
 
 type RequestHandler = any

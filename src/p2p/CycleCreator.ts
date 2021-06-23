@@ -10,7 +10,7 @@ import * as Comms from './Comms'
 import { config, crypto, logger, storage } from './Context'
 import * as CycleAutoScale from './CycleAutoScale'
 import * as CycleChain from './CycleChain'
-import { CycleTxs, CycleRecord, CycleMarker, CycleCert, CycleData, BaseRecord } from '../shared-types/Cycle/CycleCreatorTypes'
+import { CycleTxs, CycleRecord, CycleMarker, CycleCert, CycleData, BaseRecord } from '../shared-types/p2p/CycleCreatorTypes'
 import * as Join from './Join'
 import * as Lost from './Lost'
 import * as NodeList from './NodeList'
@@ -19,8 +19,9 @@ import * as Rotation from './Rotation'
 import * as SafetyMode from './SafetyMode'
 import * as Self from './Self'
 import * as Sync from './Sync'
-import { GossipHandler, InternalHandler } from '../shared-types/P2PTypes'
+import { GossipHandler, InternalHandler } from '../shared-types/p2p/P2PTypes'
 import { compareQuery, Comparison } from './Utils'
+import { Node } from '../shared-types/p2p/NodeListTypes'
 
 /** CONSTANTS */
 
@@ -106,12 +107,12 @@ const compareMarkerRoute: InternalHandler<
 const compareCertRoute: InternalHandler<
   CompareCertReq,
   CompareCertRes,
-  NodeList.Node['id']
+  Node['id']
 > = (payload, respond, sender) => {
   respond(compareCycleCertEndpoint(payload, sender))
 }
 
-const gossipCertRoute: GossipHandler<CompareCertReq, NodeList.Node['id']> = (
+const gossipCertRoute: GossipHandler<CompareCertReq, Node['id']> = (
   payload,
   sender
 ) => {
@@ -729,7 +730,7 @@ function scoreCert(cert: CycleCert): number {
   }
 }
 
-function validateCertSign(certs: CycleCert[], sender: NodeList.Node['id']) {
+function validateCertSign(certs: CycleCert[], sender: Node['id']) {
   for (const cert of certs) {
     const cleanCert: CycleCert = {
       marker: cert.marker,
@@ -967,8 +968,8 @@ function compareCycleCertEndpoint(inp: CompareCertReq, sender) {
 
 async function compareCycleCert(myC: number, myQ: number, matches: number) {
   const queryFn = async (
-    node: NodeList.Node
-  ): Promise<[CompareCertRes, NodeList.Node]> => {
+    node: Node
+  ): Promise<[CompareCertRes, Node]> => {
     const req: CompareCertReq = {
       certs: bestCycleCert.get(bestMarker),
       record: bestRecord,
@@ -1021,8 +1022,8 @@ async function compareCycleCert(myC: number, myQ: number, matches: number) {
 
   // If anything compares better than us, compareQuery starts over
   const errors = await compareQuery<
-    NodeList.Node,
-    [CompareCertRes, NodeList.Node]
+    Node,
+    [CompareCertRes, Node]
   >(NodeList.activeOthersByIdOrder, queryFn, compareFn, matches)
 
   if (errors.length > 0) {
@@ -1050,7 +1051,7 @@ async function gossipMyCycleCert() {
 
 function gossipHandlerCycleCert(
   inp: CompareCertReq,
-  sender: NodeList.Node['id']
+  sender: Node['id']
 ) {
   if (!validateCertsRecordTypes(inp, 'gossipHandlerCycleCert')) return
   // [TODO] - submodules need to validate their part of the record

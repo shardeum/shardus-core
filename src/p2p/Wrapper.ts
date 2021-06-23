@@ -12,7 +12,8 @@ import * as Self from './Self'
 import * as Utils from './Utils'
 import {logFlags} from '../logger'
 import {getNodeRequestingJoin} from './Join'
-import { P2PNode } from '../shared-types/P2PTypes'
+import { P2PNode } from '../shared-types/p2p/P2PTypes'
+import { Node } from '../shared-types/p2p/NodeListTypes'
 
 /* p2p functions */
 
@@ -40,14 +41,14 @@ class P2P extends EventEmitter {
     payload: any,
     tracker?: string,
     sender?: any,
-    inpNodes?: NodeList.Node[]
+    inpNodes?: Node[]
   ) => Promise<void>
   sendGossipAll: (
     type: any,
     payload: any,
     tracker?: string,
     sender?: any,
-    inpNodes?: NodeList.Node[]
+    inpNodes?: Node[]
   ) => Promise<void>
 
   robustQuery: any

@@ -6,8 +6,8 @@ import * as CycleParser from './CycleParser'
 import * as Rotation from './Rotation'
 import * as Self from './Self'
 import * as NodeList from './NodeList'
-import { LooseObject } from '../shared-types/P2PTypes'
-import * as Types from '../shared-types/P2PTypes'
+import { LooseObject } from '../shared-types/p2p/P2PTypes'
+import * as Types from '../shared-types/p2p/P2PTypes'
 import { validateTypes, sleep } from '../utils'
 import * as Comms from './Comms'
 import * as Utils from './Utils'
@@ -21,8 +21,9 @@ import {
   ScaleType,
   Txs,
   Record,
-} from '../shared-types/Cycle/CycleAutoScaleTypes'
-import { CycleRecord } from '../shared-types/Cycle/CycleCreatorTypes'
+} from '../shared-types/p2p/CycleAutoScaleTypes'
+import { CycleRecord } from '../shared-types/p2p/CycleCreatorTypes'
+import { Change } from '../shared-types/p2p/CycleParserTypes'
 
 /** STATE */
 
@@ -321,7 +322,7 @@ export function updateRecord(txs: Txs, record: CycleRecord) {
   reset()
 }
 
-export function parseRecord(record: CycleRecord): CycleParser.Change {
+export function parseRecord(record: CycleRecord): Change {
   // Since we don't touch the NodeList, return an empty Change
   return {
     added: [],

@@ -1,15 +1,9 @@
 import deepmerge from 'deepmerge'
 import * as CycleCreator from './CycleCreator'
-import { CycleRecord } from "../shared-types/Cycle/CycleCreatorTypes"
-import { JoinedConsensor } from "../shared-types/Cycle/JoinTypes"
-import { Node, Update } from './NodeList'
+import { CycleRecord } from "../shared-types/p2p/CycleCreatorTypes"
+import { Node, Update } from "../shared-types/p2p/NodeListTypes"
 import { reversed } from '../utils'
-
-export interface Change {
-  added: JoinedConsensor[] // order joinRequestTimestamp [OLD, ..., NEW]
-  removed: Array<Node['id']> // order doesn't matter
-  updated: Update[] // order doesn't matter
-}
+import { Change } from '../shared-types/p2p/CycleParserTypes'
 
 export function parse(record: CycleRecord): Change {
   const changes = CycleCreator.submodules.map(submodule =>

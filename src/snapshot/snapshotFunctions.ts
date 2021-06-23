@@ -1,29 +1,17 @@
-import * as express from 'express'
-import * as log4js from 'log4js'
-import * as http from '../http'
-import * as Active from '../p2p/Active'
-import * as Archivers from '../p2p/Archivers'
-import * as Comms from '../p2p/Comms'
-import * as Context from '../p2p/Context'
-import * as CycleCreator from '../p2p/CycleCreator'
-import * as NodeList from '../p2p/NodeList'
-import * as Self from '../p2p/Self'
-import * as Sync from '../p2p/Sync'
-import * as ShardusTypes from '../shardus/shardus-types'
-import * as Types from '../shared-types/P2PTypes'
-import * as shardusTypes from '../shardus/shardus-types'
-import ShardFunctions from '../state-manager/shardFunctions'
-import * as shardFunctionTypes from '../state-manager/shardFunctionTypes'
-import * as utils from '../utils'
-import * as partitionGossip from './partition-gossip'
-import { snapshotLogger, safetyModeVals } from './index'
-import { NetworkSummarytHash } from "../shared-types/Cycle/SnapshotTypes"
-import { hashMap } from './partition-gossip'
 import got from 'got'
 import stream from 'stream'
 import zlib from 'zlib'
-import {logFlags} from '../logger'
+import { logFlags } from '../logger'
+import * as Context from '../p2p/Context'
+import * as NodeList from '../p2p/NodeList'
+import * as Self from '../p2p/Self'
+import * as ShardusTypes from '../shardus/shardus-types'
+import { NetworkSummarytHash, ReceiptHashes, StateHashes, SummaryHashes } from "../shared-types/p2p/SnapshotTypes"
+import ShardFunctions from '../state-manager/shardFunctions'
+import * as shardFunctionTypes from '../state-manager/shardFunctionTypes'
 import { Cycle, CycleShardData } from '../state-manager/state-manager-types'
+import { safetyModeVals, snapshotLogger } from './index'
+import { hashMap } from './partition-gossip'
 
 const { Transform } = require('stream')
 /** TYPES */
@@ -263,7 +251,7 @@ export async function calculateOldDataMap (
 
   /**
    * [NOTE] [AS] Need to do this because type of 'cycleJoined' field differs
-   * between ShardusTypes.Node (number) and P2P/NodeList.Node (string)
+   * between ShardusTypes.Node (number) and P2P/Node (string)
    */
   const nodes = (NodeList.byIdOrder as unknown) as ShardusTypes.Node[]
 

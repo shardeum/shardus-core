@@ -6,20 +6,15 @@ import { reversed, validateTypes } from '../utils'
 import { logger, network } from './Context'
 import * as CycleChain from './CycleChain'
 import * as CycleCreator from './CycleCreator'
-import { Change, ChangeSquasher, parse } from './CycleParser'
+import { ChangeSquasher, parse } from './CycleParser'
+import { Change } from "../shared-types/p2p/CycleParserTypes"
 import * as NodeList from './NodeList'
 import * as Self from './Self'
-import { Route } from '../shared-types/P2PTypes'
+import { Route } from '../shared-types/p2p/P2PTypes'
 import { robustQuery } from './Utils'
-import { CycleRecord } from '../shared-types/Cycle/CycleCreatorTypes'
-
-/** TYPES */
-
-export interface ActiveNode {
-  ip: string
-  port: number
-  publicKey: string
-}
+import { CycleRecord } from '../shared-types/p2p/CycleCreatorTypes'
+import { ActiveNode } from '../shared-types/p2p/SyncTypes'
+import { Node } from '../shared-types/p2p/NodeListTypes'
 
 /** STATE */
 
@@ -201,7 +196,7 @@ export async function sync(activeNodes: ActiveNode[]) {
 
 type SyncNode = Partial<
   Pick<ActiveNode, 'ip' | 'port'> &
-    Pick<NodeList.Node, 'externalIp' | 'externalPort'>
+    Pick<Node, 'externalIp' | 'externalPort'>
 >
 
 export async function syncNewCycles(activeNodes: SyncNode[]) {
