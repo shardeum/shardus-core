@@ -1,12 +1,19 @@
-import { CycleRecord as Cycle } from "./CycleCreatorTypes";
-import { NamesToTypes, StateMetaData, TypeIndex, TypeName, TypeNames, ValidTypes } from '../Cycle/SnapshotTypes';
-import { SignedObject } from '../P2PTypes';
+import {
+  NamesToTypes,
+  StateMetaData,
+  TypeIndex,
+  TypeName,
+  TypeNames,
+  ValidTypes
+} from '../Cycle/SnapshotTypes'
+import { SignedObject } from '../P2PTypes'
+import { CycleRecord as Cycle } from './CycleCreatorTypes'
 
 /** TYPES */
 
 export enum RequestTypes {
   JOIN = 'JOIN',
-  LEAVE = 'LEAVE'
+  LEAVE = 'LEAVE',
 }
 
 export interface DataRequest<T extends ValidTypes> {
@@ -15,34 +22,34 @@ export interface DataRequest<T extends ValidTypes> {
 }
 
 export interface DataResponse {
-  publicKey: string;
+  publicKey: string
   responses: {
-    [T in TypeNames]?: NamesToTypes[T][];
-  };
-  recipient: string;
+    [T in TypeNames]?: NamesToTypes[T][]
+  }
+  recipient: string
 }
 export interface DataRecipient {
-  nodeInfo: JoinedArchiver;
-  dataRequests: DataRequest<Cycle | StateMetaData>[];
-  curvePk: string;
+  nodeInfo: JoinedArchiver
+  dataRequests: DataRequest<Cycle | StateMetaData>[]
+  curvePk: string
 }
 
 export interface JoinedArchiver {
-  publicKey: string;
-  ip: string;
-  port: number;
-  curvePk: string;
+  publicKey: string
+  ip: string
+  port: number
+  curvePk: string
 }
 
 export interface Request extends SignedObject {
-  nodeInfo: JoinedArchiver;
-  requestType: string;
+  nodeInfo: JoinedArchiver
+  requestType: string
 }
 export interface Txs {
-  archivers: Request[];
+  archivers: Request[]
 }
 
 export interface Record {
-  joinedArchivers: JoinedArchiver[];
-  leavingArchivers: JoinedArchiver[];
+  joinedArchivers: JoinedArchiver[]
+  leavingArchivers: JoinedArchiver[]
 }

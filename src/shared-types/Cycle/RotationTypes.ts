@@ -1,8 +1,8 @@
 /** TYPES */
 
-export interface Txs { }
+export interface Txs {}
 
 export interface Record {
-  expired: number;
-  removed: string[];
+  expired: number
+  removed: string[]
 }

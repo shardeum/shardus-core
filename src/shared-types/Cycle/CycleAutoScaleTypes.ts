@@ -1,26 +1,26 @@
-import * as Types from '../P2PTypes';
+import * as Types from '../P2PTypes'
 
 /** TYPES */
 export enum ScaleType {
   UP = 'up',
-  DOWN = 'down'
+  DOWN = 'down',
 }
 
 export interface Record {
-  desired: number;
+  desired: number
 }
 export interface ScaleRequest {
-  nodeId: string;
-  timestamp: number;
-  counter: number;
-  scale: string;
+  nodeId: string
+  timestamp: number
+  counter: number
+  scale: string
 }
 
 export interface Txs {
-  autoscaling: SignedScaleRequest[];
+  autoscaling: SignedScaleRequest[]
 }
 
-export type SignedScaleRequest = ScaleRequest & Types.SignedObject;
+export type SignedScaleRequest = ScaleRequest & Types.SignedObject
 interface ScaleRequestMap {
-  [nodeId: string]: SignedScaleRequest;
+  [nodeId: string]: SignedScaleRequest
 }

@@ -1,6 +1,6 @@
-import * as CycleCreator from './CycleCreatorTypes';
-import * as Types from '../P2PTypes';
-import { Sign } from '../../state-manager/state-manager-types';
+import { Sign } from '../../state-manager/state-manager-types'
+import * as Types from '../P2PTypes'
+import * as CycleCreator from './CycleCreatorTypes'
 
 /**
  * [TODO] [AS] Remove nodes that are taking too long to sync after they've joined.
@@ -9,25 +9,25 @@ import { Sign } from '../../state-manager/state-manager-types';
 /** TYPES */
 
 export interface JoinedConsensor extends Types.P2PNode {
-  cycleJoined: CycleCreator.CycleMarker;
-  counterRefreshed: CycleCreator.CycleRecord['counter'];
-  id: string;
+  cycleJoined: CycleCreator.CycleMarker
+  counterRefreshed: CycleCreator.CycleRecord['counter']
+  id: string
 }
 
 export interface JoinRequest {
-  nodeInfo: Types.P2PNode;
-  cycleMarker: CycleCreator.CycleMarker;
-  proofOfWork: string;
-  selectionNum: string;
-  version: string;
-  sign: Sign;
+  nodeInfo: Types.P2PNode
+  cycleMarker: CycleCreator.CycleMarker
+  proofOfWork: string
+  selectionNum: string
+  version: string
+  sign: Sign
 }
 
 export interface Txs {
-  join: JoinRequest[];
+  join: JoinRequest[]
 }
 
 export interface Record {
-  syncing: number;
-  joinedConsensors: JoinedConsensor[];
+  syncing: number
+  joinedConsensors: JoinedConsensor[]
 }

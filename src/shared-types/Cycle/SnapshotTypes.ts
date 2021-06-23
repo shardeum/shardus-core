@@ -18,8 +18,8 @@ export enum TypeNames {
 }
 
 export interface NamesToTypes {
-  CYCLE: CycleRecord;
-  STATE_METADATA: StateMetaData;
+  CYCLE: CycleRecord
+  STATE_METADATA: StateMetaData
 }
 
 export type TypeName<T extends ValidTypes> = T extends CycleRecord
