@@ -11,7 +11,7 @@
 //import { WrappedData } from "../shardus/shardus-types";
 //imports up top break the export, boo.
 import * as Shardus from '../shardus/shardus-types'
-import { StateManager } from '../types'
+import { StateManager } from 'shardus-types'
 export { App, Cycle, Sign, AcceptedTx, ApplyResponse } from '../shardus/shardus-types'
 
 export type WrappedStateArray = Shardus.WrappedData[]

@@ -20,7 +20,7 @@ of a particular node, the node is removed from the node list.
 */
 import { Handler } from 'express'
 import * as Sequelize from 'sequelize'
-import { P2P } from '../types'
+import { P2P } from 'shardus-types'
 import { validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { crypto, logger, network } from './Context'

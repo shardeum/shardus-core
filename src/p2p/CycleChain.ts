@@ -1,6 +1,6 @@
 import { Logger } from 'log4js'
 import { crypto, logger, stateManager } from './Context'
-import { P2P } from '../types'
+import { P2P } from 'shardus-types'
 import { nodes } from './NodeList'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 

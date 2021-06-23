@@ -1,7 +1,7 @@
 import deepmerge from 'deepmerge'
 import { Logger } from 'log4js'
 import { logFlags } from '../logger'
-import { P2P } from '../types'
+import { P2P } from 'shardus-types'
 import { sleep, validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { config, crypto, logger } from './Context'

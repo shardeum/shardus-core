@@ -1,7 +1,8 @@
 import { start } from 'repl'
 import { Certificate } from 'crypto'
-export { Node } from '../types/p2p/NodeListTypes'
-export {CycleRecord as Cycle} from "../types/p2p/CycleCreatorTypes"
+import { P2P } from 'shardus-types'
+export type Node = P2P.NodeListTypes.Node
+export type Cycle = P2P.CycleCreatorTypes.CycleRecord
 //import { RequestHandler } from "express"; //express was causing problems.
 
 type RequestHandler = any

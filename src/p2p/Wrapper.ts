@@ -12,8 +12,7 @@ import * as Self from './Self'
 import * as Utils from './Utils'
 import {logFlags} from '../logger'
 import {getNodeRequestingJoin} from './Join'
-import { P2PNode } from '../types/p2p/P2PTypes'
-import { Node } from '../types/p2p/NodeListTypes'
+import { P2P as P2PTypings } from 'shardus-types'
 
 /* p2p functions */
 
@@ -41,7 +40,7 @@ class P2P extends EventEmitter {
     payload: any,
     tracker?: string,
     sender?: any,
-    inpNodes?: Node[],
+    inpNodes?: P2PTypings.NodeListTypes.Node[],
     isOrigin?: boolean
   ) => Promise<void>
   sendGossipAll: (
@@ -49,7 +48,7 @@ class P2P extends EventEmitter {
     payload: any,
     tracker?: string,
     sender?: any,
-    inpNodes?: Node[]
+    inpNodes?: P2PTypings.NodeListTypes.Node[]
   ) => Promise<void>
 
   robustQuery: any
@@ -147,7 +146,7 @@ class State extends EventEmitter {
     return NodeList.nodes
   }
 
-  getNodesRequestingJoin(): P2PNode[] {
+  getNodesRequestingJoin(): P2PTypings.P2PTypes.P2PNode[] {
     return getNodeRequestingJoin()
   }
 

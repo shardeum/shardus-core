@@ -1,4 +1,5 @@
 import got from 'got'
+import { P2P, StateManager } from 'shardus-types'
 import stream from 'stream'
 import zlib from 'zlib'
 import { logFlags } from '../logger'
@@ -6,9 +7,7 @@ import * as Context from '../p2p/Context'
 import * as NodeList from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
 import * as ShardusTypes from '../shardus/shardus-types'
-import { NetworkSummarytHash, ReceiptHashes, StateHashes, SummaryHashes } from "../types/p2p/SnapshotTypes"
 import ShardFunctions from '../state-manager/shardFunctions'
-import { StateManager } from '../types'
 import { Cycle, CycleShardData } from '../state-manager/state-manager-types'
 import { safetyModeVals, snapshotLogger } from './index'
 import { hashMap } from './partition-gossip'
@@ -83,10 +82,10 @@ export function createNetworkHash (
 
 export function updateStateHashesByCycleMap (
   counter: Cycle['counter'],
-  stateHash: StateHashes,
+  stateHash: P2P.SnapshotTypes.StateHashes,
   stateHashesByCycle
 ) {
-  const newStateHashByCycle: Map<Cycle['counter'], StateHashes> = new Map(
+  const newStateHashByCycle: Map<Cycle['counter'], P2P.SnapshotTypes.StateHashes> = new Map(
     stateHashesByCycle
   )
   const transformedStateHash = {
@@ -107,10 +106,10 @@ export function updateStateHashesByCycleMap (
 
 export function updateReceiptHashesByCycleMap (
   counter: Cycle['counter'],
-  receiptHash: ReceiptHashes,
+  receiptHash: P2P.SnapshotTypes.ReceiptHashes,
   receiptHashesByCycle
 ) {
-  const newReceiptHashesByCycle: Map<Cycle['counter'], ReceiptHashes> = new Map(
+  const newReceiptHashesByCycle: Map<Cycle['counter'], P2P.SnapshotTypes.ReceiptHashes> = new Map(
     receiptHashesByCycle
   )
 
@@ -132,10 +131,10 @@ export function updateReceiptHashesByCycleMap (
 
 export function updateSummaryHashesByCycleMap (
   counter: Cycle['counter'],
-  summaryHashes: SummaryHashes,
+  summaryHashes: P2P.SnapshotTypes.SummaryHashes,
   summaryHashesByCycle
 ) {
-  const newSummaryHashesByCycle: Map<Cycle['counter'], SummaryHashes> = new Map(
+  const newSummaryHashesByCycle: Map<Cycle['counter'], P2P.SnapshotTypes.SummaryHashes> = new Map(
     summaryHashesByCycle
   )
 
@@ -194,7 +193,7 @@ export async function saveReceiptAndNetworkHashes (
 export async function saveSummaryAndNetworkHashes (
   shard: CycleShardData,
   summaryHashes: hashMap,
-  summaryReceiptHash: NetworkSummarytHash
+  summaryReceiptHash: P2P.SnapshotTypes.NetworkSummarytHash
 ) {
   for (const [partitionId, hash] of summaryHashes) {
     await Context.storage.addSummaryHash({

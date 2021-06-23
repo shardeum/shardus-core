@@ -1,6 +1,5 @@
 import { Logger } from 'log4js'
-import { P2P } from "../types"
-import { Record, Txs } from '../types/p2p/RotationTypes'
+import { P2P } from 'shardus-types'
 import { insertSorted, validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { config, logger } from './Context'
@@ -45,11 +44,11 @@ export function init() {
 
 export function reset() {}
 
-export function getTxs(): Txs {
+export function getTxs(): P2P.RotationTypes.Txs {
   return {}
 }
 
-export function validateRecordTypes(rec: Record): string {
+export function validateRecordTypes(rec: P2P.RotationTypes.Record): string {
   let err = validateTypes(rec, { expired: 'n', removed: 'a' })
   if (err) return err
   for (const item of rec.removed) {
@@ -59,14 +58,14 @@ export function validateRecordTypes(rec: Record): string {
   return ''
 }
 
-export function dropInvalidTxs(txs: Txs): Txs {
+export function dropInvalidTxs(txs: P2P.RotationTypes.Txs): P2P.RotationTypes.Txs {
   return txs
 }
 
 /*
 Given the txs and prev cycle record mutate the referenced record
 */
-export function updateRecord(txs: Txs, record: P2P.CycleCreatorTypes.CycleRecord, prev: P2P.CycleCreatorTypes.CycleRecord) {
+export function updateRecord(txs: P2P.RotationTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord, prev: P2P.CycleCreatorTypes.CycleRecord) {
   if (!prev) {
     record.expired = 0
     record.removed = []

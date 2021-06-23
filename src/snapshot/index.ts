@@ -1,40 +1,36 @@
 import * as express from 'express'
 import * as log4js from 'log4js'
-import { profilerInstance } from '../utils/profiler'
-import Crypto from '../crypto'
+import { StateManager } from 'shardus-types'
 import * as http from '../http'
+import { logFlags } from '../logger'
 import * as Active from '../p2p/Active'
-import * as Archivers from '../p2p/Archivers'
 import * as Comms from '../p2p/Comms'
 import * as Context from '../p2p/Context'
-import * as CycleCreator from '../types/p2p/CycleCreatorTypes'
 import * as CycleChain from '../p2p/CycleChain'
 import * as NodeList from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
 import * as Sync from '../p2p/Sync'
-import * as Types from '../types/p2p/P2PTypes'
 import * as ShardusTypes from '../shardus/shardus-types'
 import ShardFunctions from '../state-manager/shardFunctions'
-import { StateManager } from '../types'
+import { Cycle, CycleShardData, MainHashResults, ReceiptMapResult, StatsClump } from '../state-manager/state-manager-types'
+import { P2P } from 'shardus-types'
 import * as utils from '../utils'
+import { profilerInstance } from '../utils/profiler'
 import * as partitionGossip from './partition-gossip'
 import * as SnapshotFunctions from './snapshotFunctions'
-import {logFlags} from '../logger'
-import { Cycle, ReceiptMapResult, StatsClump, CycleShardData, MainHashResults } from '../state-manager/state-manager-types'
-import { StateHashes, ReceiptHashes, SummaryHashes, PartitionNum, PartitionRanges, offerResponse } from '../types/p2p/SnapshotTypes'
 
 /** STATE */
 
 export let oldDataPath: string
-let oldDataMap: Map<PartitionNum, any[]> = new Map()
-const dataToMigrate: Map<PartitionNum, any[]> = new Map()
-const oldPartitionHashMap: Map<PartitionNum, string> = new Map()
-let missingPartitions: PartitionNum[] = []
+let oldDataMap: Map<P2P.SnapshotTypes.PartitionNum, any[]> = new Map()
+const dataToMigrate: Map<P2P.SnapshotTypes.PartitionNum, any[]> = new Map()
+const oldPartitionHashMap: Map<P2P.SnapshotTypes.PartitionNum, string> = new Map()
+let missingPartitions: P2P.SnapshotTypes.PartitionNum[] = []
 const notNeededRepliedNodes: Map<string, true> = new Map()
 const alreadyOfferedNodes = new Map()
-let stateHashesByCycle: Map<Cycle['counter'], StateHashes> = new Map()
-let receiptHashesByCycle: Map<Cycle['counter'], ReceiptHashes> = new Map()
-let summaryHashesByCycle: Map<Cycle['counter'], SummaryHashes> = new Map()
+let stateHashesByCycle: Map<Cycle['counter'], P2P.SnapshotTypes.StateHashes> = new Map()
+let receiptHashesByCycle: Map<Cycle['counter'], P2P.SnapshotTypes.ReceiptHashes> = new Map()
+let summaryHashesByCycle: Map<Cycle['counter'], P2P.SnapshotTypes.SummaryHashes> = new Map()
 const partitionBlockMapByCycle: Map<
   Cycle['counter'],
   ReceiptMapResult[]
@@ -64,8 +60,8 @@ export function setOldDataPath(path) {
 export function getStateHashes(
   start: Cycle['counter'] = 0,
   end?: Cycle['counter']
-): StateHashes[] {
-  const collector: StateHashes[] = []
+): P2P.SnapshotTypes.StateHashes[] {
+  const collector: P2P.SnapshotTypes.StateHashes[] = []
   for (const [key] of stateHashesByCycle) {
     if (key >= start) {
       // check against end cycle only if it's provided
@@ -78,8 +74,8 @@ export function getStateHashes(
 export function getReceiptHashes(
   start: Cycle['counter'] = 0,
   end?: Cycle['counter']
-): ReceiptHashes[] {
-  const collector: ReceiptHashes[] = []
+): P2P.SnapshotTypes.ReceiptHashes[] {
+  const collector: P2P.SnapshotTypes.ReceiptHashes[] = []
   for (const [key] of receiptHashesByCycle) {
     if (key >= start) {
       // check against end cycle only if it's provided
@@ -92,8 +88,8 @@ export function getReceiptHashes(
 export function getSummaryHashes(
   start: Cycle['counter'] = 0,
   end?: Cycle['counter']
-): SummaryHashes[] {
-  const collector: SummaryHashes[] = []
+): P2P.SnapshotTypes.SummaryHashes[] {
+  const collector: P2P.SnapshotTypes.SummaryHashes[] = []
   for (const [key] of summaryHashesByCycle) {
     if (key >= start) {
       // check against end cycle only if it's provided
@@ -286,7 +282,7 @@ export function startSnapshotting() {
           )
 
           // Update stateHashes by Cycle map
-          const newStateHash: StateHashes = {
+          const newStateHash: P2P.SnapshotTypes.StateHashes = {
             counter: shard.cycleNumber,
             partitionHashes,
             networkHash: networkStateHash,
@@ -298,7 +294,7 @@ export function startSnapshotting() {
           )
 
           // Update receiptHashes by Cycle map
-          const newReceiptHash: ReceiptHashes = {
+          const newReceiptHash: P2P.SnapshotTypes.ReceiptHashes = {
             counter: shard.cycleNumber,
             receiptMapHashes: receiptHashes,
             networkReceiptHash: networkReceiptMapHash,
@@ -310,7 +306,7 @@ export function startSnapshotting() {
           )
 
           // Update summaryHashes by Cycle map
-          const newSummaryHash: SummaryHashes = {
+          const newSummaryHash: P2P.SnapshotTypes.SummaryHashes = {
             counter: shard.cycleNumber,
             summaryHashes: summaryHashes,
             networkSummaryHash: networkSummaryHash,
@@ -411,7 +407,7 @@ export async function safetySync() {
 
   // Wait until safetyNum of nodes have joined the network
   await new Promise<void>((resolve) => {
-    Self.emitter.on('new_cycle_data', (data: CycleCreator.CycleData) => {
+    Self.emitter.on('new_cycle_data', (data: P2P.CycleCreatorTypes.CycleData) => {
       if (data.syncing >= data.safetyNum) {
         safetyNum = data.safetyNum
         if (!safetyModeVals.networkStateHash) {
@@ -533,7 +529,7 @@ function getNodesThatCoverPartition(
   return nodesInPartition
 }
 
-function getPartitionRanges(shard: CycleShardData): PartitionRanges {
+function getPartitionRanges(shard: CycleShardData): P2P.SnapshotTypes.PartitionRanges {
   const partitionRanges = new Map()
   for (const partition of shard.ourStoredPartitions) {
     partitionRanges.set(
@@ -649,7 +645,7 @@ async function sendOfferToNode(node, offer, isSuggestedByNetwork = false) {
   }
   log(`Offer response from ${node.ip}:${node.port} is => `, answer)
   // If a node reply us as 'needed', send requested data for requested partitions
-  if (answer === offerResponse.needed) {
+  if (answer === P2P.SnapshotTypes.offerResponse.needed) {
     const requestedPartitions = res.partitions
     const dataToSend = {}
     for (const partitionId of requestedPartitions) {
@@ -660,7 +656,7 @@ async function sendOfferToNode(node, offer, isSuggestedByNetwork = false) {
     }
     await http.post(`${node.ip}:${node.port}/snapshot-data`, dataToSend)
     // If a node reply us 'try_later', wait X amount of time provided by node (OR) cycleDuration/2
-  } else if (answer === offerResponse.tryLater) {
+  } else if (answer === P2P.SnapshotTypes.offerResponse.tryLater) {
     const waitTime = res.waitTime || 5 * Context.config.p2p.cycleDuration * 1000
     setTimeout(() => {
       log(
@@ -669,7 +665,7 @@ async function sendOfferToNode(node, offer, isSuggestedByNetwork = false) {
       sendOfferToNode(node, offer, isSuggestedByNetwork)
     }, waitTime)
     // If a node reply us 'send_to', send data to those provided nodes
-  } else if (answer === offerResponse.sendTo) {
+  } else if (answer === P2P.SnapshotTypes.offerResponse.sendTo) {
     if (isSuggestedByNetwork) {
       // this node is suggesed by other nodes in the network, so send_to response is ignored to prevent infinite loop
       return
@@ -684,7 +680,7 @@ async function sendOfferToNode(node, offer, isSuggestedByNetwork = false) {
         }
       }
     }
-  } else if (answer === offerResponse.notNeeded) {
+  } else if (answer === P2P.SnapshotTypes.offerResponse.notNeeded) {
     increaseNotNeededNodes(node.id)
   }
 }
@@ -749,7 +745,7 @@ function processDownloadedMissingData(missingData) {
 }
 
 function registerSnapshotRoutes() {
-  const snapshotDataOfferRoute: Types.Route<express.Handler> = {
+  const snapshotDataOfferRoute: P2P.P2PTypes.Route<express.Handler> = {
     method: 'POST',
     name: 'snapshot-data-offer',
     handler: async (req, res) => {
@@ -759,9 +755,9 @@ function registerSnapshotRoutes() {
         res.json([])
         return
       }
-      if (Self.isActive) return res.json({ answer: offerResponse.notNeeded })
+      if (Self.isActive) return res.json({ answer: P2P.SnapshotTypes.offerResponse.notNeeded })
       const offerRequest = req.body
-      let answer = offerResponse.notNeeded
+      let answer = P2P.SnapshotTypes.offerResponse.notNeeded
       const neededPartitonIds = []
       const neededHashes = []
       if (offerRequest.networkStateHash === safetyModeVals.networkStateHash) {
@@ -775,10 +771,10 @@ function registerSnapshotRoutes() {
             if (!hasHashForPartition) neededHashes.push(partitionId)
           }
         }
-        if (neededPartitonIds.length > 0) answer = offerResponse.needed
+        if (neededPartitonIds.length > 0) answer = P2P.SnapshotTypes.offerResponse.needed
       }
       res.json({ answer })
-      if (answer === offerResponse.needed && missingPartitions.length > 0) {
+      if (answer === P2P.SnapshotTypes.offerResponse.needed && missingPartitions.length > 0) {
         const downloadedSnapshotData = await SnapshotFunctions.downloadDataFromNode(
           offerRequest.downloadUrl
         )
@@ -787,7 +783,7 @@ function registerSnapshotRoutes() {
       }
     },
   }
-  const snapshotWitnessDataOfferRoute: Types.Route<express.Handler> = {
+  const snapshotWitnessDataOfferRoute: P2P.P2PTypes.Route<express.Handler> = {
     method: 'POST',
     name: 'snapshot-witness-data',
     handler: (req, res) => {
@@ -798,7 +794,7 @@ function registerSnapshotRoutes() {
         return
       }
       if (Self.isActive) {
-        return res.json({ answer: offerResponse.notNeeded })
+        return res.json({ answer: P2P.SnapshotTypes.offerResponse.notNeeded })
       }
       const offerRequest = req.body
       const neededPartitonIds = []
@@ -809,7 +805,7 @@ function registerSnapshotRoutes() {
         if (!safetyModeVals.networkStateHash)
           log('We have empty network state hash. Try agian later')
         return res.json({
-          answer: offerResponse.tryLater,
+          answer: P2P.SnapshotTypes.offerResponse.tryLater,
           waitTime: Context.config.p2p.cycleDuration * 1000 * 0.5,
         })
       }
@@ -827,13 +823,13 @@ function registerSnapshotRoutes() {
         }
         if (neededPartitonIds.length > 0) {
           return res.json({
-            answer: offerResponse.needed,
+            answer: P2P.SnapshotTypes.offerResponse.needed,
             partitions: neededPartitonIds,
             hashes: neededHashes,
           })
         }
       }
-      return res.json({ answer: offerResponse.notNeeded })
+      return res.json({ answer: P2P.SnapshotTypes.offerResponse.notNeeded })
     },
   }
 

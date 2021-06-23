@@ -4,7 +4,7 @@ import * as Shardus from '../shardus/shardus-types'
 
 const stringify = require('fast-stable-stringify')
 
-import { StateManager } from '../types'
+import { StateManager } from 'shardus-types'
 
 class ShardFunctions {
   static logger: Logger = null
