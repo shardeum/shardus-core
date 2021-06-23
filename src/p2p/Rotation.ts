@@ -1,14 +1,11 @@
 import { Logger } from 'log4js'
+import { P2P } from "../shared-types"
+import { Record, Txs } from '../shared-types/p2p/RotationTypes'
 import { insertSorted, validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { config, logger } from './Context'
-import { CycleRecord } from "../shared-types/p2p/CycleCreatorTypes"
-import { Change } from "../shared-types/p2p/CycleParserTypes"
-import { getDesiredCount } from './CycleAutoScale'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
-import * as Types from '../shared-types/p2p/P2PTypes'
-import { Txs, Record } from '../shared-types/p2p/RotationTypes'
 
 /** STATE */
 
@@ -17,7 +14,7 @@ let p2pLogger: Logger
 /** ROUTES */
 
 // [TODO] - since we don't have any routes, no need to create and register this emply function
-const gossipRoute: Types.GossipHandler = (payload) => {}
+const gossipRoute: P2P.P2PTypes.GossipHandler = (payload) => {}
 
 const routes = {
   internal: {},
@@ -69,7 +66,7 @@ export function dropInvalidTxs(txs: Txs): Txs {
 /*
 Given the txs and prev cycle record mutate the referenced record
 */
-export function updateRecord(txs: Txs, record: CycleRecord, prev: CycleRecord) {
+export function updateRecord(txs: Txs, record: P2P.CycleCreatorTypes.CycleRecord, prev: P2P.CycleCreatorTypes.CycleRecord) {
   if (!prev) {
     record.expired = 0
     record.removed = []
@@ -83,7 +80,7 @@ export function updateRecord(txs: Txs, record: CycleRecord, prev: CycleRecord) {
   record.removed = removed // already sorted
 }
 
-export function parseRecord(record: CycleRecord): Change {
+export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
   // Look at the removed id's and make Self emit 'removed' if your own id is there
   if (record.removed.includes(Self.id)) {
     Self.emitter.emit('removed', Self.id)
@@ -103,8 +100,8 @@ export function sendRequests() {}
 /** Module Functions */
 
 export function getExpiredRemoved(
-  start: CycleRecord['start'],
-  desired: CycleRecord['desired']
+  start: P2P.CycleCreatorTypes.CycleRecord['start'],
+  desired: P2P.CycleCreatorTypes.CycleRecord['desired']
 ) {
   let expired = 0
   const removed = []

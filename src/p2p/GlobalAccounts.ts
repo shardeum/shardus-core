@@ -4,27 +4,20 @@
  * a direct call to whatever Wrapper.p2p was calling
  */
 
+import { logFlags } from '../logger'
+import { P2P } from '../shared-types'
 import ShardFunctions from '../state-manager/shardFunctions'
 import * as utils from '../utils'
 import * as Comms from './Comms'
 import * as Context from './Context'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
-import {
-  GossipHandler,
-  InternalHandler,
-  NodeInfo,
-  Route,
-  Signature,
-} from '../shared-types/p2p/P2PTypes'
-import {logFlags} from '../logger'
-import { SignedSetGlobalTx, Receipt, TxHash, Tracker, SetGlobalTx } from '../shared-types/p2p/GlobalAccountsTypes'
 
 /** ROUTES */
 // [TODO] - need to add validattion of types to the routes
 
-const makeReceiptRoute: Route<InternalHandler<
-  SignedSetGlobalTx,
+const makeReceiptRoute: P2P.P2PTypes.Route<P2P.P2PTypes.InternalHandler<
+  P2P.GlobalAccountsTypes.SignedSetGlobalTx,
   unknown,
   string
 >> = {
@@ -34,7 +27,7 @@ const makeReceiptRoute: Route<InternalHandler<
   },
 }
 
-const setGlobalGossipRoute: Route<GossipHandler<Receipt>> = {
+const setGlobalGossipRoute: P2P.P2PTypes.Route<P2P.P2PTypes.GossipHandler<P2P.GlobalAccountsTypes.Receipt>> = {
   name: 'set-global',
   handler: (payload, sender, tracker) => {
     if (validateReceipt(payload) === false) return
@@ -49,8 +42,8 @@ const setGlobalGossipRoute: Route<GossipHandler<Receipt>> = {
 
 let lastClean = 0
 
-const receipts = new Map<TxHash, Receipt>()
-const trackers = new Map<TxHash, Tracker>()
+const receipts = new Map<P2P.GlobalAccountsTypes.TxHash, P2P.GlobalAccountsTypes.Receipt>()
+const trackers = new Map<P2P.GlobalAccountsTypes.TxHash, P2P.GlobalAccountsTypes.Tracker>()
 
 /** FUNCTIONS */
 
@@ -77,11 +70,11 @@ export function setGlobal(address, value, when, source) {
   }
 
   // Create a tx for setting a global account
-  const tx: SetGlobalTx = { address, value, when, source }
+  const tx: P2P.GlobalAccountsTypes.SetGlobalTx = { address, value, when, source }
   const txHash = Context.crypto.hash(tx)
 
   // Sign tx
-  const signedTx: SignedSetGlobalTx = Context.crypto.sign(tx)
+  const signedTx: P2P.GlobalAccountsTypes.SignedSetGlobalTx = Context.crypto.sign(tx)
 
   if (Context.stateManager === null) {
     if (logFlags.console) console.log('setGlobal: stateManager == null')
@@ -154,8 +147,8 @@ export function createMakeReceiptHandle(txHash: string) {
 }
 
 export function makeReceipt(
-  signedTx: SignedSetGlobalTx,
-  sender: NodeInfo['id']
+  signedTx: P2P.GlobalAccountsTypes.SignedSetGlobalTx,
+  sender: P2P.P2PTypes.NodeInfo['id']
 ) {
   if (!Context.stateManager) {
     if (logFlags.console) console.log('GlobalAccounts: makeReceipt: stateManager not ready')
@@ -170,7 +163,7 @@ export function makeReceipt(
   const txHash = Context.crypto.hash(tx)
 
   // Put into correct Receipt and Tracker
-  let receipt: Receipt = receipts.get(txHash)
+  let receipt: P2P.GlobalAccountsTypes.Receipt = receipts.get(txHash)
   if (!receipt) {
     const consensusGroup = new Set(getConsensusGroupIds(tx.source))
     receipt = {
@@ -189,7 +182,7 @@ export function makeReceipt(
     )
   }
 
-  let tracker: Tracker = trackers.get(txHash)
+  let tracker: P2P.GlobalAccountsTypes.Tracker = trackers.get(txHash)
   if (!tracker) {
     tracker = createTracker(txHash)
   }
@@ -223,7 +216,7 @@ export function makeReceipt(
   }
 }
 
-export function processReceipt(receipt: Receipt) {
+export function processReceipt(receipt: P2P.GlobalAccountsTypes.Receipt) {
   const txHash = Context.crypto.hash(receipt.tx)
   const tracker = trackers.get(txHash) || createTracker(txHash)
   tracker.timestamp = receipt.tx.when
@@ -248,7 +241,7 @@ export function attemptCleanup() {
   }
 }
 
-function validateReceipt(receipt: Receipt) {
+function validateReceipt(receipt: P2P.GlobalAccountsTypes.Receipt) {
   if (Context.stateManager.currentCycleShardData === null) {
     // we may get this endpoint way before we are ready, so just log it can exit out
     if (logFlags.console) console.log(
@@ -264,7 +257,7 @@ function validateReceipt(receipt: Receipt) {
     return false
   }
   // Make a map of signs that overlap with consensusGroup
-  const signsInConsensusGroup: Signature[] = []
+  const signsInConsensusGroup: P2P.P2PTypes.Signature[] = []
   for (const sign of receipt.signs) {
     /** [TODO] [AS] Replace with NodeList.byPubKey.get() */
     // const node = p2p.state.getNodeByPubKey(sign.owner)
@@ -320,7 +313,7 @@ function validateReceipt(receipt: Receipt) {
 
 function createTracker(txHash) {
   const tracker = {
-    seen: new Set<NodeInfo['id']>(),
+    seen: new Set<P2P.P2PTypes.NodeInfo['id']>(),
     timestamp: 0,
     gossiped: false,
   }

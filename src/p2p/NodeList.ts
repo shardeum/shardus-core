@@ -1,32 +1,30 @@
 import { Logger } from 'log4js'
 import { stringify } from 'shardus-crypto-utils'
+import { P2P } from "../shared-types"
 import {
   binarySearch,
   insertSorted,
   propComparator,
-  propComparator2,
+  propComparator2
 } from '../utils'
 import { crypto, logger } from './Context'
 import * as CycleChain from './CycleChain'
-import { JoinedConsensor } from "../shared-types/p2p/JoinTypes"
 import { id } from './Self'
-import { NodeStatus } from '../shared-types/p2p/P2PTypes'
 import deepmerge = require('deepmerge')
-import { Node, Update } from '../shared-types/p2p/NodeListTypes'
 
 /** STATE */
 
 let p2pLogger: Logger
 
-export let nodes: Map<Node['id'], Node> // In order of joinRequestTimestamp [OLD, ..., NEW]
-export let byPubKey: Map<Node['publicKey'], Node>
-export let byIpPort: Map<string, Node>
-export let byJoinOrder: Node[] // In order of joinRequestTimestamp [OLD, ..., NEW]
-export let byIdOrder: Node[]
-export let othersByIdOrder: Node[] // used by sendGossipIn
-export let activeByIdOrder: Node[]
-export let activeOthersByIdOrder: Node[]
-export let potentiallyRemoved: Set<Node['id']>
+export let nodes: Map<P2P.NodeListTypes.Node['id'], P2P.NodeListTypes.Node> // In order of joinRequestTimestamp [OLD, ..., NEW]
+export let byPubKey: Map<P2P.NodeListTypes.Node['publicKey'], P2P.NodeListTypes.Node>
+export let byIpPort: Map<string, P2P.NodeListTypes.Node>
+export let byJoinOrder: P2P.NodeListTypes.Node[] // In order of joinRequestTimestamp [OLD, ..., NEW]
+export let byIdOrder: P2P.NodeListTypes.Node[]
+export let othersByIdOrder: P2P.NodeListTypes.Node[] // used by sendGossipIn
+export let activeByIdOrder: P2P.NodeListTypes.Node[]
+export let activeOthersByIdOrder: P2P.NodeListTypes.Node[]
+export let potentiallyRemoved: Set<P2P.NodeListTypes.Node['id']>
 
 const VERBOSE = false // Use to dump complete NodeList and CycleChain data
 
@@ -50,7 +48,7 @@ export function reset() {
   potentiallyRemoved = new Set()
 }
 
-export function addNode(node: Node) {
+export function addNode(node: P2P.NodeListTypes.Node) {
   // Don't add duplicates
   if (nodes.has(node.id)) {
     warn(
@@ -78,7 +76,7 @@ export function addNode(node: Node) {
   }
 
   // If active, insert sorted by id into activeByIdOrder
-  if (node.status === NodeStatus.ACTIVE) {
+  if (node.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
     insertSorted(activeByIdOrder, node, propComparator('id'))
 
     // Dont insert yourself into activeOthersByIdOrder
@@ -87,7 +85,7 @@ export function addNode(node: Node) {
     }
   }
 }
-export function addNodes(newNodes: Node[]) {
+export function addNodes(newNodes: P2P.NodeListTypes.Node[]) {
   for (const node of newNodes) addNode(node)
 }
 
@@ -132,7 +130,7 @@ export function removeNodes(ids: string[]) {
   for (const id of ids) removeNode(id)
 }
 
-export function updateNode(update: Update) {
+export function updateNode(update: P2P.NodeListTypes.Update) {
   const node = nodes.get(update.id)
   if (node) {
     // Update node properties
@@ -141,7 +139,7 @@ export function updateNode(update: Update) {
     }
 
     // Add the node to active arrays, if needed
-    if (update.status === NodeStatus.ACTIVE) {
+    if (update.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
       insertSorted(activeByIdOrder, node, propComparator('id'))
       // Don't add yourself to
       if (node.id !== id) {
@@ -150,15 +148,15 @@ export function updateNode(update: Update) {
     }
   }
 }
-export function updateNodes(updates: Update[]) {
+export function updateNodes(updates: P2P.NodeListTypes.Update[]) {
   for (const update of updates) updateNode(update)
 }
 
-export function createNode(joined: JoinedConsensor) {
-  const node: Node = {
+export function createNode(joined: P2P.JoinTypes.JoinedConsensor) {
+  const node: P2P.NodeListTypes.Node = {
     ...joined,
     curvePublicKey: crypto.convertPublicKeyToCurve(joined.publicKey),
-    status: NodeStatus.SYNCING,
+    status: P2P.P2PTypes.NodeStatus.SYNCING,
   }
 
   return node

@@ -2,19 +2,15 @@ import { Handler } from 'express'
 import { Logger } from 'log4js'
 import util from 'util'
 import * as http from '../http'
+import { P2P } from '../shared-types'
 import { reversed, validateTypes } from '../utils'
 import { logger, network } from './Context'
 import * as CycleChain from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import { ChangeSquasher, parse } from './CycleParser'
-import { Change } from "../shared-types/p2p/CycleParserTypes"
 import * as NodeList from './NodeList'
 import * as Self from './Self'
-import { Route } from '../shared-types/p2p/P2PTypes'
 import { robustQuery } from './Utils'
-import { CycleRecord } from '../shared-types/p2p/CycleCreatorTypes'
-import { ActiveNode } from '../shared-types/p2p/SyncTypes'
-import { Node } from '../shared-types/p2p/NodeListTypes'
 
 /** STATE */
 
@@ -22,7 +18,7 @@ let p2pLogger: Logger
 
 /** ROUTES */
 
-const newestCycleRoute: Route<Handler> = {
+const newestCycleRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'sync-newest-cycle',
   handler: (_req, res) => {
@@ -31,7 +27,7 @@ const newestCycleRoute: Route<Handler> = {
   },
 }
 
-const cyclesRoute: Route<Handler> = {
+const cyclesRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'POST',
   name: 'sync-cycles',
   handler: (req, res) => {
@@ -69,7 +65,7 @@ export function init() {
   }
 }
 
-export async function sync(activeNodes: ActiveNode[]) {
+export async function sync(activeNodes: P2P.SyncTypes.ActiveNode[]) {
   // Flush existing cycles/nodes
   CycleChain.reset()
   NodeList.reset()
@@ -195,8 +191,8 @@ export async function sync(activeNodes: ActiveNode[]) {
 }
 
 type SyncNode = Partial<
-  Pick<ActiveNode, 'ip' | 'port'> &
-    Pick<Node, 'externalIp' | 'externalPort'>
+  Pick<P2P.SyncTypes.ActiveNode, 'ip' | 'port'> &
+    Pick<P2P.NodeListTypes.Node, 'externalIp' | 'externalPort'>
 >
 
 export async function syncNewCycles(activeNodes: SyncNode[]) {
@@ -247,7 +243,7 @@ export async function syncNewCycles(activeNodes: SyncNode[]) {
   }
 }
 
-export function digestCycle(cycle: CycleRecord) {
+export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord) {
   const marker = CycleCreator.makeCycleMarker(cycle)
   if (CycleChain.cyclesByMarker[marker]) {
     warn(
@@ -270,7 +266,7 @@ export function digestCycle(cycle: CycleRecord) {
   `)
 }
 
-function applyNodeListChange(change: Change) {
+function applyNodeListChange(change: P2P.CycleParserTypes.Change) {
   NodeList.addNodes(change.added.map((joined) => NodeList.createNode(joined)))
   NodeList.updateNodes(change.updated)
   NodeList.removeNodes(change.removed)
@@ -278,7 +274,7 @@ function applyNodeListChange(change: Change) {
 
 export async function getNewestCycle(
   activeNodes: SyncNode[]
-): Promise<CycleRecord> {
+): Promise<P2P.CycleCreatorTypes.CycleRecord> {
   const queryFn = async (node: SyncNode) => {
     const ip = node.ip ? node.ip : node.externalIp
     const port = node.port ? node.port : node.externalPort
@@ -313,7 +309,7 @@ export async function getNewestCycle(
   if (!response) throw new Error('Bad response')
   if (!response.newestCycle) throw new Error('Bad response')
 
-  const newestCycle = response.newestCycle as CycleRecord
+  const newestCycle = response.newestCycle as P2P.CycleCreatorTypes.CycleRecord
   return newestCycle
 }
 
@@ -322,7 +318,7 @@ async function getCycles(
   activeNodes: SyncNode[],
   start: number,
   end?: number
-): Promise<CycleRecord[]> {
+): Promise<P2P.CycleCreatorTypes.CycleRecord[]> {
   if (start < 0) start = 0
   if (end !== undefined) {
     if (start > end) start = end
@@ -354,13 +350,13 @@ async function getCycles(
   )
 
   // [TODO] Validate whatever came in
-  const cycles = response as CycleRecord[]
+  const cycles = response as P2P.CycleCreatorTypes.CycleRecord[]
 
   const valid = validateCycles(cycles)
   if (valid) return cycles
 }
 
-export function activeNodeCount(cycle: CycleRecord) {
+export function activeNodeCount(cycle: P2P.CycleCreatorTypes.CycleRecord) {
   return (
     cycle.active +
     cycle.activated.length -
@@ -370,7 +366,7 @@ export function activeNodeCount(cycle: CycleRecord) {
   )
 }
 
-export function showNodeCount(cycle: CycleRecord) {
+export function showNodeCount(cycle: P2P.CycleCreatorTypes.CycleRecord) {
   warn(` syncing + joined + active - apop - rem - lost
     ${cycle.syncing} +
     ${cycle.joinedConsensors.length} +
@@ -383,7 +379,7 @@ export function showNodeCount(cycle: CycleRecord) {
   //    ${cycle.activated.length} -
 }
 
-export function totalNodeCount(cycle: CycleRecord) {
+export function totalNodeCount(cycle: P2P.CycleCreatorTypes.CycleRecord) {
   return (
     cycle.syncing +
     cycle.joinedConsensors.length +
@@ -395,7 +391,7 @@ export function totalNodeCount(cycle: CycleRecord) {
   )
 }
 
-function validateCycles(cycles: CycleRecord[]) {
+function validateCycles(cycles: P2P.CycleCreatorTypes.CycleRecord[]) {
   const archiverType = {
     publicKey: 's',
     ip: 's',

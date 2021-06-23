@@ -1,14 +1,9 @@
 import { Logger } from 'log4js'
+import { P2P } from '../shared-types'
 import * as Snapshot from '../snapshot'
 import * as Comms from './Comms'
 import * as Context from './Context'
-import * as CycleCreator from './CycleCreator'
-import * as CycleParser from './CycleParser'
 import * as Self from './Self'
-import { Txs, Record } from '../shared-types/p2p/SafetyModeTypes'
-import * as Types from '../shared-types/p2p/P2PTypes'
-import { CycleRecord } from '../shared-types/p2p/CycleCreatorTypes'
-import { Change } from '../shared-types/p2p/CycleParserTypes'
 
 /** STATE */
 
@@ -16,7 +11,7 @@ let p2pLogger: Logger
 
 /** ROUTES */
 
-const gossipRoute: Types.GossipHandler = (payload) => {}
+const gossipRoute: P2P.P2PTypes.GossipHandler = (payload) => {}
 
 const routes = {
   internal: {},
@@ -56,11 +51,11 @@ export function init() {
 
 export function reset() {}
 
-export function getTxs(): Txs {
+export function getTxs(): P2P.SafetyModeTypes.Txs {
   return
 }
 
-export function dropInvalidTxs(txs: Txs): Txs {
+export function dropInvalidTxs(txs: P2P.SafetyModeTypes.Txs): P2P.SafetyModeTypes.Txs {
   return
 }
 
@@ -68,9 +63,9 @@ export function dropInvalidTxs(txs: Txs): Txs {
 Given the txs and prev cycle record mutate the referenced record
 */
 export function updateRecord(
-  txs: Txs,
-  record: CycleRecord,
-  prev: CycleRecord
+  txs: P2P.SafetyModeTypes.Txs,
+  record: P2P.CycleCreatorTypes.CycleRecord,
+  prev: P2P.CycleCreatorTypes.CycleRecord
 ) {
   // If you're the first node
   if (Self.isFirst) {
@@ -143,14 +138,14 @@ export function updateRecord(
   }
 }
 
-export function validateRecordTypes(rec: Record): string {
+export function validateRecordTypes(rec: P2P.SafetyModeTypes.Record): string {
   // [TODO] Implement actual validation
   return ''
 }
 
 export function parseRecord(
-  record: CycleRecord
-): Change {
+  record: P2P.CycleCreatorTypes.CycleRecord
+): P2P.CycleParserTypes.Change {
   return {
     added: [],
     removed: [],

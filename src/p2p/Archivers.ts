@@ -12,22 +12,19 @@ import * as NodeList from './NodeList'
 import { crypto, logger, network, io } from './Context'
 import { getCycleChain, computeCycleMarker, getNewest } from './CycleChain'
 import * as CycleCreator from './CycleCreator'
-import { CycleRecord as Cycle, CycleRecord } from "../shared-types/p2p/CycleCreatorTypes"
 import * as CycleParser from './CycleParser'
 import { logFlags } from '../logger'
-import { StateMetaData, TypeNames, NamesToTypes } from '../shared-types/p2p/SnapshotTypes'
-import { JoinedArchiver, DataRecipient, Request, Txs, Record, RequestTypes, DataResponse, DataRequest } from '../shared-types/p2p/ArchiversTypes'
-import { Change } from '../shared-types/p2p/CycleParserTypes'
+import { P2P } from "../shared-types"
 
 /** STATE */
 
 let p2pLogger
 
-export let archivers: Map<JoinedArchiver['publicKey'], JoinedArchiver>
-let recipients: Map<JoinedArchiver['publicKey'], DataRecipient>
+export let archivers: Map<P2P.ArchiversTypes.JoinedArchiver['publicKey'], P2P.ArchiversTypes.JoinedArchiver>
+let recipients: Map<P2P.ArchiversTypes.JoinedArchiver['publicKey'], P2P.ArchiversTypes.DataRecipient>
 
-let joinRequests: Request[]
-let leaveRequests: Request[]
+let joinRequests: P2P.ArchiversTypes.Request[]
+let leaveRequests: P2P.ArchiversTypes.Request[]
 
 /** FUNCTIONS */
 
@@ -49,7 +46,7 @@ export function reset() {
   resetJoinRequests()
 }
 
-export function getTxs(): Txs {
+export function getTxs(): P2P.ArchiversTypes.Txs {
   // [IMPORTANT] Must return a copy to avoid mutation
   const requestsCopy = deepmerge({}, [...joinRequests, ...leaveRequests])
   if(logFlags.console) console.log(
@@ -64,7 +61,7 @@ export function getTxs(): Txs {
   }
 }
 
-export function validateRecordTypes(rec: Record): string {
+export function validateRecordTypes(rec: P2P.ArchiversTypes.Record): string {
   let err = validateTypes(rec, { joinedArchivers: 'a' })
   if (err) return err
   for (const item of rec.joinedArchivers) {
@@ -79,15 +76,15 @@ export function validateRecordTypes(rec: Record): string {
   return ''
 }
 
-export function updateRecord(txs: Txs, record: CycleRecord) {
+export function updateRecord(txs: P2P.ArchiversTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord) {
   // Add joining archivers to the cycle record
   const joinedArchivers = txs.archivers
-    .filter((request) => request.requestType === RequestTypes.JOIN)
+    .filter((request) => request.requestType === P2P.ArchiversTypes.RequestTypes.JOIN)
     .map((joinRequest) => joinRequest.nodeInfo)
 
   // Add leaving archivers to the cycle record
   const leavingArchivers = txs.archivers
-    .filter((request) => request.requestType === RequestTypes.LEAVE)
+    .filter((request) => request.requestType === P2P.ArchiversTypes.RequestTypes.LEAVE)
     .map((leaveRequest) => leaveRequest.nodeInfo)
 
     if(logFlags.console) console.log(
@@ -97,12 +94,12 @@ export function updateRecord(txs: Txs, record: CycleRecord) {
   )
 
   record.joinedArchivers = joinedArchivers.sort(
-    (a: JoinedArchiver, b: JoinedArchiver) =>
+    (a: P2P.ArchiversTypes.JoinedArchiver, b: P2P.ArchiversTypes.JoinedArchiver) =>
       a.publicKey > b.publicKey ? 1 : -1
   )
   record.leavingArchivers = JSON.parse(
     JSON.stringify(
-      leavingArchivers.sort((a: JoinedArchiver, b: JoinedArchiver) =>
+      leavingArchivers.sort((a: P2P.ArchiversTypes.JoinedArchiver, b: P2P.ArchiversTypes.JoinedArchiver) =>
         a.publicKey > b.publicKey ? 1 : -1
       )
     )
@@ -116,8 +113,8 @@ export function updateRecord(txs: Txs, record: CycleRecord) {
 }
 
 export function parseRecord(
-  record: CycleRecord
-): Change {
+  record: P2P.CycleCreatorTypes.CycleRecord
+): P2P.CycleParserTypes.Change {
   // Update our archivers list
   updateArchivers(record)
 
@@ -233,8 +230,8 @@ export function updateArchivers(record) {
 }
 
 export function addDataRecipient(
-  nodeInfo: JoinedArchiver,
-  dataRequests: DataRequest<Cycle | StateMetaData>[]
+  nodeInfo: P2P.ArchiversTypes.JoinedArchiver,
+  dataRequests: P2P.ArchiversTypes.DataRequest<P2P.CycleCreatorTypes.CycleRecord | P2P.SnapshotTypes.StateMetaData>[]
 ) {
   if(logFlags.console) console.log('Adding data recipient..', arguments)
   const recipient = {
@@ -262,13 +259,13 @@ export function sendData() {
   for (const [publicKey, recipient] of recipients) {
     const recipientUrl = `http://${recipient.nodeInfo.ip}:${recipient.nodeInfo.port}/newdata`
 
-    const responses: DataResponse['responses'] = {}
+    const responses: P2P.ArchiversTypes.DataResponse['responses'] = {}
 
     for (const request of recipient.dataRequests) {
       switch (request.type) {
-        case TypeNames.CYCLE: {
+        case P2P.SnapshotTypes.TypeNames.CYCLE: {
           // Identify request type
-          const typedRequest = request as DataRequest<NamesToTypes['CYCLE']>
+          const typedRequest = request as P2P.ArchiversTypes.DataRequest<P2P.SnapshotTypes.NamesToTypes['CYCLE']>
           // Get latest cycles since lastData
           const cycleRecords = getCycleChain(typedRequest.lastData + 1)
           const cyclesWithMarker = []
@@ -287,10 +284,10 @@ export function sendData() {
           responses.CYCLE = cyclesWithMarker
           break
         }
-        case TypeNames.STATE_METADATA: {
+        case P2P.SnapshotTypes.TypeNames.STATE_METADATA: {
           // Identify request type
-          const typedRequest = request as DataRequest<
-            NamesToTypes['STATE_METADATA']
+          const typedRequest = request as P2P.ArchiversTypes.DataRequest<
+            P2P.SnapshotTypes.NamesToTypes['STATE_METADATA']
           >
           if(logFlags.console) console.log('STATE_METADATA typedRequest', typedRequest)
           // Get latest state hash data since lastData
@@ -302,7 +299,7 @@ export function sendData() {
             typedRequest.lastData = stateHashes[stateHashes.length - 1].counter
           }
 
-          const metadata: StateMetaData = {
+          const metadata: P2P.SnapshotTypes.StateMetaData = {
             counter: typedRequest.lastData >= 0 ? typedRequest.lastData : 0,
             stateHashes,
             receiptHashes,
@@ -318,7 +315,7 @@ export function sendData() {
       }
     }
 
-    const dataResponse: DataResponse = {
+    const dataResponse: P2P.ArchiversTypes.DataResponse = {
       publicKey: crypto.getPublicKey(),
       responses,
       recipient: publicKey,

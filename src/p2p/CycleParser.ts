@@ -1,23 +1,21 @@
 import deepmerge from 'deepmerge'
-import * as CycleCreator from './CycleCreator'
-import { CycleRecord } from "../shared-types/p2p/CycleCreatorTypes"
-import { Node, Update } from "../shared-types/p2p/NodeListTypes"
+import { P2P } from "../shared-types"
 import { reversed } from '../utils'
-import { Change } from '../shared-types/p2p/CycleParserTypes'
+import * as CycleCreator from './CycleCreator'
 
-export function parse(record: CycleRecord): Change {
+export function parse(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
   const changes = CycleCreator.submodules.map(submodule =>
     submodule.parseRecord(record)
   )
-  const mergedChange = deepmerge.all<Change>(changes)
+  const mergedChange = deepmerge.all<P2P.CycleParserTypes.Change>(changes)
   return mergedChange
 }
 
 export class ChangeSquasher {
-  final: Change
-  removedIds: Set<Node['id']>
-  seenUpdates: Map<Update['id'], Update>
-  addedIds: Set<Node['id']>
+  final: P2P.CycleParserTypes.Change
+  removedIds: Set<P2P.NodeListTypes.Node['id']>
+  seenUpdates: Map<P2P.NodeListTypes.Update['id'], P2P.NodeListTypes.Update>
+  addedIds: Set<P2P.NodeListTypes.Node['id']>
   constructor() {
     this.final = {
       added: [],
@@ -29,7 +27,7 @@ export class ChangeSquasher {
     this.seenUpdates = new Map()
   }
 
-  addChange(change: Change) {
+  addChange(change: P2P.CycleParserTypes.Change) {
     for (const id of change.removed) {
       // Ignore if id is already removed
       if (this.removedIds.has(id)) continue

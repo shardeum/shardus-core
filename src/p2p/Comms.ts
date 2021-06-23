@@ -4,14 +4,14 @@ import * as utils from '../utils'
 import { config, crypto, logger, network } from './Context'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
-import { InternalHandler, LooseObject } from '../shared-types/p2p/P2PTypes'
+import { P2P } from '../shared-types'
 import {logFlags} from '../logger'
 
 /** ROUTES */
 
-type GossipReq = LooseObject
+type GossipReq = P2P.P2PTypes.LooseObject
 
-const gossipInternalRoute: InternalHandler<GossipReq> = async (
+const gossipInternalRoute: P2P.P2PTypes.InternalHandler<GossipReq> = async (
   payload,
   _respond,
   sender,

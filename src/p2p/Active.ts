@@ -1,26 +1,17 @@
 import { Logger } from 'log4js'
+import { logFlags } from '../logger'
+import { P2P } from '../shared-types'
 import * as utils from '../utils'
+import { validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { config, crypto, logger } from './Context'
 import * as CycleCreator from './CycleCreator'
-import { Change } from "../shared-types/p2p/CycleParserTypes"
 import * as NodeList from './NodeList'
 import * as Self from './Self'
-import * as Types from '../shared-types/p2p/P2PTypes'
-import { validateTypes } from '../utils'
-import { logFlags } from '../logger'
-import {
-  SignedActiveRequest,
-  ActiveRequest,
-  Txs,
-  Record,
-} from '../shared-types/p2p/ActiveTypes'
-import { CycleRecord } from '../shared-types/p2p/CycleCreatorTypes'
-import { Node } from '../shared-types/p2p/NodeListTypes'
 
 /** ROUTES */
 
-const gossipActiveRoute: Types.GossipHandler<SignedActiveRequest> = (
+const gossipActiveRoute: P2P.P2PTypes.GossipHandler<P2P.ActiveTypes.SignedActiveRequest> = (
   payload,
   sender,
   tracker
@@ -56,7 +47,15 @@ const gossipActiveRoute: Types.GossipHandler<SignedActiveRequest> = (
   // Do not forward gossip after quarter 2
   if (!isOrig && CycleCreator.currentQuarter > 2) return
 
-  if (addActiveTx(payload)) Comms.sendGossip('gossip-active', payload, tracker, sender, NodeList.byIdOrder, false)
+  if (addActiveTx(payload))
+    Comms.sendGossip(
+      'gossip-active',
+      payload,
+      tracker,
+      sender,
+      NodeList.byIdOrder,
+      false
+    )
 }
 
 const routes = {
@@ -70,8 +69,11 @@ const routes = {
 
 let p2pLogger: Logger
 
-let activeRequests: Map<Node['publicKey'], SignedActiveRequest>
-let queuedRequest: ActiveRequest
+let activeRequests: Map<
+  P2P.NodeListTypes.Node['publicKey'],
+  P2P.ActiveTypes.SignedActiveRequest
+>
+let queuedRequest: P2P.ActiveTypes.ActiveRequest
 
 /** FUNCTIONS */
 
@@ -97,13 +99,13 @@ export function reset() {
   activeRequests = new Map()
 }
 
-export function getTxs(): Txs {
+export function getTxs(): P2P.ActiveTypes.Txs {
   return {
     active: [...activeRequests.values()],
   }
 }
 
-export function validateRecordTypes(rec: Record): string {
+export function validateRecordTypes(rec: P2P.ActiveTypes.Record): string {
   let err = validateTypes(rec, {
     active: 'n',
     activated: 'a',
@@ -121,15 +123,15 @@ export function validateRecordTypes(rec: Record): string {
   return ''
 }
 
-export function dropInvalidTxs(txs: Txs): Txs {
+export function dropInvalidTxs(txs: P2P.ActiveTypes.Txs): P2P.ActiveTypes.Txs {
   const active = txs.active.filter((request) => validateActiveRequest(request))
   return { active }
 }
 
 export function updateRecord(
-  txs: Txs,
-  record: CycleRecord,
-  _prev: CycleRecord
+  txs: P2P.ActiveTypes.Txs,
+  record: P2P.CycleCreatorTypes.CycleRecord,
+  _prev: P2P.CycleCreatorTypes.CycleRecord
 ) {
   const active = NodeList.activeByIdOrder.length
   const activated = []
@@ -149,7 +151,9 @@ export function updateRecord(
   record.activatedPublicKeys = activatedPublicKeys.sort()
 }
 
-export function parseRecord(record: CycleRecord): Change {
+export function parseRecord(
+  record: P2P.CycleCreatorTypes.CycleRecord
+): P2P.CycleParserTypes.Change {
   // Look at the activated id's and make Self emit 'active' if your own id is there
   if (record.activated.includes(Self.id)) {
     Self.setActive()
@@ -160,7 +164,7 @@ export function parseRecord(record: CycleRecord): Change {
   const updated = record.activated.map((id) => ({
     id,
     activeTimestamp: record.start,
-    status: Types.NodeStatus.ACTIVE,
+    status: P2P.P2PTypes.NodeStatus.ACTIVE,
   }))
 
   return {
@@ -178,7 +182,14 @@ export function sendRequests() {
     if (logFlags.p2pNonFatal)
       info(`Gossiping active request: ${JSON.stringify(activeTx)}`)
     addActiveTx(activeTx)
-    Comms.sendGossip('gossip-active', activeTx, '', null, NodeList.byIdOrder, true)
+    Comms.sendGossip(
+      'gossip-active',
+      activeTx,
+      '',
+      null,
+      NodeList.byIdOrder,
+      true
+    )
 
     // Check if we went active and try again if we didn't in 1 cycle duration
     const activeTimeout = setTimeout(
@@ -193,7 +204,7 @@ export function sendRequests() {
   }
 }
 
-export function queueRequest(request: ActiveRequest) {
+export function queueRequest(request: P2P.ActiveTypes.ActiveRequest) {
   queuedRequest = request
 }
 
@@ -205,7 +216,7 @@ export function requestActive() {
   queueRequest(request)
 }
 
-function createActiveRequest(): ActiveRequest {
+function createActiveRequest(): P2P.ActiveTypes.ActiveRequest {
   const request = {
     nodeId: Self.id,
     status: 'active',
@@ -214,7 +225,7 @@ function createActiveRequest(): ActiveRequest {
   return request
 }
 
-function addActiveTx(request: SignedActiveRequest) {
+function addActiveTx(request: P2P.ActiveTypes.SignedActiveRequest) {
   if (!request) return false
   if (!validateActiveRequest(request)) return false
   if (activeRequests.has(request.sign.owner)) return false
@@ -223,7 +234,7 @@ function addActiveTx(request: SignedActiveRequest) {
   return true
 }
 
-function validateActiveRequest(request: SignedActiveRequest) {
+function validateActiveRequest(request: P2P.ActiveTypes.SignedActiveRequest) {
   // [TODO] Validate active request
   return true
 }

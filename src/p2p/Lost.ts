@@ -7,20 +7,16 @@ The lost node detection process is described in the "Lost Node Detection" Google
 internal documents.
 */
 
-import { CycleRecord } from "../shared-types/p2p/CycleCreatorTypes"
-import { Handler, request } from 'express'
+import { Handler } from 'express'
 import * as http from '../http'
-import { GossipHandler, InternalHandler, LooseObject, Route } from '../shared-types/p2p/P2PTypes'
+import { logFlags } from '../logger'
+import { P2P } from "../shared-types"
+import { binarySearch, validateTypes } from '../utils'
 import * as Comms from './Comms'
+import { crypto, logger, network } from './Context'
+import { currentCycle, currentQuarter } from './CycleCreator'
+import { activeByIdOrder, byIdOrder, nodes } from './NodeList'
 import * as Self from './Self'
-import { Change } from "../shared-types/p2p/CycleParserTypes"
-import {logger, network, crypto } from './Context'
-import * as Types from '../shared-types/p2p/P2PTypes'
-import { nodes, removeNode, byPubKey, activeByIdOrder, byIdOrder } from './NodeList'
-import { currentQuarter, currentCycle } from './CycleCreator'
-import { sleep, binarySearch, validateTypes } from '../utils'
-import Logger, {logFlags} from '../logger'
-import { LostRecord, SignedLostReport, SignedDownGossipMessage, SignedUpGossipMessage, Txs, Record, LostReport } from "../shared-types/p2p/LostTypes"
 
 /** STATE */
 
@@ -29,7 +25,7 @@ const allowKillRoute = true
 
 let p2pLogger
 
-let lost: Map<string, LostRecord>
+let lost: Map<string, P2P.LostTypes.LostRecord>
 export let isDown = {}
 let isUp = {}
 let isUpTs = {}
@@ -40,7 +36,7 @@ const CACHE_CYCLES = 10
 
 /** ROUTES */
 
-const killExternalRoute: Types.Route<Handler> = {
+const killExternalRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'kill',
   handler: (_req, res) => {
@@ -51,7 +47,7 @@ const killExternalRoute: Types.Route<Handler> = {
   },
 }
 
-const killOtherExternalRoute: Types.Route<Handler> = {
+const killOtherExternalRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'killother',
   handler: (_req, res) => {
@@ -62,16 +58,16 @@ const killOtherExternalRoute: Types.Route<Handler> = {
   },
 }
 
-const lostReportRoute: Route<InternalHandler<SignedLostReport>> = {
+const lostReportRoute: P2P.P2PTypes.Route<P2P.P2PTypes.InternalHandler<P2P.LostTypes.SignedLostReport>> = {
   name: 'lost-report',
   handler: lostReportHandler
 }
 
-const lostDownRoute: Types.GossipHandler = (payload:SignedDownGossipMessage, sender, tracker) => {
+const lostDownRoute: P2P.P2PTypes.GossipHandler = (payload:P2P.LostTypes.SignedDownGossipMessage, sender, tracker) => {
   downGossipHandler(payload, sender, tracker)
 }
 
-const lostUpRoute: Types.GossipHandler = (payload:SignedUpGossipMessage, sender, tracker) => {
+const lostUpRoute: P2P.P2PTypes.GossipHandler = (payload:P2P.LostTypes.SignedUpGossipMessage, sender, tracker) => {
   upGossipHandler(payload, sender, tracker)
 }
 
@@ -123,7 +119,7 @@ export function reset() {
 }
 
 // This gets called at the start of Q3
-export function getTxs(): Txs {
+export function getTxs(): P2P.LostTypes.Txs {
   let lostTxs = []
   let refutedTxs = []
   let seen = {}  // used to make sure we don't add the same node twice
@@ -148,7 +144,7 @@ export function getTxs(): Txs {
   }
 }
 
-export function validateRecordTypes(rec: Record): string{
+export function validateRecordTypes(rec: P2P.LostTypes.Record): string{
   let err = validateTypes(rec,{lost:'a',refuted:'a'})
   if (err) return err
   for(const item of rec.lost){
@@ -161,7 +157,7 @@ export function validateRecordTypes(rec: Record): string{
 }
 
 // This gets called during Q3 after getTxs
-export function dropInvalidTxs(txs: Txs): Txs {
+export function dropInvalidTxs(txs: P2P.LostTypes.Txs): P2P.LostTypes.Txs {
   const validLost = txs.lost.filter(request => checkDownMsg(request, currentCycle)[0])
   const validRefuted = txs.refuted.filter(request => checkUpMsg(request, currentCycle)[0])
   return { lost: validLost, refuted: validRefuted }
@@ -171,7 +167,7 @@ export function dropInvalidTxs(txs: Txs): Txs {
 Given the txs and prev cycle record mutate the referenced record
 */
 // This gets called during Q3 after dropInvalidTxs
-export function updateRecord( txs: Txs, record: CycleRecord, prev: CycleRecord) {
+export function updateRecord( txs: P2P.LostTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord, prev: P2P.CycleCreatorTypes.CycleRecord) {
   const lostNodeIds = []
   const refutedNodeIds = []
   let seen = {}  // used to make sure we don't add the same node twice
@@ -196,7 +192,7 @@ export function updateRecord( txs: Txs, record: CycleRecord, prev: CycleRecord) 
 }
 
 // This gets called before Q1 when a new cycle is created or fetched
-export function parseRecord(record: CycleRecord): Change {
+export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
   // If we see our node in the refute field clear flag to send an 'up' message at start of next cycle
   //   We ndded to do this check before checking the lost field for our node.
   for (const id of record.refuted) {
@@ -278,7 +274,7 @@ export function reportLost(target, reason){
   let obj = {target:target.id, status:'reported', cycle:currentCycle }
   const checker = getCheckerNode(target.id, currentCycle)
   if ((checker.id === Self.id) && (activeByIdOrder.length >= 3)) return // we cannot be reporter and checker if there is 3 or more nodes in the network
-  let msg:LostReport = {target:target.id, checker:checker.id, reporter:Self.id, cycle:currentCycle}
+  let msg:P2P.LostTypes.LostReport = {target:target.id, checker:checker.id, reporter:Self.id, cycle:currentCycle}
 // [TODO] - remove the following line after testing killother
   if (allowKillRoute && reason === 'killother') msg.killother = true
   if(logFlags.p2pNonFatal) info(`Sending investigate request: reporter:${Self.port} checker:${checker.externalPort} target:${target.externalPort} `+JSON.stringify(msg))
@@ -320,7 +316,7 @@ async function lostReportHandler (payload, response, sender) {
   }
   if (sender !== payload.reporter) return // sender must be same as reporter
   if (payload.checker !== Self.id) return  // the checker should be our node id
-  let obj:LostRecord = {target:payload.target, cycle:payload.cycle, status:'checking', message:payload }
+  let obj:P2P.LostTypes.LostRecord = {target:payload.target, cycle:payload.cycle, status:'checking', message:payload }
   lost.set(key, obj)
   // check if we already know that this node is down
   if (isDown[payload.target]){obj.status = 'down'; return}
@@ -471,7 +467,7 @@ if(logFlags.p2pNonFatal) info(`Checking internal connection for ${node.id}`)
   return 'up'
 }
 
-function downGossipHandler(payload:SignedDownGossipMessage, sender, tracker){
+function downGossipHandler(payload:P2P.LostTypes.SignedDownGossipMessage, sender, tracker){
   if(logFlags.p2pNonFatal) info(`Got downGossip: ${JSON.stringify(payload)}`)
   let err = ''
   err = validateTypes(payload, {cycle:'n',report:'o',status:'s',sign:'o'})
@@ -497,7 +493,7 @@ function downGossipHandler(payload:SignedDownGossipMessage, sender, tracker){
     warn(`cycle:${currentCycle} quarter:${currentQuarter} sender:${sender}`)
     return
   }
-  let obj:LostRecord = {target:payload.report.target, cycle:payload.report.cycle, status:'down', message:payload }
+  let obj:P2P.LostTypes.LostRecord = {target:payload.report.target, cycle:payload.report.cycle, status:'down', message:payload }
   lost.set(key, obj)
   Comms.sendGossip('lost-down', payload, tracker, Self.id, byIdOrder, false)
 // After message has been gossiped in Q1 and Q2 we wait for getTxs() to be invoked in Q3
@@ -509,7 +505,7 @@ function checkQuarter(source, sender){
   return [true, '']
 }
 
-function checkDownMsg(payload:SignedDownGossipMessage, expectedCycle){
+function checkDownMsg(payload:P2P.LostTypes.SignedDownGossipMessage, expectedCycle){
   if (payload.cycle !== expectedCycle) return [false, 'checker cycle is not as expected']
   const [valid, reason] = checkReport(payload.report, expectedCycle-1)
   if (!valid) return [valid, reason]
@@ -547,7 +543,7 @@ function upGossipHandler(payload, sender, tracker){
 // the getTxs() function will loop through the lost object to make txs in Q3 and build the cycle record from them
 }
 
-function checkUpMsg(payload:SignedUpGossipMessage, expectedCycle){
+function checkUpMsg(payload:P2P.LostTypes.SignedUpGossipMessage, expectedCycle){
   if (!nodes.has(payload.target)) return [false, `target is not an active node  ${payload.target}  ${JSON.stringify(activeByIdOrder)}`]
   if (!crypto.verify(payload, nodes.get(payload.target).publicKey)) return [false, 'bad sign from target']
   return [true, '']

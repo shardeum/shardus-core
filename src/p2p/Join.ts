@@ -3,32 +3,28 @@ import { Handler } from 'express'
 import { isDeepStrictEqual } from 'util'
 import { version } from '../../package.json'
 import * as http from '../http'
+import { logFlags } from '../logger'
+import { P2P } from '../shared-types'
 import * as utils from '../utils'
 import { validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { config, crypto, logger, network } from './Context'
 import * as CycleChain from './CycleChain'
 import * as CycleCreator from './CycleCreator'
-import { Change } from "../shared-types/p2p/CycleParserTypes"
 import * as NodeList from './NodeList'
 import * as Self from './Self'
-import * as Types from '../shared-types/p2p/P2PTypes'
 import { robustQuery } from './Utils'
-import {logFlags} from '../logger'
-import { JoinRequest, Txs, Record } from '../shared-types/p2p/JoinTypes'
-import { CycleRecord } from '../shared-types/p2p/CycleCreatorTypes'
-import { Node } from '../shared-types/p2p/NodeListTypes'
 
 /** STATE */
 
 let p2pLogger
 
-let requests: JoinRequest[]
-let seen: Set<Types.Node['publicKey']>
+let requests: P2P.JoinTypes.JoinRequest[]
+let seen: Set<P2P.P2PTypes.Node['publicKey']>
 
 /** ROUTES */
 
-const cycleMarkerRoute: Types.Route<Handler> = {
+const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'cyclemarker',
   handler: (_req, res) => {
@@ -39,7 +35,7 @@ const cycleMarkerRoute: Types.Route<Handler> = {
   },
 }
 
-const joinRoute: Types.Route<Handler> = {
+const joinRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'POST',
   name: 'join',
   handler: (req, res) => {
@@ -58,7 +54,7 @@ const joinRoute: Types.Route<Handler> = {
   },
 }
 
-const joinedRoute: Types.Route<Handler> = {
+const joinedRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'joined/:publicKey',
   handler: (req, res) => {
@@ -79,7 +75,7 @@ const joinedRoute: Types.Route<Handler> = {
   },
 }
 
-const gossipJoinRoute: Types.GossipHandler<JoinRequest, Node['id']> = (
+const gossipJoinRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequest, P2P.NodeListTypes.Node['id']> = (
   payload,
   sender,
   tracker
@@ -122,8 +118,8 @@ export function reset() {
   seen = new Set()
 }
 
-export function getNodeRequestingJoin() : Types.P2PNode[] {
-  let nodes: Types.P2PNode[] = []
+export function getNodeRequestingJoin() : P2P.P2PTypes.P2PNode[] {
+  let nodes: P2P.P2PTypes.P2PNode[] = []
   for(let request of requests){
     if(request && request.nodeInfo){
       nodes.push(request.nodeInfo)
@@ -174,7 +170,7 @@ function calculateToAccept() {
   return needed
 }
 
-export function getTxs(): Txs {
+export function getTxs(): P2P.JoinTypes.Txs {
   // Omar - maybe we don't have to make a copy
   // [IMPORTANT] Must return a copy to avoid mutation
   const requestsCopy = deepmerge({}, requests)
@@ -184,7 +180,7 @@ export function getTxs(): Txs {
   }
 }
 
-export function validateRecordTypes(rec: Record): string {
+export function validateRecordTypes(rec: P2P.JoinTypes.Record): string {
   let err = validateTypes(rec, { syncing: 'n', joinedConsensors: 'a' })
   if (err) return err
   for (const item of rec.joinedConsensors) {
@@ -206,15 +202,15 @@ export function validateRecordTypes(rec: Record): string {
   return ''
 }
 
-export function dropInvalidTxs(txs: Txs): Txs {
+export function dropInvalidTxs(txs: P2P.JoinTypes.Txs): P2P.JoinTypes.Txs {
   const join = txs.join.filter((request) => validateJoinRequest(request))
   return { join }
 }
 
 export function updateRecord(
-  txs: Txs,
-  record: CycleRecord,
-  _prev: CycleRecord
+  txs: P2P.JoinTypes.Txs,
+  record: P2P.CycleCreatorTypes.CycleRecord,
+  _prev: P2P.CycleCreatorTypes.CycleRecord
 ) {
   const joinedConsensors = txs.join.map((joinRequest) => {
     const { nodeInfo, cycleMarker: cycleJoined } = joinRequest
@@ -227,7 +223,7 @@ export function updateRecord(
   record.joinedConsensors = joinedConsensors.sort()
 }
 
-export function parseRecord(record: CycleRecord): Change {
+export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.CycleParserTypes.Change {
   const added = record.joinedConsensors
   return {
     added,
@@ -246,7 +242,7 @@ export function queueRequest(request) {}
 
 export async function createJoinRequest(
   cycleMarker
-): Promise<JoinRequest & Types.SignedObject> {
+): Promise<P2P.JoinTypes.JoinRequest & P2P.P2PTypes.SignedObject> {
   // Build and return a join request
   const nodeInfo = Self.getThisNodeInfo()
   // TO-DO: Think about if the selection number still needs to be signed
@@ -262,7 +258,7 @@ export async function createJoinRequest(
   return signedJoinReq
 }
 
-export function addJoinRequest(joinRequest: JoinRequest) {
+export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
   //  Validate joinReq
   let err = utils.validateTypes(joinRequest, {
     cycleMarker: 's',
@@ -413,8 +409,8 @@ export async function fetchCycleMarker(nodes) {
 }
 
 export async function submitJoin(
-  nodes: Types.Node[],
-  joinRequest: JoinRequest & Types.SignedObject
+  nodes: P2P.P2PTypes.Node[],
+  joinRequest: P2P.JoinTypes.JoinRequest & P2P.P2PTypes.SignedObject
 ) {
   // Send the join request to a handful of the active node all at once:w
   const selectedNodes = utils.getRandom(nodes, Math.min(nodes.length, 5))
@@ -462,14 +458,14 @@ export async function fetchJoined(activeNodes) {
       warn('fetchJoined invalid response response.node.id' + err)
       return
     }
-    const node = response.node as Node
+    const node = response.node as P2P.NodeListTypes.Node
     return node.id
   } catch (err) {
     warn('Self: fetchNodeId: robustQuery failed: ', err)
   }
 }
 
-function validateJoinRequest(request: JoinRequest) {
+function validateJoinRequest(request: P2P.JoinTypes.JoinRequest) {
   // [TODO] Implement this
   return true
 }

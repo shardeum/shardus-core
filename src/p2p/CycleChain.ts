@@ -1,6 +1,6 @@
 import { Logger } from 'log4js'
 import { crypto, logger, stateManager } from './Context'
-import { CycleRecord } from "../shared-types/p2p/CycleCreatorTypes"
+import { P2P } from '../shared-types'
 import { nodes } from './NodeList'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 
@@ -8,11 +8,11 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 
 let p2pLogger: Logger
 
-export let cycles: CycleRecord[] // [OLD, ..., NEW]
-export let cyclesByMarker: { [marker: string]: CycleRecord }
+export let cycles: P2P.CycleCreatorTypes.CycleRecord[] // [OLD, ..., NEW]
+export let cyclesByMarker: { [marker: string]: P2P.CycleCreatorTypes.CycleRecord }
 
-export let oldest: CycleRecord
-export let newest: CycleRecord
+export let oldest: P2P.CycleCreatorTypes.CycleRecord
+export let newest: P2P.CycleCreatorTypes.CycleRecord
 
 reset()
 
@@ -33,7 +33,7 @@ export function getNewest() {
   return newest
 }
 
-export function append(cycle: CycleRecord) {
+export function append(cycle: P2P.CycleCreatorTypes.CycleRecord) {
   const marker = computeCycleMarker(cycle)
   if (!cyclesByMarker[marker]) {
     cycles.push(cycle)
@@ -42,7 +42,7 @@ export function append(cycle: CycleRecord) {
     if (!oldest) oldest = cycle
   }
 }
-export function prepend(cycle: CycleRecord) {
+export function prepend(cycle: P2P.CycleCreatorTypes.CycleRecord) {
   const marker = computeCycleMarker(cycle)
   if (!cyclesByMarker[marker]) {
     cycles.unshift(cycle)
@@ -51,7 +51,7 @@ export function prepend(cycle: CycleRecord) {
     if (!newest) newest = cycle
   }
 }
-export function validate(prev: CycleRecord, next: CycleRecord): boolean {
+export function validate(prev: P2P.CycleCreatorTypes.CycleRecord, next: P2P.CycleCreatorTypes.CycleRecord): boolean {
   const prevMarker = computeCycleMarker(prev)
   if (next.previous !== prevMarker) return false
   // [TODO] More validation
@@ -124,7 +124,7 @@ export function getCycleNumberFromTimestamp(timestamp : number, allowOlder: bool
 
     //is it in the future
     if (offsetTimestamp >= currentCycleShardData.timestampEndCycle) {
-      let cycle: CycleRecord = getNewest()
+      let cycle: P2P.CycleCreatorTypes.CycleRecord = getNewest()
 
       let timePastCurrentCycle = offsetTimestamp - currentCycleShardData.timestampEndCycle
       let cyclesAhead = Math.ceil(timePastCurrentCycle / (cycle.duration * 1000))
@@ -149,7 +149,7 @@ export function getCycleNumberFromTimestamp(timestamp : number, allowOlder: bool
         //debug only!!!
         //let cycle2 = CycleChain.getCycleByTimestamp(offsetTimestamp)
         //stateManager.statemanager_fatal('getCycleNumberFromTimestamp getCycleByTimestamp failed', 'getCycleByTimestamp getCycleByTimestamp failed')
-        let cycle: CycleRecord = getNewest()
+        let cycle: P2P.CycleCreatorTypes.CycleRecord = getNewest()
         let cycleEstimate = currentCycleShardData.cycleNumber - Math.ceil((currentCycleShardData.timestampEndCycle - offsetTimestamp) / (cycle.duration * 1000))
         if(cycleEstimate < 1){
           cycleEstimate = 1

@@ -11,18 +11,13 @@
 
 import deepmerge from 'deepmerge'
 import { Logger } from 'log4js'
+import { P2P } from '../shared-types'
 import { propComparator, propComparator2, reversed, validateTypes } from '../utils'
 import * as Archivers from './Archivers'
 import { logger } from './Context'
 import { cycles, newest } from './CycleChain'
-import * as CycleCreator from './CycleCreator'
-import * as CycleParser from './CycleParser'
 import * as NodeList from './NodeList'
-import { activeNodeCount, totalNodeCount, showNodeCount } from './Sync'
-import { Txs, Record } from '../shared-types/p2p/RefreshTypes'
-import * as Types from '../shared-types/p2p/P2PTypes'
-import { CycleRecord } from '../shared-types/p2p/CycleCreatorTypes'
-import { Change } from '../shared-types/p2p/CycleParserTypes'
+import { totalNodeCount } from './Sync'
 
 /** STATE */
 
@@ -42,11 +37,11 @@ export function init() {
 
 export function reset() {}
 
-export function getTxs(): Txs {
+export function getTxs(): P2P.RefreshTypes.Txs {
   return {}
 }
 
-export function validateRecordTypes(rec: Record): string{
+export function validateRecordTypes(rec: P2P.RefreshTypes.Record): string{
   let err = validateTypes(rec,{refreshedArchivers:'a',refreshedConsensors:'a'})
   if (err) return err
   for(const item of rec.refreshedArchivers){
@@ -63,7 +58,7 @@ export function validateRecordTypes(rec: Record): string{
   return ''
 }
 
-export function dropInvalidTxs(txs: Txs): Txs {
+export function dropInvalidTxs(txs: P2P.RefreshTypes.Txs): P2P.RefreshTypes.Txs {
   return txs
 }
 
@@ -71,17 +66,17 @@ export function dropInvalidTxs(txs: Txs): Txs {
 Given the txs and prev cycle record mutate the referenced record
 */
 export function updateRecord(
-  txs: Txs,
-  record: CycleRecord,
-  prev: CycleRecord
+  txs: P2P.RefreshTypes.Txs,
+  record: P2P.CycleCreatorTypes.CycleRecord,
+  prev: P2P.CycleCreatorTypes.CycleRecord
 ) {
   record.refreshedArchivers = refreshArchivers() // This returns a copy of the objects
   record.refreshedConsensors = refreshConsensors() // This returns a copy of the objects
 }
 
 export function parseRecord(
-  record: CycleRecord
-): Change {
+  record: P2P.CycleCreatorTypes.CycleRecord
+): P2P.CycleParserTypes.Change {
   // If Archivers.archivers doesn't have a refreshedArchiver, put it in
   for (const refreshed of record.refreshedArchivers) {
     if (Archivers.archivers.has(refreshed.publicKey) === false) {
@@ -93,8 +88,8 @@ export function parseRecord(
    * A refreshedConsensor results in either an added or update, depending on
    * whether or not we have the refreshedConsensor in our node list or not.
    */
-  const added: Change['added'] = []
-  const updated: Change['updated'] = []
+  const added: P2P.CycleParserTypes.Change['added'] = []
+  const updated: P2P.CycleParserTypes.Change['updated'] = []
   for (const refreshed of record.refreshedConsensors) {
     const node = NodeList.nodes.get(refreshed.id)
     if (node) {
@@ -110,7 +105,7 @@ export function parseRecord(
       // (IMPORTANT: update counterRefreshed to the records counter)
       updated.push({
         id: refreshed.id,
-        status: Types.NodeStatus.ACTIVE,
+        status: P2P.P2PTypes.NodeStatus.ACTIVE,
         counterRefreshed: record.counter,
       })
     }

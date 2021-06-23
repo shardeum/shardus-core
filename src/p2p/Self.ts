@@ -1,24 +1,21 @@
-import Sntp from '@hapi/sntp'
 import * as events from 'events'
-import * as log4js from 'log4js'
 import got from 'got'
+import * as log4js from 'log4js'
 import * as http from '../http'
+import { logFlags } from '../logger'
 import * as network from '../network'
+import { P2P } from '../shared-types'
 import * as snapshot from '../snapshot'
 import * as utils from '../utils'
 import * as Archivers from './Archivers'
 import * as Comms from './Comms'
 import * as Context from './Context'
 import * as CycleCreator from './CycleCreator'
+import { calcIncomingTimes } from './CycleCreator'
 import * as GlobalAccounts from './GlobalAccounts'
 import * as Join from './Join'
 import * as NodeList from './NodeList'
 import * as Sync from './Sync'
-import * as Types from '../shared-types/p2p/P2PTypes'
-import { readOldCycleRecord } from '../snapshot/snapshotFunctions'
-import { calcIncomingTimes } from './CycleCreator'
-import { logFlags } from '../logger'
-import * as ArchiversTypes from '../shared-types/p2p/ArchiversTypes'
 
 /** STATE */
 
@@ -111,7 +108,7 @@ export async function startup(): Promise<boolean> {
   return true
 }
 
-async function witnessConditionsMet(activeNodes: Types.Node[]) {
+async function witnessConditionsMet(activeNodes: P2P.P2PTypes.Node[]) {
   try {
     // 1. node has old data
     if (snapshot.oldDataPath) {
@@ -130,7 +127,7 @@ async function witnessConditionsMet(activeNodes: Types.Node[]) {
   return false
 }
 
-async function joinNetwork(activeNodes: Types.Node[], firstTime: boolean) {
+async function joinNetwork(activeNodes: P2P.P2PTypes.Node[], firstTime: boolean) {
   // Check if you're the first node
   const isFirst = await discoverNetwork(activeNodes)
   if (isFirst) {
@@ -227,15 +224,15 @@ async function syncCycleChain() {
 }
 
 async function contactArchiver() {
-  const archiver: Types.Node = Context.config.p2p.existingArchivers[0]
+  const archiver: P2P.P2PTypes.Node = Context.config.p2p.existingArchivers[0]
   const activeNodesSigned = await getActiveNodesFromArchiver()
   if (!Context.crypto.verify(activeNodesSigned, archiver.publicKey)) {
     throw Error('Fatal: _getSeedNodes seed list was not signed by archiver!')
   }
   const joinRequest:
-    | ArchiversTypes.Request
+    | P2P.ArchiversTypes.Request
     | undefined = activeNodesSigned.joinRequest as
-    | ArchiversTypes.Request
+    | P2P.ArchiversTypes.Request
     | undefined
   if (joinRequest) {
     if (Archivers.addJoinRequest(joinRequest) === false) {
@@ -344,8 +341,8 @@ async function getActiveNodesFromArchiver() {
   const archiver = Context.config.p2p.existingArchivers[0]
   const nodeListUrl = `http://${archiver.ip}:${archiver.port}/nodelist`
   const nodeInfo = getPublicNodeInfo()
-  let seedListSigned: Types.SignedObject & {
-    nodeList: Types.Node[]
+  let seedListSigned: P2P.P2PTypes.SignedObject & {
+    nodeList: P2P.P2PTypes.Node[]
   }
   try {
     seedListSigned = await http.post(
