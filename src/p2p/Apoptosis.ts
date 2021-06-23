@@ -26,7 +26,7 @@ import * as Self from './Self'
 import { Change } from "../shared-types/p2p/CycleParserTypes"
 import {logger, network, crypto } from './Context'
 import * as Types from '../shared-types/p2p/P2PTypes'
-import { nodes, removeNode, byPubKey, activeByIdOrder } from './NodeList'
+import { nodes, removeNode, byPubKey, activeByIdOrder, byIdOrder } from './NodeList'
 import { currentQuarter, currentCycle } from './CycleCreator'
 import { sleep, validateTypes } from '../utils'
 import { robustQuery } from './Utils'
@@ -126,7 +126,7 @@ const apoptosisGossipRoute: GossipHandler<SignedApoptosisProposal> =
   if ([1,2].includes(currentQuarter)){  
     if (addProposal(payload)) {
 //    p2p.sendGossipIn(gossipRouteName, payload, tracker, sender)
-      Comms.sendGossip(gossipRouteName, payload, tracker, Self.id, NodeList.byIdOrder, false) // use Self.id so we don't gossip to ourself
+      Comms.sendGossip(gossipRouteName, payload, tracker, Self.id, byIdOrder, false) // use Self.id so we don't gossip to ourself
     }
   }
 }
@@ -231,7 +231,7 @@ export function sendRequests() {
     // make sure node is still in the network, since it might
     //   have already been removed
     if (nodes.get(id)){  
-      Comms.sendGossip(gossipRouteName, proposals[id], '', null, NodeList.byIdOrder, true)
+      Comms.sendGossip(gossipRouteName, proposals[id], '', null, byIdOrder, true)
     }
   }
 }

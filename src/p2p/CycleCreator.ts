@@ -1070,7 +1070,7 @@ function gossipHandlerCycleCert(
 
 // This gossips the best cert we have
 async function gossipCycleCert(
-  sender: NodeList.Node['id'],
+  sender: Node['id'],
   tracker?: string
 ) {
   const certGossip: CompareCertReq = {

@@ -16,7 +16,7 @@ import * as Self from './Self'
 import { Change } from "../shared-types/p2p/CycleParserTypes"
 import {logger, network, crypto } from './Context'
 import * as Types from '../shared-types/p2p/P2PTypes'
-import { nodes, removeNode, byPubKey, activeByIdOrder } from './NodeList'
+import { nodes, removeNode, byPubKey, activeByIdOrder, byIdOrder } from './NodeList'
 import { currentQuarter, currentCycle } from './CycleCreator'
 import { sleep, binarySearch, validateTypes } from '../utils'
 import Logger, {logFlags} from '../logger'
@@ -231,7 +231,7 @@ export function sendRequests() {
       obj.message = msg
       obj.gossiped = true
       if(logFlags.p2pNonFatal) info(`Gossiping node down message: ${JSON.stringify(msg)}`)
-      Comms.sendGossip('lost-down', msg, '', null, NodeList.byIdOrder, true)
+      Comms.sendGossip('lost-down', msg, '', null, byIdOrder, true)
     }
   }
 // We cannot count on the lost node seeing the gossip and refuting based on that.
@@ -245,7 +245,7 @@ export function sendRequests() {
     let msg = {target:Self.id, status:"up", cycle:currentCycle}
     msg = crypto.sign(msg)
     if(logFlags.p2pNonFatal) info(`Gossiping node up message: ${JSON.stringify(msg)}`)
-    Comms.sendGossip('lost-up', msg, '', null, NodeList.byIdOrder, true)
+    Comms.sendGossip('lost-up', msg, '', null, byIdOrder, true)
   }
 }
 
@@ -499,7 +499,7 @@ function downGossipHandler(payload:SignedDownGossipMessage, sender, tracker){
   }
   let obj:LostRecord = {target:payload.report.target, cycle:payload.report.cycle, status:'down', message:payload }
   lost.set(key, obj)
-  Comms.sendGossip('lost-down', payload, tracker, Self.id, NodeList.byIdOrder, false)
+  Comms.sendGossip('lost-down', payload, tracker, Self.id, byIdOrder, false)
 // After message has been gossiped in Q1 and Q2 we wait for getTxs() to be invoked in Q3
 }
 
@@ -543,7 +543,7 @@ function upGossipHandler(payload, sender, tracker){
   }
   let obj = {target:payload.target, status:'up', cycle:payload.cycle, message:payload}
   lost.set(key, obj)
-  Comms.sendGossip('lost-up', payload, tracker, Self.id, NodeList.byIdOrder, false)
+  Comms.sendGossip('lost-up', payload, tracker, Self.id, byIdOrder, false)
 // the getTxs() function will loop through the lost object to make txs in Q3 and build the cycle record from them
 }
 

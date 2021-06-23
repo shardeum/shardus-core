@@ -41,7 +41,8 @@ class P2P extends EventEmitter {
     payload: any,
     tracker?: string,
     sender?: any,
-    inpNodes?: Node[]
+    inpNodes?: Node[],
+    isOrigin?: boolean
   ) => Promise<void>
   sendGossipAll: (
     type: any,

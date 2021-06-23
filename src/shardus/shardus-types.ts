@@ -521,6 +521,7 @@ export interface ShardusConfiguration {
      * random nodes in the network, so messages will be propagated very quickly.
      **/
     gossipRecipients?: number
+    gossipFactor?: number
     /** The gossipTimeout parameter is an Integer specifying the amount of time (in seconds) before an old gossip is deleted from a node. */
     gossipTimeout?: number
     /** The maxSeedNodes parameter is an Integer specifying the maximum number of seedNodes used to be used. */
