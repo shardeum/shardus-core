@@ -1,5 +1,5 @@
 import { Logger } from 'log4js'
-import { P2P } from '../shared-types'
+import { P2P } from '../types'
 import * as Snapshot from '../snapshot'
 import * as Comms from './Comms'
 import * as Context from './Context'

@@ -1,5 +1,5 @@
 import * as Shardus from '../shardus/shardus-types'
-import { ShardGlobals, ShardInfo, WrappableParitionRange, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from '../shared-types/state-manager/shardFunctionTypes'
+import { ShardGlobals, ShardInfo, WrappableParitionRange, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from '../types/state-manager/shardFunctionTypes'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
 

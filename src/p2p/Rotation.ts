@@ -1,6 +1,6 @@
 import { Logger } from 'log4js'
-import { P2P } from "../shared-types"
-import { Record, Txs } from '../shared-types/p2p/RotationTypes'
+import { P2P } from "../types"
+import { Record, Txs } from '../types/p2p/RotationTypes'
 import { insertSorted, validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { config, logger } from './Context'

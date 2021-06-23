@@ -1,5 +1,5 @@
 import deepmerge from 'deepmerge'
-import { P2P } from "../shared-types"
+import { P2P } from "../types"
 import { reversed } from '../utils'
 import * as CycleCreator from './CycleCreator'
 

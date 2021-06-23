@@ -4,7 +4,7 @@ import * as utils from '../utils'
 import { config, crypto, logger, network } from './Context'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
-import { P2P } from '../shared-types'
+import { P2P } from '../types'
 import {logFlags} from '../logger'
 
 /** ROUTES */

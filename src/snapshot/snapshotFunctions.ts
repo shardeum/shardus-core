@@ -6,9 +6,9 @@ import * as Context from '../p2p/Context'
 import * as NodeList from '../p2p/NodeList'
 import * as Self from '../p2p/Self'
 import * as ShardusTypes from '../shardus/shardus-types'
-import { NetworkSummarytHash, ReceiptHashes, StateHashes, SummaryHashes } from "../shared-types/p2p/SnapshotTypes"
+import { NetworkSummarytHash, ReceiptHashes, StateHashes, SummaryHashes } from "../types/p2p/SnapshotTypes"
 import ShardFunctions from '../state-manager/shardFunctions'
-import * as shardFunctionTypes from '../shared-types/state-manager/shardFunctionTypes'
+import * as shardFunctionTypes from '../types/state-manager/shardFunctionTypes'
 import { Cycle, CycleShardData } from '../state-manager/state-manager-types'
 import { safetyModeVals, snapshotLogger } from './index'
 import { hashMap } from './partition-gossip'

@@ -5,7 +5,7 @@ import * as Shardus from '../shardus/shardus-types'
 const stringify = require('fast-stable-stringify')
 
 //import {ShardGlobals,ShardInfo,WrappableParitionRange,NodeShardData,AddressRange,HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange } from  './shardFunction2Types'
-import { ShardGlobals, ShardInfo, WrappableParitionRange, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from '../shared-types/state-manager/shardFunctionTypes'
+import { ShardGlobals, ShardInfo, WrappableParitionRange, NodeShardData, AddressRange, HomeNodeSummary, ParititionShardDataMap, NodeShardDataMap, MergeResults, BasicAddressRange } from '../types/state-manager/shardFunctionTypes'
 
 class ShardFunctions {
   static logger: Logger = null

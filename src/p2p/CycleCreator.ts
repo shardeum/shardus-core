@@ -1,7 +1,7 @@
 import deepmerge from 'deepmerge'
 import { Logger } from 'log4js'
 import { logFlags } from '../logger'
-import { P2P } from '../shared-types'
+import { P2P } from '../types'
 import * as utils from '../utils'
 // don't forget to add new modules here
 import * as Active from './Active'

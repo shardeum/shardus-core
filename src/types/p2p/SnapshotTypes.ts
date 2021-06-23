@@ -1,5 +1,5 @@
 import * as shardFunctionTypes from '../state-manager/shardFunctionTypes'
-import { CycleRecord } from '../p2p/CycleCreatorTypes'
+import { CycleRecord } from './CycleCreatorTypes'
 
 /** TYPES */
 

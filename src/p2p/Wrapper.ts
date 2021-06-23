@@ -12,8 +12,8 @@ import * as Self from './Self'
 import * as Utils from './Utils'
 import {logFlags} from '../logger'
 import {getNodeRequestingJoin} from './Join'
-import { P2PNode } from '../shared-types/p2p/P2PTypes'
-import { Node } from '../shared-types/p2p/NodeListTypes'
+import { P2PNode } from '../types/p2p/P2PTypes'
+import { Node } from '../types/p2p/NodeListTypes'
 
 /* p2p functions */
 
