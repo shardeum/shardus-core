@@ -100,8 +100,7 @@ function createScaleRequest(scaleType) {
 
 function _requestNetworkScaling(upOrDown) {
   if (!Self.isActive || scalingRequested) return
-  const request = createScaleRequest(upOrDown)
-  const signedRequest = crypto.sign(request)
+  const signedRequest = createScaleRequest(upOrDown)
   // await _waitUntilEndOfCycle()
   addExtScalingRequest(signedRequest)
   Comms.sendGossip('scaling', signedRequest, '', null, NodeList.byIdOrder, true)
