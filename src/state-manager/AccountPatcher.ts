@@ -229,52 +229,69 @@ class AccountPatcher {
 
     Comms.registerInternal('get_account_data_by_hashes', async (payload: HashTrieAccountDataRequest, respond: (arg0: HashTrieAccountDataResponse) => any) => {
 
-      //nodeChildHashes: {radix:string, childAccounts:{accountID:string, hash:string}[]}[]
-      let result:HashTrieAccountDataResponse = {accounts:[]}
+      nestedCountersInstance.countEvent('accountPatcher', `get_account_data_by_hashes`)
+      let result:HashTrieAccountDataResponse = {accounts:[]}      
+      try{
 
-      let hashMap = new Map()
-      let accountIDs = []
-      for(let accountHashEntry of payload.accounts){
-        // let radix = accountHashEntry.accountID.substr(0, this.treeMaxDepth)
-        // let layerMap = this.shardTrie.layerMaps[this.treeMaxDepth]
-        // let hashTrieNode = layerMap.get(radix)
+        //nodeChildHashes: {radix:string, childAccounts:{accountID:string, hash:string}[]}[]
 
-        hashMap.set(accountHashEntry.accountID, accountHashEntry.hash)
-        accountIDs.push(accountHashEntry.accountID)
-      }
 
-      let accountData = await this.app.getAccountDataByList(accountIDs)
+        let hashMap = new Map()
+        let accountIDs = []
+        for(let accountHashEntry of payload.accounts){
+          // let radix = accountHashEntry.accountID.substr(0, this.treeMaxDepth)
+          // let layerMap = this.shardTrie.layerMaps[this.treeMaxDepth]
+          // let hashTrieNode = layerMap.get(radix)
 
-      //only return results that match the requested hash!
-      let accountDataFinal: Shardus.WrappedData[] = []
-      if (accountData != null) {
-        for (let wrappedAccount of accountData) {
-
-          let { accountId, stateId, data: recordData } = wrappedAccount
-          let hash = this.app.calculateAccountHash(recordData)
-          if (stateId !== hash) {
-
-            continue
-          }
-
-          if(hashMap.get(accountId) === wrappedAccount.stateId){
-            accountDataFinal.push(wrappedAccount)
-          } 
-          // let wrappedAccountInQueueRef = wrappedAccount as Shardus.WrappedDataFromQueue
-          // wrappedAccountInQueueRef.seenInQueue = false
-
-          // if (this.stateManager.lastSeenAccountsMap != null) {
-          //   let queueEntry = this.stateManager.lastSeenAccountsMap[wrappedAccountInQueueRef.accountId]
-          //   if (queueEntry != null) {
-          //     wrappedAccountInQueueRef.seenInQueue = true
-          //   }
-          // }
+          hashMap.set(accountHashEntry.accountID, accountHashEntry.hash)
+          accountIDs.push(accountHashEntry.accountID)
         }
-      }
-      //PERF could disable this for more perf?
-      //this.stateManager.testAccountDataWrapped(accountDataFinal)
 
-      result.accounts = accountDataFinal
+        let accountData = await this.app.getAccountDataByList(accountIDs)
+
+        let skippedAccounts:AccountIDAndHash[] = []
+        let returnedAccounts:AccountIDAndHash[] = []
+
+        //only return results that match the requested hash!
+        let accountDataFinal: Shardus.WrappedData[] = []
+        if (accountData != null) {
+          for (let wrappedAccount of accountData) {
+
+            let { accountId, stateId, data: recordData } = wrappedAccount
+            let hash = this.app.calculateAccountHash(recordData)
+            if (stateId !== hash) {
+              skippedAccounts.push({accountID:accountId, hash:stateId})
+              continue
+            }
+
+            if(hashMap.get(accountId) === wrappedAccount.stateId){
+              accountDataFinal.push(wrappedAccount)
+            } 
+            returnedAccounts.push({accountID:accountId, hash:stateId})
+            // let wrappedAccountInQueueRef = wrappedAccount as Shardus.WrappedDataFromQueue
+            // wrappedAccountInQueueRef.seenInQueue = false
+
+            // if (this.stateManager.lastSeenAccountsMap != null) {
+            //   let queueEntry = this.stateManager.lastSeenAccountsMap[wrappedAccountInQueueRef.accountId]
+            //   if (queueEntry != null) {
+            //     wrappedAccountInQueueRef.seenInQueue = true
+            //   }
+            // }
+          }
+        }
+        //PERF could disable this for more perf?
+        //this.stateManager.testAccountDataWrapped(accountDataFinal)
+
+        this.mainLogger.debug('get_account_data_by_hashes1 ' + `todoRequestingNode ` + `requests:${utils.stringifyReduce(payload.accounts)} `)
+        this.mainLogger.debug('get_account_data_by_hashes2 ' + `todoRequestingNode ` + `skippedAccounts:${utils.stringifyReduce(skippedAccounts)} `)
+        this.mainLogger.debug('get_account_data_by_hashes3 ' + `todoRequestingNode ` + `returnedAccounts:${utils.stringifyReduce(returnedAccounts)} `)
+
+        result.accounts = accountDataFinal
+
+      } catch(ex){
+
+        this.statemanager_fatal(`get_account_data_by_hashes-failed`, 'get_account_data_by_hashes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      }
       await respond(result)
     })
 
@@ -1421,7 +1438,7 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
       nestedCountersInstance.countEvent('accountPatcher', `p.repair applied cycle:${cycle}`, Math.max(0,wrappedDataListFiltered.length - failedHashes.length))
 
       this.statemanager_fatal('isInSync = false',`bad accounts cycle:${cycle} bad:${results.badAccounts.length} received:${wrappedDataList.length} filtered:${wrappedDataListFiltered.length} failed: ${failedHashes.length} details: ${utils.stringifyReduce(results.badAccounts)}`)
-      this.statemanager_fatal('isInSync = false',`isInSync = false ${cycle}: `)
+      this.statemanager_fatal('isInSync = false',`isInSync = false ${cycle}:  repaired: ${utils.stringifyReduce(wrappedDataListFiltered.map((account) => { return {a:account.accountId, h:account.stateId } } ))}`)
 
       //This extracts accounts that have failed hashes but I forgot writeCombinedAccountDataToBackups does that already
       //let failedHashesSet = new Set(failedHashes)

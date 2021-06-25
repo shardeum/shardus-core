@@ -113,6 +113,8 @@ class AccountSync {
 
   initalSyncFinished: boolean // track when we have completed our inital data sync.
 
+  forceSyncComplete: boolean
+
   constructor(
     stateManager: StateManager,
 
@@ -188,6 +190,8 @@ class AccountSync {
 
     this.initalSyncFinished = false
     this.initalSyncRemaining = 0
+
+    this.forceSyncComplete = false
 
     console.log('this.p2p', this.p2p)
   }
@@ -354,6 +358,14 @@ class AccountSync {
 
       res.end()
     })
+
+    Context.network.registerExternalGet('forceFinishSync', (req, res) => {
+      res.write(`sync forcing complete. \n`)
+      this.forceSyncComplete = true
+      res.end()
+    })
+
+
   }
 
   /***
@@ -585,6 +597,12 @@ class AccountSync {
     await utils.sleep(8000) // sleep to make sure we are listening to some txs before we sync them
 
     for (let syncTracker of this.syncTrackers) {
+
+      if(this.dataSyncMainPhaseComplete === true){
+        // this get set if we force sync to finish
+        break
+      }
+
       // let partition = syncTracker.partition
       if (logFlags.console) console.log(`syncTracker start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
       if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
@@ -1115,6 +1133,23 @@ class AccountSync {
 
       nodes = nodes.filter(this.removePotentiallyRemovedNodes)
 
+      let filteredNodes = []
+      for(let node of nodes){
+
+        let nodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(node.id)
+        if(nodeShardData != null){
+
+          if(ShardFunctions.testAddressInRange(queryLow, nodeShardData.consensusPartitions) === false){
+            continue
+          }
+          if(ShardFunctions.testAddressInRange(queryHigh, nodeShardData.consensusPartitions) === false){
+            continue
+          }
+          filteredNodes.push(node)
+        }
+      }
+      nodes = filteredNodes
+      
       if (Array.isArray(nodes) === false) {
         if (logFlags.error) this.mainLogger.error(`syncStateTableData: non array returned ${utils.stringifyReduce(nodes)}`)
         return // nothing to do
@@ -1859,6 +1894,16 @@ class AccountSync {
     // }, 1000)
     await utils.sleep(1000)
 
+
+    if(this.forceSyncComplete){
+      nestedCountersInstance.countEvent('sync', 'forceSyncComplete')
+      this.syncStatmentIsComplete()
+      this.clearSyncData()
+      this.skipSync()
+      return
+    }
+
+
     nestedCountersInstance.countEvent('sync', 'fail and restart')
     this.syncStatement.failAndRestart++
 
@@ -2192,6 +2237,11 @@ class AccountSync {
   removePotentiallyRemovedNodes(node){
     return potentiallyRemoved.has(node.id) != true
   }
+
+  // onlyConsensusNodes(node){
+  //   return potentiallyRemoved.has(node.id) != true
+  // }
+
 }
 
 export default AccountSync

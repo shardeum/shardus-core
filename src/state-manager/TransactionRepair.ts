@@ -70,6 +70,8 @@ class TransactionRepair {
     let dataRecieved = 0
     let dataApplied = 0
     let failedHash = 0
+    let numUpToDateAccounts = 0
+    let updatedAccountAndHashes = []
 
     let allKeys = []
     try {
@@ -104,8 +106,6 @@ class TransactionRepair {
 
       let upToDateAccounts: { [id: string]: boolean }  = {}
 
-      let numUpToDateAccounts = 0
-
       this.profiler.profileSectionEnd('repair_init')
 
       // STEP 1
@@ -133,9 +133,6 @@ class TransactionRepair {
                   upToDateAccounts[id] = true
                   numUpToDateAccounts++
                   if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `account ${shortKey} already up to date our: cached:${utils.stringifyReduce(hashObj)}`)
-
-                  
-
                   break
                 }
               }    
@@ -431,7 +428,9 @@ class TransactionRepair {
                     //update hash
                     data.stateId = updatedHash
 
-                    if (logFlags.debug) this.mainLogger.debug(`repairToMatchReceipt: addAccountStates tx:${shortHash} neededUpdate:${hashNeededUpdate} updateStateTable:${updateStateTable} timeStampMatches:${timeStampMatches} test2:${test2} test3:${test3} test4:${test4} ${utils.stringifyReduce(stateTableResults)}  acc:${shortKey}`)
+                    updatedAccountAndHashes.push({accountID: data.accountId, hash: data.stateId})
+
+                    /*if (logFlags.debug)*/ this.mainLogger.debug(`repairToMatchReceipt: addAccountStates tx:${shortHash} neededUpdate:${hashNeededUpdate} updateStateTable:${updateStateTable} timeStampMatches:${timeStampMatches} test2:${test2} test3:${test3} test4:${test4} ${utils.stringifyReduce(stateTableResults)}  acc:${shortKey}`)
                   }
 
                 } finally {
@@ -470,9 +469,12 @@ class TransactionRepair {
     } finally {
 
       if(queueEntry.repairFinished === true){
-
-
         queueEntry.hasValidFinalData = true
+
+        let repairLogString = `tx:${queueEntry.logID} updatedAccountAndHashes:${utils.stringifyReduce(updatedAccountAndHashes)} counters:${utils.stringifyReduce({ requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash, numUpToDateAccounts})}`
+        if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_success', queueEntry.logID, repairLogString)
+        this.mainLogger.debug('shrd_repairToMatchReceipt_success ' + repairLogString)
+
       } else {
         queueEntry.repairFailed = true
         this.statemanager_fatal(`repairToMatchReceipt_failed`, `tx:${queueEntry.logID} counters:${utils.stringifyReduce({requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash})}  keys ${utils.stringifyReduce(allKeys)}  `)        
@@ -507,6 +509,8 @@ class TransactionRepair {
     let needUpdateAccounts: { [id: string]: boolean }  = {}
     let upToDateAccounts: { [id: string]: boolean }  = {}
     let updatedAccounts: { [id: string]: boolean }  = {}
+
+    let updatedAccountAndHashes = []
 
     let shortHash = utils.makeShortHash(txID)
     let allKeys
@@ -904,7 +908,13 @@ class TransactionRepair {
                   if (updateStateTable === true) {
                     await this.storage.addAccountStates(stateTableResults)
                   }
-                  if (logFlags.debug) this.mainLogger.debug(`repairToMatchReceipt2: addAccountStates tx:${shortHash} neededUpdate:${hashNeededUpdate} updateStateTable:${updateStateTable} timeStampMatches:${timeStampMatches} test2:${test2} test3:${test3} test4:${test4} ${utils.stringifyReduce(stateTableResults)}  acc:${shortKey}`)
+
+                  //update hash
+                  data.stateId = updatedHash
+
+                  updatedAccountAndHashes.push({accountID: data.accountId, hash: data.stateId})
+
+                  /*if (logFlags.debug)*/ this.mainLogger.debug(`repairToMatchReceipt2: addAccountStates tx:${shortHash} neededUpdate:${hashNeededUpdate} updateStateTable:${updateStateTable} timeStampMatches:${timeStampMatches} test2:${test2} test3:${test3} test4:${test4} ${utils.stringifyReduce(stateTableResults)}  acc:${shortKey}`)
                 }
               }
 
@@ -966,7 +976,10 @@ class TransactionRepair {
         this.statemanager_fatal(`repairToMatchReceiptNoRecipt_failed`, `counters:${utils.stringifyReduce({missingTXFound, requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash,neededUpdate,upToDateCount,updatedAccountsCount})} keys ${utils.stringifyReduce(allKeys)}  skipped ${utils.stringifyReduce(skippedKeys)} `)
         nestedCountersInstance.countEvent('repair2', 'complete-failed')
       } else {
-        if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt2_success', `tx:${shortHash} keys:${utils.stringifyReduce(Object.keys(needUpdateAccounts) )} counters:${utils.stringifyReduce({missingTXFound, requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash,neededUpdate,upToDateCount,updatedAccountsCount})}`)
+        let repairLogString = `tx:${shortHash} updatedAccountAndHashes:${utils.stringifyReduce(updatedAccountAndHashes )} counters:${utils.stringifyReduce({missingTXFound, requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash,neededUpdate,upToDateCount,updatedAccountsCount})}`
+        if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_success2', shortHash, repairLogString) 
+        this.mainLogger.debug('shrd_repairToMatchReceipt_success2 ' + repairLogString)
+
         nestedCountersInstance.countEvent('repair2', `complete-ok`)
         nestedCountersInstance.countEvent('repair2', `s.repair applied cycle: ${this.stateManager.currentCycleShardData.cycleNumber}`)
       }
