@@ -1900,6 +1900,11 @@ class AccountSync {
       this.syncStatmentIsComplete()
       this.clearSyncData()
       this.skipSync()
+
+      //make sync trackers clean up
+      for (let syncTracker of this.syncTrackers) {
+        syncTracker.syncFinished = true
+      }
       return
     }
 
