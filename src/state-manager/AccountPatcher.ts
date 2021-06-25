@@ -235,6 +235,8 @@ class AccountPatcher {
 
         //nodeChildHashes: {radix:string, childAccounts:{accountID:string, hash:string}[]}[]
 
+    
+        let queryStats = {fix1:0,fix2:0,skip_localHashMismatch:0,skip_requestHashMismatch:0, returned:0, missingResp:false, noResp:false}
 
         let hashMap = new Map()
         let accountIDs = []
@@ -242,7 +244,10 @@ class AccountPatcher {
           // let radix = accountHashEntry.accountID.substr(0, this.treeMaxDepth)
           // let layerMap = this.shardTrie.layerMaps[this.treeMaxDepth]
           // let hashTrieNode = layerMap.get(radix)
-
+          if(accountHashEntry == null || accountHashEntry.hash == null || accountHashEntry.accountID == null){
+            queryStats.fix1++
+            continue
+          }
           hashMap.set(accountHashEntry.accountID, accountHashEntry.hash)
           accountIDs.push(accountHashEntry.accountID)
         }
@@ -256,18 +261,28 @@ class AccountPatcher {
         let accountDataFinal: Shardus.WrappedData[] = []
         if (accountData != null) {
           for (let wrappedAccount of accountData) {
+            if(wrappedAccount == null || wrappedAccount.stateId == null || wrappedAccount.data == null){
+              queryStats.fix2++
+              continue
+            }
 
             let { accountId, stateId, data: recordData } = wrappedAccount
             let hash = this.app.calculateAccountHash(recordData)
             if (stateId !== hash) {
               skippedAccounts.push({accountID:accountId, hash:stateId})
+              queryStats.skip_localHashMismatch++
               continue
             }
 
             if(hashMap.get(accountId) === wrappedAccount.stateId){
               accountDataFinal.push(wrappedAccount)
-            } 
-            returnedAccounts.push({accountID:accountId, hash:stateId})
+              returnedAccounts.push({accountID:accountId, hash:stateId})
+              queryStats.returned++
+            } else {
+              queryStats.skip_requestHashMismatch++
+              skippedAccounts.push({accountID:accountId, hash:stateId})
+            }
+            
             // let wrappedAccountInQueueRef = wrappedAccount as Shardus.WrappedDataFromQueue
             // wrappedAccountInQueueRef.seenInQueue = false
 
@@ -282,9 +297,19 @@ class AccountPatcher {
         //PERF could disable this for more perf?
         //this.stateManager.testAccountDataWrapped(accountDataFinal)
 
-        this.mainLogger.debug('get_account_data_by_hashes1 ' + `todoRequestingNode ` + `requests:${utils.stringifyReduce(payload.accounts)} `)
-        this.mainLogger.debug('get_account_data_by_hashes2 ' + `todoRequestingNode ` + `skippedAccounts:${utils.stringifyReduce(skippedAccounts)} `)
-        this.mainLogger.debug('get_account_data_by_hashes3 ' + `todoRequestingNode ` + `returnedAccounts:${utils.stringifyReduce(returnedAccounts)} `)
+        if(queryStats.returned < payload.accounts.length){
+          nestedCountersInstance.countEvent('accountPatcher', `get_account_data_by_hashes incomplete`)
+          queryStats.missingResp = true
+          if(queryStats.returned === 0){
+            nestedCountersInstance.countEvent('accountPatcher', `get_account_data_by_hashes no results`)
+            queryStats.noResp = true
+          }
+        }
+
+        this.mainLogger.debug(`get_account_data_by_hashes1 requests[${payload.accounts.length}] :${utils.stringifyReduce(payload.accounts)} `)
+        this.mainLogger.debug(`get_account_data_by_hashes2 skippedAccounts:${utils.stringifyReduce(skippedAccounts)} `)
+        this.mainLogger.debug(`get_account_data_by_hashes3 returnedAccounts:${utils.stringifyReduce(returnedAccounts)} `)
+        this.mainLogger.debug(`get_account_data_by_hashes4 queryStats:${utils.stringifyReduce(queryStats)} `)
 
         result.accounts = accountDataFinal
 
@@ -879,8 +904,10 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
         let votes = hashTrieSyncConsensus.radixHashVotes.get(radixHash)
         let bestVote = votes.allVotes.get(votes.bestHash)
         let potentialNodes = bestVote.voters
+        //shuffle array of potential helpers
+        //utils.shuffleArray(potentialNodes) //leaving non random to catch issues in testing.
         let node = potentialNodes[0]
-        coverageMap.set(radixHash, {firstChoice:node, fullList: bestVote.voters, refuted:new Set()})
+        coverageMap.set(radixHash, {firstChoice:node, fullList: potentialNodes, refuted:new Set()})
         //let count = nodeUsage.get(node.id)
       } 
     }

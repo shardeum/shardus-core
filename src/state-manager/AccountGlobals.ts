@@ -11,6 +11,7 @@ import ShardFunctions from './shardFunctions.js'
 import { time } from 'console'
 import StateManager from '.'
 import { GlobalAccountReportResp } from './state-manager-types'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 class AccountGlobals {
   app: Shardus.App
@@ -84,10 +85,15 @@ class AccountGlobals {
 
       let toQuery: string[] = []
 
+      let responded = false
       // not ready
-      if (this.stateManager.accountSync.globalAccountsSynced === false) {
+      if (this.stateManager.accountSync.globalAccountsSynced === false || this.stateManager.appFinishedSyncing === false) {
         result.ready = false
         await respond(result)
+        responded = true
+        
+        //should just return here, but I want coutners below to help verify the fix! 20210624 
+        //return   
       }
 
       //TODO: Perf  could do things faster by pulling from cache, but would need extra testing:
@@ -106,6 +112,25 @@ class AccountGlobals {
       for (let key of globalAccountKeys) {
         toQuery.push(key)
       }
+
+      if (this.p2p.isFirstSeed) {
+        //TODO this will mess up dapps that dont use global accounts.
+        if(toQuery.length === 0){
+          nestedCountersInstance.countEvent(`sync`, `HACKFIX - first node needs to wait! ready:${result.ready} responded:${responded}`) 
+          result.ready = false
+          if(responded === false){
+            this.statemanager_fatal('get_globalaccountreport -first seed has no globals', `get_globalaccountreport -first seed has no globals. ready:${result.ready} responded:${responded}`)
+            await respond(result)
+          }
+          return
+        }
+      }
+
+      if(result.ready === false){
+        nestedCountersInstance.countEvent(`sync`, `HACKFIX - forgot to return!`) 
+        return
+      }
+
 
       let accountData: Shardus.WrappedData[]
       let ourLockID = -1

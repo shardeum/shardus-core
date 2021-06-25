@@ -637,7 +637,7 @@ setupHandlers() {
 
     // need to only count stuff from the newestCycle.
 
-    return { allPassed, allPassedMetric2, singleVotePartitions, multiVotePartitions, badPartitions }
+    return { allPassed, allPassedMetric2, singleVotePartitions, multiVotePartitions, badPartitions, dataByParition }
   }
 
 /***

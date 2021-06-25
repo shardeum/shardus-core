@@ -971,7 +971,7 @@ class AccountSync {
         //if (logFlags.error) this.mainLogger.error('ASK FAIL getRobustGlobalReport result.stateHash == null')
         result = { ready: false, msg: `invalid data format: ${Math.random()}` }
       }
-      if (result != null && result.notReady === true) {
+      if (result != null && result.ready === false) {
         //if (logFlags.error) this.mainLogger.error('ASK FAIL getRobustGlobalReport result.stateHash == null')
         result = { ready: false, msg: `not ready: ${Math.random()}` }
       }
