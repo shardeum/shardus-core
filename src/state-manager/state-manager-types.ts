@@ -929,7 +929,8 @@ export type HashTrieAccountDataRequest = {
     accounts:AccountIDAndHash[];
 }
 export type HashTrieAccountDataResponse = {
-    accounts:Shardus.WrappedData[];
+    accounts: Shardus.WrappedData[];
+    stateTableData: Shardus.StateTableObject[];
 }
 
 

@@ -692,6 +692,25 @@ class Storage {
     }
   }
 
+  async queryAccountStateTableByListNewest(accountIDs) {
+    this._checkInit()
+    try {
+      let expandQ = ''
+      for (let i = 0; i < accountIDs.length; i++) {
+        expandQ += '?'
+        if (i < accountIDs.length - 1) {
+          expandQ += ', '
+        }
+      }
+      //maxTS?
+      const query = `select accountId, txId, max(txTimestamp) txTimestamp, stateBefore, stateAfter from accountStates WHERE accountId IN (${expandQ}) group by accountId `
+      const result = await this._query(query, [ ...accountIDs])
+      return result
+    } catch (e) {
+      throw new Error(e)
+    }
+  }
+
   // First pass would be to get timestamp for N accounts
   // Then can batch these into delete statements that will be sure not to delete accounts that are to old.
   //

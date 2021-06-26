@@ -223,7 +223,7 @@ class TransactionRepair {
                 if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt while(node == null) look for other node txId. idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}  acc:${shortKey}`)
                 //find alternate
                 if (alternateIndex >= requestObject.alternates.length) {
-                  this.statemanager_fatal(`repairToMatchReceipt_1`, `ASK FAIL repairToMatchReceipt failed to find alternate node to ask for receipt. txId. ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}  acc:${shortKey}`)
+                  this.statemanager_fatal(`repairToMatchReceipt_1`, `ASK FAIL repairToMatchReceipt failed to find alternate node to ask for receipt data. txId. ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}  acc:${shortKey}`)
                   attemptsRemaining = false
 
                   if(outerloopCount <= 2){
@@ -710,7 +710,7 @@ class TransactionRepair {
                 if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt2 while(node == null) look for other node txId. idx:${alternateIndex} txid: ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}  acc:${shortKey}`)
                 //find alternate
                 if (alternateIndex >= requestObject.alternates.length) {
-                  this.statemanager_fatal(`repairToMatchReceipt2_1`, `ASK FAIL repairToMatchReceipt failed to find alternate node to ask for receipt. txId. ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}  acc:${shortKey}`)
+                  this.statemanager_fatal(`repairToMatchReceipt2_1`, `ASK FAIL repairToMatchReceipt failed to find alternate node to ask for receipt data. txId. ${utils.stringifyReduce(requestObject.appliedVote.txid)} alts: ${utils.stringifyReduce(requestObject.alternates)}  acc:${shortKey}`)
                   attemptsRemaining = false
 
 
@@ -910,7 +910,7 @@ class TransactionRepair {
                   }
 
                   //update hash
-                  data.stateId = updatedHash
+                  //data.stateId = updatedHash
 
                   updatedAccountAndHashes.push({accountID: data.accountId, hash: data.stateId})
 

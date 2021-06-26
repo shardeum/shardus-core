@@ -1294,7 +1294,23 @@ class AccountSync {
         }
       }
 
-      let recievedStateDataHash = this.crypto.hash(this.combinedAccountStateData)
+      let seenAccounts = new Set()
+
+      //only hash one account state per account. the most recent one!
+      let filteredAccountStates = []
+      for(let i = this.combinedAccountStateData.length -1; i>=0; i--){
+        let accountState:Shardus.StateTableObject = this.combinedAccountStateData[i]
+  
+        if(seenAccounts.has(accountState.accountId) === true){
+          continue
+        }
+        seenAccounts.add(accountState.accountId)
+        filteredAccountStates.unshift(accountState)
+      }
+
+
+
+      let recievedStateDataHash = this.crypto.hash(filteredAccountStates)
 
       if (recievedStateDataHash === firstHash) {
         searchingForGoodData = false

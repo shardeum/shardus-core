@@ -239,7 +239,22 @@ class TransactionQueue {
 
   async getAccountsStateHash(accountStart = '0'.repeat(64), accountEnd = 'f'.repeat(64), tsStart = 0, tsEnd = Date.now()) {
     const accountStates = await this.storage.queryAccountStateTable(accountStart, accountEnd, tsStart, tsEnd, 100000000)
-    const stateHash = this.crypto.hash(accountStates)
+
+    let seenAccounts = new Set()
+
+    //only hash one account state per account. the most recent one!
+    let filteredAccountStates = []
+    for(let i = accountStates.length -1; i>=0; i--){
+      let accountState:Shardus.StateTableObject = accountStates[i]
+
+      if(seenAccounts.has(accountState.accountId) === true){
+        continue
+      }
+      seenAccounts.add(accountState.accountId)
+      filteredAccountStates.unshift(accountState)
+    }
+
+    const stateHash = this.crypto.hash(filteredAccountStates)
     return stateHash
   }
 

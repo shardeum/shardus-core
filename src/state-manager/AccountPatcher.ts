@@ -230,7 +230,7 @@ class AccountPatcher {
     Comms.registerInternal('get_account_data_by_hashes', async (payload: HashTrieAccountDataRequest, respond: (arg0: HashTrieAccountDataResponse) => any) => {
 
       nestedCountersInstance.countEvent('accountPatcher', `get_account_data_by_hashes`)
-      let result:HashTrieAccountDataResponse = {accounts:[]}      
+      let result:HashTrieAccountDataResponse = {accounts:[], stateTableData:[]}      
       try{
 
         //nodeChildHashes: {radix:string, childAccounts:{accountID:string, hash:string}[]}[]
@@ -257,6 +257,7 @@ class AccountPatcher {
         let skippedAccounts:AccountIDAndHash[] = []
         let returnedAccounts:AccountIDAndHash[] = []
 
+        let accountsToGetStateTableDataFor = []
         //only return results that match the requested hash!
         let accountDataFinal: Shardus.WrappedData[] = []
         if (accountData != null) {
@@ -277,6 +278,7 @@ class AccountPatcher {
             if(hashMap.get(accountId) === wrappedAccount.stateId){
               accountDataFinal.push(wrappedAccount)
               returnedAccounts.push({accountID:accountId, hash:stateId})
+              accountsToGetStateTableDataFor.push(accountId)
               queryStats.returned++
             } else {
               queryStats.skip_requestHashMismatch++
@@ -306,11 +308,15 @@ class AccountPatcher {
           }
         }
 
+        if(accountsToGetStateTableDataFor.length > 0){
+          result.stateTableData = await this.stateManager.storage.queryAccountStateTableByListNewest(accountsToGetStateTableDataFor)
+        }
+        
         this.mainLogger.debug(`get_account_data_by_hashes1 requests[${payload.accounts.length}] :${utils.stringifyReduce(payload.accounts)} `)
         this.mainLogger.debug(`get_account_data_by_hashes2 skippedAccounts:${utils.stringifyReduce(skippedAccounts)} `)
         this.mainLogger.debug(`get_account_data_by_hashes3 returnedAccounts:${utils.stringifyReduce(returnedAccounts)} `)
         this.mainLogger.debug(`get_account_data_by_hashes4 queryStats:${utils.stringifyReduce(queryStats)} `)
-
+        this.mainLogger.debug(`get_account_data_by_hashes4 stateTabledata:${utils.stringifyReduce(result.stateTableData)} `)
         result.accounts = accountDataFinal
 
       } catch(ex){
@@ -1411,7 +1417,7 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
 
 
       //request data for the list of bad accounts then update. this can live in account repair?
-      let wrappedDataList = await this.getAccountRepairData(cycle, results.badAccounts )
+      let {wrappedDataList, stateTableDataMap} = await this.getAccountRepairData(cycle, results.badAccounts )
 
 
       //this.statemanager_fatal('debug shardTrie',`temp shardTrie ${cycle}: ${utils.stringifyReduce(this.shardTrie.layerMaps[0].values())}`)
@@ -1454,8 +1460,9 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
         }
       }
 
+      let updatedAccounts:string[] = []
       //do some work so ave the data  
-      let failedHashes = await this.stateManager.checkAndSetAccountData(wrappedDataListFiltered, `testAndPatchAccounts`, false)
+      let failedHashes = await this.stateManager.checkAndSetAccountData(wrappedDataListFiltered, `testAndPatchAccounts`, false, updatedAccounts)
 
       if(failedHashes.length != 0){
         nestedCountersInstance.countEvent('accountPatcher', 'checkAndSetAccountData failed hashes', failedHashes.length)
@@ -1476,6 +1483,27 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
       //   }
       //   wrappedDataUpdated.push(wrappedData)
       // }
+
+      let combinedAccountStateData:Shardus.StateTableObject[] = []
+      let updatedSet = new Set()
+      for(let updated of updatedAccounts){
+        updatedSet.add(updated)
+      }
+      for(let wrappedData of wrappedDataListFiltered){
+        if(updatedSet.has(wrappedData.accountId )){
+          
+          let stateTableData = stateTableDataMap.get(wrappedData.stateId)
+          if(stateTableData != null){
+            combinedAccountStateData.push(stateTableData)
+          }
+        }
+      }
+      if(combinedAccountStateData.length > 0){
+        await this.stateManager.storage.addAccountStates(combinedAccountStateData)        
+      }
+
+      nestedCountersInstance.countEvent('accountPatcher', `p.repair stateTable cycle:${cycle} acc:#${updatedAccounts.length} st#:${combinedAccountStateData.length} missed#${combinedAccountStateData.length-updatedAccounts.length}`, combinedAccountStateData.length)
+
 
       await this.stateManager.writeCombinedAccountDataToBackups(wrappedDataListFiltered, failedHashes)
 
@@ -1531,7 +1559,7 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
  */
   //todo test the tree to see if repairs will work.   not simple to do efficiently
   //todo robust query the hashes?  technically if we repair to bad data it will just get detected and fixed again!!!
-  async getAccountRepairData(cycle:number, badAccounts:AccountIDAndHash[] ): Promise<Shardus.WrappedData[]> {
+  async getAccountRepairData(cycle:number, badAccounts:AccountIDAndHash[] ): Promise<{wrappedDataList:Shardus.WrappedData[], stateTableDataMap:Map<string, Shardus.StateTableObject>}> {
     //pick which nodes to ask! /    //build up requests
     let nodesBySyncRadix:Map<string, {node:Shardus.Node, request:{cycle, accounts:AccountIDAndHash[]} }> = new Map()
     let accountHashMap = new Map()
@@ -1565,11 +1593,23 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
     }
 
     let wrappedDataList:Shardus.WrappedData[] = []
+    //let stateTableDataList:Shardus.StateTableObject[] = []
+
+    let stateTableDataMap:Map<string, Shardus.StateTableObject> = new Map()
 
     let results = await Promise.all(promises) as HashTrieAccountDataResponse[]
     for(let result of results){
       //HashTrieAccountDataResponse
       if(result != null && result.accounts != null && result.accounts.length > 0){
+
+        
+        if(result.stateTableData != null && result.stateTableData.length > 0){
+          for(let stateTableData of result.stateTableData){
+            stateTableDataMap.set(stateTableData.stateAfter, stateTableData)
+
+          }
+        }
+
         //wrappedDataList = wrappedDataList.concat(result.accounts)        
         for(let wrappedAccount of result.accounts){
           let desiredHash = accountHashMap.get(wrappedAccount.accountId)
@@ -1580,10 +1620,18 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
             continue
           }
           wrappedDataList.push(wrappedAccount)
+
+          // let stateDataFound = stateTableDataMap.get(wrappedAccount.accountId)
+          // if(stateDataFound != null){
+          //   //todo filtering
+          //   if(stateDataFound.stateAfter === desiredHash){
+          //     stateTableDataList.push(stateDataFound)
+          //   }
+          // }
         }
       }
     }
-    return wrappedDataList
+    return {wrappedDataList, stateTableDataMap}
   }
 
 /***

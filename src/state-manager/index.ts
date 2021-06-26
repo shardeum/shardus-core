@@ -850,7 +850,7 @@ class StateManager {
   }
 
   // TSConversion TODO need to fix some any types
-  async checkAndSetAccountData(accountRecords: Shardus.WrappedData[], note: string, initStats: boolean): Promise<string[]> {
+  async checkAndSetAccountData(accountRecords: Shardus.WrappedData[], note: string, initStats: boolean, updatedAccounts:string[] = null): Promise<string[]> {
     let accountsToAdd: any[] = []
     let failedHashes: string[] = []
     for (let wrapedAccount of accountRecords) {
@@ -882,6 +882,11 @@ class StateManager {
         // if (recordData.data) recordData.data = JSON.parse(recordData.data)
         // if (recordData.txs) recordData.txs = JSON.parse(recordData.txs) // dont parse this, since it is already the string form we need to write it.
         accountsToAdd.push(recordData)
+
+        if(updatedAccounts != null){
+          updatedAccounts.push(accountId)
+        }
+
         let debugString = `setAccountData: note:${note} acc: ${utils.makeShortHash(accountId)} hash: ${utils.makeShortHash(hash)} ts:${wrapedAccount.timestamp}`
         if (logFlags.debug) this.mainLogger.debug(debugString)
         if (logFlags.verbose) console.log(debugString)
