@@ -185,7 +185,7 @@ class AccountSync {
     this.isSyncStatementCompleted = false
 
     this.softSync_earlyOut = false
-    this.softSync_noSyncDelay = false
+    this.softSync_noSyncDelay = true
     this.softSync_checkInitialFlag = false
 
     this.initalSyncFinished = false
