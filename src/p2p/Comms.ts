@@ -6,6 +6,7 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { P2P } from 'shardus-types'
 import {logFlags} from '../logger'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 /** ROUTES */
 
@@ -41,6 +42,8 @@ let gossipSent = 0
 let gossipRecv = 0
 const gossipTypeSent = {}
 const gossipTypeRecv = {}
+
+let commsCounters = true
 
 /** FUNCTIONS */
 export function setAcceptInternal(enabled: boolean) {
@@ -201,6 +204,12 @@ export async function tell(
     tracker = createMsgTracker()
   }
   const promises = []
+
+  if(commsCounters){
+    nestedCountersInstance.countEvent('comms', `tell ${route} recipients:${nodes.length}`)
+    nestedCountersInstance.countEvent('comms', `tell recipients: ${nodes.length}`)    
+  }
+
   for (const node of nodes) {
     if (node.id === Self.id) {
       if(logFlags.p2pNonFatal) info('p2p/Comms:tell: Not telling self')
@@ -232,6 +241,12 @@ export async function ask(
     if(logFlags.p2pNonFatal) info('p2p/Comms:ask: Not asking self')
     return false
   }
+
+  if(commsCounters){
+    nestedCountersInstance.countEvent('comms', `ask ${route} recipients: 1`)
+    nestedCountersInstance.countEvent('comms', `ask recipients: 1`)
+  }
+
   const signedMessage = _wrapAndTagMessage(message, tracker, node)
   let signedResponse
   try {
@@ -428,6 +443,12 @@ export async function sendGossip(
       gossipSent++
       gossipTypeSent[type] = gossipTypeSent[type] ? gossipTypeSent[type] + 1 : 1
     }
+
+    if(commsCounters){
+      nestedCountersInstance.countEvent('comms', `sendGossip ${type} recipients: ${recipients.length}`)
+      nestedCountersInstance.countEvent('comms', `sendGossip recipients: ${recipients.length}`)
+    }
+
     await tell(recipients, 'gossip', gossipPayload, true, tracker)
   } catch (ex) {
     if (logFlags.verbose) {
@@ -508,6 +529,12 @@ export async function sendGossipAll(
         gossipPayload
       )
     }
+
+    if(commsCounters){
+      nestedCountersInstance.countEvent('comms', `sendGossipAll ${type} recipients:${recipients.length}`)
+      nestedCountersInstance.countEvent('comms', `sendGossipAll recipients: ${recipients.length}`)
+    }
+    
     await tell(recipients, 'gossip', gossipPayload, true, tracker)
   } catch (ex) {
     if (logFlags.verbose) {
