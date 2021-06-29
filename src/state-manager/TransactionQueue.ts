@@ -385,6 +385,7 @@ class TransactionQueue {
     let isGlobalModifyingTX = (queueEntry.globalModification === true)
     let savedSomething = false
     try {
+      this.profiler.profileSectionStart('commit-1-setAccount')
       if (logFlags.verbose){
         this.mainLogger.debug(`commitConsensedTransaction  ts:${timestamp} isGlobalModifyingTX:${isGlobalModifyingTX}  Applying! debugInfo: ${debugInfo}`)
         this.mainLogger.debug(`commitConsensedTransaction  filter: ${utils.stringifyReduce(queueEntry.localKeys)}`)
@@ -423,25 +424,35 @@ class TransactionQueue {
       // wrappedStates are side effected for now
       savedSomething = await this.stateManager.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter, note)
 
-      if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  savedSomething: ${savedSomething}`)
-      if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
-      if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
+      if (logFlags.verbose) {
+        this.mainLogger.debug(`commitConsensedTransaction  savedSomething: ${savedSomething}`)
+        this.mainLogger.debug(`commitConsensedTransaction  accountData[${accountDataList.length}]: ${utils.stringifyReduce(accountDataList)}`)
+        this.mainLogger.debug(`commitConsensedTransaction  stateTableResults[${stateTableResults.length}]: ${utils.stringifyReduce(stateTableResults)}`)
+      }
+
+      this.profiler.profileSectionEnd('commit-1-setAccount')
+      this.profiler.profileSectionStart('commit-2-addAccountStatesAndTX')
 
       for (let stateT of stateTableResults) {
         let wrappedRespose = wrappedStates[stateT.accountId]
         // we have to correct stateBefore because it now gets stomped in the vote, TODO cleaner fix?
         stateT.stateBefore = wrappedRespose.prevStateId
 
-        if (logFlags.verbose) if (logFlags.console) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
-        if (logFlags.verbose) this.mainLogger.debug('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
+        if (logFlags.verbose) {
+          if (logFlags.console) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
+          this.mainLogger.debug('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.id) + ' ts: ' + acceptedTX.timestamp)
+        }
       }
       await this.storage.addAccountStates(stateTableResults)
 
       // write the accepted TX to storage
       this.storage.addAcceptedTransactions([acceptedTX])
-
+      this.profiler.profileSectionEnd('commit-2-addAccountStatesAndTX')
+      this.profiler.profileSectionStart('commit-3-transactionReceiptPass')
       // endpoint to allow dapp to execute something that depends on a transaction being approved.
       this.app.transactionReceiptPass(acceptedTX.data, wrappedStates, applyResponse)
+
+      this.profiler.profileSectionEnd('commit-3-transactionReceiptPass')
     } catch (ex) {
       this.statemanager_fatal(`commitConsensedTransaction_ex`, 'commitConsensedTransaction failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       if (logFlags.debug) this.mainLogger.debug(`commitConsensedTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
@@ -455,6 +466,8 @@ class TransactionQueue {
       if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction FIFO unlock inner: ${utils.stringifyReduce(uniqueKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
     }
 
+
+    this.profiler.profileSectionStart('commit-4-updateAccountsCopyTable')
     // have to wrestle with the data a bit so we can backup the full account and not just the partial account!
     // let dataResultsByKey = {}
     let dataResultsFullList = []
@@ -484,6 +497,10 @@ class TransactionQueue {
     }
     this.stateManager.eventEmitter.emit('txApplied', acceptedTX)
 
+    this.profiler.profileSectionEnd('commit-4-updateAccountsCopyTable')
+
+
+    this.profiler.profileSectionStart('commit-5-stats')
     // STATS update
     this.stateManager.partitionStats.statsTxSummaryUpdate(queueEntry.cycleToRecordOn, queueEntry)
     for (let wrappedData of applyResponse.accountData) {
@@ -500,6 +517,9 @@ class TransactionQueue {
         if (logFlags.error) this.mainLogger.error(`commitConsensedTransaction failed to get account data for stats ${wrappedData.accountId}`)
       }
     }
+
+    this.profiler.profileSectionEnd('commit-5-stats')
+
     return { success: true }
   }
 

@@ -7,6 +7,9 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 // process.hrtime.bigint()
 import {logFlags} from '../logger'
 
+let profilerSelfReporting = false
+
+
 interface Profiler {
   sectionTimes: any
   // instance: Profiler
@@ -51,8 +54,7 @@ class Profiler {
     let section = this.sectionTimes[sectionName]
 
     if (section != null && section.started === true) {
-
-      nestedCountersInstance.countEvent('profiler-start-error', sectionName)
+      if(profilerSelfReporting) nestedCountersInstance.countEvent('profiler-start-error', sectionName)
       return
     }
 
@@ -93,7 +95,7 @@ class Profiler {
     let section = this.sectionTimes[sectionName]
     if (section == null || section.started === false) {
 
-      nestedCountersInstance.countEvent('profiler-end-error', sectionName)
+      if(profilerSelfReporting) nestedCountersInstance.countEvent('profiler-end-error', sectionName)
       return
     }
 
@@ -103,7 +105,7 @@ class Profiler {
     section.started = false
 
     if(internal === false){
-      nestedCountersInstance.countEvent('profiler-end', sectionName)
+      if(profilerSelfReporting) nestedCountersInstance.countEvent('profiler-end', sectionName)
 
       this.stackHeight--
       if(this.stackHeight === 0){
@@ -131,7 +133,7 @@ class Profiler {
   }
 
   getTotalBusyInternal() : any {
-    nestedCountersInstance.countEvent('profiler-note', 'getTotalBusyInternal')
+    if(profilerSelfReporting) nestedCountersInstance.countEvent('profiler-note', 'getTotalBusyInternal')
 
     this.profileSectionEnd('_internal_total', true)
     let internalTotalBusy = this.sectionTimes['_internal_totalBusy']

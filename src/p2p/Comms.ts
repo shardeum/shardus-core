@@ -206,8 +206,9 @@ export async function tell(
   const promises = []
 
   if(commsCounters){
-    nestedCountersInstance.countEvent('comms', `tell ${route} recipients:${nodes.length}`)
-    nestedCountersInstance.countEvent('comms', `tell recipients: ${nodes.length}`)    
+    nestedCountersInstance.countEvent('comms-route', `tell ${route}`, nodes.length)
+    nestedCountersInstance.countEvent('comms-route x recipients', `tell ${route} recipients:${nodes.length}`, nodes.length)
+    nestedCountersInstance.countEvent('comms-recipients', `tell recipients: ${nodes.length}`, nodes.length)    
   }
 
   for (const node of nodes) {
@@ -216,7 +217,7 @@ export async function tell(
       continue
     }
     const signedMessage = _wrapAndTagMessage(message, tracker, node)
-    info(`signed and tagged gossip`, signedMessage)
+    if(logFlags.p2pNonFatal) info(`signed and tagged gossip`, utils.stringifyReduceLimit(signedMessage))
     promises.push(network.tell([node], route, signedMessage, logged))
   }
   try {
@@ -243,8 +244,9 @@ export async function ask(
   }
 
   if(commsCounters){
-    nestedCountersInstance.countEvent('comms', `ask ${route} recipients: 1`)
-    nestedCountersInstance.countEvent('comms', `ask recipients: 1`)
+    nestedCountersInstance.countEvent('comms-route', `ask ${route}`)
+    nestedCountersInstance.countEvent('comms-route x recipients', `ask ${route} recipients: 1`)
+    nestedCountersInstance.countEvent('comms-recipients', `ask recipients: 1`)
   }
 
   const signedMessage = _wrapAndTagMessage(message, tracker, node)
@@ -274,7 +276,7 @@ export async function ask(
 export function registerInternal(route, handler) {
   // Create function that wraps handler function
   const wrappedHandler = async (wrappedPayload, respond) => {
-    info("registerInternal wrappedPayload", utils.stringifyReduceLimit(wrappedPayload))
+    if(logFlags.p2pNonFatal) info("registerInternal wrappedPayload", utils.stringifyReduceLimit(wrappedPayload))
     internalRecvCounter++
     // We have internal requests turned off until we have a node id
     if (!acceptInternal) {
@@ -298,7 +300,7 @@ export function registerInternal(route, handler) {
         tracker,
         node
       )
-      if (logFlags.verbose) {
+      if (logFlags.verbose && logFlags.p2pNonFatal) {
         info(
           `The signed wrapped response to send back: ${utils.stringifyReduceLimit(
             signedResponse
@@ -373,10 +375,9 @@ export async function sendGossip(
     tracker = createGossipTracker()
   }
 
-  if (logFlags.verbose) {
+  if (logFlags.verbose && logFlags.p2pNonFatal) {
     info(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
   }
-  info(`Start of sendGossipIn(${utils.stringifyReduce(payload)})`)
   const gossipPayload = { type, data: payload }
 
   /*
@@ -422,7 +423,7 @@ export async function sendGossip(
     recipients = utils.removeNodesByID(recipients, [sender])
   }
   try {
-    if (logFlags.verbose) {
+    if (logFlags.verbose && logFlags.p2pNonFatal) {
       info(
         `GossipingIn ${type} request to these nodes: ${utils.stringifyReduce(
           recipients.map(
@@ -445,8 +446,9 @@ export async function sendGossip(
     }
 
     if(commsCounters){
-      nestedCountersInstance.countEvent('comms', `sendGossip ${type} recipients: ${recipients.length}`)
-      nestedCountersInstance.countEvent('comms', `sendGossip recipients: ${recipients.length}`)
+      nestedCountersInstance.countEvent('comms-route', `sendGossip ${type}`, recipients.length)
+      nestedCountersInstance.countEvent('comms-route x recipients', `sendGossip ${type} recipients: ${recipients.length}`, recipients.length)
+      nestedCountersInstance.countEvent('comms-recipients', `sendGossip recipients: ${recipients.length}`, recipients.length)
     }
 
     await tell(recipients, 'gossip', gossipPayload, true, tracker)
@@ -461,7 +463,7 @@ export async function sendGossip(
     fatal('sendGossipIn: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
   }
   // gossipedHashesSent.set(gossipHash, currentCycle)    // No longer used
-  if (logFlags.verbose) {
+  if (logFlags.verbose && logFlags.p2pNonFatal) {
     info(`End of sendGossipIn(${utils.stringifyReduce(payload)})`)
   }
 }
@@ -531,10 +533,11 @@ export async function sendGossipAll(
     }
 
     if(commsCounters){
-      nestedCountersInstance.countEvent('comms', `sendGossipAll ${type} recipients:${recipients.length}`)
-      nestedCountersInstance.countEvent('comms', `sendGossipAll recipients: ${recipients.length}`)
+      nestedCountersInstance.countEvent('comms-route', `sendGossipAll ${type}`, recipients.length)
+      nestedCountersInstance.countEvent('comms-route x recipients', `sendGossipAll ${type} recipients: ${recipients.length}`, recipients.length)
+      nestedCountersInstance.countEvent('comms-recipients', `sendGossipAll recipients: ${recipients.length}`, recipients.length)
     }
-    
+
     await tell(recipients, 'gossip', gossipPayload, true, tracker)
   } catch (ex) {
     if (logFlags.verbose) {
@@ -559,7 +562,7 @@ export async function sendGossipAll(
  * Payload: {type: ['receipt', 'trustedTransaction'], data: {}}
  */
 export async function handleGossip(payload, sender, tracker = '') {
-  if (logFlags.verbose) {
+  if (logFlags.verbose && logFlags.p2pNonFatal) {
     info(`Start of handleGossip(${utils.stringifyReduce(payload)})`)
   }
 
@@ -643,7 +646,7 @@ export async function handleGossip(payload, sender, tracker = '') {
   logger.playbackLog(sender, 'self', 'GossipRcv', type, tracker, data)
   // [TODO] - maybe we don't need to await the following line
   await gossipHandler(data, sender, tracker)
-  if (logFlags.verbose) {
+  if (logFlags.verbose && logFlags.p2pNonFatal) {
     info(`End of handleGossip(${utils.stringifyReduce(payload)})`)
   }
 }
