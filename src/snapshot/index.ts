@@ -21,8 +21,8 @@ import * as SnapshotFunctions from './snapshotFunctions'
 /** STATE */
 
 export let oldDataPath: string
-let oldDataMap: Map<P2P.SnapshotTypes.PartitionNum, any[]> = new Map()
-const dataToMigrate: Map<P2P.SnapshotTypes.PartitionNum, any[]> = new Map()
+let oldDataMap: Map<P2P.SnapshotTypes.PartitionNum, ShardusTypes.AccountsCopy[]> = new Map()
+const dataToMigrate: Map<P2P.SnapshotTypes.PartitionNum, ShardusTypes.AccountsCopy[]> = new Map()
 const oldPartitionHashMap: Map<P2P.SnapshotTypes.PartitionNum, string> = new Map()
 let missingPartitions: P2P.SnapshotTypes.PartitionNum[] = []
 const notNeededRepliedNodes: Map<string, true> = new Map()
@@ -101,7 +101,7 @@ export function getSummaryHashes(
 export function getReceiptMap(
   start: Cycle['counter'] = 0,
   end?: Cycle['counter']
-) {
+) : { [key: number]: ReceiptMapResult[] } {
   const collector = {}
   for (const [key] of partitionBlockMapByCycle) {
     if (key >= start) {
@@ -115,7 +115,7 @@ export function getReceiptMap(
 export function getSummaryBlob(
   start: Cycle['counter'] = 0,
   end?: Cycle['counter']
-) {
+) : { [key: number]: StatsClump } {
   const collector = {}
   for (const [key] of statesClumpMapByCycle) {
     if (key >= start) {

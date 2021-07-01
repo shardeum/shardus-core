@@ -204,7 +204,7 @@ export async function saveSummaryAndNetworkHashes (
   })
 }
 
-export async function readOldCycleRecord () {
+export async function readOldCycleRecord () : Promise<P2P.CycleCreatorTypes.CycleRecord> {
   const oldCycles = await Context.storage.listOldCycles()
   if (oldCycles && oldCycles.length > 0) return oldCycles[0]
 }
@@ -234,9 +234,9 @@ export async function calculateOldDataMap (
   shardGlobals: StateManager.shardFunctionTypes.ShardGlobals,
   nodeShardDataMap: StateManager.shardFunctionTypes.NodeShardDataMap,
   oldPartitionHashMap
-) {
+) : Promise<Map<P2P.SnapshotTypes.PartitionNum, ShardusTypes.AccountsCopy[]>>{
   const partitionShardDataMap: StateManager.shardFunctionTypes.ParititionShardDataMap = new Map()
-  const oldDataMap: Map<PartitionNum, any[]> = new Map()
+  const oldDataMap: Map<P2P.SnapshotTypes.PartitionNum, ShardusTypes.AccountsCopy[]> = new Map()
   ShardFunctions.computePartitionShardDataMap(
     shardGlobals,
     partitionShardDataMap,
