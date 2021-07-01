@@ -1397,8 +1397,10 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
       let hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
 
       let debug = []
-      for(let [key,value] of hashTrieSyncConsensus.radixHashVotes){
-        debug.push({radix:key , hash: value.bestHash, votes: value.bestVotes})
+      if (hashTrieSyncConsensus && hashTrieSyncConsensus.radixHashVotes) {
+        for(let [key,value] of hashTrieSyncConsensus.radixHashVotes){
+          debug.push({radix:key , hash: value.bestHash, votes: value.bestVotes})
+        }
       }
       debug.sort(this.sortByRadix)
       this.statemanager_fatal('debug shardTrie',`temp shardTrie votes ${cycle}: ${utils.stringifyReduce(debug)}`)
