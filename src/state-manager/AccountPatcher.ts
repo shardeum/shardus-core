@@ -1362,7 +1362,7 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
     }
 
 
-    nestedCountersInstance.countEvent(`accountPatcher`, ` syncDpeth:${this.treeSyncDepth} maxDepth :${this.treeMaxDepth}`)
+    nestedCountersInstance.countEvent(`accountPatcher`, ` syncDepth:${this.treeSyncDepth} maxDepth :${this.treeMaxDepth}`)
 
     let updateStats = this.upateShardTrie(cycle)
 

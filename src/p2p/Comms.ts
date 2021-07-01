@@ -208,7 +208,8 @@ export async function tell(
   if(commsCounters){
     nestedCountersInstance.countEvent('comms-route', `tell ${route}`, nodes.length)
     nestedCountersInstance.countEvent('comms-route x recipients', `tell ${route} recipients:${nodes.length}`, nodes.length)
-    nestedCountersInstance.countEvent('comms-recipients', `tell recipients: ${nodes.length}`, nodes.length)    
+    nestedCountersInstance.countEvent('comms-recipients', `tell recipients: ${nodes.length}`, nodes.length) 
+    nestedCountersInstance.countEvent('comms-route x recipients (logical count)', `tell ${route} recipients:${nodes.length}`)  
   }
 
   for (const node of nodes) {
@@ -247,6 +248,7 @@ export async function ask(
     nestedCountersInstance.countEvent('comms-route', `ask ${route}`)
     nestedCountersInstance.countEvent('comms-route x recipients', `ask ${route} recipients: 1`)
     nestedCountersInstance.countEvent('comms-recipients', `ask recipients: 1`)
+    nestedCountersInstance.countEvent('comms-route x recipients (logical count)', `ask ${route} recipients: 1`)
   }
 
   const signedMessage = _wrapAndTagMessage(message, tracker, node)
@@ -449,6 +451,7 @@ export async function sendGossip(
       nestedCountersInstance.countEvent('comms-route', `sendGossip ${type}`, recipients.length)
       nestedCountersInstance.countEvent('comms-route x recipients', `sendGossip ${type} recipients: ${recipients.length}`, recipients.length)
       nestedCountersInstance.countEvent('comms-recipients', `sendGossip recipients: ${recipients.length}`, recipients.length)
+      nestedCountersInstance.countEvent('comms-route x recipients (logical count)', `sendGossip ${type} recipients: ${recipients.length}`)
     }
 
     await tell(recipients, 'gossip', gossipPayload, true, tracker)
@@ -536,6 +539,7 @@ export async function sendGossipAll(
       nestedCountersInstance.countEvent('comms-route', `sendGossipAll ${type}`, recipients.length)
       nestedCountersInstance.countEvent('comms-route x recipients', `sendGossipAll ${type} recipients: ${recipients.length}`, recipients.length)
       nestedCountersInstance.countEvent('comms-recipients', `sendGossipAll recipients: ${recipients.length}`, recipients.length)
+      nestedCountersInstance.countEvent('comms-route x recipients (logical count)', `sendGossipAll ${type} recipients: ${recipients.length}`)
     }
 
     await tell(recipients, 'gossip', gossipPayload, true, tracker)
