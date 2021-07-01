@@ -125,60 +125,67 @@ class TransactionQueue {
       }
     })
 
+    this.p2p.registerInternal('spread_tx_to_group_syncing', async (payload: Shardus.AcceptedTx, respondWrapped, sender, tracker) => {
+      
+      this.handleSharedTX(payload, sender)
+    })
+
     this.p2p.registerGossipHandler('spread_tx_to_group', async (payload, sender, tracker) => {
       //  gossip 'spread_tx_to_group' to transaction group
       // Place tx in queue (if younger than m)
 
-      let queueEntry = this.getQueueEntrySafe(payload.id) // , payload.timestamp)
-      if (queueEntry) {
+      let queueEntry = this.handleSharedTX(payload, sender)
+      if(queueEntry == null){
         return
-        // already have this in our queue
       }
+      // let queueEntry = this.getQueueEntrySafe(payload.id) // , payload.timestamp)
+      // if (queueEntry) {
+      //   return
+      //   // already have this in our queue
+      // }
 
-      //TODO need to check transaction fields.
+      // let noConsensus = false // this can only be true for a set command which will never come from an endpoint
+      // let added = this.routeAndQueueAcceptedTransaction(payload, /*sendGossip*/ false, sender, /*globalModification*/ false, noConsensus)
+      // if (added === 'lost') {
+      //   return // we are faking that the message got lost so bail here
+      // }
+      // if (added === 'out of range') {
+      //   return
+      // }
+      // if (added === 'notReady') {
+      //   return
+      // }
+      // queueEntry = this.getQueueEntrySafe(payload.id) //, payload.timestamp) // now that we added it to the queue, it should be possible to get the queueEntry now
 
-      let noConsensus = false // this can only be true for a set command which will never come from an endpoint
-      let added = this.routeAndQueueAcceptedTransaction(payload, /*sendGossip*/ false, sender, /*globalModification*/ false, noConsensus)
-      if (added === 'lost') {
-        return // we are faking that the message got lost so bail here
-      }
-      if (added === 'out of range') {
-        return
-      }
-      if (added === 'notReady') {
-        return
-      }
-      queueEntry = this.getQueueEntrySafe(payload.id) //, payload.timestamp) // now that we added it to the queue, it should be possible to get the queueEntry now
+      // if (queueEntry == null) {
+      //   // do not gossip this, we are not involved
+      //   // downgrading, this does not seem to be fatal, but may need further logs/testing
+      //   //this.statemanager_fatal(`spread_tx_to_group_noQE`, `spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(payload.id)}`)
+      //   if (logFlags.playback) this.logger.playbackLogNote('spread_tx_to_group_noQE', '', `spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(payload.id)}`)
+      //   return
+      // }
 
-      if (queueEntry == null) {
-        // do not gossip this, we are not involved
-        // downgrading, this does not seem to be fatal, but may need further logs/testing
-        //this.statemanager_fatal(`spread_tx_to_group_noQE`, `spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(payload.id)}`)
-        if (logFlags.playback) this.logger.playbackLogNote('spread_tx_to_group_noQE', '', `spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(payload.id)}`)
-        return
-      }
+      // //Validation.
+      // const initValidationResp = this.app.validateTxnFields(queueEntry.acceptedTx.data)
+      // if (initValidationResp.success !== true) {
+      //   this.statemanager_fatal(`spread_tx_to_group_validateTX`, `spread_tx_to_group validateTxnFields failed: ${utils.stringifyReduce(initValidationResp)}`)
+      //   return
+      // }
 
-      //Validation.
-      const initValidationResp = this.app.validateTxnFields(queueEntry.acceptedTx.data)
-      if (initValidationResp.success !== true) {
-        this.statemanager_fatal(`spread_tx_to_group_validateTX`, `spread_tx_to_group validateTxnFields failed: ${utils.stringifyReduce(initValidationResp)}`)
-        return
-      }
-
-      //TODO check time before inserting queueEntry.  1sec future 5 second past max
-      let timeM = this.stateManager.queueSitTime
-      let timestamp = queueEntry.txKeys.timestamp
-      let age = Date.now() - timestamp
-      if (age > timeM * 0.9) {
-        this.statemanager_fatal(`spread_tx_to_group_OldTx`, 'spread_tx_to_group cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
-        if (logFlags.playback) this.logger.playbackLogNote('shrd_spread_tx_to_groupToOld', '', 'spread_tx_to_group working on older tx ' + timestamp + ' age: ' + age)
-        return
-      }
-      if (age < -1000) {
-        this.statemanager_fatal(`spread_tx_to_group_tooFuture`, 'spread_tx_to_group cannot accept tx more than 1 second in future ' + timestamp + ' age: ' + age)
-        if (logFlags.playback) this.logger.playbackLogNote('shrd_spread_tx_to_groupToFutrue', '', 'spread_tx_to_group tx too far in future' + timestamp + ' age: ' + age)
-        return
-      }
+      // //TODO check time before inserting queueEntry.  1sec future 5 second past max
+      // let timeM = this.stateManager.queueSitTime
+      // let timestamp = queueEntry.txKeys.timestamp
+      // let age = Date.now() - timestamp
+      // if (age > timeM * 0.9) {
+      //   this.statemanager_fatal(`spread_tx_to_group_OldTx`, 'spread_tx_to_group cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
+      //   if (logFlags.playback) this.logger.playbackLogNote('shrd_spread_tx_to_groupToOld', '', 'spread_tx_to_group working on older tx ' + timestamp + ' age: ' + age)
+      //   return
+      // }
+      // if (age < -1000) {
+      //   this.statemanager_fatal(`spread_tx_to_group_tooFuture`, 'spread_tx_to_group cannot accept tx more than 1 second in future ' + timestamp + ' age: ' + age)
+      //   if (logFlags.playback) this.logger.playbackLogNote('shrd_spread_tx_to_groupToFutrue', '', 'spread_tx_to_group tx too far in future' + timestamp + ' age: ' + age)
+      //   return
+      // }
 
       // how did this work before??
       // get transaction group. 3 accounds, merge lists.
@@ -190,7 +197,6 @@ class TransactionQueue {
         this.stateManager.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `gossip to neighbors`, transactionGroup)
         this.p2p.sendGossipIn('spread_tx_to_group', payload, tracker, sender, transactionGroup, false)
       }
-
       // await this.transactionQueue.routeAndQueueAcceptedTransaction(acceptedTX, false, sender)
     })
 
@@ -224,6 +230,67 @@ class TransactionQueue {
       await respond(response)
     })
   }
+
+  handleSharedTX(acceptedTX:Shardus.AcceptedTx, sender:Shardus.Node):QueueEntry{
+
+    let queueEntry = this.getQueueEntrySafe(acceptedTX.id) // , payload.timestamp)
+    if (queueEntry) {
+      return null
+      // already have this in our queue
+    }
+
+    //Validation.
+    const initValidationResp = this.app.validateTxnFields(acceptedTX.data)
+    if (initValidationResp.success !== true) {
+      this.statemanager_fatal(`spread_tx_to_group_validateTX`, `spread_tx_to_group validateTxnFields failed: ${utils.stringifyReduce(initValidationResp)}`)
+      return null
+    }
+
+    // some timer checks.. should these be merged into route and accept?
+    let txKeys = this.app.getKeyFromTransaction(acceptedTX.data)
+    let timeM = this.stateManager.queueSitTime
+    let timestamp = txKeys.timestamp
+    let age = Date.now() - timestamp
+    if (age > timeM * 0.9) {
+      this.statemanager_fatal(`spread_tx_to_group_OldTx`, 'spread_tx_to_group cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
+      if (logFlags.playback) this.logger.playbackLogNote('shrd_spread_tx_to_groupToOld', '', 'spread_tx_to_group working on older tx ' + timestamp + ' age: ' + age)
+      return null
+    }
+    if (age < -1000) {
+      this.statemanager_fatal(`spread_tx_to_group_tooFuture`, 'spread_tx_to_group cannot accept tx more than 1 second in future ' + timestamp + ' age: ' + age)
+      if (logFlags.playback) this.logger.playbackLogNote('shrd_spread_tx_to_groupToFutrue', '', 'spread_tx_to_group tx too far in future' + timestamp + ' age: ' + age)
+      return null
+    }
+
+    let noConsensus = false // this can only be true for a set command which will never come from an endpoint
+    let added = this.routeAndQueueAcceptedTransaction(acceptedTX, /*sendGossip*/ false, sender, /*globalModification*/ false, noConsensus)
+    if (added === 'lost') {
+      return null // we are faking that the message got lost so bail here
+    }
+    if (added === 'out of range') {
+      return null
+    }
+    if (added === 'notReady') {
+      return null
+    }
+    queueEntry = this.getQueueEntrySafe(acceptedTX.id) //, payload.timestamp) // now that we added it to the queue, it should be possible to get the queueEntry now
+
+    if (queueEntry == null) {
+      // do not gossip this, we are not involved
+      // downgrading, this does not seem to be fatal, but may need further logs/testing
+      //this.statemanager_fatal(`spread_tx_to_group_noQE`, `spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(payload.id)}`)
+      if (logFlags.playback) this.logger.playbackLogNote('spread_tx_to_group_noQE', '', `spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(acceptedTX.id)}`)
+      return null
+    }
+
+
+
+
+    return queueEntry
+
+  }
+
+
 
   /***
    *       ###    ########  ########   ######  ########    ###    ######## ########
@@ -863,7 +930,8 @@ class TransactionQueue {
                   if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_tx', `${txQueueEntry.logID}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(this.stateManager.currentCycleShardData.syncingNeighborsTxGroup.map((x) => x.id))}`)
 
                   this.stateManager.debugNodeGroup(txId, timestamp, `share to syncing neighbors`, this.stateManager.currentCycleShardData.syncingNeighborsTxGroup)
-                  this.p2p.sendGossipAll('spread_tx_to_group', acceptedTx, '', sender, this.stateManager.currentCycleShardData.syncingNeighborsTxGroup)
+                  //this.p2p.sendGossipAll('spread_tx_to_group', acceptedTx, '', sender, this.stateManager.currentCycleShardData.syncingNeighborsTxGroup)
+                  this.p2p.tell(this.stateManager.currentCycleShardData.syncingNeighborsTxGroup, 'spread_tx_to_group_syncing', acceptedTx)
                 } else {
                   if (logFlags.verbose) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: bugfix detected. avoid forwarding txs where globalModification == true ${txQueueEntry.logID}`)
                 }
