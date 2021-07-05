@@ -12,6 +12,7 @@
 //imports up top break the export, boo.
 import * as Shardus from '../shardus/shardus-types'
 import { StateManager } from 'shardus-types'
+import { BasicAddressRange } from 'shardus-types/build/src/state-manager/shardFunctionTypes';
 export { App, Cycle, Sign, AcceptedTx, ApplyResponse } from '../shardus/shardus-types'
 
 export type WrappedStateArray = Shardus.WrappedData[]
@@ -118,7 +119,7 @@ export type QueueEntry = {
 export type SyncTracker = {
     syncStarted: boolean;
     syncFinished: boolean;
-    range: any;
+    range: BasicAddressRange;
     cycle: number;
     index: number;
     queueEntries: QueueEntry[];

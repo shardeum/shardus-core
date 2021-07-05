@@ -60,6 +60,13 @@ class AccountPatcher {
 
   failedLastTrieSync: boolean
 
+  sendHashesToEdgeNodes: boolean
+
+  lastCycleNonConsensusRanges: {low:string,high:string}[]
+
+  nonStoredRanges: {low:string,high:string}[]
+  radixIsStored: Map<string, boolean>
+
   constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     this.crypto = crypto
     this.app = app
@@ -105,6 +112,12 @@ class AccountPatcher {
     this.debug_ignoreUpdates = false
 
     this.failedLastTrieSync = false
+
+    this.sendHashesToEdgeNodes = true
+
+    this.lastCycleNonConsensusRanges = []
+    this.nonStoredRanges = []
+    this.radixIsStored = new Map()
   }
 
   hashObj(value:any){
@@ -166,6 +179,11 @@ class AccountPatcher {
 
     //this should be a tell to X..  robust tell? if a node does not get enough it can just query for more.
     Comms.registerInternal('sync_trie_hashes', async (payload: HashTrieSyncTell, respondWrapped, sender, tracker) => {
+
+      //TODO use our own definition of current cycle.
+      //use playlod cycle to filter out TXs..
+      let cycle = payload.cycle
+
       let hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(payload.cycle)
       if(hashTrieSyncConsensus == null){
         hashTrieSyncConsensus = {
@@ -174,12 +192,28 @@ class AccountPatcher {
           coverageMap: new Map()
         }
         this.hashTrieSyncConsensusByCycle.set(payload.cycle, hashTrieSyncConsensus)
+
+        //mark syncing radixes..
+
+
+        //todo compare to cycle!! only init if from current cycle.
+        this.initStoredRadixValues(payload.cycle)
       }
+
+
+
 
       const node = NodeList.nodes.get(sender)
 
       for(let nodeHashes of payload.nodeHashes){
 
+        //don't record the vote if we cant use it! 
+        // easier than filtering it out later on in the stream.
+        if(this.isRadixStored(cycle, nodeHashes.radix) === false){
+          continue
+        }
+
+        //todo: secure that the voter is allowed to vote.
         let hashVote = hashTrieSyncConsensus.radixHashVotes.get(nodeHashes.radix)
         if(hashVote == null){
           hashVote = {allVotes:new Map(), bestHash:nodeHashes.hash, bestVotes:1}
@@ -600,7 +634,8 @@ class AccountPatcher {
     let removedAccountsFailed = 0
 
     if(this.accountRemovalQueue.length > 0){
-      this.statemanager_fatal(`temp accountRemovalQueue`,`accountRemovalQueue c:${cycle} ${utils.stringifyReduce(this.accountRemovalQueue)}`)
+      //this.statemanager_fatal(`temp accountRemovalQueue`,`accountRemovalQueue c:${cycle} ${utils.stringifyReduce(this.accountRemovalQueue)}`)
+      if (logFlags.verbose) this.mainLogger.debug(`remove account from trie tracking c:${cycle} ${utils.stringifyReduce(this.accountRemovalQueue)}`)
     }
 
     for(let i =0; i< this.accountRemovalQueue.length; i++){
@@ -754,22 +789,57 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
   let consensusStartPartition = shardValues.nodeShardData.consensusStartPartition
   let consensusEndPartition = shardValues.nodeShardData.consensusEndPartition
   
+  incompleteRanges = this.getNonParitionRanges(shardValues, consensusStartPartition, consensusEndPartition)
+
+  return incompleteRanges
+}
+
+getNonStoredRanges(cycle:number): {low:string,high:string}[] {
+
+  let incompleteRanges = []
+
+  //get the min and max non covered area
+  let shardValues = this.stateManager.shardValuesByCycle.get(cycle)
+
+  let consensusStartPartition = shardValues.nodeShardData.storedPartitions.partitionStart
+  let consensusEndPartition = shardValues.nodeShardData.storedPartitions.partitionEnd
+  
+  incompleteRanges = this.getNonParitionRanges(shardValues, consensusStartPartition, consensusEndPartition)
+
+  return incompleteRanges
+}
+
+getSyncTrackerRanges(): {low:string,high:string}[]{
+  let incompleteRanges = []
+
+  for(let syncTracker of this.stateManager.accountSync.syncTrackers){
+    if(syncTracker.syncFinished === false && syncTracker.isGlobalSyncTracker === false){
+      incompleteRanges.push({low:syncTracker.range.low, high:syncTracker.range.high})
+    }
+  }
+  return incompleteRanges
+}
+
+
+getNonParitionRanges(shardValues, startPartition, endPartition): {low:string,high:string}[]{
+  let incompleteRanges = []
+
   let shardGlobals = shardValues.shardGlobals as StateManagerTypes.shardFunctionTypes.ShardGlobals
   let numPartitions = shardGlobals.numPartitions
 
-  if(consensusStartPartition === 0 && consensusEndPartition === numPartitions - 1){
+  if(startPartition === 0 && endPartition === numPartitions - 1){
     //nothing to mark incomplete our node covers the whole range with its consensus
     return incompleteRanges
   }
 
-  let incompeteAddresses = []
-  if(consensusStartPartition > consensusEndPartition){
+  //let incompeteAddresses = []
+  if(startPartition > endPartition){
     //consensus range like this  <CCCC---------CCC>  
     //incompletePartition:            1       2
 
     //we may have two ranges to mark
-    let incompletePartition1 = consensusEndPartition + 1 // get the start of this
-    let incompletePartition2 = consensusStartPartition - 1 //get the end of this
+    let incompletePartition1 = endPartition + 1 // get the start of this
+    let incompletePartition2 = startPartition - 1 //get the end of this
 
     let partition1 = shardValues.parititionShardDataMap.get(incompletePartition1)
     let partition2 = shardValues.parititionShardDataMap.get(incompletePartition2)
@@ -781,18 +851,18 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
     incompleteRanges.push(incompleteRange)
     return incompleteRanges
 
-  } else if(consensusEndPartition > consensusStartPartition) {
+  } else if(endPartition > startPartition) {
     //consensus range like this  <-----CCCCC------> or <-----------CCCCC> or <CCCCC----------->
     //incompletePartition:            1     2           2         1                2         1
     //   not needed:                                    x                                    x
 
     //we may have two ranges to mark
-    let incompletePartition1 = consensusStartPartition - 1 //get the end of this
-    let incompletePartition2 = consensusEndPartition + 1 // get the start of this
+    let incompletePartition1 = startPartition - 1 //get the end of this
+    let incompletePartition2 = endPartition + 1 // get the start of this
 
     //<CCCCC----------->
     //      2         1
-    if(consensusStartPartition === 0){
+    if(startPartition === 0){
       // = numPartitions - 1 //special case, we stil want the start
       incompletePartition1 = numPartitions - 1
       
@@ -808,7 +878,7 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
     }
     //<-----------CCCCC>
     // 2         1      
-    if(consensusEndPartition === numPartitions - 1){
+    if(endPartition === numPartitions - 1){
       //incompletePartition2 = 0 //special case, we stil want the start
       incompletePartition2 = 0
 
@@ -844,9 +914,37 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
     return incompleteRanges
   }
 
-
-  return incompleteRanges
 }
+
+initStoredRadixValues(cycle){
+
+  // //mark these here , call this where we first create the vote structure for the cycle (could be two locations)
+  // nonStoredRanges: {low:string,high:string}[]
+  // radixIsStored: Map<string, boolean>
+
+  this.nonStoredRanges = this.getNonStoredRanges(cycle)
+  this.radixIsStored.clear()
+}
+
+isRadixStored(cycle:number, radix:string){
+
+  if(this.radixIsStored.has(radix)){
+    return this.radixIsStored.get(radix)
+  }
+
+  let isNotStored = false
+  for(let range of this.nonStoredRanges){
+    if(radix >= range.low && radix <= range.high){
+      isNotStored = true
+      continue
+    }
+  }
+  let isStored = !isNotStored
+  this.radixIsStored.set(radix, isStored)
+  return isStored
+}
+
+
 
 
 /***
@@ -1051,9 +1149,13 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
     if(hashTrieSyncConsensus == null){
       return true
     }
-    //let oosRadix = []
-    //get our list of covered radix values for cycle X!!!
-    //let inSync = true
+
+    // let nonStoredRanges = this.getNonStoredRanges(cycle)
+    // let hasNonStorageRange = false
+    // let oosRadix = []
+    // get our list of covered radix values for cycle X!!!
+    // let inSync = true
+
     for(let radix of hashTrieSyncConsensus.radixHashVotes.keys()){
       let votesMap = hashTrieSyncConsensus.radixHashVotes.get(radix)
       let ourTrieNode = this.shardTrie.layerMaps[this.treeSyncDepth].get(radix)
@@ -1062,6 +1164,19 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
       if(ourTrieNode == null){
         return false
       }
+
+      // hasNonStorageRange = false
+      // //does our stored or consensus data actualy cover this range?
+      // for(let range of nonStoredRanges){
+      //   if(radix >= range.low && radix <= range.high){
+      //     hasNonStorageRange = true
+      //     continue
+      //   }
+      // }
+      // if(hasNonStorageRange){
+      //   //we dont store the full data needed by this radix so we cant repair it
+      //   continue
+      // }
 
       //TODO should not have to re compute this here!!
       ourTrieNode.hash = this.crypto.hash(ourTrieNode.childHashes)
@@ -1237,44 +1352,87 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
     let radixUsed: Map<string, Set<string>> = new Map()
 
     let nonConsensusRanges = this.getNonConsensusRanges(cycle)
+    let nonStoredRanges = this.getNonStoredRanges(cycle)
+    let syncTrackerRanges = this.getSyncTrackerRanges()
     let hasNonConsensusRange = false
+    let lastCycleNonConsensus = false
+    let hasNonStorageRange = false
+    let inSyncTrackerRange = false
     for(let treeNode of syncLayer.values()){
 
       hasNonConsensusRange = false
+      lastCycleNonConsensus = false
+      hasNonStorageRange = false
+      inSyncTrackerRange = false
+
+      for(let range of this.lastCycleNonConsensusRanges){
+        if(treeNode.radix >= range.low && treeNode.radix <= range.high){
+          lastCycleNonConsensus = true
+        }
+      }
+      for(let range of nonStoredRanges){
+        if(treeNode.radix >= range.low && treeNode.radix <= range.high){
+          hasNonStorageRange = true
+        }
+      }
       for(let range of nonConsensusRanges){
         if(treeNode.radix >= range.low && treeNode.radix <= range.high){
           hasNonConsensusRange = true
         }
       }
-      if(hasNonConsensusRange){
+      
+      //do we need to adjust what cycle we are looking at for syncing?
+      for(let range of syncTrackerRanges){
+        if(treeNode.radix >= range.low && treeNode.radix <= range.high){
+          inSyncTrackerRange = true
+          
+        }
+      }
+      if(inSyncTrackerRange){
         continue
       }
 
-      //if(treeNode.isIncomplete === false){
-        let partitionRange = ShardFunctions.getPartitionRangeFromRadix(shardGlobals, treeNode.radix)
-        for(let i=partitionRange.low; i<=partitionRange.high; i++){
-          let shardInfo = this.stateManager.currentCycleShardData.parititionShardDataMap.get(i)
-          for(let [key, value] of Object.entries(shardInfo.coveredBy)){
-            let messagePair = messageToNodeMap.get(value.id)
-            if(messagePair == null){
-              messagePair = {node: value, message: {cycle, nodeHashes: []}}
-              messageToNodeMap.set(value.id, messagePair)
-            }
-            // todo done send duplicate node hashes to the same node?
-
-            let radixSeenSet = radixUsed.get(value.id)
-            if(radixSeenSet == null){
-              radixSeenSet = new Set()
-              radixUsed.set(value.id, radixSeenSet)
-            }
-            if(radixSeenSet.has(treeNode.radix) === false){
-              //extra safety step! todo remove for perf.
-              treeNode.hash = this.hashObj(treeNode.childHashes)
-              messagePair.message.nodeHashes.push({radix:treeNode.radix, hash: treeNode.hash})
-              radixSeenSet.add(treeNode.radix)
-            }
-          }          
+      if(hasNonConsensusRange){
+        if(lastCycleNonConsensus === false && hasNonStorageRange === false){
+          //we can share this data, may be a pain for nodes to verify..
+          //todo include last cycle syncing..
+        } else{
+          //we cant send this data
+          continue
         }
+      }
+
+      //if(treeNode.isIncomplete === false){
+      let partitionRange = ShardFunctions.getPartitionRangeFromRadix(shardGlobals, treeNode.radix)
+      for(let i=partitionRange.low; i<=partitionRange.high; i++){
+        let shardInfo = this.stateManager.currentCycleShardData.parititionShardDataMap.get(i)
+
+        let sendToMap = shardInfo.coveredBy
+        if(this.sendHashesToEdgeNodes){
+          sendToMap = shardInfo.storedBy
+        }
+        
+        for(let [key, value] of Object.entries(sendToMap)){
+          let messagePair = messageToNodeMap.get(value.id)
+          if(messagePair == null){
+            messagePair = {node: value, message: {cycle, nodeHashes: []}}
+            messageToNodeMap.set(value.id, messagePair)
+          }
+          // todo done send duplicate node hashes to the same node?
+
+          let radixSeenSet = radixUsed.get(value.id)
+          if(radixSeenSet == null){
+            radixSeenSet = new Set()
+            radixUsed.set(value.id, radixSeenSet)
+          }
+          if(radixSeenSet.has(treeNode.radix) === false){
+            //extra safety step! todo remove for perf.
+            treeNode.hash = this.hashObj(treeNode.childHashes)
+            messagePair.message.nodeHashes.push({radix:treeNode.radix, hash: treeNode.hash})
+            radixSeenSet.add(treeNode.radix)
+          }
+        }          
+      }
 
       //}
     }
