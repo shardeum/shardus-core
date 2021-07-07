@@ -150,7 +150,7 @@ export function init() {
   for (const route of routes.external) {
     // [TODO] - Add Comms.registerExternalGet and Post that pass through to network.*
     //          so that we can always just use Comms.* instead of network.*
-    network.registerExternalGet(route.name, route.handler)
+    network._registerExternal(route.method, route.name, route.handler)
   }
   for (const route of routes.internal) {
     Comms.registerInternal(route.name, route.handler)

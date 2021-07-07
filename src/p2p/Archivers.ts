@@ -51,7 +51,7 @@ export function getTxs(): P2P.ArchiversTypes.Txs {
   // [IMPORTANT] Must return a copy to avoid mutation
   const requestsCopy = deepmerge({}, [...joinRequests, ...leaveRequests])
   if(logFlags.console) console.log(
-    `getTxs: Cycle ${CycleCreator.currentQuarter}, Quarter: ${CycleCreator.currentQuarter}`,
+    `getTxs: Cycle ${CycleCreator.currentCycle}, Quarter: ${CycleCreator.currentQuarter}`,
     {
       archivers: requestsCopy,
     }
@@ -89,7 +89,7 @@ export function updateRecord(txs: P2P.ArchiversTypes.Txs, record: P2P.CycleCreat
     .map((leaveRequest) => leaveRequest.nodeInfo)
 
     if(logFlags.console) console.log(
-    `Archiver before updating record: Cycle ${CycleCreator.currentQuarter}, Quarter: ${CycleCreator.currentQuarter}`,
+    `Archiver before updating record: Cycle ${CycleCreator.currentCycle}, Quarter: ${CycleCreator.currentQuarter}`,
     joinedArchivers,
     leavingArchivers
   )
@@ -106,7 +106,7 @@ export function updateRecord(txs: P2P.ArchiversTypes.Txs, record: P2P.CycleCreat
     )
   )
   if(logFlags.console) console.log(
-    `Archiver after updating record: Cycle ${CycleCreator.currentQuarter}, Quarter: ${CycleCreator.currentQuarter}`,
+    `Archiver after updating record: Cycle ${CycleCreator.currentCycle}, Quarter: ${CycleCreator.currentQuarter}`,
     record
   )
 
@@ -520,7 +520,7 @@ export function registerRoutes() {
   })
 
   network.registerExternalGet('datarecipients', (req, res) => {
-    res.json({ dataRecipients: recipients })
+    res.json({ dataRecipients: [...recipients.values()] })
   })
 }
 
