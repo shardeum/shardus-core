@@ -926,35 +926,36 @@ class TransactionQueue {
               // If we have syncing neighbors forward this TX to them
               if (this.stateManager.currentCycleShardData.hasSyncingNeighbors === true ) {
 
+                let send_spread_tx_to_group_syncing = true
                 //todo turn this back on if other testing goes ok
-                // if (txQueueEntry.ourNodeInTransactionGroup === false) {
-                //   return
-                // }
-          
-                // if(txQueueEntry.ourTXGroupIndex > 0){
-                //   let everyN = Math.max(1,Math.floor(txQueueEntry.transactionGroup.length * 0.4))
-                //   let nonce = parseInt('0x' + txQueueEntry.acceptedTx.id.substr(0,2))
-                //   let idxPlusNonce = txQueueEntry.ourTXGroupIndex + nonce
-                //   let idxModEveryN = idxPlusNonce % everyN
-                //   if(idxModEveryN > 0){ 
-                //     nestedCountersInstance.countEvent('transactionQueue', 'spread_tx_to_group_syncing-skipped')
-                //     return
-                //   }        
-                // }
-                // nestedCountersInstance.countEvent('transactionQueue', 'spread_tx_to_group_syncing-notSkipped')
-
-                // only send non global modification TXs
-                if (txQueueEntry.globalModification === false) {
-                  if (logFlags.verbose) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: spread_tx_to_group ${txQueueEntry.logID}`)
-                  if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_tx', `${txQueueEntry.logID}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(this.stateManager.currentCycleShardData.syncingNeighborsTxGroup.map((x) => x.id))}`)
-
-                  this.stateManager.debugNodeGroup(txId, timestamp, `share to syncing neighbors`, this.stateManager.currentCycleShardData.syncingNeighborsTxGroup)
-                  //this.p2p.sendGossipAll('spread_tx_to_group', acceptedTx, '', sender, this.stateManager.currentCycleShardData.syncingNeighborsTxGroup)
-                  this.p2p.tell(this.stateManager.currentCycleShardData.syncingNeighborsTxGroup, 'spread_tx_to_group_syncing', acceptedTx)
-                } else {
-                  if (logFlags.verbose) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: bugfix detected. avoid forwarding txs where globalModification == true ${txQueueEntry.logID}`)
+                if (txQueueEntry.ourNodeInTransactionGroup === false) {
+                  nestedCountersInstance.countEvent('transactionQueue', 'spread_tx_to_group_syncing-skipped2')
+                  send_spread_tx_to_group_syncing = false
+                } else if(txQueueEntry.ourTXGroupIndex > 0){
+                  let everyN = Math.max(1,Math.floor(txQueueEntry.transactionGroup.length * 0.4))
+                  let nonce = parseInt('0x' + txQueueEntry.acceptedTx.id.substr(0,2))
+                  let idxPlusNonce = txQueueEntry.ourTXGroupIndex + nonce
+                  let idxModEveryN = idxPlusNonce % everyN
+                  if(idxModEveryN > 0){ 
+                    nestedCountersInstance.countEvent('transactionQueue', 'spread_tx_to_group_syncing-skipped')
+                    send_spread_tx_to_group_syncing = false
+                  }        
                 }
+                if(send_spread_tx_to_group_syncing){
+                  nestedCountersInstance.countEvent('transactionQueue', 'spread_tx_to_group_syncing-notSkipped')
 
+                  // only send non global modification TXs
+                  if (txQueueEntry.globalModification === false) {
+                    if (logFlags.verbose) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: spread_tx_to_group ${txQueueEntry.logID}`)
+                    if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_tx', `${txQueueEntry.logID}`, `txts: ${timestamp} nodes:${utils.stringifyReduce(this.stateManager.currentCycleShardData.syncingNeighborsTxGroup.map((x) => x.id))}`)
+
+                    this.stateManager.debugNodeGroup(txId, timestamp, `share to syncing neighbors`, this.stateManager.currentCycleShardData.syncingNeighborsTxGroup)
+                    //this.p2p.sendGossipAll('spread_tx_to_group', acceptedTx, '', sender, this.stateManager.currentCycleShardData.syncingNeighborsTxGroup)
+                    this.p2p.tell(this.stateManager.currentCycleShardData.syncingNeighborsTxGroup, 'spread_tx_to_group_syncing', acceptedTx)
+                  } else {
+                    if (logFlags.verbose) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: bugfix detected. avoid forwarding txs where globalModification == true ${txQueueEntry.logID}`)
+                  }
+                }
               }
             }
           }
