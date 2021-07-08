@@ -134,10 +134,13 @@ class MemoryReporting {
       let archiveQueueCount = this.shardus.stateManager.transactionQueue.archivedQueueEntries.length
       this.addToReport('StateManager','TXQueue', 'archiveQueueCount', archiveQueueCount )
 
-      //TODO more detailed reports!!!
+      
+      for(let syncTracker of this.shardus.stateManager.accountSync.syncTrackers){
+        let partition = `${utils.stringifyReduce(syncTracker.range.low)} - ${utils.stringifyReduce(syncTracker.range.high)}`
+        this.addToReport('StateManager','SyncTracker', `isGlobal:${syncTracker.isGlobalSyncTracker} started:${syncTracker.syncStarted} finished:${syncTracker.syncFinished} partition:${partition}`, 1 )
+      }
+
     }
-
-
   }
 
 }

@@ -695,7 +695,7 @@ class AccountSync {
       //   For each account in the Account data make sure the entry in the Account State Table has the same State_after value; if not remove the record from the Account data
       //   For each account in the Account State Table make sure the entry in Account data has the same State_after value; if not save the account id to be looked up later
       //   Use the App.set_account_data function with the Account data to save the data to the application Accounts Table; if any failed accounts are returned save the account id to be looked up later
-      await this.processAccountData()
+      let accountsSaved = await this.processAccountData()
       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: partition: ${partition}, processAccountData done.`)
 
       // Sync the failed accounts
@@ -733,7 +733,7 @@ class AccountSync {
         this.repairMissingTXs()
       }
 
-      nestedCountersInstance.countEvent('sync', `sync partition: ${partition} end: ${this.stateManager.currentCycleShardData.cycleNumber} missing tx to repair: ${keysToRepair}`)
+      nestedCountersInstance.countEvent('sync', `sync partition: ${partition} end: ${this.stateManager.currentCycleShardData.cycleNumber} accountsSynced:${accountsSaved} missing tx to repair: ${keysToRepair}`)
 
     } catch (error) {
       if (error.message.includes('FailAndRestartPartition')) {
@@ -1517,7 +1517,7 @@ class AccountSync {
    * // State data = {accountId, txId, txTimestamp, stateBefore, stateAfter}
    * // accountData is in the form [{accountId, stateId, data}] for n accounts.
    */
-  async processAccountData() {
+  async processAccountData() : Promise<number> {
 
     if(this.useStateTable === false){
       await this.processAccountDataNoStateTable()
@@ -1760,6 +1760,8 @@ class AccountSync {
     nestedCountersInstance.countEvent('sync', `accounts written`, accountsSaved)
 
     this.combinedAccountData = [] // we can clear this now.
+
+    return accountsSaved
   }
 
 

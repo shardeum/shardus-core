@@ -1222,14 +1222,26 @@ isRadixStored(cycle:number, radix:string){
       skippedSyncRadix : 0,
       badSyncRadix: 0,
       ok_noTrieAcc : 0,
-      ok_trieHashBad: 0
+      ok_trieHashBad: 0,
+      fixLastSeen: 0,
+      needsVotes: 0,
     }
+
+    let minVotes = this.stateManager.currentCycleShardData.shardGlobals.consensusRadius
+    minVotes = Math.min(minVotes, this.stateManager.currentCycleShardData.activeNodes.length - 1)
+    minVotes = Math.max(1, minVotes)
 
     let goodVotes:RadixAndHash[] = []
     let hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
     for(let radix of hashTrieSyncConsensus.radixHashVotes.keys()){
       let votesMap = hashTrieSyncConsensus.radixHashVotes.get(radix)
       let isSyncingRadix = false
+
+      // if(votesMap.bestVotes < minVotes){
+      //   stats.needsVotes++
+      //   continue
+      // }
+
       //do we need to filter out a vote?
       for(let range of syncTrackerRanges){
         if(radix >= range.low && radix <= range.high){
@@ -1306,6 +1318,13 @@ isRadixStored(cycle:number, radix:string){
               }
             } else {
               stats.ok_noTrieAcc++
+            }
+
+            //this was in cache, but stale so we can reinstate the cache since it still matches the group consensus
+            let accountHashCacheHistory: AccountHashCacheHistory = this.stateManager.accountCache.accountsHashCache3.accountHashMap.get(potentalGoodAcc.accountID)
+            if(accountHashCacheHistory != null && accountHashCacheHistory.lastStaleCycle >= accountHashCacheHistory.lastSeenCycle ){
+              stats.fixLastSeen++
+              accountHashCacheHistory.lastSeenCycle = cycle
             }
             continue
           }
