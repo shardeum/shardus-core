@@ -815,7 +815,10 @@ getSyncTrackerRanges(): {low:string,high:string}[]{
 
   for(let syncTracker of this.stateManager.accountSync.syncTrackers){
     if(syncTracker.syncFinished === false && syncTracker.isGlobalSyncTracker === false){
-      incompleteRanges.push({low:syncTracker.range.low.substr(0,this.treeSyncDepth), high:syncTracker.range.high.substr(0,this.treeSyncDepth)})
+      //incompleteRanges.push({low:syncTracker.range.low.substr(0,this.treeSyncDepth), high:syncTracker.range.high.substr(0,this.treeSyncDepth)})
+
+      //temp unfix:
+      incompleteRanges.push({low:syncTracker.range.low, high:syncTracker.range.high})
     }
   }
   return incompleteRanges
@@ -1295,17 +1298,17 @@ isRadixStored(cycle:number, radix:string){
           //check if our cache value has matching hash already.  The trie can lag behind.
           //  todo would be nice to find a way to reduce this, possibly by better control of syncing ranges.
           //   (we are not supposed to test syncing ranges , but maybe that is out of phase?)
-          let accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(potentalGoodAcc.accountID)
-          if(accountMemData != null && accountMemData.h === potentalGoodAcc.hash){
-            if(potentalBadAcc != null){
-              if(potentalBadAcc.hash != potentalGoodAcc.hash){
-                stats.ok_trieHashBad++
-              }
-            } else {
-              stats.ok_noTrieAcc++
-            }
-            continue
-          }
+          // let accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(potentalGoodAcc.accountID)
+          // if(accountMemData != null && accountMemData.h === potentalGoodAcc.hash){
+          //   if(potentalBadAcc != null){
+          //     if(potentalBadAcc.hash != potentalGoodAcc.hash){
+          //       stats.ok_trieHashBad++
+          //     }
+          //   } else {
+          //     stats.ok_noTrieAcc++
+          //   }
+          //   continue
+          // }
 
           //is the account missing or wrong hash?
           if(potentalBadAcc != null){

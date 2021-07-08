@@ -924,7 +924,25 @@ class TransactionQueue {
               return 'out of range' // we are done, not involved!!!
             } else {
               // If we have syncing neighbors forward this TX to them
-              if (this.stateManager.currentCycleShardData.hasSyncingNeighbors === true) {
+              if (this.stateManager.currentCycleShardData.hasSyncingNeighbors === true ) {
+
+                //todo turn this back on if other testing goes ok
+                // if (txQueueEntry.ourNodeInTransactionGroup === false) {
+                //   return
+                // }
+          
+                // if(txQueueEntry.ourTXGroupIndex > 0){
+                //   let everyN = Math.max(1,Math.floor(txQueueEntry.transactionGroup.length * 0.4))
+                //   let nonce = parseInt('0x' + txQueueEntry.acceptedTx.id.substr(0,2))
+                //   let idxPlusNonce = txQueueEntry.ourTXGroupIndex + nonce
+                //   let idxModEveryN = idxPlusNonce % everyN
+                //   if(idxModEveryN > 0){ 
+                //     nestedCountersInstance.countEvent('transactionQueue', 'spread_tx_to_group_syncing-skipped')
+                //     return
+                //   }        
+                // }
+                // nestedCountersInstance.countEvent('transactionQueue', 'spread_tx_to_group_syncing-notSkipped')
+
                 // only send non global modification TXs
                 if (txQueueEntry.globalModification === false) {
                   if (logFlags.verbose) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: spread_tx_to_group ${txQueueEntry.logID}`)
@@ -936,6 +954,7 @@ class TransactionQueue {
                 } else {
                   if (logFlags.verbose) this.mainLogger.debug(`routeAndQueueAcceptedTransaction: bugfix detected. avoid forwarding txs where globalModification == true ${txQueueEntry.logID}`)
                 }
+
               }
             }
           }

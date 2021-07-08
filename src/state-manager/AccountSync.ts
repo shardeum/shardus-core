@@ -116,6 +116,7 @@ class AccountSync {
   forceSyncComplete: boolean
 
   useStateTable: boolean
+  forwardTXToSyncingNeighbors: boolean
 
   constructor(
     stateManager: StateManager,
@@ -196,6 +197,7 @@ class AccountSync {
     this.forceSyncComplete = false
 
     this.useStateTable = false
+    this.forwardTXToSyncingNeighbors = false
 
     console.log('this.p2p', this.p2p)
   }
