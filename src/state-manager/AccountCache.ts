@@ -118,7 +118,7 @@ class AccountCache {
         }
       } else{
         this.statemanager_fatal(`updateAccountHash: error getting cycle number ${this.stateManager.currentCycleShardData.cycleNumber}`, 
-        `updateAccountHash: error getting cycle number :${this.stateManager.currentCycleShardData.cycleNumber} `)
+        `updateAccountHash: error getting cycle number c:${this.stateManager.currentCycleShardData.cycleNumber} `)
       }
     }
 
@@ -130,7 +130,7 @@ class AccountCache {
       // this.statemanager_fatal(`debug Reinstate c${this.stateManager.currentCycleShardData.cycleNumber}`, 
       // `debug Reinstate c${this.stateManager.currentCycleShardData.cycleNumber} acc:${utils.stringifyReduce(accountId)} lastStale:${accountHashCacheHistory.lastStaleCycle}`)
 
-      if (logFlags.verbose) this.mainLogger.debug(`debug Reinstate c${this.stateManager.currentCycleShardData.cycleNumber} acc:${utils.stringifyReduce(accountId)} lastStale:${accountHashCacheHistory.lastStaleCycle}`)
+      if (logFlags.verbose) this.mainLogger.debug(`Reinstate account c:${this.stateManager.currentCycleShardData.cycleNumber} acc:${utils.stringifyReduce(accountId)} lastStale:${accountHashCacheHistory.lastStaleCycle}`)
     }
 
     accountHashCacheHistory.lastSeenCycle = this.accountsHashCache3.currentCalculationCycle

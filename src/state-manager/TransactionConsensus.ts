@@ -11,6 +11,7 @@ import ShardFunctions from './shardFunctions.js'
 import { info, time } from 'console'
 import StateManager from '.'
 import { AppliedReceipt, QueueEntry, AppliedVote } from './state-manager-types'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 class TransactionConsenus {
   app: Shardus.App
@@ -134,8 +135,21 @@ class TransactionConsenus {
     // todo only recalc if cycle boundry?
     // let updatedGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry, true)
 
-
     if (gossipGroup.length > 1) {
+
+      if (queueEntry.ourNodeInTransactionGroup === false) {
+        return
+      }
+
+      if(queueEntry.ourTXGroupIndex > 0){
+        let everyN = Math.max(1,Math.floor(gossipGroup.length * 0.4))
+        let idxModEveryN = queueEntry.ourTXGroupIndex % everyN
+        if(idxModEveryN > 0){ 
+          nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-skipped')
+          return
+        }        
+      }
+      nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-notSkipped')
       // should consider only forwarding in some cases?
       this.stateManager.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, gossipGroup)
       this.p2p.sendGossipIn('spread_appliedReceipt', appliedReceipt, '', sender, gossipGroup, true)

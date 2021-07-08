@@ -53,6 +53,7 @@ export type QueueEntry = {
     uniqueWritableKeys?: string[];
     ourNodeInTransactionGroup: boolean;
     ourNodeInConsensusGroup: boolean;
+    ourTXGroupIndex: number;
     conensusGroup?: Shardus.Node[];    
     transactionGroup?: Shardus.Node[];
     txGroupCycle:number;

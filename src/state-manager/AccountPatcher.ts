@@ -342,10 +342,12 @@ class AccountPatcher {
           }
         }
 
-        if(accountsToGetStateTableDataFor.length > 0){
-          result.stateTableData = await this.stateManager.storage.queryAccountStateTableByListNewest(accountsToGetStateTableDataFor)
+        if(this.stateManager.accountSync.useStateTable === true){
+          if(accountsToGetStateTableDataFor.length > 0){
+            result.stateTableData = await this.stateManager.storage.queryAccountStateTableByListNewest(accountsToGetStateTableDataFor)
+          }          
         }
-        
+
         this.mainLogger.debug(`get_account_data_by_hashes1 requests[${payload.accounts.length}] :${utils.stringifyReduce(payload.accounts)} `)
         this.mainLogger.debug(`get_account_data_by_hashes2 skippedAccounts:${utils.stringifyReduce(skippedAccounts)} `)
         this.mainLogger.debug(`get_account_data_by_hashes3 returnedAccounts:${utils.stringifyReduce(returnedAccounts)} `)
@@ -1561,14 +1563,14 @@ isRadixStored(cycle:number, radix:string){
         }
       }
       debug.sort(this.sortByRadix)
-      this.statemanager_fatal('debug shardTrie',`temp shardTrie votes ${cycle}: ${utils.stringifyReduce(debug)}`)
+      this.statemanager_fatal('debug shardTrie',`temp shardTrie votes c:${cycle}: ${utils.stringifyReduce(debug)}`)
     }
 
     if(this.isInSync(cycle) === false){
 
       let results = await this.findBadAccounts(cycle)
-      nestedCountersInstance.countEvent(`accountPatcher`, `badAccounts ${cycle} `, results.badAccounts.length)
-      nestedCountersInstance.countEvent(`accountPatcher`, `accountHashesChecked ${cycle}`, results.accountHashesChecked)
+      nestedCountersInstance.countEvent(`accountPatcher`, `badAccounts c:${cycle} `, results.badAccounts.length)
+      nestedCountersInstance.countEvent(`accountPatcher`, `accountHashesChecked c:${cycle}`, results.accountHashesChecked)
 
       // local test patches.//debug only feature
 
@@ -1629,7 +1631,7 @@ isRadixStored(cycle:number, radix:string){
         this.statemanager_fatal('isInSync = false, failed hashes',`isInSync = false cycle:${cycle}:  failed hashes:${failedHashes.length}`)
       }
       nestedCountersInstance.countEvent('accountPatcher', 'writeCombinedAccountDataToBackups', Math.max(0,wrappedDataListFiltered.length - failedHashes.length))
-      nestedCountersInstance.countEvent('accountPatcher', `p.repair applied cycle:${cycle}`, Math.max(0,wrappedDataListFiltered.length - failedHashes.length))
+      nestedCountersInstance.countEvent('accountPatcher', `p.repair applied c:${cycle}`, Math.max(0,wrappedDataListFiltered.length - failedHashes.length))
 
       this.statemanager_fatal('isInSync = false',`bad accounts cycle:${cycle} bad:${results.badAccounts.length} received:${wrappedDataList.length} filtered:${wrappedDataListFiltered.length} failed: ${failedHashes.length} details: ${utils.stringifyReduce(results.badAccounts)}`)
       this.statemanager_fatal('isInSync = false',`isInSync = false ${cycle}:  repaired: ${utils.stringifyReduce(wrappedDataListFiltered.map((account) => { return {a:account.accountId, h:account.stateId } } ))}`)
@@ -1662,7 +1664,7 @@ isRadixStored(cycle:number, radix:string){
         await this.stateManager.storage.addAccountStates(combinedAccountStateData)        
       }
 
-      nestedCountersInstance.countEvent('accountPatcher', `p.repair stateTable cycle:${cycle} acc:#${updatedAccounts.length} st#:${combinedAccountStateData.length} missed#${combinedAccountStateData.length-updatedAccounts.length}`, combinedAccountStateData.length)
+      nestedCountersInstance.countEvent('accountPatcher', `p.repair stateTable c:${cycle} acc:#${updatedAccounts.length} st#:${combinedAccountStateData.length} missed#${combinedAccountStateData.length-updatedAccounts.length}`, combinedAccountStateData.length)
 
 
       await this.stateManager.writeCombinedAccountDataToBackups(wrappedDataListFiltered, failedHashes)

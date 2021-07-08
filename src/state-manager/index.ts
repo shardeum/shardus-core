@@ -2647,7 +2647,7 @@ class StateManager {
         // make sure we have a receipt
         let receipt = this.getReceipt(queueEntry)
         if (receipt == null) {
-          if(logFlags.error) if (logFlags.error) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in newAcceptedTxQueue. ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+          if(logFlags.error) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in newAcceptedTxQueue. ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
         } else {
           queueEntriesToSave.push(queueEntry)
         }
@@ -2659,7 +2659,7 @@ class StateManager {
         // make sure we have a receipt
         let receipt = this.getReceipt(queueEntry)
         if (receipt == null) {
-          if(logFlags.error) if (logFlags.error) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in archivedQueueEntries. ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+          if(logFlags.error) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in archivedQueueEntries. ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
         } else {
           queueEntriesToSave.push(queueEntry)
         }

@@ -409,8 +409,8 @@ class TransactionQueue {
       if (logFlags.verbose) this.mainLogger.debug(`preApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
 
     } catch (ex) {
-      if(logFlags.error) if (logFlags.error) this.mainLogger.error(`preApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}: ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
-      if(logFlags.error) if (logFlags.error) this.mainLogger.error(`preApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
+      if(logFlags.error) this.mainLogger.error(`preApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}: ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+      if(logFlags.error) this.mainLogger.error(`preApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
 
       passedApply = false
       applyResult = ex.message
@@ -728,6 +728,7 @@ class TransactionQueue {
         fromClient: sendGossip,
         gossipedReceipt: false,
         archived: false,
+        ourTXGroupIndex: -1
       } // age comes from timestamp
 
       // todo faster hash lookup for this maybe?
@@ -1370,7 +1371,7 @@ class TransactionQueue {
       }
     }
 
-    let txGroup = []
+    let txGroup:Shardus.Node[] = []
     let uniqueNodes: StringNodeObjectMap = {}
 
     let hasNonGlobalKeys = false
@@ -1450,6 +1451,17 @@ class TransactionQueue {
       txGroup.push(v)
     }
 
+    txGroup.sort(this.stateManager._sortByIdAsc)
+    if(queueEntry.ourNodeInTransactionGroup){
+      let ourID = this.stateManager.currentCycleShardData.ourNode.id
+      for (let idx=0; idx< txGroup.length; idx++) {
+        let node = txGroup[idx]
+        if(node.id === ourID){
+          queueEntry.ourTXGroupIndex = idx
+          break
+        }
+      }      
+    }
     if (tryUpdate != true) {
       queueEntry.txGroupCycle = this.stateManager.currentCycleShardData.cycleNumber
       queueEntry.transactionGroup = txGroup
@@ -2254,8 +2266,15 @@ class TransactionQueue {
                 if (this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, result)) {
                   if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_madeReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
 
-                  // Broadcast the receipt
-                  await this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)
+                  let shouldSendReceipt = true
+                  // shouldSendReceipt = queueEntry.recievedAppliedReceipt == null
+
+                  if(shouldSendReceipt){
+                    // Broadcast the receipt
+                    await this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)
+                  } else {
+                    // no need to share a receipt
+                  }
                   queueEntry.state = 'commiting'
                   queueEntry.hasValidFinalData = true
                   continue
