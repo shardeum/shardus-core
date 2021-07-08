@@ -143,7 +143,9 @@ class TransactionConsenus {
 
       if(queueEntry.ourTXGroupIndex > 0){
         let everyN = Math.max(1,Math.floor(gossipGroup.length * 0.4))
-        let idxModEveryN = queueEntry.ourTXGroupIndex % everyN
+        let nonce = parseInt('0x' + queueEntry.acceptedTx.id.substr(0,2))
+        let idxPlusNonce = queueEntry.ourTXGroupIndex + nonce
+        let idxModEveryN = idxPlusNonce % everyN
         if(idxModEveryN > 0){ 
           nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-skipped')
           return
