@@ -415,8 +415,8 @@ class AccountPatcher {
             if(getResp.body && getResp.body.includes('false')){
               oosCount++
             }
-            res.write(`${node.externalIp}:${node.externalPort}/get-tree-last-insync\n`)
-            res.write(getResp.body ? getResp.body : 'no data')
+            res.write(`inSync: ${getResp.body ? getResp.body : 'no data'}  ${node.externalIp}:${node.externalPort} ${getResp.body ? (getResp.body?'':' ***') : ''} \n `)
+            //res.write(getResp.body ? getResp.body : 'no data')
           }
         }
 
@@ -1237,10 +1237,10 @@ isRadixStored(cycle:number, radix:string){
       let votesMap = hashTrieSyncConsensus.radixHashVotes.get(radix)
       let isSyncingRadix = false
 
-      // if(votesMap.bestVotes < minVotes){
-      //   stats.needsVotes++
-      //   continue
-      // }
+      if(votesMap.bestVotes < minVotes){
+        stats.needsVotes++
+        continue
+      }
 
       //do we need to filter out a vote?
       for(let range of syncTrackerRanges){

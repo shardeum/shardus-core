@@ -12,7 +12,7 @@
 //imports up top break the export, boo.
 import * as Shardus from '../shardus/shardus-types'
 import { StateManager } from 'shardus-types'
-import { BasicAddressRange } from 'shardus-types/build/src/state-manager/shardFunctionTypes';
+import { BasicAddressRange, ShardGlobals } from 'shardus-types/build/src/state-manager/shardFunctionTypes';
 export { App, Cycle, Sign, AcceptedTx, ApplyResponse } from '../shardus/shardus-types'
 
 export type WrappedStateArray = Shardus.WrappedData[]
@@ -134,7 +134,7 @@ export type SyncTracker = {
 
 
 export type CycleShardData = {
-    shardGlobals: any // import('./shardFunctionTypes').ShardGlobals;
+    shardGlobals: ShardGlobals// any // import('./shardFunctionTypes').ShardGlobals;
     cycleNumber: number;
     ourNode: Shardus.Node;
     /**
