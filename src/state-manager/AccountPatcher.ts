@@ -46,7 +46,6 @@ class AccountPatcher {
 
   totalAccounts: number
 
-  //accountUpdateQueueByCycle: Map<number, TrieAccount[]>
   accountUpdateQueue: TrieAccount[]
   accountUpdateQueueFuture: TrieAccount[]
 
@@ -66,6 +65,8 @@ class AccountPatcher {
 
   nonStoredRanges: {low:string,high:string}[]
   radixIsStored: Map<string, boolean>
+
+  lastRepairInfo: any
 
   constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     this.crypto = crypto
@@ -118,6 +119,8 @@ class AccountPatcher {
     this.lastCycleNonConsensusRanges = []
     this.nonStoredRanges = []
     this.radixIsStored = new Map()
+
+    this.lastRepairInfo = 'none'
   }
 
   hashObj(value:any){
@@ -415,7 +418,7 @@ class AccountPatcher {
             if(getResp.body && getResp.body.includes('false')){
               oosCount++
             }
-            res.write(`inSync: ${getResp.body ? getResp.body : 'no data'}  ${node.externalIp}:${node.externalPort} ${getResp.body ? (getResp.body?'':' ***') : ''} \n `)
+            res.write(`inSync: ${getResp.body ? getResp.body.trim() : 'no data'}  ${node.externalIp}:${node.externalPort} ${getResp.body ? (getResp.body?'':' ***') : ''} \n `)
             //res.write(getResp.body ? getResp.body : 'no data')
           }
         }
@@ -428,6 +431,12 @@ class AccountPatcher {
       res.end()
     })
   
+
+    Context.network.registerExternalGet('trie-repair-dump', (req, res) => {
+      res.write(`${utils.stringifyReduce(this.lastRepairInfo)}\n`)
+      res.end()
+    })
+
     //
     Context.network.registerExternalGet('get-shard-dump', (req, res) => {
       res.write(`${this.stateManager.lastShardReport}\n`)
@@ -569,6 +578,8 @@ class AccountPatcher {
  */
 
   upateShardTrie(cycle:number) : HashTrieUpdateStats {
+
+    //we start with the later of nodes at max depth, and will build upwards one layer at a time
     let currentLayer = this.treeMaxDepth
     let treeNodeQueue: HashTrieNode[] = []  
 
@@ -584,8 +595,6 @@ class AccountPatcher {
       totalLeafs: 0,
     }
 
-    // this.markIncompeteNodes(cycle)
-
     //feed account data into lowest layer, generates list of treeNodes
     let currentMap = this.shardTrie.layerMaps[currentLayer] 
     if(currentMap == null){
@@ -593,26 +602,22 @@ class AccountPatcher {
       this.shardTrie.layerMaps[currentLayer] = currentMap
     }
 
-    //let accountUpdateQueue = this.accountUpdateQueueByCycle.get(cycle)
+    //process accounts that need updating.  Create nodes as needed
     for(let i =0; i< this.accountUpdateQueue.length; i++){
       let tx = this.accountUpdateQueue[i]
       let key = tx.accountID.slice(0,currentLayer)
       let treeNode = currentMap.get(key)
       if(treeNode == null){
-        //init a leaf 
+        //init a leaf node.  
+        //leaf nodes will have a list of accounts that share the same radix.  
         treeNode = {radix:key, children:[], childHashes:[], accounts:[], hash:'', accountTempMap:new Map(), updated:true, isIncomplete: false, nonSparseChildCount:0} //this map will cause issues with update
         currentMap.set(key, treeNode)
-        //treeNodeQueue.push(treeNode)
         updateStats.leafsCreated++
-
         treeNodeQueue.push(treeNode)
       }
 
       //this can happen if the depth gets smaller after being larger
       if(treeNode.accountTempMap == null){
-        //nestedCountersInstance.countEvent(`accountPatcher`, 'upateShardTrie: treeNode.accountTempMap == null')
-        //this.statemanager_fatal('upateShardTrie: treeNode.accountTempMap == null', 'upateShardTrie: treeNode.accountTempMap == null')
-        //continue
         treeNode.accountTempMap = new Map()
       }
       if(treeNode.accounts == null){
@@ -639,6 +644,7 @@ class AccountPatcher {
       if (logFlags.verbose) this.mainLogger.debug(`remove account from trie tracking c:${cycle} ${utils.stringifyReduce(this.accountRemovalQueue)}`)
     }
 
+    //remove accoutns from the trie.  this happens if our node no longer carries them in storage range.
     for(let i =0; i< this.accountRemovalQueue.length; i++){
       let accountID = this.accountRemovalQueue[i]
 
@@ -678,7 +684,7 @@ class AccountPatcher {
     //   treeNodeQueue.push(treeNode)
     // }
 
-    //sort accounts
+    //look at updated leaf nodes.  Sort accounts and update hash values
     for(let i =0; i< treeNodeQueue.length; i++){
       let treeNode = treeNodeQueue[i]
 
@@ -700,6 +706,10 @@ class AccountPatcher {
 
     }
 
+    // update the tree one later at a time. start at the max depth and copy values to the parents.
+    // Then the parent depth becomes the working depth and we repeat the process
+    // a queue is used to efficiently update only the nodes that need it.
+    // hashes are efficiently calculated only once after all children have set their hash data in the childHashes
     let parentTreeNodeQueue = []
     //treenode queue has updated treeNodes from each loop, gets fed into next loop
     for(let i = currentLayer-1; i >= 0; i--){
@@ -768,6 +778,7 @@ class AccountPatcher {
         updateStats.totalNodesHashed = updateStats.totalNodesHashed + parentTreeNode.nonSparseChildCount
         updateStats.hashedChildrenPerLevel[i] = updateStats.hashedChildrenPerLevel[i] + parentTreeNode.nonSparseChildCount
       }
+      //set the parents to the treeNodeQueue so we can loop and work on the next layer up
       treeNodeQueue = parentTreeNodeQueue
       parentTreeNodeQueue = []
     }
@@ -816,15 +827,13 @@ getSyncTrackerRanges(): {low:string,high:string}[]{
   for(let syncTracker of this.stateManager.accountSync.syncTrackers){
     if(syncTracker.syncFinished === false && syncTracker.isGlobalSyncTracker === false){
       incompleteRanges.push({low:syncTracker.range.low.substr(0,this.treeSyncDepth), high:syncTracker.range.high.substr(0,this.treeSyncDepth)})
-
-      //temp unfix:
-      //incompleteRanges.push({low:syncTracker.range.low, high:syncTracker.range.high})
     }
   }
   return incompleteRanges
 }
 
-
+//Uses a wrappable start and end partition range as input and figures out the array 
+//of ranges that would not be covered by these partitions.
 getNonParitionRanges(shardValues, startPartition, endPartition): {low:string,high:string}[]{
   let incompleteRanges = []
 
@@ -948,9 +957,6 @@ isRadixStored(cycle:number, radix:string){
   return isStored
 }
 
-
-
-
 /***
  *    ########  #### ######## ########  ######   #######  ##    ##  ######  ######## ##    ## ##     ##  ######  
  *    ##     ##  ##  ##       ##       ##    ## ##     ## ###   ## ##    ## ##       ###   ## ##     ## ##    ## 
@@ -960,6 +966,16 @@ isRadixStored(cycle:number, radix:string){
  *    ##     ##  ##  ##       ##       ##    ## ##     ## ##   ### ##    ## ##       ##   ### ##     ## ##    ## 
  *    ########  #### ##       ##        ######   #######  ##    ##  ######  ######## ##    ##  #######   ######  
  */
+
+ 
+  /**
+   * diffConsenus
+   * get a list where mapB does not have entries that match consensusArray.
+   * Note this only works one way.  we do not find cases where mapB has an entry that consensusArray does not.
+   *  //   (TODO, compute this and at least start logging it.(if in debug mode))
+   * @param consensusArray the list of radix and hash values that have been voted on by the majority
+   * @param mapB a map of our hashTrie nodes to compare to the consensus
+   */
   diffConsenus(consensusArray:RadixAndHash[], mapB: Map<string, HashTrieNode>) : {radix:string, hash:string}[] {
 
     if(consensusArray == null){
@@ -998,6 +1014,15 @@ isRadixStored(cycle:number, radix:string){
  *    ##    ## ##     ## ##     ## ##        ##     ##    ##    ##       ##    ## ##     ##   ## ##   ##       ##    ##  ##     ## ##    ##  ##       
  *     ######   #######  ##     ## ##         #######     ##    ########  ######   #######     ###    ######## ##     ## ##     ##  ######   ######## 
  */
+  /**
+   * computeCoverage 
+   * 
+   * Take a look at the winning votes and build of lists of which nodes we can ask for information
+   * this happens once per cycle then getNodeForQuery() can be used to cleanly figure out what node to ask for a query given 
+   * a certain radix value.
+   * 
+   * @param cycle 
+   */
   computeCoverage(cycle:number){
     let hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
 
@@ -1038,6 +1063,14 @@ isRadixStored(cycle:number, radix:string){
  *     ######   ########    ##    ##    ##  #######  ########  ######## ##        #######  ##     ##  ##### ##  #######  ######## ##     ##    ##    
  */
   //error handling.. what if we cand find a node or run out?
+  /**
+   * getNodeForQuery
+   * Figure out what node we can ask for a query related to the given radix.
+   * this will node that has given us a winning vote for the given radix
+   * @param radix 
+   * @param cycle 
+   * @param nextNode pass true to start asking the next node in the list for data.
+   */
   getNodeForQuery(radix:string, cycle:number, nextNode:boolean = false){
     let hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
     let parentRadix = radix.substr(0, this.treeSyncDepth)
@@ -1065,6 +1098,13 @@ isRadixStored(cycle:number, radix:string){
     return null
   }
 
+  /**
+   * getChildrenOf
+   * ask nodes for the child node information of the given list of radix values
+   * TODO make this parallel!
+   * @param radixHashEntries 
+   * @param cycle 
+   */
   async getChildrenOf(radixHashEntries:RadixAndHash[], cycle:number) : Promise<RadixAndHash[]> {
     let result:HashTrieResp 
     let nodeHashes: RadixAndHash[] = []
@@ -1099,6 +1139,13 @@ isRadixStored(cycle:number, radix:string){
     return nodeHashes
   }
 
+  /**
+   * getChildAccountHashes
+   * requests account hashes from one or more nodes.
+   * TODO make this ask in parallel !!
+   * @param radixHashEntries 
+   * @param cycle 
+   */
   async getChildAccountHashes(radixHashEntries:RadixAndHash[], cycle:number) : Promise<RadixAndChildHashes[]> {
     let result:HashTrieAccountsResp
     let nodeChildHashes: RadixAndChildHashes[] = []
@@ -1146,6 +1193,15 @@ isRadixStored(cycle:number, radix:string){
  *     ##        ##  ##  ##  ####       ##    ##    ##  #### ##       
  *     ##  ##    ##  ##  ##   ### ##    ##    ##    ##   ### ##    ## 
  *    ####  ######  #### ##    ##  ######     ##    ##    ##  ######  
+ */
+/**
+ * isInSync
+ * 
+ * looks at sync level hashes to figure out if any are out of matching.
+ * there are cases where this is false but we dig into accounts an realize we do not
+ * or can't yet repair something.
+ * 
+ * @param cycle 
  */
   isInSync(cycle){
     let hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
@@ -1205,6 +1261,15 @@ isRadixStored(cycle:number, radix:string){
  *    ##        ##  ##  #### ##     ## ##     ## ######### ##     ## ######### ##       ##       ##     ## ##     ## ##  ####    ##          ## 
  *    ##        ##  ##   ### ##     ## ##     ## ##     ## ##     ## ##     ## ##    ## ##    ## ##     ## ##     ## ##   ###    ##    ##    ## 
  *    ##       #### ##    ## ########  ########  ##     ## ########  ##     ##  ######   ######   #######   #######  ##    ##    ##     ######  
+ */
+/**
+ * findBadAccounts
+ * 
+ * starts at the sync level hashes that dont match and queries for child nodes to get more details about
+ * what accounts could possibly be bad.  At the lowest level gets a list of accounts and hashes
+ * We double check out cache values before returning a list of bad accounts that need repairs.
+ * 
+ * @param cycle 
  */
   async findBadAccounts(cycle:number){
     let badAccounts:AccountIDAndHash[] = []
@@ -1357,6 +1422,14 @@ isRadixStored(cycle:number, radix:string){
  *    ##     ## ##        ##     ## ##     ##    ##    ##       ##     ## ##    ## ##    ## ##     ## ##     ## ##   ###    ##    ##     ## ##     ## ##    ## ##     ## 
  *     #######  ##        ########  ##     ##    ##    ######## ##     ##  ######   ######   #######   #######  ##    ##    ##    ##     ## ##     ##  ######  ##     ## 
  */
+/**
+ * updateAccountHash
+ * This is the main function called externally to tell the hash trie what the hash value is for a given accountID
+ * 
+ * @param accountID 
+ * @param hash 
+ * 
+ */
   updateAccountHash(accountID:string, hash:string){
 
     //todo do we need to look at cycle or timestamp and have a future vs. next queue?
@@ -1403,7 +1476,14 @@ isRadixStored(cycle:number, radix:string){
  *    ##     ## ##    ##  ##     ## ##     ## ##     ## ##    ## ##     ## ##    ##    ##    ##    ##    ##    ##   ### ##    ## ##     ## ##     ## ##    ## ##     ## ##       ##    ## 
  *    ########  ##     ##  #######  ##     ## ########   ######  ##     ##  ######     ##     ######     ##    ##    ##  ######  ##     ## ##     ##  ######  ##     ## ########  ######  
  */
-
+/**
+ * broadcastSyncHashes
+ * after each tree computation we figure out what radix + hash values we can send out
+ * these will be nodes at the treeSyncDepth (which is higher up than our leafs, and is efficient, but also adjusts to support sharding)
+ * there are important conditions about when we can send a value for a given radix and who we can send it to.
+ * 
+ * @param cycle 
+ */
   async broadcastSyncHashes(cycle){
     let syncLayer = this.shardTrie.layerMaps[this.treeSyncDepth]
 
@@ -1430,6 +1510,11 @@ isRadixStored(cycle:number, radix:string){
       lastCycleNonConsensus = false
       hasNonStorageRange = false
       inSyncTrackerRange = false
+
+      //There are several conditions below when we do not qualify to send out a hash for a given radix.
+      //In general we send hashes for nodes that are fully covered in our consensus range.
+      //Due to network shifting if we were consenus last cycle but still fully stored range we can send a hash.
+      //Syncing operation will prevent us from sending a hash (because in theory we dont have complete account data)
 
       for(let range of this.lastCycleNonConsensusRanges){
         if(treeNode.radix >= range.low && treeNode.radix <= range.high){
@@ -1469,7 +1554,8 @@ isRadixStored(cycle:number, radix:string){
         }
       }
 
-      //if(treeNode.isIncomplete === false){
+      //figure out who to send a hash to
+      //build up a map of messages 
       let partitionRange = ShardFunctions.getPartitionRangeFromRadix(shardGlobals, treeNode.radix)
       for(let i=partitionRange.low; i<=partitionRange.high; i++){
         let shardInfo = this.stateManager.currentCycleShardData.parititionShardDataMap.get(i)
@@ -1500,14 +1586,13 @@ isRadixStored(cycle:number, radix:string){
           }
         }          
       }
-
-      //}
     }
     
     if(stats.broadcastSkip > 0){
       nestedCountersInstance.countEvent(`accountPatcher`, `broadcast skip syncing`, stats.broadcastSkip)       
     }
 
+    //send the messages we have built up.  (parallel waiting with promise.all)
     let promises = []
     for(let messageEntry of messageToNodeMap.values()){
       let promise = this.p2p.tell([messageEntry.node], 'sync_trie_hashes', messageEntry.message)
@@ -1527,6 +1612,14 @@ isRadixStored(cycle:number, radix:string){
  *    ##     ## ##        ##     ## ##     ##    ##    ##          ##    ##    ##   ##  ##       ##     ## ##   ### ##     ## ##     ## ##    ##  ##     ## ##     ## ##     ## ##    ## ##     ## ##    ##    ##    
  *     #######  ##        ########  ##     ##    ##    ########    ##    ##     ## #### ######## ##     ## ##    ## ########  ########  ##     ##  #######  ##     ## ########   ######  ##     ##  ######     ##    
  */
+/**
+ * updateTrieAndBroadCast
+ * calculates what our tree leaf(max) depth and sync depths are.
+ *   if there is a change we have to do some partition work to send old leaf data to new leafs.
+ * Then calls upateShardTrie() and broadcastSyncHashes()
+ * 
+ * @param cycle 
+ */
   async updateTrieAndBroadCast(cycle){
 
     //calculate sync levels!! 
@@ -1539,6 +1632,8 @@ isRadixStored(cycle:number, radix:string){
     syncDepthRaw = Math.max(1, syncDepthRaw) // at least 1
     let newSyncDepth = Math.ceil(syncDepthRaw)
     
+    //This only happens when the depth of our tree change (based on num nodes above)
+    //We have to partition the leaf node data into leafs of the correct level and rebuild the tree
     if(this.treeSyncDepth != newSyncDepth){ //todo add this in to prevent size flipflop..(better: some deadspace)  && newSyncDepth > this.treeSyncDepth){
       let resizeStats = {
         nodesWithAccounts:0,
@@ -1551,7 +1646,6 @@ isRadixStored(cycle:number, radix:string){
       }  
 
       //detach all accounts.
-
       let currentLeafMap = this.shardTrie.layerMaps[this.treeMaxDepth]  
 
       //put all accounts into queue to rebuild Tree!
@@ -1615,21 +1709,27 @@ isRadixStored(cycle:number, radix:string){
  *       ##    ##       ##    ##    ##    ##     ## ##   ### ##     ## ##        ##     ##    ##    ##    ## ##     ## ##     ## ##    ## ##    ## ##     ## ##     ## ##   ###    ##    ##    ## 
  *       ##    ########  ######     ##    ##     ## ##    ## ########  ##        ##     ##    ##     ######  ##     ## ##     ##  ######   ######   #######   #######  ##    ##    ##     ######  
  */
-  //TODO save off last stats and put them on an endpoint for debugging/confirmation
+  /**
+   * testAndPatchAccounts
+   * does a quick check to see if we are isInSync() with the sync level votes we have been given.
+   * if we are out of sync it uses findBadAccounts to recursively find what accounts need repair.
+   * we then query nodes for the account data we need to do a repair with 
+   * finally we check the repair data and use it to repair out accounts.
+   * 
+   * @param cycle 
+   */
   async testAndPatchAccounts(cycle){
-
     // let updateStats = this.upateShardTrie(cycle)
-
     // nestedCountersInstance.countEvent(`accountPatcher`, `totalAccountsHashed`, updateStats.totalAccountsHashed)
     this.failedLastTrieSync = false
 
+    let trieRepairDump = {
+      cycle, 
+      stats:null, 
+      z_accountSummary: null}
+
     if(logFlags.debug){
-      
-      //moved this to manual endpoint, it was way too much data!
-      //this.statemanager_fatal('debug shardTrie',`temp shardTrie ${cycle}: ${utils.stringifyReduce(this.shardTrie.layerMaps[0].values().next().value)}`)
-
       let hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
-
       let debug = []
       if (hashTrieSyncConsensus && hashTrieSyncConsensus.radixHashVotes) {
         for(let [key,value] of hashTrieSyncConsensus.radixHashVotes){
@@ -1646,19 +1746,15 @@ isRadixStored(cycle:number, radix:string){
       nestedCountersInstance.countEvent(`accountPatcher`, `badAccounts c:${cycle} `, results.badAccounts.length)
       nestedCountersInstance.countEvent(`accountPatcher`, `accountHashesChecked c:${cycle}`, results.accountHashesChecked)
 
-      // local test patches.//debug only feature
-
-      //todo use this list to skip certain repairs or require a robust query on account hash values.
+      //TODO figure out if the possible repairs will fully repair a given hash for a radix.
+      // This could add some security but my concern is that it could create a situation where something unexpected prevents
+      // repairing some of the data.
       let preTestResults = this.simulateRepairs(cycle, results.badAccounts )
 
-      //request data for the list of bad accounts then update. this can live in account repair?
+      //request data for the list of bad accounts then update.
       let {wrappedDataList, stateTableDataMap, stats:getAccountStats} = await this.getAccountRepairData(cycle, results.badAccounts )
-
-      //this.statemanager_fatal('debug shardTrie',`temp shardTrie ${cycle}: ${utils.stringifyReduce(this.shardTrie.layerMaps[0].values())}`)
-
-      //return //todo dont want to test full stack yet
       
-      //need to validate TS we are trying to write
+      //we need filter our list of possible account data to use for corrections.
       //it is possible the majority voters could send us account data that is older than what we have.
       //todo must sort out if we can go backwards...  (I had dropped some pre validation earlier, but need to rethink that)
       let wrappedDataListFiltered:Shardus.WrappedData[] = []
@@ -1670,9 +1766,14 @@ isRadixStored(cycle:number, radix:string){
         sameTS:0,
         sameTSFix:0,
       }
+
+      // build a list of data that is good to use in this repair operation
+      // Also, there is a section where cache accountHashCacheHistory.lastSeenCycle may get repaired.
       for(let wrappedData of wrappedDataList){
         if (this.stateManager.accountCache.hasAccount(wrappedData.accountId)) {
           let accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(wrappedData.accountId)
+          // dont allow an older timestamp to overwrite a newer copy of data we have.
+          // we may need to do more work to make sure this can not cause an un repairable situation
           if (wrappedData.timestamp < accountMemData.t) {
             updateTooOld.add(wrappedData.accountId)
             // nestedCountersInstance.countEvent('accountPatcher', `checkAndSetAccountData updateTooOld c:${cycle}`)
@@ -1680,9 +1781,9 @@ isRadixStored(cycle:number, radix:string){
             filterStats.tooOld++
             continue
           }
+          //This is less likely to be hit here now that similar logic checking the hash happens upstream in findBadAccounts()
           if(wrappedData.timestamp === accountMemData.t) {
-
-            //This is not great. if we got here make sure to update the last seen cycle in case the cache needs to know it has current enough data
+            // if we got here make sure to update the last seen cycle in case the cache needs to know it has current enough data
             let accountHashCacheHistory: AccountHashCacheHistory = this.stateManager.accountCache.accountsHashCache3.accountHashMap.get(wrappedData.accountId)
             if(accountHashCacheHistory != null && accountHashCacheHistory.lastStaleCycle >= accountHashCacheHistory.lastSeenCycle ){
               // nestedCountersInstance.countEvent('accountPatcher', `checkAndSetAccountData updateSameTS update lastSeenCycle c:${cycle}`)
@@ -1700,13 +1801,13 @@ isRadixStored(cycle:number, radix:string){
           wrappedDataListFiltered.push(wrappedData)
         } else {
           filterStats.accepted++
-          //dont have a cache entry so take the update
+          //this good account data to repair with
           wrappedDataListFiltered.push(wrappedData)
         }
       }
 
       let updatedAccounts:string[] = []
-      //do some work so ave the data  
+      //save the account data.  note this will make sure account hashes match the wrappers and return failed hashes  that dont match
       let failedHashes = await this.stateManager.checkAndSetAccountData(wrappedDataListFiltered, `testAndPatchAccounts`, false, updatedAccounts)
 
       if(failedHashes.length != 0){
@@ -1722,9 +1823,13 @@ isRadixStored(cycle:number, radix:string){
         logLimit = 2000
       }
 
+      let repairedAccountSummary = utils.stringifyReduceLimit(wrappedDataListFiltered.map((account) => { return {a:account.accountId, h:account.stateId } } ), logLimit)
       this.statemanager_fatal('isInSync = false',`bad accounts cycle:${cycle} bad:${results.badAccounts.length} received:${wrappedDataList.length} failedH: ${failedHashes.length} filtered:${utils.stringifyReduce(filterStats)} stats:${utils.stringifyReduce(results.stats)} getAccountStats: ${utils.stringifyReduce(getAccountStats)} details: ${utils.stringifyReduceLimit(results.badAccounts, logLimit)}`)
-      this.statemanager_fatal('isInSync = false',`isInSync = false ${cycle}: fixed:${appliedFixes}  repaired: ${utils.stringifyReduceLimit(wrappedDataListFiltered.map((account) => { return {a:account.accountId, h:account.stateId } } ), logLimit)}`)
+      this.statemanager_fatal('isInSync = false',`isInSync = false ${cycle}: fixed:${appliedFixes}  repaired: ${repairedAccountSummary}`)
 
+      trieRepairDump.stats = {badAcc:results.badAccounts.length,received:wrappedDataList.length, filterStats, getAccountStats, findBadAccountStats: results.stats }
+
+      trieRepairDump.z_accountSummary = repairedAccountSummary
       //This extracts accounts that have failed hashes but I forgot writeCombinedAccountDataToBackups does that already
       //let failedHashesSet = new Set(failedHashes)
       // let wrappedDataUpdated = []
@@ -1768,9 +1873,11 @@ isRadixStored(cycle:number, radix:string){
       //     this.updateAccountHash(wrappedData.accountId, wrappedData.stateId)
       //   }
       // }
-
       //check again if we are in sync
 
+      this.lastRepairInfo = trieRepairDump
+
+      //This is something that can be checked with debug endpoints get-tree-last-insync-all / get-tree-last-insync
       this.failedLastTrieSync = true
     } else {
       nestedCountersInstance.countEvent(`accountPatcher`, `inSync`)
@@ -1778,7 +1885,16 @@ isRadixStored(cycle:number, radix:string){
 
   }
 
-
+  /**
+   * simulateRepairs
+   * incomplete.  the idea was to see if potential repairs can even solve our current sync issue.
+   * not sure this is worth the perf/complexity/effort.
+   * 
+   * if we miss something, the patcher can just try again next cycle.
+   * 
+   * @param cycle 
+   * @param badAccounts 
+   */
   simulateRepairs(cycle:number, badAccounts:AccountIDAndHash[] ) : AccountPreTest[] {
     let results = []
 
@@ -1810,6 +1926,15 @@ isRadixStored(cycle:number, radix:string){
  */
   //todo test the tree to see if repairs will work.   not simple to do efficiently
   //todo robust query the hashes?  technically if we repair to bad data it will just get detected and fixed again!!!
+  
+  /**
+   * getAccountRepairData
+   * take a list of bad accounts and figures out which nodes we can ask to get the data.
+   * makes one or more data requests in parallel
+   * organizes and returns the results.
+   * @param cycle 
+   * @param badAccounts 
+   */
   async getAccountRepairData(cycle:number, badAccounts:AccountIDAndHash[] ): Promise<{wrappedDataList:Shardus.WrappedData[], stateTableDataMap:Map<string, Shardus.StateTableObject>, stats:any}> {
     //pick which nodes to ask! /    //build up requests
     let nodesBySyncRadix:Map<string, {node:Shardus.Node, request:{cycle, accounts:AccountIDAndHash[]} }> = new Map()
@@ -1924,6 +2049,13 @@ isRadixStored(cycle:number, radix:string){
  *    ##        ##   ##   ##     ## ##       ##             ##       ##       ## ##     ## ######### ##   ##   ##     ## ##     ## ##     ## ##     ## ##        
  *    ##        ##    ##  ##     ## ##    ## ##       ##    ## ##    ## ##    ## ##     ## ##     ## ##    ##  ##     ## ##     ## ##     ## ##     ## ##        
  *    ##        ##     ##  #######   ######  ########  ######   ######   ######  ##     ## ##     ## ##     ## ########  ########   #######  ##     ## ##        
+ */
+
+/**
+ * processShardDump
+ * debug only code to create a shard report.
+ * @param stream 
+ * @param lines 
  */
 processShardDump (stream, lines) {
 
