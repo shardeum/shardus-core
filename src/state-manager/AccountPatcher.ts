@@ -1101,7 +1101,7 @@ isRadixStored(cycle:number, radix:string){
   /**
    * getChildrenOf
    * ask nodes for the child node information of the given list of radix values
-   * TODO make this parallel!
+   * TODO convert to allSettled?, but support a timeout?
    * @param radixHashEntries 
    * @param cycle 
    */
@@ -1122,16 +1122,39 @@ isRadixStored(cycle:number, radix:string){
       }
       existingRequest.radixList.push(radixHash.radix)
     }
+    // for(let [key, value] of requestMap){
+    //   try{
+    //     result = await this.p2p.ask(key, 'get_trie_hashes', value)
+    //     if(result != null && result.nodeHashes != null){
+    //       nodeHashes = nodeHashes.concat(result.nodeHashes)
+    //     } //else retry?        
+    //   } catch (error) {
+    //     this.statemanager_fatal('getChildrenOf failed', `getChildrenOf failed: ` + error.name + ': ' + error.message + ' at ' + error.stack)
+    //   }
+    // }
+
+    let promises = []
     for(let [key, value] of requestMap){
       try{
-        result = await this.p2p.ask(key, 'get_trie_hashes', value)
-        if(result != null && result.nodeHashes != null){
-          nodeHashes = nodeHashes.concat(result.nodeHashes)
-        } //else retry?        
+        let promise = this.p2p.ask(key, 'get_trie_hashes', value)
+        promises.push(promise)
       } catch (error) {
         this.statemanager_fatal('getChildrenOf failed', `getChildrenOf failed: ` + error.name + ': ' + error.message + ' at ' + error.stack)
       }
     }
+
+    try{
+      //TODO should we convert to Promise.allSettled?
+      let results = await Promise.all(promises)
+      for(let result of results){
+        if(result != null && result.nodeHashes != null){
+          nodeHashes = nodeHashes.concat(result.nodeHashes)
+        } 
+      }
+    } catch (error) {
+      this.statemanager_fatal('getChildrenOf failed', `getChildrenOf failed: ` + error.name + ': ' + error.message + ' at ' + error.stack)
+    }
+
     if(nodeHashes.length > 0){
       nestedCountersInstance.countEvent(`accountPatcher`, `got nodeHashes`, nodeHashes.length) 
     }
@@ -1142,7 +1165,7 @@ isRadixStored(cycle:number, radix:string){
   /**
    * getChildAccountHashes
    * requests account hashes from one or more nodes.
-   * TODO make this ask in parallel !!
+   * TODO convert to allSettled?, but support a timeout?
    * @param radixHashEntries 
    * @param cycle 
    */
@@ -1164,20 +1187,47 @@ isRadixStored(cycle:number, radix:string){
       }
       existingRequest.radixList.push(radixHash.radix)
     }
+    // for(let [key, value] of requestMap){
+    //   try{
+    //     result = await this.p2p.ask(key, 'get_trie_accountHashes', value) 
+    //     if(result != null && result.nodeChildHashes != null){
+    //       nodeChildHashes = nodeChildHashes.concat(result.nodeChildHashes)
+    //       // for(let childHashes of result.nodeChildHashes){
+    //       //   allHashes = allHashes.concat(childHashes.childAccounts)
+    //       // }
+    //     } //else retry?        
+    //   } catch (error) {
+    //     this.statemanager_fatal('getChildAccountHashes failed', `getChildAccountHashes failed: ` + error.name + ': ' + error.message + ' at ' + error.stack)
+
+    //   }
+    // }
+
+
+    let promises = []
     for(let [key, value] of requestMap){
       try{
-        result = await this.p2p.ask(key, 'get_trie_accountHashes', value) 
+        let promise = this.p2p.ask(key, 'get_trie_accountHashes', value) 
+        promises.push(promise)
+      } catch (error) {
+        this.statemanager_fatal('getChildAccountHashes failed', `getChildAccountHashes failed: ` + error.name + ': ' + error.message + ' at ' + error.stack)
+      }
+    }
+
+    try{
+      //TODO should we convert to Promise.allSettled?
+      let results = await Promise.all(promises)
+      for(let result of results){
         if(result != null && result.nodeChildHashes != null){
           nodeChildHashes = nodeChildHashes.concat(result.nodeChildHashes)
           // for(let childHashes of result.nodeChildHashes){
           //   allHashes = allHashes.concat(childHashes.childAccounts)
           // }
-        } //else retry?        
-      } catch (error) {
-        this.statemanager_fatal('getChildAccountHashes failed', `getChildAccountHashes failed: ` + error.name + ': ' + error.message + ' at ' + error.stack)
-
+        }
       }
+    } catch (error) {
+      this.statemanager_fatal('getChildAccountHashes failed', `getChildAccountHashes failed: ` + error.name + ': ' + error.message + ' at ' + error.stack)
     }
+
     if(nodeChildHashes.length > 0){
       nestedCountersInstance.countEvent(`accountPatcher`, `got nodeChildHashes`, nodeChildHashes.length) 
     }
