@@ -114,7 +114,7 @@ class AccountGlobals {
       }
 
       if (this.p2p.isFirstSeed) {
-        //TODO this will mess up dapps that dont use global accounts.
+        //TODO: SOON this will mess up dapps that dont use global accounts.  update: maybe add a config to specify if there will be no global accounts for a network. pls discuss fix with group.
         if(toQuery.length === 0){
           nestedCountersInstance.countEvent(`sync`, `HACKFIX - first node needs to wait! ready:${result.ready} responded:${responded}`) 
           result.ready = false
@@ -136,6 +136,8 @@ class AccountGlobals {
       let ourLockID = -1
       try {
         ourLockID = await this.stateManager.fifoLock('accountModification')
+        // TODO: if we have more than 900 keys to query in this list must split this into multiple queries!.. ok technically this will not impact liberdus but it could impact 
+        //       a dapp that uses sqlite 
         accountData = await this.app.getAccountDataByList(toQuery)
       } finally {
         this.stateManager.fifoUnlock('accountModification', ourLockID)
@@ -154,8 +156,9 @@ class AccountGlobals {
           result.accounts.push(report)
         }
       }
-      //TODO: PERF Disiable this in production or performance testing.
+      //TODO: SOON. PERF Disiable this in production or performance testing. (we need a global flag to specify if it is a release or debug build, could then implement this, along with turning off debug endpoints)
       this.stateManager.testAccountDataWrapped(accountData)
+
       result.accounts.sort(utils.sort_id_Asc)
       result.combinedHash = this.crypto.hash(result)
       await respond(result)
