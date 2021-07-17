@@ -126,10 +126,6 @@ class AccountCache {
     let onFutureCycle = cycle > this.accountsHashCache3.currentCalculationCycle
 
     if(accountHashCacheHistory.lastStaleCycle > 0 && accountHashCacheHistory.lastStaleCycle > accountHashCacheHistory.lastSeenCycle){
-      //temp debug... todo make this not fatal.
-      // this.statemanager_fatal(`debug Reinstate c${this.stateManager.currentCycleShardData.cycleNumber}`, 
-      // `debug Reinstate c${this.stateManager.currentCycleShardData.cycleNumber} acc:${utils.stringifyReduce(accountId)} lastStale:${accountHashCacheHistory.lastStaleCycle}`)
-
       if (logFlags.verbose) this.mainLogger.debug(`Reinstate account c:${this.stateManager.currentCycleShardData.cycleNumber} acc:${utils.stringifyReduce(accountId)} lastStale:${accountHashCacheHistory.lastStaleCycle}`)
     }
 

@@ -744,7 +744,8 @@ class Shardus extends EventEmitter {
       // Partition check and data repair (new)
       // disable and compare this.stateManager.startSyncPartitions()
 
-      this.stateManager.partitionObjects.startSyncPartitions()
+      //this.stateManager.partitionObjects.startSyncPartitions()
+      this.stateManager.startProcessingCycleSummaries()
     }
   }
 

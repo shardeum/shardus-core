@@ -160,6 +160,8 @@ class StateManager {
 
   lastShardReport: string
 
+  processCycleSummaries: boolean // controls if we execute processPreviousCycleSummaries() at cycle_q1_start
+
   /***
    *     ######   #######  ##    ##  ######  ######## ########  ##     ##  ######  ########  #######  ########
    *    ##    ## ##     ## ###   ## ##    ##    ##    ##     ## ##     ## ##    ##    ##    ##     ## ##     ##
@@ -237,6 +239,8 @@ class StateManager {
     // this.oldFeature_TXHashsetTest = true
     // this.oldFeature_GeneratePartitionReport = false
     // this.oldFeature_BroadCastPartitionReport = true // leaving this true since it depends on the above value
+
+    this.processCycleSummaries = false //starts false and get enabled when startProcessingCycleSummaries() is called 
 
     this.feature_receiptMapResults = true
     this.feature_partitionHashes = true
@@ -2429,7 +2433,7 @@ class StateManager {
             this.calculateChangeInCoverage()
           }
 
-          if (this.partitionObjects.syncPartitionsStarted) {
+          if (this.processCycleSummaries) {
             // not certain if we want await
             this.processPreviousCycleSummaries()
           }
@@ -2533,6 +2537,8 @@ class StateManager {
       if (cycleShardValues && cycleShardValues.ourNode.status === 'active') {
         mainHashResults = this.accountCache.buildPartitionHashesForNode(cycleShardValues)
 
+        //Note: the main work is happening in accountCache.buildPartitionHashesForNode, this just 
+        // uses that data to create our old report structure for reporting to the monitor-server
         this.partitionObjects.updatePartitionReport(cycleShardValues, mainHashResults)
 
 
@@ -2808,6 +2814,10 @@ class StateManager {
       filteredNodes.push(node)
     }
     return filteredNodes
+  }
+
+  startProcessingCycleSummaries(){
+    this.processCycleSummaries = true
   }
 
   statemanager_fatal(key, log) {

@@ -551,7 +551,8 @@ async function goActiveIfDataComplete() {
     Context.stateManager.accountSync.skipSync()
     // Go active
     Active.requestActive()
-    await Context.stateManager.partitionObjects.startSyncPartitions()
+    //await Context.stateManager.partitionObjects.startSyncPartitions()
+    Context.stateManager.startProcessingCycleSummaries()
   }
 }
 

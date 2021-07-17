@@ -397,7 +397,7 @@ setupHandlers() {
       if (cycle > blob.latestCycle) {
         blob.latestCycle = cycle
       }
-      this.app.txSummaryUpdate(blob.opaqueBlob, queueEntry.acceptedTx.data, null) //todo send data or not?
+      this.app.txSummaryUpdate(blob.opaqueBlob, queueEntry.acceptedTx.data, null) //todo: we need to remove the wrapped state parameter from this (currently passed as null)
       blob.counter++
     } else {
       if (logFlags.error) this.mainLogger.error(`statsTxSummaryUpdate no collection for ${cycle}`)
