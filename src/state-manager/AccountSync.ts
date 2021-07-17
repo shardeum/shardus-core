@@ -1520,8 +1520,8 @@ class AccountSync {
   async processAccountData() : Promise<number> {
 
     if(this.useStateTable === false){
-      await this.processAccountDataNoStateTable()
-      return
+      return await this.processAccountDataNoStateTable()
+       
     }
 
     this.missingAccountData = []
@@ -1765,7 +1765,7 @@ class AccountSync {
   }
 
 
-  async processAccountDataNoStateTable() {
+  async processAccountDataNoStateTable() : Promise<number> {
     this.missingAccountData = []
     this.mapAccountData = {}
     this.stateTableForMissingTXs = {}
@@ -1861,6 +1861,8 @@ class AccountSync {
     nestedCountersInstance.countEvent('sync', `accounts written`, accountsSaved)
 
     this.combinedAccountData = [] // we can clear this now.
+
+    return accountsSaved
   }
 
 
