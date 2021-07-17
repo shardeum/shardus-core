@@ -323,25 +323,6 @@ class ShardFunctions {
     }
   }
 
-  static computeNodePartitionDataMapExt(
-    shardGlobals: StateManager.shardFunctionTypes.ShardGlobals,
-    nodeShardDataMap: StateManager.shardFunctionTypes.NodeShardDataMap,
-    nodesToGenerate: Shardus.Node[],
-    parititionShardDataMap: StateManager.shardFunctionTypes.ParititionShardDataMap,
-    activeNodes: Shardus.Node[]
-  ) {
-    // for (let node of nodesToGenerate) {
-    //   let nodeShardData = nodeShardDataMap.get(node.id)
-    //   if (!nodeShardData) {
-    //     nodeShardData = ShardFunctions.computeNodePartitionData(shardGlobals, node, nodeShardDataMap, parititionShardDataMap, activeNodes)
-    //   }
-    //   // ShardFunctions.computeExtendedNodePartitionData(shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes)
-    //   //
-    //   // this wont be able to extend things though.
-    //   ShardFunctions.updateFullConsensusGroup(shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes)
-    // }
-  }
-
   static computeNodePartitionData(
     shardGlobals: StateManager.shardFunctionTypes.ShardGlobals,
     node: Shardus.Node,
@@ -359,7 +340,6 @@ class ShardFunctions {
     })
 
     if (nodeShardData.ourNodeIndex === -1) {
-      //todo node is syncing need to find closest index.
       for (let i = 0; i < activeNodes.length; i++) {
         nodeShardData.ourNodeIndex = i
         if (activeNodes[i].id >= node.id) {
@@ -409,31 +389,7 @@ class ShardFunctions {
     return nodeShardData
   }
 
-  //   static updateFullConsensusGroup (shardGlobals: ShardGlobals, nodeShardDataMap: NodeShardDataMap, parititionShardDataMap: ParititionShardDataMap, nodeShardData: NodeShardData, activeNodes: Shardus.Node[]) {
-  //     let homePartition = nodeShardData.homePartition
-  //     let shardPartitionData = parititionShardDataMap.get(homePartition)
 
-  //     if(shardPartitionData == null){
-  //       throw new Error('updateFullConsensusGroup: shardPartitionData==null')
-  //     }
-
-  //     nodeShardData.consensusNodeForOurNodeFull = Object.values(shardPartitionData.coveredBy)
-  //     nodeShardData.needsUpdateToFullConsensusGroup = false
-  //     nodeShardData.consensusNodeForOurNodeFull.sort(ShardFunctions.nodeSortAsc)
-
-  //     // merge into our full list for sake of TX calcs.  todo could try to be smart an only do this in some cases.
-  //     // let [results] = ShardFunctions.mergeNodeLists(nodeShardData.nodeThatStoreOurParition, nodeShardData.consensusNodeForOurNodeFull)
-  //     // switched nodeThatStoreOurParition to nodeThatStoreOurParitionFull to improve the quality of the results.
-  //     let [results] = ShardFunctions.mergeNodeLists(nodeShardData.nodeThatStoreOurParitionFull, nodeShardData.consensusNodeForOurNodeFull)
-
-  //     // not sure if we need to do this
-  //     // if (extras.length > 0) {
-  //     //   ShardFunctions.dilateNeighborCoverage(shardGlobals, nodeShardDataMap, parititionShardDataMap, activeNodes, nodeShardData, extras)
-  //     // }
-
-  //     nodeShardData.nodeThatStoreOurParitionFull = results
-  //     nodeShardData.nodeThatStoreOurParitionFull.sort(ShardFunctions.nodeSortAsc)
-  //   }
 
   /**
    * @param {StateManager.shardFunctionTypes.ShardGlobals} shardGlobals
@@ -779,8 +735,8 @@ class ShardFunctions {
             coverageChanges.push({ start: oldEnd1, end: newEnd1 })
           }
         } else if (ShardFunctions.setOverlap(oldStart2, oldEnd2, newStart1, newEnd1)) {
-          // TODO I am not sure if else-if is correct also these calculations can make results that overlap the old range.
-          // the overlap gets corrected in the post process, because that was a faster way to feel certain
+          // Note: I was not sure if else-if is correct also these calculations can make results that overlap the old range.
+          // Note response: the overlap gets corrected in the post process, because that was a faster way to feel certain
           if (ShardFunctions.setEpandedLeft(oldStart2, oldEnd2, newStart1, newEnd1)) {
             coverageChanges.push({ start: newStart1, end: oldStart2 })
           }
@@ -977,13 +933,6 @@ class ShardFunctions {
     return result
   }
 
-  // static getPartitionFromRadix(shardGlobals: ShardGlobals, radix:string){
-  //   let filledAddress = radix + '7'.repeat(64 - radix.length)
-  //   let partition = ShardFunctions.addressToPartition(shardGlobals, filledAddress)
-  //   return partition
-  // }
-
-  //TODO this must be get partition range from radix.
   static getPartitionRangeFromRadix(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, radix:string){
     let filledAddress = radix + '0'.repeat(64 - radix.length)
     let partition = ShardFunctions.addressToPartition(shardGlobals, filledAddress)
@@ -993,7 +942,6 @@ class ShardFunctions {
 
     return {low:partition.homePartition, high:partition2.homePartition}
   }
-
 
   static addressToPartition(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, address: string): { homePartition: number; addressNum: number } {
     let numPartitions = shardGlobals.numPartitions
@@ -1106,7 +1054,7 @@ class ShardFunctions {
    * could make a faster version for sorted lists.. but not worth the complexity unless it shows up on a benchmark
    * @param {Shardus.Node[]} listA
    * @param {Shardus.Node[]} listB
-   * @returns {array} result [results, extras]  TODO TSConversion  get a better output type than any.. switch to an object maybe.
+   * @returns {array} result [results, extras]  TODO, convert the array response to a type object that has results and extras
    */
   static mergeNodeLists(listA: Shardus.Node[], listB: Shardus.Node[]): any[] {
     let results = [] as Shardus.Node[]
@@ -1190,10 +1138,6 @@ class ShardFunctions {
     return result
   }
 
-  // todo save off per node calculations?
-  // get nodes with coverage of this range (does not support wrapping)
-  // todo could make a faster partition based versoin of this!
-
   /**
    * NOTE this is a raw answer.  edge cases with consensus node coverage can increase the results of our raw answer that is given here
    * @param {StateManager.shardFunctionTypes.ShardGlobals} shardGlobals
@@ -1205,7 +1149,10 @@ class ShardFunctions {
   static getNodesThatCoverParitionRaw(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, nodeShardDataMap: Map<string, StateManager.shardFunctionTypes.NodeShardData>, partition: number, exclude: string[], activeNodes: Shardus.Node[]): Shardus.Node[] {
     let results = [] as Shardus.Node[]
 
-    // TODO perf.  faster verison that expands from our node index. (needs a sorted list of nodes.)
+    // TODO perf.  (may be tricky to improve), should probably be part of a comprehensive set of improvements that consider networks with millions of nodes
+    // -is there a smart way to cache results.
+    // -is there a more efficient way to pre calculate this (but keep in mind we may need to be lazy about shard calculations in the future) 
+    // -  instead of looking at all nodes could we pick a staring point and expand our search
     for (let i = 0; i < activeNodes.length; i++) {
       let node = activeNodes[i]
       if (exclude.includes(node.id)) {
@@ -1244,24 +1191,14 @@ class ShardFunctions {
     if (scanStart < 0) {
       scanStart = allNodes.length + scanStart
 
-      // //not sure if this is bad... need to make things work in the case there is only one node to look
+      // make sure the index is 0 or above
       if (scanStart < 0) {
         scanStart = 0
       }
     }
-
-    // if (exclude.length === allNodes.length) {
-    //   return results
-    // }
-
-    //TODO found a bug here. the consensus radius needs to hold one more node!!!
-
-    //let expectedNodes = Math.min(allNodes.length - exclude.length, radius * 2)
-
-    //or check radius being geater than max nodes... and do simple loop minus exclude..
+   
     let scanAmount = radius * 2 + 1
     let scanCount = 0
-    //this isn't quite perfect, but the only current use of exclude is for a the self node.
     let expectedNodes = Math.min(allNodes.length - exclude.length, scanAmount - exclude.length)
 
     // if we need to scan all the nodes, just do that here in a simple way
@@ -1278,29 +1215,27 @@ class ShardFunctions {
       return results
     }
 
-    // this got a bit ugly should think about how to clean it up
+    //TODO found a bug here. the consensus radius needs to hold one more node!!! (update: it appears this bug has been fixed when
+    //     scanAmount became radius*2 + 1 instead of radius*2 in older commented out calculations)
+    //     could write test code to validate this is fixed for 0-n active nodes.
+
     let scanIndex = scanStart
     for (let i = 0; i < scanAmount; i++) {
       scanCount++
       if (scanCount >= allNodes.length) {
         break
       }
-
       if (scanIndex >= allNodes.length) {
         scanIndex = 0
       }
-
       let node = allNodes[scanIndex]
-
       if (exclude.includes(node.id)) {
         scanIndex++
         continue
       }
-
       if (node.status === 'active') {
         results.push(node)
       }
-
       scanIndex++
       // This does not work if we skip over it due to exclude
       if (scanIndex === scanStart) {
@@ -1313,10 +1248,13 @@ class ShardFunctions {
     return results
   }
 
-  // This builds a sorted list of nodes based on how close they are to a given address
-  // todo count should be based off of something in shard globals.  this will matter for large networks.
+  // todo count should be based off of something in shard globals.  this will matter for large networks. (update:
+  //      I don't think this is an urgent issue, but should be considered when we think about millions of nodes)
+  //      It is possible that code that uses this may end up getting nodes returned that wouldn't cover the data.
+  //      Perhaps a different approch would be better where we just get nodes that are consensus or store the data
 
   /**
+   * getNodesByProximity This builds a sorted list of nodes based on how close they are to a given address
    * @param {StateManager.shardFunctionTypes.ShardGlobals} shardGlobals
    * @param {Shardus.Node[]} activeNodes
    * @param {number} position

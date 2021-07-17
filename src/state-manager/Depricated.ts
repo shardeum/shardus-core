@@ -5050,6 +5050,50 @@ class Depricated {
   // }) */
   // }
 
+  // static computeNodePartitionDataMapExt(
+  //   shardGlobals: StateManager.shardFunctionTypes.ShardGlobals,
+  //   nodeShardDataMap: StateManager.shardFunctionTypes.NodeShardDataMap,
+  //   nodesToGenerate: Shardus.Node[],
+  //   parititionShardDataMap: StateManager.shardFunctionTypes.ParititionShardDataMap,
+  //   activeNodes: Shardus.Node[]
+  // ) {
+  //   // for (let node of nodesToGenerate) {
+  //   //   let nodeShardData = nodeShardDataMap.get(node.id)
+  //   //   if (!nodeShardData) {
+  //   //     nodeShardData = ShardFunctions.computeNodePartitionData(shardGlobals, node, nodeShardDataMap, parititionShardDataMap, activeNodes)
+  //   //   }
+  //   //   // ShardFunctions.computeExtendedNodePartitionData(shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes)
+  //   //   //
+  //   //   // this wont be able to extend things though.
+  //   //   ShardFunctions.updateFullConsensusGroup(shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes)
+  //   // }
+  // }
+
+  //   static updateFullConsensusGroup (shardGlobals: ShardGlobals, nodeShardDataMap: NodeShardDataMap, parititionShardDataMap: ParititionShardDataMap, nodeShardData: NodeShardData, activeNodes: Shardus.Node[]) {
+  //     let homePartition = nodeShardData.homePartition
+  //     let shardPartitionData = parititionShardDataMap.get(homePartition)
+
+  //     if(shardPartitionData == null){
+  //       throw new Error('updateFullConsensusGroup: shardPartitionData==null')
+  //     }
+
+  //     nodeShardData.consensusNodeForOurNodeFull = Object.values(shardPartitionData.coveredBy)
+  //     nodeShardData.needsUpdateToFullConsensusGroup = false
+  //     nodeShardData.consensusNodeForOurNodeFull.sort(ShardFunctions.nodeSortAsc)
+
+  //     // merge into our full list for sake of TX calcs.  todo could try to be smart an only do this in some cases.
+  //     // let [results] = ShardFunctions.mergeNodeLists(nodeShardData.nodeThatStoreOurParition, nodeShardData.consensusNodeForOurNodeFull)
+  //     // switched nodeThatStoreOurParition to nodeThatStoreOurParitionFull to improve the quality of the results.
+  //     let [results] = ShardFunctions.mergeNodeLists(nodeShardData.nodeThatStoreOurParitionFull, nodeShardData.consensusNodeForOurNodeFull)
+
+  //     // not sure if we need to do this
+  //     // if (extras.length > 0) {
+  //     //   ShardFunctions.dilateNeighborCoverage(shardGlobals, nodeShardDataMap, parititionShardDataMap, activeNodes, nodeShardData, extras)
+  //     // }
+
+  //     nodeShardData.nodeThatStoreOurParitionFull = results
+  //     nodeShardData.nodeThatStoreOurParitionFull.sort(ShardFunctions.nodeSortAsc)
+  //   }
 
 }
 
