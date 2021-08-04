@@ -1,10 +1,10 @@
-import { join } from 'path'
 import merge from 'deepmerge'
-import { readJsonDir } from './utils'
+
 import Shardus from './shardus'
-export { default as Shardus } from './shardus'
 import * as ShardusTypes from './shardus/shardus-types'
-export {ShardusTypes}
+
+export { default as Shardus } from './shardus'
+export { ShardusTypes }
 
 const defaultConfigs = {
   server: require('./config/server.json'),

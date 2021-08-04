@@ -1,6 +1,10 @@
-import { join, resolve } from 'path'
-import { readJsonDir } from './utils'
+import {
+  join,
+  resolve,
+} from 'path'
+
 import Shardus from './shardus'
+import { readJSONDir } from './utils'
 
 const baseDirPath = resolve(process.argv[2] || './')
 
@@ -8,11 +12,11 @@ const baseDirPath = resolve(process.argv[2] || './')
 // if not, use default configs
 let config
 try {
-  config = readJsonDir(join(baseDirPath, 'config'))
+  config = readJSONDir(join(baseDirPath, 'config'))
   if (Object.keys(config).length === 0 && config.constructor === Object)
     throw new Error('Empty configs')
 } catch (e) {
-  config = readJsonDir(join(__dirname, 'config'))
+  config = readJSONDir(join(__dirname, 'config'))
 }
 config.server.baseDir = baseDirPath
 
