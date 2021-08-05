@@ -101,7 +101,7 @@ class TransactionQueue {
    */
 
   setupHandlers() {
-    // p2p TELL
+    
     this.p2p.registerInternal('broadcast_state', async (payload: { txid: string; stateList: any[] }, respond: any) => {
       // Save the wrappedAccountState with the rest our queue data
       // let message = { stateList: datas, txid: queueEntry.acceptedTX.id }
@@ -110,11 +110,9 @@ class TransactionQueue {
       // make sure we have it
       let queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
       if (queueEntry == null) {
-        //if we are syncing we need to queue this transaction!
-
-        //this.transactionQueue.routeAndQueueAcceptedTransaction (acceptedTx:AcceptedTx, sendGossip:boolean = true, sender: Shardus.Node  |  null, globalModification:boolean)
-
-        return
+         //In the past we would enqueue the TX, expecially if syncing but that has been removed. 
+         //The normal mechanism of sharing TXs is good enough.
+         return
       }
       // add the data in
       for (let data of payload.stateList) {
@@ -126,69 +124,21 @@ class TransactionQueue {
     })
 
     this.p2p.registerInternal('spread_tx_to_group_syncing', async (payload: Shardus.AcceptedTx, respondWrapped, sender, tracker) => {
-      
+      //handleSharedTX will also validate fields
       this.handleSharedTX(payload, sender)
     })
 
     this.p2p.registerGossipHandler('spread_tx_to_group', async (payload, sender, tracker) => {
-      //  gossip 'spread_tx_to_group' to transaction group
       // Place tx in queue (if younger than m)
+      //  gossip 'spread_tx_to_group' to transaction group
 
+      //handleSharedTX will also validate fields
       let queueEntry = this.handleSharedTX(payload, sender)
       if(queueEntry == null){
         return
       }
-      // let queueEntry = this.getQueueEntrySafe(payload.id) // , payload.timestamp)
-      // if (queueEntry) {
-      //   return
-      //   // already have this in our queue
-      // }
 
-      // let noConsensus = false // this can only be true for a set command which will never come from an endpoint
-      // let added = this.routeAndQueueAcceptedTransaction(payload, /*sendGossip*/ false, sender, /*globalModification*/ false, noConsensus)
-      // if (added === 'lost') {
-      //   return // we are faking that the message got lost so bail here
-      // }
-      // if (added === 'out of range') {
-      //   return
-      // }
-      // if (added === 'notReady') {
-      //   return
-      // }
-      // queueEntry = this.getQueueEntrySafe(payload.id) //, payload.timestamp) // now that we added it to the queue, it should be possible to get the queueEntry now
-
-      // if (queueEntry == null) {
-      //   // do not gossip this, we are not involved
-      //   // downgrading, this does not seem to be fatal, but may need further logs/testing
-      //   //this.statemanager_fatal(`spread_tx_to_group_noQE`, `spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(payload.id)}`)
-      //   if (logFlags.playback) this.logger.playbackLogNote('spread_tx_to_group_noQE', '', `spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(payload.id)}`)
-      //   return
-      // }
-
-      // //Validation.
-      // const initValidationResp = this.app.validateTxnFields(queueEntry.acceptedTx.data)
-      // if (initValidationResp.success !== true) {
-      //   this.statemanager_fatal(`spread_tx_to_group_validateTX`, `spread_tx_to_group validateTxnFields failed: ${utils.stringifyReduce(initValidationResp)}`)
-      //   return
-      // }
-
-      // //TODO check time before inserting queueEntry.  1sec future 5 second past max
-      // let timeM = this.stateManager.queueSitTime
-      // let timestamp = queueEntry.txKeys.timestamp
-      // let age = Date.now() - timestamp
-      // if (age > timeM * 0.9) {
-      //   this.statemanager_fatal(`spread_tx_to_group_OldTx`, 'spread_tx_to_group cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
-      //   if (logFlags.playback) this.logger.playbackLogNote('shrd_spread_tx_to_groupToOld', '', 'spread_tx_to_group working on older tx ' + timestamp + ' age: ' + age)
-      //   return
-      // }
-      // if (age < -1000) {
-      //   this.statemanager_fatal(`spread_tx_to_group_tooFuture`, 'spread_tx_to_group cannot accept tx more than 1 second in future ' + timestamp + ' age: ' + age)
-      //   if (logFlags.playback) this.logger.playbackLogNote('shrd_spread_tx_to_groupToFutrue', '', 'spread_tx_to_group tx too far in future' + timestamp + ' age: ' + age)
-      //   return
-      // }
-
-      // how did this work before??
-      // get transaction group. 3 accounds, merge lists.
+      // get transaction group
       let transactionGroup = this.queueEntryGetTransactionGroup(queueEntry)
       if (queueEntry.ourNodeInTransactionGroup === false) {
         return
@@ -197,7 +147,6 @@ class TransactionQueue {
         this.stateManager.debugNodeGroup(queueEntry.acceptedTx.id, queueEntry.acceptedTx.timestamp, `gossip to neighbors`, transactionGroup)
         this.p2p.sendGossipIn('spread_tx_to_group', payload, tracker, sender, transactionGroup, false)
       }
-      // await this.transactionQueue.routeAndQueueAcceptedTransaction(acceptedTX, false, sender)
     })
 
     /**
@@ -215,7 +164,8 @@ class TransactionQueue {
       if (queueEntry == null) {
         response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
         await respond(response)
-        // TODO archivedQueueEntries / Memory:  If we keep archived queue entries for less time we need a backup to get thid data in another way
+        // if a node cant get data it will have to get repaired by the patcher since we can only keep stuff en the archive queue for so long
+        // due to memory concerns
         return
       }
 
@@ -283,11 +233,7 @@ class TransactionQueue {
       return null
     }
 
-
-
-
     return queueEntry
-
   }
 
 
@@ -304,6 +250,14 @@ class TransactionQueue {
 
   /* -------- APPSTATE Functions ---------- */
 
+  /**
+   * getAccountsStateHash
+   * DEPRICATED in current sync algorithm.  This is very slow when we have many accounts or TXs
+   * @param accountStart 
+   * @param accountEnd 
+   * @param tsStart 
+   * @param tsEnd 
+   */
   async getAccountsStateHash(accountStart = '0'.repeat(64), accountEnd = 'f'.repeat(64), tsStart = 0, tsEnd = Date.now()) {
     const accountStates = await this.storage.queryAccountStateTable(accountStart, accountEnd, tsStart, tsEnd, 100000000)
 
@@ -738,15 +692,6 @@ class TransactionQueue {
       }
 
       txQueueEntry.logID = utils.makeShortHash(acceptedTx.id)
-      // if (this.config.debug != null && this.config.debug.loseTxChance && this.config.debug.loseTxChance > 0) {
-      //   let rand = Math.random()
-      //   if (this.config.debug.loseTxChance > rand) {
-      //     if (this.app.canDebugDropTx(acceptedTx.data)) {
-      //       if (logFlags.playback ) this.logger.playbackLogNote('tx_dropForTest', txId, 'dropping tx ' + timestamp)
-      //       return 'lost'
-      //     }
-      //   }
-      // }
 
       this.stateManager.debugTXHistory[txQueueEntry.logID] = 'enteredQueue'
 
@@ -762,21 +707,6 @@ class TransactionQueue {
           txQueueEntry.debugFail_failNoRepair = true
         }
       }
-
-      // if (this.config.debug != null && this.config.debug.loseTxChance && this.config.debug.loseTxChance > 0) {
-      //   let rand = Math.random()
-      //   if (this.config.debug.loseTxChance > rand) {
-      //     if (this.app.canDebugDropTx(acceptedTx.data)) {
-      //       if (logFlags.error) this.mainLogger.error('tx_failReceiptTest fail vote tx  ' + txId + ' ' + timestamp)
-      //       if (logFlags.playback ) this.logger.playbackLogNote('tx_failReceiptTest', txId, 'fail vote tx ' + timestamp)
-      //       //return 'lost'
-      //       txQueueEntry.debugFail_voteFlip = true
-      //     }
-      //   }
-      // } else {
-      //   // if (logFlags.error) this.mainLogger.error('tx_failReceiptTest set  ' + this.config.debug.loseTxChance)
-      //   // this.config.debug.loseTxChance = 0
-      // }
 
       try {
         let age = Date.now() - timestamp
@@ -884,17 +814,6 @@ class TransactionQueue {
           }
         }
 
-        //if we had any sync at all flag all non global partitions..
-        // This was used by broadcast partitions that we don't use anymore
-        // if (txQueueEntry.didSync) {
-        //   for (let key of txQueueEntry.uniqueKeys) {
-        //     //if(this.stateManager.accountGlobals.globalAccountMap.has(key)){
-        //     let { homePartition, addressNum } = ShardFunctions.addressToPartition(this.stateManager.currentCycleShardData.shardGlobals, key)
-        //     this.stateManager.currentCycleShardData.partitionsToSkip.set(homePartition, true)
-        //     //}
-        //   }
-        // }
-
         if (txQueueEntry.hasShardInfo) {
           let transactionGroup = this.queueEntryGetTransactionGroup(txQueueEntry)
           if (txQueueEntry.ourNodeInTransactionGroup || txQueueEntry.didSync === true) {
@@ -987,13 +906,12 @@ class TransactionQueue {
    *     ##### ##       ##     ##  ######   ######  ########  ######   ######
    */
 
+ /**
+  * getQueueEntry
+  * get a queue entry from the current queue
+  * @param txid 
+  */
   getQueueEntry(txid: string): QueueEntry | null {
-    // for (let queueEntry of this.newAcceptedTxQueue) {
-    //   if (queueEntry.acceptedTx.id === txid) {
-    //     return queueEntry
-    //   }
-    // }
-    // return null
 
     let queueEntry = this.newAcceptedTxQueueByID.get(txid)
     if (queueEntry === undefined) {
@@ -1002,14 +920,13 @@ class TransactionQueue {
     return queueEntry
   }
 
+ /**
+  * getQueueEntryPending
+  * get a queue entry from the pending queue (has not been added to the main queue yet)
+  * this is mainly for internal use, it makes more sense to call getQueueEntrySafe
+  * @param txid 
+  */
   getQueueEntryPending(txid: string): QueueEntry | null {
-    // for (let queueEntry of this.newAcceptedTxQueueTempInjest) {
-    //   if (queueEntry.acceptedTx.id === txid) {
-    //     return queueEntry
-    //   }
-    // }
-    // return null
-
     let queueEntry = this.newAcceptedTxQueueTempInjestByID.get(txid)
     if (queueEntry === undefined) {
       return null
@@ -1017,12 +934,12 @@ class TransactionQueue {
     return queueEntry
   }
 
+  /**
+   * getQueueEntrySafe
+   * get a queue entry from the queue or the pending queue (but not archive queue)
+   * @param txid 
+   */
   getQueueEntrySafe(txid: string): QueueEntry | null {
-    // let queueEntry = this.getQueueEntry(txid)
-    // if (queueEntry == null) {
-    //   return this.getQueueEntryPending(txid)
-    // }
-    // return queueEntry
 
     let queueEntry = this.newAcceptedTxQueueByID.get(txid)
     if (queueEntry === undefined) {
@@ -1034,24 +951,28 @@ class TransactionQueue {
     return queueEntry
   }
 
+  /**
+   * getQueueEntryArchived
+   * get a queue entry from the archive queue only
+   * @param txid 
+   * @param msg 
+   */
   getQueueEntryArchived(txid: string, msg: string): QueueEntry | null {
     let queueEntry = this.archivedQueueEntriesByID.get(txid)
     if (queueEntry != null) {
       return queueEntry
     }
-
-    // for (let queueEntry of this.archivedQueueEntries) {
-    //   if (queueEntry.acceptedTx.id === txid) {
-    //     return queueEntry
-    //   }
-    // }
-    // todo make this and error.
     if (logFlags.error) this.mainLogger.error(`getQueueEntryArchived failed to find: ${utils.stringifyReduce(txid)} ${msg} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(txid)]}`)
-
     return null
   }
 
-  // TODO CODEREVIEW.  need to look at the use of local cache.  also is the early out ok?
+  /**
+   * queueEntryAddData
+   * add data to a queue entry
+   *   // TODO CODEREVIEW.  need to look at the use of local cache.  also is the early out ok?
+   * @param queueEntry 
+   * @param data 
+   */
   queueEntryAddData(queueEntry: QueueEntry, data: Shardus.WrappedResponse) {
     if (queueEntry.collectedData[data.accountId] != null) {
       return // already have the data
@@ -1080,6 +1001,13 @@ class TransactionQueue {
     if (logFlags.playback) this.logger.playbackLogNote('shrd_addData', `${utils.makeShortHash(queueEntry.acceptedTx.id)}`, `key ${utils.makeShortHash(data.accountId)} hash: ${utils.makeShortHash(data.stateId)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}  ${queueEntry.acceptedTx.timestamp}`)
   }
 
+  /**
+   * queueEntryHasAllData
+   * Test if the queueEntry has all the data it needs.
+   * TODO could be slightly more if it only recalculated when dirty.. but that would add more state and complexity, 
+   * so wait for this to show up in the profiler before fixing
+   * @param queueEntry 
+   */
   queueEntryHasAllData(queueEntry: QueueEntry) : boolean {
     if (queueEntry.hasAll === true) {
       return true
@@ -1101,6 +1029,13 @@ class TransactionQueue {
     return false
   }
 
+  /**
+   * queueEntryRequestMissingData
+   * ask other nodes for data that is missing for this TX.
+   * normally other nodes in the network should foward data to us at the correct time.
+   * This is only for the case that a TX has waited too long and not received the data it needs.
+   * @param queueEntry 
+   */
   async queueEntryRequestMissingData(queueEntry: QueueEntry) {
     if (this.stateManager.currentCycleShardData == null) {
       return
@@ -1130,7 +1065,7 @@ class TransactionQueue {
     if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_start', `${queueEntry.acceptedTx.id}`, `qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
 
     // consensus group should have all the data.. may need to correct this later
-    let consensusGroup = this.queueEntryGetConsensusGroup(queueEntry)
+    //let consensusGroup = this.queueEntryGetConsensusGroup(queueEntry)
     //let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry)
 
     for (let key of queueEntry.uniqueKeys) {
@@ -1156,7 +1091,8 @@ class TransactionQueue {
           let foundValidNode = false
           let maxTries = 1000
 
-          // todo make this non random!!!
+          // todo make this non random!!!.  It would be better to build a list and work through each node in order and then be finished
+          // we have other code that does this fine.
           while (foundValidNode == false) {
             maxTries--
             randomIndex = this.stateManager.getRandomInt(homeNodeShardData.consensusNodeForOurNodeFull.length - 1)
@@ -1262,6 +1198,11 @@ class TransactionQueue {
     }
   }
 
+  /**
+   * queueEntryRequestMissingReceipt
+   * Ask other nodes for a receipt to go with this TX
+   * @param queueEntry 
+   */
   async queueEntryRequestMissingReceipt(queueEntry: QueueEntry) {
     if (this.stateManager.currentCycleShardData == null) {
       return
@@ -2576,6 +2517,13 @@ class TransactionQueue {
   }
 
 
+  /**
+   * processQueue_accountSeen
+   * Helper for processQueue to detect if this queueEntry has any accounts that are already blocked because they were seen upstream
+   * a seen account is a an account that is involved in a TX that is upstream(older) in the queue
+   * @param seenAccounts 
+   * @param queueEntry 
+   */
   processQueue_accountSeen(seenAccounts: SeenAccounts, queueEntry: QueueEntry): boolean {
     if (queueEntry.uniqueKeys == null) {
       //TSConversion double check if this needs extra logging
@@ -2589,6 +2537,14 @@ class TransactionQueue {
     return false
   }
 
+  /**
+   * processQueue_markAccountsSeen
+   * Helper for processQueue to mark accounts as seen.
+   *    note only operates on writeable accounts.  a read only account should not block downstream operations
+   * a seen account is a an account that is involved in a TX that is upstream(older) in the queue
+   * @param seenAccounts 
+   * @param queueEntry 
+   */
   processQueue_markAccountsSeen(seenAccounts: SeenAccounts, queueEntry: QueueEntry) {
     if (queueEntry.uniqueWritableKeys == null) {
       //TSConversion double check if this needs extra logging
@@ -2602,6 +2558,13 @@ class TransactionQueue {
     }
   }
 
+  /**
+   * processQueue_clearAccountsSeen
+   * Helper for processQueue to clear accounts that were marked as seen.
+   * a seen account is a an account that is involved in a TX that is upstream(older) in the queue
+   * @param seenAccounts 
+   * @param queueEntry 
+   */
   processQueue_clearAccountsSeen(seenAccounts: SeenAccounts, queueEntry: QueueEntry) {
     if (queueEntry.uniqueKeys == null) {
       //TSConversion double check if this needs extra logging
@@ -2614,6 +2577,11 @@ class TransactionQueue {
     }
   }
   
+  /**
+   * Helper for processQueue to dump debug info
+   * @param queueEntry 
+   * @param app 
+   */
   processQueue_debugAccountData(queueEntry: QueueEntry, app: Shardus.App): string {
     let debugStr = ''
     //if (logFlags.verbose) { //this function is always verbose
@@ -2630,7 +2598,14 @@ class TransactionQueue {
     return debugStr
   }  
 
+  /**
+   * txWillChangeLocalData
+   * This is a just in time check to see if a TX will modify any local accounts managed by this node.
+   *  
+   * @param queueEntry 
+   */
   txWillChangeLocalData(queueEntry:QueueEntry) : boolean{
+    //if this TX modifies a global then return true since all nodes own all global accounts.
     if(queueEntry.globalModification){
       return true
     }
