@@ -1585,16 +1585,7 @@ class StateManager {
 
     let forceLocalGlobalLookup = false
 
-    // GLOBAL CLEANUP --this old code would not have worked in a long time.. the map was being used as set with null values..
-    // let globalAccount = null
-    // if (this.accountGlobals.globalAccountMap.has(address)) {
-    //   globalAccount = this.accountGlobals.globalAccountMap.get(address)
-    //   if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', `getLocalOrRemoteAccount - has`)
-    //   if (globalAccount != null) {
-    //     return globalAccount
-    //   }
-    //   forceLocalGlobalLookup = true
-    // }
+
 
     if (this.accountGlobals.isGlobalAccount(address)) {
       forceLocalGlobalLookup = true
@@ -1953,30 +1944,11 @@ class StateManager {
 
       if (logFlags.verbose && this.extendedRepairLogging) this.mainLogger.debug(`updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
 
-      // todo perf. batching?
+      // todo perf. queue and batch these to the table?
       // if (logFlags.verbose) this.mainLogger.debug( 'updateAccountsCopyTableA ' + JSON.stringify(accountEntry))
       // if (logFlags.verbose) this.mainLogger.debug( 'updateAccountsCopyTableB ' + JSON.stringify(backupObj))
 
-      // how does this not stop previous results, is it because only the first request gets through.
-
-      // TODO: globalaccounts
-      // intercept the account change here for global accounts and save it to our memory structure.
-      // this structure should have a list. and be sorted by timestamp. eventually we will remove older timestamp copies of the account data.
-
-      // wrappedAccounts.push({ accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp })
-
-      // GLOBAL CLEANUP Depricated this code.  it was for maintaining global account history that is not needed now.
-      // if (this.accountGlobals.isGlobalAccount(accountId) && repairing === false) {
-      //   //make sure it is a global tx.
-      //   let globalBackupList: Shardus.AccountsCopy[] = this.accountGlobals.getGlobalAccountBackupList(accountId)
-      //   if (globalBackupList != null) {
-      //     globalBackupList.push(backupObj) // sort and cleanup later.
-
-      //     if (logFlags.verbose && this.extendedRepairLogging) this.mainLogger.debug(`updateAccountsCopyTable added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
-      //   }
-      // }
-
-      //Aha! Saves the last copy per given cycle! this way when you query cycle-1 you get the right data.
+      //Saves the last copy per given cycle! this way when you query cycle-1 you get the right data.
       await this.storage.createOrReplaceAccountCopy(backupObj)
     }
   }
@@ -2045,14 +2017,6 @@ class StateManager {
             if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', `set global in _commitAccountCopies accountId:${utils.makeShortHash(accountId)}`)
           }
 
-          // GLOBAL CLEANUP Depricated this code.  it was for maintaining global account history that is not needed now.
-          // let globalBackupList: Shardus.AccountsCopy[] = this.accountGlobals.getGlobalAccountBackupList(accountId)
-          // if (globalBackupList != null) {
-          //   globalBackupList.push(backupObj) // sort and cleanup later
-          //   if (logFlags.verbose && this.extendedRepairLogging) this.mainLogger.debug(`_commitAccountCopies added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
-          // } else {
-          //   if (logFlags.error) this.mainLogger.error(`_commitAccountCopies no global backup list found for accountId:${utils.makeShortHash(accountId)}`)
-          // }
         }
         //Saves the last copy per given cycle! this way when you query cycle-1 you get the right data.
         await this.storage.createOrReplaceAccountCopy(backupObj)
@@ -2370,11 +2334,6 @@ class StateManager {
         break
       }
     }
-
-    // GLOBAL CLEANUP depricated -- sort and clean up our global account backups:
-    // if (oldestCycleTimestamp > 0) {
-    //   this.accountGlobals.sortAndMaintainBackups(oldestCycleTimestamp)
-    // }
 
     if (logFlags.debug) this.mainLogger.debug(`Clearing out old data Cleared: ${removedrepairTrackingByCycleById} ${removedallPartitionResponsesByCycleByPartition} ${removedourPartitionResultsByCycle} ${removedshardValuesByCycle} ${removedtxByCycleByPartition} ${removedrecentPartitionObjectsByCycleByHash} ${removedrepairUpdateDataByCycle} ${removedpartitionObjectsByCycle} ${removepartitionReceiptsByCycleCounter} ${removeourPartitionReceiptsByCycleCounter} archQ:${archivedEntriesRemoved}`)
 

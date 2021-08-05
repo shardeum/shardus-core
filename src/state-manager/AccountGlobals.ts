@@ -161,70 +161,13 @@ class AccountGlobals {
     })
   }
 
-  // GLOBAL CLEANUP  Depricated this code.  it was for maintaining global account history that is not needed now.
-  // getGlobalAccountValueAtTime(accountId: string, oldestTimestamp: number): Shardus.AccountsCopy | null {
-  //   let result: Shardus.AccountsCopy | null = null
-  //   let globalBackupList: Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
-  //   if (globalBackupList == null || globalBackupList.length === 0) {
-  //     if (logFlags.playback) this.logger.playbackLogNote('globalBackupList', `applyAllPreparedRepairs - missing value for ${accountId}`)
-  //     return null
-  //   }
 
-  //   //else fine the closest time lower than our input time
-  //   //non binary search, just start at then end and go backwards.
-  //   //TODO PERF make this a binary search. realistically the lists should be pretty short most of the time
-  //   if (globalBackupList.length >= 1) {
-  //     for (let i = globalBackupList.length - 1; i >= 0; i--) {
-  //       let accountCopy = globalBackupList[i]
-  //       if (accountCopy.timestamp <= oldestTimestamp) {
-  //         return accountCopy
-  //       }
-  //     }
-  //   }
-  //   return null
-  // }
 
   // sortByTimestamp(a: any, b: any): number {
   //   return utils.sortAscProp(a, b, 'timestamp')
   // }
 
-  // sortAndMaintainBackupList(globalBackupList: Shardus.AccountsCopy[], oldestTimestamp: number): void {
-  //   globalBackupList.sort(utils.sortTimestampAsc) // this.sortByTimestamp)
-  //   //remove old entries. then bail.
-  //   // note this loop only runs if there is more than one entry
-  //   // also it should always keep the last item in the list now matter what (since that is the most current backup)
-  //   // this means we only start if there are 2 items in the array and we start at index  len-2 (next to last element)
-  //   if (globalBackupList.length > 1) {
-  //     for (let i = globalBackupList.length - 2; i >= 0; i--) {
-  //       let accountCopy = globalBackupList[i]
-  //       if (accountCopy.timestamp < oldestTimestamp) {
-  //         globalBackupList.splice(i, 1)
-  //       }
-  //     }
-  //   }
-  // }
 
-  // 
-  // sortAndMaintainBackups(oldestTimestamp: number): void {
-  //   let keys = this.globalAccountRepairBank.keys()
-  //   for (let key of keys) {
-  //     let globalBackupList = this.globalAccountRepairBank.get(key)
-  //     if (globalBackupList != null) {
-  //       this.sortAndMaintainBackupList(globalBackupList, oldestTimestamp)
-  //     }
-  //   }
-  // }
-
-
-  // getGlobalAccountBackupList(accountID: string): Shardus.AccountsCopy[] {
-  //   let results: Shardus.AccountsCopy[] = []
-  //   if (this.globalAccountRepairBank.has(accountID) === false) {
-  //     this.globalAccountRepairBank.set(accountID, results) //init list
-  //   } else {
-  //     results = this.globalAccountRepairBank.get(accountID)
-  //   }
-  //   return results
-  // }
 
   /**
    * isGlobalAccount
