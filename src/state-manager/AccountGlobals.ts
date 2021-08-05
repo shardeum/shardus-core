@@ -30,8 +30,8 @@ class AccountGlobals {
   statsLogger: any
   statemanager_fatal: (key: string, log: string) => void
 
-  globalAccountMap: Map<string, Shardus.WrappedDataFromQueue | null>
-  knownGlobals: { [id: string]: boolean }
+  globalAccountSet: Set<string>
+  // knownGlobals: { [id: string]: boolean } // will just use the above set now as a simplification
   hasknownGlobals: boolean
 
   /** Need the ablity to get account copies and use them later when applying a transaction. how to use the right copy or even know when to use this at all? */
@@ -39,7 +39,7 @@ class AccountGlobals {
   /** What if the global account is transformed several times durring that cycle. oof. */
   /** ok best thing to do is to store the account every time it changes for a given period of time. */
   /** how to handle reparing a global account... yikes that is hard. */
-  globalAccountRepairBank: Map<string, Shardus.AccountsCopy[]>
+  //globalAccountRepairBank: Map<string, Shardus.AccountsCopy[]>
 
   constructor(
     stateManager: StateManager,
@@ -68,9 +68,9 @@ class AccountGlobals {
     this.statsLogger = logger.getLogger('statsDump')
     this.statemanager_fatal = stateManager.statemanager_fatal
 
-    this.globalAccountMap = new Map()
-    this.globalAccountRepairBank = new Map()
-    this.knownGlobals = {}
+    this.globalAccountSet = new Set()
+    //this.globalAccountRepairBank = new Map()
+    //this.knownGlobals = {}
     this.hasknownGlobals = false
   }
 
@@ -78,10 +78,7 @@ class AccountGlobals {
     this.p2p.registerInternal('get_globalaccountreport', async (payload: any, respond: (arg0: GlobalAccountReportResp) => any) => {
       let result = { combinedHash: '', accounts: [], ready: this.stateManager.appFinishedSyncing } as GlobalAccountReportResp
 
-      //type GlobalAccountReportResp = {combinedHash:string, accounts:{id:string, hash:string, timestamp:number }[]  }
-      //sort by account ids.
-
-      let globalAccountKeys = this.globalAccountMap.keys()
+      let globalAccountKeys = this.globalAccountSet.keys()
 
       let toQuery: string[] = []
 
@@ -131,7 +128,6 @@ class AccountGlobals {
         return
       }
 
-
       let accountData: Shardus.WrappedData[]
       let ourLockID = -1
       try {
@@ -165,92 +161,120 @@ class AccountGlobals {
     })
   }
 
-  getGlobalAccountValueAtTime(accountId: string, oldestTimestamp: number): Shardus.AccountsCopy | null {
-    let result: Shardus.AccountsCopy | null = null
-    let globalBackupList: Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
-    if (globalBackupList == null || globalBackupList.length === 0) {
-      if (logFlags.playback) this.logger.playbackLogNote('globalBackupList', `applyAllPreparedRepairs - missing value for ${accountId}`)
-      return null
-    }
+  // GLOBAL CLEANUP  Depricated this code.  it was for maintaining global account history that is not needed now.
+  // getGlobalAccountValueAtTime(accountId: string, oldestTimestamp: number): Shardus.AccountsCopy | null {
+  //   let result: Shardus.AccountsCopy | null = null
+  //   let globalBackupList: Shardus.AccountsCopy[] = this.getGlobalAccountBackupList(accountId)
+  //   if (globalBackupList == null || globalBackupList.length === 0) {
+  //     if (logFlags.playback) this.logger.playbackLogNote('globalBackupList', `applyAllPreparedRepairs - missing value for ${accountId}`)
+  //     return null
+  //   }
 
-    //else fine the closest time lower than our input time
-    //non binary search, just start at then end and go backwards.
-    //TODO PERF make this a binary search. realistically the lists should be pretty short most of the time
-    if (globalBackupList.length >= 1) {
-      for (let i = globalBackupList.length - 1; i >= 0; i--) {
-        let accountCopy = globalBackupList[i]
-        if (accountCopy.timestamp <= oldestTimestamp) {
-          return accountCopy
-        }
-      }
-    }
-    return null
-  }
+  //   //else fine the closest time lower than our input time
+  //   //non binary search, just start at then end and go backwards.
+  //   //TODO PERF make this a binary search. realistically the lists should be pretty short most of the time
+  //   if (globalBackupList.length >= 1) {
+  //     for (let i = globalBackupList.length - 1; i >= 0; i--) {
+  //       let accountCopy = globalBackupList[i]
+  //       if (accountCopy.timestamp <= oldestTimestamp) {
+  //         return accountCopy
+  //       }
+  //     }
+  //   }
+  //   return null
+  // }
 
-  sortByTimestamp(a: any, b: any): number {
-    return utils.sortAscProp(a, b, 'timestamp')
-  }
+  // sortByTimestamp(a: any, b: any): number {
+  //   return utils.sortAscProp(a, b, 'timestamp')
+  // }
 
-  sortAndMaintainBackupList(globalBackupList: Shardus.AccountsCopy[], oldestTimestamp: number): void {
-    globalBackupList.sort(utils.sortTimestampAsc) // this.sortByTimestamp)
-    //remove old entries. then bail.
-    // note this loop only runs if there is more than one entry
-    // also it should always keep the last item in the list now matter what (since that is the most current backup)
-    // this means we only start if there are 2 items in the array and we start at index  len-2 (next to last element)
-    if (globalBackupList.length > 1) {
-      for (let i = globalBackupList.length - 2; i >= 0; i--) {
-        let accountCopy = globalBackupList[i]
-        if (accountCopy.timestamp < oldestTimestamp) {
-          globalBackupList.splice(i, 1)
-        }
-      }
-    }
-  }
+  // sortAndMaintainBackupList(globalBackupList: Shardus.AccountsCopy[], oldestTimestamp: number): void {
+  //   globalBackupList.sort(utils.sortTimestampAsc) // this.sortByTimestamp)
+  //   //remove old entries. then bail.
+  //   // note this loop only runs if there is more than one entry
+  //   // also it should always keep the last item in the list now matter what (since that is the most current backup)
+  //   // this means we only start if there are 2 items in the array and we start at index  len-2 (next to last element)
+  //   if (globalBackupList.length > 1) {
+  //     for (let i = globalBackupList.length - 2; i >= 0; i--) {
+  //       let accountCopy = globalBackupList[i]
+  //       if (accountCopy.timestamp < oldestTimestamp) {
+  //         globalBackupList.splice(i, 1)
+  //       }
+  //     }
+  //   }
+  // }
 
-  // go through all account backups sort/ filter them
-  sortAndMaintainBackups(oldestTimestamp: number): void {
-    let keys = this.globalAccountRepairBank.keys()
-    for (let key of keys) {
-      let globalBackupList = this.globalAccountRepairBank.get(key)
-      if (globalBackupList != null) {
-        this.sortAndMaintainBackupList(globalBackupList, oldestTimestamp)
-      }
-    }
-  }
+  // 
+  // sortAndMaintainBackups(oldestTimestamp: number): void {
+  //   let keys = this.globalAccountRepairBank.keys()
+  //   for (let key of keys) {
+  //     let globalBackupList = this.globalAccountRepairBank.get(key)
+  //     if (globalBackupList != null) {
+  //       this.sortAndMaintainBackupList(globalBackupList, oldestTimestamp)
+  //     }
+  //   }
+  // }
 
-  //maintian all lists
-  getGlobalAccountBackupList(accountID: string): Shardus.AccountsCopy[] {
-    let results: Shardus.AccountsCopy[] = []
-    if (this.globalAccountRepairBank.has(accountID) === false) {
-      this.globalAccountRepairBank.set(accountID, results) //init list
-    } else {
-      results = this.globalAccountRepairBank.get(accountID)
-    }
-    return results
-  }
 
+  // getGlobalAccountBackupList(accountID: string): Shardus.AccountsCopy[] {
+  //   let results: Shardus.AccountsCopy[] = []
+  //   if (this.globalAccountRepairBank.has(accountID) === false) {
+  //     this.globalAccountRepairBank.set(accountID, results) //init list
+  //   } else {
+  //     results = this.globalAccountRepairBank.get(accountID)
+  //   }
+  //   return results
+  // }
+
+  /**
+   * isGlobalAccount
+   * is the account global
+   * @param accountID 
+   */
   isGlobalAccount(accountID: string): boolean {
-    if (this.stateManager.accountSync.globalAccountsSynced === false) {
-      return this.knownGlobals[accountID] === true
-    }
+    // if (this.stateManager.accountSync.globalAccountsSynced === false) {
+    //   return this.knownGlobals[accountID] === true
+    // }
 
-    return this.globalAccountMap.has(accountID)
+    return this.globalAccountSet.has(accountID)
   }
 
-  // should this be in sync?
+  setGlobalAccount(accountID: string) {
+    this.globalAccountSet.add(accountID)
+  }
+
+  /**
+   * getGlobalListEarly
+   * sync requires having knowlege of what accounts are global very early in the process.
+   * This will get an early global report (note does not have account data, just id,hash,timestamp)
+   */
   async getGlobalListEarly() {
     let globalReport: GlobalAccountReportResp = await this.stateManager.accountSync.getRobustGlobalReport()
 
-    this.knownGlobals = {}
+    //this.knownGlobals = {}
     let temp = []
     for (let report of globalReport.accounts) {
-      this.knownGlobals[report.id] = true
+      //this.knownGlobals[report.id] = true
 
       temp.push(report.id)
+
+      //set this as a known global
+      this.globalAccountSet.add(report.id)
     }
-    if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getGlobalListEarly: ${temp}`)
+    if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getGlobalListEarly: ${utils.stringifyReduce(temp)}`)
 
     this.hasknownGlobals = true
+  }
+
+  getGlobalDebugReport() : {globalAccountSummary:{id:string, state:string, ts:number}[], globalStateHash:string} {
+    let globalAccountSummary = []
+    for (let globalID in this.globalAccountSet.keys()) {
+      let accountHash = this.stateManager.accountCache.getAccountHash(globalID)
+      let summaryObj = { id: globalID, state: accountHash.h, ts: accountHash.t }
+      globalAccountSummary.push(summaryObj)
+    }
+    let globalStateHash = this.crypto.hash(globalAccountSummary)
+    return {globalAccountSummary, globalStateHash}
   }
 }
 

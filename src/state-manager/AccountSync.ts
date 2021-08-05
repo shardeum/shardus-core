@@ -889,27 +889,31 @@ class AccountSync {
         if (accountData != null) {
           dataToSet.push(accountData)
           goodAccounts.push(accountData)
-          if (this.stateManager.accountGlobals.globalAccountMap.has(report.id)) {
-            if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals has ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
-          } else {
-            if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals setting ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
-            // set the account in our table
-            this.stateManager.accountGlobals.globalAccountMap.set(report.id, null)
-            // push the time based backup count
-            let accountId = report.id
-            let data = accountData.data
-            let timestamp = accountData.timestamp
-            let hash = accountData.stateId
-            let isGlobal = this.stateManager.accountGlobals.isGlobalAccount(accountId)
-            let backupObj: Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
-            //if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug( `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
-            let globalBackupList: Shardus.AccountsCopy[] = this.stateManager.accountGlobals.getGlobalAccountBackupList(accountId)
-            if (globalBackupList != null) {
-              globalBackupList.push(backupObj) // sort and cleanup later.
-              if (logFlags.debug)
-                this.mainLogger.debug(`DATASYNC: syncStateDataGlobals push backup entry ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
-            }
-          }
+
+          // GLOBAL CLEANUP  Depricated this code.  it was for maintaining global account history that is not needed now.
+
+          // if (this.stateManager.accountGlobals.globalAccountMap.has(report.id)) {
+          //   if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals has ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
+          // } else {
+          //   if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals setting ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
+          //   // set the account in our table
+          //   this.stateManager.accountGlobals.globalAccountMap.set(report.id, null)
+          //   // push the time based backup count
+          //   let accountId = report.id
+          //   let data = accountData.data
+          //   let timestamp = accountData.timestamp
+          //   let hash = accountData.stateId
+          //   let isGlobal = this.stateManager.accountGlobals.isGlobalAccount(accountId)
+          //   let backupObj: Shardus.AccountsCopy = { accountId, data, timestamp, hash, cycleNumber, isGlobal }
+          //   //if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug( `updateAccountsCopyTable acc.timestamp: ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+          //   let globalBackupList: Shardus.AccountsCopy[] = this.stateManager.accountGlobals.getGlobalAccountBackupList(accountId)
+          //   if (globalBackupList != null) {
+          //     globalBackupList.push(backupObj) // sort and cleanup later.
+          //     if (logFlags.debug)
+          //       this.mainLogger.debug(`DATASYNC: syncStateDataGlobals push backup entry ${utils.makeShortHash(report.id)} hash: ${utils.makeShortHash(report.hash)} ts: ${report.timestamp}`)
+          //   }
+          // }
+
         }
       }
 

@@ -1391,27 +1391,15 @@ class StateManager {
         partitionDump.allNodeIds.push(utils.makeShortHash(node.id))
       }
 
-      partitionDump.globalAccountIDs = Array.from(this.accountGlobals.globalAccountMap.keys())
+      partitionDump.globalAccountIDs = Array.from(this.accountGlobals.globalAccountSet.keys())
       partitionDump.globalAccountIDs.sort()
       // dump information about consensus group and edge nodes for each partition
       // for (var [key, value] of this.currentCycleShardData.parititionShardDataMap){
 
       // }
 
-      //hash over global accounts values
-
-      let globalAccountSummary = []
-      for (let globalID in partitionDump.globalAccountIDs) {
-        let backupList: Shardus.AccountsCopy[] = this.accountGlobals.getGlobalAccountBackupList(globalID)
-        //let globalAccount = this.accountGlobals.globalAccountMap.get(globalID)
-        if (backupList != null && backupList.length > 0) {
-          let globalAccount = backupList[backupList.length - 1]
-          let summaryObj = { id: globalID, state: globalAccount.hash, ts: globalAccount.timestamp }
-          globalAccountSummary.push(summaryObj)
-        }
-      }
+      let {globalAccountSummary, globalStateHash} = this.accountGlobals.getGlobalDebugReport()
       partitionDump.globalAccountSummary = globalAccountSummary
-      let globalStateHash = this.crypto.hash(globalAccountSummary)
       partitionDump.globalStateHash = globalStateHash
     } else {
       if (this.currentCycleShardData != null && this.currentCycleShardData.activeNodes.length > 0) {
@@ -1548,28 +1536,17 @@ class StateManager {
         partitionDump.allNodeIds.push(utils.makeShortHash(node.id))
       }
 
-      partitionDump.globalAccountIDs = Array.from(this.accountGlobals.globalAccountMap.keys())
+      partitionDump.globalAccountIDs = Array.from(this.accountGlobals.globalAccountSet.keys())
       partitionDump.globalAccountIDs.sort()
       // dump information about consensus group and edge nodes for each partition
       // for (var [key, value] of this.currentCycleShardData.parititionShardDataMap){
 
       // }
 
-      //hash over global accounts values
-
-      let globalAccountSummary = []
-      for (let globalID in partitionDump.globalAccountIDs) {
-        let backupList: Shardus.AccountsCopy[] = this.accountGlobals.getGlobalAccountBackupList(globalID)
-        //let globalAccount = this.accountGlobals.globalAccountMap.get(globalID)
-        if (backupList != null && backupList.length > 0) {
-          let globalAccount = backupList[backupList.length - 1]
-          let summaryObj = { id: globalID, state: globalAccount.hash, ts: globalAccount.timestamp }
-          globalAccountSummary.push(summaryObj)
-        }
-      }
+      let {globalAccountSummary, globalStateHash} = this.accountGlobals.getGlobalDebugReport()
       partitionDump.globalAccountSummary = globalAccountSummary
-      let globalStateHash = this.crypto.hash(globalAccountSummary)
       partitionDump.globalStateHash = globalStateHash
+
     } else {
       if (this.currentCycleShardData != null && this.currentCycleShardData.activeNodes.length > 0) {
         for (let node of this.currentCycleShardData.activeNodes) {
@@ -1607,15 +1584,22 @@ class StateManager {
     }
 
     let forceLocalGlobalLookup = false
-    let globalAccount = null
-    if (this.accountGlobals.globalAccountMap.has(address)) {
-      globalAccount = this.accountGlobals.globalAccountMap.get(address)
-      if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', `getLocalOrRemoteAccount - has`)
-      if (globalAccount != null) {
-        return globalAccount
-      }
+
+    // GLOBAL CLEANUP --this old code would not have worked in a long time.. the map was being used as set with null values..
+    // let globalAccount = null
+    // if (this.accountGlobals.globalAccountMap.has(address)) {
+    //   globalAccount = this.accountGlobals.globalAccountMap.get(address)
+    //   if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', `getLocalOrRemoteAccount - has`)
+    //   if (globalAccount != null) {
+    //     return globalAccount
+    //   }
+    //   forceLocalGlobalLookup = true
+    // }
+
+    if (this.accountGlobals.isGlobalAccount(address)) {
       forceLocalGlobalLookup = true
     }
+
 
     // check if we have this account locally. (does it have to be consenus or just stored?)
     let accountIsRemote = true
@@ -1889,7 +1873,7 @@ class StateManager {
       let isGlobalKey = false
       //intercept that we have this data rather than requesting it.
       // only if this tx is not a global modifying tx.   if it is a global set then it is ok to save out the global here.
-      if (this.accountGlobals.globalAccountMap.has(key)) {
+      if (this.accountGlobals.isGlobalAccount(key)) {
         if (isGlobalModifyingTX === false) {
           if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', `setAccount - has`)
           if (logFlags.verbose) this.mainLogger.debug('setAccount: Not writing global account: ' + utils.makeShortHash(key))
@@ -1981,16 +1965,16 @@ class StateManager {
 
       // wrappedAccounts.push({ accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp })
 
-      //TODO Perf: / mem   should we only save if there is a hash change?
-      if (this.accountGlobals.isGlobalAccount(accountId) && repairing === false) {
-        //make sure it is a global tx.
-        let globalBackupList: Shardus.AccountsCopy[] = this.accountGlobals.getGlobalAccountBackupList(accountId)
-        if (globalBackupList != null) {
-          globalBackupList.push(backupObj) // sort and cleanup later.
+      // GLOBAL CLEANUP Depricated this code.  it was for maintaining global account history that is not needed now.
+      // if (this.accountGlobals.isGlobalAccount(accountId) && repairing === false) {
+      //   //make sure it is a global tx.
+      //   let globalBackupList: Shardus.AccountsCopy[] = this.accountGlobals.getGlobalAccountBackupList(accountId)
+      //   if (globalBackupList != null) {
+      //     globalBackupList.push(backupObj) // sort and cleanup later.
 
-          if (logFlags.verbose && this.extendedRepairLogging) this.mainLogger.debug(`updateAccountsCopyTable added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
-        }
-      }
+      //     if (logFlags.verbose && this.extendedRepairLogging) this.mainLogger.debug(`updateAccountsCopyTable added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+      //   }
+      // }
 
       //Aha! Saves the last copy per given cycle! this way when you query cycle-1 you get the right data.
       await this.storage.createOrReplaceAccountCopy(backupObj)
@@ -2056,17 +2040,19 @@ class StateManager {
 
           // If we do not realized this account is global yet, then set it and log to playback log
           if (this.accountGlobals.isGlobalAccount(accountId) === false) {
-            this.accountGlobals.globalAccountMap.set(accountId, null) // we use null. ended up not using the data, only checking for the key is used
+            //this.accountGlobals.globalAccountMap.set(accountId, null) // we use null. ended up not using the data, only checking for the key is used
+            this.accountGlobals.setGlobalAccount(accountId)
             if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', `set global in _commitAccountCopies accountId:${utils.makeShortHash(accountId)}`)
           }
 
-          let globalBackupList: Shardus.AccountsCopy[] = this.accountGlobals.getGlobalAccountBackupList(accountId)
-          if (globalBackupList != null) {
-            globalBackupList.push(backupObj) // sort and cleanup later
-            if (logFlags.verbose && this.extendedRepairLogging) this.mainLogger.debug(`_commitAccountCopies added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
-          } else {
-            if (logFlags.error) this.mainLogger.error(`_commitAccountCopies no global backup list found for accountId:${utils.makeShortHash(accountId)}`)
-          }
+          // GLOBAL CLEANUP Depricated this code.  it was for maintaining global account history that is not needed now.
+          // let globalBackupList: Shardus.AccountsCopy[] = this.accountGlobals.getGlobalAccountBackupList(accountId)
+          // if (globalBackupList != null) {
+          //   globalBackupList.push(backupObj) // sort and cleanup later
+          //   if (logFlags.verbose && this.extendedRepairLogging) this.mainLogger.debug(`_commitAccountCopies added account to global backups count: ${globalBackupList.length} ${timestamp} cycle computed:${cycleNumber} accountId:${utils.makeShortHash(accountId)}`)
+          // } else {
+          //   if (logFlags.error) this.mainLogger.error(`_commitAccountCopies no global backup list found for accountId:${utils.makeShortHash(accountId)}`)
+          // }
         }
         //Saves the last copy per given cycle! this way when you query cycle-1 you get the right data.
         await this.storage.createOrReplaceAccountCopy(backupObj)
@@ -2385,10 +2371,10 @@ class StateManager {
       }
     }
 
-    // sort and clean up our global account backups:
-    if (oldestCycleTimestamp > 0) {
-      this.accountGlobals.sortAndMaintainBackups(oldestCycleTimestamp)
-    }
+    // GLOBAL CLEANUP depricated -- sort and clean up our global account backups:
+    // if (oldestCycleTimestamp > 0) {
+    //   this.accountGlobals.sortAndMaintainBackups(oldestCycleTimestamp)
+    // }
 
     if (logFlags.debug) this.mainLogger.debug(`Clearing out old data Cleared: ${removedrepairTrackingByCycleById} ${removedallPartitionResponsesByCycleByPartition} ${removedourPartitionResultsByCycle} ${removedshardValuesByCycle} ${removedtxByCycleByPartition} ${removedrecentPartitionObjectsByCycleByHash} ${removedrepairUpdateDataByCycle} ${removedpartitionObjectsByCycle} ${removepartitionReceiptsByCycleCounter} ${removeourPartitionReceiptsByCycleCounter} archQ:${archivedEntriesRemoved}`)
 

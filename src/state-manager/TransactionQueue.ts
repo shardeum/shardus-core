@@ -813,16 +813,13 @@ class TransactionQueue {
         // Look at our keys and log which are known global accounts.  Set global accounts for keys if this is a globalModification TX
         for (let key of txQueueEntry.uniqueKeys) {
           if (globalModification === true) {
-            // TODO: globalaccounts
-            if (this.stateManager.accountGlobals.globalAccountMap.has(key)) {
+            if (this.stateManager.accountGlobals.isGlobalAccount(key)) {
               if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - has account:${utils.stringifyReduce(key)}`)
-              // indicate that we will have global data in this transaction!
-              // I think we do not need to test that here afterall.
             } else {
               //this makes the code aware that this key is for a global account.
               //is setting this here too soon?
               //it should be that p2p has already checked the receipt before calling shardus.push with global=true
-              this.stateManager.accountGlobals.globalAccountMap.set(key, null)
+              this.stateManager.accountGlobals.setGlobalAccount(key)
               if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', `routeAndQueueAcceptedTransaction - set account:${utils.stringifyReduce(key)}`)
             }
           }
@@ -1621,7 +1618,7 @@ class TransactionQueue {
 
       let isGlobalKey = false
       //intercept that we have this data rather than requesting it.
-      if (this.stateManager.accountGlobals.globalAccountMap.has(key)) {
+      if (this.stateManager.accountGlobals.isGlobalAccount(key)) {
         hasKey = true
         isGlobalKey = true
         if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', `tellCorrespondingNodes - has`)
