@@ -5,15 +5,15 @@ import { profilerInstance, NodeLoad } from '../utils/profiler'
 import * as Context from '../p2p/Context'
 
 interface LoadDetection {
-  highThreshold: number
-  lowThreshold: number
-  desiredTxTime: number
-  queueLimit: number
+  highThreshold: number /** if load > highThreshold, then scale up request */
+  lowThreshold: number  /** if load < lowThreshold, then scale down request */
+  desiredTxTime: number /** max desired average time for the age of a TX.  */
+  queueLimit: number    /** max desired TXs in queue. note TXs must spend a minimum 6 seconds in the before they can process*/
   statistics: Statistics
-  load: number
-  nodeLoad: NodeLoad
-  scaledTxTimeInQueue: number
-  scaledQueueLength: number
+  load: number /** load is what matters for scale up or down. it is the max of scaledTimeInQueue and scaledQueueLength. */
+  nodeLoad: NodeLoad /** this nodes perf related load. does not determine scale up/down, but can cause rate-limiting */
+  scaledTxTimeInQueue: number /** 0-1 value on how close to desiredTxTime this nodes is (set to 0 if scaledQueueLength < lowThreshold) */
+  scaledQueueLength: number /** 0-1 value on how close to queueLimit this nodes is */
   dbg: boolean
 }
 let lastMeasuredTimestamp = 0
@@ -88,12 +88,12 @@ class LoadDetection extends EventEmitter {
       // }
 
       //need 20 samples in the queue before we start worrying about them being there too long
-      //if(queueLength < 20){
-      if(scaledQueueLength < this.lowThreshold){
+      if(queueLength < 20){
+      //if(scaledQueueLength < (this.lowThreshold)){ //tried to get fancy, but going back to 20 as a constant.
         if(scaledTxTimeInQueue > this.highThreshold){
           nestedCountersInstance.countEvent(
             'loadRelated',
-            `scaled time fix`
+            `scaledTxTimeInQueue clamped due to low scaledQueueLength`
           )
         }
         scaledTxTimeInQueue = 0
@@ -107,13 +107,13 @@ class LoadDetection extends EventEmitter {
         if (dutyCycleLoad.duty > 0.4) {
           nestedCountersInstance.countEvent(
             'loadRelated',
-            'highLoad-dutyCycle 0.4'
+            'note-dutyCycle 0.4'
           )
         }
         if (dutyCycleLoad.duty > 0.6) {
           nestedCountersInstance.countEvent(
             'loadRelated',
-            `highLoad-dutyCycle 0.6`
+            `note-dutyCycle 0.6`
           )
         }
         this.nodeLoad = {
@@ -128,13 +128,13 @@ class LoadDetection extends EventEmitter {
       if(scaledQueueLength > this.highThreshold){
         nestedCountersInstance.countEvent(
           'loadRelated',
-          'scaledQueueLength past highThreshold'
+          'highThreshold-scaledQueueLength'
         )
       }
       if(scaledTxTimeInQueue > this.highThreshold){
         nestedCountersInstance.countEvent(
           'loadRelated',
-          'scaledTxTimeInQueue past highThreshold'
+          'highThreshold-scaledTxTimeInQueue'
         )
       }
     }

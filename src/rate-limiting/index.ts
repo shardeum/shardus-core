@@ -33,7 +33,7 @@ class RateLimiting {
       if (loads[key] < this.loadLimit[key]) continue
       let throttle = this.calculateThrottlePropotion(loads[key], this.loadLimit[key])
 
-      nestedCountersInstance.countEvent('loadRelated',`limit reached: ${key} > ${this.loadLimit[key]}`)  
+      nestedCountersInstance.countEvent('loadRelated',`ratelimit reached: ${key} > ${this.loadLimit[key]}`)  
       if (throttle > maxThrottle) {
         maxThrottle = throttle
         loadType = key
@@ -41,7 +41,7 @@ class RateLimiting {
     }
 
     if(loadType){
-      nestedCountersInstance.countEvent('loadRelated',`winning load factor: ${loadType}`)  
+      nestedCountersInstance.countEvent('loadRelated',`ratelimit winning load factor: ${loadType}`)  
     }
 
     return {
