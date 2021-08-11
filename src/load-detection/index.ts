@@ -87,11 +87,9 @@ class LoadDetection extends EventEmitter {
       //   nestedCountersInstance.countEvent('loadRelated',`highLoad-scaledQueueLength ${this.highThreshold}`)
       // }
 
-      
-
       //need 20 samples in the queue before we start worrying about them being there too long
-      if(queueLength < 20){
-
+      //if(queueLength < 20){
+      if(scaledQueueLength < this.lowThreshold){
         if(scaledTxTimeInQueue > this.highThreshold){
           nestedCountersInstance.countEvent(
             'loadRelated',
@@ -141,8 +139,14 @@ class LoadDetection extends EventEmitter {
       }
     }
 
-    if (load > this.highThreshold) this.emit('highLoad')
-    if (load < this.lowThreshold) this.emit('lowLoad')
+    //If our max load is higher than the threshold send highLoad event that will create scale up gossip
+    if (load > this.highThreshold){
+      this.emit('highLoad')
+    } 
+    //If our max load is lower than threshold send a scale down message.
+    if (load < this.lowThreshold){
+      this.emit('lowLoad')
+    } 
     this.load = load
   }
 

@@ -17,6 +17,7 @@ let p2pLogger: Logger
 export let scalingRequested: boolean
 export let requestedScalingType: string
 export let approvedScalingType: string
+export let lastScalingType: string
 
 export let scalingRequestsCollector: Map<
   P2P.CycleAutoScaleTypes.ScaleRequest['nodeId'],
@@ -99,12 +100,15 @@ function createScaleRequest(scaleType) {
 }
 
 function _requestNetworkScaling(upOrDown) {
+  //scalingRequested makes sure we only request scaling on our own once per cycle
   if (!Self.isActive || scalingRequested) return
   const signedRequest = createScaleRequest(upOrDown)
   // await _waitUntilEndOfCycle()
   addExtScalingRequest(signedRequest)
   Comms.sendGossip('scaling', signedRequest, '', null, NodeList.byIdOrder, true)
+
   scalingRequested = true
+  requestedScalingType = signedRequest.upOrDown //only set this when our node requests scaling
 }
 
 export function requestNetworkUpsize() {
@@ -202,26 +206,35 @@ function _checkScaling() {
   // Keep a flag if we have changed our metadata.scaling at all
   let changed = false
 
+  lastScalingType = approvedScalingType
   if (approvedScalingType === P2P.CycleAutoScaleTypes.ScaleType.UP) {
     warn('Already set to scale up this cycle. No need to scale up anymore.')
     return
   }
+  if (approvedScalingType === P2P.CycleAutoScaleTypes.ScaleType.DOWN) {
+    warn('Already set to scale down this cycle. No need to scale down anymore.')
+    return
+  }
 
-  // Check up first
-  if (getScaleUpRequests().length >= config.p2p.scaleReqsNeeded) {
+ 
+  let requiredVotes = Math.max(config.p2p.minScaleReqsNeeded, config.p2p.scaleConsensusRequired * NodeList.activeByIdOrder.length )
+
+  // Check up first, but must have more votes than down votes.
+  if (getScaleUpRequests().length >= requiredVotes &&
+      getScaleUpRequests().length >= getScaleDownRequests().length) {
     approvedScalingType = P2P.CycleAutoScaleTypes.ScaleType.UP
     changed = true
   }
 
   // If we haven't approved an scale type, check if we should scale down
   if (!changed) {
-    if (approvedScalingType === P2P.CycleAutoScaleTypes.ScaleType.DOWN) {
-      warn(
-        'Already set to scale down for this cycle. No need to scale down anymore.'
-      )
-      return
-    }
-    if (getScaleDownRequests().length >= config.p2p.scaleReqsNeeded) {
+    // if (approvedScalingType === P2P.CycleAutoScaleTypes.ScaleType.DOWN) {
+    //   warn(
+    //     'Already set to scale down for this cycle. No need to scale down anymore.'
+    //   )
+    //   return
+    // }
+    if (getScaleDownRequests().length >= requiredVotes) {
       approvedScalingType = P2P.CycleAutoScaleTypes.ScaleType.DOWN
       changed = true
     } else {
@@ -230,6 +243,7 @@ function _checkScaling() {
     }
   }
 
+  lastScalingType = approvedScalingType
   // At this point, we have changed our scaling type flag (approvedScalingType)
   let newDesired
   switch (approvedScalingType) {
@@ -284,6 +298,8 @@ export function validateRecordTypes(rec: P2P.CycleAutoScaleTypes.Record): string
 }
 
 export function updateRecord(txs: P2P.CycleAutoScaleTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord) {
+  //just in time scaling vote count.
+  _checkScaling()
   record.desired = getDesiredCount()
   reset()
 }
@@ -314,37 +330,42 @@ function getScaleDownRequests() {
 }
 
 function _addToScalingRequests(scalingRequest) {
+
   switch (scalingRequest.scale) {
     case P2P.CycleAutoScaleTypes.ScaleType.UP:
-      if (requestedScalingType === P2P.CycleAutoScaleTypes.ScaleType.DOWN) {
-        warn('Already scaling down this cycle. Cannot add scaling up request.')
-        return false
-      }
+      // This was blocking other votes from comming in.. need to check this in _requestNetworkScaling
+      // if (requestedScalingType === P2P.CycleAutoScaleTypes.ScaleType.DOWN) {
+      //   warn('Already scaling down this cycle. Cannot add scaling up request.')
+      //   return false
+      // }
 
       // Check if we have exceeded the limit of scaling requests
       if (getScaleUpRequests().length >= config.p2p.maxScaleReqs) {
         warn('Max scale up requests already exceeded. Cannot add request.')
-        return false
+        return true // return true because this should not short circuit gossip
       }
       scalingRequestsCollector.set(scalingRequest.nodeId, scalingRequest)
-      requestedScalingType = P2P.CycleAutoScaleTypes.ScaleType.UP
+      // requestedScalingType = P2P.CycleAutoScaleTypes.ScaleType.UP //this was locking out votes for scale down
       // console.log(`Added scale request in cycle ${CycleCreator.currentCycle}, quarter ${CycleCreator.currentQuarter}`, requestedScalingType, scalingRequest)
-      _checkScaling()
+      
+      //_checkScaling() //Wait till later to calculate this.  Not for perf reasons, but to get the max possible votes considered
       return true
     case P2P.CycleAutoScaleTypes.ScaleType.DOWN:
+      // This was blocking other votes from comming in.. need to check this in _requestNetworkScaling
       // Check if we are already voting scale up, don't add in that case
-      if (requestedScalingType === P2P.CycleAutoScaleTypes.ScaleType.UP) {
-        warn('Already scaling up this cycle. Cannot add scaling down request.')
-        return false
-      }
+      // if (requestedScalingType === P2P.CycleAutoScaleTypes.ScaleType.UP) {
+      //   warn('Already scaling up this cycle. Cannot add scaling down request.')
+      //   return false
+      // }
       // Check if we have exceeded the limit of scaling requests
-      if (getScaleUpRequests().length >= config.p2p.maxScaleReqs) {
+      if (getScaleDownRequests().length >= config.p2p.maxScaleReqs) {
         warn('Max scale down requests already exceeded. Cannot add request.')
-        return false
+        return true // return true because this should not short circuit gossip
       }
       scalingRequestsCollector.set(scalingRequest.nodeId, scalingRequest)
-      requestedScalingType = P2P.CycleAutoScaleTypes.ScaleType.DOWN
-      _checkScaling()
+      // requestedScalingType = P2P.CycleAutoScaleTypes.ScaleType.DOWN //this was locking out votes for scale up
+      
+      //_checkScaling() //Wait till later to calculate this.  Not for perf reasons, but to get the max possible votes considered
       return true
     default:
       warn(

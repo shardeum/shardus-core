@@ -45,8 +45,9 @@
     "maxSyncingPerCycle": 5,
     "maxRotatedPerCycle": 1,
     "maxPercentOfDelta": 40,
-    "scaleReqsNeeded": 5,
-    "maxScaleReqs": 10,
+    "minScaleReqsNeeded": 5,
+    "maxScaleReqs": 100,
+    "scaleConsensusRequired": 0.25,
     "amountToGrow": 1,
     "amountToShrink": 1,
     "startInWitnessMode": false

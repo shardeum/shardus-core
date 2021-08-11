@@ -4,7 +4,7 @@ import Logger, {logFlags} from '../logger'
 import { ipInfo } from '../network'
 import { config, crypto } from '../p2p/Context'
 import * as Context from '../p2p/Context'
-import { getDesiredCount } from '../p2p/CycleAutoScale'
+import { getDesiredCount, lastScalingType, requestedScalingType } from '../p2p/CycleAutoScale'
 import * as CycleChain from '../p2p/CycleChain'
 import * as Self from '../p2p/Self'
 import * as NodeList from '../p2p/NodeList'
@@ -242,6 +242,8 @@ class Reporter {
     const cycleCounter = CycleChain.newest.counter
     const nodelistHash = crypto.hash(NodeList.byJoinOrder)
     const desiredNodes = getDesiredCount()
+    const lastScalingTypeRequested = requestedScalingType
+    const lastScalingTypeWinner = lastScalingType
     const txInjected = this.statisticsReport.txInjected
     const txApplied = this.statisticsReport.txApplied
     const txRejected = this.statisticsReport.txRejected
@@ -299,6 +301,8 @@ class Reporter {
         cycleCounter,
         nodelistHash,
         desiredNodes,
+        lastScalingTypeWinner, // "up" "down" or null.  last scaling action decided by this node
+        lastScalingTypeRequested, // "up" "down" or null.  last scaling action decided by this node
         txInjected,
         txApplied,
         txRejected,

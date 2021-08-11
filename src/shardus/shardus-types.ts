@@ -547,10 +547,15 @@ export interface ShardusConfiguration {
 
     /** The maxPercentOfDelta parameter is an Integer specifying the percent out of 100 that additional nodes can be accepted to the network. */
     maxPercentOfDelta?: number
-    /** The scaleReqsNeeded parameter is an Integer specyifying the number of internal scaling requests shardus needs to receive before scaling up or down the number of desired nodes in the network. */
-    scaleReqsNeeded?: number
+    /** The minScaleReqsNeeded parameter is an Integer specyifying the number of internal scaling requests shardus needs to receive before scaling up or down the number of desired nodes in the network. 
+     *  This is just the minimum votes needed, scaleConsensusRequired is a 0-1 fraction of num nodes required.
+     *  The votes needed is  Math.Max(minScaleReqsNeeded,  numNodes * scaleConsensusRequired )
+    */
+    minScaleReqsNeeded?: number
     /** The maxScaleReqs parameter is an Integer specifying the maximum number of scaling requests the network will process before scaling up or down. */
     maxScaleReqs?: number
+    /** What fraction 0-1 of numNodes is required for a scale up or down vote */
+    scaleConsensusRequired?: number
     /** The amountToGrow parameter is an Integer specifying the amount of nodes to ADD to the number of desired nodes the network wants. */
     amountToGrow?: number
     /** The amountToShrink parameter is an Integer specifying the amount of nodes to REMOVE from the number of desired nodes the network wants. */
