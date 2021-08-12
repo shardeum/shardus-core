@@ -409,6 +409,7 @@ class Shardus extends EventEmitter {
             this.loadDetection ? this.loadDetection.getCurrentLoad() : 0,
         },
         timers: ['txTimeInQueue'],
+        manualStats: ['netInternalDuty', 'netExternalDuty' ],
       },
       this
     )

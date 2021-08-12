@@ -11,6 +11,7 @@ interface Statistics {
   counterDefs: any[]
   watcherDefs: any
   timerDefs: { [name: string]: TimerRing }
+  manualStatDefs: any[]
   interval: NodeJS.Timeout
   snapshotWriteFns: any[]
   stream: Readable
@@ -18,6 +19,7 @@ interface Statistics {
   counters: any
   watchers: any
   timers: any
+  manualStats: { [name: string]: ManualRing }
 }
 
 class Statistics extends EventEmitter {
@@ -28,10 +30,12 @@ class Statistics extends EventEmitter {
       counters = [],
       watchers = {},
       timers = [],
+      manualStats = [],
     }: {
       counters: string[]
       watchers: any
       timers: any
+      manualStats: string[]
     },
     context
   ) {
@@ -42,6 +46,7 @@ class Statistics extends EventEmitter {
     this.counterDefs = counters
     this.watcherDefs = watchers
     this.timerDefs = timers
+    this.manualStatDefs = manualStats
     this.initialize()
 
     this.interval = null
@@ -61,6 +66,7 @@ class Statistics extends EventEmitter {
     this.counters = this._initializeCounters(this.counterDefs)
     this.watchers = this._initializeWatchers(this.watcherDefs, this.context)
     this.timers = this._initializeTimers(this.timerDefs)
+    this.manualStats = this._initializeManualStats(this.manualStatDefs)
   }
 
   getStream() {
@@ -96,6 +102,13 @@ class Statistics extends EventEmitter {
     if (!counter) throw new Error(`Counter '${counterName}' is undefined.`)
     counter.increment()
     nestedCountersInstance.countEvent('statistics', counterName)
+  }
+
+  setManualStat(manualStatName, value: number) {
+    const ring = this.manualStats[manualStatName]
+    if (!ring) throw new Error(`manualStat '${manualStatName}' is undefined.`)
+    ring.manualSetValue(value)
+    //nestedCountersInstance.countEvent('statistics', manualStatName)
   }
 
   // Returns the current count of the given CounterRing
@@ -136,7 +149,7 @@ class Statistics extends EventEmitter {
   // Returns the current average of all elements in the given WatcherRing, CounterRing, or TimerRing
   getAverage(name) {
     const ringHolder =
-      this.counters[name] || this.watchers[name] || this.timers[name]
+      this.counters[name] || this.watchers[name] || this.timers[name] || this.manualStats[name]
     if (!ringHolder.ring) throw new Error(`Ring holder '${name}' is undefined.`)
     return ringHolder.ring.average()
   }
@@ -172,6 +185,14 @@ class Statistics extends EventEmitter {
       timers[name] = new TimerRing(60)
     }
     return timers
+  }
+
+  _initializeManualStats(counterDefs = []) {
+    const manualStats = {}
+    for (const name of counterDefs) {
+      manualStats[name] = new ManualRing(10) //should it be a config
+    }
+    return manualStats
   }
 
   _takeSnapshot() {
@@ -321,6 +342,23 @@ class TimerRing {
     this.ring.save(median)
   }
 }
+
+interface ManualRing {
+
+  ring: Ring
+}
+
+class ManualRing {
+  constructor(length) {
+    this.ring = new Ring(length)
+  }
+  manualSetValue(value){
+    this.ring.save(value)
+  }
+  snapshot() {
+  }
+}
+
 
 /**
  * Check for a variable that is not undefined or null

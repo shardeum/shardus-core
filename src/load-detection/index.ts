@@ -1,4 +1,5 @@
 import Statistics from '../statistics'
+// import { Ring } from '../statistics'
 import { EventEmitter } from 'events'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance, NodeLoad } from '../utils/profiler'
@@ -104,26 +105,38 @@ class LoadDetection extends EventEmitter {
 
       if (profilerInstance != null) {
         let dutyCycleLoad = profilerInstance.getTotalBusyInternal()
-        if (dutyCycleLoad.duty > 0.4) {
+        if (dutyCycleLoad.duty > 0.8) {
           nestedCountersInstance.countEvent(
             'loadRelated',
-            'note-dutyCycle 0.4'
+            `note-dutyCycle 0.8`
           )
         }
-        if (dutyCycleLoad.duty > 0.6) {
+        else if (dutyCycleLoad.duty > 0.6) {
           nestedCountersInstance.countEvent(
             'loadRelated',
             `note-dutyCycle 0.6`
           )
         }
+        else if (dutyCycleLoad.duty > 0.4) {
+          nestedCountersInstance.countEvent(
+            'loadRelated',
+            'note-dutyCycle 0.4'
+          )
+        }
+
+        this.statistics.setManualStat('netInternalDuty', dutyCycleLoad.netInternlDuty)
+        this.statistics.setManualStat('netExternalDuty', dutyCycleLoad.netInternlDuty)
+
+        let internalDutyAvg = this.statistics.getAverage('netInternalDuty')
+        let externalDutyAvg = this.statistics.getAverage('netExternalDuty')
+      
         this.nodeLoad = {
-          internal: dutyCycleLoad.netInternlDuty,
-          external: dutyCycleLoad.netExternlDuty,
+          internal: internalDutyAvg, //dutyCycleLoad.netInternlDuty,
+          external: externalDutyAvg, //dutyCycleLoad.netExternlDuty,
         }
       }
 
       load = Math.max(scaledTxTimeInQueue, scaledQueueLength)
-
 
       if(scaledQueueLength > this.highThreshold){
         nestedCountersInstance.countEvent(
