@@ -46,7 +46,7 @@
     "maxRotatedPerCycle": 1,
     "maxPercentOfDelta": 40,
     "minScaleReqsNeeded": 5,
-    "maxScaleReqs": 100,
+    "maxScaleReqs": 200,
     "scaleConsensusRequired": 0.25,
     "amountToGrow": 1,
     "amountToShrink": 1,

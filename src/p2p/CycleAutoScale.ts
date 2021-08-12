@@ -76,7 +76,7 @@ export function getDesiredCount(): number {
   return desiredCount
 }
 
-function createScaleRequest(scaleType) {
+function createScaleRequest(scaleType) : P2P.CycleAutoScaleTypes.ScaleRequest {
   const request: P2P.CycleAutoScaleTypes.ScaleRequest = {
     nodeId: Self.id,
     timestamp: Date.now(),
@@ -126,12 +126,12 @@ export function requestNetworkDownsize() {
   _requestNetworkScaling(P2P.CycleAutoScaleTypes.ScaleType.DOWN)
 }
 
-function addExtScalingRequest(scalingRequest) {
+function addExtScalingRequest(scalingRequest) : boolean {
   const added = _addScalingRequest(scalingRequest)
   return added
 }
 
-function validateScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedScaleRequest) {
+function validateScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedScaleRequest) : boolean {
   // Check existence of fields
   if (
     !scalingRequest.nodeId ||
@@ -215,12 +215,14 @@ function _checkScaling() {
     return
   }
 
- 
   let requiredVotes = Math.max(config.p2p.minScaleReqsNeeded, config.p2p.scaleConsensusRequired * NodeList.activeByIdOrder.length )
 
+  let scaleUpRequests = getScaleUpRequests()
+  let scaleDownRequests = getScaleDownRequests()
+
   // Check up first, but must have more votes than down votes.
-  if (getScaleUpRequests().length >= requiredVotes &&
-      getScaleUpRequests().length >= getScaleDownRequests().length) {
+  if (scaleUpRequests.length >= requiredVotes &&
+    scaleUpRequests.length >= scaleDownRequests.length) {
     approvedScalingType = P2P.CycleAutoScaleTypes.ScaleType.UP
     changed = true
   }
@@ -233,7 +235,7 @@ function _checkScaling() {
     //   )
     //   return
     // }
-    if (getScaleDownRequests().length >= requiredVotes) {
+    if (scaleDownRequests.length >= requiredVotes) {
       approvedScalingType = P2P.CycleAutoScaleTypes.ScaleType.DOWN
       changed = true
     } else {
@@ -312,7 +314,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   }
 }
 
-function getScaleUpRequests() {
+function getScaleUpRequests() : P2P.CycleAutoScaleTypes.SignedScaleRequest[] {
   let requests = []
   for (let [nodeId, request] of scalingRequestsCollector) {
     if (request.scale === P2P.CycleAutoScaleTypes.ScaleType.UP) requests.push(request)
@@ -320,7 +322,7 @@ function getScaleUpRequests() {
   return requests
 }
 
-function getScaleDownRequests() {
+function getScaleDownRequests() : P2P.CycleAutoScaleTypes.SignedScaleRequest[] {
   let requests = []
   for (let [nodeId, request] of scalingRequestsCollector) {
     if (request.scale === P2P.CycleAutoScaleTypes.ScaleType.DOWN) requests.push(request)
@@ -328,7 +330,7 @@ function getScaleDownRequests() {
   return requests
 }
 
-function _addToScalingRequests(scalingRequest) {
+function _addToScalingRequests(scalingRequest) : boolean {
 
   switch (scalingRequest.scale) {
     case P2P.CycleAutoScaleTypes.ScaleType.UP:
@@ -339,7 +341,7 @@ function _addToScalingRequests(scalingRequest) {
       // }
 
       // Check if we have exceeded the limit of scaling requests
-      if (getScaleUpRequests().length >= config.p2p.maxScaleReqs) {
+      if (scalingRequestsCollector.size >= config.p2p.maxScaleReqs) {
         warn('Max scale up requests already exceeded. Cannot add request.')
         return true // return true because this should not short circuit gossip
       }
@@ -357,7 +359,7 @@ function _addToScalingRequests(scalingRequest) {
       //   return false
       // }
       // Check if we have exceeded the limit of scaling requests
-      if (getScaleDownRequests().length >= config.p2p.maxScaleReqs) {
+      if (scalingRequestsCollector.size >= config.p2p.maxScaleReqs) {
         warn('Max scale down requests already exceeded. Cannot add request.')
         return true // return true because this should not short circuit gossip
       }
@@ -376,12 +378,12 @@ function _addToScalingRequests(scalingRequest) {
   }
 }
 
-function _addScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedScaleRequest) {
+function _addScalingRequest(scalingRequest: P2P.CycleAutoScaleTypes.SignedScaleRequest) : boolean {
   // Check existence of node
-  if (!scalingRequest.nodeId) return
+  if (!scalingRequest.nodeId) return false
 
   // Check scaling seen for this node
-  if (scalingRequestsCollector.has(scalingRequest.nodeId)) return
+  if (scalingRequestsCollector.has(scalingRequest.nodeId)) return false
 
   const valid = validateScalingRequest(scalingRequest)
   if (!valid) return false
