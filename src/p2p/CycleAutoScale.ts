@@ -106,9 +106,8 @@ function _requestNetworkScaling(upOrDown) {
   // await _waitUntilEndOfCycle()
   addExtScalingRequest(signedRequest)
   Comms.sendGossip('scaling', signedRequest, '', null, NodeList.byIdOrder, true)
-
   scalingRequested = true
-  requestedScalingType = signedRequest.upOrDown //only set this when our node requests scaling
+  requestedScalingType = signedRequest.scale //only set this when our node requests scaling
 }
 
 export function requestNetworkUpsize() {
