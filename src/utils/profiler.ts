@@ -1,5 +1,6 @@
 import * as Context from '../p2p/Context'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { memoryReportingInstance } from '../utils/memoryReporting'
 
 const NS_PER_SEC = 1e9
 
@@ -41,6 +42,34 @@ class Profiler {
       //res.json({result })
 
       res.write(result)
+      res.end()
+    })
+
+    Context.network.registerExternalGet('combined-debug', (req, res) => {
+      // write /perf endpoint
+      let result = this.printAndClearReport(1)
+      res.write(result)
+      res.write(`\n===========================\n`)
+
+      // write /counts endpoint
+      let arrayReport = nestedCountersInstance.arrayitizeAndSort(nestedCountersInstance.eventCounters)
+      res.write(`${Date.now()}\n`)
+      nestedCountersInstance.printArrayReport(arrayReport, res, 0)
+      res.write(`\n===========================\n`)
+
+
+      // write /memory endpoint
+      let toMB = 1/1000000
+      let report = process.memoryUsage()
+      res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
+      res.write(`rss: ${(report.rss * toMB).toFixed(2)} MB\n`)
+      res.write(`heapTotal: ${(report.heapTotal * toMB).toFixed(2)} MB\n`)
+      res.write(`heapUsed: ${(report.heapUsed * toMB).toFixed(2)} MB\n`)
+      res.write(`external: ${(report.external * toMB).toFixed(2)} MB\n`)
+      res.write(`arrayBuffers: ${(report.arrayBuffers * toMB).toFixed(2)} MB\n\n\n`)
+      memoryReportingInstance.gatherReport()
+      memoryReportingInstance.reportToStream(memoryReportingInstance.report, res, 0)
+
       res.end()
     })
   }
