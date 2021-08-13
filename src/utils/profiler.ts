@@ -1,7 +1,9 @@
 import * as Context from '../p2p/Context'
+import * as Self from '../p2p/Self'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { memoryReportingInstance } from '../utils/memoryReporting'
 import { sleep } from '../utils/functions/time'
+import { resolveTxt } from 'dns'
 
 const NS_PER_SEC = 1e9
 
@@ -61,19 +63,11 @@ class Profiler {
       res.write(`Results for ${waitTime} sec of sampling...`)
       res.write(`\n===========================\n`)
 
-      // write "perf" results
-      let result = this.printAndClearReport(1)
-      res.write(`\n=> PERF RESULTS\n`)
-      res.write(result)
-      res.write(`\n===========================\n`)
-
-      // write "counts" results
-      let arrayReport = nestedCountersInstance.arrayitizeAndSort(nestedCountersInstance.eventCounters)
-      res.write(`\n=> COUNTS RESULTS\n`)
-      res.write(`${Date.now()}\n`)
-      nestedCountersInstance.printArrayReport(arrayReport, res, 0)
-      res.write(`\n===========================\n`)
-
+      // write nodeId, ip and port
+      res.write(`\n=> NODE DETAIL\n`)
+      res.write(`NODE ID: ${Self.id}\n`)
+      res.write(`IP: ${Self.ip}\n`)
+      res.write(`PORT: ${Self.port}\n`)
 
       // write "memory" results
       let toMB = 1/1000000
@@ -87,6 +81,19 @@ class Profiler {
       res.write(`arrayBuffers: ${(report.arrayBuffers * toMB).toFixed(2)} MB\n\n\n`)
       memoryReportingInstance.gatherReport()
       memoryReportingInstance.reportToStream(memoryReportingInstance.report, res, 0)
+
+      // write "perf" results
+      let result = this.printAndClearReport(1)
+      res.write(`\n=> PERF RESULTS\n`)
+      res.write(result)
+      res.write(`\n===========================\n`)
+
+      // write "counts" results
+      let arrayReport = nestedCountersInstance.arrayitizeAndSort(nestedCountersInstance.eventCounters)
+      res.write(`\n=> COUNTS RESULTS\n`)
+      res.write(`${Date.now()}\n`)
+      nestedCountersInstance.printArrayReport(arrayReport, res, 0)
+      res.write(`\n===========================\n`)
 
       res.end()
     })
