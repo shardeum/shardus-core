@@ -215,6 +215,12 @@ function _checkScaling() {
     return
   }
 
+  // lazy init of desiredCount
+  // if we have a good value in our cycle chane for desired nodes update our desired count.
+  if(CycleChain.newest != null && CycleChain.newest.desired != null){
+    desiredCount = CycleChain.newest.desired
+  }
+
   let requiredVotes = Math.max(config.p2p.minScaleReqsNeeded, config.p2p.scaleConsensusRequired * NodeList.activeByIdOrder.length )
 
   let scaleUpRequests = getScaleUpRequests()
