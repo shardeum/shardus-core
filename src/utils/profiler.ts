@@ -1,6 +1,7 @@
 import * as Context from '../p2p/Context'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { memoryReportingInstance } from '../utils/memoryReporting'
+import { sleep } from '../utils/functions/time'
 
 const NS_PER_SEC = 1e9
 
@@ -45,22 +46,39 @@ class Profiler {
       res.end()
     })
 
-    Context.network.registerExternalGet('combined-debug', (req, res) => {
-      // write /perf endpoint
+    Context.network.registerExternalGet('combined-debug', async (req, res) => {
+      const waitTime = req.query.wait || 60
+
+      // hit "counts-reset" endpoint
+      this.eventCounters = new Map()
+      res.write(`counts reset at ${new Date()}\n`)
+
+      // hit "perf" endpoint to clear perf stats
+      this.printAndClearReport(1)
+
+      // wait X seconds
+      await sleep(waitTime * 1000)
+      res.write(`Results for ${waitTime} sec of sampling...`)
+      res.write(`\n===========================\n`)
+
+      // write "perf" results
       let result = this.printAndClearReport(1)
+      res.write(`\n=> PERF RESULTS\n`)
       res.write(result)
       res.write(`\n===========================\n`)
 
-      // write /counts endpoint
+      // write "counts" results
       let arrayReport = nestedCountersInstance.arrayitizeAndSort(nestedCountersInstance.eventCounters)
+      res.write(`\n=> COUNTS RESULTS\n`)
       res.write(`${Date.now()}\n`)
       nestedCountersInstance.printArrayReport(arrayReport, res, 0)
       res.write(`\n===========================\n`)
 
 
-      // write /memory endpoint
+      // write "memory" results
       let toMB = 1/1000000
       let report = process.memoryUsage()
+      res.write(`\n=> MEMORY RESULTS\n`)
       res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
       res.write(`rss: ${(report.rss * toMB).toFixed(2)} MB\n`)
       res.write(`heapTotal: ${(report.heapTotal * toMB).toFixed(2)} MB\n`)
