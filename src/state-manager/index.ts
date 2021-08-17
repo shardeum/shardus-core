@@ -39,7 +39,7 @@ import TransactionConsenus from './TransactionConsensus'
 import PartitionObjects from './PartitionObjects'
 import Depricated from './Depricated'
 import AccountPatcher from './AccountPatcher'
-import { CycleShardData, PartitionReceipt, FifoLockObjectMap, QueueEntry, AcceptedTx, AccountCopy, GetAccountDataByRangeSmart, WrappedStateArray, AccountHashCache, RequestReceiptForTxReq, RequestReceiptForTxResp, RequestStateForTxReqPost, RequestStateForTxResp, RequestTxResp, AppliedVote, GetAccountDataWithQueueHintsResp, DebugDumpPartitions, DebugDumpRangesCovered, DebugDumpNodesCovered, DebugDumpPartition, DebugDumpPartitionSkip, MainHashResults, SimpleDistanceObject, WrappedResponses, LocalCachedData, AccountFilter, StringBoolObjectMap, AppliedReceipt, ReceiptMapResult } from './state-manager-types'
+import { CycleShardData, PartitionReceipt, FifoLockObjectMap, QueueEntry, AcceptedTx, AccountCopy, GetAccountDataByRangeSmart, WrappedStateArray, AccountHashCache, RequestReceiptForTxReq, RequestReceiptForTxResp, RequestStateForTxReqPost, RequestStateForTxResp, RequestTxResp, AppliedVote, GetAccountDataWithQueueHintsResp, DebugDumpPartitions, DebugDumpRangesCovered, DebugDumpNodesCovered, DebugDumpPartition, DebugDumpPartitionSkip, MainHashResults, SimpleDistanceObject, WrappedResponses, LocalCachedData, AccountFilter, StringBoolObjectMap, AppliedReceipt } from './state-manager-types'
 
 /**
  * WrappedEventEmitter just a default extended WrappedEventEmitter
@@ -2573,15 +2573,15 @@ class StateManager {
     return receipt
   }
 
-  generateReceiptMapResults(lastCycle: Shardus.Cycle): ReceiptMapResult[] {
-    let results: ReceiptMapResult[] = []
+  generateReceiptMapResults(lastCycle: Shardus.Cycle): StateManagerTypes.StateManagerTypes.ReceiptMapResult[] {
+    let results: StateManagerTypes.StateManagerTypes.ReceiptMapResult[] = []
 
     let cycleToSave = lastCycle.counter
 
     //init results per partition
-    let receiptMapByPartition: Map<number, ReceiptMapResult> = new Map()
+    let receiptMapByPartition: Map<number, StateManagerTypes.StateManagerTypes.ReceiptMapResult> = new Map()
     for (let i = 0; i < this.currentCycleShardData.shardGlobals.numPartitions; i++) {
-      let mapResult: ReceiptMapResult = {
+      let mapResult: StateManagerTypes.StateManagerTypes.ReceiptMapResult = {
         cycle: cycleToSave,
         partition: i,
         receiptMap: {},
@@ -2629,7 +2629,7 @@ class StateManager {
         let txIdShort = utils.short(txHash)
         let txResult = utils.short(txResultFullHash)
         if (receiptMapByPartition.has(partition)) {
-          let mapResult: ReceiptMapResult = receiptMapByPartition.get(partition)
+          let mapResult: StateManagerTypes.StateManagerTypes.ReceiptMapResult = receiptMapByPartition.get(partition)
           //create an array if we have not seen this index yet
           if (mapResult.receiptMap[txIdShort] == null) {
             mapResult.receiptMap[txIdShort] = []

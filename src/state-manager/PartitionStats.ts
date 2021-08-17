@@ -10,7 +10,8 @@ import Logger, {logFlags} from '../logger'
 import ShardFunctions from './shardFunctions.js'
 import AccountCache from './AccountCache'
 import StateManager from '.'
-import { SummaryBlob, SummaryBlobCollection, AccountHashCache, QueueEntry, CycleShardData, StatsClump } from './state-manager-types'
+import { AccountHashCache, QueueEntry, CycleShardData } from './state-manager-types'
+import { StateManager as StateManagerTypes } from 'shardus-types'
 import * as Context from '../p2p/Context'
 import * as Wrapper from '../p2p/Wrapper'
 
@@ -29,9 +30,9 @@ class PartitionStats {
   shardLogger: any
   statsLogger: any
 
-  summaryBlobByPartition: Map<number, SummaryBlob>
+  summaryBlobByPartition: Map<number, StateManagerTypes.StateManagerTypes.SummaryBlob>
   summaryPartitionCount: number
-  txSummaryBlobCollections: SummaryBlobCollection[]
+  txSummaryBlobCollections: StateManagerTypes.StateManagerTypes.SummaryBlobCollection[]
   extensiveRangeChecking: boolean // non required range checks that can show additional errors (should not impact flow control)
 
   // add cycle then , never delete one from previous cycle.
@@ -136,7 +137,7 @@ setupHandlers() {
 
 
 
-  getNewSummaryBlob(partition: number): SummaryBlob {
+  getNewSummaryBlob(partition: number): StateManagerTypes.StateManagerTypes.SummaryBlob {
     return { counter: 0, latestCycle: 0, errorNull: 0, partition, opaqueBlob: {} }
   }
 
@@ -146,7 +147,7 @@ setupHandlers() {
     }
   }
 
-  initTXSummaryBlobsForCycle(cycleNumber: number): SummaryBlobCollection {
+  initTXSummaryBlobsForCycle(cycleNumber: number): StateManagerTypes.StateManagerTypes.SummaryBlobCollection {
     let summaryBlobCollection = { cycle: cycleNumber, blobsByPartition: new Map() }
     for (let i = 0; i < this.summaryPartitionCount; i++) {
       summaryBlobCollection.blobsByPartition.set(i, this.getNewSummaryBlob(i))
@@ -155,7 +156,7 @@ setupHandlers() {
     return summaryBlobCollection
   }
 
-  getOrCreateTXSummaryBlobCollectionByCycle(cycle: number): SummaryBlobCollection {
+  getOrCreateTXSummaryBlobCollectionByCycle(cycle: number): StateManagerTypes.StateManagerTypes.SummaryBlobCollection {
     let summaryBlobCollectionToUse = null
     if (cycle < 0) {
       return null
@@ -195,14 +196,14 @@ setupHandlers() {
     return summaryPartition
   }
 
-  getSummaryBlob(address: string): SummaryBlob {
+  getSummaryBlob(address: string): StateManagerTypes.StateManagerTypes.SummaryBlob {
     let partition = this.getSummaryBlobPartition(address)
-    let blob: SummaryBlob = this.summaryBlobByPartition.get(partition)
+    let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.summaryBlobByPartition.get(partition)
     return blob
   }
 
   statsDataSummaryInit(cycle: number, accountData: Shardus.WrappedData) {
-    let blob: SummaryBlob = this.getSummaryBlob(accountData.accountId)
+    let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountData.accountId)
     blob.counter++
 
     // if(this.useSeenAccountMap === true && this.seenCreatedAccounts.has(accountData.accountId)){
@@ -242,7 +243,7 @@ setupHandlers() {
   }
 
   statsDataSummaryInitRaw(cycle: number, accountId: string, accountDataRaw: any) {
-    let blob: SummaryBlob = this.getSummaryBlob(accountId)
+    let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountId)
     blob.counter++
 
     // if(this.useSeenAccountMap === true && this.seenCreatedAccounts.has(accountId)){
@@ -280,7 +281,7 @@ setupHandlers() {
 
   //statsDataSummaryUpdate(accountDataBefore:any, accountDataAfter:Shardus.WrappedData){
   statsDataSummaryUpdate(cycle: number, accountData: Shardus.WrappedResponse) {
-    let blob: SummaryBlob = this.getSummaryBlob(accountData.accountId)
+    let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountData.accountId)
     blob.counter++
     if (accountData.data == null) {
       blob.errorNull += 10000
@@ -334,7 +335,7 @@ setupHandlers() {
   }
 
   statsDataSummaryUpdate2(cycle: number, accountDataBefore: any, accountDataAfter: Shardus.WrappedData) {
-    let blob: SummaryBlob = this.getSummaryBlob(accountDataAfter.accountId)
+    let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountDataAfter.accountId)
     blob.counter++
     if (accountDataAfter.data == null) {
       blob.errorNull += 100000000
@@ -393,7 +394,7 @@ setupHandlers() {
     let summaryBlobCollection = this.getOrCreateTXSummaryBlobCollectionByCycle(queueEntry.cycleToRecordOn)
 
     if (summaryBlobCollection != null) {
-      let blob: SummaryBlob = summaryBlobCollection.blobsByPartition.get(partition)
+      let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = summaryBlobCollection.blobsByPartition.get(partition)
       if (cycle > blob.latestCycle) {
         blob.latestCycle = cycle
       }
@@ -482,9 +483,9 @@ setupHandlers() {
     return statsDump
   }
 
-  getCoveredStatsPartitions(cycleShardData: CycleShardData, excludeEmpty: boolean = true): StatsClump {
+  getCoveredStatsPartitions(cycleShardData: CycleShardData, excludeEmpty: boolean = true): StateManagerTypes.StateManagerTypes.StatsClump {
     let cycle = cycleShardData.cycleNumber
-    let statsDump: StatsClump = { error: false, cycle, dataStats: [], txStats: [], covered: [], coveredParititionCount: 0, skippedParitionCount: 0 }
+    let statsDump: StateManagerTypes.StateManagerTypes.StatsClump = { error: false, cycle, dataStats: [], txStats: [], covered: [], coveredParititionCount: 0, skippedParitionCount: 0 }
 
     let coveredParitionCount = 0
     let skippedParitionCount = 0

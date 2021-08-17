@@ -42,10 +42,6 @@ type PartitionAccounts = Map<
   Account[]
 >
 
-export type NetworkStateHash = string
-export type NetworkReceiptHash = string
-export type NetworkSummaryHash = string
-
 type PartitionNum = number
 
 enum offerResponse {
@@ -70,7 +66,7 @@ export function calculatePartitionBlock (shard) {
 
 export function createNetworkHash (
   hashes: Map<number, string>
-): NetworkStateHash {
+): P2P.SnapshotTypes.NetworkStateHash {
   let hashArray = []
   for (const [, hash] of hashes) {
     hashArray.push(hash)
@@ -157,7 +153,7 @@ export function updateSummaryHashesByCycleMap (
 export async function savePartitionAndNetworkHashes (
   shard: CycleShardData,
   partitionHashes: hashMap,
-  networkHash: NetworkStateHash
+  networkHash: P2P.SnapshotTypes.NetworkStateHash
 ) {
   for (const [partitionId, hash] of partitionHashes) {
     await Context.storage.addPartitionHash({
@@ -175,7 +171,7 @@ export async function savePartitionAndNetworkHashes (
 export async function saveReceiptAndNetworkHashes (
   shard: CycleShardData,
   receiptMapHashes: hashMap,
-  networkReceiptHash: NetworkReceiptHash
+  networkReceiptHash: P2P.SnapshotTypes.NetworkReceiptHash
 ) {
   for (const [partitionId, hash] of receiptMapHashes) {
     await Context.storage.addReceiptMapHash({

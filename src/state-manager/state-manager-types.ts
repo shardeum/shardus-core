@@ -12,7 +12,6 @@
 //imports up top break the export, boo.
 import * as Shardus from '../shardus/shardus-types'
 import { StateManager } from 'shardus-types'
-import { BasicAddressRange, ShardGlobals } from 'shardus-types/build/src/state-manager/shardFunctionTypes';
 export { App, Cycle, Sign, AcceptedTx, ApplyResponse } from '../shardus/shardus-types'
 
 export type WrappedStateArray = Shardus.WrappedData[]
@@ -120,7 +119,7 @@ export type QueueEntry = {
 export type SyncTracker = {
     syncStarted: boolean;
     syncFinished: boolean;
-    range: BasicAddressRange;
+    range: StateManager.shardFunctionTypes.BasicAddressRange;
     cycle: number;
     index: number;
     queueEntries: QueueEntry[];
@@ -134,7 +133,7 @@ export type SyncTracker = {
 
 
 export type CycleShardData = {
-    shardGlobals: ShardGlobals// any // import('./shardFunctionTypes').ShardGlobals;
+    shardGlobals: StateManager.shardFunctionTypes.ShardGlobals// any // import('./shardFunctionTypes').ShardGlobals;
     cycleNumber: number;
     ourNode: Shardus.Node;
     /**
@@ -686,42 +685,42 @@ export type FifoWaitingEntry = { id: number }
 export type FifoLock = { fifoName:string, queueCounter: number, waitingList: FifoWaitingEntry[], lastServed: number, queueLocked: boolean, lockOwner: number }
 export type FifoLockObjectMap = {[lockID:string]:FifoLock}
 
-export type ReceiptMap = {[txId:string] : string[]  }
+// export type ReceiptMap = {[txId:string] : string[]  }
 
-export type ReceiptMapResult = {
-    cycle:number;
-    partition:number;
-    receiptMap:ReceiptMap;
-    txCount:number
-}
+// export type ReceiptMapResult = {
+//     cycle:number;
+//     partition:number;
+//     receiptMap:ReceiptMap;
+//     txCount:number
+// }
 
-export type OpaqueBlob = any //Shardus is not supposed to know about the details of this, it is up to the dapp to define
+// export type OpaqueBlob = any //Shardus is not supposed to know about the details of this, it is up to the dapp to define
 
-//Shardus wrapper for a summary blob.  Has information that is needed for the reduce algorithm
-export type SummaryBlob = {
-    latestCycle: number; //The highest cycle that was used in this summary.  
-    counter:number; 
-    errorNull:number; 
-    partition:number; 
-    opaqueBlob:OpaqueBlob;
-}
+// //Shardus wrapper for a summary blob.  Has information that is needed for the reduce algorithm
+// export type SummaryBlob = {
+//     latestCycle: number; //The highest cycle that was used in this summary.  
+//     counter:number; 
+//     errorNull:number; 
+//     partition:number; 
+//     opaqueBlob:OpaqueBlob;
+// }
 
-//A collection of blobs that share the same cycle.  For TX summaries
-export type SummaryBlobCollection = {
-    cycle:number; 
-    blobsByPartition:Map<number, SummaryBlob>;
-}
+// //A collection of blobs that share the same cycle.  For TX summaries
+// export type SummaryBlobCollection = {
+//     cycle:number; 
+//     blobsByPartition:Map<number, SummaryBlob>;
+// }
 
-// Stats collected for a cycle
-export type StatsClump = {
-    error:boolean; 
-    cycle:number; 
-    dataStats:SummaryBlob[]; 
-    txStats:SummaryBlob[]; 
-    covered:number[];
-    coveredParititionCount:number;
-    skippedParitionCount:number; 
-}
+// // Stats collected for a cycle
+// export type StatsClump = {
+//     error:boolean; 
+//     cycle:number; 
+//     dataStats:SummaryBlob[]; 
+//     txStats:SummaryBlob[]; 
+//     covered:number[];
+//     coveredParititionCount:number;
+//     skippedParitionCount:number; 
+// }
 
 // cache 
 // export type AccountMemoryCache = {

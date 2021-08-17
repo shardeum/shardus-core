@@ -46,7 +46,7 @@
     "sequelize": "^5.21.7",
     "shardus-crypto-utils": "git+https://gitlab.com/shardus/shardus-crypto-utils.git#semver:^3.0.1",
     "shardus-net": "git+https://gitlab.com/shardus/shardus-net.git#semver:^1.0.1",
-    "shardus-types": "git+https://gitlab.com/shardus/shardus-types.git#semver:^1.0.0",
+    "shardus-types": "git+https://gitlab.com/shardus/shardus-types.git#update-statemanager-types",
     "socket.io": "^2.3.0",
     "sqlite3": "^5.0.0",
     "tar-fs": "^2.1.0",

@@ -1,6 +1,5 @@
 import * as express from 'express'
 import * as log4js from 'log4js'
-import { StateManager } from 'shardus-types'
 import * as http from '../http'
 import { logFlags } from '../logger'
 import * as Active from '../p2p/Active'
@@ -12,8 +11,8 @@ import * as Self from '../p2p/Self'
 import * as Sync from '../p2p/Sync'
 import * as ShardusTypes from '../shardus/shardus-types'
 import ShardFunctions from '../state-manager/shardFunctions'
-import { Cycle, CycleShardData, MainHashResults, ReceiptMapResult, StatsClump } from '../state-manager/state-manager-types'
-import { P2P } from 'shardus-types'
+import { Cycle, CycleShardData, MainHashResults } from '../state-manager/state-manager-types'
+import { P2P, StateManager } from 'shardus-types'
 import * as utils from '../utils'
 import { profilerInstance } from '../utils/profiler'
 import * as partitionGossip from './partition-gossip'
@@ -33,9 +32,9 @@ let receiptHashesByCycle: Map<Cycle['counter'], P2P.SnapshotTypes.ReceiptHashes>
 let summaryHashesByCycle: Map<Cycle['counter'], P2P.SnapshotTypes.SummaryHashes> = new Map()
 const partitionBlockMapByCycle: Map<
   Cycle['counter'],
-  ReceiptMapResult[]
+  StateManager.StateManagerTypes.ReceiptMapResult[]
 > = new Map()
-const statesClumpMapByCycle: Map<Cycle['counter'], StatsClump> = new Map()
+const statesClumpMapByCycle: Map<Cycle['counter'], StateManager.StateManagerTypes.StatsClump> = new Map()
 let safetySyncing = false // to set true when data exchange occurs during safetySync
 
 export const safetyModeVals = {
@@ -159,8 +158,8 @@ export function startSnapshotting() {
     'cycleTxsFinalized',
     async (
       shard: CycleShardData,
-      receiptMapResults: ReceiptMapResult[],
-      statsClump: StatsClump,
+      receiptMapResults: StateManager.StateManagerTypes.ReceiptMapResult[],
+      statsClump: StateManager.StateManagerTypes.StatsClump,
       mainHashResults: MainHashResults
     ) => {
       try {
@@ -170,7 +169,7 @@ export function startSnapshotting() {
         partitionBlockMapByCycle.set(shard.cycleNumber, receiptMapResults)
 
         // store summary blob map for this cycle
-        const statsClumpForThisCycle: StatsClump = statsClump
+        const statsClumpForThisCycle: StateManager.StateManagerTypes.StatsClump = statsClump
         statesClumpMapByCycle.set(shard.cycleNumber, statsClumpForThisCycle)
 
         // create our own partition hashes for that cycle number
