@@ -14,8 +14,7 @@ import { getCycleChain, computeCycleMarker, getNewest } from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import * as CycleParser from './CycleParser'
 import { logFlags } from '../logger'
-import { P2P } from 'shardus-types'
-import { ReceiptMapResult, StatsClump } from '../state-manager/state-manager-types'
+import { P2P, StateManager } from 'shardus-types'
 
 /** STATE */
 
@@ -505,7 +504,7 @@ export function registerRoutes() {
     }
     delete queryRequest.publicKey
     delete queryRequest.tag
-    let data : { [key: number]: ReceiptMapResult[] | StatsClump }
+    let data : { [key: number]: StateManager.StateManagerTypes.ReceiptMapResult[] | StateManager.StateManagerTypes.StatsClump }
     if (queryRequest.type === 'RECEIPT_MAP') {
       data = getReceiptMap(queryRequest.lastData)
     } else if (queryRequest.type === 'SUMMARY_BLOB') {
