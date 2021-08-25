@@ -165,11 +165,12 @@ setupHandlers() {
       let summaryBlobCollection = this.txSummaryBlobCollections[i]
       if (summaryBlobCollection.cycle === cycle) {
         summaryBlobCollectionToUse = summaryBlobCollection
+        break;
       }
     }
     if (summaryBlobCollectionToUse === null) {
       summaryBlobCollectionToUse = this.initTXSummaryBlobsForCycle(cycle)
-      this.txSummaryBlobCollections.push(summaryBlobCollectionToUse)
+      // this.txSummaryBlobCollections.push(summaryBlobCollectionToUse)
     }
     return summaryBlobCollectionToUse
   }

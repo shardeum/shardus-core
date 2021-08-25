@@ -812,11 +812,12 @@ getNonStoredRanges(cycle:number): {low:string,high:string}[] {
 
   //get the min and max non covered area
   let shardValues = this.stateManager.shardValuesByCycle.get(cycle)
-
-  let consensusStartPartition = shardValues.nodeShardData.storedPartitions.partitionStart
-  let consensusEndPartition = shardValues.nodeShardData.storedPartitions.partitionEnd
+  if (shardValues) {
+    let consensusStartPartition = shardValues.nodeShardData.storedPartitions.partitionStart
+    let consensusEndPartition = shardValues.nodeShardData.storedPartitions.partitionEnd
   
-  incompleteRanges = this.getNonParitionRanges(shardValues, consensusStartPartition, consensusEndPartition)
+    incompleteRanges = this.getNonParitionRanges(shardValues, consensusStartPartition, consensusEndPartition)
+  }
 
   return incompleteRanges
 }
