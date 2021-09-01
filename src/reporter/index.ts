@@ -291,11 +291,13 @@ class Reporter {
       this.statistics.getPreviousElement('txTimeInQueue') / 1000 // ms to sec
     const isNodeLost = this.checkIsNodeLost(Self.id)
     const isNodeRefuted = this.checkIsNodeRefuted(Self.id)
+    const isDataSynced = !this.stateManager.accountPatcher.failedLastTrieSync
 
     try {
       await this._sendReport({
         repairsStarted,
         repairsFinished,
+        isDataSynced,
         appState,
         cycleMarker,
         cycleCounter,
@@ -314,15 +316,15 @@ class Reporter {
         globalSync,
         partitions,
         partitionsCovered,
-        currentLoad: {
-          networkLoad: currentNetworkLoad,
-          nodeLoad: currentNodeLoad
+        'currentLoad': {
+          'networkLoad': currentNetworkLoad,
+          'nodeLoad': currentNodeLoad
         },
         queueLength,
         txTimeInQueue,
-        isLost: isNodeLost,
-        isRefuted: isNodeRefuted,
-        shardusVersion: packageJson.version,
+        'isLost': isNodeLost,
+        'isRefuted': isNodeRefuted,
+        'shardusVersion': packageJson.version,
       })
     } catch (e) {
       if (logFlags.error) this.mainLogger.error(
