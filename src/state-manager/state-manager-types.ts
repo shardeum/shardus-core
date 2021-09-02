@@ -946,3 +946,12 @@ export type HashTrieUpdateStats = {
     totalAccountsHashed: number
     totalLeafs: number
   }
+
+
+export type CycleDebugNotes = {
+    repairs: number
+    lateRepairs: number
+    patchedAccounts: number
+    badAccounts: number
+    noRcptRepairs: number
+}

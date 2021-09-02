@@ -43,10 +43,15 @@ class PartitionStats {
 
   accountCache: AccountCache
 
+  invasiveDebugInfo: boolean //inject some data into opaque blobs to improve our debugging (Never use in production)
+
   statemanager_fatal: (key: string, log: string) => void
 
   constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, crypto: Crypto, config: Shardus.ShardusConfiguration, accountCache: AccountCache) {
     
+    if(stateManager == null)
+      return //for debug testing.
+
     this.crypto = crypto
     this.app = app
     this.logger = logger
@@ -73,6 +78,8 @@ class PartitionStats {
 
     this.accountCache = accountCache
 
+    this.invasiveDebugInfo = false
+
     this.initSummaryBlobs()
   }
 
@@ -88,42 +95,64 @@ class PartitionStats {
  */
 
 setupHandlers() {
-  //
+      /**
+     * 
+     * 
+     * Usage: http://<NODE_IP>:<NODE_EXT_PORT>/get-stats-dum?cycle=x
+     */
   Context.network.registerExternalGet('get-stats-dump', (req, res) => {
 
-    let cycle = this.stateManager.currentCycleShardData.cycleNumber - 1
+    let cycle = this.stateManager.currentCycleShardData.cycleNumber - 2
 
+    if(req.query.cycle != null){
+      cycle = Number(req.query.cycle)
+    }
+    
     let cycleShardValues = null
     if (this.stateManager.shardValuesByCycle.has(cycle)) {
       cycleShardValues = this.stateManager.shardValuesByCycle.get(cycle)
     }
 
     let blob = this.dumpLogsForCycle(cycle, false, cycleShardValues)
+    
     res.write(stringify(blob) + '\n')
     res.end()
   })
 
+      /**
+     * 
+     * 
+     * Usage: http://<NODE_IP>:<NODE_EXT_PORT>/get-stats-report-all?raw=<true/fale>
+     */
   Context.network.registerExternalGet('get-stats-report-all', async (req, res) => {
     try {
-      let cycleNumber = this.stateManager.currentCycleShardData.cycleNumber - 1
+
+      let raw = req.query.raw
+
+      let cycleNumber = this.stateManager.currentCycleShardData.cycleNumber - 2
       //wow, why does Context.p2p not work..
-      res.write(`building shard report \n`)
+      res.write(`building shard report c:${cycleNumber} \n`)
       let activeNodes = Wrapper.p2p.state.getNodes()
       let lines = []
       if (activeNodes) {
         for (let node of activeNodes.values()) {
-          let getResp = await this.logger._internalHackGetWithResp(`${node.externalIp}:${node.externalPort}/get-stats-dump`)
+          let getResp = await this.logger._internalHackGetWithResp(`${node.externalIp}:${node.externalPort}/get-stats-dump?cycle=${cycleNumber}`)
           if(getResp.body != null && getResp.body != ''){
             lines.push({raw: getResp.body, file:{owner: `${node.externalIp}:${node.externalPort}`}})
           }
         }
-        {
-          let { allPassed, allPassedMetric2, singleVotePartitions, multiVotePartitions, badPartitions, totalTx } = this.processTxStatsDump(res, this.txStatsTallyFunction, lines)
-          res.write(`TX statsReport${cycleNumber}  : ${allPassed} pass2: ${allPassedMetric2}  single:${singleVotePartitions} multi:${multiVotePartitions} badPartitions:${badPartitions}\n`)
-        }
-        {
-          let { allPassed, allPassedMetric2, singleVotePartitions, multiVotePartitions, badPartitions } = this.processDataStatsDump(res, this.dataStatsTallyFunction, lines)
-          res.write(`DATA statsReport${cycleNumber}  : ${allPassed} pass2: ${allPassedMetric2}  single:${singleVotePartitions} multi:${multiVotePartitions} badPartitions:${badPartitions}\n`)
+        //raw dump or compute?
+        if(raw === 'true'){
+          res.write(JSON.stringify(lines))
+        } else {
+          {
+            let { allPassed, allPassedMetric2, singleVotePartitions, multiVotePartitions, badPartitions, totalTx } = this.processTxStatsDump(res, this.txStatsTallyFunction, lines)
+            res.write(`TX statsReport${cycleNumber}  : ${allPassed} pass2: ${allPassedMetric2}  single:${singleVotePartitions} multi:${multiVotePartitions} badPartitions:${badPartitions}\n`)
+          }
+          {
+            let { allPassed, allPassedMetric2, singleVotePartitions, multiVotePartitions, badPartitions } = this.processDataStatsDump(res, this.dataStatsTallyFunction, lines)
+            res.write(`DATA statsReport${cycleNumber}  : ${allPassed} pass2: ${allPassedMetric2}  single:${singleVotePartitions} multi:${multiVotePartitions} badPartitions:${badPartitions}\n`)
+          }
         }
       }
       //res.write(`this node in sync:${this.failedLastTrieSync} \n`)
@@ -204,6 +233,8 @@ setupHandlers() {
   }
 
   statsDataSummaryInit(cycle: number, accountData: Shardus.WrappedData) {
+    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryInit c:${cycle} accForBin:${utils.makeShortHash(accountData.accountId)}`)
+
     let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountData.accountId)
     blob.counter++
 
@@ -215,7 +246,6 @@ setupHandlers() {
     //     let accountMemData:AccountMemoryCache = {t:accountData.timestamp, h:accountData.stateId}
     //     this.seenCreatedAccounts.set(accountData.accountId, accountMemData)
     // }
-
     
     if (this.accountCache.hasAccount(accountData.accountId)) {
       return
@@ -231,6 +261,9 @@ setupHandlers() {
       blob.latestCycle = cycle
     }
     this.app.dataSummaryInit(blob.opaqueBlob, accountData.data)
+
+    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryInit c:${cycle} accForBin:${utils.makeShortHash(accountData.accountId)}`)
+    if(this.invasiveDebugInfo) this.addDebugToBlob(blob, accountData.accountId)
   }
 
   hasAccountBeenSeenByStats(accountId) {
@@ -244,6 +277,9 @@ setupHandlers() {
   }
 
   statsDataSummaryInitRaw(cycle: number, accountId: string, accountDataRaw: any) {
+    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryInitRaw c:${cycle} accForBin:${utils.makeShortHash(accountId)}`)
+
+
     let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountId)
     blob.counter++
 
@@ -278,10 +314,16 @@ setupHandlers() {
     }
 
     this.app.dataSummaryInit(blob.opaqueBlob, accountDataRaw)
+
+    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryInitRaw c:${cycle} accForBin:${utils.makeShortHash(accountId)}`)
+    if(this.invasiveDebugInfo) this.addDebugToBlob(blob, accountId)
+
   }
 
   //statsDataSummaryUpdate(accountDataBefore:any, accountDataAfter:Shardus.WrappedData){
   statsDataSummaryUpdate(cycle: number, accountData: Shardus.WrappedResponse) {
+    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryInitRaw c:${cycle} accForBin:${utils.makeShortHash(accountData.accountId)}`)
+
     let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountData.accountId)
     blob.counter++
     if (accountData.data == null) {
@@ -333,9 +375,15 @@ setupHandlers() {
       blob.latestCycle = cycle
     }
     this.app.dataSummaryUpdate(blob.opaqueBlob, accountData.prevDataCopy, accountData.data)
+
+    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryUpdate c:${cycle} accForBin:${utils.makeShortHash(accountId)}`)
+    if(this.invasiveDebugInfo) this.addDebugToBlob(blob, accountId)
+
   }
 
   statsDataSummaryUpdate2(cycle: number, accountDataBefore: any, accountDataAfter: Shardus.WrappedData) {
+    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryUpdate2 c:${cycle} accForBin:${utils.makeShortHash(accountDataAfter.accountId)}`)
+
     let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountDataAfter.accountId)
     blob.counter++
     if (accountDataAfter.data == null) {
@@ -388,21 +436,68 @@ setupHandlers() {
     }
 
     this.app.dataSummaryUpdate(blob.opaqueBlob, accountDataBefore, accountDataAfter.data)
+
+
+    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryUpdate2 c:${cycle} accForBin:${utils.makeShortHash(accountDataAfter.accountId)}`)
+    if(this.invasiveDebugInfo) this.addDebugToBlob(blob, accountDataAfter.accountId)
+
   }
 
+
+  addDebugToBlob(blob, accountID){
+    //todo be sure to turn off this setting when not debugging.
+    if(this.invasiveDebugInfo){
+      if(blob.opaqueBlob.dbgData == null){
+        blob.opaqueBlob.dbgData = []
+      }
+      //add unique.. this would be faster with a set, but dont want to have to post process sort the set later!
+      let shortID = utils.makeShortHash(accountID)
+      if(blob.opaqueBlob.dbgData.indexOf(shortID) === -1) {
+        blob.opaqueBlob.dbgData.push(shortID) 
+        blob.opaqueBlob.dbgData.sort()
+      }
+      
+    }    
+  }
+
+
   statsTxSummaryUpdate(cycle: number, queueEntry: QueueEntry) {
-    let partition = this.getSummaryBlobPartition(queueEntry.acceptedTx.id)
+
+    let accountToUseForTXStatBinning = null
+    //this list of uniqueWritableKeys is not sorted and deterministic
+    for(let key of queueEntry.uniqueWritableKeys){
+      accountToUseForTXStatBinning = key
+      break // just use the first for now.. could do something fance
+    }
+    if(accountToUseForTXStatBinning == null){
+      if(this.invasiveDebugInfo) this.mainLogger.debug(`statsTxSummaryUpdate skip(no local writable key) c:${cycle} ${utils.makeShortHash(queueEntry.acceptedTx.id)}`)
+      return
+    }
+
+    let partition = this.getSummaryBlobPartition(accountToUseForTXStatBinning) //very important to not use: queueEntry.acceptedTx.ids
     let summaryBlobCollection = this.getOrCreateTXSummaryBlobCollectionByCycle(queueEntry.cycleToRecordOn)
 
     if (summaryBlobCollection != null) {
       let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = summaryBlobCollection.blobsByPartition.get(partition)
       if (cycle > blob.latestCycle) {
-        blob.latestCycle = cycle
+        blob.latestCycle = cycle //todo condider if we can remove this.  getOrCreateTXSummaryBlobCollectionByCycle should give us the correct blob
       }
       this.app.txSummaryUpdate(blob.opaqueBlob, queueEntry.acceptedTx.data, null) //todo: we need to remove the wrapped state parameter from this (currently passed as null)
       blob.counter++
+
+      //todo be sure to turn off this setting when not debugging.
+      if(this.invasiveDebugInfo){
+        if(blob.opaqueBlob.dbg == null){
+          blob.opaqueBlob.dbg = []
+        }
+        blob.opaqueBlob.dbg.push(utils.makeShortHash(queueEntry.acceptedTx.id)) //queueEntry.acceptedTx.id.slice(0,6))
+        blob.opaqueBlob.dbg.sort()
+      }
+
+      if(this.invasiveDebugInfo) this.mainLogger.debug(`statsTxSummaryUpdate updated c:${cycle} tx: ${utils.makeShortHash(queueEntry.acceptedTx.id)} accForBin:${utils.makeShortHash(accountToUseForTXStatBinning)}`)
+
     } else {
-      if (logFlags.error) this.mainLogger.error(`statsTxSummaryUpdate no collection for ${cycle}`)
+      if (logFlags.error || this.invasiveDebugInfo) this.mainLogger.error(`statsTxSummaryUpdate no collection for c:${cycle}  tx: ${utils.makeShortHash(queueEntry.acceptedTx.id)} accForBin:${utils.makeShortHash(accountToUseForTXStatBinning)}`)
     }
   }
 
@@ -450,7 +545,9 @@ setupHandlers() {
 
 
   dumpLogsForCycle(cycle: number, writeTofile: boolean = true, cycleShardData: CycleShardData = null) {
-    let statsDump = { cycle, dataStats: [], txStats: [], covered: [] }
+    let statsDump = { cycle, dataStats: [], txStats: [], covered: [], cycleDebugNotes:{} }
+
+    statsDump.cycleDebugNotes = this.stateManager.cycleDebugNotes
 
     let covered = null
     if (cycleShardData != null) {
@@ -478,7 +575,7 @@ setupHandlers() {
 
 
     if (writeTofile) {
-      if(logFlags.debug) this.statsLogger.debug(`logs for cycle ${cycle}: ` + utils.stringifyReduce(statsDump))
+      /*if(logFlags.debug)*/ this.statsLogger.debug(`logs for cycle ${cycle}: ` + utils.stringifyReduce(statsDump))
     }
 
     return statsDump
@@ -759,6 +856,20 @@ setupHandlers() {
 
         } else {
           allPassedMetric2 = false
+        }
+      }
+    }
+
+
+    //print non zero issues
+    for (let statsObj of statsBlobs) {
+      if(statsObj.cycleDebugNotes != null){
+        
+        for (const [key, value] of Object.entries(statsObj.cycleDebugNotes)) {
+          if(value >= 1){
+            stream.write(`${statsObj.owner} : ${JSON.stringify(statsObj.cycleDebugNotes)}`)
+            break
+          }
         }
       }
     }

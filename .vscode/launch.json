@@ -143,5 +143,14 @@
                 "<node_internals>/**"
             ]
         },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "statsTest",
+            "program": "${workspaceFolder}\\test\\unit\\state-manager\\statsTest.js",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        },
     ]
 }

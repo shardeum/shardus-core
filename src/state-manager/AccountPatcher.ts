@@ -196,6 +196,12 @@ class AccountPatcher {
         }
         this.hashTrieSyncConsensusByCycle.set(payload.cycle, hashTrieSyncConsensus)
 
+        let shardValues = this.stateManager.shardValuesByCycle.get(payload.cycle)
+        if (shardValues == null) {
+          nestedCountersInstance.countEvent('accountPatcher', `sync_trie_hashes not ready c:${payload.cycle}`)
+          return
+        }
+
         //mark syncing radixes..
         //todo compare to cycle!! only init if from current cycle.
         this.initStoredRadixValues(payload.cycle)
@@ -1797,6 +1803,7 @@ isRadixStored(cycle:number, radix:string){
       nestedCountersInstance.countEvent(`accountPatcher`, `badAccounts c:${cycle} `, results.badAccounts.length)
       nestedCountersInstance.countEvent(`accountPatcher`, `accountHashesChecked c:${cycle}`, results.accountHashesChecked)
 
+      this.stateManager.cycleDebugNotes.badAccounts = results.badAccounts.length //per cycle debug info
       //TODO figure out if the possible repairs will fully repair a given hash for a radix.
       // This could add some security but my concern is that it could create a situation where something unexpected prevents
       // repairing some of the data.
@@ -1869,6 +1876,8 @@ isRadixStored(cycle:number, radix:string){
       nestedCountersInstance.countEvent('accountPatcher', 'writeCombinedAccountDataToBackups', Math.max(0,wrappedDataListFiltered.length - failedHashes.length))
       nestedCountersInstance.countEvent('accountPatcher', `p.repair applied c:${cycle} bad:${results.badAccounts.length} received:${wrappedDataList.length} failedH: ${failedHashes.length} filtered:${utils.stringifyReduce(filterStats)} stats:${utils.stringifyReduce(results.stats)} getAccountStats: ${utils.stringifyReduce(getAccountStats)}`, appliedFixes)
 
+      this.stateManager.cycleDebugNotes.patchedAccounts = appliedFixes //per cycle debug info
+      
       let logLimit = 3000000
       if(logFlags.verbose === false){
         logLimit = 2000

@@ -466,6 +466,12 @@ class TransactionRepair {
       // Set this when data has been repaired.
       queueEntry.repairFinished = true
       this.stateManager.dataRepairsCompleted++ //visible to report
+      this.stateManager.cycleDebugNotes.repairs++ //per cycle debug info
+
+      if(this.stateManager.currentCycleShardData.cycleNumber != queueEntry.cycleToRecordOn){
+        this.stateManager.cycleDebugNotes.lateRepairs++ //per cycle debug info
+      }
+
     } finally {
 
       if(queueEntry.repairFinished === true){
@@ -946,6 +952,11 @@ class TransactionRepair {
       // Set this when data has been repaired.
       //queueEntry.repairFinished = true
       this.stateManager.dataRepairsCompleted++ //visible to report
+      //this.stateManager.cycleDebugNotes.repairs++ //per cycle debug info
+
+      //if(this.stateManager.currentCycleShardData.cycleNumber != queueEntry.cycleToRecordOn){
+        this.stateManager.cycleDebugNotes.noRcptRepairs++ //per cycle debug info
+      //}
 
       return true
     } finally {

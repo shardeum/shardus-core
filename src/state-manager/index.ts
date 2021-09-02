@@ -39,7 +39,7 @@ import TransactionConsenus from './TransactionConsensus'
 import PartitionObjects from './PartitionObjects'
 import Depricated from './Depricated'
 import AccountPatcher from './AccountPatcher'
-import { CycleShardData, PartitionReceipt, FifoLockObjectMap, QueueEntry, AcceptedTx, AccountCopy, GetAccountDataByRangeSmart, WrappedStateArray, AccountHashCache, RequestReceiptForTxReq, RequestReceiptForTxResp, RequestStateForTxReqPost, RequestStateForTxResp, RequestTxResp, AppliedVote, GetAccountDataWithQueueHintsResp, DebugDumpPartitions, DebugDumpRangesCovered, DebugDumpNodesCovered, DebugDumpPartition, DebugDumpPartitionSkip, MainHashResults, SimpleDistanceObject, WrappedResponses, LocalCachedData, AccountFilter, StringBoolObjectMap, AppliedReceipt } from './state-manager-types'
+import { CycleShardData, PartitionReceipt, FifoLockObjectMap, QueueEntry, AcceptedTx, AccountCopy, GetAccountDataByRangeSmart, WrappedStateArray, AccountHashCache, RequestReceiptForTxReq, RequestReceiptForTxResp, RequestStateForTxReqPost, RequestStateForTxResp, RequestTxResp, AppliedVote, GetAccountDataWithQueueHintsResp, DebugDumpPartitions, DebugDumpRangesCovered, DebugDumpNodesCovered, DebugDumpPartition, DebugDumpPartitionSkip, MainHashResults, SimpleDistanceObject, WrappedResponses, LocalCachedData, AccountFilter, StringBoolObjectMap, AppliedReceipt, CycleDebugNotes } from './state-manager-types'
 
 /**
  * WrappedEventEmitter just a default extended WrappedEventEmitter
@@ -162,6 +162,7 @@ class StateManager {
 
   processCycleSummaries: boolean // controls if we execute processPreviousCycleSummaries() at cycle_q1_start
 
+  cycleDebugNotes : CycleDebugNotes
   /***
    *     ######   #######  ##    ##  ######  ######## ########  ##     ##  ######  ########  #######  ########
    *    ##    ## ##     ## ###   ## ##    ##    ##    ##     ## ##     ## ##    ##    ##    ##     ## ##     ##
@@ -264,6 +265,8 @@ class StateManager {
 
       this.debugFeature_dumpAccountDataFromSQL = this.tryGetBoolProperty(this.config.debug, 'dumpAccountReportFromSQL', this.debugFeature_dumpAccountDataFromSQL)
     }
+
+    this.cycleDebugNotes = {repairs:0, lateRepairs:0, patchedAccounts:0, badAccounts:0, noRcptRepairs:0 }
 
     /** @type {number} */
     this.dataRepairsCompleted = 0
@@ -2490,6 +2493,9 @@ class StateManager {
         this.accountPatcher.updateTrieAndBroadCast(lastCycle.counter)
       }
     }
+
+    //reset cycleDebugNotes
+    this.cycleDebugNotes = {repairs:0, lateRepairs:0, patchedAccounts:0, badAccounts:0, noRcptRepairs:0 }
 
     // Hook for Snapshot module to listen to after partition data is settled
     this.eventEmitter.emit('cycleTxsFinalized', cycleShardValues, receiptMapResults, statsClump, mainHashResults)

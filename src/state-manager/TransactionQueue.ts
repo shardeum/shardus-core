@@ -781,7 +781,7 @@ class TransactionQueue {
              
             txQueueEntry.didSync = true // mark that this tx had to sync, this flag should never be cleared, we will use it later to not through stuff away.
             txQueueEntry.syncKeys.push(key) // used later to instruct what local data we should JIT load
-            txQueueEntry.localKeys[key] = true // used for the filter
+            txQueueEntry.localKeys[key] = true // used for the filter.  TODO review why this is set true here!!! seems like this may flag some keys not owned by this node!
             if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.logID}`, `${txQueueEntry.logID} qId: ${txQueueEntry.entryID} account:${utils.stringifyReduce(key)}`)
           }
         }
@@ -812,6 +812,7 @@ class TransactionQueue {
           if (globalModification === false && isGlobalAcc === false) {
             txQueueEntry.uniqueWritableKeys.push(key)
           }
+          txQueueEntry.uniqueWritableKeys.sort()//need this list to be deterministic!
         }
 
         if (txQueueEntry.hasShardInfo) {
