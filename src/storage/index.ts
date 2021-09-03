@@ -912,7 +912,7 @@ class Storage {
   async getAccountCopiesByCycleAndRange(cycleNumber, lowAddress, highAddress) {
     this._checkInit()
     try {
-      const query = `SELECT a.accountId,a.data,a.timestamp,a.hash,a.isGlobal FROM accountsCopy a INNER JOIN (SELECT accountId, MAX(cycleNumber) cycleNumber FROM accountsCopy GROUP BY accountId) b ON a.accountId = b.accountId AND a.cycleNumber = b.cycleNumber WHERE a.cycleNumber<=${cycleNumber} and a.accountId>="${lowAddress}" and a.accountId<="${highAddress}" and a.isGlobal=false order by a.accountId asc`
+      const query = `SELECT a.accountId,a.data,a.timestamp,a.hash,a.isGlobal FROM accountsCopy a INNER JOIN (SELECT accountId, MAX(cycleNumber) cycleNumber FROM accountsCopy WHERE cycleNumber<=${cycleNumber} GROUP BY accountId) b ON a.accountId = b.accountId AND a.cycleNumber = b.cycleNumber WHERE a.cycleNumber<=${cycleNumber} and a.accountId>="${lowAddress}" and a.accountId<="${highAddress}" and a.isGlobal=false order by a.accountId asc`
       const result = await this._query(query, [])
       return result
     } catch (e) {
@@ -923,7 +923,7 @@ class Storage {
   async getGlobalAccountCopies(cycleNumber) {
     this._checkInit()
     try {
-      const query = `SELECT a.accountId,a.data,a.timestamp,a.hash,a.isGlobal FROM accountsCopy a INNER JOIN (SELECT accountId, MAX(cycleNumber) cycleNumber FROM accountsCopy GROUP BY accountId) b ON a.accountId = b.accountId AND a.cycleNumber = b.cycleNumber WHERE a.cycleNumber<=${cycleNumber} and a.isGlobal=true order by a.accountId asc`
+      const query = `SELECT a.accountId,a.data,a.timestamp,a.hash,a.isGlobal FROM accountsCopy a INNER JOIN (SELECT accountId, MAX(cycleNumber) cycleNumber FROM accountsCopy WHERE cycleNumber<=${cycleNumber} GROUP BY accountId) b ON a.accountId = b.accountId AND a.cycleNumber = b.cycleNumber WHERE a.cycleNumber<=${cycleNumber} and a.isGlobal=true order by a.accountId asc`
       const result = await this._query(query, [])
       return result
     } catch (e) {
@@ -931,10 +931,14 @@ class Storage {
     }
   }
 
-  async getOldAccountCopiesByCycleAndRange(lowAddress, highAddress) {
+  async getOldAccountCopiesByCycleAndRange(
+    cycleNumber,
+    lowAddress,
+    highAddress
+  ) {
     this._checkInit()
     try {
-      const query = `SELECT a.* FROM accountsCopy a INNER JOIN (SELECT accountId, MAX(cycleNumber) cycleNumber FROM accountsCopy GROUP BY accountId) b ON a.accountId = b.accountId AND a.cycleNumber = b.cycleNumber WHERE a.accountId>="${lowAddress}" and a.accountId<="${highAddress}" and a.isGlobal=false order by a.accountId asc`
+      const query = `SELECT a.* FROM accountsCopy a INNER JOIN (SELECT accountId, MAX(cycleNumber) cycleNumber FROM accountsCopy where cycleNumber<=${cycleNumber} GROUP BY accountId) b ON a.accountId = b.accountId AND a.cycleNumber = b.cycleNumber WHERE a.accountId>="${lowAddress}" and a.accountId<="${highAddress}" and a.isGlobal=false order by a.accountId asc`
       const result = await this._queryOld(query, [])
       return result
     } catch (e) {
@@ -942,10 +946,10 @@ class Storage {
     }
   }
 
-  async getOldGlobalAccountCopies() {
+  async getOldGlobalAccountCopies(cycleNumber) {
     this._checkInit()
     try {
-      const query = `SELECT a.* FROM accountsCopy a INNER JOIN (SELECT accountId, MAX(cycleNumber) cycleNumber FROM accountsCopy GROUP BY accountId) b ON a.accountId = b.accountId AND a.cycleNumber = b.cycleNumber WHERE a.isGlobal=true order by a.accountId asc`
+      const query = `SELECT a.* FROM accountsCopy a INNER JOIN (SELECT accountId, MAX(cycleNumber) cycleNumber FROM accountsCopy where cycleNumber<=${cycleNumber} GROUP BY accountId) b ON a.accountId = b.accountId AND a.cycleNumber = b.cycleNumber WHERE a.isGlobal=true order by a.accountId asc`
       const result = await this._queryOld(query, [])
       return result
     } catch (e) {

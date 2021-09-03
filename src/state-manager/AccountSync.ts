@@ -19,6 +19,7 @@ import * as Wrapper from '../p2p/Wrapper'
 import * as Self from '../p2p/Self'
 import { potentiallyRemoved } from '../p2p/NodeList'
 import { SyncTracker, SimpleRange, AccountStateHashReq, AccountStateHashResp, GetAccountStateReq, GetAccountData3Req, GetAccountDataByRangeSmart, GlobalAccountReportResp, GetAccountData3Resp, CycleShardData } from './state-manager-types'
+import { safetyModeVals } from '../snapshot'
 
 const allZeroes64 = '0'.repeat(64)
 
@@ -253,7 +254,7 @@ class AccountSync {
         result.stateHash = this.stateManager.currentCycleShardData.ourNode.id
         await respond(result)
         return
-      } 
+      }
 
       // yikes need to potentially hash only N records at a time and return an array of hashes
       let stateHash = await this.stateManager.transactionQueue.getAccountsStateHash(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd)
@@ -392,8 +393,9 @@ class AccountSync {
    * @param requiredNodeCount
    */
   async initialSyncMain(requiredNodeCount: number) {
+    const safetyMode = safetyModeVals.safetyMode
     // Dont sync if first node
-    if (this.p2p.isFirstSeed) {
+    if (this.p2p.isFirstSeed || safetyMode) {
       this.dataSyncMainPhaseComplete = true
       this.syncStatement.syncComplete = true
       this.initalSyncFinished = true
@@ -401,7 +403,10 @@ class AccountSync {
       this.globalAccountsSynced = true
       this.stateManager.accountGlobals.hasknownGlobals = true
       this.readyforTXs = true
-      if (logFlags.debug) this.mainLogger.debug(`DATASYNC: isFirstSeed = true. skipping sync`)
+      if (logFlags.debug) {
+        if (this.p2p.isFirstSeed) this.mainLogger.debug(`DATASYNC: isFirstSeed = true. skipping sync`)
+        if (safetyMode) this.mainLogger.debug(`DATASYNC: safetyMode = true. skipping sync`)
+      }
 
       // various sync statement stats are zeroed out because we are the first node and dont sync
       this.syncStatement.cycleStarted = 0
@@ -601,7 +606,7 @@ class AccountSync {
     this.readyforTXs = true
 
     if(this.useStateTable === true){
-      await utils.sleep(8000) // sleep to make sure we are listening to some txs before we sync them      
+      await utils.sleep(8000) // sleep to make sure we are listening to some txs before we sync them
     }
 
 
@@ -890,7 +895,7 @@ class AccountSync {
           dataToSet.push(accountData)
           goodAccounts.push(accountData)
 
-      
+
 
         }
       }
@@ -1144,7 +1149,7 @@ class AccountSync {
         }
       }
       nodes = filteredNodes
-      
+
       if (Array.isArray(nodes) === false) {
         if (logFlags.error) this.mainLogger.error(`syncStateTableData: non array returned ${utils.stringifyReduce(nodes)}`)
         return // nothing to do
@@ -1295,7 +1300,7 @@ class AccountSync {
       let filteredAccountStates = []
       for(let i = this.combinedAccountStateData.length -1; i>=0; i--){
         let accountState:Shardus.StateTableObject = this.combinedAccountStateData[i]
-  
+
         if(seenAccounts.has(accountState.accountId) === true){
           continue
         }
@@ -1503,7 +1508,7 @@ class AccountSync {
 
     if(this.useStateTable === false){
       return await this.processAccountDataNoStateTable()
-       
+
     }
 
     this.missingAccountData = []
@@ -1858,7 +1863,7 @@ class AccountSync {
 
     queryLow = lowAddress
     queryHigh = highAddress
-  
+
     let centerNode = ShardFunctions.getCenterHomeNode(this.stateManager.currentCycleShardData.shardGlobals, this.stateManager.currentCycleShardData.parititionShardDataMap, lowAddress, highAddress)
     if (centerNode == null) {
       if (logFlags.debug) this.mainLogger.debug(`centerNode not found`)
@@ -2130,7 +2135,7 @@ class AccountSync {
 
    /**
     * updateRuntimeSyncTrackers
-    * 
+    *
     * called in update shard values to handle sync trackers that have finished and need to restar TXs
     */
   updateRuntimeSyncTrackers() {
@@ -2227,7 +2232,7 @@ class AccountSync {
       if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeClearFinished', ` `, `num trackers left: ${this.syncTrackers.length} `)
 
       if(this.initalSyncRemaining > 0 && initalSyncRemaining === 0){
-        this.initalSyncFinished = true        
+        this.initalSyncFinished = true
         this.initalSyncRemaining = 0
         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: initalSyncFinished.`)
         nestedCountersInstance.countEvent('sync',`initialSyncFinished ${this.stateManager.currentCycleShardData.cycleNumber}`)
@@ -2236,13 +2241,13 @@ class AccountSync {
   }
 
 /***
- *     ######  ##    ## ##    ##  ######  ########  ##     ## ##    ## ######## #### ##     ## ######## ######## ########     ###     ######  ##    ## ######## ########   ######  
- *    ##    ##  ##  ##  ###   ## ##    ## ##     ## ##     ## ###   ##    ##     ##  ###   ### ##          ##    ##     ##   ## ##   ##    ## ##   ##  ##       ##     ## ##    ## 
- *    ##         ####   ####  ## ##       ##     ## ##     ## ####  ##    ##     ##  #### #### ##          ##    ##     ##  ##   ##  ##       ##  ##   ##       ##     ## ##       
- *     ######     ##    ## ## ## ##       ########  ##     ## ## ## ##    ##     ##  ## ### ## ######      ##    ########  ##     ## ##       #####    ######   ########   ######  
- *          ##    ##    ##  #### ##       ##   ##   ##     ## ##  ####    ##     ##  ##     ## ##          ##    ##   ##   ######### ##       ##  ##   ##       ##   ##         ## 
- *    ##    ##    ##    ##   ### ##    ## ##    ##  ##     ## ##   ###    ##     ##  ##     ## ##          ##    ##    ##  ##     ## ##    ## ##   ##  ##       ##    ##  ##    ## 
- *     ######     ##    ##    ##  ######  ##     ##  #######  ##    ##    ##    #### ##     ## ########    ##    ##     ## ##     ##  ######  ##    ## ######## ##     ##  ######  
+ *     ######  ##    ## ##    ##  ######  ########  ##     ## ##    ## ######## #### ##     ## ######## ######## ########     ###     ######  ##    ## ######## ########   ######
+ *    ##    ##  ##  ##  ###   ## ##    ## ##     ## ##     ## ###   ##    ##     ##  ###   ### ##          ##    ##     ##   ## ##   ##    ## ##   ##  ##       ##     ## ##    ##
+ *    ##         ####   ####  ## ##       ##     ## ##     ## ####  ##    ##     ##  #### #### ##          ##    ##     ##  ##   ##  ##       ##  ##   ##       ##     ## ##
+ *     ######     ##    ## ## ## ##       ########  ##     ## ## ## ##    ##     ##  ## ### ## ######      ##    ########  ##     ## ##       #####    ######   ########   ######
+ *          ##    ##    ##  #### ##       ##   ##   ##     ## ##  ####    ##     ##  ##     ## ##          ##    ##   ##   ######### ##       ##  ##   ##       ##   ##         ##
+ *    ##    ##    ##    ##   ### ##    ## ##    ##  ##     ## ##   ###    ##     ##  ##     ## ##          ##    ##    ##  ##     ## ##    ## ##   ##  ##       ##    ##  ##    ##
+ *     ######     ##    ##    ##  ######  ##     ##  #######  ##    ##    ##    #### ##     ## ########    ##    ##     ## ##     ##  ######  ##    ## ######## ##     ##  ######
  */
 
   /**
