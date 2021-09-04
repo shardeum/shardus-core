@@ -857,7 +857,7 @@ class StateManager {
   }
 
   // TSConversion TODO need to fix some any types
-  async checkAndSetAccountData(accountRecords: Shardus.WrappedData[], note: string, initStats: boolean, updatedAccounts:string[] = null): Promise<string[]> {
+  async checkAndSetAccountData(accountRecords: Shardus.WrappedData[], note: string, processStats: boolean, updatedAccounts:string[] = null): Promise<string[]> {
     let accountsToAdd: any[] = []
     let failedHashes: string[] = []
     for (let wrapedAccount of accountRecords) {
@@ -884,6 +884,7 @@ class StateManager {
         // if (logFlags.error) this.mainLogger.error(`checkAndSetAccountData: did not find seen account. note:${note} acc: ${utils.makeShortHash(accountId)} hash: ${utils.makeShortHash(hash)}`)
       }
 
+
       if (stateId === hash) {
         // if (recordData.owners) recordData.owners = JSON.parse(recordData.owners)
         // if (recordData.data) recordData.data = JSON.parse(recordData.data)
@@ -905,25 +906,27 @@ class StateManager {
           this.statemanager_fatal(`checkAndSetAccountData ts=0`, `checkAndSetAccountData ts=0 ${debugString}    ${stack}` )
         }
 
-        if (this.accountCache.hasAccount(accountId)) {
-          //TODO STATS BUG..  this is what can cause one form of stats bug.
-          //we may have covered this account in the past, then not covered it, and now we cover it again.  Stats doesn't know how to repair
-          // this situation.
-          //TODO, need a way to re-init.. dang idk how to do that!
-          //this.partitionStats.statsDataSummaryUpdate2(cycleToRecordOn, null, wrapedAccount)
+        if(processStats){
+          if (this.accountCache.hasAccount(accountId)) {
+            //TODO STATS BUG..  this is what can cause one form of stats bug.
+            //we may have covered this account in the past, then not covered it, and now we cover it again.  Stats doesn't know how to repair
+            // this situation.
+            //TODO, need a way to re-init.. dang idk how to do that!
+            //this.partitionStats.statsDataSummaryUpdate2(cycleToRecordOn, null, wrapedAccount)
 
-          let tryToCorrectStats = true
-          if(tryToCorrectStats){
-            let accounts = await this.app.getAccountDataByList([wrapedAccount.accountId])
-            if(accounts != null && accounts.length === 1){
-              this.partitionStats.statsDataSummaryUpdate2(cycleToRecordOn, accounts[0].data, wrapedAccount)  
+            let tryToCorrectStats = true
+            if(tryToCorrectStats){
+              let accounts = await this.app.getAccountDataByList([wrapedAccount.accountId])
+              if(accounts != null && accounts.length === 1){
+                this.partitionStats.statsDataSummaryUpdate2(cycleToRecordOn, accounts[0].data, wrapedAccount, 'checkAndSetAccountData-' + note)  
+              }
+            } else {
+              //old way
+              this.accountCache.updateAccountHash(wrapedAccount.accountId, wrapedAccount.stateId, wrapedAccount.timestamp, cycleToRecordOn)
             }
           } else {
-            //old way
-            this.accountCache.updateAccountHash(wrapedAccount.accountId, wrapedAccount.stateId, wrapedAccount.timestamp, cycleToRecordOn)
+            this.partitionStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount, 'checkAndSetAccountData-' + note)
           }
-        } else {
-          this.partitionStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount)
         }
       } else {
         if (logFlags.error) this.mainLogger.error(`setAccountData hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
@@ -2413,7 +2416,7 @@ class StateManager {
           cycleShardValues = this.shardValuesByCycle.get(lastCycle.counter)
         }
 
-        this.partitionStats.dumpLogsForCycle(lastCycle.counter, true, cycleShardValues)
+        //this.partitionStats.dumpLogsForCycle(lastCycle.counter, true, cycleShardValues)
 
         // do this every 5 cycles.
         if (lastCycle.counter % 5 !== 0) {
@@ -2477,6 +2480,9 @@ class StateManager {
     let statsClump = {}
     if (this.feature_generateStats === true) {
       statsClump = this.partitionStats.getCoveredStatsPartitions(cycleShardValues)
+
+
+      this.partitionStats.dumpLogsForCycle(cycleShardValues.cycleNumber, true, cycleShardValues)
     }
 
     // build partition hashes from previous full cycle

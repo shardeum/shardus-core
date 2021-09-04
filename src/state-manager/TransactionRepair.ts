@@ -328,7 +328,7 @@ class TransactionRepair {
                   if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `write data: ${utils.stringifyReduce(data)}  acc:${shortKey}`)
                   //Commit the data
                   let dataToSet = [data]
-                  let failedHashes = await this.stateManager.checkAndSetAccountData(dataToSet, `tx:${shortHash} repairToMatchReceipt`, false)
+                  let failedHashes = await this.stateManager.checkAndSetAccountData(dataToSet, `tx:${shortHash} repairToMatchReceipt`, true)
 
                   if(failedHashes.length === 0){
                     dataApplied++
@@ -364,10 +364,14 @@ class TransactionRepair {
                   if (beforeData == null) {
                     if (logFlags.error) this.mainLogger.error(`repairToMatchReceipt: statsDataSummaryUpdate2 beforeData data is null ${utils.stringifyReduce(data.accountId)} WILL CAUSE DATA OOS  tx:${shortHash}  acc:${shortKey}`)
                   } else {
-                    if (this.stateManager.partitionStats.hasAccountBeenSeenByStats(data.accountId) === false) {
-                      // Init stats because we have not seen this account yet.
-                      this.stateManager.partitionStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, data.accountId, beforeData)
-                    }
+
+                    // USEDEFAULT=checkAndSetAccountData for stats. use the default behavoir of checkAndSetAccountData instead since that used the local before data, and is better for stat deltas
+                    // state table repairs needed the state exactly before repair state, which would create a different delta.
+
+                    // if (this.stateManager.partitionStats.hasAccountBeenSeenByStats(data.accountId) === false) {
+                    //   // Init stats because we have not seen this account yet.
+                    //   this.stateManager.partitionStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, data.accountId, beforeData, 'repairToMatchReceipt')
+                    // }
 
                     // important to update the timestamp.  There are various reasons it could be incorrectly set to 0
                     let { timestamp: updatedTimestamp, hash: updatedHash } = this.app.getTimestampAndHashFromAccount(data.data)
@@ -378,8 +382,8 @@ class TransactionRepair {
                     data.timestamp = updatedTimestamp
                     
 
-                    // update stats
-                    this.stateManager.partitionStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, beforeData, data)
+                    // USEDEFAULT=checkAndSetAccountData for stats.  (search USEDEFAULT for more context)
+                    // this.stateManager.partitionStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, beforeData, data, 'repairToMatchReceipt')
 
                     // record state table data
                     let { timestamp: oldtimestamp, hash: oldhash } = this.app.getTimestampAndHashFromAccount(beforeData)
@@ -856,10 +860,11 @@ class TransactionRepair {
                 if (beforeData == null) {
                   if (logFlags.error) this.mainLogger.error(`repairToMatchReceipt2: statsDataSummaryUpdate2 beforeData data is null ${utils.stringifyReduce(data.accountId)} WILL CAUSE DATA OOS  tx:${shortHash}  acc:${shortKey}`)
                 } else {
-                  if (this.stateManager.partitionStats.hasAccountBeenSeenByStats(data.accountId) === false) {
-                    // Init stats because we have not seen this account yet.
-                    this.stateManager.partitionStats.statsDataSummaryInitRaw(cycleToRecordOn, data.accountId, beforeData)
-                  }
+                  // USEDEFAULT=checkAndSetAccountData for stats.  (search USEDEFAULT for more context)
+                  // if (this.stateManager.partitionStats.hasAccountBeenSeenByStats(data.accountId) === false) {
+                  //   // Init stats because we have not seen this account yet.
+                  //   this.stateManager.partitionStats.statsDataSummaryInitRaw(cycleToRecordOn, data.accountId, beforeData, 'repairToMatchReceipt2')
+                  // }
 
                   // important to update the timestamp.  There are various reasons it could be incorrectly set to 0
                   let { timestamp: updatedTimestamp, hash: updatedHash } = this.app.getTimestampAndHashFromAccount(data.data)
@@ -869,8 +874,8 @@ class TransactionRepair {
                   // This is correcting the timestamp on the wrapper
                   data.timestamp = updatedTimestamp
 
-                  // update stats
-                  this.stateManager.partitionStats.statsDataSummaryUpdate2(cycleToRecordOn, beforeData, data)
+                  // USEDEFAULT=checkAndSetAccountData for stats. (search USEDEFAULT for more context)
+                  //this.stateManager.partitionStats.statsDataSummaryUpdate2(cycleToRecordOn, beforeData, data, 'repairToMatchReceipt2')
 
                   // record state table data
                   let { timestamp: oldtimestamp, hash: oldhash } = this.app.getTimestampAndHashFromAccount(beforeData)

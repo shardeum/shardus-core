@@ -78,7 +78,7 @@ class PartitionStats {
 
     this.accountCache = accountCache
 
-    this.invasiveDebugInfo = false
+    this.invasiveDebugInfo = true
 
     this.initSummaryBlobs()
   }
@@ -232,8 +232,8 @@ setupHandlers() {
     return blob
   }
 
-  statsDataSummaryInit(cycle: number, accountData: Shardus.WrappedData) {
-    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryInit c:${cycle} accForBin:${utils.makeShortHash(accountData.accountId)}`)
+  statsDataSummaryInit(cycle: number, accountData: Shardus.WrappedData, debugMsg:string) {
+    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryInit c:${cycle} ${debugMsg} accForBin:${utils.makeShortHash(accountData.accountId)} inputs:${JSON.stringify({accountData})}`)
 
     let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountData.accountId)
     blob.counter++
@@ -262,7 +262,7 @@ setupHandlers() {
     }
     this.app.dataSummaryInit(blob.opaqueBlob, accountData.data)
 
-    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryInit c:${cycle} accForBin:${utils.makeShortHash(accountData.accountId)}`)
+    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryInit c:${cycle} accForBin:${utils.makeShortHash(accountData.accountId)}  ${this.debugAccountData(accountData.data)}`)
     if(this.invasiveDebugInfo) this.addDebugToBlob(blob, accountData.accountId)
   }
 
@@ -276,8 +276,8 @@ setupHandlers() {
     return this.accountCache.hasAccount(accountId)
   }
 
-  statsDataSummaryInitRaw(cycle: number, accountId: string, accountDataRaw: any) {
-    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryInitRaw c:${cycle} accForBin:${utils.makeShortHash(accountId)}`)
+  statsDataSummaryInitRaw(cycle: number, accountId: string, accountDataRaw: any, debugMsg:string) {
+    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryInitRaw c:${cycle} ${debugMsg} accForBin:${utils.makeShortHash(accountId)}  inputs:${JSON.stringify({accountDataRaw})}`)
 
 
     let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountId)
@@ -309,20 +309,44 @@ setupHandlers() {
       if (logFlags.error) this.mainLogger.error(`statsDataSummaryInitRaw errorNull`)
       return
     }
+
+    //crap we lack a queue. newer stuff still gets in.
     if (cycle > blob.latestCycle) {
       blob.latestCycle = cycle
     }
 
     this.app.dataSummaryInit(blob.opaqueBlob, accountDataRaw)
 
-    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryInitRaw c:${cycle} accForBin:${utils.makeShortHash(accountId)}`)
+    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryInitRaw c:${cycle} accForBin:${utils.makeShortHash(accountId)} ${this.debugAccountData(accountDataRaw)}`)
     if(this.invasiveDebugInfo) this.addDebugToBlob(blob, accountId)
 
   }
 
+  //NOTE THIS IS NOT GENERAL PURPOSE... only works in some cases. only for debug
+  //this code should not know about balance.
+  debugAccountData(accountData){
+
+    if(accountData.data && accountData.data.data && accountData.data.data.balance){
+      return accountData.data.data.balance
+    }
+    if(accountData.data && accountData.data.balance){
+      return accountData.data.balance
+    }
+    if(accountData == null){
+      return 'X'
+    }
+
+    //if(accountData.balance){
+      return accountData.balance
+    //} 
+
+    //return '_'
+  }
+
+
   //statsDataSummaryUpdate(accountDataBefore:any, accountDataAfter:Shardus.WrappedData){
-  statsDataSummaryUpdate(cycle: number, accountData: Shardus.WrappedResponse) {
-    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryInitRaw c:${cycle} accForBin:${utils.makeShortHash(accountData.accountId)}`)
+  statsDataSummaryUpdate(cycle: number, accountData: Shardus.WrappedResponse, debugMsg:string) {
+    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryUpdate c:${cycle} ${debugMsg} accForBin:${utils.makeShortHash(accountData.accountId)}   inputs:${JSON.stringify({accountData})}`)
 
     let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountData.accountId)
     blob.counter++
@@ -376,13 +400,13 @@ setupHandlers() {
     }
     this.app.dataSummaryUpdate(blob.opaqueBlob, accountData.prevDataCopy, accountData.data)
 
-    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryUpdate c:${cycle} accForBin:${utils.makeShortHash(accountId)}`)
+    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryUpdate c:${cycle} ${debugMsg} accForBin:${utils.makeShortHash(accountId)}  ${this.debugAccountData(accountData.data)} - ${this.debugAccountData(accountData.prevDataCopy)}`)
     if(this.invasiveDebugInfo) this.addDebugToBlob(blob, accountId)
 
   }
 
-  statsDataSummaryUpdate2(cycle: number, accountDataBefore: any, accountDataAfter: Shardus.WrappedData) {
-    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryUpdate2 c:${cycle} accForBin:${utils.makeShortHash(accountDataAfter.accountId)}`)
+  statsDataSummaryUpdate2(cycle: number, accountDataBefore: any, accountDataAfter: Shardus.WrappedData, debugMsg:string) {
+    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryUpdate2 c:${cycle} accForBin:${utils.makeShortHash(accountDataAfter.accountId)}   inputs:${JSON.stringify({accountDataBefore , accountDataAfter })}`)
 
     let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountDataAfter.accountId)
     blob.counter++
@@ -438,7 +462,7 @@ setupHandlers() {
     this.app.dataSummaryUpdate(blob.opaqueBlob, accountDataBefore, accountDataAfter.data)
 
 
-    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryUpdate2 c:${cycle} accForBin:${utils.makeShortHash(accountDataAfter.accountId)}`)
+    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryUpdate2 c:${cycle} accForBin:${utils.makeShortHash(accountDataAfter.accountId)}   ${this.debugAccountData(accountDataAfter.data)} - ${this.debugAccountData(accountDataBefore)}`)
     if(this.invasiveDebugInfo) this.addDebugToBlob(blob, accountDataAfter.accountId)
 
   }

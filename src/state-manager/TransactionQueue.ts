@@ -525,15 +525,13 @@ class TransactionQueue {
     // STATS update
     this.stateManager.partitionStats.statsTxSummaryUpdate(queueEntry.cycleToRecordOn, queueEntry)
     for (let wrappedData of applyResponse.accountData) {
-      //this.stateManager.partitionStats.statsDataSummaryUpdate(wrappedData.prevDataCopy, wrappedData)
       let queueData = queueEntry.collectedData[wrappedData.accountId]
       if (queueData != null) {
         if (queueData.accountCreated) {
           //account was created to do a summary init
-          //this.stateManager.partitionStats.statsDataSummaryInit(queueEntry.cycleToRecordOn, queueData);
-          this.stateManager.partitionStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, queueData.accountId, queueData.prevDataCopy)
+          this.stateManager.partitionStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, queueData.accountId, queueData.prevDataCopy, 'commit')
         }
-        this.stateManager.partitionStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, queueData.prevDataCopy, wrappedData)
+        this.stateManager.partitionStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, queueData.prevDataCopy, wrappedData, 'commit')
       } else {
         if (logFlags.error) this.mainLogger.error(`commitConsensedTransaction failed to get account data for stats ${wrappedData.accountId}`)
       }

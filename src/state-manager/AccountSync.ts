@@ -1704,7 +1704,6 @@ class AccountSync {
     // failedHashes is a list of accounts that failed to match the hash reported by the server
     let failedHashes = await this.stateManager.checkAndSetAccountData(goodAccounts, 'syncNonGlobals:processAccountData', true) // repeatable form may need to call this in batches
 
-    //this.stateManager.partitionStats.statsDataSummaryInit(goodAccounts)
 
     this.syncStatement.numAccounts += goodAccounts.length
 
@@ -1803,9 +1802,7 @@ class AccountSync {
         `DATASYNC: processAccountData saving ${goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase} outOfDateNoTxs: ${outOfDateNoTxs} futureStateTableEntry:${futureStateTableEntry} unhandledCase:${unhandledCase} fix1Worked:${fix1Worked}`
       )
     // failedHashes is a list of accounts that failed to match the hash reported by the server
-    let failedHashes = await this.stateManager.checkAndSetAccountData(goodAccounts, 'syncNonGlobals:processAccountData', true) // repeatable form may need to call this in batches
-
-    //this.stateManager.partitionStats.statsDataSummaryInit(goodAccounts)
+    let failedHashes = await this.stateManager.checkAndSetAccountData(goodAccounts, 'syncNonGlobals:processAccountDataNoStateTable', true) // repeatable form may need to call this in batches
 
     this.syncStatement.numAccounts += goodAccounts.length
 
