@@ -5170,6 +5170,230 @@ class Depricated {
   // }
 
 
+  //statsDataSummaryUpdate(accountDataBefore:any, accountDataAfter:Shardus.WrappedData){
+  // statsDataSummaryUpdate(cycle: number, accountData: Shardus.WrappedResponse, debugMsg:string) {
+  //   if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryUpdate c:${cycle} ${debugMsg} accForBin:${utils.makeShortHash(accountData.accountId)}   inputs:${JSON.stringify({accountData})}`)
+
+  //   let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountData.accountId)
+  //   blob.counter++
+  //   if (accountData.data == null) {
+  //     blob.errorNull += 10000
+  //     if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate errorNull 1`)
+  //     return
+  //   }
+  //   if (accountData.prevDataCopy == null) {
+  //     blob.errorNull += 1000000
+  //     if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate errorNull 2`)
+  //     return
+  //   }
+
+  //   // if(this.useSeenAccountMap === true){
+  //   //     let accountId = accountData.accountId
+  //   //     let timestamp = accountData.timestamp //  this.app.getAccountTimestamp(accountId)
+  //   //     let hash = accountData.stateId //this.app.getStateId(accountId)
+
+  //   //     if(this.seenCreatedAccounts.has(accountId)){
+  //   //         let accountMemData:AccountMemoryCache = this.seenCreatedAccounts.get(accountId)
+  //   //         if(accountMemData.t > timestamp){
+  //   //             if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
+  //   //             return
+  //   //         }
+  //   //     } else {
+  //   //         if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account`)
+  //   //     }
+
+  //   //     let accountMemDataUpdate:AccountMemoryCache = {t:timestamp, h:hash}
+  //   //     this.seenCreatedAccounts.set(accountId, accountMemDataUpdate)
+  //   // }
+
+  //   let accountId = accountData.accountId
+  //   let timestamp = accountData.timestamp //  this.app.getAccountTimestamp(accountId)
+  //   let hash = accountData.stateId
+
+  //   if (this.accountCache.hasAccount(accountId)) {
+  //     let accountMemData: AccountHashCache = this.accountCache.getAccountHash(accountId)
+  //     if (accountMemData.t > timestamp) {
+  //       if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
+  //       return
+  //     }
+  //   } else {
+  //     if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account`)
+  //   }
+  //   this.accountCache.updateAccountHash(accountId, hash, timestamp, cycle)
+
+  //   if (cycle > blob.latestCycle) {
+  //     blob.latestCycle = cycle
+  //   }
+  //   this.app.dataSummaryUpdate(blob.opaqueBlob, accountData.prevDataCopy, accountData.data)
+
+  //   if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryUpdate c:${cycle} ${debugMsg} accForBin:${utils.makeShortHash(accountId)}  ${this.debugAccountData(accountData.data)} - ${this.debugAccountData(accountData.prevDataCopy)}`)
+  //   if(this.invasiveDebugInfo) this.addDebugToBlob(blob, accountId)
+
+  // }
+
+   // statsDataSummaryInit(cycle: number, accountData: Shardus.WrappedData, debugMsg:string) {
+  //   if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryInit c:${cycle} ${debugMsg} accForBin:${utils.makeShortHash(accountData.accountId)} inputs:${JSON.stringify({accountData})}`)
+
+  //   let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountData.accountId)
+  //   blob.counter++
+
+  //   // if(this.useSeenAccountMap === true && this.seenCreatedAccounts.has(accountData.accountId)){
+  //   //     // if (logFlags.error) this.mainLogger.error(`statsDataSummaryInit seenCreatedAccounts dupe: ${utils.stringifyReduce(accountData.accountId)}`)
+  //   //     return
+  //   // }
+  //   // if(this.useSeenAccountMap === true){
+  //   //     let accountMemData:AccountMemoryCache = {t:accountData.timestamp, h:accountData.stateId}
+  //   //     this.seenCreatedAccounts.set(accountData.accountId, accountMemData)
+  //   // }
+    
+  //   if (this.accountCache.hasAccount(accountData.accountId)) {
+  //     return
+  //   }
+  //   this.accountCache.updateAccountHash(accountData.accountId, accountData.stateId, accountData.timestamp, cycle)
+
+  //   if (accountData.data == null) {
+  //     blob.errorNull++
+  //     if (logFlags.error) this.mainLogger.error(`statsDataSummaryInit errorNull`)
+  //     return
+  //   }
+  //   if (cycle > blob.latestCycle) {
+  //     blob.latestCycle = cycle
+  //   }
+  //   this.app.dataSummaryInit(blob.opaqueBlob, accountData.data)
+
+  //   if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryInit c:${cycle} accForBin:${utils.makeShortHash(accountData.accountId)}  ${this.debugAccountData(accountData.data)}`)
+  //   if(this.invasiveDebugInfo) this.addDebugToBlob(blob, accountData.accountId)
+  // }
+
+
+  // statsDataSummaryUpdate2(cycle: number, accountDataBefore: any, accountDataAfter: Shardus.WrappedData, debugMsg:string) {
+  //   if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryUpdate2 c:${cycle} accForBin:${utils.makeShortHash(accountDataAfter.accountId)}   inputs:${JSON.stringify({accountDataBefore , accountDataAfter })}`)
+
+  //   let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountDataAfter.accountId)
+  //   blob.counter++
+  //   if (accountDataAfter.data == null) {
+  //     blob.errorNull += 100000000
+  //     if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate2 errorNull 1`)
+  //     return
+  //   }
+  //   if (accountDataBefore == null) {
+  //     blob.errorNull += 10000000000
+  //     if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate2 errorNull 2`)
+  //     return
+  //   }
+
+  //   // if(this.useSeenAccountMap === true){
+  //   //     let accountId = accountDataAfter.accountId
+  //   //     let timestamp = accountDataAfter.timestamp //  this.app.getAccountTimestamp(accountId)
+  //   //     let hash = accountDataAfter.stateId //this.app.getStateId(accountId)
+
+  //   //     if(this.seenCreatedAccounts.has(accountId)){
+  //   //         let accountMemData:AccountMemoryCache = this.seenCreatedAccounts.get(accountId)
+  //   //         if(accountMemData.t > timestamp){
+  //   //             if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
+  //   //             return
+  //   //         }
+  //   //     } else {
+  //   //         if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account: 2`)
+  //   //     }
+
+  //   //     let accountMemDataUpdate:AccountMemoryCache = {t:timestamp, h:hash}
+  //   //     this.seenCreatedAccounts.set(accountId, accountMemDataUpdate)
+  //   // }
+
+  //   let accountId = accountDataAfter.accountId
+  //   let timestamp = accountDataAfter.timestamp //  this.app.getAccountTimestamp(accountId)
+  //   let hash = accountDataAfter.stateId //this.app.getStateId(accountId)
+
+  //   if (this.accountCache.hasAccount(accountId)) {
+  //     let accountMemData: AccountHashCache = this.accountCache.getAccountHash(accountId)
+  //     if (accountMemData.t > timestamp) {
+  //       if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
+  //       return
+  //     }
+  //   } else {
+  //     if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account: 2`)
+  //   }
+  //   this.accountCache.updateAccountHash(accountId, hash, timestamp, cycle)
+
+  //   if (cycle > blob.latestCycle) {
+  //     blob.latestCycle = cycle
+  //   }
+
+  //   this.app.dataSummaryUpdate(blob.opaqueBlob, accountDataBefore, accountDataAfter.data)
+
+
+  //   if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryUpdate2 c:${cycle} accForBin:${utils.makeShortHash(accountDataAfter.accountId)}   ${this.debugAccountData(accountDataAfter.data)} - ${this.debugAccountData(accountDataBefore)}`)
+  //   if(this.invasiveDebugInfo) this.addDebugToBlob(blob, accountDataAfter.accountId)
+
+  // }
+
+  // statsDataSummaryInitRaw(cycle: number, accountId: string, accountDataRaw: any, debugMsg:string) {
+  //   if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryInitRaw c:${cycle} ${debugMsg} accForBin:${utils.makeShortHash(accountId)}  inputs:${JSON.stringify({accountDataRaw})}`)
+
+
+  //   let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountId)
+  //   blob.counter++
+
+  //   // if(this.useSeenAccountMap === true && this.seenCreatedAccounts.has(accountId)){
+  //   //     // if (logFlags.error) this.mainLogger.error(`statsDataSummaryInitRaw seenCreatedAccounts dupe: ${utils.stringifyReduce(accountId)}`)
+  //   //     return
+  //   // }
+  //   // if(this.useSeenAccountMap === true){
+  //   //     // let timestamp = this.app.getAccountTimestamp(accountId)
+  //   //     // let hash = this.app.getStateId(accountId)
+
+  //   //     let accountInfo = this.app.getTimestampAndHashFromAccount(accountDataRaw)
+
+  //   //     //let accountMemData:AccountMemoryCache = {t:0, h:'uninit'}
+  //   //     let accountMemData:AccountMemoryCache = {t:accountInfo.timestamp, h:accountInfo.hash}
+  //   //     this.seenCreatedAccounts.set(accountId, accountMemData)
+  //   // }
+
+  //   if (this.accountCache.hasAccount(accountId)) {
+  //     return
+  //   }
+  //   let accountInfo = this.app.getTimestampAndHashFromAccount(accountDataRaw)
+  //   this.accountCache.updateAccountHash(accountId, accountInfo.hash, accountInfo.timestamp, cycle)
+
+  //   if (accountDataRaw == null) {
+  //     blob.errorNull++
+  //     if (logFlags.error) this.mainLogger.error(`statsDataSummaryInitRaw errorNull`)
+  //     return
+  //   }
+
+  //   //crap we lack a queue. newer stuff still gets in.
+  //   if (cycle > blob.latestCycle) {
+  //     blob.latestCycle = cycle
+  //   }
+
+  //   this.app.dataSummaryInit(blob.opaqueBlob, accountDataRaw)
+
+  //   if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryInitRaw c:${cycle} accForBin:${utils.makeShortHash(accountId)} ${this.debugAccountData(accountDataRaw)}`)
+  //   if(this.invasiveDebugInfo) this.addDebugToBlob(blob, accountId)
+
+  // }
+
+  // //the return value is a bit obtuse. should decide if a list or map output is better, or are they both needed.
+  // getStoredSnapshotPartitions(cycleShardData: CycleShardData): { list: number[]; map: Map<number, boolean> } {
+  //   //figure out which summary partitions are fully covered by
+  //   let result = { list: [], map: new Map() }
+  //   for (let i = 0; i < this.summaryPartitionCount; i++) {
+  //     // 2^32  4294967296 or 0xFFFFFFFF + 1
+  //     let addressLowNum = (i / this.summaryPartitionCount) * (0xffffffff + 1)
+  //     let addressHighNum = ((i + 1) / this.summaryPartitionCount) * (0xffffffff + 1) - 1
+  //     let inRangeLow = ShardFunctions.testAddressNumberInRange(addressLowNum, cycleShardData.nodeShardData.storedPartitions)
+  //     let inRangeHigh = false
+  //     if (inRangeLow) {
+  //       inRangeHigh = ShardFunctions.testAddressNumberInRange(addressHighNum, cycleShardData.nodeShardData.storedPartitions)
+  //     }
+  //     if (inRangeLow && inRangeHigh) {
+  //       result.list.push(i)
+  //       result.map.set(i, true)
+  //     }
+  //   }
+  //   return result
+  // }
 }
 
 export default Depricated

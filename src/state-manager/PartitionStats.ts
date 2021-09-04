@@ -45,7 +45,11 @@ class PartitionStats {
 
   invasiveDebugInfo: boolean //inject some data into opaque blobs to improve our debugging (Never use in production)
 
+  statsProcessCounter: number
+
   statemanager_fatal: (key: string, log: string) => void
+
+  workQueue : {cycle: number, fn:any, args:any[]}[]
 
   constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, crypto: Crypto, config: Shardus.ShardusConfiguration, accountCache: AccountCache) {
     
@@ -73,12 +77,13 @@ class PartitionStats {
     this.summaryBlobByPartition = new Map()
     this.txSummaryBlobCollections = []
 
-    // this.useSeenAccountMap = true
-    // this.seenCreatedAccounts = new Map()
-
     this.accountCache = accountCache
 
     this.invasiveDebugInfo = true
+
+    this.statsProcessCounter = 0
+
+    this.workQueue = []
 
     this.initSummaryBlobs()
   }
@@ -232,71 +237,27 @@ setupHandlers() {
     return blob
   }
 
-  statsDataSummaryInit(cycle: number, accountData: Shardus.WrappedData, debugMsg:string) {
-    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryInit c:${cycle} ${debugMsg} accForBin:${utils.makeShortHash(accountData.accountId)} inputs:${JSON.stringify({accountData})}`)
-
-    let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountData.accountId)
-    blob.counter++
-
-    // if(this.useSeenAccountMap === true && this.seenCreatedAccounts.has(accountData.accountId)){
-    //     // if (logFlags.error) this.mainLogger.error(`statsDataSummaryInit seenCreatedAccounts dupe: ${utils.stringifyReduce(accountData.accountId)}`)
-    //     return
-    // }
-    // if(this.useSeenAccountMap === true){
-    //     let accountMemData:AccountMemoryCache = {t:accountData.timestamp, h:accountData.stateId}
-    //     this.seenCreatedAccounts.set(accountData.accountId, accountMemData)
-    // }
-    
-    if (this.accountCache.hasAccount(accountData.accountId)) {
-      return
-    }
-    this.accountCache.updateAccountHash(accountData.accountId, accountData.stateId, accountData.timestamp, cycle)
-
-    if (accountData.data == null) {
-      blob.errorNull++
-      if (logFlags.error) this.mainLogger.error(`statsDataSummaryInit errorNull`)
-      return
-    }
-    if (cycle > blob.latestCycle) {
-      blob.latestCycle = cycle
-    }
-    this.app.dataSummaryInit(blob.opaqueBlob, accountData.data)
-
-    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryInit c:${cycle} accForBin:${utils.makeShortHash(accountData.accountId)}  ${this.debugAccountData(accountData.data)}`)
-    if(this.invasiveDebugInfo) this.addDebugToBlob(blob, accountData.accountId)
-  }
-
+  //todo , I think this is redundant and removable now.
   hasAccountBeenSeenByStats(accountId) {
-    // if(this.useSeenAccountMap === false){
-    //     if (logFlags.error) this.mainLogger.error(`hasAccountBeenSeenByStats disabled`)
-    //     return false
-    // }
-    // return this.seenCreatedAccounts.has(accountId)
-
     return this.accountCache.hasAccount(accountId)
   }
 
-  statsDataSummaryInitRaw(cycle: number, accountId: string, accountDataRaw: any, debugMsg:string) {
-    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryInitRaw c:${cycle} ${debugMsg} accForBin:${utils.makeShortHash(accountId)}  inputs:${JSON.stringify({accountDataRaw})}`)
-
+  /**
+   * If we have never seen this account before then call init on it.
+   * This will queue an opertation that will lead to calling
+   *    this.app.dataSummaryInit()   
+   * so that the dapp can define how to tally a newly seen account
+   * @param cycle 
+   * @param accountId 
+   * @param accountDataRaw 
+   * @param debugMsg 
+   */
+  statsDataSummaryInit(cycle: number, accountId: string, accountDataRaw: any, debugMsg:string) {
+    let opCounter = this.statsProcessCounter++
+    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryInit op:${opCounter} c:${cycle} ${debugMsg} accForBin:${utils.makeShortHash(accountId)}  inputs:${JSON.stringify({accountDataRaw})}`)
 
     let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountId)
     blob.counter++
-
-    // if(this.useSeenAccountMap === true && this.seenCreatedAccounts.has(accountId)){
-    //     // if (logFlags.error) this.mainLogger.error(`statsDataSummaryInitRaw seenCreatedAccounts dupe: ${utils.stringifyReduce(accountId)}`)
-    //     return
-    // }
-    // if(this.useSeenAccountMap === true){
-    //     // let timestamp = this.app.getAccountTimestamp(accountId)
-    //     // let hash = this.app.getStateId(accountId)
-
-    //     let accountInfo = this.app.getTimestampAndHashFromAccount(accountDataRaw)
-
-    //     //let accountMemData:AccountMemoryCache = {t:0, h:'uninit'}
-    //     let accountMemData:AccountMemoryCache = {t:accountInfo.timestamp, h:accountInfo.hash}
-    //     this.seenCreatedAccounts.set(accountId, accountMemData)
-    // }
 
     if (this.accountCache.hasAccount(accountId)) {
       return
@@ -306,139 +267,70 @@ setupHandlers() {
 
     if (accountDataRaw == null) {
       blob.errorNull++
-      if (logFlags.error) this.mainLogger.error(`statsDataSummaryInitRaw errorNull`)
+      if (logFlags.error) this.mainLogger.error(`statsDataSummaryInit errorNull`)
       return
     }
 
-    //crap we lack a queue. newer stuff still gets in.
+    this.workQueue.push({cycle, fn:this.internalDoInit , args: [cycle, blob, accountDataRaw, accountId, opCounter]})
+    
+    //this.internalDoInit(cycle, blob, accountDataRaw, accountId, opCounter)
+
+  }
+
+  /**
+   * The internal function that calls into the app.
+   * this has to go into a queue so that it can be caled only when the call
+   * is for a valid cycle# (i.e. old enough cycle that we can have consistent results)
+   * @param cycle 
+   * @param blob 
+   * @param accountDataRaw 
+   * @param accountId 
+   * @param opCounter 
+   */
+  private internalDoInit(cycle: number, blob: StateManagerTypes.StateManagerTypes.SummaryBlob, accountDataRaw: any, accountId: string, opCounter:number) {
     if (cycle > blob.latestCycle) {
       blob.latestCycle = cycle
     }
 
     this.app.dataSummaryInit(blob.opaqueBlob, accountDataRaw)
 
-    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryInitRaw c:${cycle} accForBin:${utils.makeShortHash(accountId)} ${this.debugAccountData(accountDataRaw)}`)
-    if(this.invasiveDebugInfo) this.addDebugToBlob(blob, accountId)
-
-  }
-
-  //NOTE THIS IS NOT GENERAL PURPOSE... only works in some cases. only for debug
-  //this code should not know about balance.
-  debugAccountData(accountData){
-
-    if(accountData.data && accountData.data.data && accountData.data.data.balance){
-      return accountData.data.data.balance
-    }
-    if(accountData.data && accountData.data.balance){
-      return accountData.data.balance
-    }
-    if(accountData == null){
-      return 'X'
-    }
-
-    //if(accountData.balance){
-      return accountData.balance
-    //} 
-
-    //return '_'
+    if (this.invasiveDebugInfo)
+      this.mainLogger.debug(`statData:statsDataSummaryInit op:${opCounter} c:${cycle} accForBin:${utils.makeShortHash(accountId)} ${this.debugAccountData(accountDataRaw)}`)
+    if (this.invasiveDebugInfo)
+      this.addDebugToBlob(blob, accountId)
   }
 
 
-  //statsDataSummaryUpdate(accountDataBefore:any, accountDataAfter:Shardus.WrappedData){
-  statsDataSummaryUpdate(cycle: number, accountData: Shardus.WrappedResponse, debugMsg:string) {
-    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryUpdate c:${cycle} ${debugMsg} accForBin:${utils.makeShortHash(accountData.accountId)}   inputs:${JSON.stringify({accountData})}`)
-
-    let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountData.accountId)
-    blob.counter++
-    if (accountData.data == null) {
-      blob.errorNull += 10000
-      if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate errorNull 1`)
-      return
-    }
-    if (accountData.prevDataCopy == null) {
-      blob.errorNull += 1000000
-      if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate errorNull 2`)
-      return
-    }
-
-    // if(this.useSeenAccountMap === true){
-    //     let accountId = accountData.accountId
-    //     let timestamp = accountData.timestamp //  this.app.getAccountTimestamp(accountId)
-    //     let hash = accountData.stateId //this.app.getStateId(accountId)
-
-    //     if(this.seenCreatedAccounts.has(accountId)){
-    //         let accountMemData:AccountMemoryCache = this.seenCreatedAccounts.get(accountId)
-    //         if(accountMemData.t > timestamp){
-    //             if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
-    //             return
-    //         }
-    //     } else {
-    //         if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account`)
-    //     }
-
-    //     let accountMemDataUpdate:AccountMemoryCache = {t:timestamp, h:hash}
-    //     this.seenCreatedAccounts.set(accountId, accountMemDataUpdate)
-    // }
-
-    let accountId = accountData.accountId
-    let timestamp = accountData.timestamp //  this.app.getAccountTimestamp(accountId)
-    let hash = accountData.stateId
-
-    if (this.accountCache.hasAccount(accountId)) {
-      let accountMemData: AccountHashCache = this.accountCache.getAccountHash(accountId)
-      if (accountMemData.t > timestamp) {
-        if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
-        return
-      }
-    } else {
-      if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account`)
-    }
-    this.accountCache.updateAccountHash(accountId, hash, timestamp, cycle)
-
-    if (cycle > blob.latestCycle) {
-      blob.latestCycle = cycle
-    }
-    this.app.dataSummaryUpdate(blob.opaqueBlob, accountData.prevDataCopy, accountData.data)
-
-    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryUpdate c:${cycle} ${debugMsg} accForBin:${utils.makeShortHash(accountId)}  ${this.debugAccountData(accountData.data)} - ${this.debugAccountData(accountData.prevDataCopy)}`)
-    if(this.invasiveDebugInfo) this.addDebugToBlob(blob, accountId)
-
-  }
-
-  statsDataSummaryUpdate2(cycle: number, accountDataBefore: any, accountDataAfter: Shardus.WrappedData, debugMsg:string) {
-    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryUpdate2 c:${cycle} accForBin:${utils.makeShortHash(accountDataAfter.accountId)}   inputs:${JSON.stringify({accountDataBefore , accountDataAfter })}`)
+/**
+ * 
+ * This will queue an opertation that will lead to calling
+ *    this.app.dataSummaryUpdate()   
+ * so that the dapp can define how to tally an updated account.
+ * and old copy and current copy of the account are passed in.
+ *    WARNING. current limitation can not guarantee if there are intermediate states
+ *    between these two accounts.  Need to write user facing docs on this.
+ * 
+ * @param cycle 
+ * @param accountDataBefore 
+ * @param accountDataAfter 
+ * @param debugMsg 
+ */
+  statsDataSummaryUpdate(cycle: number, accountDataBefore: any, accountDataAfter: Shardus.WrappedData, debugMsg:string) {
+    let opCounter = this.statsProcessCounter++
+    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData enter:statsDataSummaryUpdate op:${opCounter} c:${cycle} ${debugMsg}  accForBin:${utils.makeShortHash(accountDataAfter.accountId)}   inputs:${JSON.stringify({accountDataBefore , accountDataAfter })}`)
 
     let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.getSummaryBlob(accountDataAfter.accountId)
     blob.counter++
     if (accountDataAfter.data == null) {
       blob.errorNull += 100000000
-      if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate2 errorNull 1`)
+      if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate errorNull 1`)
       return
     }
     if (accountDataBefore == null) {
       blob.errorNull += 10000000000
-      if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate2 errorNull 2`)
+      if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate errorNull 2`)
       return
     }
-
-    // if(this.useSeenAccountMap === true){
-    //     let accountId = accountDataAfter.accountId
-    //     let timestamp = accountDataAfter.timestamp //  this.app.getAccountTimestamp(accountId)
-    //     let hash = accountDataAfter.stateId //this.app.getStateId(accountId)
-
-    //     if(this.seenCreatedAccounts.has(accountId)){
-    //         let accountMemData:AccountMemoryCache = this.seenCreatedAccounts.get(accountId)
-    //         if(accountMemData.t > timestamp){
-    //             if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
-    //             return
-    //         }
-    //     } else {
-    //         if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account: 2`)
-    //     }
-
-    //     let accountMemDataUpdate:AccountMemoryCache = {t:timestamp, h:hash}
-    //     this.seenCreatedAccounts.set(accountId, accountMemDataUpdate)
-    // }
 
     let accountId = accountDataAfter.accountId
     let timestamp = accountDataAfter.timestamp //  this.app.getAccountTimestamp(accountId)
@@ -455,38 +347,41 @@ setupHandlers() {
     }
     this.accountCache.updateAccountHash(accountId, hash, timestamp, cycle)
 
+
+    this.workQueue.push({cycle, fn:this.internalDoUpdate , args: [cycle, blob, accountDataBefore, accountDataAfter, opCounter]})
+    //this.internalDoUpdate(cycle, blob, accountDataBefore, accountDataAfter, opCounter)
+
+  }
+
+  /**
+   * does the queued work of calling dataSummaryUpdate()
+   * @param cycle 
+   * @param blob 
+   * @param accountDataBefore 
+   * @param accountDataAfter 
+   * @param opCounter 
+   */
+  private internalDoUpdate(cycle: number, blob: StateManagerTypes.StateManagerTypes.SummaryBlob, accountDataBefore: any, accountDataAfter: Shardus.WrappedData, opCounter:number) {
     if (cycle > blob.latestCycle) {
       blob.latestCycle = cycle
     }
-
     this.app.dataSummaryUpdate(blob.opaqueBlob, accountDataBefore, accountDataAfter.data)
-
-
-    if(this.invasiveDebugInfo) this.mainLogger.debug(`statData:statsDataSummaryUpdate2 c:${cycle} accForBin:${utils.makeShortHash(accountDataAfter.accountId)}   ${this.debugAccountData(accountDataAfter.data)} - ${this.debugAccountData(accountDataBefore)}`)
-    if(this.invasiveDebugInfo) this.addDebugToBlob(blob, accountDataAfter.accountId)
-
+    if (this.invasiveDebugInfo)
+      this.mainLogger.debug(`statData:statsDataSummaryUpdate op:${opCounter} c:${cycle} accForBin:${utils.makeShortHash(accountDataAfter.accountId)}   ${this.debugAccountData(accountDataAfter.data)} - ${this.debugAccountData(accountDataBefore)}`)
+    if (this.invasiveDebugInfo)
+      this.addDebugToBlob(blob, accountDataAfter.accountId)
   }
 
 
-  addDebugToBlob(blob, accountID){
-    //todo be sure to turn off this setting when not debugging.
-    if(this.invasiveDebugInfo){
-      if(blob.opaqueBlob.dbgData == null){
-        blob.opaqueBlob.dbgData = []
-      }
-      //add unique.. this would be faster with a set, but dont want to have to post process sort the set later!
-      let shortID = utils.makeShortHash(accountID)
-      if(blob.opaqueBlob.dbgData.indexOf(shortID) === -1) {
-        blob.opaqueBlob.dbgData.push(shortID) 
-        blob.opaqueBlob.dbgData.sort()
-      }
-      
-    }    
-  }
 
-
+/**
+ * Call this to update the TX stats.
+ * note, this does not have to get queued because it is a per cycle calculation by default
+ *  (bucketed by stat partition and by cycle)
+ * @param cycle 
+ * @param queueEntry 
+ */
   statsTxSummaryUpdate(cycle: number, queueEntry: QueueEntry) {
-
     let accountToUseForTXStatBinning = null
     //this list of uniqueWritableKeys is not sorted and deterministic
     for(let key of queueEntry.uniqueWritableKeys){
@@ -525,28 +420,17 @@ setupHandlers() {
     }
   }
 
-  // //the return value is a bit obtuse. should decide if a list or map output is better, or are they both needed.
-  // getStoredSnapshotPartitions(cycleShardData: CycleShardData): { list: number[]; map: Map<number, boolean> } {
-  //   //figure out which summary partitions are fully covered by
-  //   let result = { list: [], map: new Map() }
-  //   for (let i = 0; i < this.summaryPartitionCount; i++) {
-  //     // 2^32  4294967296 or 0xFFFFFFFF + 1
-  //     let addressLowNum = (i / this.summaryPartitionCount) * (0xffffffff + 1)
-  //     let addressHighNum = ((i + 1) / this.summaryPartitionCount) * (0xffffffff + 1) - 1
-  //     let inRangeLow = ShardFunctions.testAddressNumberInRange(addressLowNum, cycleShardData.nodeShardData.storedPartitions)
-  //     let inRangeHigh = false
-  //     if (inRangeLow) {
-  //       inRangeHigh = ShardFunctions.testAddressNumberInRange(addressHighNum, cycleShardData.nodeShardData.storedPartitions)
-  //     }
-  //     if (inRangeLow && inRangeHigh) {
-  //       result.list.push(i)
-  //       result.map.set(i, true)
-  //     }
-  //   }
-  //   return result
-  // }
 
-  //the return value is a bit obtuse. should decide if a list or map output is better, or are they both needed.
+
+  /**
+   * Figures out what snapshot partitions are fully covered by our consensus partitions.
+   * Note these partitions are not in the same address space!.
+   * There is one consenus partition per node in the network.  (each node covers them in a radius)
+   * Snapshot partitions are currently a fixed count so that we don't have to recompute all of the summaries each cycle when the 
+   * network topology changes
+   * @param cycleShardData 
+   * //the return value is a bit obtuse. should decide if a list or map output is better, or are they both needed.
+   */
   getConsensusSnapshotPartitions(cycleShardData: CycleShardData): { list: number[]; map: Map<number, boolean> } {
     //figure out which summary partitions are fully covered by
     let result = { list: [], map: new Map() }
@@ -568,6 +452,12 @@ setupHandlers() {
   }
 
 
+  /**
+   * Builds a debug object with stata information for logging or runtime debugging with endpoints.
+   * @param cycle 
+   * @param writeTofile 
+   * @param cycleShardData 
+   */
   dumpLogsForCycle(cycle: number, writeTofile: boolean = true, cycleShardData: CycleShardData = null) {
     let statsDump = { cycle, dataStats: [], txStats: [], covered: [], cycleDebugNotes:{} }
 
@@ -597,7 +487,6 @@ setupHandlers() {
       }
     }
 
-
     if (writeTofile) {
       /*if(logFlags.debug)*/ this.statsLogger.debug(`logs for cycle ${cycle}: ` + utils.stringifyReduce(statsDump))
     }
@@ -605,8 +494,29 @@ setupHandlers() {
     return statsDump
   }
 
-  getCoveredStatsPartitions(cycleShardData: CycleShardData, excludeEmpty: boolean = true): StateManagerTypes.StateManagerTypes.StatsClump {
+  /**
+   * Build the statsDump report that is used sent to the archive server.
+   * Will only include covered stats partitions.
+   * @param cycleShardData 
+   * @param excludeEmpty 
+   */
+  buildStatsReport(cycleShardData: CycleShardData, excludeEmpty: boolean = true): StateManagerTypes.StateManagerTypes.StatsClump {
     let cycle = cycleShardData.cycleNumber
+    let nextQueue = []
+
+    //Execute our work queue for any items that are for this cycle or older
+    for(let item of this.workQueue){
+      if(item.cycle <= cycle){
+        item.fn.apply(this, item.args)
+
+      } else {
+        nextQueue.push(item)
+      }
+    }
+    //update new work queue with items that were newer than this cycle
+    this.workQueue = nextQueue
+  
+    //start building the statsDump
     let statsDump: StateManagerTypes.StateManagerTypes.StatsClump = { error: false, cycle, dataStats: [], txStats: [], covered: [], coveredParititionCount: 0, skippedParitionCount: 0 }
 
     let coveredParitionCount = 0
@@ -913,6 +823,43 @@ setupHandlers() {
       return 0
     }
     return opaqueBlob.totalTx
+  }
+
+    //NOTE THIS IS NOT GENERAL PURPOSE... only works in some cases. only for debug
+  //this code should not know about balance.
+  debugAccountData(accountData){
+
+    if(accountData.data && accountData.data.data && accountData.data.data.balance){
+      return accountData.data.data.balance
+    }
+    if(accountData.data && accountData.data.balance){
+      return accountData.data.balance
+    }
+    if(accountData == null){
+      return 'X'
+    }
+
+    //if(accountData.balance){
+      return accountData.balance
+    //} 
+
+    //return '_'
+  }
+
+  //debug helper for invasiveDebugInfo
+  addDebugToBlob(blob, accountID){
+    //todo be sure to turn off this setting when not debugging.
+    if(this.invasiveDebugInfo){
+      if(blob.opaqueBlob.dbgData == null){
+        blob.opaqueBlob.dbgData = []
+      }
+      //add unique.. this would be faster with a set, but dont want to have to post process sort the set later!
+      let shortID = utils.makeShortHash(accountID)
+      if(blob.opaqueBlob.dbgData.indexOf(shortID) === -1) {
+        blob.opaqueBlob.dbgData.push(shortID) 
+        blob.opaqueBlob.dbgData.sort()
+      }
+    }    
   }
 
 }

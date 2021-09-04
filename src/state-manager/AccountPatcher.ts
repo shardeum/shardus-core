@@ -1866,7 +1866,7 @@ isRadixStored(cycle:number, radix:string){
 
       let updatedAccounts:string[] = []
       //save the account data.  note this will make sure account hashes match the wrappers and return failed hashes  that dont match
-      let failedHashes = await this.stateManager.checkAndSetAccountData(wrappedDataListFiltered, `testAndPatchAccounts`, false, updatedAccounts)
+      let failedHashes = await this.stateManager.checkAndSetAccountData(wrappedDataListFiltered, `testAndPatchAccounts`, true, updatedAccounts)
 
       if(failedHashes.length != 0){
         nestedCountersInstance.countEvent('accountPatcher', 'checkAndSetAccountData failed hashes', failedHashes.length)

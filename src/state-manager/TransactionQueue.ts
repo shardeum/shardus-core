@@ -529,9 +529,9 @@ class TransactionQueue {
       if (queueData != null) {
         if (queueData.accountCreated) {
           //account was created to do a summary init
-          this.stateManager.partitionStats.statsDataSummaryInitRaw(queueEntry.cycleToRecordOn, queueData.accountId, queueData.prevDataCopy, 'commit')
+          this.stateManager.partitionStats.statsDataSummaryInit(queueEntry.cycleToRecordOn, queueData.accountId, queueData.prevDataCopy, 'commit')
         }
-        this.stateManager.partitionStats.statsDataSummaryUpdate2(queueEntry.cycleToRecordOn, queueData.prevDataCopy, wrappedData, 'commit')
+        this.stateManager.partitionStats.statsDataSummaryUpdate(queueEntry.cycleToRecordOn, queueData.prevDataCopy, wrappedData, 'commit')
       } else {
         if (logFlags.error) this.mainLogger.error(`commitConsensedTransaction failed to get account data for stats ${wrappedData.accountId}`)
       }

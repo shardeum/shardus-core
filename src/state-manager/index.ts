@@ -918,14 +918,14 @@ class StateManager {
             if(tryToCorrectStats){
               let accounts = await this.app.getAccountDataByList([wrapedAccount.accountId])
               if(accounts != null && accounts.length === 1){
-                this.partitionStats.statsDataSummaryUpdate2(cycleToRecordOn, accounts[0].data, wrapedAccount, 'checkAndSetAccountData-' + note)  
+                this.partitionStats.statsDataSummaryUpdate(cycleToRecordOn, accounts[0].data, wrapedAccount, 'checkAndSetAccountData-' + note)  
               }
             } else {
               //old way
               this.accountCache.updateAccountHash(wrapedAccount.accountId, wrapedAccount.stateId, wrapedAccount.timestamp, cycleToRecordOn)
             }
           } else {
-            this.partitionStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount, 'checkAndSetAccountData-' + note)
+            this.partitionStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount.accountId, wrapedAccount.data, 'checkAndSetAccountData-' + note)
           }
         }
       } else {
@@ -1205,7 +1205,7 @@ class StateManager {
       let cycleShardValues = null
       if (this.shardValuesByCycle.has(cycle)) {
         cycleShardValues = this.shardValuesByCycle.get(cycle)
-        blob = this.partitionStats.getCoveredStatsPartitions(cycleShardValues)
+        blob = this.partitionStats.buildStatsReport(cycleShardValues)
       }
       res.json({ cycle, blob })
     })
@@ -2479,7 +2479,7 @@ class StateManager {
     // Get the stats data to send as a reort
     let statsClump = {}
     if (this.feature_generateStats === true) {
-      statsClump = this.partitionStats.getCoveredStatsPartitions(cycleShardValues)
+      statsClump = this.partitionStats.buildStatsReport(cycleShardValues)
 
 
       this.partitionStats.dumpLogsForCycle(cycleShardValues.cycleNumber, true, cycleShardValues)
