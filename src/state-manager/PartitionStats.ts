@@ -15,6 +15,42 @@ import { StateManager as StateManagerTypes } from 'shardus-types'
 import * as Context from '../p2p/Context'
 import * as Wrapper from '../p2p/Wrapper'
 
+/**
+ * PartitionStats is a system that allows the dapp to build custom anonymous tallies of accounts and committed TXs.
+ * This code manages opaque blobs and then uploads them once a cycle as part of a report.
+ * This can ultimately allow for a sort of map reduce that helps and explorer server figure out things like
+ * total account balance, or number of accounts, etc.
+ * 
+ * Other state manager modules need to call a few functions to make this work:
+ * -When a new account is seen for the first time (create or synced or other?) it calls statsDataSummaryInit()
+ * -When an account is updated it calls statsDataSummaryUpdate() and passes in the last and current copy of the account
+ * -When a TX is committed statsTxSummaryUpdate() is called 
+ * 
+ * These call results in calls to the dapp.  This code creates and maintains opaqueBlobs.  This code should not understand 
+ * what is in the blob, it just has to hand the correct blob to the dapp for updating.  The dapp does not have to worry about complex
+ * address math to figure out what opaqueBlob should be used!
+ * 
+ * Once per cycle buildStatsReport() is called to generate a summary for any stats data that this node has consensus coverage over.
+ *   
+ * --------------Everything else is just debug support, or support accessors.
+ * 
+ * A few other notes.
+ * -TX stats are bucketed per cycle per stat partition and the tally starts freash each cycle
+ * -DATA(account) stats bucketed by stat partition only.  The update operations go through a queue
+ *  that is synchronized to only commit the stats as a cycle is "ready" i.e. old enough that nodes can be in sync.
+ * 
+ * Debug notes:
+ *   -there is are some debug endpoints but they will only work with smaller numbers of nodes.
+ *    get-stats-report-all
+ * 
+ *   -shardus-scan tool can do stats analysis if you pass in the folder your instances are in.  ex:
+ *    node .\statsReport.js C:\shardus\gitlab\liberdus-server5\instances
+ * 
+ *   it is almost impossible to trace failures without turning invasiveDebugInfo on. (but never check it in as true!)
+ *    invasiveDebugInfo allows stats report to have enough clue to determine which accounts or 
+ *    TXs are missing, and which nodes voted on which opaqueBlobs.
+ * 
+ */
 class PartitionStats {
   app: Shardus.App
   crypto: Crypto
