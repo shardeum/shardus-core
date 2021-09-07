@@ -601,7 +601,8 @@ class PartitionStats {
         continue
       }
       if (excludeEmpty === false || summaryBlob.counter > 0) {
-        statsDump.dataStats.push(summaryBlob)
+        const cloneSummaryBlob = JSON.parse(JSON.stringify(summaryBlob))
+        statsDump.dataStats.push(cloneSummaryBlob)
       }
       coveredParitionCount++
       continue
