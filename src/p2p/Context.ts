@@ -63,7 +63,7 @@ export function setReporterContext(context) {
   reporter = context
 }
 
-export function setConfig(conf) {
+export function setConfig(conf: ShardusTypes.ShardusConfiguration) {
   config = conf
 }
 

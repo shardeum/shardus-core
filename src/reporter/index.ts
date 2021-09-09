@@ -13,6 +13,7 @@ import StateManager from '../state-manager'
 import Statistics from '../statistics'
 import Profiler from '../utils/profiler'
 import packageJson from '../../package.json'
+import { isDebugModeAnd } from '../debug'
 
 const http = require('../http')
 const allZeroes64 = '0'.repeat(64)
@@ -67,10 +68,8 @@ class Reporter {
 
     this.lastTime = Date.now()
 
-    this.doConsoleReport = false
-    if (this.config.debug && this.config.debug.profiler) {
-      this.doConsoleReport = true
-    }
+    this.doConsoleReport = isDebugModeAnd((config) => config.profiler);
+
     this.hasRecipient = this.config.recipient != null
     this.resetStatisticsReport()
   }

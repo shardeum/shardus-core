@@ -87,6 +87,7 @@ dist/
 
 # VS Code IDE files
 .vscode
+!.vscode/settings.json
 
 # TS build results
 build/

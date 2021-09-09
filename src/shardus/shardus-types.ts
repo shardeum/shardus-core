@@ -472,9 +472,9 @@ export interface IncomingTransactionResult {
   txnTimestamp?: number
 }
 
-enum Results {
-  pass,
-  fail,
+export enum ServerMode {
+  Debug = 'debug',
+  Release = 'release'
 }
 
 export interface ShardusConfiguration {
@@ -590,6 +590,8 @@ export interface ShardusConfiguration {
     /** The console parameter is an Boolean specifying whether or not to report data updates to the console. */
     console?: boolean
   }
+  /** Server's current mode or environment to be run in. Can be 'release' or 'debug' with 'release' being the default. */
+  mode?: ServerMode
   /** Server Debug module configuration */
   debug?: {
     /** The loseReceiptChance parameter is a Float specifying a percentage chance to randomly drop a receipt (currently doesn’t do anything) */
