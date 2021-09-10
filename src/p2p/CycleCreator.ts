@@ -14,6 +14,7 @@ import * as CycleChain from './CycleChain'
 import * as Join from './Join'
 import * as Lost from './Lost'
 import * as NodeList from './NodeList'
+import { profilerInstance } from '../utils/profiler'
 import * as Refresh from './Refresh'
 import * as Rotation from './Rotation'
 import * as SafetyMode from './SafetyMode'
@@ -289,11 +290,15 @@ async function cycleCreator() {
 function runQ1() {
   currentQuarter = 1
   Self.emitter.emit('cycle_q1_start')
+  profilerInstance.profileSectionStart('CycleCreator-runQ1')
+
   if (logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
 
   // Tell submodules to sign and send their requests
   if (logFlags.p2pNonFatal) info('Triggering submodules to send requests...')
   for (const submodule of submodules) submodule.sendRequests()
+
+  profilerInstance.profileSectionEnd('CycleCreator-runQ1')
 }
 
 /**
@@ -351,6 +356,7 @@ async function runQ3() {
   Self.emitter.emit('cycle_q3_start')
   if (logFlags.p2pNonFatal) info(`C${currentCycle} Q${currentQuarter}`)
 
+  profilerInstance.profileSectionStart('CycleCreator-runQ3')
   // Get txs and create this cycle's record, marker, and cert
   txs = collectCycleTxs()
   ;({ record, marker, cert } = makeCycleData(txs, CycleChain.newest))
@@ -393,6 +399,8 @@ async function runQ3() {
 
   // Gossip your cert for this cycle with the network
   gossipMyCycleCert()
+
+  profilerInstance.profileSectionEnd('CycleCreator-runQ3')
 }
 
 /**
@@ -408,6 +416,7 @@ async function runQ4() {
     warn('In Q4 nothing to do since we madeCycle is false.')
     return
   }
+  profilerInstance.profileSectionStart('CycleCreator-runQ4')
 
   // Compare your cert for this cycle with the network
   const myC = currentCycle
@@ -421,6 +430,7 @@ async function runQ4() {
         warn(
           `In Q4 ran out of time waiting for compareCycleCert with DESIRED_CERT_MATCHES of ${DESIRED_CERT_MATCHES}`
         )
+        profilerInstance.profileSectionEnd('CycleCreator-runQ4')
         return
       }
       await utils.sleep(100)
@@ -436,6 +446,7 @@ async function runQ4() {
 
   // Dont need this any more since we are not doing anything after this
   // if (cycleQuarterChanged(myC, myQ)) return
+  profilerInstance.profileSectionEnd('CycleCreator-runQ4')
 }
 
 /** HELPER FUNCTIONS */
@@ -1036,7 +1047,7 @@ async function compareCycleCert(myC: number, myQ: number, matches: number) {
 async function gossipMyCycleCert() {
   // If we're not active dont gossip, unless we are first
   if (!Self.isActive && !Self.isFirst) return
-
+  profilerInstance.profileSectionStart('CycleCreator-gossipMyCycleCert')
   // We may have already received certs from other other nodes so gossip only if our cert improves it
   // madeCert = true  // not used
   if (logFlags.p2pNonFatal) info('About to improveBestCert with our cert...')
@@ -1046,6 +1057,7 @@ async function gossipMyCycleCert() {
     if (logFlags.p2pNonFatal) info('bestRecord was set to our record')
     await gossipCycleCert(Self.id)
   }
+  profilerInstance.profileSectionEnd('CycleCreator-gossipMyCycleCert')
 }
 
 function gossipHandlerCycleCert(
@@ -1053,6 +1065,7 @@ function gossipHandlerCycleCert(
   sender: P2P.NodeListTypes.Node['id'],
   tracker: string
 ) {
+  profilerInstance.profileSectionStart('CycleCreator-gossipHandlerCycleCert')
   if (!validateCertsRecordTypes(inp, 'gossipHandlerCycleCert')) return
   // [TODO] - submodules need to validate their part of the record
   const { certs: inpCerts, record: inpRecord } = inp
@@ -1064,6 +1077,7 @@ function gossipHandlerCycleCert(
     // bestRecord = inpRecord
     gossipCycleCert(sender, tracker)
   }
+  profilerInstance.profileSectionEnd('CycleCreator-gossipHandlerCycleCert')
 }
 
 // This gossips the best cert we have

@@ -2375,19 +2375,25 @@ class StateManager {
             return
           }
 
+          this.profiler.profileSectionStart('stateManager_cycle_q1_start_updateShardValues')
           // this.dumpAccountDebugData()
           this.updateShardValues(lastCycle.counter)
           // this.dumpAccountDebugData() // better to print values after an update!
+          this.profiler.profileSectionEnd('stateManager_cycle_q1_start_updateShardValues')
 
+          this.profiler.profileSectionStart('stateManager_cycle_q1_start_calculateChangeInCoverage')
           // calculate coverage change asap
           if (this.currentCycleShardData && this.currentCycleShardData.ourNode.status === 'active') {
             this.calculateChangeInCoverage()
           }
+          this.profiler.profileSectionEnd('stateManager_cycle_q1_start_calculateChangeInCoverage')
 
+          this.profiler.profileSectionStart('stateManager_cycle_q1_start_processPreviousCycleSummaries')
           if (this.processCycleSummaries) {
             // not certain if we want await
             this.processPreviousCycleSummaries()
           }
+          this.profiler.profileSectionEnd('stateManager_cycle_q1_start_processPreviousCycleSummaries')
         }
       } finally {
         this.profiler.profileSectionEnd('stateManager_cycle_q1_start')
@@ -2470,12 +2476,15 @@ class StateManager {
 
     let receiptMapResults = []
 
+    this.profiler.profileSectionStart('stateManager_processPreviousCycleSummaries_generateReceiptMapResults')
     // Get the receipt map to send as a report
     if (this.feature_receiptMapResults === true) {
       receiptMapResults = this.generateReceiptMapResults(cycle)
       if (logFlags.verbose) this.mainLogger.debug(`receiptMapResults: ${stringify(receiptMapResults)}`)
     }
+    this.profiler.profileSectionEnd('stateManager_processPreviousCycleSummaries_generateReceiptMapResults')
 
+    this.profiler.profileSectionStart('stateManager_processPreviousCycleSummaries_buildStatsReport')
     // Get the stats data to send as a reort
     let statsClump = {}
     if (this.feature_generateStats === true) {
@@ -2484,21 +2493,28 @@ class StateManager {
 
       this.partitionStats.dumpLogsForCycle(cycleShardValues.cycleNumber, true, cycleShardValues)
     }
+    this.profiler.profileSectionEnd('stateManager_processPreviousCycleSummaries_buildStatsReport')
 
+
+    
     // build partition hashes from previous full cycle
     let mainHashResults: MainHashResults = null
     if (this.feature_partitionHashes === true) {
       if (cycleShardValues && cycleShardValues.ourNode.status === 'active') {
+        this.profiler.profileSectionStart('stateManager_processPreviousCycleSummaries_buildPartitionHashesForNode')
         mainHashResults = this.accountCache.buildPartitionHashesForNode(cycleShardValues)
+        this.profiler.profileSectionEnd('stateManager_processPreviousCycleSummaries_buildPartitionHashesForNode')
 
+
+        this.profiler.profileSectionStart('stateManager_updatePartitionReport_updateTrie')
         //Note: the main work is happening in accountCache.buildPartitionHashesForNode, this just 
         // uses that data to create our old report structure for reporting to the monitor-server
         this.partitionObjects.updatePartitionReport(cycleShardValues, mainHashResults)
-
-
         this.accountPatcher.updateTrieAndBroadCast(lastCycle.counter)
+        this.profiler.profileSectionEnd('stateManager_updatePartitionReport_updateTrie')
       }
     }
+    
 
     //reset cycleDebugNotes
     this.cycleDebugNotes = {repairs:0, lateRepairs:0, patchedAccounts:0, badAccounts:0, noRcptRepairs:0 }
@@ -2532,7 +2548,9 @@ class StateManager {
 
     await utils.sleep(10000) //wait 10 seconds
 
+    //this.profiler.profileSectionStart('stateManager_testAndPatchAccounts')
     await this.accountPatcher.testAndPatchAccounts(lastCycle.counter)
+    //this.profiler.profileSectionEnd('stateManager_testAndPatchAccounts')
   }
 
   /**

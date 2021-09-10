@@ -6,8 +6,10 @@ import * as utils from '../utils'
 import Crypto from "../crypto"
 import Shardus from '../shardus'
 import StateManager from '../state-manager'
+const os = require('os');
 
 const process = require('process');
+import { resourceUsage } from 'process';
 
 // process.hrtime.bigint()
 
@@ -34,6 +36,7 @@ class MemoryReporting {
   crypto: Crypto
   report: MemItem[]
   shardus: Shardus
+  lastCPUTimes: any[]
 
   constructor(shardus:Shardus) {
 
@@ -41,6 +44,8 @@ class MemoryReporting {
     memoryReportingInstance = this
     this.report = []
     this.shardus = shardus
+
+    this.lastCPUTimes = this.getCPUTimes()
   }
 
   registerEndpoints() {
@@ -115,6 +120,7 @@ class MemoryReporting {
   gatherReport(){
     this.report = []
     this.gatherStateManagerReport()
+    this.systemProcessReport()
   }
 
 
@@ -141,6 +147,79 @@ class MemoryReporting {
       }
 
     }
+  }
+
+
+  getCPUTimes(){
+    const cpus = os.cpus();
+    let times = []
+    
+    for(let cpu of cpus){
+      let timeObj = {}
+      let total = 0
+      for(const [key, value] of Object.entries(cpu.times)){
+        let time = Number(value)
+        total += time
+        timeObj[key] = value
+      }  
+      timeObj['total'] = total
+
+      times.push(timeObj)
+    }
+    return times
+  }
+
+  cpuPercent(){
+ 
+    let currentTimes = this.getCPUTimes()
+
+    let deltaTimes = []
+    let percentTimes = []
+    
+    let percentTotal = 0
+    
+    for(let i=0; i< currentTimes.length; i++) {
+      const currentTimeEntry = currentTimes[i];
+      const lastTimeEntry = this.lastCPUTimes[i]
+      let deltaTimeObj = {}
+      for(const [key, value] of Object.entries(currentTimeEntry)){
+        deltaTimeObj[key] = currentTimeEntry[key] - lastTimeEntry[key]
+      }  
+      deltaTimes.push(deltaTimeObj)
+
+      for(const [key, value] of Object.entries(currentTimeEntry)){
+        percentTimes[key] = deltaTimeObj[key] / deltaTimeObj['total']
+      } 
+      
+      percentTotal += (percentTimes['user'] || 0)
+      percentTotal += (percentTimes['nice'] || 0)
+      percentTotal += (percentTimes['sys'] || 0)
+
+    }
+
+    this.lastCPUTimes = currentTimes
+    let percentUsed = percentTotal / currentTimes.length
+
+    // const usage = process.cpuUsage();
+    // const currentCPUUsage = (usage.user + usage.system) * 1000; //micro seconds to ms
+    // const percentUsed = currentCPUUsage / total * 100
+
+    return percentUsed 
+  }
+
+
+  systemProcessReport(){
+
+    this.addToReport('Process','CPU', 'cpuPercent', this.cpuPercent() )
+
+    let avgCPU = this.shardus.statistics.getAverage('cpuPercent')
+    this.addToReport('Process','CPU', 'cpuAVGPercent', avgCPU )
+
+    let report = resourceUsage()
+    for (const [key, value] of Object.entries(report)) {
+      this.addToReport('Process','Details', key, value )
+    }
+
   }
 
 }

@@ -4,7 +4,7 @@ import { EventEmitter } from 'events'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance, NodeLoad } from '../utils/profiler'
 import * as Context from '../p2p/Context'
-
+import { memoryReportingInstance } from '../utils/memoryReporting'
 interface LoadDetection {
   highThreshold: number /** if load > highThreshold, then scale up request */
   lowThreshold: number  /** if load < lowThreshold, then scale down request */
@@ -126,6 +126,10 @@ class LoadDetection extends EventEmitter {
 
         this.statistics.setManualStat('netInternalDuty', dutyCycleLoad.netInternlDuty)
         this.statistics.setManualStat('netExternalDuty', dutyCycleLoad.netInternlDuty)
+
+        let cpuPercent = memoryReportingInstance.cpuPercent()
+        this.statistics.setManualStat('cpuPercent', cpuPercent)
+        
 
         let internalDutyAvg = this.statistics.getAverage('netInternalDuty')
         let externalDutyAvg = this.statistics.getAverage('netExternalDuty')
