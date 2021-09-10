@@ -450,8 +450,11 @@ class Shardus extends EventEmitter {
       this._createAndLinkStateManager()
       this._attemptCreateAppliedListener()
 
-      // Start state snapshotting once you go active with an app
-      this.once('active', Snapshot.startSnapshotting)
+      let disableSnapshots = !!(this.config && this.config.debug && this.config.debug.disableSnapshots === true)
+      if(disableSnapshots != true){
+        // Start state snapshotting once you go active with an app
+        this.once('active', Snapshot.startSnapshotting)        
+      }
     }
 
     this.reporter = this.config.reporting.report

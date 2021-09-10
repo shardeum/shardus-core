@@ -624,6 +624,8 @@ export interface ShardusConfiguration {
     startInFatalsLogMode?: boolean
     /** fake network delay in ms */
     fakeNetworkDelay?: number
+    /** disable snapshots */
+    disableSnapshots?: boolean
   }
   /** Options for the statistics module */
   statistics?: {

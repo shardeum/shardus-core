@@ -25,6 +25,10 @@ import * as SnapshotFunctions from './snapshotFunctions'
 console.log('StateManager', StateManager)
 console.log('StateManager type', StateManager.StateManagerTypes)
 
+
+let disableSummarySnapshot = true //with 4096 stats regions the snapshot module grinds to a halt.  This is a temporary hack to stop
+                                  // the issue until we decide where to fix it (partitionStats, or here)
+
 /** STATE */
 
 export let oldDataPath: string
@@ -389,37 +393,40 @@ export function startSnapshotting() {
           )
         }
 
-        // attach summary hashes to the message to be gossiped
-        const summaryDataStatHash = {}
-        const summarytxStatsHash = {}
-        for (const blob of statsClumpForThisCycle.dataStats) {
-          summaryDataStatHash[blob.partition] = blob.opaqueBlob
-        }
-        for (const blob of statsClumpForThisCycle.txStats) {
-          summarytxStatsHash[blob.partition] = blob.opaqueBlob
-        }
-
-        for (const partition of statsClumpForThisCycle.covered) {
-          const summaryObj = {
-            dataStats: summaryDataStatHash[partition]
-              ? summaryDataStatHash[partition]
-              : {},
-            txStats: summarytxStatsHash[partition]
-              ? summarytxStatsHash[partition]
-              : {},
+        if(disableSummarySnapshot === true){
+          //no summary hash info shared
+        } else {
+          // attach summary hashes to the message to be gossiped
+          const summaryDataStatHash = {}
+          const summarytxStatsHash = {}
+          for (const blob of statsClumpForThisCycle.dataStats) {
+            summaryDataStatHash[blob.partition] = blob.opaqueBlob
           }
-          message.data.summaryHash[partition] = Context.crypto.hash(summaryObj)
-          if (logFlags.console)
-            console.log(`Summary Obj for partition ${partition}`, summaryObj)
-          if (summaryObj) {
-            if (logFlags.console) console.log('summaryObj', summaryObj)
+          for (const blob of statsClumpForThisCycle.txStats) {
+            summarytxStatsHash[blob.partition] = blob.opaqueBlob
+          }
+
+          for (const partition of statsClumpForThisCycle.covered) {
+            const summaryObj = {
+              dataStats: summaryDataStatHash[partition]
+                ? summaryDataStatHash[partition]
+                : {},
+              txStats: summarytxStatsHash[partition]
+                ? summarytxStatsHash[partition]
+                : {},
+            }
+            message.data.summaryHash[partition] = Context.crypto.hash(summaryObj)
             if (logFlags.console)
-              console.log('summaryObj stringified', JSON.stringify(summaryObj))
-            if (logFlags.console)
-              console.log('summaryObj hash', Context.crypto.hash(summaryObj))
+              console.log(`Summary Obj for partition ${partition}`, summaryObj)
+            if (summaryObj) {
+              if (logFlags.console) console.log('summaryObj', summaryObj)
+              if (logFlags.console)
+                console.log('summaryObj stringified', JSON.stringify(summaryObj))
+              if (logFlags.console)
+                console.log('summaryObj hash', Context.crypto.hash(summaryObj))
+            }
           }
         }
-
         const signedMessage = Context.crypto.sign(message)
 
         Comms.sendGossip(

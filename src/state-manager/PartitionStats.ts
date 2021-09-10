@@ -14,6 +14,7 @@ import { AccountHashCache, QueueEntry, CycleShardData } from './state-manager-ty
 import { StateManager as StateManagerTypes } from 'shardus-types'
 import * as Context from '../p2p/Context'
 import * as Wrapper from '../p2p/Wrapper'
+import { requestNetworkDownsize } from '../p2p/CycleAutoScale'
 
 /**
  * PartitionStats is a system that allows the dapp to build custom anonymous tallies of accounts and committed TXs.
@@ -99,7 +100,7 @@ class PartitionStats {
     this.accountCache = accountCache
 
     //Init Summary Blobs
-    this.summaryPartitionCount = 32 //TODO my next branch will address this.  Needs to be 4096! (and some other support)
+    this.summaryPartitionCount = 4096 //32 //TODO my next branch will address this.  Needs to be 4096! (and some other support)
 
     this.extensiveRangeChecking = true //leaving true for now may go away with next update
 
@@ -114,7 +115,7 @@ class PartitionStats {
 
     this.initSummaryBlobs()
   }
-  
+
   /***
    *    ######## ##    ## ########  ########   #######  #### ##    ## ########  ######
    *    ##       ###   ## ##     ## ##     ## ##     ##  ##  ###   ##    ##    ##    ##
@@ -192,21 +193,21 @@ class PartitionStats {
     })
   }
 
-/***
- *    #### ##    ## #### ########       ###    ##    ## ########        ###     ######   ######  ########  ######   ######  
- *     ##  ###   ##  ##     ##         ## ##   ###   ## ##     ##      ## ##   ##    ## ##    ## ##       ##    ## ##    ## 
- *     ##  ####  ##  ##     ##        ##   ##  ####  ## ##     ##     ##   ##  ##       ##       ##       ##       ##       
- *     ##  ## ## ##  ##     ##       ##     ## ## ## ## ##     ##    ##     ## ##       ##       ######    ######   ######  
- *     ##  ##  ####  ##     ##       ######### ##  #### ##     ##    ######### ##       ##       ##             ##       ## 
- *     ##  ##   ###  ##     ##       ##     ## ##   ### ##     ##    ##     ## ##    ## ##    ## ##       ##    ## ##    ## 
- *    #### ##    ## ####    ##       ##     ## ##    ## ########     ##     ##  ######   ######  ########  ######   ######  
- */
+  /***
+   *    #### ##    ## #### ########       ###    ##    ## ########        ###     ######   ######  ########  ######   ######
+   *     ##  ###   ##  ##     ##         ## ##   ###   ## ##     ##      ## ##   ##    ## ##    ## ##       ##    ## ##    ##
+   *     ##  ####  ##  ##     ##        ##   ##  ####  ## ##     ##     ##   ##  ##       ##       ##       ##       ##
+   *     ##  ## ## ##  ##     ##       ##     ## ## ## ## ##     ##    ##     ## ##       ##       ######    ######   ######
+   *     ##  ##  ####  ##     ##       ######### ##  #### ##     ##    ######### ##       ##       ##             ##       ##
+   *     ##  ##   ###  ##     ##       ##     ## ##   ### ##     ##    ##     ## ##    ## ##    ## ##       ##    ## ##    ##
+   *    #### ##    ## ####    ##       ##     ## ##    ## ########     ##     ##  ######   ######  ########  ######   ######
+   */
 
   /**
    * get a new data summary blob
-   * note that opaqueBlob is what we eventually show to the dapp.  
+   * note that opaqueBlob is what we eventually show to the dapp.
    * This code should not understand opaqueBlob *other than some debug only hacks hardcoded for liberdus
-   * @param partition 
+   * @param partition
    */
   getNewSummaryBlob(partition: number): StateManagerTypes.StateManagerTypes.SummaryBlob {
     return { counter: 0, latestCycle: 0, errorNull: 0, partition, opaqueBlob: {} }
@@ -216,14 +217,15 @@ class PartitionStats {
    * init the data stats blobs
    */
   initSummaryBlobs() {
-    for (let i = 0; i < this.summaryPartitionCount; i++) {
-      this.summaryBlobByPartition.set(i, this.getNewSummaryBlob(i))
-    }
+    // sparse blobs!
+    // for (let i = 0; i < this.summaryPartitionCount; i++) {
+    //   this.summaryBlobByPartition.set(i, this.getNewSummaryBlob(i))
+    // }
   }
 
   /**
    * Init the TX summary blobs
-   * @param cycleNumber 
+   * @param cycleNumber
    */
   initTXSummaryBlobsForCycle(cycleNumber: number): StateManagerTypes.StateManagerTypes.SummaryBlobCollection {
     let summaryBlobCollection = { cycle: cycleNumber, blobsByPartition: new Map() }
@@ -236,7 +238,7 @@ class PartitionStats {
 
   /**
    * gets the TX summary blob partition for the given cycle.  (should be the TX's cycleToRecordOn).
-   * @param cycle 
+   * @param cycle
    */
   getOrCreateTXSummaryBlobCollectionByCycle(cycle: number): StateManagerTypes.StateManagerTypes.SummaryBlobCollection {
     let summaryBlobCollectionToUse = null
@@ -261,27 +263,35 @@ class PartitionStats {
    * Get the correct summary blob partition that matches this address.
    * Address must be in the account space. (i.e. AccountIDs)
    * Never pass a TX id into this (we use the first sorted writable account key for a TX)
-   * @param address 
+   * @param address
    */
+  // getSummaryBlobPartition(address: string): number {
+  //   let addressNum = parseInt(address.slice(0, 8), 16)
+  //   // 2^32  4294967296 or 0xFFFFFFFF + 1
+  //   let size = Math.round((0xffffffff + 1) / this.summaryPartitionCount)
+  //   //let preRound = addressNum / size
+  //   let summaryPartition = Math.floor(addressNum / size)
+
+  //   if (this.extensiveRangeChecking) {
+  //     if (summaryPartition < 0) {
+  //       if (logFlags.error) this.mainLogger.error(`getSummaryBlobPartition summaryPartition < 0 ${summaryPartition}`)
+  //     }
+  //     if (summaryPartition > this.summaryPartitionCount) {
+  //       if (logFlags.error) this.mainLogger.error(`getSummaryBlobPartition summaryPartition > this.summaryPartitionCount ${summaryPartition}`)
+  //     }
+  //   }
+
+  //   if (summaryPartition === this.summaryPartitionCount) {
+  //     summaryPartition = summaryPartition - 1
+  //   }
+  //   return summaryPartition
+  // }
+
+  //requires exactly 4096 partitions.
   getSummaryBlobPartition(address: string): number {
-    let addressNum = parseInt(address.slice(0, 8), 16)
-    // 2^32  4294967296 or 0xFFFFFFFF + 1
-    let size = Math.round((0xffffffff + 1) / this.summaryPartitionCount)
-    //let preRound = addressNum / size
-    let summaryPartition = Math.floor(addressNum / size)
+    let threebyteHex = address.slice(0, 3)
+    let summaryPartition = Number.parseInt(threebyteHex, 16)
 
-    if (this.extensiveRangeChecking) {
-      if (summaryPartition < 0) {
-        if (logFlags.error) this.mainLogger.error(`getSummaryBlobPartition summaryPartition < 0 ${summaryPartition}`)
-      }
-      if (summaryPartition > this.summaryPartitionCount) {
-        if (logFlags.error) this.mainLogger.error(`getSummaryBlobPartition summaryPartition > this.summaryPartitionCount ${summaryPartition}`)
-      }
-    }
-
-    if (summaryPartition === this.summaryPartitionCount) {
-      summaryPartition = summaryPartition - 1
-    }
     return summaryPartition
   }
 
@@ -289,10 +299,16 @@ class PartitionStats {
    * Get the correct summary blob that matches this address.
    * Address must be in the account space. (i.e. AccountIDs)
    * Never pass a TX id into this (we use the first sorted writable account key for a TX)
-   * @param address 
+   * @param address
    */
   getSummaryBlob(address: string): StateManagerTypes.StateManagerTypes.SummaryBlob {
     let partition = this.getSummaryBlobPartition(address)
+
+    //lazy create summary blob.  TODO way to clean long unused/uncoveraged blobs? (could help with memory in a minor way)
+    if (this.summaryBlobByPartition.has(partition) === false) {
+      this.summaryBlobByPartition.set(partition, this.getNewSummaryBlob(partition))
+    }
+
     let blob: StateManagerTypes.StateManagerTypes.SummaryBlob = this.summaryBlobByPartition.get(partition)
     return blob
   }
@@ -301,7 +317,6 @@ class PartitionStats {
   hasAccountBeenSeenByStats(accountId) {
     return this.accountCache.hasAccount(accountId)
   }
-
 
   /**
    * Figures out what snapshot partitions are fully covered by our consensus partitions.
@@ -312,35 +327,83 @@ class PartitionStats {
    * @param cycleShardData
    * //the return value is a bit obtuse. should decide if a list or map output is better, or are they both needed.
    */
+  // getConsensusSnapshotPartitions(cycleShardData: CycleShardData): { list: number[]; map: Map<number, boolean> } {
+  //   //figure out which summary partitions are fully covered by
+  //   let result = { list: [], map: new Map() }
+  //   for (let i = 0; i < this.summaryPartitionCount; i++) {
+  //     // 2^32  4294967296 or 0xFFFFFFFF + 1
+  //     let addressLowNum = (i / this.summaryPartitionCount) * (0xffffffff + 1)
+  //     let addressHighNum = ((i + 1) / this.summaryPartitionCount) * (0xffffffff + 1) - 1
+  //     let inRangeLow = ShardFunctions.testAddressNumberInRange(addressLowNum, cycleShardData.nodeShardData.consensusPartitions)
+  //     let inRangeHigh = false
+  //     if (inRangeLow) {
+  //       inRangeHigh = ShardFunctions.testAddressNumberInRange(addressHighNum, cycleShardData.nodeShardData.consensusPartitions)
+  //     }
+  //     if (inRangeLow && inRangeHigh) {
+  //       result.list.push(i)
+  //       result.map.set(i, true)
+  //     }
+  //   }
+  //   return result
+  // }
+
+  /**
+   * 
+   * @param cycleShardData 
+   */
   getConsensusSnapshotPartitions(cycleShardData: CycleShardData): { list: number[]; map: Map<number, boolean> } {
     //figure out which summary partitions are fully covered by
     let result = { list: [], map: new Map() }
-    for (let i = 0; i < this.summaryPartitionCount; i++) {
-      // 2^32  4294967296 or 0xFFFFFFFF + 1
-      let addressLowNum = (i / this.summaryPartitionCount) * (0xffffffff + 1)
-      let addressHighNum = ((i + 1) / this.summaryPartitionCount) * (0xffffffff + 1) - 1
-      let inRangeLow = ShardFunctions.testAddressNumberInRange(addressLowNum, cycleShardData.nodeShardData.consensusPartitions)
-      let inRangeHigh = false
-      if (inRangeLow) {
-        inRangeHigh = ShardFunctions.testAddressNumberInRange(addressHighNum, cycleShardData.nodeShardData.consensusPartitions)
-      }
-      if (inRangeLow && inRangeHigh) {
-        result.list.push(i)
-        result.map.set(i, true)
-      }
+
+    let consensusStartPartition = cycleShardData.nodeShardData.consensusStartPartition
+    let consensusEndPartition = cycleShardData.nodeShardData.consensusEndPartition
+
+    let outOfRange = this.stateManager.accountPatcher.getNonParitionRanges(cycleShardData, consensusStartPartition, consensusEndPartition, 3)
+
+    if (outOfRange.length === 0) {
+      return result
     }
+    let lowN, highN, lowN2, highN2
+    let twoRanges = false
+
+    //note we dialate the ranges by 1. the partitions are already dialated by one but that is not enough.
+    // this might sometimes result on us not covering a stat partition we could have, but the alternative is another 60 lines of code similar
+    // to getNonParitionRanges
+    if (outOfRange.length >= 1) {
+      lowN = Number.parseInt(outOfRange[0].low.slice(0, 3), 16) - 1
+      highN = Number.parseInt(outOfRange[0].high.slice(0, 3), 16) + 1
+    }
+    if (outOfRange.length >= 2) {
+      lowN2 = Number.parseInt(outOfRange[1].low.slice(0, 3), 16) - 1
+      highN2 = Number.parseInt(outOfRange[1].high.slice(0, 3), 16) + 1
+      twoRanges = true
+    }
+
+    for (let i = 0; i < this.summaryPartitionCount; i++) {
+      if (i <= highN && i >= lowN) {
+        continue //out of range 1
+      }
+      if (twoRanges && i <= highN2 && i >= lowN2) {
+        continue //out of range 2
+      }
+
+      //else it is covered
+      result.list.push(i)
+      result.map.set(i, true)
+    }
+
     return result
   }
 
-/***
- *    #### ##    ## #### ########       ########     ###    ########    ###           ######  ########    ###    ########  ######  
- *     ##  ###   ##  ##     ##          ##     ##   ## ##      ##      ## ##         ##    ##    ##      ## ##      ##    ##    ## 
- *     ##  ####  ##  ##     ##          ##     ##  ##   ##     ##     ##   ##        ##          ##     ##   ##     ##    ##       
- *     ##  ## ## ##  ##     ##          ##     ## ##     ##    ##    ##     ##        ######     ##    ##     ##    ##     ######  
- *     ##  ##  ####  ##     ##          ##     ## #########    ##    #########             ##    ##    #########    ##          ## 
- *     ##  ##   ###  ##     ##          ##     ## ##     ##    ##    ##     ##       ##    ##    ##    ##     ##    ##    ##    ## 
- *    #### ##    ## ####    ##          ########  ##     ##    ##    ##     ##        ######     ##    ##     ##    ##     ######  
- */
+  /***
+   *    #### ##    ## #### ########       ########     ###    ########    ###           ######  ########    ###    ########  ######
+   *     ##  ###   ##  ##     ##          ##     ##   ## ##      ##      ## ##         ##    ##    ##      ## ##      ##    ##    ##
+   *     ##  ####  ##  ##     ##          ##     ##  ##   ##     ##     ##   ##        ##          ##     ##   ##     ##    ##
+   *     ##  ## ## ##  ##     ##          ##     ## ##     ##    ##    ##     ##        ######     ##    ##     ##    ##     ######
+   *     ##  ##  ####  ##     ##          ##     ## #########    ##    #########             ##    ##    #########    ##          ##
+   *     ##  ##   ###  ##     ##          ##     ## ##     ##    ##    ##     ##       ##    ##    ##    ##     ##    ##    ##    ##
+   *    #### ##    ## ####    ##          ########  ##     ##    ##    ##     ##        ######     ##    ##     ##    ##     ######
+   */
 
   /**
    * If we have never seen this account before then call init on it.
@@ -398,17 +461,15 @@ class PartitionStats {
     if (this.invasiveDebugInfo) this.addDebugToBlob(blob, accountId)
   }
 
-
-/***
- *    ##     ## ########  ########     ###    ######## ########       ########     ###    ########    ###           ######  ########    ###    ########  ######  
- *    ##     ## ##     ## ##     ##   ## ##      ##    ##             ##     ##   ## ##      ##      ## ##         ##    ##    ##      ## ##      ##    ##    ## 
- *    ##     ## ##     ## ##     ##  ##   ##     ##    ##             ##     ##  ##   ##     ##     ##   ##        ##          ##     ##   ##     ##    ##       
- *    ##     ## ########  ##     ## ##     ##    ##    ######         ##     ## ##     ##    ##    ##     ##        ######     ##    ##     ##    ##     ######  
- *    ##     ## ##        ##     ## #########    ##    ##             ##     ## #########    ##    #########             ##    ##    #########    ##          ## 
- *    ##     ## ##        ##     ## ##     ##    ##    ##             ##     ## ##     ##    ##    ##     ##       ##    ##    ##    ##     ##    ##    ##    ## 
- *     #######  ##        ########  ##     ##    ##    ########       ########  ##     ##    ##    ##     ##        ######     ##    ##     ##    ##     ######  
- */
-
+  /***
+   *    ##     ## ########  ########     ###    ######## ########       ########     ###    ########    ###           ######  ########    ###    ########  ######
+   *    ##     ## ##     ## ##     ##   ## ##      ##    ##             ##     ##   ## ##      ##      ## ##         ##    ##    ##      ## ##      ##    ##    ##
+   *    ##     ## ##     ## ##     ##  ##   ##     ##    ##             ##     ##  ##   ##     ##     ##   ##        ##          ##     ##   ##     ##    ##
+   *    ##     ## ########  ##     ## ##     ##    ##    ######         ##     ## ##     ##    ##    ##     ##        ######     ##    ##     ##    ##     ######
+   *    ##     ## ##        ##     ## #########    ##    ##             ##     ## #########    ##    #########             ##    ##    #########    ##          ##
+   *    ##     ## ##        ##     ## ##     ##    ##    ##             ##     ## ##     ##    ##    ##     ##       ##    ##    ##    ##     ##    ##    ##    ##
+   *     #######  ##        ########  ##     ##    ##    ########       ########  ##     ##    ##    ##     ##        ######     ##    ##     ##    ##     ######
+   */
 
   /**
    *
@@ -488,15 +549,15 @@ class PartitionStats {
     if (this.invasiveDebugInfo) this.addDebugToBlob(blob, accountDataAfter.accountId)
   }
 
-/***
- *    ##     ## ########  ########     ###    ######## ########       ######## ##     ##        ######  ########    ###    ########  ######  
- *    ##     ## ##     ## ##     ##   ## ##      ##    ##                ##     ##   ##        ##    ##    ##      ## ##      ##    ##    ## 
- *    ##     ## ##     ## ##     ##  ##   ##     ##    ##                ##      ## ##         ##          ##     ##   ##     ##    ##       
- *    ##     ## ########  ##     ## ##     ##    ##    ######            ##       ###           ######     ##    ##     ##    ##     ######  
- *    ##     ## ##        ##     ## #########    ##    ##                ##      ## ##               ##    ##    #########    ##          ## 
- *    ##     ## ##        ##     ## ##     ##    ##    ##                ##     ##   ##        ##    ##    ##    ##     ##    ##    ##    ## 
- *     #######  ##        ########  ##     ##    ##    ########          ##    ##     ##        ######     ##    ##     ##    ##     ######  
- */
+  /***
+   *    ##     ## ########  ########     ###    ######## ########       ######## ##     ##        ######  ########    ###    ########  ######
+   *    ##     ## ##     ## ##     ##   ## ##      ##    ##                ##     ##   ##        ##    ##    ##      ## ##      ##    ##    ##
+   *    ##     ## ##     ## ##     ##  ##   ##     ##    ##                ##      ## ##         ##          ##     ##   ##     ##    ##
+   *    ##     ## ########  ##     ## ##     ##    ##    ######            ##       ###           ######     ##    ##     ##    ##     ######
+   *    ##     ## ##        ##     ## #########    ##    ##                ##      ## ##               ##    ##    #########    ##          ##
+   *    ##     ## ##        ##     ## ##     ##    ##    ##                ##     ##   ##        ##    ##    ##    ##     ##    ##    ##    ##
+   *     #######  ##        ########  ##     ##    ##    ########          ##    ##     ##        ######     ##    ##     ##    ##     ######
+   */
 
   /**
    * Call this to update the TX stats.
@@ -545,15 +606,15 @@ class PartitionStats {
     }
   }
 
-/***
- *    ########  ##     ## #### ##       ########        ########  ######## ########   #######  ########  ######## 
- *    ##     ## ##     ##  ##  ##       ##     ##       ##     ## ##       ##     ## ##     ## ##     ##    ##    
- *    ##     ## ##     ##  ##  ##       ##     ##       ##     ## ##       ##     ## ##     ## ##     ##    ##    
- *    ########  ##     ##  ##  ##       ##     ##       ########  ######   ########  ##     ## ########     ##    
- *    ##     ## ##     ##  ##  ##       ##     ##       ##   ##   ##       ##        ##     ## ##   ##      ##    
- *    ##     ## ##     ##  ##  ##       ##     ##       ##    ##  ##       ##        ##     ## ##    ##     ##    
- *    ########   #######  #### ######## ########        ##     ## ######## ##         #######  ##     ##    ##    
- */
+  /***
+   *    ########  ##     ## #### ##       ########        ########  ######## ########   #######  ########  ########
+   *    ##     ## ##     ##  ##  ##       ##     ##       ##     ## ##       ##     ## ##     ## ##     ##    ##
+   *    ##     ## ##     ##  ##  ##       ##     ##       ##     ## ##       ##     ## ##     ## ##     ##    ##
+   *    ########  ##     ##  ##  ##       ##     ##       ########  ######   ########  ##     ## ########     ##
+   *    ##     ## ##     ##  ##  ##       ##     ##       ##   ##   ##       ##        ##     ## ##   ##      ##
+   *    ##     ## ##     ##  ##  ##       ##     ##       ##    ##  ##       ##        ##     ## ##    ##     ##
+   *    ########   #######  #### ######## ########        ##     ## ######## ##         #######  ##     ##    ##
+   */
 
   /**
    * Build the statsDump report that is used sent to the archive server.
@@ -626,16 +687,15 @@ class PartitionStats {
     return statsDump
   }
 
-
-/***
- *    ########  ######## ########  ##     ##  ######       ######  ##     ## ########  ########   #######  ########  ######## 
- *    ##     ## ##       ##     ## ##     ## ##    ##     ##    ## ##     ## ##     ## ##     ## ##     ## ##     ##    ##    
- *    ##     ## ##       ##     ## ##     ## ##           ##       ##     ## ##     ## ##     ## ##     ## ##     ##    ##    
- *    ##     ## ######   ########  ##     ## ##   ####     ######  ##     ## ########  ########  ##     ## ########     ##    
- *    ##     ## ##       ##     ## ##     ## ##    ##           ## ##     ## ##        ##        ##     ## ##   ##      ##    
- *    ##     ## ##       ##     ## ##     ## ##    ##     ##    ## ##     ## ##        ##        ##     ## ##    ##     ##    
- *    ########  ######## ########   #######   ######       ######   #######  ##        ##         #######  ##     ##    ##    
- */
+  /***
+   *    ########  ######## ########  ##     ##  ######       ######  ##     ## ########  ########   #######  ########  ########
+   *    ##     ## ##       ##     ## ##     ## ##    ##     ##    ## ##     ## ##     ## ##     ## ##     ## ##     ##    ##
+   *    ##     ## ##       ##     ## ##     ## ##           ##       ##     ## ##     ## ##     ## ##     ## ##     ##    ##
+   *    ##     ## ######   ########  ##     ## ##   ####     ######  ##     ## ########  ########  ##     ## ########     ##
+   *    ##     ## ##       ##     ## ##     ## ##    ##           ## ##     ## ##        ##        ##     ## ##   ##      ##
+   *    ##     ## ##       ##     ## ##     ## ##    ##     ##    ## ##     ## ##        ##        ##     ## ##    ##     ##
+   *    ########  ######## ########   #######   ######       ######   #######  ##        ##         #######  ##     ##    ##
+   */
 
   /**
    * Builds a debug object with stata information for logging or runtime debugging with endpoints.
@@ -678,8 +738,6 @@ class PartitionStats {
 
     return statsDump
   }
-
-
 
   /***
    *    ########  ########   #######   ######  ########  ######   ######  ########     ###    ########    ###     ######  ########    ###    ########  ######  ########  ##     ## ##     ## ########

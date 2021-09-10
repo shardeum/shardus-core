@@ -16,7 +16,7 @@ import * as NodeList from '../p2p/NodeList'
 import * as Comms from '../p2p/Comms'
 import * as Context from '../p2p/Context'
 import * as Wrapper from '../p2p/Wrapper'
-import { AccountHashCache, AccountHashCacheHistory, AccountIDAndHash, AccountPreTest, HashTrieAccountDataRequest, HashTrieAccountDataResponse, HashTrieAccountsResp, HashTrieNode, HashTrieRadixCoverage, HashTrieReq, HashTrieResp, HashTrieSyncConsensus, HashTrieSyncTell, HashTrieUpdateStats, RadixAndChildHashes, RadixAndHash, ShardedHashTrie, TrieAccount } from './state-manager-types'
+import { AccountHashCache, AccountHashCacheHistory, AccountIDAndHash, AccountPreTest, HashTrieAccountDataRequest, HashTrieAccountDataResponse, HashTrieAccountsResp, HashTrieNode, HashTrieRadixCoverage, HashTrieReq, HashTrieResp, HashTrieSyncConsensus, HashTrieSyncTell, HashTrieUpdateStats, RadixAndChildHashes, RadixAndHash, ShardedHashTrie, TrieAccount, CycleShardData } from './state-manager-types'
 //import { all } from 'deepmerge'
 //import { Node } from '../p2p/Types'
 
@@ -807,7 +807,7 @@ getNonConsensusRanges(cycle:number): {low:string,high:string}[] {
   let consensusStartPartition = shardValues.nodeShardData.consensusStartPartition
   let consensusEndPartition = shardValues.nodeShardData.consensusEndPartition
   
-  incompleteRanges = this.getNonParitionRanges(shardValues, consensusStartPartition, consensusEndPartition)
+  incompleteRanges = this.getNonParitionRanges(shardValues, consensusStartPartition, consensusEndPartition, this.treeSyncDepth)
 
   return incompleteRanges
 }
@@ -822,7 +822,7 @@ getNonStoredRanges(cycle:number): {low:string,high:string}[] {
     let consensusStartPartition = shardValues.nodeShardData.storedPartitions.partitionStart
     let consensusEndPartition = shardValues.nodeShardData.storedPartitions.partitionEnd
   
-    incompleteRanges = this.getNonParitionRanges(shardValues, consensusStartPartition, consensusEndPartition)
+    incompleteRanges = this.getNonParitionRanges(shardValues, consensusStartPartition, consensusEndPartition, this.treeSyncDepth)
   }
 
   return incompleteRanges
@@ -839,9 +839,20 @@ getSyncTrackerRanges(): {low:string,high:string}[]{
   return incompleteRanges
 }
 
-//Uses a wrappable start and end partition range as input and figures out the array 
-//of ranges that would not be covered by these partitions.
-getNonParitionRanges(shardValues, startPartition, endPartition): {low:string,high:string}[]{
+/**
+ * Uses a wrappable start and end partition range as input and figures out the array 
+ *  of ranges that would not be covered by these partitions.
+ * 
+ * TODO!  consider if the offset used in "partition space" should really be happening on the result address instead!
+ *        I think that would be more correct.  getConsensusSnapshotPartitions would need adjustments after this since it 
+ *        is making this compensation on its own.
+ * 
+ * @param shardValues 
+ * @param startPartition 
+ * @param endPartition 
+ * @param depth How many characters long should the high/low return values be? usually treeSyncDepth
+ */
+getNonParitionRanges(shardValues: CycleShardData, startPartition: number, endPartition: number, depth: number): {low:string,high:string}[]{
   let incompleteRanges = []
 
   let shardGlobals = shardValues.shardGlobals as StateManagerTypes.shardFunctionTypes.ShardGlobals
@@ -865,8 +876,8 @@ getNonParitionRanges(shardValues, startPartition, endPartition): {low:string,hig
     let partition2 = shardValues.parititionShardDataMap.get(incompletePartition2)
     
     let incompleteRange = {
-      low:partition1.homeRange.low.substr(0,this.treeSyncDepth),
-      high:partition2.homeRange.high.substr(0,this.treeSyncDepth)
+      low:partition1.homeRange.low.substr(0,depth),
+      high:partition2.homeRange.high.substr(0,depth)
     }
     incompleteRanges.push(incompleteRange)
     return incompleteRanges
@@ -890,8 +901,8 @@ getNonParitionRanges(shardValues, startPartition, endPartition): {low:string,hig
       let partition2 = shardValues.parititionShardDataMap.get(incompletePartition1)
 
       let incompleteRange = {
-        low:partition1.homeRange.low.substr(0,this.treeSyncDepth),
-        high:partition2.homeRange.high.substr(0,this.treeSyncDepth)
+        low:partition1.homeRange.low.substr(0,depth),
+        high:partition2.homeRange.high.substr(0,depth)
       }
       incompleteRanges.push(incompleteRange)
       return incompleteRanges
@@ -906,8 +917,8 @@ getNonParitionRanges(shardValues, startPartition, endPartition): {low:string,hig
       let partition2 = shardValues.parititionShardDataMap.get(incompletePartition1)
 
       let incompleteRange = {
-        low:partition1.homeRange.low.substr(0,this.treeSyncDepth),
-        high:partition2.homeRange.high.substr(0,this.treeSyncDepth)
+        low:partition1.homeRange.low.substr(0,depth),
+        high:partition2.homeRange.high.substr(0,depth)
       }
       incompleteRanges.push(incompleteRange)
       return incompleteRanges
@@ -918,15 +929,15 @@ getNonParitionRanges(shardValues, startPartition, endPartition): {low:string,hig
     let partition1 = shardValues.parititionShardDataMap.get(0)
     let partition2 = shardValues.parititionShardDataMap.get(incompletePartition1)
     let incompleteRange = {
-      low:partition1.homeRange.low.substr(0,this.treeSyncDepth),
-      high:partition2.homeRange.high.substr(0,this.treeSyncDepth)
+      low:partition1.homeRange.low.substr(0,depth),
+      high:partition2.homeRange.high.substr(0,depth)
     }
 
     let partition1b = shardValues.parititionShardDataMap.get(incompletePartition2)
     let partition2b = shardValues.parititionShardDataMap.get(numPartitions - 1)
     let incompleteRangeB= {
-      low:partition1b.homeRange.low.substr(0,this.treeSyncDepth),
-      high:partition2b.homeRange.high.substr(0,this.treeSyncDepth)
+      low:partition1b.homeRange.low.substr(0,depth),
+      high:partition2b.homeRange.high.substr(0,depth)
     }
 
     incompleteRanges.push(incompleteRange)

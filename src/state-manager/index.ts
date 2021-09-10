@@ -223,7 +223,7 @@ class StateManager {
     this.accountCache = new AccountCache(this, profiler, app, logger, crypto, config)
 
     this.partitionStats = new PartitionStats(this, profiler, app, logger, crypto, config, this.accountCache)
-    this.partitionStats.summaryPartitionCount = 32
+    this.partitionStats.summaryPartitionCount = 4096 //32
     this.partitionStats.initSummaryBlobs()
 
     this.accountSync = new AccountSync(this,  profiler, app, logger, storage, p2p, crypto, config)
