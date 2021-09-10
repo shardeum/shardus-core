@@ -666,7 +666,8 @@ export async function startWitnessMode() {
         oldDataMap = await SnapshotFunctions.calculateOldDataMap(
           shardGlobals,
           nodeShardDataMap,
-          oldPartitionHashMap
+          oldPartitionHashMap,
+          lastSnapshotCycle
         )
         SnapshotFunctions.registerDownloadRoutes(
           Context.network,
