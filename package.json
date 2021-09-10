@@ -24,6 +24,7 @@
     "clean": "gts clean",
     "compile": "tsc -p .",
     "fix": "gts fix",
+    "prepare": "npm run compile",
     "test": "jest",
     "test-watch": "jest --watch"
   },
