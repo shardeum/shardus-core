@@ -158,7 +158,8 @@ export function init() {
 
 function updateScaleFactor(){
   let activeNodeCount = NodeList.activeByIdOrder.length
-  let consensusRange = config.sharding.nodesPerConsensusGroup
+  let consensusRange = Math.min(config.sharding.nodesPerConsensusGroup, activeNodeCount) //if we have less activeNodeCount than consensus radius
+                       //  we can only count the minumum of the two. otherwise it would over boost scaling
   let networkParSize = 50 //num nodes where we want scale to be 1.0.   should be 50-100, can set to 5 for small network testing
   let consenusParSize = 5 //consenus size where we want the scale to be 1.0
   scaleFactor = Math.max((consensusRange / consenusParSize) * (activeNodeCount / networkParSize),1)
