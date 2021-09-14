@@ -6,6 +6,7 @@ import * as utils from '../utils'
 import Crypto from "../crypto"
 import Shardus from '../shardus'
 import StateManager from '../state-manager'
+import * as CycleCreator from '../p2p/CycleCreator'
 const os = require('os');
 
 const process = require('process');
@@ -93,6 +94,17 @@ class MemoryReporting {
       res.end()
     })
 
+    Context.network.registerExternalGet('scaleFactor', (req, res) => {
+      
+      res.write(`Scale debug  Timestamp: ${Date.now()}\n`)
+      try {
+        res.write(`CycleAutoScale.  ${CycleCreator.scaleFactor}`)
+      } catch (e) {
+        res.write(JSON.stringify(e));
+      }
+      res.end()
+    })
+
   }
 
 
@@ -122,8 +134,6 @@ class MemoryReporting {
     this.gatherStateManagerReport()
     this.systemProcessReport()
   }
-
-
 
   gatherStateManagerReport(){
     if(this.shardus && this.shardus.stateManager){

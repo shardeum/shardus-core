@@ -22,6 +22,7 @@ let p2pLogger
 let requests: P2P.JoinTypes.JoinRequest[]
 let seen: Set<P2P.P2PTypes.Node['publicKey']>
 
+let lastLoggedCycle = 0
 
 /** ROUTES */
 
@@ -172,6 +173,11 @@ function calculateToAccept() {
     needed = 0
   }
 
+  let cycle = CycleChain.newest.counter
+  if(cycle > lastLoggedCycle){
+    lastLoggedCycle = cycle
+    info('scale dump:' + JSON.stringify({cycle, scaleFactor:CycleCreator.scaleFactor,needed, desired, active, syncing, canSync, syncMax, maxJoin, expired  })  )
+  }
   return needed
 }
 

@@ -125,6 +125,9 @@ export function getExpiredRemoved(
     let scaledAmountToShrink = Math.floor(config.p2p.amountToShrink * CycleCreator.scaleFactor)
     if (maxRemove > scaledAmountToShrink)
       maxRemove = scaledAmountToShrink
+
+    info('scale down dump:' + JSON.stringify({scaleFactor:CycleCreator.scaleFactor, desired, active, scaledAmountToShrink, maxRemove, expired  })  )
+
   } else {
     if (maxRemove > active - desired) maxRemove = active - desired
   }
