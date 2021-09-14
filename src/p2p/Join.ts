@@ -22,6 +22,7 @@ let p2pLogger
 let requests: P2P.JoinTypes.JoinRequest[]
 let seen: Set<P2P.P2PTypes.Node['publicKey']>
 
+
 /** ROUTES */
 
 const cycleMarkerRoute: P2P.P2PTypes.Route<Handler> = {
@@ -98,6 +99,8 @@ const routes = {
 
 /** CycleCreator Functions */
 
+
+
 export function init() {
   p2pLogger = logger.getLogger('p2p')
 
@@ -132,15 +135,17 @@ export function getNodeRequestingJoin() : P2P.P2PTypes.P2PNode[] {
 function calculateToAccept() {
   const desired = CycleChain.newest.desired
   const active = CycleChain.newest.active
-  const maxJoin = config.p2p.maxJoinedPerCycle // [TODO] allow autoscaling to change this
+  let maxJoin = config.p2p.maxJoinedPerCycle // [TODO] allow autoscaling to change this
   const syncing = NodeList.byJoinOrder.length - active
   const expired = CycleChain.newest.expired
 
+  maxJoin = Math.floor(maxJoin * CycleCreator.scaleFactor)
+
   // If in safetyMode, set syncMax to safetyNum
-  const syncMax =
+  let syncMax =
     CycleChain.newest.safetyMode === true
       ? CycleChain.newest.safetyNum
-      : config.p2p.maxSyncingPerCycle
+      : Math.floor(config.p2p.maxSyncingPerCycle * CycleCreator.scaleFactor)
 
   const canSync = syncMax - syncing
 

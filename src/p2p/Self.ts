@@ -163,7 +163,7 @@ async function joinNetwork(activeNodes: P2P.P2PTypes.Node[], firstTime: boolean)
   const request = await Join.createJoinRequest(latestCycle.previous)
 
   // Figure out when Q1 is from the latestCycle
-  const { startQ1 } = calcIncomingTimes(latestCycle)
+  const { startQ1, startQ4 } = calcIncomingTimes(latestCycle)
   if (logFlags.p2pNonFatal)
     info(`Next cycles Q1 start ${startQ1}; Currently ${Date.now()}`)
 
@@ -182,7 +182,17 @@ async function joinNetwork(activeNodes: P2P.P2PTypes.Node[], firstTime: boolean)
   // Wait approx. one cycle then check again
   if (logFlags.p2pNonFatal)
     info('Waiting approx. one cycle then checking again...')
-  await utils.sleep(Context.config.p2p.cycleDuration * 1000 + 500)
+
+  // Wait until a Q4 before we loop ..
+  // This is a bit faster than before and should allow nodes to try joining 
+  // without skipping a cycle
+  let untilQ4 = startQ4 - Date.now()
+  while (untilQ4 < 0) {
+    untilQ4 += latestCycle.duration * 1000
+  }
+  await utils.sleep(untilQ4 + 500)
+
+  //await utils.sleep(Context.config.p2p.cycleDuration * 1000 + 500)
 
   return {
     isFirst: undefined,
