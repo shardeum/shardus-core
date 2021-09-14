@@ -52,6 +52,9 @@ export let currentQuarter = -1 // means we have not started creating cycles
 export let currentCycle = 0
 export let nextQ1Start = 0
 
+export let scaleFactor: number = 1
+
+
 let madeCycle = false // True if we successfully created the last cycle record, otherwise false
 // not used anymore
 //let madeCert = false // set to True after we make our own cert and try to gossip it
@@ -153,8 +156,19 @@ export function init() {
   }
 }
 
+function updateScaleFactor(){
+  let activeNodeCount = NodeList.activeByIdOrder.length
+  let consensusRange = config.sharding.nodesPerConsensusGroup
+  let networkParSize = 50 //num nodes where we want scale to be 1.0.   should be 50-100, can set to 5 for small network testing
+  let consenusParSize = 5 //consenus size where we want the scale to be 1.0
+  scaleFactor = Math.max((consensusRange / consenusParSize) * (activeNodeCount / networkParSize),1)
+}
+
 // Resets CycleCreator and submodules
 function reset() {
+
+  updateScaleFactor()
+
   // Reset submodules
   for (const module of submodules) module.reset()
 

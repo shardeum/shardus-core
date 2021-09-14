@@ -5,6 +5,7 @@ import * as Comms from './Comms'
 import { config, logger } from './Context'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
+import * as CycleCreator from './CycleCreator'
 
 /** STATE */
 
@@ -120,8 +121,10 @@ export function getExpiredRemoved(
   // Allows the network to scale down even if node rotation is turned off
   if (maxRemove < 1) {
     if (active - desired > 0) maxRemove = active - desired
-    if (maxRemove > config.p2p.amountToShrink)
-      maxRemove = config.p2p.amountToShrink
+
+    let scaledAmountToShrink = Math.floor(config.p2p.amountToShrink * CycleCreator.scaleFactor)
+    if (maxRemove > scaledAmountToShrink)
+      maxRemove = scaledAmountToShrink
   } else {
     if (maxRemove > active - desired) maxRemove = active - desired
   }
