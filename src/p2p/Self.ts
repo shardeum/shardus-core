@@ -29,6 +29,10 @@ export let isActive = false
 export let ip: string
 export let port: number
 
+export let p2pJoinTime = 0
+export let p2pSyncStart = 0
+export let p2pSyncEnd = 0
+
 /** ROUTES */
 
 /** FUNCTIONS */
@@ -91,6 +95,8 @@ export async function startup(): Promise<boolean> {
     firstTime = false
   } while (utils.isUndefined(isFirst) || utils.isUndefined(id))
 
+  p2pSyncStart = Date.now() 
+
   if (logFlags.p2pNonFatal) info('Emitting `joined` event.')
   emitter.emit('joined', id, publicKey)
 
@@ -102,7 +108,10 @@ export async function startup(): Promise<boolean> {
 
   // Start creating cycle records
   await CycleCreator.startCycles()
-  if (logFlags.p2pNonFatal) info('Emitting `initialized` event.')
+
+  p2pSyncEnd = Date.now() 
+  p2pJoinTime = (p2pSyncEnd-p2pSyncStart)/1000
+  if (logFlags.p2pNonFatal) info('Emitting `initialized` event.' + p2pJoinTime)
   emitter.emit('initialized')
 
   return true

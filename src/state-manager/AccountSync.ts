@@ -24,6 +24,12 @@ import { safetyModeVals } from '../snapshot'
 const allZeroes64 = '0'.repeat(64)
 
 type SyncStatment = {
+
+  p2pJoinTime: number
+  timeBeforeDataSync: number
+  timeBeforeDataSync2: number
+  totalSyncTime: number
+
   cycleStarted: number
   cycleEnded: number
   numCycles: number
@@ -167,6 +173,11 @@ class AccountSync {
       numCycles: -1,
       syncComplete: false,
       numNodesOnStart: 0,
+      p2pJoinTime: Self.p2pJoinTime,
+
+      timeBeforeDataSync: 0,
+      timeBeforeDataSync2: 0,
+      totalSyncTime: 0,
 
       syncStartTime: 0,
       syncEndTime: 0,
@@ -418,17 +429,24 @@ class AccountSync {
       this.syncStatement.syncEndTime = this.syncStatement.syncStartTime
       this.syncStatement.numNodesOnStart = 0
 
+      this.syncStatement.p2pJoinTime = Self.p2pJoinTime
+
+      this.syncStatement.timeBeforeDataSync = (Date.now() - Self.p2pSyncEnd)/1000
+      this.syncStatement.timeBeforeDataSync2 = this.syncStatement.timeBeforeDataSync
+
       nestedCountersInstance.countEvent('sync', `sync comlete numCycles: ${this.syncStatement.numCycles} start:${this.syncStatement.cycleStarted} end:${this.syncStatement.cycleEnded}`)
 
       if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_syncStatement', ` `, `${utils.stringifyReduce(this.syncStatement)}`)
-      this.statemanager_fatal('shrd_sync_syncStatement-tempdebug', `${utils.stringifyReduce(this.syncStatement)}`)
 
       this.syncStatmentIsComplete()
-
+      this.statemanager_fatal('shrd_sync_syncStatement-tempdebug', `${utils.stringifyReduce(this.syncStatement)}`)
       return
     }
 
     this.isSyncingAcceptedTxs = true
+
+    this.syncStatement.timeBeforeDataSync = (Date.now() - Self.p2pSyncEnd)/1000
+
 
     await utils.sleep(5000) // Temporary delay to make it easier to attach a debugger
     if (logFlags.console) console.log('syncStateData start')
@@ -469,6 +487,8 @@ class AccountSync {
     this.syncStatement.cycleStarted = this.stateManager.currentCycleShardData.cycleNumber
     this.syncStatement.syncStartTime = Date.now()
     this.syncStatement.numNodesOnStart = this.stateManager.currentCycleShardData.activeNodes.length
+    this.syncStatement.p2pJoinTime = Self.p2pJoinTime
+
 
     // //DO NOT CHECK IN
     // if(this.syncStatement.numNodesOnStart >= 15) {
@@ -600,6 +620,9 @@ class AccountSync {
     this.createSyncTrackerByForGlobals(cycle, true)
 
     this.syncStatement.syncRanges = rangesToSync.length
+
+
+    this.syncStatement.timeBeforeDataSync2 = (Date.now() - Self.p2pSyncEnd)/1000
 
     // must get a list of globals before we can listen to any TXs, otherwise the isGlobal function returns bad values
     await this.stateManager.accountGlobals.getGlobalListEarly()
@@ -2400,6 +2423,9 @@ class AccountSync {
    *
    */
   syncStatmentIsComplete() {
+
+    this.syncStatement.totalSyncTime = (Date.now() - Self.p2pSyncStart) / 1000
+
     // place to hook in and read or send the sync statement
     this.isSyncStatementCompleted = true
     Context.reporter.reportSyncStatement(Self.id, this.syncStatement)

@@ -6,10 +6,13 @@ import { config, logger } from './Context'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import * as CycleCreator from './CycleCreator'
+import * as CycleChain from './CycleChain'
 
 /** STATE */
 
 let p2pLogger: Logger
+
+let lastLoggedCycle: number
 
 /** ROUTES */
 
@@ -33,6 +36,7 @@ export function init() {
 
   // Init state
   reset()
+  lastLoggedCycle = 0
 
   // Register routes
   for (const [name, handler] of Object.entries(routes.internal)) {
@@ -126,8 +130,11 @@ export function getExpiredRemoved(
     if (maxRemove > scaledAmountToShrink)
       maxRemove = scaledAmountToShrink
 
-    info('scale down dump:' + JSON.stringify({scaleFactor:CycleCreator.scaleFactor, desired, active, scaledAmountToShrink, maxRemove, expired  })  )
-
+    let cycle = CycleChain.newest.counter
+    if(cycle > lastLoggedCycle){
+      lastLoggedCycle = cycle
+      info('scale down dump:' + JSON.stringify({cycle, scaleFactor:CycleCreator.scaleFactor, desired, active, scaledAmountToShrink, maxRemove, expired  })  )
+    }
   } else {
     if (maxRemove > active - desired) maxRemove = active - desired
   }

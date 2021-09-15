@@ -732,8 +732,8 @@ class StateManager {
     nestedCountersInstance.countEvent('sync', `sync comlete numCycles: ${this.accountSync.syncStatement.numCycles} start:${this.accountSync.syncStatement.cycleStarted} end:${this.accountSync.syncStatement.cycleEnded}`)
     if(this.accountSync.syncStatement.internalFlag === true){
       if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_syncStatement', ` `, `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
+      this.accountSync.syncStatmentIsComplete()      
       this.statemanager_fatal('shrd_sync_syncStatement-tempdebug', `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
-      this.accountSync.syncStatmentIsComplete()
     } else{
       this.accountSync.syncStatement.internalFlag = true
     }
@@ -1300,8 +1300,8 @@ class StateManager {
 
     if(this.accountSync.syncStatement.internalFlag === true){
       if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_syncStatement', ` `, `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
+      this.accountSync.syncStatmentIsComplete()      
       this.statemanager_fatal('shrd_sync_syncStatement-tempdebug', `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
-      this.accountSync.syncStatmentIsComplete()
     } else{
       this.accountSync.syncStatement.internalFlag = true
     }
