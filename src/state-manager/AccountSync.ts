@@ -499,7 +499,7 @@ class AccountSync {
     let nodeShardData = this.stateManager.currentCycleShardData.nodeShardData
     if (logFlags.console) console.log('GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
 
-    let rangesToSync = [] as StateManagerTypes.shardFunctionTypes.AddressRange[]
+    let rangesToSync: StateManagerTypes.shardFunctionTypes.AddressRange[]
 
     let cycle = this.stateManager.currentCycleShardData.cycleNumber
 
@@ -511,10 +511,111 @@ class AccountSync {
     // chunksGuide === 4, would mean that in a network with many nodes most of the time we would have 4 ranges to sync.
     // there could be less ranges if the network is smaller.
     // TODO review that this is up to spec.
+    rangesToSync = this.initRangesToSync(nodeShardData, homePartition)
+    this.syncStatement.syncRanges = rangesToSync.length
+
+    for (let range of rangesToSync) {
+      // let nodes = ShardFunctions.getNodesThatCoverRange(this.stateManager.currentCycleShardData.shardGlobals, range.low, range.high, this.stateManager.currentCycleShardData.ourNode, this.stateManager.currentCycleShardData.activeNodes)
+      this.createSyncTrackerByRange(range, cycle, true)
+    }
+
+    this.createSyncTrackerByForGlobals(cycle, true)
+
+
+
+    this.syncStatement.timeBeforeDataSync2 = (Date.now() - Self.p2pSyncEnd)/1000
+
+    // must get a list of globals before we can listen to any TXs, otherwise the isGlobal function returns bad values
+    await this.stateManager.accountGlobals.getGlobalListEarly()
+    this.readyforTXs = true
+
+    if(this.useStateTable === true){
+      await utils.sleep(8000) // sleep to make sure we are listening to some txs before we sync them
+    }
+
+    //This has an inner loop that will process sync trackers one at a time.
+    //The outer while loop can be used to recalculate the list of sync trackers and try again
+    let breakCount = 0
+    let running = true
+    while(running){
+
+      try{
+        for (let syncTracker of this.syncTrackers) {
+          if(this.dataSyncMainPhaseComplete === true){
+            // this get set if we force sync to finish
+            running = false
+            break
+          }
+          // let partition = syncTracker.partition
+          if (logFlags.console) console.log(`syncTracker start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
+          if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+
+          syncTracker.syncStarted = true
+
+          if (syncTracker.isGlobalSyncTracker === false) {
+            if (this.softSync_earlyOut === true) {
+              // do nothing realtime sync will work on this later
+            } else {
+              await this.syncStateDataForRange(syncTracker.range)
+            }
+          } else {
+            if (logFlags.console) console.log(`syncTracker syncStateDataGlobals start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
+            await this.syncStateDataGlobals(syncTracker)
+          }
+          syncTracker.syncFinished = true
+
+          if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+          this.clearSyncData()
+        }
+        //if we get here without an exception that we are finished with the outer loop
+        running = false
+
+      } catch (error){
+
+        if(error.message.includes('reset-sync-ranges')){
+
+          this.statemanager_fatal(`mainSyncLoop_reset-sync-ranges`, 'DATASYNC: reset-sync-ranges: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+          
+          if(breakCount > 5){
+            this.statemanager_fatal(`mainSyncLoop_reset-sync-ranges-givingUP`,'too many tries' )
+            running = false
+            continue
+          }
+
+          breakCount++
+          this.clearSyncData()
+
+          let trackersToKeep = []
+          for (let syncTracker of this.syncTrackers){
+            //keep unfinished global sync trackers
+            if (syncTracker.isGlobalSyncTracker === true && syncTracker.syncFinished === false){
+              trackersToKeep.push(syncTracker)
+            }
+          }
+          this.syncTrackers = trackersToKeep
+          //init new non global trackers
+          rangesToSync = this.initRangesToSync(nodeShardData, homePartition)
+          this.syncStatement.syncRanges = rangesToSync.length
+          for (let range of rangesToSync) {
+            this.createSyncTrackerByRange(range, cycle, true)
+          }
+          continue //resume loop at top!
+
+        } else {
+          running = false
+        }
+      }
+    }
+    // if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, ` qId: ${txQueueEntry.entryID}`)
+    if (logFlags.console) console.log('syncStateData end' + '   time:' + Date.now())
+  }
+
+  private initRangesToSync(nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData, homePartition: number):StateManagerTypes.shardFunctionTypes.AddressRange[] {
     let chunksGuide = 4
     let syncRangeGoal = Math.max(1, Math.min(chunksGuide, Math.floor(this.stateManager.currentCycleShardData.shardGlobals.numPartitions / chunksGuide)))
     let partitionsCovered = 0
     let partitionsPerRange = 1
+    let rangesToSync = [] //, rangesToSync: StateManagerTypes.shardFunctionTypes.AddressRange[]
 
     if (nodeShardData.storedPartitions.rangeIsSplit === true) {
       partitionsCovered = nodeShardData.storedPartitions.partitionEnd1 - nodeShardData.storedPartitions.partitionStart1
@@ -541,7 +642,8 @@ class AccountSync {
         if (nextLowAddress != null) {
           range.low = nextLowAddress
         }
-        if (logFlags.console) console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition}  a1: ${range.low} a2: ${range.high}`)
+        if (logFlags.console)
+          console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition}  a1: ${range.low} a2: ${range.high}`)
         nextLowAddress = address2
         currentStart = currentEnd
         i++
@@ -564,7 +666,8 @@ class AccountSync {
         if (nextLowAddress != null) {
           range.low = nextLowAddress
         }
-        if (logFlags.console) console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition} a1: ${range.low} a2: ${range.high}`)
+        if (logFlags.console)
+          console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition} a1: ${range.low} a2: ${range.high}`)
 
         nextLowAddress = address2
         currentStart = currentEnd
@@ -596,7 +699,8 @@ class AccountSync {
         if (nextLowAddress != null) {
           range.low = nextLowAddress
         }
-        if (logFlags.console) console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition}  a1: ${range.low} a2: ${range.high}`)
+        if (logFlags.console)
+          console.log(`range ${i}  s:${currentStart} e:${currentEnd} h: ${homePartition}  a1: ${range.low} a2: ${range.high}`)
         nextLowAddress = address2
         currentStart = currentEnd
         i++
@@ -606,64 +710,15 @@ class AccountSync {
 
     // if we don't have a range to sync yet manually sync the whole range.
     if (rangesToSync.length === 0) {
-      if (logFlags.console) console.log(`syncStateData ranges: pushing full range, no ranges found`)
+      if (logFlags.console)
+        console.log(`syncStateData ranges: pushing full range, no ranges found`)
       let range = ShardFunctions.partitionToAddressRange2(this.stateManager.currentCycleShardData.shardGlobals, 0, this.stateManager.currentCycleShardData.shardGlobals.numPartitions - 1)
       rangesToSync.push(range)
     }
-    if (logFlags.console) console.log(`syncStateData ranges: ${utils.stringifyReduce(rangesToSync)}}`)
+    if (logFlags.console)
+      console.log(`syncStateData ranges: ${utils.stringifyReduce(rangesToSync)}}`)
 
-    for (let range of rangesToSync) {
-      // let nodes = ShardFunctions.getNodesThatCoverRange(this.stateManager.currentCycleShardData.shardGlobals, range.low, range.high, this.stateManager.currentCycleShardData.ourNode, this.stateManager.currentCycleShardData.activeNodes)
-      this.createSyncTrackerByRange(range, cycle, true)
-    }
-
-    this.createSyncTrackerByForGlobals(cycle, true)
-
-    this.syncStatement.syncRanges = rangesToSync.length
-
-
-    this.syncStatement.timeBeforeDataSync2 = (Date.now() - Self.p2pSyncEnd)/1000
-
-    // must get a list of globals before we can listen to any TXs, otherwise the isGlobal function returns bad values
-    await this.stateManager.accountGlobals.getGlobalListEarly()
-    this.readyforTXs = true
-
-    if(this.useStateTable === true){
-      await utils.sleep(8000) // sleep to make sure we are listening to some txs before we sync them
-    }
-
-
-    for (let syncTracker of this.syncTrackers) {
-
-      if(this.dataSyncMainPhaseComplete === true){
-        // this get set if we force sync to finish
-        break
-      }
-
-      // let partition = syncTracker.partition
-      if (logFlags.console) console.log(`syncTracker start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
-      if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
-
-      syncTracker.syncStarted = true
-
-      if (syncTracker.isGlobalSyncTracker === false) {
-        if (this.softSync_earlyOut === true) {
-          // do nothing realtime sync will work on this later
-        } else {
-          await this.syncStateDataForRange(syncTracker.range)
-        }
-      } else {
-        if (logFlags.console) console.log(`syncTracker syncStateDataGlobals start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
-        await this.syncStateDataGlobals(syncTracker)
-      }
-      syncTracker.syncFinished = true
-
-      if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
-      this.clearSyncData()
-    }
-
-    // if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, ` qId: ${txQueueEntry.entryID}`)
-    if (logFlags.console) console.log('syncStateData end' + '   time:' + Date.now())
+    return rangesToSync
   }
 
   /***
@@ -764,7 +819,12 @@ class AccountSync {
       nestedCountersInstance.countEvent('sync', `sync partition: ${partition} end: ${this.stateManager.currentCycleShardData.cycleNumber} accountsSynced:${accountsSaved} missing tx to repair: ${keysToRepair}`)
 
     } catch (error) {
-      if (error.message.includes('FailAndRestartPartition')) {
+      if(error.message.includes('reset-sync-ranges')){
+
+        this.statemanager_fatal(`syncStateDataForRange_reset-sync-ranges`, 'DATASYNC: reset-sync-ranges: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+        //buble up:
+        throw new Error('reset-sync-ranges')
+      } else if (error.message.includes('FailAndRestartPartition')) {
         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: Error Failed at: ${error.stack}`)
         this.statemanager_fatal(`syncStateDataForRange_ex_failandrestart`, 'DATASYNC: FailAndRestartPartition: ' + error.name + ': ' + error.message + ' at ' + error.stack)
         await this.failandRestart()
@@ -1389,6 +1449,15 @@ class AccountSync {
 
     if(this.useStateTable === false){
       this.getDataSourceNode(lowAddress, highAddress)
+    }
+
+
+    if(this.dataSourceNode === null){
+      //if we see this then getDataSourceNode failed.
+      // this is most likely because the ranges selected when we started sync are now invalid and too wide to be filled.
+
+      //throwing this specific error text will bubble us up to the main sync loop and cause re-init of all the non global sync ranges/trackers
+      throw new Error('reset-sync-ranges')
     }
 
     // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
