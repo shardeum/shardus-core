@@ -141,12 +141,24 @@ function calculateToAccept() {
   const expired = CycleChain.newest.expired
 
   maxJoin = Math.floor(maxJoin * CycleCreator.scaleFactor)
-
   // If in safetyMode, set syncMax to safetyNum
   let syncMax =
     CycleChain.newest.safetyMode === true
       ? CycleChain.newest.safetyNum
-      : Math.floor(config.p2p.maxSyncingPerCycle * CycleCreator.scaleFactor)
+      : Math.floor(config.p2p.maxSyncingPerCycle * CycleCreator.scaleFactor * CycleCreator.scaleFactorSyncBoost)
+
+  //The first batch of nodes to join the network after the seed node server can join at a higher rate if firstCycleJoin is set
+  //This first batch will sync the full data range from the seed node, which should be very little data
+  //This get the network rolling faster, but also allows us to use a slightly higher base join rate because
+  //we are not worrying on how it performs with small networks. < 25 nodes.
+  if(active === 0 && config.p2p.firstCycleJoin ){
+    maxJoin = Math.max(config.p2p.firstCycleJoin, maxJoin)
+    syncMax += config.p2p.firstCycleJoin
+  }
+  //For a few cycles we can boost the max sync to account for firstCycleJoin nodes.
+  if(CycleChain.newest.counter < 10 && config.p2p.firstCycleJoin){
+    syncMax += config.p2p.firstCycleJoin
+  }
 
   const canSync = syncMax - syncing
 
@@ -176,7 +188,7 @@ function calculateToAccept() {
   let cycle = CycleChain.newest.counter
   if(cycle > lastLoggedCycle){
     lastLoggedCycle = cycle
-    info('scale dump:' + JSON.stringify({cycle, scaleFactor:CycleCreator.scaleFactor,needed, desired, active, syncing, canSync, syncMax, maxJoin, expired  })  )
+    info('scale dump:' + JSON.stringify({cycle, scaleFactor:CycleCreator.scaleFactor,needed, desired, active, syncing, canSync, syncMax, maxJoin, expired ,scaleFactorSyncBoost:CycleCreator.scaleFactorSyncBoost  })  )
   }
   return needed
 }

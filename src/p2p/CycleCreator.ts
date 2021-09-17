@@ -53,7 +53,7 @@ export let currentCycle = 0
 export let nextQ1Start = 0
 
 export let scaleFactor: number = 1
-
+export let scaleFactorSyncBoost: number = 1
 
 let madeCycle = false // True if we successfully created the last cycle record, otherwise false
 // not used anymore
@@ -162,6 +162,18 @@ function updateScaleFactor(){
                        //  we can only count the minumum of the two. otherwise it would over boost scaling
   let networkParSize = 50 //num nodes where we want scale to be 1.0.   should be 50-100, can set to 5 for small network testing
   let consenusParSize = 5 //consenus size where we want the scale to be 1.0
+
+  // this is a bit hard coded, but basicaly the first 400 nodes in a network get a boost to max syncing allowes
+  // this should smooth out the joining process but make it so we dont need such high defaults for syncMax that 
+  // could become a problem when there are more nodes in the network later on.
+  if(activeNodeCount < 200){
+    scaleFactorSyncBoost = 2
+  } else if (activeNodeCount < 400){
+    scaleFactorSyncBoost = 1.5
+  } else {
+    scaleFactorSyncBoost = 1
+  }
+
   scaleFactor = Math.max((consensusRange / consenusParSize) * (activeNodeCount / networkParSize),1)
 }
 

@@ -544,6 +544,8 @@ export interface ShardusConfiguration {
     maxSyncingPerCycle?: number
     /** The maxRotatedPerCycle parameter is an Integer specifying the maximum number of nodes that can that can be rotated out of the network each cycle. */
     maxRotatedPerCycle?: number
+    /** A fixed boost to let more nodes in when we have just the one seed node in the network */
+    firstCycleJoin?: number
 
     /** The maxPercentOfDelta parameter is an Integer specifying the percent out of 100 that additional nodes can be accepted to the network. */
     maxPercentOfDelta?: number
