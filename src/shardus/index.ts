@@ -370,11 +370,13 @@ class Shardus extends EventEmitter {
       console.log('in Shardus got network timeout from', node)
       reportLost(node, 'timeout')
       /** [TODO] Report lost */
+      nestedCountersInstance.countEvent('lostNodes','timeout')
     })
     this.network.on('error', (node) => {
       console.log('in Shardus got network error from', node)
       reportLost(node, 'error')
       /** [TODO] Report lost */
+      nestedCountersInstance.countEvent('lostNodes','error')
     })
 
     // Setup storage

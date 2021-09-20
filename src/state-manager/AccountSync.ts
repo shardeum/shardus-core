@@ -585,20 +585,39 @@ class AccountSync {
           breakCount++
           this.clearSyncData()
 
+          let cleared = 0
+          let kept = 0
+          let newTrackers = 0
           let trackersToKeep = []
           for (let syncTracker of this.syncTrackers){
             //keep unfinished global sync trackers
             if (syncTracker.isGlobalSyncTracker === true && syncTracker.syncFinished === false){
               trackersToKeep.push(syncTracker)
+              kept++
+            } else {
+              cleared++
             }
           }
           this.syncTrackers = trackersToKeep
+
+          //get fresh nodeShardData, homePartition and cycle so that we can re init the sync ranges.
+          nodeShardData = this.stateManager.currentCycleShardData.nodeShardData
+          console.log('RETRYSYNC: GOT current cycle ' + '   time:' + utils.stringifyReduce(nodeShardData))
+          let lastCycle = cycle
+          cycle = this.stateManager.currentCycleShardData.cycleNumber
+          homePartition = nodeShardData.homePartition
+          console.log(`RETRYSYNC: homePartition: ${homePartition} storedPartitions: ${utils.stringifyReduce(nodeShardData.storedPartitions)}`)
+          
+          
           //init new non global trackers
           rangesToSync = this.initRangesToSync(nodeShardData, homePartition)
           this.syncStatement.syncRanges = rangesToSync.length
           for (let range of rangesToSync) {
             this.createSyncTrackerByRange(range, cycle, true)
+            newTrackers++
           }
+          nestedCountersInstance.countEvent('sync', `RETRYSYNC: lastCycle: ${lastCycle} cycle: ${cycle} ${JSON.stringify({cleared, kept, newTrackers})}`)
+
           continue //resume loop at top!
 
         } else {
