@@ -20,12 +20,14 @@ export let nestedCountersInstance: NestedCounters
 
 class NestedCounters {
   eventCounters: Map<string, CounterNode>
+  rareEventCounters: Map<string, CounterNode>
   crypto: Crypto
   infLoopDebug: boolean
 
   constructor() {
     // this.sectionTimes = {}
     this.eventCounters = new Map()
+    this.rareEventCounters = new Map()
     this.crypto = null
     nestedCountersInstance = this
     this.infLoopDebug = false
@@ -42,7 +44,7 @@ class NestedCounters {
         // let stream = fs.createWriteStream(reportPath, {
         //   flags: 'w'
         // })
-        
+
         res.write(`${Date.now()}\n`)
 
         this.printArrayReport(arrayReport, res, 0)
@@ -106,6 +108,35 @@ class NestedCounters {
       }
       nextNode.count += count
       counterMap = nextNode.subCounters
+  }
+
+  countRareEvent(category1: string, category2: string, count:number = 1) {
+    // trigger normal event counter
+    this.countEvent(category1, category2, count)
+
+    // start counting rare event
+    let counterMap: CounterMap = this.rareEventCounters
+
+    let nextNode:CounterNode = null
+    if (counterMap.has(category1) === false) {
+      nextNode = { count: 0, subCounters: new Map()}
+      counterMap.set(category1, nextNode)
+    } else {
+      nextNode = counterMap.get(category1)
+    }
+    nextNode.count += count
+    counterMap = nextNode.subCounters
+
+    //unrolled loop to avoid memory alloc
+    category1 = category2
+    if (counterMap.has(category1) === false) {
+      nextNode = { count: 0, subCounters: new Map() }
+      counterMap.set(category1, nextNode)
+    } else {
+      nextNode = counterMap.get(category1)
+    }
+    nextNode.count += count
+    counterMap = nextNode.subCounters
   }
 
   arrayitizeAndSort(counterMap) {

@@ -14,6 +14,7 @@ import Statistics from '../statistics'
 import Profiler from '../utils/profiler'
 import packageJson from '../../package.json'
 import { isDebugModeAnd } from '../debug'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 const http = require('../http')
 const allZeroes64 = '0'.repeat(64)
@@ -291,6 +292,15 @@ class Reporter {
     const isNodeLost = this.checkIsNodeLost(Self.id)
     const isNodeRefuted = this.checkIsNodeRefuted(Self.id)
     const isDataSynced = !this.stateManager.accountPatcher.failedLastTrieSync
+    let rareCounters = {}
+    // convert nested Map to nested Object
+    for (const [key, value] of nestedCountersInstance.rareEventCounters) {
+      rareCounters[key] = { ...value }
+      rareCounters[key].subCounters = {}
+      for (const [subKey, subValue] of value.subCounters) {
+        rareCounters[key].subCounters[subKey] = subValue
+      }
+    }
 
     try {
       await this._sendReport({
@@ -321,6 +331,7 @@ class Reporter {
         },
         queueLength,
         txTimeInQueue,
+        rareCounters,
         'isLost': isNodeLost,
         'isRefuted': isNodeRefuted,
         'shardusVersion': packageJson.version,
