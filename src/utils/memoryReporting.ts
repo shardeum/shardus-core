@@ -8,7 +8,7 @@ import Shardus from '../shardus'
 import StateManager from '../state-manager'
 import * as CycleCreator from '../p2p/CycleCreator'
 const os = require('os');
-
+import { nestedCountersInstance } from '../utils/nestedCounters'
 const process = require('process');
 import { resourceUsage } from 'process';
 
@@ -66,7 +66,8 @@ class MemoryReporting {
 
     })
     Context.network.registerExternalGet('memory-short', (req, res) => {
-      
+      nestedCountersInstance.countRareEvent('test', `memory-short`) // only here to so we can test the rare event counter system
+
       let toMB = 1/1000000
       let report = process.memoryUsage()
       res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
@@ -79,7 +80,7 @@ class MemoryReporting {
     })
 
     Context.network.registerExternalGet('memory-gc', (req, res) => {
-      
+
       res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
       try {
         if (global.gc) {
