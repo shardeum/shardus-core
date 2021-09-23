@@ -368,7 +368,7 @@ async function getActiveNodesFromArchiver() {
       nodeListUrl,
       Context.crypto.sign({
         nodeInfo,
-      })
+      }), false, 5000
     )
   } catch (e) {
     throw Error(
