@@ -171,7 +171,7 @@ function updateScaleFactor(){
   } else if (activeNodeCount < 400){
     scaleFactorSyncBoost = 1.5
   } else {
-    scaleFactorSyncBoost = 1
+    scaleFactorSyncBoost = 1.5
   }
 
   scaleFactor = Math.max((consensusRange / consenusParSize) * (activeNodeCount / networkParSize),1)
