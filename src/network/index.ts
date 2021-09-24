@@ -255,6 +255,7 @@ export class NetworkClass extends EventEmitter {
           const err = new Error(
             `Request timed out. ${utils.stringifyReduce(id)}`
           )
+          nestedCountersInstance.countRareEvent('network','timeout ' + route) 
           if (logFlags.error) this.mainLogger.error('Network: ' + err)
           if (logFlags.error) this.mainLogger.error(err.stack)
           this.emit('timeout', node)
