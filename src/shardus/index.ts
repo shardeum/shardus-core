@@ -29,6 +29,8 @@ import * as Archivers from '../p2p/Archivers'
 import * as AutoScaling from '../p2p/CycleAutoScale'
 import { currentCycle, currentQuarter } from '../p2p/CycleCreator'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { Handler } from 'express'
+import { isDebugModeMiddleware } from '../network/debugMiddleware'
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
@@ -44,6 +46,8 @@ const defaultConfigs = {
   storage: ShardusTypes.StorageConfiguration
 }
 Context.setDefaultConfigs(defaultConfigs)
+
+type RouteHandlerRegister = (route: string, responseHandler: Handler) => void;
 
 interface Shardus {
   io: SocketIO.Server
@@ -72,11 +76,11 @@ interface Shardus {
   rateLimiting: RateLimiting
   heartbeatInterval: number
   heartbeatTimer: NodeJS.Timeout
-  registerExternalGet: any
-  registerExternalPost: any
-  registerExternalPut: any
-  registerExternalDelete: any
-  registerExternalPatch: any
+  registerExternalGet: RouteHandlerRegister
+  registerExternalPost: RouteHandlerRegister
+  registerExternalPut: RouteHandlerRegister
+  registerExternalDelete: RouteHandlerRegister
+  registerExternalPatch: RouteHandlerRegister
   _listeners: any
 }
 
@@ -1455,18 +1459,18 @@ class Shardus extends EventEmitter {
    */
   _registerRoutes() {
     // DEBUG routes
-    // TODO: Remove eventually, or at least route guard these
-    this.network.registerExternalPost('exit', async (req, res) => {
+    this.network.registerExternalPost('exit', isDebugModeMiddleware, async (req, res) => {
       res.json({ success: true })
       await this.shutdown()
     })
 
-    this.network.registerExternalGet('config', async (req, res) => {
+    this.network.registerExternalGet('config', isDebugModeMiddleware, async (req, res) => {
       res.json({ config: this.config })
     })
     // FOR internal testing. NEEDS to be removed for security purposes
     this.network.registerExternalPost(
       'testGlobalAccountTX',
+      isDebugModeMiddleware,
       async (req, res) => {
         try {
           this.mainLogger.debug(
@@ -1498,6 +1502,7 @@ class Shardus extends EventEmitter {
 
     this.network.registerExternalPost(
       'testGlobalAccountTXSet',
+      isDebugModeMiddleware,
       async (req, res) => {
         try {
           this.mainLogger.debug(

@@ -5,6 +5,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { profilerInstance, NodeLoad } from '../utils/profiler'
 import * as Context from '../p2p/Context'
 import { memoryReportingInstance } from '../utils/memoryReporting'
+import { isDebugModeMiddleware } from '../network/debugMiddleware'
 interface LoadDetection {
   highThreshold: number /** if load > highThreshold, then scale up request */
   lowThreshold: number  /** if load < lowThreshold, then scale down request */
@@ -42,7 +43,7 @@ class LoadDetection extends EventEmitter {
      * 
      * Usage: http://<NODE_IP>:<NODE_EXT_PORT>/loadset?load=<DESIRED_LOAD>
      */
-    Context.network.registerExternalGet('loadset', (req, res) => {
+    Context.network.registerExternalGet('loadset', isDebugModeMiddleware, (req, res) => {
       if (req.query.load == null) return
       this.dbg = true
       this.load = Number(req.query.load)
@@ -54,7 +55,7 @@ class LoadDetection extends EventEmitter {
      * 
      * Usage: http://<NODE_IP>:<NODE_EXT_PORT>/loadreset
      */
-    Context.network.registerExternalGet('loadreset', (req, res) => {
+    Context.network.registerExternalGet('loadreset', isDebugModeMiddleware, (req, res) => {
       this.dbg = false
       console.log('reset load detection to normal behavior')
       res.send('reset load detection to normal behavior')

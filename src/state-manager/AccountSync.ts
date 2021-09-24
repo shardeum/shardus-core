@@ -20,6 +20,7 @@ import * as Self from '../p2p/Self'
 import { potentiallyRemoved } from '../p2p/NodeList'
 import { SyncTracker, SimpleRange, AccountStateHashReq, AccountStateHashResp, GetAccountStateReq, GetAccountData3Req, GetAccountDataByRangeSmart, GlobalAccountReportResp, GetAccountData3Resp, CycleShardData } from './state-manager-types'
 import { safetyModeVals } from '../snapshot'
+import { isDebugModeMiddleware } from '../network/debugMiddleware'
 
 const allZeroes64 = '0'.repeat(64)
 
@@ -339,14 +340,14 @@ class AccountSync {
       await respond(result)
     })
 
-    Context.network.registerExternalGet('sync-statement', (req, res) => {
+    Context.network.registerExternalGet('sync-statement', isDebugModeMiddleware, (req, res) => {
       res.write(`${utils.stringifyReduce(this.syncStatement)}\n`)
 
       res.end()
     })
 
     //TODO DEBUG DO NOT USE IN LIVE NETWORK
-    Context.network.registerExternalGet('sync-statement-all', async (req, res) => {
+    Context.network.registerExternalGet('sync-statement-all', isDebugModeMiddleware, async (req, res) => {
       try {
         //wow, why does Context.p2p not work..
         let activeNodes = Wrapper.p2p.state.getNodes()
@@ -377,7 +378,7 @@ class AccountSync {
       res.end()
     })
 
-    Context.network.registerExternalGet('forceFinishSync', (req, res) => {
+    Context.network.registerExternalGet('forceFinishSync', isDebugModeMiddleware, (req, res) => {
       res.write(`sync forcing complete. \n`)
       this.forceSyncComplete = true
       res.end()

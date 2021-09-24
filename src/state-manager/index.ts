@@ -40,6 +40,7 @@ import PartitionObjects from './PartitionObjects'
 import Depricated from './Depricated'
 import AccountPatcher from './AccountPatcher'
 import { CycleShardData, PartitionReceipt, FifoLockObjectMap, QueueEntry, AcceptedTx, AccountCopy, GetAccountDataByRangeSmart, WrappedStateArray, AccountHashCache, RequestReceiptForTxReq, RequestReceiptForTxResp, RequestStateForTxReqPost, RequestStateForTxResp, RequestTxResp, AppliedVote, GetAccountDataWithQueueHintsResp, DebugDumpPartitions, DebugDumpRangesCovered, DebugDumpNodesCovered, DebugDumpPartition, DebugDumpPartitionSkip, MainHashResults, SimpleDistanceObject, WrappedResponses, LocalCachedData, AccountFilter, StringBoolObjectMap, AppliedReceipt, CycleDebugNotes } from './state-manager-types'
+import { isDebugModeMiddleware } from '../network/debugMiddleware'
 
 /**
  * WrappedEventEmitter just a default extended WrappedEventEmitter
@@ -1186,7 +1187,7 @@ class StateManager {
     })
 
     //<pre id="json"></pre>
-    Context.network.registerExternalGet('debug_stats', (req, res) => {
+    Context.network.registerExternalGet('debug_stats', isDebugModeMiddleware, (req, res) => {
       let cycle = this.currentCycleShardData.cycleNumber - 1
 
       let cycleShardValues = null
@@ -1198,7 +1199,7 @@ class StateManager {
       res.json({ cycle, blob })
     })
 
-    Context.network.registerExternalGet('debug_stats2', (req, res) => {
+    Context.network.registerExternalGet('debug_stats2', isDebugModeMiddleware, (req, res) => {
       let cycle = this.currentCycleShardData.cycleNumber - 1
 
       let blob = {}

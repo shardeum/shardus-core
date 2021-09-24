@@ -2,7 +2,7 @@ import Sntp from '@hapi/sntp'
 import bodyParser from 'body-parser'
 import cors from 'cors'
 import { EventEmitter } from 'events'
-import express from 'express'
+import express, { Application, Handler } from 'express'
 import Log4js from 'log4js'
 import * as net from 'net'
 import { Sn } from 'shardus-net'
@@ -15,6 +15,7 @@ import { profilerInstance } from '../utils/profiler'
 import NatAPI = require('nat-api')
 import * as Shardus from '../shardus/shardus-types'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { isDebugMode } from '../debug'
 
 /** TYPES */
 export interface IPInfo {
@@ -35,16 +36,15 @@ export let ipInfo: IPInfo
 /** CLASS */
 
 export class NetworkClass extends EventEmitter {
-  app: any
+  app: Application
   io: SocketIO.Server
-  server: any
   sn: any
   logger: Logger
   mainLogger: Log4js.Logger
   netLogger: Log4js.Logger
   timeout: number
   internalRoutes: {}
-  externalRoutes: any[]
+  externalRoutes: Array<(app: Application) => void>
   extServer: any
   intServer: any
   verboseLogsNet: boolean
@@ -53,6 +53,7 @@ export class NetworkClass extends EventEmitter {
   ipInfo: any
   externalCatchAll: any
   debugNetworkDelay: number
+
   constructor(config: Shardus.ShardusConfiguration, logger: Logger) {
     super()
     this.app = express()
@@ -321,14 +322,22 @@ export class NetworkClass extends EventEmitter {
     }
   }
 
-  _registerExternal(method, route, handler) {
+  _registerExternal(method: string, route: string, responseHandler: Handler)
+  _registerExternal(method: string, route: string, authHandler: Handler, responseHandler: Handler)
+  _registerExternal(method: string, route: string, authHandler: Handler, responseHandler?: Handler) {
     const formattedRoute = `/${route}`
+    const handlers = [];
 
-    const self = this
-    let wrappedHandler = handler
+    // This logic normalizes the optional parameter of the method signature.
+    // If the responseHandler is null, then the value set as the authHandler param is actually the responseHandler.
+    if (!responseHandler) {
+      responseHandler = authHandler;
+      authHandler = null;
+    }
+
     if (logFlags.playback) {
-      wrappedHandler = function (req, res) {
-        self.logger.playbackLog(
+      const playbackHandler = (req, res, next) => {
+        this.logger.playbackLog(
           req.hostname,
           'self',
           'ExternalHttpReq',
@@ -336,49 +345,53 @@ export class NetworkClass extends EventEmitter {
           '',
           { params: req.params, body: req.body }
         )
-        return handler(req, res)
+
+        next()
       }
-    }
-    wrappedHandler = async function (req, res) {
-      await handler(req, res)
-      profilerInstance.profileSectionEnd('net-externl', false)
-      profilerInstance.profileSectionEnd(`net-externl-${route}`, false)
+
+      handlers.push(playbackHandler)
     }
 
-    const startProfiler = (req, res, next) => {
-      profilerInstance.profileSectionStart('net-externl', false)
-      profilerInstance.profileSectionStart(`net-externl-${route}`, false)
-      next()
+    if (authHandler) {
+      handlers.push(authHandler)
     }
-    switch (method) {
-      case 'GET':
-        this.externalRoutes.push((app) => {
-          app.get(formattedRoute, startProfiler, wrappedHandler)
-        })
-        break
-      case 'POST':
-        this.externalRoutes.push((app) => {
-          app.post(formattedRoute, startProfiler, wrappedHandler)
-        })
-        break
-      case 'PUT':
-        this.externalRoutes.push((app) => {
-          app.put(formattedRoute, wrappedHandler)
-        })
-        break
-      case 'DELETE':
-        this.externalRoutes.push((app) => {
-          app.delete(formattedRoute, wrappedHandler)
-        })
-        break
-      case 'PATCH':
-        this.externalRoutes.push((app) => {
-          app.patch(formattedRoute, wrappedHandler)
-        })
-        break
-      default:
-        throw new Error('Fatal: Invalid HTTP method for handler.')
+
+    if (isDebugMode() && ['GET', 'POST'].includes(method)) {
+      const wrappedHandler = async (req, res, next) => {
+          profilerInstance.profileSectionStart('net-externl', false)
+          profilerInstance.profileSectionStart(`net-externl-${route}`, false)
+
+          let result;
+          try {
+            result = await responseHandler(req, res, next)
+          } finally {
+            profilerInstance.profileSectionEnd('net-externl', false)
+            profilerInstance.profileSectionEnd(`net-externl-${route}`, false)
+          }
+
+          return result
+      }
+
+      handlers.push(wrappedHandler)
+    } else {
+      handlers.push(responseHandler)
     }
+
+    let expressMethod = ({
+      GET: 'get',
+      POST: 'post',
+      PUT: 'put',
+      DELETE: 'delete',
+      PATCH: 'patch'
+    })[method]
+
+    if (!expressMethod) {
+      throw new Error(`Fatal: Invalid HTTP method for handler ${method}.`)
+    }
+
+    this.externalRoutes.push((app) => {
+      app[expressMethod](formattedRoute, handlers)
+    })
 
     if (this.extServer && this.extServer.listening) {
       this._applyExternal()
@@ -396,27 +409,37 @@ export class NetworkClass extends EventEmitter {
     this.externalCatchAll = handler
   }
 
-  registerExternalGet(route, handler) {
-    this._registerExternal('GET', route, handler)
+  registerExternalGet(route: string, responseHandler: Handler)
+  registerExternalGet(route: string, authHandler: Handler, responseHandler: Handler)
+  registerExternalGet(route: string, authHandler: Handler, responseHandler?: Handler) {
+    this._registerExternal('GET', route, authHandler, responseHandler)
   }
 
-  registerExternalPost(route, handler) {
-    this._registerExternal('POST', route, handler)
+  registerExternalPost(route: string, responseHandler: Handler)
+  registerExternalPost(route: string, authHandler: Handler, responseHandler: Handler)
+  registerExternalPost(route: string, authHandler: Handler, responseHandler?: Handler) {
+    this._registerExternal('POST', route, authHandler, responseHandler)
   }
 
-  registerExternalPut(route, handler) {
-    this._registerExternal('PUT', route, handler)
+  registerExternalPut(route: string, responseHandler: Handler)
+  registerExternalPut(route: string, authHandler: Handler, responseHandler: Handler)
+  registerExternalPut(route: string, authHandler: Handler, responseHandler?: Handler) {
+    this._registerExternal('PUT', route, authHandler, responseHandler)
   }
 
-  registerExternalDelete(route, handler) {
-    this._registerExternal('DELETE', route, handler)
+  registerExternalDelete(route: string, responseHandler: Handler)
+  registerExternalDelete(route: string, authHandler: Handler, responseHandler: Handler)
+  registerExternalDelete(route: string, authHandler: Handler, responseHandler?: Handler) {
+    this._registerExternal('DELETE', route, authHandler, responseHandler)
   }
 
-  registerExternalPatch(route, handler) {
-    this._registerExternal('PATCH', route, handler)
+  registerExternalPatch(route: string, responseHandler: Handler)
+  registerExternalPatch(route: string, authHandler: Handler, responseHandler: Handler)
+  registerExternalPatch(route: string, authHandler: Handler, responseHandler?: Handler) {
+    this._registerExternal('PATCH', route, authHandler, responseHandler)
   }
 
-  registerInternal(route, handler) {
+  registerInternal(route: string, handler: Handler) {
     if (this.internalRoutes[route])
       throw Error('Handler already exists for specified internal route.')
     this.internalRoutes[route] = handler

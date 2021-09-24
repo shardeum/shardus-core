@@ -17,6 +17,7 @@ import * as Comms from '../p2p/Comms'
 import * as Context from '../p2p/Context'
 import * as Wrapper from '../p2p/Wrapper'
 import { AccountHashCache, AccountHashCacheHistory, AccountIDAndHash, AccountPreTest, HashTrieAccountDataRequest, HashTrieAccountDataResponse, HashTrieAccountsResp, HashTrieNode, HashTrieRadixCoverage, HashTrieReq, HashTrieResp, HashTrieSyncConsensus, HashTrieSyncTell, HashTrieUpdateStats, RadixAndChildHashes, RadixAndHash, ShardedHashTrie, TrieAccount, CycleShardData } from './state-manager-types'
+import { isDebugModeMiddleware } from '../network/debugMiddleware'
 //import { all } from 'deepmerge'
 //import { Node } from '../p2p/Types'
 
@@ -371,7 +372,7 @@ class AccountPatcher {
     })
 
 
-    Context.network.registerExternalGet('debug-patcher-ignore-hash-updates', (req, res) => {
+    Context.network.registerExternalGet('debug-patcher-ignore-hash-updates', isDebugModeMiddleware, (req, res) => {
       try{
         this.debug_ignoreUpdates = !this.debug_ignoreUpdates
         res.write(`this.debug_ignoreUpdates: ${this.debug_ignoreUpdates}\n`)  
@@ -380,7 +381,7 @@ class AccountPatcher {
       }
       res.end()
     })
-    Context.network.registerExternalGet('debug-patcher-fail-tx', (req, res) => {
+    Context.network.registerExternalGet('debug-patcher-fail-tx', isDebugModeMiddleware, (req, res) => {
       try{
         //toggle chance to fail TXs in a way that they do not get fixed by the first tier of repair.
 
@@ -396,7 +397,7 @@ class AccountPatcher {
       }
       res.end()
     })
-    Context.network.registerExternalGet('debug-patcher-dumpTree', (req, res) => {
+    Context.network.registerExternalGet('debug-patcher-dumpTree', isDebugModeMiddleware, (req, res) => {
       try{
         this.statemanager_fatal('debug shardTrie',`temp shardTrie ${utils.stringifyReduce(this.shardTrie.layerMaps[0].values().next().value)}`)
         res.write(`${utils.stringifyReduce(this.shardTrie.layerMaps[0].values().next().value)}\n`)  
@@ -406,14 +407,14 @@ class AccountPatcher {
       res.end()
     })
 
-    Context.network.registerExternalGet('get-tree-last-insync', (req, res) => {
+    Context.network.registerExternalGet('get-tree-last-insync', isDebugModeMiddleware, (req, res) => {
       res.write(`${this.failedLastTrieSync === false}\n`)
 
       res.end()
     })
 
     //TODO DEBUG DO NOT USE IN LIVE NETWORK
-    Context.network.registerExternalGet('get-tree-last-insync-all', async (req, res) => {
+    Context.network.registerExternalGet('get-tree-last-insync-all', isDebugModeMiddleware, async (req, res) => {
       try {
         //wow, why does Context.p2p not work..
         let oosCount = 0
@@ -438,19 +439,19 @@ class AccountPatcher {
     })
   
 
-    Context.network.registerExternalGet('trie-repair-dump', (req, res) => {
+    Context.network.registerExternalGet('trie-repair-dump', isDebugModeMiddleware, (req, res) => {
       res.write(`${utils.stringifyReduce(this.lastRepairInfo)}\n`)
       res.end()
     })
 
     //
-    Context.network.registerExternalGet('get-shard-dump', (req, res) => {
+    Context.network.registerExternalGet('get-shard-dump', isDebugModeMiddleware, (req, res) => {
       res.write(`${this.stateManager.lastShardReport}\n`)
       res.end()
     })
 
     //TODO DEBUG DO NOT USE IN LIVE NETWORK
-    Context.network.registerExternalGet('get-shard-dump-all', async (req, res) => {
+    Context.network.registerExternalGet('get-shard-dump-all', isDebugModeMiddleware, async (req, res) => {
       try {
         //wow, why does Context.p2p not work..
         res.write(`last shard reports \n`)
@@ -470,7 +471,7 @@ class AccountPatcher {
       res.end()
     })
 
-    Context.network.registerExternalGet('get-shard-report-all', async (req, res) => {
+    Context.network.registerExternalGet('get-shard-report-all', isDebugModeMiddleware, async (req, res) => {
       try {
         //wow, why does Context.p2p not work..
         res.write(`building shard report \n`)
@@ -497,9 +498,9 @@ class AccountPatcher {
      * 
      * Usage: http://<NODE_IP>:<NODE_EXT_PORT>/account-report?id=<accountID>
      */
-    Context.network.registerExternalGet('account-report', async (req, res) => {
+    Context.network.registerExternalGet('account-report', isDebugModeMiddleware, async (req, res) => {
       if (req.query.id == null) return
-      let id = req.query.id
+      let id = req.query.id as string
       res.write(`report for: ${id} \n`)
       try {
         if(id.length === 10){

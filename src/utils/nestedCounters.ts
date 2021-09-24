@@ -4,6 +4,7 @@ import { Utils } from 'sequelize/types'
 import * as Context from '../p2p/Context'
 import * as utils from '../utils'
 import Crypto from "../crypto"
+import { isDebugModeMiddleware } from '../network/debugMiddleware'
 
 // process.hrtime.bigint()
 
@@ -35,7 +36,7 @@ class NestedCounters {
   }
 
   registerEndpoints() {
-    Context.network.registerExternalGet('counts', (req, res) => {
+    Context.network.registerExternalGet('counts', isDebugModeMiddleware, (req, res) => {
 
         // let counterMap = utils.deepCopy(this.eventCounters)
         let arrayReport = this.arrayitizeAndSort(this.eventCounters)
@@ -52,7 +53,7 @@ class NestedCounters {
 
       //res.json(utils.stringifyReduce(this.eventCounters))
     })
-    Context.network.registerExternalGet('counts-reset', (req, res) => {
+    Context.network.registerExternalGet('counts-reset', isDebugModeMiddleware, (req, res) => {
 
       this.eventCounters = new Map()
       res.write(`counts reset ${Date.now()}`)
@@ -60,7 +61,7 @@ class NestedCounters {
 
   })
 
-    Context.network.registerExternalGet('debug-inf-loop', (req, res) => {
+    Context.network.registerExternalGet('debug-inf-loop', isDebugModeMiddleware, (req, res) => {
         res.write('starting inf loop, goodbye')
         res.end()
         let counter = 1
@@ -77,7 +78,7 @@ class NestedCounters {
 
     })
 
-    Context.network.registerExternalGet('debug-inf-loop-off', (req, res) => {
+    Context.network.registerExternalGet('debug-inf-loop-off', isDebugModeMiddleware, (req, res) => {
         this.infLoopDebug = false
         res.write('stopping inf loop, who knows if this is possible')
         res.end()

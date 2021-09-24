@@ -4,6 +4,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 import { memoryReportingInstance } from '../utils/memoryReporting'
 import { sleep } from '../utils/functions/time'
 import { resolveTxt } from 'dns'
+import { isDebugModeMiddleware } from '../network/debugMiddleware'
 
 const NS_PER_SEC = 1e9
 
@@ -40,7 +41,7 @@ class Profiler {
   }
 
   registerEndpoints() {
-    Context.network.registerExternalGet('perf', (req, res) => {
+    Context.network.registerExternalGet('perf', isDebugModeMiddleware, (req, res) => {
       let result = this.printAndClearReport(1)
       //res.json({result })
 
@@ -48,8 +49,8 @@ class Profiler {
       res.end()
     })
 
-    Context.network.registerExternalGet('combined-debug', async (req, res) => {
-      const waitTime = req.query.wait || 60
+    Context.network.registerExternalGet('combined-debug', isDebugModeMiddleware, async (req, res) => {
+      const waitTime = Number.parseInt(req.query.wait as string, 10) || 60
 
       // hit "counts-reset" endpoint
       this.eventCounters = new Map()

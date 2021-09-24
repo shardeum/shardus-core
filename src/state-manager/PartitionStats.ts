@@ -15,6 +15,7 @@ import { StateManager as StateManagerTypes } from 'shardus-types'
 import * as Context from '../p2p/Context'
 import * as Wrapper from '../p2p/Wrapper'
 import { requestNetworkDownsize } from '../p2p/CycleAutoScale'
+import { isDebugModeMiddleware } from '../network/debugMiddleware'
 
 /**
  * PartitionStats is a system that allows the dapp to build custom anonymous tallies of accounts and committed TXs.
@@ -132,7 +133,7 @@ class PartitionStats {
      *
      * Usage: http://<NODE_IP>:<NODE_EXT_PORT>/get-stats-dum?cycle=x
      */
-    Context.network.registerExternalGet('get-stats-dump', (req, res) => {
+    Context.network.registerExternalGet('get-stats-dump', isDebugModeMiddleware, (req, res) => {
       let cycle = this.stateManager.currentCycleShardData.cycleNumber - 2
 
       if (req.query.cycle != null) {
@@ -155,7 +156,7 @@ class PartitionStats {
      *
      * Usage: http://<NODE_IP>:<NODE_EXT_PORT>/get-stats-report-all?raw=<true/fale>
      */
-    Context.network.registerExternalGet('get-stats-report-all', async (req, res) => {
+    Context.network.registerExternalGet('get-stats-report-all', isDebugModeMiddleware, async (req, res) => {
       try {
         let raw = req.query.raw
 

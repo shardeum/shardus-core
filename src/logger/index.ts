@@ -10,6 +10,7 @@ const stringify = require('fast-stable-stringify')
 const log4jsExtend = require('log4js-extend')
 import got from 'got'
 import { parse as parseUrl } from 'url'
+import { isDebugModeMiddleware } from '../network/debugMiddleware'
 
 interface Logger {
   baseDir: string
@@ -317,7 +318,7 @@ class Logger {
 
 
   registerEndpoints(Context) {
-    Context.network.registerExternalGet('log-fatal', (req, res) => {
+    Context.network.registerExternalGet('log-fatal', isDebugModeMiddleware, (req, res) => {
 
       this.setFatalFlags()
 
@@ -327,7 +328,7 @@ class Logger {
 
       res.end()
     })
-    Context.network.registerExternalGet('log-default', (req, res) => {
+    Context.network.registerExternalGet('log-default', isDebugModeMiddleware, (req, res) => {
       this.setDefaultFlags()
 
       for (const [key, value] of Object.entries(logFlags)) {
@@ -337,8 +338,8 @@ class Logger {
     })
 
 
-    //TODO DEBUG DO NOT USE IN LIVE NETWORK
-    Context.network.registerExternalGet('log-default-all', (req, res) => {
+    // DO NOT USE IN LIVE NETWORK
+    Context.network.registerExternalGet('log-default-all', isDebugModeMiddleware, (req, res) => {
       this.setDefaultFlags()
 
       try{
@@ -366,8 +367,8 @@ class Logger {
       res.end()
     })
 
-    //TODO DEBUG DO NOT USE IN LIVE NETWORK
-    Context.network.registerExternalGet('log-fatal-all', (req, res) => {
+    // DO NOT USE IN LIVE NETWORK
+    Context.network.registerExternalGet('log-fatal-all', isDebugModeMiddleware, (req, res) => {
       this.setFatalFlags()
       try{
         let activeNodes = Context.p2p.state.getNodes()

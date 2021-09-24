@@ -11,6 +11,7 @@ const os = require('os');
 import { nestedCountersInstance } from '../utils/nestedCounters'
 const process = require('process');
 import { resourceUsage } from 'process';
+import { isDebugModeMiddleware } from '../network/debugMiddleware'
 
 // process.hrtime.bigint()
 
@@ -50,7 +51,7 @@ class MemoryReporting {
   }
 
   registerEndpoints() {
-    Context.network.registerExternalGet('memory', (req, res) => {
+    Context.network.registerExternalGet('memory', isDebugModeMiddleware, (req, res) => {
         let toMB = 1/1000000
         let report = process.memoryUsage()
         res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
@@ -65,7 +66,7 @@ class MemoryReporting {
         res.end()
 
     })
-    Context.network.registerExternalGet('memory-short', (req, res) => {
+    Context.network.registerExternalGet('memory-short', isDebugModeMiddleware, (req, res) => {
       nestedCountersInstance.countRareEvent('test', `memory-short`) // only here to so we can test the rare event counter system
 
       let toMB = 1/1000000
@@ -79,7 +80,7 @@ class MemoryReporting {
       res.end()
     })
 
-    Context.network.registerExternalGet('memory-gc', (req, res) => {
+    Context.network.registerExternalGet('memory-gc', isDebugModeMiddleware, (req, res) => {
 
       res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
       try {
@@ -95,7 +96,7 @@ class MemoryReporting {
       res.end()
     })
 
-    Context.network.registerExternalGet('scaleFactor', (req, res) => {
+    Context.network.registerExternalGet('scaleFactor', isDebugModeMiddleware, (req, res) => {
       
       res.write(`Scale debug  Timestamp: ${Date.now()}\n`)
       try {

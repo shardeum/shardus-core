@@ -2,6 +2,7 @@ import path from 'path'
 import { NetworkClass } from '../network'
 import zlib from 'zlib'
 import Trie from 'trie-prefix-tree'
+import { isDebugModeMiddleware } from '../network/debugMiddleware'
 const tar = require('tar-fs')
 
 interface Debug {
@@ -60,7 +61,7 @@ class Debug {
   }
 
   _registerRoutes() {
-    this.network.registerExternalGet('debug', (req, res) => {
+    this.network.registerExternalGet('debug', isDebugModeMiddleware, (req, res) => {
       const archive = this.createArchiveStream()
       const gzip = zlib.createGzip()
       res.set(
