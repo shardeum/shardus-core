@@ -2401,6 +2401,21 @@ class AccountSync {
     } catch (ex) {
       if (logFlags.debug) this.mainLogger.debug('syncRuntimeTrackers: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       this.statemanager_fatal(`syncRuntimeTrackers_ex`, 'syncRuntimeTrackers: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+
+      //clear out sync trackers and let repair handle it if needed.
+      let cleared = this.syncTrackers.length
+      let kept = 0
+      let newTrackers = 0
+
+      let cycle = this.stateManager.currentCycleShardData.cycleNumber
+      let lastCycle = cycle - 1
+
+      nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: runtime. lastCycle: ${lastCycle} cycle: ${cycle} ${JSON.stringify({cleared, kept, newTrackers})}`)
+
+      // clear all sync trackers.  
+      this.syncTrackers = []
+      // may need to think more about this.. what if multiple nodes fail sync and then cast bad votes in subsequent updates?
+
     } finally {
       this.runtimeSyncTrackerSyncing = false
     }
