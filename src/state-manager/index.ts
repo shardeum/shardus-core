@@ -710,6 +710,10 @@ class StateManager {
   // }
 
   async startCatchUpQueue() {
+
+    //make sure we have cycle shard data.
+    await this.waitForShardData('startCatchUpQueue')
+
     await this._firstTimeQueueAwait()
 
     if (logFlags.console) console.log('syncStateData startCatchUpQueue ' + '   time:' + Date.now())
@@ -1567,11 +1571,16 @@ class StateManager {
     //this.shardLogger.debug(utils.stringifyReduce(partitionDump))
   }
 
-  async waitForShardData() {
+  async waitForShardData(counterMsg:string = '') {
     // wait for shard data
     while (this.currentCycleShardData == null) {
       this.getCurrentCycleShardData()
       await utils.sleep(1000)
+
+      if(counterMsg.length > 0){
+        nestedCountersInstance.countRareEvent('sync' , `waitForShardData ${counterMsg}` )
+      }
+      
       if (logFlags.playback) this.logger.playbackLogNote('_waitForShardData', ` `, ` ${utils.stringifyReduce(this.currentCycleShardData)} `)
     }
   }
