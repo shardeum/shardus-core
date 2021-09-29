@@ -83,7 +83,8 @@ class TransactionQueue {
     this.newAcceptedTxQueueTempInjestByID = new Map()
     this.archivedQueueEntriesByID = new Map()
 
-    this.archivedQueueEntryMaxCount = 50000
+    this.archivedQueueEntryMaxCount = 15000 // was 50000 but this too high
+                                            // 15k will fit into memory and should persist long enough at desired loads 
     this.newAcceptedTxQueueRunning = false
 
     this.processingLastRunTime = 0
