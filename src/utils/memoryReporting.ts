@@ -110,6 +110,13 @@ class MemoryReporting {
   }
 
 
+  getMemoryStringBasic(){
+    let toMB = 1/1000000
+    let report = process.memoryUsage()
+    return `rss: ${(report.rss * toMB).toFixed(2)} MB\n`
+  }
+
+
   addToReport(category:string, subcat:string, itemKey:string, count:number){
     let obj = {category, subcat, itemKey, count}
     this.report.push(obj)

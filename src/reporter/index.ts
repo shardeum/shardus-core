@@ -15,6 +15,7 @@ import Profiler from '../utils/profiler'
 import packageJson from '../../package.json'
 import { isDebugModeAnd } from '../debug'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { memoryReportingInstance } from '../utils/memoryReporting'
 
 const http = require('../http')
 const allZeroes64 = '0'.repeat(64)
@@ -355,6 +356,10 @@ class Reporter {
     const self = this
     setInterval(() => {
       self.collectStatisticToReport()
+
+      //temp mem debugging:
+      this.mainLogger.info(memoryReportingInstance.getMemoryStringBasic() )
+
     }, 1000)
     // Creates and sends a report every `interval` seconds
     this.reportTimer = setTimeout(() => {
