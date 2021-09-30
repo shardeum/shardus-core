@@ -83,8 +83,8 @@ class TransactionQueue {
     this.newAcceptedTxQueueTempInjestByID = new Map()
     this.archivedQueueEntriesByID = new Map()
 
-    this.archivedQueueEntryMaxCount = 15000 // was 50000 but this too high
-                                            // 15k will fit into memory and should persist long enough at desired loads 
+    this.archivedQueueEntryMaxCount = 10000 // was 50000 but this too high
+                                            // 10k will fit into memory and should persist long enough at desired loads 
     this.newAcceptedTxQueueRunning = false
 
     this.processingLastRunTime = 0
@@ -962,6 +962,7 @@ class TransactionQueue {
     if (queueEntry != null) {
       return queueEntry
     }
+    nestedCountersInstance.countRareEvent('error', `getQueueEntryArchived no entry: ${msg}`)
     if (logFlags.error) this.mainLogger.error(`getQueueEntryArchived failed to find: ${utils.stringifyReduce(txid)} ${msg} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(txid)]}`)
     return null
   }
