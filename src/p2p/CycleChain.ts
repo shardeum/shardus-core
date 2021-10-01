@@ -73,7 +73,14 @@ export function getCycleChain(start, end = start + 100) {
 
   return cycles.slice(relStart, relEnd + 1)
 }
-export function getCycleByTimestamp(timestamp) {
+
+/**
+ * Find a stored cycle with a timestamp.
+ * This will fail if a timestamp is newer or older than cycles stored on this node
+ * getCycleNumberFromTimestamp() will allow for predictions about future or past cycles.
+ * @param timestamp
+ */
+export function getStoredCycleByTimestamp(timestamp) {
   let secondsTs = Math.floor(timestamp * 0.001)
   // search from end, to improve normal case perf
   for (let i = cycles.length - 1; i >= 0; i--) {
@@ -85,9 +92,21 @@ export function getCycleByTimestamp(timestamp) {
   return null
 }
 
-export function getCycleNumberFromTimestamp(timestamp : number, allowOlder: boolean = true) {
+/**
+ * Get a cycle from a timestamp.
+ * Future timestamps are allowed. Timestamps for cycles older than stored are allow if the allowOlder flag is set 
+ * @param timestamp timestamp of the TX.  NOTE by default the sync settle time will be added.  set addSyncSettleTime = false to avoid this
+ * @param allowOlder this allows calculating a cycle number for a cycle that is not stored. 
+ * @param addSyncSettleTime add in the sync settle time to the request.
+ */
+export function getCycleNumberFromTimestamp(timestamp : number, allowOlder: boolean = true, addSyncSettleTime: boolean = true) {
     let currentCycleShardData = stateManager.getCurrentCycleShardData()
-    let offsetTimestamp = timestamp + stateManager.syncSettleTime
+
+    let offsetTimestamp = timestamp
+
+    if(addSyncSettleTime){
+      offsetTimestamp = timestamp + stateManager.syncSettleTime
+    }
 
     if(timestamp < 1 || timestamp == null){
       let stack = new Error().stack
@@ -99,16 +118,16 @@ export function getCycleNumberFromTimestamp(timestamp : number, allowOlder: bool
       if(currentCycleShardData.cycleNumber == null){
         stateManager.statemanager_fatal('getCycleNumberFromTimestamp failed. cycleNumber == null', 'currentCycleShardData.cycleNumber == null')
         nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber fail')
-        const cycle = getCycleByTimestamp(offsetTimestamp)
-        console.log("CycleChain.getCycleByTimestamp",cycle)
+        const cycle = getStoredCycleByTimestamp(offsetTimestamp)
+        console.log("CycleChain.getCycleNumberFromTimestamp getStoredCycleByTimestamp",cycle, timestamp)
         if (cycle != null) {
           stateManager.statemanager_fatal('getCycleNumberFromTimestamp failed fatal redeemed', 'currentCycleShardData.cycleNumber == null, fatal redeemed')
           nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber redeemed')
           return cycle.counter
         } else {
           //debug only!!!
-          let cycle2 = getCycleByTimestamp(offsetTimestamp)
-          stateManager.statemanager_fatal('getCycleNumberFromTimestamp failed fatal not redeemed', 'getCycleByTimestamp cycleNumber == null not redeemed')
+          let cycle2 = getStoredCycleByTimestamp(offsetTimestamp)
+          stateManager.statemanager_fatal('getCycleNumberFromTimestamp failed fatal not redeemed', 'getStoredCycleByTimestamp cycleNumber == null not redeemed')
           nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'currentCycleShardData.cycleNumber failed to redeem')
         }
       } else {
@@ -135,7 +154,7 @@ export function getCycleNumberFromTimestamp(timestamp : number, allowOlder: bool
     if (allowOlder === true) {
       //cycle is in the past, by process of elimination
       // let offsetSeconds = Math.floor(offsetTimestamp * 0.001)
-      const cycle = getCycleByTimestamp(offsetTimestamp)
+      const cycle = getStoredCycleByTimestamp(offsetTimestamp)
       if (cycle != null) {
         nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup')
         if(cycle.counter == null){

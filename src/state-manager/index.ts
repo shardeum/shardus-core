@@ -861,7 +861,6 @@ class StateManager {
     }
   }
 
-  // TSConversion TODO need to fix some any types
   async checkAndSetAccountData(accountRecords: Shardus.WrappedData[], note: string, processStats: boolean, updatedAccounts:string[] = null): Promise<string[]> {
     let accountsToAdd: any[] = []
     let failedHashes: string[] = []
@@ -869,8 +868,10 @@ class StateManager {
       let { accountId, stateId, data: recordData, timestamp } = wrapedAccount
       let hash = this.app.calculateAccountHash(recordData)
       let cycleToRecordOn = CycleChain.getCycleNumberFromTimestamp(wrapedAccount.timestamp)
-      if(cycleToRecordOn == null){
-        this.statemanager_fatal(`checkAndSetAccountData cycleToRecordOn==null`, `checkAndSetAccountData cycleToRecordOn==null ${wrapedAccount.timestamp}` )
+      if(cycleToRecordOn <= -1){
+        this.statemanager_fatal(`checkAndSetAccountData cycleToRecordOn==-1`, `checkAndSetAccountData cycleToRecordOn==-1 ${wrapedAccount.timestamp}` )
+        failedHashes.push(accountId)
+        return failedHashes
       }
       //TODO per remove this when we are satisfied with the situation
       //Additional testing to cache if we try to overrite with older data
@@ -1912,35 +1913,48 @@ class StateManager {
   async updateAccountsCopyTable(accountDataList: Shardus.AccountData[], repairing: boolean, txTimestamp: number) {
     let cycleNumber = -1
 
-    let cycle = CycleChain.getCycleByTimestamp(txTimestamp + this.syncSettleTime)
-        console.log("CycleChain.getCycleByTimestamp",cycle)
-        console.log("OLD CycleChain.getCycleByTimestamp", this.p2p.state.getCycleByTimestamp(txTimestamp + this.syncSettleTime))
-    let cycleOffset = 0
-    // todo review this assumption. seems ok at the moment.  are there times cycle could be null and getting the last cycle is not a valid answer?
-    if (cycle == null) {
-      cycle = CycleChain.getNewest()
-      // if (logFlags.verbose) if (logFlags.error) this.mainLogger.error( `updateAccountsCopyTable error getting cycle by timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle returned:${cycle.counter} `)
-      cycleOffset = 1
+    let timePlusSettle = txTimestamp + this.syncSettleTime //tx timestamp + settle time to determine what cycle to save in
+    
+    //use different function to get cycle number
+    let cycle = CycleChain.getCycleNumberFromTimestamp(txTimestamp)
+    cycleNumber = cycle
+
+    if(cycleNumber <= -1){
+      this.statemanager_fatal(`updateAccountsCopyTable cycleToRecordOn==-1`, `updateAccountsCopyTable cycleToRecordOn==-1 ${timePlusSettle}` )
+      return
     }
-    cycleNumber = cycle.counter + cycleOffset
+
+    //let cycle = CycleChain.getStoredCycleByTimestamp(timePlusSettle)
+    //console.log("CycleChain.getCycleByTimestamp",cycle, timePlusSettle)
+    //console.log("OLD CycleChain.getCycleByTimestamp", this.p2p.state.getCycleByTimestamp(timePlusSettle), timePlusSettle)
+
+    // let cycleOffset = 0
+    // todo review this assumption. seems ok at the moment.  are there times cycle could be null and getting the last cycle is not a valid answer?
+    // if (cycle == null) {
+    //   cycle = CycleChain.getNewest()
+    //   // if (logFlags.verbose) if (logFlags.error) this.mainLogger.error( `updateAccountsCopyTable error getting cycle by timestamp: ${accountDataList[0].timestamp} offsetTime: ${this.syncSettleTime} cycle returned:${cycle.counter} `)
+    //   cycleOffset = 1
+    // }
+    // cycleNumber = cycle.counter + cycleOffset
 
     // extra safety testing
     // TODO !!!  if cycle durations become variable we need to update this logic
-    let cycleStart = (cycle.start + cycle.duration * cycleOffset) * 1000
-    let cycleEnd = (cycle.start + cycle.duration * (cycleOffset + 1)) * 1000
-    if (txTimestamp + this.syncSettleTime < cycleStart) {
-      if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`updateAccountsCopyTable time error< ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
-    }
-    if (txTimestamp + this.syncSettleTime >= cycleEnd) {
-      // if (logFlags.verbose) if (logFlags.error) this.mainLogger.error( `updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
-      cycleOffset++
-      cycleNumber = cycle.counter + cycleOffset
-      cycleStart = (cycle.start + cycle.duration * cycleOffset) * 1000
-      cycleEnd = (cycle.start + cycle.duration * (cycleOffset + 1)) * 1000
-      if (txTimestamp + this.syncSettleTime >= cycleEnd) {
-        if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
-      }
-    }
+    // let cycleStart = (cycle.start + cycle.duration * cycleOffset) * 1000
+    // let cycleEnd = (cycle.start + cycle.duration * (cycleOffset + 1)) * 1000
+    // if (timePlusSettle < cycleStart) {
+    //   if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`updateAccountsCopyTable time error< ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+    // }
+    // if (timePlusSettle >= cycleEnd) {
+    //   // if (logFlags.verbose) if (logFlags.error) this.mainLogger.error( `updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+    //   cycleOffset++
+    //   cycleNumber = cycle.counter + cycleOffset
+    //   cycleStart = (cycle.start + cycle.duration * cycleOffset) * 1000
+    //   cycleEnd = (cycle.start + cycle.duration * (cycleOffset + 1)) * 1000
+    //   if (timePlusSettle >= cycleEnd) {
+    //     if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`updateAccountsCopyTable time error>= ts:${txTimestamp} cs:${cycleStart} ce:${cycleEnd} `)
+    //   }
+    // }
+
     // TSConversion need to sort out account types!!!
     // @ts-ignore This has seemed fine in past so not going to sort out a type discrepencie here.  !== would detect and log it anyhow.
     if (accountDataList.length > 0 && accountDataList[0].timestamp !== txTimestamp) {

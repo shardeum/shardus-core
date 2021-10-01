@@ -83,7 +83,7 @@ class TransactionQueue {
     this.newAcceptedTxQueueTempInjestByID = new Map()
     this.archivedQueueEntriesByID = new Map()
 
-    this.archivedQueueEntryMaxCount = 10000 // was 50000 but this too high
+    this.archivedQueueEntryMaxCount = 5000 // was 50000 but this too high
                                             // 10k will fit into memory and should persist long enough at desired loads 
     this.newAcceptedTxQueueRunning = false
 
@@ -727,7 +727,7 @@ class TransactionQueue {
         // calculate information needed for receiptmap
         //txQueueEntry.cycleToRecordOn = this.stateManager.getCycleNumberFromTimestamp(timestamp)
         txQueueEntry.cycleToRecordOn = CycleChain.getCycleNumberFromTimestamp(timestamp)
-        console.log("Cycle number from timestamp", timestamp, txQueueEntry.cycleToRecordOn)
+        if (logFlags.verbose) console.log("Cycle number from timestamp", timestamp, txQueueEntry.cycleToRecordOn)
         if (txQueueEntry.cycleToRecordOn < 0) {
           nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'caused Enqueue fail')
           if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`routeAndQueueAcceptedTransaction failed to calculate cycle ${timestamp} error code:${txQueueEntry.cycleToRecordOn}`)
