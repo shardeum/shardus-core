@@ -257,13 +257,29 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord) {
   applyNodeListChange(changes)
   CycleChain.append(cycle)
 
-  info(`
+  let nodeLimit = 2 //todo set this to a higher number, but for now I want to make sure it works in a small test
+  if(NodeList.activeByIdOrder.length <= nodeLimit){
+    info(`
+      Digested C${cycle.counter}
+        cycle record: ${JSON.stringify(cycle)}
+        cycle changes: ${JSON.stringify(changes)}
+        node list: ${JSON.stringify([...NodeList.nodes.values()])}
+        active nodes: ${JSON.stringify(NodeList.activeByIdOrder)}
+    `)    
+  } else {
+    info(`
     Digested C${cycle.counter}
       cycle record: ${JSON.stringify(cycle)}
       cycle changes: ${JSON.stringify(changes)}
-      node list: ${JSON.stringify([...NodeList.nodes.values()])}
-      active nodes: ${JSON.stringify(NodeList.activeByIdOrder)}
-  `)
+      node list: too many to list: ${NodeList.nodes.size}
+      active nodes: too many to list: ${NodeList.activeByIdOrder.length}
+    `)
+
+  }
+
+
+
+
 }
 
 function applyNodeListChange(change: P2P.CycleParserTypes.Change) {

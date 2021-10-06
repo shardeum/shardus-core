@@ -418,10 +418,13 @@ class Shardus extends EventEmitter {
         },
         timers: ['txTimeInQueue'],
         manualStats: ['netInternalDuty', 'netExternalDuty', 'cpuPercent' ],
+        ringOverrides: { cpuPercent : 60 }
       },
       this
     )
     this.debug.addToArchive('./statistics.tsv', './statistics.tsv')
+
+    this.statistics
 
     this.loadDetection = new LoadDetection(
       this.config.loadDetection,

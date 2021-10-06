@@ -20,6 +20,7 @@ interface Statistics {
   watchers: any
   timers: any
   manualStats: { [name: string]: ManualRing }
+  ringOverrides: {[override:string]: number}
 }
 
 class Statistics extends EventEmitter {
@@ -31,11 +32,13 @@ class Statistics extends EventEmitter {
       watchers = {},
       timers = [],
       manualStats = [],
+      ringOverrides = {}
     }: {
       counters: string[]
       watchers: any
       timers: any
       manualStats: string[]
+      ringOverrides: {[override:string]: number}
     },
     context
   ) {
@@ -47,6 +50,8 @@ class Statistics extends EventEmitter {
     this.watcherDefs = watchers
     this.timerDefs = timers
     this.manualStatDefs = manualStats
+    this.ringOverrides = ringOverrides
+
     this.initialize()
 
     this.interval = null
@@ -66,7 +71,7 @@ class Statistics extends EventEmitter {
     this.counters = this._initializeCounters(this.counterDefs)
     this.watchers = this._initializeWatchers(this.watcherDefs, this.context)
     this.timers = this._initializeTimers(this.timerDefs)
-    this.manualStats = this._initializeManualStats(this.manualStatDefs)
+    this.manualStats = this._initializeManualStats(this.manualStatDefs, this.ringOverrides)
   }
 
   getStream() {
@@ -154,6 +159,15 @@ class Statistics extends EventEmitter {
     return ringHolder.ring.average()
   }
 
+  getMultiStatReport(name) {
+    const ringHolder =
+      this.counters[name] || this.watchers[name] || this.timers[name] || this.manualStats[name]
+    if (!ringHolder.ring) throw new Error(`Ring holder '${name}' is undefined.`)
+
+    return ringHolder.ring.multiStats()
+
+  }
+
   // Returns the value of the last element of the given WatcherRing, CounterRing, or TimerRing
   getPreviousElement(name) {
     const ringHolder =
@@ -187,10 +201,14 @@ class Statistics extends EventEmitter {
     return timers
   }
 
-  _initializeManualStats(counterDefs = []) {
+  _initializeManualStats(counterDefs = [], ringOverrides = {}) {
     const manualStats = {}
     for (const name of counterDefs) {
-      manualStats[name] = new ManualRing(10) //should it be a config
+      let count = 10
+      if(ringOverrides[name] != null){
+        count = ringOverrides[name]
+      }
+      manualStats[name] = new ManualRing(count) //should it be a config
     }
     return manualStats
   }
@@ -263,6 +281,33 @@ class Ring {
     }
     return total > 0 ? sum / total : 0
   }
+
+  multiStats() {
+    let sum = 0
+    let total = 0
+    let min = Number.MAX_VALUE
+    let max = Number.MIN_VALUE
+    let allVals = []
+    for (const element of this.elements) {
+      if (_exists(element)) {
+        let val = Number(element)
+        sum += 
+        total++
+
+        if(val < min) {
+          min = val
+        }
+        if(val > max){
+          max = val
+        }
+        allVals.push(val)
+      }
+    }
+    let avg =  total > 0 ? sum / total : 0
+    return {min, max, avg, allVals}
+  }
+
+
   previous() {
     const prevIndex = (this.index < 1 ? this.elements.length : this.index) - 1
     return this.elements[prevIndex] || 0

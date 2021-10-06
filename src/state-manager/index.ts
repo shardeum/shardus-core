@@ -164,6 +164,8 @@ class StateManager {
   processCycleSummaries: boolean // controls if we execute processPreviousCycleSummaries() at cycle_q1_start
 
   cycleDebugNotes : CycleDebugNotes
+
+  superLargeNetworkDebugReduction: boolean
   /***
    *     ######   #######  ##    ##  ######  ######## ########  ##     ##  ######  ########  #######  ########
    *    ##    ## ##     ## ###   ## ##    ##    ##    ##     ## ##     ## ##    ##    ##    ##     ## ##     ##
@@ -313,6 +315,8 @@ class StateManager {
 
     this.lastShardReport = ''
     //if (logFlags.playback) this.logger.playbackLogNote('canDataRepair', `0`, `canDataRepair: ${this.canDataRepair}  `)
+
+    this.superLargeNetworkDebugReduction = true
   }
 
   configsInit() {
@@ -2519,7 +2523,7 @@ class StateManager {
     }
     this.profiler.profileSectionEnd('stateManager_processPreviousCycleSummaries_buildStatsReport')
 
-
+    
     
     // build partition hashes from previous full cycle
     let mainHashResults: MainHashResults = null
@@ -2547,7 +2551,18 @@ class StateManager {
     this.eventEmitter.emit('cycleTxsFinalized', cycleShardValues, receiptMapResults, statsClump, mainHashResults)
 
     if (this.debugFeature_dumpAccountData === true) {
-      this.dumpAccountDebugData2(mainHashResults)
+      if(this.superLargeNetworkDebugReduction === true || logFlags.verbose){
+        //log just the node IDS and cycle number even this may be too much eventually
+        let partitionDump = { cycle, allNodeIds:[]}
+        for (let node of this.currentCycleShardData.activeNodes) {
+          partitionDump.allNodeIds.push(utils.makeShortHash(node.id))
+        }
+        this.lastShardReport = utils.stringifyReduce(partitionDump)
+        this.shardLogger.debug(this.lastShardReport)
+      } else {
+        this.dumpAccountDebugData2(mainHashResults) //more detailed work
+      }
+      
     }
 
     // pre-allocate the next two cycles if needed

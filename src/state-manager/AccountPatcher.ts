@@ -59,6 +59,10 @@ class AccountPatcher {
   debug_ignoreUpdates: boolean
 
   failedLastTrieSync: boolean
+  failStartCycle: number
+  failEndCycle: number
+  failRepairsCounter: number
+  syncFailHistory: {s:number,e:number, cycles:number, repaired:number}[]
 
   sendHashesToEdgeNodes: boolean
 
@@ -122,6 +126,11 @@ class AccountPatcher {
     this.radixIsStored = new Map()
 
     this.lastRepairInfo = 'none'
+
+    this.failStartCycle = -1
+    this.failEndCycle = -1
+    this.failRepairsCounter = 0
+    this.syncFailHistory = []
   }
 
   hashObj(value:any){
@@ -1790,6 +1799,9 @@ isRadixStored(cycle:number, radix:string){
   async testAndPatchAccounts(cycle){
     // let updateStats = this.upateShardTrie(cycle)
     // nestedCountersInstance.countEvent(`accountPatcher`, `totalAccountsHashed`, updateStats.totalAccountsHashed)
+
+    let lastFail = this.failedLastTrieSync
+
     this.failedLastTrieSync = false
 
     let trieRepairDump = {
@@ -1810,6 +1822,17 @@ isRadixStored(cycle:number, radix:string){
     }
 
     if(this.isInSync(cycle) === false){
+      let failHistoryObject
+      if(lastFail === false){
+        this.failStartCycle = cycle
+        this.failEndCycle = -1
+        this.failRepairsCounter = 0
+        failHistoryObject = {s:this.failStartCycle, e:this.failEndCycle, cycles: 1, repaired: this.failRepairsCounter}
+        this.syncFailHistory.push(failHistoryObject)
+      } else {
+        failHistoryObject = this.syncFailHistory[this.syncFailHistory.length -1]
+      }
+
 
       let results = await this.findBadAccounts(cycle)
       nestedCountersInstance.countEvent(`accountPatcher`, `badAccounts c:${cycle} `, results.badAccounts.length)
@@ -1949,10 +1972,27 @@ isRadixStored(cycle:number, radix:string){
 
       this.lastRepairInfo = trieRepairDump
 
+      //update the repair count
+      failHistoryObject.repaired += appliedFixes
+
       //This is something that can be checked with debug endpoints get-tree-last-insync-all / get-tree-last-insync
       this.failedLastTrieSync = true
     } else {
       nestedCountersInstance.countEvent(`accountPatcher`, `inSync`)
+      
+      if(lastFail === true){
+        let failHistoryObject = this.syncFailHistory[this.syncFailHistory.length -1]
+        this.failEndCycle = cycle
+        failHistoryObject.e = this.failEndCycle
+        failHistoryObject.cycles = this.failEndCycle - this.failStartCycle
+
+        nestedCountersInstance.countEvent(`accountPatcher`, `inSync again. ${JSON.stringify(this.syncFailHistory[this.syncFailHistory.length -1])}`)
+
+        //this is not really a fatal log so should be removed eventually. is is somewhat usefull context though when debugging.
+        this.statemanager_fatal(`inSync again`,  JSON.stringify(this.syncFailHistory))
+      }
+
+      
     }
 
   }
