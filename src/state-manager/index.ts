@@ -2553,7 +2553,7 @@ class StateManager {
     if (this.debugFeature_dumpAccountData === true) {
       if(this.superLargeNetworkDebugReduction === true || logFlags.verbose){
         //log just the node IDS and cycle number even this may be too much eventually
-        let partitionDump = { cycle, allNodeIds:[]}
+        let partitionDump = { cycle:cycleShardValues.cycleNumber, allNodeIds:[]}
         for (let node of this.currentCycleShardData.activeNodes) {
           partitionDump.allNodeIds.push(utils.makeShortHash(node.id))
         }

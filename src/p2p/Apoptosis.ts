@@ -28,6 +28,7 @@ import { currentCycle, currentQuarter } from './CycleCreator'
 import { activeByIdOrder, byIdOrder, byPubKey, nodes } from './NodeList'
 import * as Self from './Self'
 import { robustQuery } from './Utils'
+import { isDebugMode } from '../debug'
 
 /** STATE */
 
@@ -38,12 +39,10 @@ export const cycleUpdatesName = 'apoptosis'
 const internalRouteName = 'apoptosize'
 const gossipRouteName = 'apoptosis'
 
-// [TODO] - This enables the /stop debug route and should be set to false after testing
-//          Normally oter parts of the program can just call apoptosizeSelf()
-const allowStopRoute = true
-
 let p2pLogger
 const proposals: { [id: string]: P2P.ApoptosisTypes.SignedApoptosisProposal } = {}
+
+
 
 /** ROUTES */
 
@@ -51,7 +50,7 @@ const stopExternalRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'stop',
   handler: (_req, res) => {
-    if (allowStopRoute){
+    if (isDebugMode()){
       res.json({status: 'goodbye cruel world'})
       apoptosizeSelf()
     }
@@ -62,11 +61,11 @@ const failExternalRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'fail',
   handler: (_req, res) => {
-    if (allowStopRoute){
+    if (isDebugMode()){
       warn ('fail route invoked in Apoptosis; used to test unclean exit')
-      let x = undefined
-      console.log(x.a)
-//      throw Error('fail route invoked in Apoptosis; used to test unclean exit')
+      //let fail_endpoint_debug = undefined
+      //console.log(fail_endpoint_debug.forced)
+      throw Error('fail_endpoint_debug') 
     }
   },
 }
