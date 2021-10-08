@@ -553,6 +553,7 @@ class TransactionQueue {
         }
         let homeNode = ShardFunctions.findHomeNode(this.stateManager.currentCycleShardData.shardGlobals, key, this.stateManager.currentCycleShardData.parititionShardDataMap)
         if (homeNode == null) {
+          nestedCountersInstance.countRareEvent('fatal', 'updateHomeInformation homeNode == null')
           throw new Error(`updateHomeInformation homeNode == null ${key}`)
         }
         txQueueEntry.homeNodes[key] = homeNode

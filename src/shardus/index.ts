@@ -585,6 +585,7 @@ class Shardus extends EventEmitter {
         'Shardus: caught apoptosized event; finished clean up'
       )
 */
+      nestedCountersInstance.countRareEvent('fatal', 'exitCleanly: apoptosized (not technically fatal)')
       this.mainLogger.info('exitCleanly: apoptosized')
       if (this.reporter) {
         this.reporter.stopReporting()

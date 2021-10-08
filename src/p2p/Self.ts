@@ -16,6 +16,7 @@ import * as GlobalAccounts from './GlobalAccounts'
 import * as Join from './Join'
 import * as NodeList from './NodeList'
 import * as Sync from './Sync'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 /** STATE */
 
@@ -371,6 +372,7 @@ async function getActiveNodesFromArchiver() {
       }), false, 5000
     )
   } catch (e) {
+    nestedCountersInstance.countRareEvent('fatal', 'Could not get seed list from seed node server')
     throw Error(
       `Fatal: Could not get seed list from seed node server ${nodeListUrl}: ` +
         e.message
