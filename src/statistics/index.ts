@@ -291,7 +291,7 @@ class Ring {
     for (const element of this.elements) {
       if (_exists(element)) {
         let val = Number(element)
-        sum += 
+        sum += val
         total++
 
         if(val < min) {
