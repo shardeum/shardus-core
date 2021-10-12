@@ -11,6 +11,7 @@ import { ChangeSquasher, parse } from './CycleParser'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { robustQuery } from './Utils'
+import { profilerInstance } from '../utils/profiler'
 
 /** STATE */
 
@@ -22,8 +23,10 @@ const newestCycleRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'sync-newest-cycle',
   handler: (_req, res) => {
+    profilerInstance.scopedProfileSectionStart('Endpoint-newest-cycle')
     const newestCycle = CycleChain.newest ? CycleChain.newest : undefined
     res.json({ newestCycle })
+    profilerInstance.scopedProfileSectionEnd('Endpoint-newest-cycle')
   },
 }
 
@@ -31,23 +34,30 @@ const cyclesRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'POST',
   name: 'sync-cycles',
   handler: (req, res) => {
-    let err = validateTypes(req, { body: 'o' })
-    if (err) {
-      warn('sync-cycles bad req ' + err)
-      res.json([])
-      return
+    profilerInstance.scopedProfileSectionStart('Endpoint-sync-cycles')
+    try {
+      let err = validateTypes(req, { body: 'o' })
+      if (err) {
+        warn('sync-cycles bad req ' + err)
+        res.json([])
+        return
+      }
+      err = validateTypes(req.body, { start: 'n?', end: 'n?' })
+      if (err) {
+        warn('sync-cycles bad req.body ' + err)
+        res.json([])
+        return
+      }
+      const start = req.body.start | 0
+      const end = req.body.end
+      // const cycles = p2p.state.getCycles(start, end)
+      const cycles = CycleChain.getCycleChain(start, end)
+      res.json(cycles)
+    } catch(e) {
+      warn('sync-cycles', e)
+    } finally {
+      profilerInstance.scopedProfileSectionEnd('Endpoint-sync-cycles')
     }
-    err = validateTypes(req.body, { start: 'n?', end: 'n?' })
-    if (err) {
-      warn('sync-cycles bad req.body ' + err)
-      res.json([])
-      return
-    }
-    const start = req.body.start | 0
-    const end = req.body.end
-    // const cycles = p2p.state.getCycles(start, end)
-    const cycles = CycleChain.getCycleChain(start, end)
-    res.json(cycles)
   },
 }
 
@@ -265,7 +275,7 @@ export function digestCycle(cycle: P2P.CycleCreatorTypes.CycleRecord) {
         cycle changes: ${JSON.stringify(changes)}
         node list: ${JSON.stringify([...NodeList.nodes.values()])}
         active nodes: ${JSON.stringify(NodeList.activeByIdOrder)}
-    `)    
+    `)
   } else {
     info(`
     Digested C${cycle.counter}

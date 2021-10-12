@@ -102,8 +102,10 @@ const compareMarkerRoute: P2P.P2PTypes.InternalHandler<
   CompareMarkerReq,
   CompareMarkerRes
 > = (payload, respond, sender) => {
+  profilerInstance.scopedProfileSectionStart('Endpoint_compareMarker')
   const req = payload
   respond(compareCycleMarkersEndpoint(req))
+  profilerInstance.scopedProfileSectionStart('Endpoint_compareMarker')
 }
 
 const compareCertRoute: P2P.P2PTypes.InternalHandler<
@@ -111,7 +113,9 @@ const compareCertRoute: P2P.P2PTypes.InternalHandler<
   CompareCertRes,
   P2P.NodeListTypes.Node['id']
 > = (payload, respond, sender) => {
+  profilerInstance.scopedProfileSectionStart('Endpoint_compareCert')
   respond(compareCycleCertEndpoint(payload, sender))
+  profilerInstance.scopedProfileSectionEnd('Endpoint_compareCert')
 }
 
 const gossipCertRoute: P2P.P2PTypes.GossipHandler<CompareCertReq, P2P.NodeListTypes.Node['id']> = (
@@ -164,7 +168,7 @@ function updateScaleFactor(){
   let consenusParSize = 5 //consenus size where we want the scale to be 1.0
 
   // this is a bit hard coded, but basicaly the first 400 nodes in a network get a boost to max syncing allowes
-  // this should smooth out the joining process but make it so we dont need such high defaults for syncMax that 
+  // this should smooth out the joining process but make it so we dont need such high defaults for syncMax that
   // could become a problem when there are more nodes in the network later on.
   if(activeNodeCount < 200){
     scaleFactorSyncBoost = 2

@@ -23,6 +23,7 @@ export interface NodeLoad {
 export let profilerInstance: Profiler
 class Profiler {
   sectionTimes: any
+  scopedSectionTimes: any
   eventCounters: Map<string, Map<string, number>>
   stackHeight: number
   netInternalStackHeight: number
@@ -30,6 +31,7 @@ class Profiler {
 
   constructor() {
     this.sectionTimes = {}
+    this.scopedSectionTimes = {}
     this.eventCounters = new Map()
     this.stackHeight = 0
     this.netInternalStackHeight = 0
@@ -43,6 +45,14 @@ class Profiler {
   registerEndpoints() {
     Context.network.registerExternalGet('perf', isDebugModeMiddleware, (req, res) => {
       let result = this.printAndClearReport(1)
+      //res.json({result })
+
+      res.write(result)
+      res.end()
+    })
+
+    Context.network.registerExternalGet('perf-scoped', isDebugModeMiddleware, (req, res) => {
+      let result = this.printAndClearScopedReport(1)
       //res.json({result })
 
       res.write(result)
@@ -179,6 +189,44 @@ class Profiler {
     }
   }
 
+  scopedProfileSectionStart(sectionName, internal = false) {
+    let section = this.scopedSectionTimes[sectionName]
+
+    if (section != null && section.started === true) {
+      return
+    }
+
+    if (section == null) {
+      const t = BigInt(0)
+      const max = BigInt(0)
+      const min = BigInt(0)
+      const avg = BigInt(0)
+      section = { name: sectionName, total: t, max, min, avg, c: 0, internal }
+      this.scopedSectionTimes[sectionName] = section
+    }
+
+    section.start = process.hrtime.bigint()
+    section.started = true
+    section.c++
+  }
+
+  scopedProfileSectionEnd(sectionName, internal = false) {
+    const section = this.scopedSectionTimes[sectionName]
+    if (section == null || section.started === false) {
+      if (profilerSelfReporting) return
+    }
+
+    section.end = process.hrtime.bigint()
+
+    const duration = section.end - section.start
+    section.total += duration
+    section.c += 1
+    if (duration > section.max) section.max = duration
+    if (duration < section.min) section.min = duration
+    section.avg = section.total / BigInt(section.c)
+    section.started = false
+  }
+
   cleanInt(x) {
     x = Number(x)
     return x >= 0 ? Math.floor(x) : Math.ceil(x)
@@ -238,6 +286,18 @@ class Profiler {
       }
     }
   }
+  clearScopedTimes() {
+    for (let key in this.scopedSectionTimes) {
+      if (this.scopedSectionTimes.hasOwnProperty(key)) {
+        let section = this.scopedSectionTimes[key]
+        section.total = BigInt(0)
+        section.max = BigInt(0)
+        section.min = BigInt(0)
+        section.avg = BigInt(0)
+        section.c = 0
+      }
+    }
+  }
 
   printAndClearReport(delta?: number): string {
     this.profileSectionEnd('_total', true)
@@ -283,6 +343,33 @@ class Profiler {
     this.clearTimes()
 
     this.profileSectionStart('_total', true)
+    return result
+  }
+
+  printAndClearScopedReport(delta?: number): string {
+    let result = 'Scoped Profile Sections:\n'
+    let d1 = this.cleanInt(1e6) // will get us ms
+    let divider = BigInt(d1)
+
+    let lines = []
+    for (let key in this.scopedSectionTimes) {
+      if (this.scopedSectionTimes.hasOwnProperty(key)) {
+        let section = this.scopedSectionTimes[key]
+        const percent = BigInt(100)
+        const avgMs = Number((section.avg * percent) / divider) / 100
+        const maxMs = Number((section.max * percent) / divider) / 100
+        const minMs = Number((section.min * percent) / divider) / 100
+        const totalMs = Number((section.total * percent) / divider) / 100
+        let line = `Avg: ${avgMs}ms ${section.name.padEnd(30)}, Max: ${maxMs}ms,  Min: ${minMs}ms,  Total: ${totalMs}ms, #:${
+          section.c
+        }`
+        lines.push({ line, avgMs })
+      }
+    }
+    lines.sort((l1, l2) => Number(l2.avgMs - l1.avgMs))
+    result = result + lines.map((line) => line.line).join('\n')
+
+    this.clearScopedTimes()
     return result
   }
 }

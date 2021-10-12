@@ -1,3 +1,5 @@
+import { profilerInstance } from './profiler'
+
 const NS_PER_SEC = 1e9
 
 import { Utils } from 'sequelize/types'
@@ -38,6 +40,7 @@ class NestedCounters {
   registerEndpoints() {
     Context.network.registerExternalGet('counts', isDebugModeMiddleware, (req, res) => {
 
+      profilerInstance.scopedProfileSectionStart('Endpoint_counts')
         // let counterMap = utils.deepCopy(this.eventCounters)
         let arrayReport = this.arrayitizeAndSort(this.eventCounters)
 
@@ -50,6 +53,7 @@ class NestedCounters {
 
         this.printArrayReport(arrayReport, res, 0)
         res.end()
+      profilerInstance.scopedProfileSectionEnd('Endpoint_counts')
 
       //res.json(utils.stringifyReduce(this.eventCounters))
     })
