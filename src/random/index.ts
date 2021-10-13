@@ -1,12 +1,12 @@
-let crypto
+let _crypto
 try {
-  crypto = require('crypto')
+  _crypto = require('crypto')
 } catch (err) {
   console.log('Crypto support is disabled!')
 }
 
 const generateSeed = () => {
-  const bytes = crypto.randomBytes(16)
+  const bytes = _crypto.randomBytes(16)
   return bytes.toString('hex')
 }
 

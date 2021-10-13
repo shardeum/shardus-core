@@ -2,7 +2,7 @@
   "name": "shardus-global-server",
   "version": "2.3.0",
   "engines": {
-    "node": "^12.18.3"
+    "node": "^16.11.1"
   },
   "description": "The Shardus Global Server",
   "main": "./build/src/index.js",
