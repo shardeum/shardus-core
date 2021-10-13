@@ -541,7 +541,7 @@ class Sqlite3Storage {
 
 // From: https://stackoverflow.com/a/21196961
 async function _ensureExists(dir) {
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     fs.mkdir(dir, { recursive: true }, (err) => {
       if (err) {
         // Ignore err if folder exists
