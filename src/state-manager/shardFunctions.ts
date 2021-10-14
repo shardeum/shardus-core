@@ -301,23 +301,30 @@ class ShardFunctions {
     nodesToGenerate: Shardus.Node[],
     parititionShardDataMap: StateManager.shardFunctionTypes.ParititionShardDataMap,
     activeNodes: Shardus.Node[],
-    extendedData: boolean
+    extendedData: boolean,
+    isActiveNodeList: boolean = true
   ) {
+    let index = 0
     for (let node of nodesToGenerate) {
       let nodeShardData = nodeShardDataMap.get(node.id)
       if (!nodeShardData) {
-        nodeShardData = ShardFunctions.computeNodePartitionData(shardGlobals, node, nodeShardDataMap, parititionShardDataMap, activeNodes, false)
+        let thisNodeIndex = undefined
+        if(isActiveNodeList){
+          thisNodeIndex = index
+        }
+        nodeShardData = ShardFunctions.computeNodePartitionData(shardGlobals, node, nodeShardDataMap, parititionShardDataMap, activeNodes, false, thisNodeIndex)
       }
+      index++
     }
-    // second pass for extended data
-    for (let node of nodesToGenerate) {
-      let nodeShardData = nodeShardDataMap.get(node.id)
-      if (nodeShardData == null) {
-        //log error?
-        continue
-      }
-
-      if (extendedData) {
+    if (extendedData) {
+      index = 0
+      // second pass for extended data
+      for (let node of nodesToGenerate) {
+        let nodeShardData = nodeShardDataMap.get(node.id)
+        if (nodeShardData == null) {
+          //log error?
+          continue
+        } 
         ShardFunctions.computeExtendedNodePartitionData(shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes)
       }
     }
@@ -329,25 +336,31 @@ class ShardFunctions {
     nodeShardDataMap: StateManager.shardFunctionTypes.NodeShardDataMap,
     parititionShardDataMap: StateManager.shardFunctionTypes.ParititionShardDataMap,
     activeNodes: Shardus.Node[],
-    extendedData?: boolean
+    extendedData?: boolean,
+    thisNodeIndex?: number
   ): StateManager.shardFunctionTypes.NodeShardData {
     let numPartitions = shardGlobals.numPartitions
 
     let nodeShardData = {} as StateManager.shardFunctionTypes.NodeShardData
 
-    nodeShardData.ourNodeIndex = activeNodes.findIndex(function (_node) {
-      return _node.id === node.id
-    })
-
-    if (nodeShardData.ourNodeIndex === -1) {
-      for (let i = 0; i < activeNodes.length; i++) {
-        nodeShardData.ourNodeIndex = i
-        if (activeNodes[i].id >= node.id) {
-          break
+    if(thisNodeIndex != undefined){
+      nodeShardData.ourNodeIndex = thisNodeIndex
+    } else{
+      //this is way too slow
+      nodeShardData.ourNodeIndex = activeNodes.findIndex(function (_node) {
+        return _node.id === node.id
+      })
+      //find closest index if our node is not in the active list.  Not sure this is valid
+      //I think we need a more direct path for computing info on nodes that are not active yet
+      if (nodeShardData.ourNodeIndex === -1) {
+        for (let i = 0; i < activeNodes.length; i++) {
+          nodeShardData.ourNodeIndex = i
+          if (activeNodes[i].id >= node.id) {
+            break
+          }
         }
       }
     }
-
     let homePartition = nodeShardData.ourNodeIndex
     let centeredAddress = Math.floor(((homePartition + 0.5) * 0xffffffff) / numPartitions)
     let nodeAddressNum = centeredAddress
@@ -422,8 +435,20 @@ class ShardFunctions {
     let exclude = [nodeShardData.node.id]
     let excludeNodeArray = [nodeShardData.node]
 
-    // tried a better way but it dies of needing data we dont have yet..
-    nodeShardData.nodeThatStoreOurParition = ShardFunctions.getNodesThatCoverParitionRaw(shardGlobals, nodeShardDataMap, nodeShardData.homePartition, exclude, activeNodes)
+    nodeShardData.nodeThatStoreOurParition = ShardFunctions.getNodesThatCoverHomePartition(shardGlobals,  nodeShardData, nodeShardDataMap, activeNodes)
+    
+    // let temp = ShardFunctions.getNodesThatCoverPartitionRaw(shardGlobals, nodeShardDataMap, nodeShardData.homePartition, exclude, activeNodes)
+    // //temp validation that the functions above are equal
+    // let diffA = ShardFunctions.subtractNodeLists(temp, nodeShardData.nodeThatStoreOurParition)
+    // let diffB = ShardFunctions.subtractNodeLists(nodeShardData.nodeThatStoreOurParition, temp)
+    // if(diffA.length > 0){
+    //   throw new Error( `diffA ${diffA.length}`)
+    // }
+    // if(diffB.length > 0){
+    //   throw new Error( `diffB ${diffB.length}`)
+    // }
+
+
     // nodeShardData.nodeThatStoreOurParition = ShardFunctions.getNodesThatCoverRange(shardGlobals, nodeShardData.storedPartitions.homeRange.low, nodeShardData.storedPartitions.homeRange.high, exclude, activeNodes)
 
     // check if node is active because there are many calculations that are invalid or wrong if you try to compute them with a node that is not active in the network.
@@ -1146,7 +1171,7 @@ class ShardFunctions {
    * @param {string[]} exclude
    * @param {Node[]} activeNodes
    */
-  static getNodesThatCoverParitionRaw(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, nodeShardDataMap: Map<string, StateManager.shardFunctionTypes.NodeShardData>, partition: number, exclude: string[], activeNodes: Shardus.Node[]): Shardus.Node[] {
+  static getNodesThatCoverPartitionRaw(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, nodeShardDataMap: Map<string, StateManager.shardFunctionTypes.NodeShardData>, partition: number, exclude: string[], activeNodes: Shardus.Node[]): Shardus.Node[] {
     let results = [] as Shardus.Node[]
 
     // TODO perf.  (may be tricky to improve), should probably be part of a comprehensive set of improvements that consider networks with millions of nodes
@@ -1174,6 +1199,95 @@ class ShardFunctions {
     }
     return results
   }
+
+  /**
+   * NOTE this is a raw answer.  edge cases with consensus node coverage can increase the results of our raw answer that is given here
+   * @param {StateManager.shardFunctionTypes.ShardGlobals} shardGlobals
+   * @param {Map<string, StateManager.shardFunctionTypes.NodeShardData>} nodeShardDataMap
+   * @param {number} partition
+   * @param {string[]} exclude
+   * @param {Node[]} activeNodes
+   */
+  static getNodesThatCoverHomePartition(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, thisNode: StateManager.shardFunctionTypes.NodeShardData, nodeShardDataMap: Map<string, StateManager.shardFunctionTypes.NodeShardData>, activeNodes: Shardus.Node[]): Shardus.Node[] {
+    let results = [] as Shardus.Node[]
+    let homePartition = thisNode.homePartition
+
+    let searchRight = true
+    let index = homePartition
+    //let failCount = 0
+    let startIndex = index
+    let once = false
+    while (searchRight) {
+      // if (failCount > 1) {
+      //   searchRight = false
+      //   break
+      // }
+
+      if (index >= activeNodes.length) {
+        index = 0
+      }   
+      //check for a complete wrap if we have full coverage
+      //this only happens when there is no sharding yet. numnodes *2 = consenus range  (approx)
+      //we could break this logic out above in a separate check but I think this is ok for now (not too costly)
+      if(startIndex === index && once){
+        return results
+      }    
+      once=true  
+      
+      let node = activeNodes[index]
+      index++
+
+      if(node == thisNode.node)
+        continue
+
+      let nodeShardData = nodeShardDataMap.get(node.id)
+      if (nodeShardData == null) {
+        continue
+      }
+      if (nodeShardData.storedPartitions == null) {
+        nodeShardData.storedPartitions = ShardFunctions.calculateStoredPartitions2(shardGlobals, nodeShardData.homePartition)
+      }
+      if (ShardFunctions.testInRange(homePartition, nodeShardData.storedPartitions) !== true) {
+        //failCount++
+        break
+      }
+      results.push(node)
+    }
+    let searchLeft = true
+    index = homePartition
+    //failCount = 0
+    while (searchLeft) {
+      // if (failCount > 2) {
+      //   searchLeft = false
+      //   break
+      // }
+
+      if (index < 0) {
+        index = activeNodes.length - 1
+      }      
+      let node = activeNodes[index]
+      index--
+
+      if(node == thisNode.node)
+        continue
+
+
+      let nodeShardData = nodeShardDataMap.get(node.id)
+      if (nodeShardData == null) {
+        continue
+      }
+      if (nodeShardData.storedPartitions == null) {
+        nodeShardData.storedPartitions = ShardFunctions.calculateStoredPartitions2(shardGlobals, nodeShardData.homePartition)
+      }
+      if (ShardFunctions.testInRange(homePartition, nodeShardData.storedPartitions) !== true) {
+        //failCount++
+        break
+      }
+      results.push(node)
+    }
+    return results
+  }
+
 
   /**
    * getNeigborNodesInRange

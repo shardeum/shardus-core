@@ -266,7 +266,9 @@ export async function calculateOldDataMap(
     nodes,
     partitionShardDataMap,
     nodes,
-    true
+    true,
+    false // this is not the active node list.  Perf will be slower so we may want to 
+          // rework this calculation
   )
 
   // If we have old data, figure out which partitions we have and put into OldDataMap

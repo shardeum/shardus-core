@@ -470,30 +470,32 @@ class StateManager {
     // save this per cycle?
     cycleShardData.shardGlobals = ShardFunctions.calculateShardGlobals(cycleShardData.activeNodes.length, this.config.sharding.nodesPerConsensusGroup as number, edgeNodes)
 
-    this.profiler.profileSectionStart('updateShardValues_computePartitionShardDataMap1')
+    this.profiler.profileSectionStart('updateShardValues_computePartitionShardDataMap1') //13ms, #:60
     // partition shard data
     ShardFunctions.computePartitionShardDataMap(cycleShardData.shardGlobals, cycleShardData.parititionShardDataMap, 0, cycleShardData.shardGlobals.numPartitions)
     this.profiler.profileSectionEnd('updateShardValues_computePartitionShardDataMap1')
     
-    this.profiler.profileSectionStart('updateShardValues_computePartitionShardDataMap2')
+    this.profiler.profileSectionStart('updateShardValues_computePartitionShardDataMap2') //37ms, #:60
     // generate limited data for all nodes data for all nodes.
     ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, false)
     this.profiler.profileSectionEnd('updateShardValues_computePartitionShardDataMap2')
     
-    this.profiler.profileSectionStart('updateShardValues_computeNodePartitionData')
+    this.profiler.profileSectionStart('updateShardValues_computeNodePartitionData')  //22ms, #:60
     // get extended data for our node
     cycleShardData.nodeShardData = ShardFunctions.computeNodePartitionData(cycleShardData.shardGlobals, cycleShardData.ourNode, cycleShardData.nodeShardDataMap, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true)
     this.profiler.profileSectionEnd('updateShardValues_computeNodePartitionData')
 
-    this.profiler.profileSectionStart('updateShardValues_computeNodePartitionDataMap1')
+    // This is currently redudnant if we move to lazy init of extended data we should turn it back on
+    // this.profiler.profileSectionStart('updateShardValues_computeNodePartitionDataMap1') // 4ms, #:60
     // TODO perf scalability  need to generate this as needed in very large networks with millions of nodes.
     // generate full data for nodes that store our home partition
-    ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.nodeShardData.nodeThatStoreOurParitionFull, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true)
-    this.profiler.profileSectionEnd('updateShardValues_computeNodePartitionDataMap1')
+    // 
+    // ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.nodeShardData.nodeThatStoreOurParitionFull, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true, false)
+    // this.profiler.profileSectionEnd('updateShardValues_computeNodePartitionDataMap1')
 
     // cycleShardData.nodeShardData = cycleShardData.nodeShardDataMap.get(cycleShardData.ourNode.id)
 
-    this.profiler.profileSectionStart('updateShardValues_computeNodePartitionDataMap2')
+    this.profiler.profileSectionStart('updateShardValues_computeNodePartitionDataMap2') //232ms, #:60
     // generate lightweight data for all active nodes  (note that last parameter is false to specify the lightweight data)
     let fullDataForDebug = true // Set this to false for performance reasons!!! setting it to true saves us from having to recalculate stuff when we dump logs.
     ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, fullDataForDebug)
@@ -507,7 +509,7 @@ class StateManager {
 
     // calculate nodes that would just now start syncing edge data because the network shrank.
     if (cycleShardData.ourNode.status === 'active') {
-      this.profiler.profileSectionStart('updateShardValues_getOrderedSyncingNeighbors')
+      this.profiler.profileSectionStart('updateShardValues_getOrderedSyncingNeighbors') //0
       // calculate if there are any nearby nodes that are syncing right now.
       if (logFlags.verbose) this.mainLogger.debug(`updateShardValues: getOrderedSyncingNeighbors`)
       cycleShardData.syncingNeighbors = this.p2p.state.getOrderedSyncingNeighbors(cycleShardData.ourNode)
@@ -538,13 +540,13 @@ class StateManager {
       //   }
       //   this.preTXQueue = []
       // }
-      this.profiler.profileSectionStart('updateShardValues_updateRuntimeSyncTrackers')
+      this.profiler.profileSectionStart('updateShardValues_updateRuntimeSyncTrackers') //0
       this.accountSync.updateRuntimeSyncTrackers()
       this.profiler.profileSectionEnd('updateShardValues_updateRuntimeSyncTrackers')
       // this.calculateChangeInCoverage()
     }
 
-    this.profiler.profileSectionStart('updateShardValues_getPartitionLists')
+    this.profiler.profileSectionStart('updateShardValues_getPartitionLists') // 0
     // calculate our consensus partitions for use by data repair:
     // cycleShardData.ourConsensusPartitions = []
     let partitions = ShardFunctions.getConsenusPartitionList(cycleShardData.shardGlobals, cycleShardData.nodeShardData)

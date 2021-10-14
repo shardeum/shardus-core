@@ -50,6 +50,19 @@
         {
             "type": "node",
             "request": "launch",
+            "name": "shardPerfTest",
+            "program": "${workspaceFolder}\\test\\unit\\state-manager\\shardPerfTest.js",
+            //"port": 9229,
+            //"restart": true,
+            //"sourceMaps": true,
+            //"protocol": "inspector" ,
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        },
+        {
+            "type": "node",
+            "request": "launch",
             "name": "hashset2",
             "program": "${workspaceFolder}\\test\\unit\\state-manager\\hashset2.js",
             "skipFiles": [
