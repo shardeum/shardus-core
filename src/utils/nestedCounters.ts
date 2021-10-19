@@ -40,7 +40,7 @@ class NestedCounters {
   registerEndpoints() {
     Context.network.registerExternalGet('counts', isDebugModeMiddleware, (req, res) => {
 
-      profilerInstance.scopedProfileSectionStart('Endpoint_counts')
+      profilerInstance.scopedProfileSectionStart('counts')
         // let counterMap = utils.deepCopy(this.eventCounters)
         let arrayReport = this.arrayitizeAndSort(this.eventCounters)
 
@@ -53,7 +53,7 @@ class NestedCounters {
 
         this.printArrayReport(arrayReport, res, 0)
         res.end()
-      profilerInstance.scopedProfileSectionEnd('Endpoint_counts')
+      profilerInstance.scopedProfileSectionEnd('counts')
 
       //res.json(utils.stringifyReduce(this.eventCounters))
     })

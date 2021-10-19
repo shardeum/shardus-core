@@ -102,10 +102,10 @@ const compareMarkerRoute: P2P.P2PTypes.InternalHandler<
   CompareMarkerReq,
   CompareMarkerRes
 > = (payload, respond, sender) => {
-  profilerInstance.scopedProfileSectionStart('Endpoint_compareMarker')
+  profilerInstance.scopedProfileSectionStart('compareMarker')
   const req = payload
   respond(compareCycleMarkersEndpoint(req))
-  profilerInstance.scopedProfileSectionStart('Endpoint_compareMarker')
+  profilerInstance.scopedProfileSectionStart('compareMarker')
 }
 
 const compareCertRoute: P2P.P2PTypes.InternalHandler<
@@ -113,9 +113,9 @@ const compareCertRoute: P2P.P2PTypes.InternalHandler<
   CompareCertRes,
   P2P.NodeListTypes.Node['id']
 > = (payload, respond, sender) => {
-  profilerInstance.scopedProfileSectionStart('Endpoint_compareCert')
+  profilerInstance.scopedProfileSectionStart('compareCert')
   respond(compareCycleCertEndpoint(payload, sender))
-  profilerInstance.scopedProfileSectionEnd('Endpoint_compareCert')
+  profilerInstance.scopedProfileSectionEnd('compareCert')
 }
 
 const gossipCertRoute: P2P.P2PTypes.GossipHandler<CompareCertReq, P2P.NodeListTypes.Node['id']> = (

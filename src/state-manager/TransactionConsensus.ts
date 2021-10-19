@@ -2,7 +2,7 @@ import * as Shardus from '../shardus/shardus-types'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
 
-import Profiler from '../utils/profiler'
+import Profiler, { profilerInstance } from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
@@ -18,7 +18,7 @@ class TransactionConsenus {
   crypto: Crypto
   config: Shardus.ShardusConfiguration
   profiler: Profiler
-  
+
   logger: Logger
   p2p: P2P
   storage: Storage
@@ -31,7 +31,7 @@ class TransactionConsenus {
   statemanager_fatal: (key: string, log: string) => void
 
   constructor(stateManager: StateManager,  profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
-    
+
     this.crypto = crypto
     this.app = app
     this.logger = logger
@@ -61,6 +61,8 @@ class TransactionConsenus {
 
   setupHandlers(){
     this.p2p.registerGossipHandler('spread_appliedReceipt', async (payload, sender, tracker) => {
+      profilerInstance.scopedProfileSectionStart('spread_appliedReceipt')
+      try {
         let appliedReceipt = payload as AppliedReceipt
         let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(appliedReceipt.txid) // , payload.timestamp)
         if (queueEntry == null) {
@@ -79,27 +81,27 @@ class TransactionConsenus {
             return
           }
         }
-  
+
         if (this.stateManager.testFailChance(this.stateManager.ignoreRecieptChance, 'spread_appliedReceipt', utils.stringifyReduce(appliedReceipt.txid), '', logFlags.verbose) === true) {
           return
         }
-  
+
         // TODO STATESHARDING4 ENDPOINTS check payload format
         // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
-  
+
         let receiptNotNull = appliedReceipt != null
-  
+
         if (queueEntry.gossipedReceipt === false){
           queueEntry.gossipedReceipt = true
           if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`)
-  
+
 
           if(queueEntry.archived === false){
-            queueEntry.recievedAppliedReceipt = appliedReceipt            
+            queueEntry.recievedAppliedReceipt = appliedReceipt
           }
 
           // I think we handle the negative cases later by checking queueEntry.recievedAppliedReceipt vs queueEntry.appliedReceipt
-  
+
           // share the appliedReceipt.
           let sender = null
           let gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
@@ -112,9 +114,11 @@ class TransactionConsenus {
           // we get here if the receipt has already been shared
           if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt skipped ${queueEntry.logID} receiptNotNull:${receiptNotNull} Already Shared`)
         }
-      })
 
-
+      } finally {
+        profilerInstance.scopedProfileSectionEnd('spread_appliedReceipt')
+      }
+    })
   }
 
 
@@ -146,10 +150,10 @@ class TransactionConsenus {
         let nonce = parseInt('0x' + queueEntry.acceptedTx.id.substr(0,2))
         let idxPlusNonce = queueEntry.ourTXGroupIndex + nonce
         let idxModEveryN = idxPlusNonce % everyN
-        if(idxModEveryN > 0){ 
+        if(idxModEveryN > 0){
           nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-skipped')
           return
-        }        
+        }
       }
       nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-notSkipped')
       // should consider only forwarding in some cases?

@@ -23,10 +23,10 @@ const newestCycleRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'sync-newest-cycle',
   handler: (_req, res) => {
-    profilerInstance.scopedProfileSectionStart('Endpoint-newest-cycle')
+    profilerInstance.scopedProfileSectionStart('newest-cycle')
     const newestCycle = CycleChain.newest ? CycleChain.newest : undefined
     res.json({ newestCycle })
-    profilerInstance.scopedProfileSectionEnd('Endpoint-newest-cycle')
+    profilerInstance.scopedProfileSectionEnd('newest-cycle')
   },
 }
 
@@ -34,7 +34,7 @@ const cyclesRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'POST',
   name: 'sync-cycles',
   handler: (req, res) => {
-    profilerInstance.scopedProfileSectionStart('Endpoint-sync-cycles')
+    profilerInstance.scopedProfileSectionStart('sync-cycles')
     try {
       let err = validateTypes(req, { body: 'o' })
       if (err) {
@@ -56,7 +56,7 @@ const cyclesRoute: P2P.P2PTypes.Route<Handler> = {
     } catch(e) {
       warn('sync-cycles', e)
     } finally {
-      profilerInstance.scopedProfileSectionEnd('Endpoint-sync-cycles')
+      profilerInstance.scopedProfileSectionEnd('sync-cycles')
     }
   },
 }

@@ -1,5 +1,5 @@
 /*
-Nodes can chose to exit the network at anytime. This can happen if 
+Nodes can chose to exit the network at anytime. This can happen if
 a node gets in a bad state or the process is being stopped. When a node
 is about to exit the network, it should send a message to let other
 nodes know that it is leaving. This allows other nodes to remove the
@@ -10,12 +10,12 @@ The exiting node sends the Apoptosis message to about 3 other active
 nodes. The message can be sent at anytime and does not have to be
 sent during quarter 1 as with most other messages. This message is sent
 on the internal route and is accepted by other nodes based on verifying
-that the sending node is the one being Apoptosized. The message is 
+that the sending node is the one being Apoptosized. The message is
 stored to be gossiped in the next quarter 1. But if the receiving node
 is in quarter 1 then the message can be gossiped immeadiately.
 When a gossip is received for Apoptosis during quarter 1 or quarter 2,
 it is saved and gossiped to other nodes.
-When the apoptosized field of a cycle record contains the node id 
+When the apoptosized field of a cycle record contains the node id
 of a particular node, the node is removed from the node list.
 */
 import { Handler } from 'express'
@@ -29,6 +29,7 @@ import { activeByIdOrder, byIdOrder, byPubKey, nodes } from './NodeList'
 import * as Self from './Self'
 import { robustQuery } from './Utils'
 import { isDebugMode } from '../debug'
+import { profilerInstance } from '../utils/profiler'
 
 /** STATE */
 
@@ -65,65 +66,74 @@ const failExternalRoute: P2P.P2PTypes.Route<Handler> = {
       warn ('fail route invoked in Apoptosis; used to test unclean exit')
       //let fail_endpoint_debug = undefined
       //console.log(fail_endpoint_debug.forced)
-      throw Error('fail_endpoint_debug') 
+      throw Error('fail_endpoint_debug')
     }
   },
 }
 
 // This route is expected to return "pass" or "fail" so that
-//   the exiting node can know that some other nodes have 
+//   the exiting node can know that some other nodes have
 //   received the message and will send it to other nodes
 const apoptosisInternalRoute: P2P.P2PTypes.Route<P2P.P2PTypes.InternalHandler<P2P.ApoptosisTypes.SignedApoptosisProposal>> = {
   name: internalRouteName,
   handler: (payload, response, sender) => {
-    info(`Got Apoptosis proposal: ${JSON.stringify(payload)}`)
-    let err = ''
-    err = validateTypes(payload, {when:'n',id:'s',sign:'o'})
-    if (err){ warn('bad input '+err); return }
-    err = validateTypes(payload.sign, {owner:'s',sig:'s'})
-    if (err){ warn('bad input sign '+err); return }
+    profilerInstance.scopedProfileSectionStart('apoptosize')
+    try {
+      info(`Got Apoptosis proposal: ${JSON.stringify(payload)}`)
+      let err = ''
+      err = validateTypes(payload, {when:'n',id:'s',sign:'o'})
+      if (err){ warn('bad input '+err); return }
+      err = validateTypes(payload.sign, {owner:'s',sig:'s'})
+      if (err){ warn('bad input sign '+err); return }
 // The when must be set to current cycle +-1 because it is being
 //    received from the originating node
-    if (!(payload as P2P.P2PTypes.LooseObject).when){ response({s:'fail',r:1}); return }
-    const when = payload.when
-    if (when > currentCycle+1 || when < currentCycle-1){ response({s:'fail',r:2}); return  }
-  //  check that the node which sent this is the same as the node that signed it, otherwise this is not original message so ignore it
-    if (sender === payload.id){
+      if (!(payload as P2P.P2PTypes.LooseObject).when){ response({s:'fail',r:1}); return }
+      const when = payload.when
+      if (when > currentCycle+1 || when < currentCycle-1){ response({s:'fail',r:2}); return  }
+      //  check that the node which sent this is the same as the node that signed it, otherwise this is not original message so ignore it
+      if (sender === payload.id){
 //  if (addProposal(payload)) p2p.sendGossipIn(gossipRouteName, payload)
 //  if (addProposal(payload)) Comms.sendGossip(gossipRouteName, payload)
 //  Omar - we must always accept the original apoptosis message regardless of quarter and save it to gossip next cycle
 //    but if we are in Q1 gossip it, otherwise save for Q1 of next cycle
-      if (addProposal(payload)){
-        if (currentQuarter === 1){  // if it is Q1 we can try to gossip the message now instead of waiting for Q1 of next cycle
-          Comms.sendGossip(gossipRouteName, payload)
+        if (addProposal(payload)){
+          if (currentQuarter === 1){  // if it is Q1 we can try to gossip the message now instead of waiting for Q1 of next cycle
+            Comms.sendGossip(gossipRouteName, payload)
+          }
+          response({s:'pass'})
+          return
         }
-        response({s:'pass'})
-        return
+        else{
+          warn(`addProposal failed for payload: ${JSON.stringify(payload)}`)
+        }
       }
       else{
-        warn(`addProposal failed for payload: ${JSON.stringify(payload)}`)
+        warn(`sender is not apop node: sender:${sender} apop:${payload.id}`)
+        response({s:'fail',r:3})
       }
-    } 
-    else{
-      warn(`sender is not apop node: sender:${sender} apop:${payload.id}`)
-      response({s:'fail',r:3})
+    } finally {
+      profilerInstance.scopedProfileSectionEnd('apoptosize')
     }
   }
 }
 
-const apoptosisGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ApoptosisTypes.SignedApoptosisProposal> = 
+const apoptosisGossipRoute: P2P.P2PTypes.GossipHandler<P2P.ApoptosisTypes.SignedApoptosisProposal> =
    (payload, sender, tracker) => {
-  info(`Got Apoptosis gossip: ${JSON.stringify(payload)}`)
-  let err = ''
-  err = validateTypes(payload, {when:'n',id:'s',sign:'o'})
-  if (err){ warn('apoptosisGossipRoute bad payload: '+err); return }
-  err = validateTypes(payload.sign, {owner:'s',sig:'s'})
-  if (err){ warn('apoptosisGossipRoute bad payload.sign: '+err); return }
-  if ([1,2].includes(currentQuarter)){  
-    if (addProposal(payload)) {
-//    p2p.sendGossipIn(gossipRouteName, payload, tracker, sender)
-      Comms.sendGossip(gossipRouteName, payload, tracker, Self.id, byIdOrder, false) // use Self.id so we don't gossip to ourself
+  profilerInstance.scopedProfileSectionStart('apoptosis')
+  try {
+    info(`Got Apoptosis gossip: ${JSON.stringify(payload)}`)
+    let err = ''
+    err = validateTypes(payload, {when:'n',id:'s',sign:'o'})
+    if (err){ warn('apoptosisGossipRoute bad payload: '+err); return }
+    err = validateTypes(payload.sign, {owner:'s',sig:'s'})
+    if (err){ warn('apoptosisGossipRoute bad payload.sign: '+err); return }
+    if ([1,2].includes(currentQuarter)){
+      if (addProposal(payload)) {
+        Comms.sendGossip(gossipRouteName, payload, tracker, Self.id, byIdOrder, false) // use Self.id so we don't gossip to ourself
+      }
     }
+  } finally {
+    profilerInstance.scopedProfileSectionEnd('apoptosis')
   }
 }
 
@@ -163,7 +173,7 @@ export function reset() {
   // only delete proposals where the node has been removed
   //   otherwise we will submit the proposal again in the next Q1
   for (const id of Object.keys(proposals)){
-    if (!nodes.get(id)){  
+    if (!nodes.get(id)){
       delete proposals[id]
     }
   }
@@ -195,7 +205,7 @@ Given the txs and prev cycle record mutate the referenced record
 export function updateRecord(
   txs: P2P.ApoptosisTypes.Txs,
   record: P2P.ApoptosisTypes.Record,
-) 
+)
 {
   const apoptosized = []
   for (const request of txs.apoptosis) {
@@ -226,7 +236,7 @@ export function sendRequests() {
   for (const id of Object.keys(proposals)){
     // make sure node is still in the network, since it might
     //   have already been removed
-    if (nodes.get(id)){  
+    if (nodes.get(id)){
       Comms.sendGossip(gossipRouteName, proposals[id], '', null, byIdOrder, true)
     }
   }
@@ -240,7 +250,7 @@ export function sendRequests() {
 export async function apoptosizeSelf() {
   warn(`In apoptosizeSelf`)
   // [TODO] - maybe we should shuffle this array
-  const activeNodes = activeByIdOrder  
+  const activeNodes = activeByIdOrder
   const proposal = createProposal()
 /* Don't use tell, do a robust query instead
 //  await p2p.tell(activeNodes, internalRouteName, proposal)
@@ -307,7 +317,7 @@ function validateProposal(payload: unknown): boolean {
   const id = proposal.id
 
   // even joining nodes can send apoptosis message, so check all nodes list
-  const node = nodes.get(id)  
+  const node = nodes.get(id)
   if (! node) return false
 
   // Check if signature is valid and signed by expected node
@@ -343,4 +353,3 @@ export const addCycleFieldQuery = `ALTER TABLE cycles ADD ${cycleDataName} JSON 
 export const sequelizeCycleFieldModel = {
   [cycleDataName]: { type: Sequelize.JSON, allowNull: true },
 }
-

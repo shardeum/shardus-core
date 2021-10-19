@@ -14,6 +14,7 @@ import * as CycleCreator from './CycleCreator'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { robustQuery } from './Utils'
+import { profilerInstance } from '../utils/profiler'
 
 /** STATE */
 
@@ -82,11 +83,16 @@ const gossipJoinRoute: P2P.P2PTypes.GossipHandler<P2P.JoinTypes.JoinRequest, P2P
   sender,
   tracker
 ) => {
-  // Do not forward gossip after quarter 2
-  if (CycleCreator.currentQuarter >= 3) return
+  profilerInstance.scopedProfileSectionStart('gossip-join')
+  try {
+    // Do not forward gossip after quarter 2
+    if (CycleCreator.currentQuarter >= 3) return
 
-  //  Validate of payload is done in addJoinRequest
-  if (addJoinRequest(payload)) Comms.sendGossip('gossip-join', payload, tracker, sender, NodeList.byIdOrder, false)
+    //  Validate of payload is done in addJoinRequest
+    if (addJoinRequest(payload)) Comms.sendGossip('gossip-join', payload, tracker, sender, NodeList.byIdOrder, false)
+  } finally {
+    profilerInstance.scopedProfileSectionEnd('gossip-join')
+  }
 }
 
 const routes = {
@@ -334,7 +340,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
   // Return if we already know about this node
   const ipPort = NodeList.ipPort(node.internalIp, node.internalPort)
   if (NodeList.byIpPort.has(ipPort)) {
-    if(logFlags.p2pNonFatal) info('Cannot add join request for this node, already a known node.')
+    if(logFlags.p2pNonFatal) info('Cannot add join request for this node, already a known node.', JSON.stringify(NodeList.byIpPort.get(ipPort)))
     return false
   }
 

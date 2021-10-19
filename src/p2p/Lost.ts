@@ -2,7 +2,7 @@
 Nodes can be lost at anytime without notifiying the network. This is different than Apoptosis where
 the node sends a message to peers before exiting. When a node notifies the network that it is exiting,
 the peers can remove it from their node list within 2 cycles. If a node does not notifiy the network
-before exiting it will take the peers about 3 cycles to remove the node from their node list. 
+before exiting it will take the peers about 3 cycles to remove the node from their node list.
 The lost node detection process is described in the "Lost Node Detection" Google doc under Shardus
 internal documents.
 */
@@ -17,6 +17,7 @@ import { crypto, logger, network } from './Context'
 import { currentCycle, currentQuarter } from './CycleCreator'
 import { activeByIdOrder, byIdOrder, nodes } from './NodeList'
 import * as Self from './Self'
+import { profilerInstance } from '../utils/profiler'
 
 /** STATE */
 
@@ -64,11 +65,21 @@ const lostReportRoute: P2P.P2PTypes.Route<P2P.P2PTypes.InternalHandler<P2P.LostT
 }
 
 const lostDownRoute: P2P.P2PTypes.GossipHandler = (payload:P2P.LostTypes.SignedDownGossipMessage, sender, tracker) => {
-  downGossipHandler(payload, sender, tracker)
+  profilerInstance.scopedProfileSectionStart('lost-down')
+  try {
+    downGossipHandler(payload, sender, tracker)
+  } finally {
+    profilerInstance.scopedProfileSectionStart('lost-down')
+  }
 }
 
 const lostUpRoute: P2P.P2PTypes.GossipHandler = (payload:P2P.LostTypes.SignedUpGossipMessage, sender, tracker) => {
-  upGossipHandler(payload, sender, tracker)
+  profilerInstance.scopedProfileSectionStart('lost-up')
+  try {
+    upGossipHandler(payload, sender, tracker)
+  } finally {
+    profilerInstance.scopedProfileSectionStart('lost-up')
+  }
 }
 
 const routes = {
@@ -125,8 +136,8 @@ export function getTxs(): P2P.LostTypes.Txs {
   let seen = {}  // used to make sure we don't add the same node twice
   for (const [key, obj] of lost){
     if (seen[obj.target]) continue
-    if (obj.message && obj.message.report && obj.message.cycle === currentCycle){ 
-      lostTxs.push(obj.message) 
+    if (obj.message && obj.message.report && obj.message.cycle === currentCycle){
+      lostTxs.push(obj.message)
       seen[obj.target] = true
     }
   }
@@ -134,7 +145,7 @@ export function getTxs(): P2P.LostTypes.Txs {
   for (const [key, obj] of lost){
     if (seen[obj.target]) continue
     if (obj.message && obj.message.status === 'up' && obj.message.cycle === currentCycle){
-      refutedTxs.push(obj.message) 
+      refutedTxs.push(obj.message)
       seen[obj.target] = true
     }
   }
@@ -187,7 +198,7 @@ export function updateRecord( txs: P2P.LostTypes.Txs, record: P2P.CycleCreatorTy
   if (prev){
     let apop = prev.lost.filter(id => nodes.has(id))  // remove nodes that are no longer in the network
     apop = apop.filter(id => !refutedNodeIds.includes(id))  // remove nodes that refuted
-    record.apoptosized = [...apop, ...record.apoptosized ].sort() 
+    record.apoptosized = [...apop, ...record.apoptosized ].sort()
   }
 }
 
@@ -198,7 +209,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   for (const id of record.refuted) {
     if (id === Self.id) sendRefute = -1
   }
-  // Once we see any node in the lost field of the cycle record, we should stop 
+  // Once we see any node in the lost field of the cycle record, we should stop
   //   sending lost reports for it to reduce the amount of network messages caused by the lost node
   // If we see our node in the lost field set flag to send an 'up' message at start of next cycle
   for (const id of record.lost) {
@@ -267,7 +278,7 @@ export function reportLost(target, reason){
   if (target.id === Self.id) return  // don't report self
   if (stopReporting[target.id]) return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
 // we set isDown cache to the cycle number here; to speed up deciding if a node is down
-  isDown[target.id] = currentCycle  
+  isDown[target.id] = currentCycle
   const key = `${target.id}-${currentCycle}`
   const lostRec = lost.get(key)
   if (lostRec) return  // we have already seen this node for this cycle
@@ -300,31 +311,36 @@ function getCheckerNode(id, cycle){
 }
 
 async function lostReportHandler (payload, response, sender) {
-  if(logFlags.p2pNonFatal) info(`Got investigate request: ${JSON.stringify(payload)} from ${JSON.stringify(sender)}`)
-  let err = ''
-  err = validateTypes(payload, {target:'s',reporter:'s',checker:'s',cycle:'n',sign:'o'})
-  if (err){ warn('bad input '+err); return }
-  err = validateTypes(payload.sign, {owner:'s',sig:'s'})
-  if (err){ warn('bad input sign '+err); return }
-  if (stopReporting[payload.target]) return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
-  const key = `${payload.target}-${payload.cycle}`
-  if (lost.get(key)) return // we have already seen this node for this cycle
-  const [valid, reason] = checkReport(payload, currentCycle+1)
-  if (!valid){ 
-    warn('Got bad investigate request. Reason: '+reason)
-    return
+  profilerInstance.scopedProfileSectionStart('lost-report')
+  try {
+    if(logFlags.p2pNonFatal) info(`Got investigate request: ${JSON.stringify(payload)} from ${JSON.stringify(sender)}`)
+    let err = ''
+    err = validateTypes(payload, {target:'s',reporter:'s',checker:'s',cycle:'n',sign:'o'})
+    if (err){ warn('bad input '+err); return }
+    err = validateTypes(payload.sign, {owner:'s',sig:'s'})
+    if (err){ warn('bad input sign '+err); return }
+    if (stopReporting[payload.target]) return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
+    const key = `${payload.target}-${payload.cycle}`
+    if (lost.get(key)) return // we have already seen this node for this cycle
+    const [valid, reason] = checkReport(payload, currentCycle+1)
+    if (!valid){
+      warn('Got bad investigate request. Reason: '+reason)
+      return
+    }
+    if (sender !== payload.reporter) return // sender must be same as reporter
+    if (payload.checker !== Self.id) return  // the checker should be our node id
+    let obj:P2P.LostTypes.LostRecord = {target:payload.target, cycle:payload.cycle, status:'checking', message:payload }
+    lost.set(key, obj)
+    // check if we already know that this node is down
+    if (isDown[payload.target]){obj.status = 'down'; return}
+    let result = await isDownCache(nodes.get(payload.target))
+    if (allowKillRoute && payload.killother) result = 'down'
+    if (obj.status === 'checking') obj.status = result
+    if(logFlags.p2pNonFatal) info('Status after checking is '+obj.status)
+    // At start of Q1 of the next cycle sendRequests() will start a gossip if the node was found to be down
+  } finally {
+    profilerInstance.scopedProfileSectionEnd('lost-report')
   }
-  if (sender !== payload.reporter) return // sender must be same as reporter
-  if (payload.checker !== Self.id) return  // the checker should be our node id
-  let obj:P2P.LostTypes.LostRecord = {target:payload.target, cycle:payload.cycle, status:'checking', message:payload }
-  lost.set(key, obj)
-  // check if we already know that this node is down
-  if (isDown[payload.target]){obj.status = 'down'; return}
-  let result = await isDownCache(nodes.get(payload.target))
-  if (allowKillRoute && payload.killother) result = 'down'
-  if (obj.status === 'checking') obj.status = result
-  if(logFlags.p2pNonFatal) info('Status after checking is '+obj.status)
-  // At start of Q1 of the next cycle sendRequests() will start a gossip if the node was found to be down
 }
 
 function checkReport(report, expectCycle){
@@ -336,16 +352,16 @@ function checkReport(report, expectCycle){
   if (!report.sign || typeof(report.sign) !== 'object') return [false, 'no sign field']
   if (report.target == Self.id) return [false, 'target is self']   // Don' accept if target is our node
   const cyclediff = expectCycle - report.cycle
-  if (cyclediff < 0) return [false, 'reporter cycle is not as expected; too new'] 
-  if (cyclediff >= 2) return [false, 'reporter cycle is not as expected; too old'] 
+  if (cyclediff < 0) return [false, 'reporter cycle is not as expected; too new']
+  if (cyclediff >= 2) return [false, 'reporter cycle is not as expected; too old']
   if (report.target === report.reporter) return [false, 'target cannot be reporter']  // the target should not be the reporter
   if (report.checker === report.target) return [false, 'target cannot be checker']  // the target should not be the reporter
   if (report.checker === report.reporter){
-    if (activeByIdOrder.length >= 3) return [false, 'checker cannot be reporter']  
-  } 
-  if (!nodes.has(report.target)) return [false, 'target not in network'] 
-  if (!nodes.has(report.reporter)) return [false, 'reporter not in network'] 
-  if (!nodes.has(report.checker)) return [false, 'checker not in network'] 
+    if (activeByIdOrder.length >= 3) return [false, 'checker cannot be reporter']
+  }
+  if (!nodes.has(report.target)) return [false, 'target not in network']
+  if (!nodes.has(report.reporter)) return [false, 'reporter not in network']
+  if (!nodes.has(report.checker)) return [false, 'checker not in network']
   let checkerNode = getCheckerNode(report.target, report.cycle)
   if (checkerNode.id !== report.checker) return [false, `checker node should be ${checkerNode.id} and not ${report.checker}`] // we should be the checker based on our own calculations
   if (!crypto.verify(report, nodes.get(report.reporter).publicKey)) return [false, 'bad sign from reporter'] // the report should be properly signed
@@ -371,7 +387,7 @@ async function isDownCache(node){
   const id = node.id
   if (isDown[id]) return "down"
   if (isUp[id]) return "up"
-  const status = await isDownCheck(node) 
+  const status = await isDownCheck(node)
   if (status === 'down') isDown[id] = currentCycle
   else isUp[id] = currentCycle
   return status
@@ -387,18 +403,18 @@ export function isNodeUpRecent(nodeId:string, maxAge:number) : {upRecent:boolean
   let age = Date.now() - lastCheck
 
   if(isNaN(age)){
-    return {upRecent:false, state:'noLastState', age} 
+    return {upRecent:false, state:'noLastState', age}
   }
 
-  if (age < maxAge) return {upRecent:true, state:'up', age} 
-  return {upRecent:false, state:'noLastState', age} 
+  if (age < maxAge) return {upRecent:true, state:'up', age}
+  return {upRecent:false, state:'noLastState', age}
 }
 
 export function isNodeDown(nodeId:string) : {down:boolean, state:string} {
   // First check the isUp isDown caches to see if we already checked this node before
-  if (isDown[nodeId]) return {down:true, state:'down'} 
-  if (isUp[nodeId]) return {down:false, state:'up'} 
-  return {down:false, state:'noLastState'} 
+  if (isDown[nodeId]) return {down:true, state:'down'}
+  if (isUp[nodeId]) return {down:false, state:'up'}
+  return {down:false, state:'noLastState'}
 }
 
 export function isNodeLost(nodeId:string): boolean  {
@@ -437,7 +453,7 @@ function pruneStopReporting(){
 async function isDownCheck(node){
 // Check the internal route
 // The timeout for this is controled by the network.timeout paramater in server.json
-if(logFlags.p2pNonFatal) info(`Checking internal connection for ${node.id}`)
+  if(logFlags.p2pNonFatal) info(`Checking internal connection for ${node.id}`)
   const res = await Comms.ask(node, 'apoptosize', {id:'bad'})
   try{
     if (typeof(res.s) !== 'string') return 'down'
@@ -453,7 +469,7 @@ if(logFlags.p2pNonFatal) info(`Checking internal connection for ${node.id}`)
     const port = node.port ? node.port : node.externalPort
     // the queryFunction must return null if the given node is our own
     // while syncing nodeList we dont have node.id, so use ip and port
-    if (ip === Self.ip && port === Self.port) return null  
+    if (ip === Self.ip && port === Self.port) return null
     const resp = await http.get(`${ip}:${port}/sync-newest-cycle`)
     return resp
   }

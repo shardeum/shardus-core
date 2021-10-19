@@ -3,7 +3,7 @@ import { StateManager as StateManagerTypes } from 'shardus-types'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
 
-import Profiler from '../utils/profiler'
+import Profiler, { profilerInstance } from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
@@ -258,21 +258,28 @@ class AccountSync {
     // Returns a single hash of the data from the Account State Table determined by the input parameters; sort by Tx_ts  then Tx_id before taking the hash
     // Updated names:  accountStart , accountEnd, tsStart, tsEnd
     this.p2p.registerInternal('get_account_state_hash', async (payload: AccountStateHashReq, respond: (arg0: AccountStateHashResp) => any) => {
-      let result = {} as AccountStateHashResp
+      profilerInstance.scopedProfileSectionStart('get_account_state_hash')
+      try {
+        let result = {} as AccountStateHashResp
 
-      if(this.softSync_checkInitialFlag && this.initalSyncFinished === false){
-        //not ready?
-        result.ready = false
-        result.stateHash = this.stateManager.currentCycleShardData.ourNode.id
+        if(this.softSync_checkInitialFlag && this.initalSyncFinished === false){
+          //not ready?
+          result.ready = false
+          result.stateHash = this.stateManager.currentCycleShardData.ourNode.id
+          await respond(result)
+          return
+        }
+
+        // yikes need to potentially hash only N records at a time and return an array of hashes
+        let stateHash = await this.stateManager.transactionQueue.getAccountsStateHash(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd)
+        result.stateHash = stateHash
+        result.ready = true
         await respond(result)
-        return
+      } catch (e) {
+        this.statemanager_fatal('get_account_state_hash', e)
+      } finally {
+        profilerInstance.scopedProfileSectionEnd('get_account_state_hash')
       }
-
-      // yikes need to potentially hash only N records at a time and return an array of hashes
-      let stateHash = await this.stateManager.transactionQueue.getAccountsStateHash(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd)
-      result.stateHash = stateHash
-      result.ready = true
-      await respond(result)
     })
 
     //    /get_account_state (Acc_start, Acc_end, Ts_start, Ts_end)
@@ -283,20 +290,22 @@ class AccountSync {
     // Returns data from the Account State Table determined by the input parameters; limits result to 1000 records (as configured)
     // Updated names:  accountStart , accountEnd, tsStart, tsEnd
     this.p2p.registerInternal('get_account_state', async (payload: GetAccountStateReq, respond: (arg0: { accountStates: Shardus.StateTableObject[] }) => any) => {
-      let result = {} as { accountStates: Shardus.StateTableObject[] }
-
       if (this.config.stateManager == null) {
         throw new Error('this.config.stateManager == null') //TODO TSConversion  would be nice to eliminate some of these config checks.
       }
+      profilerInstance.scopedProfileSectionStart('get_account_state')
+      let result = {} as { accountStates: Shardus.StateTableObject[] }
 
       // max records set artificially low for better test coverage
       // todo m11: make configs for how many records to query
       let accountStates = await this.storage.queryAccountStateTable(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, this.config.stateManager.stateTableBucketSize)
       result.accountStates = accountStates
       await respond(result)
+      profilerInstance.scopedProfileSectionEnd('get_account_state')
     })
 
     this.p2p.registerInternal('get_account_data3', async (payload: GetAccountData3Req, respond: (arg0: { data: GetAccountDataByRangeSmart }) => any) => {
+      profilerInstance.scopedProfileSectionStart('get_account_data3')
       let result = {} as { data: GetAccountDataByRangeSmart } //TSConversion  This is complicated !!(due to app wrapping)  as {data: Shardus.AccountData[] | null}
       let accountData: GetAccountDataByRangeSmart | null = null
       let ourLockID = -1
@@ -316,6 +325,7 @@ class AccountSync {
 
       result.data = accountData
       await respond(result)
+      profilerInstance.scopedProfileSectionEnd('get_account_data3')
     })
 
     // /get_account_data_by_list (Acc_ids)
@@ -325,6 +335,7 @@ class AccountSync {
     // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
     // Updated names:  accountIds, max records
     this.p2p.registerInternal('get_account_data_by_list', async (payload: { accountIds: any }, respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => any) => {
+      profilerInstance.scopedProfileSectionStart('get_account_data_by_list')
       let result = {} as { accountData: Shardus.WrappedData[] | null }
       let accountData = null
       let ourLockID = -1
@@ -338,6 +349,7 @@ class AccountSync {
       this.stateManager.testAccountDataWrapped(accountData)
       result.accountData = accountData
       await respond(result)
+      profilerInstance.scopedProfileSectionEnd('get_account_data_by_list')
     })
 
     Context.network.registerExternalGet('sync-statement', isDebugModeMiddleware, (req, res) => {
@@ -576,7 +588,7 @@ class AccountSync {
         if(error.message.includes('reset-sync-ranges')){
 
           this.statemanager_fatal(`mainSyncLoop_reset-sync-ranges`, 'DATASYNC: reset-sync-ranges: ' + error.name + ': ' + error.message + ' at ' + error.stack)
-          
+
           if(breakCount > 5){
             this.statemanager_fatal(`mainSyncLoop_reset-sync-ranges-givingUP`,'too many tries' )
             running = false
@@ -608,8 +620,8 @@ class AccountSync {
           cycle = this.stateManager.currentCycleShardData.cycleNumber
           homePartition = nodeShardData.homePartition
           console.log(`RETRYSYNC: homePartition: ${homePartition} storedPartitions: ${utils.stringifyReduce(nodeShardData.storedPartitions)}`)
-          
-          
+
+
           //init new non global trackers
           rangesToSync = this.initRangesToSync(nodeShardData, homePartition)
           this.syncStatement.syncRanges = rangesToSync.length
@@ -2412,7 +2424,7 @@ class AccountSync {
 
       nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: runtime. lastCycle: ${lastCycle} cycle: ${cycle} ${JSON.stringify({cleared, kept, newTrackers})}`)
 
-      // clear all sync trackers.  
+      // clear all sync trackers.
       this.syncTrackers = []
       // may need to think more about this.. what if multiple nodes fail sync and then cast bad votes in subsequent updates?
 

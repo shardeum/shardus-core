@@ -8,6 +8,7 @@ import { config, crypto, logger } from './Context'
 import * as CycleCreator from './CycleCreator'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
+import { profilerInstance } from '../utils/profiler'
 
 /** ROUTES */
 
@@ -16,46 +17,51 @@ const gossipActiveRoute: P2P.P2PTypes.GossipHandler<P2P.ActiveTypes.SignedActive
   sender,
   tracker
 ) => {
-  if (logFlags.p2pNonFatal)
-    info(`Got active request: ${JSON.stringify(payload)}`)
-  let err = ''
-  err = validateTypes(payload, {
-    nodeId: 's',
-    status: 's',
-    timestamp: 'n',
-    sign: 'o',
-  })
-  if (err) {
-    warn('bad input ' + err)
-    return
+  profilerInstance.scopedProfileSectionStart('gossip-active', true)
+  try {
+    if (logFlags.p2pNonFatal)
+      info(`Got active request: ${JSON.stringify(payload)}`)
+    let err = ''
+    err = validateTypes(payload, {
+      nodeId: 's',
+      status: 's',
+      timestamp: 'n',
+      sign: 'o',
+    })
+    if (err) {
+      warn('bad input ' + err)
+      return
+    }
+    err = validateTypes(payload.sign, { owner: 's', sig: 's' })
+    if (err) {
+      warn('bad input sign ' + err)
+      return
+    }
+
+    const signer = NodeList.byPubKey.get(payload.sign.owner)
+    if (!signer) {
+      warn('Got active request from unknown node')
+    }
+    const isOrig = signer.id === sender
+
+    // Only accept original txs in quarter 1
+    if (isOrig && CycleCreator.currentQuarter > 1) return
+
+    // Do not forward gossip after quarter 2
+    if (!isOrig && CycleCreator.currentQuarter > 2) return
+
+    if (addActiveTx(payload))
+      Comms.sendGossip(
+        'gossip-active',
+        payload,
+        tracker,
+        sender,
+        NodeList.byIdOrder,
+        false
+      )
+  } finally {
+    profilerInstance.scopedProfileSectionEnd('gossip-active', true)
   }
-  err = validateTypes(payload.sign, { owner: 's', sig: 's' })
-  if (err) {
-    warn('bad input sign ' + err)
-    return
-  }
-
-  const signer = NodeList.byPubKey.get(payload.sign.owner)
-  if (!signer) {
-    warn('Got active request from unknown node')
-  }
-  const isOrig = signer.id === sender
-
-  // Only accept original txs in quarter 1
-  if (isOrig && CycleCreator.currentQuarter > 1) return
-
-  // Do not forward gossip after quarter 2
-  if (!isOrig && CycleCreator.currentQuarter > 2) return
-
-  if (addActiveTx(payload))
-    Comms.sendGossip(
-      'gossip-active',
-      payload,
-      tracker,
-      sender,
-      NodeList.byIdOrder,
-      false
-    )
 }
 
 const routes = {
@@ -72,7 +78,7 @@ let p2pLogger: Logger
 let activeRequests: Map<
   P2P.NodeListTypes.Node['publicKey'],
   P2P.ActiveTypes.SignedActiveRequest
->
+  >
 let queuedRequest: P2P.ActiveTypes.ActiveRequest
 
 /** FUNCTIONS */

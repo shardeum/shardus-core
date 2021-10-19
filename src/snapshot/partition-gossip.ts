@@ -5,6 +5,7 @@ import * as Comm from '../p2p/Comms'
 import * as NodeList from '../p2p/NodeList'
 import {logFlags} from '../logger'
 import { CycleShardData } from '../state-manager/state-manager-types'
+import { profilerInstance } from '../utils/profiler'
 
 /** TYPES */
 
@@ -205,7 +206,7 @@ export class Collector extends EventEmitter {
           }
         }
         possibleHashes = possibleHashes.sort()
-    
+
         // if (logFlags.console) console.log(`RECEIPT HASH COUNTER: Cycle ${cycle}, Partition ${partitionId} => `, counterMap)
         if (possibleHashes.length > 0) selectedHash = possibleHashes[0]
         if (selectedHash) this.allReceiptMapHashes.set(partitionId, selectedHash)
@@ -227,7 +228,7 @@ export class Collector extends EventEmitter {
           }
         }
         possibleHashes = possibleHashes.sort()
-        
+
         // if (logFlags.console) console.log(`SUMMARY HASH COUNTER: Cycle ${cycle}, Partition ${partitionId} => `, counterMap)
         if (possibleHashes.length > 0) selectedHash = possibleHashes[0]
         if (selectedHash) this.allSummaryHashes.set(partitionId, selectedHash)
@@ -247,19 +248,24 @@ export class Collector extends EventEmitter {
 export function initGossip() {
   if (logFlags.console) console.log('registering gossip handler...')
   registerGossipHandler('snapshot_gossip', (message) => {
-    let { cycle } = message
-    let collector = collectors.get(cycle)
-    if (collector) {
-      // if (logFlags.console) console.log('A collector exists. Processing new incoming message', message.sender)
-      collector.process([message])
-    } else {
-      // if (logFlags.console) console.log('No collector found. Adding gossip to queue', message.sender)
-      if (queue.has(cycle)) {
-        let messageList = queue.get(cycle)
-        messageList.push(message)
+    profilerInstance.scopedProfileSectionStart('snapshot_gossip')
+    try {
+      let { cycle } = message
+      let collector = collectors.get(cycle)
+      if (collector) {
+        // if (logFlags.console) console.log('A collector exists. Processing new incoming message', message.sender)
+        collector.process([message])
       } else {
-        queue.set(cycle, [message])
+        // if (logFlags.console) console.log('No collector found. Adding gossip to queue', message.sender)
+        if (queue.has(cycle)) {
+          let messageList = queue.get(cycle)
+          messageList.push(message)
+        } else {
+          queue.set(cycle, [message])
+        }
       }
+    } finally {
+      profilerInstance.scopedProfileSectionEnd('snapshot_gossip')
     }
   })
 }

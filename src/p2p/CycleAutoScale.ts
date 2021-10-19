@@ -9,6 +9,7 @@ import * as CycleChain from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import * as NodeList from './NodeList'
 import * as Self from './Self'
+import { profilerInstance } from '../utils/profiler'
 
 /** STATE */
 
@@ -32,15 +33,20 @@ const gossipScaleRoute: P2P.P2PTypes.GossipHandler<P2P.CycleAutoScaleTypes.Signe
   sender,
   tracker
 ) => {
-  if (logFlags.p2pNonFatal)
-    info(`Got scale request: ${JSON.stringify(payload)}`)
-  if (!payload) {
-    warn('No payload provided for the `scaling` request.')
-    return
+  profilerInstance.scopedProfileSectionStart('gossip-scaling')
+  try {
+    if (logFlags.p2pNonFatal)
+      info(`Got scale request: ${JSON.stringify(payload)}`)
+    if (!payload) {
+      warn('No payload provided for the `scaling` request.')
+      return
+    }
+    const added = await addExtScalingRequest(payload)
+    if (!added) return
+    Comms.sendGossip('scaling', payload, tracker, sender, NodeList.byIdOrder, false)
+  } finally {
+    profilerInstance.scopedProfileSectionEnd('gossip-scaling')
   }
-  const added = await addExtScalingRequest(payload)
-  if (!added) return
-  Comms.sendGossip('scaling', payload, tracker, sender, NodeList.byIdOrder, false)
 }
 
 const routes = {
@@ -354,7 +360,7 @@ function _addToScalingRequests(scalingRequest) : boolean {
       scalingRequestsCollector.set(scalingRequest.nodeId, scalingRequest)
       // requestedScalingType = P2P.CycleAutoScaleTypes.ScaleType.UP //this was locking out votes for scale down
       // console.log(`Added scale request in cycle ${CycleCreator.currentCycle}, quarter ${CycleCreator.currentQuarter}`, requestedScalingType, scalingRequest)
-      
+
       //_checkScaling() //Wait till later to calculate this.  Not for perf reasons, but to get the max possible votes considered
       return true
     case P2P.CycleAutoScaleTypes.ScaleType.DOWN:
@@ -371,7 +377,7 @@ function _addToScalingRequests(scalingRequest) : boolean {
       }
       scalingRequestsCollector.set(scalingRequest.nodeId, scalingRequest)
       // requestedScalingType = P2P.CycleAutoScaleTypes.ScaleType.DOWN //this was locking out votes for scale up
-      
+
       //_checkScaling() //Wait till later to calculate this.  Not for perf reasons, but to get the max possible votes considered
       return true
     default:
