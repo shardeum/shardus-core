@@ -240,7 +240,7 @@ let testIterations = 2000
 let homeNodeQueryTests = 100
 
 let testAllNodesInList = true
-let numNodes = 2000
+let numNodes = 1
 let numNodes2 = 0
 
 /** @type {boolean} */

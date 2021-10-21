@@ -345,6 +345,15 @@ class ShardFunctions {
 
     if(thisNodeIndex != undefined){
       nodeShardData.ourNodeIndex = thisNodeIndex
+
+      // //temp test
+      // let test = activeNodes.findIndex(function (_node) {
+      //   return _node.id === node.id
+      // })
+      // if (test != nodeShardData.ourNodeIndex){
+      //   throw new Error(`index failure : ${thisNodeIndex}`)
+      // }
+
     } else{
       //this is way too slow
       nodeShardData.ourNodeIndex = activeNodes.findIndex(function (_node) {
