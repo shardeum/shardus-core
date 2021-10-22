@@ -1869,6 +1869,8 @@ class AccountPatcher {
         tooOld:0,
         sameTS:0,
         sameTSFix:0,
+        tsFix2:0,
+        tsFix3:0
       }
 
       // build a list of data that is good to use in this repair operation
@@ -1892,6 +1894,21 @@ class AccountPatcher {
             if(accountHashCacheHistory != null && accountHashCacheHistory.lastStaleCycle >= accountHashCacheHistory.lastSeenCycle ){
               // nestedCountersInstance.countEvent('accountPatcher', `checkAndSetAccountData updateSameTS update lastSeenCycle c:${cycle}`)
               filterStats.sameTSFix++
+              accountHashCacheHistory.lastSeenCycle = cycle
+            } else if(accountHashCacheHistory != null && accountHashCacheHistory.accountHashList.length > 0 && wrappedData.stateId != accountHashCacheHistory.accountHashList[0].h ){
+              // not sure if this is the correct fix but testing will let us know more
+              nestedCountersInstance.countRareEvent('accountPatcher', `tsFix2`)
+              nestedCountersInstance.countEvent('accountPatcher', `tsFix2 c:${cycle}`)
+              //not really fatal. but want to validate info
+              this.statemanager_fatal('accountPatcher_tsFix2', `tsFix2 c:${cycle} wrappedData:${utils.stringifyReduce(wrappedData)} accountHashCacheHistory:${utils.stringifyReduce(accountHashCacheHistory)}` )
+              filterStats.tsFix2++
+              accountHashCacheHistory.lastSeenCycle = cycle
+            } else {
+              //just dont even care and bump the last seen cycle up.. this might do nothing
+              nestedCountersInstance.countRareEvent('accountPatcher', `tsFix3`)
+              //not really fatal. but want to validate info
+              this.statemanager_fatal('accountPatcher_tsFix3', `tsFix3 c:${cycle} wrappedData:${utils.stringifyReduce(wrappedData)} accountHashCacheHistory:${utils.stringifyReduce(accountHashCacheHistory)}` )
+              filterStats.tsFix3++
               accountHashCacheHistory.lastSeenCycle = cycle
             }
 
