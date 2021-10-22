@@ -15,6 +15,7 @@ import StateManager from '.'
 import { potentiallyRemoved } from '../p2p/NodeList'
 import * as CycleChain from '../p2p/CycleChain'
 import { QueueEntry, RequestStateForTxReq, RequestStateForTxResp, PreApplyAcceptedTransactionResult, CommitConsensedTransactionResult, AccountFilter, AcceptedTx, StringBoolObjectMap, RequestReceiptForTxResp, StringNodeObjectMap, SeenAccounts } from './state-manager-types'
+import { errorToStringFull } from '../utils'
 
 const http = require('../http')
 const allZeroes64 = '0'.repeat(64)
@@ -909,7 +910,7 @@ class TransactionQueue {
         this.stateManager.tryStartAcceptedQueue()
       } catch (error) {
         if (logFlags.playback) this.logger.playbackLogNote('shrd_addtoqueue_rejected', `${txId}`, `AcceptedTransaction: ${txQueueEntry.logID} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)}`)
-        this.statemanager_fatal(`routeAndQueueAcceptedTransaction_ex`, 'routeAndQueueAcceptedTransaction failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+        this.statemanager_fatal(`routeAndQueueAcceptedTransaction_ex`, 'routeAndQueueAcceptedTransaction failed: ' + errorToStringFull(error))
         throw new Error(error)
       }
       return true

@@ -18,6 +18,7 @@ import * as Context from '../p2p/Context'
 import * as Wrapper from '../p2p/Wrapper'
 import { AccountHashCache, AccountHashCacheHistory, AccountIDAndHash, AccountPreTest, HashTrieAccountDataRequest, HashTrieAccountDataResponse, HashTrieAccountsResp, HashTrieNode, HashTrieRadixCoverage, HashTrieReq, HashTrieResp, HashTrieSyncConsensus, HashTrieSyncTell, HashTrieUpdateStats, RadixAndChildHashes, RadixAndHash, ShardedHashTrie, TrieAccount, CycleShardData } from './state-manager-types'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
+import { errorToStringFull } from '../utils'
 //import { all } from 'deepmerge'
 //import { Node } from '../p2p/Types'
 
@@ -1167,7 +1168,7 @@ class AccountPatcher {
     //       nodeHashes = nodeHashes.concat(result.nodeHashes)
     //     } //else retry?
     //   } catch (error) {
-    //     this.statemanager_fatal('getChildrenOf failed', `getChildrenOf failed: ` + error.name + ': ' + error.message + ' at ' + error.stack)
+    //     this.statemanager_fatal('getChildrenOf failed', `getChildrenOf failed: ` + errorToStringFull(error))
     //   }
     // }
 
@@ -1177,7 +1178,7 @@ class AccountPatcher {
         let promise = this.p2p.ask(key, 'get_trie_hashes', value)
         promises.push(promise)
       } catch (error) {
-        this.statemanager_fatal('getChildrenOf failed', `getChildrenOf failed: ` + error.name + ': ' + error.message + ' at ' + error.stack)
+        this.statemanager_fatal('getChildrenOf failed', `getChildrenOf failed: ` + errorToStringFull(error))
       }
     }
 
@@ -1190,7 +1191,7 @@ class AccountPatcher {
         }
       }
     } catch (error) {
-      this.statemanager_fatal('getChildrenOf failed', `getChildrenOf failed: ` + error.name + ': ' + error.message + ' at ' + error.stack)
+      this.statemanager_fatal('getChildrenOf failed', `getChildrenOf failed: ` + errorToStringFull(error))
     }
 
     if(nodeHashes.length > 0){
@@ -1235,7 +1236,7 @@ class AccountPatcher {
     //       // }
     //     } //else retry?
     //   } catch (error) {
-    //     this.statemanager_fatal('getChildAccountHashes failed', `getChildAccountHashes failed: ` + error.name + ': ' + error.message + ' at ' + error.stack)
+    //     this.statemanager_fatal('getChildAccountHashes failed', `getChildAccountHashes failed: ` + errorToStringFull(error))
 
     //   }
     // }
@@ -1247,7 +1248,7 @@ class AccountPatcher {
         let promise = this.p2p.ask(key, 'get_trie_accountHashes', value)
         promises.push(promise)
       } catch (error) {
-        this.statemanager_fatal('getChildAccountHashes failed', `getChildAccountHashes failed: ` + error.name + ': ' + error.message + ' at ' + error.stack)
+        this.statemanager_fatal('getChildAccountHashes failed', `getChildAccountHashes failed: ` + errorToStringFull(error))
       }
     }
 
@@ -1263,7 +1264,7 @@ class AccountPatcher {
         }
       }
     } catch (error) {
-      this.statemanager_fatal('getChildAccountHashes failed', `getChildAccountHashes failed: ` + error.name + ': ' + error.message + ' at ' + error.stack)
+      this.statemanager_fatal('getChildAccountHashes failed', `getChildAccountHashes failed: ` + errorToStringFull(error))
     }
 
     if(nodeChildHashes.length > 0){

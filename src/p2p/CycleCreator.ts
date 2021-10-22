@@ -21,6 +21,7 @@ import * as SafetyMode from './SafetyMode'
 import * as Self from './Self'
 import * as Sync from './Sync'
 import { compareQuery, Comparison } from './Utils'
+import { errorToStringFull } from '../utils'
 
 /** CONSTANTS */
 
@@ -652,15 +653,20 @@ async function fetchLatestRecord(): Promise<P2P.CycleCreatorTypes.CycleRecord> {
       // We didn't actually sync
       warn('CycleCreator: fetchLatestRecord: synced record not newer')
       fetchLatestRecordFails++
-      if (fetchLatestRecordFails > maxFetchLatestRecordFails)
-        Apoptosis.apoptosizeSelf()
+      if (fetchLatestRecordFails > maxFetchLatestRecordFails){
+        warn('CycleCreator: fetchLatestRecord_A: fetchLatestRecordFails > maxFetchLatestRecordFails. apoptosizeSelf ')
+        Apoptosis.apoptosizeSelf()        
+      }
+
       return null
     }
   } catch (err) {
-    warn('CycleCreator: fetchLatestRecord: syncNewCycles failed:', err)
+    warn('CycleCreator: fetchLatestRecord: syncNewCycles failed:', errorToStringFull(err))
     fetchLatestRecordFails++
-    if (fetchLatestRecordFails > maxFetchLatestRecordFails)
-      Apoptosis.apoptosizeSelf()
+    if (fetchLatestRecordFails > maxFetchLatestRecordFails){
+      warn('CycleCreator: fetchLatestRecord_B: fetchLatestRecordFails > maxFetchLatestRecordFails. apoptosizeSelf ')
+      Apoptosis.apoptosizeSelf()      
+    }
     return null
   }
   fetchLatestRecordFails = 0

@@ -147,3 +147,7 @@ export function validateTypes(inp, def) {
   }
   return ''
 }
+
+export function errorToStringFull(error){
+  return `${error.name}: ${error.message} at ${error.stack}`
+}

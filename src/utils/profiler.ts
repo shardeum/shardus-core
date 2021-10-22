@@ -308,7 +308,7 @@ class Profiler {
 
     let totalSection = this.sectionTimes['_total']
     let totalBusySection = this.sectionTimes['_totalBusy']
-    console.log('totalSection from printAndClearReport', totalSection)
+    //console.log('totalSection from printAndClearReport', totalSection)
 
     let lines = []
     for (let key in this.sectionTimes) {

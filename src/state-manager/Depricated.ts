@@ -3395,11 +3395,11 @@ class Depricated {
   //   } catch (error) {
   //     if (error.message.includes('FailAndRestartPartition')) {
   //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: Error Failed at: ${error.stack}`)
-  //       this.statemanager_fatal(`syncStateDataForRange_ex_failandrestart`, 'DATASYNC: FailAndRestartPartition: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+  //       this.statemanager_fatal(`syncStateDataForRange_ex_failandrestart`, 'DATASYNC: FailAndRestartPartition: ' + errorToStringFull(error))
   //       await this.failandRestart()
   //     } else {
-  //       this.statemanager_fatal(`syncStateDataForRange_ex`, 'syncStateDataForPartition failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
-  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + error.name + ': ' + error.message + ' at ' + error.stack)
+  //       this.statemanager_fatal(`syncStateDataForRange_ex`, 'syncStateDataForPartition failed: ' + errorToStringFull(error))
+  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
   //       await this.failandRestart()
   //     }
   //   }
@@ -3768,11 +3768,11 @@ class Depricated {
   //   } catch (error) {
   //     if (error.message.includes('FailAndRestartPartition')) {
   //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncStateDataGlobals Error Failed at: ${error.stack}`)
-  //       this.statemanager_fatal(`syncStateDataGlobals_ex_failandrestart`, 'DATASYNC: syncStateDataGlobals FailAndRestartPartition: ' + error.name + ': ' + error.message + ' at ' + error.stack)
+  //       this.statemanager_fatal(`syncStateDataGlobals_ex_failandrestart`, 'DATASYNC: syncStateDataGlobals FailAndRestartPartition: ' + errorToStringFull(error))
   //       await this.failandRestart()
   //     } else {
-  //       this.statemanager_fatal(`syncStateDataGlobals_ex`, 'syncStateDataGlobals failed: ' + error.name + ': ' + error.message + ' at ' + error.stack)
-  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + error.name + ': ' + error.message + ' at ' + error.stack)
+  //       this.statemanager_fatal(`syncStateDataGlobals_ex`, 'syncStateDataGlobals failed: ' + errorToStringFull(error))
+  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
   //       await this.failandRestart()
   //     }
   //   }

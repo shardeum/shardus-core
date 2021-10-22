@@ -9,12 +9,18 @@ export default class FastRandomIterator {
 
   indexList: number[] = null
 
+  sparseSet: Set<number> = null
+
   constructor(arraySize: number, par: number = -1, strideSize: number = -1) {
     this.iteratorIndex = 0
     this.arraySize = arraySize
 
     let parForcesSimpleMode = false
     if (par > 0) {
+      if(arraySize / par > 100){
+        this.sparseSet = new Set()
+        return //use the simple sparse mode
+      }
       if (strideSize < 0) {
         strideSize = arraySize / 100
       }
@@ -27,7 +33,9 @@ export default class FastRandomIterator {
 
       this.strideSize = Math.floor(strideSize)
 
-      parForcesSimpleMode = par * (strideSize / arraySize) > 0.1
+      //let forceSimpleCalc = (par * (strideSize / arraySize)) // using stride size was too complicated..
+      let forceSimpleCalc = (par / arraySize)
+      parForcesSimpleMode = forceSimpleCalc > 0.1 //if we will pick more than 10% of the array then just go with simple
     }
 
     if (arraySize < 100 || strideSize > arraySize || parForcesSimpleMode) {
@@ -50,7 +58,7 @@ export default class FastRandomIterator {
 
       this.strideSize = Math.floor(strideSize)
 
-      this.indexStrides = Array(Math.ceil(arraySize / strideSize)).fill(false) //new Map()
+      this.indexStrides = Array(Math.ceil(arraySize / this.strideSize)).fill(false) //new Map()
 
       // let firstStride = new Array(this.strideSize)
       // for (let i = 0; i < this.strideSize; ++i) {
@@ -60,16 +68,35 @@ export default class FastRandomIterator {
     }
   }
 
+  debugGetMode(): string {
+    if(this.sparseSet != null){
+      return 'sparse'
+    }
+    if(this.indexList != null){
+      return 'fastSimple'
+    }
+    return 'fast'
+  }
+
   getNextIndex(): number {
     if (this.iteratorIndex >= this.arraySize) {
       return -1
     }
-
-    let randomFetchIndex =
-      Math.floor(Math.random() * (this.arraySize - this.iteratorIndex)) +
-      this.iteratorIndex
-
     let nextIndex
+    //if we are using the Sparse algorithm:
+    if(this.sparseSet != null){
+      let nextIndex = Math.floor(Math.random() * (this.arraySize))
+      while(this.sparseSet.has(nextIndex)){
+        nextIndex = Math.floor(Math.random() * (this.arraySize))
+      }
+      this.sparseSet.add(nextIndex)
+      this.iteratorIndex++
+      return nextIndex
+    }
+
+    // FastSimple and Simple methods start here
+    let randomFetchIndex = Math.floor(Math.random() * (this.arraySize - this.iteratorIndex)) + this.iteratorIndex
+    //The simple fast algorithm
     if (this.indexList != null) {
       nextIndex = this.indexList[randomFetchIndex]
       let indexValueToSwap = this.indexList[this.iteratorIndex]
@@ -77,7 +104,7 @@ export default class FastRandomIterator {
 
       this.iteratorIndex++
       return nextIndex
-    } else {
+    } else { //the Fast algorithm
       let currentStrideKey = Math.floor(this.iteratorIndex / this.strideSize)
       let hasCurrentStride = this.indexStrides[currentStrideKey] //.has(currentStrideKey)
       let currentStrideStart = currentStrideKey * this.strideSize
