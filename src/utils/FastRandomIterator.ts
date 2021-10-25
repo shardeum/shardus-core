@@ -68,6 +68,7 @@ export default class FastRandomIterator {
     }
   }
 
+  //to help with profiling use
   debugGetMode(): string {
     if(this.sparseSet != null){
       return 'sparse'
@@ -76,6 +77,11 @@ export default class FastRandomIterator {
       return 'fastSimple'
     }
     return 'fast'
+  }
+
+  //to help with profiling use
+  debugForceSparse() {
+    this.sparseSet = new Set()
   }
 
   getNextIndex(): number {
