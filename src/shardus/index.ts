@@ -55,7 +55,7 @@ interface Shardus {
   nestedCounters: NestedCounters
   memoryReporting: MemoryReporting
   config: ShardusTypes.ShardusConfiguration
-  
+
   logger: Logger
   mainLogger: Log4js.Logger
   fatalLogger: Log4js.Logger
@@ -98,7 +98,7 @@ class Shardus extends EventEmitter {
     storage: ShardusTypes.StorageConfiguration
   }) {
     super()
-    this.nestedCounters = new NestedCounters()    
+    this.nestedCounters = new NestedCounters()
     this.memoryReporting = new MemoryReporting(this)
     this.profiler = new Profiler()
     this.config = config
@@ -367,7 +367,7 @@ class Shardus extends EventEmitter {
         console.log(`Archive server has with public key ${ARCHIVER_PUBLIC_KEY} request to unsubscribe`)
         console.log('connectedSockets', connectedSockets)
         Archivers.removeDataRecipient(ARCHIVER_PUBLIC_KEY)
-        
+
       })
     })
     this.network.on('timeout', (node) => {
@@ -376,7 +376,7 @@ class Shardus extends EventEmitter {
       /** [TODO] Report lost */
       nestedCountersInstance.countEvent('lostNodes','timeout')
 
-      nestedCountersInstance.countRareEvent('lostNodes',`timeout  ${node.internalIp}:${node.internalPort}`) 
+      nestedCountersInstance.countRareEvent('lostNodes',`timeout  ${node.internalIp}:${node.internalPort}`)
     })
     this.network.on('error', (node) => {
       console.log('in Shardus got network error from', node)
@@ -424,6 +424,8 @@ class Shardus extends EventEmitter {
     )
     this.debug.addToArchive('./statistics.tsv', './statistics.tsv')
 
+    this.profiler.setStatisticsInstance(this.statistics)
+
     this.statistics
 
     this.loadDetection = new LoadDetection(
@@ -464,7 +466,7 @@ class Shardus extends EventEmitter {
       let disableSnapshots = !!(this.config && this.config.debug && this.config.debug.disableSnapshots === true)
       if(disableSnapshots != true){
         // Start state snapshotting once you go active with an app
-        this.once('active', Snapshot.startSnapshotting)        
+        this.once('active', Snapshot.startSnapshotting)
       }
     }
 
@@ -784,7 +786,7 @@ class Shardus extends EventEmitter {
   }
 
 /**
- * Gets log flags. 
+ * Gets log flags.
  * use these for to cull out slow log lines with stringify
  * if you pass comma separated objects to dapp.log you do not need this.
  * Also good for controlling console logging
@@ -929,7 +931,7 @@ class Shardus extends EventEmitter {
       )
       //this.profiler.profileSectionStart('consensusInject')
 
-      // TODO INJECT: this is old consensus, and idea for a swapable system, but it does very little work now and the name 
+      // TODO INJECT: this is old consensus, and idea for a swapable system, but it does very little work now and the name
       //              seems to add complexity
       this.consensus.inject(signedShardusTx, global, noConsensus).then((txReceipt) => {
       //this.profiler.profileSectionEnd('consensusInject')
@@ -1427,7 +1429,7 @@ class Shardus extends EventEmitter {
           return 0
         }
       }
-      
+
       if (typeof application.getTimestampAndHashFromAccount === 'function') {
         applicationInterfaceImpl.getTimestampAndHashFromAccount = (account) => application.getTimestampAndHashFromAccount(account)
       } else {
@@ -1618,7 +1620,7 @@ class Shardus extends EventEmitter {
     } else {
       this.fatalLogger.fatal(log)
     }
-    
+
   }
 
 }

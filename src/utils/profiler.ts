@@ -28,6 +28,7 @@ class Profiler {
   stackHeight: number
   netInternalStackHeight: number
   netExternalStackHeight: number
+  statisticsInstance: any
 
   constructor() {
     this.sectionTimes = {}
@@ -36,10 +37,15 @@ class Profiler {
     this.stackHeight = 0
     this.netInternalStackHeight = 0
     this.netExternalStackHeight = 0
+    this.statisticsInstance = null
     profilerInstance = this
 
     this.profileSectionStart('_total', true)
     this.profileSectionStart('_internal_total', true)
+  }
+
+  setStatisticsInstance(statistics) {
+    this.statisticsInstance = statistics
   }
 
   registerEndpoints() {
@@ -69,6 +75,8 @@ class Profiler {
       // hit "perf" endpoint to clear perf stats
       this.printAndClearReport(1)
 
+      if (this.statisticsInstance) this.statisticsInstance.clearRing('txProcessed')
+
       // wait X seconds
       await sleep(waitTime * 1000)
       res.write(`Results for ${waitTime} sec of sampling...`)
@@ -92,6 +100,15 @@ class Profiler {
       res.write(`arrayBuffers: ${(report.arrayBuffers * toMB).toFixed(2)} MB\n\n\n`)
       memoryReportingInstance.gatherReport()
       memoryReportingInstance.reportToStream(memoryReportingInstance.report, res, 0)
+
+      if (this.statisticsInstance) {
+        const tpsReport = this.statisticsInstance.getMultiStatReport('txProcessed')
+        res.write('\n=> Node TPS \n')
+        res.write(`\n Avg: ${tpsReport.avg} \n`)
+        res.write(`\n Max: ${tpsReport.max} \n`)
+        res.write(`\n Vals: ${tpsReport.allVals} \n`)
+        this.statisticsInstance.clearRing('txProcessed')
+      }
 
       // write "perf" results
       let result = this.printAndClearReport(1)
