@@ -23,10 +23,10 @@ const newestCycleRoute: P2P.P2PTypes.Route<Handler> = {
   method: 'GET',
   name: 'sync-newest-cycle',
   handler: (_req, res) => {
-    profilerInstance.scopedProfileSectionStart('newest-cycle')
+    profilerInstance.scopedProfileSectionStart('sync-newest-cycle')
     const newestCycle = CycleChain.newest ? CycleChain.newest : undefined
     res.json({ newestCycle })
-    profilerInstance.scopedProfileSectionEnd('newest-cycle')
+    profilerInstance.scopedProfileSectionEnd('sync-newest-cycle')
   },
 }
 

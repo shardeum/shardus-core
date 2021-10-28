@@ -102,18 +102,38 @@ class Profiler {
       memoryReportingInstance.reportToStream(memoryReportingInstance.report, res, 0)
 
       if (this.statisticsInstance) {
-        const tpsReport = this.statisticsInstance.getMultiStatReport('txProcessed')
-        res.write('\n=> Node TPS \n')
-        res.write(`\n Avg: ${tpsReport.avg} \n`)
-        res.write(`\n Max: ${tpsReport.max} \n`)
-        res.write(`\n Vals: ${tpsReport.allVals} \n`)
+        const injectedTpsReport = this.statisticsInstance.getMultiStatReport('txInjected')
+        res.write('\n=> Node Injected TPS \n')
+        res.write(`\n Avg: ${injectedTpsReport.avg} \n`)
+        res.write(`\n Max: ${injectedTpsReport.max} \n`)
+        res.write(`\n Vals: ${injectedTpsReport.allVals} \n`)
+        this.statisticsInstance.clearRing('txInjected')
+
+        const processedTpsReport = this.statisticsInstance.getMultiStatReport('txProcessed')
+        res.write('\n=> Node Processed TPS \n')
+        res.write(`\n Avg: ${processedTpsReport.avg} \n`)
+        res.write(`\n Max: ${processedTpsReport.max} \n`)
+        res.write(`\n Vals: ${processedTpsReport.allVals} \n`)
         this.statisticsInstance.clearRing('txProcessed')
+
+        const rejectedTpsReport = this.statisticsInstance.getMultiStatReport('txRejected')
+        res.write('\n=> Node Rejected TPS \n')
+        res.write(`\n Avg: ${rejectedTpsReport.avg} \n`)
+        res.write(`\n Max: ${rejectedTpsReport.max} \n`)
+        res.write(`\n Vals: ${rejectedTpsReport.allVals} \n`)
+        this.statisticsInstance.clearRing('txRejected')
       }
 
       // write "perf" results
       let result = this.printAndClearReport(1)
       res.write(`\n=> PERF RESULTS\n`)
       res.write(result)
+      res.write(`\n===========================\n`)
+
+      // write scoped-perf results
+      let scopedPerfResult = this.printAndClearScopedReport(1)
+      res.write(`\n=> SCOPED PERF RESULTS\n`)
+      res.write(scopedPerfResult)
       res.write(`\n===========================\n`)
 
       // write "counts" results
