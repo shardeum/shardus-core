@@ -53,6 +53,7 @@ export class NetworkClass extends EventEmitter {
   ipInfo: any
   externalCatchAll: any
   debugNetworkDelay: number
+  statisticsInstance: any
 
   constructor(config: Shardus.ShardusConfiguration, logger: Logger) {
     super()
@@ -70,14 +71,19 @@ export class NetworkClass extends EventEmitter {
     this.InternalTellCounter = 1
     this.InternalAskCounter = 1
     this.debugNetworkDelay = 0
+    this.statisticsInstance = null
 
 
     if(config && config.debug && config.debug.fakeNetworkDelay){
       this.debugNetworkDelay = config.debug.fakeNetworkDelay
     }
 
-    nestedCountersInstance.countEvent('network','init') 
+    nestedCountersInstance.countEvent('network','init')
 
+  }
+
+  setStatisticsInstance(statistics) {
+    this.statisticsInstance = statistics
   }
 
   // TODO: Allow for binding to a specified network interface
@@ -148,7 +154,7 @@ export class NetworkClass extends EventEmitter {
           throw new Error('Unable to handle request, invalid route.')
 
         if(this.debugNetworkDelay > 0){
-          await utils.sleep(this.debugNetworkDelay)          
+          await utils.sleep(this.debugNetworkDelay)
         }
         profilerInstance.profileSectionStart('net-internl')
         profilerInstance.profileSectionStart(`net-internl-${route}`)
@@ -233,7 +239,7 @@ export class NetworkClass extends EventEmitter {
 
       try {
         if(this.debugNetworkDelay > 0){
-          await utils.sleep(this.debugNetworkDelay)          
+          await utils.sleep(this.debugNetworkDelay)
         }
         profilerInstance.profileSectionStart('net-ask')
         profilerInstance.profileSectionStart(`net-ask-${route}`)
@@ -252,11 +258,12 @@ export class NetworkClass extends EventEmitter {
           resolve(res)
         }
         const onTimeout = () => {
-          nestedCountersInstance.countEvent('network','timeout') 
+          nestedCountersInstance.countEvent('network','timeout')
+          if (this.statisticsInstance) this.statisticsInstance.incrementCounter('networkTimeout')
           const err = new Error(
             `Request timed out. ${utils.stringifyReduce(id)}`
           )
-          nestedCountersInstance.countRareEvent('network','timeout ' + route) 
+          nestedCountersInstance.countRareEvent('network','timeout ' + route)
           if (logFlags.error) this.mainLogger.error('Network: ' + err)
           if (logFlags.error) this.mainLogger.error(err.stack)
           this.emit('timeout', node)
@@ -503,7 +510,7 @@ export async function init() {
 
   if(logFlags.info) {
     mainLogger.info('This nodes ipInfo:')
-    mainLogger.info(JSON.stringify(ipInfo, null, 2))    
+    mainLogger.info(JSON.stringify(ipInfo, null, 2))
   }
 }
 

@@ -377,6 +377,8 @@ class Shardus extends EventEmitter {
       nestedCountersInstance.countEvent('lostNodes','timeout')
 
       nestedCountersInstance.countRareEvent('lostNodes',`timeout  ${node.internalIp}:${node.internalPort}`)
+      if (this.network.statisticsInstance)
+        this.network.statisticsInstance.incrementCounter('lostNodeTimeout')
     })
     this.network.on('error', (node) => {
       console.log('in Shardus got network error from', node)
@@ -409,6 +411,8 @@ class Shardus extends EventEmitter {
           'txRejected',
           'txExpired',
           'txProcessed',
+          'networkTimeout',
+          'lostNodeTimeout',
         ],
         watchers: {
           queueLength: () =>
@@ -425,6 +429,7 @@ class Shardus extends EventEmitter {
     this.debug.addToArchive('./statistics.tsv', './statistics.tsv')
 
     this.profiler.setStatisticsInstance(this.statistics)
+    this.network.setStatisticsInstance(this.statistics)
 
     this.statistics
 
