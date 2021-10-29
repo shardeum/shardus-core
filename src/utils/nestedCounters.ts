@@ -64,6 +64,11 @@ class NestedCounters {
       res.end()
 
   })
+    Context.network.registerExternalGet('rare-counts-reset', isDebugModeMiddleware, (req, res) => {
+      this.rareEventCounters = new Map()
+      res.write(`Rare counts reset ${Date.now()}`)
+      res.end()
+    })
 
     Context.network.registerExternalGet('debug-inf-loop', isDebugModeMiddleware, (req, res) => {
         res.write('starting inf loop, goodbye')
