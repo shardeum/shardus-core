@@ -1044,6 +1044,45 @@ class AccountPatcher {
     return toFix
   }
 
+  /**
+   * findExtraChildren
+   * a debug method to figure out if we have keys not covered by other nodes.
+   * @param consensusArray 
+   * @param mapB 
+   * @returns 
+   */
+  findExtraBadKeys(consensusArray:RadixAndHash[], mapB: Map<string, HashTrieNode>) : string[]  {
+    let extraBadKeys = []
+    if(consensusArray == null){
+      this.statemanager_fatal('findExtraBadKeys: consensusArray == null', 'findExtraBadKeys: consensusArray == null')
+      return []
+    }
+    let parentKeys = new Set()
+    let goodKeys = new Set()
+    //build sets of parents and good keys
+    for(let value of consensusArray){
+      let parentKey = value.radix.slice(0, value.radix.length-1)
+      parentKeys.add(parentKey)
+      goodKeys.add(value.radix)
+    }
+
+    //iterate all possible children of the parent keys and detect if we have extra keys that are not in the good list
+    for(let parentKey of parentKeys){
+      for(let i = 0; i<16; i++){
+        let childKey = parentKey + i.toString(16)
+        let weHaveKey =  mapB.has(childKey)
+        if(weHaveKey){
+          let theyHaveKey = goodKeys.has(childKey)
+          if(theyHaveKey === false){
+            extraBadKeys.push(mapB.get(childKey).radix)
+          }
+        }
+      }
+    }
+
+    return extraBadKeys
+  }
+
   /***
    *     ######   #######  ##     ## ########  ##     ## ######## ########  ######   #######  ##     ## ######## ########     ###     ######   ########
    *    ##    ## ##     ## ###   ### ##     ## ##     ##    ##    ##       ##    ## ##     ## ##     ## ##       ##     ##   ## ##   ##    ##  ##
@@ -1196,6 +1235,8 @@ class AccountPatcher {
 
     if(nodeHashes.length > 0){
       nestedCountersInstance.countEvent(`accountPatcher`, `got nodeHashes`, nodeHashes.length)
+    } else {
+      nestedCountersInstance.countEvent(`accountPatcher`, `failed to get nodeHashes c:${cycle}`, 1)
     }
 
     return nodeHashes
@@ -1379,7 +1420,10 @@ class AccountPatcher {
       ok_trieHashBad: 0,
       fixLastSeen: 0,
       needsVotes: 0,
+      subHashesTested: 0,
+      trailColdLevel: 0,
     }
+    let extraBadKeys = []
 
     let minVotes = this.stateManager.currentCycleShardData.shardGlobals.consensusRadius
     minVotes = Math.min(minVotes, this.stateManager.currentCycleShardData.activeNodes.length - 1)
@@ -1435,6 +1479,15 @@ class AccountPatcher {
       let childrenToDiff = await this.getChildrenOf(toFix, cycle)
 
       toFix = this.diffConsenus(childrenToDiff, badLayerMap)
+
+      stats.subHashesTested += toFix.length
+      if(toFix.length === 0){
+        stats.trailColdLevel = level
+
+        extraBadKeys = this.findExtraBadKeys(childrenToDiff, badLayerMap)
+
+      }
+
       //record some debug info
       badHashesPerLevel[level] = toFix.length
       checkedKeysPerLevel[level] = toFix.map(x => x.radix)
@@ -1496,7 +1549,7 @@ class AccountPatcher {
         badAccounts = badAccounts.concat(radixAndChildHash.childAccounts)
       }
     }
-    return {badAccounts, hashesPerLevel, checkedKeysPerLevel, requestedKeysPerLevel, badHashesPerLevel, accountHashesChecked, stats}
+    return {badAccounts, hashesPerLevel, checkedKeysPerLevel, requestedKeysPerLevel, badHashesPerLevel, accountHashesChecked, stats, extraBadKeys}
   }
 
   //big todo .. be able to test changes on a temp tree and validate the hashed before we commit updates
@@ -1769,9 +1822,9 @@ class AccountPatcher {
 
       if(newMaxDepth < this.treeMaxDepth){
         //cant get here, but consider deleting layers out of the map
-        nestedCountersInstance.countEvent(`accountPatcher`, `max depth decrease oldMaxDepth:${this.treeMaxDepth} maxDepth :${newMaxDepth} stats:${utils.stringifyReduce(resizeStats)}`)
+        nestedCountersInstance.countEvent(`accountPatcher`, `max depth decrease oldMaxDepth:${this.treeMaxDepth} maxDepth :${newMaxDepth} stats:${utils.stringifyReduce(resizeStats)} cycle:${cycle}`)
       } else {
-        nestedCountersInstance.countEvent(`accountPatcher`, `max depth increase oldMaxDepth:${this.treeMaxDepth} maxDepth :${newMaxDepth} stats:${utils.stringifyReduce(resizeStats)}`)
+        nestedCountersInstance.countEvent(`accountPatcher`, `max depth increase oldMaxDepth:${this.treeMaxDepth} maxDepth :${newMaxDepth} stats:${utils.stringifyReduce(resizeStats)} cycle:${cycle}`)
       }
 
       this.treeSyncDepth = newSyncDepth
@@ -1855,6 +1908,10 @@ class AccountPatcher {
       // repairing some of the data.
       let preTestResults = this.simulateRepairs(cycle, results.badAccounts )
 
+      if(results.extraBadKeys.length > 0){
+        this.statemanager_fatal('checkAndSetAccountData extra bad keys',`c:${cycle} extra bad keys: ${JSON.stringify(results.extraBadKeys)}  `)
+      }
+
       //request data for the list of bad accounts then update.
       let {wrappedDataList, stateTableDataMap, stats:getAccountStats} = await this.getAccountRepairData(cycle, results.badAccounts )
 
@@ -1937,7 +1994,7 @@ class AccountPatcher {
       }
       let appliedFixes = Math.max(0,wrappedDataListFiltered.length - failedHashes.length)
       nestedCountersInstance.countEvent('accountPatcher', 'writeCombinedAccountDataToBackups', Math.max(0,wrappedDataListFiltered.length - failedHashes.length))
-      nestedCountersInstance.countEvent('accountPatcher', `p.repair applied c:${cycle} bad:${results.badAccounts.length} received:${wrappedDataList.length} failedH: ${failedHashes.length} filtered:${utils.stringifyReduce(filterStats)} stats:${utils.stringifyReduce(results.stats)} getAccountStats: ${utils.stringifyReduce(getAccountStats)}`, appliedFixes)
+      nestedCountersInstance.countEvent('accountPatcher', `p.repair applied c:${cycle} bad:${results.badAccounts.length} received:${wrappedDataList.length} failedH: ${failedHashes.length} filtered:${utils.stringifyReduce(filterStats)} stats:${utils.stringifyReduce(results.stats)} getAccountStats: ${utils.stringifyReduce(getAccountStats)} extraBadKeys:${results.extraBadKeys.length}`, appliedFixes)
 
       this.stateManager.cycleDebugNotes.patchedAccounts = appliedFixes //per cycle debug info
 
