@@ -90,6 +90,14 @@ class MemoryReporting {
       res.end()
     })
 
+    Context.network.registerExternalGet('netstats', isDebugModeMiddleware, (req, res) => {
+      this.report = []
+      res.write('\n')
+      this.addNetStatsToReport()
+      this.reportToStream(this.report, res, 0)
+      res.write('\n')
+      res.end()
+    })
 
     Context.network.registerExternalGet('memory-gc', isDebugModeMiddleware, (req, res) => {
 
@@ -172,6 +180,7 @@ class MemoryReporting {
     this.report = []
     this.gatherStateManagerReport()
     this.systemProcessReport()
+    this.addNetStatsToReport()
   }
 
   gatherStateManagerReport(){
@@ -294,6 +303,25 @@ class MemoryReporting {
     let report = resourceUsage()
     for (const [key, value] of Object.entries(report)) {
       this.addToReport('Process','Details', key, value )
+    }
+
+  }
+
+  getShardusNetReport(){
+    if(this.shardus == null || this.shardus.network == null || this.shardus.network.sn == null){
+      return null
+    }
+    if(this.shardus.network.sn.stats != null){
+      let stats = this.shardus.network.sn.stats()
+      return stats
+    }
+    return null
+  }
+
+  addNetStatsToReport(){
+    let stats = this.getShardusNetReport()
+    if(stats != null){
+      this.addToReport('NetStats','stats', 'stats', (JSON.stringify(stats, null, 4), 1))
     }
 
   }
