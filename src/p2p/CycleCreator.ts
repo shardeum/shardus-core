@@ -1071,7 +1071,7 @@ async function compareCycleCert(myC: number, myQ: number, matches: number) {
   const errors = await compareQuery<
     P2P.NodeListTypes.Node,
     [CompareCertRes, P2P.NodeListTypes.Node]
-  >(NodeList.activeOthersByIdOrder, queryFn, compareFn, matches)
+  >(nodesToAsk, queryFn, compareFn, matches)
 
   if (errors.length > 0) {
     warn(`compareCycleCertEndpoint: errors: ${JSON.stringify(errors)}`)
