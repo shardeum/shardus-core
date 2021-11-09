@@ -22,12 +22,13 @@ import * as Self from './Self'
 import * as Sync from './Sync'
 import { compareQuery, Comparison } from './Utils'
 import { errorToStringFull } from '../utils'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 /** CONSTANTS */
 
 const SECOND = 1000
-const BEST_CERTS_WANTED = 4
-const DESIRED_CERT_MATCHES = 10
+const BEST_CERTS_WANTED = 3
+const DESIRED_CERT_MATCHES = 3
 const DESIRED_MARKER_MATCHES = 2
 
 /** STATE */
@@ -1047,6 +1048,10 @@ async function compareCycleCert(myC: number, myQ: number, matches: number) {
       // Their marker is better, change to it and their record
       // don't need the following line anymore since improveBestCert sets bestRecord if it improved
       // bestRecord = resp.record
+
+      nestedCountersInstance.countRareEvent('cycle', `improved cert (better node) ${node.internalIp}:${node.internalPort}`)
+      nestedCountersInstance.countRareEvent('cycle', `improved cert (our node) ${Self.ip}:${Self.port}`)
+      
       return Comparison.BETTER
     } else {
       // Their marker was worse
