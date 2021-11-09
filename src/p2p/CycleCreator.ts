@@ -26,8 +26,8 @@ import { errorToStringFull } from '../utils'
 /** CONSTANTS */
 
 const SECOND = 1000
-const BEST_CERTS_WANTED = 2
-const DESIRED_CERT_MATCHES = 2
+const BEST_CERTS_WANTED = 4
+const DESIRED_CERT_MATCHES = 10
 const DESIRED_MARKER_MATCHES = 2
 
 /** STATE */
