@@ -577,9 +577,12 @@ class AccountPatcher {
       res.end()
     })
 
+    Context.network.registerExternalGet('hack-version', isDebugModeMiddleware, (req, res) => {
+      res.write(`1.0.0\n`)
+      res.end()
+    })
 
   }
-
 
   getAccountTreeInfo(accountID:string) : TrieAccount {
 
@@ -591,8 +594,6 @@ class AccountPatcher {
     }
     return treeNode.accountTempMap.get(accountID)
   }
-
-
 
   /***
    *    ##     ## ########     ###    ######## ########  ######  ##     ##    ###    ########  ########  ######## ########  #### ########
@@ -1156,7 +1157,7 @@ class AccountPatcher {
     let coverageEntry = hashTrieSyncConsensus.coverageMap.get(parentRadix)
 
     if(coverageEntry == null || coverageEntry.firstChoice == null){
-      this.fatalLogger(`getNodeForQuery null ${coverageEntry == null} ${coverageEntry?.firstChoice == null}`,`getNodeForQuery null ${coverageEntry == null} ${coverageEntry?.firstChoice == null}`)
+      this.statemanager_fatal(`getNodeForQuery null`, `getNodeForQuery null ${coverageEntry == null} ${coverageEntry?.firstChoice == null}`,`getNodeForQuery null ${coverageEntry == null} ${coverageEntry?.firstChoice == null}`)
     }
 
     if(nextNode === true){
