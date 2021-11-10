@@ -1157,7 +1157,7 @@ class AccountPatcher {
     let coverageEntry = hashTrieSyncConsensus.coverageMap.get(parentRadix)
 
     if(coverageEntry == null || coverageEntry.firstChoice == null){
-      this.statemanager_fatal(`getNodeForQuery null`, `getNodeForQuery null ${coverageEntry == null} ${coverageEntry?.firstChoice == null}`,`getNodeForQuery null ${coverageEntry == null} ${coverageEntry?.firstChoice == null}`)
+      this.statemanager_fatal(`getNodeForQuery null ${coverageEntry == null} ${coverageEntry?.firstChoice == null}`,`getNodeForQuery null ${coverageEntry == null} ${coverageEntry?.firstChoice == null}`)
     }
 
     if(nextNode === true){
