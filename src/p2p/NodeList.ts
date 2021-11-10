@@ -137,13 +137,16 @@ export function updateNode(update: P2P.NodeListTypes.Update) {
     for (const key of Object.keys(update)) {
       node[key] = update[key]
     }
-
-    // Add the node to active arrays, if needed
-    if (update.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
-      insertSorted(activeByIdOrder, node, propComparator('id'))
-      // Don't add yourself to
-      if (node.id !== id) {
-        insertSorted(activeOthersByIdOrder, node, propComparator('id'))
+    //test if this node is in the active list already.  if it is not, then we can add it
+    let idx = binarySearch(activeByIdOrder, { id }, propComparator('id'))
+    if (idx < 0) {
+      // Add the node to active arrays, if needed
+      if (update.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
+        insertSorted(activeByIdOrder, node, propComparator('id'))
+        // Don't add yourself to
+        if (node.id !== id) {
+          insertSorted(activeOthersByIdOrder, node, propComparator('id'))
+        }
       }
     }
   }
