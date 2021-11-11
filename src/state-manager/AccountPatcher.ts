@@ -578,7 +578,7 @@ class AccountPatcher {
     })
 
     Context.network.registerExternalGet('hack-version', isDebugModeMiddleware, (req, res) => {
-      res.write(`1.0.0\n`)
+      res.write(`1.0.1\n`)
       res.end()
     })
 
@@ -1157,7 +1157,9 @@ class AccountPatcher {
     let coverageEntry = hashTrieSyncConsensus.coverageMap.get(parentRadix)
 
     if(coverageEntry == null || coverageEntry.firstChoice == null){
-      this.statemanager_fatal(`getNodeForQuery null ${coverageEntry == null} ${coverageEntry?.firstChoice == null}`,`getNodeForQuery null ${coverageEntry == null} ${coverageEntry?.firstChoice == null}`)
+      let numActiveNodes = this.stateManager.currentCycleShardData.activeNodes.length
+      this.statemanager_fatal(`getNodeForQuery null ${coverageEntry == null} ${coverageEntry?.firstChoice == null} numActiveNodes:${numActiveNodes}`,`getNodeForQuery null ${coverageEntry == null} ${coverageEntry?.firstChoice == null}`)
+      return null
     }
 
     if(nextNode === true){
@@ -1190,14 +1192,14 @@ class AccountPatcher {
     let requestMap:Map<Shardus.Node, HashTrieReq> = new Map()
     for(let radixHash of radixHashEntries ){
       let node = this.getNodeForQuery(radixHash.radix, cycle)
+      if(node == null){
+        this.statemanager_fatal('getChildrenOf node null', 'getChildrenOf node null')
+        continue
+      }      
       let existingRequest = requestMap.get(node)
       if(existingRequest == null){
         existingRequest = {radixList:[]}
         requestMap.set(node, existingRequest)
-      }
-      if(node == null){
-        this.statemanager_fatal('getChildrenOf node null', 'getChildrenOf node null')
-        continue
       }
       existingRequest.radixList.push(radixHash.radix)
     }
@@ -1257,15 +1259,16 @@ class AccountPatcher {
     let requestMap:Map<Shardus.Node, HashTrieReq> = new Map()
     for(let radixHash of radixHashEntries ){
       let node = this.getNodeForQuery(radixHash.radix, cycle)
+      if(node == null){
+        this.statemanager_fatal('getChildAccountHashes node null', 'getChildAccountHashes node null ')
+        continue
+      }      
       let existingRequest = requestMap.get(node)
       if(existingRequest == null){
         existingRequest = {radixList:[]}
         requestMap.set(node, existingRequest)
       }
-      if(node == null){
-        this.statemanager_fatal('getChildAccountHashes node null', 'getChildAccountHashes node null ')
-        continue
-      }
+
       existingRequest.radixList.push(radixHash.radix)
     }
     // for(let [key, value] of requestMap){
