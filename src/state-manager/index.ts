@@ -166,6 +166,8 @@ class StateManager {
   cycleDebugNotes : CycleDebugNotes
 
   superLargeNetworkDebugReduction: boolean
+
+  lastActiveCount: number
   /***
    *     ######   #######  ##    ##  ######  ######## ########  ##     ##  ######  ########  #######  ########
    *    ##    ## ##     ## ###   ## ##    ##    ##    ##     ## ##     ## ##    ##    ##    ##     ## ##     ##
@@ -317,6 +319,8 @@ class StateManager {
     //if (logFlags.playback) this.logger.playbackLogNote('canDataRepair', `0`, `canDataRepair: ${this.canDataRepair}  `)
 
     this.superLargeNetworkDebugReduction = true
+
+    this.lastActiveCount = -1
   }
 
   configsInit() {
@@ -442,6 +446,15 @@ class StateManager {
     cycleShardData.cycleNumber = cycleNumber
     cycleShardData.partitionsToSkip = new Map()
     cycleShardData.hasCompleteData = false
+
+
+    if(this.lastActiveCount === -1){
+      this.lastActiveCount = activeByIdOrder.length
+    } else {
+      let change = activeByIdOrder.length - this.lastActiveCount
+      nestedCountersInstance.countEvent('networkSize',`cyc:${cycleNumber} active:${activeByIdOrder.length} change:${change}`)
+      this.lastActiveCount = activeByIdOrder.length
+    }
 
     try {
       cycleShardData.ourNode = NodeList.nodes.get(Self.id)

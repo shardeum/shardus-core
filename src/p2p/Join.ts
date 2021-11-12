@@ -15,6 +15,7 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { robustQuery } from './Utils'
 import { profilerInstance } from '../utils/profiler'
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 /** STATE */
 
@@ -164,6 +165,14 @@ function calculateToAccept() {
   //For a few cycles we can boost the max sync to account for firstCycleJoin nodes.
   if(CycleChain.newest.counter < 10 && config.p2p.firstCycleJoin){
     syncMax += config.p2p.firstCycleJoin
+  }
+
+  if(active > 0){
+    let syncMaxLimit = 150 //todo make config
+    if(syncMax > syncMaxLimit){
+      nestedCountersInstance.countEvent('networkSize', `limit syncmax ${syncMax}=>${syncMaxLimit} cyc:${CycleCreator.currentCycle}`)
+      syncMax = syncMaxLimit
+    }
   }
 
   const canSync = syncMax - syncing
