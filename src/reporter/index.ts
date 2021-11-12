@@ -241,7 +241,10 @@ class Reporter {
     let appState = allZeroes64 // monititor server will set color based on partition report
     const cycleMarker = CycleChain.newest.previous || '' // [TODO] Replace with cycle creator
     const cycleCounter = CycleChain.newest.counter
-    const nodelistHash = crypto.hash(NodeList.byJoinOrder)
+
+    let nodelistIDs = NodeList.activeByIdOrder.map((node)=>node.id)
+    const nodelistHash = crypto.hash(nodelistIDs)
+    //const nodelistHash = crypto.hash(NodeList.byJoinOrder) //todo figure out what fields are off.
     const desiredNodes = getDesiredCount()
     const lastScalingTypeRequested = requestedScalingType
     const lastScalingTypeWinner = lastScalingType
