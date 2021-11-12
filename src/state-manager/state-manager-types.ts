@@ -923,6 +923,11 @@ export type RadixAndChildHashes = {
 
 export type HashTrieAccountsResp = {
     nodeChildHashes: RadixAndChildHashes[]
+    stats: {
+        matched:number,
+        visisted:number,
+        empty:number
+    }
 };
 
 export type HashTrieAccountDataRequest = {

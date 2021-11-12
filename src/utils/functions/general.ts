@@ -151,3 +151,20 @@ export function validateTypes(inp, def) {
 export function errorToStringFull(error){
   return `${error.name}: ${error.message} at ${error.stack}`
 }
+
+
+export function sumObject(sumObject, toAddObject){
+  for (const [key, val] of Object.entries(sumObject)) {
+    let otherVal = toAddObject[key]
+    if(otherVal == null){
+      continue
+    }
+    switch (typeof val) {
+      case 'number':
+        sumObject[key] = val + otherVal
+        break
+      default:
+        break
+    }
+  }
+}

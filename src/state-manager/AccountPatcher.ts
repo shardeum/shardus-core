@@ -8,7 +8,7 @@ import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger, {logFlags} from '../logger'
 import ShardFunctions from './shardFunctions.js'
-import { time } from 'console'
+import { debug, time } from 'console'
 import StateManager from '.'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import * as NodeList from '../p2p/NodeList'
@@ -19,6 +19,7 @@ import * as Wrapper from '../p2p/Wrapper'
 import { AccountHashCache, AccountHashCacheHistory, AccountIDAndHash, AccountPreTest, HashTrieAccountDataRequest, HashTrieAccountDataResponse, HashTrieAccountsResp, HashTrieNode, HashTrieRadixCoverage, HashTrieReq, HashTrieResp, HashTrieSyncConsensus, HashTrieSyncTell, HashTrieUpdateStats, RadixAndChildHashes, RadixAndHash, ShardedHashTrie, TrieAccount, CycleShardData } from './state-manager-types'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { errorToStringFull } from '../utils'
+import { promises } from 'dns'
 //import { all } from 'deepmerge'
 //import { Node } from '../p2p/Types'
 
@@ -264,20 +265,25 @@ class AccountPatcher {
     Comms.registerInternal('get_trie_accountHashes', async (payload: HashTrieReq, respond: (arg0: HashTrieAccountsResp) => any) => {
       profilerInstance.scopedProfileSectionStart('get_trie_hashes')
       //nodeChildHashes: {radix:string, childAccounts:{accountID:string, hash:string}[]}[]
-      let result = {nodeChildHashes:[]} as HashTrieAccountsResp
+      let result = {nodeChildHashes:[], stats:{ matched:0, visisted:0, empty:0}} as HashTrieAccountsResp
 
       for(let radix of payload.radixList){
-
+        result.stats.visisted++
         let level = radix.length
         let layerMap = this.shardTrie.layerMaps[level]
 
         let hashTrieNode = layerMap.get(radix)
         if(hashTrieNode != null && hashTrieNode.accounts != null){
+          result.stats.matched++
           let childAccounts = []
           result.nodeChildHashes.push({radix, childAccounts})
           for(let account of hashTrieNode.accounts){
             childAccounts.push({accountID:account.accountID, hash: account.hash})
           }
+          if(hashTrieNode.accounts.length === 0){
+            result.stats.empty++
+          }
+
         }
       }
       await respond(result)
@@ -1252,7 +1258,7 @@ class AccountPatcher {
    * @param radixHashEntries
    * @param cycle
    */
-  async getChildAccountHashes(radixHashEntries:RadixAndHash[], cycle:number) : Promise<RadixAndChildHashes[]> {
+  async getChildAccountHashes(radixHashEntries:RadixAndHash[], cycle:number) : Promise<{radixAndChildHashes:RadixAndChildHashes[], getAccountStats:any}> {
     let result:HashTrieAccountsResp
     let nodeChildHashes: RadixAndChildHashes[] = []
     let allHashes: AccountIDAndHash[] = []
@@ -1297,6 +1303,8 @@ class AccountPatcher {
       }
     }
 
+    let getAccountStats = { matched:0, visisted:0, empty:0, nullResults:0, numRequests:requestMap.size, responses:0 }
+
     try{
       //TODO should we convert to Promise.allSettled?
       let results = await Promise.all(promises)
@@ -1306,6 +1314,10 @@ class AccountPatcher {
           // for(let childHashes of result.nodeChildHashes){
           //   allHashes = allHashes.concat(childHashes.childAccounts)
           // }
+          utils.sumObject(getAccountStats, result.stats)
+          getAccountStats.responses++
+        } else {
+          getAccountStats.nullResults++
         }
       }
     } catch (error) {
@@ -1316,7 +1328,11 @@ class AccountPatcher {
       nestedCountersInstance.countEvent(`accountPatcher`, `got nodeChildHashes`, nodeChildHashes.length)
     }
 
-    return nodeChildHashes
+    if(logFlags.debug){
+      this.mainLogger.debug(`getChildAccountHashes ${utils.stringifyReduce(getAccountStats)}`)
+    }
+
+    return {radixAndChildHashes:nodeChildHashes, getAccountStats}
   }
 
   /***
@@ -1426,6 +1442,10 @@ class AccountPatcher {
       needsVotes: 0,
       subHashesTested: 0,
       trailColdLevel: 0,
+      checkedLevel: 0,
+      leafsChecked:0,
+      leafResponses:0,
+      getAccountStats:{}
     }
     let extraBadKeys = []
 
@@ -1476,20 +1496,21 @@ class AccountPatcher {
 
     this.computeCoverage(cycle)
 
+    stats.checkedLevel = level
     //refine our query until we get to the lowest level
     while(level < this.treeMaxDepth && toFix.length > 0){
       level++
+      stats.checkedLevel = level
       badLayerMap = this.shardTrie.layerMaps[level]
       let childrenToDiff = await this.getChildrenOf(toFix, cycle)
 
       toFix = this.diffConsenus(childrenToDiff, badLayerMap)
 
       stats.subHashesTested += toFix.length
+
       if(toFix.length === 0){
         stats.trailColdLevel = level
-
         extraBadKeys = this.findExtraBadKeys(childrenToDiff, badLayerMap)
-
       }
 
       //record some debug info
@@ -1499,8 +1520,12 @@ class AccountPatcher {
       hashesPerLevel[level] = childrenToDiff.length // badLayerMap.size ...badLayerMap could be null!
     }
 
+    stats.leafsChecked = toFix.length
     //get bad accounts
-    let radixAndChildHashes = await this.getChildAccountHashes(toFix, cycle)
+    let {radixAndChildHashes, getAccountStats} = await this.getChildAccountHashes(toFix, cycle)
+    stats.getAccountStats = getAccountStats
+
+    stats.leafResponses = radixAndChildHashes.length
 
     let accountHashesChecked = 0
     for(let radixAndChildHash of radixAndChildHashes){
