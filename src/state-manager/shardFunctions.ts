@@ -1,10 +1,17 @@
-import { Utils } from 'sequelize/types'
-import Logger, {logFlags} from '../logger'
+import Logger, { logFlags } from '../logger'
 import * as Shardus from '../shardus/shardus-types'
+import { StateManager } from 'shardus-types'
 
 const stringify = require('fast-stable-stringify')
 
-import { StateManager } from 'shardus-types'
+type ShardGlobals = StateManager.shardFunctionTypes.ShardGlobals
+type ShardInfo = StateManager.shardFunctionTypes.ShardInfo
+type NodeShardData = StateManager.shardFunctionTypes.NodeShardData
+type NodeShardDataMap = StateManager.shardFunctionTypes.NodeShardDataMap
+type PartitionShardDataMap = StateManager.shardFunctionTypes.ParititionShardDataMap
+type WrappablePartitionRange = StateManager.shardFunctionTypes.WrappableParitionRange
+type HomeNodeSummary = StateManager.shardFunctionTypes.HomeNodeSummary
+type AddressRange = StateManager.shardFunctionTypes.AddressRange
 
 class ShardFunctions {
   static logger: Logger = null
@@ -16,8 +23,8 @@ class ShardFunctions {
    * @param {number} numNodes
    * @param {number} nodesPerConsenusGroup
    */
-  static calculateShardGlobals(numNodes: number, nodesPerConsenusGroup: number, nodesPerEdge: number): StateManager.shardFunctionTypes.ShardGlobals {
-    let shardGlobals = {} as StateManager.shardFunctionTypes.ShardGlobals
+  static calculateShardGlobals(numNodes: number, nodesPerConsenusGroup: number, nodesPerEdge: number): ShardGlobals {
+    const shardGlobals = {} as ShardGlobals
 
     if (nodesPerConsenusGroup % 2 === 0) {
       nodesPerConsenusGroup++
@@ -38,10 +45,10 @@ class ShardFunctions {
     shardGlobals.numPartitions = shardGlobals.numActiveNodes
 
     //make sure nodesPerConsenusGroup is an odd number >= 3
-    if((nodesPerConsenusGroup % 2) === 0 || nodesPerConsenusGroup < 3){
+    if (nodesPerConsenusGroup % 2 === 0 || nodesPerConsenusGroup < 3) {
       throw new Error(`nodesPerConsenusGroup:${nodesPerConsenusGroup} must be odd and >= 3`)
     }
-    
+
     shardGlobals.consensusRadius = Math.floor((nodesPerConsenusGroup - 1) / 2)
 
     // NOT ready for using nodes per edge as an input, so we will force it to a procedural value
@@ -51,7 +58,7 @@ class ShardFunctions {
     nodesPerEdge = shardGlobals.consensusRadius
     shardGlobals.nodesPerEdge = nodesPerEdge
 
-    let partitionStoreRadius = shardGlobals.consensusRadius + shardGlobals.nodesPerEdge
+    const partitionStoreRadius = shardGlobals.consensusRadius + shardGlobals.nodesPerEdge
     shardGlobals.numVisiblePartitions = shardGlobals.nodesPerConsenusGroup + nodesPerEdge * 2
 
     shardGlobals.nodeLookRange = Math.floor((partitionStoreRadius / shardGlobals.numPartitions) * 0xffffffff) // 0.5 added since our search will look from the center of a partition
@@ -63,8 +70,8 @@ class ShardFunctions {
     return ('00000000' + input).slice(-8)
   }
 
-  static calculateShardValues(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, address: string): StateManager.shardFunctionTypes.ShardInfo {
-    let shardinfo = {} as StateManager.shardFunctionTypes.ShardInfo
+  static calculateShardValues(shardGlobals: ShardGlobals, address: string): ShardInfo {
+    const shardinfo = {} as ShardInfo
     shardinfo.address = address
     shardinfo.homeNodes = []
     shardinfo.addressPrefix = parseInt(address.slice(0, 8), 16)
@@ -81,139 +88,135 @@ class ShardFunctions {
 
   /**
    * calculateStoredPartitions2
-   * gets the WrappableParitionRange for a node's stored partitions
-   * this uses nodesPerConsenusGroup as the radius to include, so we will end up with 1 + 2*nodesPerConsenusGroup stored partitions 
-   * @param shardGlobals 
-   * @param homePartition 
+   * gets the WrappablePartitionRange for a node's stored partitions
+   * this uses nodesPerConsenusGroup as the radius to include, so we will end up with 1 + 2*nodesPerConsenusGroup stored partitions
+   * @param shardGlobals
+   * @param homePartition
    */
-  static calculateStoredPartitions2(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, homePartition: number): StateManager.shardFunctionTypes.WrappableParitionRange {
+  static calculateStoredPartitions2(shardGlobals: ShardGlobals, homePartition: number): WrappablePartitionRange {
     return ShardFunctions.calculateParitionRange(shardGlobals, homePartition, shardGlobals.nodesPerConsenusGroup)
   }
 
-  static calculateConsensusPartitions(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, homePartition: number): StateManager.shardFunctionTypes.WrappableParitionRange {
+  static calculateConsensusPartitions(shardGlobals: ShardGlobals, homePartition: number): WrappablePartitionRange {
     return ShardFunctions.calculateParitionRange(shardGlobals, homePartition, shardGlobals.consensusRadius)
   }
 
   /**
    * calculateParitionRange
-   * give a center parition and the radius to calculate a WrappableParitionRange
-   * @param shardGlobals 
-   * @param homePartition 
-   * @param paritionRadius 
+   * give a center partition and the radius to calculate a WrappablePartitionRange
+   * @param shardGlobals
+   * @param homePartition
+   * @param partitionRadius
    */
-  static calculateParitionRange(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, homePartition: number, paritionRadius: number): StateManager.shardFunctionTypes.WrappableParitionRange {
-    let wrappableParitionRange = {} as StateManager.shardFunctionTypes.WrappableParitionRange
+  static calculateParitionRange(shardGlobals: ShardGlobals, homePartition: number, partitionRadius: number): WrappablePartitionRange {
+    const wrappableParitionRange = {} as WrappablePartitionRange
 
     wrappableParitionRange.homeRange = ShardFunctions.partitionToAddressRange2(shardGlobals, homePartition)
     // test if we will cover the full range by default
-    if (shardGlobals.numPartitions / 2 <= paritionRadius) {
+    if (shardGlobals.numPartitions / 2 <= partitionRadius) {
       wrappableParitionRange.rangeIsSplit = false
       wrappableParitionRange.partitionStart = 0
       wrappableParitionRange.partitionEnd = shardGlobals.numPartitions - 1
 
-      ShardFunctions.calculatePartitionRangeInternal(shardGlobals, wrappableParitionRange, paritionRadius)
+      ShardFunctions.calculatePartitionRangeInternal(shardGlobals, wrappableParitionRange, partitionRadius)
       return wrappableParitionRange
     }
 
-    let x = paritionRadius
-    let n = homePartition
+    const x = partitionRadius
+    const n = homePartition
     wrappableParitionRange.x = x // for debug
     wrappableParitionRange.n = n
 
     wrappableParitionRange.partitionStart = n - x
     wrappableParitionRange.partitionEnd = n + x
 
-    ShardFunctions.calculatePartitionRangeInternal(shardGlobals, wrappableParitionRange, paritionRadius)
+    ShardFunctions.calculatePartitionRangeInternal(shardGlobals, wrappableParitionRange, partitionRadius)
 
     return wrappableParitionRange
   }
 
   /**
    * calculatePartitionRangeInternal
-   * additional calculations required to fill out a WrappableParitionRange and make sure the wrapping is correct
-   * @param {StateManager.shardFunctionTypes.ShardGlobals} shardGlobals
-   * @param {StateManager.shardFunctionTypes.WrappableParitionRange} wrappableParitionRange
+   * additional calculations required to fill out a WrappablePartitionRange and make sure the wrapping is correct
+   * @param {ShardGlobals} shardGlobals
+   * @param {WrappablePartitionRange} wrappablePartitionRange
    */
-  static calculatePartitionRangeInternal(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, wrappableParitionRange: StateManager.shardFunctionTypes.WrappableParitionRange, paritionRadius: number) {
-    wrappableParitionRange.partitionRangeVector = { start: wrappableParitionRange.partitionStart, dist: 1 + 2 * shardGlobals.nodesPerConsenusGroup, end: wrappableParitionRange.partitionEnd }
-    wrappableParitionRange.rangeIsSplit = false
+  static calculatePartitionRangeInternal(shardGlobals: ShardGlobals, wrappablePartitionRange: WrappablePartitionRange, partitionRadius: number) {
+    wrappablePartitionRange.partitionRangeVector = { start: wrappablePartitionRange.partitionStart, dist: 1 + 2 * shardGlobals.nodesPerConsenusGroup, end: wrappablePartitionRange.partitionEnd }
+    wrappablePartitionRange.rangeIsSplit = false
 
-    wrappableParitionRange.partitionsCovered = 0
-    if (wrappableParitionRange.partitionStart < 0) {
-      wrappableParitionRange.rangeIsSplit = true
-      wrappableParitionRange.partitionStart2 = wrappableParitionRange.partitionStart + shardGlobals.numPartitions
-      wrappableParitionRange.partitionEnd2 = shardGlobals.numPartitions - 1
-      wrappableParitionRange.partitionStart1 = 0
-      wrappableParitionRange.partitionEnd1 = wrappableParitionRange.partitionEnd
-      wrappableParitionRange.partitionRangeVector.start = wrappableParitionRange.partitionStart2
-      wrappableParitionRange.partitionStart = wrappableParitionRange.partitionRangeVector.start
+    wrappablePartitionRange.partitionsCovered = 0
+    if (wrappablePartitionRange.partitionStart < 0) {
+      wrappablePartitionRange.rangeIsSplit = true
+      wrappablePartitionRange.partitionStart2 = wrappablePartitionRange.partitionStart + shardGlobals.numPartitions
+      wrappablePartitionRange.partitionEnd2 = shardGlobals.numPartitions - 1
+      wrappablePartitionRange.partitionStart1 = 0
+      wrappablePartitionRange.partitionEnd1 = wrappablePartitionRange.partitionEnd
+      wrappablePartitionRange.partitionRangeVector.start = wrappablePartitionRange.partitionStart2
+      wrappablePartitionRange.partitionStart = wrappablePartitionRange.partitionRangeVector.start
     }
-    if (wrappableParitionRange.partitionEnd >= shardGlobals.numPartitions) {
-      wrappableParitionRange.rangeIsSplit = true
-      wrappableParitionRange.partitionEnd1 = wrappableParitionRange.partitionEnd - shardGlobals.numPartitions
-      wrappableParitionRange.partitionStart1 = 0
-      wrappableParitionRange.partitionStart2 = wrappableParitionRange.partitionStart
-      wrappableParitionRange.partitionEnd2 = shardGlobals.numPartitions - 1
-      wrappableParitionRange.partitionRangeVector.end = wrappableParitionRange.partitionEnd1
-      wrappableParitionRange.partitionEnd = wrappableParitionRange.partitionRangeVector.end
+    if (wrappablePartitionRange.partitionEnd >= shardGlobals.numPartitions) {
+      wrappablePartitionRange.rangeIsSplit = true
+      wrappablePartitionRange.partitionEnd1 = wrappablePartitionRange.partitionEnd - shardGlobals.numPartitions
+      wrappablePartitionRange.partitionStart1 = 0
+      wrappablePartitionRange.partitionStart2 = wrappablePartitionRange.partitionStart
+      wrappablePartitionRange.partitionEnd2 = shardGlobals.numPartitions - 1
+      wrappablePartitionRange.partitionRangeVector.end = wrappablePartitionRange.partitionEnd1
+      wrappablePartitionRange.partitionEnd = wrappablePartitionRange.partitionRangeVector.end
     }
 
-    if (wrappableParitionRange.partitionEnd < wrappableParitionRange.partitionStart) {
-      wrappableParitionRange.rangeIsSplit = true
+    if (wrappablePartitionRange.partitionEnd < wrappablePartitionRange.partitionStart) {
+      wrappablePartitionRange.rangeIsSplit = true
 
-      wrappableParitionRange.partitionEnd1 = wrappableParitionRange.partitionEnd
-      wrappableParitionRange.partitionStart1 = 0
-      wrappableParitionRange.partitionStart2 = wrappableParitionRange.partitionStart
-      wrappableParitionRange.partitionEnd2 = shardGlobals.numPartitions - 1
-      wrappableParitionRange.partitionRangeVector.end = wrappableParitionRange.partitionEnd1
-      wrappableParitionRange.partitionEnd = wrappableParitionRange.partitionRangeVector.end
+      wrappablePartitionRange.partitionEnd1 = wrappablePartitionRange.partitionEnd
+      wrappablePartitionRange.partitionStart1 = 0
+      wrappablePartitionRange.partitionStart2 = wrappablePartitionRange.partitionStart
+      wrappablePartitionRange.partitionEnd2 = shardGlobals.numPartitions - 1
+      wrappablePartitionRange.partitionRangeVector.end = wrappablePartitionRange.partitionEnd1
+      wrappablePartitionRange.partitionEnd = wrappablePartitionRange.partitionRangeVector.end
     }
 
     // need to collapse a split range that covers all partitions?
-    if(wrappableParitionRange.rangeIsSplit === true && wrappableParitionRange.partitionEnd1 + 1 === wrappableParitionRange.partitionStart2){
-      wrappableParitionRange.rangeIsSplit = false
-      wrappableParitionRange.partitionStart = 0
-      wrappableParitionRange.partitionEnd = shardGlobals.numPartitions - 1 
+    if (wrappablePartitionRange.rangeIsSplit === true && wrappablePartitionRange.partitionEnd1 + 1 === wrappablePartitionRange.partitionStart2) {
+      wrappablePartitionRange.rangeIsSplit = false
+      wrappablePartitionRange.partitionStart = 0
+      wrappablePartitionRange.partitionEnd = shardGlobals.numPartitions - 1
 
-      wrappableParitionRange.partitionRangeVector = { start: wrappableParitionRange.partitionStart, dist: 1 + 2 * paritionRadius, end: wrappableParitionRange.partitionEnd }
-
+      wrappablePartitionRange.partitionRangeVector = { start: wrappablePartitionRange.partitionStart, dist: 1 + 2 * partitionRadius, end: wrappablePartitionRange.partitionEnd }
     }
 
     // alias to start and end 1 in the simple case.  sync code expects values for these
-    if (wrappableParitionRange.rangeIsSplit === false) {
-      wrappableParitionRange.partitionStart1 = wrappableParitionRange.partitionStart
-      wrappableParitionRange.partitionEnd1 = wrappableParitionRange.partitionEnd
+    if (wrappablePartitionRange.rangeIsSplit === false) {
+      wrappablePartitionRange.partitionStart1 = wrappablePartitionRange.partitionStart
+      wrappablePartitionRange.partitionEnd1 = wrappablePartitionRange.partitionEnd
     }
 
     // did we wrap to cover the entire range, that should have early outed at the top of the function
-    if (wrappableParitionRange.rangeIsSplit === true && (wrappableParitionRange.partitionStart1 === wrappableParitionRange.partitionEnd2 || wrappableParitionRange.partitionStart2 === wrappableParitionRange.partitionEnd1)) {
-      throw new Error('this should never happen: ' + stringify(wrappableParitionRange) + 'globals: ' + stringify(shardGlobals))
+    if (wrappablePartitionRange.rangeIsSplit === true && (wrappablePartitionRange.partitionStart1 === wrappablePartitionRange.partitionEnd2 || wrappablePartitionRange.partitionStart2 === wrappablePartitionRange.partitionEnd1)) {
+      throw new Error('this should never happen: ' + stringify(wrappablePartitionRange) + 'globals: ' + stringify(shardGlobals))
     }
-    if (wrappableParitionRange.rangeIsSplit) {
-      if (wrappableParitionRange.partitionStart2 >= 0 && wrappableParitionRange.partitionEnd2 >= 0) {
-        wrappableParitionRange.partitionRange = ShardFunctions.partitionToAddressRange2(shardGlobals, wrappableParitionRange.partitionStart1, wrappableParitionRange.partitionEnd1)
-        wrappableParitionRange.partitionRange2 = ShardFunctions.partitionToAddressRange2(shardGlobals, wrappableParitionRange.partitionStart2, wrappableParitionRange.partitionEnd2)
-        wrappableParitionRange.partitionsCovered = 2 + (wrappableParitionRange.partitionEnd1 - wrappableParitionRange.partitionStart1) + (wrappableParitionRange.partitionEnd2 - wrappableParitionRange.partitionStart2)
+    if (wrappablePartitionRange.rangeIsSplit) {
+      if (wrappablePartitionRange.partitionStart2 >= 0 && wrappablePartitionRange.partitionEnd2 >= 0) {
+        wrappablePartitionRange.partitionRange = ShardFunctions.partitionToAddressRange2(shardGlobals, wrappablePartitionRange.partitionStart1, wrappablePartitionRange.partitionEnd1)
+        wrappablePartitionRange.partitionRange2 = ShardFunctions.partitionToAddressRange2(shardGlobals, wrappablePartitionRange.partitionStart2, wrappablePartitionRange.partitionEnd2)
+        wrappablePartitionRange.partitionsCovered = 2 + (wrappablePartitionRange.partitionEnd1 - wrappablePartitionRange.partitionStart1) + (wrappablePartitionRange.partitionEnd2 - wrappablePartitionRange.partitionStart2)
       } else {
         throw new Error('missing ranges in partitionRange 1')
       }
     } else {
-      wrappableParitionRange.partitionRange = ShardFunctions.partitionToAddressRange2(shardGlobals, wrappableParitionRange.partitionStart, wrappableParitionRange.partitionEnd)
-      if (wrappableParitionRange.partitionStart1 >= 0 && wrappableParitionRange.partitionEnd1 >= 0) {
-        wrappableParitionRange.partitionsCovered = 1 + (wrappableParitionRange.partitionEnd1 - wrappableParitionRange.partitionStart1)
+      wrappablePartitionRange.partitionRange = ShardFunctions.partitionToAddressRange2(shardGlobals, wrappablePartitionRange.partitionStart, wrappablePartitionRange.partitionEnd)
+      if (wrappablePartitionRange.partitionStart1 >= 0 && wrappablePartitionRange.partitionEnd1 >= 0) {
+        wrappablePartitionRange.partitionsCovered = 1 + (wrappablePartitionRange.partitionEnd1 - wrappablePartitionRange.partitionStart1)
       } else {
         // throw new Error('missing ranges in storedPartitions 2')
-        throw new Error(`missing ranges in partitionRange 2b  ${wrappableParitionRange.partitionStart1} ${wrappableParitionRange.partitionEnd1} ${stringify(wrappableParitionRange)}`)
+        throw new Error(`missing ranges in partitionRange 2b  ${wrappablePartitionRange.partitionStart1} ${wrappablePartitionRange.partitionEnd1} ${stringify(wrappablePartitionRange)}`)
       }
     }
   }
 
-  static testAddressInRange(address: string, wrappableParitionRange: StateManager.shardFunctionTypes.WrappableParitionRange): boolean {
+  static testAddressInRange(address: string, wrappableParitionRange: WrappablePartitionRange): boolean {
     if (wrappableParitionRange.rangeIsSplit) {
-      if (
-        (address >= wrappableParitionRange.partitionRange.low && address <= wrappableParitionRange.partitionRange.high) ||
-        (address >= wrappableParitionRange.partitionRange2.low && address <= wrappableParitionRange.partitionRange2.high)
-      ) {
+      if ((address >= wrappableParitionRange.partitionRange.low && address <= wrappableParitionRange.partitionRange.high) || (address >= wrappableParitionRange.partitionRange2.low && address <= wrappableParitionRange.partitionRange2.high)) {
         return true
       }
     } else {
@@ -224,12 +227,9 @@ class ShardFunctions {
     return false
   }
 
-  static testAddressNumberInRange(address: number, wrappableParitionRange: StateManager.shardFunctionTypes.WrappableParitionRange): boolean {
+  static testAddressNumberInRange(address: number, wrappableParitionRange: WrappablePartitionRange): boolean {
     if (wrappableParitionRange.rangeIsSplit) {
-      if (
-        (address >= wrappableParitionRange.partitionRange.startAddr && address <= wrappableParitionRange.partitionRange.endAddr) ||
-        (address >= wrappableParitionRange.partitionRange2.startAddr && address <= wrappableParitionRange.partitionRange2.endAddr)
-      ) {
+      if ((address >= wrappableParitionRange.partitionRange.startAddr && address <= wrappableParitionRange.partitionRange.endAddr) || (address >= wrappableParitionRange.partitionRange2.startAddr && address <= wrappableParitionRange.partitionRange2.endAddr)) {
         return true
       }
     } else {
@@ -240,12 +240,9 @@ class ShardFunctions {
     return false
   }
 
-  static testInRange(partition: number, wrappableParitionRange: StateManager.shardFunctionTypes.WrappableParitionRange): boolean {
+  static testInRange(partition: number, wrappableParitionRange: WrappablePartitionRange): boolean {
     if (wrappableParitionRange.rangeIsSplit) {
-      if (
-        (partition >= wrappableParitionRange.partitionStart1 && partition <= wrappableParitionRange.partitionEnd1) ||
-        (partition >= wrappableParitionRange.partitionStart2 && partition <= wrappableParitionRange.partitionEnd2)
-      ) {
+      if ((partition >= wrappableParitionRange.partitionStart1 && partition <= wrappableParitionRange.partitionEnd1) || (partition >= wrappableParitionRange.partitionStart2 && partition <= wrappableParitionRange.partitionEnd2)) {
         return true
       }
     } else {
@@ -256,7 +253,7 @@ class ShardFunctions {
     return false
   }
 
-  static getPartitionsCovered(wrappableParitionRange: StateManager.shardFunctionTypes.WrappableParitionRange): number {
+  static getPartitionsCovered(wrappableParitionRange: WrappablePartitionRange): number {
     let covered = 0
     if (wrappableParitionRange.rangeIsSplit === true) {
       covered = 2 + (wrappableParitionRange.partitionEnd2 - wrappableParitionRange.partitionStart2) + (wrappableParitionRange.partitionEnd1 - wrappableParitionRange.partitionStart1)
@@ -270,23 +267,23 @@ class ShardFunctions {
     return covered
   }
 
-  static computePartitionShardDataMap(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, parititionShardDataMap: StateManager.shardFunctionTypes.ParititionShardDataMap, partitionStart: number, partitionsToScan: number) {
+  static computePartitionShardDataMap(shardGlobals: ShardGlobals, partitionShardDataMap: PartitionShardDataMap, partitionStart: number, partitionsToScan: number) {
     let partitionIndex = partitionStart
 
-    let numPartitions = shardGlobals.numPartitions
+    const numPartitions = shardGlobals.numPartitions
 
     for (let i = 0; i < partitionsToScan; ++i) {
       if (partitionIndex >= numPartitions) {
         partitionIndex = 0
       }
-      let fpAdressCenter = (i + 0.5) / numPartitions
-      let addressPrefix = Math.floor(fpAdressCenter * 0xffffffff)
+      const fpAdressCenter = (i + 0.5) / numPartitions
+      const addressPrefix = Math.floor(fpAdressCenter * 0xffffffff)
 
-      let addressPrefixHex = ShardFunctions.leadZeros8(addressPrefix.toString(16))
-      let address = addressPrefixHex + '7' + 'f'.repeat(55) // 55 + 1 + 8 = 64
+      const addressPrefixHex = ShardFunctions.leadZeros8(addressPrefix.toString(16))
+      const address = addressPrefixHex + '7' + 'f'.repeat(55) // 55 + 1 + 8 = 64
 
-      let shardinfo = ShardFunctions.calculateShardValues(shardGlobals, address)
-      parititionShardDataMap.set(i, shardinfo)
+      const shardinfo = ShardFunctions.calculateShardValues(shardGlobals, address)
+      partitionShardDataMap.set(i, shardinfo)
       // increment index:
       partitionIndex++
       if (partitionIndex === partitionStart) {
@@ -295,55 +292,39 @@ class ShardFunctions {
     }
   }
 
-  static computeNodePartitionDataMap(
-    shardGlobals: StateManager.shardFunctionTypes.ShardGlobals,
-    nodeShardDataMap: StateManager.shardFunctionTypes.NodeShardDataMap,
-    nodesToGenerate: Shardus.Node[],
-    parititionShardDataMap: StateManager.shardFunctionTypes.ParititionShardDataMap,
-    activeNodes: Shardus.Node[],
-    extendedData: boolean,
-    isActiveNodeList: boolean = true
-  ) {
+  static computeNodePartitionDataMap(shardGlobals: ShardGlobals, nodeShardDataMap: NodeShardDataMap, nodesToGenerate: Shardus.Node[], partitionShardDataMap: PartitionShardDataMap, activeNodes: Shardus.Node[], extendedData: boolean, isActiveNodeList = true) {
     let index = 0
-    for (let node of nodesToGenerate) {
+    for (const node of nodesToGenerate) {
       let nodeShardData = nodeShardDataMap.get(node.id)
       if (!nodeShardData) {
         let thisNodeIndex = undefined
-        if(isActiveNodeList){
+        if (isActiveNodeList) {
           thisNodeIndex = index
         }
-        nodeShardData = ShardFunctions.computeNodePartitionData(shardGlobals, node, nodeShardDataMap, parititionShardDataMap, activeNodes, false, thisNodeIndex)
+        nodeShardData = ShardFunctions.computeNodePartitionData(shardGlobals, node, nodeShardDataMap, partitionShardDataMap, activeNodes, false, thisNodeIndex)
       }
       index++
     }
     if (extendedData) {
       index = 0
       // second pass for extended data
-      for (let node of nodesToGenerate) {
-        let nodeShardData = nodeShardDataMap.get(node.id)
+      for (const node of nodesToGenerate) {
+        const nodeShardData = nodeShardDataMap.get(node.id)
         if (nodeShardData == null) {
           //log error?
           continue
-        } 
-        ShardFunctions.computeExtendedNodePartitionData(shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes)
+        }
+        ShardFunctions.computeExtendedNodePartitionData(shardGlobals, nodeShardDataMap, partitionShardDataMap, nodeShardData, activeNodes)
       }
     }
   }
 
-  static computeNodePartitionData(
-    shardGlobals: StateManager.shardFunctionTypes.ShardGlobals,
-    node: Shardus.Node,
-    nodeShardDataMap: StateManager.shardFunctionTypes.NodeShardDataMap,
-    parititionShardDataMap: StateManager.shardFunctionTypes.ParititionShardDataMap,
-    activeNodes: Shardus.Node[],
-    extendedData?: boolean,
-    thisNodeIndex?: number
-  ): StateManager.shardFunctionTypes.NodeShardData {
-    let numPartitions = shardGlobals.numPartitions
+  static computeNodePartitionData(shardGlobals: ShardGlobals, node: Shardus.Node, nodeShardDataMap: NodeShardDataMap, partitionShardDataMap: PartitionShardDataMap, activeNodes: Shardus.Node[], extendedData?: boolean, thisNodeIndex?: number): NodeShardData {
+    const numPartitions = shardGlobals.numPartitions
 
-    let nodeShardData = {} as StateManager.shardFunctionTypes.NodeShardData
+    const nodeShardData = {} as NodeShardData
 
-    if(thisNodeIndex != undefined){
+    if (thisNodeIndex != undefined) {
       nodeShardData.ourNodeIndex = thisNodeIndex
 
       // //temp test
@@ -353,10 +334,9 @@ class ShardFunctions {
       // if (test != nodeShardData.ourNodeIndex){
       //   throw new Error(`index failure : ${thisNodeIndex}`)
       // }
-
-    } else{
+    } else {
       //this is way too slow
-      nodeShardData.ourNodeIndex = activeNodes.findIndex(function (_node) {
+      nodeShardData.ourNodeIndex = activeNodes.findIndex((_node) => {
         return _node.id === node.id
       })
       //find closest index if our node is not in the active list.  Not sure this is valid
@@ -370,9 +350,9 @@ class ShardFunctions {
         }
       }
     }
-    let homePartition = nodeShardData.ourNodeIndex
-    let centeredAddress = Math.floor(((homePartition + 0.5) * 0xffffffff) / numPartitions)
-    let nodeAddressNum = centeredAddress
+    const homePartition = nodeShardData.ourNodeIndex
+    const centeredAddress = Math.floor(((homePartition + 0.5) * 0xffffffff) / numPartitions)
+    const nodeAddressNum = centeredAddress
 
     nodeShardData.node = node
     nodeShardData.nodeAddressNum = nodeAddressNum
@@ -385,13 +365,13 @@ class ShardFunctions {
     nodeShardData.patchedOnNodes = []
 
     // push the data in to the correct homenode list for the home partition
-    let partitionShard = parititionShardDataMap.get(homePartition)
+    let partitionShard = partitionShardDataMap.get(homePartition)
     if (partitionShard == null) {
-      partitionShard = parititionShardDataMap.get(homePartition)
+      partitionShard = partitionShardDataMap.get(homePartition)
     }
 
     if (partitionShard == null) {
-      throw new Error(`computeNodePartitionData: cant find partitionShard for index:${nodeShardData.ourNodeIndex} size:${parititionShardDataMap.size} activeNodes:${activeNodes.length}  `)
+      throw new Error(`computeNodePartitionData: cant find partitionShard for index:${nodeShardData.ourNodeIndex} size:${partitionShardDataMap.size} activeNodes:${activeNodes.length}  `)
     }
 
     if (nodeShardData.ourNodeIndex !== -1) {
@@ -401,7 +381,7 @@ class ShardFunctions {
 
     nodeShardData.extendedData = false
     if (extendedData) {
-      ShardFunctions.computeExtendedNodePartitionData(shardGlobals, nodeShardDataMap, parititionShardDataMap, nodeShardData, activeNodes)
+      ShardFunctions.computeExtendedNodePartitionData(shardGlobals, nodeShardDataMap, partitionShardDataMap, nodeShardData, activeNodes)
     }
 
     // set the data in our map
@@ -411,22 +391,14 @@ class ShardFunctions {
     return nodeShardData
   }
 
-
-
   /**
-   * @param {StateManager.shardFunctionTypes.ShardGlobals} shardGlobals
-   * @param {Map<string, StateManager.shardFunctionTypes.NodeShardData>} nodeShardDataMap
-   * @param {Map<number, StateManager.shardFunctionTypes.ShardInfo>} parititionShardDataMap
-   * @param {StateManager.shardFunctionTypes.NodeShardData} nodeShardData
+   * @param {ShardGlobals} shardGlobals
+   * @param {Map<string, NodeShardData>} nodeShardDataMap
+   * @param {Map<number, ShardInfo>} partitionShardDataMap
+   * @param {NodeShardData} nodeShardData
    * @param {Node[]} activeNodes
    */
-  static computeExtendedNodePartitionData(
-    shardGlobals: StateManager.shardFunctionTypes.ShardGlobals,
-    nodeShardDataMap: StateManager.shardFunctionTypes.NodeShardDataMap,
-    parititionShardDataMap: StateManager.shardFunctionTypes.ParititionShardDataMap,
-    nodeShardData: StateManager.shardFunctionTypes.NodeShardData,
-    activeNodes: Shardus.Node[]
-  ) {
+  static computeExtendedNodePartitionData(shardGlobals: ShardGlobals, nodeShardDataMap: NodeShardDataMap, partitionShardDataMap: PartitionShardDataMap, nodeShardData: NodeShardData, activeNodes: Shardus.Node[]) {
     if (nodeShardData.extendedData) {
       return
     }
@@ -438,14 +410,13 @@ class ShardFunctions {
     if (nodeShardData.consensusPartitions == null) {
       nodeShardData.consensusPartitions = ShardFunctions.calculateConsensusPartitions(shardGlobals, nodeShardData.homePartition)
     }
-    
 
-    let nodeIsActive = nodeShardData.ourNodeIndex !== -1
-    let exclude = [nodeShardData.node.id]
-    let excludeNodeArray = [nodeShardData.node]
+    const nodeIsActive = nodeShardData.ourNodeIndex !== -1
+    const exclude = [nodeShardData.node.id]
+    const excludeNodeArray = [nodeShardData.node]
 
-    nodeShardData.nodeThatStoreOurParition = ShardFunctions.getNodesThatCoverHomePartition(shardGlobals,  nodeShardData, nodeShardDataMap, activeNodes)
-    
+    nodeShardData.nodeThatStoreOurParition = ShardFunctions.getNodesThatCoverHomePartition(shardGlobals, nodeShardData, nodeShardDataMap, activeNodes)
+
     // let temp = ShardFunctions.getNodesThatCoverPartitionRaw(shardGlobals, nodeShardDataMap, nodeShardData.homePartition, exclude, activeNodes)
     // //temp validation that the functions above are equal
     // let diffA = ShardFunctions.subtractNodeLists(temp, nodeShardData.nodeThatStoreOurParition)
@@ -456,7 +427,6 @@ class ShardFunctions {
     // if(diffB.length > 0){
     //   throw new Error( `diffB ${diffB.length}`)
     // }
-
 
     // nodeShardData.nodeThatStoreOurParition = ShardFunctions.getNodesThatCoverRange(shardGlobals, nodeShardData.storedPartitions.homeRange.low, nodeShardData.storedPartitions.homeRange.high, exclude, activeNodes)
 
@@ -472,8 +442,8 @@ class ShardFunctions {
       //     if we left our node out then it would truncate the consensus range
       if (nodeShardData.consensusNodeForOurNodeFull.length >= 2) {
         // this logic only works because we know that getNeigborNodesInRange starts at the starting point
-        let startNode = nodeShardData.consensusNodeForOurNodeFull[0]
-        let endNode = nodeShardData.consensusNodeForOurNodeFull[nodeShardData.consensusNodeForOurNodeFull.length - 1]
+        const startNode = nodeShardData.consensusNodeForOurNodeFull[0]
+        const endNode = nodeShardData.consensusNodeForOurNodeFull[nodeShardData.consensusNodeForOurNodeFull.length - 1]
 
         let startPartition = nodeShardDataMap.get(startNode.id).homePartition
         let endPartition = nodeShardDataMap.get(endNode.id).homePartition
@@ -491,7 +461,7 @@ class ShardFunctions {
       //update covered by list
       if (nodeShardData.consensusStartPartition <= nodeShardData.consensusEndPartition) {
         for (let i = nodeShardData.consensusStartPartition; i <= nodeShardData.consensusEndPartition; i++) {
-          let shardPartitionData = parititionShardDataMap.get(i)
+          const shardPartitionData = partitionShardDataMap.get(i)
           if (shardPartitionData == null) {
             throw new Error('computeExtendedNodePartitionData: shardPartitionData==null 1')
           }
@@ -499,14 +469,14 @@ class ShardFunctions {
         }
       } else {
         for (let i = 0; i <= nodeShardData.consensusEndPartition; i++) {
-          let shardPartitionData = parititionShardDataMap.get(i)
+          const shardPartitionData = partitionShardDataMap.get(i)
           if (shardPartitionData == null) {
             throw new Error('computeExtendedNodePartitionData: shardPartitionData==null 2')
           }
           shardPartitionData.coveredBy[nodeShardData.node.id] = nodeShardData.node // { idx: nodeShardData.ourNodeIndex }
         }
         for (let i = nodeShardData.consensusStartPartition; i < shardGlobals.numPartitions; i++) {
-          let shardPartitionData = parititionShardDataMap.get(i)
+          const shardPartitionData = partitionShardDataMap.get(i)
           if (shardPartitionData == null) {
             throw new Error('computeExtendedNodePartitionData: shardPartitionData==null 3')
           }
@@ -517,7 +487,7 @@ class ShardFunctions {
       // this list is a temporary list that counts as 2c range.  Stored nodes are the merged max of 2c range (2r on each side) and node in the 2c partition range
       nodeShardData.c2NodeForOurNode = ShardFunctions.getNeigborNodesInRange(nodeShardData.ourNodeIndex, 2 * shardGlobals.consensusRadius, exclude, activeNodes)
 
-      let [results, extras] = ShardFunctions.mergeNodeLists(nodeShardData.nodeThatStoreOurParition, nodeShardData.c2NodeForOurNode)
+      const [results, extras] = ShardFunctions.mergeNodeLists(nodeShardData.nodeThatStoreOurParition, nodeShardData.c2NodeForOurNode)
 
       nodeShardData.nodeThatStoreOurParitionFull = results
       nodeShardData.outOfDefaultRangeNodes = extras
@@ -526,13 +496,13 @@ class ShardFunctions {
       nodeShardData.edgeNodes = ShardFunctions.subtractNodeLists(nodeShardData.edgeNodes, excludeNodeArray) // remove ourself!
 
       if (extras.length > 0) {
-        //ShardFunctions.dilateNeighborCoverage(shardGlobals, nodeShardDataMap, parititionShardDataMap, activeNodes, nodeShardData, extras)
+        //ShardFunctions.dilateNeighborCoverage(shardGlobals, nodeShardDataMap, partitionShardDataMap, activeNodes, nodeShardData, extras)
         //can get rid of some of the above merge logic if this never shows up in testing
-        let message = `computeExtendedNodePartitionData: failed`
+        let message = 'computeExtendedNodePartitionData: failed'
         try {
-          let list1 = nodeShardData.nodeThatStoreOurParition.map((n) => n.id.substring(0, 5))
-          let list2 = nodeShardData.nodeThatStoreOurParition.map((n) => n.id.substring(0, 5))
-          let extraLists = extras.map((n) => n.id.substring(0, 5))
+          const list1 = nodeShardData.nodeThatStoreOurParition.map((n) => n.id.substring(0, 5))
+          const list2 = nodeShardData.nodeThatStoreOurParition.map((n) => n.id.substring(0, 5))
+          const extraLists = extras.map((n) => n.id.substring(0, 5))
           message = `computeExtendedNodePartitionData: should never have extras. node:${nodeShardData.node.id.substring(0, 5)} ${stringify({ list1, list2, extraLists })}`
         } catch (ex) {
           this.fatalLogger.fatal('computeExtendedNodePartitionData: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
@@ -564,7 +534,7 @@ class ShardFunctions {
     // storedBy
     if (nodeShardData.storedPartitions.rangeIsSplit === false) {
       for (let i = nodeShardData.storedPartitions.partitionStart; i <= nodeShardData.storedPartitions.partitionEnd; i++) {
-        let shardPartitionData = parititionShardDataMap.get(i)
+        const shardPartitionData = partitionShardDataMap.get(i)
         if (shardPartitionData == null) {
           throw new Error('computeExtendedNodePartitionData: shardPartitionData==null 4')
         }
@@ -572,14 +542,14 @@ class ShardFunctions {
       }
     } else {
       for (let i = 0; i <= nodeShardData.storedPartitions.partitionEnd; i++) {
-        let shardPartitionData = parititionShardDataMap.get(i)
+        const shardPartitionData = partitionShardDataMap.get(i)
         if (shardPartitionData == null) {
           throw new Error('computeExtendedNodePartitionData: shardPartitionData==null 5')
         }
         shardPartitionData.storedBy[nodeShardData.node.id] = nodeShardData.node // { idx: nodeShardData.ourNodeIndex }
       }
       for (let i = nodeShardData.storedPartitions.partitionStart; i < shardGlobals.numPartitions; i++) {
-        let shardPartitionData = parititionShardDataMap.get(i)
+        const shardPartitionData = partitionShardDataMap.get(i)
         if (shardPartitionData == null) {
           throw new Error('computeExtendedNodePartitionData: shardPartitionData==null 6')
         }
@@ -594,12 +564,12 @@ class ShardFunctions {
 
   /**
    * getConsenusPartitions
-   * @param {StateManager.shardFunctionTypes.ShardGlobals} shardGlobals
-   * @param {StateManager.shardFunctionTypes.NodeShardData} nodeShardData the node we want to get a list of consensus partions from
+   * @param {ShardGlobals} shardGlobals
+   * @param {NodeShardData} nodeShardData the node we want to get a list of consensus partions from
    * @returns {number[]} a list of partitions
    */
-  static getConsenusPartitionList(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, nodeShardData: StateManager.shardFunctionTypes.NodeShardData): number[] {
-    let consensusPartitions = [] as number[]
+  static getConsenusPartitionList(shardGlobals: ShardGlobals, nodeShardData: NodeShardData): number[] {
+    const consensusPartitions = [] as number[]
     if (nodeShardData.consensusStartPartition <= nodeShardData.consensusEndPartition) {
       for (let i = nodeShardData.consensusStartPartition; i <= nodeShardData.consensusEndPartition; i++) {
         consensusPartitions.push(i)
@@ -617,12 +587,12 @@ class ShardFunctions {
 
   /**
    * getStoredPartitions
-   * @param {StateManager.shardFunctionTypes.ShardGlobals} shardGlobals
-   * @param {StateManager.shardFunctionTypes.NodeShardData} nodeShardData the node we want to get a list of consensus partions from
+   * @param {ShardGlobals} shardGlobals
+   * @param {NodeShardData} nodeShardData the node we want to get a list of consensus partions from
    * @returns {number[]} a list of partitions
    */
-  static getStoredPartitionList(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, nodeShardData: StateManager.shardFunctionTypes.NodeShardData): number[] {
-    let storedPartitionList = [] as number[]
+  static getStoredPartitionList(shardGlobals: ShardGlobals, nodeShardData: NodeShardData): number[] {
+    const storedPartitionList = [] as number[]
     if (nodeShardData.storedPartitions.partitionStart <= nodeShardData.storedPartitions.partitionEnd) {
       for (let i = nodeShardData.storedPartitions.partitionStart; i <= nodeShardData.storedPartitions.partitionEnd; i++) {
         storedPartitionList.push(i)
@@ -672,11 +642,11 @@ class ShardFunctions {
   // calculate this for self and neighbor nodes!!  how far to scan into neighors. // oldShardData_shardGlobals, newSharddata_shardGlobals,
 
   // TSConversion  fix up any[]
-  static computeCoverageChanges(oldShardDataNodeShardData: StateManager.shardFunctionTypes.NodeShardData, newSharddataNodeShardData: StateManager.shardFunctionTypes.NodeShardData): { start: number; end: number }[] {
-    let coverageChanges = [] as { start: number; end: number }[]
+  static computeCoverageChanges(oldShardDataNodeShardData: NodeShardData, newSharddataNodeShardData: NodeShardData): { start: number; end: number }[] {
+    const coverageChanges = [] as { start: number; end: number }[]
 
-    let oldStoredPartitions = oldShardDataNodeShardData.storedPartitions
-    let newStoredPartitions = newSharddataNodeShardData.storedPartitions
+    const oldStoredPartitions = oldShardDataNodeShardData.storedPartitions
+    const newStoredPartitions = newSharddataNodeShardData.storedPartitions
 
     // let d1s = 0
     // let d1e = 0
@@ -689,20 +659,20 @@ class ShardFunctions {
         // NEW:  [xxxxxxx-------------------xxxx]
 
         // partitionRange, partitionRange2
-        let oldStart1 = oldStoredPartitions.partitionRange.startAddr
-        let oldEnd1 = oldStoredPartitions.partitionRange.endAddr
+        const oldStart1 = oldStoredPartitions.partitionRange.startAddr
+        const oldEnd1 = oldStoredPartitions.partitionRange.endAddr
 
-        let newStart1 = newStoredPartitions.partitionRange.startAddr
-        let newEnd1 = newStoredPartitions.partitionRange.endAddr
+        const newStart1 = newStoredPartitions.partitionRange.startAddr
+        const newEnd1 = newStoredPartitions.partitionRange.endAddr
 
         // d1s = newStart1 - oldStart1
         // d1e = newEnd1 - oldEnd1
 
-        let oldStart2 = oldStoredPartitions.partitionRange2.startAddr
-        let oldEnd2 = oldStoredPartitions.partitionRange2.endAddr
+        const oldStart2 = oldStoredPartitions.partitionRange2.startAddr
+        const oldEnd2 = oldStoredPartitions.partitionRange2.endAddr
 
-        let newStart2 = newStoredPartitions.partitionRange2.startAddr
-        let newEnd2 = newStoredPartitions.partitionRange2.endAddr
+        const newStart2 = newStoredPartitions.partitionRange2.startAddr
+        const newEnd2 = newStoredPartitions.partitionRange2.endAddr
 
         // d2s = newStart2 - oldStart2
         // d2e = newEnd2 - oldEnd2
@@ -745,13 +715,13 @@ class ShardFunctions {
         // NEW:  [--xxxxxxxxxxxxxxxxxxxxxxxx--]
         //          post pass.  need to not overlap expanded areas.
         //
-        let oldStart1 = oldStoredPartitions.partitionRange.startAddr
-        let oldEnd1 = oldStoredPartitions.partitionRange.endAddr
-        let oldStart2 = oldStoredPartitions.partitionRange2.startAddr
-        let oldEnd2 = oldStoredPartitions.partitionRange2.endAddr
+        const oldStart1 = oldStoredPartitions.partitionRange.startAddr
+        const oldEnd1 = oldStoredPartitions.partitionRange.endAddr
+        const oldStart2 = oldStoredPartitions.partitionRange2.startAddr
+        const oldEnd2 = oldStoredPartitions.partitionRange2.endAddr
 
-        let newStart1 = newStoredPartitions.partitionRange.startAddr
-        let newEnd1 = newStoredPartitions.partitionRange.endAddr
+        const newStart1 = newStoredPartitions.partitionRange.startAddr
+        const newEnd1 = newStoredPartitions.partitionRange.endAddr
 
         if (oldStart1 >= oldEnd1 || oldStart2 >= oldEnd2 || newStart1 >= newEnd1) {
           throw new Error('invalid ranges')
@@ -795,13 +765,13 @@ class ShardFunctions {
         // case 4:  overlaps both new sets...  compare to both..
         // OLD:  [--xxxxxxxxxxxxxxxxxxxxxxxx--]
         // NEW:  [xxx-------------xxxxxxxxxxxx]
-        let oldStart1 = oldStoredPartitions.partitionRange.startAddr
-        let oldEnd1 = oldStoredPartitions.partitionRange.endAddr
+        const oldStart1 = oldStoredPartitions.partitionRange.startAddr
+        const oldEnd1 = oldStoredPartitions.partitionRange.endAddr
 
-        let newStart1 = newStoredPartitions.partitionRange.startAddr
-        let newEnd1 = newStoredPartitions.partitionRange.endAddr
-        let newStart2 = newStoredPartitions.partitionRange2.startAddr
-        let newEnd2 = newStoredPartitions.partitionRange2.endAddr
+        const newStart1 = newStoredPartitions.partitionRange.startAddr
+        const newEnd1 = newStoredPartitions.partitionRange.endAddr
+        const newStart2 = newStoredPartitions.partitionRange2.startAddr
+        const newEnd2 = newStoredPartitions.partitionRange2.endAddr
 
         if (oldStart1 >= oldEnd1 || newStart1 >= newEnd1 || newStart2 >= newEnd2) {
           throw new Error('invalid ranges')
@@ -836,11 +806,11 @@ class ShardFunctions {
       } else {
         // partitionRange
 
-        let oldStart1 = oldStoredPartitions.partitionRange.startAddr
-        let oldEnd1 = oldStoredPartitions.partitionRange.endAddr
+        const oldStart1 = oldStoredPartitions.partitionRange.startAddr
+        const oldEnd1 = oldStoredPartitions.partitionRange.endAddr
 
-        let newStart1 = newStoredPartitions.partitionRange.startAddr
-        let newEnd1 = newStoredPartitions.partitionRange.endAddr
+        const newStart1 = newStoredPartitions.partitionRange.startAddr
+        const newEnd1 = newStoredPartitions.partitionRange.endAddr
 
         // d1s = newStart1 - oldStart1
         // d1e = newEnd1 - oldEnd1
@@ -860,42 +830,41 @@ class ShardFunctions {
       }
     }
 
-    if(coverageChanges.length === 0){
+    if (coverageChanges.length === 0) {
       return coverageChanges
     }
 
-    let oldStart1 = oldStoredPartitions.partitionRange.startAddr
-    let oldEnd1 = oldStoredPartitions.partitionRange.endAddr
-    let oldStart2 = oldStoredPartitions.partitionRange2?.startAddr
-    let oldEnd2 = oldStoredPartitions.partitionRange2?.endAddr
+    const oldStart1 = oldStoredPartitions.partitionRange.startAddr
+    const oldEnd1 = oldStoredPartitions.partitionRange.endAddr
+    const oldStart2 = oldStoredPartitions.partitionRange2?.startAddr
+    const oldEnd2 = oldStoredPartitions.partitionRange2?.endAddr
 
-    let finalChanges = []
+    const finalChanges = []
     // post process our coverage changes.  If any of our old range overlaps subtract out the old range
-    for(let coverageChange of coverageChanges){
-
-      if (ShardFunctions.setOverlap(oldStart1, oldEnd1, coverageChange.start, coverageChange.end)){
-        if(oldStart1 <= coverageChange.start){
+    for (const coverageChange of coverageChanges) {
+      if (ShardFunctions.setOverlap(oldStart1, oldEnd1, coverageChange.start, coverageChange.end)) {
+        if (oldStart1 <= coverageChange.start) {
           coverageChange.start = oldEnd1
         }
-        if(oldEnd1 >= coverageChange.end){
+        if (oldEnd1 >= coverageChange.end) {
           coverageChange.end = oldStart1
         }
-        if(coverageChange.start >= coverageChange.end){
+        if (coverageChange.start >= coverageChange.end) {
           continue
         }
       }
-      if(oldStoredPartitions.rangeIsSplit){
-        if (ShardFunctions.setOverlap(oldStart2, oldEnd2, coverageChange.start, coverageChange.end)){
-          if(oldStart2 <= coverageChange.start){
+      if (oldStoredPartitions.rangeIsSplit) {
+        if (ShardFunctions.setOverlap(oldStart2, oldEnd2, coverageChange.start, coverageChange.end)) {
+          if (oldStart2 <= coverageChange.start) {
             coverageChange.start = oldEnd2
           }
-          if(oldEnd2 >= coverageChange.end){
+          if (oldEnd2 >= coverageChange.end) {
             coverageChange.end = oldStart2
           }
-          if(coverageChange.start >= coverageChange.end){
+          if (coverageChange.start >= coverageChange.end) {
             continue
           }
-        }      
+        }
       }
 
       finalChanges.push(coverageChange)
@@ -910,35 +879,35 @@ class ShardFunctions {
     // calculate new and edge partitions?   then calculate change between partitions? --- NO!
   }
 
-  static getHomeNodeSummaryObject(nodeShardData: StateManager.shardFunctionTypes.NodeShardData): StateManager.shardFunctionTypes.HomeNodeSummary {
+  static getHomeNodeSummaryObject(nodeShardData: NodeShardData): HomeNodeSummary {
     if (nodeShardData.extendedData === false) {
-      return { noExtendedData: true, edge: [], consensus: [], storedFull: [] } as StateManager.shardFunctionTypes.HomeNodeSummary
+      return { noExtendedData: true, edge: [], consensus: [], storedFull: [] } as HomeNodeSummary
     }
-    let result = { edge: [], consensus: [], storedFull: [] } as StateManager.shardFunctionTypes.HomeNodeSummary
+    const result = { edge: [], consensus: [], storedFull: [] } as HomeNodeSummary
 
-    for (let node of nodeShardData.edgeNodes) {
+    for (const node of nodeShardData.edgeNodes) {
       result.edge.push(node.id)
     }
-    for (let node of nodeShardData.consensusNodeForOurNodeFull) {
+    for (const node of nodeShardData.consensusNodeForOurNodeFull) {
       result.consensus.push(node.id)
     }
-    for (let node of nodeShardData.nodeThatStoreOurParitionFull) {
+    for (const node of nodeShardData.nodeThatStoreOurParitionFull) {
       result.storedFull.push(node.id)
     }
 
-    result.edge.sort(function (a, b) {
+    result.edge.sort((a, b) => {
       return a === b ? 0 : a < b ? -1 : 1
     })
-    result.consensus.sort(function (a, b) {
+    result.consensus.sort((a, b) => {
       return a === b ? 0 : a < b ? -1 : 1
     })
-    result.storedFull.sort(function (a, b) {
+    result.storedFull.sort((a, b) => {
       return a === b ? 0 : a < b ? -1 : 1
     })
     return result
   }
 
-  static getNodeRelation(nodeShardData: StateManager.shardFunctionTypes.NodeShardData, nodeId: string) {
+  static getNodeRelation(nodeShardData: NodeShardData, nodeId: string) {
     if (nodeShardData.extendedData === false) {
       return 'failed, no extended data'
     }
@@ -947,19 +916,19 @@ class ShardFunctions {
       result = 'home, '
     }
 
-    for (let node of nodeShardData.nodeThatStoreOurParitionFull) {
+    for (const node of nodeShardData.nodeThatStoreOurParitionFull) {
       if (node.id === nodeId) {
         result += 'stored,'
       }
     }
 
-    for (let node of nodeShardData.edgeNodes) {
+    for (const node of nodeShardData.edgeNodes) {
       if (node.id === nodeId) {
         result += 'edge,'
       }
     }
 
-    for (let node of nodeShardData.consensusNodeForOurNodeFull) {
+    for (const node of nodeShardData.consensusNodeForOurNodeFull) {
       if (node.id === nodeId) {
         result += 'consensus,'
       }
@@ -967,22 +936,22 @@ class ShardFunctions {
     return result
   }
 
-  static getPartitionRangeFromRadix(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, radix:string){
-    let filledAddress = radix + '0'.repeat(64 - radix.length)
-    let partition = ShardFunctions.addressToPartition(shardGlobals, filledAddress)
+  static getPartitionRangeFromRadix(shardGlobals: ShardGlobals, radix: string) {
+    const filledAddress = radix + '0'.repeat(64 - radix.length)
+    const partition = ShardFunctions.addressToPartition(shardGlobals, filledAddress)
 
-    let filledAddress2 = radix + 'f'.repeat(64 - radix.length)
-    let partition2 = ShardFunctions.addressToPartition(shardGlobals, filledAddress2)
+    const filledAddress2 = radix + 'f'.repeat(64 - radix.length)
+    const partition2 = ShardFunctions.addressToPartition(shardGlobals, filledAddress2)
 
-    return {low:partition.homePartition, high:partition2.homePartition}
+    return { low: partition.homePartition, high: partition2.homePartition }
   }
 
-  static addressToPartition(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, address: string): { homePartition: number; addressNum: number } {
-    let numPartitions = shardGlobals.numPartitions
-    let addressNum = parseInt(address.slice(0, 8), 16)
+  static addressToPartition(shardGlobals: ShardGlobals, address: string): { homePartition: number; addressNum: number } {
+    const numPartitions = shardGlobals.numPartitions
+    const addressNum = parseInt(address.slice(0, 8), 16)
 
     // 2^32  4294967296 or 0xFFFFFFFF + 1
-    let size = Math.round((0xffffffff + 1) / numPartitions)
+    const size = Math.round((0xffffffff + 1) / numPartitions)
     let homePartition = Math.floor(addressNum / size)
     if (homePartition === numPartitions) {
       homePartition = homePartition - 1
@@ -991,13 +960,13 @@ class ShardFunctions {
     return { homePartition, addressNum }
   }
 
-  static addressNumberToPartition(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, addressNum: number): number {
-    let numPartitions = shardGlobals.numPartitions
+  static addressNumberToPartition(shardGlobals: ShardGlobals, addressNum: number): number {
+    const numPartitions = shardGlobals.numPartitions
     // 2^32  4294967296 or 0xFFFFFFFF + 1
-    let size = Math.round((0xffffffff + 1) / numPartitions)
-    let preround = addressNum / size
+    const size = Math.round((0xffffffff + 1) / numPartitions)
+    const preround = addressNum / size
     let homePartition = Math.floor(addressNum / size)
-    let asdf = preround
+    const asdf = preround
     if (homePartition === numPartitions) {
       homePartition = homePartition - 1
     }
@@ -1005,9 +974,9 @@ class ShardFunctions {
     return homePartition
   }
 
-  static findHomeNode(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, address: string, parititionShardDataMap: Map<number, StateManager.shardFunctionTypes.ShardInfo>): StateManager.shardFunctionTypes.NodeShardData | null {
-    let { homePartition, addressNum } = ShardFunctions.addressToPartition(shardGlobals, address)
-    let partitionShard = parititionShardDataMap.get(homePartition)
+  static findHomeNode(shardGlobals: ShardGlobals, address: string, partitionShardDataMap: Map<number, ShardInfo>): NodeShardData | null {
+    const { homePartition, addressNum } = ShardFunctions.addressToPartition(shardGlobals, address)
+    const partitionShard = partitionShardDataMap.get(homePartition)
 
     if (partitionShard == null) {
       return null
@@ -1019,15 +988,15 @@ class ShardFunctions {
   }
 
   static circularDistance(a: number, b: number, max: number): number {
-    let directDist = Math.abs(a - b)
+    const directDist = Math.abs(a - b)
     let wrapDist = directDist
     // if (a < b) {
     //   wrapDist = Math.abs(a + (max - b))
     // } else if (b < a) {
     //   wrapDist = Math.abs(b + (max - a))
     // }
-    let wrapDist1 = Math.abs(a + (max - b))
-    let wrapDist2 = Math.abs(b + (max - a))
+    const wrapDist1 = Math.abs(a + (max - b))
+    const wrapDist2 = Math.abs(b + (max - a))
     wrapDist = Math.min(wrapDist1, wrapDist2)
 
     return Math.min(directDist, wrapDist)
@@ -1091,14 +1060,14 @@ class ShardFunctions {
    * @returns {array} result [results, extras]  TODO, convert the array response to a type object that has results and extras
    */
   static mergeNodeLists(listA: Shardus.Node[], listB: Shardus.Node[]): any[] {
-    let results = [] as Shardus.Node[]
-    let extras = [] as Shardus.Node[]
-    let map = {} as { [id: string]: boolean }
-    for (let node of listA) {
+    const results = [] as Shardus.Node[]
+    const extras = [] as Shardus.Node[]
+    const map = {} as { [id: string]: boolean }
+    for (const node of listA) {
       map[node.id] = true
       results.push(node)
     }
-    for (let node of listB) {
+    for (const node of listB) {
       if (map[node.id] !== true) {
         results.push(node)
         extras.push(node)
@@ -1114,12 +1083,12 @@ class ShardFunctions {
    * @returns {Shardus.Node[]} results list
    */
   static subtractNodeLists(listA: Shardus.Node[], listB: Shardus.Node[]): Shardus.Node[] {
-    let results = [] as Shardus.Node[]
-    let map = {} as { [id: string]: boolean }
-    for (let node of listB) {
+    const results = [] as Shardus.Node[]
+    const map = {} as { [id: string]: boolean }
+    for (const node of listB) {
       map[node.id] = true
     }
-    for (let node of listA) {
+    for (const node of listA) {
       if (map[node.id] !== true) {
         results.push(node)
       }
@@ -1127,20 +1096,20 @@ class ShardFunctions {
     return results
   }
 
-  static partitionToAddressRange2(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, partition: number, paritionMax?: number): StateManager.shardFunctionTypes.AddressRange {
-    let result = {} as StateManager.shardFunctionTypes.AddressRange
+  static partitionToAddressRange2(shardGlobals: ShardGlobals, partition: number, partitionMax?: number): AddressRange {
+    const result = {} as AddressRange
     result.partition = partition
 
     // 2^32  4294967296 or 0xFFFFFFFF + 1
-    let size = Math.round((0xffffffff + 1) / shardGlobals.numPartitions)
-    let startAddr = partition * size
+    const size = Math.round((0xffffffff + 1) / shardGlobals.numPartitions)
+    const startAddr = partition * size
 
     result.p_low = partition
 
     let endPartition = partition + 1
-    if (paritionMax) {
-      result.p_high = paritionMax
-      endPartition = paritionMax + 1
+    if (partitionMax) {
+      result.p_high = partitionMax
+      endPartition = partitionMax + 1
     } else {
       //result.p_high = partition
     }
@@ -1148,7 +1117,7 @@ class ShardFunctions {
     let endAddr = endPartition * size
 
     // compounded rounding errors can reach up to num partitions at worst
-    let roundingErrorSupport = shardGlobals.numPartitions
+    const roundingErrorSupport = shardGlobals.numPartitions
 
     //fix for int precision problem where id of the highest shard rolls over
     if (endAddr >= 4294967295 - roundingErrorSupport) {
@@ -1174,25 +1143,25 @@ class ShardFunctions {
 
   /**
    * NOTE this is a raw answer.  edge cases with consensus node coverage can increase the results of our raw answer that is given here
-   * @param {StateManager.shardFunctionTypes.ShardGlobals} shardGlobals
-   * @param {Map<string, StateManager.shardFunctionTypes.NodeShardData>} nodeShardDataMap
+   * @param {ShardGlobals} shardGlobals
+   * @param {Map<string, NodeShardData>} nodeShardDataMap
    * @param {number} partition
    * @param {string[]} exclude
    * @param {Node[]} activeNodes
    */
-  static getNodesThatCoverPartitionRaw(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, nodeShardDataMap: Map<string, StateManager.shardFunctionTypes.NodeShardData>, partition: number, exclude: string[], activeNodes: Shardus.Node[]): Shardus.Node[] {
-    let results = [] as Shardus.Node[]
+  static getNodesThatCoverPartitionRaw(shardGlobals: ShardGlobals, nodeShardDataMap: Map<string, NodeShardData>, partition: number, exclude: string[], activeNodes: Shardus.Node[]): Shardus.Node[] {
+    const results = [] as Shardus.Node[]
 
     // TODO perf.  (may be tricky to improve), should probably be part of a comprehensive set of improvements that consider networks with millions of nodes
     // -is there a smart way to cache results.
-    // -is there a more efficient way to pre calculate this (but keep in mind we may need to be lazy about shard calculations in the future) 
+    // -is there a more efficient way to pre calculate this (but keep in mind we may need to be lazy about shard calculations in the future)
     // -  instead of looking at all nodes could we pick a staring point and expand our search
     for (let i = 0; i < activeNodes.length; i++) {
-      let node = activeNodes[i]
+      const node = activeNodes[i]
       if (exclude.includes(node.id)) {
         continue
       }
-      let nodeShardData = nodeShardDataMap.get(node.id)
+      const nodeShardData = nodeShardDataMap.get(node.id)
 
       if (nodeShardData == null) {
         continue
@@ -1211,20 +1180,20 @@ class ShardFunctions {
 
   /**
    * NOTE this is a raw answer.  edge cases with consensus node coverage can increase the results of our raw answer that is given here
-   * @param {StateManager.shardFunctionTypes.ShardGlobals} shardGlobals
-   * @param {Map<string, StateManager.shardFunctionTypes.NodeShardData>} nodeShardDataMap
+   * @param {ShardGlobals} shardGlobals
+   * @param {Map<string, NodeShardData>} nodeShardDataMap
    * @param {number} partition
    * @param {string[]} exclude
    * @param {Node[]} activeNodes
    */
-  static getNodesThatCoverHomePartition(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, thisNode: StateManager.shardFunctionTypes.NodeShardData, nodeShardDataMap: Map<string, StateManager.shardFunctionTypes.NodeShardData>, activeNodes: Shardus.Node[]): Shardus.Node[] {
-    let results = [] as Shardus.Node[]
-    let homePartition = thisNode.homePartition
+  static getNodesThatCoverHomePartition(shardGlobals: ShardGlobals, thisNode: NodeShardData, nodeShardDataMap: Map<string, NodeShardData>, activeNodes: Shardus.Node[]): Shardus.Node[] {
+    const results = [] as Shardus.Node[]
+    const homePartition = thisNode.homePartition
 
-    let searchRight = true
+    const searchRight = true
     let index = homePartition
     //let failCount = 0
-    let startIndex = index
+    const startIndex = index
     let once = false
     while (searchRight) {
       // if (failCount > 1) {
@@ -1234,22 +1203,21 @@ class ShardFunctions {
 
       if (index >= activeNodes.length) {
         index = 0
-      }   
+      }
       //check for a complete wrap if we have full coverage
       //this only happens when there is no sharding yet. numnodes *2 = consenus range  (approx)
       //we could break this logic out above in a separate check but I think this is ok for now (not too costly)
-      if(startIndex === index && once){
+      if (startIndex === index && once) {
         return results
-      }    
-      once=true  
-      
-      let node = activeNodes[index]
+      }
+      once = true
+
+      const node = activeNodes[index]
       index++
 
-      if(node == thisNode.node)
-        continue
+      if (node == thisNode.node) continue
 
-      let nodeShardData = nodeShardDataMap.get(node.id)
+      const nodeShardData = nodeShardDataMap.get(node.id)
       if (nodeShardData == null) {
         continue
       }
@@ -1262,7 +1230,7 @@ class ShardFunctions {
       }
       results.push(node)
     }
-    let searchLeft = true
+    const searchLeft = true
     index = homePartition
     //failCount = 0
     while (searchLeft) {
@@ -1273,15 +1241,13 @@ class ShardFunctions {
 
       if (index < 0) {
         index = activeNodes.length - 1
-      }      
-      let node = activeNodes[index]
+      }
+      const node = activeNodes[index]
       index--
 
-      if(node == thisNode.node)
-        continue
+      if (node == thisNode.node) continue
 
-
-      let nodeShardData = nodeShardDataMap.get(node.id)
+      const nodeShardData = nodeShardDataMap.get(node.id)
       if (nodeShardData == null) {
         continue
       }
@@ -1297,7 +1263,6 @@ class ShardFunctions {
     return results
   }
 
-
   /**
    * getNeigborNodesInRange
    * get nodes in count range to either side of our node
@@ -1309,7 +1274,7 @@ class ShardFunctions {
    */
   static getNeigborNodesInRange(position: number, radius: number, exclude: any[], allNodes: any[]): Shardus.Node[] {
     // let allNodes = this.p2p.state.getNodesOrdered() // possibly faster version that does not need a copy
-    let results = [] as Shardus.Node[]
+    const results = [] as Shardus.Node[]
     let scanStart = position - radius // have to pick floor or ceiling and be consistent.
     if (scanStart < 0) {
       scanStart = allNodes.length + scanStart
@@ -1319,15 +1284,15 @@ class ShardFunctions {
         scanStart = 0
       }
     }
-   
-    let scanAmount = radius * 2 + 1
+
+    const scanAmount = radius * 2 + 1
     let scanCount = 0
-    let expectedNodes = Math.min(allNodes.length - exclude.length, scanAmount - exclude.length)
+    const expectedNodes = Math.min(allNodes.length - exclude.length, scanAmount - exclude.length)
 
     // if we need to scan all the nodes, just do that here in a simple way
     if (scanAmount >= allNodes.length) {
       for (let i = 0; i < allNodes.length; i++) {
-        let node = allNodes[i]
+        const node = allNodes[i]
         if (exclude.includes(node.id)) {
           continue
         }
@@ -1351,7 +1316,7 @@ class ShardFunctions {
       if (scanIndex >= allNodes.length) {
         scanIndex = 0
       }
-      let node = allNodes[scanIndex]
+      const node = allNodes[scanIndex]
       if (exclude.includes(node.id)) {
         scanIndex++
         continue
@@ -1378,16 +1343,16 @@ class ShardFunctions {
 
   /**
    * getNodesByProximity This builds a sorted list of nodes based on how close they are to a given address
-   * @param {StateManager.shardFunctionTypes.ShardGlobals} shardGlobals
+   * @param {ShardGlobals} shardGlobals
    * @param {Shardus.Node[]} activeNodes
    * @param {number} position
    * @param {string} excludeID
    * @param {number} [count]
    * @param {boolean} [centeredScan]
    */
-  static getNodesByProximity(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, activeNodes: Shardus.Node[], position: number, excludeID: string, count: number = 10, centeredScan: boolean = false): Shardus.Node[] {
-    let allNodes = activeNodes
-    let results = [] as Shardus.Node[]
+  static getNodesByProximity(shardGlobals: ShardGlobals, activeNodes: Shardus.Node[], position: number, excludeID: string, count = 10, centeredScan = false): Shardus.Node[] {
+    const allNodes = activeNodes
+    const results = [] as Shardus.Node[]
     let leftScanIndex = position
     let rightScanIndex = position - 1
     let maxIterations = Math.ceil(count / 2)
@@ -1449,16 +1414,16 @@ class ShardFunctions {
    * TSConversion  fix up any[] with a wrapped object.
    */
   static findCenterAddressPair(lowAddress: string, highAddress: string): any[] {
-    let leftAddressNum = parseInt(lowAddress.slice(0, 8), 16)
-    let nodeAddressNum = parseInt(highAddress.slice(0, 8), 16)
+    const leftAddressNum = parseInt(lowAddress.slice(0, 8), 16)
+    const nodeAddressNum = parseInt(highAddress.slice(0, 8), 16)
 
-    let centerNum = Math.round((leftAddressNum + nodeAddressNum) * 0.5)
+    const centerNum = Math.round((leftAddressNum + nodeAddressNum) * 0.5)
 
-    let addressPrefixHex = ShardFunctions.leadZeros8(centerNum.toString(16))
-    let addressPrefixHex2 = ShardFunctions.leadZeros8((centerNum + 1).toString(16))
+    const addressPrefixHex = ShardFunctions.leadZeros8(centerNum.toString(16))
+    const addressPrefixHex2 = ShardFunctions.leadZeros8((centerNum + 1).toString(16))
 
-    let centerAddr = addressPrefixHex + 'f'.repeat(56)
-    let centerAddrPlusOne = addressPrefixHex2 + '0'.repeat(56)
+    const centerAddr = addressPrefixHex + 'f'.repeat(56)
+    const centerAddrPlusOne = addressPrefixHex2 + '0'.repeat(56)
     return [centerAddr, centerAddrPlusOne]
   }
 
@@ -1470,20 +1435,20 @@ class ShardFunctions {
    *
    */
   static getNextAdjacentAddresses(address: string) {
-    let addressNum = parseInt(address.slice(0, 8), 16)
+    const addressNum = parseInt(address.slice(0, 8), 16)
 
-    let addressPrefixHex = ShardFunctions.leadZeros8(addressNum.toString(16))
-    let addressPrefixHex2 = ShardFunctions.leadZeros8((addressNum + 1).toString(16))
+    const addressPrefixHex = ShardFunctions.leadZeros8(addressNum.toString(16))
+    const addressPrefixHex2 = ShardFunctions.leadZeros8((addressNum + 1).toString(16))
 
-    let address1 = addressPrefixHex + 'f'.repeat(56)
-    let address2 = addressPrefixHex2 + '0'.repeat(56)
+    const address1 = addressPrefixHex + 'f'.repeat(56)
+    const address2 = addressPrefixHex2 + '0'.repeat(56)
     return { address1, address2 } // is this valid: as {address1:string; address2:string}
   }
 
-  static getCenterHomeNode(shardGlobals: StateManager.shardFunctionTypes.ShardGlobals, parititionShardDataMap: StateManager.shardFunctionTypes.ParititionShardDataMap, lowAddress: string, highAddress: string): StateManager.shardFunctionTypes.NodeShardData | null {
-    let [centerAddr] = ShardFunctions.findCenterAddressPair(lowAddress, highAddress)
+  static getCenterHomeNode(shardGlobals: ShardGlobals, partitionShardDataMap: PartitionShardDataMap, lowAddress: string, highAddress: string): NodeShardData | null {
+    const [centerAddr] = ShardFunctions.findCenterAddressPair(lowAddress, highAddress)
 
-    return ShardFunctions.findHomeNode(shardGlobals, centerAddr, parititionShardDataMap)
+    return ShardFunctions.findHomeNode(shardGlobals, centerAddr, partitionShardDataMap)
   }
 
   /**
@@ -1508,7 +1473,7 @@ class ShardFunctions {
    * @param {number} index1
    */
   static fastStableCorrespondingIndicies(size1: number, size2: number, index1: number): number[] {
-    let results = [] as number[]
+    const results = [] as number[]
     if (size1 >= size2) {
       let value = Math.round((index1 / size1) * size2)
       if (value === 0) {
@@ -1516,12 +1481,12 @@ class ShardFunctions {
       }
       results.push(value)
     } else {
-      let targetIndex = Math.round(index1 * (size2 / size1))
-      let range = Math.round(size2 / size1)
-      let start = Math.max(1, targetIndex - range)
-      let stop = Math.min(size2, targetIndex + range)
+      const targetIndex = Math.round(index1 * (size2 / size1))
+      const range = Math.round(size2 / size1)
+      const start = Math.max(1, targetIndex - range)
+      const stop = Math.min(size2, targetIndex + range)
       for (let i = start; i <= stop; i++) {
-        let res = ShardFunctions.fastStableCorrespondingIndicies(size2, size1, i)
+        const res = ShardFunctions.fastStableCorrespondingIndicies(size2, size1, i)
         if (res[0] === index1) {
           results.push(i)
         }
@@ -1540,7 +1505,7 @@ class ShardFunctions {
    * @param {number} maxP
    */
   static partitionInWrappingRange(i: number, minP: number, maxP: number): boolean {
-    let key = i
+    const key = i
     if (minP === maxP) {
       if (i !== minP) {
         return false
