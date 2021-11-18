@@ -2419,12 +2419,12 @@ class StateManager {
 
   startShardCalculations() {
     //this.p2p.state.on('cycle_q1_start', async (lastCycle, time) => {
-    this._registerListener(this.p2p.state, 'cycle_q1_start', async (lastCycle: Shardus.Cycle, time: number) => {
+    this._registerListener(this.p2p.state, 'cycle_q1_start', async () => {
       try {
         this.profiler.profileSectionStart('stateManager_cycle_q1_start')
 
         this.eventEmitter.emit('set_queue_partition_gossip')
-        lastCycle = CycleChain.getNewest()
+        let lastCycle = CycleChain.getNewest()
         if (lastCycle) {
           const ourNode = NodeList.nodes.get(Self.id)
 

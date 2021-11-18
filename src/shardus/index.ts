@@ -49,6 +49,8 @@ Context.setDefaultConfigs(defaultConfigs)
 
 type RouteHandlerRegister = (route: string, responseHandler: Handler) => void;
 
+const changeListGlobalAccount = '0'.repeat(64)
+
 interface Shardus {
   io: SocketIO.Server
   profiler: Profiler
@@ -82,6 +84,7 @@ interface Shardus {
   registerExternalDelete: RouteHandlerRegister
   registerExternalPatch: RouteHandlerRegister
   _listeners: any
+  appliedConfigChanges: Set<number>
 }
 
 /**
@@ -145,6 +148,9 @@ class Shardus extends EventEmitter {
     this.statistics = null
     this.loadDetection = null
     this.rateLimiting = null
+
+    this.appliedConfigChanges = new Set()
+    this.appliedConfigChanges.add(1) //ignore the first change in the list.
 
     if(logFlags.info) {
       this.mainLogger.info(`Server started with pid: ${process.pid}`)
@@ -610,6 +616,12 @@ class Shardus extends EventEmitter {
 
     // Start P2P
     await Self.startup()
+
+    // handle config queue changes
+    this._registerListener(this.p2p.state, 'cycle_q1_start', async () => {
+      let lastCycle = CycleChain.getNewest()
+      this.updateConfigChangeQueue(lastCycle)
+    })
   }
 
   /**
@@ -1611,6 +1623,48 @@ class Shardus extends EventEmitter {
     }
     // this.mainLogger.debug(`End of _isTransactionTimestampExpired(${timestamp})`)
     return transactionExpired
+  }
+
+  
+  async updateConfigChangeQueue(lastCycle: ShardusTypes.Cycle) {
+    if(lastCycle == null)
+      return
+    let accounts = await this.app.getAccountDataByList([changeListGlobalAccount])
+    if(accounts != null && accounts.length === 1){
+      let account = accounts[0]
+      let changes = account.data.listOfChanges as {cycle:number, change:any}[]
+      for(let change of changes){
+        //skip future changes
+        if(change.cycle > lastCycle.counter){
+          continue
+        }
+        //skip handled changes
+        if(this.appliedConfigChanges.has(change.cycle)){
+          continue
+        }
+        //apply this change
+        this.appliedConfigChanges.add(change.cycle)
+        let changeObj = change.change
+
+        this.patchObject(this.config, changeObj)
+
+        this.p2p.configUpdated()
+      }
+    }
+  }
+
+  patchObject(existingObject:any, changeObj:any){
+    for(const [key, value] of Object.entries(changeObj)){
+      if(existingObject[key] != null){
+        if(typeof value === 'object'){
+          this.patchObject(existingObject[key], value)
+        } else {
+          existingObject[key] = value
+          this.mainLogger.info(`patched ${key} to ${value}`)
+          nestedCountersInstance.countEvent('config', `patched ${key} to ${value}` )
+        }
+      }
+    }
   }
 
   setGlobal(address, value, when, source) {

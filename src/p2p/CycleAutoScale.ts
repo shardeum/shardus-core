@@ -79,6 +79,12 @@ export function reset() {
 }
 
 export function getDesiredCount(): number {
+
+  // having trouble finding a better way to update this!
+  if(desiredCount < config.p2p.minNodes){
+    desiredCount = config.p2p.minNodes
+  }
+
   return desiredCount
 }
 
@@ -287,6 +293,12 @@ function setDesireCount(count: number) {
   if (count >= config.p2p.minNodes && count <= config.p2p.maxNodes) {
     console.log('Setting desired count to', count)
     desiredCount = count
+  }
+}
+
+export function configUpdated(){
+  if(desiredCount < config.p2p.minNodes){
+    desiredCount = config.p2p.minNodes
   }
 }
 

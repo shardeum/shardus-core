@@ -13,6 +13,7 @@ import * as Utils from './Utils'
 import {logFlags} from '../logger'
 import {getNodeRequestingJoin} from './Join'
 import { P2P as P2PTypings } from 'shardus-types'
+import * as CycleAutoScale from './CycleAutoScale'
 
 /* p2p functions */
 
@@ -133,6 +134,11 @@ class P2P extends EventEmitter {
   shutdown(){
     CycleCreator.shutdown()
   }
+
+  configUpdated(){
+    //todo, make this nicer!
+    CycleAutoScale.configUpdated()
+  }
 }
 
 export const p2p = new P2P()
@@ -209,14 +215,18 @@ class State extends EventEmitter {
 }
 
 const state = new State()
-Self.emitter.on('cycle_q1_start', (lastCycle: Shardus.Cycle, time: number) => {
-  state.emit('cycle_q1_start', lastCycle, time)
+// old way had lastCycle, and time.  but this seems unused now
+// Self.emitter.on('cycle_q1_start', (lastCycle: Shardus.Cycle, time: number) => {
+//   state.emit('cycle_q1_start', lastCycle, time)
+// })
+Self.emitter.on('cycle_q1_start', () => {
+  state.emit('cycle_q1_start')
 })
-Self.emitter.on('cycle_q2_start', (lastCycle: Shardus.Cycle, time: number) => {
-  state.emit('cycle_q2_start', lastCycle, time)
+Self.emitter.on('cycle_q2_start', () => {
+  state.emit('cycle_q2_start')
 })
-Self.emitter.on('cycle_q3_start', (lastCycle: Shardus.Cycle, time: number) => {
-  state.emit('cycle_q3_start', lastCycle, time)
+Self.emitter.on('cycle_q3_start', () => {
+  state.emit('cycle_q3_start')
 })
 
 p2p['state'] = state
