@@ -114,12 +114,12 @@ export let logFlags: LogFlags = {
 class Logger {
   backupLogFlags: LogFlags
 
-  constructor(baseDir: string, config: Shardus.LogsConfiguration, startInFatalsLogMode:boolean) {
+  constructor(baseDir: string, config: Shardus.LogsConfiguration, dynamicLogMode:string) {
     this.baseDir = baseDir
     this.config = config
     this.logDir = null
     this.log4Conf = null
-    this._setupLogs(startInFatalsLogMode)
+    this._setupLogs(dynamicLogMode)
 
   }
 
@@ -151,7 +151,7 @@ class Logger {
   }
 
   // Setup the logs with the provided configuration using the base directory provided for relative paths
-  _setupLogs(startInFatalsLogMode:boolean) {
+  _setupLogs(dynamicLogMode:string) {
     const baseDir = this.baseDir
     const config = this.config
 
@@ -174,10 +174,14 @@ class Logger {
 
     this.setupLogControlValues()
 
-    if(startInFatalsLogMode){
+    if(dynamicLogMode.toLowerCase() === 'fatal' || dynamicLogMode.toLowerCase() === 'fatals'){
       console.log('startInFatalsLogMode=true!')
       this.setFatalFlags()
+    } else if(dynamicLogMode.toLowerCase() === 'error' || dynamicLogMode.toLowerCase() === 'errors'){
+      console.log('startInErrorLogMode=true!')
+      this.setErrorFlags()
     }
+    
 
     this._seenAddresses = {}
     this._shortStrings = {}
@@ -304,6 +308,17 @@ class Logger {
 
       logFlags.playback = false
   }
+
+  setErrorFlags(){
+    for (const [key, value] of Object.entries(logFlags)) {
+      logFlags[key] = false
+    }
+    logFlags.fatal = true
+    logFlags.error = true
+
+    logFlags.playback = false
+}
+
   setDefaultFlags(){
     for (const [key, value] of Object.entries(logFlags)) {
       logFlags[key] = this.backupLogFlags[key]
@@ -319,18 +334,21 @@ class Logger {
 
   registerEndpoints(Context) {
     Context.network.registerExternalGet('log-fatal', isDebugModeMiddleware, (req, res) => {
-
       this.setFatalFlags()
-
       for (const [key, value] of Object.entries(logFlags)) {
         res.write(`${key}: ${value}\n`)
       }
-
+      res.end()
+    })
+    Context.network.registerExternalGet('log-error', isDebugModeMiddleware, (req, res) => {
+      this.setErrorFlags()
+      for (const [key, value] of Object.entries(logFlags)) {
+        res.write(`${key}: ${value}\n`)
+      }
       res.end()
     })
     Context.network.registerExternalGet('log-default', isDebugModeMiddleware, (req, res) => {
       this.setDefaultFlags()
-
       for (const [key, value] of Object.entries(logFlags)) {
         res.write(`${key}: ${value}\n`)
       }      

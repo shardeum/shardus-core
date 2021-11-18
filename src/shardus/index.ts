@@ -109,8 +109,16 @@ class Shardus extends EventEmitter {
     logFlags.verbose = false
 
     let startInFatalsLogMode = (config && config.debug && config.debug.startInFatalsLogMode)?true:false
+    let startInErrorsLogMode = (config && config.debug && config.debug.startInErrorLogMode)?true:false
 
-    this.logger = new Logger(config.baseDir, logsConfig, startInFatalsLogMode)
+    let dynamicLogMode = ''
+    if(startInFatalsLogMode === true) {
+      dynamicLogMode = 'fatal'
+    } else if (startInErrorsLogMode === true) {
+      dynamicLogMode = 'error'
+    }
+
+    this.logger = new Logger(config.baseDir, logsConfig, dynamicLogMode)
     Context.setLoggerContext(this.logger)
     Snapshot.initLogger()
 

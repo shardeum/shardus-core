@@ -2458,14 +2458,14 @@ class StateManager {
       }
     })
 
-    this._registerListener(this.p2p.state, 'cycle_q3_start', async (lastCycle: Shardus.Cycle, time: number) => {
+    this._registerListener(this.p2p.state, 'cycle_q3_start', async () => {
       try {
         this.profiler.profileSectionStart('stateManager_cycle_q3_start')
         // moved coverage calculation changes earlier to q1
         // if (this.currentCycleShardData && this.currentCycleShardData.ourNode.status === 'active') {
         //   this.calculateChangeInCoverage()
         // }
-        lastCycle = CycleChain.getNewest()
+        let lastCycle = CycleChain.getNewest()
         if (lastCycle == null) {
           return
         }
@@ -2697,7 +2697,8 @@ class StateManager {
         // make sure we have a receipt
         let receipt = this.getReceipt(queueEntry)
         if (receipt == null) {
-          if(logFlags.error) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in newAcceptedTxQueue. ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+          //check  && queueEntry.globalModification === false because global accounts will not get a receipt, should this change?
+          if(logFlags.error && queueEntry.globalModification === false) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in newAcceptedTxQueue. ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
         } else {
           queueEntriesToSave.push(queueEntry)
         }
@@ -2709,7 +2710,8 @@ class StateManager {
         // make sure we have a receipt
         let receipt = this.getReceipt(queueEntry)
         if (receipt == null) {
-          if(logFlags.error) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in archivedQueueEntries. ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+          //check  && queueEntry.globalModification === false
+          if(logFlags.error && queueEntry.globalModification === false) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in archivedQueueEntries. ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
         } else {
           queueEntriesToSave.push(queueEntry)
         }
