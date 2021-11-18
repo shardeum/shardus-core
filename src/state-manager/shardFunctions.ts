@@ -142,7 +142,11 @@ class ShardFunctions {
    * @param {WrappablePartitionRange} wrappablePartitionRange
    */
   static calculatePartitionRangeInternal(shardGlobals: ShardGlobals, wrappablePartitionRange: WrappablePartitionRange, partitionRadius: number) {
-    wrappablePartitionRange.partitionRangeVector = { start: wrappablePartitionRange.partitionStart, dist: 1 + 2 * shardGlobals.nodesPerConsenusGroup, end: wrappablePartitionRange.partitionEnd }
+    wrappablePartitionRange.partitionRangeVector = {
+      start: wrappablePartitionRange.partitionStart,
+      dist: 1 + 2 * shardGlobals.nodesPerConsenusGroup,
+      end: wrappablePartitionRange.partitionEnd,
+    }
     wrappablePartitionRange.rangeIsSplit = false
 
     wrappablePartitionRange.partitionsCovered = 0
@@ -182,7 +186,11 @@ class ShardFunctions {
       wrappablePartitionRange.partitionStart = 0
       wrappablePartitionRange.partitionEnd = shardGlobals.numPartitions - 1
 
-      wrappablePartitionRange.partitionRangeVector = { start: wrappablePartitionRange.partitionStart, dist: 1 + 2 * partitionRadius, end: wrappablePartitionRange.partitionEnd }
+      wrappablePartitionRange.partitionRangeVector = {
+        start: wrappablePartitionRange.partitionStart,
+        dist: 1 + 2 * partitionRadius,
+        end: wrappablePartitionRange.partitionEnd,
+      }
     }
 
     // alias to start and end 1 in the simple case.  sync code expects values for these
@@ -436,6 +444,12 @@ class ShardFunctions {
       nodeShardData.consensusNodeForOurNode = ShardFunctions.getNeigborNodesInRange(nodeShardData.ourNodeIndex, shardGlobals.consensusRadius, exclude, activeNodes)
       nodeShardData.consensusNodeForOurNodeFull = ShardFunctions.getNeigborNodesInRange(nodeShardData.ourNodeIndex, shardGlobals.consensusRadius, [], activeNodes)
 
+      const combinedNodes = ShardFunctions.getCombinedNodeLists(shardGlobals, nodeShardData, nodeShardDataMap, activeNodes)
+      // nodeShardData.consensusNodeForOurNode = combinedNodes.consensusNodeForOurNode
+      // nodeShardData.consensusNodeForOurNodeFull = combinedNodes.consensusNodeForOurNodeFull
+      // nodeShardData.nodeThatStoreOurParition = combinedNodes.nodeThatStoreOurPartition
+      // nodeShardData.nodeThatStoreOurParitionFull = combinedNodes.nodeThatStoreOurPartitionFull
+
       // calcuate partition range for consensus
       // note we must use consensusNodeForOurNodeFull because consensusNodeForOurNode is not our node,
       //     but our node could be at the front or back of the not wrapped list of nodes.
@@ -495,6 +509,38 @@ class ShardFunctions {
       nodeShardData.edgeNodes = ShardFunctions.subtractNodeLists(nodeShardData.nodeThatStoreOurParitionFull, nodeShardData.consensusNodeForOurNode)
       nodeShardData.edgeNodes = ShardFunctions.subtractNodeLists(nodeShardData.edgeNodes, excludeNodeArray) // remove ourself!
 
+      // nodeShardData.edgeNodes = combinedNodes.edgeNodes
+
+      // COMPARE COMBINED LIST and Original calculations
+      // const diffA1 = ShardFunctions.subtractNodeLists(nodeShardData.nodeThatStoreOurParition, combinedNodes.nodeThatStoreOurPartition)
+      // const diffA2 = ShardFunctions.subtractNodeLists(combinedNodes.nodeThatStoreOurPartition, nodeShardData.nodeThatStoreOurParition)
+      //
+      // const diffB1 = ShardFunctions.subtractNodeLists(combinedNodes.consensusNodeForOurNode, nodeShardData.consensusNodeForOurNode)
+      // const diffB2 = ShardFunctions.subtractNodeLists(nodeShardData.consensusNodeForOurNode, combinedNodes.consensusNodeForOurNode)
+      //
+      // const diffC1 = ShardFunctions.subtractNodeLists(combinedNodes.consensusNodeForOurNodeFull, nodeShardData.consensusNodeForOurNodeFull)
+      // const diffC2 = ShardFunctions.subtractNodeLists(nodeShardData.consensusNodeForOurNodeFull, combinedNodes.consensusNodeForOurNodeFull)
+      //
+      // const diffD1 = ShardFunctions.subtractNodeLists(combinedNodes.edgeNodes, nodeShardData.edgeNodes)
+      // const diffD2 = ShardFunctions.subtractNodeLists(nodeShardData.edgeNodes, combinedNodes.edgeNodes)
+      //
+      // console.log('diffA1', diffA1)
+      // console.log('diffA2', diffA2)
+      // console.log('diffB1', diffB1)
+      // console.log('diffB2', diffB2)
+      // console.log('diffC1', diffC1)
+      // console.log('diffC2', diffC2)
+      // console.log('diffD1', diffD1)
+      // console.log('diffD2', diffD2)
+      // if (diffA1.length > 0) throw new Error("Different calculation")
+      // if (diffA2.length > 0) throw new Error("Different calculation")
+      // if (diffB1.length > 0) throw new Error("Different calculation")
+      // if (diffB2.length > 0) throw new Error("Different calculation")
+      // if (diffC1.length > 0) throw new Error("Different calculation")
+      // if (diffC2.length > 0) throw new Error("Different calculation")
+      // if (diffD1.length > 0) throw new Error("Different calculation")
+      // if (diffD2.length > 0) throw new Error("Different calculation")
+
       if (extras.length > 0) {
         //ShardFunctions.dilateNeighborCoverage(shardGlobals, nodeShardDataMap, partitionShardDataMap, activeNodes, nodeShardData, extras)
         //can get rid of some of the above merge logic if this never shows up in testing
@@ -503,7 +549,11 @@ class ShardFunctions {
           const list1 = nodeShardData.nodeThatStoreOurParition.map((n) => n.id.substring(0, 5))
           const list2 = nodeShardData.nodeThatStoreOurParition.map((n) => n.id.substring(0, 5))
           const extraLists = extras.map((n) => n.id.substring(0, 5))
-          message = `computeExtendedNodePartitionData: should never have extras. node:${nodeShardData.node.id.substring(0, 5)} ${stringify({ list1, list2, extraLists })}`
+          message = `computeExtendedNodePartitionData: should never have extras. node:${nodeShardData.node.id.substring(0, 5)} ${stringify({
+            list1,
+            list2,
+            extraLists,
+          })}`
         } catch (ex) {
           this.fatalLogger.fatal('computeExtendedNodePartitionData: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
         }
@@ -620,9 +670,11 @@ class ShardFunctions {
   static setEpandedLeft(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
     return bStart < aStart
   }
+
   static setEpandedRight(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
     return bEnd > aEnd
   }
+
   //  a=old, b=new
   static setShrink(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
     return (bStart > aStart && bStart < aEnd) || (bEnd > aStart && bEnd < aEnd)
@@ -1062,13 +1114,13 @@ class ShardFunctions {
   static mergeNodeLists(listA: Shardus.Node[], listB: Shardus.Node[]): any[] {
     const results = [] as Shardus.Node[]
     const extras = [] as Shardus.Node[]
-    const map = {} as { [id: string]: boolean }
+    const nodeSet = new Set()
     for (const node of listA) {
-      map[node.id] = true
+      nodeSet.add(node)
       results.push(node)
     }
     for (const node of listB) {
-      if (map[node.id] !== true) {
+      if (!nodeSet.has(node)) {
         results.push(node)
         extras.push(node)
       }
@@ -1084,12 +1136,12 @@ class ShardFunctions {
    */
   static subtractNodeLists(listA: Shardus.Node[], listB: Shardus.Node[]): Shardus.Node[] {
     const results = [] as Shardus.Node[]
-    const map = {} as { [id: string]: boolean }
+    const nodeSet = new Set()
     for (const node of listB) {
-      map[node.id] = true
+      nodeSet.add(node)
     }
     for (const node of listA) {
-      if (map[node.id] !== true) {
+      if (!nodeSet.has(node)) {
         results.push(node)
       }
     }
@@ -1178,6 +1230,58 @@ class ShardFunctions {
     return results
   }
 
+  static getCombinedNodeLists(shardGlobals: ShardGlobals, thisNode: NodeShardData, nodeShardDataMap: NodeShardDataMap, activeNodes: Shardus.Node[]): any {
+    const consensusNodeForOurNode = [] as Shardus.Node[]
+    const consensusNodeForOurNodeFull = [] as Shardus.Node[]
+    const nodeThatStoreOurPartition = [] as Shardus.Node[]
+    const nodeThatStoreOurPartitionFull = [] as Shardus.Node[]
+    const edgeNodes = [] as Shardus.Node[]
+    const homePartition = thisNode.homePartition
+
+    let partition = this.modulo(homePartition - (2 * shardGlobals.consensusRadius + 1), shardGlobals.numPartitions) - 1
+    let maxScanNeeded = 2 * (2 * shardGlobals.consensusRadius + 1) + 1
+    if (maxScanNeeded > activeNodes.length) maxScanNeeded = activeNodes.length
+    let once = false
+    for (let i = 0; i < maxScanNeeded; i++) {
+      let isInConsensusRange = false
+      let isInPartitionRange = false
+      partition = this.modulo(partition + 1, shardGlobals.numPartitions)
+      if (partition >= activeNodes.length) {
+        partition = 0
+      }
+      once = true
+
+      const node = activeNodes[partition]
+
+      if (node == thisNode.node) {
+        nodeThatStoreOurPartitionFull.push(node)
+        consensusNodeForOurNodeFull.push(node)
+        continue
+      }
+
+      if (ShardFunctions.testInRange(partition, thisNode.storedPartitions)) {
+        nodeThatStoreOurPartition.push(node)
+        nodeThatStoreOurPartitionFull.push(node)
+        isInPartitionRange = true
+      }
+      if (ShardFunctions.testInRange(partition, thisNode.consensusPartitions)) {
+        consensusNodeForOurNode.push(node)
+        consensusNodeForOurNodeFull.push(node)
+        isInConsensusRange = true
+      }
+      if (isInPartitionRange && !isInConsensusRange) {
+        edgeNodes.push(node)
+      }
+    }
+    return {
+      nodeThatStoreOurPartition,
+      nodeThatStoreOurPartitionFull,
+      consensusNodeForOurNode,
+      consensusNodeForOurNodeFull,
+      edgeNodes,
+    }
+  }
+
   /**
    * NOTE this is a raw answer.  edge cases with consensus node coverage can increase the results of our raw answer that is given here
    * @param {ShardGlobals} shardGlobals
@@ -1258,6 +1362,76 @@ class ShardFunctions {
         //failCount++
         break
       }
+      results.push(node)
+    }
+    return results
+  }
+
+  static getEdgeNodes(shardGlobals: ShardGlobals, thisNode: NodeShardData, nodeShardDataMap: Map<string, NodeShardData>, activeNodes: Shardus.Node[]): Shardus.Node[] {
+    const results = []
+    const homePartition = thisNode.homePartition
+
+    let rightIndex = homePartition - shardGlobals.consensusRadius
+    const startIndex = rightIndex
+    let once = false
+    let edgeRadius = shardGlobals.nodesPerConsenusGroup - shardGlobals.consensusRadius
+    if (activeNodes.length <= shardGlobals.nodesPerConsenusGroup) return []
+    if (edgeRadius > activeNodes.length) {
+      edgeRadius = activeNodes.length
+    }
+
+    for (let i = 0; i < edgeRadius; i++) {
+      rightIndex -= 1
+      if (rightIndex < 0) {
+        if (activeNodes.length + rightIndex < 0) {
+          rightIndex = 0
+        } else {
+          rightIndex = activeNodes.length + rightIndex // rightIndex (on right side of eqn) is a negative value here
+        }
+      }
+      if (this.testInRange(rightIndex, thisNode.consensusPartitions)) {
+        break
+      }
+
+      if (startIndex === homePartition && once) {
+        return Object.values(results)
+      }
+      once = true
+      const node = activeNodes[rightIndex]
+
+      if (!node) {
+        throw new Error(`Unable to get node for right index ${rightIndex}`)
+      }
+      if (node == thisNode.node) continue
+      results.push(node)
+    }
+
+    let leftIndex = homePartition + shardGlobals.consensusRadius
+    for (let i = 0; i < edgeRadius; i++) {
+      leftIndex += 1
+      if (leftIndex >= activeNodes.length) {
+        if (leftIndex - activeNodes.length >= activeNodes.length) {
+          leftIndex = activeNodes.length - 1
+        } else {
+          leftIndex = leftIndex - activeNodes.length
+        }
+      }
+      if (this.testInRange(leftIndex, thisNode.consensusPartitions)) {
+        break
+      }
+
+      if (startIndex === leftIndex && once) {
+        return Object.values(results)
+      }
+      once = true
+      const node = activeNodes[leftIndex]
+
+      if (!node) {
+        throw new Error(`Unable to get node for left leftIndex ${leftIndex}`)
+      }
+
+      if (node == thisNode.node) continue
+
       results.push(node)
     }
     return results
@@ -1523,7 +1697,12 @@ class ShardFunctions {
     }
     return true
   }
+
+  private static modulo(number: number, base: number) {
+    return ((number % base) + base) % base
+  }
 }
+
 //module.exports = ShardFunctions
 
 export default ShardFunctions
