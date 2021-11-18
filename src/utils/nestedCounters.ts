@@ -190,6 +190,13 @@ class NestedCounters {
       }
     }
   }
+
+  resetCounters(){
+    this.eventCounters = new Map()
+  }
+  resetRareCounters(){
+    this.rareEventCounters = new Map()
+  }
 }
 
 export default NestedCounters

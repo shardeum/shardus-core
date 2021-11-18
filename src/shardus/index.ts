@@ -21,7 +21,7 @@ import StateManager from '../state-manager'
 import Statistics from '../statistics'
 import Storage from '../storage'
 import * as utils from '../utils'
-import Profiler from '../utils/profiler'
+import Profiler, { profilerInstance } from '../utils/profiler'
 import NestedCounters from '../utils/nestedCounters'
 import MemoryReporting from '../utils/memoryReporting'
 import * as ShardusTypes from '../shardus/shardus-types'
@@ -625,10 +625,12 @@ class Shardus extends EventEmitter {
     // Start P2P
     await Self.startup()
 
-    // handle config queue changes
+    // handle config queue changes and debug logic updates
     this._registerListener(this.p2p.state, 'cycle_q1_start', async () => {
       let lastCycle = CycleChain.getNewest()
       this.updateConfigChangeQueue(lastCycle)
+
+      this.updateDebug(lastCycle)
     })
   }
 
@@ -1657,6 +1659,7 @@ class Shardus extends EventEmitter {
         this.patchObject(this.config, changeObj)
 
         this.p2p.configUpdated()
+        
       }
     }
   }
@@ -1674,6 +1677,46 @@ class Shardus extends EventEmitter {
       }
     }
   }
+
+  /**
+   * Do some periodic debug logic work
+   * @param lastCycle 
+   */
+  updateDebug(lastCycle: ShardusTypes.Cycle){
+    if(lastCycle == null)
+      return
+    let countEndpointStart = this.config?.debug?.countEndpointStart
+    let countEndpointStop = this.config?.debug?.countEndpointStop
+
+    if(countEndpointStart == null || countEndpointStart < 0){
+      return
+    }
+
+    //reset counters
+    if(countEndpointStart === lastCycle.counter){
+      //nestedCountersInstance.resetCounters()
+      //nestedCountersInstance.resetRareCounters()
+      profilerInstance.clearScopedTimes()
+
+      if(countEndpointStop === -1 || countEndpointStop <= countEndpointStart || countEndpointStop == null){
+        this.config.debug.countEndpointStop = countEndpointStart + 2
+      }
+    }
+
+    if(countEndpointStop === lastCycle.counter && countEndpointStop != null){
+      //nestedCountersInstance.resetRareCounters()
+      //convert a scoped report into rare counter report blob
+      let scopedReport = profilerInstance.scopedTimesDataReport()
+      scopedReport.cycle = lastCycle.counter
+      scopedReport.node =  `${Self.ip}:${Self.port}` 
+      scopedReport.id = utils.makeShortHash(Self.id)
+      nestedCountersInstance.countRareEvent('scopedTimeReport', JSON.stringify(scopedReport) )
+    }
+
+
+  }
+
+
 
   setGlobal(address, value, when, source) {
     GlobalAccounts.setGlobal(address, value, when, source)

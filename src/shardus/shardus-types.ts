@@ -630,6 +630,10 @@ export interface ShardusConfiguration {
     fakeNetworkDelay?: number
     /** disable snapshots */
     disableSnapshots?: boolean
+    /** start counting endpoints */
+    countEndpointStart?: number
+    /** stop counting endpoints */
+    countEndpointStop?: number
   }
   /** Options for the statistics module */
   statistics?: {

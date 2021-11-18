@@ -423,6 +423,26 @@ class Profiler {
     this.clearScopedTimes()
     return result
   }
+
+  scopedTimesDataReport(): any {
+    let d1 = this.cleanInt(1e6) // will get us ms
+    let divider = BigInt(d1)
+
+    let times = []
+    for (let key in this.scopedSectionTimes) {
+      if (this.scopedSectionTimes.hasOwnProperty(key)) {
+        let section = this.scopedSectionTimes[key]
+        const percent = BigInt(100)
+        const avgMs = Number((section.avg * percent) / divider) / 100
+        const maxMs = Number((section.max * percent) / divider) / 100
+        const minMs = Number((section.min * percent) / divider) / 100
+        const totalMs = Number((section.total * percent) / divider) / 100
+        times.push({name:section.name, minMs, maxMs, totalMs, avgMs, c:section.c })
+      }
+    }
+    let scopedTimes = {scopedTimes:times}
+    return scopedTimes
+  }
 }
 
 export default Profiler
