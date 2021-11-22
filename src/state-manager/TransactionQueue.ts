@@ -376,7 +376,7 @@ class TransactionQueue {
 
       ourLockID = await this.stateManager.fifoLock('accountModification')
 
-      applyResponse = this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
+      applyResponse = await this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
       if(applyResponse == null){
         throw Error('null response from app.apply')
       }
