@@ -376,7 +376,9 @@ class TransactionQueue {
 
       ourLockID = await this.stateManager.fifoLock('accountModification')
 
+      this.profiler.scopedProfileSectionStart('apply_duration')
       applyResponse = await this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
+      this.profiler.scopedProfileSectionEnd('apply_duration')
       if(applyResponse == null){
         throw Error('null response from app.apply')
       }
