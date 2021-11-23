@@ -85,6 +85,8 @@ class AccountGlobals {
         let toQuery: string[] = []
 
         let responded = false
+        console.log('Running get_globalaccountreport', this.stateManager.accountSync.globalAccountsSynced, this.stateManager.appFinishedSyncing)
+        console.log('Running get_globalaccountreport result', result)
         // not ready
         if (this.stateManager.accountSync.globalAccountsSynced === false || this.stateManager.appFinishedSyncing === false) {
           result.ready = false
@@ -112,7 +114,9 @@ class AccountGlobals {
           toQuery.push(key)
         }
 
-        if (this.p2p.isFirstSeed) {
+        // TODO: set this as config parameter
+        const useGlobalAccount = false
+        if (this.p2p.isFirstSeed && useGlobalAccount) {
           //TODO: SOON this will mess up dapps that dont use global accounts.  update: maybe add a config to specify if there will be no global accounts for a network. pls discuss fix with group.
           if(toQuery.length === 0){
             nestedCountersInstance.countEvent(`sync`, `HACKFIX - first node needs to wait! ready:${result.ready} responded:${responded}`)
