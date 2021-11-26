@@ -74,6 +74,7 @@ class Profiler {
 
       // hit "perf" endpoint to clear perf stats
       this.printAndClearReport(1)
+      this.clearScopedTimes()
 
       if (this.statisticsInstance) this.statisticsInstance.clearRing('txProcessed')
 
