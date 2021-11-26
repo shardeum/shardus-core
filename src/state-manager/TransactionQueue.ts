@@ -54,6 +54,7 @@ class TransactionQueue {
 
   processingLastRunTime: number
   processingMinRunBreak: number
+  processingLeftBusy: boolean
 
   constructor(stateManager: StateManager,  profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
 
@@ -89,7 +90,8 @@ class TransactionQueue {
     this.newAcceptedTxQueueRunning = false
 
     this.processingLastRunTime = 0
-    this.processingMinRunBreak = 200 //200ms breaks between processing loops
+    this.processingMinRunBreak = 20 //200ms breaks between processing loops
+    this.processingLeftBusy = false
   }
 
   /***
@@ -391,6 +393,7 @@ class TransactionQueue {
       if(logFlags.error) this.mainLogger.error(`preApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}: ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       if(logFlags.error) this.mainLogger.error(`preApplyTransaction failed id:${utils.makeShortHash(acceptedTX.id)}  ${utils.stringifyReduce(acceptedTX)}`)
 
+      this.profiler.scopedProfileSectionEnd('apply_duration')
       passedApply = false
       applyResult = ex.message
 
@@ -1789,6 +1792,11 @@ class TransactionQueue {
         nestedCountersInstance.countEvent('processing', 'resting')
       }
 
+      if(this.processingLeftBusy && timeSinceLastRun > 500){
+        this.statemanager_fatal(`processAcceptedTxQueue left busy and waited too long to restart`,`processAcceptedTxQueue left busy and waited too long to restart ${timeSinceLastRun/1000} `)
+      }
+
+
       this.profiler.profileSectionStart('processQ')
 
       if (this.stateManager.currentCycleShardData == null) {
@@ -2037,10 +2045,13 @@ class TransactionQueue {
               if (queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null && queueEntry.requestingReceipt === false) {
                 if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`txAge > timeM3 => ask for receipt now ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
                 if (logFlags.playback) this.logger.playbackLogNote('txMissingReceipt1', `txAge > timeM3 ${shortID}`, `syncNeedsReceipt ${shortID}`)
+                
+                let seen = this.processQueue_accountSeen(seenAccounts, queueEntry)
+                
                 this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
                 this.queueEntryRequestMissingReceipt(queueEntry)
 
-                nestedCountersInstance.countEvent('txMissingReceipt', `txAge > timeM3 => ask for receipt now. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
+                nestedCountersInstance.countEvent('txMissingReceipt', `txAge > timeM3 => ask for receipt now. state:${queueEntry.state} globalMod:${queueEntry.globalModification} seen:${seen}`)
                 queueEntry.waitForReceiptOnly = true
                 queueEntry.m2TimeoutReached = true
                 queueEntry.state = 'consensing'
@@ -2089,6 +2100,7 @@ class TransactionQueue {
 
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
           } else if (queueEntry.state === 'aging') {
+            queueEntry.executionDebug = {a:'go'}
             ///////////////////////////////////////////--aging--////////////////////////////////////////////////////////////////
             // We wait in the aging phase, and mark accounts as seen to prevent a TX that is after this from using or changing data
             // on the accounts in this TX
@@ -2101,6 +2113,7 @@ class TransactionQueue {
               // corresponding nodes and then move into awaiting data phase
 
               this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
+              let time = Date.now()
               try {
                 // TODO re-evaluate if it is correct for us to share info for a global modifing TX.
                 //if(queueEntry.globalModification === false) {
@@ -2110,12 +2123,18 @@ class TransactionQueue {
               } catch (ex) {
                 if (logFlags.debug) this.mainLogger.debug('processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
                 this.statemanager_fatal(`processAcceptedTxQueue2_ex`, 'processAcceptedTxQueue2 tellCorrespondingNodes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
+
+                queueEntry.executionDebug.process1 = 'tell fail'
               } finally {
                 queueEntry.state = 'awaiting data'
               }
+              queueEntry.executionDebug.processElaped = Date.now() - time
             }
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
           } else if (queueEntry.state === 'awaiting data') {
+
+            queueEntry.executionDebug.log = 'entered awaiting data'
+
             ///////////////////////////////////////--awaiting data--////////////////////////////////////////////////////////////////////
 
             // Wait for all data to be aquired.
@@ -2158,6 +2177,8 @@ class TransactionQueue {
                 this.statemanager_fatal(`processAcceptedTxQueue2_missingData`, 'processAcceptedTxQueue2 queueEntryRequestMissingData:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
               }
             } else if (queueEntry.hasAll) {
+              queueEntry.executionDebug.log1 = 'has all'
+
               // we have all the data, but we need to make sure there are no upstream TXs using accounts we need first.
               if (this.processQueue_accountSeen(seenAccounts, queueEntry) === false) {
                 this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
@@ -2177,7 +2198,14 @@ class TransactionQueue {
                 // }
 
                 try {
+
+                  queueEntry.executionDebug.log2 = 'call pre apply'
+
                   let txResult = await this.preApplyTransaction(queueEntry)
+
+                  queueEntry.executionDebug.log3 = 'called pre apply'
+                  queueEntry.executionDebug.txResult = txResult
+
                   if (txResult != null && txResult.applied === true) {
                     queueEntry.state = 'consensing'
 
@@ -2230,6 +2258,8 @@ class TransactionQueue {
                 } finally {
                   if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_preapplyFinish', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter} values: ${this.processQueue_debugAccountData(queueEntry, app)} AcceptedTransaction: ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
                 }
+              } else{
+                queueEntry.executionDebug.logBusy = 'has all, but busy'
               }
               this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
             } else {
@@ -2529,9 +2559,12 @@ class TransactionQueue {
 
       // restart loop if there are still elements in it
       if (this.newAcceptedTxQueue.length > 0 || this.newAcceptedTxQueueTempInjest.length > 0) {
+        this.processingLeftBusy = true
         setTimeout(() => {
           this.stateManager.tryStartAcceptedQueue()
         }, 15)
+      } else {
+        this.processingLeftBusy = false
       }
 
       this.newAcceptedTxQueueRunning = false

@@ -113,7 +113,9 @@ export type QueueEntry = {
 
     fromClient:boolean; //from a client, or from another node in the network
 
-    archived:boolean
+    archived:boolean,
+
+    executionDebug?:any
 };
 
 export type SyncTracker = {

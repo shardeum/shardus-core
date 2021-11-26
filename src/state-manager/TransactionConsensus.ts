@@ -488,7 +488,10 @@ class TransactionConsenus {
     // save our vote to our queueEntry
     queueEntry.ourVote = ourVote
     // also append it to the total list of votes
-    this.tryAppendVote(queueEntry, ourVote)
+    let appendWorked = this.tryAppendVote(queueEntry, ourVote)
+    if(appendWorked === false){
+      nestedCountersInstance.countEvent('transactionQueue', 'createAndShareVote appendFailed')
+    }
     // share the vote via gossip
     let sender = null
     let consensusGroup = this.stateManager.transactionQueue.queueEntryGetConsensusGroup(queueEntry)
@@ -510,6 +513,8 @@ class TransactionConsenus {
       let filteredConsensusGroup = filteredNodes
 
       this.p2p.tell(filteredConsensusGroup, 'spread_appliedVote', ourVote)
+    } else {
+      nestedCountersInstance.countEvent('transactionQueue', 'createAndShareVote fail, no consensus group')
     }
   }
 
