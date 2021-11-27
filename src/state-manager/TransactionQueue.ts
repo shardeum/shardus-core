@@ -90,7 +90,7 @@ class TransactionQueue {
     this.newAcceptedTxQueueRunning = false
 
     this.processingLastRunTime = 0
-    this.processingMinRunBreak = 20 //200ms breaks between processing loops
+    this.processingMinRunBreak = 10 //20 //200ms breaks between processing loops
     this.processingLeftBusy = false
   }
 
@@ -2106,7 +2106,8 @@ class TransactionQueue {
             // on the accounts in this TX
             queueEntry.state = 'processing'
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
-          } else if (queueEntry.state === 'processing') {
+          } 
+          if (queueEntry.state === 'processing') {
             ////////////////////////////////////////--processing--///////////////////////////////////////////////////////////////////
             if (this.processQueue_accountSeen(seenAccounts, queueEntry) === false) {
               // Processing is when we start doing real work.  the task is to read and share the correct account data to the correct
@@ -2131,7 +2132,8 @@ class TransactionQueue {
               queueEntry.executionDebug.processElaped = Date.now() - time
             }
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
-          } else if (queueEntry.state === 'awaiting data') {
+          } 
+          if (queueEntry.state === 'awaiting data') {
 
             queueEntry.executionDebug.log = 'entered awaiting data'
 
@@ -2273,6 +2275,8 @@ class TransactionQueue {
 
               let didNotMatchReceipt = false
 
+              let finishedConsensing = false
+
               // try to produce a receipt
               if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`)
               let result = this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
@@ -2291,61 +2295,67 @@ class TransactionQueue {
                   }
                   queueEntry.state = 'commiting'
                   queueEntry.hasValidFinalData = true
-                  continue
+                  finishedConsensing = true
+                  //continue
                 } else {
                   if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch1', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                   didNotMatchReceipt = true
                   queueEntry.appliedReceiptForRepair = result
                 }
               }
-
-              // if we got a reciept while waiting see if we should use it (if our own vote matches)
-              if (hasReceivedApplyReceipt) {
-                if (this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, queueEntry.recievedAppliedReceipt)) {
-                  if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${shortID}`, `qId: ${queueEntry.entryID} `)
-                  queueEntry.state = 'commiting'
-                  queueEntry.hasValidFinalData = true
-                  continue
+              if(finishedConsensing === false){
+                // if we got a reciept while waiting see if we should use it (if our own vote matches)
+                if (hasReceivedApplyReceipt) {
+                  if (this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, queueEntry.recievedAppliedReceipt)) {
+                    if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${shortID}`, `qId: ${queueEntry.entryID} `)
+                    queueEntry.state = 'commiting'
+                    queueEntry.hasValidFinalData = true
+                    finishedConsensing = true
+                    //continue
+                  } else {
+                    if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch2', `${shortID}`, `qId: ${queueEntry.entryID}  `)
+                    didNotMatchReceipt = true
+                    queueEntry.appliedReceiptForRepair = queueEntry.recievedAppliedReceipt
+                  }
                 } else {
-                  if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch2', `${shortID}`, `qId: ${queueEntry.entryID}  `)
-                  didNotMatchReceipt = true
-                  queueEntry.appliedReceiptForRepair = queueEntry.recievedAppliedReceipt
-                }
-              } else {
-                //just keep waiting for a reciept
-              }
-
-              // we got a receipt but did not match it.
-              if (didNotMatchReceipt === true) {
-
-                if(queueEntry.debugFail_failNoRepair){
-                  queueEntry.state = 'fail'
-                  this.removeFromQueue(queueEntry, currentIndex)
-                  nestedCountersInstance.countEvent('stateManager', 'debugFail_failNoRepair')
-                  this.statemanager_fatal(`processAcceptedTxQueue_debugFail_failNoRepair2`, `processAcceptedTxQueue_debugFail_failNoRepair2 tx: ${shortID} cycle:${queueEntry.cycleToRecordOn}  accountkeys: ${utils.stringifyReduce(queueEntry.uniqueWritableKeys)}`)
-                  this.processQueue_clearAccountsSeen(seenAccounts, queueEntry)
-                  continue
+                  //just keep waiting for a reciept
                 }
 
-                if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_didNotMatchReceipt', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} `)
-                queueEntry.repairFinished = false
-                if (queueEntry.appliedReceiptForRepair.result === true) {
-                  // need to start repair process and wait
-                  //await note: it is best to not await this.  it should be an async operation.
-                  this.stateManager.transactionRepair.repairToMatchReceipt(queueEntry)
-                  queueEntry.state = 'await repair'
-                } else {
-                  // We got a reciept, but the consensus is that this TX was not applied.
-                  if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_finishedFailReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
-                  // we are finished since there is nothing to apply
-                  this.statemanager_fatal(`consensing: repairToMatchReceipt failed`, `consensing: repairToMatchReceipt failed ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
-                  this.removeFromQueue(queueEntry, currentIndex)
-                  queueEntry.state = 'fail'
+                // we got a receipt but did not match it.
+                if (didNotMatchReceipt === true) {
+                  if(queueEntry.debugFail_failNoRepair){
+                    queueEntry.state = 'fail'
+                    this.removeFromQueue(queueEntry, currentIndex)
+                    nestedCountersInstance.countEvent('stateManager', 'debugFail_failNoRepair')
+                    this.statemanager_fatal(`processAcceptedTxQueue_debugFail_failNoRepair2`, `processAcceptedTxQueue_debugFail_failNoRepair2 tx: ${shortID} cycle:${queueEntry.cycleToRecordOn}  accountkeys: ${utils.stringifyReduce(queueEntry.uniqueWritableKeys)}`)
+                    this.processQueue_clearAccountsSeen(seenAccounts, queueEntry)
+                    continue
+                  }
+
+                  if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_didNotMatchReceipt', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} `)
+                  queueEntry.repairFinished = false
+                  if (queueEntry.appliedReceiptForRepair.result === true) {
+                    // need to start repair process and wait
+                    //await note: it is best to not await this.  it should be an async operation.
+                    this.stateManager.transactionRepair.repairToMatchReceipt(queueEntry)
+                    queueEntry.state = 'await repair'
+                    continue
+                  } else {
+                    // We got a reciept, but the consensus is that this TX was not applied.
+                    if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_finishedFailReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
+                    // we are finished since there is nothing to apply
+                    this.statemanager_fatal(`consensing: repairToMatchReceipt failed`, `consensing: repairToMatchReceipt failed ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+                    this.removeFromQueue(queueEntry, currentIndex)
+                    queueEntry.state = 'fail'
+                    continue
+                  }
                 }
               }
             }
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
-          } else if (queueEntry.state === 'await repair') {
+            
+          } 
+          if (queueEntry.state === 'await repair') {
             ///////////////////////////////////////////--await repair--////////////////////////////////////////////////////////////////
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
 
@@ -2360,8 +2370,10 @@ class TransactionQueue {
               }
               // most remove from queue at the end because it compacts the queue entry
               this.removeFromQueue(queueEntry, currentIndex)
+              continue
             }
-          } else if (queueEntry.state === 'commiting') {
+          } 
+          if (queueEntry.state === 'commiting') {
             ///////////////////////////////////////////--commiting--////////////////////////////////////////////////////////////////
             if (this.processQueue_accountSeen(seenAccounts, queueEntry) === false) {
               this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
@@ -2523,7 +2535,8 @@ class TransactionQueue {
               //   }
               // }
             }
-          } else if (queueEntry.state === 'canceled') {
+          } 
+          if (queueEntry.state === 'canceled') {
             ///////////////////////////////////////////////--canceled--////////////////////////////////////////////////////////////
             this.processQueue_clearAccountsSeen(seenAccounts, queueEntry)
             this.removeFromQueue(queueEntry, currentIndex)
