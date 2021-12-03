@@ -533,15 +533,24 @@ class AccountSync {
       this.createSyncTrackerByRange(range, cycle, true)
     }
 
-    this.createSyncTrackerByForGlobals(cycle, true)
-
-
+    let useGlobalAccounts = false // hack for shardium
+ 
+    //@ts-ignore
+    if(useGlobalAccounts === true){
+      this.createSyncTrackerByForGlobals(cycle, true)
+    }
 
     this.syncStatement.timeBeforeDataSync2 = (Date.now() - Self.p2pSyncEnd)/1000
-
+    //@ts-ignore
+    if(useGlobalAccounts === true){
     // must get a list of globals before we can listen to any TXs, otherwise the isGlobal function returns bad values
     await this.stateManager.accountGlobals.getGlobalListEarly()
     this.readyforTXs = true
+
+    } else {
+      //hack force this to true
+      this.stateManager.accountGlobals.hasknownGlobals = true
+    }
 
     if(this.useStateTable === true){
       await utils.sleep(8000) // sleep to make sure we are listening to some txs before we sync them
