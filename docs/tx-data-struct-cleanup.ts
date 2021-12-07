@@ -4,6 +4,10 @@
  * 
  *  [TODO] For each of the steps before the tx gets to state-manager, come up with
  *  what its data structure should look like.
+ * 
+ *  [TODO] Change the current code to be in sync with the data structures we come up with
+ * 
+ *  [TODO] Add the ability for the network to timestamp tx's
  */
 
 /** TYPES */
