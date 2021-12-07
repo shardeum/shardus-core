@@ -1,3 +1,11 @@
+/** Link to the document describing the steps taken by Shardus to process txs
+ * 
+ *  https://docs.google.com/document/d/1hx7ALdJXbT5W2xnefMFhJA0mbloNrxVwGE1R-JNJf_U/edit#bookmark=id.95rrplpl4wwr
+ * 
+ *  [TODO] For each of the steps before the tx gets to state-manager, come up with
+ *  what its data structure should look like.
+ */
+
 /** TYPES */
 
 type Timestamp = number
