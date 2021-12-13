@@ -71,11 +71,13 @@ interface Signature {
 
   /** INPUT: AcceptedTx */
 
-  /** OUTPUT: AcceptedTx */
+  /** OUTPUT: QueueEntry */
 
     /** this.p2p.sendGossipIn('spread_tx_to_group', acceptedTx, '', sender, transactionGroup, true) */
 
     /** this.p2p.tell(this.stateManager.currentCycleShardData.syncingNeighborsTxGroup, 'spread_tx_to_group_syncing', acceptedTx) */
+
+    /** this.transactionQueue.processAcceptedTxQueue() */
 
 /** 5. 'spread_tx_to_group' gossipIn handler */
 
@@ -88,3 +90,103 @@ interface Signature {
   /** INPUT: AcceptedTx */
 
   /** OUTPUT: AcceptedTx */
+
+/** 7. this.transactionQueue.processAcceptedTxQueue() */
+
+  /** INPUT: QueueEntry[] */
+  
+  /** OUTPUT: */
+
+    /** 
+     * const txResult = this.preApplyTransaction();
+     * queueEntry.preApplyTXResult = txResult
+    */
+
+    /** this.stateManager.transactionConsensus.createAndShareVote(queueEntry) */
+
+    /** this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry) */
+
+    /** this.commitConsensedTransaction(queueEntry) */
+
+type PreApplyAcceptedTransactionResult = {
+  applied: boolean
+  passed: boolean
+  applyResult: string
+  reason: string
+  applyResponse?: ApplyResponse
+}
+
+interface ApplyResponse {
+  stateTableResults: StateTableObject[]
+  txId: string
+  txTimestamp: number
+  accountData: WrappedResponse[]
+  appDefinedData: any
+}
+
+interface StateTableObject {
+  accountId: string
+  txId: string
+  txTimestamp: string
+  stateBefore: string
+  stateAfter: string
+}
+
+interface WrappedResponse {
+  /** */
+}
+
+/** 8. this.preApplyTransaction() */
+
+  /** INPUT: QueueEntry */
+
+  /** OUTPUT: PreApplyAcceptedTransactionResult */
+
+export type AppliedVote = {
+  txid: string
+  transaction_result: boolean
+  account_id: string[]
+  account_state_hash_after: string[]
+  cant_apply: boolean
+  node_id: string
+  sign?: Signature
+}
+
+/** 9. this.stateManager.transactionConsensus.createAndShareVote(queueEntry) */
+
+  /** INPUT: QueueEntry */
+
+  /** OUTPUT: AppliedVote */
+  
+    /**
+     * const ourVote : AppliedVote 
+     * this.tryAppendVote(queueEntry, ourVote)
+     * this.p2p.tell(filteredConsensusGroup, 'spread_appliedVote', ourVote)
+     */
+
+/** 10. 'spread_appliedVote' tell handler */
+
+  /** INPUT: AppliedVote */
+
+  /** this.transactionConsensus.tryAppendVote(queueEntry, newVote) */
+
+export type AppliedReceipt = {
+  txid: string
+  result: boolean
+  appliedVotes: AppliedVote[]
+}
+
+/** 11. this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry) */
+
+  /** INPUT: QueueEntry */
+
+  /** OUTPUT: AppliedReceipt */
+
+type CommitConsensedTransactionResult = { success: boolean }
+
+/** 12. this.commitConsensedTransaction(queueEntry) */
+
+  /** INPUT: QueueEntry */
+
+  /** OUTPUT: CommitConsensedTransactionResult */
+
