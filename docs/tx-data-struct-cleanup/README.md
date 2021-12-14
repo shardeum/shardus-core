@@ -1,4 +1,28 @@
-# Validate Crack Verify: (2) (4)
+# Shardus Transaction Flow
+
+## Overview
+
+![Overview of Shardus transaction processing](https://cdn.discordapp.com/attachments/910988453687218277/918644762033143838/20211209_171128.jpg)
+
+## Implementation of Steps (1) - (5) in `shardus-global-server`
+```
+1. App's /inject endpoint
+
+2. Shardus.put(...)
+
+2. Consensus.inject(...)
+
+2. Consensus.on('accepted', (...) => { StateManager.TransactionQueue.routeAndQueueAcceptedTransaction(...) })
+
+3. P2P.sendGossipIn('spread_tx_to_group', ...)
+
+4. P2P.registerGossipHandler('spread_tx_to_group', StateManager.TransactionQueue.handleSharedTX(...))
+
+5. StateManager.TransactionQueue.newAcceptedTxQueueTempInjest.push(txQueueEntry)
+   StateManager.TransactionQueue.newAcceptedTxQueueTempInjestByID.set(txQueueEntry.acceptedTx.id, txQueueEntry)
+```
+
+## Validate Crack Verify: Steps (2) (4)
 
 ```mermaid
 sequenceDiagram
@@ -20,7 +44,7 @@ sequenceDiagram
     A -->> S: Returns tx signature verification passed/failed
 ```
 
-# Get Local Account Data: (6)
+## Get Local Account Data: Step (6)
 
 ```mermaid
 sequenceDiagram
@@ -32,7 +56,7 @@ sequenceDiagram
     A -->> S: Returns account metadata (hash, timestamp) and data
 ```
 
-# Pre-apply Tx to Create Vote: (9)
+## Pre-apply Tx to Create Vote: Step (9)
 
 ```mermaid
 sequenceDiagram
@@ -45,7 +69,7 @@ sequenceDiagram
     Note over  S: Uses apply response to create vote
 ```
 
-# Apply Verify Fix: (14)
+## Apply Verify Fix: Step (14)
 
 ```mermaid
 sequenceDiagram
@@ -56,3 +80,4 @@ sequenceDiagram
     Note over S, A: StateManager.TransactionQueue.commitConsensedTransaction » <br> StateManager.setAccount » <br> App.updateAccountFull || App.updateAccountPartial
     A -->> S: Returns whether update was successful or not
 ```
+
