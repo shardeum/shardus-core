@@ -80,4 +80,5 @@ sequenceDiagram
     Note over S, A: StateManager.TransactionQueue.commitConsensedTransaction » <br> StateManager.setAccount » <br> App.updateAccountFull || App.updateAccountPartial
     A -->> S: Returns whether update was successful or not
 ```
+[Differences betweeen diagrams and actual implementation](./TODO.md)
 
