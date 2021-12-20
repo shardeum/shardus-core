@@ -1077,14 +1077,45 @@ class Shardus extends EventEmitter {
       state.stateBefore = allZeroes64
     }
     resultObject.stateTableResults.push(state)
+    let foundAccountData = resultObject.accountData.find(
+      (a) => a.accountId === accountId
+    )
+    if (foundAccountData) {
+      foundAccountData = {
+        ...foundAccountData,
+        accountId,
+        data: accountData,
+        txId,
+        timestamp: txTimestamp,
+        hash: stateAfter,
+        stateId: stateAfter, // duplicate of hash.., really need to go back and add types to this
+        localCache,
+      }
+    } else {
+      resultObject.accountData.push({
+        accountId,
+        data: accountData,
+        txId,
+        timestamp: txTimestamp,
+        hash: stateAfter,
+        stateId: stateAfter, // duplicate of hash.., really need to go back and add types to this
+        localCache,
+      })
+    }
+  }
+  // USED BY SIMPLECOINAPP
+  applyResponseAddChangedAccount(
+    resultObject,
+    accountData,
+    accountId,
+    txId,
+    txTimestamp
+  ) {
     resultObject.accountData.push({
       accountId,
       data: accountData,
       txId,
       timestamp: txTimestamp,
-      hash: stateAfter,
-      stateId: stateAfter, // duplicate of hash.., really need to go back and add types to this
-      localCache,
     })
   }
 
@@ -1635,7 +1666,7 @@ class Shardus extends EventEmitter {
     return transactionExpired
   }
 
-  
+
   async updateConfigChangeQueue(lastCycle: ShardusTypes.Cycle) {
     if(lastCycle == null)
       return
@@ -1659,7 +1690,7 @@ class Shardus extends EventEmitter {
         this.patchObject(this.config, changeObj)
 
         this.p2p.configUpdated()
-        
+
       }
     }
   }
@@ -1680,7 +1711,7 @@ class Shardus extends EventEmitter {
 
   /**
    * Do some periodic debug logic work
-   * @param lastCycle 
+   * @param lastCycle
    */
   updateDebug(lastCycle: ShardusTypes.Cycle){
     if(lastCycle == null)
@@ -1708,7 +1739,7 @@ class Shardus extends EventEmitter {
       //convert a scoped report into rare counter report blob
       let scopedReport = profilerInstance.scopedTimesDataReport()
       scopedReport.cycle = lastCycle.counter
-      scopedReport.node =  `${Self.ip}:${Self.port}` 
+      scopedReport.node =  `${Self.ip}:${Self.port}`
       scopedReport.id = utils.makeShortHash(Self.id)
       nestedCountersInstance.countRareEvent('scopedTimeReport', JSON.stringify(scopedReport) )
     }
