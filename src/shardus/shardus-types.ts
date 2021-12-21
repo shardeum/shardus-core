@@ -307,6 +307,7 @@ export interface ApplyResponse {
    * Account data array
    */
   accountData: WrappedResponse[]
+  accountWrites: any
   /**
    * a blob for the app to define.
    * This gets passed to post apply
@@ -549,7 +550,7 @@ export interface ShardusConfiguration {
 
     /** The maxPercentOfDelta parameter is an Integer specifying the percent out of 100 that additional nodes can be accepted to the network. */
     maxPercentOfDelta?: number
-    /** The minScaleReqsNeeded parameter is an Integer specyifying the number of internal scaling requests shardus needs to receive before scaling up or down the number of desired nodes in the network. 
+    /** The minScaleReqsNeeded parameter is an Integer specyifying the number of internal scaling requests shardus needs to receive before scaling up or down the number of desired nodes in the network.
      *  This is just the minimum votes needed, scaleConsensusRequired is a 0-1 fraction of num nodes required.
      *  The votes needed is  Math.Max(minScaleReqsNeeded,  numNodes * scaleConsensusRequired )
     */

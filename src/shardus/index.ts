@@ -1055,6 +1055,7 @@ class Shardus extends EventEmitter {
       txId,
       txTimestamp,
       accountData: [],
+      accountWrites: [],
       appDefinedData: {}
     }
     return replyObject
@@ -1106,14 +1107,14 @@ class Shardus extends EventEmitter {
   // USED BY SIMPLECOINAPP
   applyResponseAddChangedAccount(
     resultObject,
-    accountData,
     accountId,
+    account,
     txId,
     txTimestamp
   ) {
-    resultObject.accountData.push({
+    resultObject.accountWrites.push({
       accountId,
-      data: accountData,
+      account,
       txId,
       timestamp: txTimestamp,
     })

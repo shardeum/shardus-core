@@ -2045,9 +2045,9 @@ class TransactionQueue {
               if (queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null && queueEntry.requestingReceipt === false) {
                 if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`txAge > timeM3 => ask for receipt now ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
                 if (logFlags.playback) this.logger.playbackLogNote('txMissingReceipt1', `txAge > timeM3 ${shortID}`, `syncNeedsReceipt ${shortID}`)
-                
+
                 let seen = this.processQueue_accountSeen(seenAccounts, queueEntry)
-                
+
                 this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
                 this.queueEntryRequestMissingReceipt(queueEntry)
 
@@ -2106,7 +2106,7 @@ class TransactionQueue {
             // on the accounts in this TX
             queueEntry.state = 'processing'
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
-          } 
+          }
           if (queueEntry.state === 'processing') {
             ////////////////////////////////////////--processing--///////////////////////////////////////////////////////////////////
             if (this.processQueue_accountSeen(seenAccounts, queueEntry) === false) {
@@ -2132,7 +2132,7 @@ class TransactionQueue {
               queueEntry.executionDebug.processElaped = Date.now() - time
             }
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
-          } 
+          }
           if (queueEntry.state === 'awaiting data') {
 
             queueEntry.executionDebug.log = 'entered awaiting data'
@@ -2353,8 +2353,8 @@ class TransactionQueue {
               }
             }
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
-            
-          } 
+
+          }
           if (queueEntry.state === 'await repair') {
             ///////////////////////////////////////////--await repair--////////////////////////////////////////////////////////////////
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
@@ -2372,7 +2372,7 @@ class TransactionQueue {
               this.removeFromQueue(queueEntry, currentIndex)
               continue
             }
-          } 
+          }
           if (queueEntry.state === 'commiting') {
             ///////////////////////////////////////////--commiting--////////////////////////////////////////////////////////////////
             if (this.processQueue_accountSeen(seenAccounts, queueEntry) === false) {
@@ -2535,7 +2535,7 @@ class TransactionQueue {
               //   }
               // }
             }
-          } 
+          }
           if (queueEntry.state === 'canceled') {
             ///////////////////////////////////////////////--canceled--////////////////////////////////////////////////////////////
             this.processQueue_clearAccountsSeen(seenAccounts, queueEntry)
