@@ -333,13 +333,22 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
     )
     return false
   }
+  let selectionKey
 
-  const result = shardus.app.validateJoinRequest(joinRequest)
-  if (!result.success) {
-    warn(
-      `Validation of join request data is failed!`
-    )
-    return false
+  if (typeof shardus.app.validateJoinRequest === 'function') {
+    try {
+      let validationResponse = shardus.app.validateJoinRequest(joinRequest)
+      if (validationResponse.success !== true) {
+        warn(`Validation of join request data is failed!`)
+        return false
+      }
+      if (typeof validationResponse.data === 'string') {
+        selectionKey = validationResponse.data
+      }
+    } catch (e) {
+      warn(`shardus.app.validateJoinRequest failed due to ${e}`)
+      return false
+    }
   }
   const node = joinRequest.nodeInfo
   if(logFlags.p2pNonFatal) info(`Got join request for ${node.externalIp}:${node.externalPort}`)
@@ -378,7 +387,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
   */
   const selectionNum = crypto.hash({
     cycleNumber: CycleChain.newest.counter,
-    address: result.data ? result.data : node.publicKey,
+    selectionKey: selectionKey ? selectionKey : node.publicKey,
   })
   if (
     last &&
