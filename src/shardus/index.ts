@@ -1654,6 +1654,13 @@ class Shardus extends EventEmitter {
         }
       }
       //txSummaryUpdate: (blob: any, tx: any, wrappedStates: any)
+      if (typeof application.validateJoinRequest === 'function') {
+        applicationInterfaceImpl.validateJoinRequest = (data) => application.validateJoinRequest(data)
+      } else {
+        applicationInterfaceImpl.validateJoinRequest = function (data) {
+          return {success: true, data:''}
+        }
+      }
     } catch (ex) {
       this.shardus_fatal(
         `getAppInterface_ex`,

@@ -8,7 +8,7 @@ import { P2P } from '@shardus/types'
 import * as utils from '../utils'
 import { validateTypes } from '../utils'
 import * as Comms from './Comms'
-import { config, crypto, logger, network } from './Context'
+import { config, crypto, logger, network, shardus } from './Context'
 import * as CycleChain from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import * as NodeList from './NodeList'
@@ -334,6 +334,13 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
     return false
   }
 
+  const result = shardus.app.validateJoinRequest(joinRequest)
+  if (!result.success) {
+    warn(
+      `Validation of join request data is failed!`
+    )
+    return false
+  }
   const node = joinRequest.nodeInfo
   if(logFlags.p2pNonFatal) info(`Got join request for ${node.externalIp}:${node.externalPort}`)
 
@@ -371,7 +378,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
   */
   const selectionNum = crypto.hash({
     cycleNumber: CycleChain.newest.counter,
-    address: node.publicKey,
+    address: result.data ? result.data : node.publicKey,
   })
   if (
     last &&
