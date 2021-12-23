@@ -375,15 +375,16 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
   // Check if we are better than the lowest selectionNum
   const last = requests.length > 0 ? requests[requests.length - 1] : undefined
   /*
-    [TODO] To calclulate selectionNumber, we now use the hash of node public key and cycle number
-    but in the future the application will provide what to use
-    and we can hash that with the cycle number. For example the
-    application may want to use the steaking address or the POW.
+    (This is implemented on 22/12/2021 in commit 9bf8b052673d03e7b7ba0e36321bb8d2fee5cc37)
+    To calculate selectionNumber, we now use the hash of selectionKey and cycle number
+    Selection key is provided by the application , and we can hash that with the cycle number.
+    For example the application may want to use the staking address or the POW.
     It should be something that the node cannot easily change to
     guess a high selection number. If we generate a network
     random number we have to be careful that a node inside the network
     does not have an advantage by having access to this info and
-    is able to create a stronger selectionNum.
+    is able to create a stronger selectionNum. If no selectionKey is provided,
+    joining node public key and cycle number are hashed to calculate selectionNumber.
   */
   const selectionNum = crypto.hash({
     cycleNumber: CycleChain.newest.counter,
