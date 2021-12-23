@@ -786,11 +786,9 @@ export interface StorageConfiguration {
 }
 
 export interface AcceptedTx {
-  id: string
+  txId: string
   timestamp: number
   data: OpaqueTransaction
-  status: string
-  receipt: TxReceipt
 }
 
 export interface TxReceipt {

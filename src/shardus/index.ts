@@ -953,17 +953,10 @@ class Shardus extends EventEmitter {
       // Hash , pack into acceptedTx, and pass to StateManager
       const txHash = this.crypto.hash(tx)
 
-      const acceptedTX = {
-        id: txHash,
+      const acceptedTX: ShardusTypes.AcceptedTx = {
+        txId: txHash,
         timestamp,
         data: tx,
-        status: '1' /** Not used */,
-        receipt: {
-          stateId: null /** Not used */, 
-          targetStateId: null /** Not used */,
-          txHash /** Duplicate of id */,
-          time: Date.now() /** Not used */
-        }
       }
 
       this.stateManager.transactionQueue.routeAndQueueAcceptedTransaction(acceptedTX,/*send gossip*/ true, null, global, noConsensus)

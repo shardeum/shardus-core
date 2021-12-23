@@ -575,7 +575,7 @@ class PartitionStats {
       break // just use the first for now.. could do something fance
     }
     if (accountToUseForTXStatBinning == null) {
-      if (this.invasiveDebugInfo) this.mainLogger.debug(`statsTxSummaryUpdate skip(no local writable key) c:${cycle} ${utils.makeShortHash(queueEntry.acceptedTx.id)}`)
+      if (this.invasiveDebugInfo) this.mainLogger.debug(`statsTxSummaryUpdate skip(no local writable key) c:${cycle} ${utils.makeShortHash(queueEntry.acceptedTx.txId)}`)
       return
     }
 
@@ -595,15 +595,15 @@ class PartitionStats {
         if (blob.opaqueBlob.dbg == null) {
           blob.opaqueBlob.dbg = []
         }
-        blob.opaqueBlob.dbg.push(utils.makeShortHash(queueEntry.acceptedTx.id)) //queueEntry.acceptedTx.id.slice(0,6))
+        blob.opaqueBlob.dbg.push(utils.makeShortHash(queueEntry.acceptedTx.txId)) //queueEntry.acceptedTx.id.slice(0,6))
         blob.opaqueBlob.dbg.sort()
       }
 
       if (this.invasiveDebugInfo)
-        this.mainLogger.debug(`statsTxSummaryUpdate updated c:${cycle} tx: ${utils.makeShortHash(queueEntry.acceptedTx.id)} accForBin:${utils.makeShortHash(accountToUseForTXStatBinning)}`)
+        this.mainLogger.debug(`statsTxSummaryUpdate updated c:${cycle} tx: ${utils.makeShortHash(queueEntry.acceptedTx.txId)} accForBin:${utils.makeShortHash(accountToUseForTXStatBinning)}`)
     } else {
       if (logFlags.error || this.invasiveDebugInfo)
-        this.mainLogger.error(`statsTxSummaryUpdate no collection for c:${cycle}  tx: ${utils.makeShortHash(queueEntry.acceptedTx.id)} accForBin:${utils.makeShortHash(accountToUseForTXStatBinning)}`)
+        this.mainLogger.error(`statsTxSummaryUpdate no collection for c:${cycle}  tx: ${utils.makeShortHash(queueEntry.acceptedTx.txId)} accForBin:${utils.makeShortHash(accountToUseForTXStatBinning)}`)
     }
   }
 

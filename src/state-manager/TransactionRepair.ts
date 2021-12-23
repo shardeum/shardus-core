@@ -86,7 +86,7 @@ class TransactionRepair {
         nestedCountersInstance.countEvent('repair1', 'init-normal')
       }
 
-      let shortHash = utils.makeShortHash(queueEntry.acceptedTx.id)
+      let shortHash = utils.makeShortHash(queueEntry.acceptedTx.txId)
       // Need to build a list of what accounts we need, what state they should be in and who to get them from
       let requestObjects: { [id: string]: { appliedVote: AppliedVote; voteIndex: number; accountHash: string; accountId: string; nodeShardInfo: StateManagerTypes.shardFunctionTypes.NodeShardData; alternates: string[] } } = {}
       let appliedVotes = queueEntry.appliedReceiptForRepair.appliedVotes
@@ -288,7 +288,7 @@ class TransactionRepair {
                 nestedCountersInstance.countEvent('repair1', 'asking')
               
                 requestsMade++
-                let message = { key: requestObject.accountId, hash: requestObject.accountHash, txid: queueEntry.acceptedTx.id, timestamp: queueEntry.acceptedTx.timestamp }
+                let message = { key: requestObject.accountId, hash: requestObject.accountHash, txid: queueEntry.acceptedTx.txId, timestamp: queueEntry.acceptedTx.timestamp }
                 result = await this.p2p.ask(node, 'request_state_for_tx_post', message) // not sure if we should await this.
 
                 if (result == null) {
@@ -393,7 +393,7 @@ class TransactionRepair {
 
                     let stateTableResults: Shardus.StateTableObject = {
                       accountId: data.accountId,
-                      txId: queueEntry.acceptedTx.id,
+                      txId: queueEntry.acceptedTx.txId,
                       stateBefore: oldhash,
                       stateAfter: updatedHash,
                       txTimestamp: `${updatedTimestamp}`,

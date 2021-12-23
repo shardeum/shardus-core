@@ -2298,11 +2298,11 @@ class AccountSync {
 
             if (queueEntry.syncCounter <= 0) {
               // dont adjust a
-              let found = this.stateManager.transactionQueue.getQueueEntry(queueEntry.acceptedTx.id)
+              let found = this.stateManager.transactionQueue.getQueueEntry(queueEntry.acceptedTx.txId)
               if (!found) {
                 this.logger.playbackLogNote(
                   'shrd_sync_wakeupTX_skip1',
-                  `${queueEntry.acceptedTx.id}`,
+                  `${queueEntry.acceptedTx.txId}`,
                   `not in active queue qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`
                 )
                 continue
@@ -2311,7 +2311,7 @@ class AccountSync {
               if (queueEntry.state != 'syncing') {
                 this.logger.playbackLogNote(
                   'shrd_sync_wakeupTX_skip2',
-                  `${queueEntry.acceptedTx.id}`,
+                  `${queueEntry.acceptedTx.txId}`,
                   `state!=syncing ${queueEntry.state} qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`
                 )
                 continue
@@ -2333,7 +2333,7 @@ class AccountSync {
                 if (logFlags.playback)
                   this.logger.playbackLogNote(
                     'shrd_sync_wakeupTX_txGroupUpdate',
-                    `${queueEntry.acceptedTx.id}`,
+                    `${queueEntry.acceptedTx.txId}`,
                     `new value: ${queueEntry.ourNodeInTransactionGroup}   qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(queueEntry.txKeys.allKeys)}`
                   )
               }
@@ -2347,7 +2347,7 @@ class AccountSync {
               if (logFlags.playback)
                 this.logger.playbackLogNote(
                   'shrd_sync_wakeupTX',
-                  `${queueEntry.acceptedTx.id}`,
+                  `${queueEntry.acceptedTx.txId}`,
                   `before: ${before} inTXGrp: ${queueEntry.ourNodeInTransactionGroup} qId: ${queueEntry.entryID} ts: ${queueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(
                     queueEntry.txKeys.allKeys
                   )}`

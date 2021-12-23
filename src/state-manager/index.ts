@@ -2386,7 +2386,7 @@ class StateManager {
       // added a few more to oldest cycle to keep entries in the queue longer in case syncing nodes need the data
       if (queueEntry.approximateCycleAge < oldestCycle - 3) {
         this.transactionQueue.archivedQueueEntries.shift()
-        this.transactionQueue.archivedQueueEntriesByID.delete(queueEntry.acceptedTx.id)
+        this.transactionQueue.archivedQueueEntriesByID.delete(queueEntry.acceptedTx.txId)
         archivedEntriesRemoved++
 
         //if (logFlags.verbose) this.mainLogger.log(`queue entry removed from archive ${queueEntry.logID} tx cycle: ${queueEntry.approximateCycleAge} cycle: ${this.currentCycleShardData.cycleNumber}`)
@@ -2722,7 +2722,7 @@ class StateManager {
         let receipt = this.getReceipt(queueEntry)
 
         let status = receipt.result === true ? 'applied' : 'rejected'
-        let txHash = queueEntry.acceptedTx.id
+        let txHash = queueEntry.acceptedTx.txId
         let txResultFullHash = this.crypto.hash({ tx: queueEntry.acceptedTx.data, status, netId })
         let txIdShort = utils.short(txHash)
         let txResult = utils.short(txResultFullHash)
