@@ -1,7 +1,6 @@
 import { EventEmitter } from 'events'
 import Log4js from 'log4js'
 import path from 'path'
-import Consensus from '../consensus'
 import Crypto from '../crypto'
 import Debug from '../debug'
 import ExitHandler from '../exit-handler'
@@ -68,7 +67,6 @@ interface Shardus {
   network: Network.NetworkClass
   p2p: any
   debug: Debug
-  consensus: Consensus
   appProvided: boolean
   app: ShardusTypes.App
   reporter: Reporter
@@ -148,7 +146,6 @@ class Shardus extends EventEmitter {
     Context.setP2pContext(this.p2p)
 
     this.debug = null
-    this.consensus = null
     this.appProvided = null
     this.app = null
     this.reporter = null
@@ -469,15 +466,6 @@ class Shardus extends EventEmitter {
       this.loadDetection
     )
 
-    this.consensus = new Consensus(
-      this.app,
-      this.config,
-      this.logger,
-      this.crypto,
-      this.storage,
-      this.profiler
-    )
-
     if (this.app) {
       this._createAndLinkStateManager()
       this._attemptCreateAppliedListener()
@@ -722,26 +710,11 @@ class Shardus extends EventEmitter {
     this.stateManager = new StateManager(
       this.profiler,
       this.app,
-      this.consensus,
       this.logger,
       this.storage,
       this.p2p,
       this.crypto,
       this.config
-    )
-    // manually spelling out parameters here for readablity
-    this._registerListener(
-      this.consensus,
-      'accepted',
-      (
-        ...txArgs: [
-          ShardusTypes.AcceptedTx,
-          boolean,
-          ShardusTypes.Node,
-          boolean,
-          boolean
-        ]
-      ) => this.stateManager.transactionQueue.routeAndQueueAcceptedTransaction(...txArgs)
     )
 
     this.storage.stateManager = this.stateManager
@@ -835,8 +808,18 @@ class Shardus extends EventEmitter {
    *
    */
   put (tx, set = false, global = false) {
-    this.io.emit('DATA', tx)
     let noConsensus = set || global
+
+    /**
+     * 1. Pass received txs to any subscribed 'DATA' receivers
+     * 
+     *      [TODO] [AS] Might want to do this after fast validation depending on
+     *      who's consuming it
+     */
+
+    this.io.emit('DATA', tx)
+
+    /** 2. Check if Consensor is ready to receive txs before processing it further */
 
     if (!this.appProvided)
       throw new Error(
@@ -903,8 +886,43 @@ class Shardus extends EventEmitter {
       }
     }
 
+    /**
+     * 
+     * Looks like the old model wanted to pass txs to the Consensus module
+     * to do fast synchronous tx validation and return an immediate
+     * pass/fail, then kick off asynchronous consensus that ultimately
+     * resulted in a tx receipt that would be passed to StateManager.
+     * 
+     * Shardus.put should now do the fast synchronous tx validation and return
+     * pass/fail, then hand off the tx to StateManager for asynchronous 
+     * consensus 
+     * 
+     * 3. Perform fast validation of tx:
+     *      1. All tx fields present, data types acceptable, ranges valid
+     *      2. Tx timestamp within acceptable window
+     * 
+     *      [TODO] [AS] Looks like Fast validation happens at 2 places in the tx
+     *      processing pipeline and seems to have 2 implementations right now:
+     * 
+     *        1. When the initial node receives an injected tx
+     *             (Shardus.put below)
+     * 
+     *        2. When tx group nodes receive the tx as gossip from the initial
+     *           node
+     *             (TransactionQueue.handleSharedTX)
+     * 
+     *      might make sense to consolidate into one implementation that's
+     *      called from both places.
+     * 
+     * 4. Hash tx and pack into acceptedTx before passing to StateManager
+     * 
+     *      [TODO] [AS] Need to clean up the ShardusTypes.AcceptedTx data type
+     *      to remove unused fields and the places where it's used
+     *  
+     */
+
     try {
-      // Perform basic validation of the transaction fields
+      // Perform basic validation of the transaction fields and get timestamp
       if (logFlags.verbose)
         this.mainLogger.debug(
           'Performing initial validation of the transaction'
@@ -932,41 +950,23 @@ class Shardus extends EventEmitter {
         return { success: false, reason: 'Transaction Expired' }
       }
 
-      // TODO INJECT: we hash the TX and use this non typed structure
-      const shardusTx: any = {}
-      shardusTx.receivedTimestamp = Date.now()
-      shardusTx.inTransaction = tx
-      const txId = this.crypto.hash(tx)
+      // Hash , pack into acceptedTx, and pass to StateManager
+      const txHash = this.crypto.hash(tx)
 
-      if (logFlags.verbose)
-        this.mainLogger.debug(
-          `shardusTx. shortTxID: ${txId} txID: ${utils.makeShortHash(
-            txId
-          )} TX data: ${utils.stringifyReduce(shardusTx)}`
-        )
-      this.profiler.profileSectionStart('put')
+      const acceptedTX = {
+        id: txHash,
+        timestamp,
+        data: tx,
+        status: '1' /** Not used */,
+        receipt: {
+          stateId: null /** Not used */, 
+          targetStateId: null /** Not used */,
+          txHash /** Duplicate of id */,
+          time: Date.now() /** Not used */
+        }
+      }
 
-      // TODO INJECT: we sign the TX, is this signature ever used?
-      const signedShardusTx = this.crypto.sign(shardusTx)
-
-      if (logFlags.verbose) this.mainLogger.debug('Transaction validated')
-      this.statistics.incrementCounter('txInjected')
-      this.logger.playbackLogNote(
-        'tx_injected',
-        `${txId}`,
-        `Transaction: ${utils.stringifyReduce(tx)}`
-      )
-      //this.profiler.profileSectionStart('consensusInject')
-
-      // TODO INJECT: this is old consensus, and idea for a swapable system, but it does very little work now and the name
-      //              seems to add complexity
-      this.consensus.inject(signedShardusTx, global, noConsensus).then((txReceipt) => {
-      //this.profiler.profileSectionEnd('consensusInject')
-        if (logFlags.verbose)
-          this.mainLogger.debug(
-            `Received Consensus. Receipt: ${utils.stringifyReduce(txReceipt)}`
-          )
-      })
+      this.stateManager.transactionQueue.routeAndQueueAcceptedTransaction(acceptedTX,/*send gossip*/ true, null, global, noConsensus)
     } catch (err) {
       this.shardus_fatal(`put_ex_` + err.message,
         `Put: Failed to process transaction. Exception: ${err}`

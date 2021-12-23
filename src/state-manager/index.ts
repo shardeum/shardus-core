@@ -14,7 +14,6 @@ const stringify = require('fast-stable-stringify')
 const allZeroes64 = '0'.repeat(64)
 
 // not sure about this.
-import Consensus from '../consensus'
 import Profiler from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
@@ -64,7 +63,6 @@ class StateManager {
   crypto: Crypto
   config: Shardus.ShardusConfiguration
   profiler: Profiler
-  consensus: Consensus
 
   mainLogger: any
   fatalLogger: any
@@ -177,7 +175,7 @@ class StateManager {
    *    ##    ## ##     ## ##   ### ##    ##    ##    ##    ##  ##     ## ##    ##    ##    ##     ## ##    ##
    *     ######   #######  ##    ##  ######     ##    ##     ##  #######   ######     ##     #######  ##     ##
    */
-  constructor( profiler: Profiler, app: Shardus.App, consensus: Consensus, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
+  constructor( profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     //super()
     
 
@@ -185,7 +183,6 @@ class StateManager {
     this.crypto = crypto
     this.storage = storage
     this.app = app
-    this.consensus = consensus
     this.logger = logger
     this.config = config
     this.profiler = profiler
