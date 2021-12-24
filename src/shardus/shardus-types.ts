@@ -1,5 +1,3 @@
-import { start } from 'repl'
-import { Certificate } from 'crypto'
 import { P2P } from 'shardus-types'
 export type Node = P2P.NodeListTypes.Node
 export type Cycle = P2P.CycleCreatorTypes.CycleRecord
@@ -211,9 +209,10 @@ export interface App {
   /**
    * A function that allows the app to look at a passed in account ane return the hash and timestamp
    */
-  getTimestampAndHashFromAccount: (
-    account: any
-  ) => { timestamp: number; hash: string }
+  getTimestampAndHashFromAccount: (account: any) => {
+    timestamp: number
+    hash: string
+  }
 
   /**
    * A function that will be called when the shardus instance shuts down
@@ -475,7 +474,7 @@ export interface IncomingTransactionResult {
 
 export enum ServerMode {
   Debug = 'debug',
-  Release = 'release'
+  Release = 'release',
 }
 
 export interface ShardusConfiguration {
@@ -553,7 +552,7 @@ export interface ShardusConfiguration {
     /** The minScaleReqsNeeded parameter is an Integer specyifying the number of internal scaling requests shardus needs to receive before scaling up or down the number of desired nodes in the network.
      *  This is just the minimum votes needed, scaleConsensusRequired is a 0-1 fraction of num nodes required.
      *  The votes needed is  Math.Max(minScaleReqsNeeded,  numNodes * scaleConsensusRequired )
-    */
+     */
     minScaleReqsNeeded?: number
     /** The maxScaleReqs parameter is an Integer specifying the maximum number of scaling requests the network will process before scaling up or down. */
     maxScaleReqs?: number
@@ -613,8 +612,8 @@ export interface ShardusConfiguration {
     failReceiptChance?: number
     /** chance to flip our vote */
     voteFlipChance?: number
-      /** chance to fail a TX and the TX repair */
-      failNoRepairTxChance?:number
+    /** chance to fail a TX and the TX repair */
+    failNoRepairTxChance?: number
     /** use the new stats data for partition state reports to monitor server */
     useNewParitionReport?: boolean
     /** is the old partition checking system enabled */
