@@ -28,3 +28,17 @@ export const setAlarm = (callback, timestamp) => {
   const toWait = timestamp - now
   setTimeout(callback, toWait)
 }
+
+export function inRangeOfCurrentTime(
+  timestamp: number,
+  before: number,
+  after: number
+): boolean {
+  const currentTime = Date.now()
+  if (timestamp - currentTime <= after) {
+    if (currentTime - timestamp <= before) {
+      return true
+    }
+  }
+  return false
+}
