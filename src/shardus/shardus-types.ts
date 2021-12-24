@@ -144,6 +144,26 @@ type RequestHandler = any
 // }
 
 export interface App {
+  /**
+   * Runs fast validation of the tx checking if all tx fields present, data
+   * types acceptable, and ranges valid.
+   *
+   * Returns whether tx pass or failed validation plus the reason why
+   */
+  validate(tx: OpaqueTransaction): { success: boolean; reason: string }
+
+  /**
+   * Cracks open the transaction and returns its timestamp, id (hash), and any
+   * involved keys.
+   *
+   * Txs passed to this function are guaranteed to have passed validation first.
+   */
+  crack(tx: OpaqueTransaction): {
+    timestamp: number
+    id: string
+    keys: TransactionKeys
+  }
+
   validateTransaction: (...data: any) => any
   /**
    * A function responsible for validation the incoming transaction fields
