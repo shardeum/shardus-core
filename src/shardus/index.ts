@@ -907,7 +907,7 @@ class Shardus extends EventEmitter {
 
       // Validate the transaction timestamp
       const txExpireTimeMs = this.config.transactionExpireTime * 1000
-      if (inRangeOfCurrentTime(timestamp, 0, txExpireTimeMs) === false) {
+      if (inRangeOfCurrentTime(timestamp, txExpireTimeMs, txExpireTimeMs) === false) {
         this.shardus_fatal(
           `put_txExpired`,
           `Transaction Expired: ${utils.stringifyReduce(tx)}`

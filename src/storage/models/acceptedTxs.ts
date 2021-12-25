@@ -3,11 +3,10 @@ import * as Sequelize from 'sequelize'
 const acceptedTx = [
   'acceptedTxs',
   {
-    id: { type: Sequelize.STRING, allowNull: false, primaryKey: true },
+    txId: { type: Sequelize.STRING, allowNull: false, primaryKey: true },
     timestamp: { type: Sequelize.BIGINT, allowNull: false },
     data: { type: Sequelize.JSON, allowNull: false },
-    status: { type: Sequelize.STRING, allowNull: false },
-    receipt: { type: Sequelize.JSON, allowNull: false }
+    keys: { type: Sequelize.JSON, allowNull: false },
   }
 ]
 
