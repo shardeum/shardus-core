@@ -8,7 +8,7 @@ import { potentiallyRemoved } from '../p2p/NodeList'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
 import * as utils from '../utils'
-import { errorToStringFull } from '../utils'
+import { errorToStringFull, inRangeOfCurrentTime } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { profilerInstance } from '../utils/profiler'
 import ShardFunctions from './shardFunctions.js'
@@ -201,38 +201,43 @@ class TransactionQueue {
     })
   }
 
-  handleSharedTX(acceptedTX: Shardus.AcceptedTx, sender: Shardus.Node): QueueEntry {
-    let queueEntry = this.getQueueEntrySafe(acceptedTX.txId) // , payload.timestamp)
-    if (queueEntry) {
+  handleSharedTX(tx: Shardus.OpaqueTransaction, sender: Shardus.Node): QueueEntry {
+    // Perform fast validation of the transaction fields
+    const validateResult = this.app.validate(tx)
+    if (validateResult.success === false) {
+      this.statemanager_fatal(`spread_tx_to_group_validateTX`, `spread_tx_to_group validateTxnFields failed: ${utils.stringifyReduce(validateResult)}`)
       return null
-      // already have this in our queue
     }
 
-    //Validation.
-    const initValidationResp = this.app.validateTxnFields(acceptedTX.data)
-    if (initValidationResp.success !== true) {
-      this.statemanager_fatal(`spread_tx_to_group_validateTX`, `spread_tx_to_group validateTxnFields failed: ${utils.stringifyReduce(initValidationResp)}`)
+    // Ask App to crack open tx and return timestamp, id (hash), and keys
+    const { timestamp, id, keys } = this.app.crack(tx)
+
+    // Check if we already have this tx in our queue
+    let queueEntry = this.getQueueEntrySafe(id) // , payload.timestamp)
+    if (queueEntry) {
       return null
     }
 
     // some timer checks.. should these be merged into route and accept?
-    let txKeys = this.app.getKeyFromTransaction(acceptedTX.data)
-    let timeM = this.stateManager.queueSitTime
-    let timestamp = txKeys.timestamp
-    let age = Date.now() - timestamp
-    if (age > timeM * 0.9) {
-      this.statemanager_fatal(`spread_tx_to_group_OldTx`, 'spread_tx_to_group cannot accept tx older than 0.9M ' + timestamp + ' age: ' + age)
-      if (logFlags.playback) this.logger.playbackLogNote('shrd_spread_tx_to_groupToOld', '', 'spread_tx_to_group working on older tx ' + timestamp + ' age: ' + age)
-      return null
-    }
-    if (age < -1000) {
-      this.statemanager_fatal(`spread_tx_to_group_tooFuture`, 'spread_tx_to_group cannot accept tx more than 1 second in future ' + timestamp + ' age: ' + age)
-      if (logFlags.playback) this.logger.playbackLogNote('shrd_spread_tx_to_groupToFutrue', '', 'spread_tx_to_group tx too far in future' + timestamp + ' age: ' + age)
+    const mostOfQueueSitTimeMs = this.stateManager.queueSitTime * 0.9
+    const txExpireTimeMs = this.config.transactionExpireTime * 1000
+    const age = Date.now() - timestamp
+    if (inRangeOfCurrentTime(timestamp, mostOfQueueSitTimeMs, txExpireTimeMs) === false) {
+      this.statemanager_fatal(`spread_tx_to_group_OldTx_or_tooFuture`, 'spread_tx_to_group cannot accept tx with age: ' + age)
+      if (logFlags.playback) this.logger.playbackLogNote('shrd_spread_tx_to_groupToOldOrTooFuture', '', 'spread_tx_to_group working on tx with age: ' + age)
       return null
     }
 
-    let noConsensus = false // this can only be true for a set command which will never come from an endpoint
-    let added = this.routeAndQueueAcceptedTransaction(acceptedTX, /*sendGossip*/ false, sender, /*globalModification*/ false, noConsensus)
+    // Pack into AcceptedTx for routeAndQueueAcceptedTransaction
+    const acceptedTx: AcceptedTx = {
+      timestamp,
+      txId: id,
+      keys,
+      data: tx,
+    }
+
+    const noConsensus = false // this can only be true for a set command which will never come from an endpoint
+    const added = this.routeAndQueueAcceptedTransaction(acceptedTx, /*sendGossip*/ false, sender, /*globalModification*/ false, noConsensus)
     if (added === 'lost') {
       return null // we are faking that the message got lost so bail here
     }
@@ -242,13 +247,13 @@ class TransactionQueue {
     if (added === 'notReady') {
       return null
     }
-    queueEntry = this.getQueueEntrySafe(acceptedTX.txId) //, payload.timestamp) // now that we added it to the queue, it should be possible to get the queueEntry now
+    queueEntry = this.getQueueEntrySafe(id) //, payload.timestamp) // now that we added it to the queue, it should be possible to get the queueEntry now
 
     if (queueEntry == null) {
       // do not gossip this, we are not involved
       // downgrading, this does not seem to be fatal, but may need further logs/testing
       //this.statemanager_fatal(`spread_tx_to_group_noQE`, `spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(payload.id)}`)
-      if (logFlags.playback) this.logger.playbackLogNote('spread_tx_to_group_noQE', '', `spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(acceptedTX.txId)}`)
+      if (logFlags.playback) this.logger.playbackLogNote('spread_tx_to_group_noQE', '', `spread_tx_to_group failed: cant find queueEntry for:  ${utils.makeShortHash(id)}`)
       return null
     }
 
@@ -632,8 +637,8 @@ class TransactionQueue {
         return 'notReady'
       }
 
-      let keysResponse = this.app.getKeyFromTransaction(acceptedTx.data)
-      let timestamp = keysResponse.timestamp
+      let keysResponse = acceptedTx.keys
+      let timestamp = acceptedTx.timestamp
       let txId = acceptedTx.txId
 
       // This flag turns of consensus for all TXs for debuggging

@@ -2,6 +2,7 @@ import { EventEmitter } from 'events'
 import { Handler } from 'express'
 import Log4js from 'log4js'
 import path from 'path'
+import { OpaqueBlob } from 'shardus-types/build/src/state-manager/StateManagerTypes'
 import Crypto from '../crypto'
 import Debug from '../debug'
 import ExitHandler from '../exit-handler'
@@ -25,6 +26,7 @@ import StateManager from '../state-manager'
 import Statistics from '../statistics'
 import Storage from '../storage'
 import * as utils from '../utils'
+import { inRangeOfCurrentTime } from '../utils'
 import MemoryReporting from '../utils/memoryReporting'
 import NestedCounters, { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { profilerInstance } from '../utils/profiler'
@@ -830,32 +832,20 @@ class Shardus extends EventEmitter {
    * }
    *
    */
-  put(tx, set = false, global = false) {
-    let noConsensus = set || global
+  put(tx: ShardusTypes.OpaqueTransaction, set = false, global = false) {
+    const noConsensus = set || global
 
-    /**
-     * 1. Pass received txs to any subscribed 'DATA' receivers
-     *
-     *      [TODO] [AS] Might want to do this after fast validation depending on
-     *      who's consuming it
-     */
-
-    this.io.emit('DATA', tx)
-
-    /** 2. Check if Consensor is ready to receive txs before processing it further */
-
+    // Check if Consensor is ready to receive txs before processing it further
     if (!this.appProvided)
       throw new Error(
         'Please provide an App object to Shardus.setup before calling Shardus.put'
       )
-
     if (logFlags.verbose)
       this.mainLogger.debug(
         `Start of injectTransaction ${JSON.stringify(
           tx
         )} set:${set} global:${global}`
       ) // not reducing tx here so we can get the long hashes
-
     if (!this.stateManager.accountSync.dataSyncMainPhaseComplete) {
       this.statistics.incrementCounter('txRejected')
       nestedCountersInstance.countEvent(
@@ -864,7 +854,6 @@ class Shardus extends EventEmitter {
       )
       return { success: false, reason: 'Node is still syncing.' }
     }
-
     if (!this.stateManager.hasCycleShardData()) {
       this.statistics.incrementCounter('txRejected')
       nestedCountersInstance.countEvent('rejected', '!hasCycleShardData')
@@ -873,7 +862,6 @@ class Shardus extends EventEmitter {
         reason: 'Not ready to accept transactions, shard calculations pending',
       }
     }
-
     if (set === false) {
       if (!this.p2p.allowTransactions()) {
         if (global === true && this.p2p.allowSet()) {
@@ -902,7 +890,6 @@ class Shardus extends EventEmitter {
         }
       }
     }
-
     if (this.rateLimiting.isOverloaded()) {
       this.statistics.incrementCounter('txRejected')
       nestedCountersInstance.countEvent('loadRelated', 'txRejected')
@@ -910,71 +897,17 @@ class Shardus extends EventEmitter {
       return { success: false, reason: 'Maximum load exceeded.' }
     }
 
-    if (typeof tx !== 'object') {
-      this.statistics.incrementCounter('txRejected')
-      nestedCountersInstance.countEvent('rejected', 'tx !== object')
-      return {
-        success: false,
-        reason: `Invalid Transaction! ${utils.stringifyReduce(tx)}`,
-      }
-    }
-
-    /**
-     *
-     * Looks like the old model wanted to pass txs to the Consensus module
-     * to do fast synchronous tx validation and return an immediate
-     * pass/fail, then kick off asynchronous consensus that ultimately
-     * resulted in a tx receipt that would be passed to StateManager.
-     *
-     * Shardus.put should now do the fast synchronous tx validation and return
-     * pass/fail, then hand off the tx to StateManager for asynchronous
-     * consensus
-     *
-     * 3. Perform fast validation of tx:
-     *      1. All tx fields present, data types acceptable, ranges valid
-     *      2. Tx timestamp within acceptable window
-     *
-     *      [TODO] [AS] Looks like Fast validation happens at 2 places in the tx
-     *      processing pipeline and seems to have 2 implementations right now:
-     *
-     *        1. When the initial node receives an injected tx
-     *             (Shardus.put below)
-     *
-     *        2. When tx group nodes receive the tx as gossip from the initial
-     *           node
-     *             (TransactionQueue.handleSharedTX)
-     *
-     *      might make sense to consolidate into one implementation that's
-     *      called from both places.
-     *
-     * 4. Hash tx and pack into acceptedTx before passing to StateManager
-     *
-     *      [TODO] [AS] Need to clean up the ShardusTypes.AcceptedTx data type
-     *      to remove unused fields and the places where it's used
-     *
-     */
-
     try {
-      // Perform basic validation of the transaction fields and get timestamp
-      if (logFlags.verbose)
-        this.mainLogger.debug(
-          'Performing initial validation of the transaction'
-        )
-      const initValidationResp = this.app.validateTxnFields(tx)
-      if (logFlags.verbose)
-        this.mainLogger.debug(
-          `InitialValidationResponse: ${utils.stringifyReduce(
-            initValidationResp
-          )}`
-        )
+      // Perform fast validation of the transaction fields
+      const validateResult = this.app.validate(tx)
+      if (validateResult.success === false) return validateResult
 
-      if (initValidationResp.success !== true) {
-        return { success: false, reason: `Validation Failed` }
-      }
+      // Ask App to crack open tx and return timestamp, id (hash), and keys
+      const { timestamp, id, keys } = this.app.crack(tx)
 
       // Validate the transaction timestamp
-      const timestamp = initValidationResp.txnTimestamp
-      if (this._isTransactionTimestampExpired(timestamp)) {
+      const txExpireTimeMs = this.config.transactionExpireTime * 1000
+      if (inRangeOfCurrentTime(timestamp, 0, txExpireTimeMs) === false) {
         this.shardus_fatal(
           `put_txExpired`,
           `Transaction Expired: ${utils.stringifyReduce(tx)}`
@@ -987,15 +920,13 @@ class Shardus extends EventEmitter {
         return { success: false, reason: 'Transaction Expired' }
       }
 
-      // Hash , pack into acceptedTx, and pass to StateManager
-      const txHash = this.crypto.hash(tx)
-
+      // Pack into acceptedTx, and pass to StateManager
       const acceptedTX: ShardusTypes.AcceptedTx = {
-        txId: txHash,
         timestamp,
+        txId: id,
+        keys,
         data: tx,
       }
-
       this.stateManager.transactionQueue.routeAndQueueAcceptedTransaction(
         acceptedTX,
         /*send gossip*/ true,
@@ -1003,6 +934,9 @@ class Shardus extends EventEmitter {
         global,
         noConsensus
       )
+
+      // Pass received txs to any subscribed 'DATA' receivers
+      this.io.emit('DATA', tx)
     } catch (err) {
       this.shardus_fatal(
         `put_ex_` + err.message,
@@ -1021,10 +955,11 @@ class Shardus extends EventEmitter {
       this.profiler.profileSectionEnd('put')
     }
 
-    if (logFlags.verbose)
+    if (logFlags.verbose) {
       this.mainLogger.debug(
         `End of injectTransaction ${utils.stringifyReduce(tx)}`
       )
+    }
 
     return { success: true, reason: 'Transaction queued, poll for results.' }
   }
@@ -1262,12 +1197,49 @@ class Shardus extends EventEmitter {
         return null
       }
 
-      if (typeof application.validateTxnFields === 'function') {
-        applicationInterfaceImpl.validateTxnFields = (inTx) =>
-          application.validateTxnFields(inTx)
+      if (typeof application.validate === 'function') {
+        applicationInterfaceImpl.validate = (inTx) =>
+          application.validate(inTx)
+      } else if (typeof application.validateTxnFields === 'function') {
+        /** 
+         * Compatibility layer for Apps that use the old validateTxnFields fn
+         * instead of the new validate fn
+         */
+        applicationInterfaceImpl.validate = (inTx) => {
+          const oldResult: ShardusTypes.IncomingTransactionResult = application.validateTxnFields(inTx)
+          const newResult = {
+            success: oldResult.success,
+            reason: oldResult.reason
+          }
+          return newResult
+        }
       } else {
         throw new Error(
-          'Missing requried interface function. validateTxnFields()'
+          'Missing required interface function. validate()'
+        )
+      }
+
+      if (typeof application.crack === 'function') {
+        applicationInterfaceImpl.crack = (inTx) =>
+          application.crack(inTx)
+      } else if (typeof application.getKeyFromTransaction === 'function' && typeof application.validateTxnFields === 'function') {
+        /** 
+         * Compatibility layer for Apps that use the old getKeyFromTransaction
+         * fn instead of the new crack fn
+         */
+        applicationInterfaceImpl.crack = (inTx) => {
+          const oldGetKeyFromTransactionResult: ShardusTypes.TransactionKeys = application.getKeyFromTransaction(inTx)
+          const oldValidateTxnFieldsResult: ShardusTypes.IncomingTransactionResult = application.validateTxnFields(inTx)
+          const newResult = {
+            timestamp: oldValidateTxnFieldsResult.txnTimestamp,
+            id: this.crypto.hash(inTx), // [TODO] [URGENT] We really shouldn't be doing this and should change all apps to use the new way and do their own hash
+            keys: oldGetKeyFromTransactionResult
+          }
+          return newResult
+        }
+      } else {
+        throw new Error(
+          'Missing required interface function. validate()'
         )
       }
 
@@ -1275,7 +1247,7 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.apply = (inTx, wrappedStates) =>
           application.apply(inTx, wrappedStates)
       } else {
-        throw new Error('Missing requried interface function. apply()')
+        throw new Error('Missing required interface function. apply()')
       }
 
       if (typeof application.transactionReceiptPass === 'function') {
@@ -1321,7 +1293,7 @@ class Shardus extends EventEmitter {
           )
       } else {
         throw new Error(
-          'Missing requried interface function. updateAccountFull()'
+          'Missing required interface function. updateAccountFull()'
         )
       }
 
@@ -1338,7 +1310,7 @@ class Shardus extends EventEmitter {
           )
       } else {
         throw new Error(
-          'Missing requried interface function. updateAccountPartial()'
+          'Missing required interface function. updateAccountPartial()'
         )
       }
 
@@ -1347,16 +1319,7 @@ class Shardus extends EventEmitter {
           application.getRelevantData(accountId, tx)
       } else {
         throw new Error(
-          'Missing requried interface function. getRelevantData()'
-        )
-      }
-
-      if (typeof application.getKeyFromTransaction === 'function') {
-        applicationInterfaceImpl.getKeyFromTransaction =
-          application.getKeyFromTransaction
-      } else {
-        throw new Error(
-          'Missing requried interface function. getKeysFromTransaction()'
+          'Missing required interface function. getRelevantData()'
         )
       }
 
@@ -1366,7 +1329,7 @@ class Shardus extends EventEmitter {
           mustExist
         ) => application.getStateId(accountAddress, mustExist)
       } else {
-        // throw new Error('Missing requried interface function. getStateId()')
+        // throw new Error('Missing required interface function. getStateId()')
         if (logFlags.debug)
           this.mainLogger.debug('getStateId not used by global server')
       }
@@ -1374,27 +1337,27 @@ class Shardus extends EventEmitter {
       if (typeof application.close === 'function') {
         applicationInterfaceImpl.close = async () => application.close()
       } else {
-        throw new Error('Missing requried interface function. close()')
+        throw new Error('Missing required interface function. close()')
       }
 
       // unused at the moment
       // if (typeof (application.handleHttpRequest) === 'function') {
       //   applicationInterfaceImpl.handleHttpRequest = async (httpMethod, uri, req, res) => application.handleHttpRequest(httpMethod, uri, req, res)
       // } else {
-      //   // throw new Error('Missing requried interface function. apply()')
+      //   // throw new Error('Missing required interface function. apply()')
       // }
 
       // // TEMP endpoints for workaround. delete this later.
       // if (typeof (application.onAccounts) === 'function') {
       //   applicationInterfaceImpl.onAccounts = async (req, res) => application.onAccounts(req, res)
       // } else {
-      //   // throw new Error('Missing requried interface function. apply()')
+      //   // throw new Error('Missing required interface function. apply()')
       // }
 
       // if (typeof (application.onGetAccount) === 'function') {
       //   applicationInterfaceImpl.onGetAccount = async (req, res) => application.onGetAccount(req, res)
       // } else {
-      //   // throw new Error('Missing requried interface function. apply()')
+      //   // throw new Error('Missing required interface function. apply()')
       // }
 
       // App.get_account_data (Acc_start, Acc_end, Max_records)
@@ -1407,7 +1370,7 @@ class Shardus extends EventEmitter {
           maxRecords
         ) => application.getAccountData(accountStart, accountEnd, maxRecords)
       } else {
-        throw new Error('Missing requried interface function. getAccountData()')
+        throw new Error('Missing required interface function. getAccountData()')
       }
 
       if (typeof application.getAccountDataByRange === 'function') {
@@ -1427,7 +1390,7 @@ class Shardus extends EventEmitter {
           )
       } else {
         throw new Error(
-          'Missing requried interface function. getAccountDataByRange()'
+          'Missing required interface function. getAccountDataByRange()'
         )
       }
 
@@ -1436,7 +1399,7 @@ class Shardus extends EventEmitter {
           application.calculateAccountHash(account)
       } else {
         throw new Error(
-          'Missing requried interface function. calculateAccountHash()'
+          'Missing required interface function. calculateAccountHash()'
         )
       }
 
@@ -1448,7 +1411,7 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.setAccountData = async (accountRecords) =>
           application.setAccountData(accountRecords)
       } else {
-        throw new Error('Missing requried interface function. setAccountData()')
+        throw new Error('Missing required interface function. setAccountData()')
       }
 
       // pass array of account copies to this (only looks at the data field) and it will reset the account state
@@ -1457,7 +1420,7 @@ class Shardus extends EventEmitter {
           application.resetAccountData(accountRecords)
       } else {
         throw new Error(
-          'Missing requried interface function. resetAccountData()'
+          'Missing required interface function. resetAccountData()'
         )
       }
 
@@ -1467,7 +1430,7 @@ class Shardus extends EventEmitter {
           application.deleteAccountData(addressList)
       } else {
         throw new Error(
-          'Missing requried interface function. deleteAccountData()'
+          'Missing required interface function. deleteAccountData()'
         )
       }
 
@@ -1476,7 +1439,7 @@ class Shardus extends EventEmitter {
           application.getAccountDataByList(addressList)
       } else {
         throw new Error(
-          'Missing requried interface function. getAccountDataByList()'
+          'Missing required interface function. getAccountDataByList()'
         )
       }
       if (typeof application.deleteLocalAccountData === 'function') {
@@ -1484,7 +1447,7 @@ class Shardus extends EventEmitter {
           application.deleteLocalAccountData()
       } else {
         throw new Error(
-          'Missing requried interface function. deleteLocalAccountData()'
+          'Missing required interface function. deleteLocalAccountData()'
         )
       }
       if (typeof application.getAccountDebugValue === 'function') {
@@ -1493,7 +1456,7 @@ class Shardus extends EventEmitter {
       } else {
         applicationInterfaceImpl.getAccountDebugValue = (wrappedAccount) =>
           'getAccountDebugValue() missing on app'
-        // throw new Error('Missing requried interface function. deleteLocalAccountData()')
+        // throw new Error('Missing required interface function. deleteLocalAccountData()')
       }
 
       if (typeof application.canDebugDropTx === 'function') {

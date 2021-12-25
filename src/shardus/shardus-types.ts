@@ -805,8 +805,9 @@ export interface StorageConfiguration {
 }
 
 export interface AcceptedTx {
-  txId: string
   timestamp: number
+  txId: string
+  keys: TransactionKeys
   data: OpaqueTransaction
 }
 
