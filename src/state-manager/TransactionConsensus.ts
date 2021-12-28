@@ -466,6 +466,26 @@ class TransactionConsenus {
 
     let wrappedStates = queueEntry.collectedData
 
+
+    let allWrittenStates = queueEntry?.preApplyTXResult?.applyResponse.accountWrites
+    if(allWrittenStates != null && allWrittenStates.length > 0){
+      // resultObject.accountWrites.push({
+      //   accountId,
+      //   account,
+      //   txId,
+      //   timestamp: txTimestamp,
+      // })
+
+
+      //build up a new wrappedState list to pass to the code below.
+      //may also need some work to sort out which wrapped state is new an not seen before yet.
+
+      //may need to add additial data to the vote/receipt.  however nodes may be able to do their own work to sort out what they need.
+      //It may be nice if nodes could just forward the extra data needed to corresponding nodes that are predicted to need it, but
+      //letting nodes ask might be more simple.
+    }
+
+
     if (wrappedStates != null) {
       //we need to sort this list and doing it in place seems ok
       //applyResponse.stateTableResults.sort(this.sortByAccountId )

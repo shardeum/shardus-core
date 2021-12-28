@@ -329,6 +329,10 @@ class TransactionQueue {
     if (logFlags.verbose) if (logFlags.console) console.log('preApplyTransaction ' + timestamp + ' debugInfo:' + debugInfo)
     if (logFlags.verbose) this.mainLogger.debug('preApplyTransaction ' + timestamp + ' debugInfo:' + debugInfo)
 
+    //TODO need to adjust logic to add in more stuff. 
+    // may only need this in the case where we have hopped over to another shard or additional 
+    // accounts were passed in.  And that me handled earlier.
+
     for (let key of uniqueKeys) {
       if (wrappedStates[key] == null) {
         if (logFlags.verbose) if (logFlags.console) console.log(`preApplyTransaction missing some account data. timestamp:${timestamp}  key: ${utils.makeShortHash(key)}  debuginfo:${debugInfo}`)
@@ -452,6 +456,16 @@ class TransactionQueue {
 
       let { stateTableResults, accountData: _accountdata } = applyResponse
       accountDataList = _accountdata
+
+      /**
+       * Change to existing functionality.   Similar to how createAndShareVote should now check for the presence of 
+       * applyResponse.accountWrites, commitConsensedTransaction should also check for this data and use it.   
+       * It may take some more investigation but it is important that the order that accounts are added to accountWrites 
+       * will be maintained when committing the accounts.  We may have to investigate the code to make sure that there 
+       * is not any sorting by address that could get in the way.
+       */
+
+
 
       if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
 
@@ -2179,6 +2193,13 @@ class TransactionQueue {
                 // }
 
                 try {
+                  let accountsValid = this.checkAccountTimestamps()
+                  if(accountsValid === false){
+                    // Todo, if this is false we need to make a fail vote and go to consensus
+                    queueEntry.state = 'consensing'
+
+                    continue
+                  }
                   queueEntry.executionDebug.log2 = 'call pre apply'
 
                   let txResult = await this.preApplyTransaction(queueEntry)
@@ -2684,6 +2705,15 @@ class TransactionQueue {
       }
     }
     return false
+  }
+  checkAccountTimestamps() : boolean{
+    /**
+     * This is a new function.  It must be called before calling dapp.apply().    
+     * The purpose is to do a last minute test to make sure that no involved accounts have a 
+     * timestamp newer than our transaction timestamp.   
+     * If they do have a newer timestamp we must fail the TX and vote for a TX fail receipt.  
+     */
+    return true
   }
 }
 
