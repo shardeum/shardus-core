@@ -1092,7 +1092,7 @@ class Shardus extends EventEmitter {
     })
   }
 
-  tryInvolveAccount(txId: string, address: string, isRead: boolean) {
+  tryInvolveAccount(txId: string, address: string, isRead: boolean) : boolean {
     const result = this.stateManager.transactionQueue.tryInvloveAccount(
       txId,
       address,
