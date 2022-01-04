@@ -617,6 +617,27 @@ class TransactionQueue {
     }
   }
 
+  tryInvloveAccount(txId: string, address: string, isRead: boolean): boolean {
+    const queueEntry = this.getQueueEntry(txId)
+
+    // check if address is already invloved in this tx
+    if (queueEntry.collectedData[address]) {
+      console.log(`account ${address} is already existed in collected data`, queueEntry.collectedData[address]);
+      return true
+    }
+    if (queueEntry.involvedReads[address] || queueEntry.involvedWrites[address]) {
+      console.log(`account ${address} is already existed in involvedReads or involvedWrites`, queueEntry.involvedReads[address], queueEntry.involvedWrites[address]);
+      return true
+    }
+    // add the account to involved read or write
+    if (isRead) {
+      queueEntry.involvedReads[address] = address
+    } else {
+      queueEntry.involvedWrites[address] = address
+    }
+    return true
+  }
+
   /***
    *    ######## ##    ##  #######  ##     ## ######## ##     ## ########
    *    ##       ###   ## ##     ## ##     ## ##       ##     ## ##
@@ -716,6 +737,8 @@ class TransactionQueue {
         gossipedReceipt: false,
         archived: false,
         ourTXGroupIndex: -1,
+        involvedReads: {},
+        involvedWrites: {}
       } // age comes from timestamp
 
       // todo faster hash lookup for this maybe?

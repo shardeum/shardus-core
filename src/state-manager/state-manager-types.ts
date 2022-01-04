@@ -43,7 +43,7 @@ export type QueueEntry = {
     txGroupDebug: string;
     syncKeys: any[];
     logstate: string; // logging state
-    requests: {[key:string]:Shardus.Node} // map of account keys to the node that we are requesting the account data from 
+    requests: {[key:string]:Shardus.Node} // map of account keys to the node that we are requesting the account data from
     globalModification:boolean;
     noConsensus:boolean; // This means our queue entry does not need the consensus step. should only be used for initial network set commands
     m2TimeoutReached:boolean; // A flag to track if we have executed the M2 timeout yet.
@@ -53,7 +53,7 @@ export type QueueEntry = {
     ourNodeInTransactionGroup: boolean;
     ourNodeInConsensusGroup: boolean;
     ourTXGroupIndex: number;
-    conensusGroup?: Shardus.Node[];    
+    conensusGroup?: Shardus.Node[];
     transactionGroup?: Shardus.Node[];
     txGroupCycle:number;
     updatedTransactionGroup?: Shardus.Node[];
@@ -69,7 +69,7 @@ export type QueueEntry = {
     newVotes : boolean
     // receipt that we created
     appliedReceipt?: AppliedReceipt;
-    
+
     gossipedReceipt: boolean;
     // receipt that we got from gossip
     recievedAppliedReceipt?: AppliedReceipt;
@@ -77,7 +77,7 @@ export type QueueEntry = {
     // receipt that we need to repair to
     appliedReceiptForRepair?: AppliedReceipt;
 
-    // receipt coalesced in getReceipt(). 
+    // receipt coalesced in getReceipt().
     appliedReceiptFinal?: AppliedReceipt;
 
     repairFinished?: boolean;
@@ -114,8 +114,10 @@ export type QueueEntry = {
     fromClient:boolean; //from a client, or from another node in the network
 
     archived:boolean,
+    involvedReads: any;
+    involvedWrites: any;
 
-    executionDebug?:any
+  executionDebug?:any
 };
 
 export type SyncTracker = {
@@ -152,7 +154,7 @@ export type CycleShardData = {
     partitionsToSkip: Map<number, boolean>
 
     timestamp:number // timestamp for cleanup purposes, may not match exactly the rules of which transactions will live in a partition for this cycle.
-    timestampEndCycle:number 
+    timestampEndCycle:number
 
     hasCompleteData:boolean;
 
@@ -491,7 +493,7 @@ export type ExtendedVote = Vote & {
     winIdx: number|null;
     val:string;
     lowestIndex:number;
-    voteTally: { i: number, p: number }[];  // number[] // { i: index, p: hashListEntry.votePower } 
+    voteTally: { i: number, p: number }[];  // number[] // { i: index, p: hashListEntry.votePower }
     votesseen: any;
     finalIdx: number;
 }
@@ -532,12 +534,12 @@ export type AccountCopy = {
 };
 
 // AppliedVote
-// The vote contains: [txid, [account_id], [account_state_hash_after], transaction_result, sign]; 
+// The vote contains: [txid, [account_id], [account_state_hash_after], transaction_result, sign];
 
-// where the 
-// result is the transaction result; 
-// the account_id array is sorted by account_id and 
-// the account_state_hash_after array is in corresponding order. 
+// where the
+// result is the transaction result;
+// the account_id array is sorted by account_id and
+// the account_state_hash_after array is in corresponding order.
 // The applied vote is sent even if the result is ‘fail’.
 
 export type AppliedVoteCore = {
@@ -700,31 +702,31 @@ export type FifoLockObjectMap = {[lockID:string]:FifoLock}
 
 // //Shardus wrapper for a summary blob.  Has information that is needed for the reduce algorithm
 // export type SummaryBlob = {
-//     latestCycle: number; //The highest cycle that was used in this summary.  
-//     counter:number; 
-//     errorNull:number; 
-//     partition:number; 
+//     latestCycle: number; //The highest cycle that was used in this summary.
+//     counter:number;
+//     errorNull:number;
+//     partition:number;
 //     opaqueBlob:OpaqueBlob;
 // }
 
 // //A collection of blobs that share the same cycle.  For TX summaries
 // export type SummaryBlobCollection = {
-//     cycle:number; 
+//     cycle:number;
 //     blobsByPartition:Map<number, SummaryBlob>;
 // }
 
 // // Stats collected for a cycle
 // export type StatsClump = {
-//     error:boolean; 
-//     cycle:number; 
-//     dataStats:SummaryBlob[]; 
-//     txStats:SummaryBlob[]; 
+//     error:boolean;
+//     cycle:number;
+//     dataStats:SummaryBlob[];
+//     txStats:SummaryBlob[];
 //     covered:number[];
 //     coveredParititionCount:number;
-//     skippedParitionCount:number; 
+//     skippedParitionCount:number;
 // }
 
-// cache 
+// cache
 // export type AccountMemoryCache = {
 //     t: number;  //timestamp
 //     h: string;  //hash.  todo, a compact form acceptable?
@@ -746,12 +748,12 @@ export type AccountHashCache = {
  * Recent history, and a index to to the last list it was written to
  */
 export type AccountHashCacheHistory = {
-    lastSeenCycle: number; 
+    lastSeenCycle: number;
     lastSeenSortIndex: number;
     queueIndex: SafeIndex;
     accountHashList: AccountHashCache[]
     lastStaleCycle: number;
-    lastUpdateCycle: number; 
+    lastUpdateCycle: number;
 }
 
 export type SafeIndex = {
@@ -772,7 +774,7 @@ export type AccountHashesForPartition = {
  * This is the complete cache structure (old method 2)
  */
 export type AccountHashCacheHistoryOld = {
-    lastSeenCycle: number; 
+    lastSeenCycle: number;
     lastSeenSortIndex: number;
     accountHashList: AccountHashCache[]
 }
@@ -844,14 +846,14 @@ export type TrieAccount = {
 export type HashTrieNode = {
     radix: string; //node key
     hash: string;
-    childHashes: string[]; //len16 array of child hashes       
+    childHashes: string[]; //len16 array of child hashes
     children: HashTrieNode[]; // len 16  not on leaf nodes.
 
     isIncomplete: boolean;
     updated: boolean; // has this trie node or its children been updated
 
-    accounts?: TrieAccount[]; //any length, sorted by id.  only on leaf nodes    
-    accountTempMap?: Map<string, TrieAccount>; //only on leaf nodes    
+    accounts?: TrieAccount[]; //any length, sorted by id.  only on leaf nodes
+    accountTempMap?: Map<string, TrieAccount>; //only on leaf nodes
 
     nonSparseChildCount:number
 }
@@ -864,10 +866,10 @@ export type HashTrieSyncConsensus = {
     cycle: number;
     radixHashVotes: Map<string, {
         allVotes:Map<string, {
-            count:number, 
+            count:number,
             voters:Shardus.Node[]
-        }>, 
-        bestHash:string, 
+        }>,
+        bestHash:string,
         bestVotes:number
 
         }>;
@@ -877,12 +879,12 @@ export type HashTrieSyncConsensus = {
 }
 
 export type HashTrieRadixCoverage = {
-    firstChoice:Shardus.Node, 
-    fullList: Shardus.Node[], 
+    firstChoice:Shardus.Node,
+    fullList: Shardus.Node[],
     refuted: Set<string>;
 }
 
-export type HashTrieReq = { 
+export type HashTrieReq = {
     radixList: string[]
 }
 
@@ -913,7 +915,7 @@ export type AccountPreTest = {
     preTestStatus:PreTestStatus
 }
 
-export type HashTrieSyncTell = { 
+export type HashTrieSyncTell = {
     cycle: number
     nodeHashes: {radix:string, hash:string}[]
 }

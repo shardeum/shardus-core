@@ -1893,23 +1893,27 @@ class StateManager {
     let canWriteToAccount = function (accountId: string) {
       return !accountFilter || accountFilter[accountId] !== undefined
     }
+    const { accountWrites } = applyResponse
 
     let savedSomething = false
 
     let keys = Object.keys(wrappedStates)
     keys.sort() // have to sort this because object.keys is non sorted and we always use the [0] index for hashset strings
-    for (let key of keys) {
-      let wrappedData = wrappedStates[key]
+    for (const account of accountWrites) {
+      const key = account.accountId
+      const wrappedData = account.data
+      // let wrappedData = wrappedStates[key]
       if (wrappedData == null) {
         // TSConversion todo: harden this. throw exception?
         if (logFlags.verbose) this.mainLogger.debug(`setAccount wrappedData == null :${utils.makeShortHash(wrappedData.accountId)}`)
         continue
       }
 
-      if (canWriteToAccount(wrappedData.accountId) === false) {
-        if (logFlags.verbose) this.mainLogger.debug(`setAccount canWriteToAccount == false :${utils.makeShortHash(wrappedData.accountId)}`)
-        continue
-      }
+      // TODO: to discuss how to handle this
+      // if (canWriteToAccount(wrappedData.accountId) === false) {
+      //   if (logFlags.verbose) this.mainLogger.debug(`setAccount canWriteToAccount == false :${utils.makeShortHash(wrappedData.accountId)}`)
+      //   continue
+      // }
 
       let isGlobalKey = false
       //intercept that we have this data rather than requesting it.

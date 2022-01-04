@@ -1086,12 +1086,20 @@ class Shardus extends EventEmitter {
   ) {
     resultObject.accountWrites.push({
       accountId,
-      account,
+      data: account,
       txId,
       timestamp: txTimestamp,
     })
   }
 
+  tryInvolveAccount(txId: string, address: string, isRead: boolean) {
+    const result = this.stateManager.transactionQueue.tryInvloveAccount(
+      txId,
+      address,
+      isRead
+    )
+    return result
+  }
   // USED BY SIMPLECOINAPP
   async resetAppRelatedState() {
     await this.storage.clearAppRelatedState()
