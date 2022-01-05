@@ -23,6 +23,9 @@ export type QueueEntry = {
     originalData: WrappedResponses;//{[accountID:string]:string}; //serialized to string backups of account data.
     beforeHashes: {[accountID:string]:string}; //before hashes of account data
     homeNodes: {[accountID:string]:StateManager.shardFunctionTypes.NodeShardData};
+    /**
+     * TODO (after Jan 2022): review if we even need patchedOnNodes, it seems complicated, and I cant remember if the fix is still needed!
+     */
     patchedOnNodes: Map<string, StateManager.shardFunctionTypes.NodeShardData>; //{[accountID:string]:import('./shardFunctionTypes').NodeShardData};
     hasShardInfo: boolean;
     state: string;
@@ -114,8 +117,8 @@ export type QueueEntry = {
     fromClient:boolean; //from a client, or from another node in the network
 
     archived:boolean,
-    involvedReads: any;
-    involvedWrites: any;
+    involvedReads: {[accountID:string]:boolean};
+    involvedWrites: {[accountID:string]:boolean};
 
   executionDebug?:any
 };

@@ -10,7 +10,7 @@ import Logger, {logFlags} from '../logger'
 import ShardFunctions from './shardFunctions.js'
 import { info, time } from 'console'
 import StateManager from '.'
-import { AppliedReceipt, QueueEntry, AppliedVote } from './state-manager-types'
+import { AppliedReceipt, QueueEntry, AppliedVote, WrappedResponses } from './state-manager-types'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 
 class TransactionConsenus {
@@ -164,8 +164,9 @@ class TransactionConsenus {
 
   /**
    * hasAppliedReceiptMatchingPreApply
-   * check if recievedAppliedReceipt matches what we voted for.
-   * this implies that our pre apply had the same result.
+   * check if our data matches our vote
+   * If the vote was for an appliable, on failed result then check if our local data
+   * that is ready to be committed will match the receipt
    *
    * @param queueEntry
    */
@@ -196,13 +197,40 @@ class TransactionConsenus {
       if (appliedReceipt.appliedVotes[0].cant_apply === true) {
         // TODO STATESHARDING4 NEGATIVECASE    need to figure out what to do here
         if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} appliedReceipt.appliedVotes[0].cant_apply === true`)
-        return false
+        //If the network votes for cant_apply then we wouldn't need to patch.  We return true here
+        //but outside logic will have to know to check cant_apply flag and make sure to not commit data
+        return true
       }
+
+      //we return true for a false receipt because there is no need to repair our data to match the receipt
+      //it is already checked above if we matched the result
+      if(appliedReceipt.result === false){
+        if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} result===false Good Match`)
+        return true
+      }
+
+      
 
       //test our vote against data hashes.
       let wrappedStates = queueEntry.collectedData
       let wrappedStateKeys = Object.keys(queueEntry.collectedData)
       let vote = appliedReceipt.appliedVotes[0] //queueEntry.ourVote
+
+
+      // Iff we have accountWrites, then overwrite the keys and wrapped data
+      let appOrderedKeys = []
+      let writtenAccountsMap:WrappedResponses = {}
+      let applyResponse = queueEntry?.preApplyTXResult?.applyResponse
+      if(applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0){
+        for(let wrappedAccount of applyResponse.accountWrites){
+          appOrderedKeys.push(wrappedAccount.accountId)
+          writtenAccountsMap[wrappedAccount.accountId] = wrappedAccount.data
+        }
+        wrappedStateKeys = appOrderedKeys
+        //override wrapped states with writtenAccountsMap which should be more complete if it included
+        wrappedStates = writtenAccountsMap
+      }
+
       for (let j = 0; j < vote.account_id.length; j++) {
         let id = vote.account_id[j]
         let hash = vote.account_state_hash_after[j]
@@ -466,25 +494,22 @@ class TransactionConsenus {
 
     let wrappedStates = queueEntry.collectedData
 
-
-    let allWrittenStates = queueEntry?.preApplyTXResult?.applyResponse.accountWrites
-    if(allWrittenStates != null && allWrittenStates.length > 0){
-      // resultObject.accountWrites.push({
-      //   accountId,
-      //   account,
-      //   txId,
-      //   timestamp: txTimestamp,
-      // })
-
-
-      //build up a new wrappedState list to pass to the code below.
-      //may also need some work to sort out which wrapped state is new an not seen before yet.
-
-      //may need to add additial data to the vote/receipt.  however nodes may be able to do their own work to sort out what they need.
-      //It may be nice if nodes could just forward the extra data needed to corresponding nodes that are predicted to need it, but
-      //letting nodes ask might be more simple.
+    let applyResponse = queueEntry?.preApplyTXResult?.applyResponse
+    //if we have values for accountWrites, then build a list wrappedStates from it and use this list instead
+    //of the collected data list
+    if(applyResponse != null){
+      let writtenAccountsMap:WrappedResponses = {}
+      if(applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0){
+        for(let writtenAccount of applyResponse.accountWrites){
+          writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+        }
+        //override wrapped states with writtenAccountsMap which should be more complete if it included
+        wrappedStates = writtenAccountsMap
+      }
+      //Issue that could happen with sharded network:
+      //Need to figure out where to put the logic that knows which nodes need final data forwarded to them
+      //A receipt aline may not be enough, remote shards will need an updated copy of the data.
     }
-
 
     if (wrappedStates != null) {
       //we need to sort this list and doing it in place seems ok

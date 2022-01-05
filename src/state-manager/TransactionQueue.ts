@@ -12,7 +12,7 @@ import { errorToStringFull, inRangeOfCurrentTime } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { profilerInstance } from '../utils/profiler'
 import ShardFunctions from './shardFunctions.js'
-import { AcceptedTx, AccountFilter, CommitConsensedTransactionResult, PreApplyAcceptedTransactionResult, QueueEntry, RequestReceiptForTxResp, RequestStateForTxReq, RequestStateForTxResp, SeenAccounts, StringBoolObjectMap, StringNodeObjectMap } from './state-manager-types'
+import { AcceptedTx, AccountFilter, CommitConsensedTransactionResult, PreApplyAcceptedTransactionResult, QueueEntry, RequestReceiptForTxResp, RequestStateForTxReq, RequestStateForTxResp, SeenAccounts, StringBoolObjectMap, StringNodeObjectMap, WrappedResponses } from './state-manager-types'
 const stringify = require('fast-stable-stringify')
 
 const http = require('../http')
@@ -446,6 +446,7 @@ class TransactionQueue {
       uniqueKeys = queueEntry.uniqueKeys
 
       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`commitConsensedTransaction FIFO lock outer: ${utils.stringifyReduce(uniqueKeys)} `)
+      // TODO Perf (for sharded networks).  consider if we can remove this lock
       ourAccountLocks = await this.stateManager.bulkFifoLockAccounts(uniqueKeys)
       if (logFlags.verbose && this.stateManager.extendedRepairLogging) this.mainLogger.debug(`commitConsensedTransaction FIFO lock inner: ${utils.stringifyReduce(uniqueKeys)} ourLocks: ${utils.stringifyReduce(ourAccountLocks)}`)
 
@@ -465,15 +466,37 @@ class TransactionQueue {
        * is not any sorting by address that could get in the way.
        */
 
+      //create a temp map for state table logging below. 
+      //importantly, we override the wrappedStates with writtenAccountsMap if there is any accountWrites used
+      //this should mean dapps don't have to use this feature.  (keeps simple dapps simpler)
+      let writtenAccountsMap:WrappedResponses = {}
+      if(applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0){
+        for(let writtenAccount of applyResponse.accountWrites){
+          writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+        }
+        //override wrapped states with writtenAccountsMap which should be more complete if it included
+        wrappedStates = writtenAccountsMap
+      }
 
+      // set a filter based so we only save data for local accounts.  The filter is a slightly different structure than localKeys
+      // decided not to try and merge them just yet, but did accomplish some cleanup of the filter logic
+      let filter: AccountFilter = {}
+
+      let nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData = this.stateManager.currentCycleShardData.nodeShardData
+      //update the filter to contain any local accounts in accountWrites
+      if(applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0){
+        for(let writtenAccount of applyResponse.accountWrites){
+          let isLocal = ShardFunctions.testAddressInRange(writtenAccount.accountId, nodeShardData.storedPartitions)
+          if(isLocal){
+            filter[writtenAccount.accountId] = 1
+          }
+        }
+      }
 
       if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
 
       let note = `setAccountData: tx:${queueEntry.logID} in commitConsensedTransaction. `
 
-      // set a filter based so we only save data for local accounts.  The filter is a slightly different structure than localKeys
-      // decided not to try and merge them just yet, but did accomplish some cleanup of the filter logic
-      let filter: AccountFilter = {}
       for (let key of Object.keys(queueEntry.localKeys)) {
         filter[key] = 1
       }
@@ -492,6 +515,12 @@ class TransactionQueue {
 
       for (let stateT of stateTableResults) {
         let wrappedRespose = wrappedStates[stateT.accountId]
+
+        //backup if we dont have the account in wrapped states (state table results is just for debugging now, and no longer used by sync)
+        if(wrappedRespose == null){
+          wrappedRespose = writtenAccountsMap[stateT.accountId]
+        }
+
         // we have to correct stateBefore because it now gets stomped in the vote, TODO cleaner fix?
         stateT.stateBefore = wrappedRespose.prevStateId
 
@@ -629,11 +658,16 @@ class TransactionQueue {
       console.log(`account ${address} is already existed in involvedReads or involvedWrites`, queueEntry.involvedReads[address], queueEntry.involvedWrites[address]);
       return true
     }
+
+    // test if the queue can take this account?
+    // technically we can delay this check and since we have to run the just in time version of the check before apply
+    // only difference of doing the work here also would be if we can more quickly reject a TX.
+
     // add the account to involved read or write
     if (isRead) {
-      queueEntry.involvedReads[address] = address
+      queueEntry.involvedReads[address] = true
     } else {
-      queueEntry.involvedWrites[address] = address
+      queueEntry.involvedWrites[address] = true
     }
     return true
   }
@@ -1595,6 +1629,8 @@ class TransactionQueue {
       if (homeNode.node.id === ourNodeData.node.id) {
         hasKey = true
       } else {
+
+        //perf todo: this seems like a slow calculation, coult improve this
         for (let node of homeNode.nodeThatStoreOurParitionFull) {
           if (node.id === ourNodeData.node.id) {
             hasKey = true
@@ -2216,11 +2252,12 @@ class TransactionQueue {
                 // }
 
                 try {
-                  let accountsValid = this.checkAccountTimestamps()
+                  //This is a just in time check to make sure our involved accounts 
+                  //have not changed after our TX timestamp
+                  let accountsValid = this.checkAccountTimestamps(queueEntry)
                   if(accountsValid === false){
-                    // Todo, if this is false we need to make a fail vote and go to consensus
                     queueEntry.state = 'consensing'
-
+                    queueEntry.preApplyTXResult = { applied: false, passed: false, applyResult: 'failed account TS checks', reason: 'apply result', applyResponse: null } 
                     continue
                   }
                   queueEntry.executionDebug.log2 = 'call pre apply'
@@ -2315,9 +2352,24 @@ class TransactionQueue {
                   } else {
                     // no need to share a receipt
                   }
-                  queueEntry.state = 'commiting'
-                  queueEntry.hasValidFinalData = true
-                  finishedConsensing = true
+
+                  //todo check cant_apply flag to make sure a vote can form with it!
+                  //also check if failed votes will work...?
+                  if(result.appliedVotes[0].cant_apply === false && result.result === true ){
+                    queueEntry.state = 'commiting'
+                    queueEntry.hasValidFinalData = true
+                    finishedConsensing = true
+                  } else{
+                    if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_finishedFailReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
+                    // we are finished since there is nothing to apply
+                    // this.statemanager_fatal(`consensing: repairToMatchReceipt failed`, `consensing: repairToMatchReceipt failed ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+                    this.removeFromQueue(queueEntry, currentIndex)
+                    queueEntry.state = 'fail'
+                    continue
+                  }
+
+
+
                   //continue
                 } else {
                   if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch1', `${shortID}`, `qId: ${queueEntry.entryID}  `)
@@ -2330,9 +2382,22 @@ class TransactionQueue {
                 if (hasReceivedApplyReceipt) {
                   if (this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, queueEntry.recievedAppliedReceipt)) {
                     if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${shortID}`, `qId: ${queueEntry.entryID} `)
-                    queueEntry.state = 'commiting'
-                    queueEntry.hasValidFinalData = true
-                    finishedConsensing = true
+                    
+                    
+                    //todo check cant_apply flag to make sure a vote can form with it!
+                    if(result.appliedVotes[0].cant_apply === false && result.result === true ){
+                      queueEntry.state = 'commiting'
+                      queueEntry.hasValidFinalData = true
+                      finishedConsensing = true
+                    } else{
+                      if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_finishedFailReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
+                      // we are finished since there is nothing to apply
+                      //this.statemanager_fatal(`consensing: repairToMatchReceipt failed`, `consensing: repairToMatchReceipt failed ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+                      this.removeFromQueue(queueEntry, currentIndex)
+                      queueEntry.state = 'fail'
+                      continue
+                    }
+
                     //continue
                   } else {
                     if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch2', `${shortID}`, `qId: ${queueEntry.entryID}  `)
@@ -2729,13 +2794,26 @@ class TransactionQueue {
     }
     return false
   }
-  checkAccountTimestamps() : boolean{
-    /**
-     * This is a new function.  It must be called before calling dapp.apply().
-     * The purpose is to do a last minute test to make sure that no involved accounts have a
-     * timestamp newer than our transaction timestamp.
-     * If they do have a newer timestamp we must fail the TX and vote for a TX fail receipt.
-     */
+
+  /**
+   * This is a new function.  It must be called before calling dapp.apply().    
+   * The purpose is to do a last minute test to make sure that no involved accounts have a 
+   * timestamp newer than our transaction timestamp.   
+   * If they do have a newer timestamp we must fail the TX and vote for a TX fail receipt.  
+   */  
+  checkAccountTimestamps(queueEntry:QueueEntry) : boolean{
+    for(let accountID of Object.keys(queueEntry.involvedReads)){
+      let cacheEntry = this.stateManager.accountCache.getAccountHash(accountID)
+      if(cacheEntry != null && cacheEntry.t >= queueEntry.acceptedTx.timestamp){
+        return false
+      }
+    }
+    for(let accountID of Object.keys(queueEntry.involvedWrites)){
+      let cacheEntry = this.stateManager.accountCache.getAccountHash(accountID)
+      if(cacheEntry != null && cacheEntry.t >= queueEntry.acceptedTx.timestamp){
+        return false
+      }
+    }
     return true
   }
 }

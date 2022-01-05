@@ -23,6 +23,7 @@ import Reporter from '../reporter'
 import * as ShardusTypes from '../shardus/shardus-types'
 import * as Snapshot from '../snapshot'
 import StateManager from '../state-manager'
+import { WrappedResponses } from '../state-manager/state-manager-types'
 import Statistics from '../statistics'
 import Storage from '../storage'
 import * as utils from '../utils'
@@ -1035,15 +1036,15 @@ class Shardus extends EventEmitter {
 
   // USED BY SIMPLECOINAPP
   applyResponseAddState(
-    resultObject,
-    accountData,
-    localCache,
-    accountId,
-    txId,
-    txTimestamp,
-    stateBefore,
-    stateAfter,
-    accountCreated
+    resultObject, //TODO define type! :{stateTableResults: ShardusTypes.StateTableObject[], accountData:ShardusTypes.WrappedResponse[] },
+    accountData: any,
+    localCache: any,
+    accountId: string,
+    txId: string,
+    txTimestamp: number,
+    stateBefore: string,
+    stateAfter: string,
+    accountCreated: boolean
   ) {
     const state = { accountId, txId, txTimestamp, stateBefore, stateAfter }
     if (accountCreated) {
@@ -1078,11 +1079,11 @@ class Shardus extends EventEmitter {
   }
   // USED BY SIMPLECOINAPP
   applyResponseAddChangedAccount(
-    resultObject,
-    accountId,
-    account,
-    txId,
-    txTimestamp
+    resultObject, //TODO define this type!
+    accountId: string,
+    account: ShardusTypes.WrappedResponse,
+    txId: string,
+    txTimestamp: number
   ) {
     resultObject.accountWrites.push({
       accountId,

@@ -329,7 +329,15 @@ export interface ApplyResponse {
    * Account data array
    */
   accountData: WrappedResponse[]
-  accountWrites: any
+  /**
+   * Optional(for now) list of accounts that were written to
+   * Can include accounts that were not in the initial list of involved accounts
+   */
+  accountWrites: {
+    accountId:string,
+    data: WrappedResponse,
+    txId: string,
+    timestamp: number}[]
   /**
    * a blob for the app to define.
    * This gets passed to post apply

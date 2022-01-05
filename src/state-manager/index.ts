@@ -1899,9 +1899,24 @@ class StateManager {
 
     let keys = Object.keys(wrappedStates)
     keys.sort() // have to sort this because object.keys is non sorted and we always use the [0] index for hashset strings
-    for (const account of accountWrites) {
-      const key = account.accountId
-      const wrappedData = account.data
+    // for (const account of accountWrites) {
+    //   const key = account.accountId
+    //   const wrappedData = account.data
+
+    // if we have any account writes then get the key order from them
+    // This ordering can be vitally important for things like a contract account that requires contract storage to be saved first
+    // note that the wrapped data passed in alread had accountWrites merged in
+    let appOrderedKeys = []
+    if(applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0){
+      for(let wrappedAccount of applyResponse.accountWrites){
+        appOrderedKeys.push(wrappedAccount.accountId)
+      }
+      keys = appOrderedKeys
+    }
+
+    for (let key of keys) {
+      let wrappedData = wrappedStates[key]
+
       // let wrappedData = wrappedStates[key]
       if (wrappedData == null) {
         // TSConversion todo: harden this. throw exception?
@@ -1910,10 +1925,10 @@ class StateManager {
       }
 
       // TODO: to discuss how to handle this
-      // if (canWriteToAccount(wrappedData.accountId) === false) {
-      //   if (logFlags.verbose) this.mainLogger.debug(`setAccount canWriteToAccount == false :${utils.makeShortHash(wrappedData.accountId)}`)
-      //   continue
-      // }
+      if (canWriteToAccount(wrappedData.accountId) === false) {
+        if (logFlags.verbose) this.mainLogger.debug(`setAccount canWriteToAccount == false :${utils.makeShortHash(wrappedData.accountId)}`)
+        continue
+      }
 
       let isGlobalKey = false
       //intercept that we have this data rather than requesting it.
