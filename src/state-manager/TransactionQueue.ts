@@ -466,13 +466,15 @@ class TransactionQueue {
        * is not any sorting by address that could get in the way.
        */
 
-      //create a temp map for state table logging below. 
+      //create a temp map for state table logging below.
       //importantly, we override the wrappedStates with writtenAccountsMap if there is any accountWrites used
       //this should mean dapps don't have to use this feature.  (keeps simple dapps simpler)
       let writtenAccountsMap:WrappedResponses = {}
       if(applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0){
         for(let writtenAccount of applyResponse.accountWrites){
           writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+          writtenAccountsMap[writtenAccount.accountId].prevStateId = writtenAccount.data.stateId
+          writtenAccountsMap[writtenAccount.accountId].prevDataCopy = utils.deepCopy(writtenAccount.data)
         }
         //override wrapped states with writtenAccountsMap which should be more complete if it included
         wrappedStates = writtenAccountsMap
@@ -2252,12 +2254,12 @@ class TransactionQueue {
                 // }
 
                 try {
-                  //This is a just in time check to make sure our involved accounts 
+                  //This is a just in time check to make sure our involved accounts
                   //have not changed after our TX timestamp
                   let accountsValid = this.checkAccountTimestamps(queueEntry)
                   if(accountsValid === false){
                     queueEntry.state = 'consensing'
-                    queueEntry.preApplyTXResult = { applied: false, passed: false, applyResult: 'failed account TS checks', reason: 'apply result', applyResponse: null } 
+                    queueEntry.preApplyTXResult = { applied: false, passed: false, applyResult: 'failed account TS checks', reason: 'apply result', applyResponse: null }
                     continue
                   }
                   queueEntry.executionDebug.log2 = 'call pre apply'
@@ -2382,8 +2384,8 @@ class TransactionQueue {
                 if (hasReceivedApplyReceipt) {
                   if (this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, queueEntry.recievedAppliedReceipt)) {
                     if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${shortID}`, `qId: ${queueEntry.entryID} `)
-                    
-                    
+
+
                     //todo check cant_apply flag to make sure a vote can form with it!
                     if(result.appliedVotes[0].cant_apply === false && result.result === true ){
                       queueEntry.state = 'commiting'
@@ -2796,11 +2798,11 @@ class TransactionQueue {
   }
 
   /**
-   * This is a new function.  It must be called before calling dapp.apply().    
-   * The purpose is to do a last minute test to make sure that no involved accounts have a 
-   * timestamp newer than our transaction timestamp.   
-   * If they do have a newer timestamp we must fail the TX and vote for a TX fail receipt.  
-   */  
+   * This is a new function.  It must be called before calling dapp.apply().
+   * The purpose is to do a last minute test to make sure that no involved accounts have a
+   * timestamp newer than our transaction timestamp.
+   * If they do have a newer timestamp we must fail the TX and vote for a TX fail receipt.
+   */
   checkAccountTimestamps(queueEntry:QueueEntry) : boolean{
     for(let accountID of Object.keys(queueEntry.involvedReads)){
       let cacheEntry = this.stateManager.accountCache.getAccountHash(accountID)

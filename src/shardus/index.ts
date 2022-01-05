@@ -1758,6 +1758,12 @@ class Shardus extends EventEmitter {
         cycle: number
         change: any
       }[]
+      if (!changes || !Array.isArray(changes)) {
+        this.mainLogger.error(
+          `Invalid changes in global account ${changeListGlobalAccount}`
+        )
+        return
+      }
       for (let change of changes) {
         //skip future changes
         if (change.cycle > lastCycle.counter) {
