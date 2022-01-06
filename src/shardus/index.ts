@@ -1036,7 +1036,7 @@ class Shardus extends EventEmitter {
 
   // USED BY SIMPLECOINAPP
   applyResponseAddState(
-    resultObject, //TODO define type! :{stateTableResults: ShardusTypes.StateTableObject[], accountData:ShardusTypes.WrappedResponse[] },
+    resultObject: ShardusTypes.ApplyResponse, //TODO define type! :{stateTableResults: ShardusTypes.StateTableObject[], accountData:ShardusTypes.WrappedResponse[] },
     accountData: any,
     localCache: any,
     accountId: string,
@@ -1050,6 +1050,7 @@ class Shardus extends EventEmitter {
     if (accountCreated) {
       state.stateBefore = allZeroes64
     }
+    //@ts-ignore
     resultObject.stateTableResults.push(state)
     let foundAccountData = resultObject.accountData.find(
       (a) => a.accountId === accountId
@@ -1059,6 +1060,7 @@ class Shardus extends EventEmitter {
         ...foundAccountData,
         accountId,
         data: accountData,
+        //@ts-ignore
         txId,
         timestamp: txTimestamp,
         hash: stateAfter,
@@ -1069,6 +1071,7 @@ class Shardus extends EventEmitter {
       resultObject.accountData.push({
         accountId,
         data: accountData,
+        //@ts-ignore
         txId,
         timestamp: txTimestamp,
         hash: stateAfter,
@@ -1079,7 +1082,7 @@ class Shardus extends EventEmitter {
   }
   // USED BY SIMPLECOINAPP
   applyResponseAddChangedAccount(
-    resultObject, //TODO define this type!
+    resultObject: ShardusTypes.ApplyResponse, //TODO define this type!
     accountId: string,
     account: ShardusTypes.WrappedResponse,
     txId: string,

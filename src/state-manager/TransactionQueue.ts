@@ -590,7 +590,8 @@ class TransactionQueue {
     // STATS update
     this.stateManager.partitionStats.statsTxSummaryUpdate(queueEntry.cycleToRecordOn, queueEntry)
     for (let wrappedData of applyResponse.accountData) {
-      let queueData = queueEntry.collectedData[wrappedData.accountId]
+      //let queueData = queueEntry.collectedData[wrappedData.accountId]
+      let queueData = wrappedStates[wrappedData.accountId]
       if (queueData != null) {
         if (queueData.accountCreated) {
           //account was created to do a summary init
