@@ -144,8 +144,8 @@ class TransactionQueue {
         // Place tx in queue (if younger than m)
         //  gossip 'spread_tx_to_group' to transaction group
 
-        //handleSharedTX will also validate fields
-        let queueEntry = this.handleSharedTX(payload, sender)
+        //handleSharedTX will also validate fields.  payload is an AcceptedTX so must pass in the .data as the rawTX
+        let queueEntry = this.handleSharedTX(payload.data, sender)
         if (queueEntry == null) {
           return
         }
