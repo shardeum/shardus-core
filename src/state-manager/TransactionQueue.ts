@@ -2382,13 +2382,12 @@ class TransactionQueue {
               }
               if (finishedConsensing === false) {
                 // if we got a reciept while waiting see if we should use it (if our own vote matches)
-                if (hasReceivedApplyReceipt) {
+                if (hasReceivedApplyReceipt && queueEntry.recievedAppliedReceipt != null) {
                   if (this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, queueEntry.recievedAppliedReceipt)) {
                     if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${shortID}`, `qId: ${queueEntry.entryID} `)
 
-
                     //todo check cant_apply flag to make sure a vote can form with it!
-                    if(result.appliedVotes[0].cant_apply === false && result.result === true ){
+                    if(queueEntry.recievedAppliedReceipt.appliedVotes[0].cant_apply === false && queueEntry.recievedAppliedReceipt.result === true ){
                       queueEntry.state = 'commiting'
                       queueEntry.hasValidFinalData = true
                       finishedConsensing = true
