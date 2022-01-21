@@ -121,7 +121,10 @@ class Storage {
       this.storage._rawQueryOld(query, tableModel) // or queryString, valueArray for non-sequelize
 
     this.initialized = true
-    if (Snapshot.oldDataPath) await Snapshot.initSafetyModeVals()
+    if (Snapshot.oldDataPath){
+      //temporarily disable safety mode, it seems to break rotation
+      //await Snapshot.initSafetyModeVals()
+    } 
   }
   async close() {
     await this.storage.close()

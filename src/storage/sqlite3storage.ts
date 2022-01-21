@@ -110,6 +110,7 @@ class Sqlite3Storage {
       oldDirPath = dbDir + '-old-' + Date.now()
       fs.renameSync(dbDir, oldDirPath)
       if (oldDirPath) {
+        this.mainLogger.info('Setting old data path. this will cause safety mode?' + oldDirPath)
         Snapshot.setOldDataPath(oldDirPath)
         this.oldDb = new sqlite3.Database(`${oldDirPath}/db.sqlite`)
       }
