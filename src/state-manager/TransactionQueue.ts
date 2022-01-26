@@ -380,6 +380,7 @@ class TransactionQueue {
       ourLockID = await this.stateManager.fifoLock('accountModification')
 
       this.profiler.scopedProfileSectionStart('apply_duration')
+      //I think Shardus.IncomingTransaction may be the wrong type here
       applyResponse = await this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
       this.profiler.scopedProfileSectionEnd('apply_duration')
       if (applyResponse == null) {
@@ -654,11 +655,11 @@ class TransactionQueue {
 
     // check if address is already invloved in this tx
     if (queueEntry.collectedData[address]) {
-      console.log(`account ${address} is already existed in collected data`, queueEntry.collectedData[address]);
+      if (logFlags.verbose) console.log(`account ${address} is already existed in collected data`, queueEntry.collectedData[address]);
       return true
     }
     if (queueEntry.involvedReads[address] || queueEntry.involvedWrites[address]) {
-      console.log(`account ${address} is already existed in involvedReads or involvedWrites`, queueEntry.involvedReads[address], queueEntry.involvedWrites[address]);
+      if (logFlags.verbose) console.log(`account ${address} is already existed in involvedReads or involvedWrites`, queueEntry.involvedReads[address], queueEntry.involvedWrites[address]);
       return true
     }
 
