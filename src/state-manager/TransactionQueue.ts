@@ -474,10 +474,10 @@ class TransactionQueue {
       //this should mean dapps don't have to use this feature.  (keeps simple dapps simpler)
       let writtenAccountsMap:WrappedResponses = {}
       if(applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0){
-        for(let writtenAccount of applyResponse.accountWrites){
+        for (let writtenAccount of applyResponse.accountWrites) {
           writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
-          writtenAccountsMap[writtenAccount.accountId].prevStateId = writtenAccount.data.stateId
-          writtenAccountsMap[writtenAccount.accountId].prevDataCopy = utils.deepCopy(writtenAccount.data)
+          writtenAccountsMap[writtenAccount.accountId].prevStateId = wrappedStates[writtenAccount.accountId] ? wrappedStates[writtenAccount.accountId].stateId : ''
+          writtenAccountsMap[writtenAccount.accountId].prevDataCopy = wrappedStates[writtenAccount.accountId] ? utils.deepCopy(writtenAccount.data) : {}
         }
         //override wrapped states with writtenAccountsMap which should be more complete if it included
         wrappedStates = writtenAccountsMap
@@ -532,7 +532,7 @@ class TransactionQueue {
         stateT.stateBefore = wrappedRespose.prevStateId
 
         if (logFlags.verbose) {
-          if (logFlags.console) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' accounts total' + accountDataList.length)
+          if (logFlags.console) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.txId) + ' ts: ' + acceptedTX.timestamp)
           this.mainLogger.debug('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.txId) + ' ts: ' + acceptedTX.timestamp)
         }
       }
@@ -659,11 +659,9 @@ class TransactionQueue {
 
     // check if address is already invloved in this tx
     if (queueEntry.collectedData[address]) {
-      if (logFlags.verbose) console.log(`account ${address} is already existed in collected data`, queueEntry.collectedData[address]);
       return true
     }
     if (queueEntry.involvedReads[address] || queueEntry.involvedWrites[address]) {
-      if (logFlags.verbose) console.log(`account ${address} is already existed in involvedReads or involvedWrites`, queueEntry.involvedReads[address], queueEntry.involvedWrites[address]);
       return true
     }
 
@@ -1684,7 +1682,7 @@ class TransactionQueue {
         let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
         this.profiler.scopedProfileSectionEnd('process_dapp.getRelevantData')
         this.profiler.profileSectionEnd('process_dapp.getRelevantData')
-        
+
 
         //only queue this up to share if it is not a global account. global accounts dont need to be shared.
 
