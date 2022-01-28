@@ -379,10 +379,12 @@ class TransactionQueue {
 
       ourLockID = await this.stateManager.fifoLock('accountModification')
 
+      this.profiler.profileSectionStart('process-dapp.apply')
       this.profiler.scopedProfileSectionStart('apply_duration')
       //I think Shardus.IncomingTransaction may be the wrong type here
       applyResponse = await this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
       this.profiler.scopedProfileSectionEnd('apply_duration')
+      this.profiler.profileSectionEnd('process-dapp.apply')
       if (applyResponse == null) {
         throw Error('null response from app.apply')
       }
@@ -504,8 +506,10 @@ class TransactionQueue {
         filter[key] = 1
       }
 
+      this.profiler.scopedProfileSectionStart('commit_setAccount')
       // wrappedStates are side effected for now
       savedSomething = await this.stateManager.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter, note)
+      this.profiler.scopedProfileSectionEnd('commit_setAccount')
 
       if (logFlags.verbose) {
         this.mainLogger.debug(`commitConsensedTransaction  savedSomething: ${savedSomething}`)
