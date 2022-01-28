@@ -1678,7 +1678,14 @@ class TransactionQueue {
         //    when checking timestamps.. alternatively maybe there is a away we can note the timestamp with what is returned here in the queueEntry data
         //    and not have to deal with the cache.
         // todo old: Detect if our node covers this paritition..  need our partition data
+
+        this.profiler.profileSectionStart('process_dapp.getRelevantData')
+        this.profiler.scopedProfileSectionStart('process_dapp.getRelevantData')
         let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
+        this.profiler.scopedProfileSectionEnd('process_dapp.getRelevantData')
+        this.profiler.profileSectionEnd('process_dapp.getRelevantData')
+        
+
         //only queue this up to share if it is not a global account. global accounts dont need to be shared.
 
         // not sure if it is correct to update timestamp like this.

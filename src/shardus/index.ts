@@ -49,6 +49,7 @@ Context.setDefaultConfigs(defaultConfigs)
 
 type RouteHandlerRegister = (route: string, responseHandler: Handler) => void
 
+//todo make this a config parameter set by the dapp
 const changeListGlobalAccount = '0'.repeat(64)
 
 interface Shardus {
@@ -1762,6 +1763,8 @@ class Shardus extends EventEmitter {
         change: any
       }[]
       if (!changes || !Array.isArray(changes)) {
+        //this may get logged if we have a changeListGlobalAccount that does not have config settings on it.
+        //The fix is to let the dapp set the global account to use for this
         this.mainLogger.error(
           `Invalid changes in global account ${changeListGlobalAccount}`
         )
