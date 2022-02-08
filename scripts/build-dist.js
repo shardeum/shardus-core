@@ -20,7 +20,7 @@ const packageJsonNew = Object.assign({}, packageJson)
 packageJsonNew.name = packageJson.name + '-dist'
 packageJsonNew.description = `Compiled version of ${packageJson.name}.`
 packageJsonNew.main = './index.js'
-delete packageJsonNew.types
+packageJsonNew.types = './index.d.ts'
 delete packageJsonNew.files
 delete packageJsonNew.config
 delete packageJsonNew.scripts
@@ -35,13 +35,15 @@ fs.writeFileSync(path.join(distDir, 'package.json'), JSON.stringify(packageJsonN
 // Copy config/, into dist/
 copyFolderSync(path.join(rootDir, 'src/config'), path.join(distDir, 'config'))
 
-// Copy src/.../computePowGenerator.js and scripts/build-index.js into dist/
+// Copy src/.../computePowGenerator.js, scripts/build-index.js, and scripts/build-index.d.ts into dist/
 fs.copyFileSync(path.join(rootDir, 'src/crypto/computePowGenerator.js'), path.join(distDir, 'computePowGenerator.js'))
 fs.copyFileSync(path.join(__dirname, '../', 'scripts/build-index.js'), path.join(distDir, 'index.js'))
+fs.copyFileSync(path.join(__dirname, '../', 'scripts/build-index.d.ts'), path.join(distDir, 'index.d.ts'))
 
-// Copy build/src/shardus/shardus-types.d.ts into dist/src/shardus/shardus-types.d.ts
+// Copy build/src/shardus/index.d.ts and shardus-types.ts into dist/
 fs.mkdirSync(path.join(distDir, 'src'), { recursive: true })
 fs.mkdirSync(path.join(distDir, 'src/shardus'), { recursive: true })
+fs.copyFileSync(path.join(rootDir, 'src/shardus/index.d.ts'), path.join(distDir, 'src/shardus/index.d.ts'))
 fs.copyFileSync(path.join(rootDir, 'src/shardus/shardus-types.d.ts'), path.join(distDir, 'src/shardus/shardus-types.d.ts'))
 
 console.log('Done')
