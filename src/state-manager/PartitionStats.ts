@@ -17,7 +17,6 @@ import * as Wrapper from '../p2p/Wrapper'
 import { requestNetworkDownsize } from '../p2p/CycleAutoScale'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { constants } from 'fs'
-import S_IFIFO = module
 
 /**
  * PartitionStats is a system that allows the dapp to build custom anonymous tallies of accounts and committed TXs.
