@@ -908,11 +908,16 @@ class Shardus extends EventEmitter {
       const { timestamp, id, keys } = this.app.crack(tx)
 
       // Validate the transaction timestamp
-      const txExpireTimeMs = this.config.transactionExpireTime * 1000
+      let txExpireTimeMs = this.config.transactionExpireTime * 1000
+
+      if(global){
+        txExpireTimeMs = 2 * 10 * 1000 //todo consider if this should be a config.
+      }
+
       if (inRangeOfCurrentTime(timestamp, txExpireTimeMs, txExpireTimeMs) === false) {
         this.shardus_fatal(
           `put_txExpired`,
-          `Transaction Expired: ${utils.stringifyReduce(tx)}`
+          `Transaction Expired: timestamp:${timestamp} now:${Date.now()} diff(now-ts):${Date.now()-timestamp}  ${utils.stringifyReduce(tx)} `
         )
         this.statistics.incrementCounter('txRejected')
         nestedCountersInstance.countEvent(

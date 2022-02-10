@@ -859,28 +859,30 @@ class TransactionQueue {
 
         // Check to see if any keys are inside of a syncing range.
         // If it is a global key in a non-globalModification TX then we dont care about it
-        for (let key of txQueueEntry.uniqueKeys) {
-          let syncTracker = this.stateManager.accountSync.getSyncTracker(key)
-          // only look at syncing for accounts that are changed.
-          // if the sync range is for globals and the tx is not a global modifier then skip it!
 
-          // todo take another look at this condition and syncTracker.globalAddressMap
-          if (syncTracker != null && (syncTracker.isGlobalSyncTracker === false || txQueueEntry.globalModification === true)) {
-            if (this.stateManager.accountSync.softSync_noSyncDelay === true) {
-              //no delay means that don't pause the TX in state = 'syncing'
-            } else {
-              txQueueEntry.state = 'syncing'
-              txQueueEntry.syncCounter++
-              syncTracker.queueEntries.push(txQueueEntry) // same tx may get pushed in multiple times. that's ok.
-              syncTracker.keys[key] = true //mark this key for fast testing later
-            }
+        // COMPLETE HACK!!!!!!!!!
+        // for (let key of txQueueEntry.uniqueKeys) {
+        //   let syncTracker = this.stateManager.accountSync.getSyncTracker(key)
+        //   // only look at syncing for accounts that are changed.
+        //   // if the sync range is for globals and the tx is not a global modifier then skip it!
 
-            txQueueEntry.didSync = true // mark that this tx had to sync, this flag should never be cleared, we will use it later to not through stuff away.
-            txQueueEntry.syncKeys.push(key) // used later to instruct what local data we should JIT load
-            txQueueEntry.localKeys[key] = true // used for the filter.  TODO review why this is set true here!!! seems like this may flag some keys not owned by this node!
-            if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.logID}`, `${txQueueEntry.logID} qId: ${txQueueEntry.entryID} account:${utils.stringifyReduce(key)}`)
-          }
-        }
+        //   // todo take another look at this condition and syncTracker.globalAddressMap
+        //   if (syncTracker != null && (syncTracker.isGlobalSyncTracker === false || txQueueEntry.globalModification === true)) {
+        //     if (this.stateManager.accountSync.softSync_noSyncDelay === true) {
+        //       //no delay means that don't pause the TX in state = 'syncing'
+        //     } else {
+        //       txQueueEntry.state = 'syncing'
+        //       txQueueEntry.syncCounter++
+        //       syncTracker.queueEntries.push(txQueueEntry) // same tx may get pushed in multiple times. that's ok.
+        //       syncTracker.keys[key] = true //mark this key for fast testing later
+        //     }
+
+        //     txQueueEntry.didSync = true // mark that this tx had to sync, this flag should never be cleared, we will use it later to not through stuff away.
+        //     txQueueEntry.syncKeys.push(key) // used later to instruct what local data we should JIT load
+        //     txQueueEntry.localKeys[key] = true // used for the filter.  TODO review why this is set true here!!! seems like this may flag some keys not owned by this node!
+        //     if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.logID}`, `${txQueueEntry.logID} qId: ${txQueueEntry.entryID} account:${utils.stringifyReduce(key)}`)
+        //   }
+        // }
 
         if (age > this.stateManager.queueSitTime * 0.9) {
           if (txQueueEntry.didSync === true) {

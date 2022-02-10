@@ -235,7 +235,7 @@ export function processReceipt(receipt: P2P.GlobalAccountsTypes.Receipt) {
   tracker.timestamp = receipt.tx.when
   if (tracker.gossiped) return false
   Context.shardus.put(receipt.tx.value as OpaqueTransaction, false, true)
-  if (logFlags.console) console.log(`Processed set-global receipt: ${JSON.stringify(receipt)}`)
+  if (logFlags.console) console.log(`Processed set-global receipt: ${JSON.stringify(receipt)} now:${Date.now()}`)
   tracker.gossiped = true
   attemptCleanup()
   return true

@@ -564,6 +564,8 @@ export type AppliedVote = {
     txid: string;
     transaction_result: boolean;
     account_id: string[];
+    //if we add hash state before then we could prove a dishonest apply vote
+    //have to consider software version
     account_state_hash_after: string[];
     cant_apply: boolean;  // indicates that the preapply could not give a pass or fail
     node_id: string; // record the node that is making this vote.. todo could look this up from the sig later
