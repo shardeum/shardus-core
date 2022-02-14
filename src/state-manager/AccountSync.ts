@@ -476,6 +476,8 @@ class AccountSync {
     if (this.stateManager.currentCycleShardData != null) {
       hasValidShardData = this.stateManager.currentCycleShardData.hasCompleteData
     }
+
+    //wait untill we have valid shard data
     while (hasValidShardData === false) {
       this.stateManager.getCurrentCycleShardData()
       await utils.sleep(1000)
@@ -533,7 +535,7 @@ class AccountSync {
       this.createSyncTrackerByRange(range, cycle, true)
     }
 
-    let useGlobalAccounts = false // hack for shardium
+    let useGlobalAccounts = true // this should stay true now.
  
     //@ts-ignore
     if(useGlobalAccounts === true){
@@ -602,6 +604,7 @@ class AccountSync {
           if(breakCount > 5){
             this.statemanager_fatal(`mainSyncLoop_reset-sync-ranges-givingUP`,'too many tries' )
             running = false
+            this.syncTrackers = []
             continue
           }
 
@@ -633,7 +636,7 @@ class AccountSync {
 
 
           //init new non global trackers
-          rangesToSync = this.initRangesToSync(nodeShardData, homePartition)
+          rangesToSync = this.initRangesToSync(nodeShardData, homePartition, 4, 4)
           this.syncStatement.syncRanges = rangesToSync.length
           for (let range of rangesToSync) {
             this.createSyncTrackerByRange(range, cycle, true)
@@ -652,9 +655,10 @@ class AccountSync {
     if (logFlags.console) console.log('syncStateData end' + '   time:' + Date.now())
   }
 
-  private initRangesToSync(nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData, homePartition: number):StateManagerTypes.shardFunctionTypes.AddressRange[] {
-    let chunksGuide = 4
-    let syncRangeGoal = Math.max(1, Math.min(chunksGuide, Math.floor(this.stateManager.currentCycleShardData.shardGlobals.numPartitions / chunksGuide)))
+  private initRangesToSync(nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData, homePartition: number, chunksGuide:number = 4, minSyncRangeGuide:number = 1):StateManagerTypes.shardFunctionTypes.AddressRange[] {
+    //let chunksGuide = 4
+    // todo consider making minSyncRangeGuide = 3 or 4..
+    let syncRangeGoal = Math.max(minSyncRangeGuide, Math.min(chunksGuide, Math.floor(this.stateManager.currentCycleShardData.shardGlobals.numPartitions / chunksGuide)))
     let partitionsCovered = 0
     let partitionsPerRange = 1
     let rangesToSync = [] //, rangesToSync: StateManagerTypes.shardFunctionTypes.AddressRange[]
@@ -917,6 +921,7 @@ class AccountSync {
 
       if (globalReport.accounts.length === 0) {
         if (logFlags.debug) this.mainLogger.debug(`DATASYNC:  syncStateDataGlobals no global accounts `)
+        this.globalAccountsSynced = true
         return // no global accounts
       }
       if (logFlags.debug) this.mainLogger.debug(`DATASYNC:  syncStateDataGlobals globalReport: ${utils.stringifyReduce(globalReport)} `)
@@ -1019,9 +1024,6 @@ class AccountSync {
         if (accountData != null) {
           dataToSet.push(accountData)
           goodAccounts.push(accountData)
-
-
-
         }
       }
 
@@ -1049,6 +1051,7 @@ class AccountSync {
       }
     }
 
+    if (logFlags.debug) this.mainLogger.debug(`DATASYNC:  syncStateDataGlobals complete ${this.syncStatement.numGlobalAccounts}`)
     this.globalAccountsSynced = true
   }
 
@@ -1091,13 +1094,12 @@ class AccountSync {
       }
 
       // TODO I dont know the best way to handle a non null network error here, below is something I had before but disabled for some reason
-
       if (result != null && result.accounts == null) {
-        //if (logFlags.error) this.mainLogger.error('ASK FAIL getRobustGlobalReport result.stateHash == null')
+        if (logFlags.error) this.mainLogger.error('ASK FAIL getRobustGlobalReport result.stateHash == null')
         result = { ready: false, msg: `invalid data format: ${Math.random()}` }
       }
       if (result != null && result.ready === false) {
-        //if (logFlags.error) this.mainLogger.error('ASK FAIL getRobustGlobalReport result.stateHash == null')
+        if (logFlags.error) this.mainLogger.error('ASK FAIL getRobustGlobalReport result.ready === false')
         result = { ready: false, msg: `not ready: ${Math.random()}` }
       }
       return result
@@ -1114,18 +1116,32 @@ class AccountSync {
     let winners
     try {
       let robustQueryResult = await robustQuery(nodes, queryFn, equalFn, 3, false)
+
+      // if we did not get a result at all wait, log and retry
+      if (robustQueryResult === null) {
+        if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getRobustGlobalReport results === null wait 10 seconds and try again. nodes:${nodes.length} `)
+        if (logFlags.console) console.log(`DATASYNC: getRobustGlobalReport results === null wait 10 seconds and try again. nodes:${nodes.length}  `)
+        nestedCountersInstance.countEvent('sync','DATASYNC: getRobustGlobalReport results === null')
+        await utils.sleep(10 * 1000) //wait 10 seconds and try again.
+        return await this.getRobustGlobalReport()
+      }
+
       result = robustQueryResult.topResult
       winners = robustQueryResult.winningNodes
 
+      // if the result is not robust wait, throw an execption
       if (robustQueryResult.isRobustResult == false) {
-        if (logFlags.debug) this.mainLogger.debug('getRobustGlobalReport: robustQuery ')
-        this.statemanager_fatal(`getRobustGlobalReport_nonRobust`, 'getRobustGlobalReport: robustQuery ')
+        if (logFlags.debug) this.mainLogger.debug('getRobustGlobalReport: robustQuery isRobustResult == false')
+        this.statemanager_fatal(`getRobustGlobalReport_nonRobust`, 'getRobustGlobalReport: robustQuery isRobustResult == false')
+        nestedCountersInstance.countEvent('sync','DATASYNC: getRobustGlobalReport: robustQuery isRobustResult == false')
         throw new Error('FailAndRestartPartition_globalReport_A')
       }
 
+      // if the reports are not ready then wait, log an retry
       if (result.ready === false) {
         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: getRobustGlobalReport results not ready wait 10 seconds and try again `)
         if (logFlags.console) console.log(`DATASYNC: getRobustGlobalReport results not ready wait 10 seconds and try again `)
+        nestedCountersInstance.countEvent('sync','DATASYNC: getRobustGlobalReport results not ready wait 10 seconds and try again')
         await utils.sleep(10 * 1000) //wait 10 seconds and try again.
         return await this.getRobustGlobalReport()
       }
@@ -1490,11 +1506,12 @@ class AccountSync {
     let lowTimeQuery = startTime
 
     if(this.useStateTable === false){
+      this.dataSourceNode = null
       this.getDataSourceNode(lowAddress, highAddress)
     }
 
-
-    if(this.dataSourceNode === null){
+    if(this.dataSourceNode == null){
+      if (logFlags.error) this.mainLogger.error(`syncAccountData: dataSourceNode == null ${lowAddress} - ${highAddress}`)
       //if we see this then getDataSourceNode failed.
       // this is most likely because the ranges selected when we started sync are now invalid and too wide to be filled.
 
@@ -2000,7 +2017,7 @@ class AccountSync {
 
     let centerNode = ShardFunctions.getCenterHomeNode(this.stateManager.currentCycleShardData.shardGlobals, this.stateManager.currentCycleShardData.parititionShardDataMap, lowAddress, highAddress)
     if (centerNode == null) {
-      if (logFlags.debug) this.mainLogger.debug(`centerNode not found`)
+      if (logFlags.error) this.mainLogger.error(`getDataSourceNode: centerNode not found`)
       return
     }
 
@@ -2011,9 +2028,9 @@ class AccountSync {
       this.p2p.id,
       40
     )
-
+    let nodesInProximity = nodes.length
     nodes = nodes.filter(this.removePotentiallyRemovedNodes)
-
+    let filteredNodes1 = nodes.length
     let filteredNodes = []
     for(let node of nodes){
 
@@ -2021,17 +2038,24 @@ class AccountSync {
       if(nodeShardData != null){
 
         if(ShardFunctions.testAddressInRange(queryLow, nodeShardData.consensusPartitions) === false){
+          if (logFlags.error) this.mainLogger.error(`node cant fit range: queryLow:${queryLow}  ${utils.stringifyReduce(nodeShardData.consensusPartitions)}  `)
           continue
         }
         if(ShardFunctions.testAddressInRange(queryHigh, nodeShardData.consensusPartitions) === false){
+          if (logFlags.error) this.mainLogger.error(`node cant fit range: queryHigh:${queryHigh}  ${utils.stringifyReduce(nodeShardData.consensusPartitions)}  `)
           continue
         }
         filteredNodes.push(node)
       }
     }
     nodes = filteredNodes
+    let filteredNodes2 = nodes.length
     if(nodes.length > 0){
       this.dataSourceNode = nodes[Math.floor(Math.random() * nodes.length)]
+      //this next line is not an error: comment it out later
+      if (logFlags.error) this.mainLogger.error(`data source nodes found: ${nodes.length}  nodesInProximity:${nodesInProximity} filteredNodes1:${filteredNodes1} filteredNodes2:${filteredNodes2} `)
+    } else {
+      if (logFlags.error) this.mainLogger.error(`no data source nodes found nodesInProximity:${nodesInProximity} filteredNodes1:${filteredNodes1} filteredNodes2:${filteredNodes2} `)
     }
   }
 

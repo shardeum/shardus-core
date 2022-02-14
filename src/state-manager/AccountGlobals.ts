@@ -114,20 +114,20 @@ class AccountGlobals {
           toQuery.push(key)
         }
 
-        // TODO: set this as config parameter
-        const useGlobalAccount = false
-        if (this.p2p.isFirstSeed && useGlobalAccount) {
-          //TODO: SOON this will mess up dapps that dont use global accounts.  update: maybe add a config to specify if there will be no global accounts for a network. pls discuss fix with group.
-          if(toQuery.length === 0){
-            nestedCountersInstance.countEvent(`sync`, `HACKFIX - first node needs to wait! ready:${result.ready} responded:${responded}`)
-            result.ready = false
-            if(responded === false){
-              this.statemanager_fatal('get_globalaccountreport -first seed has no globals', `get_globalaccountreport -first seed has no globals. ready:${result.ready} responded:${responded}`)
-              await respond(result)
-            }
-            return
-          }
-        }
+        // I Think this section can be depricated.  The appFinishedSyncing check above should be enough to bail when it is appropriate
+        // const useGlobalAccount = true
+        // if (this.p2p.isFirstSeed && useGlobalAccount) {
+        //   //TODO: SOON this will mess up dapps that dont use global accounts.  update: maybe add a config to specify if there will be no global accounts for a network. pls discuss fix with group.
+        //   if(toQuery.length === 0 && this.stateManager.appFinishedSyncing === false){
+        //     nestedCountersInstance.countEvent(`sync`, `HACKFIX - first node needs to wait! ready:${result.ready} responded:${responded}`)
+        //     result.ready = false
+        //     if(responded === false){
+        //       this.statemanager_fatal('get_globalaccountreport -first seed has no globals', `get_globalaccountreport -first seed has no globals. ready:${result.ready} responded:${responded}`)
+        //       await respond(result)
+        //     }
+        //     return
+        //   }
+        // }
 
         if(result.ready === false){
           nestedCountersInstance.countEvent(`sync`, `HACKFIX - forgot to return!`)
