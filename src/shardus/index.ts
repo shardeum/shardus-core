@@ -236,7 +236,7 @@ class Shardus extends EventEmitter {
    * This function is what the app developer uses to setup all the SDK functions used by shardus
    * @typedef {import('./index').App} App
    */
-  setup(app) {
+  setup(app: ShardusTypes.App) {
     if (app === null) {
       this.appProvided = false
     } else if (app === Object(app)) {
@@ -1201,7 +1201,7 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.validate = (inTx) =>
           application.validate(inTx)
       } else if (typeof application.validateTxnFields === 'function') {
-        /** 
+        /**
          * Compatibility layer for Apps that use the old validateTxnFields fn
          * instead of the new validate fn
          */
@@ -1223,7 +1223,7 @@ class Shardus extends EventEmitter {
         applicationInterfaceImpl.crack = (inTx) =>
           application.crack(inTx)
       } else if (typeof application.getKeyFromTransaction === 'function' && typeof application.validateTxnFields === 'function') {
-        /** 
+        /**
          * Compatibility layer for Apps that use the old getKeyFromTransaction
          * fn instead of the new crack fn
          */
@@ -1744,6 +1744,7 @@ class Shardus extends EventEmitter {
     ])
     if (accounts != null && accounts.length === 1) {
       let account = accounts[0]
+      // @ts-ignore // TODO where is listOfChanges coming from here? I don't think it should exist on data
       let changes = account.data.listOfChanges as {
         cycle: number
         change: any
@@ -1841,7 +1842,7 @@ class Shardus extends EventEmitter {
     }
   }
   tryInvolveAccount(txID:string, address:string, isRead:boolean): boolean {
-    
+
     return true
   }
 
@@ -1849,3 +1850,4 @@ class Shardus extends EventEmitter {
 
 // tslint:disable-next-line: no-default-export
 export default Shardus
+export * as ShardusTypes from '../shardus/shardus-types'

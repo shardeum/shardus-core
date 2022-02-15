@@ -133,7 +133,7 @@ class StateManager {
 
   debugFeatureOld_partitionReciepts: boolean // depends on old partition report features.
 
-  
+
 
   logger: Logger
 
@@ -177,7 +177,7 @@ class StateManager {
    */
   constructor( profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
     //super()
-    
+
 
     this.p2p = p2p
     this.crypto = crypto
@@ -243,7 +243,7 @@ class StateManager {
     // this.oldFeature_GeneratePartitionReport = false
     // this.oldFeature_BroadCastPartitionReport = true // leaving this true since it depends on the above value
 
-    this.processCycleSummaries = false //starts false and get enabled when startProcessingCycleSummaries() is called 
+    this.processCycleSummaries = false //starts false and get enabled when startProcessingCycleSummaries() is called
 
     this.feature_receiptMapResults = true
     this.feature_partitionHashes = true
@@ -386,7 +386,7 @@ class StateManager {
       }
     }
 
-    
+
   }
 
   // TEMP hack emit events through p2p
@@ -423,7 +423,7 @@ class StateManager {
       }
       else if(delay > 4000){
         nestedCountersInstance.countEvent('stateManager', 'updateShardValues delay > 4s')
-      }      
+      }
       else if(delay > 3000){
         nestedCountersInstance.countEvent('stateManager', 'updateShardValues delay > 3s')
       }
@@ -484,12 +484,12 @@ class StateManager {
     // partition shard data
     ShardFunctions.computePartitionShardDataMap(cycleShardData.shardGlobals, cycleShardData.parititionShardDataMap, 0, cycleShardData.shardGlobals.numPartitions)
     this.profiler.profileSectionEnd('updateShardValues_computePartitionShardDataMap1')
-    
+
     this.profiler.profileSectionStart('updateShardValues_computePartitionShardDataMap2') //37ms, #:60
     // generate limited data for all nodes data for all nodes.
     ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.activeNodes, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, false)
     this.profiler.profileSectionEnd('updateShardValues_computePartitionShardDataMap2')
-    
+
     this.profiler.profileSectionStart('updateShardValues_computeNodePartitionData')  //22ms, #:60
     // get extended data for our node
     cycleShardData.nodeShardData = ShardFunctions.computeNodePartitionData(cycleShardData.shardGlobals, cycleShardData.ourNode, cycleShardData.nodeShardDataMap, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true)
@@ -499,7 +499,7 @@ class StateManager {
     // this.profiler.profileSectionStart('updateShardValues_computeNodePartitionDataMap1') // 4ms, #:60
     // TODO perf scalability  need to generate this as needed in very large networks with millions of nodes.
     // generate full data for nodes that store our home partition
-    // 
+    //
     // ShardFunctions.computeNodePartitionDataMap(cycleShardData.shardGlobals, cycleShardData.nodeShardDataMap, cycleShardData.nodeShardData.nodeThatStoreOurParitionFull, cycleShardData.parititionShardDataMap, cycleShardData.activeNodes, true, false)
     // this.profiler.profileSectionEnd('updateShardValues_computeNodePartitionDataMap1')
 
@@ -571,7 +571,7 @@ class StateManager {
     // Temp disable for log size
     // if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${cycleNumber} data: ${utils.stringifyReduce(cycleShardData)}`)
     if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_cycleData', `${cycleNumber}`, ` cycleShardData: cycle:${this.currentCycleShardData.cycleNumber} `)
-    
+
     this.lastActiveNodeCount = cycleShardData.activeNodes.length
 
     cycleShardData.hasCompleteData = true
@@ -586,7 +586,7 @@ class StateManager {
     }
 
     let cycleToCompareTo = newSharddata.cycleNumber - 1
-    
+
     //if this is our first time to sync we should attempt to compare to an older cycle
     if(this.firstTimeToRuntimeSync === true){
       this.firstTimeToRuntimeSync = false
@@ -768,7 +768,7 @@ class StateManager {
     nestedCountersInstance.countEvent('sync', `sync comlete numCycles: ${this.accountSync.syncStatement.numCycles} start:${this.accountSync.syncStatement.cycleStarted} end:${this.accountSync.syncStatement.cycleEnded}`)
     if(this.accountSync.syncStatement.internalFlag === true){
       if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_syncStatement', ` `, `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
-      this.accountSync.syncStatmentIsComplete()      
+      this.accountSync.syncStatmentIsComplete()
       this.statemanager_fatal('shrd_sync_syncStatement-tempdebug', `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
     } else{
       this.accountSync.syncStatement.internalFlag = true
@@ -861,7 +861,7 @@ class StateManager {
       // may have to be carefull about how we tune this value relative to the rate that we make this query
       // we should try to make this query more often then the delta.
       if (logFlags.verbose) console.log('delta ' + delta)
-      // increased allowed delta to allow for a better chance to catch up  
+      // increased allowed delta to allow for a better chance to catch up
       if (delta < this.queueSitTime * 2) {
         let tsStart2 = highestTs
         wrappedAccounts2 = await this.app.getAccountDataByRange(accountStart, accountEnd, tsStart2, Date.now(), 10000000)
@@ -910,7 +910,7 @@ class StateManager {
         let accountMemData: AccountHashCache = this.accountCache.getAccountHash(accountId)
         if (timestamp < accountMemData.t) {
           //should update cache anyway (older value may be needed)
-          
+
           this.accountCache.updateAccountHash(wrapedAccount.accountId, wrapedAccount.stateId, wrapedAccount.timestamp, cycleToRecordOn)
 
           if (logFlags.error) this.mainLogger.error(`setAccountData: abort. checkAndSetAccountData older timestamp note:${note} acc: ${utils.makeShortHash(accountId)} timestamp:${timestamp} accountMemData.t:${accountMemData.t} hash: ${utils.makeShortHash(hash)} cache:${utils.stringifyReduce(accountMemData)}`)
@@ -955,7 +955,7 @@ class StateManager {
             if(tryToCorrectStats){
               let accounts = await this.app.getAccountDataByList([wrapedAccount.accountId])
               if(accounts != null && accounts.length === 1){
-                this.partitionStats.statsDataSummaryUpdate(cycleToRecordOn, accounts[0].data, wrapedAccount, 'checkAndSetAccountData-' + note)  
+                this.partitionStats.statsDataSummaryUpdate(cycleToRecordOn, accounts[0].data, wrapedAccount, 'checkAndSetAccountData-' + note)
               }
             } else {
               //old way
@@ -1266,7 +1266,7 @@ class StateManager {
     Comms.unregisterInternal('request_state_for_tx')
     Comms.unregisterInternal('request_state_for_tx_post')
     Comms.unregisterInternal('request_tx_and_state')
-  
+
     Comms.unregisterInternal('request_receipt_for_tx')
     Comms.unregisterInternal('broadcast_state')
     Comms.unregisterGossipHandler('spread_tx_to_group')
@@ -1279,7 +1279,7 @@ class StateManager {
     Comms.unregisterInternal('sync_trie_hashes')
     Comms.unregisterInternal('get_trie_accountHashes')
     Comms.unregisterInternal('get_account_data_by_hashes')
-    
+
   }
 
   // //////////////////////////////////////////////////////////////////////////
@@ -1330,14 +1330,14 @@ class StateManager {
           this.accountSync.syncStatement.discardedTXs++
         }
       }
-    }  
+    }
     this.transactionQueue.newAcceptedTxQueueTempInjest = newList
 
     await this.transactionQueue.processAcceptedTxQueue(true)
 
     if(this.accountSync.syncStatement.internalFlag === true){
       if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_syncStatement', ` `, `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
-      this.accountSync.syncStatmentIsComplete()      
+      this.accountSync.syncStatmentIsComplete()
       this.statemanager_fatal('shrd_sync_syncStatement-tempdebug', `${utils.stringifyReduce(this.accountSync.syncStatement)}`)
     } else{
       this.accountSync.syncStatement.internalFlag = true
@@ -1357,8 +1357,8 @@ class StateManager {
 
     let ourNodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData = this.currentCycleShardData.nodeShardData
     // partittions:
-    let partitionDump: DebugDumpPartitions = { partitions: [], cycle: 0, rangesCovered: {} as DebugDumpRangesCovered, 
-    nodesCovered: {} as DebugDumpNodesCovered, allNodeIds: [], globalAccountIDs: [], globalAccountSummary: [], 
+    let partitionDump: DebugDumpPartitions = { partitions: [], cycle: 0, rangesCovered: {} as DebugDumpRangesCovered,
+    nodesCovered: {} as DebugDumpNodesCovered, allNodeIds: [], globalAccountIDs: [], globalAccountSummary: [],
     globalStateHash: '', calculationTime: this.currentCycleShardData.calculationTime }
     partitionDump.cycle = this.currentCycleShardData.cycleNumber
 
@@ -1419,6 +1419,7 @@ class StateManager {
             continue
           }
           duplicateCheck[wrappedAccount.accountId] = true
+          // @ts-ignore // TODO how do we check "balance" on the data we don't know anything about?
           let v = wrappedAccount.data.balance // hack, todo maybe ask app for a debug value
           if (this.app.getAccountDebugValue != null) {
             v = this.app.getAccountDebugValue(wrappedAccount)
@@ -1480,8 +1481,8 @@ class StateManager {
 
     let ourNodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData = this.currentCycleShardData.nodeShardData
     // partittions:
-    let partitionDump: DebugDumpPartitions = { partitions: [], cycle: 0, rangesCovered: {} as DebugDumpRangesCovered, 
-    nodesCovered: {} as DebugDumpNodesCovered, allNodeIds: [], globalAccountIDs: [], globalAccountSummary: [], 
+    let partitionDump: DebugDumpPartitions = { partitions: [], cycle: 0, rangesCovered: {} as DebugDumpRangesCovered,
+    nodesCovered: {} as DebugDumpNodesCovered, allNodeIds: [], globalAccountIDs: [], globalAccountSummary: [],
     globalStateHash: '', calculationTime: this.currentCycleShardData.calculationTime }
     partitionDump.cycle = this.currentCycleShardData.cycleNumber
 
@@ -1551,6 +1552,7 @@ class StateManager {
               continue
             }
             duplicateCheck[wrappedAccount.accountId] = true
+            // @ts-ignore // TODO how do we check "balance" on the data we don't know anything about?
             let v = wrappedAccount.data.balance // hack, todo maybe ask app for a debug value
             if (this.app.getAccountDebugValue != null) {
               v = this.app.getAccountDebugValue(wrappedAccount)
@@ -1612,7 +1614,7 @@ class StateManager {
       if(counterMsg.length > 0){
         nestedCountersInstance.countRareEvent('sync' , `waitForShardData ${counterMsg}` )
       }
-      
+
       if (logFlags.playback) this.logger.playbackLogNote('_waitForShardData', ` `, ` ${utils.stringifyReduce(this.currentCycleShardData)} `)
     }
   }
@@ -1945,7 +1947,7 @@ class StateManager {
     let cycleNumber = -1
 
     let timePlusSettle = txTimestamp + this.syncSettleTime //tx timestamp + settle time to determine what cycle to save in
-    
+
     //use different function to get cycle number
     let cycle = CycleChain.getCycleNumberFromTimestamp(txTimestamp)
     cycleNumber = cycle
@@ -2026,7 +2028,7 @@ class StateManager {
       for (let accountData of accountCopies) {
         // make sure the data is not a json string
         if (utils.isString(accountData.data)) {
-          accountData.data = JSON.parse(accountData.data)
+          accountData.data = JSON.parse(accountData.data as string)
         }
 
         if (accountData == null || accountData.data == null || accountData.accountId == null) {
@@ -2113,7 +2115,7 @@ class StateManager {
     let entry = { id: ourID }
 
     if(fifoName === 'accountModification'){
-      nestedCountersInstance.countEvent('fifo-backup',`accountModification ${thisFifo.waitingList.length}`) 
+      nestedCountersInstance.countEvent('fifo-backup',`accountModification ${thisFifo.waitingList.length}`)
     }
 
     if (thisFifo.waitingList.length > 0 || thisFifo.queueLocked) {
@@ -2550,8 +2552,8 @@ class StateManager {
     }
     this.profiler.profileSectionEnd('stateManager_processPreviousCycleSummaries_buildStatsReport')
 
-    
-    
+
+
     // build partition hashes from previous full cycle
     let mainHashResults: MainHashResults = null
     if (this.feature_partitionHashes === true) {
@@ -2562,14 +2564,14 @@ class StateManager {
 
 
         this.profiler.profileSectionStart('stateManager_updatePartitionReport_updateTrie')
-        //Note: the main work is happening in accountCache.buildPartitionHashesForNode, this just 
+        //Note: the main work is happening in accountCache.buildPartitionHashesForNode, this just
         // uses that data to create our old report structure for reporting to the monitor-server
         this.partitionObjects.updatePartitionReport(cycleShardValues, mainHashResults)
         this.accountPatcher.updateTrieAndBroadCast(lastCycle.counter)
         this.profiler.profileSectionEnd('stateManager_updatePartitionReport_updateTrie')
       }
     }
-    
+
 
     //reset cycleDebugNotes
     this.cycleDebugNotes = {repairs:0, lateRepairs:0, patchedAccounts:0, badAccounts:0, noRcptRepairs:0 }
@@ -2589,7 +2591,7 @@ class StateManager {
       } else {
         this.dumpAccountDebugData2(mainHashResults) //more detailed work
       }
-      
+
     }
 
     // pre-allocate the next two cycles if needed
@@ -2610,7 +2612,7 @@ class StateManager {
     //   await this.partitionObjects.broadcastPartitionResults(cycle.counter) // Cycle_number
     // }
 
-    //this funciton is not awaited so we should be able to sleep and then 
+    //this funciton is not awaited so we should be able to sleep and then
 
     await utils.sleep(10000) //wait 10 seconds
 
