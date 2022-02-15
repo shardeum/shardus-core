@@ -1419,10 +1419,11 @@ class StateManager {
             continue
           }
           duplicateCheck[wrappedAccount.accountId] = true
-          // @ts-ignore // TODO how do we check "balance" on the data we don't know anything about?
-          let v = wrappedAccount.data.balance // hack, todo maybe ask app for a debug value
+          let v:string
           if (this.app.getAccountDebugValue != null) {
             v = this.app.getAccountDebugValue(wrappedAccount)
+          } else {
+            v = 'getAccountDebugValue not defined'
           }
           partition.accounts.push({ id: wrappedAccount.accountId, hash: wrappedAccount.stateId, v: v })
         }
@@ -1552,10 +1553,11 @@ class StateManager {
               continue
             }
             duplicateCheck[wrappedAccount.accountId] = true
-            // @ts-ignore // TODO how do we check "balance" on the data we don't know anything about?
-            let v = wrappedAccount.data.balance // hack, todo maybe ask app for a debug value
+            let v:string
             if (this.app.getAccountDebugValue != null) {
               v = this.app.getAccountDebugValue(wrappedAccount)
+            } else {
+              v = 'getAccountDebugValue not defined'
             }
             partition.accounts.push({ id: wrappedAccount.accountId, hash: wrappedAccount.stateId, v: v })
           }

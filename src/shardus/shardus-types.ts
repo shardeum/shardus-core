@@ -164,7 +164,7 @@ export interface App {
     keys: TransactionKeys
   }
 
-  // DEPRECATED in favor of `validate`
+  // DEPRECATED . This was previously a deep validate for buisness logic but it is up to the dapp to handle this as part of apply
   validateTransaction?: (...data: any) => any
   /**
    * A function responsible for validation the incoming transaction fields

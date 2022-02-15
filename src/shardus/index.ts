@@ -1867,10 +1867,6 @@ class Shardus extends EventEmitter {
       this.fatalLogger.fatal(log)
     }
   }
-  tryInvolveAccount(txID:string, address:string, isRead:boolean): boolean {
-
-    return true
-  }
 
 }
 
