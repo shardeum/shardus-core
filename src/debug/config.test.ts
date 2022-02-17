@@ -1,9 +1,9 @@
 import { setConfig } from '../p2p/Context';
-import { ServerMode, ShardusConfiguration } from '../shardus/shardus-types';
+import { ServerMode, ServerConfiguration } from '../shardus/shardus-types';
 import { DebugConfigurations, isDebugMode, isDebugModeAnd } from './index';
 
 test('debug > isDebugMode > Should return true if config mode is DEBUG', () => {
-  const config: Partial<ShardusConfiguration> = {
+  const config: Partial<ServerConfiguration> = {
     mode: ServerMode.Debug
   };
 
@@ -15,7 +15,7 @@ test('debug > isDebugMode > Should return true if config mode is DEBUG', () => {
 });
 
 test('debug > isDebugMode > Should return false if config mode is Release', () => {
-  const config: Partial<ShardusConfiguration> = {
+  const config: Partial<ServerConfiguration> = {
     mode: ServerMode.Release
   };
 
@@ -27,7 +27,7 @@ test('debug > isDebugMode > Should return false if config mode is Release', () =
 });
 
 test('debug > isDebugMode > Should default to false if config mode does not exist', () => {
-  const config: Partial<ShardusConfiguration> = {};
+  const config: Partial<ServerConfiguration> = {};
 
   setConfig(config);
   
@@ -37,7 +37,7 @@ test('debug > isDebugMode > Should default to false if config mode does not exis
 });
 
 test('debug > isDebugMode > Should default to false if config mode is not explicit', () => {
-  const config: Partial<ShardusConfiguration> = {
+  const config: Partial<ServerConfiguration> = {
     mode: 'blah' as ServerMode
   };
 
@@ -49,7 +49,7 @@ test('debug > isDebugMode > Should default to false if config mode is not explic
 });
 
 test('debug > isDebugModeAnd > Should run the predicate if config is debug mode', () => {
-  const config: Partial<ShardusConfiguration> = {
+  const config: Partial<ServerConfiguration> = {
     mode: ServerMode.Debug
   };
 
@@ -63,7 +63,7 @@ test('debug > isDebugModeAnd > Should run the predicate if config is debug mode'
 });
 
 test('debug > isDebugModeAnd > Should NOT run the predicate if config is not debug mode', () => {
-  const config: Partial<ShardusConfiguration> = {};
+  const config: Partial<ServerConfiguration> = {};
 
   setConfig(config);
 
@@ -76,7 +76,7 @@ test('debug > isDebugModeAnd > Should NOT run the predicate if config is not deb
 
 test('debug > isDebugModeAnd > Should provide the debug configurations to the predicate', () => {
   const debugConfig: DebugConfigurations = {};
-  const config: Partial<ShardusConfiguration> = {
+  const config: Partial<ServerConfiguration> = {
     mode: ServerMode.Debug,
     debug: debugConfig
   };
@@ -91,7 +91,7 @@ test('debug > isDebugModeAnd > Should provide the debug configurations to the pr
 });
 
 test('debug > isDebugModeAnd > Should return true if predicate is true', () => {
-  const config: Partial<ShardusConfiguration> = {
+  const config: Partial<ServerConfiguration> = {
     mode: ServerMode.Debug
   };
 
@@ -103,7 +103,7 @@ test('debug > isDebugModeAnd > Should return true if predicate is true', () => {
 });
 
 test('debug > isDebugModeAnd > Should return true if predicate is false', () => {
-  const config: Partial<ShardusConfiguration> = {
+  const config: Partial<ServerConfiguration> = {
     mode: ServerMode.Debug
   };
 

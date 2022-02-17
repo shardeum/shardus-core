@@ -41,7 +41,7 @@ const defaultConfigs = {
   logs: require('../config/logs.json'),
   storage: require('../config/storage.json'),
 } as {
-  server: ShardusTypes.ShardusConfiguration
+  server: ShardusTypes.ServerConfiguration
   logs: ShardusTypes.LogsConfiguration
   storage: ShardusTypes.StorageConfiguration
 }
@@ -57,7 +57,7 @@ interface Shardus {
   profiler: Profiler
   nestedCounters: NestedCounters
   memoryReporting: MemoryReporting
-  config: ShardusTypes.ShardusConfiguration
+  config: ShardusTypes.ServerConfiguration
 
   logger: Logger
   mainLogger: Log4js.Logger
@@ -96,7 +96,7 @@ class Shardus extends EventEmitter {
     logs: logsConfig,
     storage: storageConfig,
   }: {
-    server: ShardusTypes.ShardusConfiguration
+    server: ShardusTypes.ServerConfiguration
     logs: ShardusTypes.LogsConfiguration
     storage: ShardusTypes.StorageConfiguration
   }) {

@@ -16,7 +16,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 class TransactionConsenus {
   app: Shardus.App
   crypto: Crypto
-  config: Shardus.ShardusConfiguration
+  config: Shardus.ServerConfiguration
   profiler: Profiler
 
   logger: Logger
@@ -30,7 +30,7 @@ class TransactionConsenus {
   statsLogger: any
   statemanager_fatal: (key: string, log: string) => void
 
-  constructor(stateManager: StateManager,  profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
+  constructor(stateManager: StateManager,  profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ServerConfiguration) {
 
     this.crypto = crypto
     this.app = app

@@ -19,9 +19,9 @@ export let shardus: Shardus
 export let stateManager: StateManager
 export let storage: Storage
 export let io
-export let config: ShardusTypes.ShardusConfiguration
+export let config: ShardusTypes.ServerConfiguration
 export let defaultConfigs: {
-  server: ShardusTypes.ShardusConfiguration
+  server: ShardusTypes.ServerConfiguration
   logs: ShardusTypes.LogsConfiguration
   storage: ShardusTypes.StorageConfiguration
 }
@@ -63,7 +63,7 @@ export function setReporterContext(context) {
   reporter = context
 }
 
-export function setConfig(conf: ShardusTypes.ShardusConfiguration) {
+export function setConfig(conf: ShardusTypes.ServerConfiguration) {
   config = conf
 }
 

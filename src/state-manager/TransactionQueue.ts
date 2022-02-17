@@ -21,7 +21,7 @@ const allZeroes64 = '0'.repeat(64)
 class TransactionQueue {
   app: Shardus.App
   crypto: Crypto
-  config: Shardus.ShardusConfiguration
+  config: Shardus.ServerConfiguration
   profiler: Profiler
 
   logger: Logger
@@ -54,7 +54,7 @@ class TransactionQueue {
   processingMinRunBreak: number
   processingLeftBusy: boolean
 
-  constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
+  constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ServerConfiguration) {
     this.crypto = crypto
     this.app = app
     this.logger = logger

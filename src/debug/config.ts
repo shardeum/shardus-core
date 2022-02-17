@@ -1,7 +1,7 @@
-import { ServerMode, ShardusConfiguration } from "../shardus/shardus-types";
+import { ServerMode, ServerConfiguration } from "../shardus/shardus-types";
 import { config } from '../p2p/Context'
 
-export type DebugConfigurations = ShardusConfiguration['debug'];
+export type DebugConfigurations = ServerConfiguration['debug'];
 
 export function isDebugMode(): boolean {
     return !!(config && config.mode && config.mode.toLowerCase && config.mode.toLowerCase() === ServerMode.Debug)

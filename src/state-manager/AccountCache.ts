@@ -17,7 +17,7 @@ import { AccountHashCache, AccountHashCacheMain, AccountHashCacheMain3, CycleSha
 class AccountCache {
   app: Shardus.App
   crypto: Crypto
-  config: Shardus.ShardusConfiguration
+  config: Shardus.ServerConfiguration
   profiler: Profiler
   
   logger: Logger
@@ -40,7 +40,7 @@ class AccountCache {
   statemanager_fatal: (key: string, log: string) => void
   stateManager: StateManager
 
-  constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, crypto: Crypto, config: Shardus.ShardusConfiguration) {
+  constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, crypto: Crypto, config: Shardus.ServerConfiguration) {
     this.crypto = crypto
     this.app = app
     this.logger = logger

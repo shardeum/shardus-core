@@ -508,7 +508,7 @@ export enum ServerMode {
   Release = 'release',
 }
 
-export interface ShardusConfiguration {
+export interface ServerConfiguration {
   /** The heartbeatInterval parameter is an Integer that defines the number of seconds between each heartbeat logged within shardus */
   heartbeatInterval?: number
   /** The baseDir parameter is a String that defines the relative base directory for this running instance of shardus */
@@ -813,6 +813,12 @@ export interface StorageConfiguration {
     }
     memoryFile?: false
   }
+}
+
+export interface ShardusConfiguration {
+  server?: ServerConfiguration
+  logs?: LogsConfiguration
+  storage?: StorageConfiguration
 }
 
 export interface AcceptedTx {
