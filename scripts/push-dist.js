@@ -1,3 +1,4 @@
+/* eslint-disable no-process-exit */
 const execa = require('execa')
 
 const branch = process.argv[2]
