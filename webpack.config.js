@@ -5,7 +5,7 @@ const BytenodeWebpackPlugin = require('bytenode-webpack-plugin')
 module.exports = {
   entry: './build/src/',
   output: {
-    filename: 'shardus.js',
+    filename: 'index.js',
     path: path.resolve(__dirname, process.env.npm_package_config_dist),
     libraryTarget: 'commonjs2'
   },

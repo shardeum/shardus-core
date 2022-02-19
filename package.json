@@ -1,30 +1,36 @@
 {
-  "name": "shardus-global-server",
+  "name": "@shardus/core",
   "version": "2.4.0",
   "engines": {
     "node": "^16.11.1"
   },
   "description": "The Shardus Global Server",
-  "main": "./build/src/index.js",
-  "types": "./build/src/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "files": [
-    "build/**/*",
-    "src/**/*"
+    "dist/*"
   ],
   "config": {
     "dist": "./dist"
   },
   "scripts": {
-    "build-dist": "node scripts/build-dist.js",
-    "update-dist": "node scripts/update-dist.js master",
-    "update-dist-arm": "node scripts/update-dist.js arm",
-    "push-dist": "node scripts/push-dist.js master",
-    "push-dist-arm": "node scripts/push-dist.js arm",
+    "clean": "shx rm -rf dist build",
+    "create:folders": "shx mkdir -p dist",
+    "compile:ts": "tsc",
+    "compile:pack": "webpack",
+    "compile:js": "bytenode -c build/src/index.js",
+    "release:move:typedocs": "shx mv build/src/index.d.ts dist/",
+    "release:move:extras": "shx mv build/src/crypto/computePowGenerator.js dist/ && shx cp templates/release.index.js dist/index.js",
+    "dev:move": "shx mv build/src dist",
+    "prep": "npm run create:folders",
+    "np": "np --any-branch --no-cleanup --no-tests --no-yarn --message=\"Bump version to %s\"",
+    "compile": "npm-run-all compile:*",
+    "release:move": "npm-run-all release:move:*",
+    "build:dev": "npm-run-all clean compile:ts dev:move",
+    "build:release": "npm-run-all clean prep compile release:move",
+    "release": "npm-run-all build:release np",
     "check": "gts check",
-    "clean": "gts clean",
-    "compile": "tsc -p .",
     "fix": "gts fix",
-    "prepare": "npm run compile",
     "test": "jest",
     "test-watch": "jest --watch",
     "depcheck": "depcheck --skip-missing --ignores webpack,webpack-cli"
@@ -33,9 +39,13 @@
     "type": "git",
     "url": "git@gitlab.com:shardus/global/shardus-global-server.git"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@hapi/sntp": "^3.1.1",
     "body-parser": "^1.18.3",
+    "bytenode": "^1.3.4",
     "cors": "^2.8.5",
     "deepmerge": "^4.2.2",
     "express": "^4.16.4",
@@ -64,10 +74,11 @@
     "@types/trie-prefix-tree": "^1.5.0",
     "bytenode-webpack-plugin": "^1.0.5",
     "depcheck": "^1.4.3",
-    "execa": "^4.0.1",
     "gts": "^3.1.0",
     "jest": "^27.1.1",
-    "shelljs": "^0.8.4",
+    "np": "^7.6.0",
+    "npm-run-all": "^4.1.5",
+    "shx": "^0.3.4",
     "ts-jest": "^27.0.5",
     "typescript": "^4.4.4",
     "webpack": "^5.68.0",
