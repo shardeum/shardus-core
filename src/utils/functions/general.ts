@@ -168,3 +168,35 @@ export function sumObject(sumObject, toAddObject){
     }
   }
 }
+
+// @param {Literal Object} `obj` object to be genrate schema for
+// @param {Literal Object} `options`, an object including a flag to whether the return schema should be serialize or not
+// @return {String | LiteralObject} will return schema object or serialize version of it when specify
+// This function generate a schema (object/serialization) of the object it has been passed
+export function generateObjSchema(obj, options: { serialize: boolean } = { serialize: false }) {
+  let schema = {}
+  for (const [key, value] of Object.entries(obj)) {
+    if (obj.hasOwnProperty(key) && obj[key] !== null) {
+      if (value.constructor === Object) {
+        //recursive call occurs here
+        schema[key] = generateObjSchema(value)
+      } else if (value.constructor === Array) {
+        schema[key] = 'array'
+      } else {
+        schema[key] = typeof value
+      }
+    }
+  }
+  return options.serialize ? JSON.stringify(schema) : schema
+}
+
+// @param {Literal Object} idol, the first object to be compared
+// @param {Literal Object} admirer, the second object to be compared
+// @return {Boolean} return true if obj shapes are equal, false otherwise
+// This function compare shapes of two object
+export function compareObjShape(idol, admirer): boolean {
+  const idol_schema = generateObjSchema(idol, { serialize: true })
+  const admirer_schema = generateObjSchema(admirer, { serialize: true })
+
+  return idol_schema === admirer_schema
+}
