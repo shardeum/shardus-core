@@ -1,0 +1,22 @@
+cache:
+  paths:
+  - node_modules/
+
+stages:
+  - check
+
+check:
+  image: node:16
+  stage: check
+  variables:
+    NODE_ENV: test
+  before_script:
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup_install.sh
+    - chmod 777 rustup_install.sh
+    - ./rustup_install.sh -y
+    - source $HOME/.cargo/env
+    - npm ci
+  script:
+    - npm run depcheck
+    - npm run compile
+
