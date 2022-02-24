@@ -2,6 +2,17 @@
 
 The foundational technology upon which all Shardus applications are built
 
+## Installation
+
+Installing this is mostly like usual:
+
+```sh
+npm install
+```
+
+However, there's one consideration. For the time being, you need to have [the rust toolchain](https://opensource.com/article/20/3/rust-cargo).
+We're working on a fix for this, but for now you'll need it. Specifically, `cargo` must be in your `PATH`.
+
 ## Releasing
 
 If you are a core developer on this project, you may sometimes want to cut a release.
