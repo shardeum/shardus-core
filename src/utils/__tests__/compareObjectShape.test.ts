@@ -1,0 +1,219 @@
+import { compareObjectShape } from '..'
+
+test('compareObjectShape() > two identical object should return true', () => {
+  const idol = {
+    timestamp: new Date(),
+    fn: (str) => str,
+    debug: false,
+    id: 1,
+    dummyObj: { id: 1, name: 'john doe', NRC: '23403492340' }, // this information is purely made up
+    nestedObj: {
+      numArr: [1, 3, 4],
+      strArr: ['name1', 'name2'],
+      multiDiArr: [[12, 32]],
+      nestedArr: [{ id: 1 }, { id: 2 }],
+      diverseArr: [1, false, 'str'],
+      id: 1,
+      debug: false,
+    },
+  }
+  const admirer = {
+    timestamp: new Date(),
+    fn: (str) => str,
+    debug: false,
+    id: 1,
+    dummyObj: { id: 1, name: 'john doe', NRC: '23403492340' }, // this information is purely made up
+    nestedObj: {
+      numArr: [1, 3, 4],
+      strArr: ['name1', 'name2'],
+      multiDiArr: [[12, 32]],
+      nestedArr: [{ id: 1 }, { id: 2 }],
+      diverseArr: [1, false, 'str'],
+      id: 1,
+      debug: false,
+    },
+  }
+
+  const { isValid, error } = compareObjectShape(idol, admirer)
+
+  expect(isValid).toBe(true)
+  expect(error).toBe(undefined)
+})
+
+test('compareObjectShape() > should return true for array diversity', () => {
+  const idol = {
+    timestamp: new Date(),
+    fn: (str) => str,
+    debug: false,
+    id: 1,
+    dummyObj: { id: 1, name: 'john doe', NRC: '23403492340' }, // this information is purely made up
+    nestedObj: {
+      numArr: [1, 3, 4],
+      strArr: ['name1', 'name2'],
+      multiDiArr: [[12, 32]],
+      nestedArr: [{ id: 1 }, { id: 2 }],
+      diverseArr: [1, false, 'str'],
+      id: 1,
+      debug: false,
+    },
+  }
+  const admirer = {
+    timestamp: new Date(),
+    fn: (str) => str,
+    debug: false,
+    id: 1,
+    dummyObj: { id: 1, name: 'john doe', NRC: '23403492340' }, // this information is purely made up
+    nestedObj: {
+      numArr: [1, 3, 4],
+      strArr: ['name1', 'name2'],
+      multiDiArr: [[12, 32]],
+      nestedArr: [{ id: 1 }, { id: 2 }],
+      diverseArr: ['str', 'str', 'str'],
+      id: 1,
+      debug: false,
+    },
+  }
+
+  const { isValid, error } = compareObjectShape(idol, admirer)
+
+  expect(isValid).toBe(true)
+  expect(error).toBe(undefined)
+})
+
+test('compareObjectShape() > should detect missing property', () => {
+  const idol = {
+    timestamp: new Date(),
+    fn: (str) => str,
+    debug: false,
+    id: 1,
+    dummyObj: { id: 1, name: 'john doe', NRC: '23403492340' }, // this information is purely made up
+    nestedObj: {
+      numArr: [1, 3, 4],
+      strArr: ['name1', 'name2'],
+      multiDiArr: [[12, 32]],
+      nestedArr: [{ id: 1 }, { id: 2 }],
+      diverseArr: [1, false, 'str'],
+      id: 1,
+      debug: false,
+    },
+  }
+  const admirer = {
+    timestamp: new Date(),
+    fn: (str) => str,
+    debug: false,
+    id: 1,
+    dummyObj: { id: 1, name: 'john doe', NRC: '23403492340' }, // this information is purely made up
+    nestedObj: {
+      numArr: [1, 3, 4],
+      strArr: ['name1', 'name2'],
+      multiDiArr: [[12, 32]],
+      nestedArr: [{ id: 1 }, { id: 2 }],
+      id: 1,
+      debug: false,
+    },
+  }
+
+  const { isValid, error } = compareObjectShape(idol, admirer)
+
+  const expectedError = {
+    defectiveProp: { diverseArr: undefined },
+    defectiveChain: ['nestedObj', 'diverseArr'],
+  }
+
+  console.log(error)
+  expect(isValid).toBe(false)
+  expect(JSON.stringify(expectedError) === JSON.stringify(error)).toBe(true)
+})
+
+test('compareObjectShape() > should detect extra props', () => {
+  const idol = {
+    timestamp: new Date(),
+    fn: (str) => str,
+    debug: false,
+    id: 1,
+    dummyObj: { id: 1, name: 'john doe', NRC: '23403492340' }, // this information is purely made up
+    nestedObj: {
+      numArr: [1, 3, 4],
+      strArr: ['name1', 'name2'],
+      multiDiArr: [[12, 32]],
+      nestedArr: [{ id: 1 }, { id: 2 }],
+      diverseArr: [1, false, 'str'],
+      id: 1,
+      debug: false,
+    },
+  }
+  const admirer = {
+    timestamp: new Date(),
+    fn: (str) => str,
+    debug: false,
+    id: 1,
+    dummyObj: { id: 1, name: 'john doe', NRC: '23403492340' }, // this information is purely made up
+    nestedObj: {
+      numArr: [1, 3, 4],
+      strArr: ['name1', 'name2'],
+      multiDiArr: [[12, 32]],
+      nestedArr: [{ id: 1 }, { id: 2 }],
+      diverseArr: ['1', false, 'str'],
+      extraProp: { id: 1, name: 'doe' },
+      id: 1,
+      debug: false,
+    },
+  }
+
+  const { isValid, error } = compareObjectShape(idol, admirer)
+
+  const expectedError = {
+    defectiveProp: { extraProp: { id: 'number', name: 'string' } },
+    defectiveChain: ['nestedObj', 'extraProp'],
+  }
+
+  expect(isValid).toBe(false)
+  expect(JSON.stringify(expectedError) === JSON.stringify(error)).toBe(true)
+})
+
+test('compareObjectShape() > should return error object on property type mismatch', () => {
+  const idol = {
+    fn: (str) => str,
+    debug: false,
+    id: 1,
+    dummyObj: { id: 1, name: 'john doe', NRC: '23403492340' }, // this information is purely made up
+    nestedObj: {
+      timestamp: new Date(),
+      strArr: ['name1', 'name2'],
+      multiDiArr: [[12, 32]],
+      nestedArr: [{ id: 1 }, { id: 2 }],
+      diverseArr: [1, false, 'str'],
+      numArr: [1, 3, 4],
+      id: 1,
+      debug: false,
+    },
+  }
+  const admirer = {
+    fn: (str) => str,
+    debug: false,
+    id: 1,
+    dummyObj: { id: 1, name: 'john doe', NRC: '23403492340' }, // this information is purely made up
+    nestedObj: {
+      timestamp: { reason: 'defector' },
+      numArr: [1, 3, 4],
+      strArr: ['name1', 'name2'],
+      multiDiArr: [[12, 32]],
+      nestedArr: [{ id: 1 }, { id: 2 }],
+      diverseArr: ['1', false, 'str'],
+      extraProp: { id: 1, name: 'doe' },
+      id: 1,
+      debug: false,
+    },
+  }
+
+  const { isValid, error } = compareObjectShape(idol, admirer)
+
+  const expectedError = {
+    defectiveProp: { timestamp: { reason: 'string' } },
+    defectiveChain: ['nestedObj','timestamp'],
+  }
+
+  console.log(error)
+  expect(isValid).toBe(false)
+  expect(JSON.stringify(expectedError) === JSON.stringify(error)).toBe(true)
+})
