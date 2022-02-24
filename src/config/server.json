@@ -44,6 +44,7 @@
     "maxJoinedPerCycle": 1,
     "maxSyncingPerCycle": 5,
     "maxRotatedPerCycle": 1,
+    "firstCycleJoin": 10,
     "maxPercentOfDelta": 40,
     "minScaleReqsNeeded": 5,
     "maxScaleReqs": 200,
@@ -70,7 +71,13 @@
   "debug": {
     "loseReceiptChance": 0.0,
     "loseTxChance": 0.0,
-    "canDataRepair": false
+    "canDataRepair": false,
+    "startInFatalsLogMode": false,
+    "startInErrorLogMode": true,
+    "fakeNetworkDelay": 0,
+    "disableSnapshots": true,
+    "countEndpointStart": -1,
+    "countEndpointStop": -1
   },
   "statistics": {
     "save": true,
@@ -97,5 +104,6 @@
   },
   "sharding": {
     "nodesPerConsensusGroup": 5
-  }
+  },
+  "mode": "debug"
 }
