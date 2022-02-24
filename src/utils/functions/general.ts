@@ -169,34 +169,141 @@ export function sumObject(sumObject, toAddObject){
   }
 }
 
-// @param {Literal Object} `obj` object to be genrate schema for
-// @param {Literal Object} `options`, an object including a flag to whether the return schema should be serialize or not
-// @return {String | LiteralObject} will return schema object or serialize version of it when specify
-// This function generate a schema (object/serialization) of the object it has been passed
-export function generateObjSchema(obj, options: { serialize: boolean } = { serialize: false }) {
-  let schema = {}
+// @param {LiteralObject} `obj` object to be genrate schema for
+// @return {LiteralObject} will return schema object
+// This function generate a schema (object) of the object it has been fed
+export function generateObjectSchema(obj) {
+  const schema = {}
+
+  if (Array.isArray(obj)) {
+    throw new Error(
+      'Object schema generation function does not accept array as argument'
+    )
+  }
+
   for (const [key, value] of Object.entries(obj)) {
-    if (obj.hasOwnProperty(key) && obj[key] !== null) {
+    if (obj[key] && obj[key] !== null) {
       if (value.constructor === Object) {
-        //recursive call occurs here
-        schema[key] = generateObjSchema(value)
-      } else if (value.constructor === Array) {
-        schema[key] = 'array'
+        schema[key] = generateObjectSchema(value)
+      } else if (Array.isArray(value)) {
+        schema[key] = generateArraySchema(value)
       } else {
         schema[key] = typeof value
       }
     }
   }
-  return options.serialize ? JSON.stringify(schema) : schema
+  return schema
 }
 
-// @param {Literal Object} idol, the first object to be compared
-// @param {Literal Object} admirer, the second object to be compared
-// @return {Boolean} return true if obj shapes are equal, false otherwise
-// This function compare shapes of two object
-export function compareObjShape(idol, admirer): boolean {
-  const idol_schema = generateObjSchema(idol, { serialize: true })
-  const admirer_schema = generateObjSchema(admirer, { serialize: true })
+// @param {Array} arr, the array to generate schema
+// @return {String} will return schema array, Example: `string[]`
+// This function generate a schema (array) of the array it has been fed
+// SYMBOLS
+// [1, 2, 4]                    -> 'number[]'
+// ['john','doe']               -> 'string[]'
+// [(str)=>str, console.log()]  -> 'function[]'
+// [{id: 1}, {id: 2}]           -> '{}[]'
+// [new Date(), new Date()]     -> 'object[]'
+// [[1,3,2],[1,3,4]]            -> 'array[]'
+// [new Date(), 'false', 1]     -> 'any[]'
+export function generateArraySchema(arr: unknown[]): string {
+  let schema: string
 
-  return idol_schema === admirer_schema
+  for (let i = 0; i < arr.length; i++) {
+    // let's return 'any' when array is holding multiple types 
+    if (i > 0 && arr[i].constructor !== arr[i - 1].constructor) {
+      return 'any[]'
+    }
+
+    // declare conditions for readability
+    const IS_MULTI_DIMENSIONAL = Array.isArray(arr[i])
+    if (arr[i].constructor === Object) {
+      schema = '{}[]'
+    } else if (IS_MULTI_DIMENSIONAL) {
+      schema = 'array[]'
+    } else {
+      schema = `${typeof arr[i]}[]`
+    }
+  }
+
+  return schema
+}
+
+// @param {LiteralObject} idol, This is the object the function will hold standard to
+// @param {LiteralObject} admirer, This is the object the function compare against standard object idol
+// Note: these positional parameter matter at which position the object is passed to
+// This first parameter idol object will be idolized 
+// and the function will determine if the second parameter (admirer) object fit the idolized object schema
+// Example if idol is { id: [1, false, 'str'] } ( schema will be { id: 'any[]' } )
+// and admirer is { id: ['str', 'str'] } (schema will be { id: 'string[]' } )
+// the function will returns true
+// The function will returns an error object if you switch position in parameter of the same two object
+export function compareObjectShape(idol, admirer) {
+  let isValid
+  let error
+  let defectoChain = []
+
+  const idol_schema = generateObjectSchema(idol)
+  const admirer_schema = generateObjectSchema(admirer)
+
+  if (JSON.stringify(idol_schema) === JSON.stringify(admirer_schema)){
+    isValid = true
+    return { isValid, error }
+  }
+
+  // this function compare prop types
+  // this function is not meant to be call outside of this block
+  const smartComparator = (idol_type, admirer_type) => {
+    if (typeof idol_type === 'object' && idol_type.constructor === Object) {
+      return JSON.stringify(idol_type) === JSON.stringify(admirer_type)
+    } else if (idol_type === 'any[]' && typeof admirer_type === 'string' && admirer_type.includes('[]')) {
+      return true
+    } else {
+      return idol_type === admirer_type
+    }
+  }
+
+  // this function is not meant to be call outside of this block
+  // worshipped represent idolized schema
+  // worshipper represent admirer's schema
+  const defectoHunter = (worshipped, worshipper) => {
+    const l1 = Object.keys(worshipped).length
+    const l2 = Object.keys(worshipper).length
+
+    //this variable represent whichever object that has the most properpties(key)
+    const bigger_obj = l1 >= l2 ? worshipped : worshipper
+
+    for (const key in bigger_obj) {
+      const DEFECTOR_FOUND =
+        smartComparator(worshipped[key], worshipper[key]) === false
+
+      if (DEFECTOR_FOUND) {
+        // save the path to the prop , Example: ['server', 'log']
+        defectoChain.push(key)
+        if (worshipped[key] && worshipped[key].constructor === Object) {
+          return defectoHunter(worshipped[key], worshipper[key])
+        } else {
+          return { [key]: worshipper[key] }
+        }
+      }
+    }
+    // when no defective is found
+    return false
+  }
+
+  error = {
+    defectiveProp: defectoHunter(idol_schema, admirer_schema),
+    defectiveChain: defectoChain,
+  }
+
+  // couldn't find defective
+  if (error.defectiveProp === false) {
+    defectoChain = []
+    isValid = true
+    error = undefined
+  } else {
+    isValid = false
+  }
+
+  return { isValid, error }
 }
