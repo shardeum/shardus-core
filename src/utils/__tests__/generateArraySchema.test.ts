@@ -17,6 +17,14 @@ test('generateArraySchema() > should generate proper array schema', () => {
   expect(generateArraySchema(fn)).toBe('function[]')
   expect(generateArraySchema(instanceObj)).toBe('object[]')
   expect(generateArraySchema(literalObj)).toBe('{}[]')
-  expect(generateArraySchema(any)).toBe('any[]')
+  expect(generateArraySchema(any, { diversity: true })).toBe('any[]')
+
+  try {
+    generateArraySchema(any)
+  } catch (e) {
+    expect(e.message).toBe(
+      'Array schema generation does not allowed type diversities in an array unless specified'
+    )
+  }
   expect(generateArraySchema(dimensional)).toBe('array[]')
 })

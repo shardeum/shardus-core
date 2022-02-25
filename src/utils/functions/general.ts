@@ -172,7 +172,7 @@ export function sumObject(sumObject, toAddObject){
 // @param {LiteralObject} `obj` object to be genrate schema for
 // @return {LiteralObject} will return schema object
 // This function generate a schema (object) of the object it has been fed
-export function generateObjectSchema(obj) {
+export function generateObjectSchema(obj, options = { arrTypeDiversity: false }) {
   const schema = {}
 
   if (Array.isArray(obj)) {
@@ -184,9 +184,9 @@ export function generateObjectSchema(obj) {
   for (const [key, value] of Object.entries(obj)) {
     if (obj.hasOwnProperty(key) && obj[key] !== null) {
       if (value.constructor === Object) {
-        schema[key] = generateObjectSchema(value)
+        schema[key] = generateObjectSchema(value, { arrTypeDiversity: options.arrTypeDiversity})
       } else if (Array.isArray(value)) {
-        schema[key] = generateArraySchema(value)
+        schema[key] = generateArraySchema(value, { diversity: options.arrTypeDiversity})
       } else {
         schema[key] = typeof value
       }
@@ -205,14 +205,20 @@ export function generateObjectSchema(obj) {
 // [{id: 1}, {id: 2}]           -> '{}[]'
 // [new Date(), new Date()]     -> 'object[]'
 // [[1,3,2],[1,3,4]]            -> 'array[]'
-// [new Date(), 'false', 1]     -> 'any[]'
-export function generateArraySchema(arr: unknown[]): string {
+// [new Date(), 'false', 1]     -> 'any[]' if options.diversity set true
+export function generateArraySchema(arr: unknown[], options = { diversity : false}): string {
   let schema: string
 
   for (let i = 0; i < arr.length; i++) {
     // let's return 'any' when array is holding multiple types 
     if (i > 0 && arr[i].constructor !== arr[i - 1].constructor) {
-      return 'any[]'
+      if (options.diversity) {
+        return 'any[]'
+      } else {
+        throw new Error(
+          'Array schema generation does not allowed type diversities in an array unless specified'
+        )
+      }
     }
 
     // declare conditions for readability
@@ -234,17 +240,19 @@ export function generateArraySchema(arr: unknown[]): string {
 // Note: these positional parameter matter at which position the object is passed to
 // This first parameter idol object will be idolized 
 // and the function will determine if the second parameter (admirer) object fit the idolized object schema
-// Example if idol is { id: [1, false, 'str'] } ( schema will be { id: 'any[]' } )
-// and admirer is { id: ['str', 'str'] } (schema will be { id: 'string[]' } )
-// the function will returns true
-// The function will returns an error object if you switch position in parameter of the same two object
+// Note idol object does not accept type diversive array like this { arr: ['doe', 1, false] } will throw errors.
 export function compareObjectShape(idol, admirer) {
   let isValid
   let error
   let defectoChain = []
 
-  const idol_schema = generateObjectSchema(idol)
-  const admirer_schema = generateObjectSchema(admirer)
+  let idol_schema
+  try{
+    idol_schema = generateObjectSchema(idol, { arrTypeDiversity: false }) 
+  } catch (e) {
+    throw new Error('Type varies array detected inside idol object')
+  }
+  const admirer_schema = generateObjectSchema(admirer, { arrTypeDiversity: true })
 
   if (JSON.stringify(idol_schema) === JSON.stringify(admirer_schema)){
     isValid = true
@@ -256,8 +264,6 @@ export function compareObjectShape(idol, admirer) {
   const smartComparator = (idol_type, admirer_type) => {
     if (typeof idol_type === 'object' && idol_type.constructor === Object) {
       return JSON.stringify(idol_type) === JSON.stringify(admirer_type)
-    } else if (idol_type === 'any[]' && typeof admirer_type === 'string' && admirer_type.includes('[]')) {
-      return true
     } else {
       return idol_type === admirer_type
     }
@@ -287,23 +293,12 @@ export function compareObjectShape(idol, admirer) {
         }
       }
     }
-    // when no defective is found
-    return false
   }
 
   error = {
     defectiveProp: defectoHunter(idol_schema, admirer_schema),
     defectiveChain: defectoChain,
   }
-
-  // couldn't find defective
-  if (error.defectiveProp === false) {
-    defectoChain = []
-    isValid = true
-    error = undefined
-  } else {
-    isValid = false
-  }
-
+  isValid = false
   return { isValid, error }
 }

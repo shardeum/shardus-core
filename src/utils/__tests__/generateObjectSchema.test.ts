@@ -35,7 +35,7 @@ test('generateObjectSchema() > should generate proper object schema', () => {
     },
   }
 
-  const generatedSchema = generateObjectSchema(obj)
+  const generatedSchema = generateObjectSchema(obj, { arrTypeDiversity: true })
 
   const isEqual =
     JSON.stringify(generatedSchema) === JSON.stringify(expectedSchema)
