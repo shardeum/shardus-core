@@ -182,7 +182,7 @@ export function generateObjectSchema(obj) {
   }
 
   for (const [key, value] of Object.entries(obj)) {
-    if (obj[key] && obj[key] !== null) {
+    if (obj.hasOwnProperty(key) && obj[key] !== null) {
       if (value.constructor === Object) {
         schema[key] = generateObjectSchema(value)
       } else if (Array.isArray(value)) {
@@ -280,7 +280,7 @@ export function compareObjectShape(idol, admirer) {
       if (DEFECTOR_FOUND) {
         // save the path to the prop , Example: ['server', 'log']
         defectoChain.push(key)
-        if (worshipped[key] && worshipped[key].constructor === Object) {
+        if (worshipped.hasOwnProperty(key) && worshipped[key].constructor === Object) {
           return defectoHunter(worshipped[key], worshipper[key])
         } else {
           return { [key]: worshipper[key] }
