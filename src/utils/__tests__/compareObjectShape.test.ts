@@ -100,7 +100,7 @@ test('compareObjectShape() > should detect missing property', () => {
   const admirer = {
     timestamp: new Date(),
     fn: (str) => str,
-    debug: false,
+    debug: true,
     id: 1,
     dummyObj: { id: 1, name: 'john doe', NRC: '23403492340' }, // this information is purely made up
     nestedObj: {
@@ -120,7 +120,6 @@ test('compareObjectShape() > should detect missing property', () => {
     defectiveChain: ['nestedObj', 'diverseArr'],
   }
 
-  console.log(error)
   expect(isValid).toBe(false)
   expect(JSON.stringify(expectedError) === JSON.stringify(error)).toBe(true)
 })
@@ -210,10 +209,49 @@ test('compareObjectShape() > should return error object on property type mismatc
 
   const expectedError = {
     defectiveProp: { timestamp: { reason: 'string' } },
-    defectiveChain: ['nestedObj','timestamp'],
+    defectiveChain: ['nestedObj', 'timestamp'],
   }
 
-  console.log(error)
   expect(isValid).toBe(false)
   expect(JSON.stringify(expectedError) === JSON.stringify(error)).toBe(true)
+})
+
+test('compareObjectShape() > should not fail when property possess falsy value', () => {
+  const idol = {
+    timestamp: new Date(),
+    fn: (str) => str,
+    falsy: 0,
+    id: 1,
+    dummyObj: { id: 1, name: 'john doe', NRC: '23403492340' }, // this information is purely made up
+    nestedObj: {
+      numArr: [1, 3, 4],
+      strArr: ['name1', 'name2'],
+      multiDiArr: [[12, 32]],
+      nestedArr: [{ id: 1 }, { id: 2 }],
+      diverseArr: [1, false, 'str'],
+      id: 1,
+      debug: false,
+    },
+  }
+  const admirer = {
+    timestamp: new Date(),
+    fn: (str) => str,
+    falsy: 20,
+    id: 1,
+    dummyObj: { id: 1, name: 'john doe', NRC: '23403492340' }, // this information is purely made up
+    nestedObj: {
+      numArr: [1, 3, 4],
+      strArr: ['name1', 'name2'],
+      multiDiArr: [[12, 32]],
+      nestedArr: [{ id: 1 }, { id: 2 }],
+      diverseArr: [1, false, 'str'],
+      id: 1,
+      debug: false,
+    },
+  }
+
+  const { isValid, error } = compareObjectShape(idol, admirer)
+
+  expect(isValid).toBe(true)
+  expect(error).toBe(undefined)
 })

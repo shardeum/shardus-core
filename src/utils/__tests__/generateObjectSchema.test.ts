@@ -4,7 +4,7 @@ test('generateObjectSchema() > should generate proper object schema', () => {
   const obj = {
     timestamp: new Date(),
     fn: (str) => str,
-    debug: false,
+    falsy: -0,
     id: 1,
     dummyObj: { id: 1, name: 'john doe', NRC: '23403492340' }, // this information is purely made up
     nestedObj: {
@@ -14,13 +14,14 @@ test('generateObjectSchema() > should generate proper object schema', () => {
       nestedArr: [{ id: 1 }, { id: 2 }],
       diverseArr: [1, false, 'str'],
       id: 1,
-      debug: false,
+      debug: true,
     },
   }
 
   const expectedSchema = {
     timestamp: 'object',
     fn: 'function',
+    falsy: 'number',
     id: 'number',
     dummyObj: { id: 'number', name: 'string', NRC: 'string' },
     nestedObj: {
@@ -30,6 +31,7 @@ test('generateObjectSchema() > should generate proper object schema', () => {
       nestedArr: '{}[]',
       diverseArr: 'any[]',
       id: 'number',
+      debug: 'boolean',
     },
   }
 
