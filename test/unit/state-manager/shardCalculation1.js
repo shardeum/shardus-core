@@ -6,7 +6,7 @@ const ShardFunctions = require('../../../build/src/state-manager/shardFunctions2
 // import {ShardGlobals,ShardInfo,WrappableParitionRange,NodeShardData,AddressRange, HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange} from  './shardFunctionTypes'
 // import ShardFunctions from './shardFunctions.js'
 
-const crypto = require('shardus-crypto-utils')
+const crypto = require('@shardus/crypto-utils')
 const utils = require('../../../build/src/utils')
 crypto('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
 

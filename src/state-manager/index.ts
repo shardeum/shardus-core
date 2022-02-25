@@ -1,6 +1,6 @@
 import * as Shardus from '../shardus/shardus-types'
 
-import {StateManager as StateManagerTypes } from 'shardus-types'
+import {StateManager as StateManagerTypes } from '@shardus/types'
 
 import { isNodeDown, isNodeLost, isNodeUpRecent } from '../p2p/Lost'
 

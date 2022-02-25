@@ -5,7 +5,7 @@
  */
 
 import { logFlags } from '../logger'
-import { P2P } from 'shardus-types'
+import { P2P } from '@shardus/types'
 import ShardFunctions from '../state-manager/shardFunctions'
 import * as utils from '../utils'
 import * as Comms from './Comms'

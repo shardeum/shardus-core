@@ -1,4 +1,4 @@
-import { P2P } from 'shardus-types'
+import { P2P } from '@shardus/types'
 export type Node = P2P.NodeListTypes.Node
 export type Cycle = P2P.CycleCreatorTypes.CycleRecord
 //import { RequestHandler } from "express"; //express was causing problems.

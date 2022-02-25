@@ -16,7 +16,7 @@ import {
   CycleShardData,
   MainHashResults,
 } from '../state-manager/state-manager-types'
-import { P2P, StateManager } from 'shardus-types'
+import { P2P, StateManager } from '@shardus/types'
 import * as utils from '../utils'
 import { profilerInstance } from '../utils/profiler'
 import * as partitionGossip from './partition-gossip'

@@ -1,7 +1,7 @@
 
 const StateManager = require('../../../src/state-manager')
 
-const crypto = require('shardus-crypto-utils')
+const crypto = require('@shardus/crypto-utils')
 const utils = require('../../../src/utils')
 
 const Profiler = require('../../../src/utils/profiler.js')

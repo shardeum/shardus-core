@@ -1,6 +1,6 @@
 import { Logger } from 'log4js'
-import { stringify } from 'shardus-crypto-utils'
-import { P2P } from 'shardus-types'
+import { stringify } from '@shardus/crypto-utils'
+import { P2P } from '@shardus/types'
 import {
   binarySearch,
   insertSorted,

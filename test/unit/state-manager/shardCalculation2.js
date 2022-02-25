@@ -3,7 +3,7 @@
 
 const ShardFunctions = require('../../../build/src/state-manager/shardFunctions2.js').default
 
-const crypto = require('shardus-crypto-utils')
+const crypto = require('@shardus/crypto-utils')
 const utils = require('../../../build/src/utils')
 crypto.init('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
 

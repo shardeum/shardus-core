@@ -1,5 +1,5 @@
 import got from 'got'
-import { P2P, StateManager } from 'shardus-types'
+import { P2P, StateManager } from '@shardus/types'
 import stream from 'stream'
 import zlib from 'zlib'
 import { logFlags } from '../logger'
@@ -11,7 +11,6 @@ import ShardFunctions from '../state-manager/shardFunctions'
 import { Cycle, CycleShardData } from '../state-manager/state-manager-types'
 import { safetyModeVals, snapshotLogger } from './index'
 import { hashMap } from './partition-gossip'
-import { CycleRecord } from 'shardus-types/build/src/p2p/CycleCreatorTypes'
 
 const { Transform } = require('stream')
 /** TYPES */

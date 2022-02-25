@@ -1,5 +1,5 @@
 import * as Shardus from '../shardus/shardus-types'
-import { StateManager as StateManagerTypes} from 'shardus-types'
+import { StateManager as StateManagerTypes} from '@shardus/types'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
 

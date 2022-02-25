@@ -12,7 +12,7 @@ import * as Self from './Self'
 import * as Utils from './Utils'
 import {logFlags} from '../logger'
 import {getNodeRequestingJoin} from './Join'
-import { P2P as P2PTypings } from 'shardus-types'
+import { P2P as P2PTypings } from '@shardus/types'
 import * as CycleAutoScale from './CycleAutoScale'
 
 /* p2p functions */

@@ -1,6 +1,6 @@
 import Logger, { logFlags } from '../logger'
 import * as Shardus from '../shardus/shardus-types'
-import { StateManager } from 'shardus-types'
+import { StateManager } from '@shardus/types'
 
 const stringify = require('fast-stable-stringify')
 

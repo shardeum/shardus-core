@@ -10,7 +10,7 @@ internal documents.
 import { Handler } from 'express'
 import * as http from '../http'
 import { logFlags } from '../logger'
-import { P2P } from 'shardus-types'
+import { P2P } from '@shardus/types'
 import { binarySearch, validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { crypto, logger, network } from './Context'

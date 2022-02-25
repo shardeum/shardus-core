@@ -1,5 +1,5 @@
 import { Logger } from 'log4js'
-import { P2P } from 'shardus-types'
+import { P2P } from '@shardus/types'
 import { insertSorted, validateTypes } from '../utils'
 import * as Comms from './Comms'
 import { config, logger } from './Context'

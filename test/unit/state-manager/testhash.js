@@ -3,7 +3,7 @@
 
 var fs = require('fs')
 var path = require('path')
-const crypto = require('shardus-crypto-utils')
+const crypto = require('@shardus/crypto-utils')
 const utils = require('../../../build/src/utils')
 const ShardFunctions = require('../../../build/src/state-manager/shardFunctions.js').default
 // const Profiler = require('../../../src/utils/profiler.js')

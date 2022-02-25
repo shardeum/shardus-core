@@ -1,4 +1,4 @@
-import { StateManager as StateManagerTypes } from 'shardus-types'
+import { StateManager as StateManagerTypes } from '@shardus/types'
 import StateManager from '.'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'

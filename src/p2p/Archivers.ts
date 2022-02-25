@@ -14,7 +14,7 @@ import { getCycleChain, computeCycleMarker, getNewest } from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import * as CycleParser from './CycleParser'
 import { logFlags } from '../logger'
-import { P2P, StateManager } from 'shardus-types'
+import { P2P, StateManager } from '@shardus/types'
 import { profilerInstance } from '../utils/profiler'
 
 /** STATE */
