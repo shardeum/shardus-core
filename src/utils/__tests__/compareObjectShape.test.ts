@@ -246,7 +246,7 @@ test('compareObjectShape() > should not fail when property possess falsy value',
       nestedArr: [{ id: 1 }, { id: 2 }],
       diverseArr: [1, false, 'str'],
       id: 1,
-      debug: false,
+      debug: true,
     },
   }
 
