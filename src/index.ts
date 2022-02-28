@@ -7,6 +7,8 @@ import { compareObjectShape } from './utils'
 export { default as Shardus } from './shardus'
 export { ShardusTypes }
 
+export * as __ShardFunctions from './state-manager/shardFunctionsExport'
+
 const defaultConfigs = {
   server: require('./config/server.json'),
   logs: require('./config/logs.json'),
