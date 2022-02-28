@@ -24,6 +24,12 @@ npm run release
 
 and it'll walk you through the steps to release the package.
 
+Note: You need to be running the correct version of node (to the T) in order to cut a release.
+The correct version is whatever is listed in the package.json engines.node property, which should
+be the same as in the docs. The script won't allow you to, but if you built it with a different
+version of node, everyone who wants to run it would have to switch as well, as bytenode requires
+you to use the exact same version of node to run it as to build it.
+
 ## Building / Developing
 
 If you want to build the project in order to develop off this source code, run:
