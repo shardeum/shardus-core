@@ -36,7 +36,7 @@
     "gossipSeedFallof": 15,
     "gossipTimeout": 180,
     "maxSeedNodes": 10,
-    "minNodesToAllowTxs": 3,
+    "minNodesToAllowTxs": 1,
     "minNodes": 15,
     "maxNodes": 30,
     "seedNodeOffset": 4,
