@@ -165,6 +165,29 @@ class Shardus extends EventEmitter {
       this.mainLogger.info('===== Server config: =====')
       this.mainLogger.info(JSON.stringify(config, null, 2))
     }
+
+    // error log and console log on unacceptable minNodesToAllowTxs value
+    if (this.config.p2p.minNodesToAllowTxs < 20) {
+      const minNodesToAllowTxs = this.config.p2p.minNodesToAllowTxs
+      // debug mode and detected non-ideal value
+      console.log(
+        '[X] Minimum node required to allow transaction is set to a number less than 20 which is not ideal and secure for production'
+      )
+      if (this.config.mode === 'debug' && logFlags.error) {
+        this.mainLogger.error(
+          `Unacceptable \`minNodesToAllowTxs\` value detected: ${minNodesToAllowTxs} (< 20)`
+        )
+      }
+      // production mode and detected non-ideal value
+      else if (this.config.mode !== 'debug' && logFlags.error) {
+        this.mainLogger.error(
+          `Unacceptable \`minNodesToAllowTxs\` value detected: ${minNodesToAllowTxs} (< 20)`
+        )
+      }
+      // for now they'd have the same error log
+      // this is not as error per technical definition rather logical error
+    }
+
     this._listeners = {}
 
     this.heartbeatInterval = config.heartbeatInterval
