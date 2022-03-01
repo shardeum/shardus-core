@@ -7,7 +7,15 @@ import { compareObjectShape } from './utils'
 export { default as Shardus } from './shardus'
 export { ShardusTypes }
 
-export * as __ShardFunctions from './state-manager/shardFunctionsExport'
+// Temporary private export to avoid digging into shardus source code for
+// functions it otherwise wasn't exporting. ATTOW we have not decided on whether
+// a more permanent solution is proper.
+import { addressToPartition, partitionInWrappingRange, findHomeNode } from './state-manager/shardFunctions'
+export const __ShardFunctions = {
+  addressToPartition,
+  partitionInWrappingRange,
+  findHomeNode
+}
 
 const defaultConfigs = {
   server: require('./config/server.json'),

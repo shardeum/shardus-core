@@ -1527,15 +1527,3 @@ class ShardFunctions {
 //module.exports = ShardFunctions
 
 export default ShardFunctions
-
-export function addressToPartition(shardGlobals: ShardGlobals, address: string): { homePartition: number; addressNum: number } {
-  return ShardFunctions.addressToPartition(shardGlobals,address)
-}
-
-export function partitionInWrappingRange(i: number, minP: number, maxP: number): boolean  {
-  return ShardFunctions.partitionInWrappingRange(i, minP, maxP)
-}
-
-export function findHomeNode(shardGlobals: ShardGlobals, address: string, partitionShardDataMap: Map<number, ShardInfo>): NodeShardData | null  {
-  return ShardFunctions.findHomeNode(shardGlobals, address, partitionShardDataMap)
-}
