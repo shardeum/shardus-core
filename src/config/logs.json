@@ -1,11 +1,16 @@
 {
   "saveConsoleOutput": true,
   "dir": "logs",
-  "files": { "main": "", "fatal": "", "net": "" },
+  "files": { "main": "", "fatal": "", "net": "", "app": "" },
   "options": {
     "appenders": {
       "out": { "type": "console" },
       "main": {
+        "type": "file",
+        "maxLogSize": 10000000,
+        "backups": 10
+      },
+      "app": {
         "type": "file",
         "maxLogSize": 10000000,
         "backups": 10
@@ -63,6 +68,7 @@
     },
     "categories": {
       "default": { "appenders": ["out"], "level": "trace" },
+      "app": { "appenders": ["app", "errors"], "level": "trace" },
       "main": { "appenders": ["main", "errors"], "level": "trace" },
       "p2p": { "appenders": ["p2p"], "level": "trace" },
       "snapshot": { "appenders": ["snapshot"], "level": "trace" },
