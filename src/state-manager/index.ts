@@ -1254,8 +1254,6 @@ class StateManager {
 
     Context.network.registerExternalGet('print_tx_debug', isDebugModeMiddleware, (req, res) => {
       const result = this.transactionQueue.printTxDebug()
-      // const result = 'test ■'
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
       res.write(result)
       res.end()
     })

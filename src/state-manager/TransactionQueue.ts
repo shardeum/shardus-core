@@ -1860,30 +1860,33 @@ class TransactionQueue {
   }
 
   printTxDebug() {
-    console.log('Printing tx debug stat', this.txDebugStatList)
-    const collector = {}
+    const applyDurationCollector = {}
     const totalTxCount = this.txDebugStatList.length
     for (const bucket of txStatBucketSize.default) {
-      collector[bucket] = []
+      applyDurationCollector[bucket] = []
     }
     for (const txStat of this.txDebugStatList) {
       const duration = txStat.applyDuration
-      console.log('Apply duration', duration)
       for (const bucket of txStatBucketSize.default) {
         if (duration < bucket) {
-          collector[bucket].push(duration)
+          applyDurationCollector[bucket].push(duration)
           break
         }
       }
     }
-    console.log('Tx Stat collector', collector)
     const lines = []
-    for (const time in collector) {
-      const arr = collector[time]
+    lines.push('=> Tx Apply Duration: \n')
+    for (let i = 0; i < Object.keys(applyDurationCollector).length; i++) {
+      const time = Object.keys(applyDurationCollector)[i]
+      const arr = applyDurationCollector[time]
+      if (!arr) continue
       const percentage = (arr.length / totalTxCount) * 100
       const blockCount = Math.round(percentage / 5)
-      const blockStr = '■'.repeat(blockCount)
-      lines.push(`< ${time} ms: \t ${blockStr} \t ${percentage}%`)
+      const blockStr = '||'.repeat(blockCount)
+      const lowerLimit = i === 0 ? 0 : Object.keys(applyDurationCollector)[i - 1]
+      const upperLimit = time
+      const bucketDescription = `${lowerLimit} ms - ${upperLimit} ms:`.padEnd(19, ' ')
+      lines.push(`${bucketDescription}  ${percentage.toFixed(1).padEnd(5, ' ')}%  ${blockStr} `)
     }
     const strToPrint = lines.join('\n')
     return strToPrint
