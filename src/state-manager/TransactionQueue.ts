@@ -1875,14 +1875,15 @@ class TransactionQueue {
       }
     }
     const lines = []
+    lines.push(`=> Total Transactions: ${totalTxCount}`)
     lines.push('=> Tx Apply Duration: \n')
     for (let i = 0; i < Object.keys(applyDurationCollector).length; i++) {
       const time = Object.keys(applyDurationCollector)[i]
       const arr = applyDurationCollector[time]
       if (!arr) continue
       const percentage = (arr.length / totalTxCount) * 100
-      const blockCount = Math.round(percentage / 5)
-      const blockStr = '||'.repeat(blockCount)
+      const blockCount = Math.round(percentage / 2)
+      const blockStr = '|'.repeat(blockCount)
       const lowerLimit = i === 0 ? 0 : Object.keys(applyDurationCollector)[i - 1]
       const upperLimit = time
       const bucketDescription = `${lowerLimit} ms - ${upperLimit} ms:`.padEnd(19, ' ')
