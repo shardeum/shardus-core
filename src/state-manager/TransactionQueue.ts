@@ -12,11 +12,45 @@ import { errorToStringFull, inRangeOfCurrentTime } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { profilerInstance } from '../utils/profiler'
 import ShardFunctions from './shardFunctions.js'
-import { AcceptedTx, AccountFilter, CommitConsensedTransactionResult, PreApplyAcceptedTransactionResult, QueueEntry, RequestReceiptForTxResp, RequestStateForTxReq, RequestStateForTxResp, SeenAccounts, StringBoolObjectMap, StringNodeObjectMap, WrappedResponses } from './state-manager-types'
+import {
+  AcceptedTx,
+  AccountFilter,
+  CommitConsensedTransactionResult,
+  PreApplyAcceptedTransactionResult,
+  QueueEntry,
+  TxDebug,
+  RequestReceiptForTxResp,
+  RequestStateForTxReq,
+  RequestStateForTxResp,
+  SeenAccounts,
+  StringBoolObjectMap,
+  StringNodeObjectMap,
+  WrappedResponses
+} from './state-manager-types'
+
 const stringify = require('fast-stable-stringify')
 
 const http = require('../http')
 const allZeroes64 = '0'.repeat(64)
+const txStatBucketSize = {
+  default: [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128,
+    256,
+    512,
+    1024,
+    2048,
+    4096,
+    8192,
+    10000,
+  ]
+}
 
 class TransactionQueue {
   app: Shardus.App
@@ -38,6 +72,7 @@ class TransactionQueue {
   newAcceptedTxQueue: QueueEntry[]
   newAcceptedTxQueueTempInjest: QueueEntry[]
   archivedQueueEntries: QueueEntry[]
+  txDebugStatList: TxDebug[]
 
   newAcceptedTxQueueByID: Map<string, QueueEntry>
   newAcceptedTxQueueTempInjestByID: Map<string, QueueEntry>
@@ -77,6 +112,7 @@ class TransactionQueue {
     this.newAcceptedTxQueue = []
     this.newAcceptedTxQueueTempInjest = []
     this.archivedQueueEntries = []
+    this.txDebugStatList = []
 
     this.newAcceptedTxQueueByID = new Map()
     this.newAcceptedTxQueueTempInjestByID = new Map()
@@ -233,7 +269,7 @@ class TransactionQueue {
       timestamp,
       txId: id,
       keys,
-      data: tx,
+      data: tx
     }
 
     const noConsensus = false // this can only be true for a set command which will never come from an endpoint
@@ -343,7 +379,10 @@ class TransactionQueue {
         wrappedState.prevDataCopy = utils.deepCopy(wrappedState.data)
 
         // important to update the wrappedState timestamp here to prevent bad timestamps from propagating the system
-        let { timestamp: updatedTimestamp, hash: updatedHash } = this.app.getTimestampAndHashFromAccount(wrappedState.data)
+        let {
+          timestamp: updatedTimestamp,
+          hash: updatedHash
+        } = this.app.getTimestampAndHashFromAccount(wrappedState.data)
         wrappedState.timestamp = updatedTimestamp
 
         // check if current account timestamp is too new for this TX
@@ -357,7 +396,12 @@ class TransactionQueue {
     if (!accountTimestampsAreOK) {
       if (logFlags.verbose) this.mainLogger.debug('preApplyTransaction pretest failed: ' + timestamp)
       if (logFlags.playback) this.logger.playbackLogNote('tx_preapply_rejected 1', `${acceptedTX.txId}`, `Transaction: ${utils.stringifyReduce(acceptedTX)}`)
-      return { applied: false, passed: false, applyResult: '', reason: 'preApplyTransaction pretest failed, TX rejected' }
+      return {
+        applied: false,
+        passed: false,
+        applyResult: '',
+        reason: 'preApplyTransaction pretest failed, TX rejected'
+      }
     }
 
     try {
@@ -381,8 +425,11 @@ class TransactionQueue {
 
       this.profiler.profileSectionStart('process-dapp.apply')
       this.profiler.scopedProfileSectionStart('apply_duration')
+      queueEntry.txDebug.applyStart = process.hrtime()
       //I think Shardus.IncomingTransaction may be the wrong type here
       applyResponse = await this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
+      queueEntry.txDebug.applyEnd = process.hrtime(queueEntry.txDebug.applyStart)
+      queueEntry.txDebug.applyDuration = queueEntry.txDebug.applyEnd[1] / 1000000
       this.profiler.scopedProfileSectionEnd('apply_duration')
       this.profiler.profileSectionEnd('process-dapp.apply')
       if (applyResponse == null) {
@@ -411,7 +458,13 @@ class TransactionQueue {
     if (logFlags.playback) this.logger.playbackLogNote('tx_preapplied', `${acceptedTX.txId}`, `preApplyTransaction ${timestamp} `)
     if (logFlags.verbose) this.mainLogger.debug(`preApplyTransaction ${timestamp}`)
 
-    return { applied: true, passed: passedApply, applyResult: applyResult, reason: 'apply result', applyResponse: applyResponse }
+    return {
+      applied: true,
+      passed: passedApply,
+      applyResult: applyResult,
+      reason: 'apply result',
+      applyResponse: applyResponse
+    }
   }
 
   /**
@@ -469,11 +522,11 @@ class TransactionQueue {
        * is not any sorting by address that could get in the way.
        */
 
-      //create a temp map for state table logging below.
-      //importantly, we override the wrappedStates with writtenAccountsMap if there is any accountWrites used
-      //this should mean dapps don't have to use this feature.  (keeps simple dapps simpler)
-      let writtenAccountsMap:WrappedResponses = {}
-      if(applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0){
+        //create a temp map for state table logging below.
+        //importantly, we override the wrappedStates with writtenAccountsMap if there is any accountWrites used
+        //this should mean dapps don't have to use this feature.  (keeps simple dapps simpler)
+      let writtenAccountsMap: WrappedResponses = {}
+      if (applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
         for (let writtenAccount of applyResponse.accountWrites) {
           writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
           writtenAccountsMap[writtenAccount.accountId].prevStateId = wrappedStates[writtenAccount.accountId] ? wrappedStates[writtenAccount.accountId].stateId : ''
@@ -489,10 +542,10 @@ class TransactionQueue {
 
       let nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData = this.stateManager.currentCycleShardData.nodeShardData
       //update the filter to contain any local accounts in accountWrites
-      if(applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0){
-        for(let writtenAccount of applyResponse.accountWrites){
+      if (applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
+        for (let writtenAccount of applyResponse.accountWrites) {
           let isLocal = ShardFunctions.testAddressInRange(writtenAccount.accountId, nodeShardData.storedPartitions)
-          if(isLocal){
+          if (isLocal) {
             filter[writtenAccount.accountId] = 1
           }
         }
@@ -524,7 +577,7 @@ class TransactionQueue {
         let wrappedRespose = wrappedStates[stateT.accountId]
 
         //backup if we dont have the account in wrapped states (state table results is just for debugging now, and no longer used by sync)
-        if(wrappedRespose == null){
+        if (wrappedRespose == null) {
           wrappedRespose = writtenAccountsMap[stateT.accountId]
         }
 
@@ -778,7 +831,10 @@ class TransactionQueue {
         archived: false,
         ourTXGroupIndex: -1,
         involvedReads: {},
-        involvedWrites: {}
+        involvedWrites: {},
+        txDebug: {
+          enqueTimestamp: Date.now(),
+        }
       } // age comes from timestamp
 
       // todo faster hash lookup for this maybe?
@@ -1795,6 +1851,44 @@ class TransactionQueue {
     }
   }
 
+  dumpTxDebugToStatList(queueEntry: QueueEntry): void {
+    this.txDebugStatList.push({ ...queueEntry.txDebug })
+  }
+
+  clearTxDebugStatList(): void {
+    this.txDebugStatList = []
+  }
+
+  printTxDebug() {
+    console.log('Printing tx debug stat', this.txDebugStatList)
+    const collector = {}
+    const totalTxCount = this.txDebugStatList.length
+    for (const bucket of txStatBucketSize.default) {
+      collector[bucket] = []
+    }
+    for (const txStat of this.txDebugStatList) {
+      const duration = txStat.applyDuration
+      console.log('Apply duration', duration)
+      for (const bucket of txStatBucketSize.default) {
+        if (duration < bucket) {
+          collector[bucket].push(duration)
+          break
+        }
+      }
+    }
+    console.log('Tx Stat collector', collector)
+    const lines = []
+    for (const time in collector) {
+      const arr = collector[time]
+      const percentage = (arr.length / totalTxCount) * 100
+      const blockCount = Math.round(percentage / 5)
+      const blockStr = '■'.repeat(blockCount)
+      lines.push(`< ${time} ms: \t ${blockStr} \t ${percentage}%`)
+    }
+    const strToPrint = lines.join('\n')
+    return strToPrint
+  }
+
   /**
    * removeFromQueue remove an item from the queue and place it in the archivedQueueEntries list for awhile in case we have to access it again
    * @param {QueueEntry} queueEntry
@@ -1802,6 +1896,7 @@ class TransactionQueue {
    */
   removeFromQueue(queueEntry: QueueEntry, currentIndex: number) {
     this.stateManager.eventEmitter.emit('txPopped', queueEntry.acceptedTx.txId)
+    if (queueEntry.txDebug) this.dumpTxDebugToStatList(queueEntry)
     this.newAcceptedTxQueue.splice(currentIndex, 1)
     this.newAcceptedTxQueueByID.delete(queueEntry.acceptedTx.txId)
 
@@ -1832,8 +1927,11 @@ class TransactionQueue {
     }
   }
 
-  setState(queueEntry: QueueEntry, newState: string) {}
-  setHigherState(queueEntry: QueueEntry, newState: string) {}
+  setState(queueEntry: QueueEntry, newState: string) {
+  }
+
+  setHigherState(queueEntry: QueueEntry, newState: string) {
+  }
 
   /***
    *    ########  ########   #######   ######  ########  ######   ######
@@ -2270,9 +2368,15 @@ class TransactionQueue {
                   //This is a just in time check to make sure our involved accounts
                   //have not changed after our TX timestamp
                   let accountsValid = this.checkAccountTimestamps(queueEntry)
-                  if(accountsValid === false){
+                  if (accountsValid === false) {
                     queueEntry.state = 'consensing'
-                    queueEntry.preApplyTXResult = { applied: false, passed: false, applyResult: 'failed account TS checks', reason: 'apply result', applyResponse: null }
+                    queueEntry.preApplyTXResult = {
+                      applied: false,
+                      passed: false,
+                      applyResult: 'failed account TS checks',
+                      reason: 'apply result',
+                      applyResponse: null
+                    }
                     continue
                   }
                   queueEntry.executionDebug.log2 = 'call pre apply'
@@ -2370,11 +2474,11 @@ class TransactionQueue {
 
                   //todo check cant_apply flag to make sure a vote can form with it!
                   //also check if failed votes will work...?
-                  if(result.appliedVotes[0].cant_apply === false && result.result === true ){
+                  if (result.appliedVotes[0].cant_apply === false && result.result === true) {
                     queueEntry.state = 'commiting'
                     queueEntry.hasValidFinalData = true
                     finishedConsensing = true
-                  } else{
+                  } else {
                     if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_finishedFailReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                     // we are finished since there is nothing to apply
                     // this.statemanager_fatal(`consensing: repairToMatchReceipt failed`, `consensing: repairToMatchReceipt failed ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
@@ -2382,7 +2486,6 @@ class TransactionQueue {
                     queueEntry.state = 'fail'
                     continue
                   }
-
 
 
                   //continue
@@ -2399,11 +2502,11 @@ class TransactionQueue {
                     if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${shortID}`, `qId: ${queueEntry.entryID} `)
 
                     //todo check cant_apply flag to make sure a vote can form with it!
-                    if(queueEntry.recievedAppliedReceipt.appliedVotes[0].cant_apply === false && queueEntry.recievedAppliedReceipt.result === true ){
+                    if (queueEntry.recievedAppliedReceipt.appliedVotes[0].cant_apply === false && queueEntry.recievedAppliedReceipt.result === true) {
                       queueEntry.state = 'commiting'
                       queueEntry.hasValidFinalData = true
                       finishedConsensing = true
-                    } else{
+                    } else {
                       if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_finishedFailReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                       // we are finished since there is nothing to apply
                       //this.statemanager_fatal(`consensing: repairToMatchReceipt failed`, `consensing: repairToMatchReceipt failed ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
@@ -2815,16 +2918,16 @@ class TransactionQueue {
    * timestamp newer than our transaction timestamp.
    * If they do have a newer timestamp we must fail the TX and vote for a TX fail receipt.
    */
-  checkAccountTimestamps(queueEntry:QueueEntry) : boolean{
-    for(let accountID of Object.keys(queueEntry.involvedReads)){
+  checkAccountTimestamps(queueEntry: QueueEntry): boolean {
+    for (let accountID of Object.keys(queueEntry.involvedReads)) {
       let cacheEntry = this.stateManager.accountCache.getAccountHash(accountID)
-      if(cacheEntry != null && cacheEntry.t >= queueEntry.acceptedTx.timestamp){
+      if (cacheEntry != null && cacheEntry.t >= queueEntry.acceptedTx.timestamp) {
         return false
       }
     }
-    for(let accountID of Object.keys(queueEntry.involvedWrites)){
+    for (let accountID of Object.keys(queueEntry.involvedWrites)) {
       let cacheEntry = this.stateManager.accountCache.getAccountHash(accountID)
-      if(cacheEntry != null && cacheEntry.t >= queueEntry.acceptedTx.timestamp){
+      if (cacheEntry != null && cacheEntry.t >= queueEntry.acceptedTx.timestamp) {
         return false
       }
     }

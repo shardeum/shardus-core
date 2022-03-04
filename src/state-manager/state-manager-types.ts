@@ -16,6 +16,13 @@ export { App, Cycle, Sign, AcceptedTx, ApplyResponse } from '../shardus/shardus-
 
 export type WrappedStateArray = Shardus.WrappedData[]
 
+export type TxDebug = {
+  applyStart?: [number, number]
+  applyEnd?: [number, number]
+  applyDuration?: number
+  enqueTimestamp?: number
+}
+
 export type QueueEntry = {
     acceptedTx: Shardus.AcceptedTx;
     txKeys: Shardus.TransactionKeys
@@ -121,6 +128,7 @@ export type QueueEntry = {
     involvedWrites: {[accountID:string]:boolean};
 
   executionDebug?:any
+  txDebug?: TxDebug
 };
 
 export type SyncTracker = {

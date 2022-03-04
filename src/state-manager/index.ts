@@ -1246,6 +1246,19 @@ class StateManager {
       }
       res.json({ cycle, blob })
     })
+
+    Context.network.registerExternalGet('clear_tx_debug', isDebugModeMiddleware, (req, res) => {
+      this.transactionQueue.clearTxDebugStatList()
+      res.json({ success: true })
+    })
+
+    Context.network.registerExternalGet('print_tx_debug', isDebugModeMiddleware, (req, res) => {
+      const result = this.transactionQueue.printTxDebug()
+      // const result = 'test ■'
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+      res.write(result)
+      res.end()
+    })
   }
 
   _unregisterEndpoints() {
