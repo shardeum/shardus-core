@@ -419,9 +419,16 @@ class TransactionRepair {
                     }
 
                     let test4 = false
+                    let branch4 = -1
                     if(isGlobal === false){
                       let hash = this.stateManager.accountCache.getAccountHash(data.accountId)
-                      test4 = hash.h === updatedHash
+
+                      if(hash != null){
+                        test4 = hash.h === updatedHash    
+                        branch4 = 1
+                      } else {
+                        branch4 = 0
+                      }
                     }
 
                     if (updateStateTable === true) {
@@ -434,7 +441,7 @@ class TransactionRepair {
 
                     updatedAccountAndHashes.push({accountID: data.accountId, hash: data.stateId})
 
-                    /*if (logFlags.debug)*/ this.mainLogger.debug(`repairToMatchReceipt: addAccountStates tx:${shortHash} neededUpdate:${hashNeededUpdate} updateStateTable:${updateStateTable} timeStampMatches:${timeStampMatches} test2:${test2} test3:${test3} test4:${test4} ${utils.stringifyReduce(stateTableResults)}  acc:${shortKey}`)
+                    /*if (logFlags.debug)*/ this.mainLogger.debug(`repairToMatchReceipt: addAccountStates tx:${shortHash} neededUpdate:${hashNeededUpdate} updateStateTable:${updateStateTable} timeStampMatches:${timeStampMatches} test2:${test2} test3:${test3} test4:${test4} branch4:${branch4} ${utils.stringifyReduce(stateTableResults)} acc:${shortKey}`)
                   }
 
                 } finally {
