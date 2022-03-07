@@ -17,10 +17,9 @@ export { App, Cycle, Sign, AcceptedTx, ApplyResponse } from '../shardus/shardus-
 export type WrappedStateArray = Shardus.WrappedData[]
 
 export type TxDebug = {
-  applyStart?: [number, number]
-  applyEnd?: [number, number]
-  applyDuration?: number
-  enqueTimestamp?: number
+  enqueueHrTime?: [number, number]
+  dequeueHrTime?: [number, number]
+  duration: { [key: string]: number }
 }
 
 export type QueueEntry = {

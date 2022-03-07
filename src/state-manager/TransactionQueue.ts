@@ -27,29 +27,14 @@ import {
   StringNodeObjectMap,
   WrappedResponses
 } from './state-manager-types'
+import { start } from 'repl'
 
 const stringify = require('fast-stable-stringify')
 
 const http = require('../http')
 const allZeroes64 = '0'.repeat(64)
 const txStatBucketSize = {
-  default: [
-    1,
-    2,
-    4,
-    8,
-    16,
-    32,
-    64,
-    128,
-    256,
-    512,
-    1024,
-    2048,
-    4096,
-    8192,
-    10000,
-  ]
+  default: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 10000],
 }
 
 class TransactionQueue {
@@ -425,11 +410,11 @@ class TransactionQueue {
 
       this.profiler.profileSectionStart('process-dapp.apply')
       this.profiler.scopedProfileSectionStart('apply_duration')
-      queueEntry.txDebug.applyStart = process.hrtime()
+      const startTime = process.hrtime()
       //I think Shardus.IncomingTransaction may be the wrong type here
       applyResponse = await this.app.apply(tx as Shardus.IncomingTransaction, wrappedStates)
-      queueEntry.txDebug.applyEnd = process.hrtime(queueEntry.txDebug.applyStart)
-      queueEntry.txDebug.applyDuration = queueEntry.txDebug.applyEnd[1] / 1000000
+      const endTime = process.hrtime(startTime)
+      queueEntry.txDebug.duration['apply_duration'] = endTime[1] / 1000000
       this.profiler.scopedProfileSectionEnd('apply_duration')
       this.profiler.profileSectionEnd('process-dapp.apply')
       if (applyResponse == null) {
@@ -559,7 +544,10 @@ class TransactionQueue {
         filter[key] = 1
       }
 
+      const startTime = process.hrtime()
       this.profiler.scopedProfileSectionStart('commit_setAccount')
+      const endTime = process.hrtime(startTime)
+      queueEntry.txDebug.duration['commit_setAccount'] = endTime[1] / 1000000
       // wrappedStates are side effected for now
       savedSomething = await this.stateManager.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter, note)
       this.profiler.scopedProfileSectionEnd('commit_setAccount')
@@ -833,8 +821,9 @@ class TransactionQueue {
         involvedReads: {},
         involvedWrites: {},
         txDebug: {
-          enqueTimestamp: Date.now(),
-        }
+          enqueueHrTime: process.hrtime(),
+          duration: {},
+        },
       } // age comes from timestamp
 
       // todo faster hash lookup for this maybe?
@@ -1860,35 +1849,45 @@ class TransactionQueue {
   }
 
   printTxDebug() {
-    const applyDurationCollector = {}
+    const collector = {}
     const totalTxCount = this.txDebugStatList.length
-    for (const bucket of txStatBucketSize.default) {
-      applyDurationCollector[bucket] = []
-    }
+
     for (const txStat of this.txDebugStatList) {
-      const duration = txStat.applyDuration
-      for (const bucket of txStatBucketSize.default) {
-        if (duration < bucket) {
-          applyDurationCollector[bucket].push(duration)
-          break
+      for (const key in txStat.duration) {
+        if (!collector[key]) {
+          collector[key] = {}
+          for (const bucket of txStatBucketSize.default) {
+            collector[key][bucket] = []
+          }
+        }
+        const duration = txStat.duration[key]
+        for (const bucket of txStatBucketSize.default) {
+          if (duration < bucket) {
+            collector[key][bucket].push(duration)
+            break
+          }
         }
       }
     }
     const lines = []
     lines.push(`=> Total Transactions: ${totalTxCount}`)
-    lines.push('=> Tx Apply Duration: \n')
-    for (let i = 0; i < Object.keys(applyDurationCollector).length; i++) {
-      const time = Object.keys(applyDurationCollector)[i]
-      const arr = applyDurationCollector[time]
-      if (!arr) continue
-      const percentage = (arr.length / totalTxCount) * 100
-      const blockCount = Math.round(percentage / 2)
-      const blockStr = '|'.repeat(blockCount)
-      const lowerLimit = i === 0 ? 0 : Object.keys(applyDurationCollector)[i - 1]
-      const upperLimit = time
-      const bucketDescription = `${lowerLimit} ms - ${upperLimit} ms:`.padEnd(19, ' ')
-      lines.push(`${bucketDescription}  ${percentage.toFixed(1).padEnd(5, ' ')}%  ${blockStr} `)
+    for (const key in collector) {
+      lines.push(`\n => Tx ${key}: \n`)
+      const collectorForThisKey = collector[key]
+      for (let i = 0; i < Object.keys(collectorForThisKey).length; i++) {
+        const time = Object.keys(collectorForThisKey)[i]
+        const arr = collectorForThisKey[time]
+        if (!arr) continue
+        const percentage = (arr.length / totalTxCount) * 100
+        const blockCount = Math.round(percentage / 2)
+        const blockStr = '|'.repeat(blockCount)
+        const lowerLimit = i === 0 ? 0 : Object.keys(collectorForThisKey)[i - 1]
+        const upperLimit = time
+        const bucketDescription = `${lowerLimit} ms - ${upperLimit} ms:`.padEnd(19, ' ')
+        lines.push(`${bucketDescription}  ${percentage.toFixed(1).padEnd(5, ' ')}%  ${blockStr} `)
+      }
     }
+
     const strToPrint = lines.join('\n')
     return strToPrint
   }
@@ -1899,6 +1898,8 @@ class TransactionQueue {
    * @param {number} currentIndex
    */
   removeFromQueue(queueEntry: QueueEntry, currentIndex: number) {
+    queueEntry.txDebug.dequeueHrTime = process.hrtime(queueEntry.txDebug.enqueueHrTime)
+    queueEntry.txDebug.duration['queue_sit_time'] = queueEntry.txDebug.dequeueHrTime[1] / 1000000
     this.stateManager.eventEmitter.emit('txPopped', queueEntry.acceptedTx.txId)
     if (queueEntry.txDebug) this.dumpTxDebugToStatList(queueEntry)
     this.newAcceptedTxQueue.splice(currentIndex, 1)
