@@ -1,17 +1,26 @@
-import * as Shardus from '../shardus/shardus-types'
-import * as utils from '../utils'
+import * as Shardus from "../shardus/shardus-types";
+import * as utils from "../utils";
+import Profiler, { profilerInstance } from "../utils/profiler";
+import * as Context from "../p2p/Context";
+import { P2PModuleContext as P2P } from "../p2p/Context";
+import Storage from "../storage";
+import Crypto from "../crypto";
+import Logger, { logFlags } from "../logger";
+import ShardFunctions from "./shardFunctions.js";
+import StateManager from ".";
+import { AppliedReceipt, AppliedVote, QueueEntry } from "./state-manager-types";
+import { nestedCountersInstance } from "../utils/nestedCounters";
+import * as Self from "../p2p/Self";
+import * as CycleChain from "../p2p/CycleChain";
+import * as Comms from "../p2p/Comms";
+
 const stringify = require('fast-stable-stringify')
 
-import Profiler, { profilerInstance } from '../utils/profiler'
-import { P2PModuleContext as P2P } from '../p2p/Context'
-import Storage from '../storage'
-import Crypto from '../crypto'
-import Logger, {logFlags} from '../logger'
-import ShardFunctions from './shardFunctions.js'
-import { info, time } from 'console'
-import StateManager from '.'
-import { AppliedReceipt, QueueEntry, AppliedVote, WrappedResponses } from './state-manager-types'
-import { nestedCountersInstance } from '../utils/nestedCounters'
+export interface TsReceipt {
+  txId: string
+  cycleMarker: string
+  timestamp: number
+}
 
 class TransactionConsenus {
   app: Shardus.App
@@ -30,7 +39,9 @@ class TransactionConsenus {
   statsLogger: any
   statemanager_fatal: (key: string, log: string) => void
 
-  constructor(stateManager: StateManager,  profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ServerConfiguration) {
+  txTimestampReceipts: any
+
+  constructor(stateManager: StateManager,  profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ShardusConfiguration) {
 
     this.crypto = crypto
     this.app = app
@@ -46,6 +57,7 @@ class TransactionConsenus {
     this.shardLogger = logger.getLogger('shardDump')
     this.statsLogger = logger.getLogger('statsDump')
     this.statemanager_fatal = stateManager.statemanager_fatal
+    this.txTimestampReceipts = {}
   }
 
 
@@ -59,7 +71,19 @@ class TransactionConsenus {
    *    ######## ##    ## ########  ##         #######  #### ##    ##    ##     ######
    */
 
-  setupHandlers(){
+  setupHandlers() {
+    this.p2p.registerInternal('get_tx_timestamp', async (payload, respond) => {
+      const { txId, cycleMarker } = payload
+      if (this.txTimestampReceipts[cycleMarker] && this.txTimestampReceipts[cycleMarker][txId]) {
+        console.log('DBG: get_tx_timestamp: Returning timestamp from cache')
+        await respond(this.txTimestampReceipts[cycleMarker][txId])
+      } else {
+        const tsReceipt = this.generateTsReceipt(txId, cycleMarker)
+        console.log('DBG: Generate tsReceipt', tsReceipt)
+        await respond(tsReceipt)
+      }
+    })
+
     this.p2p.registerGossipHandler('spread_appliedReceipt', async (payload, sender, tracker) => {
       profilerInstance.scopedProfileSectionStart('spread_appliedReceipt')
       try {
@@ -121,6 +145,34 @@ class TransactionConsenus {
     })
   }
 
+  generateTsReceipt(txId, cycleMarker) {
+    const tsReceipt = {
+      txId,
+      cycleMarker,
+      timestamp: Date.now(),
+    }
+    const signedTsReceipt = tsReceipt
+    // caching ts receipt for later nodes
+    if (!this.txTimestampReceipts[signedTsReceipt.cycleMarker]) {
+      this.txTimestampReceipts[signedTsReceipt.cycleMarker] = {}
+    }
+    this.txTimestampReceipts[signedTsReceipt.cycleMarker][txId] = signedTsReceipt
+    return signedTsReceipt
+  }
+
+  async askTxnTimestampFromNode(tx, txId) {
+    const homeNode = ShardFunctions.findHomeNode(Context.stateManager.currentCycleShardData.shardGlobals, txId, Context.stateManager.currentCycleShardData.parititionShardDataMap)
+    const cycleMarker = CycleChain.computeCycleMarker(CycleChain.newest)
+    console.log('Asking timestamp from node', homeNode.node)
+    this.mainLogger.debug('Asking timestamp from node', homeNode.node)
+    if (homeNode.node.id === Self.id) {
+      // we generate the tx timestamp by ourselves
+      return this.generateTsReceipt(txId, cycleMarker)
+    } else {
+      const tsReceipt: TsReceipt = await Comms.ask(homeNode.node, 'get_tx_timestamp', { cycleMarker, txId, tx })
+      return tsReceipt
+    }
+  }
 
   /**
    * shareAppliedReceipt

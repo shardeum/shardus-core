@@ -1282,6 +1282,14 @@ class Shardus extends EventEmitter {
           'Missing required interface function. validate()'
         )
       }
+      if (typeof application.getTimestampFromInjectedTx === 'function') {
+        applicationInterfaceImpl.getTimestampFromInjectedTx = (inTx) =>
+          application.getTimestampFromInjectedTx(inTx)
+      } else {
+        throw new Error(
+          'Missing requried interface function.getTimestampFromInjectedTx()'
+        )
+      }
 
       if (typeof application.apply === 'function') {
         applicationInterfaceImpl.apply = (inTx, wrappedStates) =>

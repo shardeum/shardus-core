@@ -174,6 +174,12 @@ export interface App {
     inTx: OpaqueTransaction // it is better to not use IncomingTransaction
   ) => IncomingTransactionResult
   /**
+   * A function responsible for getting timestamp from injected transaction
+   */
+  getTimestampFromInjectedTx: (
+    inTx: OpaqueTransaction // it is better to not use IncomingTransaction
+  ) => number
+  /**
    * A function responsible for applying an accepted transaction
    */
   apply: (inTx: OpaqueTransaction, wrappedStates: { [accountId: string]: WrappedData }) => ApplyResponse
