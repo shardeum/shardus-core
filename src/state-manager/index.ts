@@ -2610,6 +2610,7 @@ class StateManager {
 
     // Hook for Snapshot module to listen to after partition data is settled
     this.eventEmitter.emit('cycleTxsFinalized', cycleShardValues, receiptMapResults, statsClump, mainHashResults)
+    this.transactionConsensus.pruneTxTimestampCache()
 
     if (this.debugFeature_dumpAccountData === true) {
       if(this.superLargeNetworkDebugReduction === true || logFlags.verbose){

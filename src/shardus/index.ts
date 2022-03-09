@@ -30,6 +30,7 @@ import { inRangeOfCurrentTime } from '../utils'
 import MemoryReporting from '../utils/memoryReporting'
 import NestedCounters, { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { profilerInstance } from '../utils/profiler'
+import { time } from 'console'
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
@@ -856,7 +857,7 @@ class Shardus extends EventEmitter {
    * }
    *
    */
-  put(tx: ShardusTypes.OpaqueTransaction, set = false, global = false) {
+  async put(tx: ShardusTypes.OpaqueTransaction, set = false, global = false) {
     const noConsensus = set || global
 
     // Check if Consensor is ready to receive txs before processing it further
@@ -922,12 +923,55 @@ class Shardus extends EventEmitter {
     }
 
     try {
+      const injectedTimestamp = this.app.getTimestampFromTransaction(tx)
+
+      const txId = this.crypto.hash(tx)
+      let timestampReceipt: ShardusTypes.TimestampReceipt
+      if (!injectedTimestamp) {
+        timestampReceipt =
+          await this.stateManager.transactionConsensus.askTxnTimestampFromNode(
+            tx,
+            txId
+          )
+      }
+      if (!injectedTimestamp && !timestampReceipt) {
+        this.shardus_fatal(
+          'put_noTimestamp',
+          `Transaction timestamp cannot be determined ${utils.stringifyReduce(tx)} `
+        )
+        this.statistics.incrementCounter('txRejected')
+        nestedCountersInstance.countEvent('rejected', '_timestampNotDetermined')
+        return {
+          success: false,
+          reason: 'Transaction timestamp cannot be determined.',
+        }
+      }
+      let timestampedTx
+      if (
+        !injectedTimestamp &&
+        timestampReceipt &&
+        timestampReceipt.timestamp
+      ) {
+        timestampedTx = {
+          tx: { ...tx, timestamp: timestampReceipt.timestamp },
+          timestampReceipt,
+        }
+      } else {
+        timestampedTx = { tx }
+      }
+      // Perform basic validation of the transaction fields
+      if (logFlags.verbose)
+        this.mainLogger.debug(
+          'Performing initial validation of the transaction'
+        )
+
       // Perform fast validation of the transaction fields
-      const validateResult = this.app.validate(tx)
+      const validateResult = this.app.validate(timestampedTx)
       if (validateResult.success === false) return validateResult
 
       // Ask App to crack open tx and return timestamp, id (hash), and keys
-      const { timestamp, id, keys } = this.app.crack(tx)
+      const { timestamp, id, keys } = this.app.crack(timestampedTx)
+      console.log('app.crack results', timestamp, id, keys)
 
       // Validate the transaction timestamp
       let txExpireTimeMs = this.config.transactionExpireTime * 1000
@@ -954,8 +998,9 @@ class Shardus extends EventEmitter {
         timestamp,
         txId: id,
         keys,
-        data: tx,
+        data: timestampedTx,
       }
+      console.log('acceptedTX', acceptedTX)
       this.stateManager.transactionQueue.routeAndQueueAcceptedTransaction(
         acceptedTX,
         /*send gossip*/ true,
@@ -1282,12 +1327,12 @@ class Shardus extends EventEmitter {
           'Missing required interface function. validate()'
         )
       }
-      if (typeof application.getTimestampFromInjectedTx === 'function') {
-        applicationInterfaceImpl.getTimestampFromInjectedTx = (inTx) =>
-          application.getTimestampFromInjectedTx(inTx)
+      if (typeof application.getTimestampFromTransaction === 'function') {
+        applicationInterfaceImpl.getTimestampFromTransaction = (inTx) =>
+          application.getTimestampFromTransaction(inTx)
       } else {
         throw new Error(
-          'Missing requried interface function.getTimestampFromInjectedTx()'
+          'Missing requried interface function.getTimestampFromTransaction()'
         )
       }
 
