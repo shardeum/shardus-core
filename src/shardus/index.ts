@@ -953,7 +953,7 @@ class Shardus extends EventEmitter {
         timestampReceipt.timestamp
       ) {
         timestampedTx = {
-          tx: { ...tx, timestamp: timestampReceipt.timestamp },
+          tx,
           timestampReceipt,
         }
       } else {
