@@ -2,12 +2,12 @@
 /*eslint-disable*/
 // const StateManager = require('../../../src/state-manager')
 //const ShardFunctions = require('../../../src/state-manager/shardFunctions.js')
-const ShardFunctions = require('../../../build/src/state-manager/shardFunctions.js').default
+const ShardFunctions = require('../../../dist/state-manager/shardFunctions').default
 // import {ShardGlobals,ShardInfo,WrappableParitionRange,NodeShardData,AddressRange, HomeNodeSummary,ParititionShardDataMap,NodeShardDataMap,MergeResults,BasicAddressRange} from  './shardFunctionTypes'
 // import ShardFunctions from './shardFunctions.js'
 
 const crypto = require('@shardus/crypto-utils')
-const utils = require('../../../build/src/utils')
+const utils = require('../../../dist/utils')
 crypto.init('69fa4195670576c0160d660c3be36556ff8d504725be8a59b5a96509e0c994bc')
 
 // generate a sorted list of nodes
@@ -234,13 +234,13 @@ function syncRangeCalculations(currentCycleShardData){
 
 
 let extraNodesTotal = 0
-let testCounter = 2000
+let testCounter = 1
 // test 1
-let testIterations = 2000
+let testIterations = 1
 let homeNodeQueryTests = 100
 
 let testAllNodesInList = true
-let numNodes = 3
+let numNodes = 10000
 let numNodes2 = 0
 
 /** @type {boolean} */
@@ -295,7 +295,7 @@ async function runOneTest() {
 
     console.log(`Test run: ${testCounter} --nodes:${numNodes}------------------------------------`)
 
-    let nodesPerConsenusGroup = 5
+    let nodesPerConsenusGroup = 128
     let activeNodes
     let activeNodes2
     // @ts-ignore the error below make no sense!
@@ -351,7 +351,7 @@ async function runOneTest() {
 
     if (debugStartsWith != null && ourNode == null) {
         // debugID
-        ourNode = { status: 'syncing', id: debugID }
+        ourNode = { status: 'active', id: debugID }
         debugNode = ourNode
     }
 
