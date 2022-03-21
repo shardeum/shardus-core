@@ -27,8 +27,11 @@ export type QueueEntry = {
     txKeys: Shardus.TransactionKeys
     collectedData: WrappedResponses;
     originalData: WrappedResponses;//{[accountID:string]:string}; //serialized to string backups of account data.
+    collectedFinalData: WrappedResponses;
     beforeHashes: {[accountID:string]:string}; //before hashes of account data
     homeNodes: {[accountID:string]:StateManager.shardFunctionTypes.NodeShardData};
+    executionShardKey: string;
+    isInExecutionHome: boolean;
     /**
      * TODO (after Jan 2022): review if we even need patchedOnNodes, it seems complicated, and I cant remember if the fix is still needed!
      */
@@ -64,6 +67,8 @@ export type QueueEntry = {
     ourTXGroupIndex: number;
     conensusGroup?: Shardus.Node[];
     transactionGroup?: Shardus.Node[];
+    executionGroup?: Shardus.Node[]; //List of nodes that are in the execution group
+    executionIdSet?: Set<string>; //set of node accountIDs for nodes that are in the execution group
     txGroupCycle:number;
     updatedTransactionGroup?: Shardus.Node[];
     updatedTxGroupCycle:number;

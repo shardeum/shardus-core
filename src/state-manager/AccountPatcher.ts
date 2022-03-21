@@ -668,6 +668,8 @@ class AccountPatcher {
 
       }
       treeNode.updated= true
+
+      if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('accountPatcher', `upateShardTrie ${utils.makeShortHash(tx.accountID)}`, `upateShardTrie update: ${utils.makeShortHash(tx.accountID)} h:${utils.makeShortHash(tx.hash)}`)
     }
 
     let removedAccounts = 0
@@ -702,6 +704,7 @@ class AccountPatcher {
       let removed = treeNode.accountTempMap.delete(accountID)
       if(removed){
         removedAccounts++
+        if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('accountPatcher', `upateShardTrie ${utils.makeShortHash(accountID)}`, `upateShardTrie remove ${utils.makeShortHash(accountID)} `)
       } else {
         removedAccountsFailed++
       }
@@ -1394,6 +1397,20 @@ class AccountPatcher {
       if(ourTrieNode.hash != votesMap.bestHash){
         //inSync = false
         //oosRadix.push()
+        if(logFlags.debug){
+          //overkill, need it for now
+          let kvp = []
+          for(let [key,value] of votesMap.allVotes.entries()){
+            kvp.push({id:key, count:value.count, nodeIDs:value.voters.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort)  })
+          }
+          let simpleMap = {
+            bestHash : votesMap.bestHash,
+            bestVotes: votesMap.bestVotes,
+            allVotes: kvp
+          }
+          nestedCountersInstance.countEvent(`accountPatcher`, `isInSync ${radix} ${utils.makeShortHash(votesMap.bestHash)} ourTrieNode.hash:${utils.makeShortHash(ourTrieNode.hash)} uniqueVotes: ${votesMap.allVotes.size}`, 1)
+          this.statemanager_fatal('isInSync',`isInSync fail ${cycle}: ${radix}  uniqueVotes: ${votesMap.allVotes.size} ${utils.stringifyReduce(simpleMap)}`)
+        }
         return false
       }
     }
@@ -1461,6 +1478,20 @@ class AccountPatcher {
 
       if(votesMap.bestVotes < minVotes){
         stats.needsVotes++
+        if(logFlags.debug){
+          //overkill, need it for now
+          let kvp = []
+          for(let [key,value] of votesMap.allVotes.entries()){
+            kvp.push({id:key, count:value.count, nodeIDs:value.voters.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort)  })
+          }
+          let simpleMap = {
+            bestHash : votesMap.bestHash,
+            bestVotes: votesMap.bestVotes,
+            allVotes: kvp
+          }
+          nestedCountersInstance.countEvent(`accountPatcher`, `not enough votes ${radix} ${utils.makeShortHash(votesMap.bestHash)} uniqueVotes: ${votesMap.allVotes.size}`, 1)
+          this.statemanager_fatal('debug findBadAccounts',`debug findBadAccounts ${cycle}: ${radix} bestVotes${votesMap.bestVotes} < minVotes:${minVotes} uniqueVotes: ${votesMap.allVotes.size} ${utils.stringifyReduce(simpleMap)}`)
+        }
         continue
       }
 
@@ -1672,6 +1703,9 @@ class AccountPatcher {
     let hasNonStorageRange = false
     let inSyncTrackerRange = false
 
+    let debugSyncSkipSet = new Set<string>()
+    let debugRadixSet = new Set<string>()
+
     let stats = {
       broadcastSkip:0
     }
@@ -1712,6 +1746,9 @@ class AccountPatcher {
       }
       if(inSyncTrackerRange){
         stats.broadcastSkip++
+        if (logFlags.verbose && logFlags.playback) {
+          debugSyncSkipSet.add(treeNode.radix)
+        }
         continue
       }
 
@@ -1719,11 +1756,14 @@ class AccountPatcher {
         if(lastCycleNonConsensus === false && hasNonStorageRange === false){
           //we can share this data, may be a pain for nodes to verify..
           //todo include last cycle syncing..
+          
         } else{
           //we cant send this data
           continue
         }
       }
+      
+      debugRadixSet.add(`${treeNode.radix}:${utils.stringifyReduce(treeNode.hash)}`)
 
       //figure out who to send a hash to
       //build up a map of messages
@@ -1761,8 +1801,12 @@ class AccountPatcher {
 
     if(stats.broadcastSkip > 0){
       nestedCountersInstance.countEvent(`accountPatcher`, `broadcast skip syncing`, stats.broadcastSkip)
+      if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('accountPatcher', ``, `broadcast skip syncing c:${cycle} set: ${utils.stringifyReduce(debugSyncSkipSet)}`)
     }
 
+    //radixUsed
+    if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('accountPatcher', ``, `broadcast radixUsed syncing c:${cycle} set: ${[utils.stringifyReduce([...debugRadixSet.keys()])]}`)
+    
     //send the messages we have built up.  (parallel waiting with promise.all)
     let promises = []
     for(let messageEntry of messageToNodeMap.values()){

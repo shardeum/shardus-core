@@ -1101,6 +1101,9 @@ class StateManager {
       // }
 
       let wrappedStates = queueEntry.collectedData
+
+      //TODO need to use other source of data here.  FINAL data
+
       if (wrappedStates != null) {
         for (let key of Object.keys(wrappedStates)) {
           let wrappedState = wrappedStates[key]
@@ -1158,6 +1161,9 @@ class StateManager {
       response.acceptedTX = queueEntry.acceptedTx
 
       let wrappedStates = queueEntry.collectedData
+
+      //TODO need to use other source of data here.  FINAL data
+
       if (wrappedStates != null) {
         for (let key of Object.keys(wrappedStates)) {
           let wrappedState = wrappedStates[key]
@@ -1906,7 +1912,7 @@ class StateManager {
     let canWriteToAccount = function (accountId: string) {
       return !accountFilter || accountFilter[accountId] !== undefined
     }
-    const { accountWrites } = applyResponse
+    // const { accountWrites } = applyResponse
 
     let savedSomething = false
 
@@ -1920,12 +1926,14 @@ class StateManager {
     // This ordering can be vitally important for things like a contract account that requires contract storage to be saved first
     // note that the wrapped data passed in alread had accountWrites merged in
     let appOrderedKeys = []
-    if(applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0){
+    if(applyResponse != null && applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0){
       for(let wrappedAccount of applyResponse.accountWrites){
         appOrderedKeys.push(wrappedAccount.accountId)
       }
       keys = appOrderedKeys
     }
+    //todo how to handle case where apply response is null?  probably need to get write order from the other nodes
+    //it may be impossible to work without an apply response..
 
     for (let key of keys) {
       let wrappedData = wrappedStates[key]
@@ -2552,6 +2560,12 @@ class StateManager {
     if (cycle === null || cycle === undefined) {
       return
     }
+
+    await utils.sleep(1000) //wait one second helps with local networks
+                            //need to investigate further
+                            //it was either a sync issue or something to do with the actions below.
+                            //I made this fix locally awhile ago and had too much come up before I could get good
+                            //notes down.
 
     // if (this.oldFeature_GeneratePartitionReport === true) {
     //   if (logFlags.verbose) this.mainLogger.debug(` processPreviousCycleSummaries cycle: ${cycle.counter}`)

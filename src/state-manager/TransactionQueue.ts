@@ -28,6 +28,7 @@ import {
   WrappedResponses
 } from './state-manager-types'
 import { start } from 'repl'
+import { json } from 'body-parser'
 
 const stringify = require('fast-stable-stringify')
 
@@ -74,6 +75,8 @@ class TransactionQueue {
   processingMinRunBreak: number
   processingLeftBusy: boolean
 
+  executeInOneShard: boolean
+
   constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ServerConfiguration) {
     this.crypto = crypto
     this.app = app
@@ -110,6 +113,8 @@ class TransactionQueue {
     this.processingLastRunTime = 0
     this.processingMinRunBreak = 10 //20 //200ms breaks between processing loops
     this.processingLeftBusy = false
+
+    this.executeInOneShard = false
   }
 
   /***
@@ -123,7 +128,7 @@ class TransactionQueue {
    */
 
   setupHandlers() {
-    this.p2p.registerInternal('broadcast_state', async (payload: { txid: string; stateList: any[] }, respond: any) => {
+    this.p2p.registerInternal('broadcast_state', async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }, respond: any) => {
       profilerInstance.scopedProfileSectionStart('broadcast_state')
       try {
         // Save the wrappedAccountState with the rest our queue data
@@ -146,6 +151,38 @@ class TransactionQueue {
         }
       } finally {
         profilerInstance.scopedProfileSectionEnd('broadcast_state')
+      }
+    })
+
+    this.p2p.registerInternal('broadcast_finalstate', async (payload: { txid: string; stateList: Shardus.WrappedResponse[] }, respond: any) => {
+      profilerInstance.scopedProfileSectionStart('broadcast_finalstate')
+      try {
+        // make sure we have it
+        let queueEntry = this.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+        if (queueEntry == null) {
+          //In the past we would enqueue the TX, expecially if syncing but that has been removed.
+          //The normal mechanism of sharing TXs is good enough.
+          return
+        }
+        // add the data in
+        for (let data of payload.stateList) {
+          //let wrappedResponse = data as Shardus.WrappedResponse
+          //this.queueEntryAddData(queueEntry, data)
+          if(data == null){
+            if (logFlags.error && logFlags.verbose) this.mainLogger.error(`broadcast_finalstate data == null`)
+            continue
+          }
+          if(queueEntry.collectedFinalData[data.accountId] == null){
+            queueEntry.collectedFinalData[data.accountId] = data
+            if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('broadcast_finalstate', `${queueEntry.logID}`, `broadcast_finalstate addFinalData qId: ${queueEntry.entryID} data:${utils.makeShortHash(data.accountId)} collected keys: ${utils.stringifyReduce(Object.keys(queueEntry.collectedFinalData))}`)
+          }
+          
+          // if (queueEntry.state === 'syncing') {
+          //   if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastfinalstate', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
+          // }
+        }
+      } finally {
+        profilerInstance.scopedProfileSectionEnd('broadcast_finalstate')
       }
     })
 
@@ -470,7 +507,7 @@ class TransactionQueue {
     let localCachedData = queueEntry.localCachedData
     let keysResponse = queueEntry.txKeys
     let { timestamp, sourceKeys, targetKeys, debugInfo } = keysResponse
-    let applyResponse = queueEntry.preApplyTXResult.applyResponse
+    let applyResponse = queueEntry?.preApplyTXResult?.applyResponse
     let isGlobalModifyingTX = queueEntry.globalModification === true
     let savedSomething = false
     try {
@@ -493,10 +530,19 @@ class TransactionQueue {
 
       ourLockID = await this.stateManager.fifoLock('accountModification')
 
-      if (logFlags.verbose) if (logFlags.console) console.log(`commitConsensedTransaction  ts:${timestamp} Applying!`)
+      if (logFlags.verbose) if (logFlags.console) console.log(`commitConsensedTransaction tx:${queueEntry.logID} ts:${timestamp} Applying!`)
       // if (logFlags.verbose) this.mainLogger.debug('APPSTATE: tryApplyTransaction ' + timestamp + ' Applying!' + ' source: ' + utils.makeShortHash(sourceAddress) + ' target: ' + utils.makeShortHash(targetAddress) + ' srchash_before:' + utils.makeShortHash(sourceState) + ' tgtHash_before: ' + utils.makeShortHash(targetState))
 
-      let { stateTableResults, accountData: _accountdata } = applyResponse
+      //let { stateTableResults, accountData: _accountdata } = applyResponse
+      let stateTableResults = null
+      let _accountdata = []
+
+      if(applyResponse != null){
+        stateTableResults = applyResponse.stateTableResults
+        _accountdata = applyResponse.accountData
+      }
+      
+
       accountDataList = _accountdata
 
       /**
@@ -507,11 +553,12 @@ class TransactionQueue {
        * is not any sorting by address that could get in the way.
        */
 
+       if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction tx:${queueEntry.logID} ts:${timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
         //create a temp map for state table logging below.
         //importantly, we override the wrappedStates with writtenAccountsMap if there is any accountWrites used
         //this should mean dapps don't have to use this feature.  (keeps simple dapps simpler)
       let writtenAccountsMap: WrappedResponses = {}
-      if (applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
+      if (applyResponse != null && applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
         for (let writtenAccount of applyResponse.accountWrites) {
           writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
           writtenAccountsMap[writtenAccount.accountId].prevStateId = wrappedStates[writtenAccount.accountId] ? wrappedStates[writtenAccount.accountId].stateId : ''
@@ -519,6 +566,24 @@ class TransactionQueue {
         }
         //override wrapped states with writtenAccountsMap which should be more complete if it included
         wrappedStates = writtenAccountsMap
+        if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction applyResponse.accountWrites tx:${queueEntry.logID} ts:${timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
+      }
+
+      //If we are not in the execution home then use data that was sent to us for the commit
+      if(queueEntry.globalModification === false && this.executeInOneShard && queueEntry.isInExecutionHome === false){
+        wrappedStates = {}
+        for(let key of Object.keys(queueEntry.collectedFinalData)){
+          let finalAccount = queueEntry.collectedFinalData[key]
+          let accountId = finalAccount.accountId
+
+          //finalAccount.prevStateId = wrappedStates[accountId] ? wrappedStates[accountId].stateId : ''
+          //finalAccount.prevDataCopy = wrappedStates[accountId] ? utils.deepCopy(wrappedStates[accountId].data) : {}
+          let prevStateCalc = wrappedStates[accountId] ? wrappedStates[accountId].stateId : ''
+          if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction collectedFinalData tx:${queueEntry.logID} ts:${timestamp} ${utils.makeShortHash(finalAccount)} preveStateID: ${finalAccount.prevStateId } vs expected: ${prevStateCalc}`)
+
+          wrappedStates[key] = finalAccount
+        }
+        if (logFlags.verbose) this.mainLogger.debug(`commitConsensedTransaction collectedFinalData tx:${queueEntry.logID} ts:${timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
       }
 
       // set a filter based so we only save data for local accounts.  The filter is a slightly different structure than localKeys
@@ -527,8 +592,17 @@ class TransactionQueue {
 
       let nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData = this.stateManager.currentCycleShardData.nodeShardData
       //update the filter to contain any local accounts in accountWrites
-      if (applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
+      if (applyResponse != null && applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
         for (let writtenAccount of applyResponse.accountWrites) {
+          let isLocal = ShardFunctions.testAddressInRange(writtenAccount.accountId, nodeShardData.storedPartitions)
+          if (isLocal) {
+            filter[writtenAccount.accountId] = 1
+          }
+        }
+      }
+
+      if (this.executeInOneShard && applyResponse == null && queueEntry.collectedFinalData != null){
+        for (let writtenAccount of Object.values(wrappedStates)) {
           let isLocal = ShardFunctions.testAddressInRange(writtenAccount.accountId, nodeShardData.storedPartitions)
           if (isLocal) {
             filter[writtenAccount.accountId] = 1
@@ -561,23 +635,25 @@ class TransactionQueue {
       this.profiler.profileSectionEnd('commit-1-setAccount')
       this.profiler.profileSectionStart('commit-2-addAccountStatesAndTX')
 
-      for (let stateT of stateTableResults) {
-        let wrappedRespose = wrappedStates[stateT.accountId]
+      if(stateTableResults != null){
+        for (let stateT of stateTableResults) {
+          let wrappedRespose = wrappedStates[stateT.accountId]
 
-        //backup if we dont have the account in wrapped states (state table results is just for debugging now, and no longer used by sync)
-        if (wrappedRespose == null) {
-          wrappedRespose = writtenAccountsMap[stateT.accountId]
+          //backup if we dont have the account in wrapped states (state table results is just for debugging now, and no longer used by sync)
+          if (wrappedRespose == null) {
+            wrappedRespose = writtenAccountsMap[stateT.accountId]
+          }
+
+          // we have to correct stateBefore because it now gets stomped in the vote, TODO cleaner fix?
+          stateT.stateBefore = wrappedRespose.prevStateId
+
+          if (logFlags.verbose) {
+            if (logFlags.console) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.txId) + ' ts: ' + acceptedTX.timestamp)
+            this.mainLogger.debug('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.txId) + ' ts: ' + acceptedTX.timestamp)
+          }
         }
-
-        // we have to correct stateBefore because it now gets stomped in the vote, TODO cleaner fix?
-        stateT.stateBefore = wrappedRespose.prevStateId
-
-        if (logFlags.verbose) {
-          if (logFlags.console) console.log('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.txId) + ' ts: ' + acceptedTX.timestamp)
-          this.mainLogger.debug('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.txId) + ' ts: ' + acceptedTX.timestamp)
-        }
+        await this.storage.addAccountStates(stateTableResults)        
       }
-      await this.storage.addAccountStates(stateTableResults)
 
       // write the accepted TX to storage
       this.storage.addAcceptedTransactions([acceptedTX])
@@ -768,8 +844,11 @@ class TransactionQueue {
       let txQueueEntry: QueueEntry = {
         acceptedTx: acceptedTx,
         txKeys: keysResponse,
+        executionShardKey: null,
+        isInExecutionHome: true,
         noConsensus,
         collectedData: {},
+        collectedFinalData: {},
         originalData: {},
         beforeHashes: {},
         homeNodes: {},
@@ -824,6 +903,7 @@ class TransactionQueue {
           enqueueHrTime: process.hrtime(),
           duration: {},
         },
+        executionIdSet: new Set()
       } // age comes from timestamp
 
       // todo faster hash lookup for this maybe?
@@ -852,7 +932,7 @@ class TransactionQueue {
       try {
         let age = Date.now() - timestamp
 
-        let keyHash: StringBoolObjectMap = {}
+        let keyHash: StringBoolObjectMap = {}  //TODO replace with Set<string>
         for (let key of txQueueEntry.txKeys.allKeys) {
           if (key == null) {
             // throw new Error(`routeAndQueueAcceptedTransaction key == null ${key}`)
@@ -864,7 +944,46 @@ class TransactionQueue {
         }
         txQueueEntry.uniqueKeys = Object.keys(keyHash)
 
+        if(txQueueEntry.txKeys.allKeys == null || txQueueEntry.txKeys.allKeys.length === 0){
+          if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`routeAndQueueAcceptedTransaction allKeys == null || allKeys.length === 0 ${timestamp} not putting tx in queue.`)
+          return false
+        }
+
         this.updateHomeInformation(txQueueEntry)
+
+        //set the executionShardKey for the transaction
+        if(txQueueEntry.globalModification === false && this.executeInOneShard){
+          txQueueEntry.executionShardKey = txQueueEntry.txKeys.allKeys[0]  
+          if (logFlags.verbose) this.mainLogger.debug(`routeAndQueueAcceptedTransaction set executionShardKey tx:${txQueueEntry.logID} ts:${timestamp} accounts: ${utils.stringifyReduce(Object.keys(txQueueEntry.executionShardKey))}  `)
+        
+          // we were doing this in queueEntryGetTransactionGroup.  moved it earlier.
+          let { homePartition } = ShardFunctions.addressToPartition(this.stateManager.currentCycleShardData.shardGlobals, txQueueEntry.executionShardKey)
+          let ourNodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData = this.stateManager.currentCycleShardData.nodeShardData
+          // let nodeStoresThisPartition = ShardFunctions.testInRange(homePartition, ourNodeShardData.storedPartitions)
+          // if(nodeStoresThisPartition === false){
+          //   //before being in the set that stores the partition was enough, but we want to make it just the consensus nodes
+          //   //txQueueEntry.isInExecutionHome = false
+          // }
+
+          let homeShardData = this.stateManager.currentCycleShardData.parititionShardDataMap.get(homePartition)
+
+          //set the nodes that are in the executionGroup.
+          //This is needed so that consensus will expect less nodes to be voting
+          txQueueEntry.executionGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.slice()
+          for(let node of txQueueEntry.executionGroup){
+            txQueueEntry.executionIdSet.add(node.id)
+ 
+          }
+          //if we are not in the execution group then set isInExecutionHome to false
+          if(txQueueEntry.executionIdSet.has(this.stateManager.currentCycleShardData.ourNode.id) === false){
+            txQueueEntry.isInExecutionHome = false
+          }
+
+          if (logFlags.verbose) this.mainLogger.debug(`routeAndQueueAcceptedTransaction info ${txQueueEntry.logID} isInExecutionHome:${txQueueEntry.isInExecutionHome} hasShardInfo:${txQueueEntry.hasShardInfo}`)
+          if (logFlags.playback) this.logger.playbackLogNote('routeAndQueueAcceptedTransaction', `routeAndQueueAcceptedTransaction info ${txQueueEntry.logID} isInExecutionHome:${txQueueEntry.isInExecutionHome} hasShardInfo:${txQueueEntry.hasShardInfo} executionShardKey:${utils.makeShortHash(txQueueEntry.executionShardKey)}`)
+
+        }
+
 
         // calculate information needed for receiptmap
         //txQueueEntry.cycleToRecordOn = this.stateManager.getCycleNumberFromTimestamp(timestamp)
@@ -879,7 +998,7 @@ class TransactionQueue {
           this.statemanager_fatal(`routeAndQueueAcceptedTransaction cycleToRecordOn==null`, `routeAndQueueAcceptedTransaction cycleToRecordOn==null  ${txQueueEntry.logID} ${timestamp}`)
         }
 
-        if (logFlags.playback) this.logger.playbackLogNote('shrd_queueInsertion_start', txQueueEntry.logID, `${txQueueEntry.logID} ${utils.stringifyReduce(txQueueEntry.txKeys)} cycleToRecordOn:${txQueueEntry.cycleToRecordOn}`)
+        if (logFlags.playback) this.logger.playbackLogNote('shrd_queueInsertion_start', txQueueEntry.logID, `${txQueueEntry.logID} uniqueKeys:${utils.stringifyReduce(txQueueEntry.uniqueKeys)}  txKeys: ${utils.stringifyReduce(txQueueEntry.txKeys)} cycleToRecordOn:${txQueueEntry.cycleToRecordOn}`)
 
         // Look at our keys and log which are known global accounts.  Set global accounts for keys if this is a globalModification TX
         for (let key of txQueueEntry.uniqueKeys) {
@@ -1510,6 +1629,9 @@ class TransactionQueue {
       // make sure the home node is in there in case we hit and edge case
       uniqueNodes[homeNode.node.id] = homeNode.node
 
+
+      
+
       // TODO STATESHARDING4 is this next block even needed:
       // HOMENODEMATHS need to patch in nodes that would cover this partition!
       // TODO PERF make an optimized version of this in ShardFunctions that is smarter about which node range to check and saves off the calculation
@@ -1536,6 +1658,30 @@ class TransactionQueue {
           }
         }
       }
+
+      if(queueEntry.globalModification === false && this.executeInOneShard && key === queueEntry.executionShardKey){
+        //queueEntry.executionGroup = homeNode.consensusNodeForOurNodeFull.slice()
+        let executionKeys = []
+        if (logFlags.verbose) {
+          for(let node of queueEntry.executionGroup){
+            executionKeys.push(utils.makeShortHash(node.id) + `:${node.externalPort}`)
+          }
+        }
+        if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetTransactionGroup executeInOneShard ${queueEntry.logID} isInExecutionHome:${queueEntry.isInExecutionHome} executionKeys:${JSON.stringify(executionKeys)}`)
+        if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('queueEntryGetTransactionGroup', `queueEntryGetTransactionGroup executeInOneShard ${queueEntry.logID} isInExecutionHome:${queueEntry.isInExecutionHome} executionKeys:${JSON.stringify(executionKeys)}`)
+      }
+
+
+      // if(queueEntry.globalModification === false && this.executeInOneShard && key === queueEntry.executionShardKey){
+      //   let ourNodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData = this.stateManager.currentCycleShardData.nodeShardData
+      //   let nodeStoresThisPartition = ShardFunctions.testInRange(homePartition, ourNodeShardData.storedPartitions)
+      //   if(nodeStoresThisPartition === false){
+      //     queueEntry.isInExecutionHome = false
+      //     queueEntry.waitForReceiptOnly = true
+      //   }
+      //   if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetTransactionGroup ${queueEntry.logID} isInExecutionHome:${queueEntry.isInExecutionHome} waitForReceiptOnly:${queueEntry.waitForReceiptOnly}`)
+      //   if (logFlags.playback) this.logger.playbackLogNote('queueEntryGetTransactionGroup', `queueEntryGetTransactionGroup ${queueEntry.logID} isInExecutionHome:${queueEntry.isInExecutionHome} waitForReceiptOnly:${queueEntry.waitForReceiptOnly}`)
+      // }
     }
     queueEntry.ourNodeInTransactionGroup = true
     if (uniqueNodes[this.stateManager.currentCycleShardData.ourNode.id] == null) {
@@ -1544,6 +1690,8 @@ class TransactionQueue {
     }
 
     // make sure our node is included: needed for gossip! - although we may not care about the data!
+    // This may seem confusing, but to gossip to other nodes, we have to have our node in the list we will gossip to
+    // Other logic will use queueEntry.ourNodeInTransactionGroup to know what else to do with the queue entry
     uniqueNodes[this.stateManager.currentCycleShardData.ourNode.id] = this.stateManager.currentCycleShardData.ourNode
 
     let values = Object.values(uniqueNodes)
@@ -1667,10 +1815,10 @@ class TransactionQueue {
     // Report data to corresponding nodes
     let ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
     // let correspondingEdgeNodes = []
-    let correspondingAccNodes = []
+    let correspondingAccNodes: Shardus.Node[] = []
     let dataKeysWeHave = []
     let dataValuesWeHave = []
-    let datas: { [accountID: string]: any } = {}
+    let datas: { [accountID: string]: Shardus.WrappedResponse } = {}
     let remoteShardsByKey: { [accountID: string]: StateManagerTypes.shardFunctionTypes.NodeShardData } = {} // shard homenodes that we do not have the data for.
     let loggedPartition = false
     for (let key of queueEntry.uniqueKeys) {
@@ -1706,7 +1854,7 @@ class TransactionQueue {
       if (this.stateManager.accountGlobals.isGlobalAccount(key)) {
         hasKey = true
         isGlobalKey = true
-        if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', `tellCorrespondingNodes - has`)
+        if (logFlags.playback) this.logger.playbackLogNote('globalAccountMap', queueEntry.logID, `tellCorrespondingNodes - has`)
       }
 
       if (hasKey === false) {
@@ -1729,7 +1877,6 @@ class TransactionQueue {
         let data = await this.app.getRelevantData(key, queueEntry.acceptedTx.data)
         this.profiler.scopedProfileSectionEnd('process_dapp.getRelevantData')
         this.profiler.profileSectionEnd('process_dapp.getRelevantData')
-
 
         //only queue this up to share if it is not a global account. global accounts dont need to be shared.
 
@@ -1758,7 +1905,15 @@ class TransactionQueue {
       }
     }
     if (queueEntry.globalModification === true) {
-      if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodes', `tellCorrespondingNodes - globalModification = true, not telling other nodes`)
+      if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodes', queueEntry.logID, `tellCorrespondingNodes - globalModification = true, not telling other nodes`)
+      return
+    }
+
+    // if we are in the execution shard no need to forward data
+    // This is because other nodes will not expect pre-apply data anymore (but they will send us their pre apply data)
+    if(queueEntry.globalModification === false && this.executeInOneShard && queueEntry.isInExecutionHome === true){
+      //will this break things..
+      if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodes', queueEntry.logID, `tellCorrespondingNodes - isInExecutionHome = true, not telling other nodes`)
       return
     }
 
@@ -1767,6 +1922,8 @@ class TransactionQueue {
     let consensusNodeIds = []
 
     let nodesToSendTo: StringNodeObjectMap = {}
+    let doOnceNodeAccPair = new Set<string>() //can skip  node+acc if it happens more than once.
+
     for (let key of queueEntry.uniqueKeys) {
       if (datas[key] != null) {
         for (let key2 of queueEntry.uniqueKeys) {
@@ -1774,10 +1931,19 @@ class TransactionQueue {
             let localHomeNode = queueEntry.homeNodes[key]
             let remoteHomeNode = queueEntry.homeNodes[key2]
 
+            // //can ignore nodes not in the execution group since they will not be running apply
+            // if(this.executeInOneShard && (queueEntry.executionIdSet.has(remoteHomeNode.node.id) === false)){
+            //   continue
+            // }
+
             let ourLocalConsensusIndex = localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === ourNodeData.node.id)
             if (ourLocalConsensusIndex === -1) {
               continue
             }
+
+            edgeNodeIds = []
+            consensusNodeIds = []
+            correspondingAccNodes = []
 
             // must add one to each lookup index!
             let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.consensusNodeForOurNodeFull.length, ourLocalConsensusIndex + 1)
@@ -1815,10 +1981,26 @@ class TransactionQueue {
               }
             }
 
-            correspondingAccNodes = Object.values(nodesToSendTo)
             let dataToSend = []
             dataToSend.push(datas[key]) // only sending just this one key at a time
             message = { stateList: dataToSend, txid: queueEntry.acceptedTx.txId }
+
+            //correspondingAccNodes = Object.values(nodesToSendTo)
+
+            //build correspondingAccNodes, but filter out nodeid, account key pairs we have seen before
+            for(let [accountID, node] of Object.entries(nodesToSendTo)){
+              let keyPair = accountID + key
+              if(node != null && doOnceNodeAccPair.has(keyPair) === false){
+                doOnceNodeAccPair.add(keyPair)
+
+                // consider this optimization later (should make it so we only send to execution set nodes)
+                // if(queueEntry.executionIdSet.has(remoteHomeNode.node.id) === true){
+                //   correspondingAccNodes.push(node)
+                // }
+                correspondingAccNodes.push(node)
+              }
+            }
+
             if (correspondingAccNodes.length > 0) {
               let remoteRelation = ShardFunctions.getNodeRelation(remoteHomeNode, this.stateManager.currentCycleShardData.ourNode.id)
               let localRelation = ShardFunctions.getNodeRelation(localHomeNode, this.stateManager.currentCycleShardData.ourNode.id)
@@ -1832,12 +2014,171 @@ class TransactionQueue {
               }
               let filterdCorrespondingAccNodes = filteredNodes
 
+              // TODO Perf: need a tellMany enhancement.  that will minimize signing and stringify required!
               this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_state', message)
             }
           }
         }
       }
     }
+  }
+
+  /**
+   * After a reciept is formed, use this to send updated account data to shards that did not execute a change
+   * @param queueEntry 
+   * @returns 
+   */
+  async tellCorrespondingNodesFinalData(queueEntry: QueueEntry) {
+
+    if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodesFinalData', queueEntry.logID, `tellCorrespondingNodesFinalData - start: ${queueEntry.logID}`)
+
+    if (this.stateManager.currentCycleShardData == null) {
+      throw new Error('tellCorrespondingNodesFinalData: currentCycleShardData == null')
+    }
+    if (queueEntry.uniqueKeys == null) {
+      throw new Error('tellCorrespondingNodesFinalData: queueEntry.uniqueKeys == null')
+    }
+    if(queueEntry.globalModification === true){
+      throw new Error('tellCorrespondingNodesFinalData globalModification === true')
+    }
+
+    if(this.executeInOneShard && queueEntry.isInExecutionHome === false){
+      throw new Error('tellCorrespondingNodesFinalData isInExecutionHome === false')
+    }
+    if(queueEntry.executionShardKey == null || queueEntry.executionShardKey == ''){
+      throw new Error('tellCorrespondingNodesFinalData executionShardKey == null or empty')
+    }
+    if(queueEntry.preApplyTXResult == null){
+      throw new Error('tellCorrespondingNodesFinalData preApplyTXResult == null')
+    }
+
+    // Report data to corresponding nodes
+    let ourNodeData = this.stateManager.currentCycleShardData.nodeShardData
+    let correspondingAccNodes: Shardus.Node[] = []
+    let datas: { [accountID: string]: Shardus.WrappedResponse } = {}
+
+    let applyResponse = queueEntry.preApplyTXResult.applyResponse
+    let wrappedStates = queueEntry.collectedData
+    let writtenAccountsMap:WrappedResponses = {}
+    if(applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0){
+      for (let writtenAccount of applyResponse.accountWrites) {
+        writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+        writtenAccountsMap[writtenAccount.accountId].prevStateId = wrappedStates[writtenAccount.accountId] ? wrappedStates[writtenAccount.accountId].stateId : ''
+        writtenAccountsMap[writtenAccount.accountId].prevDataCopy = wrappedStates[writtenAccount.accountId] ? utils.deepCopy(writtenAccount.data) : {}
+      
+        datas[writtenAccount.accountId] = writtenAccount.data
+      }
+      //override wrapped states with writtenAccountsMap which should be more complete if it included
+      wrappedStates = writtenAccountsMap
+    }
+    let keysToShare = Object.keys(wrappedStates)
+
+    let message
+    let edgeNodeIds = []
+    let consensusNodeIds = []
+
+    let localHomeNode = queueEntry.homeNodes[queueEntry.executionShardKey]
+    
+    let nodesToSendTo: StringNodeObjectMap = {}
+    let doOnceNodeAccPair = new Set<string>() //can skip  node+acc if it happens more than once.
+
+    //let uniqueAccountsShared = 0
+    let totalShares = 0
+    for (let key of keysToShare) {
+      if (wrappedStates[key] != null) {
+
+        for (let key2 of queueEntry.uniqueKeys) {
+          if (key !== key2) {
+            //let localHomeNode = queueEntry.homeNodes[key]
+            let remoteHomeNode = queueEntry.homeNodes[key2]
+
+            //if (key !== queueEntry.executionShardKey) {
+              //let remoteHomeNode = ShardFunctions.findHomeNode(this.stateManager.currentCycleShardData.shardGlobals, key, this.stateManager.currentCycleShardData.parititionShardDataMap)
+              //let remoteHomeNode = ShardFunctions.findHomeNode(this.stateManager.currentCycleShardData.shardGlobals, key2, this.stateManager.currentCycleShardData.parititionShardDataMap)
+
+              edgeNodeIds = []
+              consensusNodeIds = []
+              correspondingAccNodes = []
+
+              let ourLocalConsensusIndex = localHomeNode.consensusNodeForOurNodeFull.findIndex((a) => a.id === ourNodeData.node.id)
+              if (ourLocalConsensusIndex === -1) {
+                continue
+              }
+
+              // must add one to each lookup index!
+              let indicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.consensusNodeForOurNodeFull.length, ourLocalConsensusIndex + 1)
+              let edgeIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.edgeNodes.length, ourLocalConsensusIndex + 1)
+
+              let patchIndicies = []
+              if (remoteHomeNode.patchedOnNodes.length > 0) {
+                patchIndicies = ShardFunctions.debugFastStableCorrespondingIndicies(localHomeNode.consensusNodeForOurNodeFull.length, remoteHomeNode.patchedOnNodes.length, ourLocalConsensusIndex + 1)
+              }
+
+              // for each remote node lets save it's id
+              for (let index of indicies) {
+                let node = remoteHomeNode.consensusNodeForOurNodeFull[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+                if (node != null && node.id !== ourNodeData.node.id) {
+                  nodesToSendTo[node.id] = node
+                  consensusNodeIds.push(node.id)
+                }
+              }
+              for (let index of edgeIndicies) {
+                let node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+                if (node != null && node.id !== ourNodeData.node.id) {
+                  nodesToSendTo[node.id] = node
+                  edgeNodeIds.push(node.id)
+                }
+              }
+
+              for (let index of patchIndicies) {
+                let node = remoteHomeNode.edgeNodes[index - 1] // fastStableCorrespondingIndicies is one based so adjust for 0 based array
+                if (node != null && node.id !== ourNodeData.node.id) {
+                  nodesToSendTo[node.id] = node
+                  //edgeNodeIds.push(node.id)
+                }
+              }
+
+              //correspondingAccNodes = Object.values(nodesToSendTo)
+
+              for(let [accountID, node] of Object.entries(nodesToSendTo)){
+                let keyPair = accountID + key
+                if(node != null && doOnceNodeAccPair.has(keyPair) === false){
+                  doOnceNodeAccPair.add(keyPair)
+                  correspondingAccNodes.push(node)
+                }
+              }
+
+              //how can we be making so many calls??
+              if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodesFinalData', queueEntry.logID, `tellCorrespondingNodesFinalData nodesToSendTo:${Object.keys(nodesToSendTo).length} doOnceNodeAccPair:${doOnceNodeAccPair.size} indicies:${JSON.stringify(indicies)} edgeIndicies:${JSON.stringify(edgeIndicies)} patchIndicies:${JSON.stringify(patchIndicies)}  doOnceNodeAccPair: ${JSON.stringify([...doOnceNodeAccPair.keys()])} `)
+
+              let dataToSend:Shardus.WrappedResponse[] = []
+              dataToSend.push(datas[key]) // only sending just this one key at a time
+              message = { stateList: dataToSend, txid: queueEntry.acceptedTx.txId }
+              if (correspondingAccNodes.length > 0) {
+                let remoteRelation = ShardFunctions.getNodeRelation(remoteHomeNode, this.stateManager.currentCycleShardData.ourNode.id)
+                let localRelation = ShardFunctions.getNodeRelation(localHomeNode, this.stateManager.currentCycleShardData.ourNode.id)
+                if (logFlags.playback) this.logger.playbackLogNote('tellCorrespondingNodesFinalData', queueEntry.logID, `remoteRel: ${remoteRelation} localrel: ${localRelation} qId: ${queueEntry.entryID} AccountBeingShared: ${utils.makeShortHash(key)} EdgeNodes:${utils.stringifyReduce(edgeNodeIds)} ConsesusNodes${utils.stringifyReduce(consensusNodeIds)}`)
+
+                // Filter nodes before we send tell()
+                let filteredNodes = this.stateManager.filterValidNodesForInternalMessage(correspondingAccNodes, 'tellCorrespondingNodesFinalData', true, true)
+                if (filteredNodes.length === 0) {
+                  if (logFlags.error) this.mainLogger.error('tellCorrespondingNodesFinalData: filterValidNodesForInternalMessage no valid nodes left to try')
+                  //return null
+                  continue
+                }
+                let filterdCorrespondingAccNodes = filteredNodes
+                this.p2p.tell(filterdCorrespondingAccNodes, 'broadcast_finalstate', message)
+                totalShares++
+              }
+            //}
+          }
+        }
+      }
+    }
+
+
+    if (logFlags.verbose) this.mainLogger.debug(`tellCorrespondingNodesFinalData - end: ${queueEntry.logID} totalShares:${totalShares}`)
+
   }
 
   dumpTxDebugToStatList(queueEntry: QueueEntry): void {
@@ -2299,6 +2640,13 @@ class TransactionQueue {
                 queueEntry.executionDebug.process1 = 'tell fail'
               } finally {
                 queueEntry.state = 'awaiting data'
+
+                //if we are not going to execute the TX go strait to consensing
+                if(queueEntry.globalModification === false && this.executeInOneShard && queueEntry.isInExecutionHome === false){
+                  //is there a way to preemptively forward data without there being tons of repair..
+                  if (logFlags.verbose) this.mainLogger.debug(`processAcceptedTxQueue2 isInExecutionHome === false. set state = 'await final data' tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp}`)
+                  queueEntry.state = 'await final data'
+                }
               }
               queueEntry.executionDebug.processElaped = Date.now() - time
             }
@@ -2464,6 +2812,9 @@ class TransactionQueue {
               if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`)
               let result = this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
               if (result != null) {
+
+                //TODO share receipt with corresponding index
+
                 if (this.stateManager.transactionConsensus.hasAppliedReceiptMatchingPreApply(queueEntry, result)) {
                   if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_madeReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
 
@@ -2492,7 +2843,11 @@ class TransactionQueue {
                     continue
                   }
 
-
+                  if(queueEntry.globalModification === false && finishedConsensing === true && this.executeInOneShard && queueEntry.isInExecutionHome ){
+                    //forward all finished data to corresponding nodes
+                    //tellFinalDataToCorrespondingNodes()
+                    await this.tellCorrespondingNodesFinalData(queueEntry) 
+                  }
                   //continue
                 } else {
                   if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch1', `${shortID}`, `qId: ${queueEntry.entryID}  `)
@@ -2581,6 +2936,88 @@ class TransactionQueue {
               continue
             }
           }
+          if(queueEntry.state === 'await final data') {
+            //wait patiently for data to match receipt
+            //if we run out of time repair to receipt?
+
+            if (this.processQueue_accountSeen(seenAccounts, queueEntry) === false) {
+              this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
+
+              //temp hack
+              if(queueEntry.recievedAppliedReceipt == null){
+                let result = this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)    
+                if(result != null){
+                  queueEntry.recievedAppliedReceipt = result    
+                  if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitFinalData_hackReceipt', `${shortID}`, `qId: ${queueEntry.entryID} result:${utils.stringifyReduce(result)}`)       
+                }
+              }
+
+              //collectedFinalData
+              if(queueEntry.recievedAppliedReceipt != null 
+                && queueEntry.recievedAppliedReceipt.appliedVotes != null
+                && queueEntry.recievedAppliedReceipt.appliedVotes.length > 0){
+                
+                let vote = queueEntry.recievedAppliedReceipt.appliedVotes[0]
+                let failed = false
+                let incomplete = false
+                for(let i=0; i<vote.account_id.length; i++ ){
+                  let accountID = vote.account_id[i]
+                  let accountHash = vote.account_state_hash_after[i]
+                  
+                  let wrappedAccount = queueEntry.collectedFinalData[accountID]
+                  if(wrappedAccount == null){
+                    incomplete = true
+                    break
+                  }
+                  if(wrappedAccount.stateId != accountHash){
+                    failed = true
+                    break
+                  }
+                }
+                if(failed === true){
+                  this.stateManager.transactionRepair.repairToMatchReceipt(queueEntry)
+                  queueEntry.state = 'await repair'
+                  if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitFinalData_failed', `${shortID}`, `qId: ${queueEntry.entryID} `)
+                  if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData_failed : ${queueEntry.logID} `)
+                  continue
+                }
+                if(failed === false && incomplete === false){
+                  if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitFinalData_passed', `${shortID}`, `qId: ${queueEntry.entryID} `)
+                  if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData_passed : ${queueEntry.logID} `)
+                  
+                  //we let commiting handle this before but we need to just set account!
+                  //queueEntry.state = 'commiting'
+
+                  //TODO vote order should be in apply response order!
+                  let rawAccounts = []
+                  let accountRecords:Shardus.WrappedData[] = []                  
+                  for(let i=0; i<vote.account_id.length; i++ ){
+                    let accountID = vote.account_id[i]
+                    let wrappedAccount = queueEntry.collectedFinalData[accountID]
+
+                    rawAccounts.push(wrappedAccount.data)
+                    accountRecords.push(wrappedAccount)
+                  }
+                  //await this.app.setAccountData(rawAccounts)
+
+                  await this.stateManager.checkAndSetAccountData(accountRecords, 'awaitFinalData_passed', false)
+
+                  //log tx processed if needed
+                  if (queueEntry != null && queueEntry.transactionGroup != null && this.p2p.getNodeId() === queueEntry.transactionGroup[0].id) {
+                    this.stateManager.eventEmitter.emit('txProcessed')
+                  }
+
+                  if (queueEntry.recievedAppliedReceipt.result === true) {
+                    queueEntry.state = 'pass'
+                  } else {
+                    queueEntry.state = 'fail'
+                  }
+                  this.removeFromQueue(queueEntry, currentIndex)
+                }
+              }
+            }
+
+          }
           if (queueEntry.state === 'commiting') {
             ///////////////////////////////////////////--commiting--////////////////////////////////////////////////////////////////
             if (this.processQueue_accountSeen(seenAccounts, queueEntry) === false) {
@@ -2614,6 +3051,19 @@ class TransactionQueue {
 
               let wrappedStates = queueEntry.collectedData // Object.values(queueEntry.collectedData)
               let localCachedData = queueEntry.localCachedData
+
+              //TODO apply the data we got!!! (override wrapped states)
+              // if(this.executeInOneShard){
+              //   for(let key of Object.keys(queueEntry.collectedFinalData)){
+              //     wrappedStates[key] = queueEntry.collectedFinalData[key]
+              //   }
+              // }
+              // make sure the branches below will use this data correctly
+
+              // commit  queueEntry.preApplyTXResult.applyResponse.... hmm
+              // aslo is queueEntry.preApplyTXResult.applyResponse use above in tex data tell?
+            
+
               try {
                 let canCommitTX = true
                 let hasReceiptFail = false

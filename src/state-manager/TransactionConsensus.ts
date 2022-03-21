@@ -284,6 +284,22 @@ class TransactionConsenus {
         wrappedStates = writtenAccountsMap
       }
 
+      // Not sure if we should keep this.  it may only come up in error cases that would not be using final data in the repair?
+      //If we are not in the execution home then use data that was sent to us for the commit
+      // if(queueEntry.globalModification === false && this.stateManager.transactionQueue.executeInOneShard && queueEntry.isInExecutionHome === false){
+      //   wrappedStates = {}
+      //   let timestamp = queueEntry.acceptedTx.timestamp        
+      //   for(let key of Object.keys(queueEntry.collectedFinalData)){
+      //     let finalAccount = queueEntry.collectedFinalData[key]
+      //     let accountId = finalAccount.accountId
+      //     let prevStateCalc = wrappedStates[accountId] ? wrappedStates[accountId].stateId : ''
+      //     if (logFlags.verbose) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply collectedFinalData tx:${queueEntry.logID} ts:${timestamp} ${utils.makeShortHash(finalAccount)} preveStateID: ${finalAccount.prevStateId } vs expected: ${prevStateCalc}`)
+
+      //     wrappedStates[key] = finalAccount
+      //   }
+      //   if (logFlags.verbose) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply collectedFinalData tx:${queueEntry.logID} ts:${timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
+      // }
+
       for (let j = 0; j < vote.account_id.length; j++) {
         let id = vote.account_id[j]
         let hash = vote.account_state_hash_after[j]
@@ -323,12 +339,36 @@ class TransactionConsenus {
       return null
     }
 
+    // TEMP hack.. allow any node to try and make a receipt
+    // if (this.stateManager.transactionQueue.executeInOneShard && queueEntry.isInExecutionHome === false) {
+    //   return null
+    // }
+
+    if(queueEntry.appliedReceipt != null){
+      return queueEntry.appliedReceipt
+    }
+
     let passed = false
     let canProduceReceipt = false
 
     // Design TODO:  should this be the full transaction group or just the consensus group?
     let votingGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+
+    if(this.stateManager.transactionQueue.executeInOneShard){
+      //use execuiton group instead of full transaciton group, since only the execution group will run the transaction
+      votingGroup = queueEntry.executionGroup
+    }
+
     let requiredVotes = Math.round(votingGroup.length * (2 / 3.0))
+
+    //hacky for now.  debug code:
+    //@ts-ignore
+    if(queueEntry.loggedStats1 == null){
+      //@ts-ignore
+      queueEntry.loggedStats1 = true
+      nestedCountersInstance.countEvent('transactionStats', ` votingGroup:${votingGroup.length}`)      
+    }
+
 
     let numVotes = queueEntry.collectedVotes.length
 
@@ -592,7 +632,8 @@ class TransactionConsenus {
     }
     // share the vote via gossip
     let sender = null
-    let consensusGroup = this.stateManager.transactionQueue.queueEntryGetConsensusGroup(queueEntry)
+    // TODO need to migrate to execution group and then corresponding node tell the receipt at the end
+    let consensusGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)   //.queueEntryGetConsensusGroup(queueEntry)
     if (consensusGroup.length >= 1) {
       // should consider only forwarding in some cases?
       this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `share tx vote to neighbors`, consensusGroup)
