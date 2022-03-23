@@ -176,7 +176,7 @@ class TransactionQueue {
             queueEntry.collectedFinalData[data.accountId] = data
             if (logFlags.playback && logFlags.verbose) this.logger.playbackLogNote('broadcast_finalstate', `${queueEntry.logID}`, `broadcast_finalstate addFinalData qId: ${queueEntry.entryID} data:${utils.makeShortHash(data.accountId)} collected keys: ${utils.stringifyReduce(Object.keys(queueEntry.collectedFinalData))}`)
           }
-          
+
           // if (queueEntry.state === 'syncing') {
           //   if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_gotBroadcastfinalstate', `${queueEntry.acceptedTx.txId}`, ` qId: ${queueEntry.entryID} data:${data.accountId}`)
           // }
@@ -190,7 +190,7 @@ class TransactionQueue {
       profilerInstance.scopedProfileSectionStart('spread_tx_to_group_syncing')
       try {
         //handleSharedTX will also validate fields
-        this.handleSharedTX(payload, sender)
+        this.handleSharedTX(payload.data, sender)
       } finally {
         profilerInstance.scopedProfileSectionEnd('spread_tx_to_group_syncing')
       }
@@ -541,7 +541,7 @@ class TransactionQueue {
         stateTableResults = applyResponse.stateTableResults
         _accountdata = applyResponse.accountData
       }
-      
+
 
       accountDataList = _accountdata
 
@@ -652,7 +652,7 @@ class TransactionQueue {
             this.mainLogger.debug('writeStateTable ' + utils.makeShortHash(stateT.accountId) + ' before: ' + utils.makeShortHash(stateT.stateBefore) + ' after: ' + utils.makeShortHash(stateT.stateAfter) + ' txid: ' + utils.makeShortHash(acceptedTX.txId) + ' ts: ' + acceptedTX.timestamp)
           }
         }
-        await this.storage.addAccountStates(stateTableResults)        
+        await this.storage.addAccountStates(stateTableResults)
       }
 
       // write the accepted TX to storage
@@ -953,9 +953,9 @@ class TransactionQueue {
 
         //set the executionShardKey for the transaction
         if(txQueueEntry.globalModification === false && this.executeInOneShard){
-          txQueueEntry.executionShardKey = txQueueEntry.txKeys.allKeys[0]  
+          txQueueEntry.executionShardKey = txQueueEntry.txKeys.allKeys[0]
           if (logFlags.verbose) this.mainLogger.debug(`routeAndQueueAcceptedTransaction set executionShardKey tx:${txQueueEntry.logID} ts:${timestamp} accounts: ${utils.stringifyReduce(Object.keys(txQueueEntry.executionShardKey))}  `)
-        
+
           // we were doing this in queueEntryGetTransactionGroup.  moved it earlier.
           let { homePartition } = ShardFunctions.addressToPartition(this.stateManager.currentCycleShardData.shardGlobals, txQueueEntry.executionShardKey)
           let ourNodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData = this.stateManager.currentCycleShardData.nodeShardData
@@ -972,7 +972,7 @@ class TransactionQueue {
           txQueueEntry.executionGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.slice()
           for(let node of txQueueEntry.executionGroup){
             txQueueEntry.executionIdSet.add(node.id)
- 
+
           }
           //if we are not in the execution group then set isInExecutionHome to false
           if(txQueueEntry.executionIdSet.has(this.stateManager.currentCycleShardData.ourNode.id) === false){
@@ -1630,7 +1630,7 @@ class TransactionQueue {
       uniqueNodes[homeNode.node.id] = homeNode.node
 
 
-      
+
 
       // TODO STATESHARDING4 is this next block even needed:
       // HOMENODEMATHS need to patch in nodes that would cover this partition!
@@ -2025,8 +2025,8 @@ class TransactionQueue {
 
   /**
    * After a reciept is formed, use this to send updated account data to shards that did not execute a change
-   * @param queueEntry 
-   * @returns 
+   * @param queueEntry
+   * @returns
    */
   async tellCorrespondingNodesFinalData(queueEntry: QueueEntry) {
 
@@ -2065,7 +2065,7 @@ class TransactionQueue {
         writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
         writtenAccountsMap[writtenAccount.accountId].prevStateId = wrappedStates[writtenAccount.accountId] ? wrappedStates[writtenAccount.accountId].stateId : ''
         writtenAccountsMap[writtenAccount.accountId].prevDataCopy = wrappedStates[writtenAccount.accountId] ? utils.deepCopy(writtenAccount.data) : {}
-      
+
         datas[writtenAccount.accountId] = writtenAccount.data
       }
       //override wrapped states with writtenAccountsMap which should be more complete if it included
@@ -2078,7 +2078,7 @@ class TransactionQueue {
     let consensusNodeIds = []
 
     let localHomeNode = queueEntry.homeNodes[queueEntry.executionShardKey]
-    
+
     let nodesToSendTo: StringNodeObjectMap = {}
     let doOnceNodeAccPair = new Set<string>() //can skip  node+acc if it happens more than once.
 
@@ -2846,7 +2846,7 @@ class TransactionQueue {
                   if(queueEntry.globalModification === false && finishedConsensing === true && this.executeInOneShard && queueEntry.isInExecutionHome ){
                     //forward all finished data to corresponding nodes
                     //tellFinalDataToCorrespondingNodes()
-                    await this.tellCorrespondingNodesFinalData(queueEntry) 
+                    await this.tellCorrespondingNodesFinalData(queueEntry)
                   }
                   //continue
                 } else {
@@ -2945,25 +2945,25 @@ class TransactionQueue {
 
               //temp hack
               if(queueEntry.recievedAppliedReceipt == null){
-                let result = this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)    
+                let result = this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
                 if(result != null){
-                  queueEntry.recievedAppliedReceipt = result    
-                  if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitFinalData_hackReceipt', `${shortID}`, `qId: ${queueEntry.entryID} result:${utils.stringifyReduce(result)}`)       
+                  queueEntry.recievedAppliedReceipt = result
+                  if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitFinalData_hackReceipt', `${shortID}`, `qId: ${queueEntry.entryID} result:${utils.stringifyReduce(result)}`)
                 }
               }
 
               //collectedFinalData
-              if(queueEntry.recievedAppliedReceipt != null 
+              if(queueEntry.recievedAppliedReceipt != null
                 && queueEntry.recievedAppliedReceipt.appliedVotes != null
                 && queueEntry.recievedAppliedReceipt.appliedVotes.length > 0){
-                
+
                 let vote = queueEntry.recievedAppliedReceipt.appliedVotes[0]
                 let failed = false
                 let incomplete = false
                 for(let i=0; i<vote.account_id.length; i++ ){
                   let accountID = vote.account_id[i]
                   let accountHash = vote.account_state_hash_after[i]
-                  
+
                   let wrappedAccount = queueEntry.collectedFinalData[accountID]
                   if(wrappedAccount == null){
                     incomplete = true
@@ -2984,13 +2984,13 @@ class TransactionQueue {
                 if(failed === false && incomplete === false){
                   if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitFinalData_passed', `${shortID}`, `qId: ${queueEntry.entryID} `)
                   if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData_passed : ${queueEntry.logID} `)
-                  
+
                   //we let commiting handle this before but we need to just set account!
                   //queueEntry.state = 'commiting'
 
                   //TODO vote order should be in apply response order!
                   let rawAccounts = []
-                  let accountRecords:Shardus.WrappedData[] = []                  
+                  let accountRecords:Shardus.WrappedData[] = []
                   for(let i=0; i<vote.account_id.length; i++ ){
                     let accountID = vote.account_id[i]
                     let wrappedAccount = queueEntry.collectedFinalData[accountID]
@@ -3062,7 +3062,7 @@ class TransactionQueue {
 
               // commit  queueEntry.preApplyTXResult.applyResponse.... hmm
               // aslo is queueEntry.preApplyTXResult.applyResponse use above in tex data tell?
-            
+
 
               try {
                 let canCommitTX = true
