@@ -520,13 +520,13 @@ class Shardus extends EventEmitter {
 
     this.reporter = this.config.reporting.report
       ? new Reporter(
-          this.config.reporting,
-          this.logger,
-          this.statistics,
-          this.stateManager,
-          this.profiler,
-          this.loadDetection
-        )
+        this.config.reporting,
+        this.logger,
+        this.statistics,
+        this.stateManager,
+        this.profiler,
+        this.loadDetection
+      )
       : null
     Context.setReporterContext(this.reporter)
 
@@ -976,14 +976,14 @@ class Shardus extends EventEmitter {
       // Validate the transaction timestamp
       let txExpireTimeMs = this.config.transactionExpireTime * 1000
 
-      if(global){
+      if (global) {
         txExpireTimeMs = 2 * 10 * 1000 //todo consider if this should be a config.
       }
 
       if (inRangeOfCurrentTime(timestamp, txExpireTimeMs, txExpireTimeMs) === false) {
         this.shardus_fatal(
           `put_txExpired`,
-          `Transaction Expired: timestamp:${timestamp} now:${Date.now()} diff(now-ts):${Date.now()-timestamp}  ${utils.stringifyReduce(tx)} `
+          `Transaction Expired: timestamp:${timestamp} now:${Date.now()} diff(now-ts):${Date.now() - timestamp}  ${utils.stringifyReduce(tx)} `
         )
         this.statistics.incrementCounter('txRejected')
         nestedCountersInstance.countEvent(
@@ -993,6 +993,8 @@ class Shardus extends EventEmitter {
         return { success: false, reason: 'Transaction Expired' }
       }
 
+      this.profiler.profileSectionStart('put')
+
       // Pack into acceptedTx, and pass to StateManager
       const acceptedTX: ShardusTypes.AcceptedTx = {
         timestamp,
@@ -1001,6 +1003,13 @@ class Shardus extends EventEmitter {
         data: timestampedTx,
       }
       console.log('acceptedTX', acceptedTX)
+      if (logFlags.verbose) this.mainLogger.debug('Transaction validated')
+      this.statistics.incrementCounter('txInjected')
+      this.logger.playbackLogNote(
+        'tx_injected',
+        `${txId}`,
+        `Transaction: ${utils.stringifyReduce(timestampedTx)}`
+      )
       this.stateManager.transactionQueue.routeAndQueueAcceptedTransaction(
         acceptedTX,
         /*send gossip*/ true,
@@ -1169,7 +1178,7 @@ class Shardus extends EventEmitter {
     })
   }
 
-  tryInvolveAccount(txId: string, address: string, isRead: boolean) : boolean {
+  tryInvolveAccount(txId: string, address: string, isRead: boolean): boolean {
     const result = this.stateManager.transactionQueue.tryInvloveAccount(
       txId,
       address,
@@ -1355,7 +1364,7 @@ class Shardus extends EventEmitter {
           tx,
           wrappedStates,
           applyResponse
-        ) {}
+        ) { }
       }
 
       if (typeof application.transactionReceiptFail === 'function') {
@@ -1370,7 +1379,7 @@ class Shardus extends EventEmitter {
           tx,
           wrappedStates,
           applyResponse
-        ) {}
+        ) { }
       }
 
       if (typeof application.updateAccountFull === 'function') {
@@ -1652,11 +1661,11 @@ class Shardus extends EventEmitter {
       )
       this.fatalLogger.fatal(
         '_getApplicationInterface: ' +
-          ex.name +
-          ': ' +
-          ex.message +
-          ' at ' +
-          ex.stack
+        ex.name +
+        ': ' +
+        ex.message +
+        ' at ' +
+        ex.stack
       )
       throw new Error(ex)
     }
@@ -1704,20 +1713,20 @@ class Shardus extends EventEmitter {
         } catch (ex) {
           this.mainLogger.debug(
             'testGlobalAccountTX:' +
-              ex.name +
-              ': ' +
-              ex.message +
-              ' at ' +
-              ex.stack
+            ex.name +
+            ': ' +
+            ex.message +
+            ' at ' +
+            ex.stack
           )
           this.shardus_fatal(
             `registerExternalPost_ex`,
             'testGlobalAccountTX:' +
-              ex.name +
-              ': ' +
-              ex.message +
-              ' at ' +
-              ex.stack
+            ex.name +
+            ': ' +
+            ex.message +
+            ' at ' +
+            ex.stack
           )
         }
       }
@@ -1737,20 +1746,20 @@ class Shardus extends EventEmitter {
         } catch (ex) {
           this.mainLogger.debug(
             'testGlobalAccountTXSet:' +
-              ex.name +
-              ': ' +
-              ex.message +
-              ' at ' +
-              ex.stack
+            ex.name +
+            ': ' +
+            ex.message +
+            ' at ' +
+            ex.stack
           )
           this.shardus_fatal(
             `registerExternalPost2_ex`,
             'testGlobalAccountTXSet:' +
-              ex.name +
-              ': ' +
-              ex.message +
-              ' at ' +
-              ex.stack
+            ex.name +
+            ': ' +
+            ex.message +
+            ' at ' +
+            ex.stack
           )
         }
       }
