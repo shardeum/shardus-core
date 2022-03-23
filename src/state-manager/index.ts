@@ -904,13 +904,14 @@ class StateManager {
         failedHashes.push(accountId)
         return failedHashes
       }
-      //TODO per remove this when we are satisfied with the situation
+      //TODO perf remove this when we are satisfied with the situation
       //Additional testing to cache if we try to overrite with older data
       if (this.accountCache.hasAccount(accountId)) {
         let accountMemData: AccountHashCache = this.accountCache.getAccountHash(accountId)
         if (timestamp < accountMemData.t) {
           //should update cache anyway (older value may be needed)
 
+          // I have doubts that cache should be able to roll a value back..
           this.accountCache.updateAccountHash(wrapedAccount.accountId, wrapedAccount.stateId, wrapedAccount.timestamp, cycleToRecordOn)
 
           if (logFlags.error) this.mainLogger.error(`setAccountData: abort. checkAndSetAccountData older timestamp note:${note} acc: ${utils.makeShortHash(accountId)} timestamp:${timestamp} accountMemData.t:${accountMemData.t} hash: ${utils.makeShortHash(hash)} cache:${utils.stringifyReduce(accountMemData)}`)
@@ -962,6 +963,7 @@ class StateManager {
               this.accountCache.updateAccountHash(wrapedAccount.accountId, wrapedAccount.stateId, wrapedAccount.timestamp, cycleToRecordOn)
             }
           } else {
+            //I think some work was done to fix diverging stats, but how did it turn out?
             this.partitionStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount.accountId, wrapedAccount.data, 'checkAndSetAccountData-' + note)
           }
         }
@@ -1022,7 +1024,9 @@ class StateManager {
 
     this.depricated.setupHandlers()
 
-    this.partitionObjects.setupHandlers()
+    if(this.partitionObjects != null){
+      this.partitionObjects.setupHandlers()      
+    }
 
     this.transactionQueue.setupHandlers()
 
@@ -1359,120 +1363,6 @@ class StateManager {
     } else{
       this.accountSync.syncStatement.internalFlag = true
     }
-  }
-
-  /**
-   * dumpAccountDebugData this is what creats the shardreports
-   */
-  async dumpAccountDebugData() {
-    if (this.currentCycleShardData == null) {
-      return
-    }
-
-    // hmm how to deal with data that is changing... it cant!!
-    let partitionMap = this.currentCycleShardData.parititionShardDataMap
-
-    let ourNodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData = this.currentCycleShardData.nodeShardData
-    // partittions:
-    let partitionDump: DebugDumpPartitions = { partitions: [], cycle: 0, rangesCovered: {} as DebugDumpRangesCovered,
-    nodesCovered: {} as DebugDumpNodesCovered, allNodeIds: [], globalAccountIDs: [], globalAccountSummary: [],
-    globalStateHash: '', calculationTime: this.currentCycleShardData.calculationTime }
-    partitionDump.cycle = this.currentCycleShardData.cycleNumber
-
-    // todo port this to a static stard function!
-    // check if we are in the consenus group for this partition
-    let minP = ourNodeShardData.consensusStartPartition // storedPartitions.partitionStart
-    let maxP = ourNodeShardData.consensusEndPartition // storedPartitions.partitionEnd
-    partitionDump.rangesCovered = { ipPort: `${ourNodeShardData.node.externalIp}:${ourNodeShardData.node.externalPort}`, id: utils.makeShortHash(ourNodeShardData.node.id), fracID: ourNodeShardData.nodeAddressNum / 0xffffffff, hP: ourNodeShardData.homePartition, cMin: minP, cMax: maxP, stMin: ourNodeShardData.storedPartitions.partitionStart, stMax: ourNodeShardData.storedPartitions.partitionEnd, numP: this.currentCycleShardData.shardGlobals.numPartitions }
-
-    // todo print out coverage map by node index
-
-    partitionDump.nodesCovered = { idx: ourNodeShardData.ourNodeIndex, ipPort: `${ourNodeShardData.node.externalIp}:${ourNodeShardData.node.externalPort}`, id: utils.makeShortHash(ourNodeShardData.node.id), fracID: ourNodeShardData.nodeAddressNum / 0xffffffff, hP: ourNodeShardData.homePartition, consensus: [], stored: [], extra: [], numP: this.currentCycleShardData.shardGlobals.numPartitions }
-
-    for (let node of ourNodeShardData.consensusNodeForOurNode) {
-      let nodeData = this.currentCycleShardData.nodeShardDataMap.get(node.id)
-      //@ts-ignore just debug junk
-      partitionDump.nodesCovered.consensus.push({ idx: nodeData.ourNodeIndex, hp: nodeData.homePartition })
-    }
-    for (let node of ourNodeShardData.nodeThatStoreOurParitionFull) {
-      let nodeData = this.currentCycleShardData.nodeShardDataMap.get(node.id)
-      //@ts-ignore just debug junk
-      partitionDump.nodesCovered.stored.push({ idx: nodeData.ourNodeIndex, hp: nodeData.homePartition })
-    }
-
-    if (this.currentCycleShardData.ourNode.status === 'active') {
-      for (var [key, value] of partitionMap) {
-        let partition: DebugDumpPartition = { parititionID: key, accounts: [], skip: {} as DebugDumpPartitionSkip }
-        partitionDump.partitions.push(partition)
-
-        // normal case
-        if (maxP > minP) {
-          // are we outside the min to max range
-          if (key < minP || key > maxP) {
-            partition.skip = { p: key, min: minP, max: maxP }
-            continue
-          }
-        } else if (maxP === minP) {
-          if (key !== maxP) {
-            partition.skip = { p: key, min: minP, max: maxP, noSpread: true }
-            continue
-          }
-        } else {
-          // are we inside the min to max range (since the covered rage is inverted)
-          if (key > maxP && key < minP) {
-            partition.skip = { p: key, min: minP, max: maxP, inverted: true }
-            continue
-          }
-        }
-
-        let partitionShardData = value
-        let accountStart = partitionShardData.homeRange.low
-        let accountEnd = partitionShardData.homeRange.high
-        let wrappedAccounts = await this.app.getAccountData(accountStart, accountEnd, 10000000)
-        // { accountId: account.address, stateId: account.hash, data: account, timestamp: account.timestamp }
-        let duplicateCheck = {}
-        for (let wrappedAccount of wrappedAccounts) {
-          if (duplicateCheck[wrappedAccount.accountId] != null) {
-            continue
-          }
-          duplicateCheck[wrappedAccount.accountId] = true
-          let v:string
-          if (this.app.getAccountDebugValue != null) {
-            v = this.app.getAccountDebugValue(wrappedAccount)
-          } else {
-            v = 'getAccountDebugValue not defined'
-          }
-          partition.accounts.push({ id: wrappedAccount.accountId, hash: wrappedAccount.stateId, v: v })
-        }
-
-        partition.accounts.sort(this._sortByIdAsc)
-      }
-
-      //partitionDump.allNodeIds = []
-      for (let node of this.currentCycleShardData.activeNodes) {
-        partitionDump.allNodeIds.push(utils.makeShortHash(node.id))
-      }
-
-      partitionDump.globalAccountIDs = Array.from(this.accountGlobals.globalAccountSet.keys())
-      partitionDump.globalAccountIDs.sort()
-      // dump information about consensus group and edge nodes for each partition
-      // for (var [key, value] of this.currentCycleShardData.parititionShardDataMap){
-
-      // }
-
-      let {globalAccountSummary, globalStateHash} = this.accountGlobals.getGlobalDebugReport()
-      partitionDump.globalAccountSummary = globalAccountSummary
-      partitionDump.globalStateHash = globalStateHash
-    } else {
-      if (this.currentCycleShardData != null && this.currentCycleShardData.activeNodes.length > 0) {
-        for (let node of this.currentCycleShardData.activeNodes) {
-          partitionDump.allNodeIds.push(utils.makeShortHash(node.id))
-        }
-      }
-    }
-
-    this.lastShardReport = utils.stringifyReduce(partitionDump)
-    this.shardLogger.debug(this.lastShardReport)
   }
 
   // for debug. need to check it sorts in correcdt direction.
@@ -2264,12 +2154,15 @@ class StateManager {
     // if (this.depricated.repairTrackingByCycleById == null) {
     //   return
     // }
-    if (this.partitionObjects.allPartitionResponsesByCycleByPartition == null) {
-      return
+    if(this.partitionObjects != null){
+      if (this.partitionObjects.allPartitionResponsesByCycleByPartition == null) {
+        return
+      }
+      if (this.partitionObjects.ourPartitionResultsByCycle == null) {
+        return
+      }      
     }
-    if (this.partitionObjects.ourPartitionResultsByCycle == null) {
-      return
-    }
+
     if (this.shardValuesByCycle == null) {
       return
     }
@@ -2301,11 +2194,10 @@ class StateManager {
     // }
 
     // cleanup old partition objects / receipts.
-    // let responsesById = this.partitionObjects.allPartitionResponsesByCycleByPartition[key]
-    // let ourPartitionValues = this.partitionObjects.ourPartitionResultsByCycle[key]
-    for (let cycleKey of Object.keys(this.partitionObjects.allPartitionResponsesByCycleByPartition)) {
-      let cycle = cycleKey.slice(1)
-      let cycleNum = parseInt(cycle, 10)
+    if(this.partitionObjects != null){
+      for (let cycleKey of Object.keys(this.partitionObjects.allPartitionResponsesByCycleByPartition)) {
+        let cycle = cycleKey.slice(1)
+        let cycleNum = parseInt(cycle, 10)
       if (cycleNum < oldestCycle) {
         // delete old cycle
         delete this.partitionObjects.allPartitionResponsesByCycleByPartition[cycleKey]
@@ -2318,10 +2210,12 @@ class StateManager {
       let cycleNum = parseInt(cycle, 10)
       if (cycleNum < oldestCycle) {
         // delete old cycle
-        delete this.partitionObjects.ourPartitionResultsByCycle[cycleKey]
-        removedourPartitionResultsByCycle++
-      }
+          delete this.partitionObjects.ourPartitionResultsByCycle[cycleKey]
+          removedourPartitionResultsByCycle++
+        }
+      }      
     }
+
 
     // cleanup this.shardValuesByCycle
     for (let cycleKey of this.shardValuesByCycle.keys()) {
@@ -2354,26 +2248,29 @@ class StateManager {
     let removedrepairUpdateDataByCycle = 0
     let removedpartitionObjectsByCycle = 0
 
-    // cleanup this.partitionObjects.txByCycleByPartition
-    for (let cycleKey of Object.keys(this.partitionObjects.txByCycleByPartition)) {
-      let cycle = cycleKey.slice(1)
-      let cycleNum = parseInt(cycle, 10)
-      if (cycleNum < oldestCycle) {
-        // delete old cycle
-        delete this.partitionObjects.txByCycleByPartition[cycleKey]
-        removedtxByCycleByPartition++
+    if(this.partitionObjects != null){
+      // cleanup this.partitionObjects.txByCycleByPartition
+      for (let cycleKey of Object.keys(this.partitionObjects.txByCycleByPartition)) {
+        let cycle = cycleKey.slice(1)
+        let cycleNum = parseInt(cycle, 10)
+        if (cycleNum < oldestCycle) {
+          // delete old cycle
+          delete this.partitionObjects.txByCycleByPartition[cycleKey]
+          removedtxByCycleByPartition++
+        }
       }
+      // cleanup this.partitionObjects.recentPartitionObjectsByCycleByHash
+      for (let cycleKey of Object.keys(this.partitionObjects.recentPartitionObjectsByCycleByHash)) {
+        let cycle = cycleKey.slice(1)
+        let cycleNum = parseInt(cycle, 10)
+        if (cycleNum < oldestCycle) {
+          // delete old cycle
+          delete this.partitionObjects.recentPartitionObjectsByCycleByHash[cycleKey]
+          removedrecentPartitionObjectsByCycleByHash++
+        }
+      }      
     }
-    // cleanup this.partitionObjects.recentPartitionObjectsByCycleByHash
-    for (let cycleKey of Object.keys(this.partitionObjects.recentPartitionObjectsByCycleByHash)) {
-      let cycle = cycleKey.slice(1)
-      let cycleNum = parseInt(cycle, 10)
-      if (cycleNum < oldestCycle) {
-        // delete old cycle
-        delete this.partitionObjects.recentPartitionObjectsByCycleByHash[cycleKey]
-        removedrecentPartitionObjectsByCycleByHash++
-      }
-    }
+
     // // cleanup this.depricated.repairUpdateDataByCycle
     // for (let cycleKey of Object.keys(this.depricated.repairUpdateDataByCycle)) {
     //   let cycle = cycleKey.slice(1)
@@ -2384,14 +2281,16 @@ class StateManager {
     //     removedrepairUpdateDataByCycle++
     //   }
     // }
-    // cleanup this.partitionObjects.partitionObjectsByCycle
-    for (let cycleKey of Object.keys(this.partitionObjects.partitionObjectsByCycle)) {
-      let cycle = cycleKey.slice(1)
-      let cycleNum = parseInt(cycle, 10)
-      if (cycleNum < oldestCycle) {
-        // delete old cycle
-        delete this.partitionObjects.partitionObjectsByCycle[cycleKey]
-        removedpartitionObjectsByCycle++
+    if(this.partitionObjects != null){
+      // cleanup this.partitionObjects.partitionObjectsByCycle
+      for (let cycleKey of Object.keys(this.partitionObjects.partitionObjectsByCycle)) {
+        let cycle = cycleKey.slice(1)
+        let cycleNum = parseInt(cycle, 10)
+        if (cycleNum < oldestCycle) {
+          // delete old cycle
+          delete this.partitionObjects.partitionObjectsByCycle[cycleKey]
+          removedpartitionObjectsByCycle++
+        }
       }
     }
 
@@ -2473,9 +2372,9 @@ class StateManager {
           }
 
           this.profiler.profileSectionStart('stateManager_cycle_q1_start_updateShardValues')
-          // this.dumpAccountDebugData()
+
           this.updateShardValues(lastCycle.counter)
-          // this.dumpAccountDebugData() // better to print values after an update!
+
           this.profiler.profileSectionEnd('stateManager_cycle_q1_start_updateShardValues')
 
           this.profiler.profileSectionStart('stateManager_cycle_q1_start_calculateChangeInCoverage')
@@ -2605,15 +2504,19 @@ class StateManager {
     if (this.feature_partitionHashes === true) {
       if (cycleShardValues && cycleShardValues.ourNode.status === 'active') {
         this.profiler.profileSectionStart('stateManager_processPreviousCycleSummaries_buildPartitionHashesForNode')
-        mainHashResults = this.accountCache.buildPartitionHashesForNode(cycleShardValues)
+        mainHashResults = this.accountCache.buildPartitionHashesForNode(cycleShardValues) //This needs to be replaced by something that
+                    //processes data for a completed cycle in a consistent way.  mainHash reults are not needed anymore.
+                    //they will not scale well with a large number of accounts.
         this.profiler.profileSectionEnd('stateManager_processPreviousCycleSummaries_buildPartitionHashesForNode')
 
 
         this.profiler.profileSectionStart('stateManager_updatePartitionReport_updateTrie')
         //Note: the main work is happening in accountCache.buildPartitionHashesForNode, this just
         // uses that data to create our old report structure for reporting to the monitor-server
-        this.partitionObjects.updatePartitionReport(cycleShardValues, mainHashResults)
-        this.accountPatcher.updateTrieAndBroadCast(lastCycle.counter)
+        // this.partitionObjects.updatePartitionReport(cycleShardValues, mainHashResults) //this needs to go away along all of partitionObjects I think
+              //this is used in the reporter and account dump, but these features cant scale to hundreds of nodes.
+              //
+        this.accountPatcher.updateTrieAndBroadCast(lastCycle.counter) 
         this.profiler.profileSectionEnd('stateManager_updatePartitionReport_updateTrie')
       }
     }
@@ -2636,20 +2539,24 @@ class StateManager {
         this.lastShardReport = utils.stringifyReduce(partitionDump)
         this.shardLogger.debug(this.lastShardReport)
       } else {
-        this.dumpAccountDebugData2(mainHashResults) //more detailed work
+        if(this.partitionObjects != null){
+          this.dumpAccountDebugData2(mainHashResults) //more detailed work          
+        }
       }
 
     }
 
-    // pre-allocate the next two cycles if needed
-    for (let i = 1; i <= 2; i++) {
-      let prekey = 'c' + (cycle.counter + i)
-      if (this.partitionObjects.partitionObjectsByCycle[prekey] == null) {
-        this.partitionObjects.partitionObjectsByCycle[prekey] = []
-      }
-      if (this.partitionObjects.ourPartitionResultsByCycle[prekey] == null) {
-        this.partitionObjects.ourPartitionResultsByCycle[prekey] = []
-      }
+    if(this.partitionObjects != null){
+      // pre-allocate the next two cycles if needed
+      for (let i = 1; i <= 2; i++) {
+        let prekey = 'c' + (cycle.counter + i)
+        if (this.partitionObjects.partitionObjectsByCycle[prekey] == null) {
+          this.partitionObjects.partitionObjectsByCycle[prekey] = []
+        }
+        if (this.partitionObjects.ourPartitionResultsByCycle[prekey] == null) {
+          this.partitionObjects.ourPartitionResultsByCycle[prekey] = []
+        }
+      }      
     }
 
     // if (this.oldFeature_GeneratePartitionReport === true && this.oldFeature_BroadCastPartitionReport === true) {
@@ -2750,6 +2657,10 @@ class StateManager {
         }
       }
     }
+
+    // I am worried that archiveQueueEntries being capped to 5k could cause a reciept breakdown
+    // if cycle times are long enough to have more than 5000 txs on a node.
+    // I think we should maybe be working on these as we go rather than processing them in a batch.
 
     for (let queueEntry of this.transactionQueue.archivedQueueEntries) {
       if (queueEntry.cycleToRecordOn === cycleToSave) {

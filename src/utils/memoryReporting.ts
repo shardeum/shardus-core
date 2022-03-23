@@ -191,10 +191,11 @@ class MemoryReporting {
         this.addToReport('P2P','Nodelist', 'numActiveNodes', numActiveNodes )        
       }
 
-      let cacheCount = this.shardus.stateManager.accountCache.accountsHashCache3.workingHistoryList.accountIDs.length
-      this.addToReport('StateManager','AccountsCache', 'workingAccounts', cacheCount )
-      let cacheCount2 = this.shardus.stateManager.accountCache.accountsHashCache3.accountHashMap.size
-      this.addToReport('StateManager','AccountsCache', 'mainMap', cacheCount2 )
+      let cacheDbg = this.shardus.stateManager.accountCache.getDebugStats()
+      //let cacheCount = this.shardus.stateManager.accountCache.accountsHashCache3.workingHistoryList.accountIDs.length
+      this.addToReport('StateManager','AccountsCache', 'workingAccounts', cacheDbg[0] )
+      //let cacheCount2 = this.shardus.stateManager.accountCache.accountsHashCache3.accountHashMap.size
+      this.addToReport('StateManager','AccountsCache', 'mainMap', cacheDbg[1] )
       
       let queueCount = this.shardus.stateManager.transactionQueue.newAcceptedTxQueue.length
       this.addToReport('StateManager','TXQueue', 'queueCount', queueCount )

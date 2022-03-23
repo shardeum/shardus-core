@@ -263,10 +263,16 @@ class Reporter {
     let partitionReport = null
     let globalSync = null
     if (this.stateManager != null) {
-      partitionReport = this.stateManager.partitionObjects.getPartitionReport(
-        true,
-        true
-      )
+
+      //todo need to get rid of / no-op partition report.  It can't scale with # of accounts. (at least not without some advanements in how handle hashing)
+      //A report using trie hashes would be smarter / more usefull as a replacement.
+      if(this.stateManager.partitionObjects != null){
+        partitionReport = this.stateManager.partitionObjects.getPartitionReport(
+          true,
+          true
+        )        
+      }
+
       globalSync = this.stateManager.isStateGood()
 
       repairsStarted = this.stateManager.dataRepairsStarted

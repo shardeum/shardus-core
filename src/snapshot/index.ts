@@ -197,7 +197,7 @@ export function startSnapshotting() {
       shard: CycleShardData,
       receiptMapResults: StateManager.StateManagerTypes.ReceiptMapResult[],
       statsClump: StateManager.StateManagerTypes.StatsClump,
-      mainHashResults: MainHashResults
+      mainHashResults: MainHashResults //unused, accounts are queried manually below.
     ) => {
       try {
         profilerInstance.profileSectionStart('snapshot')
@@ -386,7 +386,7 @@ export function startSnapshotting() {
         }
         // attach partition and receipt hashes to the message to be gossiped
         for (const [partitionId, hash] of partitionHashes) {
-          message.data.partitionHash[partitionId] = hash
+          message.data.partitionHash[partitionId] = hash  //this could be a hash over hash( list of trie chunks  )
           message.data.receiptMapHash[partitionId] = hashPartitionBlocks(
             partitionId,
             partitionBlockMapByCycle.get(shard.cycleNumber)

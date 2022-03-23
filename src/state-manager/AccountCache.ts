@@ -12,7 +12,7 @@ import ShardFunctions from './shardFunctions.js'
 import { time } from 'console'
 import StateManager from '.'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-import { AccountHashCache, AccountHashCacheMain, AccountHashCacheMain3, CycleShardData, MainHashResults, AccountHashCacheHistory, AccountHashCacheList, PartitionHashResults } from './state-manager-types'
+import { AccountHashCache, AccountHashCacheMain3, CycleShardData, MainHashResults, AccountHashCacheHistory, AccountHashCacheList, PartitionHashResults } from './state-manager-types'
 
 class AccountCache {
   app: Shardus.App
@@ -27,15 +27,10 @@ class AccountCache {
   shardLogger: any
   statsLogger: any
 
-  accountsHashCache: Map<string, AccountHashCache[]>
+  accountsHashCache3: AccountHashCacheMain3 //This is the main storage
 
-  accountsHashCacheMain: AccountHashCacheMain
-
-  accountsHashCache3: AccountHashCacheMain3
-
-  shardValuesByCycle: Map<number, CycleShardData>
-
-  currentMainHashResults: MainHashResults
+  currentMainHashResults: MainHashResults //one of the main outputs produced by account cache.  However this was important for accounting 
+                                          //for values in a given partition, and that does not scale
 
   statemanager_fatal: (key: string, log: string) => void
   stateManager: StateManager
@@ -59,10 +54,6 @@ class AccountCache {
     this.statsLogger = logger.getLogger('statsDump')
     this.statemanager_fatal = stateManager.statemanager_fatal
     this.stateManager = stateManager
-
-    this.accountsHashCache = new Map()
-
-    this.accountsHashCacheMain = { accountHashCacheByPartition: new Map(), accountHashMap: new Map() }
 
     this.accountsHashCache3 = {
       currentCalculationCycle: -1,
@@ -101,6 +92,7 @@ class AccountCache {
 
     nestedCountersInstance.countEvent('cache', 'updateAccountHash: start') 
 
+    // See if we have a cache entry yet.  if not create a history entry for this account
     let accountHashCacheHistory: AccountHashCacheHistory
     if (this.accountsHashCache3.accountHashMap.has(accountId) === false) {
       accountHashCacheHistory = { lastSeenCycle: -1, lastSeenSortIndex: -1, queueIndex: { id: -1, idx: -1 }, accountHashList: [], lastStaleCycle:-1, lastUpdateCycle:-1 }
@@ -109,7 +101,8 @@ class AccountCache {
       accountHashCacheHistory = this.accountsHashCache3.accountHashMap.get(accountId)
     }
 
-    //update cycle number if needed
+    //update main cycle number if needed..  not sure this is perfect.. may be better as a function that can be smart?
+    //
     if(this.accountsHashCache3.currentCalculationCycle === -1){
       if(this.stateManager?.currentCycleShardData != null){
         this.accountsHashCache3.currentCalculationCycle = this.stateManager.currentCycleShardData.cycleNumber -1
@@ -125,11 +118,15 @@ class AccountCache {
     let updateIsNewerHash = false
     let onFutureCycle = cycle > this.accountsHashCache3.currentCalculationCycle
 
+    //last state cycle gets set if our node has an account that it no longer covers.  I am not sure we will be able to track this in the future.
+    //and that may not matter.
     if(accountHashCacheHistory.lastStaleCycle > 0 && accountHashCacheHistory.lastStaleCycle > accountHashCacheHistory.lastSeenCycle){
       if (logFlags.verbose) this.mainLogger.debug(`Reinstate account c:${this.stateManager.currentCycleShardData.cycleNumber} acc:${utils.stringifyReduce(accountId)} lastStale:${accountHashCacheHistory.lastStaleCycle}`)
     }
 
+    //gets compared with lastStaleCycle here and in the patcher.  here it stops the data from being in the report.
     accountHashCacheHistory.lastSeenCycle = this.accountsHashCache3.currentCalculationCycle
+    //I think this doesnt do anything:  (maybe for debu only)
     if(cycle > accountHashCacheHistory.lastUpdateCycle){
       accountHashCacheHistory.lastUpdateCycle = cycle
     }
@@ -168,7 +165,7 @@ class AccountCache {
           while (accountHashList.length > 3 
             && accountHashList[accountHashList.length-1].c < this.accountsHashCache3.currentCalculationCycle) {
             //remove from end.  but only if the data older than the current working cycle
-            accountHashList.pop()
+            accountHashList.pop()  //hmm could this axe data too soon? i.e. push out cache entries before they get put in a report.
           }
           nestedCountersInstance.countEvent('cache', 'updateAccountHash: new cycle update')  
 
@@ -297,6 +294,7 @@ class AccountCache {
     return this.accountsHashCache3.accountHashMap.has(accountId)
   }
 
+  //just gets the newest seen hash.  does that cause issues?
   getAccountHash(accountId: string): AccountHashCache {
     if (this.accountsHashCache3.accountHashMap.has(accountId) === false) {
       return null
@@ -367,6 +365,8 @@ class AccountCache {
         staleAccountsSkipped++
         continue
       }
+
+      //is the line below causing a whole extra cycle of delay in the system?
 
       //if index 0 entry is not for this cycle then look through the list for older cycles. 
       while (index < accountCacheHistory.accountHashList.length - 1 && accountCacheHistory.accountHashList[index].c > cycleToProcess) {
@@ -469,7 +469,7 @@ class AccountCache {
       partitionHashResults.hashes.push(accountHashData.h)
       partitionHashResults.timestamps.push(accountHashData.t)
 
-      
+      //very important call in the data pipeline.
       this.stateManager.accountPatcher.updateAccountHash(accountID, accountHashData.h)
     }
 
@@ -691,6 +691,34 @@ class AccountCache {
     }
     return mainHashResults
   }
+
+  getAccountDebugObject(id: string) :any {
+
+    let accountHashFull = this.stateManager.accountCache.accountsHashCache3.accountHashMap.get(id)
+    return accountHashFull
+  }
+
+  //temp to hide some internal fields
+  getDebugStats(): any[] {
+
+    let workingAccounts = this.accountsHashCache3.workingHistoryList.accountIDs.length
+    //this.addToReport('StateManager','AccountsCache', 'workingAccounts', cacheCount )
+    let mainMap = this.accountsHashCache3.accountHashMap.size
+    //this.addToReport('StateManager','AccountsCache', 'mainMap', cacheCount2 )
+
+    return [workingAccounts, mainMap]
+
+  }
+
+  getAccountHashHistoryItem(accountID:string): AccountHashCacheHistory{
+
+    let accountHashCacheHistory: AccountHashCacheHistory = this.stateManager.accountCache.accountsHashCache3.accountHashMap.get(accountID)
+    return accountHashCacheHistory
+
+  }
+
+
+
 }
 
 export default AccountCache
