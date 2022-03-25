@@ -110,12 +110,12 @@ class Profiler {
         res.write(`\n Vals: ${injectedTpsReport.allVals} `)
         this.statisticsInstance.clearRing('txInjected')
 
-        const processedTpsReport = this.statisticsInstance.getMultiStatReport('txProcessed')
-        res.write('\n=> Node Processed TPS \n')
+        const processedTpsReport = this.statisticsInstance.getMultiStatReport('txApplied')
+        res.write('\n=> Node Applied TPS \n')
         res.write(`\n Avg: ${processedTpsReport.avg} `)
         res.write(`\n Max: ${processedTpsReport.max} `)
         res.write(`\n Vals: ${processedTpsReport.allVals} `)
-        this.statisticsInstance.clearRing('txProcessed')
+        this.statisticsInstance.clearRing('txApplied')
 
         const rejectedTpsReport = this.statisticsInstance.getMultiStatReport('txRejected')
         res.write('\n=> Node Rejected TPS \n')
