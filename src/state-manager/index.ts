@@ -1087,26 +1087,20 @@ class StateManager {
         return
       }
 
-      // cant use applyResponse.accountData at this point need to look on collected data..
-
-      // let data = queueEntry.originalData[payload.key] // collectedData
-      // let transformedAccounts = queueEntry.preApplyTXResult.applyResponse.accountData
-      // for(let i = 0; i< transformedAccounts.length; i++){
-      //   let accountData = transformedAccounts[i]
-
-      //   if(accountData.stateId != payload.hash){
-      //     response.note = `failed accountData.stateId != payload.hash: ${payload.txid}  ${payload.timestamp} ${utils.makeShortHash(accountData.stateId)}`
-      //     await respond(response)
-      //     return
-      //   }
-      //   if (accountData) {
-      //     response.stateList.push(accountData)
-      //   }
-      // }
-
       let wrappedStates = queueEntry.collectedData
 
-      //TODO need to use other source of data here.  FINAL data
+      // if we have applyResponse then use it.  This is where and advanced apply() will put its transformed data
+      let writtenAccountsMap: WrappedResponses = {}
+      let applyResponse = queueEntry?.preApplyTXResult.applyResponse
+      if (applyResponse != null && applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
+        for (let writtenAccount of applyResponse.accountWrites) {
+          writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+        }
+        wrappedStates = writtenAccountsMap
+        if (logFlags.verbose) this.mainLogger.debug(`request_state_for_tx_post applyResponse.accountWrites tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
+      }
+
+      //TODO figure out if we need to include collectedFinalData (after refactor/cleanup)
 
       if (wrappedStates != null) {
         for (let key of Object.keys(wrappedStates)) {
@@ -1166,7 +1160,18 @@ class StateManager {
 
       let wrappedStates = queueEntry.collectedData
 
-      //TODO need to use other source of data here.  FINAL data
+      // if we have applyResponse then use it.  This is where and advanced apply() will put its transformed data
+      let writtenAccountsMap: WrappedResponses = {}
+      let applyResponse = queueEntry?.preApplyTXResult.applyResponse
+      if (applyResponse != null && applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
+        for (let writtenAccount of applyResponse.accountWrites) {
+          writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+        }
+        wrappedStates = writtenAccountsMap
+        if (logFlags.verbose) this.mainLogger.debug(`request_tx_and_state applyResponse.accountWrites tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
+      }
+
+      //TODO figure out if we need to include collectedFinalData (after refactor/cleanup)
 
       if (wrappedStates != null) {
         for (let key of Object.keys(wrappedStates)) {

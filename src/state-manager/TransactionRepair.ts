@@ -491,6 +491,7 @@ class TransactionRepair {
         let repairLogString = `tx:${queueEntry.logID} updatedAccountAndHashes:${utils.stringifyReduce(updatedAccountAndHashes)} counters:${utils.stringifyReduce({ requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash, numUpToDateAccounts})}`
         if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_success', queueEntry.logID, repairLogString)
         this.mainLogger.debug('shrd_repairToMatchReceipt_success ' + repairLogString)
+        nestedCountersInstance.countEvent('repair1', 'success')
 
       } else {
         queueEntry.repairFailed = true

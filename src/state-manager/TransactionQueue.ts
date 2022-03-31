@@ -2261,7 +2261,7 @@ class TransactionQueue {
     delete queueEntry.appliedReceiptForRepair
     //delete queueEntry.appliedReceiptFinal
 
-    delete queueEntry.preApplyTXResult
+    //delete queueEntry.preApplyTXResult //turn this off for now, until we can do some refactor of queueEntry.preApplyTXResult.applyResponse
 
     this.archivedQueueEntries.push(queueEntry)
 

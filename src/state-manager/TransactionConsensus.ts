@@ -264,10 +264,10 @@ class TransactionConsenus {
 
 
 
-      //test our vote against data hashes.
+      //test our data against a winning vote in the receipt
       let wrappedStates = queueEntry.collectedData
       let wrappedStateKeys = Object.keys(queueEntry.collectedData)
-      let vote = appliedReceipt.appliedVotes[0] //queueEntry.ourVote
+      let vote = appliedReceipt.appliedVotes[0] //all votes are equivalent, so grab the first
 
 
       // Iff we have accountWrites, then overwrite the keys and wrapped data

@@ -423,6 +423,21 @@ class AccountPatcher {
       }
       res.end()
     })
+    Context.network.registerExternalGet('debug-patcher-voteflip', isDebugModeMiddleware, (req, res) => {
+      try{
+
+        if(this.stateManager.voteFlipChance === 0){
+          this.stateManager.voteFlipChance = 1
+        } else {
+          this.stateManager.voteFlipChance = 0
+        }
+
+        res.write(`this.voteFlipChance: ${this.stateManager.voteFlipChance}\n`)
+      } catch(e){
+        res.write(`${e}\n`)
+      }
+      res.end()
+    })
     Context.network.registerExternalGet('debug-patcher-dumpTree', isDebugModeMiddleware, (req, res) => {
       try{
         this.statemanager_fatal('debug shardTrie',`temp shardTrie ${utils.stringifyReduce(this.shardTrie.layerMaps[0].values().next().value)}`)
