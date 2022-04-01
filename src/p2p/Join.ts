@@ -327,7 +327,7 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
     return false
   }
 
-  if (joinRequest.version !== version) {
+  if (joinRequest.version >= version) {
     warn(
       `version number is different. Our node version is ${version}. Join request node version is ${joinRequest.version}`
     )
