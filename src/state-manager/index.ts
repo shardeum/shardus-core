@@ -247,7 +247,7 @@ class StateManager {
 
     this.feature_receiptMapResults = true
     this.feature_partitionHashes = true
-    this.feature_generateStats = true
+    this.feature_generateStats = false
 
     this.feature_useNewParitionReport = true
 
@@ -2638,10 +2638,11 @@ class StateManager {
     //init results per partition
     let receiptMapByPartition: Map<number, StateManagerTypes.StateManagerTypes.ReceiptMapResult> = new Map()
     for (let i = 0; i < this.currentCycleShardData.shardGlobals.numPartitions; i++) {
-      let mapResult: StateManagerTypes.StateManagerTypes.ReceiptMapResult = {
+      let mapResult: any = {
         cycle: cycleToSave,
         partition: i,
         receiptMap: {},
+        txsMap: {},
         txCount: 0,
       }
       receiptMapByPartition.set(i, mapResult)
@@ -2683,6 +2684,13 @@ class StateManager {
     const netId: string = '123abc'
     //go over the save list..
     for (let queueEntry of queueEntriesToSave) {
+      // console.log('queueEntry', queueEntry.preApplyTXResult.applyResponse.accountData)
+      let accountData : Shardus.WrappedResponse[] = queueEntry.preApplyTXResult.applyResponse.accountData
+      // delete the localCache
+      for (let account of accountData) {
+        delete account.localCache
+      }
+      console.log('accountData accountData', accountData)
       for (let partition of queueEntry.involvedPartitions) {
         let receipt = this.getReceipt(queueEntry)
 
@@ -2692,11 +2700,12 @@ class StateManager {
         let txIdShort = utils.short(txHash)
         let txResult = utils.short(txResultFullHash)
         if (receiptMapByPartition.has(partition)) {
-          let mapResult: StateManagerTypes.StateManagerTypes.ReceiptMapResult = receiptMapByPartition.get(partition)
+          let mapResult: any = receiptMapByPartition.get(partition)
           //create an array if we have not seen this index yet
           if (mapResult.receiptMap[txIdShort] == null) {
             mapResult.receiptMap[txIdShort] = []
           }
+          mapResult.txsMap[txIdShort] = accountData // For tx data to save in Explorer
           //push the result.  note the order is not deterministic unless we were to sort at the end.
           mapResult.receiptMap[txIdShort].push(txResult)
           mapResult.txCount++
