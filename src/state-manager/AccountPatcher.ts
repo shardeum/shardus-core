@@ -2034,6 +2034,8 @@ class AccountPatcher {
           }
           //This is less likely to be hit here now that similar logic checking the hash happens upstream in findBadAccounts()
           if(wrappedData.timestamp === accountMemData.t) {
+
+            let allowPatch = false
             // if we got here make sure to update the last seen cycle in case the cache needs to know it has current enough data
             let accountHashCacheHistory: AccountHashCacheHistory = this.stateManager.accountCache.getAccountHashHistoryItem(wrappedData.accountId)
             if(accountHashCacheHistory != null && accountHashCacheHistory.lastStaleCycle >= accountHashCacheHistory.lastSeenCycle ){
@@ -2048,6 +2050,12 @@ class AccountPatcher {
               this.statemanager_fatal('accountPatcher_tsFix2', `tsFix2 c:${cycle} wrappedData:${utils.stringifyReduce(wrappedData)} accountHashCacheHistory:${utils.stringifyReduce(accountHashCacheHistory)}` )
               filterStats.tsFix2++
               accountHashCacheHistory.lastSeenCycle = cycle
+              allowPatch = true
+
+              //this.stateManager.accountCache.updateAccountHash()
+
+              //We need to patch the hash value to what it will be..  TODO think more if there is a better way to do this.
+              accountMemData.h = wrappedData.stateId
             } else {
               //just dont even care and bump the last seen cycle up.. this might do nothing
               nestedCountersInstance.countRareEvent('accountPatcher', `tsFix3`)
@@ -2057,10 +2065,12 @@ class AccountPatcher {
               accountHashCacheHistory.lastSeenCycle = cycle
             }
 
-            noChange.add(wrappedData.accountId)
-            // nestedCountersInstance.countEvent('accountPatcher', `checkAndSetAccountData updateSameTS c:${cycle}`)
+            if(allowPatch === false){
+              noChange.add(wrappedData.accountId)
+              // nestedCountersInstance.countEvent('accountPatcher', `checkAndSetAccountData updateSameTS c:${cycle}`)  
+              continue            
+            }
             filterStats.sameTS++
-            continue
           }
           filterStats.accepted++
           //we can proceed with the update
