@@ -6,7 +6,7 @@ import * as http from '../http'
 import { logFlags } from '../logger'
 import { P2P } from '@shardus/types'
 import * as utils from '../utils'
-import { validateTypes } from '../utils'
+import { validateTypes, isEqualOrNewerVersion } from '../utils'
 import * as Comms from './Comms'
 import { config, crypto, logger, network, shardus } from './Context'
 import * as CycleChain from './CycleChain'
@@ -326,10 +326,9 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
     warn('join bad joinRequest.sign ' + err)
     return false
   }
-
-  if (joinRequest.version >= version) {
+  if (!isEqualOrNewerVersion(version, joinRequest.version)) {
     warn(
-      `version number is different. Our node version is ${version}. Join request node version is ${joinRequest.version}`
+      `version number is old. Our node version is ${version}. Join request node version is ${joinRequest.version}`
     )
     return false
   }
