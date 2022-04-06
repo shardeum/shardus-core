@@ -2225,7 +2225,7 @@ class TransactionQueue {
         const lowerLimit = i === 0 ? 0 : Object.keys(collectorForThisKey)[i - 1]
         const upperLimit = time
         const bucketDescription = `${lowerLimit} ms - ${upperLimit} ms:`.padEnd(19, ' ')
-        lines.push(`${bucketDescription}  ${percentage.toFixed(1).padEnd(5, ' ')}%  ${blockStr} `)
+        lines.push(`${bucketDescription}  ${arr.length} ${percentage.toFixed(1).padEnd(5, ' ')}%  ${blockStr} `)
       }
     }
 
