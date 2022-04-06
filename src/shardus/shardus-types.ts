@@ -294,7 +294,8 @@ export interface App {
     accountDataAfter: any
   ) => void
   txSummaryUpdate?: (blob: any, tx: any, wrappedStates: any) => void
-  validateJoinRequest: (data: any) => any
+  validateJoinRequest?: (data: any) => any
+  getJoinData?: () => any
 }
 
 export interface TransactionKeys {

@@ -290,7 +290,18 @@ export async function createJoinRequest(
       config.p2p.difficulty
     ),
   }
-  const joinReq = { nodeInfo, cycleMarker, proofOfWork, version }
+  let joinReq = { nodeInfo, cycleMarker, proofOfWork, version }
+  if (typeof shardus.app.getJoinData === 'function') {
+    try {
+      let appJoinData = shardus.app.getJoinData()
+      if (appJoinData) {
+        joinReq['appJoinData'] = appJoinData
+      }
+    } catch (e) {
+      warn(`shardus.app.getJoinData failed due to ${e}`)
+      return
+    }
+  }
   const signedJoinReq = crypto.sign(joinReq)
   if(logFlags.p2pNonFatal) info(`Join request created... Join request: ${JSON.stringify(signedJoinReq)}`)
   return signedJoinReq
