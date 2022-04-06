@@ -25,7 +25,7 @@ import {
   SeenAccounts,
   StringBoolObjectMap,
   StringNodeObjectMap,
-  WrappedResponses
+  WrappedResponses, Cycle
 } from './state-manager-types'
 import { start } from 'repl'
 import { json } from 'body-parser'
@@ -77,6 +77,8 @@ class TransactionQueue {
 
   executeInOneShard: boolean
 
+  txCoverageMap: any
+
   constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ServerConfiguration) {
     this.crypto = crypto
     this.app = app
@@ -115,6 +117,8 @@ class TransactionQueue {
     this.processingLeftBusy = false
 
     this.executeInOneShard = false
+
+    this.txCoverageMap = new Map()
   }
 
   /***
@@ -489,6 +493,10 @@ class TransactionQueue {
     }
   }
 
+  resetTxCoverageMap() {
+    this.txCoverageMap = {}
+  }
+
   /**
    * commitConsensedTransaction
    * This works with our in memory copies of data that have had a TX applied.
@@ -625,6 +633,9 @@ class TransactionQueue {
       // wrappedStates are side effected for now
       savedSomething = await this.stateManager.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter, note)
       this.profiler.scopedProfileSectionEnd('commit_setAccount')
+      if (savedSomething) {
+        this.txCoverageMap[queueEntry.logID] = queueEntry.appliedReceipt.appliedVotes.length
+      }
 
       if (logFlags.verbose) {
         this.mainLogger.debug(`commitConsensedTransaction  savedSomething: ${savedSomething}`)

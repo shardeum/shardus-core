@@ -262,6 +262,7 @@ class Reporter {
     // only knowingly report deltas.
     let partitionReport = null
     let globalSync = null
+    let txCoverage = {}
     if (this.stateManager != null) {
 
       //todo need to get rid of / no-op partition report.  It can't scale with # of accounts. (at least not without some advanements in how handle hashing)
@@ -270,8 +271,10 @@ class Reporter {
         partitionReport = this.stateManager.partitionObjects.getPartitionReport(
           true,
           true
-        )        
+        )
       }
+
+      txCoverage = { ...this.stateManager.transactionQueue.txCoverageMap }
 
       globalSync = this.stateManager.isStateGood()
 
@@ -342,10 +345,14 @@ class Reporter {
         queueLength,
         txTimeInQueue,
         rareCounters,
+        txCoverage,
         'isLost': isNodeLost,
         'isRefuted': isNodeRefuted,
         'shardusVersion': packageJson.version,
       })
+      if (this.stateManager != null) {
+        this.stateManager.transactionQueue.resetTxCoverageMap()
+      }
     } catch (e) {
       if (logFlags.error) this.mainLogger.error(
         'startReporting: ' + e.name + ': ' + e.message + ' at ' + e.stack
