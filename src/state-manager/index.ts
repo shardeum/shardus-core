@@ -2685,10 +2685,16 @@ class StateManager {
     //go over the save list..
     for (let queueEntry of queueEntriesToSave) {
       // console.log('queueEntry', queueEntry.preApplyTXResult.applyResponse.accountData)
-      let accountData : Shardus.WrappedResponse[] = queueEntry.preApplyTXResult.applyResponse.accountData
+      let accountData : Shardus.WrappedResponse[] = queueEntry?.preApplyTXResult?.applyResponse.accountData
+
+      if(accountData == null){
+        nestedCountersInstance.countRareEvent('generateReceiptMapResults' , `accountData==null tests: ${queueEntry?.preApplyTXResult == null} ${queueEntry?.preApplyTXResult?.applyResponse == null} ${queueEntry?.preApplyTXResult?.applyResponse.accountData == null}` )
+      }
       // delete the localCache
-      for (let account of accountData) {
-        delete account.localCache
+      if(accountData != null){
+        for (let account of accountData) {
+          delete account.localCache
+        }        
       }
       console.log('accountData accountData', accountData)
       for (let partition of queueEntry.involvedPartitions) {
