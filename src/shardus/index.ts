@@ -168,26 +168,26 @@ class Shardus extends EventEmitter {
     }
 
     // error log and console log on unacceptable minNodesToAllowTxs value
-    if (this.config.p2p.minNodesToAllowTxs < 20) {
-      const minNodesToAllowTxs = this.config.p2p.minNodesToAllowTxs
-      // debug mode and detected non-ideal value
-      console.log(
-        '[X] Minimum node required to allow transaction is set to a number less than 20 which is not ideal and secure for production'
-      )
-      if (this.config.mode === 'debug' && logFlags.error) {
-        this.mainLogger.error(
-          `Unacceptable \`minNodesToAllowTxs\` value detected: ${minNodesToAllowTxs} (< 20)`
-        )
-      }
-      // production mode and detected non-ideal value
-      else if (this.config.mode !== 'debug' && logFlags.error) {
-        this.mainLogger.error(
-          `Unacceptable \`minNodesToAllowTxs\` value detected: ${minNodesToAllowTxs} (< 20)`
-        )
-      }
-      // for now they'd have the same error log
-      // this is not as error per technical definition rather logical error
-    }
+    // if (this.config.p2p.minNodesToAllowTxs < 20) {
+    //   const minNodesToAllowTxs = this.config.p2p.minNodesToAllowTxs
+    //   // debug mode and detected non-ideal value
+    //   console.log(
+    //     '[X] Minimum node required to allow transaction is set to a number less than 20 which is not ideal and secure for production'
+    //   )
+    //   if (this.config.mode === 'debug' && logFlags.error) {
+    //     this.mainLogger.error(
+    //       `Unacceptable \`minNodesToAllowTxs\` value detected: ${minNodesToAllowTxs} (< 20)`
+    //     )
+    //   }
+    //   // production mode and detected non-ideal value
+    //   else if (this.config.mode !== 'debug' && logFlags.error) {
+    //     this.mainLogger.error(
+    //       `Unacceptable \`minNodesToAllowTxs\` value detected: ${minNodesToAllowTxs} (< 20)`
+    //     )
+    //   }
+    //   // for now they'd have the same error log
+    //   // this is not as error per technical definition rather logical error
+    // }
 
     this._listeners = {}
 
@@ -1857,9 +1857,9 @@ class Shardus extends EventEmitter {
       if (!changes || !Array.isArray(changes)) {
         //this may get logged if we have a changeListGlobalAccount that does not have config settings on it.
         //The fix is to let the dapp set the global account to use for this
-        this.mainLogger.error(
-          `Invalid changes in global account ${changeListGlobalAccount}`
-        )
+        // this.mainLogger.error(
+        //   `Invalid changes in global account ${changeListGlobalAccount}`
+        // )
         return
       }
       for (let change of changes) {
