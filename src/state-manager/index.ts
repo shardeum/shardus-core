@@ -2684,11 +2684,9 @@ class StateManager {
     const netId: string = '123abc'
     //go over the save list..
     for (let queueEntry of queueEntriesToSave) {
-      // console.log('queueEntry', queueEntry.preApplyTXResult.applyResponse.accountData)
-      let accountData : Shardus.WrappedResponse[] = queueEntry?.preApplyTXResult?.applyResponse.accountData
-
+      let accountData : Shardus.WrappedResponse[] = queueEntry?.preApplyTXResult?.applyResponse?.accountData
       if(accountData == null){
-        nestedCountersInstance.countRareEvent('generateReceiptMapResults' , `accountData==null tests: ${queueEntry?.preApplyTXResult == null} ${queueEntry?.preApplyTXResult?.applyResponse == null} ${queueEntry?.preApplyTXResult?.applyResponse.accountData == null}` )
+        nestedCountersInstance.countRareEvent('generateReceiptMapResults' , `accountData==null tests: ${queueEntry?.preApplyTXResult == null} ${queueEntry?.preApplyTXResult?.applyResponse == null} ${queueEntry?.preApplyTXResult?.applyResponse?.accountData == null}` )
       }
       // delete the localCache
       if(accountData != null){

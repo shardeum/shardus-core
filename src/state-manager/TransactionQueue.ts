@@ -634,7 +634,10 @@ class TransactionQueue {
       savedSomething = await this.stateManager.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter, note)
       this.profiler.scopedProfileSectionEnd('commit_setAccount')
       if (savedSomething) {
-        this.txCoverageMap[queueEntry.logID] = queueEntry.appliedReceipt.appliedVotes.length
+        if (queueEntry.appliedReceipt && queueEntry.appliedReceipt.appliedVotes)
+          this.txCoverageMap[queueEntry.logID] = queueEntry.appliedReceipt.appliedVotes.length
+        else
+          this.mainLogger.error(`commitConsensedTransaction  savedSomething: ${savedSomething} does not have appliedVotes: ${utils.stringifyReduce(queueEntry)}`)
       }
 
       if (logFlags.verbose) {
