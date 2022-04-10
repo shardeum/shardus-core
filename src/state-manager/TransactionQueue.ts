@@ -716,7 +716,9 @@ class TransactionQueue {
 
     //the first node in the TX group will emit txProcessed.  I think this it to prevent over reporting (one node per tx group will report)
     if (queueEntry != null && queueEntry.transactionGroup != null && this.p2p.getNodeId() === queueEntry.transactionGroup[0].id) {
-      this.stateManager.eventEmitter.emit('txProcessed')
+      if(queueEntry.globalModification === false){ //temp way to make global modifying TXs not over count
+        this.stateManager.eventEmitter.emit('txProcessed')        
+      }
     }
     this.stateManager.eventEmitter.emit('txApplied', acceptedTX)
 
@@ -3018,7 +3020,9 @@ class TransactionQueue {
 
                   //log tx processed if needed
                   if (queueEntry != null && queueEntry.transactionGroup != null && this.p2p.getNodeId() === queueEntry.transactionGroup[0].id) {
-                    this.stateManager.eventEmitter.emit('txProcessed')
+                    if(queueEntry.globalModification === false){ //temp way to make global modifying TXs not over count
+                      this.stateManager.eventEmitter.emit('txProcessed')
+                    }
                   }
 
                   if (queueEntry.recievedAppliedReceipt.result === true) {

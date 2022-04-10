@@ -1004,7 +1004,9 @@ class Shardus extends EventEmitter {
       }
       console.log('acceptedTX', acceptedTX)
       if (logFlags.verbose) this.mainLogger.debug('Transaction validated')
-      this.statistics.incrementCounter('txInjected')
+      if(global === false){ //temp way to make global modifying TXs not over count
+        this.statistics.incrementCounter('txInjected')
+      }
       this.logger.playbackLogNote(
         'tx_injected',
         `${txId}`,
