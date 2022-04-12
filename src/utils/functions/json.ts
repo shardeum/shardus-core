@@ -2,6 +2,7 @@ import {
   readdirSync,
   readFileSync,
 } from 'fs'
+import { join } from 'path'
 
 export const readJSON = (filename) => {
   const file = readFileSync(filename).toString()
