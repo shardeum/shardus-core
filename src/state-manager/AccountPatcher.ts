@@ -1072,9 +1072,9 @@ class AccountPatcher {
   /**
    * findExtraChildren
    * a debug method to figure out if we have keys not covered by other nodes.
-   * @param consensusArray 
-   * @param mapB 
-   * @returns 
+   * @param consensusArray
+   * @param mapB
+   * @returns
    */
   findExtraBadKeys(consensusArray:RadixAndHash[], mapB: Map<string, HashTrieNode>) : string[]  {
     let extraBadKeys = []
@@ -1219,7 +1219,7 @@ class AccountPatcher {
       if(node == null){
         this.statemanager_fatal('getChildrenOf node null', 'getChildrenOf node null')
         continue
-      }      
+      }
       let existingRequest = requestMap.get(node)
       if(existingRequest == null){
         existingRequest = {radixList:[]}
@@ -1286,7 +1286,7 @@ class AccountPatcher {
       if(node == null){
         this.statemanager_fatal('getChildAccountHashes node null', 'getChildAccountHashes node null ')
         continue
-      }      
+      }
       let existingRequest = requestMap.get(node)
       if(existingRequest == null){
         existingRequest = {radixList:[]}
@@ -1775,13 +1775,13 @@ class AccountPatcher {
         if(lastCycleNonConsensus === false && hasNonStorageRange === false){
           //we can share this data, may be a pain for nodes to verify..
           //todo include last cycle syncing..
-          
+
         } else{
           //we cant send this data
           continue
         }
       }
-      
+
       debugRadixSet.add(`${treeNode.radix}:${utils.stringifyReduce(treeNode.hash)}`)
 
       //figure out who to send a hash to
@@ -1825,7 +1825,7 @@ class AccountPatcher {
 
     //radixUsed
     if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('accountPatcher', ``, `broadcast radixUsed syncing c:${cycle} set: ${[utils.stringifyReduce([...debugRadixSet.keys()])]}`)
-    
+
     //send the messages we have built up.  (parallel waiting with promise.all)
     let promises = []
     for(let messageEntry of messageToNodeMap.values()){
@@ -1989,10 +1989,15 @@ class AccountPatcher {
         failHistoryObject = this.syncFailHistory[this.syncFailHistory.length -1]
       }
 
-
       let results = await this.findBadAccounts(cycle)
       nestedCountersInstance.countEvent(`accountPatcher`, `badAccounts c:${cycle} `, results.badAccounts.length)
       nestedCountersInstance.countEvent(`accountPatcher`, `accountHashesChecked c:${cycle}`, results.accountHashesChecked)
+
+      if (this.config.mode === 'debug' && this.config.debug.haltOnDataOOS) {
+        this.statemanager_fatal('testAndPatchAccounts', 'Data OOS detected. We are halting the repair process on purpose')
+        this.failedLastTrieSync = true
+        return
+      }
 
       this.stateManager.cycleDebugNotes.badAccounts = results.badAccounts.length //per cycle debug info
       //TODO figure out if the possible repairs will fully repair a given hash for a radix.
@@ -2071,8 +2076,8 @@ class AccountPatcher {
 
             if(allowPatch === false){
               noChange.add(wrappedData.accountId)
-              // nestedCountersInstance.countEvent('accountPatcher', `checkAndSetAccountData updateSameTS c:${cycle}`)  
-              continue            
+              // nestedCountersInstance.countEvent('accountPatcher', `checkAndSetAccountData updateSameTS c:${cycle}`)
+              continue
             }
             filterStats.sameTS++
           }
@@ -2178,10 +2183,7 @@ class AccountPatcher {
         //this is not really a fatal log so should be removed eventually. is is somewhat usefull context though when debugging.
         this.statemanager_fatal(`inSync again`,  JSON.stringify(this.syncFailHistory))
       }
-
-
     }
-
   }
 
   /**

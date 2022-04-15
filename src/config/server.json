@@ -77,6 +77,7 @@
     "fakeNetworkDelay": 0,
     "disableSnapshots": true,
     "disableTxCoverageReport": true,
+    "haltOnDataOOS": false,
     "countEndpointStart": -1,
     "countEndpointStop": -1
   },
