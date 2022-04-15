@@ -677,6 +677,10 @@ export interface ServerConfiguration {
     fakeNetworkDelay?: number
     /** disable snapshots */
     disableSnapshots?: boolean
+    /** disable txCoverage report */
+    disableTxCoverageReport?: boolean
+    /** Halt repair attempts when data OOS happens */
+    haltOnDataOOS?: boolean
     /** start counting endpoints */
     countEndpointStart?: number
     /** stop counting endpoints */

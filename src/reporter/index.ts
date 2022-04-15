@@ -3,6 +3,7 @@ import LoadDetection from '../load-detection'
 import Logger, {logFlags} from '../logger'
 import { ipInfo } from '../network'
 import { config, crypto } from '../p2p/Context'
+import * as Shardus from '../shardus/shardus-types'
 import * as Context from '../p2p/Context'
 import { getDesiredCount, lastScalingType, requestedScalingType } from '../p2p/CycleAutoScale'
 import * as CycleChain from '../p2p/CycleChain'
@@ -16,6 +17,7 @@ import packageJson from '../../package.json'
 import { isDebugModeAnd } from '../debug'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { memoryReportingInstance } from '../utils/memoryReporting'
+import { getLinearGossipBurstList } from '../utils'
 
 const http = require('../http')
 const allZeroes64 = '0'.repeat(64)
@@ -274,7 +276,9 @@ class Reporter {
         )
       }
 
-      txCoverage = { ...this.stateManager.transactionQueue.txCoverageMap }
+      if (config.mode === 'debug' && !config.debug.disableTxCoverageReport) {
+        txCoverage = { ...this.stateManager.transactionQueue.txCoverageMap }
+      }
 
       globalSync = this.stateManager.isStateGood()
 
@@ -350,7 +354,11 @@ class Reporter {
         'isRefuted': isNodeRefuted,
         'shardusVersion': packageJson.version,
       })
-      if (this.stateManager != null) {
+      if (
+        this.stateManager != null &&
+        config.mode === 'debug' &&
+        !config.debug.disableTxCoverageReport
+      ) {
         this.stateManager.transactionQueue.resetTxCoverageMap()
       }
     } catch (e) {
@@ -359,6 +367,7 @@ class Reporter {
       )
       console.error(e)
     }
+
 
     this.resetStatisticsReport()
     //this.consoleReport()

@@ -634,10 +634,13 @@ class TransactionQueue {
       savedSomething = await this.stateManager.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter, note)
       this.profiler.scopedProfileSectionEnd('commit_setAccount')
       if (savedSomething) {
-        if (queueEntry.appliedReceipt && queueEntry.appliedReceipt.appliedVotes)
-          this.txCoverageMap[queueEntry.logID] = queueEntry.appliedReceipt.appliedVotes.length
-        else
+        if (queueEntry.appliedReceipt && queueEntry.appliedReceipt.appliedVotes) {
+          if (!this.config.debug.disableTxCoverageReport) {
+            this.txCoverageMap[queueEntry.logID] = queueEntry.appliedReceipt.appliedVotes.length
+          }
+        } else {
           this.mainLogger.error(`commitConsensedTransaction  savedSomething: ${savedSomething} does not have appliedVotes: ${utils.stringifyReduce(queueEntry)}`)
+        }
       }
 
       if (logFlags.verbose) {
@@ -717,7 +720,7 @@ class TransactionQueue {
     //the first node in the TX group will emit txProcessed.  I think this it to prevent over reporting (one node per tx group will report)
     if (queueEntry != null && queueEntry.transactionGroup != null && this.p2p.getNodeId() === queueEntry.transactionGroup[0].id) {
       if(queueEntry.globalModification === false){ //temp way to make global modifying TXs not over count
-        this.stateManager.eventEmitter.emit('txProcessed')        
+        this.stateManager.eventEmitter.emit('txProcessed')
       }
     }
     this.stateManager.eventEmitter.emit('txApplied', acceptedTX)

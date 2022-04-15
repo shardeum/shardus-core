@@ -76,6 +76,7 @@
     "startInErrorLogMode": true,
     "fakeNetworkDelay": 0,
     "disableSnapshots": true,
+    "disableTxCoverageReport": true,
     "countEndpointStart": -1,
     "countEndpointStop": -1
   },
