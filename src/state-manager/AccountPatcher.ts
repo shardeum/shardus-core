@@ -1384,6 +1384,8 @@ class AccountPatcher {
     // get our list of covered radix values for cycle X!!!
     // let inSync = true
 
+    let minVotes = this.calculateMinVotes()
+
     for(let radix of hashTrieSyncConsensus.radixHashVotes.keys()){
       let votesMap = hashTrieSyncConsensus.radixHashVotes.get(radix)
       let ourTrieNode = this.shardTrie.layerMaps[this.treeSyncDepth].get(radix)
@@ -1391,6 +1393,11 @@ class AccountPatcher {
       //if we dont have the node we may have missed an account completely!
       if(ourTrieNode == null){
         return false
+      }
+
+      if(votesMap.bestVotes < minVotes){
+        //temporary rare event so we can consider this.
+        nestedCountersInstance.countRareEvent(`accountPatcher`, `isInSync ${radix} votesMap.bestVotes < minVotes bestVotes: ${votesMap.bestVotes} < ${minVotes} uniqueVotes: ${votesMap.allVotes.size}`, 1)
       }
 
       // hasNonStorageRange = false
@@ -1433,7 +1440,6 @@ class AccountPatcher {
     //todo?? more utility / get list of oos radix
     return true// {inSync, }
   }
-
 
   /***
    *    ######## #### ##    ## ########  ########     ###    ########     ###     ######   ######   #######  ##     ## ##    ## ########  ######
@@ -1481,9 +1487,7 @@ class AccountPatcher {
     }
     let extraBadKeys = []
 
-    let minVotes = this.stateManager.currentCycleShardData.shardGlobals.consensusRadius
-    minVotes = Math.min(minVotes, this.stateManager.currentCycleShardData.activeNodes.length - 1)
-    minVotes = Math.max(1, minVotes)
+    let minVotes = this.calculateMinVotes()
 
     let goodVotes:RadixAndHash[] = []
     let hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
@@ -2605,9 +2609,13 @@ class AccountPatcher {
     return { allPassed, allPassed2 }
   }
 
-
-
-
+  calculateMinVotes(){
+    let minVotes = Math.ceil(this.stateManager.currentCycleShardData.shardGlobals.nodesPerConsenusGroup * 0.51)
+    let majorityOfActiveNodes = Math.ceil(this.stateManager.currentCycleShardData.activeNodes.length * 0.51)
+    minVotes = Math.min(minVotes, majorityOfActiveNodes)
+    minVotes = Math.max(1, minVotes)
+    return minVotes
+  }
 
 }
 
