@@ -166,7 +166,7 @@ function updateScaleFactor(){
   let activeNodeCount = NodeList.activeByIdOrder.length
   let consensusRange = Math.min(config.sharding.nodesPerConsensusGroup, activeNodeCount) //if we have less activeNodeCount than consensus radius
                        //  we can only count the minumum of the two. otherwise it would over boost scaling
-  let networkParSize = 75 //num nodes where we want scale to be 1.0.   should be 50-100, can set to 5 for small network testing
+  let networkParSize = 100 //num nodes where we want scale to be 1.0.   should be 50-100, can set to 5 for small network testing
   let consenusParSize = 5 //consenus size where we want the scale to be 1.0
 
   // this is a bit hard coded, but basicaly the first 400 nodes in a network get a boost to max syncing allowes
