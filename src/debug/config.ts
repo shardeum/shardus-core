@@ -10,3 +10,16 @@ export function isDebugMode(): boolean {
 export function isDebugModeAnd(predicate: (config: DebugConfigurations) => boolean): boolean {
     return isDebugMode() && !!predicate(config.debug || {} as Partial<DebugConfigurations>)
 }
+
+export function getHashedDevKey(): string {
+    if(config && config.debug && config.debug.hashedDevAuth){
+        return config.debug.hashedDevAuth
+    }
+    return ""
+}
+export function getDevPublicKey(): string {
+    if(config && config.debug && config.debug.devPublicKey){
+        return config.debug.devPublicKey
+    }
+    return ""
+}

@@ -47,7 +47,7 @@ const defaultConfigs = {
 }
 Context.setDefaultConfigs(defaultConfigs)
 
-type RouteHandlerRegister = (route: string, responseHandler: Handler) => void
+type RouteHandlerRegister = (route: string, authHandler: Handler, responseHandler?: Handler) => void
 
 //todo make this a config parameter set by the dapp
 const changeListGlobalAccount = '0'.repeat(64)
@@ -195,16 +195,16 @@ class Shardus extends EventEmitter {
     this.heartbeatTimer = null
 
     // alias the network register calls so that an app can get to them
-    this.registerExternalGet = (route, handler) =>
-      this.network.registerExternalGet(route, handler)
-    this.registerExternalPost = (route, handler) =>
-      this.network.registerExternalPost(route, handler)
-    this.registerExternalPut = (route, handler) =>
-      this.network.registerExternalPut(route, handler)
-    this.registerExternalDelete = (route, handler) =>
-      this.network.registerExternalDelete(route, handler)
-    this.registerExternalPatch = (route, handler) =>
-      this.network.registerExternalPatch(route, handler)
+    this.registerExternalGet = (route, authHandler, handler) =>
+      this.network.registerExternalGet(route, authHandler, handler)
+    this.registerExternalPost = (route, authHandler, handler) =>
+      this.network.registerExternalPost(route, authHandler, handler)
+    this.registerExternalPut = (route, authHandler, handler) =>
+      this.network.registerExternalPut(route, authHandler, handler)
+    this.registerExternalDelete = (route, authHandler, handler) =>
+      this.network.registerExternalDelete(route, authHandler, handler)
+    this.registerExternalPatch = (route, authHandler, handler) =>
+      this.network.registerExternalPatch(route, authHandler, handler)
 
     this.exitHandler.addSigListeners()
     this.exitHandler.registerSync('reporter', () => {
@@ -1948,6 +1948,10 @@ class Shardus extends EventEmitter {
 
   setGlobal(address, value, when, source) {
     GlobalAccounts.setGlobal(address, value, when, source)
+  }
+
+  getDebugModeMiddleware() {
+    return isDebugModeMiddleware
   }
 
   shardus_fatal(key, log, log2 = null) {

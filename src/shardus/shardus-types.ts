@@ -685,6 +685,9 @@ export interface ServerConfiguration {
     countEndpointStart?: number
     /** stop counting endpoints */
     countEndpointStop?: number
+    //** hash of our dev auth key */
+    hashedDevAuth?: string
+    devPublicKey?: string
   }
   /** Options for the statistics module */
   statistics?: {
