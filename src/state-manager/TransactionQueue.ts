@@ -118,6 +118,10 @@ class TransactionQueue {
 
     this.executeInOneShard = false
 
+    if(this.config.sharding.executeInOneShard === true){
+      this.executeInOneShard = true
+    }
+
     this.txCoverageMap = new Map()
   }
 

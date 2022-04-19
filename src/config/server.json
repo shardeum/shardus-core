@@ -107,7 +107,8 @@
     "accountBucketSize": 200
   },
   "sharding": {
-    "nodesPerConsensusGroup": 5
+    "nodesPerConsensusGroup": 5,
+    "executeInOneShard": false
   },
   "mode": "debug"
 }
