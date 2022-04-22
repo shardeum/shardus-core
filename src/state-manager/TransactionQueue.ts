@@ -465,9 +465,14 @@ class TransactionQueue {
       if (applyResponse == null) {
         throw Error('null response from app.apply')
       }
-      passedApply = true
-      applyResult = 'applied'
 
+      if(applyResponse.failed === true){
+        passedApply = false
+        applyResult = applyResponse.failMessage
+      } else {
+        passedApply = true
+        applyResult = 'applied'        
+      }
       if (logFlags.verbose) this.mainLogger.debug(`preApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
     } catch (ex) {
       if (logFlags.error) this.mainLogger.error(`preApplyTransaction failed id:${utils.makeShortHash(acceptedTX.txId)}: ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)

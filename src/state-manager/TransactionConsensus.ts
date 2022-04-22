@@ -420,6 +420,7 @@ class TransactionConsenus {
 
     // Second Pass: look at the account hashes and find the most common hash per account
     //let uniqueKeys: {[id: string]: boolean} = {}
+    //let topAppDataByHash: {[id: string]: number}
     let topHashByID: { [id: string]: { hash: string; count: number } } = {}
     let topValuesByIDByHash: { [id: string]: { [id: string]: { count: number } } } = {}
     if (passed && canProduceReceipt) {
@@ -428,6 +429,29 @@ class TransactionConsenus {
           let currentVote = queueEntry.collectedVotes[i]
           if (passed === currentVote.transaction_result) {
             let vote = currentVote
+
+            //use top values for app_data_hash. this should just work
+            if(currentVote.app_data_hash != null && currentVote.app_data_hash != ''){
+              let id = 'app_data_hash'
+              let hash = currentVote.app_data_hash
+              if (topValuesByIDByHash[id] == null) {
+                topValuesByIDByHash[id] = {}
+              }
+              if (topValuesByIDByHash[id][hash] == null) {
+                topValuesByIDByHash[id][hash] = { count: 0 }
+              }
+              let count = topValuesByIDByHash[id][hash].count + 1
+              topValuesByIDByHash[id][hash].count = count
+
+              if (topHashByID[id] == null) {
+                topHashByID[id] = { hash: '', count: 0 }
+              }
+              if (count > topHashByID[id].count) {
+                topHashByID[id].count = count
+                topHashByID[id].hash = hash
+              }
+            }
+
             for (let j = 0; j < vote.account_id.length; j++) {
               let id = vote.account_id[j]
               let hash = vote.account_state_hash_after[j]
@@ -482,6 +506,7 @@ class TransactionConsenus {
         txid: queueEntry.acceptedTx.txId,
         result: passed,
         appliedVotes: [],
+        app_data_hash:''
       }
 
       // grab just the votes that match the winning pass or fail status
@@ -513,6 +538,13 @@ class TransactionConsenus {
             appliedReceipt.appliedVotes.push(currentVote)
           }
         }
+
+        let topAppDataHashEntry = topHashByID['app_data_hash']
+        if(topAppDataHashEntry != null && topAppDataHashEntry.hash != null){
+          appliedReceipt.app_data_hash = topAppDataHashEntry.hash
+          //should we append the full app data?
+        }
+        
       }
 
       // if a passing vote won then check all the hashes.
@@ -565,7 +597,10 @@ class TransactionConsenus {
       account_state_hash_after: [],
       node_id: this.stateManager.currentCycleShardData.ourNode.id,
       cant_apply: queueEntry.preApplyTXResult.applied === false,
+      app_data_hash:''
     }
+
+    ourVote.app_data_hash = queueEntry?.preApplyTXResult?.applyResponse.appReceiptDataHash
 
     if (queueEntry.debugFail_voteFlip === true) {
       if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_createAndShareVote_voteFlip', `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID} `)

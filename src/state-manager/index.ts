@@ -40,6 +40,7 @@ import Depricated from './Depricated'
 import AccountPatcher from './AccountPatcher'
 import { CycleShardData, PartitionReceipt, FifoLockObjectMap, QueueEntry, AcceptedTx, AccountCopy, GetAccountDataByRangeSmart, WrappedStateArray, AccountHashCache, RequestReceiptForTxReq, RequestReceiptForTxResp, RequestStateForTxReqPost, RequestStateForTxResp, RequestTxResp, AppliedVote, GetAccountDataWithQueueHintsResp, DebugDumpPartitions, DebugDumpRangesCovered, DebugDumpNodesCovered, DebugDumpPartition, DebugDumpPartitionSkip, MainHashResults, SimpleDistanceObject, WrappedResponses, LocalCachedData, AccountFilter, StringBoolObjectMap, AppliedReceipt, CycleDebugNotes } from './state-manager-types'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
+import { ReceiptMapResult } from '@shardus/types/build/src/state-manager/StateManagerTypes'
 
 /**
  * WrappedEventEmitter just a default extended WrappedEventEmitter
@@ -2638,17 +2639,22 @@ class StateManager {
     //init results per partition
     let receiptMapByPartition: Map<number, StateManagerTypes.StateManagerTypes.ReceiptMapResult> = new Map()
     for (let i = 0; i < this.currentCycleShardData.shardGlobals.numPartitions; i++) {
-      let mapResult: any = {
+      let mapResult: ReceiptMapResult = {
         cycle: cycleToSave,
         partition: i,
         receiptMap: {},
-        txsMap: {},
         txCount: 0,
+        txsMap: {},
+        txsMapEVMReceipt: {}
       }
       receiptMapByPartition.set(i, mapResult)
       // add to the list we will return
       results.push(mapResult)
     }
+
+    // todo add to ReceiptMapResult in shardus types
+    // txsMap: {[id:string]:WrappedResponse[]};
+    // txsMapEVMReceipt: {[id:string]:unknown[]};
 
     let queueEntriesToSave: QueueEntry[] = []
     for (let queueEntry of this.transactionQueue.newAcceptedTxQueue) {
@@ -2704,12 +2710,31 @@ class StateManager {
         let txIdShort = utils.short(txHash)
         let txResult = utils.short(txResultFullHash)
         if (receiptMapByPartition.has(partition)) {
-          let mapResult: any = receiptMapByPartition.get(partition)
+          let mapResult: ReceiptMapResult = receiptMapByPartition.get(partition)
           //create an array if we have not seen this index yet
           if (mapResult.receiptMap[txIdShort] == null) {
             mapResult.receiptMap[txIdShort] = []
           }
+
+          // TODO: too much data duplication to put accounts and receitps in mapResult
+          // They get duplicated per involved partition currently.
+          // They should be in a separate list I think..
+
+          let gotAppReceipt = false
+          //set receipt data.  todo get evmReceiptForTX from receipt.
+          if(receipt.app_data_hash != null && receipt.app_data_hash != ''){
+            let applyResponse = queueEntry?.preApplyTXResult?.applyResponse
+            // we may not always have appReceiptData... especially in execute in local shard
+            if(applyResponse.appReceiptDataHash === receipt.app_data_hash){
+              mapResult.txsMapEVMReceipt[txIdShort] = applyResponse.appReceiptData 
+              gotAppReceipt = true
+            }  
+          }
+
+          nestedCountersInstance.countEvent('stateManager', `gotAppReceipt:${gotAppReceipt}`)
+
           mapResult.txsMap[txIdShort] = accountData // For tx data to save in Explorer
+
           //push the result.  note the order is not deterministic unless we were to sort at the end.
           mapResult.receiptMap[txIdShort].push(txResult)
           mapResult.txCount++

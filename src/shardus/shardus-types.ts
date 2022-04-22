@@ -353,6 +353,20 @@ export interface ApplyResponse {
    * This gets passed to post apply
    */
   appDefinedData: unknown
+  /**
+   * can return this if failed instead of throwing an exception
+   */
+  failed: boolean
+  failMessage: string
+  /**
+   * a blob of dapp data returned. This can attach to the receipt for a pass
+   * or fail vote
+   */
+  appReceiptData: unknown
+  appReceiptDataHash: string
+
+
+
 }
 
 export interface AccountData {

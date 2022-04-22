@@ -1114,8 +1114,22 @@ class Shardus extends EventEmitter {
       accountData: [],
       accountWrites: [],
       appDefinedData: {},
+      failed:false,
+      failMessage:null,
+      appReceiptData:null,
+      appReceiptDataHash:null
     }
     return replyObject
+  }
+
+  applyResponseAddReceiptData(resultObject: ShardusTypes.ApplyResponse, appReceiptData:unknown, appReceiptDataHash:string){
+    resultObject.appReceiptData = appReceiptData
+    resultObject.appReceiptDataHash = appReceiptDataHash
+  }
+
+  applyResponseSetFailed(resultObject: ShardusTypes.ApplyResponse, failMessage:string){
+    resultObject.failed = true
+    resultObject.failMessage = failMessage
   }
 
   // USED BY SIMPLECOINAPP
