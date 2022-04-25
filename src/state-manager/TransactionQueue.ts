@@ -648,7 +648,7 @@ class TransactionQueue {
             this.txCoverageMap[queueEntry.logID] = queueEntry.appliedReceipt.appliedVotes.length
           }
         } else {
-          this.mainLogger.error(`commitConsensedTransaction  savedSomething: ${savedSomething} does not have appliedVotes: ${utils.stringifyReduce(queueEntry)}`)
+          this.mainLogger.error(`commitConsensedTransaction  savedSomething: ${savedSomething}; it does not have appliedVotes field in the ${utils.stringifyReduce(queueEntry.originalData)}`)
         }
       }
 
