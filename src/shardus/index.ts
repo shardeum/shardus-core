@@ -1202,6 +1202,10 @@ class Shardus extends EventEmitter {
     )
     return result
   }
+
+  signAsNode(obj) {
+    return this.crypto.sign(obj)
+  }
   // USED BY SIMPLECOINAPP
   async resetAppRelatedState() {
     await this.storage.clearAppRelatedState()
