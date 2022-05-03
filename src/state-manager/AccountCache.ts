@@ -330,7 +330,8 @@ class AccountCache {
     //   this.accountsHashCache3 = debugAC3
     // }
     
-    if (logFlags.verbose) this.mainLogger.debug(`accountsHashCache3 ${cycleShardData.cycleNumber}: ${utils.stringifyReduce(this.accountsHashCache3)}`)
+    //the line below is too slow.. needs to be in an ultra verbose categor that we dont have, so for now you have to uncomment it on manually
+    //if (logFlags.verbose) this.mainLogger.debug(`accountsHashCache3 ${cycleShardData.cycleNumber}: ${utils.stringifyReduce(this.accountsHashCache3)}`)
     
     let cycleToProcess = cycleShardData.cycleNumber
     let nextCycleToProcess = cycleToProcess + 1
@@ -548,7 +549,8 @@ class AccountCache {
   //    This function is important because it scales much much better than the above as the number
   //    of accounts gets large.
   buildPartitionHashesForNode_fast(cycleShardData: CycleShardData): MainHashResults {
-    if (logFlags.verbose) this.mainLogger.debug(`accountsHashCache3 ${cycleShardData.cycleNumber}: ${utils.stringifyReduce(this.accountsHashCache3)}`)
+    //the line below is too slow.. needs to be in an ultra verbose categor that we dont have, so for now you have to uncomment it on manually
+    //if (logFlags.verbose) this.mainLogger.debug(`accountsHashCache3 ${cycleShardData.cycleNumber}: ${utils.stringifyReduce(this.accountsHashCache3)}`)
     
     let cycleToProcess = cycleShardData.cycleNumber
     let nextCycleToProcess = cycleToProcess + 1
