@@ -1960,6 +1960,8 @@ class StateManager {
    * @param accountCopies
    */
   async _commitAccountCopies(accountCopies: Shardus.AccountsCopy[]) {
+
+    let rawDataList:unknown[] = []
     if (accountCopies.length > 0) {
       for (let accountData of accountCopies) {
         // make sure the data is not a json string
@@ -1973,9 +1975,12 @@ class StateManager {
         } else {
           if (logFlags.verbose && this.extendedRepairLogging) this.mainLogger.debug(` _commitAccountCopies: ${utils.makeShortHash(accountData.accountId)} ts: ${utils.makeShortHash(accountData.timestamp)} data: ${utils.stringifyReduce(accountData)}`)
         }
+
+        rawDataList.push(accountData.data)
       }
       // tell the app to replace the account data
-      await this.app.resetAccountData(accountCopies)
+      //await this.app.resetAccountData(accountCopies)
+      await this.app.setAccountData(rawDataList)
 
       let globalAccountKeyMap: { [key: string]: boolean } = {}
 
@@ -2017,8 +2022,19 @@ class StateManager {
           }
 
         }
-        //Saves the last copy per given cycle! this way when you query cycle-1 you get the right data.
-        await this.storage.createOrReplaceAccountCopy(backupObj)
+
+        this.accountCache.updateAccountHash(accountId, hash, timestamp, 0)
+
+        try{
+          //Saves the last copy per given cycle! this way when you query cycle-1 you get the right data.
+          await this.storage.createOrReplaceAccountCopy(backupObj)
+        } catch(error){
+          if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(` _commitAccountCopies storage: ${JSON.stringify(error)}}`)
+          nestedCountersInstance.countEvent('_commitAccountCopies', `_commitAccountCopies fail`) 
+        }
+
+
+
       }
     }
   }

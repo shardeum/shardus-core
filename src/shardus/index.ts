@@ -1274,6 +1274,25 @@ class Shardus extends EventEmitter {
     }
   }
 
+  // ended up not using this yet:
+  // async debugSetAccountState(wrappedResponse:ShardusTypes.WrappedResponse) {
+  //   //set data. this will invoke the app to set data also
+  //   await this.stateManager.checkAndSetAccountData([wrappedResponse], 'debugSetAccountState', false)
+  // }
+
+
+  /**
+   * This is for a dapp to restore a bunch of account data in a debug situation.
+   * This will call back into the dapp and instruct it to commit each account
+   * This will also update shardus values.
+   * There is a bug with re-updating the accounts copy db though.
+   * @param accountCopies 
+   */
+  async debugCommitAccountCopies(accountCopies: ShardusTypes.AccountsCopy[]){
+    await this.stateManager._commitAccountCopies(accountCopies)
+  }
+
+
   /**
    * Checks if this node is active in the network
    */
@@ -1537,14 +1556,14 @@ class Shardus extends EventEmitter {
       }
 
       // pass array of account copies to this (only looks at the data field) and it will reset the account state
-      if (typeof application.resetAccountData === 'function') {
-        applicationInterfaceImpl.resetAccountData = async (accountRecords) =>
-          application.resetAccountData(accountRecords)
-      } else {
-        throw new Error(
-          'Missing required interface function. resetAccountData()'
-        )
-      }
+      // if (typeof application.resetAccountData === 'function') {
+      //   applicationInterfaceImpl.resetAccountData = async (accountRecords) =>
+      //     application.resetAccountData(accountRecords)
+      // } else {
+      //   throw new Error(
+      //     'Missing required interface function. resetAccountData()'
+      //   )
+      // }
 
       // pass array of account ids to this and it will delete the accounts
       if (typeof application.deleteAccountData === 'function') {

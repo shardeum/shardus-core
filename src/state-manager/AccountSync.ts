@@ -1519,6 +1519,11 @@ class AccountSync {
       throw new Error('reset-sync-ranges')
     }
 
+    // This flag is kind of tricky.  It tells us that the loop can go one more time after bumping up the min timestamp to check
+    // If we still don't get account data then we will quit.
+    // This is needed to solve a case where there are more than 2x account sync max accounts in the same timestamp
+    let stopIfNextLoopHasNoResults = false
+
     // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
     while (moreDataRemaining) {
       // Node Precheck!
@@ -1612,7 +1617,25 @@ class AccountSync {
       }
 
       if (lastUpdateNeeded || (accountData2.length === 0 && accountData.length === 0)) {
-        moreDataRemaining = false
+
+        
+        if(lastUpdateNeeded){
+          //we are done
+          moreDataRemaining = false    
+        } else {
+          if(stopIfNextLoopHasNoResults === true){
+            //we are done
+            moreDataRemaining = false           
+          } else{
+            //bump start time and loop once more!
+            //If we don't get anymore accounts on that loopl then we will quit for sure
+            //If we do get more accounts then stopIfNextLoopHasNoResults will reset in a branch below
+            startTime++
+            loopCount++  
+            stopIfNextLoopHasNoResults = true            
+          }    
+        }
+        
         if (logFlags.debug)
           this.mainLogger.debug(
             `DATASYNC: syncAccountData3 got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lowTimeQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta}`
@@ -1624,6 +1647,8 @@ class AccountSync {
           this.combinedAccountData = this.combinedAccountData.concat(accountData2)
         }
       } else {
+        //we got accounts this time so reset this flag to false
+        stopIfNextLoopHasNoResults = false
         if (logFlags.debug)
           this.mainLogger.debug(
             `DATASYNC: syncAccountData3b got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lowTimeQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta}`
