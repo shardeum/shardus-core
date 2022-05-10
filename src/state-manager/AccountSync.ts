@@ -581,7 +581,8 @@ class AccountSync {
             if (this.softSync_earlyOut === true) {
               // do nothing realtime sync will work on this later
             } else {
-              await this.syncStateDataForRange(syncTracker.range)
+              //await this.syncStateDataForRange(syncTracker.range)
+              await this.syncStateDataForRange2(syncTracker.range)
             }
           } else {
             if (logFlags.console) console.log(`syncTracker syncStateDataGlobals start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
@@ -881,6 +882,385 @@ class AccountSync {
       }
     }
   }
+
+
+
+  async syncStateDataForRange2(range: SimpleRange) {
+    try {
+      let partition = 'notUsed'
+      this.currentRange = range
+      this.addressRange = range // this.partitionToAddressRange(partition)
+
+      this.partitionStartTimeStamp = Date.now()
+
+      let lowAddress = this.addressRange.low
+      let highAddress = this.addressRange.high
+      partition = `${utils.stringifyReduce(lowAddress)} - ${utils.stringifyReduce(highAddress)}`
+
+      nestedCountersInstance.countEvent('sync', `sync partition: ${partition} start: ${this.stateManager.currentCycleShardData.cycleNumber}`)
+      
+      this.readyforTXs = true // open the floodgates of queuing stuffs.
+
+      let accountsSaved = await this.syncAccountData2(lowAddress, highAddress)
+      if (logFlags.debug) this.mainLogger.debug(`DATASYNC: partition: ${partition}, syncAccountData2 done.`)
+
+      
+      // Sync the failed accounts
+      //   Log that some account failed
+      //   Use the /get_account_data_by_list API to get the data for the accounts that need to be looked up later from any of the nodes that had a matching hash but different from previously used nodes
+      //   Repeat the “Sync the Account State Table Second Pass” step
+      //   Repeat the “Process the Account data” step
+      await this.syncFailedAcccounts(lowAddress, highAddress)
+
+      if (this.failedAccountsRemain()) {
+        if (logFlags.debug)
+          this.mainLogger.debug(
+            `DATASYNC: failedAccountsRemain,  ${utils.stringifyReduce(lowAddress)} - ${utils.stringifyReduce(highAddress)} accountsWithStateConflict:${
+              this.accountsWithStateConflict.length
+            } missingAccountData:${this.missingAccountData.length} stateTableForMissingTXs:${Object.keys(this.stateTableForMissingTXs).length}`
+          )
+      }
+
+      let keysToRepair = Object.keys(this.stateTableForMissingTXs).length
+      if (keysToRepair > 0) {
+        // alternate repair.
+        this.repairMissingTXs()
+      }
+
+      nestedCountersInstance.countEvent('sync', `sync partition: ${partition} end: ${this.stateManager.currentCycleShardData.cycleNumber} accountsSynced:${accountsSaved} missing tx to repair: ${keysToRepair}`)
+
+    } catch (error) {
+      if(error.message.includes('reset-sync-ranges')){
+
+        this.statemanager_fatal(`syncStateDataForRange_reset-sync-ranges`, 'DATASYNC: reset-sync-ranges: ' + errorToStringFull(error))
+        //buble up:
+        throw new Error('reset-sync-ranges')
+      } else if (error.message.includes('FailAndRestartPartition')) {
+        if (logFlags.debug) this.mainLogger.debug(`DATASYNC: Error Failed at: ${error.stack}`)
+        this.statemanager_fatal(`syncStateDataForRange_ex_failandrestart`, 'DATASYNC: FailAndRestartPartition: ' + errorToStringFull(error))
+        await this.failandRestart()
+      } else {
+        this.statemanager_fatal(`syncStateDataForRange_ex`, 'syncStateDataForPartition failed: ' + errorToStringFull(error))
+        if (logFlags.debug) this.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
+        await this.failandRestart()
+      }
+    }
+  }
+
+
+  async syncAccountData2(lowAddress: string, highAddress: string): Promise<number> {
+    // Sync the Account data
+    //   Use the /get_account_data API to get the data from the Account Table using any of the nodes that had a matching hash
+    if (logFlags.console) console.log(`syncAccountData3` + '   time:' + Date.now())
+
+    if (this.config.stateManager == null) {
+      throw new Error('this.config.stateManager == null')
+    }
+    let totalAccountsSaved = 0
+
+    let queryLow = lowAddress
+    let queryHigh = highAddress
+
+    let moreDataRemaining = true
+
+    this.combinedAccountData = []
+    let loopCount = 0
+
+    let startTime = 0
+    let lowTimeQuery = startTime
+
+    if(this.useStateTable === false){
+      this.dataSourceNode = null
+      this.getDataSourceNode(lowAddress, highAddress)
+    }
+
+    if(this.dataSourceNode == null){
+      if (logFlags.error) this.mainLogger.error(`syncAccountData: dataSourceNode == null ${lowAddress} - ${highAddress}`)
+      //if we see this then getDataSourceNode failed.
+      // this is most likely because the ranges selected when we started sync are now invalid and too wide to be filled.
+
+      //throwing this specific error text will bubble us up to the main sync loop and cause re-init of all the non global sync ranges/trackers
+      throw new Error('reset-sync-ranges')
+    }
+
+    // This flag is kind of tricky.  It tells us that the loop can go one more time after bumping up the min timestamp to check
+    // If we still don't get account data then we will quit.
+    // This is needed to solve a case where there are more than 2x account sync max accounts in the same timestamp
+    let stopIfNextLoopHasNoResults = false
+
+    let offset = 0
+    // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
+    while (moreDataRemaining) {
+      // Node Precheck!
+      if (this.stateManager.isNodeValidForInternalMessage(this.dataSourceNode.id, 'syncAccountData', true, true) === false) {
+        if (this.tryNextDataSourceNode('syncAccountData') == false) {
+          break
+        }
+        continue
+      }
+
+      // max records artificially low to make testing coverage better.  todo refactor: make it a config or calculate based on data size
+      let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, maxRecords: this.config.stateManager.accountBucketSize, offset }
+      let r: GetAccountData3Resp | boolean = await this.p2p.ask(this.dataSourceNode, 'get_account_data3', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
+
+      // TSConversion need to consider better error handling here!
+      let result: GetAccountData3Resp = r as GetAccountData3Resp
+
+      if (result == null) {
+        if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`ASK FAIL syncAccountData result == null node:${this.dataSourceNode.id}`)
+        if (this.tryNextDataSourceNode('syncAccountData') == false) {
+          break
+        }
+        continue
+      }
+      if (result.data == null) {
+        if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`ASK FAIL syncAccountData result.data == null node:${this.dataSourceNode.id}`)
+        if (this.tryNextDataSourceNode('syncAccountData') == false) {
+          break
+        }
+        continue
+      }
+      // accountData is in the form [{accountId, stateId, data}] for n accounts.
+      let accountData = result.data.wrappedAccounts
+      let lastUpdateNeeded = result.data.lastUpdateNeeded
+
+      let lastLowQuery = lowTimeQuery
+      // get the timestamp of the last account data received so we can use it as the low timestamp for our next query
+      if (accountData.length > 0) {
+        let lastAccount = accountData[accountData.length - 1]
+        if (lastAccount.timestamp > lowTimeQuery) {
+          lowTimeQuery = lastAccount.timestamp
+          startTime = lowTimeQuery
+        }
+      }
+
+      let sameAsStartTS = 0
+
+      // If this is a repeated query, clear out any dupes from the new list we just got.
+      // There could be many rows that use the stame timestamp so we will search and remove them
+      let dataDuplicated = true
+      if (loopCount > 0) {
+        while (accountData.length > 0 && dataDuplicated) {
+          let stateData = accountData[0]
+          dataDuplicated = false
+
+          if(stateData.timestamp === lastLowQuery){
+            sameAsStartTS++
+          }
+
+          //todo get rid of this in next verision
+          for (let i = this.combinedAccountData.length - 1; i >= 0; i--) {
+            let existingStateData = this.combinedAccountData[i]
+            if (existingStateData.timestamp === stateData.timestamp && existingStateData.accountId === stateData.accountId) {
+              dataDuplicated = true
+              break
+            }
+            // once we get to an older timestamp we can stop looking, the outer loop will be done also
+            if (existingStateData.timestamp < stateData.timestamp) {
+              break
+            }
+          }
+          if (dataDuplicated) {
+            accountData.shift()
+          }
+        }
+      }
+
+
+      if(lastLowQuery === lowTimeQuery){
+        //update offset, so we can get next page of data
+        //offset+= (result.data.wrappedAccounts.length + result.data.wrappedAccounts2.length)
+        offset+=sameAsStartTS //conservative offset!
+      } else {
+        //clear offset
+        offset=0 
+      }
+
+
+      // if we have any accounts in wrappedAccounts2
+      let accountData2 = result.data.wrappedAccounts2
+      if (accountData2.length > 0) {
+        while (accountData.length > 0 && dataDuplicated) {
+          let stateData = accountData2[0]
+          dataDuplicated = false
+          for (let i = this.combinedAccountData.length - 1; i >= 0; i--) {
+            let existingStateData = this.combinedAccountData[i]
+            if (existingStateData.timestamp === stateData.timestamp && existingStateData.accountId === stateData.accountId) {
+              dataDuplicated = true
+              break
+            }
+            // once we get to an older timestamp we can stop looking, the outer loop will be done also
+            if (existingStateData.timestamp < stateData.timestamp) {
+              break
+            }
+          }
+          if (dataDuplicated) {
+            accountData2.shift()
+          }
+        }
+      }
+
+      if (lastUpdateNeeded || (accountData2.length === 0 && accountData.length === 0)) {
+        if(lastUpdateNeeded){
+          //we are done
+          moreDataRemaining = false    
+        } else {
+          if(stopIfNextLoopHasNoResults === true){
+            //we are done
+            moreDataRemaining = false           
+          } else{
+            //bump start time and loop once more!
+            //If we don't get anymore accounts on that loopl then we will quit for sure
+            //If we do get more accounts then stopIfNextLoopHasNoResults will reset in a branch below
+            startTime++
+            loopCount++  
+            stopIfNextLoopHasNoResults = true            
+          }    
+        }
+        
+        if (logFlags.debug)
+          this.mainLogger.debug(
+            `DATASYNC: syncAccountData3 got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lastLowQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta} offset:${offset}`
+          )
+        if (accountData.length > 0) {
+          this.combinedAccountData = this.combinedAccountData.concat(accountData)
+        }
+        if (accountData2.length > 0) {
+          this.combinedAccountData = this.combinedAccountData.concat(accountData2)
+        }
+      } else {
+        //we got accounts this time so reset this flag to false
+        stopIfNextLoopHasNoResults = false
+        if (logFlags.debug)
+          this.mainLogger.debug(
+            `DATASYNC: syncAccountData3b got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lastLowQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta} offset:${offset}`
+          )
+        this.combinedAccountData = this.combinedAccountData.concat(accountData)
+        loopCount++
+        // await utils.sleep(500)
+      }
+
+      //process combinedAccountData right away and then clear it
+      if(this.combinedAccountData.length > 0){
+        let accountToSave = this.combinedAccountData.length
+        let accountsSaved = await this.processAccountDataNoStateTable2()
+        totalAccountsSaved+=accountsSaved
+        if (logFlags.debug)
+          this.mainLogger.debug(
+            `DATASYNC: syncAccountData3 accountToSave: ${accountToSave} accountsSaved: ${accountsSaved} `
+          )
+        //clear data
+        this.combinedAccountData = []
+      }
+      await utils.sleep(200)
+    }
+
+    return totalAccountsSaved
+  }
+
+  async processAccountDataNoStateTable2() : Promise<number> {
+    this.missingAccountData = []
+    this.mapAccountData = {}
+    this.stateTableForMissingTXs = {}
+    // create a fast lookup map for the accounts we have.  Perf.  will need to review if this fits into memory.  May need a novel structure.
+    let account
+    for (let i = 0; i < this.combinedAccountData.length; i++) {
+      account = this.combinedAccountData[i]
+      this.mapAccountData[account.accountId] = account
+    }
+
+    let accountKeys = Object.keys(this.mapAccountData)
+    let uniqueAccounts = accountKeys.length
+    let initialCombinedAccountLength = this.combinedAccountData.length
+    if (uniqueAccounts < initialCombinedAccountLength) {
+      // keep only the newest copies of each account:
+      // we need this if using a time based datasync
+      this.combinedAccountData = []
+      for (let accountID of accountKeys) {
+        this.combinedAccountData.push(this.mapAccountData[accountID])
+      }
+    }
+
+    // let missingButOkAccounts = 0
+    let missingTXs = 0
+    let handledButOk = 0
+    let otherMissingCase = 0
+    let futureStateTableEntry = 0
+    // let missingButOkAccountIDs: { [id: string]: boolean } = {}
+
+    // let missingAccountIDs: { [id: string]: boolean } = {}
+
+    if (logFlags.debug)
+      this.mainLogger.debug(
+        `DATASYNC: processAccountData stateTableCount: ${this.inMemoryStateTableData.length} unique accounts: ${uniqueAccounts}  initial combined len: ${initialCombinedAccountLength}`
+      )
+    // For each account in the Account data make sure the entry in the Account State Table has the same State_after value; if not remove the record from the Account data
+
+
+    //   For each account in the Account State Table make sure the entry in Account data has the same State_after value; if not save the account id to be looked up later
+    this.accountsWithStateConflict = []
+    let goodAccounts: Shardus.WrappedData[] = []
+    let noSyncData = 0
+    let noMatches = 0
+    let outOfDateNoTxs = 0
+    let unhandledCase = 0
+    let fix1Worked = 0
+    for (let account of this.combinedAccountData) {
+      goodAccounts.push(account)
+    }
+
+    if (logFlags.debug)
+      this.mainLogger.debug(
+        `DATASYNC: processAccountData saving ${goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase} outOfDateNoTxs: ${outOfDateNoTxs} futureStateTableEntry:${futureStateTableEntry} unhandledCase:${unhandledCase} fix1Worked:${fix1Worked}`
+      )
+    // failedHashes is a list of accounts that failed to match the hash reported by the server
+    let failedHashes = await this.stateManager.checkAndSetAccountData(goodAccounts, 'syncNonGlobals:processAccountDataNoStateTable', true) // repeatable form may need to call this in batches
+
+    this.syncStatement.numAccounts += goodAccounts.length
+
+    //TODO need to reconsider this, there are normal cases where accounts can have a bad hash now?
+    // should get more details out of checkAndSetAccountData
+    // if (failedHashes.length > 1000) {
+    //   if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
+    //   // state -> try another node. TODO record/eval/report blame?
+    //   this.stateManager.recordPotentialBadnode()
+    //   throw new Error('FailAndRestartPartition_processAccountData_A')
+    // }
+    // if (failedHashes.length > 0) {
+    //   if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes:  ${failedHashes.length} will have to download them again`)
+    //   // TODO ? record/eval/report blame?
+    //   this.stateManager.recordPotentialBadnode()
+    //   this.failedAccounts = this.failedAccounts.concat(failedHashes)
+    //   for (let accountId of failedHashes) {
+    //     account = this.mapAccountData[accountId]
+
+    //     if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData ${accountId}  data: ${utils.stringifyReduce(account)}`)
+
+    //     if (account != null) {
+    //       if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData adding account to list`)
+    //       this.accountsWithStateConflict.push(account)
+    //     } else {
+    //       if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData cant find data: ${accountId}`)
+    //       if (accountId) {
+    //         //this.accountsWithStateConflict.push({ address: accountId,  }) //NOTE: fixed with refactor
+    //         this.accountsWithStateConflict.push({ accountId: accountId, data: null, stateId: null, timestamp: 0 })
+    //       }
+    //     }
+    //   }
+    // }
+
+    let accountsSaved = await this.stateManager.writeCombinedAccountDataToBackups(goodAccounts, failedHashes)
+
+    nestedCountersInstance.countEvent('sync', `accounts written`, accountsSaved)
+
+    this.combinedAccountData = [] // we can clear this now.
+
+    return accountsSaved
+  }
+
+
+
+
 
   /***
    *     ######  ##    ## ##    ##  ######   ######  ########    ###    ######## ######## ########     ###    ########    ###     ######   ##        #######  ########     ###    ##        ######
@@ -1570,13 +1950,7 @@ class AccountSync {
         }
       }
 
-      if(lastLowQuery === lowTimeQuery){
-        //update offset, so we can get next page of data
-        offset+= (result.data.wrappedAccounts.length + result.data.wrappedAccounts2.length)
-      } else {
-        //clear offset
-        offset=0 
-      }
+      let sameAsStartTS = 0
 
       // If this is a repeated query, clear out any dupes from the new list we just got.
       // There could be many rows that use the stame timestamp so we will search and remove them
@@ -1585,6 +1959,12 @@ class AccountSync {
         while (accountData.length > 0 && dataDuplicated) {
           let stateData = accountData[0]
           dataDuplicated = false
+
+          if(stateData.timestamp === lastLowQuery){
+            sameAsStartTS++
+          }
+
+          //todo get rid of this in next verision
           for (let i = this.combinedAccountData.length - 1; i >= 0; i--) {
             let existingStateData = this.combinedAccountData[i]
             if (existingStateData.timestamp === stateData.timestamp && existingStateData.accountId === stateData.accountId) {
@@ -1601,6 +1981,17 @@ class AccountSync {
           }
         }
       }
+
+
+      if(lastLowQuery === lowTimeQuery){
+        //update offset, so we can get next page of data
+        //offset+= (result.data.wrappedAccounts.length + result.data.wrappedAccounts2.length)
+        offset+=sameAsStartTS //conservative offset!
+      } else {
+        //clear offset
+        offset=0 
+      }
+
 
       // if we have any accounts in wrappedAccounts2
       let accountData2 = result.data.wrappedAccounts2
