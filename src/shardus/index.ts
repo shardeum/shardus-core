@@ -1520,14 +1520,16 @@ class Shardus extends EventEmitter {
           accountEnd,
           tsStart,
           tsEnd,
-          maxRecords
+          maxRecords,
+          offset
         ) =>
           application.getAccountDataByRange(
             accountStart,
             accountEnd,
             tsStart,
             tsEnd,
-            maxRecords
+            maxRecords,
+            offset
           )
       } else {
         throw new Error(

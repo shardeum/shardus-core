@@ -552,7 +552,7 @@ class AccountPatcher {
           let high = prefix + 'f'.repeat(60)
 
           let suffix = id.substr(5,5)
-          let possibleAccounts = await this.app.getAccountDataByRange(low, high, 0 , Date.now(), 100)
+          let possibleAccounts = await this.app.getAccountDataByRange(low, high, 0 , Date.now(), 100, 0)
 
           res.write(`searching ${possibleAccounts.length} accounts \n`)
 

@@ -623,7 +623,7 @@ export type GetAccountDataReq = AccountRangeAndLimit
 
 export type GetAccountData2Req = AccountAddressAndTimeRange & {maxRecords:number}
 
-export type GetAccountData3Req = {accountStart:string, accountEnd:string, tsStart:number, maxRecords:number}
+export type GetAccountData3Req = {accountStart:string, accountEnd:string, tsStart:number, maxRecords:number, offset: number}
 export type GetAccountData3Resp = { data: GetAccountDataByRangeSmart }
 
 export type PosPartitionResults = { partitionResults: PartitionResult[]; Cycle_number: number; }

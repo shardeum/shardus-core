@@ -314,7 +314,7 @@ class AccountSync {
         ourLockID = await this.stateManager.fifoLock('accountModification')
         // returns { wrappedAccounts, lastUpdateNeeded, wrappedAccounts2, highestTs }
         //GetAccountDataByRangeSmart
-        accountData = await this.stateManager.getAccountDataByRangeSmart(payload.accountStart, payload.accountEnd, payload.tsStart, payload.maxRecords)
+        accountData = await this.stateManager.getAccountDataByRangeSmart(payload.accountStart, payload.accountEnd, payload.tsStart, payload.maxRecords, payload.offset)
       } finally {
         this.stateManager.fifoUnlock('accountModification', ourLockID)
       }
@@ -1524,6 +1524,7 @@ class AccountSync {
     // This is needed to solve a case where there are more than 2x account sync max accounts in the same timestamp
     let stopIfNextLoopHasNoResults = false
 
+    let offset = 0
     // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
     while (moreDataRemaining) {
       // Node Precheck!
@@ -1535,7 +1536,7 @@ class AccountSync {
       }
 
       // max records artificially low to make testing coverage better.  todo refactor: make it a config or calculate based on data size
-      let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, maxRecords: this.config.stateManager.accountBucketSize }
+      let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, maxRecords: this.config.stateManager.accountBucketSize, offset }
       let r: GetAccountData3Resp | boolean = await this.p2p.ask(this.dataSourceNode, 'get_account_data3', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
 
       // TSConversion need to consider better error handling here!
@@ -1557,9 +1558,9 @@ class AccountSync {
       }
       // accountData is in the form [{accountId, stateId, data}] for n accounts.
       let accountData = result.data.wrappedAccounts
-
       let lastUpdateNeeded = result.data.lastUpdateNeeded
 
+      let lastLowQuery = lowTimeQuery
       // get the timestamp of the last account data received so we can use it as the low timestamp for our next query
       if (accountData.length > 0) {
         let lastAccount = accountData[accountData.length - 1]
@@ -1567,6 +1568,14 @@ class AccountSync {
           lowTimeQuery = lastAccount.timestamp
           startTime = lowTimeQuery
         }
+      }
+
+      if(lastLowQuery === lowTimeQuery){
+        //update offset, so we can get next page of data
+        offset+= (result.data.wrappedAccounts.length + result.data.wrappedAccounts2.length)
+      } else {
+        //clear offset
+        offset=0 
       }
 
       // If this is a repeated query, clear out any dupes from the new list we just got.
@@ -1617,8 +1626,6 @@ class AccountSync {
       }
 
       if (lastUpdateNeeded || (accountData2.length === 0 && accountData.length === 0)) {
-
-        
         if(lastUpdateNeeded){
           //we are done
           moreDataRemaining = false    
@@ -1638,7 +1645,7 @@ class AccountSync {
         
         if (logFlags.debug)
           this.mainLogger.debug(
-            `DATASYNC: syncAccountData3 got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lowTimeQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta}`
+            `DATASYNC: syncAccountData3 got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lastLowQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta} offset:${offset}`
           )
         if (accountData.length > 0) {
           this.combinedAccountData = this.combinedAccountData.concat(accountData)
@@ -1651,7 +1658,7 @@ class AccountSync {
         stopIfNextLoopHasNoResults = false
         if (logFlags.debug)
           this.mainLogger.debug(
-            `DATASYNC: syncAccountData3b got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lowTimeQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta}`
+            `DATASYNC: syncAccountData3b got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lastLowQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta} offset:${offset}`
           )
         this.combinedAccountData = this.combinedAccountData.concat(accountData)
         loopCount++

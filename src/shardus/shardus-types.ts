@@ -261,7 +261,8 @@ export interface App {
     accountEnd: string,
     tsStart: number,
     tsEnd: number,
-    maxRecords: number
+    maxRecords: number,
+    offset: number
   ) => WrappedData[]
 
   calculateAccountHash: (account: unknown) => string
