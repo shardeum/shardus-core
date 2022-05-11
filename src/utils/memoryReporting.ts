@@ -13,6 +13,7 @@ const process = require('process');
 import { resourceUsage } from 'process';
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import * as NodeList from '../p2p/NodeList'
+import { spawn } from 'child_process'
 
 // process.hrtime.bigint()
 
@@ -35,7 +36,7 @@ type MemItem = {
 }
 
 class MemoryReporting {
-  
+
   crypto: Crypto
   report: MemItem[]
   shardus: Shardus
@@ -99,6 +100,48 @@ class MemoryReporting {
       res.end()
     })
 
+    Context.network.registerExternalGet(
+      'top',
+      isDebugModeMiddleware,
+      (req, res) => {
+        const top = spawn("top", ["-n", "10"]);
+        top.stdout.on("data", dataBuffer => {
+          res.write(dataBuffer)
+          top.kill()
+          res.end()
+        })
+        top.on("close", code => {
+          console.log(`child process exited with code ${code}`);
+        });
+        top.stderr.on("data", data => {
+          console.log('top command error', data)
+          res.write('top command error')
+          top.kill()
+          res.end()
+        })
+    })
+
+    Context.network.registerExternalGet(
+      'df',
+      isDebugModeMiddleware,
+      (req, res) => {
+        const df = spawn("df");
+        df.stdout.on("data", dataBuffer => {
+          res.write(dataBuffer)
+          df.kill()
+          res.end()
+        })
+        df.on("close", code => {
+          console.log(`child process exited with code ${code}`);
+        });
+        df.stderr.on("data", data => {
+          console.log('df command error', data)
+          res.write('df command error')
+          df.kill()
+          res.end()
+        })
+      })
+
     Context.network.registerExternalGet('memory-gc', isDebugModeMiddleware, (req, res) => {
 
       res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
@@ -116,7 +159,7 @@ class MemoryReporting {
     })
 
     Context.network.registerExternalGet('scaleFactor', isDebugModeMiddleware, (req, res) => {
-      
+
       res.write(`Scale debug  Timestamp: ${Date.now()}\n`)
       try {
         res.write(`CycleAutoScale.  ${CycleCreator.scaleFactor}`)
@@ -141,13 +184,13 @@ class MemoryReporting {
 
   getMemoryStringBasic(){
     let toMB = 1/1000000
-    let report = process.memoryUsage() 
+    let report = process.memoryUsage()
     let outStr = `rss: ${(report.rss * toMB).toFixed(2)} MB`
     //todo integrate this into the main stats tsv
     if(this.shardus && this.shardus.stateManager){
       let numActiveNodes = NodeList.activeByIdOrder.length
       let queueCount = this.shardus.stateManager.transactionQueue.newAcceptedTxQueue.length
-      let archiveQueueCount = this.shardus.stateManager.transactionQueue.archivedQueueEntries.length  
+      let archiveQueueCount = this.shardus.stateManager.transactionQueue.archivedQueueEntries.length
       outStr += ` nds:${numActiveNodes} qCt:${queueCount} aAr:${archiveQueueCount}`
     }
     outStr += '\n'
@@ -161,7 +204,7 @@ class MemoryReporting {
   }
 
   reportToStream(report:MemItem[], stream, indent){
-    
+
     let indentText = '___'.repeat(indent)
     for (let item of report) {
       let {category, subcat, itemKey, count} = item
@@ -188,7 +231,7 @@ class MemoryReporting {
 
       if(NodeList.activeByIdOrder){
         let numActiveNodes = NodeList.activeByIdOrder.length
-        this.addToReport('P2P','Nodelist', 'numActiveNodes', numActiveNodes )        
+        this.addToReport('P2P','Nodelist', 'numActiveNodes', numActiveNodes )
       }
 
       let cacheDbg = this.shardus.stateManager.accountCache.getDebugStats()
@@ -196,7 +239,7 @@ class MemoryReporting {
       this.addToReport('StateManager','AccountsCache', 'workingAccounts', cacheDbg[0] )
       //let cacheCount2 = this.shardus.stateManager.accountCache.accountsHashCache3.accountHashMap.size
       this.addToReport('StateManager','AccountsCache', 'mainMap', cacheDbg[1] )
-      
+
       let queueCount = this.shardus.stateManager.transactionQueue.newAcceptedTxQueue.length
       this.addToReport('StateManager','TXQueue', 'queueCount', queueCount )
       let pendingQueueCount = this.shardus.stateManager.transactionQueue.newAcceptedTxQueueTempInjest.length
@@ -204,7 +247,7 @@ class MemoryReporting {
       let archiveQueueCount = this.shardus.stateManager.transactionQueue.archivedQueueEntries.length
       this.addToReport('StateManager','TXQueue', 'archiveQueueCount', archiveQueueCount )
 
-      
+
       for(let syncTracker of this.shardus.stateManager.accountSync.syncTrackers){
         let partition = `${utils.stringifyReduce(syncTracker.range.low)} - ${utils.stringifyReduce(syncTracker.range.high)}`
         this.addToReport('StateManager','SyncTracker', `isGlobal:${syncTracker.isGlobalSyncTracker} started:${syncTracker.syncStarted} finished:${syncTracker.syncFinished} partition:${partition}`, 1 )
@@ -226,7 +269,7 @@ class MemoryReporting {
   getCPUTimes(){
     const cpus = os.cpus();
     let times = []
-    
+
     for(let cpu of cpus){
       let timeObj = {}
       let total = 0
@@ -234,7 +277,7 @@ class MemoryReporting {
         let time = Number(value)
         total += time
         timeObj[key] = value
-      }  
+      }
       timeObj['total'] = total
 
       times.push(timeObj)
@@ -243,27 +286,27 @@ class MemoryReporting {
   }
 
   cpuPercent(){
- 
+
     let currentTimes = this.getCPUTimes()
 
     let deltaTimes = []
     let percentTimes = []
-    
+
     let percentTotal = 0
-    
+
     for(let i=0; i< currentTimes.length; i++) {
       const currentTimeEntry = currentTimes[i];
       const lastTimeEntry = this.lastCPUTimes[i]
       let deltaTimeObj = {}
       for(const [key, value] of Object.entries(currentTimeEntry)){
         deltaTimeObj[key] = currentTimeEntry[key] - lastTimeEntry[key]
-      }  
+      }
       deltaTimes.push(deltaTimeObj)
 
       for(const [key, value] of Object.entries(currentTimeEntry)){
         percentTimes[key] = deltaTimeObj[key] / deltaTimeObj['total']
-      } 
-      
+      }
+
       percentTotal += (percentTimes['user'] || 0)
       percentTotal += (percentTimes['nice'] || 0)
       percentTotal += (percentTimes['sys'] || 0)
@@ -277,7 +320,7 @@ class MemoryReporting {
     // const currentCPUUsage = (usage.user + usage.system) * 1000; //micro seconds to ms
     // const percentUsed = currentCPUUsage / total * 100
 
-    return percentUsed 
+    return percentUsed
   }
 
   roundTo3decimals(num){
@@ -291,7 +334,7 @@ class MemoryReporting {
     let avgCPU = this.shardus.statistics.getAverage('cpuPercent')
     this.addToReport('Process','CPU', 'cpuAVGPercent', this.roundTo3decimals(avgCPU * 100) )
     let multiStats = this.shardus.statistics.getMultiStatReport('cpuPercent')
-    
+
     multiStats.allVals.forEach(function(val, index) {
       multiStats.allVals[index] = Math.round(val * 100);
     })
