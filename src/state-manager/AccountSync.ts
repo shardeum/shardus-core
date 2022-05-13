@@ -1025,6 +1025,7 @@ class AccountSync {
       let lastUpdateNeeded = result.data.lastUpdateNeeded
 
       let lastLowQuery = lowTimeQuery
+
       // get the timestamp of the last account data received so we can use it as the low timestamp for our next query
       if (accountData.length > 0) {
         let lastAccount = accountData[accountData.length - 1]
@@ -1035,6 +1036,20 @@ class AccountSync {
       }
 
       let sameAsStartTS = 0
+      let sameAsLastTS = 0
+      let lastLoopTS = -1
+      //need to track some counters to help with offset calculations
+      for(let account of accountData){
+        if(account.timestamp === lastLowQuery){
+          sameAsStartTS++
+        }
+        if(account.timestamp === lastLoopTS){
+          sameAsLastTS++
+        } else {
+          sameAsLastTS=0
+          lastLoopTS = account.timestamp
+        }
+      }
 
       // If this is a repeated query, clear out any dupes from the new list we just got.
       // There could be many rows that use the stame timestamp so we will search and remove them
@@ -1043,10 +1058,6 @@ class AccountSync {
         while (accountData.length > 0 && dataDuplicated) {
           let stateData = accountData[0]
           dataDuplicated = false
-
-          if(stateData.timestamp === lastLowQuery){
-            sameAsStartTS++
-          }
 
           //todo get rid of this in next verision
           for (let i = this.combinedAccountData.length - 1; i >= 0; i--) {
@@ -1066,16 +1077,21 @@ class AccountSync {
         }
       }
 
-
+      //finish our calculations related to offset
       if(lastLowQuery === lowTimeQuery){
         //update offset, so we can get next page of data
         //offset+= (result.data.wrappedAccounts.length + result.data.wrappedAccounts2.length)
-        offset+=sameAsStartTS //conservative offset!
+        offset+=sameAsLastTS //conservative offset!
       } else {
         //clear offset
         offset=0 
       }
-
+      if(accountData.length < message.maxRecords){
+        //bump clock up because we didn't get a full data return
+        startTime++;            
+        //dont need offset because we should already have all the records
+        offset = 0
+      }      
 
       // if we have any accounts in wrappedAccounts2
       let accountData2 = result.data.wrappedAccounts2
@@ -1120,7 +1136,7 @@ class AccountSync {
         
         if (logFlags.debug)
           this.mainLogger.debug(
-            `DATASYNC: syncAccountData3 got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lastLowQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta} offset:${offset}`
+            `DATASYNC: syncAccountData3 got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lastLowQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta} offset:${offset} sameAsStartTS:${sameAsStartTS}`
           )
         if (accountData.length > 0) {
           this.combinedAccountData = this.combinedAccountData.concat(accountData)
@@ -1133,7 +1149,7 @@ class AccountSync {
         stopIfNextLoopHasNoResults = false
         if (logFlags.debug)
           this.mainLogger.debug(
-            `DATASYNC: syncAccountData3b got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lastLowQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta} offset:${offset}`
+            `DATASYNC: syncAccountData3b got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lastLowQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta} offset:${offset} sameAsStartTS:${sameAsStartTS}`
           )
         this.combinedAccountData = this.combinedAccountData.concat(accountData)
         loopCount++
@@ -1147,7 +1163,7 @@ class AccountSync {
         totalAccountsSaved+=accountsSaved
         if (logFlags.debug)
           this.mainLogger.debug(
-            `DATASYNC: syncAccountData3 accountToSave: ${accountToSave} accountsSaved: ${accountsSaved} `
+            `DATASYNC: syncAccountData3 accountToSave: ${accountToSave} accountsSaved: ${accountsSaved}  offset:${offset} sameAsStartTS:${sameAsStartTS}`
           )
         //clear data
         this.combinedAccountData = []
