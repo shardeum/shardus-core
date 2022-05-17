@@ -27,7 +27,7 @@ console.log('StateManager type', StateManager.StateManagerTypes)
 
 
 let disableSummarySnapshot = true //with 4096 stats regions the snapshot module grinds to a halt.  This is a temporary hack to stop
-                                  // the issue until we decide where to fix it (partitionStats, or here)
+// the issue until we decide where to fix it (partitionStats, or here)
 
 /** STATE */
 
@@ -230,15 +230,16 @@ export function startSnapshotting() {
             const hash = Context.crypto.hash(accountsInPartition)
             partitionHashes.set(partition, hash)
 
-            try {
-              //DBG: Print all accounts in mem
-              const wrappedAccts = await Context.stateManager.app.getAccountData(
-                range.low,
-                range.high,
-                10000000
-              )
-              debugStrs.push(
-                `  PARTITION ${partition}\n` +
+            if (logFlags.debug) {
+              try {
+                //DBG: Print all accounts in mem
+                const wrappedAccts = await Context.stateManager.app.getAccountData(
+                  range.low,
+                  range.high,
+                  10000000
+                )
+                debugStrs.push(
+                  `  PARTITION ${partition}\n` +
                   wrappedAccts
                     .map((acct) => {
                       const id =
@@ -252,9 +253,10 @@ export function startSnapshotting() {
                       return `    ID: ${id} HASH: ${hash}`
                     })
                     .join('\n')
-              )
-            } catch (e) {
-              console.log(e)
+                )
+              } catch (e) {
+                console.log(e)
+              }
             }
           }
         }
@@ -393,7 +395,7 @@ export function startSnapshotting() {
           )
         }
 
-        if(disableSummarySnapshot === true){
+        if (disableSummarySnapshot === true) {
           //no summary hash info shared
         } else {
           // attach summary hashes to the message to be gossiped

@@ -2720,7 +2720,7 @@ class StateManager {
           delete account.localCache
         }        
       }
-      console.log('accountData accountData', accountData)
+      // console.log('accountData accountData', accountData)
       for (let partition of queueEntry.involvedPartitions) {
         let receipt = this.getReceipt(queueEntry)
 
