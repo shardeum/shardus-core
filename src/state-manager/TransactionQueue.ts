@@ -8,7 +8,7 @@ import { potentiallyRemoved } from '../p2p/NodeList'
 import * as Shardus from '../shardus/shardus-types'
 import Storage from '../storage'
 import * as utils from '../utils'
-import { errorToStringFull, inRangeOfCurrentTime } from '../utils'
+import { errorToStringFull, getLinearGossipBurstList, inRangeOfCurrentTime } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { profilerInstance } from '../utils/profiler'
 import ShardFunctions from './shardFunctions.js'
@@ -25,7 +25,7 @@ import {
   SeenAccounts,
   StringBoolObjectMap,
   StringNodeObjectMap,
-  WrappedResponses, Cycle
+  WrappedResponses, Cycle, AppliedReceipt
 } from './state-manager-types'
 import { start } from 'repl'
 import { json } from 'body-parser'
@@ -63,6 +63,7 @@ class TransactionQueue {
   newAcceptedTxQueueByID: Map<string, QueueEntry>
   newAcceptedTxQueueTempInjestByID: Map<string, QueueEntry>
   archivedQueueEntriesByID: Map<string, QueueEntry>
+  receiptsToForward: any[]
 
   queueStopped: boolean
   queueEntryCounter: number
@@ -103,6 +104,7 @@ class TransactionQueue {
     this.newAcceptedTxQueueTempInjest = []
     this.archivedQueueEntries = []
     this.txDebugStatList = []
+    this.receiptsToForward = []
 
     this.newAcceptedTxQueueByID = new Map()
     this.newAcceptedTxQueueTempInjestByID = new Map()
@@ -471,7 +473,7 @@ class TransactionQueue {
         applyResult = applyResponse.failMessage
       } else {
         passedApply = true
-        applyResult = 'applied'        
+        applyResult = 'applied'
       }
       if (logFlags.verbose) this.mainLogger.debug(`preApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
     } catch (ex) {
@@ -3148,9 +3150,13 @@ class TransactionQueue {
                   //}
 
                   if (commitResult != null && commitResult.success) {
+
                   }
                 } else {
                 }
+
+                if(this.config.p2p.experimentalSnapshot) this.addReceiptToForward(queueEntry)
+
                 if (hasReceiptFail) {
                   // endpoint to allow dapp to execute something that depends on a transaction failing
 
@@ -3270,6 +3276,55 @@ class TransactionQueue {
 
       this.profiler.profileSectionEnd('processQ')
     }
+  }
+
+  addReceiptToForward(queueEntry: QueueEntry) {
+    const netId: string = '123abc'
+    const receipt = this.getReceipt(queueEntry)
+    const status = receipt.result === true ? 'applied' : 'rejected'
+    let txHash = queueEntry.acceptedTx.txId
+    let txResultFullHash = this.crypto.hash({ tx: queueEntry.acceptedTx.data, status, netId })
+    let txIdShort = utils.short(txHash)
+    let txResult = utils.short(txResultFullHash)
+
+    const txReceiptToPass = {
+      tx: { ...queueEntry.acceptedTx },
+      cycle: queueEntry.cycleToRecordOn,
+      result: { txIdShort, txResult },
+      accounts: queueEntry.preApplyTXResult.applyResponse.accountData.map(acc => {
+        let accountCopy = {...acc}
+        delete accountCopy.localCache
+        return accountCopy
+      })
+    }
+    const signedTxReceiptToPass = this.crypto.sign(txReceiptToPass)
+    this.receiptsToForward.push(signedTxReceiptToPass)
+  }
+
+  getReceiptsToForward() {
+    return [...this.receiptsToForward]
+  }
+
+  resetReceiptsToForward() {
+    this.receiptsToForward = []
+  }
+
+  getReceipt(queueEntry: QueueEntry): AppliedReceipt {
+    if (queueEntry.appliedReceiptFinal != null) {
+      return queueEntry.appliedReceiptFinal
+    }
+    // start with a receipt we made
+    let receipt: AppliedReceipt = queueEntry.appliedReceipt
+    if (receipt == null) {
+      // or see if we got one
+      receipt = queueEntry.recievedAppliedReceipt
+    }
+    // if we had to repair use that instead. this stomps the other ones
+    if (queueEntry.appliedReceiptForRepair != null) {
+      receipt = queueEntry.appliedReceiptForRepair
+    }
+    queueEntry.appliedReceiptFinal = receipt
+    return receipt
   }
 
   /**

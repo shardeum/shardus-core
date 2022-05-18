@@ -626,6 +626,7 @@ export interface ServerConfiguration {
     amountToShrink?: number
     /** If witenss mode is true, node will not join the network but help other nodes to sync the data */
     startInWitnessMode?: boolean
+    experimentalSnapshot?: boolean
   }
   /** Server IP configuration */
   ip?: {

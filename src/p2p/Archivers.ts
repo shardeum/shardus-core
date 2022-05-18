@@ -9,13 +9,14 @@ import {
 import { validateTypes } from '../utils'
 import * as Comms from './Comms'
 import * as NodeList from './NodeList'
-import { crypto, logger, network, io } from './Context'
+import { crypto, logger, network, io, stateManager, config } from './Context'
 import { getCycleChain, computeCycleMarker, getNewest } from './CycleChain'
 import * as CycleCreator from './CycleCreator'
 import * as CycleParser from './CycleParser'
 import { logFlags } from '../logger'
 import { P2P, StateManager } from '@shardus/types'
 import { profilerInstance } from '../utils/profiler'
+import Timeout = NodeJS.Timeout
 
 /** STATE */
 
@@ -26,6 +27,7 @@ let recipients: Map<P2P.ArchiversTypes.JoinedArchiver['publicKey'], P2P.Archiver
 
 let joinRequests: P2P.ArchiversTypes.Request[]
 let leaveRequests: P2P.ArchiversTypes.Request[]
+let receiptForwardInterval: Timeout | null = null
 
 /** FUNCTIONS */
 
@@ -243,6 +245,34 @@ export function addDataRecipient(
   }
   if(logFlags.console) console.log('dataRequests: ', recipient.dataRequests)
   recipients.set(nodeInfo.publicKey, recipient)
+  if (config.p2p.experimentalSnapshot && !receiptForwardInterval) {
+    receiptForwardInterval = setInterval(forwardReceipts, 10000)
+  }
+}
+
+async function forwardReceipts() {
+  if (!config.p2p.experimentalSnapshot) return
+  for (const [publicKey, recipient] of recipients) {
+
+    // const responses: P2P.ArchiversTypes.DataResponse['responses'] = {}
+    // TODO: add a new type for receipt
+    const responses: any = {}
+    responses.RECEIPT = stateManager.transactionQueue.getReceiptsToForward()
+
+    if (responses.RECEIPT.length === 0) return
+
+    const dataResponse: P2P.ArchiversTypes.DataResponse = {
+      publicKey: crypto.getPublicKey(),
+      responses,
+      recipient: publicKey,
+    }
+
+    // Tag dataResponse
+    const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
+    if(logFlags.console) console.log('Sending receipts to archivers', taggedDataResponse)
+    io.emit('DATA', taggedDataResponse)
+    stateManager.transactionQueue.resetReceiptsToForward()
+  }
 }
 
 export function removeDataRecipient(publicKey) {
@@ -259,7 +289,6 @@ export function sendData() {
   if(logFlags.console) console.log(recipients)
   for (const [publicKey, recipient] of recipients) {
     const recipientUrl = `http://${recipient.nodeInfo.ip}:${recipient.nodeInfo.port}/newdata`
-
     const responses: P2P.ArchiversTypes.DataResponse['responses'] = {}
 
     for (const request of recipient.dataRequests) {
@@ -315,7 +344,6 @@ export function sendData() {
         default:
       }
     }
-
     const dataResponse: P2P.ArchiversTypes.DataResponse = {
       publicKey: crypto.getPublicKey(),
       responses,

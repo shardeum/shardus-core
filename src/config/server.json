@@ -51,7 +51,8 @@
     "scaleConsensusRequired": 0.25,
     "amountToGrow": 1,
     "amountToShrink": 1,
-    "startInWitnessMode": false
+    "startInWitnessMode": false,
+    "experimentalSnapshot": true
   },
   "ip": {
     "externalIp": "0.0.0.0",
