@@ -802,6 +802,8 @@ export type AccountHashCacheMain3 = {
     currentCalculationCycle: number
 
     workingHistoryList:AccountHashCacheList
+
+    //main storage of cache entries.
     accountHashMap: Map<string, AccountHashCacheHistory>
 
     //queue stuff here that we are not ready for yet

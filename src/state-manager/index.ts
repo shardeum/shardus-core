@@ -971,6 +971,10 @@ class StateManager {
             //I think some work was done to fix diverging stats, but how did it turn out?
             this.partitionStats.statsDataSummaryInit(cycleToRecordOn, wrapedAccount.accountId, wrapedAccount.data, 'checkAndSetAccountData-' + note)
           }
+        } else {
+          //even if we do not process stats still need to update cache
+          //todo maybe even take the stats out of the pipeline for updating cache? (but that is kinda tricky)
+          this.accountCache.updateAccountHash(wrapedAccount.accountId, wrapedAccount.stateId, wrapedAccount.timestamp, cycleToRecordOn)
         }
       } else {
         if (logFlags.error) this.mainLogger.error(`setAccountData hash test failed: setAccountData for account ${utils.makeShortHash(accountId)} expected account hash: ${utils.makeShortHash(stateId)} got ${utils.makeShortHash(hash)} `)
@@ -2529,10 +2533,16 @@ class StateManager {
     let mainHashResults: MainHashResults = null
     if (this.feature_partitionHashes === true) {
       if (cycleShardValues && cycleShardValues.ourNode.status === 'active') {
+
         this.profiler.profileSectionStart('stateManager_processPreviousCycleSummaries_buildPartitionHashesForNode')
-        mainHashResults = this.accountCache.buildPartitionHashesForNode(cycleShardValues) //This needs to be replaced by something that
-                    //processes data for a completed cycle in a consistent way.  mainHash reults are not needed anymore.
-                    //they will not scale well with a large number of accounts.
+        if(this.config.debug.newCacheFlow){
+          this.accountCache.processCacheUpdates(cycleShardValues) 
+        } else{
+          mainHashResults = this.accountCache.buildPartitionHashesForNode(cycleShardValues) //This needs to be replaced by something that
+                      //processes data for a completed cycle in a consistent way.  mainHash reults are not needed anymore.
+                      //they will not scale well with a large number of accounts.
+        }
+
         this.profiler.profileSectionEnd('stateManager_processPreviousCycleSummaries_buildPartitionHashesForNode')
 
 

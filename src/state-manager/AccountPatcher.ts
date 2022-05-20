@@ -743,8 +743,10 @@ class AccountPatcher {
 
       if( treeNode.updated === true  ){ //treeNode.accountTempMap != null){
         treeNode.accounts = Array.from(treeNode.accountTempMap.values())
+        
+        //delete treeNode.accountTempMap...  need to keep it
+        //treeNode.accountTempMap = null
 
-        //delete treeNode.accountTempMap ... keeping it for now.
         //sort treeNode.accounts by accountID
         treeNode.accounts.sort(this.sortByAccountID)
         //compute treenode hash of accounts
@@ -1477,6 +1479,7 @@ class AccountPatcher {
       badSyncRadix: 0,
       ok_noTrieAcc : 0,
       ok_trieHashBad: 0,
+      fix_butHashMatch: 0,
       fixLastSeen: 0,
       needsVotes: 0,
       subHashesTested: 0,
@@ -1597,23 +1600,35 @@ class AccountPatcher {
           //check if our cache value has matching hash already.  The trie can lag behind.
           //  todo would be nice to find a way to reduce this, possibly by better control of syncing ranges.
           //   (we are not supposed to test syncing ranges , but maybe that is out of phase?)
+
+          //only do this check if the account is new.  It was skipping potential oos situations.
           let accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(potentalGoodAcc.accountID)
           if(accountMemData != null && accountMemData.h === potentalGoodAcc.hash){
-            if(potentalBadAcc != null){
-              if(potentalBadAcc.hash != potentalGoodAcc.hash){
-                stats.ok_trieHashBad++
+            if(accountMemData.c >= (cycle-1)){
+              if(potentalBadAcc != null){
+                if(potentalBadAcc.hash != potentalGoodAcc.hash){
+                  stats.ok_trieHashBad++
+                }
+              } else {
+                stats.ok_noTrieAcc++
               }
-            } else {
-              stats.ok_noTrieAcc++
-            }
 
-            //this was in cache, but stale so we can reinstate the cache since it still matches the group consensus
-            let accountHashCacheHistory: AccountHashCacheHistory = this.stateManager.accountCache.getAccountHashHistoryItem(potentalGoodAcc.accountID)
-            if(accountHashCacheHistory != null && accountHashCacheHistory.lastStaleCycle >= accountHashCacheHistory.lastSeenCycle ){
-              stats.fixLastSeen++
-              accountHashCacheHistory.lastSeenCycle = cycle
+              //this was in cache, but stale so we can reinstate the cache since it still matches the group consensus
+              let accountHashCacheHistory: AccountHashCacheHistory = this.stateManager.accountCache.getAccountHashHistoryItem(potentalGoodAcc.accountID)
+              if(accountHashCacheHistory != null && accountHashCacheHistory.lastStaleCycle >= accountHashCacheHistory.lastSeenCycle ){
+                stats.fixLastSeen++
+                accountHashCacheHistory.lastSeenCycle = cycle
+              }
+              //skip out
+              continue              
+            } else {
+              //dont skip out!
+              //cache matches but trie hash is bad
+              stats.fix_butHashMatch++
+              //actually we can repair trie here:
+              this.updateAccountHash(potentalGoodAcc.accountID, potentalGoodAcc.hash)
+              continue
             }
-            continue
           }
 
           //is the account missing or wrong hash?

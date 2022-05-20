@@ -704,6 +704,7 @@ export interface ServerConfiguration {
     //** hash of our dev auth key */
     hashedDevAuth?: string
     devPublicKey?: string
+    newCacheFlow?: boolean
   }
   /** Options for the statistics module */
   statistics?: {

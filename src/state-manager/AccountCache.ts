@@ -32,6 +32,8 @@ class AccountCache {
   currentMainHashResults: MainHashResults //one of the main outputs produced by account cache.  However this was important for accounting 
                                           //for values in a given partition, and that does not scale
 
+  cacheUpdateQueue: AccountHashCacheList                                          
+
   statemanager_fatal: (key: string, log: string) => void
   stateManager: StateManager
 
@@ -61,6 +63,8 @@ class AccountCache {
       accountHashMap: new Map(),
       futureHistoryList: { accountIDs: [], accountHashesSorted: [] },
     }
+
+    this.cacheUpdateQueue = { accountIDs: [], accountHashesSorted: [] }
 
     this.currentMainHashResults = null
   }
@@ -140,7 +144,10 @@ class AccountCache {
 
     if (accountHashList.length === 0) {
       accountHashList.push(accountHashData)
-      nestedCountersInstance.countEvent('cache', 'updateAccountHash: push as first entry') 
+      nestedCountersInstance.countEvent('cache', 'updateAccountHash: push as first entry')
+      if(this.config.debug.newCacheFlow){ 
+        updateIsNewerHash = true 
+      }
     } else {
       if (accountHashList.length > 0) {
         //0 is the most current entry, older entries for older cycles are after that
@@ -209,27 +216,34 @@ class AccountCache {
       }
     }
 
-    //update data in the accountHashesSorted list and record our lastSeenSortIndex index
-    if (updateIsNewerHash === true && onFutureCycle === false) {
-      let lastIndex = accountHashCacheHistory.lastSeenSortIndex
-      // lastIndex is used to clean our spot in history by setting data to null
-      //   this method of cleaning is used to avoid resizing the list constantly
-      //   the empty spaces get cleared out when buildPartitionHashesForNode is run
-      let index = this.insertIntoHistoryList(accountId, accountHashData, this.accountsHashCache3.workingHistoryList, lastIndex)
-      accountHashCacheHistory.lastSeenSortIndex = index
-
-      nestedCountersInstance.countEvent('cache', 'updateAccountHash: update-working')
-    } else if (updateIsNewerHash === true && onFutureCycle === true) {
-      let lastIndex = -1
-      //if our queue index is for the future cycle then we can use this index as a lastIndex for the insert to use on cleaning
-      if (accountHashCacheHistory.queueIndex.id > this.accountsHashCache3.currentCalculationCycle) {
-        lastIndex = accountHashCacheHistory.queueIndex.idx
+    if(this.config.debug.newCacheFlow){
+      if(updateIsNewerHash){
+        this.cacheUpdateQueue.accountHashesSorted.push(accountHashData)
+        this.cacheUpdateQueue.accountIDs.push(accountId)      
       }
-      let index = this.insertIntoHistoryList(accountId, accountHashData, this.accountsHashCache3.futureHistoryList, lastIndex)
-      accountHashCacheHistory.queueIndex.idx = index
-      accountHashCacheHistory.queueIndex.id = cycle
+    } else {
+      //update data in the accountHashesSorted list and record our lastSeenSortIndex index
+      if (updateIsNewerHash === true && onFutureCycle === false) {
+        let lastIndex = accountHashCacheHistory.lastSeenSortIndex
+        // lastIndex is used to clean our spot in history by setting data to null
+        //   this method of cleaning is used to avoid resizing the list constantly
+        //   the empty spaces get cleared out when buildPartitionHashesForNode is run
+        let index = this.insertIntoHistoryList(accountId, accountHashData, this.accountsHashCache3.workingHistoryList, lastIndex)
+        accountHashCacheHistory.lastSeenSortIndex = index
 
-      nestedCountersInstance.countEvent('cache', 'updateAccountHash: update-future')
+        nestedCountersInstance.countEvent('cache', 'updateAccountHash: update-working')
+      } else if (updateIsNewerHash === true && onFutureCycle === true) {
+        let lastIndex = -1
+        //if our queue index is for the future cycle then we can use this index as a lastIndex for the insert to use on cleaning
+        if (accountHashCacheHistory.queueIndex.id > this.accountsHashCache3.currentCalculationCycle) {
+          lastIndex = accountHashCacheHistory.queueIndex.idx
+        }
+        let index = this.insertIntoHistoryList(accountId, accountHashData, this.accountsHashCache3.futureHistoryList, lastIndex)
+        accountHashCacheHistory.queueIndex.idx = index
+        accountHashCacheHistory.queueIndex.id = cycle
+
+        nestedCountersInstance.countEvent('cache', 'updateAccountHash: update-future')
+      }
     }
   }
 
@@ -443,6 +457,7 @@ class AccountCache {
       //if we do not store this partition then dont put it in a report.  tell the trie to remove it.
       //TODO perf, will need something more efficient.
       if(ShardFunctions.testInRange(partition, cycleShardData.nodeShardData.storedPartitions) === false){
+        //how important is this step
         this.stateManager.accountPatcher.removeAccountHash(accountID)
 
         let accountHashCacheHistory: AccountHashCacheHistory = this.accountsHashCache3.accountHashMap.get(accountID)
@@ -693,6 +708,77 @@ class AccountCache {
     }
     return mainHashResults
   }
+
+
+  // currently a sync function, dont have correct buffers for async
+  processCacheUpdates(cycleShardData: CycleShardData, debugAC3: AccountHashCacheMain3 = null, debugAccount:string = null ): void {
+    
+    // OFFLINE DEBUGGING
+    // if(debugAC3 != null){
+    //   this.accountsHashCache3 = debugAC3
+    // }
+    
+    //the line below is too slow.. needs to be in an ultra verbose categor that we dont have, so for now you have to uncomment it on manually
+    //if (logFlags.verbose) this.mainLogger.debug(`accountsHashCache3 ${cycleShardData.cycleNumber}: ${utils.stringifyReduce(this.accountsHashCache3)}`)
+    
+    let cycleToProcess = cycleShardData.cycleNumber
+    let nextCycleToProcess = cycleToProcess + 1
+
+    let nextCacheUpdateQueue: AccountHashCacheList = {
+      accountHashesSorted: [],
+      accountIDs: [],
+    }
+
+    //rebuild the working list with out selected data from the map
+    this.accountsHashCache3.workingHistoryList.accountHashesSorted = []
+    this.accountsHashCache3.workingHistoryList.accountIDs = []
+
+    // process the working list.  split data into partitions and build a new list with nulled spots cleared out
+    for (let index = 0; index < this.cacheUpdateQueue.accountIDs.length; index++) {
+      let accountHashData: AccountHashCache = this.cacheUpdateQueue.accountHashesSorted[index]
+      if (accountHashData == null) {
+        //if this is null then it is blank entry (by design how we remove from the array at run time and retain perf)
+        continue
+      }
+      let accountID = this.cacheUpdateQueue.accountIDs[index]
+      if (accountID == null) {
+        //should never be null if accountHashData was not null
+        this.statemanager_fatal('buildPartitionHashesForNode: accountID==null unexpected', 
+        `buildPartitionHashesForNode: accountID==null unexpected:${utils.stringifyReduce(accountHashData)} `)
+        continue
+      }
+
+      //if we cycle is too new then put in next list:
+
+      if(accountHashData.c > cycleToProcess){
+        nextCacheUpdateQueue.accountHashesSorted.push(accountHashData)
+        nextCacheUpdateQueue.accountIDs.push(accountID)
+        continue
+      }
+
+      //DONT TEST IN RANGE!!  because it may be in range later
+      // let { homePartition: partition } = ShardFunctions.addressToPartition(cycleShardData.shardGlobals, accountID)
+      // //if we do not store this partition then dont put it in a report.  tell the trie to remove it.
+      // //TODO perf, will need something more efficient.
+      // if(ShardFunctions.testInRange(partition, cycleShardData.nodeShardData.storedPartitions) === false){
+      //   this.stateManager.accountPatcher.removeAccountHash(accountID)
+      //   let accountHashCacheHistory: AccountHashCacheHistory = this.accountsHashCache3.accountHashMap.get(accountID)
+      //   if(cycleToProcess > accountHashCacheHistory.lastStaleCycle){
+      //     accountHashCacheHistory.lastStaleCycle = cycleToProcess
+      //   }
+      //   continue
+      // }
+
+      //very important call in the data pipeline.
+      this.stateManager.accountPatcher.updateAccountHash(accountID, accountHashData.h)
+    }
+
+    this.cacheUpdateQueue = nextCacheUpdateQueue
+    
+    // update the cycle we are tracking now
+    this.accountsHashCache3.currentCalculationCycle = nextCycleToProcess
+  }
+
 
   getAccountDebugObject(id: string) :any {
 
