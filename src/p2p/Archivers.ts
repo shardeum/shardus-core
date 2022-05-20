@@ -43,6 +43,10 @@ export function init() {
   reset()
   resetLeaveRequests()
   registerRoutes()
+
+  if (config.p2p.experimentalSnapshot && !receiptForwardInterval) {
+    receiptForwardInterval = setInterval(forwardReceipts, 10000)
+  }
 }
 
 export function reset() {
@@ -245,21 +249,15 @@ export function addDataRecipient(
   }
   if(logFlags.console) console.log('dataRequests: ', recipient.dataRequests)
   recipients.set(nodeInfo.publicKey, recipient)
-  if (config.p2p.experimentalSnapshot && !receiptForwardInterval) {
-    receiptForwardInterval = setInterval(forwardReceipts, 10000)
-  }
 }
 
 async function forwardReceipts() {
   if (!config.p2p.experimentalSnapshot) return
   for (const [publicKey, recipient] of recipients) {
 
-    // const responses: P2P.ArchiversTypes.DataResponse['responses'] = {}
     // TODO: add a new type for receipt
     const responses: any = {}
     responses.RECEIPT = stateManager.transactionQueue.getReceiptsToForward()
-
-    if (responses.RECEIPT.length === 0) return
 
     const dataResponse: P2P.ArchiversTypes.DataResponse = {
       publicKey: crypto.getPublicKey(),
@@ -271,8 +269,8 @@ async function forwardReceipts() {
     const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
     if(logFlags.console) console.log('Sending receipts to archivers', taggedDataResponse)
     io.emit('DATA', taggedDataResponse)
-    stateManager.transactionQueue.resetReceiptsToForward()
   }
+  stateManager.transactionQueue.resetReceiptsToForward()
 }
 
 export function removeDataRecipient(publicKey) {

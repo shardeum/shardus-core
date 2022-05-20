@@ -64,6 +64,8 @@ class TransactionQueue {
   newAcceptedTxQueueTempInjestByID: Map<string, QueueEntry>
   archivedQueueEntriesByID: Map<string, QueueEntry>
   receiptsToForward: any[]
+  forwardedReceipts: Map<string, boolean>
+  lastReceiptForwardResetTimestamp: number
 
   queueStopped: boolean
   queueEntryCounter: number
@@ -105,6 +107,8 @@ class TransactionQueue {
     this.archivedQueueEntries = []
     this.txDebugStatList = []
     this.receiptsToForward = []
+    this.forwardedReceipts = new Map()
+    this.lastReceiptForwardResetTimestamp = Date.now()
 
     this.newAcceptedTxQueueByID = new Map()
     this.newAcceptedTxQueueTempInjestByID = new Map()
@@ -3302,11 +3306,21 @@ class TransactionQueue {
   }
 
   getReceiptsToForward() {
-    return [...this.receiptsToForward]
+    const freshReceipts = []
+    for (const receipt of this.receiptsToForward) {
+      if (!this.forwardedReceipts.has(receipt.tx.txId)) {
+        freshReceipts.push(receipt)
+      }
+    }
+    return freshReceipts
   }
 
   resetReceiptsToForward() {
-    this.receiptsToForward = []
+    if (Date.now() - this.lastReceiptForwardResetTimestamp >= 30000) {
+      this.receiptsToForward = []
+      this.forwardedReceipts = new Map()
+      this.lastReceiptForwardResetTimestamp = Date.now()
+    }
   }
 
   getReceipt(queueEntry: QueueEntry): AppliedReceipt {
