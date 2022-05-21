@@ -3316,8 +3316,14 @@ class TransactionQueue {
   }
 
   resetReceiptsToForward() {
+    const lastReceiptsToForward = [...this.receiptsToForward]
+    this.receiptsToForward = []
     if (Date.now() - this.lastReceiptForwardResetTimestamp >= 30000) {
-      this.receiptsToForward = []
+      for (const receipt of lastReceiptsToForward) {   // Start sending from the last receipts it saved (30s of data) when a new node is selected
+        if (!this.forwardedReceipts.has(receipt.tx.txId)) {
+          this.receiptsToForward.push(receipt)
+        }
+      }
       this.forwardedReceipts = new Map()
       this.lastReceiptForwardResetTimestamp = Date.now()
     }

@@ -253,12 +253,17 @@ export function addDataRecipient(
 
 async function forwardReceipts() {
   if (!config.p2p.experimentalSnapshot) return
+  // TODO: add a new type for receipt
+  const responses: any = {}
+  responses.RECEIPT = stateManager.transactionQueue.getReceiptsToForward()
+  if (recipients.size > 0) {
+    for (const receipt of responses.RECEIPT) {
+      if (!stateManager.transactionQueue.forwardedReceipts.has(receipt.tx.txId)) {
+        stateManager.transactionQueue.forwardedReceipts.set(receipt.tx.txId, true)
+      }
+    }
+  }
   for (const [publicKey, recipient] of recipients) {
-
-    // TODO: add a new type for receipt
-    const responses: any = {}
-    responses.RECEIPT = stateManager.transactionQueue.getReceiptsToForward()
-
     const dataResponse: P2P.ArchiversTypes.DataResponse = {
       publicKey: crypto.getPublicKey(),
       responses,
