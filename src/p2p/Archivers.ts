@@ -17,6 +17,7 @@ import { logFlags } from '../logger'
 import { P2P, StateManager } from '@shardus/types'
 import { profilerInstance } from '../utils/profiler'
 import Timeout = NodeJS.Timeout
+import { nestedCountersInstance } from '../utils/nestedCounters'
 
 /** STATE */
 
@@ -253,6 +254,9 @@ export function addDataRecipient(
 
 async function forwardReceipts() {
   if (!config.p2p.experimentalSnapshot) return
+
+  profilerInstance.scopedProfileSectionStart('forwardReceipts')
+
   // TODO: add a new type for receipt
   const responses: any = {}
   responses.RECEIPT = stateManager.transactionQueue.getReceiptsToForward()
@@ -270,12 +274,17 @@ async function forwardReceipts() {
       recipient: publicKey,
     }
 
+    nestedCountersInstance.countEvent('Archiver','forwardReceipts', responses.RECEIPT.length ) 
+
     // Tag dataResponse
     const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
     if(logFlags.console) console.log('Sending receipts to archivers', taggedDataResponse)
     io.emit('DATA', taggedDataResponse)
   }
+
   stateManager.transactionQueue.resetReceiptsToForward()
+
+  profilerInstance.scopedProfileSectionEnd('forwardReceipts')
 }
 
 export function removeDataRecipient(publicKey) {
