@@ -108,11 +108,23 @@ class Sqlite3Storage {
     let oldDirPath
     try {
       oldDirPath = dbDir + '-old-' + Date.now()
-      fs.renameSync(dbDir, oldDirPath)
-      if (oldDirPath) {
-        this.mainLogger.info('Setting old data path. this will cause safety mode?' + oldDirPath)
-        Snapshot.setOldDataPath(oldDirPath)
-        this.oldDb = new sqlite3.Database(`${oldDirPath}/db.sqlite`)
+
+      if(this.storageConfig.options.saveOldDBFiles){
+        fs.renameSync(dbDir, oldDirPath)
+        if (oldDirPath) {
+          this.mainLogger.info('Setting old data path. this will cause safety mode?' + oldDirPath)
+          Snapshot.setOldDataPath(oldDirPath)
+          this.oldDb = new sqlite3.Database(`${oldDirPath}/db.sqlite`)
+        }        
+      } else {
+        //recursive delete of db folder
+        try{
+          fs.rmdirSync(dbDir, { recursive: true })
+        } catch (e) {
+          //wait 5 seconds and try one more time
+          await utils.sleep(5000)
+          fs.rmdirSync(dbDir, { recursive: true })
+        }
       }
     } catch (e) {
       if (config.p2p.startInWitnessMode) {
@@ -149,7 +161,15 @@ class Sqlite3Storage {
     // await this.run('CREATE TABLE if not exists `accounts` (`address` VARCHAR(255) NOT NULL PRIMARY KEY, `modified` BIGINT NOT NULL, `sequence` BIGINT NOT NULL, `owners` JSON NOT NULL, `signs` SMALLINT NOT NULL, `balance` DOUBLE PRECISION NOT NULL, `type` VARCHAR(255) NOT NULL, `data` JSON NOT NULL, `hash` VARCHAR(255) NOT NULL, `txs` TEXT NOT NULL, `timestamp` BIGINT NOT NULL)')
 
     await this.run('PRAGMA synchronous = OFF')
-    await this.run('PRAGMA journal_mode = MEMORY')
+
+    if(this.storageConfig.options.walMode === true){
+      await this.run('PRAGMA journal_mode = WAL')
+    } else {
+      await this.run('PRAGMA journal_mode = MEMORY')
+    }
+    if(this.storageConfig.options.exclusiveLockMode === true){
+      await this.run('PRAGMA locking_mode = EXCLUSIVE')
+    }
 
     this.initialized = true
     this.mainLogger.info('Database initialized.')

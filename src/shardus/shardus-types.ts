@@ -854,6 +854,9 @@ export interface StorageConfiguration {
       force?: false
     }
     memoryFile?: false
+    saveOldDBFiles: boolean
+    walMode: boolean
+    exclusiveLockMode: boolean
   }
 }
 
