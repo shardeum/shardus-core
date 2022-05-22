@@ -2521,13 +2521,13 @@ class StateManager {
     let statsClump = {}
     if (this.feature_generateStats === true) {
       statsClump = this.partitionStats.buildStatsReport(cycleShardValues)
-
-
       this.partitionStats.dumpLogsForCycle(cycleShardValues.cycleNumber, true, cycleShardValues)
+    } else {
+      //todo could make ncider way to avoid this memory
+      this.partitionStats.workQueue = []
     }
+
     this.profiler.profileSectionEnd('stateManager_processPreviousCycleSummaries_buildStatsReport')
-
-
 
     // build partition hashes from previous full cycle
     let mainHashResults: MainHashResults = null
