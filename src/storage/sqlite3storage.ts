@@ -119,11 +119,19 @@ class Sqlite3Storage {
       } else {
         //recursive delete of db folder
         try{
-          fs.rmdirSync(dbDir, { recursive: true })
+          fs.rmdirSync(dbDir, { recursive: true, maxRetries : 5 })
+          
+          //why does this not work: it was added in v14.14 !!!
+          //fs.rmSync(dbDir, { recursive: true, force: true, maxRetries : 5 })
+          //fs.rmSync(dbDir,{ recursive: true, force: true })
         } catch (e) {
+          
+          this.mainLogger.error('error removing directory db..')
           //wait 5 seconds and try one more time
           await utils.sleep(5000)
           fs.rmdirSync(dbDir, { recursive: true })
+
+
         }
       }
     } catch (e) {

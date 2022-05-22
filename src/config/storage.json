@@ -16,8 +16,8 @@
     "storage": "db/db.sqlite",
     "sync": { "force": false },
     "memoryFile": false,
-    "saveOldDBFiles": false,
-    "walMode": true,
-    "exclusiveLockMode": true
+    "saveOldDBFiles": true,
+    "walMode": false,
+    "exclusiveLockMode": false
   }
 }
