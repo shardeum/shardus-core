@@ -668,25 +668,25 @@ export interface ServerConfiguration {
     /** The canDataRepair parameter is a boolean that allows dataRepair to be turned on/off by the application (true = on | false = off) */
     canDataRepair?: boolean
     /** Disable voting consensus for TXs (true = on | false = off) */
-    // debugNoTxVoting?: boolean
+    debugNoTxVoting?: boolean
     /** ignore initial incomming receipt */
-    // ignoreRecieptChance?: number
+    ignoreRecieptChance?: number
     /** ignore initial incomming vote */
-    // ignoreVoteChance?: number
+    ignoreVoteChance?: number
     /** chance to fail making a receipt */
-    // failReceiptChance?: number
+    failReceiptChance?: number
     /** chance to flip our vote */
-    // voteFlipChance?: number
+    voteFlipChance?: number
     /** chance to fail a TX and the TX repair */
-    // failNoRepairTxChance?: number
+    failNoRepairTxChance?: number
     /** use the new stats data for partition state reports to monitor server */
-    // useNewParitionReport?: boolean
+    useNewParitionReport?: boolean
     /** is the old partition checking system enabled */
-    // oldPartitionSystem?: boolean
+    oldPartitionSystem?: boolean
     /** slow old reporting that queries sql for account values */
-    // dumpAccountReportFromSQL?: boolean
+    dumpAccountReportFromSQL?: boolean
     /** enable the built in profiling */
-    // profiler?: boolean
+    profiler?: boolean
     /** starts the node in fatals mode, use endpoints to turn back on default logs */
     startInFatalsLogMode?: boolean
     /** starts the node in error mode, use endpoints to turn back on default logs */
