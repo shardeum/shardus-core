@@ -440,8 +440,20 @@ class AccountPatcher {
     })
     Context.network.registerExternalGet('debug-patcher-dumpTree', isDebugModeMiddleware, (req, res) => {
       try{
-        this.statemanager_fatal('debug shardTrie',`temp shardTrie ${utils.stringifyReduce(this.shardTrie.layerMaps[0].values().next().value)}`)
-        res.write(`${utils.stringifyReduce(this.shardTrie.layerMaps[0].values().next().value)}\n`)
+        // this.statemanager_fatal('debug shardTrie',`temp shardTrie ${utils.stringifyReduce(this.shardTrie.layerMaps[0].values().next().value)}`)
+        // res.write(`${utils.stringifyReduce(this.shardTrie.layerMaps[0].values().next().value)}\n`)
+
+        let trieRoot = this.shardTrie.layerMaps[0].values().next().value
+
+        //strip noisy fields
+        let tempString = JSON.stringify(trieRoot, utils.debugReplacer)
+        let processedObject = JSON.parse(tempString)
+
+        // use stringify to put a stable sort on the object keys (important for comparisons)
+        let finalStr = utils.stringifyReduce(processedObject)
+
+        this.statemanager_fatal('debug shardTrie',`temp shardTrie ${finalStr}`)
+        res.write(`${finalStr}\n`)
       } catch(e){
         res.write(`${e}\n`)
       }

@@ -198,3 +198,33 @@ export const reviverMemoize = (key, value) => {
   }
   return value
 }
+
+
+export const debugReplacer = (key, value) => {
+  const originalObject = value // this[key]
+
+  if(key === 'accountTempMap'){
+    return {}
+  }
+  if(typeof originalObject === 'string'){
+    const reduced = makeShortHash(originalObject)
+    return reduced
+  }
+  if (originalObject instanceof Map) {
+    return {
+      dataType: 'stringifyReduce_map_2_array',
+      value: Array.from(originalObject.entries()), // or with spread: value: [...originalObject]
+    }
+  } else {
+    return value
+  }
+}
+
+export const debugReviver = (key, value) => {
+  if (typeof value === 'object' && value !== null) {
+    if (value.dataType === 'stringifyReduce_map_2_array') {
+      return new Map(value.value)
+    }
+  }
+  return value
+}
