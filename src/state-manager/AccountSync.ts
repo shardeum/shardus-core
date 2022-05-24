@@ -994,6 +994,9 @@ class AccountSync {
     let stopIfNextLoopHasNoResults = false
 
     let offset = 0
+
+    let retriesLeft = 10
+
     // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
     while (moreDataRemaining) {
       // Node Precheck!
@@ -1006,7 +1009,23 @@ class AccountSync {
 
       // max records artificially low to make testing coverage better.  todo refactor: make it a config or calculate based on data size
       let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, maxRecords: this.config.stateManager.accountBucketSize, offset }
-      let r: GetAccountData3Resp | boolean = await this.p2p.ask(this.dataSourceNode, 'get_account_data3', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
+      let r: GetAccountData3Resp | boolean
+      try{
+        r = await this.p2p.ask(this.dataSourceNode, 'get_account_data3', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
+      } catch(ex){
+
+        this.statemanager_fatal(`syncAccountData2`, `syncAccountData2 retries:${retriesLeft} ask: ` + errorToStringFull(ex))
+        //wait 5 sec
+        await utils.sleep(5000)
+        //max retries
+        if(retriesLeft > 0){
+          retriesLeft--
+          continue
+        } else {
+          throw new Error('out of account sync retries')
+        }
+        
+      }
 
       // TSConversion need to consider better error handling here!
       let result: GetAccountData3Resp = r as GetAccountData3Resp
