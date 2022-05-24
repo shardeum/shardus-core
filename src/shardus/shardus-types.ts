@@ -176,7 +176,10 @@ export interface App {
   /**
    * A function responsible for applying an accepted transaction
    */
-  apply: (inTx: OpaqueTransaction, wrappedStates: { [accountId: string]: WrappedData }) => ApplyResponse
+  apply: (
+    inTx: OpaqueTransaction,
+    wrappedStates: { [accountId: string]: WrappedData }
+  ) => ApplyResponse
 
   /**
    * This is called after consensus has received or produced a receipt and the trasaction is approved.
@@ -221,7 +224,6 @@ export interface App {
   getTimestampFromTransaction: (
     inTx: OpaqueTransaction // it is better to not use IncomingTransaction
   ) => number
-
 
   /**
    * A function that returns the Keys for the accounts involved in the transaction
@@ -345,10 +347,11 @@ export interface ApplyResponse {
    * Can include accounts that were not in the initial list of involved accounts
    */
   accountWrites: {
-    accountId:string,
-    data: WrappedResponse,
-    txId: string,
-    timestamp: number}[]
+    accountId: string
+    data: WrappedResponse
+    txId: string
+    timestamp: number
+  }[]
   /**
    * a blob for the app to define.
    * This gets passed to post apply
@@ -365,9 +368,6 @@ export interface ApplyResponse {
    */
   appReceiptData: unknown
   appReceiptDataHash: string
-
-
-
 }
 
 export interface AccountData {
@@ -570,13 +570,13 @@ export interface ServerConfiguration {
     /** The maxRejoinTime parameter is an Integer specifying the amount of time (in seconds) between network heartbeats before a node must ask to rejoin. */
     maxRejoinTime?: number
     /** The seedList parameter is a String specifying the url for the seedNode server that the application will communicate with. */
-    seedList?: string
+    // seedList?: string
     /** The difficulty parameter is an Integer specifying the proof of work difficulty to prevent network spam. */
     difficulty?: number
     /** The queryDelay parameter is an Integer specifying the amount of time (in seconds) to delay between cycle phase. */
     queryDelay?: number
     /** The netadmin parameter is a String specifying the public key of the network admin for emergency network alerts, updates, or broadcasts. */
-    netadmin?: string
+    // netadmin?: string
     /** The gossipRecipients parameter is an Integer specifying the number of nodes to send gossip to in the network after receiving a message.
      * Shardus groups nodes with neighbors, who they can gossip the message to, so you can set this pretty low and still expect it to be
      * propogated through the entire network. (It’s recommended to set this to AT LEAST 3, 4 is recommended, and 5 would be even safer,
@@ -585,6 +585,8 @@ export interface ServerConfiguration {
      **/
     gossipRecipients?: number
     gossipFactor?: number
+    gossipStartSeed?: number
+    gossipSeedFallof?: number
     /** The gossipTimeout parameter is an Integer specifying the amount of time (in seconds) before an old gossip is deleted from a node. */
     gossipTimeout?: number
     /** The maxSeedNodes parameter is an Integer specifying the maximum number of seedNodes used to be used. */
@@ -656,7 +658,7 @@ export interface ServerConfiguration {
     console?: boolean
   }
   /** Server's current mode or environment to be run in. Can be 'release' or 'debug' with 'release' being the default. */
-  mode?: ServerMode
+  mode?: 'debug' | 'release'
   /** Server Debug module configuration */
   debug?: {
     /** The loseReceiptChance parameter is a Float specifying a percentage chance to randomly drop a receipt (currently doesn’t do anything) */
@@ -664,27 +666,27 @@ export interface ServerConfiguration {
     /** The loseTxChance parameter is a Float specifying a percentage chance to randomly drop a transaction. */
     loseTxChance?: number
     /** The canDataRepair parameter is a boolean that allows dataRepair to be turned on/off by the application (true = on | false = off) */
-    //canDataRepair?: boolean
+    canDataRepair?: boolean
     /** Disable voting consensus for TXs (true = on | false = off) */
-    debugNoTxVoting?: boolean
+    // debugNoTxVoting?: boolean
     /** ignore initial incomming receipt */
-    ignoreRecieptChance?: number
+    // ignoreRecieptChance?: number
     /** ignore initial incomming vote */
-    ignoreVoteChance?: number
+    // ignoreVoteChance?: number
     /** chance to fail making a receipt */
-    failReceiptChance?: number
+    // failReceiptChance?: number
     /** chance to flip our vote */
-    voteFlipChance?: number
+    // voteFlipChance?: number
     /** chance to fail a TX and the TX repair */
-    failNoRepairTxChance?: number
+    // failNoRepairTxChance?: number
     /** use the new stats data for partition state reports to monitor server */
-    useNewParitionReport?: boolean
+    // useNewParitionReport?: boolean
     /** is the old partition checking system enabled */
-    oldPartitionSystem?: boolean
+    // oldPartitionSystem?: boolean
     /** slow old reporting that queries sql for account values */
-    dumpAccountReportFromSQL?: boolean
+    // dumpAccountReportFromSQL?: boolean
     /** enable the built in profiling */
-    profiler?: boolean
+    // profiler?: boolean
     /** starts the node in fatals mode, use endpoints to turn back on default logs */
     startInFatalsLogMode?: boolean
     /** starts the node in error mode, use endpoints to turn back on default logs */
@@ -737,7 +739,12 @@ export interface ServerConfiguration {
      * With loadLimit set to 0.5, at 75% or 0.75 load, the network would drop 50% of incoming transactions.
      * (The percentage of chance to drop a transaction scales linearly as the load increases past the threshold).
      **/
-    loadLimit?: number
+    loadLimit?: {
+      internal?: number
+      external?: number
+      txTimeInQueue?: number
+      queueLength?: number
+    }
   }
   /** Server State manager module configuration */
   stateManager?: {
@@ -774,6 +781,26 @@ export interface LogsConfiguration {
         maxLogSize?: number
         backups?: number
       }
+      app?: {
+        type?: string
+        maxLogSize?: number
+        backups?: number
+      }
+      p2p?: {
+        type?: string
+        maxLogSize?: number
+        backups?: number
+      }
+      snapshot?: {
+        type?: string
+        maxLogSize?: number
+        backups?: number
+      }
+      cycle?: {
+        type?: string
+        maxLogSize?: number
+        backups?: number
+      }
       fatal?: {
         type?: string
         maxLogSize?: number
@@ -786,8 +813,8 @@ export interface LogsConfiguration {
       }
       errors?: {
         type?: string
-        maxLogSize?: number
-        backups?: number
+        level?: string
+        appender?: string
       }
       net?: {
         type?: string
@@ -804,32 +831,57 @@ export interface LogsConfiguration {
         maxLogSize?: number
         backups?: number
       }
+      statsDump?: {
+        type?: string
+        maxLogSize?: number
+        backups?: number
+      }
     }
-  }
-  categories?: {
-    default?: {
-      appenders?: string[]
-      level?: string
-    }
-    main?: {
-      appenders?: string[]
-      level?: string
-    }
-    fatal?: {
-      appenders?: string[]
-      level?: string
-    }
-    net?: {
-      appenders?: string[]
-      level?: string
-    }
-    playback?: {
-      appenders?: string[]
-      level?: string
-    }
-    shardDump?: {
-      appenders?: string[]
-      level?: string
+    categories?: {
+      default?: {
+        appenders?: string[]
+        level?: string
+      }
+      app?: {
+        appenders?: string[]
+        level?: string
+      }
+      main?: {
+        appenders?: string[]
+        level?: string
+      }
+      p2p?: {
+        appenders?: string[]
+        level?: string
+      }
+      snapshot?: {
+        appenders?: string[]
+        level?: string
+      }
+      cycle?: {
+        appenders?: string[]
+        level?: string
+      }
+      fatal?: {
+        appenders?: string[]
+        level?: string
+      }
+      net?: {
+        appenders?: string[]
+        level?: string
+      }
+      playback?: {
+        appenders?: string[]
+        level?: string
+      }
+      shardDump?: {
+        appenders?: string[]
+        level?: string
+      }
+      statsDump?: {
+        appenders?: string[]
+        level?: string
+      }
     }
   }
 }
@@ -866,6 +918,16 @@ export interface ShardusConfiguration {
   storage?: StorageConfiguration
 }
 
+export type StrictServerConfiguration = DeepRequired<ServerConfiguration>
+export type StrictLogsConfiguration = DeepRequired<LogsConfiguration>
+export type StrictStorageConfiguration = DeepRequired<StorageConfiguration>
+
+export interface StrictShardusConfiguration {
+  server: StrictServerConfiguration
+  logs: StrictLogsConfiguration
+  storage: StrictStorageConfiguration
+}
+
 export interface AcceptedTx {
   timestamp: number
   txId: string
@@ -886,3 +948,9 @@ type ObjectAlias = object
  * OpaqueTransaction is the way shardus should see transactions internally. it should not be able to mess with parameters individually
  */
 export interface OpaqueTransaction extends ObjectAlias {}
+
+type DeepRequired<T> = Required<{
+  [P in keyof T]: T[P] extends object | undefined
+    ? DeepRequired<Required<T[P]>>
+    : T[P]
+}>
