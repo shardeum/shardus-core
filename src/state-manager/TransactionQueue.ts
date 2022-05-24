@@ -41,7 +41,7 @@ const txStatBucketSize = {
 class TransactionQueue {
   app: Shardus.App
   crypto: Crypto
-  config: Shardus.ServerConfiguration
+  config: Shardus.StrictServerConfiguration
   profiler: Profiler
 
   logger: Logger
@@ -83,7 +83,7 @@ class TransactionQueue {
 
   txCoverageMap: any
 
-  constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ServerConfiguration) {
+  constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.StrictServerConfiguration) {
     this.crypto = crypto
     this.app = app
     this.logger = logger

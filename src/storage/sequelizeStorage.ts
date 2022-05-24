@@ -9,7 +9,7 @@ import Logger, {logFlags} from '../logger'
 interface SequelizeStorage {
   baseDir: string
   models: any
-  storageConfig: Shardus.StorageConfiguration
+  storageConfig: Shardus.StrictStorageConfiguration
   profiler: Profiler
   mainLogger: Log4js.Logger
   sequelize: Sequelize
@@ -21,7 +21,7 @@ class SequelizeStorage {
   // note that old storage passed in logger, now we pass in the specific log for it to use.  This works for application use, but may need to rethink if we apply this to shardus core
   constructor(
     models: any,
-    storageConfig: Shardus.StorageConfiguration,
+    storageConfig: Shardus.StrictStorageConfiguration,
     logger: Logger,
     baseDir: string,
     profiler: Profiler

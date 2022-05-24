@@ -14,7 +14,7 @@ import { isDebugModeMiddleware } from '../network/debugMiddleware'
 
 interface Logger {
   baseDir: string
-  config: Shardus.LogsConfiguration
+  config: Shardus.StrictLogsConfiguration
   logDir: string
   log4Conf: any
   // playbackLogEnabled: boolean
@@ -114,7 +114,7 @@ export let logFlags: LogFlags = {
 class Logger {
   backupLogFlags: LogFlags
 
-  constructor(baseDir: string, config: Shardus.LogsConfiguration, dynamicLogMode:string) {
+  constructor(baseDir: string, config: Shardus.StrictLogsConfiguration, dynamicLogMode:string) {
     this.baseDir = baseDir
     this.config = config
     this.logDir = null

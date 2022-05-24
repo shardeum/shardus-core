@@ -59,7 +59,7 @@ class AccountSync {
   stateManager: StateManager
   app: Shardus.App
   crypto: Crypto
-  config: Shardus.ServerConfiguration
+  config: Shardus.StrictServerConfiguration
   profiler: Profiler
 
   logger: Logger
@@ -136,7 +136,7 @@ class AccountSync {
     storage: Storage,
     p2p: P2P,
     crypto: Crypto,
-    config: Shardus.ServerConfiguration
+    config: Shardus.StrictServerConfiguration
   ) {
     this.stateManager = stateManager
 

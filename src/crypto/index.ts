@@ -6,7 +6,7 @@ import Logger, {logFlags} from '../logger'
 import Storage from '../storage'
 
 interface Crypto {
-  config: Shardus.ServerConfiguration
+  config: Shardus.StrictServerConfiguration
   mainLogger: Log4js.Logger
   storage: Storage
   keypair: any
@@ -20,7 +20,7 @@ interface Crypto {
 
 class Crypto {
   constructor(
-    config: Shardus.ServerConfiguration,
+    config: Shardus.StrictServerConfiguration,
     logger: Logger,
     storage: Storage
   ) {

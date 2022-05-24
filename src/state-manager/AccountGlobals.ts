@@ -16,7 +16,7 @@ import { nestedCountersInstance } from '../utils/nestedCounters'
 class AccountGlobals {
   app: Shardus.App
   crypto: Crypto
-  config: Shardus.ServerConfiguration
+  config: Shardus.StrictServerConfiguration
   profiler: Profiler
 
   logger: Logger
@@ -50,7 +50,7 @@ class AccountGlobals {
     storage: Storage,
     p2p: P2P,
     crypto: Crypto,
-    config: Shardus.ServerConfiguration
+    config: Shardus.StrictServerConfiguration
   ) {
 
     this.crypto = crypto

@@ -62,7 +62,7 @@ class StateManager {
   storage: Storage
   p2p: P2P
   crypto: Crypto
-  config: Shardus.ServerConfiguration
+  config: Shardus.StrictServerConfiguration
   profiler: Profiler
 
   mainLogger: any
@@ -176,7 +176,7 @@ class StateManager {
    *    ##    ## ##     ## ##   ### ##    ##    ##    ##    ##  ##     ## ##    ##    ##    ##     ## ##    ##
    *     ######   #######  ##    ##  ######     ##    ##     ##  #######   ######     ##     #######  ##     ##
    */
-  constructor( profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ServerConfiguration) {
+  constructor( profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.StrictServerConfiguration) {
     //super()
 
 

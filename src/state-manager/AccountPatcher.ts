@@ -27,7 +27,7 @@ import { promises } from 'dns'
 class AccountPatcher {
   app: Shardus.App
   crypto: Crypto
-  config: Shardus.ServerConfiguration
+  config: Shardus.StrictServerConfiguration
   profiler: Profiler
 
   p2p: P2P
@@ -75,7 +75,7 @@ class AccountPatcher {
 
   lastRepairInfo: any
 
-  constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, p2p: P2P, crypto: Crypto, config: Shardus.ServerConfiguration) {
+  constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, p2p: P2P, crypto: Crypto, config: Shardus.StrictServerConfiguration) {
     this.crypto = crypto
     this.app = app
     this.logger = logger

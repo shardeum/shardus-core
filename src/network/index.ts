@@ -55,7 +55,7 @@ export class NetworkClass extends EventEmitter {
   debugNetworkDelay: number
   statisticsInstance: any
 
-  constructor(config: Shardus.ServerConfiguration, logger: Logger) {
+  constructor(config: Shardus.StrictServerConfiguration, logger: Logger) {
     super()
     this.app = express()
     this.sn = null

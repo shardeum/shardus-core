@@ -57,7 +57,7 @@ import { constants } from 'fs'
 class PartitionStats {
   app: Shardus.App
   crypto: Crypto
-  config: Shardus.ServerConfiguration
+  config: Shardus.StrictServerConfiguration
   profiler: Profiler
 
   logger: Logger
@@ -85,7 +85,7 @@ class PartitionStats {
 
   workQueue: { cycle: number; fn: any; args: any[] }[]
 
-  constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, crypto: Crypto, config: Shardus.ServerConfiguration, accountCache: AccountCache) {
+  constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, crypto: Crypto, config: Shardus.StrictServerConfiguration, accountCache: AccountCache) {
     if (stateManager == null) return //for debug testing.
 
     this.crypto = crypto

@@ -31,20 +31,14 @@ import MemoryReporting from '../utils/memoryReporting'
 import NestedCounters, { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { profilerInstance } from '../utils/profiler'
 import { time } from 'console'
+import SHARDUS_CONFIG from '../config'
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
 const saveConsoleOutput = require('./saveConsoleOutput')
 
-const defaultConfigs = {
-  server: require('../config/server.json'),
-  logs: require('../config/logs.json'),
-  storage: require('../config/storage.json'),
-} as {
-  server: ShardusTypes.ServerConfiguration
-  logs: ShardusTypes.LogsConfiguration
-  storage: ShardusTypes.StorageConfiguration
-}
+const defaultConfigs: ShardusTypes.StrictShardusConfiguration = SHARDUS_CONFIG
+  
 Context.setDefaultConfigs(defaultConfigs)
 
 type RouteHandlerRegister = (route: string, authHandler: Handler, responseHandler?: Handler) => void
@@ -57,7 +51,7 @@ interface Shardus {
   profiler: Profiler
   nestedCounters: NestedCounters
   memoryReporting: MemoryReporting
-  config: ShardusTypes.ServerConfiguration
+  config: ShardusTypes.StrictServerConfiguration
 
   logger: Logger
   mainLogger: Log4js.Logger
@@ -95,11 +89,7 @@ class Shardus extends EventEmitter {
     server: config,
     logs: logsConfig,
     storage: storageConfig,
-  }: {
-    server: ShardusTypes.ServerConfiguration
-    logs: ShardusTypes.LogsConfiguration
-    storage: ShardusTypes.StorageConfiguration
-  }) {
+  }: ShardusTypes.StrictShardusConfiguration) {
     super()
     this.nestedCounters = new NestedCounters()
     this.memoryReporting = new MemoryReporting(this)

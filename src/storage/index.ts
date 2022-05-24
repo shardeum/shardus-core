@@ -36,7 +36,7 @@ interface Storage {
 class Storage {
   constructor(
     baseDir: string,
-    config: ShardusTypes.StorageConfiguration,
+    config: ShardusTypes.StrictStorageConfiguration,
     logger: Logger,
     profiler: Profiler
   ) {

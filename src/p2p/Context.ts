@@ -19,12 +19,8 @@ export let shardus: Shardus
 export let stateManager: StateManager
 export let storage: Storage
 export let io
-export let config: ShardusTypes.ServerConfiguration
-export let defaultConfigs: {
-  server: ShardusTypes.ServerConfiguration
-  logs: ShardusTypes.LogsConfiguration
-  storage: ShardusTypes.StorageConfiguration
-}
+export let config: ShardusTypes.StrictServerConfiguration
+export let defaultConfigs: ShardusTypes.StrictShardusConfiguration
 export let reporter: Reporter
 
 export function setP2pContext(context: P2PModuleContext) {
@@ -63,7 +59,7 @@ export function setReporterContext(context) {
   reporter = context
 }
 
-export function setConfig(conf: ShardusTypes.ServerConfiguration) {
+export function setConfig(conf: ShardusTypes.StrictServerConfiguration) {
   config = conf
 }
 

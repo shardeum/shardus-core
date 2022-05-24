@@ -658,7 +658,7 @@ export interface ServerConfiguration {
     console?: boolean
   }
   /** Server's current mode or environment to be run in. Can be 'release' or 'debug' with 'release' being the default. */
-  mode?: 'debug' | 'release'
+  mode?: ServerMode
   /** Server Debug module configuration */
   debug?: {
     /** The loseReceiptChance parameter is a Float specifying a percentage chance to randomly drop a receipt (currently doesn’t do anything) */
@@ -949,7 +949,7 @@ type ObjectAlias = object
  */
 export interface OpaqueTransaction extends ObjectAlias {}
 
-type DeepRequired<T> = Required<{
+export type DeepRequired<T> = Required<{
   [P in keyof T]: T[P] extends object | undefined
     ? DeepRequired<Required<T[P]>>
     : T[P]

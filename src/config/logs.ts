@@ -1,8 +1,4 @@
-import util from 'util'
 import { StrictLogsConfiguration } from '../shardus/shardus-types'
-const buffer = require('./deprecated/logs.json')
-
-console.log(util.inspect(buffer, false, null, true /* enable colors */))
 
 const LOGS_CONFIG: StrictLogsConfiguration = {
   saveConsoleOutput: true,

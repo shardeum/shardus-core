@@ -11,17 +11,14 @@ export { ShardusTypes }
 // functions it otherwise wasn't exporting. ATTOW we have not decided on whether
 // a more permanent solution is proper.
 import { addressToPartition, partitionInWrappingRange, findHomeNode } from './state-manager/shardFunctions'
+import SHARDUS_CONFIG from './config'
 export const __ShardFunctions = {
   addressToPartition,
   partitionInWrappingRange,
   findHomeNode
 }
 
-const defaultConfigs = {
-  server: require('./config/server.json'),
-  logs: require('./config/logs.json'),
-  storage: require('./config/storage.json'),
-}
+const defaultConfigs: ShardusTypes.StrictShardusConfiguration = SHARDUS_CONFIG 
 
 const overwriteMerge = (target, source, options) => source
 

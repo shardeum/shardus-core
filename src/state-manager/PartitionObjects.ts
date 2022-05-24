@@ -17,7 +17,7 @@ import { PartitionCycleReport, PartitionObject, PartitionResult, TempTxRecord, T
 class PartitionObjects {
   app: Shardus.App
   crypto: Crypto
-  config: Shardus.ServerConfiguration
+  config: Shardus.StrictServerConfiguration
   profiler: Profiler
   
   logger: Logger
@@ -52,7 +52,7 @@ class PartitionObjects {
 
   resetAndApplyPerPartition: boolean
 
-  constructor(stateManager: StateManager,  profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.ServerConfiguration) {
+  constructor(stateManager: StateManager,  profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.StrictServerConfiguration) {
     
     this.crypto = crypto
     this.app = app

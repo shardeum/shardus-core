@@ -13,7 +13,7 @@ const stringify = require('fast-stable-stringify')
 
 interface BetterSqlite3Storage {
   baseDir: string
-  storageConfig: Shardus.StorageConfiguration
+  storageConfig: Shardus.StrictStorageConfiguration
   profiler: Profiler
   mainLogger: Log4js.Logger
   initialized: boolean
@@ -25,7 +25,7 @@ class BetterSqlite3Storage {
   // note that old storage passed in logger, now we pass in the specific log for it to use.  This works for application use, but may need to rethink if we apply this to shardus core
   constructor(
     models: any,
-    storageConfig: Shardus.StorageConfiguration,
+    storageConfig: Shardus.StrictStorageConfiguration,
     logger: Logger,
     baseDir: string,
     profiler: Profiler

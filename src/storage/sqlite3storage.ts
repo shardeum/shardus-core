@@ -16,7 +16,7 @@ const sqlite3 = require('sqlite3').verbose()
 
 interface Sqlite3Storage {
   baseDir: string
-  storageConfig: Shardus.StorageConfiguration
+  storageConfig: Shardus.StrictStorageConfiguration
   profiler: Profiler
   mainLogger: Log4js.Logger
   initialized: boolean

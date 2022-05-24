@@ -1,4 +1,4 @@
-import { StrictServerConfiguration } from '../shardus/shardus-types'
+import { ServerMode, StrictServerConfiguration } from '../shardus/shardus-types'
 
 const SERVER_CONFIG: StrictServerConfiguration = {
   heartbeatInterval: 5,
@@ -115,6 +115,6 @@ const SERVER_CONFIG: StrictServerConfiguration = {
   },
   stateManager: { stateTableBucketSize: 500, accountBucketSize: 200 },
   sharding: { nodesPerConsensusGroup: 5, executeInOneShard: false },
-  mode: 'debug',
+  mode: ServerMode.Debug,
 }
 export default SERVER_CONFIG
