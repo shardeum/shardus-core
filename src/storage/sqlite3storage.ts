@@ -26,6 +26,9 @@ interface Sqlite3Storage {
 }
 
 class Sqlite3Storage {
+
+  oldDBPath: string
+
   // note that old storage passed in logger, now we pass in the specific log for it to use.  This works for application use, but may need to rethink if we apply this to shardus core
   constructor(models, storageConfig, logger, baseDir, profiler) {
     this.baseDir = baseDir
@@ -101,6 +104,29 @@ class Sqlite3Storage {
     // todo base this off of models
   }
 
+
+  async deleteFolder(path:string){
+    //recursive delete of db folder
+    try{
+      fs.rmdirSync(path, { recursive: true, maxRetries : 5 })
+      //why does this not work: it was added in v14.14 !!!
+      //fs.rmSync(dbDir, { recursive: true, force: true, maxRetries : 5 })
+      //fs.rmSync(dbDir,{ recursive: true, force: true })
+    } catch (e) {
+      
+      this.mainLogger.error('error removing directory db..' + e.name + ': ' + e.message + ' at ' + e.stack)
+      //wait 5 seconds and try one more time
+      // await utils.sleep(5000)
+      // fs.rmdirSync(path, { recursive: true })
+    }
+  }
+
+  async deleteOldDBPath(){
+    if(this.storageConfig.options.saveOldDBFiles != true){
+      await this.deleteFolder(this.oldDBPath)
+    }
+  }
+
   async init() {
     const dbDir = path.parse(this.storageConfig.options.storage).dir
 
@@ -108,6 +134,8 @@ class Sqlite3Storage {
     let oldDirPath
     try {
       oldDirPath = dbDir + '-old-' + Date.now()
+
+      this.oldDBPath = oldDirPath
 
       if(this.storageConfig.options.saveOldDBFiles){
         fs.renameSync(dbDir, oldDirPath)
@@ -117,29 +145,29 @@ class Sqlite3Storage {
           this.oldDb = new sqlite3.Database(`${oldDirPath}/db.sqlite`)
         }        
       } else {
-        //recursive delete of db folder
-        try{
-          fs.rmdirSync(dbDir, { recursive: true, maxRetries : 5 })
-          
-          //why does this not work: it was added in v14.14 !!!
-          //fs.rmSync(dbDir, { recursive: true, force: true, maxRetries : 5 })
-          //fs.rmSync(dbDir,{ recursive: true, force: true })
-        } catch (e) {
-          
-          this.mainLogger.error('error removing directory db..')
-          //wait 5 seconds and try one more time
-          await utils.sleep(5000)
-          fs.rmdirSync(dbDir, { recursive: true })
 
+        // for now we rename it not matter what and delete it later
+        fs.renameSync(dbDir, oldDirPath)
+        if (oldDirPath) {
+          this.mainLogger.info('Setting old data path. this will cause safety mode?' + oldDirPath)
+          // TODO work something out to load this on demand
+          // Snapshot.setOldDataPath(oldDirPath)
+          // this.oldDb = new sqlite3.Database(`${oldDirPath}/db.sqlite`)
+        }   
 
-        }
+        //TEMP HACK always delete old db.  TODO later have it delete at a later time
+        // but the delay is making testing hard
+        await utils.sleep(5000) 
+        await this.deleteOldDBPath()
       }
     } catch (e) {
       if (config.p2p.startInWitnessMode) {
         throw new Error('Unable to start in witness mode: no old data')
+      } else{
+        this.mainLogger.error('error moving/removing directory db.. ' + e.name + ': ' + e.message + ' at ' + e.stack)
       }
     }
-
+    try {
     // Create dbDir if it doesn't exist
     await _ensureExists(dbDir)
     this.mainLogger.info('Created Database directory.')
@@ -181,6 +209,14 @@ class Sqlite3Storage {
 
     this.initialized = true
     this.mainLogger.info('Database initialized.')
+
+  } catch (e) {
+
+    this.mainLogger.error('storage init error ' + e.name + ': ' + e.message + ' at ' + e.stack)
+    throw new Error('storage init error ' + e.name + ': ' + e.message + ' at ' + e.stack)
+    
+  }
+
   }
   async close() {
     // this.mainLogger.info('Closing Database connections.')

@@ -557,6 +557,10 @@ class Shardus extends EventEmitter {
         // Use snapshot to put old app data into state-manager then go active
         await Snapshot.safetySync()
       } else {
+        // not doing a safety sync
+        // todo hook this up later cant deal with it now.
+        // await this.storage.deleteOldDBPath()
+
         await this.syncAppData()
       }
     })
@@ -664,8 +668,13 @@ class Shardus extends EventEmitter {
     // handle config queue changes and debug logic updates
     this._registerListener(this.p2p.state, 'cycle_q1_start', async () => {
       let lastCycle = CycleChain.getNewest()
-      this.updateConfigChangeQueue(lastCycle)
 
+      // need to make sure sync is finish or we may not have the global account
+      // even worse, the dapp may not have initialized storage yet
+      if(this.stateManager.appFinishedSyncing === true){
+        this.updateConfigChangeQueue(lastCycle)
+      }
+      
       this.updateDebug(lastCycle)
     })
   }

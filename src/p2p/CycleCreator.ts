@@ -141,14 +141,14 @@ const routes = {
 /** CONTROL FUNCTIONS */
 
 export function init() {
+  // Get a handle to write to p2p.log
+  p2pLogger = logger.getLogger('p2p')
+  cycleLogger = logger.getLogger('cycle')
+
   // Init submodules
   for (const submodule of submodules) {
     if (submodule.init) submodule.init()
   }
-
-  // Get a handle to write to p2p.log
-  p2pLogger = logger.getLogger('p2p')
-  cycleLogger = logger.getLogger('cycle')
 
   // Init state
   reset()

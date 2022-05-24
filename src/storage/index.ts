@@ -58,7 +58,9 @@ class Storage {
   }
 
   async init() {
+    console.log('shardus storage init:' )
     await this.storage.init()
+    console.log('shardus storage init complete' )
 
     await this.storage.runCreate(
       'CREATE TABLE if not exists `acceptedTxs` (`txId` VARCHAR(255) NOT NULL PRIMARY KEY, `timestamp` BIGINT NOT NULL, `data` JSON NOT NULL, `keys` JSON NOT NULL)'
@@ -128,6 +130,10 @@ class Storage {
   }
   async close() {
     await this.storage.close()
+  }
+
+  async deleteOldDBPath(){
+    await this.storage.deleteOldDBPath()
   }
 
   _checkInit() {

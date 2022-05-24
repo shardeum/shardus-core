@@ -419,6 +419,11 @@ class AccountSync {
    */
   async initialSyncMain(requiredNodeCount: number) {
     const safetyMode = safetyModeVals.safetyMode
+
+    //not great, but this currently triggers the storage init in the dapp
+    //todo: replace with a specific   initDappStorage() function
+    await this.app.deleteLocalAccountData()
+
     // Dont sync if first node
     if (this.p2p.isFirstSeed || safetyMode) {
       this.dataSyncMainPhaseComplete = true

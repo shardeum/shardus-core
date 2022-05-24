@@ -79,6 +79,8 @@ export async function startup(): Promise<boolean> {
         if (logFlags.p2pNonFatal) info('Emitting `witnessing` event.')
         emitter.emit('witnessing', publicKey)
         return true
+      } else {
+        //not in witness mode
       }
 
       // Otherwise, try to join the network
