@@ -65,6 +65,7 @@ class TransactionQueue {
   archivedQueueEntriesByID: Map<string, QueueEntry>
   receiptsToForward: any[]
   forwardedReceipts: Map<string, boolean>
+  oldNotForwardedReceipts: Map<string, boolean>
   lastReceiptForwardResetTimestamp: number
 
   queueStopped: boolean
@@ -108,6 +109,7 @@ class TransactionQueue {
     this.txDebugStatList = []
     this.receiptsToForward = []
     this.forwardedReceipts = new Map()
+    this.oldNotForwardedReceipts = new Map()
     this.lastReceiptForwardResetTimestamp = Date.now()
 
     this.newAcceptedTxQueueByID = new Map()
@@ -3160,6 +3162,7 @@ class TransactionQueue {
                 }
 
                 if(this.config.p2p.experimentalSnapshot) this.addReceiptToForward(queueEntry)
+                console.log('commit commit', queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp)
 
                 if (hasReceiptFail) {
                   // endpoint to allow dapp to execute something that depends on a transaction failing
@@ -3316,15 +3319,19 @@ class TransactionQueue {
   }
 
   resetReceiptsToForward() {
-    const lastReceiptsToForward = [...this.receiptsToForward]
-    this.receiptsToForward = []
     if (Date.now() - this.lastReceiptForwardResetTimestamp >= 30000) {
+      const lastReceiptsToForward = [...this.receiptsToForward]
+      this.receiptsToForward = []
       for (const receipt of lastReceiptsToForward) {   // Start sending from the last receipts it saved (30s of data) when a new node is selected
-        if (!this.forwardedReceipts.has(receipt.tx.txId)) {
+        if (!this.forwardedReceipts.has(receipt.tx.txId) && !this.oldNotForwardedReceipts.has(receipt.tx.txId)) {
           this.receiptsToForward.push(receipt)
         }
       }
       this.forwardedReceipts = new Map()
+      this.oldNotForwardedReceipts = new Map()
+      for (const receipt of this.receiptsToForward) {
+        this.oldNotForwardedReceipts.set(receipt.tx.txId, true)
+      }
       this.lastReceiptForwardResetTimestamp = Date.now()
     }
   }
