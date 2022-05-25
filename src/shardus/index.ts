@@ -1085,6 +1085,10 @@ class Shardus extends EventEmitter {
     return this.p2p.getCycleMarker()
   }
 
+  forwardAccounts(data: any) {
+    Archivers.forwardAccounts(data)
+  }
+
   /**
    * @typedef {import('../shardus/index.js').Node} Node
    */
