@@ -1301,6 +1301,13 @@ class Shardus extends EventEmitter {
     await this.stateManager._commitAccountCopies(accountCopies)
   }
 
+  async forwardAccounts(accounts: any[]) {
+  
+    await Archivers.forwardAccounts(accounts)
+  }
+
+
+
 
   /**
    * Checks if this node is active in the network
@@ -2011,6 +2018,8 @@ class Shardus extends EventEmitter {
       this.fatalLogger.fatal(log)
     }
   }
+
+
 
 }
 

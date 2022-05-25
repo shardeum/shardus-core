@@ -287,6 +287,24 @@ async function forwardReceipts() {
   profilerInstance.scopedProfileSectionEnd('forwardReceipts')
 }
 
+export async function forwardAccounts(accounts: any[]) {
+  if (!config.p2p.experimentalSnapshot) return
+  const responses: any = {}
+  responses.ACCOUNT = accounts //Accounts Data (loads account data here) <------
+  for (const [publicKey, recipient] of recipients) {
+    const dataResponse: P2P.ArchiversTypes.DataResponse = {
+      publicKey: crypto.getPublicKey(),
+      responses,
+      recipient: publicKey,
+    }
+
+    // Tag dataResponse
+    const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
+    if(logFlags.console) console.log('Sending accounts to archivers', taggedDataResponse)
+    io.emit('DATA', taggedDataResponse)
+  }
+}
+
 export function removeDataRecipient(publicKey) {
   if (recipients.has(publicKey)) {
     if(logFlags.console) console.log('Removing data recipient', publicKey)
