@@ -98,7 +98,7 @@ export async function startup(): Promise<boolean> {
     firstTime = false
   } while (utils.isUndefined(isFirst) || utils.isUndefined(id))
 
-  p2pSyncStart = Date.now() 
+  p2pSyncStart = Date.now()
 
   if (logFlags.p2pNonFatal) info('Emitting `joined` event.')
   emitter.emit('joined', id, publicKey)
@@ -112,8 +112,8 @@ export async function startup(): Promise<boolean> {
   // Start creating cycle records
   await CycleCreator.startCycles()
 
-  p2pSyncEnd = Date.now() 
-  p2pJoinTime = (p2pSyncEnd-p2pSyncStart)/1000
+  p2pSyncEnd = Date.now()
+  p2pJoinTime = (p2pSyncEnd - p2pSyncStart) / 1000
   if (logFlags.p2pNonFatal) info('Emitting `initialized` event.' + p2pJoinTime)
   emitter.emit('initialized')
 
@@ -139,7 +139,10 @@ async function witnessConditionsMet(activeNodes: P2P.P2PTypes.Node[]) {
   return false
 }
 
-async function joinNetwork(activeNodes: P2P.P2PTypes.Node[], firstTime: boolean) {
+async function joinNetwork(
+  activeNodes: P2P.P2PTypes.Node[],
+  firstTime: boolean
+) {
   // Check if you're the first node
   const isFirst = await discoverNetwork(activeNodes)
   if (isFirst) {
@@ -196,7 +199,7 @@ async function joinNetwork(activeNodes: P2P.P2PTypes.Node[], firstTime: boolean)
     info('Waiting approx. one cycle then checking again...')
 
   // Wait until a Q4 before we loop ..
-  // This is a bit faster than before and should allow nodes to try joining 
+  // This is a bit faster than before and should allow nodes to try joining
   // without skipping a cycle
   let untilQ4 = startQ4 - Date.now()
   while (untilQ4 < 0) {
@@ -246,16 +249,31 @@ async function syncCycleChain() {
 }
 
 async function contactArchiver() {
-  const archiver: P2P.P2PTypes.Node = Context.config.p2p.existingArchivers[0]
+  const randInt = (min = 0, max = 100): number => {
+    // find diff
+    const difference = max - min
+
+    // generate random number
+    let rand = Math.random()
+
+    // multiply with difference
+    rand = Math.floor(rand * difference)
+
+    // add with min value
+    rand = rand + min
+
+    return rand
+  }
+
+  const availableArchivers = Context.config.p2p.existingArchivers
+  const archiver: P2P.P2PTypes.Node =
+    availableArchivers[randInt(0, availableArchivers.length)]
   const activeNodesSigned = await getActiveNodesFromArchiver()
   if (!Context.crypto.verify(activeNodesSigned, archiver.publicKey)) {
     throw Error('Fatal: _getSeedNodes seed list was not signed by archiver!')
   }
-  const joinRequest:
-    | P2P.ArchiversTypes.Request
-    | undefined = activeNodesSigned.joinRequest as
-    | P2P.ArchiversTypes.Request
-    | undefined
+  const joinRequest: P2P.ArchiversTypes.Request | undefined =
+    activeNodesSigned.joinRequest as P2P.ArchiversTypes.Request | undefined
   if (joinRequest) {
     if (Archivers.addJoinRequest(joinRequest) === false) {
       throw Error(
@@ -371,10 +389,15 @@ async function getActiveNodesFromArchiver() {
       nodeListUrl,
       Context.crypto.sign({
         nodeInfo,
-      }), false, 5000
+      }),
+      false,
+      5000
     )
   } catch (e) {
-    nestedCountersInstance.countRareEvent('fatal', 'Could not get seed list from seed node server')
+    nestedCountersInstance.countRareEvent(
+      'fatal',
+      'Could not get seed list from seed node server'
+    )
     throw Error(
       `Fatal: Could not get seed list from seed node server ${nodeListUrl}: ` +
         e.message
