@@ -3,7 +3,7 @@ import { Handler } from 'express'
 import Log4js from 'log4js'
 import path from 'path'
 import Crypto from '../crypto'
-import Debug from '../debug'
+import Debug, { getDevPublicKey } from '../debug'
 import ExitHandler from '../exit-handler'
 import LoadDetection from '../load-detection'
 import Logger, { logFlags, LogFlags } from '../logger'
@@ -1011,7 +1011,7 @@ class Shardus extends EventEmitter {
         keys,
         data: timestampedTx,
       }
-      console.log('acceptedTX', acceptedTX)
+      // console.log('acceptedTX', acceptedTX)
       if (logFlags.verbose) this.mainLogger.debug('Transaction validated')
       if(global === false){ //temp way to make global modifying TXs not over count
         this.statistics.incrementCounter('txInjected')
@@ -1310,7 +1310,10 @@ class Shardus extends EventEmitter {
     await Archivers.forwardAccounts(accounts)
   }
 
-
+  // Expose dev public key to verify things on the app
+  getDevPublicKey() {
+    return getDevPublicKey()
+  }
 
 
   /**
