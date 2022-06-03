@@ -30,6 +30,7 @@ import * as Self from './Self'
 import { robustQuery } from './Utils'
 import { isDebugMode } from '../debug'
 import { profilerInstance } from '../utils/profiler'
+import getCallstack from '../utils/getCallstack'
 
 /** STATE */
 
@@ -53,7 +54,7 @@ const stopExternalRoute: P2P.P2PTypes.Route<Handler> = {
   handler: (_req, res) => {
     if (isDebugMode()){
       res.json({status: 'goodbye cruel world'})
-      apoptosizeSelf()
+      apoptosizeSelf('Apoptosis called at stopExternalRoute => src/p2p/Apoptosis.ts')
     }
   },
 }
@@ -221,8 +222,8 @@ export function updateRecord(
 export function parseRecord(record: P2P.ApoptosisTypes.Record): P2P.CycleParserTypes.Change {
   if (record.apoptosized.includes(Self.id)) {
     // This could happen if our Internet connection was bad.
-    warn(`We got marked for apoptosis even though we didn't ask for it. Being nice and leaving.`)
-    Self.emitter.emit('apoptosized')
+    error(`We got marked for apoptosis even though we didn't ask for it. Being nice and leaving.`)
+    Self.emitter.emit('apoptosized', getCallstack(), 'Apoptosis being called at parseRecord() => src/p2p/Apoptosis.ts')
   }
   return {
     added: [],
@@ -247,7 +248,7 @@ export function sendRequests() {
 
 // [TODO] - We don't need the caller to pass us the list of nodes
 //          remove this after changing references
-export async function apoptosizeSelf() {
+export async function apoptosizeSelf(message: string) {
   warn(`In apoptosizeSelf`)
   // [TODO] - maybe we should shuffle this array
   const activeNodes = activeByIdOrder
@@ -280,10 +281,10 @@ export async function apoptosizeSelf() {
     info(`Sent apoptosize-self proposal: ${JSON.stringify(proposal)}`)
   }
 // Omar - added the following line. Maybe we should emit an event when we apoptosize so other modules and app can clean up
-  Self.emitter.emit('apoptosized') // we can pass true as a parameter if we want to be restarted
+  Self.emitter.emit('apoptosized', getCallstack(), message) // we can pass true as a parameter if we want to be restarted
 // Omar - we should not add any proposal since we are exiting; we already sent our proposal to some nodes
 //  addProposal(proposal)
-  warn('We have been apoptosized. Exiting with status 1. Will not be restarted.')
+  error('We have been apoptosized. Exiting with status 1. Will not be restarted.')
 }
 
 function createProposal(): P2P.ApoptosisTypes.SignedApoptosisProposal {

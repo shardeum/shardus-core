@@ -609,7 +609,7 @@ class Shardus extends EventEmitter {
       }
       this.exitHandler.exitCleanly() // exits with status 0 so that PM2 can restart the process
     })
-    Self.emitter.on('apoptosized', async (restart) => {
+    Self.emitter.on('apoptosized', async (restart: boolean, callstack: string, message: string) => {
       // Omar - Why are we trying to call the functions in modules directly before exiting.
       //        The modules have already registered shutdown functions with the exitHandler.
       //        We should let exitHandler handle the shutdown process.
@@ -637,7 +637,9 @@ class Shardus extends EventEmitter {
         'fatal',
         'exitCleanly: apoptosized (not technically fatal)'
       )
-      this.mainLogger.info('exitCleanly: apoptosized')
+      this.mainLogger.error('exitCleanly: apoptosized')
+      this.mainLogger.error(message)
+      this.mainLogger.error(callstack)
       if (this.reporter) {
         this.reporter.stopReporting()
         await this.reporter.reportRemoved(Self.id)

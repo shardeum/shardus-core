@@ -5,7 +5,7 @@ const NS_PER_SEC = 1e9
 import { Utils } from 'sequelize/types'
 import * as Context from '../p2p/Context'
 import * as utils from '../utils'
-import Crypto from "../crypto"
+import Crypto from '../crypto'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 
 // process.hrtime.bigint()
@@ -14,9 +14,8 @@ interface NestedCounters {}
 
 type CounterMap = Map<string, CounterNode>
 interface CounterNode {
-    count: number
-    subCounters: CounterMap
-
+  count: number
+  subCounters: CounterMap
 }
 
 export let nestedCountersInstance: NestedCounters
@@ -34,15 +33,16 @@ class NestedCounters {
     this.crypto = null
     nestedCountersInstance = this
     this.infLoopDebug = false
-
   }
 
   registerEndpoints() {
-    Context.network.registerExternalGet('counts', isDebugModeMiddleware, (req, res) => {
-
-      profilerInstance.scopedProfileSectionStart('counts')
+    Context.network.registerExternalGet(
+      'counts',
+      isDebugModeMiddleware,
+      (req, res) => {
+        profilerInstance.scopedProfileSectionStart('counts')
         // let counterMap = utils.deepCopy(this.eventCounters)
-        let arrayReport = this.arrayitizeAndSort(this.eventCounters)
+        const arrayReport = this.arrayitizeAndSort(this.eventCounters)
 
         // let reportPath = path.join(scanner.instanceDir, 'histogram.txt')
         // let stream = fs.createWriteStream(reportPath, {
@@ -53,54 +53,67 @@ class NestedCounters {
 
         this.printArrayReport(arrayReport, res, 0)
         res.end()
-      profilerInstance.scopedProfileSectionEnd('counts')
+        profilerInstance.scopedProfileSectionEnd('counts')
 
-      //res.json(utils.stringifyReduce(this.eventCounters))
-    })
-    Context.network.registerExternalGet('counts-reset', isDebugModeMiddleware, (req, res) => {
+        //res.json(utils.stringifyReduce(this.eventCounters))
+      }
+    )
+    Context.network.registerExternalGet(
+      'counts-reset',
+      isDebugModeMiddleware,
+      (req, res) => {
+        this.eventCounters = new Map()
+        res.write(`counts reset ${Date.now()}`)
+        res.end()
+      }
+    )
+    Context.network.registerExternalGet(
+      'rare-counts-reset',
+      isDebugModeMiddleware,
+      (req, res) => {
+        this.rareEventCounters = new Map()
+        res.write(`Rare counts reset ${Date.now()}`)
+        res.end()
+      }
+    )
 
-      this.eventCounters = new Map()
-      res.write(`counts reset ${Date.now()}`)
-      res.end()
-
-  })
-    Context.network.registerExternalGet('rare-counts-reset', isDebugModeMiddleware, (req, res) => {
-      this.rareEventCounters = new Map()
-      res.write(`Rare counts reset ${Date.now()}`)
-      res.end()
-    })
-
-    Context.network.registerExternalGet('debug-inf-loop', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet(
+      'debug-inf-loop',
+      isDebugModeMiddleware,
+      (req, res) => {
         res.write('starting inf loop, goodbye')
         res.end()
         let counter = 1
         this.infLoopDebug = true
-        while(this.infLoopDebug) {
-            let s = "asdf"
-            let s2 = utils.stringifyReduce({test:[s,s,s,s,s,s,s]})
-            let s3 = utils.stringifyReduce({test:[s2,s2,s2,s2,s2,s2,s2]})
-            if(this.crypto != null){
-                this.crypto.hash(s3)
-            }
-            counter++
+        while (this.infLoopDebug) {
+          const s = 'asdf'
+          const s2 = utils.stringifyReduce({ test: [s, s, s, s, s, s, s] })
+          const s3 = utils.stringifyReduce({ test: [s2, s2, s2, s2, s2, s2, s2] })
+          if (this.crypto != null) {
+            this.crypto.hash(s3)
+          }
+          counter++
         }
+      }
+    )
 
-    })
-
-    Context.network.registerExternalGet('debug-inf-loop-off', isDebugModeMiddleware, (req, res) => {
+    Context.network.registerExternalGet(
+      'debug-inf-loop-off',
+      isDebugModeMiddleware,
+      (req, res) => {
         this.infLoopDebug = false
         res.write('stopping inf loop, who knows if this is possible')
         res.end()
-    })
-
+      }
+    )
   }
 
-  countEvent(category1: string, category2: string, count:number = 1) {
-    let counterMap:CounterMap = this.eventCounters
+  countEvent(category1: string, category2: string, count: number = 1) {
+    let counterMap: CounterMap = this.eventCounters
 
-    let nextNode:CounterNode = null
+    let nextNode: CounterNode = null
     if (counterMap.has(category1) === false) {
-      nextNode = { count: 0, subCounters: new Map()}
+      nextNode = { count: 0, subCounters: new Map() }
       counterMap.set(category1, nextNode)
     } else {
       nextNode = counterMap.get(category1)
@@ -111,25 +124,25 @@ class NestedCounters {
     //unrolled loop to avoid memory alloc
     category1 = category2
     if (counterMap.has(category1) === false) {
-        nextNode = { count: 0, subCounters: new Map()}
-        counterMap.set(category1, nextNode)
-      } else {
-        nextNode = counterMap.get(category1)
-      }
-      nextNode.count += count
-      counterMap = nextNode.subCounters
+      nextNode = { count: 0, subCounters: new Map() }
+      counterMap.set(category1, nextNode)
+    } else {
+      nextNode = counterMap.get(category1)
+    }
+    nextNode.count += count
+    counterMap = nextNode.subCounters
   }
 
-  countRareEvent(category1: string, category2: string, count:number = 1) {
+  countRareEvent(category1: string, category2: string, count: number = 1) {
     // trigger normal event counter
     this.countEvent(category1, category2, count)
 
     // start counting rare event
     let counterMap: CounterMap = this.rareEventCounters
 
-    let nextNode:CounterNode = null
+    let nextNode: CounterNode = null
     if (counterMap.has(category1) === false) {
-      nextNode = { count: 0, subCounters: new Map()}
+      nextNode = { count: 0, subCounters: new Map() }
       counterMap.set(category1, nextNode)
     } else {
       nextNode = counterMap.get(category1)
@@ -150,11 +163,11 @@ class NestedCounters {
   }
 
   arrayitizeAndSort(counterMap) {
-    let array = []
-    for (let key of counterMap.keys()) {
-      let valueObj = counterMap.get(key)
+    const array = []
+    for (const key of counterMap.keys()) {
+      const valueObj = counterMap.get(key)
 
-      let newValueObj = {key, count: valueObj.count, subArray: null}
+      const newValueObj = { key, count: valueObj.count, subArray: null }
       // newValueObj.key = key
       array.push(newValueObj)
 
@@ -176,10 +189,10 @@ class NestedCounters {
   }
 
   printArrayReport(arrayReport, stream, indent = 0) {
-    let indentText = '___'.repeat(indent)
-    for (let item of arrayReport) {
-      let { key, count, subArray, avgLen, logLen } = item
-      let countStr = `${count}`
+    const indentText = '___'.repeat(indent)
+    for (const item of arrayReport) {
+      const { key, count, subArray, avgLen, logLen } = item
+      const countStr = `${count}`
       stream.write(
         //`${indentText}${key.padEnd(40)}\tcount:\t${countStr}\n`
         `${countStr.padStart(10)} ${indentText} ${key}\n`
@@ -191,10 +204,10 @@ class NestedCounters {
     }
   }
 
-  resetCounters(){
+  resetCounters() {
     this.eventCounters = new Map()
   }
-  resetRareCounters(){
+  resetRareCounters() {
     this.rareEventCounters = new Map()
   }
 }

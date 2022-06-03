@@ -86,13 +86,13 @@ class P2P extends EventEmitter {
     return Self.id
   }
 
-  initApoptosis() {
+  initApoptosis(message: string) {
     // [TODO] - we need to change apoptosizeSelf
     //          currently it tell all the nodes in the network that it is leaving; not practical in large networks
     //          we should gossip this, but origninal gossip is only allowed in Q1 and the node cannot
     //          wait until then.
     //          Need to think about the best way to handle this.
-    apoptosizeSelf()
+    apoptosizeSelf(message)
   }
 
   allowTransactions() {

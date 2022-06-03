@@ -49,117 +49,143 @@ class Profiler {
   }
 
   registerEndpoints() {
-    Context.network.registerExternalGet('perf', isDebugModeMiddleware, (req, res) => {
-      let result = this.printAndClearReport(1)
-      //res.json({result })
+    Context.network.registerExternalGet(
+      'perf',
+      isDebugModeMiddleware,
+      (req, res) => {
+        let result = this.printAndClearReport(1)
+        //res.json({result })
 
-      res.write(result)
-      res.end()
-    })
-
-    Context.network.registerExternalGet('perf-scoped', isDebugModeMiddleware, (req, res) => {
-      let result = this.printAndClearScopedReport(1)
-      //res.json({result })
-
-      res.write(result)
-      res.end()
-    })
-
-    Context.network.registerExternalGet('combined-debug', isDebugModeMiddleware, async (req, res) => {
-      const waitTime = Number.parseInt(req.query.wait as string, 10) || 60
-
-      // hit "counts-reset" endpoint
-      this.eventCounters = new Map()
-      res.write(`counts reset at ${new Date()}\n`)
-
-      // hit "perf" endpoint to clear perf stats
-      this.printAndClearReport(1)
-      this.clearScopedTimes()
-
-      if (this.statisticsInstance) this.statisticsInstance.clearRing('txProcessed')
-
-      // wait X seconds
-      await sleep(waitTime * 1000)
-      res.write(`Results for ${waitTime} sec of sampling...`)
-      res.write(`\n===========================\n`)
-
-      // write nodeId, ip and port
-      res.write(`\n=> NODE DETAIL\n`)
-      res.write(`NODE ID: ${Self.id}\n`)
-      res.write(`IP: ${Self.ip}\n`)
-      res.write(`PORT: ${Self.port}\n`)
-
-      // write "memory" results
-      let toMB = 1/1000000
-      let report = process.memoryUsage()
-      res.write(`\n=> MEMORY RESULTS\n`)
-      res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
-      res.write(`rss: ${(report.rss * toMB).toFixed(2)} MB\n`)
-      res.write(`heapTotal: ${(report.heapTotal * toMB).toFixed(2)} MB\n`)
-      res.write(`heapUsed: ${(report.heapUsed * toMB).toFixed(2)} MB\n`)
-      res.write(`external: ${(report.external * toMB).toFixed(2)} MB\n`)
-      res.write(`arrayBuffers: ${(report.arrayBuffers * toMB).toFixed(2)} MB\n\n\n`)
-      memoryReportingInstance.gatherReport()
-      memoryReportingInstance.reportToStream(memoryReportingInstance.report, res, 0)
-
-      if (this.statisticsInstance) {
-        const injectedTpsReport = this.statisticsInstance.getMultiStatReport('txInjected')
-        res.write('\n=> Node Injected TPS \n')
-        res.write(`\n Avg: ${injectedTpsReport.avg} `)
-        res.write(`\n Max: ${injectedTpsReport.max} `)
-        res.write(`\n Vals: ${injectedTpsReport.allVals} `)
-        this.statisticsInstance.clearRing('txInjected')
-
-        const processedTpsReport = this.statisticsInstance.getMultiStatReport('txApplied')
-        res.write('\n=> Node Applied TPS \n')
-        res.write(`\n Avg: ${processedTpsReport.avg} `)
-        res.write(`\n Max: ${processedTpsReport.max} `)
-        res.write(`\n Vals: ${processedTpsReport.allVals} `)
-        this.statisticsInstance.clearRing('txApplied')
-
-        const rejectedTpsReport = this.statisticsInstance.getMultiStatReport('txRejected')
-        res.write('\n=> Node Rejected TPS \n')
-        res.write(`\n Avg: ${rejectedTpsReport.avg} `)
-        res.write(`\n Max: ${rejectedTpsReport.max} `)
-        res.write(`\n Vals: ${rejectedTpsReport.allVals} `)
-        this.statisticsInstance.clearRing('txRejected')
-
-        const networkTimeoutReport = this.statisticsInstance.getMultiStatReport('networkTimeout')
-        res.write('\n=> Network Timeout / sec \n')
-        res.write(`\n Avg: ${networkTimeoutReport.avg} `)
-        res.write(`\n Max: ${networkTimeoutReport.max} `)
-        res.write(`\n Vals: ${networkTimeoutReport.allVals} `)
-        this.statisticsInstance.clearRing('networkTimeout')
-
-        const lostNodeTimeoutReport = this.statisticsInstance.getMultiStatReport('lostNodeTimeout')
-        res.write('\n=> LostNode Timeout / sec \n')
-        res.write(`\n Avg: ${lostNodeTimeoutReport.avg} `)
-        res.write(`\n Max: ${lostNodeTimeoutReport.max} `)
-        res.write(`\n Vals: ${lostNodeTimeoutReport.allVals} `)
-        this.statisticsInstance.clearRing('lostNodeTimeout')
+        res.write(result)
+        res.end()
       }
+    )
 
-      // write "perf" results
-      let result = this.printAndClearReport(1)
-      res.write(`\n=> PERF RESULTS\n`)
-      res.write(result)
-      res.write(`\n===========================\n`)
+    Context.network.registerExternalGet(
+      'perf-scoped',
+      isDebugModeMiddleware,
+      (req, res) => {
+        let result = this.printAndClearScopedReport(1)
+        //res.json({result })
 
-      // write scoped-perf results
-      let scopedPerfResult = this.printAndClearScopedReport(1)
-      res.write(`\n=> SCOPED PERF RESULTS\n`)
-      res.write(scopedPerfResult)
-      res.write(`\n===========================\n`)
+        res.write(result)
+        res.end()
+      }
+    )
 
-      // write "counts" results
-      let arrayReport = nestedCountersInstance.arrayitizeAndSort(nestedCountersInstance.eventCounters)
-      res.write(`\n=> COUNTS RESULTS\n`)
-      res.write(`${Date.now()}\n`)
-      nestedCountersInstance.printArrayReport(arrayReport, res, 0)
-      res.write(`\n===========================\n`)
+    Context.network.registerExternalGet(
+      'combined-debug',
+      isDebugModeMiddleware,
+      async (req, res) => {
+        const waitTime = Number.parseInt(req.query.wait as string, 10) || 60
 
-      res.end()
-    })
+        // hit "counts-reset" endpoint
+        this.eventCounters = new Map()
+        res.write(`counts reset at ${new Date()}\n`)
+
+        // hit "perf" endpoint to clear perf stats
+        this.printAndClearReport(1)
+        this.clearScopedTimes()
+
+        if (this.statisticsInstance)
+          this.statisticsInstance.clearRing('txProcessed')
+
+        // wait X seconds
+        await sleep(waitTime * 1000)
+        res.write(`Results for ${waitTime} sec of sampling...`)
+        res.write(`\n===========================\n`)
+
+        // write nodeId, ip and port
+        res.write(`\n=> NODE DETAIL\n`)
+        res.write(`NODE ID: ${Self.id}\n`)
+        res.write(`IP: ${Self.ip}\n`)
+        res.write(`PORT: ${Self.port}\n`)
+
+        // write "memory" results
+        let toMB = 1 / 1000000
+        let report = process.memoryUsage()
+        res.write(`\n=> MEMORY RESULTS\n`)
+        res.write(`System Memory Report.  Timestamp: ${Date.now()}\n`)
+        res.write(`rss: ${(report.rss * toMB).toFixed(2)} MB\n`)
+        res.write(`heapTotal: ${(report.heapTotal * toMB).toFixed(2)} MB\n`)
+        res.write(`heapUsed: ${(report.heapUsed * toMB).toFixed(2)} MB\n`)
+        res.write(`external: ${(report.external * toMB).toFixed(2)} MB\n`)
+        res.write(
+          `arrayBuffers: ${(report.arrayBuffers * toMB).toFixed(2)} MB\n\n\n`
+        )
+        memoryReportingInstance.gatherReport()
+        memoryReportingInstance.reportToStream(
+          memoryReportingInstance.report,
+          res,
+          0
+        )
+
+        if (this.statisticsInstance) {
+          const injectedTpsReport =
+            this.statisticsInstance.getMultiStatReport('txInjected')
+          res.write('\n=> Node Injected TPS \n')
+          res.write(`\n Avg: ${injectedTpsReport.avg} `)
+          res.write(`\n Max: ${injectedTpsReport.max} `)
+          res.write(`\n Vals: ${injectedTpsReport.allVals} `)
+          this.statisticsInstance.clearRing('txInjected')
+
+          const processedTpsReport =
+            this.statisticsInstance.getMultiStatReport('txApplied')
+          res.write('\n=> Node Applied TPS \n')
+          res.write(`\n Avg: ${processedTpsReport.avg} `)
+          res.write(`\n Max: ${processedTpsReport.max} `)
+          res.write(`\n Vals: ${processedTpsReport.allVals} `)
+          this.statisticsInstance.clearRing('txApplied')
+
+          const rejectedTpsReport =
+            this.statisticsInstance.getMultiStatReport('txRejected')
+          res.write('\n=> Node Rejected TPS \n')
+          res.write(`\n Avg: ${rejectedTpsReport.avg} `)
+          res.write(`\n Max: ${rejectedTpsReport.max} `)
+          res.write(`\n Vals: ${rejectedTpsReport.allVals} `)
+          this.statisticsInstance.clearRing('txRejected')
+
+          const networkTimeoutReport =
+            this.statisticsInstance.getMultiStatReport('networkTimeout')
+          res.write('\n=> Network Timeout / sec \n')
+          res.write(`\n Avg: ${networkTimeoutReport.avg} `)
+          res.write(`\n Max: ${networkTimeoutReport.max} `)
+          res.write(`\n Vals: ${networkTimeoutReport.allVals} `)
+          this.statisticsInstance.clearRing('networkTimeout')
+
+          const lostNodeTimeoutReport =
+            this.statisticsInstance.getMultiStatReport('lostNodeTimeout')
+          res.write('\n=> LostNode Timeout / sec \n')
+          res.write(`\n Avg: ${lostNodeTimeoutReport.avg} `)
+          res.write(`\n Max: ${lostNodeTimeoutReport.max} `)
+          res.write(`\n Vals: ${lostNodeTimeoutReport.allVals} `)
+          this.statisticsInstance.clearRing('lostNodeTimeout')
+        }
+
+        // write "perf" results
+        let result = this.printAndClearReport(1)
+        res.write(`\n=> PERF RESULTS\n`)
+        res.write(result)
+        res.write(`\n===========================\n`)
+
+        // write scoped-perf results
+        let scopedPerfResult = this.printAndClearScopedReport(1)
+        res.write(`\n=> SCOPED PERF RESULTS\n`)
+        res.write(scopedPerfResult)
+        res.write(`\n===========================\n`)
+
+        // write "counts" results
+        let arrayReport = nestedCountersInstance.arrayitizeAndSort(
+          nestedCountersInstance.eventCounters
+        )
+        res.write(`\n=> COUNTS RESULTS\n`)
+        res.write(`${Date.now()}\n`)
+        nestedCountersInstance.printArrayReport(arrayReport, res, 0)
+        res.write(`\n===========================\n`)
+
+        res.end()
+      }
+    )
   }
 
   profileSectionStart(sectionName, internal = false) {
@@ -412,7 +438,9 @@ class Profiler {
         const maxMs = Number((section.max * percent) / divider) / 100
         const minMs = Number((section.min * percent) / divider) / 100
         const totalMs = Number((section.total * percent) / divider) / 100
-        let line = `Avg: ${avgMs}ms ${section.name.padEnd(30)}, Max: ${maxMs}ms,  Min: ${minMs}ms,  Total: ${totalMs}ms, #:${
+        let line = `Avg: ${avgMs}ms ${section.name.padEnd(
+          30
+        )}, Max: ${maxMs}ms,  Min: ${minMs}ms,  Total: ${totalMs}ms, #:${
           section.c
         }`
         lines.push({ line, avgMs })
@@ -438,10 +466,17 @@ class Profiler {
         const maxMs = Number((section.max * percent) / divider) / 100
         const minMs = Number((section.min * percent) / divider) / 100
         const totalMs = Number((section.total * percent) / divider) / 100
-        times.push({name:section.name, minMs, maxMs, totalMs, avgMs, c:section.c })
+        times.push({
+          name: section.name,
+          minMs,
+          maxMs,
+          totalMs,
+          avgMs,
+          c: section.c,
+        })
       }
     }
-    let scopedTimes = {scopedTimes:times}
+    let scopedTimes = { scopedTimes: times }
     return scopedTimes
   }
 }

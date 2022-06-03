@@ -655,8 +655,12 @@ async function fetchLatestRecord(): Promise<P2P.CycleCreatorTypes.CycleRecord> {
       warn('CycleCreator: fetchLatestRecord: synced record not newer')
       fetchLatestRecordFails++
       if (fetchLatestRecordFails > maxFetchLatestRecordFails){
-        warn('CycleCreator: fetchLatestRecord_A: fetchLatestRecordFails > maxFetchLatestRecordFails. apoptosizeSelf ')
-        Apoptosis.apoptosizeSelf()        
+        error(
+          'CycleCreator: fetchLatestRecord_A: fetchLatestRecordFails > maxFetchLatestRecordFails. apoptosizeSelf '
+        )
+        Apoptosis.apoptosizeSelf(
+          'Apoptosized within fetchLatestRecord() => src/p2p/CycleCreator.ts'
+        )
       }
 
       return null
@@ -665,8 +669,12 @@ async function fetchLatestRecord(): Promise<P2P.CycleCreatorTypes.CycleRecord> {
     warn('CycleCreator: fetchLatestRecord: syncNewCycles failed:', errorToStringFull(err))
     fetchLatestRecordFails++
     if (fetchLatestRecordFails > maxFetchLatestRecordFails){
-      warn('CycleCreator: fetchLatestRecord_B: fetchLatestRecordFails > maxFetchLatestRecordFails. apoptosizeSelf ')
-      Apoptosis.apoptosizeSelf()      
+      error(
+        'CycleCreator: fetchLatestRecord_B: fetchLatestRecordFails > maxFetchLatestRecordFails. apoptosizeSelf '
+      )
+      Apoptosis.apoptosizeSelf(
+        'Apoptosized within fetchLatestRecord() => src/p2p/CycleCreator.ts'
+      )
     }
     return null
   }

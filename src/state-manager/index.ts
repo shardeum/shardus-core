@@ -2624,7 +2624,7 @@ class StateManager {
     this.statemanager_fatal('initApoptosisAndQuitSyncing', `initApoptosisAndQuitSyncing ${logMsg} ${stack}` )
 
     this.accountSync.failAndDontRestartSync()
-    this.p2p.initApoptosis()
+    this.p2p.initApoptosis('Apoptosis being initialized by `p2p.initApoptosis` within initApoptosisAndQuitSyncing() at src/state-manager/index.ts')
   }
 
   /***

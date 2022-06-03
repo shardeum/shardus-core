@@ -18,6 +18,7 @@ import { currentCycle, currentQuarter } from './CycleCreator'
 import { activeByIdOrder, byIdOrder, nodes } from './NodeList'
 import * as Self from './Self'
 import { profilerInstance } from '../utils/profiler'
+import getCallstack from '../utils/getCallstack'
 
 /** STATE */
 
@@ -43,7 +44,7 @@ const killExternalRoute: P2P.P2PTypes.Route<Handler> = {
   handler: (_req, res) => {
     if (allowKillRoute){
       res.json({status: 'left the network without telling any peers'})
-      killSelf()
+      killSelf('Apoptosis being called killExternalRoute()->killSelf()->emitter.emit(`apoptosized`) at src/p2p/Lost.ts')
     }
   },
 }
@@ -259,10 +260,10 @@ export function sendRequests() {
 
 /* Module functions */
 
-async function killSelf() {
-  if(logFlags.p2pNonFatal) info(`In killSelf`)
-  Self.emitter.emit('apoptosized')
-  if(logFlags.p2pNonFatal) info(`I have been killed, will not restart.`)
+async function killSelf(message: string) {
+  if(logFlags.p2pNonFatal) error(`In killSelf`)
+  Self.emitter.emit('apoptosized', getCallstack(), message)
+  if(logFlags.p2pNonFatal) error(`I have been killed, will not restart.`)
 }
 
 async function killOther() {
