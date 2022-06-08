@@ -121,7 +121,10 @@ class Shardus extends EventEmitter {
     this.mainLogger = this.logger.getLogger('main')
     this.fatalLogger = this.logger.getLogger('fatal')
     this.appLogger = this.logger.getLogger('app')
-    this.exitHandler = new ExitHandler()
+    this.exitHandler = new ExitHandler(
+      this.memoryReporting,
+      this.nestedCounters
+    )
     this.storage = new Storage(
       config.baseDir,
       storageConfig,
