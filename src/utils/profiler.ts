@@ -540,8 +540,6 @@ class Profiler {
         const avgMs = Number((section.avg * percent) / divider) / 100
         const maxMs = Number((section.max * percent) / divider) / 100
         let minMs = Number((section.min * percent) / divider) / 100
-	
-	
         const totalMs = Number((section.total * percent) / divider) / 100
         if(section.c === 0){
           minMs = 0
