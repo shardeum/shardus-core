@@ -292,6 +292,9 @@ export async function forwardAccounts(accounts: any[]) {
   if (!config.p2p.experimentalSnapshot) return
   const responses: any = {}
   responses.ACCOUNT = accounts
+  if (recipients.size === 0) {
+    console.log('No Connected Archiver To Forward!')
+  }
   for (const [publicKey, recipient] of recipients) {
     const dataResponse: P2P.ArchiversTypes.DataResponse = {
       publicKey: crypto.getPublicKey(),
@@ -303,8 +306,8 @@ export async function forwardAccounts(accounts: any[]) {
     const taggedDataResponse = crypto.tag(dataResponse, recipient.curvePk)
     if (logFlags.console) console.log('Sending accounts to archivers', taggedDataResponse)
     io.emit('DATA', taggedDataResponse)
+    console.log('forward Accounts Successfully!')
   }
-  console.log('forward Accounts Successfully!')
 }
 
 export function removeDataRecipient(publicKey) {

@@ -17,6 +17,7 @@ import * as Join from './Join'
 import * as NodeList from './NodeList'
 import * as Sync from './Sync'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { getRandom } from '../utils'
 
 /** STATE */
 
@@ -249,26 +250,9 @@ async function syncCycleChain() {
 }
 
 async function contactArchiver() {
-  const randInt = (min = 0, max = 100): number => {
-    // find diff
-    const difference = max - min
-
-    // generate random number
-    let rand = Math.random()
-
-    // multiply with difference
-    rand = Math.floor(rand * difference)
-
-    // add with min value
-    rand = rand + min
-
-    return rand
-  }
-
   const availableArchivers = Context.config.p2p.existingArchivers
-  const archiver: P2P.P2PTypes.Node =
-    availableArchivers[randInt(0, availableArchivers.length)]
-  const activeNodesSigned = await getActiveNodesFromArchiver()
+  const archiver: P2P.P2PTypes.Node = getRandom(availableArchivers, 1)[0]
+  const activeNodesSigned = await getActiveNodesFromArchiver(archiver)
   if (!Context.crypto.verify(activeNodesSigned, archiver.publicKey)) {
     throw Error('Fatal: _getSeedNodes seed list was not signed by archiver!')
   }
@@ -377,8 +361,7 @@ function checkIfFirstSeedNode(seedNodes) {
   return false
 }
 
-async function getActiveNodesFromArchiver() {
-  const archiver = Context.config.p2p.existingArchivers[0]
+async function getActiveNodesFromArchiver(archiver: P2P.P2PTypes.Node) {
   const nodeListUrl = `http://${archiver.ip}:${archiver.port}/nodelist`
   const nodeInfo = getPublicNodeInfo()
   let seedListSigned: P2P.P2PTypes.SignedObject & {
