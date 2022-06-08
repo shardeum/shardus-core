@@ -2,7 +2,7 @@ import * as Shardus from '../shardus/shardus-types'
 import { StateManager as StateManagerTypes } from '@shardus/types'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
-import Profiler, { profilerInstance } from '../utils/profiler'
+import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
@@ -169,8 +169,9 @@ class AccountPatcher {
    */
 
   setupHandlers() {
-    Comms.registerInternal('get_trie_hashes', async (payload: HashTrieReq, respond: (arg0: HashTrieResp) => any) => {
-      profilerInstance.scopedProfileSectionStart('get_trie_hashes')
+    Comms.registerInternal('get_trie_hashes', async (payload: HashTrieReq, respond: (arg0: HashTrieResp) => any, sender, tracker: string, msgSize: number) => {
+      profilerInstance.scopedProfileSectionStart('get_trie_hashes', false, msgSize)
+
       let result = {nodeHashes:[]} as HashTrieResp
 
       for(let radix of payload.radixList){
@@ -189,15 +190,17 @@ class AccountPatcher {
           //result.nodeHashes.push({radix, hash:hashTrieNode.hash})
         }
       }
-      await respond(result)
-      profilerInstance.scopedProfileSectionEnd('get_trie_hashes')
+      // todo could recored a split time here.. so we know time spend on handling the request vs sending the response?
+      // that would not be completely accurate because the time to get the data is outide of this handler...
+      let respondSize = await respond(result)
+      profilerInstance.scopedProfileSectionEnd('get_trie_hashes', respondSize)
     })
 
 
     //this should be a tell to X..  robust tell? if a node does not get enough it can just query for more.
-    Comms.registerInternal('sync_trie_hashes', async (payload: HashTrieSyncTell, respondWrapped, sender, tracker) => {
+    Comms.registerInternal('sync_trie_hashes', async (payload: HashTrieSyncTell, respondWrapped, sender:string, tracker:string, msgSize: number) => {
 
-      profilerInstance.scopedProfileSectionStart('sync_trie_hashes')
+      profilerInstance.scopedProfileSectionStart('sync_trie_hashes', false, msgSize)
       try {
         //TODO use our own definition of current cycle.
         //use playlod cycle to filter out TXs..
@@ -262,8 +265,8 @@ class AccountPatcher {
     })
 
     //get child accountHashes for radix.  //get the hashes and ids so we know what to fix.
-    Comms.registerInternal('get_trie_accountHashes', async (payload: HashTrieReq, respond: (arg0: HashTrieAccountsResp) => any) => {
-      profilerInstance.scopedProfileSectionStart('get_trie_hashes')
+    Comms.registerInternal('get_trie_accountHashes', async (payload: HashTrieReq, respond: (arg0: HashTrieAccountsResp) => any, sender:string, tracker:string, msgSize: number) => {
+      profilerInstance.scopedProfileSectionStart('get_trie_hashes', false, msgSize)
       //nodeChildHashes: {radix:string, childAccounts:{accountID:string, hash:string}[]}[]
       let result = {nodeChildHashes:[], stats:{ matched:0, visisted:0, empty:0}} as HashTrieAccountsResp
 
@@ -286,13 +289,13 @@ class AccountPatcher {
 
         }
       }
-      await respond(result)
-      profilerInstance.scopedProfileSectionEnd('get_trie_hashes')
+      let respondSize = await respond(result)
+      profilerInstance.scopedProfileSectionEnd('get_trie_hashes', respondSize)
     })
 
-    Comms.registerInternal('get_account_data_by_hashes', async (payload: HashTrieAccountDataRequest, respond: (arg0: HashTrieAccountDataResponse) => any) => {
+    Comms.registerInternal('get_account_data_by_hashes', async (payload: HashTrieAccountDataRequest, respond: (arg0: HashTrieAccountDataResponse) => any, sender:string, tracker:string, msgSize: number) => {
 
-      profilerInstance.scopedProfileSectionStart('get_account_data_by_hashes')
+      profilerInstance.scopedProfileSectionStart('get_account_data_by_hashes', false, msgSize)
       nestedCountersInstance.countEvent('accountPatcher', `get_account_data_by_hashes`)
       let result:HashTrieAccountDataResponse = {accounts:[], stateTableData:[]}
       try{
@@ -393,8 +396,8 @@ class AccountPatcher {
 
         this.statemanager_fatal(`get_account_data_by_hashes-failed`, 'get_account_data_by_hashes:' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       }
-      await respond(result)
-      profilerInstance.scopedProfileSectionEnd('get_account_data_by_hashes')
+      let respondSize = await respond(result)
+      profilerInstance.scopedProfileSectionEnd('get_account_data_by_hashes', respondSize)
     })
 
 

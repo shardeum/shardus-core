@@ -2,7 +2,7 @@ import * as Shardus from '../shardus/shardus-types'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
 
-import Profiler, { profilerInstance } from '../utils/profiler'
+import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
@@ -75,8 +75,9 @@ class AccountGlobals {
   }
 
   setupHandlers() {
-    this.p2p.registerInternal('get_globalaccountreport', async (payload: any, respond: (arg0: GlobalAccountReportResp) => any) => {
-      profilerInstance.scopedProfileSectionStart('get_globalaccountreport')
+    this.p2p.registerInternal('get_globalaccountreport', async (payload: any, respond: (arg0: GlobalAccountReportResp) => any, sender, tracker: string, msgSize: number) => {
+      profilerInstance.scopedProfileSectionStart('get_globalaccountreport', false, msgSize)
+      let responseSize = cUninitializedSize
       try {
         let result = { combinedHash: '', accounts: [], ready: this.stateManager.appFinishedSyncing } as GlobalAccountReportResp
 
@@ -163,9 +164,9 @@ class AccountGlobals {
 
         result.accounts.sort(utils.sort_id_Asc)
         result.combinedHash = this.crypto.hash(result)
-        await respond(result)
+        responseSize = await respond(result)
       } finally {
-        profilerInstance.profileSectionEnd('get_globalaccountreport')
+        profilerInstance.scopedProfileSectionEnd('get_globalaccountreport', responseSize)
       }
     })
   }

@@ -7,6 +7,7 @@ import * as Self from './Self'
 import { P2P } from '@shardus/types'
 import {logFlags} from '../logger'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { cNoSizeTrack, cUninitializedSize } from '../utils/profiler'
 
 /** ROUTES */
 
@@ -16,9 +17,10 @@ const gossipInternalRoute: P2P.P2PTypes.InternalHandler<GossipReq> = async (
   payload,
   _respond,
   sender,
-  tracker
+  tracker,
+  msgSize
 ) => {
-  await handleGossip(payload, sender, tracker)
+  await handleGossip(payload, sender, tracker, msgSize)
 }
 
 const routes = {
@@ -150,7 +152,8 @@ function _extractPayload(wrappedPayload, nodeGroup) {
   const payload = wrappedPayload.payload
   const sender = wrappedPayload.sender
   const tracker = wrappedPayload.tracker
-  return [payload, sender, tracker]
+  const msgSize = wrappedPayload.tag_msgSize
+  return [payload, sender, tracker, msgSize]
 }
 
 function _wrapAndTagMessage(msg, tracker = '', recipientNode) {
@@ -165,9 +168,10 @@ function _wrapAndTagMessage(msg, tracker = '', recipientNode) {
   const wrapped = {
     payload: msg,
     sender: Self.id,
-    tracker
+    tracker,
+    tag_msgSize:0
   }
-  const tagged = crypto.tag(wrapped, recipientNode.curvePublicKey)
+  const tagged = crypto.tagWithSize(wrapped, recipientNode.curvePublicKey)
   return tagged
 }
 
@@ -200,6 +204,7 @@ export async function tell(
   logged = false,
   tracker = '',
 ) {
+  let msgSize = cUninitializedSize
   if (tracker === '') {
     tracker = createMsgTracker()
   }
@@ -218,6 +223,7 @@ export async function tell(
       continue
     }
     const signedMessage = _wrapAndTagMessage(message, tracker, node)
+    msgSize = signedMessage.tag_msgSize
     if(logFlags.p2pNonFatal) info(`signed and tagged gossip`, utils.stringifyReduceLimit(signedMessage))
     promises.push(network.tell([node], route, signedMessage, logged))
   }
@@ -226,6 +232,7 @@ export async function tell(
   } catch (err) {
     warn('P2P TELL: failed', err)
   }
+  return msgSize
 }
 
 // Our own P2P version of the network ask, with a sign added, and sign verified on other side
@@ -285,6 +292,9 @@ export function registerInternal(route, handler) {
       if(logFlags.p2pNonFatal) info('We are not currently accepting internal requests...')
       return
     }
+
+    let msgSize = 0
+
     let tracker = ''
     // Create wrapped respond function for sending back signed data
     const respondWrapped = async (response) => {
@@ -320,6 +330,9 @@ export function registerInternal(route, handler) {
         )
       }
       await respond(signedResponse)
+
+      //return the message size in bytes
+      return signedResponse.tag_msgSize
     }
     // Checks to see if we can extract the actual payload from the wrapped message
     const payloadArray = _extractPayload(
@@ -328,6 +341,7 @@ export function registerInternal(route, handler) {
     )
     const [payload, sender] = payloadArray
     tracker = payloadArray[2] || ''
+    msgSize = payloadArray[3] || cNoSizeTrack
     if (!payload) {
       warn('Payload unable to be extracted, possible missing signature...')
       return
@@ -342,7 +356,7 @@ export function registerInternal(route, handler) {
         payload
       )
     }
-    await handler(payload, respondWrapped, sender, tracker)
+    await handler(payload, respondWrapped, sender, tracker, msgSize)
   }
   // Include that in the handler function that is passed
   network.registerInternal(route, wrappedHandler)
@@ -368,6 +382,7 @@ export async function sendGossip(
   inpNodes = NodeList.byIdOrder, // Joining nodes need gossip too; we don't send to ourself
   isOrigin = false
 ) {
+  let msgSize = cUninitializedSize
   // [TODO] Don't copy the node list once sorted lists are passed in
   const nodes = [...inpNodes]
 
@@ -400,7 +415,7 @@ export async function sendGossip(
   if (myIdx < 0) {
     // throw new Error('Could not find self in nodes array')
     error(`Failed to sendGossip. Could not find self in nodes array`)
-    return
+    return msgSize
   }
   
   const gossipFactor = config.p2p.gossipFactor
@@ -454,7 +469,7 @@ export async function sendGossip(
       nestedCountersInstance.countEvent('comms-route x recipients (logical count)', `sendGossip ${type} recipients: ${recipients.length}`)
     }
 
-    await tell(recipients, 'gossip', gossipPayload, true, tracker)
+    msgSize = await tell(recipients, 'gossip', gossipPayload, true, tracker)
   } catch (ex) {
     if (logFlags.verbose) {
       error(
@@ -469,6 +484,7 @@ export async function sendGossip(
   if (logFlags.verbose && logFlags.p2pNonFatal) {
     info(`End of sendGossipIn(${utils.stringifyReduce(payload)})`)
   }
+  return msgSize
 }
 
 export async function sendGossipAll(
@@ -478,6 +494,8 @@ export async function sendGossipAll(
   sender = null,
   inpNodes = NodeList.byIdOrder // Joining nodes need gossip too; we don't send to ourself
 ) {
+  let msgSize = cUninitializedSize
+
   // [TODO] Don't copy the node list once sorted lists are passed in
   const nodes = [...inpNodes]
 
@@ -507,7 +525,7 @@ export async function sendGossipAll(
   if (myIdx < 0) {
     // throw new Error('Could not find self in nodes array')
     error(`Failed to sendGossip. Could not find self in nodes array`)
-    return
+    return msgSize
   }
 
   let recipients = nodes
@@ -542,7 +560,7 @@ export async function sendGossipAll(
       nestedCountersInstance.countEvent('comms-route x recipients (logical count)', `sendGossipAll ${type} recipients: ${recipients.length}`)
     }
 
-    await tell(recipients, 'gossip', gossipPayload, true, tracker)
+    msgSize = await tell(recipients, 'gossip', gossipPayload, true, tracker)
   } catch (ex) {
     if (logFlags.verbose) {
       p2pLogger.error(
@@ -559,13 +577,14 @@ export async function sendGossipAll(
   if (logFlags.verbose) {
     p2pLogger.debug(`End of sendGossipIn(${utils.stringifyReduce(payload)})`)
   }
+  return msgSize
 }
 
 /**
  * Handle Goosip Transactions
  * Payload: {type: ['receipt', 'trustedTransaction'], data: {}}
  */
-export async function handleGossip(payload, sender, tracker = '') {
+export async function handleGossip(payload, sender, tracker = '', msgSize = cNoSizeTrack) {
   if (logFlags.verbose && logFlags.p2pNonFatal) {
     info(`Start of handleGossip(${utils.stringifyReduce(payload)})`)
   }
@@ -649,7 +668,7 @@ export async function handleGossip(payload, sender, tracker = '') {
   gossipTypeRecv[type] = gossipTypeRecv[type] ? gossipTypeRecv[type] + 1 : 1
   logger.playbackLog(sender, 'self', 'GossipRcv', type, tracker, data)
   // [TODO] - maybe we don't need to await the following line
-  await gossipHandler(data, sender, tracker)
+  await gossipHandler(data, sender, tracker, msgSize)
   if (logFlags.verbose && logFlags.p2pNonFatal) {
     info(`End of handleGossip(${utils.stringifyReduce(payload)})`)
   }

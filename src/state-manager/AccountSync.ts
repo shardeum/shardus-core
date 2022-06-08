@@ -3,7 +3,7 @@ import { StateManager as StateManagerTypes } from '@shardus/types'
 import * as utils from '../utils'
 const stringify = require('fast-stable-stringify')
 
-import Profiler, { profilerInstance } from '../utils/profiler'
+import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
@@ -258,8 +258,9 @@ class AccountSync {
     // Ts_end - get data older than this timestamp
     // Returns a single hash of the data from the Account State Table determined by the input parameters; sort by Tx_ts  then Tx_id before taking the hash
     // Updated names:  accountStart , accountEnd, tsStart, tsEnd
-    this.p2p.registerInternal('get_account_state_hash', async (payload: AccountStateHashReq, respond: (arg0: AccountStateHashResp) => any) => {
-      profilerInstance.scopedProfileSectionStart('get_account_state_hash')
+    this.p2p.registerInternal('get_account_state_hash', async (payload: AccountStateHashReq, respond: (arg0: AccountStateHashResp) => any, sender, tracker: string, msgSize: number) => {
+      profilerInstance.scopedProfileSectionStart('get_account_state_hash', false, msgSize)
+      let responseSize = cUninitializedSize
       try {
         let result = {} as AccountStateHashResp
 
@@ -275,11 +276,11 @@ class AccountSync {
         let stateHash = await this.stateManager.transactionQueue.getAccountsStateHash(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd)
         result.stateHash = stateHash
         result.ready = true
-        await respond(result)
+        responseSize = await respond(result)
       } catch (e) {
         this.statemanager_fatal('get_account_state_hash', e)
       } finally {
-        profilerInstance.scopedProfileSectionEnd('get_account_state_hash')
+        profilerInstance.scopedProfileSectionEnd('get_account_state_hash', responseSize)
       }
     })
 
@@ -290,23 +291,23 @@ class AccountSync {
     // Ts_end - get data older than this timestamp
     // Returns data from the Account State Table determined by the input parameters; limits result to 1000 records (as configured)
     // Updated names:  accountStart , accountEnd, tsStart, tsEnd
-    this.p2p.registerInternal('get_account_state', async (payload: GetAccountStateReq, respond: (arg0: { accountStates: Shardus.StateTableObject[] }) => any) => {
+    this.p2p.registerInternal('get_account_state', async (payload: GetAccountStateReq, respond: (arg0: { accountStates: Shardus.StateTableObject[] }) => any, sender, tracker: string, msgSize: number) => {
       if (this.config.stateManager == null) {
         throw new Error('this.config.stateManager == null') //TODO TSConversion  would be nice to eliminate some of these config checks.
       }
-      profilerInstance.scopedProfileSectionStart('get_account_state')
+      profilerInstance.scopedProfileSectionStart('get_account_state', false, msgSize)
       let result = {} as { accountStates: Shardus.StateTableObject[] }
 
       // max records set artificially low for better test coverage
       // todo m11: make configs for how many records to query
       let accountStates = await this.storage.queryAccountStateTable(payload.accountStart, payload.accountEnd, payload.tsStart, payload.tsEnd, this.config.stateManager.stateTableBucketSize)
       result.accountStates = accountStates
-      await respond(result)
-      profilerInstance.scopedProfileSectionEnd('get_account_state')
+      let responseSize = await respond(result)
+      profilerInstance.scopedProfileSectionEnd('get_account_state', responseSize)
     })
 
-    this.p2p.registerInternal('get_account_data3', async (payload: GetAccountData3Req, respond: (arg0: { data: GetAccountDataByRangeSmart }) => any) => {
-      profilerInstance.scopedProfileSectionStart('get_account_data3')
+    this.p2p.registerInternal('get_account_data3', async (payload: GetAccountData3Req, respond: (arg0: { data: GetAccountDataByRangeSmart }) => any, sender, tracker: string, msgSize: number) => {
+      profilerInstance.scopedProfileSectionStart('get_account_data3', false, msgSize)
       let result = {} as { data: GetAccountDataByRangeSmart } //TSConversion  This is complicated !!(due to app wrapping)  as {data: Shardus.AccountData[] | null}
       let accountData: GetAccountDataByRangeSmart | null = null
       let ourLockID = -1
@@ -325,8 +326,8 @@ class AccountSync {
       this.stateManager.testAccountDataWrapped(accountData.wrappedAccounts2)
 
       result.data = accountData
-      await respond(result)
-      profilerInstance.scopedProfileSectionEnd('get_account_data3')
+      let responseSize = await respond(result)
+      profilerInstance.scopedProfileSectionEnd('get_account_data3', responseSize)
     })
 
     // /get_account_data_by_list (Acc_ids)
@@ -335,8 +336,8 @@ class AccountSync {
     // For applications with multiple “Account” tables the returned data is grouped by table name.
     // For example: [ {Acc_id, State_after, Acc_data}, { … }, ….. ]
     // Updated names:  accountIds, max records
-    this.p2p.registerInternal('get_account_data_by_list', async (payload: { accountIds: any }, respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => any) => {
-      profilerInstance.scopedProfileSectionStart('get_account_data_by_list')
+    this.p2p.registerInternal('get_account_data_by_list', async (payload: { accountIds: any }, respond: (arg0: { accountData: Shardus.WrappedData[] | null }) => any, sender, tracker: string, msgSize: number) => {
+      profilerInstance.scopedProfileSectionStart('get_account_data_by_list', false, msgSize)
       let result = {} as { accountData: Shardus.WrappedData[] | null }
       let accountData = null
       let ourLockID = -1
@@ -349,8 +350,8 @@ class AccountSync {
       //PERF Disiable this in production or performance testing.
       this.stateManager.testAccountDataWrapped(accountData)
       result.accountData = accountData
-      await respond(result)
-      profilerInstance.scopedProfileSectionEnd('get_account_data_by_list')
+      let responseSize = await respond(result)
+      profilerInstance.scopedProfileSectionEnd('get_account_data_by_list', responseSize)
     })
 
     Context.network.registerExternalGet('sync-statement', isDebugModeMiddleware, (req, res) => {

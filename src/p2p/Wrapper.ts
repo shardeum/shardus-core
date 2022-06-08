@@ -35,7 +35,7 @@ class P2P extends EventEmitter {
     message: any,
     logged?: boolean,
     tracker?: string
-  ) => Promise<void>
+  ) => Promise<number>
   sendGossipIn: (
     type: any,
     payload: any,
@@ -43,14 +43,14 @@ class P2P extends EventEmitter {
     sender?: any,
     inpNodes?: P2PTypings.NodeListTypes.Node[],
     isOrigin?: boolean
-  ) => Promise<void>
+  ) => Promise<number>
   sendGossipAll: (
     type: any,
     payload: any,
     tracker?: string,
     sender?: any,
     inpNodes?: P2PTypings.NodeListTypes.Node[]
-  ) => Promise<void>
+  ) => Promise<number>
 
   robustQuery: any
   state: typeof state

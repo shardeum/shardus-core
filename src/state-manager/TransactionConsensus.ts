@@ -1,7 +1,7 @@
 import * as Shardus from '../shardus/shardus-types'
 import { TimestampReceipt } from '../shardus/shardus-types'
 import * as utils from '../utils'
-import Profiler, { profilerInstance } from '../utils/profiler'
+import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 import * as Context from '../p2p/Context'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
@@ -76,8 +76,9 @@ class TransactionConsenus {
       }
     })
 
-    this.p2p.registerGossipHandler('spread_appliedReceipt', async (payload, sender, tracker) => {
-      profilerInstance.scopedProfileSectionStart('spread_appliedReceipt')
+    this.p2p.registerGossipHandler('spread_appliedReceipt', async (payload, sender, tracker, msgSize: number) => {
+      profilerInstance.scopedProfileSectionStart('spread_appliedReceipt', false, msgSize)
+      let respondSize = cUninitializedSize
       try {
         let appliedReceipt = payload as AppliedReceipt
         let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(appliedReceipt.txid) // , payload.timestamp)
@@ -124,6 +125,7 @@ class TransactionConsenus {
           if (gossipGroup.length > 1) {
             // should consider only forwarding in some cases?
             this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, gossipGroup)
+            //no await so we cant get the message out size in a reasonable way
             this.p2p.sendGossipIn('spread_appliedReceipt', appliedReceipt, tracker, sender, gossipGroup, false)
           }
         } else {
@@ -132,7 +134,7 @@ class TransactionConsenus {
         }
 
       } finally {
-        profilerInstance.scopedProfileSectionEnd('spread_appliedReceipt')
+        profilerInstance.scopedProfileSectionEnd('spread_appliedReceipt', respondSize)
       }
     })
   }

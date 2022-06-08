@@ -60,7 +60,7 @@ const gossipActiveRoute: P2P.P2PTypes.GossipHandler<P2P.ActiveTypes.SignedActive
         false
       )
   } finally {
-    profilerInstance.scopedProfileSectionEnd('gossip-active', true)
+    profilerInstance.scopedProfileSectionEnd('gossip-active')
   }
 }
 

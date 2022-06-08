@@ -5,14 +5,49 @@ import { memoryReportingInstance } from '../utils/memoryReporting'
 import { sleep } from '../utils/functions/time'
 import { resolveTxt } from 'dns'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
+import { humanFileSize } from '.'
 
 const NS_PER_SEC = 1e9
+
+const cDefaultMin = 1e12
+const cDefaultMinBig = BigInt(cDefaultMin)
 
 let profilerSelfReporting = false
 
 interface Profiler {
   sectionTimes: any
   // instance: Profiler
+}
+
+export const cNoSizeTrack = -2
+export const cUninitializedSize = -1
+
+type NumberStat = {
+  total: number;
+  max: number;
+  min: number;
+  avg: number;
+  c: number ; 
+}
+
+type BigNumberStat = {
+  total: bigint;
+  max: bigint;
+  min: bigint;
+  avg: bigint;
+  c: number; 
+}
+
+type SectionStat = BigNumberStat & {
+  name: string;
+  internal: boolean
+  req: NumberStat;
+  resp: NumberStat;
+  start: bigint;
+  end: bigint;
+  started: boolean;
+  reentryCount: number;
+  reentryCountEver: number;
 }
 
 export interface NodeLoad {
@@ -23,7 +58,7 @@ export interface NodeLoad {
 export let profilerInstance: Profiler
 class Profiler {
   sectionTimes: any
-  scopedSectionTimes: any
+  scopedSectionTimes: {[name:string]:SectionStat}
   eventCounters: Map<string, Map<string, number>>
   stackHeight: number
   netInternalStackHeight: number
@@ -267,20 +302,61 @@ class Profiler {
     }
   }
 
-  scopedProfileSectionStart(sectionName, internal = false) {
-    let section = this.scopedSectionTimes[sectionName]
+  scopedProfileSectionStart(sectionName:string, internal:boolean = false, messageSize:number = cNoSizeTrack) {
+    let section:SectionStat = this.scopedSectionTimes[sectionName]
 
     if (section != null && section.started === true) {
+      //need thes because we cant handle recursion, but does it ever happen?
+      //could be interesting to track.
+      section.reentryCount++
+      section.reentryCountEver++
       return
     }
 
     if (section == null) {
       const t = BigInt(0)
       const max = BigInt(0)
-      const min = BigInt(0)
+      const min = cDefaultMinBig
       const avg = BigInt(0)
-      section = { name: sectionName, total: t, max, min, avg, c: 0, internal }
+      section = {
+        name: sectionName,
+        total: t,
+        max,
+        min,
+        avg,
+        c: 0,
+        internal,
+        req: {
+          total: 0,
+          max: 0,
+          min: cDefaultMin,
+          avg: 0,
+          c: 0,          
+        },
+        resp: {
+          total: 0,
+          max: 0,
+          min: cDefaultMin,
+          avg: 0,
+          c: 0,          
+        },
+        start: t,
+        end: t,
+        started: false,
+        reentryCount: 0,
+        reentryCountEver: 0
+      }
       this.scopedSectionTimes[sectionName] = section
+    }
+
+    // update request size stats
+    if(messageSize != cNoSizeTrack && messageSize != cUninitializedSize){
+      let stat = section.req
+      stat.total += messageSize
+      stat.c += 1
+      if (messageSize > stat.max) stat.max = messageSize
+      if (messageSize < stat.min) stat.min = messageSize
+      stat.avg = stat.total / stat.c
     }
 
     section.start = process.hrtime.bigint()
@@ -288,7 +364,7 @@ class Profiler {
     section.c++
   }
 
-  scopedProfileSectionEnd(sectionName, internal = false) {
+  scopedProfileSectionEnd(sectionName: string, messageSize:number = cNoSizeTrack) {
     const section = this.scopedSectionTimes[sectionName]
     if (section == null || section.started === false) {
       if (profilerSelfReporting) return
@@ -303,6 +379,16 @@ class Profiler {
     if (duration < section.min) section.min = duration
     section.avg = section.total / BigInt(section.c)
     section.started = false
+
+    //if we get a valid size let track stats on it
+    if(messageSize != cNoSizeTrack && messageSize != cUninitializedSize){
+      let stat = section.resp
+      stat.total += messageSize
+      stat.c += 1
+      if (messageSize > stat.max) stat.max = messageSize
+      if (messageSize < stat.min) stat.min = messageSize
+      stat.avg = stat.total / stat.c
+    }
   }
 
   cleanInt(x) {
@@ -370,9 +456,26 @@ class Profiler {
         let section = this.scopedSectionTimes[key]
         section.total = BigInt(0)
         section.max = BigInt(0)
-        section.min = BigInt(0)
+        section.min = cDefaultMinBig
         section.avg = BigInt(0)
         section.c = 0
+
+        section.reentryCount = 0
+        section.req = {
+          total: 0,
+          max: 0,
+          min: cDefaultMin,
+          avg: 0,
+          c: 0,          
+        }
+        section.resp = {
+          total: 0,
+          max: 0,
+          min: cDefaultMin,
+          avg: 0,
+          c: 0,          
+        }
+
       }
     }
   }
@@ -436,13 +539,39 @@ class Profiler {
         const percent = BigInt(100)
         const avgMs = Number((section.avg * percent) / divider) / 100
         const maxMs = Number((section.max * percent) / divider) / 100
-        const minMs = Number((section.min * percent) / divider) / 100
+        let minMs = Number((section.min * percent) / divider) / 100
+	
+	
         const totalMs = Number((section.total * percent) / divider) / 100
-        let line = `Avg: ${avgMs}ms ${section.name.padEnd(
-          30
-        )}, Max: ${maxMs}ms,  Min: ${minMs}ms,  Total: ${totalMs}ms, #:${
+        if(section.c === 0){
+          minMs = 0
+        }
+        let line = `Avg: ${avgMs}ms ${section.name.padEnd(30)}, Max: ${maxMs}ms,  Min: ${minMs}ms,  Total: ${totalMs}ms, #:${
           section.c
         }`
+
+        if(section.resp.c > 0){
+          let dataReport = {
+            total: humanFileSize(section.resp.total),
+            min: humanFileSize(section.resp.min),
+            max: humanFileSize(section.resp.max),
+            c: section.resp.c,
+            avg: humanFileSize(Math.ceil(section.resp.total / section.resp.c)) //Math.round(100 * section.s.total / section.s.c) / 100
+          }
+          line += ' resp:' + JSON.stringify(dataReport)          
+        }
+        let numberStat = section.req
+        if(numberStat.c > 0){
+          let dataReport = {
+            total: humanFileSize(numberStat.total),
+            min: humanFileSize(numberStat.min),
+            max: humanFileSize(numberStat.max),
+            c: numberStat.c,
+            avg: humanFileSize(Math.ceil(numberStat.total / numberStat.c)) //Math.round(100 * section.s.total / section.s.c) / 100
+          }
+          line += ' req:' + JSON.stringify(dataReport)          
+        }
+
         lines.push({ line, avgMs })
       }
     }
@@ -464,16 +593,36 @@ class Profiler {
         const percent = BigInt(100)
         const avgMs = Number((section.avg * percent) / divider) / 100
         const maxMs = Number((section.max * percent) / divider) / 100
-        const minMs = Number((section.min * percent) / divider) / 100
+        let minMs = Number((section.min * percent) / divider) / 100
         const totalMs = Number((section.total * percent) / divider) / 100
-        times.push({
-          name: section.name,
-          minMs,
-          maxMs,
-          totalMs,
-          avgMs,
-          c: section.c,
-        })
+        if(section.c === 0){
+          minMs = 0
+        }
+        let data = {}
+        let dataReq = {}
+        if(section.resp.c > 0){
+          let dataReport = {
+            total: section.resp.total,
+            min: section.resp.min,
+            max: section.resp.max,
+            c: section.resp.c,
+            avg: humanFileSize(Math.ceil(section.resp.total / section.resp.c)) //Math.round(100 * section.s.total / section.s.c) / 100
+          }
+          data = dataReport       
+        }
+        let numberStat = section.req
+        if(numberStat.c > 0){
+          let dataReport = {
+            total: humanFileSize(numberStat.total),
+            min: humanFileSize(numberStat.min),
+            max: humanFileSize(numberStat.max),
+            c: numberStat.c,
+            avg: humanFileSize(Math.ceil(numberStat.total / numberStat.c)) //Math.round(100 * section.s.total / section.s.c) / 100
+          }
+          dataReq = dataReport  
+        }
+
+        times.push({name:section.name, minMs, maxMs, totalMs, avgMs, c:section.c , data, dataReq})
       }
     }
     let scopedTimes = { scopedTimes: times }

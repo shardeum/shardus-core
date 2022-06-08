@@ -14,7 +14,7 @@ const stringify = require('fast-stable-stringify')
 const allZeroes64 = '0'.repeat(64)
 
 // not sure about this.
-import Profiler from '../utils/profiler'
+import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
@@ -450,7 +450,9 @@ class StateManager {
       this.lastActiveCount = activeByIdOrder.length
     } else {
       let change = activeByIdOrder.length - this.lastActiveCount
-      nestedCountersInstance.countEvent('networkSize',`cyc:${cycleNumber} active:${activeByIdOrder.length} change:${change}`)
+      if(change != 0){
+        nestedCountersInstance.countEvent('networkSize',`cyc:${cycleNumber} active:${activeByIdOrder.length} change:${change}`)
+      }
       this.lastActiveCount = activeByIdOrder.length
     }
 
@@ -1048,202 +1050,234 @@ class StateManager {
     this.partitionStats.setupHandlers()
 
     // p2p ASK
-    Comms.registerInternal('request_receipt_for_tx', async (payload: RequestReceiptForTxReq, respond: (arg0: RequestReceiptForTxResp) => any) => {
+    Comms.registerInternal('request_receipt_for_tx', async (payload: RequestReceiptForTxReq, respond: (arg0: RequestReceiptForTxResp) => any, sender, tracker: string, msgSize: number) => {
+      profilerInstance.scopedProfileSectionStart('request_receipt_for_tx', false, msgSize)
+      
       let response: RequestReceiptForTxResp = { receipt: null, note: '', success: false }
-      let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-      if (queueEntry == null) {
-        queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'request_receipt_for_tx') // , payload.timestamp)
-      }
 
-      if (queueEntry == null) {
-        response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
-        await respond(response)
-        return
-      }
+      let responseSize = cUninitializedSize
+      try {
+        let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+        if (queueEntry == null) {
+          queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'request_receipt_for_tx') // , payload.timestamp)
+        }
 
-      if (queueEntry.appliedReceipt != null) {
-        response.receipt = queueEntry.appliedReceipt
-      } else if (queueEntry.recievedAppliedReceipt != null) {
-        response.receipt = queueEntry.recievedAppliedReceipt
+        if (queueEntry == null) {
+          response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
+          await respond(response)
+          return
+        }
+
+        if (queueEntry.appliedReceipt != null) {
+          response.receipt = queueEntry.appliedReceipt
+        } else if (queueEntry.recievedAppliedReceipt != null) {
+          response.receipt = queueEntry.recievedAppliedReceipt
+        }
+        if (response.receipt != null) {
+          response.success = true
+        } else {
+          response.note = `found queueEntry but no receipt: ${utils.stringifyReduce(payload.txid)} ${payload.txid}  ${payload.timestamp}`
+        }
+        responseSize = await respond(response)
+      } finally {
+        profilerInstance.scopedProfileSectionEnd('request_receipt_for_tx', responseSize)
       }
-      if (response.receipt != null) {
+    })
+
+    Comms.registerInternal('request_state_for_tx_post', async (payload: RequestStateForTxReqPost, respond: (arg0: RequestStateForTxResp) => any, sender, tracker: string, msgSize: number) => {
+      profilerInstance.scopedProfileSectionStart('request_state_for_tx_post', false, msgSize)
+      let responseSize = cUninitializedSize
+      try {      
+        let response: RequestStateForTxResp = { stateList: [], beforeHashes: {}, note: '', success: false }
+        // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
+        let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+        if (queueEntry == null) {
+          queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'request_state_for_tx_post') // , payload.timestamp)
+        }
+
+        if (queueEntry == null) {
+          response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
+          nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post cant find queue entry')
+          await respond(response)
+          return
+        }
+
+        if(queueEntry.hasValidFinalData === false){
+          response.note = `has queue entry but not final data: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
+          nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post hasValidFinalData==false')
+          await respond(response)
+          return
+        }
+
+        let wrappedStates = queueEntry.collectedData
+
+        // if we have applyResponse then use it.  This is where and advanced apply() will put its transformed data
+        let writtenAccountsMap: WrappedResponses = {}
+        let applyResponse = queueEntry?.preApplyTXResult.applyResponse
+        if (applyResponse != null && applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
+          for (let writtenAccount of applyResponse.accountWrites) {
+            writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+          }
+          wrappedStates = writtenAccountsMap
+          if (logFlags.verbose) this.mainLogger.debug(`request_state_for_tx_post applyResponse.accountWrites tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
+        }
+
+        //TODO figure out if we need to include collectedFinalData (after refactor/cleanup)
+
+        if (wrappedStates != null) {
+          for (let key of Object.keys(wrappedStates)) {
+            let wrappedState = wrappedStates[key]
+            let accountData = wrappedState
+
+            if (payload.key !== accountData.accountId) {
+              continue //not this account.
+            }
+
+            if (accountData.stateId != payload.hash) {
+              response.note = `failed accountData.stateId != payload.hash txid: ${utils.makeShortHash(payload.txid)}  ts:${payload.timestamp} hash:${utils.makeShortHash(accountData.stateId)}`
+              nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post failed accountData.stateId != payload.hash txid')
+              await respond(response)
+              return
+            }
+            if (accountData) {
+              //include the before hash
+              response.beforeHashes[key] = queueEntry.beforeHashes[key]
+              //include the data
+              response.stateList.push(accountData)
+            }
+          }
+        }
+
+        nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post success')
         response.success = true
-      } else {
-        response.note = `found queueEntry but no receipt: ${utils.stringifyReduce(payload.txid)} ${payload.txid}  ${payload.timestamp}`
-      }
-      await respond(response)
-    })
-
-    Comms.registerInternal('request_state_for_tx_post', async (payload: RequestStateForTxReqPost, respond: (arg0: RequestStateForTxResp) => any) => {
-      let response: RequestStateForTxResp = { stateList: [], beforeHashes: {}, note: '', success: false }
-      // app.getRelevantData(accountId, tx) -> wrappedAccountState  for local accounts
-      let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-      if (queueEntry == null) {
-        queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'request_state_for_tx_post') // , payload.timestamp)
+        responseSize = await respond(response)        
+      } finally{
+        profilerInstance.scopedProfileSectionEnd('request_state_for_tx_post', responseSize)
       }
 
-      if (queueEntry == null) {
-        response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
-        nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post cant find queue entry')
-        await respond(response)
-        return
-      }
-
-      if(queueEntry.hasValidFinalData === false){
-        response.note = `has queue entry but not final data: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
-        nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post hasValidFinalData==false')
-        await respond(response)
-        return
-      }
-
-      let wrappedStates = queueEntry.collectedData
-
-      // if we have applyResponse then use it.  This is where and advanced apply() will put its transformed data
-      let writtenAccountsMap: WrappedResponses = {}
-      let applyResponse = queueEntry?.preApplyTXResult.applyResponse
-      if (applyResponse != null && applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
-        for (let writtenAccount of applyResponse.accountWrites) {
-          writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
-        }
-        wrappedStates = writtenAccountsMap
-        if (logFlags.verbose) this.mainLogger.debug(`request_state_for_tx_post applyResponse.accountWrites tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
-      }
-
-      //TODO figure out if we need to include collectedFinalData (after refactor/cleanup)
-
-      if (wrappedStates != null) {
-        for (let key of Object.keys(wrappedStates)) {
-          let wrappedState = wrappedStates[key]
-          let accountData = wrappedState
-
-          if (payload.key !== accountData.accountId) {
-            continue //not this account.
-          }
-
-          if (accountData.stateId != payload.hash) {
-            response.note = `failed accountData.stateId != payload.hash txid: ${utils.makeShortHash(payload.txid)}  ts:${payload.timestamp} hash:${utils.makeShortHash(accountData.stateId)}`
-            nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post failed accountData.stateId != payload.hash txid')
-            await respond(response)
-            return
-          }
-          if (accountData) {
-            //include the before hash
-            response.beforeHashes[key] = queueEntry.beforeHashes[key]
-            //include the data
-            response.stateList.push(accountData)
-          }
-        }
-      }
-
-      nestedCountersInstance.countEvent('stateManager', 'request_state_for_tx_post success')
-      response.success = true
-      await respond(response)
     })
 
 
-    Comms.registerInternal('request_tx_and_state', async (payload: {txid:string}, respond: (arg0: RequestTxResp) => any) => {
-      let response: RequestTxResp = { stateList: [], beforeHashes: {}, note: '', success: false, originalData:{} }
+    Comms.registerInternal('request_tx_and_state', async (payload: {txid:string}, respond: (arg0: RequestTxResp) => any, sender, tracker: string, msgSize: number) => {
+      profilerInstance.scopedProfileSectionStart('request_state_for_tx_post', false, msgSize)
+      let responseSize = cUninitializedSize
+      try {  
+        let response: RequestTxResp = { stateList: [], beforeHashes: {}, note: '', success: false, originalData:{} }
 
-      let txid = payload.txid
+        let txid = payload.txid
 
-
-      let queueEntry = this.transactionQueue.getQueueEntrySafe(txid)
-      if (queueEntry == null) {
-        queueEntry = this.transactionQueue.getQueueEntryArchived(txid, 'request_tx_and_state')
-      }
-
-      //temp error for debug
-      // if (logFlags.error) this.mainLogger.error(`request_tx_and_state NOTE ${utils.stringifyReduce(payload)} got queue entry: ${queueEntry != null}`)
-
-
-      if (queueEntry == null) {
-        response.note = `failed to find queue entry: ${utils.stringifyReduce(txid)} dbg:${this.debugTXHistory[utils.stringifyReduce(txid)]}`
-
-        if (logFlags.error) this.mainLogger.error(`request_tx_and_state ${response.note}`)
-
-        await respond(response)
-        return
-      }
-
-      response.acceptedTX = queueEntry.acceptedTx
-
-      let wrappedStates = queueEntry.collectedData
-
-      // if we have applyResponse then use it.  This is where and advanced apply() will put its transformed data
-      let writtenAccountsMap: WrappedResponses = {}
-      let applyResponse = queueEntry?.preApplyTXResult.applyResponse
-      if (applyResponse != null && applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
-        for (let writtenAccount of applyResponse.accountWrites) {
-          writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+        let queueEntry = this.transactionQueue.getQueueEntrySafe(txid)
+        if (queueEntry == null) {
+          queueEntry = this.transactionQueue.getQueueEntryArchived(txid, 'request_tx_and_state')
         }
-        wrappedStates = writtenAccountsMap
-        if (logFlags.verbose) this.mainLogger.debug(`request_tx_and_state applyResponse.accountWrites tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
-      }
 
-      //TODO figure out if we need to include collectedFinalData (after refactor/cleanup)
+        //temp error for debug
+        // if (logFlags.error) this.mainLogger.error(`request_tx_and_state NOTE ${utils.stringifyReduce(payload)} got queue entry: ${queueEntry != null}`)
 
-      if (wrappedStates != null) {
-        for (let key of Object.keys(wrappedStates)) {
-          let wrappedState = wrappedStates[key]
-          let accountData = wrappedState
-          if (accountData) {
-            //include the before hash
-            response.beforeHashes[key] = queueEntry.beforeHashes[key]
-            //include the data
-            response.stateList.push(accountData)
+        if (queueEntry == null) {
+          response.note = `failed to find queue entry: ${utils.stringifyReduce(txid)} dbg:${this.debugTXHistory[utils.stringifyReduce(txid)]}`
+
+          if (logFlags.error) this.mainLogger.error(`request_tx_and_state ${response.note}`)
+
+          await respond(response)
+          return
+        }
+
+        response.acceptedTX = queueEntry.acceptedTx
+
+        let wrappedStates = queueEntry.collectedData
+
+        // if we have applyResponse then use it.  This is where and advanced apply() will put its transformed data
+        let writtenAccountsMap: WrappedResponses = {}
+        let applyResponse = queueEntry?.preApplyTXResult.applyResponse
+        if (applyResponse != null && applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0) {
+          for (let writtenAccount of applyResponse.accountWrites) {
+            writtenAccountsMap[writtenAccount.accountId] = writtenAccount.data
+          }
+          wrappedStates = writtenAccountsMap
+          if (logFlags.verbose) this.mainLogger.debug(`request_tx_and_state applyResponse.accountWrites tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp} accounts: ${utils.stringifyReduce(Object.keys(wrappedStates))}  `)
+        }
+
+        //TODO figure out if we need to include collectedFinalData (after refactor/cleanup)
+
+        if (wrappedStates != null) {
+          for (let key of Object.keys(wrappedStates)) {
+            let wrappedState = wrappedStates[key]
+            let accountData = wrappedState
+            if (accountData) {
+              //include the before hash
+              response.beforeHashes[key] = queueEntry.beforeHashes[key]
+              //include the data
+              response.stateList.push(accountData)
+            }
           }
         }
+
+        response.originalData = stringify(queueEntry.originalData)
+        response.success = true
+        responseSize = await respond(response)
+      } finally {
+        profilerInstance.scopedProfileSectionEnd('request_state_for_tx_post', responseSize)
       }
 
-      response.originalData = stringify(queueEntry.originalData)
-      response.success = true
-      await respond(response)
     })
 
     // TODO STATESHARDING4 ENDPOINTS ok, I changed this to tell, but we still need to check sender!
     //this.p2p.registerGossipHandler('spread_appliedVote', async (payload, sender, tracker) => {
-    Comms.registerInternal('spread_appliedVote', async (payload: AppliedVote, respond: any) => {
-      let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
-      if (queueEntry == null) {
-        return
-      }
-      let newVote = payload as AppliedVote
-      // TODO STATESHARDING4 ENDPOINTS check payload format
-      // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
+    Comms.registerInternal('spread_appliedVote', async (payload: AppliedVote, respond: any, sender, tracker: string, msgSize: number) => {
+      profilerInstance.scopedProfileSectionStart('spread_appliedVote', false, msgSize)
+      try{
+        let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+        if (queueEntry == null) {
+          return
+        }
+        let newVote = payload as AppliedVote
+        // TODO STATESHARDING4 ENDPOINTS check payload format
+        // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
 
-      if (this.transactionConsensus.tryAppendVote(queueEntry, newVote)) {
-        // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
+        if (this.transactionConsensus.tryAppendVote(queueEntry, newVote)) {
+          // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
+        }        
+      } finally {
+        profilerInstance.scopedProfileSectionStart('spread_appliedVote')        
       }
     })
 
-    Comms.registerInternal('get_account_data_with_queue_hints', async (payload: { accountIds: string[] }, respond: (arg0: GetAccountDataWithQueueHintsResp) => any) => {
-      let result = {} as GetAccountDataWithQueueHintsResp //TSConversion  This is complicated !! check app for details.
-      let accountData = null
-      let ourLockID = -1
-      try {
-        ourLockID = await this.fifoLock('accountModification')
-        accountData = await this.app.getAccountDataByList(payload.accountIds)
-      } finally {
-        this.fifoUnlock('accountModification', ourLockID)
-      }
-      if (accountData != null) {
-        for (let wrappedAccount of accountData) {
-          let wrappedAccountInQueueRef = wrappedAccount as Shardus.WrappedDataFromQueue
-          wrappedAccountInQueueRef.seenInQueue = false
+    Comms.registerInternal('get_account_data_with_queue_hints', async (payload: { accountIds: string[] }, respond: (arg0: GetAccountDataWithQueueHintsResp) => any, sender, tracker: string, msgSize: number) => {
+      profilerInstance.scopedProfileSectionStart('request_state_for_tx_post', false, msgSize)
+      let responseSize = cUninitializedSize
+      try { 
+      
+        let result = {} as GetAccountDataWithQueueHintsResp //TSConversion  This is complicated !! check app for details.
+        let accountData = null
+        let ourLockID = -1
+        try {
+          ourLockID = await this.fifoLock('accountModification')
+          accountData = await this.app.getAccountDataByList(payload.accountIds)
+        } finally {
+          this.fifoUnlock('accountModification', ourLockID)
+        }
+        if (accountData != null) {
+          for (let wrappedAccount of accountData) {
+            let wrappedAccountInQueueRef = wrappedAccount as Shardus.WrappedDataFromQueue
+            wrappedAccountInQueueRef.seenInQueue = false
 
-          if (this.lastSeenAccountsMap != null) {
-            let queueEntry = this.lastSeenAccountsMap[wrappedAccountInQueueRef.accountId]
-            if (queueEntry != null) {
-              wrappedAccountInQueueRef.seenInQueue = true
+            if (this.lastSeenAccountsMap != null) {
+              let queueEntry = this.lastSeenAccountsMap[wrappedAccountInQueueRef.accountId]
+              if (queueEntry != null) {
+                wrappedAccountInQueueRef.seenInQueue = true
+              }
             }
           }
         }
+        //PERF Disiable this in production or performance testing. / this works due to inheritance
+        this.testAccountDataWrapped(accountData)
+        // we cast up the array return type because we have attached the seenInQueue memeber to the data.
+        result.accountData = accountData as Shardus.WrappedDataFromQueue[]
+        responseSize = await respond(result)
+      } finally {
+        profilerInstance.scopedProfileSectionEnd('request_state_for_tx_post', responseSize)
       }
-      //PERF Disiable this in production or performance testing. / this works due to inheritance
-      this.testAccountDataWrapped(accountData)
-      // we cast up the array return type because we have attached the seenInQueue memeber to the data.
-      result.accountData = accountData as Shardus.WrappedDataFromQueue[]
-      await respond(result)
     })
 
     //<pre id="json"></pre>

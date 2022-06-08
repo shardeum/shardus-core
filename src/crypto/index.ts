@@ -89,6 +89,26 @@ class Crypto {
     return objCopy
   }
 
+  /**
+   * Measure the message size when we are making the object copy (because it is pretty much free)
+   * then add tag_msgSize to the object
+   * relies on node honesty.. better (but more work) to implement at shardus_net level
+   *    to implement at shardus_net level we need to have it send us an extra argument to show
+   *    the message size
+   * @param obj 
+   * @param recipientCurvePk 
+   * @returns 
+   */
+  tagWithSize(obj: any, recipientCurvePk: crypto.curvePublicKey) {
+    const strEncoded = crypto.stringify(obj)
+    const tag_msgSize = strEncoded.length //get the message size                                        
+    const objCopy = JSON.parse(strEncoded)
+    objCopy.tag_msgSize = tag_msgSize // set the size
+    const sharedKey = this.getSharedKey(recipientCurvePk)
+    crypto.tagObj(objCopy, sharedKey)
+    return objCopy
+  }  
+
   authenticate(obj: any, senderCurvePk: crypto.curvePublicKey) {
     const sharedKey = this.getSharedKey(senderCurvePk)
     return crypto.authenticateObj(obj, sharedKey)
