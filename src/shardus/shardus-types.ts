@@ -806,6 +806,11 @@ export interface LogsConfiguration {
         maxLogSize?: number
         backups?: number
       }
+      exit?: {
+        type?: string
+        maxLogSize?: number
+        backups?: number
+      }
       errorFile?: {
         type?: string
         maxLogSize?: number
@@ -863,6 +868,10 @@ export interface LogsConfiguration {
         level?: string
       }
       fatal?: {
+        appenders?: string[]
+        level?: string
+      }
+      exit?: {
         appenders?: string[]
         level?: string
       }
@@ -947,6 +956,7 @@ type ObjectAlias = object
 /**
  * OpaqueTransaction is the way shardus should see transactions internally. it should not be able to mess with parameters individually
  */
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface OpaqueTransaction extends ObjectAlias {}
 
 export type DeepRequired<T> = Required<{

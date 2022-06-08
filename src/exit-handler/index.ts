@@ -1,7 +1,11 @@
+import Log4js from 'log4js'
+import * as Context from '../p2p/Context'
+
 interface ExitHandler {
   exited: boolean
   syncFuncs: Map<string, Function>
   asyncFuncs: Map<string, Function>
+  exitLogger: Log4js.Logger
 }
 
 class ExitHandler {
@@ -9,6 +13,8 @@ class ExitHandler {
     this.exited = false
     this.syncFuncs = new Map()
     this.asyncFuncs = new Map()
+
+    this.exitLogger = Context.logger.getLogger('exit')
   }
 
   // Modules can use this to register synchronous cleanup functions
@@ -41,6 +47,7 @@ class ExitHandler {
     this.exited = true
     this._cleanupSync()
     try {
+      this.exitLogger.fatal('EXIT LOGGER WORKING !!!!')
       await this._cleanupAsync()
     } catch (e) {
       console.error(e)
@@ -49,11 +56,13 @@ class ExitHandler {
     if (exitProcess) process.exit()
   }
 
-  async exitUncleanly() {
+  async exitUncleanly(SIG_TYPE?: string) {
     if (this.exited) return
     this.exited = true
     this._cleanupSync()
+
     try {
+      this.exitLogger.fatal('EXIT LOGGER WORKING !!!!')
       await this._cleanupAsync()
     } catch (e) {
       console.error(e)
@@ -67,13 +76,13 @@ class ExitHandler {
     if (sigint) {
       process.on('SIGINT', async () => {
         // await this.exitCleanly()
-        await this.exitUncleanly()
+        await this.exitUncleanly('SIGINT')
       })
     }
     if (sigterm) {
       process.on('SIGTERM', async () => {
         // await this.exitCleanly()
-        await this.exitUncleanly()
+        await this.exitUncleanly('SIGTERM')
       })
     }
   }
