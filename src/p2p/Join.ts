@@ -16,6 +16,7 @@ import * as Self from './Self'
 import { robustQuery } from './Utils'
 import { profilerInstance } from '../utils/profiler'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { reportLost } from './Lost'
 
 /** STATE */
 
@@ -375,7 +376,14 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
   // Return if we already know about this node
   const ipPort = NodeList.ipPort(node.internalIp, node.internalPort)
   if (NodeList.byIpPort.has(ipPort)) {
-    if(logFlags.p2pNonFatal) info('Cannot add join request for this node, already a known node.', JSON.stringify(NodeList.byIpPort.get(ipPort)))
+    if (logFlags.p2pNonFatal) info('Cannot add join request for this node, already a known node.', JSON.stringify(NodeList.byIpPort.get(ipPort)))
+    const node = NodeList.byIpPort.get(ipPort)
+    if (logFlags.p2pNonFatal)
+      info(
+        'Reporting as lost because join request received from a known node',
+        node
+      )
+    reportLost(node, 'rejoin')
     return false
   }
 
