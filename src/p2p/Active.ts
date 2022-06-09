@@ -166,7 +166,7 @@ export function updateRecord(
     let addedCount = 0
     const maxLoopCount = 1000 // to prevent unexpected infinite loops
     const cycles = CycleChain.cycles
-    let index = 0
+    let index = cycles.length - 1
 
     // loop through cycle chain and collect sync times
     while (
@@ -221,7 +221,7 @@ export function updateRecord(
         error(`Found no cycle for counter ${cycleCounter}`)
       }
       cycleCounter--
-      index++
+      index--
     }
     if (addedCount > 0) {
       syncTimes = syncTimes.sort((a, b) => b.activeTimestamp - a.activeTimestamp)
