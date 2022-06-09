@@ -596,6 +596,8 @@ class TransactionQueue {
 
       //If we are not in the execution home then use data that was sent to us for the commit
       if(queueEntry.globalModification === false && this.executeInOneShard && queueEntry.isInExecutionHome === false){
+        //looks like this next line could be wiping out state from just above that used accountWrites
+        //we have a task to refactor his code that needs to happen for executeInOneShard to work
         wrappedStates = {}
         for(let key of Object.keys(queueEntry.collectedFinalData)){
           let finalAccount = queueEntry.collectedFinalData[key]
@@ -651,13 +653,20 @@ class TransactionQueue {
       savedSomething = await this.stateManager.setAccount(wrappedStates, localCachedData, applyResponse, isGlobalModifyingTX, filter, note)
       this.profiler.scopedProfileSectionEnd('commit_setAccount')
       if (savedSomething) {
-        if (queueEntry.appliedReceipt && queueEntry.appliedReceipt.appliedVotes) {
-          if (!this.config.debug.disableTxCoverageReport) {
-            this.txCoverageMap[queueEntry.logID] = queueEntry.appliedReceipt.appliedVotes.length
-          }
-        } else {
-          this.mainLogger.error(`commitConsensedTransaction  savedSomething: ${savedSomething}; it does not have appliedVotes field in the ${utils.stringifyReduce(queueEntry.originalData)}`)
+        if(this.config.debug.optimizedTXConsenus){
+          //todo implement if we need it?
+
         }
+        else {
+          if (queueEntry.appliedReceipt && queueEntry.appliedReceipt.appliedVotes) {
+            if (!this.config.debug.disableTxCoverageReport) {
+              this.txCoverageMap[queueEntry.logID] = queueEntry.appliedReceipt.appliedVotes.length
+            }
+          } else {
+            this.mainLogger.error(`commitConsensedTransaction  savedSomething: ${savedSomething}; it does not have appliedVotes field in the ${utils.stringifyReduce(queueEntry.originalData)}`)
+          }
+        }
+
       }
 
       if (logFlags.verbose) {
@@ -905,6 +914,7 @@ class TransactionQueue {
         requests: {},
         globalModification: globalModification,
         collectedVotes: [],
+        collectedVoteHashes: [],
         waitForReceiptOnly: false,
         m2TimeoutReached: false,
         debugFail_voteFlip: false,
@@ -1585,6 +1595,7 @@ class TransactionQueue {
         if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_result', `${utils.makeShortHash(queueEntry.acceptedTx.txId)}`, `r:${relationString}   result:${queueEntry.logstate} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} result: ${utils.stringifyReduce(result)}`)
 
         if (result.success === true && result.receipt != null) {
+          //TODO implement this!!!
           queueEntry.recievedAppliedReceipt = result.receipt
           keepTrying = false
           gotReceipt = true
@@ -2295,6 +2306,15 @@ class TransactionQueue {
 
     delete queueEntry.recievedAppliedReceipt
     delete queueEntry.appliedReceiptForRepair
+
+    // coalesce the receipt2s into applied receipt. maybe not as descriptive, but save memory.
+    this.stateManager.getReceipt2(queueEntry)
+    queueEntry.recievedAppliedReceipt2 = null
+    queueEntry.appliedReceiptForRepair2 = null
+
+    delete queueEntry.recievedAppliedReceipt2
+    delete queueEntry.appliedReceiptForRepair2
+
     //delete queueEntry.appliedReceiptFinal
 
     //delete queueEntry.preApplyTXResult //turn this off for now, until we can do some refactor of queueEntry.preApplyTXResult.applyResponse
@@ -2477,6 +2497,12 @@ class TransactionQueue {
         let hasReceivedApplyReceiptForRepair = queueEntry.appliedReceiptForRepair != null
         let shortID = queueEntry.logID //`${utils.makeShortHash(queueEntry.acceptedTx.id)}`
 
+        if(this.config.debug.optimizedTXConsenus){
+          hasApplyReceipt = queueEntry.appliedReceipt2 != null
+          hasReceivedApplyReceipt = queueEntry.recievedAppliedReceipt2 != null
+          hasReceivedApplyReceiptForRepair = queueEntry.appliedReceiptForRepair2 != null
+        }
+
         // on the off chance we are here with a pass of fail state remove this from the queue.
         // log fatal because we do not want to get to this situation.
         if (queueEntry.state === 'pass' || queueEntry.state === 'fail') {
@@ -2591,7 +2617,7 @@ class TransactionQueue {
 
             // The TX technically expired past M3, but we will now request reciept in hope that we can repair the tx
             if (txAge > timeM3 && queueEntry.requestingReceiptFailed === false && queueEntry.globalModification === false) {
-              if (queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null && queueEntry.requestingReceipt === false) {
+              if ((this.stateManager.hasReceipt(queueEntry) === false) && queueEntry.requestingReceipt === false) {
                 if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`txAge > timeM3 => ask for receipt now ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
                 if (logFlags.playback) this.logger.playbackLogNote('txMissingReceipt1', `txAge > timeM3 ${shortID}`, `syncNeedsReceipt ${shortID}`)
 
@@ -2858,20 +2884,26 @@ class TransactionQueue {
                   // shouldSendReceipt = queueEntry.recievedAppliedReceipt == null
 
                   if (shouldSendReceipt) {
-                    // Broadcast the receipt
-                    await this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)
+                    if(this.config.debug.optimizedTXConsenus && queueEntry.appliedReceipt2){
+                      // Broadcast the receipt, only if we made one (try produce can early out if we received one)
+                      await this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)  
+                    } else {
+                      // Broadcast the receipt
+                      await this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)                      
+                    }
+
                   } else {
                     // no need to share a receipt
                   }
 
                   //todo check cant_apply flag to make sure a vote can form with it!
                   //also check if failed votes will work...?
-                  if (result.appliedVotes[0].cant_apply === false && result.result === true) {
+                  if (this.stateManager.getReceiptVote(queueEntry).cant_apply === false && this.stateManager.getReceiptResult(queueEntry) === true) {
                     queueEntry.state = 'commiting'
                     queueEntry.hasValidFinalData = true
                     finishedConsensing = true
                   } else {
-                    if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_finishedFailReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
+                    if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_finishedFailReceipt1', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                     // we are finished since there is nothing to apply
                     // this.statemanager_fatal(`consensing: repairToMatchReceipt failed`, `consensing: repairToMatchReceipt failed ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
                     this.removeFromQueue(queueEntry, currentIndex)
@@ -2898,12 +2930,12 @@ class TransactionQueue {
                     if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceipt', `${shortID}`, `qId: ${queueEntry.entryID} `)
 
                     //todo check cant_apply flag to make sure a vote can form with it!
-                    if (queueEntry.recievedAppliedReceipt.appliedVotes[0].cant_apply === false && queueEntry.recievedAppliedReceipt.result === true) {
+                    if (this.stateManager.getReceiptVote(queueEntry).cant_apply === false && this.stateManager.getReceiptResult(queueEntry) === true) {
                       queueEntry.state = 'commiting'
                       queueEntry.hasValidFinalData = true
                       finishedConsensing = true
                     } else {
-                      if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_finishedFailReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
+                      if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_finishedFailReceipt2', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                       // we are finished since there is nothing to apply
                       //this.statemanager_fatal(`consensing: repairToMatchReceipt failed`, `consensing: repairToMatchReceipt failed ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
                       this.removeFromQueue(queueEntry, currentIndex)
@@ -2942,7 +2974,7 @@ class TransactionQueue {
                     continue
                   } else {
                     // We got a reciept, but the consensus is that this TX was not applied.
-                    if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_finishedFailReceipt', `${shortID}`, `qId: ${queueEntry.entryID}  `)
+                    if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_finishedFailReceipt3', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                     // we are finished since there is nothing to apply
                     this.statemanager_fatal(`consensing: repairToMatchReceipt failed`, `consensing: repairToMatchReceipt failed ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
                     this.removeFromQueue(queueEntry, currentIndex)
@@ -2979,7 +3011,7 @@ class TransactionQueue {
             if (this.processQueue_accountSeen(seenAccounts, queueEntry) === false) {
               this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
 
-              //temp hack
+              //temp hack ... hopefully this hack can go away
               if(queueEntry.recievedAppliedReceipt == null){
                 let result = this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
                 if(result != null){
@@ -2989,11 +3021,8 @@ class TransactionQueue {
               }
 
               //collectedFinalData
-              if(queueEntry.recievedAppliedReceipt != null
-                && queueEntry.recievedAppliedReceipt.appliedVotes != null
-                && queueEntry.recievedAppliedReceipt.appliedVotes.length > 0){
-
-                let vote = queueEntry.recievedAppliedReceipt.appliedVotes[0]
+              let vote = this.stateManager.getReceiptVote(queueEntry)
+              if(vote){
                 let failed = false
                 let incomplete = false
                 for(let i=0; i<vote.account_id.length; i++ ){
@@ -3287,8 +3316,10 @@ class TransactionQueue {
 
   addReceiptToForward(queueEntry: QueueEntry) {
     const netId: string = '123abc'
-    const receipt = this.getReceipt(queueEntry)
-    const status = receipt.result === true ? 'applied' : 'rejected'
+    // const receipt = this.stateManager.getReceipt(queueEntry)
+    // const status = receipt.result === true ? 'applied' : 'rejected'
+    const status = this.stateManager.getReceiptResult(queueEntry) === true ? 'applied' : 'rejected'
+    
     let txHash = queueEntry.acceptedTx.txId
     let txResultFullHash = this.crypto.hash({ tx: queueEntry.acceptedTx.data, status, netId })
     let txIdShort = utils.short(txHash)
@@ -3336,23 +3367,23 @@ class TransactionQueue {
     }
   }
 
-  getReceipt(queueEntry: QueueEntry): AppliedReceipt {
-    if (queueEntry.appliedReceiptFinal != null) {
-      return queueEntry.appliedReceiptFinal
-    }
-    // start with a receipt we made
-    let receipt: AppliedReceipt = queueEntry.appliedReceipt
-    if (receipt == null) {
-      // or see if we got one
-      receipt = queueEntry.recievedAppliedReceipt
-    }
-    // if we had to repair use that instead. this stomps the other ones
-    if (queueEntry.appliedReceiptForRepair != null) {
-      receipt = queueEntry.appliedReceiptForRepair
-    }
-    queueEntry.appliedReceiptFinal = receipt
-    return receipt
-  }
+  // getReceipt(queueEntry: QueueEntry): AppliedReceipt {
+  //   if (queueEntry.appliedReceiptFinal != null) {
+  //     return queueEntry.appliedReceiptFinal
+  //   }
+  //   // start with a receipt we made
+  //   let receipt: AppliedReceipt = queueEntry.appliedReceipt
+  //   if (receipt == null) {
+  //     // or see if we got one
+  //     receipt = queueEntry.recievedAppliedReceipt
+  //   }
+  //   // if we had to repair use that instead. this stomps the other ones
+  //   if (queueEntry.appliedReceiptForRepair != null) {
+  //     receipt = queueEntry.appliedReceiptForRepair
+  //   }
+  //   queueEntry.appliedReceiptFinal = receipt
+  //   return receipt
+  // }
 
   /**
    * processQueue_accountSeen

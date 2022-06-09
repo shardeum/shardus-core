@@ -707,6 +707,8 @@ export interface ServerConfiguration {
     hashedDevAuth?: string
     devPublicKey?: string
     newCacheFlow?: boolean
+    /** use the new path for TX receipt and vote sharing optimizations */
+    optimizedTXConsenus: boolean
   }
   /** Options for the statistics module */
   statistics?: {

@@ -96,6 +96,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     oldPartitionSystem: false,
     dumpAccountReportFromSQL: false,
     profiler: false,
+    optimizedTXConsenus: true,
   },
   statistics: { save: true, interval: 1 },
   loadDetection: {

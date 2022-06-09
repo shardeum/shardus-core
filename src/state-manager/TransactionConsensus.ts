@@ -3,13 +3,13 @@ import { TimestampReceipt } from '../shardus/shardus-types'
 import * as utils from '../utils'
 import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 import * as Context from '../p2p/Context'
-import { P2PModuleContext as P2P } from '../p2p/Context'
+import { config, P2PModuleContext as P2P } from '../p2p/Context'
 import Storage from '../storage'
 import Crypto from '../crypto'
 import Logger, { logFlags } from '../logger'
 import ShardFunctions from './shardFunctions.js'
 import StateManager from '.'
-import { AppliedReceipt, AppliedVote, QueueEntry, WrappedResponses } from './state-manager-types'
+import { AppliedReceipt, AppliedReceipt2, AppliedVote, AppliedVoteHash, QueueEntry, WrappedResponses } from './state-manager-types'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import * as Self from '../p2p/Self'
 import * as CycleChain from '../p2p/CycleChain'
@@ -137,6 +137,69 @@ class TransactionConsenus {
         profilerInstance.scopedProfileSectionEnd('spread_appliedReceipt', respondSize)
       }
     })
+
+    this.p2p.registerGossipHandler('spread_appliedReceipt2', async (payload, sender, tracker, msgSize: number) => {
+      profilerInstance.scopedProfileSectionStart('spread_appliedReceipt2', false, msgSize)
+      let respondSize = cUninitializedSize
+      try {
+        let appliedReceipt = payload as AppliedReceipt2
+        let queueEntry = this.stateManager.transactionQueue.getQueueEntrySafe(appliedReceipt.txid) // , payload.timestamp)
+        if (queueEntry == null) {
+          if (queueEntry == null) {
+            // It is ok to search the archive for this.  Not checking this was possibly breaking the gossip chain before
+            queueEntry = this.stateManager.transactionQueue.getQueueEntryArchived(payload.txid, 'spread_appliedReceipt2') // , payload.timestamp)
+            if (queueEntry != null) {
+              // TODO : PERF on a faster version we may just bail if this lives in the arcive list.
+              // would need to make sure we send gossip though.
+            }
+          }
+          if (queueEntry == null) {
+            if (logFlags.error) this.mainLogger.error(`spread_appliedReceipt no queue entry for ${appliedReceipt.txid} dbg:${this.stateManager.debugTXHistory[utils.stringifyReduce(payload.txid)]}`)
+            // NEW start repair process that will find the TX then apply repairs
+            // this.stateManager.transactionRepair.repairToMatchReceiptWithoutQueueEntry(appliedReceipt)
+            return
+          }
+        }
+
+        if (this.stateManager.testFailChance(this.stateManager.ignoreRecieptChance, 'spread_appliedReceipt2', utils.stringifyReduce(appliedReceipt.txid), '', logFlags.verbose) === true) {
+          return
+        }
+
+        // TODO STATESHARDING4 ENDPOINTS check payload format
+        // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (may need to check docs)
+
+        let receiptNotNull = appliedReceipt != null
+
+        if (queueEntry.gossipedReceipt === false){
+          queueEntry.gossipedReceipt = true
+          if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt2 update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`)
+
+
+          if(queueEntry.archived === false){
+            queueEntry.recievedAppliedReceipt2 = appliedReceipt
+          }
+
+          // I think we handle the negative cases later by checking queueEntry.recievedAppliedReceipt vs queueEntry.appliedReceipt
+
+          // share the appliedReceipt.
+          let sender = null
+          let gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
+          if (gossipGroup.length > 1) {
+            // should consider only forwarding in some cases?
+            this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, gossipGroup)
+            //no await so we cant get the message out size in a reasonable way
+            this.p2p.sendGossipIn('spread_appliedReceipt2', appliedReceipt, tracker, sender, gossipGroup, false)
+          }
+        } else {
+          // we get here if the receipt has already been shared
+          if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt2 skipped ${queueEntry.logID} receiptNotNull:${receiptNotNull} Already Shared`)
+        }
+
+      } finally {
+        profilerInstance.scopedProfileSectionEnd('spread_appliedReceipt2', respondSize)
+      }
+    })
+
   }
 
   generateTimestampReceipt(txId, cycleMarker: string, cycleCounter: CycleRecord['counter']): TimestampReceipt {
@@ -213,7 +276,14 @@ class TransactionConsenus {
       nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-notSkipped')
       // should consider only forwarding in some cases?
       this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, gossipGroup)
-      this.p2p.sendGossipIn('spread_appliedReceipt', appliedReceipt, '', sender, gossipGroup, true)
+      
+      if(config.debug.optimizedTXConsenus){
+        let appliedReceipt2 = queueEntry.appliedReceipt2
+        this.p2p.sendGossipIn('spread_appliedReceipt2', appliedReceipt2, '', sender, gossipGroup, true)
+      } else {
+        this.p2p.sendGossipIn('spread_appliedReceipt', appliedReceipt, '', sender, gossipGroup, true)
+      }
+
     }
   }
 
@@ -232,6 +302,17 @@ class TransactionConsenus {
 
     if (queueEntry.ourVote == null) {
       if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} ourVote == null`)
+      return false
+    }
+
+    // This is much easier than the old way
+    if(config.debug.optimizedTXConsenus){
+      let reciept = queueEntry.appliedReceipt2 ?? queueEntry.recievedAppliedReceipt2
+      if(reciept != null && queueEntry.ourVoteHash != null){
+        if(this.crypto.hash(reciept.appliedVote) === queueEntry.ourVoteHash){
+          return true
+        }
+      }
       return false
     }
 
@@ -350,6 +431,13 @@ class TransactionConsenus {
       return queueEntry.appliedReceipt
     }
 
+    if(config.debug.optimizedTXConsenus){
+      if(queueEntry.recievedAppliedReceipt2 != null){
+        //early out for speed but is returning null the right answer?
+        return queueEntry.recievedAppliedReceipt
+      }
+    }
+
     let passed = false
     let canProduceReceipt = false
 
@@ -373,6 +461,9 @@ class TransactionConsenus {
 
 
     let numVotes = queueEntry.collectedVotes.length
+    if(config.debug.optimizedTXConsenus){
+      numVotes = queueEntry.collectedVoteHashes.length
+    }
 
     if (numVotes < requiredVotes) {
       // we need more votes
@@ -387,6 +478,78 @@ class TransactionConsenus {
 
     let passCount = 0
     let failCount = 0
+
+    if(config.debug.optimizedTXConsenus){
+
+      let mostVotes = 0
+      let winningVoteHash
+      let hashCounts:Map<string,number> = new Map()
+      
+      for (let i = 0; i < numVotes; i++) {
+        let currentVote = queueEntry.collectedVoteHashes[i]
+        let voteCount = hashCounts.get(currentVote.voteHash)
+        let updatedVoteCount
+        if(voteCount === undefined){
+          updatedVoteCount = 1
+        } else {
+          updatedVoteCount = voteCount + 1
+        }
+        hashCounts.set(currentVote.voteHash, updatedVoteCount)
+        if(updatedVoteCount > mostVotes){
+          mostVotes = updatedVoteCount
+          winningVoteHash = currentVote.voteHash
+        }
+
+      }
+      if(winningVoteHash != undefined){
+        //make the new receipt.
+        let appliedReceipt2: AppliedReceipt2 = {
+          txid: queueEntry.acceptedTx.txId,
+          result: undefined,
+          appliedVote: undefined,
+          signatures: [],
+          app_data_hash: '',
+          //transaction_result: false //this was missing before..
+        }
+
+        for (let i = 0; i < numVotes; i++) {
+          let currentVote = queueEntry.collectedVoteHashes[i]
+          if(currentVote.voteHash === winningVoteHash){
+            appliedReceipt2.signatures.push(currentVote.sign)
+          }
+        }
+        //result and appliedVote must be set using a winning vote..
+        //we may not have this yet
+
+        if(queueEntry.ourVote != null && queueEntry.ourVoteHash === winningVoteHash){
+          appliedReceipt2.result = queueEntry.ourVote.transaction_result
+          appliedReceipt2.appliedVote = queueEntry.ourVote
+          // now send it !!!
+
+          queueEntry.appliedReceipt2 = appliedReceipt2
+
+          for(let i=0; i<queueEntry.ourVote.account_id.length; i++){
+            if(queueEntry.ourVote.account_id[i] === 'app_data_hash'){
+              appliedReceipt2.app_data_hash = queueEntry.ourVote.account_state_hash_after[i]
+              break
+            }
+          }
+
+          //this is a temporary hack to reduce the ammount of refactor needed.
+          let appliedReceipt: AppliedReceipt = {
+            txid: queueEntry.acceptedTx.txId,
+            result: queueEntry.ourVote.transaction_result,
+            appliedVotes: [queueEntry.ourVote],
+            app_data_hash: appliedReceipt2.app_data_hash
+          }
+          queueEntry.appliedReceipt = appliedReceipt
+
+          return appliedReceipt
+        }
+
+      }
+      return null
+    } 
 
     // First Pass: Check if there are enough pass or fail votes to attempt a receipt.
     for (let i = 0; i < numVotes; i++) {
@@ -418,7 +581,6 @@ class TransactionConsenus {
     //     node_id: string; // record the node that is making this vote.. todo could look this up from the sig later
     //     sign?: Shardus.Sign
     // };
-
 
     // Second Pass: look at the account hashes and find the most common hash per account
     //let uniqueKeys: {[id: string]: boolean} = {}
@@ -508,7 +670,7 @@ class TransactionConsenus {
         txid: queueEntry.acceptedTx.txId,
         result: passed,
         appliedVotes: [],
-        app_data_hash:''
+        app_data_hash: ''
       }
 
       // grab just the votes that match the winning pass or fail status
@@ -571,7 +733,12 @@ class TransactionConsenus {
       // recored our generated receipt to the queue entry
       queueEntry.appliedReceipt = appliedReceipt
       return appliedReceipt
+    
+
     }
+
+
+
 
     return null
   }
@@ -644,21 +811,63 @@ class TransactionConsenus {
     if (wrappedStates != null) {
       //we need to sort this list and doing it in place seems ok
       //applyResponse.stateTableResults.sort(this.sortByAccountId )
-      for (let key of Object.keys(wrappedStates)) {
-        let wrappedState = wrappedStates[key]
 
-        // note this is going to stomp the hash value for the account
-        // this used to happen in dapp.updateAccountFull  we now have to save off prevStateId on the wrappedResponse
-        //We have to update the hash now! Not sure if this is the greatest place but it needs to be done
-        let updatedHash = this.app.calculateAccountHash(wrappedState.data)
-        wrappedState.stateId = updatedHash
+  
+      if(config.debug.optimizedTXConsenus){
+        //need to sort our parallel lists so that they are deterministic!!
+        let wrappedStatesList = [...Object.values(wrappedStates)]
 
-        ourVote.account_id.push(wrappedState.accountId)
-        ourVote.account_state_hash_after.push(wrappedState.stateId)
-      }
+        //this sort is critical to a deterministic vote structure.. we need this if taking a hash
+        wrappedStatesList.sort(this.sortByAccountId)
+        
+        for (let wrappedState of wrappedStatesList) {
+          // note this is going to stomp the hash value for the account
+          // this used to happen in dapp.updateAccountFull  we now have to save off prevStateId on the wrappedResponse
+          //We have to update the hash now! Not sure if this is the greatest place but it needs to be done
+          let updatedHash = this.app.calculateAccountHash(wrappedState.data)
+          wrappedState.stateId = updatedHash
+
+          ourVote.account_id.push(wrappedState.accountId)
+          ourVote.account_state_hash_after.push(wrappedState.stateId)
+        } 
+      } else {
+        //old way usorted.
+        for (let key of Object.keys(wrappedStates)) {
+          let wrappedState = wrappedStates[key]
+
+          // note this is going to stomp the hash value for the account
+          // this used to happen in dapp.updateAccountFull  we now have to save off prevStateId on the wrappedResponse
+          //We have to update the hash now! Not sure if this is the greatest place but it needs to be done
+          let updatedHash = this.app.calculateAccountHash(wrappedState.data)
+          wrappedState.stateId = updatedHash
+
+          ourVote.account_id.push(wrappedState.accountId)
+          ourVote.account_state_hash_after.push(wrappedState.stateId)
+        }        
+      }   
+
     }
 
-    ourVote = this.crypto.sign(ourVote)
+    let appliedVoteHash:AppliedVoteHash
+    if(config.debug.optimizedTXConsenus ){
+      //let temp = ourVote.node_id
+      ourVote.node_id = '' //exclue this from hash
+      let voteHash = this.crypto.hash(ourVote)
+      //ourVote.node_id = temp
+      appliedVoteHash = {
+        txid:ourVote.txid,
+        voteHash
+      }
+      appliedVoteHash = this.crypto.sign(appliedVoteHash)
+      queueEntry.ourVoteHash = voteHash
+      
+      //append our vote
+      this.tryAppendVoteHash(queueEntry, appliedVoteHash)
+      
+    } else {
+      //in the old way we must sign the vote here
+      ourVote = this.crypto.sign(ourVote)
+    }
 
     // save our vote to our queueEntry
     queueEntry.ourVote = ourVote
@@ -688,7 +897,13 @@ class TransactionConsenus {
       }
       let filteredConsensusGroup = filteredNodes
 
-      this.p2p.tell(filteredConsensusGroup, 'spread_appliedVote', ourVote)
+      if(config.debug.optimizedTXConsenus){
+        this.p2p.tell(filteredConsensusGroup, 'spread_appliedVoteHash', appliedVoteHash)
+      } else {
+        //old way 
+        this.p2p.tell(filteredConsensusGroup, 'spread_appliedVote', ourVote)
+      }
+      
     } else {
       nestedCountersInstance.countEvent('transactionQueue', 'createAndShareVote fail, no consensus group')
     }
@@ -729,6 +944,38 @@ class TransactionConsenus {
 
     return true
   }
+
+  tryAppendVoteHash(queueEntry: QueueEntry, voteHash: AppliedVoteHash): boolean {
+    let numVotes = queueEntry.collectedVotes.length
+
+    if (logFlags.playback) this.logger.playbackLogNote('tryAppendVoteHash', `${queueEntry.logID}`, `collectedVotes: ${queueEntry.collectedVoteHashes.length}`)
+    if (logFlags.debug) this.mainLogger.debug(`tryAppendVoteHash collectedVotes: ${queueEntry.logID}   ${queueEntry.collectedVoteHashes.length} `)
+
+    // just add the vote if we dont have any yet
+    if (numVotes === 0) {
+      queueEntry.collectedVoteHashes.push(voteHash)
+      queueEntry.newVotes = true
+      return true
+    }
+
+    //compare to existing votes.  keep going until we find that this vote is already in the list or our id is at the right spot to insert sorted
+    for (let i = 0; i < numVotes; i++) {
+      let currentVote = queueEntry.collectedVoteHashes[i]
+
+      if (currentVote.sign.owner === voteHash.sign.owner) {
+        // already in our list so do nothing and return
+        return false
+      }
+    }
+
+    queueEntry.collectedVoteHashes.push(voteHash)
+    queueEntry.newVotes = true
+
+    return true
+  }
+
 }
+
+
 
 export default TransactionConsenus

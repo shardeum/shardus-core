@@ -25,8 +25,13 @@ export type TxDebug = {
 export type QueueEntry = {
     acceptedTx: Shardus.AcceptedTx;
     txKeys: Shardus.TransactionKeys
+    /** This is data that is collected or loaded locally before it attemps to call apply() */
     collectedData: WrappedResponses;
-    originalData: WrappedResponses;//{[accountID:string]:string}; //serialized to string backups of account data.
+    /** serialized to string backups of account data */
+    originalData: WrappedResponses;
+    /** This is data that transaction group nodes that are not in the consensus are sent after the consenus group has a valid receipt
+     *  This is sent via the broadcast_finalstate endpoint and is critical to the executeInOneShard optimization
+     */
     collectedFinalData: WrappedResponses;
     beforeHashes: {[accountID:string]:string}; //before hashes of account data
     homeNodes: {[accountID:string]:StateManager.shardFunctionTypes.NodeShardData};
@@ -79,21 +84,32 @@ export type QueueEntry = {
 
     // Consensus tracking:
     ourVote? : AppliedVote;
+    ourVoteHash?: string;
     collectedVotes : AppliedVote[];
+    collectedVoteHashes : AppliedVoteHash[]
     newVotes : boolean
+
+    gossipedReceipt: boolean;   
+
     // receipt that we created
     appliedReceipt?: AppliedReceipt;
-
-    gossipedReceipt: boolean;
     // receipt that we got from gossip
     recievedAppliedReceipt?: AppliedReceipt;
-
     // receipt that we need to repair to
     appliedReceiptForRepair?: AppliedReceipt;
-
     // receipt coalesced in getReceipt().
     appliedReceiptFinal?: AppliedReceipt;
 
+    // For config.debug.optimizedTXConsenus === true
+    // receipt that we created
+    appliedReceipt2?: AppliedReceipt2;
+    // receipt that we got from gossip
+    recievedAppliedReceipt2?: AppliedReceipt2;
+    // receipt that we need to repair to
+    appliedReceiptForRepair2?: AppliedReceipt2;
+    // receipt coalesced in getReceipt().
+    appliedReceiptFinal2?: AppliedReceipt2;
+    
     repairFinished?: boolean;
     repairFailed: boolean;
 
@@ -596,10 +612,34 @@ export type AppliedReceipt = {
     txid: string;
     result: boolean;
     appliedVotes: AppliedVote[]
-
     // hash of app data
     app_data_hash: string
 };
+
+/**
+ * a space efficent version of the receipt
+ * 
+ * use TellSignedVoteHash to send just signatures of the vote hash (votes must have a deterministic sort now)
+ * never have to send or request votes individually, should be able to rely on existing receipt send/request
+ * for nodes that match what is required.
+ */
+export type AppliedReceipt2 = {
+    txid: string;
+    result: boolean;
+    //single copy of vote
+    appliedVote: AppliedVote
+    //all signatures for this vote
+    signatures: Shardus.Sign[] //Could have all signatures or best N.  (lowest signature value?)
+    // hash of app data
+    app_data_hash: string
+};
+
+export type AppliedVoteHash = {
+    txid: string;
+    voteHash: string;
+    sign?: Shardus.Sign
+};
+
 
 // export type AppliedReceiptGossip2 = {
 //     appliedReceipt: AppliedReceipt2
@@ -657,6 +697,8 @@ export type GlobalAccountReportResp = {ready:boolean, combinedHash:string, accou
 export type PreApplyAcceptedTransactionResult = { applied: boolean, passed: boolean, applyResult:string, reason:string, applyResponse? : Shardus.ApplyResponse }
 
 export type CommitConsensedTransactionResult = { success: boolean }
+
+export type TellSignedVoteHash = { voteHash: string; sign: Shardus.Sign } 
 
 // Sync related
 export type StateHashResult = {stateHash:string}

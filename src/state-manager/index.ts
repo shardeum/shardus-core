@@ -38,7 +38,7 @@ import TransactionConsenus from './TransactionConsensus'
 import PartitionObjects from './PartitionObjects'
 import Depricated from './Depricated'
 import AccountPatcher from './AccountPatcher'
-import { CycleShardData, PartitionReceipt, FifoLockObjectMap, QueueEntry, AcceptedTx, AccountCopy, GetAccountDataByRangeSmart, WrappedStateArray, AccountHashCache, RequestReceiptForTxReq, RequestReceiptForTxResp, RequestStateForTxReqPost, RequestStateForTxResp, RequestTxResp, AppliedVote, GetAccountDataWithQueueHintsResp, DebugDumpPartitions, DebugDumpRangesCovered, DebugDumpNodesCovered, DebugDumpPartition, DebugDumpPartitionSkip, MainHashResults, SimpleDistanceObject, WrappedResponses, LocalCachedData, AccountFilter, StringBoolObjectMap, AppliedReceipt, CycleDebugNotes } from './state-manager-types'
+import { CycleShardData, PartitionReceipt, FifoLockObjectMap, QueueEntry, AcceptedTx, AccountCopy, GetAccountDataByRangeSmart, WrappedStateArray, AccountHashCache, RequestReceiptForTxReq, RequestReceiptForTxResp, RequestStateForTxReqPost, RequestStateForTxResp, RequestTxResp, AppliedVote, GetAccountDataWithQueueHintsResp, DebugDumpPartitions, DebugDumpRangesCovered, DebugDumpNodesCovered, DebugDumpPartition, DebugDumpPartitionSkip, MainHashResults, SimpleDistanceObject, WrappedResponses, LocalCachedData, AccountFilter, StringBoolObjectMap, AppliedReceipt, CycleDebugNotes, AppliedVoteHash, AppliedReceipt2 } from './state-manager-types'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { ReceiptMapResult } from '@shardus/types/build/src/state-manager/StateManagerTypes'
 
@@ -1239,7 +1239,26 @@ class StateManager {
           // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
         }        
       } finally {
-        profilerInstance.scopedProfileSectionStart('spread_appliedVote')        
+        profilerInstance.scopedProfileSectionEnd('spread_appliedVote')        
+      }
+    })
+
+    Comms.registerInternal('spread_appliedVoteHash', async (payload: AppliedVoteHash, respond: any, sender, tracker: string, msgSize: number) => {
+      profilerInstance.scopedProfileSectionStart('spread_appliedVoteHash', false, msgSize)
+      try{
+        let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+        if (queueEntry == null) {
+          return
+        }
+        let collectedVoteHash = payload as AppliedVoteHash
+        // TODO STATESHARDING4 ENDPOINTS check payload format
+        // TODO STATESHARDING4 ENDPOINTS that this message is from a valid sender (correct consenus group and valid signature)
+
+        if (this.transactionConsensus.tryAppendVoteHash(queueEntry, collectedVoteHash)) {
+          // Note this was sending out gossip, but since this needs to be converted to a tell function i deleted the gossip send
+        }        
+      } finally {
+        profilerInstance.scopedProfileSectionEnd('spread_appliedVoteHash')        
       }
     })
 
@@ -2695,6 +2714,62 @@ class StateManager {
     return receipt
   }
 
+  getReceipt2(queueEntry: QueueEntry): AppliedReceipt2 {
+    if (queueEntry.appliedReceiptFinal2 != null) {
+      return queueEntry.appliedReceiptFinal2
+    }
+    // start with a receipt we made
+    let receipt: AppliedReceipt2 = queueEntry.appliedReceipt2
+    if (receipt == null) {
+      // or see if we got one
+      receipt = queueEntry.recievedAppliedReceipt2
+    }
+    // if we had to repair use that instead. this stomps the other ones
+    if (queueEntry.appliedReceiptForRepair != null) {
+      receipt = queueEntry.appliedReceiptForRepair2
+    }
+    queueEntry.appliedReceiptFinal2 = receipt
+    return receipt
+  }
+
+  hasReceipt(queueEntry: QueueEntry){
+    if(this.config.debug.optimizedTXConsenus){
+      return this.getReceipt2(queueEntry) != null
+    } else {
+      return this.getReceipt(queueEntry) != null
+    }
+  }
+  getReceiptResult(queueEntry: QueueEntry){
+    if(this.config.debug.optimizedTXConsenus){
+      let receipt = this.getReceipt2(queueEntry)
+      if(receipt){
+        return receipt.result
+      }
+    } else {
+      let receipt = this.getReceipt(queueEntry)
+      if(receipt){
+        return receipt.result
+      }
+    }
+    return false
+  }
+
+  getReceiptVote(queueEntry: QueueEntry): AppliedVote {
+    if(this.config.debug.optimizedTXConsenus){
+      let receipt = this.getReceipt2(queueEntry)
+      if(receipt){
+        return receipt.appliedVote
+      }
+    } else {
+      let receipt = this.getReceipt(queueEntry)
+      if(receipt && receipt.appliedVotes && receipt.appliedVotes.length > 0){
+        return receipt.appliedVotes[0]
+      }
+    }
+
+  }
+
+
   generateReceiptMapResults(lastCycle: Shardus.Cycle): StateManagerTypes.StateManagerTypes.ReceiptMapResult[] {
     let results: StateManagerTypes.StateManagerTypes.ReceiptMapResult[] = []
 
@@ -2724,7 +2799,12 @@ class StateManager {
     for (let queueEntry of this.transactionQueue.newAcceptedTxQueue) {
       if (queueEntry.cycleToRecordOn === cycleToSave) {
         // make sure we have a receipt
-        let receipt = this.getReceipt(queueEntry)
+        let receipt: AppliedReceipt | AppliedReceipt2 = this.getReceipt(queueEntry)
+
+        if(this.config.debug.optimizedTXConsenus){
+          receipt = this.getReceipt2(queueEntry)
+        }
+
         if (receipt == null) {
           //check  && queueEntry.globalModification === false because global accounts will not get a receipt, should this change?
           if(logFlags.error && queueEntry.globalModification === false) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in newAcceptedTxQueue. ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
@@ -2741,7 +2821,10 @@ class StateManager {
     for (let queueEntry of this.transactionQueue.archivedQueueEntries) {
       if (queueEntry.cycleToRecordOn === cycleToSave) {
         // make sure we have a receipt
-        let receipt = this.getReceipt(queueEntry)
+        let receipt: AppliedReceipt | AppliedReceipt2 = this.getReceipt(queueEntry)
+        if(this.config.debug.optimizedTXConsenus){
+          receipt = this.getReceipt2(queueEntry)
+        }
         if (receipt == null) {
           //check  && queueEntry.globalModification === false
           if(logFlags.error && queueEntry.globalModification === false) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in archivedQueueEntries. ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
@@ -2766,7 +2849,10 @@ class StateManager {
       }
       // console.log('accountData accountData', accountData)
       for (let partition of queueEntry.involvedPartitions) {
-        let receipt = this.getReceipt(queueEntry)
+        let receipt: AppliedReceipt | AppliedReceipt2 = this.getReceipt(queueEntry)
+        if(this.config.debug.optimizedTXConsenus){
+          receipt = this.getReceipt2(queueEntry)
+        }
 
         let status = receipt.result === true ? 'applied' : 'rejected'
         let txHash = queueEntry.acceptedTx.txId
