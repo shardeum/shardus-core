@@ -11,6 +11,7 @@ import { crypto, logger } from './Context'
 import * as CycleChain from './CycleChain'
 import { id } from './Self'
 import deepmerge = require('deepmerge')
+import { sync } from './Sync'
 
 /** STATE */
 
@@ -23,6 +24,7 @@ export let byJoinOrder: P2P.NodeListTypes.Node[] // In order of joinRequestTimes
 export let byIdOrder: P2P.NodeListTypes.Node[]
 export let othersByIdOrder: P2P.NodeListTypes.Node[] // used by sendGossipIn
 export let activeByIdOrder: P2P.NodeListTypes.Node[]
+export let syncingByIdOrder: P2P.NodeListTypes.Node[]
 export let activeOthersByIdOrder: P2P.NodeListTypes.Node[]
 export let potentiallyRemoved: Set<P2P.NodeListTypes.Node['id']>
 
@@ -44,11 +46,13 @@ export function reset() {
   byIdOrder = []
   othersByIdOrder = []
   activeByIdOrder = []
+  syncingByIdOrder = []
   activeOthersByIdOrder = []
   potentiallyRemoved = new Set()
 }
 
 export function addNode(node: P2P.NodeListTypes.Node) {
+  console.log('thant: adding node', node)
   // Don't add duplicates
   if (nodes.has(node.id)) {
     warn(
@@ -74,6 +78,12 @@ export function addNode(node: P2P.NodeListTypes.Node) {
   if (node.id !== id) {
     insertSorted(othersByIdOrder, node, propComparator('id'))
   }
+  // If syncing, insert sorted by id into syncingByIdOrder
+  if (node.status === P2P.P2PTypes.NodeStatus.SYNCING) {
+    console.log('Adding to sycingByIdOrder')
+    insertSorted(syncingByIdOrder, node, propComparator('id'))
+    console.log('syncingByIdOrder', syncingByIdOrder)
+  }
 
   // If active, insert sorted by id into activeByIdOrder
   if (node.status === P2P.P2PTypes.NodeStatus.ACTIVE) {
@@ -87,6 +97,12 @@ export function addNode(node: P2P.NodeListTypes.Node) {
 }
 export function addNodes(newNodes: P2P.NodeListTypes.Node[]) {
   for (const node of newNodes) addNode(node)
+}
+
+export function removeSyncingNode(id) {
+  const idx = binarySearch(syncingByIdOrder, { id }, propComparator('id'))
+  console.log('Removing syncing node', id, idx)
+  if (idx >= 0) syncingByIdOrder.splice(idx, 1)
 }
 
 export function removeNode(id) {
@@ -111,6 +127,9 @@ export function removeNode(id) {
 
   idx = binarySearch(byIdOrder, { id }, propComparator('id'))
   if (idx >= 0) byIdOrder.splice(idx, 1)
+
+  idx = binarySearch(syncingByIdOrder, { id }, propComparator('id'))
+  if (idx >= 0) syncingByIdOrder.splice(idx, 1)
 
   const joinRequestTimestamp = nodes.get(id).joinRequestTimestamp
   idx = binarySearch(
@@ -146,6 +165,16 @@ export function updateNode(update: P2P.NodeListTypes.Update) {
         // Don't add yourself to
         if (node.id !== id) {
           insertSorted(activeOthersByIdOrder, node, propComparator('id'))
+        }
+        // remove active node from syncing list
+        const syncIndex = binarySearch(
+          syncingByIdOrder,
+          { id: node.id },
+          propComparator('id')
+        )
+        console.log('updateNode: removing active node from syncing list')
+        if (syncIndex >= 0) {
+          syncingByIdOrder.splice(idx, 1)
         }
       }
     }

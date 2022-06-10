@@ -10,6 +10,7 @@ import * as NodeList from './NodeList'
 import * as Self from './Self'
 import { profilerInstance } from '../utils/profiler'
 
+const maxSyncTime = 60 * 1000
 /** ROUTES */
 
 const gossipActiveRoute: P2P.P2PTypes.GossipHandler<P2P.ActiveTypes.SignedActiveRequest> = (
@@ -155,6 +156,7 @@ export function updateRecord(
   record.active = active
   record.activated = activated.sort()
   record.activatedPublicKeys = activatedPublicKeys.sort()
+  record.maxSyncTime = maxSyncTime
 }
 
 export function parseRecord(

@@ -17,6 +17,7 @@ import { robustQuery } from './Utils'
 import { profilerInstance } from '../utils/profiler'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { reportLost } from './Lost'
+import { join } from 'path'
 
 /** STATE */
 
@@ -50,6 +51,7 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       res.end()
       return
     }
+    console.log('Join request received', joinRequest)
 
     //  Validate of joinReq is done in addJoinRequest
     if (addJoinRequest(joinRequest)) {
@@ -383,7 +385,11 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
         'Reporting as lost because join request received from a known node',
         node
       )
-    reportLost(node, 'rejoin')
+    // console.log(
+    //   'Reporting as lost because join request received from a known node',
+    //   node
+    // )
+    // reportLost(node, 'rejoin')
     return false
   }
 

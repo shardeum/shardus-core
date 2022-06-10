@@ -23,6 +23,7 @@ import * as Sync from './Sync'
 import { compareQuery, Comparison } from './Utils'
 import { errorToStringFull } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { reportSyncLost } from './Lost'
 
 /** CONSTANTS */
 
@@ -476,6 +477,23 @@ async function runQ4() {
     Certified cycle marker: ${JSON.stringify(marker)}
     Certified cycle cert: ${JSON.stringify(cert)}
   `)
+
+  console.log(
+    'We have certified cycle record now. Should we report lost syncing node ?', record
+  )
+  // remove activated nodes from syncing by id order
+  for (const nodeId of record.activated) {
+    NodeList.removeSyncingNode(nodeId)
+  }
+  const syncingNodes = NodeList.syncingByIdOrder
+  console.log('syncing nodes', syncingNodes)
+
+
+
+  // find node that are syncing longer than maxSyncTime
+
+  // report the lost syncing node
+  // reportSyncLost()
 
   // Dont need this any more since we are not doing anything after this
   // if (cycleQuarterChanged(myC, myQ)) return
