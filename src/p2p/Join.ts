@@ -51,7 +51,6 @@ const joinRoute: P2P.P2PTypes.Route<Handler> = {
       res.end()
       return
     }
-    console.log('Join request received', joinRequest)
 
     //  Validate of joinReq is done in addJoinRequest
     if (addJoinRequest(joinRequest)) {
@@ -380,16 +379,6 @@ export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
   if (NodeList.byIpPort.has(ipPort)) {
     if (logFlags.p2pNonFatal) info('Cannot add join request for this node, already a known node.', JSON.stringify(NodeList.byIpPort.get(ipPort)))
     const node = NodeList.byIpPort.get(ipPort)
-    if (logFlags.p2pNonFatal)
-      info(
-        'Reporting as lost because join request received from a known node',
-        node
-      )
-    // console.log(
-    //   'Reporting as lost because join request received from a known node',
-    //   node
-    // )
-    // reportLost(node, 'rejoin')
     return false
   }
 

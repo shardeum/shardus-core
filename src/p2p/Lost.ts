@@ -276,27 +276,7 @@ async function killOther() {
 
 // This gets called from Shardus when network module emits timeout or error
 export function reportLost(target, reason){
-  if (target.id === Self.id) return  // don't report self
-  if (stopReporting[target.id]) return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
-// we set isDown cache to the cycle number here; to speed up deciding if a node is down
-  isDown[target.id] = currentCycle
-  const key = `${target.id}-${currentCycle}`
-  const lostRec = lost.get(key)
-  if (lostRec) return  // we have already seen this node for this cycle
-  let obj = {target:target.id, status:'reported', cycle:currentCycle }
-  const checker = getCheckerNode(target.id, currentCycle)
-  if ((checker.id === Self.id) && (activeByIdOrder.length >= 3)) return // we cannot be reporter and checker if there is 3 or more nodes in the network
-  let msg:P2P.LostTypes.LostReport = {target:target.id, checker:checker.id, reporter:Self.id, cycle:currentCycle}
-// [TODO] - remove the following line after testing killother
-  if (allowKillRoute && reason === 'killother') msg.killother = true
-  if(logFlags.p2pNonFatal) info(`Sending investigate request: reporter:${Self.port} checker:${checker.externalPort} target:${target.externalPort} `+JSON.stringify(msg))
-  msg = crypto.sign(msg)
-  lost.set(key, obj)
-  Comms.tell([checker], 'lost-report', msg)
-}
-
-
-export function reportSyncLost(target, reason){
+  console.log('Reporting lost', target, reason)
   if (target.id === Self.id) return  // don't report self
   if (stopReporting[target.id]) return // this node already appeared in the lost field of the cycle record, we dont need to keep reporting
 // we set isDown cache to the cycle number here; to speed up deciding if a node is down

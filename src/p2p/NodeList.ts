@@ -93,6 +93,9 @@ export function addNode(node: P2P.NodeListTypes.Node) {
     if (node.id !== id) {
       insertSorted(activeOthersByIdOrder, node, propComparator('id'))
     }
+
+    // remove active node from syncing list
+    removeSyncingNode(node.id)
   }
 }
 export function addNodes(newNodes: P2P.NodeListTypes.Node[]) {
@@ -167,15 +170,8 @@ export function updateNode(update: P2P.NodeListTypes.Update) {
           insertSorted(activeOthersByIdOrder, node, propComparator('id'))
         }
         // remove active node from syncing list
-        const syncIndex = binarySearch(
-          syncingByIdOrder,
-          { id: node.id },
-          propComparator('id')
-        )
         console.log('updateNode: removing active node from syncing list')
-        if (syncIndex >= 0) {
-          syncingByIdOrder.splice(idx, 1)
-        }
+        removeSyncingNode(node.id)
       }
     }
   }

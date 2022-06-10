@@ -23,7 +23,7 @@ import * as Sync from './Sync'
 import { compareQuery, Comparison } from './Utils'
 import { errorToStringFull } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-import { reportSyncLost } from './Lost'
+import { reportLost  } from './Lost'
 
 /** CONSTANTS */
 
@@ -478,16 +478,27 @@ async function runQ4() {
     Certified cycle cert: ${JSON.stringify(cert)}
   `)
 
-  console.log(
-    'We have certified cycle record now. Should we report lost syncing node ?', record
-  )
+  // if (NodeList.syncingByIdOrder.length !== record.syncing) {
+  //   console.log('nodelist syncingByIdOrder length', NodeList.syncingByIdOrder)
+  //   throw new Error('Difference between record.syncing and syncingByIdOrder')
+  // }
+
   // remove activated nodes from syncing by id order
   for (const nodeId of record.activated) {
     NodeList.removeSyncingNode(nodeId)
   }
   const syncingNodes = NodeList.syncingByIdOrder
-  console.log('syncing nodes', syncingNodes)
-
+  console.log('syncing nodes after clearing activated nodes', syncingNodes)
+  const now = Math.floor(Date.now() / 1000)
+  for (const syncingNode of syncingNodes) {
+    const syncTime = now - syncingNode.joinRequestTimestamp
+    console.log(`Syncing time for node ${syncingNode.id}`, syncTime)
+    console.log(`Max sync time from record`, record.maxSyncTime)
+    if (syncTime > record.maxSyncTime) {
+      console.log(`Sync time is longer than max sync time. Reporting as lost`)
+      reportLost(syncingNode, 'killother')
+    }
+  }
 
 
   // find node that are syncing longer than maxSyncTime
