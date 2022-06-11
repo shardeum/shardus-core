@@ -529,7 +529,7 @@ class PartitionStats {
       }
     } else {
       //this path doesnt matter much now because of checkAndSetAccountData() being used in different ways.
-      if (logFlags.verbose) this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account: 2`)
+      // if (logFlags.verbose) this.mainLogger.error(`statsDataSummaryUpdate: did not find seen account: 2`)
     }
     this.accountCache.updateAccountHash(accountId, hash, timestamp, cycle)
 

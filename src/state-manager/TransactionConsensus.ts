@@ -250,6 +250,13 @@ class TransactionConsenus {
 
     let appliedReceipt = queueEntry.appliedReceipt
 
+    if(config.debug.optimizedTXConsenus && queueEntry.appliedReceipt2 == null){
+      //take no action
+      nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-skipped appliedReceipt2 == null')
+      return
+    }
+
+
     // share the appliedReceipt.
     let sender = null
     let gossipGroup = this.stateManager.transactionQueue.queueEntryGetTransactionGroup(queueEntry)
@@ -278,8 +285,9 @@ class TransactionConsenus {
       this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, gossipGroup)
       
       if(config.debug.optimizedTXConsenus){
-        let appliedReceipt2 = queueEntry.appliedReceipt2
-        this.p2p.sendGossipIn('spread_appliedReceipt2', appliedReceipt2, '', sender, gossipGroup, true)
+        let payload = queueEntry.appliedReceipt2
+        //let payload = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
+        this.p2p.sendGossipIn('spread_appliedReceipt2', payload, '', sender, gossipGroup, true)
       } else {
         this.p2p.sendGossipIn('spread_appliedReceipt', appliedReceipt, '', sender, gossipGroup, true)
       }
@@ -296,6 +304,21 @@ class TransactionConsenus {
    * @param queueEntry
    */
   hasAppliedReceiptMatchingPreApply(queueEntry: QueueEntry, appliedReceipt: AppliedReceipt): boolean {
+
+    // This is much easier than the old way
+    if(config.debug.optimizedTXConsenus && queueEntry.ourVote){
+      let reciept = queueEntry.appliedReceipt2 ?? queueEntry.recievedAppliedReceipt2
+      if(reciept != null && queueEntry.ourVoteHash != null){
+        if(this.crypto.hash(reciept.appliedVote) === queueEntry.ourVoteHash){
+          return true
+        } else {
+          if (logFlags.debug) this.mainLogger.debug(`hasAppliedReceiptMatchingPreApply  ${queueEntry.logID} state does not match missing id:${utils.stringifyReduce(reciept.txid)} `)
+          return false
+        }
+      }
+      return false
+    }
+
     if (appliedReceipt == null) {
       return false
     }
@@ -305,16 +328,7 @@ class TransactionConsenus {
       return false
     }
 
-    // This is much easier than the old way
-    if(config.debug.optimizedTXConsenus){
-      let reciept = queueEntry.appliedReceipt2 ?? queueEntry.recievedAppliedReceipt2
-      if(reciept != null && queueEntry.ourVoteHash != null){
-        if(this.crypto.hash(reciept.appliedVote) === queueEntry.ourVoteHash){
-          return true
-        }
-      }
-      return false
-    }
+
 
     if (appliedReceipt != null) {
       if (appliedReceipt.result !== queueEntry.ourVote.transaction_result) {
@@ -418,6 +432,15 @@ class TransactionConsenus {
    * @param queueEntry
    */
   tryProduceReceipt(queueEntry: QueueEntry): AppliedReceipt | null {
+    if(config.debug.optimizedTXConsenus){
+      let receipt2 = queueEntry.recievedAppliedReceipt2 ?? queueEntry.appliedReceipt2
+      if(receipt2 != null){
+        //
+        //@ts-ignore
+        return receipt2
+      }
+    }
+
     if (queueEntry.waitForReceiptOnly === true) {
       return null
     }
@@ -429,13 +452,6 @@ class TransactionConsenus {
 
     if(queueEntry.appliedReceipt != null){
       return queueEntry.appliedReceipt
-    }
-
-    if(config.debug.optimizedTXConsenus){
-      if(queueEntry.recievedAppliedReceipt2 != null){
-        //early out for speed but is returning null the right answer?
-        return queueEntry.recievedAppliedReceipt
-      }
     }
 
     let passed = false
