@@ -14,6 +14,7 @@ import { sync } from './Sync'
 
 const maxSyncTime = 100 // 100s for testing
 let syncTimes = []
+let lastCheckedCycleForSyncTimes = 0
 /** ROUTES */
 
 const gossipActiveRoute: P2P.P2PTypes.GossipHandler<P2P.ActiveTypes.SignedActiveRequest> = (
@@ -161,49 +162,81 @@ export function updateRecord(
   record.activatedPublicKeys = activatedPublicKeys.sort()
   record.maxSyncTime = maxSyncTime
 
+  let cycleCounter = CycleChain.newest ? CycleChain.newest.counter : 0
+  const loopCount = 0
+  let addedCount = 0
 
-  let shouldCalculate = true
+  const cycles = CycleChain.cycles
+  let index = 0
+  while (cycles.length > 0 && cycleCounter > lastCheckedCycleForSyncTimes) {
+    const cycle = cycles[index]
+    if (cycle) {
+      // collect sync time from recently activated nodes
+      for (const nodeId of cycle.activated) {
+        const node = NodeList.nodes.get(nodeId)
+        const included = syncTimes.filter(
+          (item) =>
+            item.nodeId === node.id &&
+            item.activeTimestamp === node.activeTimestamp
+        )
+        if (included && included.length > 0) continue
+        const syncTime = node.activeTimestamp - node.joinRequestTimestamp
 
-  if (shouldCalculate) {
-    let cycleCounter = CycleChain.cycles.length - 1
-    let lastCheckedCounter = syncTimes.length > 0 ? syncTimes[0].counter : 0
-    let loopCount = 0
-    console.log('cycle count', cycleCounter, 'lastCheckedCounter', lastCheckedCounter)
-
-    while(cycleCounter >= lastCheckedCounter) {
-      loopCount++
-      console.log('Checking sync time in cycle', cycleCounter)
-      const cycle = CycleChain.cycles[cycleCounter]
-      if (cycle) {
-        for (let nodeId of cycle.activated) {
-          console.log(`Node ${nodeId} is activated in cycle ${cycle.counter}`)
-          const node = NodeList.nodes.get(nodeId)
-          console.log(`Node ${node.id} joined network at ${node.joinRequestTimestamp} and active at ${node.activeTimestamp}`)
-          const syncTime = node.activeTimestamp - node.joinRequestTimestamp
-          console.log(`Node ${node.id} sync time is ${syncTime} s`)
-          syncTimes.push({
-            nodeId,
-            activeTimestamp: node.activeTimestamp,
-            joinTimestamp: node.joinRequestTimestamp,
-            syncTime,
-            counter: cycle.counter
-          })
-        }
+        syncTimes.push({
+          nodeId: node.id,
+          activeTimestamp: node.activeTimestamp,
+          joinTimestamp: node.joinRequestTimestamp,
+          syncTime,
+          refreshedCounter: cycle.counter
+        })
+        addedCount += 1
       }
-      cycleCounter--
+
+      // collect sync time from refreshed nodes
+      for (const node of cycle.refreshedConsensors) {
+        const included = syncTimes.filter(
+          (item) =>
+            item.nodeId === node.id &&
+            item.activeTimestamp === node.activeTimestamp
+        )
+        if (included && included.length > 0) continue
+        const syncTime = node.activeTimestamp - node.joinRequestTimestamp
+
+        syncTimes.push({
+          nodeId: node.id,
+          activeTimestamp: node.activeTimestamp,
+          joinTimestamp: node.joinRequestTimestamp,
+          syncTime,
+          refreshedCounter: cycle.counter
+        })
+        addedCount += 1
+      }
+    } else {
+      error(`Found no cycle for counter ${cycleCounter}`)
     }
-    syncTimes = syncTimes.sort((a, b) => b.counter - a.counter)
+    cycleCounter--
+    index++
+  }
+  if (addedCount > 0) {
+    syncTimes = syncTimes.sort((a, b) => b.activeTimestamp - a.activeTimestamp)
     if (syncTimes.length > 9) {
       syncTimes = syncTimes.slice(0, 9)
     }
-    console.log(`Sync loop count`, loopCount)
-    console.log('Sync time records sorted', syncTimes.length, syncTimes)
-    const syncDurations = syncTimes.map(syncTime => syncTime.activeTimestamp - syncTime.joinTimestamp).sort((a, b) => a - b)
-    const medianIndex = Math.floor(syncDurations.length / 2)
-    const medianSyncTime = syncDurations[medianIndex]
-    console.log(`Median sync time at cycle ${CycleChain.newest.counter} is ${medianSyncTime} s.`)
-    record.maxSyncTime = medianSyncTime
   }
+  if (syncTimes.length > 0)
+    lastCheckedCycleForSyncTimes = syncTimes[0].refreshedCounter // updated last checked cycle
+  const syncDurations = syncTimes.map(syncTime => syncTime.activeTimestamp - syncTime.joinTimestamp).sort((a, b) => a - b)
+  const medianIndex = Math.floor(syncDurations.length / 2)
+  const medianSyncTime = syncDurations[medianIndex]
+
+  info('Sync time records sorted', syncTimes.length, syncTimes)
+
+  if (CycleChain.newest)
+    info(
+      `Median sync time at cycle ${CycleChain.newest.counter} is ${medianSyncTime} s.`
+    )
+
+  record.maxSyncTime = medianSyncTime
 }
 
 export function parseRecord(

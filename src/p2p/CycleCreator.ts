@@ -478,33 +478,23 @@ async function runQ4() {
     Certified cycle cert: ${JSON.stringify(cert)}
   `)
 
-  // if (NodeList.syncingByIdOrder.length !== record.syncing) {
-  //   console.log('nodelist syncingByIdOrder length', NodeList.syncingByIdOrder)
-  //   throw new Error('Difference between record.syncing and syncingByIdOrder')
-  // }
-
   // remove activated nodes from syncing by id order
   for (const nodeId of record.activated) {
     NodeList.removeSyncingNode(nodeId)
   }
   const syncingNodes = NodeList.syncingByIdOrder
-  console.log('syncing nodes after clearing activated nodes', syncingNodes)
   const now = Math.floor(Date.now() / 1000)
   for (const syncingNode of syncingNodes) {
     const syncTime = now - syncingNode.joinRequestTimestamp
-    console.log(`Syncing time for node ${syncingNode.id}`, syncTime)
-    console.log(`Max sync time from record`, record.maxSyncTime)
     if (syncTime > record.maxSyncTime) {
-      console.log(`Sync time is longer than max sync time. Reporting as lost`)
-      reportLost(syncingNode, 'killother')
+      if (logFlags.p2pNonFatal) {
+        info(`Syncing time for node ${syncingNode.id}`, syncTime)
+        info(`Max sync time from record`, record.maxSyncTime)
+        info(`Sync time is longer than max sync time. Reporting as lost`)
+      }
+      reportLost(syncingNode, 'lostsync')
     }
   }
-
-
-  // find node that are syncing longer than maxSyncTime
-
-  // report the lost syncing node
-  // reportSyncLost()
 
   // Dont need this any more since we are not doing anything after this
   // if (cycleQuarterChanged(myC, myQ)) return
