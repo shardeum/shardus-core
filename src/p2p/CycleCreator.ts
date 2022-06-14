@@ -486,7 +486,7 @@ async function runQ4() {
   const now = Math.floor(Date.now() / 1000)
   for (const syncingNode of syncingNodes) {
     const syncTime = now - syncingNode.joinRequestTimestamp
-    if (syncTime > record.maxSyncTime) {
+    if (record.maxSyncTime && syncTime > record.maxSyncTime) {
       if (logFlags.p2pNonFatal) {
         info(`Syncing time for node ${syncingNode.id}`, syncTime)
         info(`Max sync time from record`, record.maxSyncTime)

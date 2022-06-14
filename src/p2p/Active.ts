@@ -12,7 +12,6 @@ import * as Self from './Self'
 import { profilerInstance } from '../utils/profiler'
 import { sync } from './Sync'
 
-const maxSyncTime = 100 // 100s for testing
 let syncTimes = []
 let lastCheckedCycleForSyncTimes = 0
 /** ROUTES */
@@ -160,83 +159,100 @@ export function updateRecord(
   record.active = active
   record.activated = activated.sort()
   record.activatedPublicKeys = activatedPublicKeys.sort()
-  record.maxSyncTime = maxSyncTime
 
-  let cycleCounter = CycleChain.newest ? CycleChain.newest.counter : 0
-  const loopCount = 0
-  let addedCount = 0
+  try {
+    let cycleCounter = CycleChain.newest ? CycleChain.newest.counter : 0
+    let loopCount = 0
+    let addedCount = 0
+    const maxLoopCount = 1000 // to prevent unexpected infinite loops
+    const cycles = CycleChain.cycles
+    let index = 0
 
-  const cycles = CycleChain.cycles
-  let index = 0
-  while (cycles.length > 0 && cycleCounter > lastCheckedCycleForSyncTimes) {
-    const cycle = cycles[index]
-    if (cycle) {
-      // collect sync time from recently activated nodes
-      for (const nodeId of cycle.activated) {
-        const node = NodeList.nodes.get(nodeId)
-        const included = syncTimes.filter(
-          (item) =>
-            item.nodeId === node.id &&
-            item.activeTimestamp === node.activeTimestamp
-        )
-        if (included && included.length > 0) continue
-        const syncTime = node.activeTimestamp - node.joinRequestTimestamp
+    // loop through cycle chain and collect sync times
+    while (
+      cycles.length > 0 &&
+      cycleCounter > lastCheckedCycleForSyncTimes &&
+      loopCount < maxLoopCount
+    ) {
+      loopCount++
+      const cycle = cycles[index]
+      if (cycle) {
+        // collect sync time from recently activated nodes
+        for (const nodeId of cycle.activated) {
+          const node = NodeList.nodes.get(nodeId)
+          const included = syncTimes.filter(
+            (item) =>
+              item.nodeId === node.id &&
+              item.activeTimestamp === node.activeTimestamp
+          )
+          if (included && included.length > 0) continue
+          const syncTime = node.activeTimestamp - node.joinRequestTimestamp
 
-        syncTimes.push({
-          nodeId: node.id,
-          activeTimestamp: node.activeTimestamp,
-          joinTimestamp: node.joinRequestTimestamp,
-          syncTime,
-          refreshedCounter: cycle.counter
-        })
-        addedCount += 1
+          syncTimes.push({
+            nodeId: node.id,
+            activeTimestamp: node.activeTimestamp,
+            joinTimestamp: node.joinRequestTimestamp,
+            syncTime,
+            refreshedCounter: cycle.counter
+          })
+          addedCount += 1
+        }
+
+        // collect sync time from refreshed active nodes
+        for (const node of cycle.refreshedConsensors) {
+          const included = syncTimes.filter(
+            (item) =>
+              item.nodeId === node.id &&
+              item.activeTimestamp === node.activeTimestamp
+          )
+          if (included && included.length > 0) continue
+          const syncTime = node.activeTimestamp - node.joinRequestTimestamp
+
+          syncTimes.push({
+            nodeId: node.id,
+            activeTimestamp: node.activeTimestamp,
+            joinTimestamp: node.joinRequestTimestamp,
+            syncTime,
+            refreshedCounter: cycle.counter
+          })
+          addedCount += 1
+        }
+      } else {
+        error(`Found no cycle for counter ${cycleCounter}`)
       }
-
-      // collect sync time from refreshed nodes
-      for (const node of cycle.refreshedConsensors) {
-        const included = syncTimes.filter(
-          (item) =>
-            item.nodeId === node.id &&
-            item.activeTimestamp === node.activeTimestamp
-        )
-        if (included && included.length > 0) continue
-        const syncTime = node.activeTimestamp - node.joinRequestTimestamp
-
-        syncTimes.push({
-          nodeId: node.id,
-          activeTimestamp: node.activeTimestamp,
-          joinTimestamp: node.joinRequestTimestamp,
-          syncTime,
-          refreshedCounter: cycle.counter
-        })
-        addedCount += 1
+      cycleCounter--
+      index++
+    }
+    if (addedCount > 0) {
+      syncTimes = syncTimes.sort((a, b) => b.activeTimestamp - a.activeTimestamp)
+      if (syncTimes.length > 9) {
+        syncTimes = syncTimes.slice(0, 9)
       }
-    } else {
-      error(`Found no cycle for counter ${cycleCounter}`)
     }
-    cycleCounter--
-    index++
-  }
-  if (addedCount > 0) {
-    syncTimes = syncTimes.sort((a, b) => b.activeTimestamp - a.activeTimestamp)
-    if (syncTimes.length > 9) {
-      syncTimes = syncTimes.slice(0, 9)
-    }
-  }
-  if (syncTimes.length > 0)
-    lastCheckedCycleForSyncTimes = syncTimes[0].refreshedCounter // updated last checked cycle
-  const syncDurations = syncTimes.map(syncTime => syncTime.activeTimestamp - syncTime.joinTimestamp).sort((a, b) => a - b)
-  const medianIndex = Math.floor(syncDurations.length / 2)
-  const medianSyncTime = syncDurations[medianIndex]
+    if (syncTimes.length > 0)
+      lastCheckedCycleForSyncTimes = syncTimes[0].refreshedCounter // updated last checked cycle
+    const syncDurations = syncTimes
+      .map((syncTime) => syncTime.activeTimestamp - syncTime.joinTimestamp)
+      .sort((a, b) => a - b)
+    const medianIndex = Math.floor(syncDurations.length / 2)
+    const medianSyncTime = syncDurations[medianIndex]
 
-  info('Sync time records sorted', syncTimes.length, syncTimes)
-
-  if (CycleChain.newest)
     info(
-      `Median sync time at cycle ${CycleChain.newest.counter} is ${medianSyncTime} s.`
+      'Sync time records sorted',
+      syncTimes.length,
+      JSON.stringify(syncTimes)
     )
 
-  record.maxSyncTime = medianSyncTime
+    if (CycleChain.newest)
+      info(
+        `Median sync time at cycle ${CycleChain.newest.counter} is ${medianSyncTime} s.`
+      )
+
+    record.maxSyncTime = medianSyncTime ? medianSyncTime : null
+  } catch (e) {
+    record.maxSyncTime = null
+    error(`calculateMaxSyncTime: Unable to calculate max sync time`, e)
+  }
 }
 
 export function parseRecord(

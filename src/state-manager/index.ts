@@ -1630,15 +1630,12 @@ class StateManager {
 
     // hack to say we have all the data
     if (this.currentCycleShardData.activeNodes.length <= this.currentCycleShardData.shardGlobals.consensusRadius) {
-      console.log('thant: active node length is less than consensRadius. Setting accountIsRemote to false', this.currentCycleShardData.activeNodes, this.currentCycleShardData.shardGlobals.consensusRadius)
       accountIsRemote = false
     }
     if (forceLocalGlobalLookup) {
       accountIsRemote = false
     }
 
-    console.log('thant: forcedGlobalLookup', forceLocalGlobalLookup, address)
-    console.log('thant: accountIsRemote', accountIsRemote, address)
 
     if (accountIsRemote) {
       let homeNode = ShardFunctions.findHomeNode(this.currentCycleShardData.shardGlobals, address, this.currentCycleShardData.parititionShardDataMap)
