@@ -478,23 +478,6 @@ async function runQ4() {
     Certified cycle cert: ${JSON.stringify(cert)}
   `)
 
-  // remove activated nodes from syncing by id order
-  for (const nodeId of record.activated) {
-    NodeList.removeSyncingNode(nodeId)
-  }
-  const syncingNodes = NodeList.syncingByIdOrder
-  const now = Math.floor(Date.now() / 1000)
-  for (const syncingNode of syncingNodes) {
-    const syncTime = now - syncingNode.joinRequestTimestamp
-    if (record.maxSyncTime && syncTime > record.maxSyncTime) {
-      if (logFlags.p2pNonFatal) {
-        info(`Syncing time for node ${syncingNode.id}`, syncTime)
-        info(`Max sync time from record`, record.maxSyncTime)
-        info(`Sync time is longer than max sync time. Reporting as lost`)
-      }
-      reportLost(syncingNode, 'lostsync')
-    }
-  }
 
   // Dont need this any more since we are not doing anything after this
   // if (cycleQuarterChanged(myC, myQ)) return
@@ -539,6 +522,7 @@ function makeCycleRecord(
     joined: [],
     returned: [],
     lost: [],
+    lostSyncing: [],
     refuted: [],
     apoptosized: [],
   }) as P2P.CycleCreatorTypes.CycleRecord

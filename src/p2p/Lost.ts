@@ -19,6 +19,8 @@ import { activeByIdOrder, byIdOrder, nodes } from './NodeList'
 import * as Self from './Self'
 import { profilerInstance } from '../utils/profiler'
 import getCallstack from '../utils/getCallstack'
+import { NodeStatus } from '../../../shardus-types/build/src/p2p/P2PTypes'
+import * as NodeList from './NodeList'
 
 /** STATE */
 
@@ -181,6 +183,7 @@ Given the txs and prev cycle record mutate the referenced record
 // This gets called during Q3 after dropInvalidTxs
 export function updateRecord( txs: P2P.LostTypes.Txs, record: P2P.CycleCreatorTypes.CycleRecord, prev: P2P.CycleCreatorTypes.CycleRecord) {
   const lostNodeIds = []
+  const lostSyncingNodeIds = []
   const refutedNodeIds = []
   let seen = {}  // used to make sure we don't add the same node twice
   for (const request of txs.lost) {
@@ -194,12 +197,35 @@ export function updateRecord( txs: P2P.LostTypes.Txs, record: P2P.CycleCreatorTy
     refutedNodeIds.push(request.target)
     seen[request.target] = true
   }
+
+  // remove activated nodes from syncing by id order
+  for (const nodeId of record.activated) {
+    NodeList.removeSyncingNode(nodeId)
+  }
+  const syncingNodes = NodeList.syncingByIdOrder
+  const now = Math.floor(Date.now() / 1000)
+  for (const syncingNode of syncingNodes) {
+    const syncTime = now - syncingNode.joinRequestTimestamp
+    if (record.maxSyncTime && syncTime > record.maxSyncTime) {
+      if (logFlags.p2pNonFatal) {
+        info(`Syncing time for node ${syncingNode.id}`, syncTime)
+        info(`Max sync time from record`, record.maxSyncTime)
+        info(`Sync time is longer than max sync time. Reporting as lost`)
+      }
+      lostSyncingNodeIds.push(syncingNode.id)
+    }
+  }
+
   record.lost = lostNodeIds.sort()
+  record.lostSyncing = lostSyncingNodeIds.sort()
+  record.lostSyncing = []
   record.refuted = refutedNodeIds.sort()
   if (prev){
     let apop = prev.lost.filter(id => nodes.has(id))  // remove nodes that are no longer in the network
+    // let apopSyncing = prev.lostSyncing.filter(id => nodes.has(id))  // remove nodes that are no longer in the network
+    const apopSyncing = []
     apop = apop.filter(id => !refutedNodeIds.includes(id))  // remove nodes that refuted
-    record.apoptosized = [...apop, ...record.apoptosized ].sort()
+    record.apoptosized = [...apop, ...apopSyncing, ...record.apoptosized ].sort()
   }
 }
 
@@ -217,11 +243,22 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
     stopReporting[id] = record.counter
     if (id === Self.id) sendRefute = record.counter + 1
   }
+
+  if (record.lostSyncing.includes(Self.id)) {
+    // This could happen if we take longer than maxSyncTime to sync
+    error(`We got marked for apoptosis even though we didn't ask for it. Being nice and leaving.`)
+    Self.emitter.emit(
+      'apoptosized',
+      getCallstack(),
+      'Apoptosis being called at parseRecord() => src/p2p/Apoptosis.ts'
+    )
+  }
+
   // We don't actually have to set removed because the Apoptosis module will do it.
   // Make sure the Lost module is listed after Apoptosis in the CycleCreator submodules list
   return {
     added: [],
-    removed: [],
+    removed: record.lostSyncing,
     updated: []
   }
 }

@@ -225,8 +225,8 @@ export function updateRecord(
     }
     if (addedCount > 0) {
       syncTimes = syncTimes.sort((a, b) => b.activeTimestamp - a.activeTimestamp)
-      if (syncTimes.length > 9) {
-        syncTimes = syncTimes.slice(0, 9)
+      if (syncTimes.length > config.p2p.maxNodeForSyncTime) {
+        syncTimes = syncTimes.slice(0, config.p2p.maxNodeForSyncTime)
       }
     }
     if (syncTimes.length > 0)
@@ -248,9 +248,10 @@ export function updateRecord(
         `Median sync time at cycle ${CycleChain.newest.counter} is ${medianSyncTime} s.`
       )
 
-    record.maxSyncTime = medianSyncTime ? medianSyncTime * 2 : null
+    const maxSyncTime = medianSyncTime ? medianSyncTime * 2 : 0
+    record.maxSyncTime = Math.min(config.p2p.maxSyncTimeFloor, maxSyncTime)
   } catch (e) {
-    record.maxSyncTime = null
+    record.maxSyncTime = config.p2p.maxSyncTimeFloor
     error(`calculateMaxSyncTime: Unable to calculate max sync time`, e)
   }
 }

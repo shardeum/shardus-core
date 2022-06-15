@@ -606,6 +606,10 @@ export interface ServerConfiguration {
     maxJoinedPerCycle?: number
     /** The maxSyncingPerCycle parameter is an Integer specifying the maximum number of nodes that can be in the syncing phase each cycle. */
     maxSyncingPerCycle?: number
+    /** The max syncing time a node can take */
+    maxSyncTimeFloor?: number
+    /** max nodes to calculate median/max sync time */
+    maxNodeForSyncTime?: number
     /** The maxRotatedPerCycle parameter is an Integer specifying the maximum number of nodes that can that can be rotated out of the network each cycle. */
     maxRotatedPerCycle?: number
     /** A fixed boost to let more nodes in when we have just the one seed node in the network */

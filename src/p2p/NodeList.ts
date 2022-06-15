@@ -80,9 +80,7 @@ export function addNode(node: P2P.NodeListTypes.Node) {
   }
   // If syncing, insert sorted by id into syncingByIdOrder
   if (node.status === P2P.P2PTypes.NodeStatus.SYNCING) {
-    console.log('Adding to sycingByIdOrder')
     insertSorted(syncingByIdOrder, node, propComparator('id'))
-    console.log('syncingByIdOrder', syncingByIdOrder)
   }
 
   // If active, insert sorted by id into activeByIdOrder
