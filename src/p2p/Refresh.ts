@@ -175,8 +175,8 @@ export function cyclesToKeep() {
       break
     }
 */
-    for (const n of record.refreshedConsensors) seen.set(n.publicKey, 1)
-    for (const n of record.joinedConsensors) seen.set(n.publicKey, 1)
+    for (const n of record.refreshedConsensors) seen.set(n.externalIp + ':' + n.externalPort, 1)
+    for (const n of record.joinedConsensors) seen.set(n.externalIp + ':' + n.externalPort, 1)
     if (seen.size >= totalNodeCount(newest)) break
     count++
   }
