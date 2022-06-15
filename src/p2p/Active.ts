@@ -248,7 +248,7 @@ export function updateRecord(
         `Median sync time at cycle ${CycleChain.newest.counter} is ${medianSyncTime} s.`
       )
 
-    record.maxSyncTime = medianSyncTime ? medianSyncTime : null
+    record.maxSyncTime = medianSyncTime ? medianSyncTime * 2 : null
   } catch (e) {
     record.maxSyncTime = null
     error(`calculateMaxSyncTime: Unable to calculate max sync time`, e)
