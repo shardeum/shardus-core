@@ -248,8 +248,12 @@ export function updateRecord(
         `Median sync time at cycle ${CycleChain.newest.counter} is ${medianSyncTime} s.`
       )
 
-    const maxSyncTime = medianSyncTime ? medianSyncTime * 2 : 0
-    record.maxSyncTime = Math.min(config.p2p.maxSyncTimeFloor, maxSyncTime)
+    let maxSyncTime = medianSyncTime ? medianSyncTime * 2 : 0
+    if (maxSyncTime < config.p2p.maxSyncTimeFloor) {
+      maxSyncTime = config.p2p.maxSyncTimeFloor
+    }
+    record.maxSyncTime = maxSyncTime
+    // record.maxSyncTime = Math.min(config.p2p.maxSyncTimeFloor, maxSyncTime)
   } catch (e) {
     record.maxSyncTime = config.p2p.maxSyncTimeFloor
     error(`calculateMaxSyncTime: Unable to calculate max sync time`, e)

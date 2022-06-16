@@ -47,7 +47,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     nodeExpiryAge: 30,
     maxJoinedPerCycle: 1,
     maxSyncingPerCycle: 5,
-    maxSyncTimeFloor: 60,
+    maxSyncTimeFloor: 120,
     maxNodeForSyncTime: 9,
     maxRotatedPerCycle: 1,
     firstCycleJoin: 10,
@@ -59,6 +59,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     amountToShrink: 1,
     startInWitnessMode: false,
     experimentalSnapshot: true,
+    detectLostSyncing: true,
   },
   ip: {
     externalIp: '0.0.0.0',

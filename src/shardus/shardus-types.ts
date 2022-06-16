@@ -633,6 +633,7 @@ export interface ServerConfiguration {
     /** If witenss mode is true, node will not join the network but help other nodes to sync the data */
     startInWitnessMode?: boolean
     experimentalSnapshot?: boolean
+    detectLostSyncing?: boolean
   }
   /** Server IP configuration */
   ip?: {

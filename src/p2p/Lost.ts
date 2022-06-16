@@ -13,7 +13,7 @@ import { logFlags } from '../logger'
 import { P2P } from '@shardus/types'
 import { binarySearch, validateTypes } from '../utils'
 import * as Comms from './Comms'
-import { crypto, logger, network } from './Context'
+import { crypto, logger, network, config } from './Context'
 import { currentCycle, currentQuarter } from './CycleCreator'
 import { activeByIdOrder, byIdOrder, nodes } from './NodeList'
 import * as Self from './Self'
@@ -202,28 +202,36 @@ export function updateRecord( txs: P2P.LostTypes.Txs, record: P2P.CycleCreatorTy
   for (const nodeId of record.activated) {
     NodeList.removeSyncingNode(nodeId)
   }
-  const syncingNodes = NodeList.syncingByIdOrder
-  const now = Math.floor(Date.now() / 1000)
-  for (const syncingNode of syncingNodes) {
-    const syncTime = now - syncingNode.joinRequestTimestamp
-    if (record.maxSyncTime && syncTime > record.maxSyncTime) {
-      if (logFlags.p2pNonFatal) {
-        info(`Syncing time for node ${syncingNode.id}`, syncTime)
-        info(`Max sync time from record`, record.maxSyncTime)
-        info(`Sync time is longer than max sync time. Reporting as lost`)
+
+  if (config.p2p.detectLostSyncing) {
+    const syncingNodes = NodeList.syncingByIdOrder
+    const now = Math.floor(Date.now() / 1000)
+    for (const syncingNode of syncingNodes) {
+      const syncTime = now - syncingNode.joinRequestTimestamp
+      console.log('syncTime vs maxSyncTime', syncTime, record.maxSyncTime)
+      if (record.maxSyncTime && syncTime > record.maxSyncTime) {
+        if (logFlags.p2pNonFatal) {
+          info(`Syncing time for node ${syncingNode.id}`, syncTime)
+          info(`Max sync time from record`, record.maxSyncTime)
+          info(`Sync time is longer than max sync time. Reporting as lost`)
+        }
+        info('adding node to lost syncing list', syncingNode.id)
+        lostSyncingNodeIds.push(syncingNode.id)
       }
-      lostSyncingNodeIds.push(syncingNode.id)
     }
   }
 
   record.lost = lostNodeIds.sort()
   record.lostSyncing = lostSyncingNodeIds.sort()
-  record.lostSyncing = []
   record.refuted = refutedNodeIds.sort()
+
   if (prev){
     let apop = prev.lost.filter(id => nodes.has(id))  // remove nodes that are no longer in the network
-    // let apopSyncing = prev.lostSyncing.filter(id => nodes.has(id))  // remove nodes that are no longer in the network
-    const apopSyncing = []
+    let apopSyncing = []
+    if (config.p2p.detectLostSyncing) {
+      apopSyncing = prev.lostSyncing.filter((id) => nodes.has(id))
+    }
+    // remove nodes that are no longer in the network
     apop = apop.filter(id => !refutedNodeIds.includes(id))  // remove nodes that refuted
     record.apoptosized = [...apop, ...apopSyncing, ...record.apoptosized ].sort()
   }
