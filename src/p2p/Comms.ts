@@ -316,7 +316,7 @@ export function registerInternal(route, handler) {
         info(
           `The signed wrapped response to send back: ${utils.stringifyReduceLimit(
             signedResponse
-          )}`
+          )} size:${signedResponse.tag_msgSize}`
         )
       }
       if (route !== 'gossip') {

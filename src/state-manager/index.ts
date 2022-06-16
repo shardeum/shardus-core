@@ -34,11 +34,12 @@ import AccountSync from './AccountSync'
 import AccountGlobals from './AccountGlobals'
 import TransactionQueue from './TransactionQueue'
 import TransactionRepair from './TransactionRepair'
+import TransactionRepairOld from './TransactionRepairOld'
 import TransactionConsenus from './TransactionConsensus'
 import PartitionObjects from './PartitionObjects'
 import Depricated from './Depricated'
 import AccountPatcher from './AccountPatcher'
-import { CycleShardData, PartitionReceipt, FifoLockObjectMap, QueueEntry, AcceptedTx, AccountCopy, GetAccountDataByRangeSmart, WrappedStateArray, AccountHashCache, RequestReceiptForTxReq, RequestReceiptForTxResp, RequestStateForTxReqPost, RequestStateForTxResp, RequestTxResp, AppliedVote, GetAccountDataWithQueueHintsResp, DebugDumpPartitions, DebugDumpRangesCovered, DebugDumpNodesCovered, DebugDumpPartition, DebugDumpPartitionSkip, MainHashResults, SimpleDistanceObject, WrappedResponses, LocalCachedData, AccountFilter, StringBoolObjectMap, AppliedReceipt, CycleDebugNotes, AppliedVoteHash, AppliedReceipt2 } from './state-manager-types'
+import { CycleShardData, PartitionReceipt, FifoLockObjectMap, QueueEntry, AcceptedTx, AccountCopy, GetAccountDataByRangeSmart, WrappedStateArray, AccountHashCache, RequestReceiptForTxReq, RequestReceiptForTxResp, RequestStateForTxReqPost, RequestStateForTxResp, RequestTxResp, AppliedVote, GetAccountDataWithQueueHintsResp, DebugDumpPartitions, DebugDumpRangesCovered, DebugDumpNodesCovered, DebugDumpPartition, DebugDumpPartitionSkip, MainHashResults, SimpleDistanceObject, WrappedResponses, LocalCachedData, AccountFilter, StringBoolObjectMap, AppliedReceipt, CycleDebugNotes, AppliedVoteHash, AppliedReceipt2, RequestReceiptForTxResp_old } from './state-manager-types'
 import { isDebugModeMiddleware } from '../network/debugMiddleware'
 import { ReceiptMapResult } from '@shardus/types/build/src/state-manager/StateManagerTypes'
 
@@ -78,7 +79,8 @@ class StateManager {
   accountSync: AccountSync
   accountGlobals: AccountGlobals
   transactionQueue: TransactionQueue
-  transactionRepair: TransactionRepair
+  private transactionRepair: TransactionRepair
+  private transactionRepairOld: TransactionRepairOld
   transactionConsensus: TransactionConsenus
   partitionObjects: PartitionObjects
   accountPatcher: AccountPatcher
@@ -233,7 +235,14 @@ class StateManager {
 
     this.accountGlobals = new AccountGlobals(this,  profiler, app, logger, storage, p2p, crypto, config)
     this.transactionQueue = new TransactionQueue(this,  profiler, app, logger, storage, p2p, crypto, config)
-    this.transactionRepair = new TransactionRepair(this,  profiler, app, logger, storage, p2p, crypto, config)
+
+    if(this.config.debug.optimizedTXConsenus){
+      this.transactionRepair = new TransactionRepair(this,  profiler, app, logger, storage, p2p, crypto, config)     
+    } else {
+      this.transactionRepairOld = new TransactionRepairOld(this,  profiler, app, logger, storage, p2p, crypto, config)      
+    }
+
+
     this.transactionConsensus = new TransactionConsenus(this,  profiler, app, logger, storage, p2p, crypto, config)
     this.partitionObjects = new PartitionObjects(this,  profiler, app, logger, storage, p2p, crypto, config)
     this.depricated = new Depricated(this,  profiler, app, logger, storage, p2p, crypto, config)
@@ -1050,10 +1059,10 @@ class StateManager {
     this.partitionStats.setupHandlers()
 
     // p2p ASK
-    Comms.registerInternal('request_receipt_for_tx', async (payload: RequestReceiptForTxReq, respond: (arg0: RequestReceiptForTxResp) => any, sender, tracker: string, msgSize: number) => {
-      profilerInstance.scopedProfileSectionStart('request_receipt_for_tx', false, msgSize)
+    Comms.registerInternal('request_receipt_for_tx_old', async (payload: RequestReceiptForTxReq, respond: (arg0: RequestReceiptForTxResp_old) => any, sender, tracker: string, msgSize: number) => {
+      profilerInstance.scopedProfileSectionStart('request_receipt_for_tx_old', false, msgSize)
       
-      let response: RequestReceiptForTxResp = { receipt: null, note: '', success: false }
+      let response: RequestReceiptForTxResp_old = { receipt: null, note: '', success: false }
 
       let responseSize = cUninitializedSize
       try {
@@ -1073,6 +1082,38 @@ class StateManager {
         } else if (queueEntry.recievedAppliedReceipt != null) {
           response.receipt = queueEntry.recievedAppliedReceipt
         }
+        if (response.receipt != null) {
+          response.success = true
+        } else {
+          response.note = `found queueEntry but no receipt: ${utils.stringifyReduce(payload.txid)} ${payload.txid}  ${payload.timestamp}`
+        }
+        responseSize = await respond(response)
+      } finally {
+        profilerInstance.scopedProfileSectionEnd('request_receipt_for_tx_old', responseSize)
+      }
+    })
+
+    // p2p ASK
+    Comms.registerInternal('request_receipt_for_tx', async (payload: RequestReceiptForTxReq, respond: (arg0: RequestReceiptForTxResp) => any, sender, tracker: string, msgSize: number) => {
+      profilerInstance.scopedProfileSectionStart('request_receipt_for_tx', false, msgSize)
+      
+      let response: RequestReceiptForTxResp = { receipt: null, note: '', success: false }
+
+      let responseSize = cUninitializedSize
+      try {
+        let queueEntry = this.transactionQueue.getQueueEntrySafe(payload.txid) // , payload.timestamp)
+        if (queueEntry == null) {
+          queueEntry = this.transactionQueue.getQueueEntryArchived(payload.txid, 'request_receipt_for_tx') // , payload.timestamp)
+        }
+
+        if (queueEntry == null) {
+          response.note = `failed to find queue entry: ${utils.stringifyReduce(payload.txid)}  ${payload.timestamp} dbg:${this.debugTXHistory[utils.stringifyReduce(payload.txid)]}`
+          await respond(response)
+          return
+        }
+
+        response.receipt = this.getReceipt2(queueEntry)
+
         if (response.receipt != null) {
           response.success = true
         } else {
@@ -2726,7 +2767,7 @@ class StateManager {
       receipt = queueEntry.recievedAppliedReceipt2
     }
     // if we had to repair use that instead. this stomps the other ones
-    if (queueEntry.appliedReceiptForRepair != null) {
+    if (queueEntry.appliedReceiptForRepair2 != null) {
       receipt = queueEntry.appliedReceiptForRepair2
     }
     queueEntry.appliedReceiptFinal2 = receipt
@@ -3011,6 +3052,15 @@ class StateManager {
       filteredNodes.push(node)
     }
     return filteredNodes
+  }
+
+  getTxRepair() : TransactionRepair | TransactionRepairOld {
+    if(this.transactionRepair){
+      return this.transactionRepair
+    }
+    if(this.transactionRepairOld){
+      return this.transactionRepairOld
+    }
   }
 
   startProcessingCycleSummaries(){

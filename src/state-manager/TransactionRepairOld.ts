@@ -15,9 +15,9 @@ import { json } from 'sequelize/types'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { potentiallyRemoved } from '../p2p/NodeList'
 import * as CycleChain from '../p2p/CycleChain'
-import { QueueEntry, AppliedVote, AccountHashCache, RequestStateForTxResp, AppliedReceipt, RequestTxResp, RequestReceiptForTxResp, AppliedReceipt2 } from './state-manager-types'
+import { QueueEntry, AppliedVote, AccountHashCache, RequestStateForTxResp, AppliedReceipt, RequestTxResp, RequestReceiptForTxResp, RequestReceiptForTxResp_old } from './state-manager-types'
 
-class TransactionRepair {
+class TransactionRepairOld {
   app: Shardus.App
   crypto: Crypto
   config: Shardus.StrictServerConfiguration
@@ -89,15 +89,14 @@ class TransactionRepair {
       let shortHash = utils.makeShortHash(queueEntry.acceptedTx.txId)
       // Need to build a list of what accounts we need, what state they should be in and who to get them from
       let requestObjects: { [id: string]: { appliedVote: AppliedVote; voteIndex: number; accountHash: string; accountId: string; nodeShardInfo: StateManagerTypes.shardFunctionTypes.NodeShardData; alternates: string[] } } = {}
-      let appliedVote = queueEntry.appliedReceiptForRepair2.appliedVote
+      let appliedVotes = queueEntry.appliedReceiptForRepair.appliedVotes
 
-      let voters = queueEntry.appliedReceiptForRepair2.signatures
       //shuffle the array
-      utils.shuffleArray(voters)
+      utils.shuffleArray(appliedVotes)
 
 
 
-      if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `appliedVoters ${utils.stringifyReduce(voters)}  `)
+      if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `appliedVotes ${utils.stringifyReduce(appliedVotes)}  `)
       if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `queueEntry.uniqueKeys ${utils.stringifyReduce(queueEntry.uniqueKeys)}`)
 
       if (logFlags.debug) this.mainLogger.debug(`repairToMatchReceipt: ${shortHash} queueEntry.uniqueKeys ${utils.stringifyReduce(queueEntry.uniqueKeys)}`)
@@ -117,13 +116,8 @@ class TransactionRepair {
         let isGlobal = this.stateManager.accountGlobals.isGlobalAccount(key)
         let shortKey = utils.stringifyReduce(key)
         //It modifying global.
-        for (let i = 0; i < voters.length; i++) {
-          let voter = voters[i]
-          let node = this.stateManager.p2p.state.getNodeByPubKey(voter.owner)
-          if(node == null){
-            continue
-          }
-          let node_id = node.id
+        for (let i = 0; i < appliedVotes.length; i++) {
+          let appliedVote = appliedVotes[i]
           for (let j = 0; j < appliedVote.account_id.length; j++) {
             let id = appliedVote.account_id[j]
             let hash = appliedVote.account_state_hash_after[j]
@@ -145,30 +139,30 @@ class TransactionRepair {
               
               if (requestObjects[key] != null) {
                 //todo perf delay these checks for jit.
-                if (node_id !== this.stateManager.currentCycleShardData.ourNode.id) {
-                  if (this.stateManager.currentCycleShardData.nodeShardDataMap.has(node_id) === true) {
+                if (appliedVote.node_id !== this.stateManager.currentCycleShardData.ourNode.id) {
+                  if (this.stateManager.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === true) {
                     //build a list of alternates
-                    requestObjects[key].alternates.push(node_id)
+                    requestObjects[key].alternates.push(appliedVote.node_id)
                   }
                 }
                 continue //we already have this request ready to go
               }
 
               coveredKey = true
-              if (node_id === this.stateManager.currentCycleShardData.ourNode.id) {
+              if (appliedVote.node_id === this.stateManager.currentCycleShardData.ourNode.id) {
                 //dont reference our own node, should not happen anyway
-                if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `node_id != this.stateManager.currentCycleShardData.ourNode.id ${utils.stringifyReduce(node_id)} our: ${utils.stringifyReduce(this.stateManager.currentCycleShardData.ourNode.id)} acc:${shortKey}`)
+                if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `appliedVote.node_id != this.stateManager.currentCycleShardData.ourNode.id ${utils.stringifyReduce(appliedVote.node_id)} our: ${utils.stringifyReduce(this.stateManager.currentCycleShardData.ourNode.id)} acc:${shortKey}`)
                 continue
               }
-              if (this.stateManager.currentCycleShardData.nodeShardDataMap.has(node_id) === false) {
-                if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `this.stateManager.currentCycleShardData.nodeShardDataMap.has(node_id) === false ${utils.stringifyReduce(node_id)}  acc:${shortKey}`)
+              if (this.stateManager.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === false) {
+                if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `this.stateManager.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === false ${utils.stringifyReduce(appliedVote.node_id)}  acc:${shortKey}`)
                 continue
               }
-              let nodeShardInfo: StateManagerTypes.shardFunctionTypes.NodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(node_id)
+              let nodeShardInfo: StateManagerTypes.shardFunctionTypes.NodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(appliedVote.node_id)
 
               if (nodeShardInfo == null) {
-                if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt nodeShardInfo == null ${utils.stringifyReduce(node_id)} tx:${shortHash} acc:${shortKey}`)
-                if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `nodeShardInfo == null ${utils.stringifyReduce(node_id)}  acc:${shortKey}`)
+                if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt nodeShardInfo == null ${utils.stringifyReduce(appliedVote.node_id)} tx:${shortHash} acc:${shortKey}`)
+                if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `nodeShardInfo == null ${utils.stringifyReduce(appliedVote.node_id)}  acc:${shortKey}`)
                 continue
               }
               // if the account is not global check if it is in range.
@@ -511,7 +505,7 @@ class TransactionRepair {
 
 
   // can the repair work if just have the receipt
-  async repairToMatchReceiptWithoutQueueEntry(receipt: AppliedReceipt2, refAccountId:string) : Promise<boolean> {
+  async repairToMatchReceiptWithoutQueueEntry(receipt: AppliedReceipt, refAccountId:string) : Promise<boolean> {
     if (this.stateManager.currentCycleShardData == null) {
       return false
     }
@@ -592,13 +586,12 @@ class TransactionRepair {
 
       // Need to build a list of what accounts we need, what state they should be in and who to get them from
       let requestObjects: { [id: string]: { appliedVote: AppliedVote; voteIndex: number; accountHash: string; accountId: string; nodeShardInfo: StateManagerTypes.shardFunctionTypes.NodeShardData; alternates: string[] } } = {}
-      let appliedVote = receipt.appliedVote
+      let appliedVotes = receipt.appliedVotes
 
-      let voters = receipt.signatures
       //shuffle the array
-      utils.shuffleArray(voters)
+      utils.shuffleArray(appliedVotes)
 
-      if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note2', `${shortHash}`, `appliedVotes ${utils.stringifyReduce(voters)}  `)
+      if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note2', `${shortHash}`, `appliedVotes ${utils.stringifyReduce(appliedVotes)}  `)
       if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note2', `${shortHash}`, `queueEntry.uniqueKeys ${utils.stringifyReduce(uniqueKeys)}`)
 
       if (logFlags.debug) this.mainLogger.debug(`repairToMatchReceipt2: ${shortHash} queueEntry.uniqueKeys ${utils.stringifyReduce(uniqueKeys)} ${utils.stringifyReduce(txRequestResult)}`)
@@ -616,13 +609,8 @@ class TransactionRepair {
         let isGlobal = this.stateManager.accountGlobals.isGlobalAccount(key)
         let shortKey = utils.stringifyReduce(key)
         //It modifying global.
-        for (let i = 0; i < voters.length; i++) {
-          let voter = voters[i]
-          let node = this.stateManager.p2p.state.getNodeByPubKey(voter.owner)
-          if(node == null){
-            continue
-          }
-          let node_id = node.id
+        for (let i = 0; i < appliedVotes.length; i++) {
+          let appliedVote = appliedVotes[i]
           for (let j = 0; j < appliedVote.account_id.length; j++) {
             let id = appliedVote.account_id[j]
             let hash = appliedVote.account_state_hash_after[j]
@@ -650,30 +638,30 @@ class TransactionRepair {
               
               if (requestObjects[key] != null) {
                 //todo perf delay these checks for jit.
-                if (node_id !== this.stateManager.currentCycleShardData.ourNode.id) {
-                  if (this.stateManager.currentCycleShardData.nodeShardDataMap.has(node_id) === true) {
+                if (appliedVote.node_id !== this.stateManager.currentCycleShardData.ourNode.id) {
+                  if (this.stateManager.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === true) {
                     //build a list of alternates
-                    requestObjects[key].alternates.push(node_id)
+                    requestObjects[key].alternates.push(appliedVote.node_id)
                   }
                 }
                 continue //we already have this request ready to go
               }
 
               coveredKey = true
-              if (node_id === this.stateManager.currentCycleShardData.ourNode.id) {
+              if (appliedVote.node_id === this.stateManager.currentCycleShardData.ourNode.id) {
                 //dont reference our own node, should not happen anyway
-                if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note2', `${shortHash}`, `node_id != this.stateManager.currentCycleShardData.ourNode.id ${utils.stringifyReduce(node_id)} our: ${utils.stringifyReduce(this.stateManager.currentCycleShardData.ourNode.id)} acc:${shortKey}`)
+                if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note2', `${shortHash}`, `appliedVote.node_id != this.stateManager.currentCycleShardData.ourNode.id ${utils.stringifyReduce(appliedVote.node_id)} our: ${utils.stringifyReduce(this.stateManager.currentCycleShardData.ourNode.id)} acc:${shortKey}`)
                 continue
               }
-              if (this.stateManager.currentCycleShardData.nodeShardDataMap.has(node_id) === false) {
-                if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note2', `${shortHash}`, `this.stateManager.currentCycleShardData.nodeShardDataMap.has(node_id) === false ${utils.stringifyReduce(node_id)}  acc:${shortKey}`)
+              if (this.stateManager.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === false) {
+                if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note2', `${shortHash}`, `this.stateManager.currentCycleShardData.nodeShardDataMap.has(appliedVote.node_id) === false ${utils.stringifyReduce(appliedVote.node_id)}  acc:${shortKey}`)
                 continue
               }
-              let nodeShardInfo: StateManagerTypes.shardFunctionTypes.NodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(node_id)
+              let nodeShardInfo: StateManagerTypes.shardFunctionTypes.NodeShardData = this.stateManager.currentCycleShardData.nodeShardDataMap.get(appliedVote.node_id)
 
               if (nodeShardInfo == null) {
-                if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt2 nodeShardInfo == null ${utils.stringifyReduce(node_id)} tx:${shortHash} acc:${shortKey}`)
-                if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note2', `${shortHash}`, `nodeShardInfo == null ${utils.stringifyReduce(node_id)}  acc:${shortKey}`)
+                if (logFlags.error) this.mainLogger.error(`shrd_repairToMatchReceipt2 nodeShardInfo == null ${utils.stringifyReduce(appliedVote.node_id)} tx:${shortHash} acc:${shortKey}`)
+                if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note2', `${shortHash}`, `nodeShardInfo == null ${utils.stringifyReduce(appliedVote.node_id)}  acc:${shortKey}`)
                 continue
               }
               // if the account is not global check if it is in range.
@@ -1109,7 +1097,7 @@ class TransactionRepair {
     return null
   }
 
-  async requestMissingReceipt(txID:string, timestamp: number, refAccountId:string) : Promise<RequestReceiptForTxResp | null> {
+  async requestMissingReceipt(txID:string, timestamp: number, refAccountId:string) : Promise<RequestReceiptForTxResp_old | null> {
     if (this.stateManager.currentCycleShardData == null) {
       return null
     }
@@ -1160,7 +1148,7 @@ class TransactionRepair {
       }
 
       let message = { txid: txID, timestamp }
-      let result: RequestReceiptForTxResp = await this.p2p.ask(node, 'request_receipt_for_tx', message) // not sure if we should await this.
+      let result: RequestReceiptForTxResp_old = await this.p2p.ask(node, 'request_receipt_for_tx_old', message) // not sure if we should await this.
 
 
       if (result == null) {
@@ -1190,4 +1178,4 @@ class TransactionRepair {
 
 }
 
-export default TransactionRepair
+export default TransactionRepairOld

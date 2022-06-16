@@ -2666,9 +2666,10 @@ class AccountSync {
 
         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: repairMissingTXs start: ${utils.stringifyReduce(stateTableData)}`)
         //get receipt for txID
-        let result = await this.stateManager.transactionRepair.requestMissingReceipt(stateTableData.txId, Number(stateTableData.txTimestamp), stateTableData.accountId)
+        let result = await this.stateManager.getTxRepair().requestMissingReceipt(stateTableData.txId, Number(stateTableData.txTimestamp), stateTableData.accountId)
         if (result != null && result.success === true) {
-          let repairOk = await this.stateManager.transactionRepair.repairToMatchReceiptWithoutQueueEntry(result.receipt, stateTableData.accountId)
+          //@ts-ignore todo can axe this when we get rid of old receipts
+          let repairOk = await this.stateManager.getTxRepair().repairToMatchReceiptWithoutQueueEntry(result.receipt, stateTableData.accountId)
           if (logFlags.debug) this.mainLogger.debug(`DATASYNC: repairMissingTXs finished: ok:${repairOk} ${utils.stringifyReduce(stateTableData)}`)
         } else {
           if (logFlags.debug) this.mainLogger.debug(`DATASYNC: repairMissingTXs cant get receipt: ${utils.stringifyReduce(stateTableData)}`)

@@ -10,7 +10,7 @@ import Storage from '../storage'
 import * as utils from '../utils'
 import { errorToStringFull, getLinearGossipBurstList, inRangeOfCurrentTime } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
-import Profiler, { profilerInstance } from '../utils/profiler'
+import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 import ShardFunctions from './shardFunctions.js'
 import {
   AcceptedTx,
@@ -25,7 +25,7 @@ import {
   SeenAccounts,
   StringBoolObjectMap,
   StringNodeObjectMap,
-  WrappedResponses, Cycle, AppliedReceipt
+  WrappedResponses, Cycle, AppliedReceipt, RequestReceiptForTxResp_old
 } from './state-manager-types'
 import { start } from 'repl'
 import { json } from 'body-parser'
@@ -212,8 +212,9 @@ class TransactionQueue {
       }
     })
 
-    this.p2p.registerGossipHandler('spread_tx_to_group', async (payload, sender, tracker) => {
-      profilerInstance.scopedProfileSectionStart('spread_tx_to_group')
+    this.p2p.registerGossipHandler('spread_tx_to_group', async (payload, sender, tracker, msgSize: number) => {
+      profilerInstance.scopedProfileSectionStart('spread_tx_to_group', false, msgSize)
+      let respondSize = cUninitializedSize
       try {
         // Place tx in queue (if younger than m)
         //  gossip 'spread_tx_to_group' to transaction group
@@ -231,10 +232,10 @@ class TransactionQueue {
         }
         if (transactionGroup.length > 1) {
           this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `gossip to neighbors`, transactionGroup)
-          this.p2p.sendGossipIn('spread_tx_to_group', payload, tracker, sender, transactionGroup, false)
+          respondSize = await this.p2p.sendGossipIn('spread_tx_to_group', payload, tracker, sender, transactionGroup, false)
         }
       } finally {
-        profilerInstance.scopedProfileSectionEnd('spread_tx_to_group')
+        profilerInstance.scopedProfileSectionEnd('spread_tx_to_group', respondSize)
       }
     })
 
@@ -1596,6 +1597,112 @@ class TransactionQueue {
 
         if (result.success === true && result.receipt != null) {
           //TODO implement this!!!
+          queueEntry.recievedAppliedReceipt2 = result.receipt
+          keepTrying = false
+          gotReceipt = true
+
+          this.mainLogger.debug(`queueEntryRequestMissingReceipt got good receipt for: ${utils.makeShortHash(queueEntry.acceptedTx.txId)} from: ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)}`)
+        }
+      }
+
+      // break the outer loop after we are done trying.  todo refactor this.
+      if (keepTrying == false) {
+        break
+      }
+    }
+    queueEntry.requestingReceipt = false
+
+    if (gotReceipt === false) {
+      queueEntry.requestingReceiptFailed = true
+    }
+  }
+
+  async queueEntryRequestMissingReceipt_old(queueEntry: QueueEntry) {
+    if (this.stateManager.currentCycleShardData == null) {
+      return
+    }
+
+    if (queueEntry.uniqueKeys == null) {
+      throw new Error('queueEntryRequestMissingReceipt queueEntry.uniqueKeys == null')
+    }
+
+    if (queueEntry.requestingReceipt === true) {
+      return
+    }
+
+    queueEntry.requestingReceipt = true
+    queueEntry.receiptEverRequested = true
+
+    if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_start', `${queueEntry.acceptedTx.txId}`, `qId: ${queueEntry.entryID}`)
+
+    let consensusGroup = this.queueEntryGetConsensusGroup(queueEntry)
+
+    this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `queueEntryRequestMissingReceipt`, consensusGroup)
+    //let consensusGroup = this.queueEntryGetTransactionGroup(queueEntry)
+    //the outer loop here could just use the transaction group of nodes instead. but already had this working in a similar function
+    //TODO change it to loop the transaction group untill we get a good receipt
+
+    //Note: we only need to get one good receipt, the loop on keys is in case we have to try different groups of nodes
+    let gotReceipt = false
+    for (let key of queueEntry.uniqueKeys) {
+      if (gotReceipt === true) {
+        break
+      }
+
+      let keepTrying = true
+      let triesLeft = Math.min(5, consensusGroup.length)
+      let nodeIndex = 0
+      while (keepTrying) {
+        if (triesLeft <= 0) {
+          keepTrying = false
+          break
+        }
+        triesLeft--
+        let homeNodeShardData = queueEntry.homeNodes[key] // mark outstanding request somehow so we dont rerequest
+
+        let node = consensusGroup[nodeIndex]
+        nodeIndex++
+
+        if (node == null) {
+          continue
+        }
+        if (node.status != 'active' || potentiallyRemoved.has(node.id)) {
+          continue
+        }
+        if (node === this.stateManager.currentCycleShardData.ourNode) {
+          continue
+        }
+
+        let relationString = ShardFunctions.getNodeRelation(homeNodeShardData, this.stateManager.currentCycleShardData.ourNode.id)
+        if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_ask', `${utils.makeShortHash(queueEntry.acceptedTx.txId)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+
+        // Node Precheck!
+        if (this.stateManager.isNodeValidForInternalMessage(node.id, 'queueEntryRequestMissingReceipt', true, true) === false) {
+          // if(this.tryNextDataSourceNode('queueEntryRequestMissingReceipt') == false){
+          //   break
+          // }
+          continue
+        }
+
+        let message = { txid: queueEntry.acceptedTx.txId, timestamp: queueEntry.acceptedTx.timestamp }
+        let result: RequestReceiptForTxResp_old = await this.p2p.ask(node, 'request_receipt_for_tx_old', message) // not sure if we should await this.
+
+        if (result == null) {
+          if (logFlags.verbose) {
+            if (logFlags.error) this.mainLogger.error(`ASK FAIL request_receipt_for_tx_old ${triesLeft} ${utils.makeShortHash(node.id)}`)
+          }
+          if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.txId)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+          continue
+        }
+        if (result.success !== true) {
+          if (logFlags.error) this.mainLogger.error(`ASK FAIL queueEntryRequestMissingReceipt 9 ${triesLeft} ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)} note:${result.note} txid:${queueEntry.logID}`)
+          continue
+        }
+
+        if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_result', `${utils.makeShortHash(queueEntry.acceptedTx.txId)}`, `r:${relationString}   result:${queueEntry.logstate} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} result: ${utils.stringifyReduce(result)}`)
+
+        if (result.success === true && result.receipt != null) {
+          //TODO implement this!!!
           queueEntry.recievedAppliedReceipt = result.receipt
           keepTrying = false
           gotReceipt = true
@@ -1615,6 +1722,7 @@ class TransactionQueue {
       queueEntry.requestingReceiptFailed = true
     }
   }
+
 
   /**
    * queueEntryGetTransactionGroup
@@ -2624,7 +2732,11 @@ class TransactionQueue {
                 let seen = this.processQueue_accountSeen(seenAccounts, queueEntry)
 
                 this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
-                this.queueEntryRequestMissingReceipt(queueEntry)
+                if(this.config.debug.optimizedTXConsenus){
+                  this.queueEntryRequestMissingReceipt(queueEntry)                  
+                } else {
+                  this.queueEntryRequestMissingReceipt_old(queueEntry)   
+                }
 
                 nestedCountersInstance.countEvent('txMissingReceipt', `txAge > timeM3 => ask for receipt now. state:${queueEntry.state} globalMod:${queueEntry.globalModification} seen:${seen}`)
                 queueEntry.waitForReceiptOnly = true
@@ -2924,6 +3036,8 @@ class TransactionQueue {
                   if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch1', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                   didNotMatchReceipt = true
                   queueEntry.appliedReceiptForRepair = result
+
+                  queueEntry.appliedReceiptForRepair2 = this.stateManager.getReceipt2(queueEntry)
                 }
               }
               if (finishedConsensing === false) {
@@ -2951,6 +3065,8 @@ class TransactionQueue {
                     if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_consensingComplete_gotReceiptNoMatch2', `${shortID}`, `qId: ${queueEntry.entryID}  `)
                     didNotMatchReceipt = true
                     queueEntry.appliedReceiptForRepair = queueEntry.recievedAppliedReceipt
+
+                    queueEntry.appliedReceiptForRepair2 = this.stateManager.getReceipt2(queueEntry)
                   }
                 } else {
                   //just keep waiting for a reciept
@@ -2972,7 +3088,7 @@ class TransactionQueue {
                   if (queueEntry.appliedReceiptForRepair.result === true) {
                     // need to start repair process and wait
                     //await note: it is best to not await this.  it should be an async operation.
-                    this.stateManager.transactionRepair.repairToMatchReceipt(queueEntry)
+                    this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
                     queueEntry.state = 'await repair'
                     continue
                   } else {
@@ -3043,7 +3159,7 @@ class TransactionQueue {
                   }
                 }
                 if(failed === true){
-                  this.stateManager.transactionRepair.repairToMatchReceipt(queueEntry)
+                  this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
                   queueEntry.state = 'await repair'
                   if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitFinalData_failed', `${shortID}`, `qId: ${queueEntry.entryID} `)
                   if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData_failed : ${queueEntry.logID} `)

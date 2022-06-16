@@ -685,7 +685,9 @@ export type RequestTxResp = { acceptedTX?:Shardus.AcceptedTx; stateList: Shardus
 
 
 export type RequestReceiptForTxReq = { txid: string; timestamp: number; }
-export type RequestReceiptForTxResp = { receipt:AppliedReceipt ; note: string; success:boolean }
+export type RequestReceiptForTxResp_old = { receipt:AppliedReceipt ; note: string; success:boolean }
+
+export type RequestReceiptForTxResp = { receipt:AppliedReceipt2 ; note: string; success:boolean }
 //export type RequestStateForTxResp = { stateList: any[]; note: string; success:boolean }
 
 export type RequestStateForTxReqPost = { txid: string; timestamp: number; key:string; hash:string }

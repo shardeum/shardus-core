@@ -126,7 +126,7 @@ class TransactionConsenus {
             // should consider only forwarding in some cases?
             this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, gossipGroup)
             //no await so we cant get the message out size in a reasonable way
-            this.p2p.sendGossipIn('spread_appliedReceipt', appliedReceipt, tracker, sender, gossipGroup, false)
+            respondSize = await this.p2p.sendGossipIn('spread_appliedReceipt', appliedReceipt, tracker, sender, gossipGroup, false)
           }
         } else {
           // we get here if the receipt has already been shared
@@ -188,7 +188,7 @@ class TransactionConsenus {
             // should consider only forwarding in some cases?
             this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, gossipGroup)
             //no await so we cant get the message out size in a reasonable way
-            this.p2p.sendGossipIn('spread_appliedReceipt2', appliedReceipt, tracker, sender, gossipGroup, false)
+            respondSize = await this.p2p.sendGossipIn('spread_appliedReceipt2', appliedReceipt, tracker, sender, gossipGroup, false)
           }
         } else {
           // we get here if the receipt has already been shared
