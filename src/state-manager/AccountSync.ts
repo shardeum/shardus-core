@@ -2716,7 +2716,7 @@ class AccountSync {
     this.syncStatement.failAndRestart++
 
     //TODO proper restart not useing global var
-    await this.syncStateDataForRange(this.currentRange)
+    await this.syncStateDataForRange2(this.currentRange)
   }
 
   /**
@@ -2901,7 +2901,7 @@ class AccountSync {
 
             syncTracker.syncStarted = true
             startedCount++
-            await this.syncStateDataForRange(syncTracker.range)
+            await this.syncStateDataForRange2(syncTracker.range)
             syncTracker.syncFinished = true
 
             if (logFlags.playback) this.logger.playbackLogNote('rt_shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
