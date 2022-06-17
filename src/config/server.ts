@@ -47,7 +47,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     nodeExpiryAge: 30,
     maxJoinedPerCycle: 1,
     maxSyncingPerCycle: 5,
-    maxSyncTimeFloor: 120,
+    maxSyncTimeFloor: 1200,
     maxNodeForSyncTime: 9,
     maxRotatedPerCycle: 1,
     firstCycleJoin: 10,

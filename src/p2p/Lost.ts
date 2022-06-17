@@ -21,6 +21,8 @@ import { profilerInstance } from '../utils/profiler'
 import getCallstack from '../utils/getCallstack'
 import { NodeStatus } from '../../../shardus-types/build/src/p2p/P2PTypes'
 import * as NodeList from './NodeList'
+import { nestedCountersInstance } from '../utils/nestedCounters'
+import * as utils from '../utils'
 
 /** STATE */
 
@@ -215,7 +217,9 @@ export function updateRecord( txs: P2P.LostTypes.Txs, record: P2P.CycleCreatorTy
           info(`Max sync time from record`, record.maxSyncTime)
           info(`Sync time is longer than max sync time. Reporting as lost`)
         }
-        info('adding node to lost syncing list', syncingNode.id)
+        info('adding node to lost syncing list', syncingNode.id, `${syncTime} > ${record.maxSyncTime}`)
+        //todo remove this later after we feel good about the system.. it wont really be that rare, so we dont want to swamp rare counters
+        nestedCountersInstance.countRareEvent('lost','sync timeout ' + `${utils.stringifyReduce(syncingNode.id)} ${syncTime} > ${record.maxSyncTime}`)
         lostSyncingNodeIds.push(syncingNode.id)
       }
     }
