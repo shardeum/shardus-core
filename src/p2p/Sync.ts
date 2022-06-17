@@ -385,10 +385,10 @@ async function getCycles(
 export function activeNodeCount(cycle: P2P.CycleCreatorTypes.CycleRecord) {
   return (
     cycle.active +
-    cycle.activated.length -
-    cycle.apoptosized.length -
-    cycle.removed.length -
-    cycle.lost.length
+    cycle.activated.length +
+    -cycle.apoptosized.length +
+    -cycle.removed.length +
+    -cycle.lost.length
   )
 }
 
@@ -411,9 +411,9 @@ export function totalNodeCount(cycle: P2P.CycleCreatorTypes.CycleRecord) {
     cycle.joinedConsensors.length +
     cycle.active +
     //    cycle.activated.length -      // don't count activated because it was already counted in syncing
-    cycle.apoptosized.length -
-    cycle.removed.length -
-    cycle.lost.length
+    -cycle.apoptosized.length +
+    -cycle.removed.length +
+    -cycle.lost.length
   )
 }
 

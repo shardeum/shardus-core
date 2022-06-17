@@ -19,10 +19,10 @@ import { activeByIdOrder, byIdOrder, nodes } from './NodeList'
 import * as Self from './Self'
 import { profilerInstance } from '../utils/profiler'
 import getCallstack from '../utils/getCallstack'
-import { NodeStatus } from '../../../shardus-types/build/src/p2p/P2PTypes'
 import * as NodeList from './NodeList'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import * as utils from '../utils'
+import { isApopMarkedNode } from './Apoptosis'
 
 /** STATE */
 
@@ -138,6 +138,13 @@ export function reset() {
 export function getTxs(): P2P.LostTypes.Txs {
   let lostTxs = []
   let refutedTxs = []
+  // Check if the node in the lost list is in the apop list; remove it if there is one
+  for (const [key, obj] of lost){
+    const { target } = obj
+    if (isApopMarkedNode(target)) {
+      lost.delete(key)
+    }
+  }
   let seen = {}  // used to make sure we don't add the same node twice
   for (const [key, obj] of lost){
     if (seen[obj.target]) continue

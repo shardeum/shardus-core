@@ -32,6 +32,7 @@ import NestedCounters, { nestedCountersInstance } from '../utils/nestedCounters'
 import Profiler, { profilerInstance } from '../utils/profiler'
 import { time } from 'console'
 import SHARDUS_CONFIG from '../config'
+import { isApopMarkedNode } from '../p2p/Apoptosis'
 // the following can be removed now since we are not using the old p2p code
 //const P2P = require('../p2p')
 const allZeroes64 = '0'.repeat(64)
@@ -408,6 +409,10 @@ class Shardus extends EventEmitter {
     })
     this.network.on('timeout', (node) => {
       console.log('in Shardus got network timeout from', node)
+      const result = isApopMarkedNode(node.id)
+      if (result) {
+        return
+      }
       reportLost(node, 'timeout')
       /** [TODO] Report lost */
       nestedCountersInstance.countEvent('lostNodes', 'timeout')

@@ -233,16 +233,16 @@ export function getDebug() {
 /** ROUTES */
 
 function info(...msg) {
-  const entry = `Refresh: ${msg.join(' ')}`
+  const entry = `NodeList: ${msg.join(' ')}`
   p2pLogger.info(entry)
 }
 
 function warn(...msg) {
-  const entry = `Refresh: ${msg.join(' ')}`
+  const entry = `NodeList: ${msg.join(' ')}`
   p2pLogger.warn(entry)
 }
 
 function error(...msg) {
-  const entry = `Refresh: ${msg.join(' ')}`
+  const entry = `NodeList: ${msg.join(' ')}`
   p2pLogger.error(entry)
 }

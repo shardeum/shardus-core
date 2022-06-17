@@ -329,6 +329,15 @@ function validateProposal(payload: unknown): boolean {
   return true
 }
 
+export function isApopMarkedNode(id: string): boolean {
+  let apopNode = false
+  if (proposals[id]) {// Check if the node is in the proposal list
+    apopNode = true
+  }
+  info('check if the node is apop marked node', id, apopNode)
+  return apopNode
+}
+
 function info(...msg) {
   const entry = `Apoptosis: ${msg.join(' ')}`
   p2pLogger.info(entry)
