@@ -173,12 +173,19 @@ function updateScaleFactor(){
   // this is a bit hard coded, but basicaly the first 400 nodes in a network get a boost to max syncing allowes
   // this should smooth out the joining process but make it so we dont need such high defaults for syncMax that
   // could become a problem when there are more nodes in the network later on.
-  if(activeNodeCount < 200){
-    scaleFactorSyncBoost = 2
-  } else if (activeNodeCount < 400){
-    scaleFactorSyncBoost = 1.5
+
+  if(config.p2p.syncBoostEnabled){
+    if(activeNodeCount < 10){
+      scaleFactorSyncBoost = 1
+    } else if (activeNodeCount < 200){
+      scaleFactorSyncBoost = 2
+    } else if (activeNodeCount < 400){
+      scaleFactorSyncBoost = 1.5
+    } else {
+      scaleFactorSyncBoost = 1.5
+    }    
   } else {
-    scaleFactorSyncBoost = 1.5
+    scaleFactorSyncBoost = 1    
   }
 
   scaleFactor = Math.max((consensusRange / consenusParSize) * (activeNodeCount / networkParSize),1)
