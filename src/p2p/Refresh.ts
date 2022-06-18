@@ -165,6 +165,7 @@ export function cyclesToKeep() {
 //  const squasher = new CycleParser.ChangeSquasher()
   let count = 1
   let seen = new Map()
+  let removed = []
   for (const record of reversed(cycles)) {
 /*
     squasher.addChange(CycleParser.parse(record))
@@ -175,8 +176,24 @@ export function cyclesToKeep() {
       break
     }
 */
-    for (const n of record.refreshedConsensors) seen.set(n.externalIp + ':' + n.externalPort, 1)
-    for (const n of record.joinedConsensors) seen.set(n.externalIp + ':' + n.externalPort, 1)
+    if (record.apoptosized.length > 0) {
+      removed = [...removed, ...record.apoptosized]
+    }
+    if (record.lost.length > 0) {
+      removed = [...removed, ...record.lost]
+    }
+    if (record.lostSyncing.length > 0) {
+      removed = [...removed, ...record.lostSyncing]
+    }
+    if (record.removed.length > 0) {
+      removed = [...removed, ...record.removed]
+    }
+    for (const n of record.refreshedConsensors) {
+      if (!removed.includes(n.id)) seen.set(n.id, 1)
+    }
+    for (const n of record.joinedConsensors) {
+      if (!removed.includes(n.id)) seen.set(n.id, 1)
+    }
     if (seen.size >= totalNodeCount(newest)) break
     count++
   }
