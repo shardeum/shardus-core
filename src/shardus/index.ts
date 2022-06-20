@@ -802,15 +802,17 @@ class Shardus extends EventEmitter {
       console.log('syncAppData - sync')
       this.stateManager.appFinishedSyncing = true
       Self.setp2pIgnoreJoinRequests(false)
+      console.log('p2pIgnoreJoinRequests = false')
     } else {
       await this.stateManager.startCatchUpQueue()
       console.log('syncAppData - startCatchUpQueue')
       await this.app.sync()
       console.log('syncAppData - sync')
+      Self.setp2pIgnoreJoinRequests(false)
+      console.log('p2pIgnoreJoinRequests = false')
       await this.p2p.goActive()
       console.log('syncAppData - goActive')
       this.stateManager.appFinishedSyncing = true
-      Self.setp2pIgnoreJoinRequests(false)
     }
     // Set network joinable to true
     this.p2p.setJoinRequestToggle(true)
