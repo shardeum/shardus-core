@@ -27,8 +27,7 @@ import {
   StringNodeObjectMap,
   WrappedResponses, Cycle, AppliedReceipt, RequestReceiptForTxResp_old
 } from './state-manager-types'
-import { start } from 'repl'
-import { json } from 'body-parser'
+
 
 const stringify = require('fast-stable-stringify')
 
@@ -1150,7 +1149,7 @@ class TransactionQueue {
               return 'out of range' // we are done, not involved!!!
             } else {
               // If we have syncing neighbors forward this TX to them
-              if (this.stateManager.currentCycleShardData.hasSyncingNeighbors === true) {
+              if (this.config.debug.forwardTXToSyncingNeighbors && this.stateManager.currentCycleShardData.hasSyncingNeighbors === true) {
                 let send_spread_tx_to_group_syncing = true
                 //todo turn this back on if other testing goes ok
                 if (txQueueEntry.ourNodeInTransactionGroup === false) {
