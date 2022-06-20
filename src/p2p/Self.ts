@@ -35,6 +35,8 @@ export let p2pJoinTime = 0
 export let p2pSyncStart = 0
 export let p2pSyncEnd = 0
 
+export let p2pIgnoreJoinRequests = false
+
 /** ROUTES */
 
 /** FUNCTIONS */
@@ -450,6 +452,10 @@ export function getThisNodeInfo() {
 
 export function setActive() {
   isActive = true
+}
+
+export function setp2pIgnoreJoinRequests(value:boolean){
+  p2pIgnoreJoinRequests = value
 }
 
 function info(...msg) {

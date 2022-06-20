@@ -310,6 +310,12 @@ export async function createJoinRequest(
 }
 
 export function addJoinRequest(joinRequest: P2P.JoinTypes.JoinRequest) {
+
+  if(Self.p2pIgnoreJoinRequests === true){
+    if(logFlags.p2pNonFatal) info(`Join request ignored. p2pIgnoreJoinRequests === true`)
+    return
+  }
+
   //  Validate joinReq
   let err = utils.validateTypes(joinRequest, {
     cycleMarker: 's',
