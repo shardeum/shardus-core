@@ -795,7 +795,6 @@ class Shardus extends EventEmitter {
     // if (this.stateManager) await this.stateManager.accountSync.syncStateDataFast(3) // fast mode
     console.log('syncAppData')
     if (this.p2p.isFirstSeed) {
-      Self.setp2pIgnoreJoinRequests(true)
       await this.p2p.goActive()
       console.log('syncAppData - goActive')
       await this.stateManager.waitForShardCalcs()
@@ -811,6 +810,7 @@ class Shardus extends EventEmitter {
       await this.p2p.goActive()
       console.log('syncAppData - goActive')
       this.stateManager.appFinishedSyncing = true
+      Self.setp2pIgnoreJoinRequests(false)
     }
     // Set network joinable to true
     this.p2p.setJoinRequestToggle(true)

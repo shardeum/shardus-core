@@ -35,7 +35,7 @@ export let p2pJoinTime = 0
 export let p2pSyncStart = 0
 export let p2pSyncEnd = 0
 
-export let p2pIgnoreJoinRequests = false
+export let p2pIgnoreJoinRequests = true
 
 /** ROUTES */
 
