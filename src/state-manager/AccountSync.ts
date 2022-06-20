@@ -1821,6 +1821,12 @@ class AccountSync {
     // }, 1000)
     await utils.sleep(1000)
 
+    let anyNonGlobalSyncTrackersLeft = false
+    for (let syncTracker of this.syncTrackers) {
+      if(syncTracker.isGlobalSyncTracker === false && syncTracker.syncFinished === false){
+        anyNonGlobalSyncTrackersLeft = true
+      }
+    }
 
     if(this.forceSyncComplete){
       nestedCountersInstance.countEvent('sync', 'forceSyncComplete')
@@ -1836,7 +1842,7 @@ class AccountSync {
     }
 
 
-    nestedCountersInstance.countEvent('sync', 'fail and restart')
+    nestedCountersInstance.countEvent('sync', `fail and restart non globals left:${anyNonGlobalSyncTrackersLeft}`)
     this.syncStatement.failAndRestart++
 
     //TODO proper restart not useing global var
