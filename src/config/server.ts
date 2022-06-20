@@ -101,6 +101,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     dumpAccountReportFromSQL: false,
     profiler: false,
     optimizedTXConsenus: true,
+    robustQueryDebug: false
   },
   statistics: { save: true, interval: 1 },
   loadDetection: {

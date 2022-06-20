@@ -716,6 +716,8 @@ export interface ServerConfiguration {
     newCacheFlow?: boolean
     /** use the new path for TX receipt and vote sharing optimizations */
     optimizedTXConsenus: boolean
+    /** dump extra data for robust query even if in error/fatal logggin only mode */
+    robustQueryDebug: boolean 
   }
   /** Options for the statistics module */
   statistics?: {
