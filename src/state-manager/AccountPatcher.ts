@@ -1,6 +1,7 @@
 import * as Shardus from '../shardus/shardus-types'
 import { StateManager as StateManagerTypes } from '@shardus/types'
 import * as utils from '../utils'
+import * as CycleChain from '../p2p/CycleChain'
 const stringify = require('fast-stable-stringify')
 import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 import { P2PModuleContext as P2P } from '../p2p/Context'
@@ -458,6 +459,89 @@ class AccountPatcher {
         this.statemanager_fatal('debug shardTrie',`temp shardTrie ${finalStr}`)
         res.write(`${finalStr}\n`)
       } catch(e){
+        res.write(`${e}\n`)
+      }
+      res.end()
+    })
+
+    Context.network.registerExternalGet('debug-patcher-dumpTree-partial', isDebugModeMiddleware, (req, res) => {
+      try {
+        const subTree: boolean = req.query.subtree === 'true' ? true : false
+        let radix: string = req.query.radix as string
+        if (radix.length > this.treeMaxDepth) radix = radix.slice(0, this.treeMaxDepth)
+        const level = radix.length
+        const layerMap = this.shardTrie.layerMaps[level]
+
+        let hashTrieNode = layerMap.get(radix.toLowerCase())
+        if (!subTree) {
+          // deep clone the trie node before removing children property
+          hashTrieNode = JSON.parse(JSON.stringify(hashTrieNode))
+          delete hashTrieNode.children
+        }
+        //strip noisy fields
+        const tempString = JSON.stringify(hashTrieNode, utils.debugReplacer)
+        const processedObject = JSON.parse(tempString)
+
+        // use stringify to put a stable sort on the object keys (important for comparisons)
+        const finalStr = utils.stringifyReduce(processedObject)
+
+        this.statemanager_fatal('debug shardTrie', `temp shardTrie ${finalStr}`)
+        res.write(`${finalStr}\n`)
+      } catch (e) {
+        console.log('Error', e)
+        res.write(`${e}\n`)
+      }
+      res.end()
+    })
+
+    Context.network.registerExternalGet('debug-patcher-fail-hashes', isDebugModeMiddleware, (req, res) => {
+      try {
+        const lastCycle = CycleChain.getNewest()
+        const cycle = lastCycle.counter
+        const minVotes = this.calculateMinVotes()
+        const notEnoughVotesRadix = {}
+        const outOfSyncRadix = {}
+
+        const hashTrieSyncConsensus = this.hashTrieSyncConsensusByCycle.get(cycle)
+
+        if (!hashTrieSyncConsensus) {
+          return res.json({ error: `Unable to find hashTrieSyncConsensus for last cycle ${lastCycle}` })
+        }
+
+        for (const radix of hashTrieSyncConsensus.radixHashVotes.keys()) {
+          const votesMap = hashTrieSyncConsensus.radixHashVotes.get(radix)
+          const ourTrieNode = this.shardTrie.layerMaps[this.treeSyncDepth].get(radix)
+
+          const hasEnoughVotes = votesMap.bestVotes >= minVotes
+          const isRadixInSync = ourTrieNode ? ourTrieNode.hash === votesMap.bestHash : false
+
+          if (!hasEnoughVotes || !isRadixInSync) {
+            const kvp = []
+            for (const [key, value] of votesMap.allVotes.entries()) {
+              kvp.push({
+                id: key,
+                count: value.count,
+                nodeIDs: value.voters.map(node => utils.makeShortHash(node.id) + ':' + node.externalPort)
+              })
+            }
+            const simpleMap = {
+              bestHash: votesMap.bestHash,
+              ourHash: ourTrieNode ? ourTrieNode.hash : '',
+              bestVotes: votesMap.bestVotes,
+              minVotes,
+              allVotes: kvp,
+            }
+            if (!hasEnoughVotes) notEnoughVotesRadix[radix] = simpleMap
+            if (!isRadixInSync) outOfSyncRadix[radix] = simpleMap
+          }
+        }
+        return res.json({
+          cycle,
+          notEnoughVotesRadix,
+          outOfSyncRadix
+        })
+      } catch (e) {
+        console.log('Error', e)
         res.write(`${e}\n`)
       }
       res.end()
