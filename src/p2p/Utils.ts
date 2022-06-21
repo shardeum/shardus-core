@@ -181,8 +181,8 @@ export async function robustQuery<Node = unknown, Response = unknown>(
     redundancy = 3
   }
   if (redundancy > nodes.length) {
-    if (strictRedundancy || config.debug.robustQueryDebug) {
-      if (logFlags.console) console.log(
+    if (strictRedundancy) {
+      if (logFlags.console || config.debug.robustQueryDebug) console.log(
         'robustQuery: isRobustResult=false. not enough nodes to meet strictRedundancy'
       )
       return { topResult: null, winningNodes: [], isRobustResult: false }
