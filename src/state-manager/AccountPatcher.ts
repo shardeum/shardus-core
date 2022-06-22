@@ -2389,17 +2389,18 @@ class AccountPatcher {
 
 
     let promises = []
+    let accountPerRequest = this.config.stateManager.patcherAccountsPerRequest
+    let maxAskCount = this.config.stateManager.patcherAccountsPerUpdate
     for(let requestEntry of nodesBySyncRadix.values()){
-      if(requestEntry.request.accounts.length > 900){
+      if(requestEntry.request.accounts.length > accountPerRequest){
         let offset = 0
         let allAccounts = requestEntry.request.accounts
-        let maxAskCount = 5000
         let thisAskCount = 0
-        while(offset < allAccounts.length && Math.min(offset + 900, allAccounts.length) < maxAskCount){
-          requestEntry.request.accounts = allAccounts.slice(offset, offset + 900)
+        while(offset < allAccounts.length && Math.min(offset + accountPerRequest, allAccounts.length) < maxAskCount){
+          requestEntry.request.accounts = allAccounts.slice(offset, offset + accountPerRequest)
           let promise = this.p2p.ask(requestEntry.node, 'get_account_data_by_hashes', requestEntry.request)
           promises.push(promise)
-          offset = offset + 900
+          offset = offset + accountPerRequest
           stats.multiRequests++
           thisAskCount = requestEntry.request.accounts.length
         }

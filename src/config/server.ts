@@ -120,7 +120,12 @@ const SERVER_CONFIG: StrictServerConfiguration = {
       queueLength: 0.2,
     },
   },
-  stateManager: { stateTableBucketSize: 500, accountBucketSize: 200 },
+  stateManager: { 
+    stateTableBucketSize: 500, 
+    accountBucketSize: 200,
+    patcherAccountsPerRequest: 250,
+    patcherAccountsPerUpdate: 2500 
+  },
   sharding: { nodesPerConsensusGroup: 5, executeInOneShard: false },
   mode: ServerMode.Debug,
 }

@@ -764,7 +764,11 @@ export interface ServerConfiguration {
     /** The stateTableBucketSize parameter is an Integer which defines the max number of accountRecords that the p2p module will ask for in it’s get_account_state call. */
     stateTableBucketSize?: number
     /** The accountBucketSize This is also currently used as input to a p2p ask method for the max number of account records */
-    accountBucketSize?: number
+    accountBucketSize?: number,
+    /** number of accounts that the patcher can get per request */
+    patcherAccountsPerRequest: number,
+    /** number of accounts that the patcher can get per upddate (cycle) */
+    patcherAccountsPerUpdate: number
   }
   /** Options for sharding calculations */
   sharding?: {
