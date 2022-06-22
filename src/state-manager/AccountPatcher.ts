@@ -2328,9 +2328,6 @@ class AccountPatcher {
     return results
   }
 
-
-
-
   /***
    *     ######   ######## ########    ###     ######   ######   #######  ##     ## ##    ## ######## ########  ######## ########     ###    #### ########  ########     ###    ########    ###
    *    ##    ##  ##          ##      ## ##   ##    ## ##    ## ##     ## ##     ## ###   ##    ##    ##     ## ##       ##     ##   ## ##    ##  ##     ## ##     ##   ## ##      ##      ## ##
@@ -2356,6 +2353,9 @@ class AccountPatcher {
     let nodesBySyncRadix:Map<string, {node:Shardus.Node, request:{cycle, accounts:AccountIDAndHash[]} }> = new Map()
     let accountHashMap = new Map()
 
+    let wrappedDataList:Shardus.WrappedData[] = []
+    let stateTableDataMap:Map<string, Shardus.StateTableObject> = new Map()
+
     let stats= {
       skipping:0,
       multiRequests:0,
@@ -2363,98 +2363,101 @@ class AccountPatcher {
       //alreadyOKHash:0
     }
 
-    for(let accountEntry of badAccounts){
-      let syncRadix = accountEntry.accountID.substr(0, this.treeSyncDepth)
-      let requestEntry = nodesBySyncRadix.get(syncRadix)
+    try{   
+      for(let accountEntry of badAccounts){
+        let syncRadix = accountEntry.accountID.substr(0, this.treeSyncDepth)
+        let requestEntry = nodesBySyncRadix.get(syncRadix)
 
-      // let accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(accountEntry.accountID)
-      // if(accountMemData != null && accountMemData.h === accountEntry.hash){
-      //   stats.alreadyOKHash++
-      //   continue
-      // }
+        // let accountMemData: AccountHashCache = this.stateManager.accountCache.getAccountHash(accountEntry.accountID)
+        // if(accountMemData != null && accountMemData.h === accountEntry.hash){
+        //   stats.alreadyOKHash++
+        //   continue
+        // }
 
-      accountHashMap.set(accountEntry.accountID, accountEntry.hash)
-      if(requestEntry == null){
-        //minor layer of security, we will ask a different node for the account than the one that gave us the hash
-        let nodeToAsk = this.getNodeForQuery(accountEntry.accountID, cycle, true)
-        if(nodeToAsk == null){
-          this.statemanager_fatal('getAccountRepairData no node avail',`getAccountRepairData no node avail ${cycle}`)
-          continue
-        }
-        requestEntry = {node:nodeToAsk, request:{cycle, accounts:[]}}
-        nodesBySyncRadix.set(syncRadix, requestEntry)
-      }
-      requestEntry.request.accounts.push(accountEntry)
-    }
-
-
-    let promises = []
-    let accountPerRequest = this.config.stateManager.patcherAccountsPerRequest
-    let maxAskCount = this.config.stateManager.patcherAccountsPerUpdate
-    for(let requestEntry of nodesBySyncRadix.values()){
-      if(requestEntry.request.accounts.length > accountPerRequest){
-        let offset = 0
-        let allAccounts = requestEntry.request.accounts
-        let thisAskCount = 0
-        while(offset < allAccounts.length && Math.min(offset + accountPerRequest, allAccounts.length) < maxAskCount){
-          requestEntry.request.accounts = allAccounts.slice(offset, offset + accountPerRequest)
-          let promise = this.p2p.ask(requestEntry.node, 'get_account_data_by_hashes', requestEntry.request)
-          promises.push(promise)
-          offset = offset + accountPerRequest
-          stats.multiRequests++
-          thisAskCount = requestEntry.request.accounts.length
-        }
-
-        stats.skipping += Math.max(0,allAccounts.length - thisAskCount)
-        stats.requested += thisAskCount
-
-        //would it be better to resync if we have a high number of errors?  not easy to answer this.
-
-      } else {
-        let promise = this.p2p.ask(requestEntry.node, 'get_account_data_by_hashes', requestEntry.request)
-        promises.push(promise)
-        stats.requested = requestEntry.request.accounts.length
-      }
-    }
-
-    let wrappedDataList:Shardus.WrappedData[] = []
-    //let stateTableDataList:Shardus.StateTableObject[] = []
-
-    let stateTableDataMap:Map<string, Shardus.StateTableObject> = new Map()
-
-    let results = await Promise.all(promises) as HashTrieAccountDataResponse[]
-    for(let result of results){
-      //HashTrieAccountDataResponse
-      if(result != null && result.accounts != null && result.accounts.length > 0){
-
-        if(result.stateTableData != null && result.stateTableData.length > 0){
-          for(let stateTableData of result.stateTableData){
-            stateTableDataMap.set(stateTableData.stateAfter, stateTableData)
-
-          }
-        }
-
-        //wrappedDataList = wrappedDataList.concat(result.accounts)
-        for(let wrappedAccount of result.accounts){
-          let desiredHash = accountHashMap.get(wrappedAccount.accountId)
-          if(desiredHash != wrappedAccount.stateId){
-            //got account back but has the wrong stateID
-            //nestedCountersInstance.countEvent('accountPatcher', 'getAccountRepairData wrong hash')
-            this.statemanager_fatal('getAccountRepairData wrong hash',`getAccountRepairData wrong hash ${utils.stringifyReduce(wrappedAccount.accountId)}`)
+        accountHashMap.set(accountEntry.accountID, accountEntry.hash)
+        if(requestEntry == null){
+          //minor layer of security, we will ask a different node for the account than the one that gave us the hash
+          let nodeToAsk = this.getNodeForQuery(accountEntry.accountID, cycle, true)
+          if(nodeToAsk == null){
+            this.statemanager_fatal('getAccountRepairData no node avail',`getAccountRepairData no node avail ${cycle}`)
             continue
           }
-          wrappedDataList.push(wrappedAccount)
+          requestEntry = {node:nodeToAsk, request:{cycle, accounts:[]}}
+          nodesBySyncRadix.set(syncRadix, requestEntry)
+        }
+        requestEntry.request.accounts.push(accountEntry)
+      }
 
-          // let stateDataFound = stateTableDataMap.get(wrappedAccount.accountId)
-          // if(stateDataFound != null){
-          //   //todo filtering
-          //   if(stateDataFound.stateAfter === desiredHash){
-          //     stateTableDataList.push(stateDataFound)
-          //   }
-          // }
+      let promises = []
+      let accountPerRequest = this.config.stateManager.patcherAccountsPerRequest
+      let maxAskCount = this.config.stateManager.patcherAccountsPerUpdate
+      for(let requestEntry of nodesBySyncRadix.values()){
+        if(requestEntry.request.accounts.length > accountPerRequest){
+          let offset = 0
+          let allAccounts = requestEntry.request.accounts
+          let thisAskCount = 0
+          while(offset < allAccounts.length && Math.min(offset + accountPerRequest, allAccounts.length) < maxAskCount){
+            requestEntry.request.accounts = allAccounts.slice(offset, offset + accountPerRequest)
+            let promise = this.p2p.ask(requestEntry.node, 'get_account_data_by_hashes', requestEntry.request)
+            promises.push(promise)
+            offset = offset + accountPerRequest
+            stats.multiRequests++
+            thisAskCount = requestEntry.request.accounts.length
+          }
+
+          stats.skipping += Math.max(0,allAccounts.length - thisAskCount)
+          stats.requested += thisAskCount
+
+          //would it be better to resync if we have a high number of errors?  not easy to answer this.
+
+        } else {
+          let promise = this.p2p.ask(requestEntry.node, 'get_account_data_by_hashes', requestEntry.request)
+          promises.push(promise)
+          stats.requested = requestEntry.request.accounts.length
         }
       }
+
+      let promiseResults = await Promise.allSettled(promises) //as HashTrieAccountDataResponse[]
+      for(let promiseResult of promiseResults){
+        if(promiseResult.status === 'rejected'){
+          continue
+        }
+        let result = promiseResult.value as HashTrieAccountDataResponse
+        //HashTrieAccountDataResponse
+        if(result != null && result.accounts != null && result.accounts.length > 0){
+
+          if(result.stateTableData != null && result.stateTableData.length > 0){
+            for(let stateTableData of result.stateTableData){
+              stateTableDataMap.set(stateTableData.stateAfter, stateTableData)
+            }
+          }
+
+          //wrappedDataList = wrappedDataList.concat(result.accounts)
+          for(let wrappedAccount of result.accounts){
+            let desiredHash = accountHashMap.get(wrappedAccount.accountId)
+            if(desiredHash != wrappedAccount.stateId){
+              //got account back but has the wrong stateID
+              //nestedCountersInstance.countEvent('accountPatcher', 'getAccountRepairData wrong hash')
+              this.statemanager_fatal('getAccountRepairData wrong hash',`getAccountRepairData wrong hash ${utils.stringifyReduce(wrappedAccount.accountId)}`)
+              continue
+            }
+            wrappedDataList.push(wrappedAccount)
+
+            // let stateDataFound = stateTableDataMap.get(wrappedAccount.accountId)
+            // if(stateDataFound != null){
+            //   //todo filtering
+            //   if(stateDataFound.stateAfter === desiredHash){
+            //     stateTableDataList.push(stateDataFound)
+            //   }
+            // }
+          }
+        }
+      }
+
+    } catch( error) {
+      this.statemanager_fatal('getAccountRepairData fatal ' + wrappedDataList.length, 'getAccountRepairData fatal ' + wrappedDataList.length + ' ' + errorToStringFull(error))
     }
+
     return {wrappedDataList, stateTableDataMap, stats}
   }
 
