@@ -277,7 +277,7 @@ export function parseRecord(record: P2P.CycleCreatorTypes.CycleRecord): P2P.Cycl
   // Make sure the Lost module is listed after Apoptosis in the CycleCreator submodules list
   return {
     added: [],
-    removed: record.lostSyncing,
+    removed: [],
     updated: []
   }
 }

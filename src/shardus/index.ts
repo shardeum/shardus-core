@@ -984,7 +984,7 @@ class Shardus extends EventEmitter {
 
       // Ask App to crack open tx and return timestamp, id (hash), and keys
       const { timestamp, id, keys } = this.app.crack(timestampedTx)
-      console.log('app.crack results', timestamp, id, keys)
+      // console.log('app.crack results', timestamp, id, keys)
 
       // Validate the transaction timestamp
       let txExpireTimeMs = this.config.transactionExpireTime * 1000

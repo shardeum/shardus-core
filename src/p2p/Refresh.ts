@@ -166,6 +166,7 @@ export function cyclesToKeep() {
   let count = 1
   let seen = new Map()
   let removed = []
+  let refuted = []
   for (const record of reversed(cycles)) {
 /*
     squasher.addChange(CycleParser.parse(record))
@@ -176,23 +177,28 @@ export function cyclesToKeep() {
       break
     }
 */
+    if (record.refuted.length > 0) {
+      refuted = [...refuted, ...record.refuted]
+    }
+    if (newest.counter !== record.counter) {
+      if (record.lost.length > 0) {
+        removed = [...removed, ...record.lost.filter(id => !refuted.includes(id))]
+      }
+      if (record.lostSyncing.length > 0) {
+        removed = [...removed, ...record.lostSyncing.filter(id => !refuted.includes(id))]
+      }
+    }
     if (record.apoptosized.length > 0) {
       removed = [...removed, ...record.apoptosized]
-    }
-    if (record.lost.length > 0) {
-      removed = [...removed, ...record.lost]
-    }
-    if (record.lostSyncing.length > 0) {
-      removed = [...removed, ...record.lostSyncing]
     }
     if (record.removed.length > 0) {
       removed = [...removed, ...record.removed]
     }
     for (const n of record.refreshedConsensors) {
-      if (!removed.includes(n.id)) seen.set(n.id, 1)
+      if (!removed.includes(n.id) && !seen.has(n.id)) seen.set(n.id, 1)
     }
     for (const n of record.joinedConsensors) {
-      if (!removed.includes(n.id)) seen.set(n.id, 1)
+      if (!removed.includes(n.id) && !seen.has(n.id)) seen.set(n.id, 1)
     }
     if (seen.size >= totalNodeCount(newest)) break
     count++
