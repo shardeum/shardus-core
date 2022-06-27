@@ -6521,6 +6521,287 @@ class Depricated {
 
   //   return accountsSaved
   // }
+
+  /***
+   *     ######  ##    ## ##    ##  ######  ########    ###    #### ##       ######## ########     ###     ######   ######   ######   #######  ##     ## ##    ## ########  ######
+   *    ##    ##  ##  ##  ###   ## ##    ## ##         ## ##    ##  ##       ##       ##     ##   ## ##   ##    ## ##    ## ##    ## ##     ## ##     ## ###   ##    ##    ##    ##
+   *    ##         ####   ####  ## ##       ##        ##   ##   ##  ##       ##       ##     ##  ##   ##  ##       ##       ##       ##     ## ##     ## ####  ##    ##    ##
+   *     ######     ##    ## ## ## ##       ######   ##     ##  ##  ##       ######   ##     ## ##     ## ##       ##       ##       ##     ## ##     ## ## ## ##    ##     ######
+   *          ##    ##    ##  #### ##       ##       #########  ##  ##       ##       ##     ## ######### ##       ##       ##       ##     ## ##     ## ##  ####    ##          ##
+   *    ##    ##    ##    ##   ### ##    ## ##       ##     ##  ##  ##       ##       ##     ## ##     ## ##    ## ##    ## ##    ## ##     ## ##     ## ##   ###    ##    ##    ##
+   *     ######     ##    ##    ##  ######  ##       ##     ## #### ######## ######## ########  ##     ##  ######   ######   ######   #######   #######  ##    ##    ##     ######
+   */
+  /**
+   * syncFailedAcccounts
+   *   // Sync the failed accounts
+   * //   Log that some account failed
+   * //   Use the /get_account_data_by_list API to get the data for the accounts that need to be looked up later from any of the nodes that had a matching hash but different from previously used nodes
+   * //   Repeat the “Sync the Account State Table Second Pass” step
+   * //   Repeat the “Process the Account data” step
+   *
+   * @param lowAddress
+   * @param highAddress
+   */
+  //  async syncFailedAcccounts(lowAddress: string, highAddress: string) {
+  //   if (this.accountsWithStateConflict.length === 0 && this.missingAccountData.length === 0) {
+  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncFailedAcccounts no failed hashes to sync`)
+  //     return
+  //   }
+
+  //   nestedCountersInstance.countEvent('sync', 'syncFailedAcccounts')
+  //   this.syncStatement.failedAccountLoops++
+
+  //   if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: syncFailedAcccounts start`)
+  //   let addressList: string[] = []
+  //   for (let accountEntry of this.accountsWithStateConflict) {
+  //     // //NOTE: fixed with refactor
+  //     // if (accountEntry.data && accountEntry.data.address) {
+  //     //     addressList.push(accountEntry.data.address)
+  //     if (accountEntry.accountId) {
+  //       addressList.push(accountEntry.accountId)
+  //     } else {
+  //       if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: syncFailedAcccounts failed to add account ${accountEntry}`)
+  //     }
+  //   }
+  //   // add the addresses of accounts that we got state table data for but not data for
+  //   addressList = addressList.concat(this.missingAccountData)
+  //   this.missingAccountData = []
+
+  //   // TODO m11:  should we pick different nodes to ask? (at the very least need to change the data source node!!!!!!)
+  //   if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncFailedAcccounts requesting data for failed hashes ${utils.stringifyReduce(addressList)}`)
+
+  //   // Node Precheck!
+  //   if (this.stateManager.isNodeValidForInternalMessage(this.dataSourceNode.id, 'syncStateDataGlobals', true, true) === false) {
+  //     if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
+  //       return
+  //     }
+  //     //we picked a new node to ask so relaunch
+  //     await this.syncFailedAcccounts(lowAddress, highAddress)
+  //     return
+  //   }
+
+  //   let message = { accountIds: addressList }
+  //   let result = await this.p2p.ask(this.dataSourceNode, 'get_account_data_by_list', message)
+
+  //   nestedCountersInstance.countEvent('sync', 'syncFailedAcccounts accountsFailed', addressList.length)
+  //   this.syncStatement.failedAccounts += addressList.length
+
+  //   if (result == null) {
+  //     if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncFailedAcccounts result == null')
+  //     if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
+  //       return
+  //     }
+  //     //we picked a new node to ask so relaunch
+  //     await this.syncFailedAcccounts(lowAddress, highAddress)
+  //     return
+  //   }
+  //   if (result.accountData == null) {
+  //     if (logFlags.verbose) if (logFlags.error) this.mainLogger.error('ASK FAIL syncFailedAcccounts result.accountData == null')
+  //     if (this.tryNextDataSourceNode('syncStateDataGlobals') == false) {
+  //       return
+  //     }
+  //     //we picked a new node to ask so relaunch
+  //     await this.syncFailedAcccounts(lowAddress, highAddress)
+  //     return
+  //   }
+
+  //   this.combinedAccountData = this.combinedAccountData.concat(result.accountData)
+
+  //   if (logFlags.debug) this.mainLogger.debug(`DATASYNC: syncFailedAcccounts combinedAccountData: ${this.combinedAccountData.length} accountData: ${result.accountData.length}`)
+  //   if(this.useStateTable === true){
+  //     //depricated
+  //     //await this.syncStateTableData(lowAddress, highAddress, this.lastStateSyncEndtime, Date.now())
+  //   }
+  //   // process the new accounts.
+  //   // await this.processAccountData()  //using state table is depricated
+
+  //   await this.processAccountDataNoStateTable()
+  // }
+
+  /***
+   *    ########  ######## ########     ###    #### ########  ##     ## ####  ######   ######  #### ##    ##  ######   ######## ##     ##  ######
+   *    ##     ## ##       ##     ##   ## ##    ##  ##     ## ###   ###  ##  ##    ## ##    ##  ##  ###   ## ##    ##     ##     ##   ##  ##    ##
+   *    ##     ## ##       ##     ##  ##   ##   ##  ##     ## #### ####  ##  ##       ##        ##  ####  ## ##           ##      ## ##   ##
+   *    ########  ######   ########  ##     ##  ##  ########  ## ### ##  ##   ######   ######   ##  ## ## ## ##   ####    ##       ###     ######
+   *    ##   ##   ##       ##        #########  ##  ##   ##   ##     ##  ##        ##       ##  ##  ##  #### ##    ##     ##      ## ##         ##
+   *    ##    ##  ##       ##        ##     ##  ##  ##    ##  ##     ##  ##  ##    ## ##    ##  ##  ##   ### ##    ##     ##     ##   ##  ##    ##
+   *    ##     ## ######## ##        ##     ## #### ##     ## ##     ## ####  ######   ######  #### ##    ##  ######      ##    ##     ##  ######
+   */
+  /**
+   * repairMissingTXs
+   *
+   */
+  //  async repairMissingTXs() {
+  //   nestedCountersInstance.countEvent('sync', 'repairMissingTXs')
+
+  //   let keys = Object.keys(this.stateTableForMissingTXs)
+
+  //   if (logFlags.debug) this.mainLogger.debug(`DATASYNC: repairMissingTXs begin: ${keys.length} ${utils.stringifyReduce(keys)}`)
+  //   for (let key of keys) {
+  //     try {
+  //       this.profiler.profileSectionStart('repairMissingTX')
+  //       let stateTableData = this.stateTableForMissingTXs[key]
+
+  //       if (stateTableData == null) {
+  //         nestedCountersInstance.countEvent('sync', 'repairMissingTXs stateTableData == null')
+  //         continue
+  //       }
+  //       if (stateTableData.txId == null) {
+  //         nestedCountersInstance.countEvent('sync', 'repairMissingTXs stateTableData.txId == null')
+  //         continue
+  //       }
+
+  //       if (logFlags.debug) this.mainLogger.debug(`DATASYNC: repairMissingTXs start: ${utils.stringifyReduce(stateTableData)}`)
+  //       //get receipt for txID
+  //       let result = await this.stateManager.getTxRepair().requestMissingReceipt(stateTableData.txId, Number(stateTableData.txTimestamp), stateTableData.accountId)
+  //       if (result != null && result.success === true) {
+  //         //@ts-ignore todo can axe this when we get rid of old receipts
+  //         let repairOk = await this.stateManager.getTxRepair().repairToMatchReceiptWithoutQueueEntry(result.receipt, stateTableData.accountId)
+  //         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: repairMissingTXs finished: ok:${repairOk} ${utils.stringifyReduce(stateTableData)}`)
+  //       } else {
+  //         if (logFlags.debug) this.mainLogger.debug(`DATASYNC: repairMissingTXs cant get receipt: ${utils.stringifyReduce(stateTableData)}`)
+  //         this.statemanager_fatal(`repairMissingTXs_fail`, `repairMissingTXs_fail ${utils.stringifyReduce(stateTableData)} result:${utils.stringifyReduce(result)}`)
+  //       }
+  //     } catch (error) {
+  //       this.statemanager_fatal(`repairMissingTXs_ex`, 'repairMissingTXs ex: ' + errorToStringFull(error))
+  //     } finally {
+  //       this.profiler.profileSectionEnd('repairMissingTX')
+  //     }
+  //   }
+  // }
+
+  /***
+   *    ########  ########   #######   ######  ########  ######   ######     ###     ######   ######   #######  ##     ## ##    ## ######## ########     ###    ########    ###
+   *    ##     ## ##     ## ##     ## ##    ## ##       ##    ## ##    ##   ## ##   ##    ## ##    ## ##     ## ##     ## ###   ##    ##    ##     ##   ## ##      ##      ## ##
+   *    ##     ## ##     ## ##     ## ##       ##       ##       ##        ##   ##  ##       ##       ##     ## ##     ## ####  ##    ##    ##     ##  ##   ##     ##     ##   ##
+   *    ########  ########  ##     ## ##       ######    ######   ######  ##     ## ##       ##       ##     ## ##     ## ## ## ##    ##    ##     ## ##     ##    ##    ##     ##
+   *    ##        ##   ##   ##     ## ##       ##             ##       ## ######### ##       ##       ##     ## ##     ## ##  ####    ##    ##     ## #########    ##    #########
+   *    ##        ##    ##  ##     ## ##    ## ##       ##    ## ##    ## ##     ## ##    ## ##    ## ##     ## ##     ## ##   ###    ##    ##     ## ##     ##    ##    ##     ##
+   *    ##        ##     ##  #######   ######  ########  ######   ######  ##     ##  ######   ######   #######   #######  ##    ##    ##    ########  ##     ##    ##    ##     ##
+   */
+
+  //  async processAccountDataNoStateTable() : Promise<number> {
+  //   this.missingAccountData = []
+  //   this.mapAccountData = {}
+  //   this.stateTableForMissingTXs = {}
+  //   // create a fast lookup map for the accounts we have.  Perf.  will need to review if this fits into memory.  May need a novel structure.
+  //   let account
+  //   for (let i = 0; i < this.combinedAccountData.length; i++) {
+  //     account = this.combinedAccountData[i]
+  //     this.mapAccountData[account.accountId] = account
+  //   }
+
+  //   let accountKeys = Object.keys(this.mapAccountData)
+  //   let uniqueAccounts = accountKeys.length
+  //   let initialCombinedAccountLength = this.combinedAccountData.length
+  //   if (uniqueAccounts < initialCombinedAccountLength) {
+  //     // keep only the newest copies of each account:
+  //     // we need this if using a time based datasync
+  //     this.combinedAccountData = []
+  //     for (let accountID of accountKeys) {
+  //       this.combinedAccountData.push(this.mapAccountData[accountID])
+  //     }
+  //   }
+
+  //   let missingButOkAccounts = 0
+  //   let missingTXs = 0
+  //   let handledButOk = 0
+  //   let otherMissingCase = 0
+  //   let futureStateTableEntry = 0
+  //   let missingButOkAccountIDs: { [id: string]: boolean } = {}
+
+  //   let missingAccountIDs: { [id: string]: boolean } = {}
+
+  //   if (logFlags.debug)
+  //     this.mainLogger.debug(
+  //       `DATASYNC: processAccountData stateTableCount: ${this.inMemoryStateTableData.length} unique accounts: ${uniqueAccounts}  initial combined len: ${initialCombinedAccountLength}`
+  //     )
+  //   // For each account in the Account data make sure the entry in the Account State Table has the same State_after value; if not remove the record from the Account data
+
+
+  //   //   For each account in the Account State Table make sure the entry in Account data has the same State_after value; if not save the account id to be looked up later
+  //   this.accountsWithStateConflict = []
+  //   let goodAccounts: Shardus.WrappedData[] = []
+  //   let noSyncData = 0
+  //   let noMatches = 0
+  //   let outOfDateNoTxs = 0
+  //   let unhandledCase = 0
+  //   let fix1Worked = 0
+  //   for (let account of this.combinedAccountData) {
+  //     goodAccounts.push(account)
+  //   }
+
+  //   if (logFlags.debug)
+  //     this.mainLogger.debug(
+  //       `DATASYNC: processAccountData saving ${goodAccounts.length} of ${this.combinedAccountData.length} records to db.  noSyncData: ${noSyncData} noMatches: ${noMatches} missingTXs: ${missingTXs} handledButOk: ${handledButOk} otherMissingCase: ${otherMissingCase} outOfDateNoTxs: ${outOfDateNoTxs} futureStateTableEntry:${futureStateTableEntry} unhandledCase:${unhandledCase} fix1Worked:${fix1Worked}`
+  //     )
+  //   // failedHashes is a list of accounts that failed to match the hash reported by the server
+  //   let failedHashes = await this.stateManager.checkAndSetAccountData(goodAccounts, 'syncNonGlobals:processAccountDataNoStateTable', true) // repeatable form may need to call this in batches
+
+  //   this.syncStatement.numAccounts += goodAccounts.length
+
+  //   if (failedHashes.length > 1000) {
+  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
+  //     // state -> try another node. TODO record/eval/report blame?
+  //     this.stateManager.recordPotentialBadnode()
+  //     throw new Error('FailAndRestartPartition_processAccountData_A')
+  //   }
+  //   if (failedHashes.length > 0) {
+  //     if (logFlags.debug) this.mainLogger.debug(`DATASYNC: processAccountData failed hashes:  ${failedHashes.length} will have to download them again`)
+  //     // TODO ? record/eval/report blame?
+  //     this.stateManager.recordPotentialBadnode()
+  //     this.failedAccounts = this.failedAccounts.concat(failedHashes)
+  //     for (let accountId of failedHashes) {
+  //       account = this.mapAccountData[accountId]
+
+  //       if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData ${accountId}  data: ${utils.stringifyReduce(account)}`)
+
+  //       if (account != null) {
+  //         if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData adding account to list`)
+  //         this.accountsWithStateConflict.push(account)
+  //       } else {
+  //         if (logFlags.verbose) this.mainLogger.debug(`DATASYNC: processAccountData cant find data: ${accountId}`)
+  //         if (accountId) {
+  //           //this.accountsWithStateConflict.push({ address: accountId,  }) //NOTE: fixed with refactor
+  //           this.accountsWithStateConflict.push({ accountId: accountId, data: null, stateId: null, timestamp: 0 })
+  //         }
+  //       }
+  //     }
+  //   }
+
+  //   let accountsSaved = await this.stateManager.writeCombinedAccountDataToBackups(goodAccounts, failedHashes)
+
+  //   nestedCountersInstance.countEvent('sync', `accounts written`, accountsSaved)
+
+  //   this.combinedAccountData = [] // we can clear this now.
+
+  //   return accountsSaved
+  // }
+
+  //from:syncStateDataForRange2
+
+        // // Sync the failed accounts
+      // //   Log that some account failed
+      // //   Use the /get_account_data_by_list API to get the data for the accounts that need to be looked up later from any of the nodes that had a matching hash but different from previously used nodes
+      // //   Repeat the “Sync the Account State Table Second Pass” step
+      // //   Repeat the “Process the Account data” step
+      // await this.syncFailedAcccounts(lowAddress, highAddress)
+
+      // if (this.failedAccountsRemain()) {
+      //   if (logFlags.debug)
+      //     this.mainLogger.debug(
+      //       `DATASYNC: failedAccountsRemain,  ${utils.stringifyReduce(lowAddress)} - ${utils.stringifyReduce(highAddress)} accountsWithStateConflict:${
+      //         this.accountsWithStateConflict.length
+      //       } missingAccountData:${this.missingAccountData.length} stateTableForMissingTXs:${Object.keys(this.stateTableForMissingTXs).length}`
+      //     )
+      // }
+
+      // let keysToRepair = Object.keys(this.stateTableForMissingTXs).length
+      // if (keysToRepair > 0) {
+      //   // alternate repair.
+      //   this.repairMissingTXs()
+      // }
+
 }
 
 export default Depricated
