@@ -380,11 +380,7 @@ class AccountPatcher {
           }
         }
 
-        if(this.stateManager.accountSync.useStateTable === true){
-          if(accountsToGetStateTableDataFor.length > 0){
-            result.stateTableData = await this.stateManager.storage.queryAccountStateTableByListNewest(accountsToGetStateTableDataFor)
-          }
-        }
+
 
         this.mainLogger.debug(`get_account_data_by_hashes1 requests[${payload.accounts.length}] :${utils.stringifyReduce(payload.accounts)} `)
         this.mainLogger.debug(`get_account_data_by_hashes2 skippedAccounts:${utils.stringifyReduce(skippedAccounts)} `)

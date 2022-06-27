@@ -995,7 +995,7 @@ export type HashTrieAccountDataRequest = {
 }
 export type HashTrieAccountDataResponse = {
     accounts: Shardus.WrappedData[];
-    stateTableData: Shardus.StateTableObject[];
+    stateTableData: Shardus.StateTableObject[]; //TODO depricate this
 }
 
 

@@ -85,6 +85,7 @@ class AccountSync {
 
   syncTrackers: SyncTracker[]
 
+  //PREP: TO SYNC TRACKER
   currentRange: SimpleRange
   addressRange: SimpleRange
 
@@ -93,24 +94,20 @@ class AccountSync {
   dataSourceNodeIndex: number
 
   combinedAccountData: Shardus.WrappedData[]
-  accountsWithStateConflict: Shardus.WrappedData[] //{address:string}[] //Shardus.WrappedData[];
-
-  stateTableForMissingTXs: { [accountID: string]: Shardus.StateTableObject }
-
-  lastStateSyncEndtime: number
+  accountsWithStateConflict: Shardus.WrappedData[]
 
   failedAccounts: string[]
   missingAccountData: string[]
 
   mapAccountData: { [accountID: string]: Shardus.WrappedData }
 
-  acceptedTXByHash: { [accountID: string]: string } //not sure if this is correct.  TODO where did this impl go!
-
-  statemanager_fatal: (key: string, log: string) => void
+  combinedAccountStateData: Shardus.StateTableObject[]
 
   partitionStartTimeStamp: number
 
-  combinedAccountStateData: Shardus.StateTableObject[]
+  //// END TO SYNC TRACKER
+
+  statemanager_fatal: (key: string, log: string) => void
 
   syncStatement: SyncStatment
   isSyncStatementCompleted: boolean
@@ -123,8 +120,6 @@ class AccountSync {
 
   forceSyncComplete: boolean
 
-  useStateTable: boolean
-  forwardTXToSyncingNeighbors: boolean
 
   constructor(
     stateManager: StateManager,
@@ -163,8 +158,6 @@ class AccountSync {
 
     this.readyforTXs = false
     this.syncTrackerIndex = 1 // increments up for each new sync tracker we create gets maped to calls.
-
-    this.acceptedTXByHash = {}
 
     this.clearSyncData()
 
@@ -209,9 +202,6 @@ class AccountSync {
 
     this.forceSyncComplete = false
 
-    this.useStateTable = false
-    this.forwardTXToSyncingNeighbors = false
-
     console.log('this.p2p', this.p2p)
   }
   // ////////////////////////////////////////////////////////////////////
@@ -220,7 +210,6 @@ class AccountSync {
 
   // this clears state data related to the current partion we are syncinge
   clearSyncData() {
-    this.lastStateSyncEndtime = 0
 
     //this seems out of place need to review it.
     this.stateManager.fifoLocks = {}
@@ -557,10 +546,6 @@ class AccountSync {
       this.stateManager.accountGlobals.hasknownGlobals = true
     }
 
-    if(this.useStateTable === true){
-      await utils.sleep(8000) // sleep to make sure we are listening to some txs before we sync them
-    }
-
     //This has an inner loop that will process sync trackers one at a time.
     //The outer while loop can be used to recalculate the list of sync trackers and try again
     let breakCount = 0
@@ -843,10 +828,10 @@ class AccountSync {
     let startTime = 0
     let lowTimeQuery = startTime
 
-    if(this.useStateTable === false){
-      this.dataSourceNode = null
-      this.getDataSourceNode(lowAddress, highAddress)
-    }
+    
+    this.dataSourceNode = null
+    this.getDataSourceNode(lowAddress, highAddress)
+    
 
     if(this.dataSourceNode == null){
       if (logFlags.error) this.mainLogger.error(`syncAccountData: dataSourceNode == null ${lowAddress} - ${highAddress}`)
@@ -1070,7 +1055,6 @@ class AccountSync {
   async processAccountDataNoStateTable2() : Promise<number> {
     this.missingAccountData = []
     this.mapAccountData = {}
-    this.stateTableForMissingTXs = {}
     // create a fast lookup map for the accounts we have.  Perf.  will need to review if this fits into memory.  May need a novel structure.
     let account
     for (let i = 0; i < this.combinedAccountData.length; i++) {

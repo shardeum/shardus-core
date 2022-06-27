@@ -6802,6 +6802,14 @@ class Depricated {
       //   this.repairMissingTXs()
       // }
 
+
+      ///from get_account_data_by_hashes handler
+      // if(this.stateManager.accountSync.useStateTable === true){
+      //   if(accountsToGetStateTableDataFor.length > 0){
+      //     result.stateTableData = await this.stateManager.storage.queryAccountStateTableByListNewest(accountsToGetStateTableDataFor)
+      //   }
+      // }
+
 }
 
 export default Depricated
