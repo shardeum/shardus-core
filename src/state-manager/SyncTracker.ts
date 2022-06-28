@@ -6,7 +6,18 @@ const stringify = require('fast-stable-stringify')
 import Profiler, { cUninitializedSize, profilerInstance } from '../utils/profiler'
 
 //import { SimpleRange } from "./state-manager-types"
-import { SimpleRange, AccountStateHashReq, AccountStateHashResp, GetAccountStateReq, GetAccountData3Req, GetAccountDataByRangeSmart, GlobalAccountReportResp, GetAccountData3Resp, CycleShardData, QueueEntry } from './state-manager-types'
+import {
+  SimpleRange,
+  AccountStateHashReq,
+  AccountStateHashResp,
+  GetAccountStateReq,
+  GetAccountData3Req,
+  GetAccountDataByRangeSmart,
+  GlobalAccountReportResp,
+  GetAccountData3Resp,
+  CycleShardData,
+  QueueEntry,
+} from './state-manager-types'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import AccountSync from './AccountSync'
 import { logFlags } from '../logger'
@@ -15,31 +26,27 @@ import * as Comms from '../p2p/Comms'
 
 import DataSourceHelper from './DataSourceHelper'
 
-
 export default class SyncTracker {
-    accountSync:AccountSync //parent sync manager
+  accountSync: AccountSync //parent sync manager
 
-    syncStarted: boolean;
-    syncFinished: boolean;
-    range: StateManagerTypes.shardFunctionTypes.BasicAddressRange;
-    cycle: number;
-    index: number;
-    queueEntries: QueueEntry[];
+  syncStarted: boolean
+  syncFinished: boolean
+  range: StateManagerTypes.shardFunctionTypes.BasicAddressRange
+  cycle: number
+  index: number
+  queueEntries: QueueEntry[]
 
-    isGlobalSyncTracker:boolean;
-    globalAddressMap: {[address:string]:boolean}; //this appears to be unused?
-    isPartOfInitialSync:boolean;
+  isGlobalSyncTracker: boolean
+  globalAddressMap: { [address: string]: boolean } //this appears to be unused?
+  isPartOfInitialSync: boolean
 
-    keys: {[address:string]:boolean};
+  keys: { [address: string]: boolean }
 
-
-    dataSourceHelper: DataSourceHelper
+  dataSourceHelper: DataSourceHelper
 
   //moved from accountSync
   currentRange: SimpleRange
   addressRange: SimpleRange
-
-
 
   combinedAccountData: Shardus.WrappedData[]
   accountsWithStateConflict: Shardus.WrappedData[]
@@ -53,25 +60,21 @@ export default class SyncTracker {
 
   partitionStartTimeStamp: number
 
-
-  reset(){
-    this.addressRange = null    
+  reset() {
+    this.addressRange = null
 
     this.mapAccountData = {}
 
     this.accountsWithStateConflict = []
     this.combinedAccountData = []
-    this.failedAccounts = []  
+    this.failedAccounts = []
 
     this.syncStarted = false
-    this.syncFinished = false  
-
-
+    this.syncFinished = false
   }
 
-  initByRange(accountSync:AccountSync, index:number, range: StateManagerTypes.shardFunctionTypes.BasicAddressRange, cycle: number, initalSync: boolean = false){
-    
-    // let syncTracker = { range, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false, 
+  initByRange(accountSync: AccountSync, index: number, range: StateManagerTypes.shardFunctionTypes.BasicAddressRange, cycle: number, initalSync: boolean = false) {
+    // let syncTracker = { range, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false,
     //isGlobalSyncTracker: false, globalAddressMap: {}, isPartOfInitialSync:initalSync, keys:{}  } as SyncTracker // partition,
     this.reset()
     this.accountSync = accountSync
@@ -85,12 +88,11 @@ export default class SyncTracker {
     this.keys = {}
 
     this.dataSourceHelper = new DataSourceHelper(this.accountSync.stateManager)
-
   }
 
-  initGlobal(accountSync:AccountSync, index:number, cycle: number, initalSync: boolean = false){
-        // let syncTracker = { range: {}, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false, 
-        //isGlobalSyncTracker: true, globalAddressMap: {}, isPartOfInitialSync:initalSync, keys:{} } as SyncTracker // partition,
+  initGlobal(accountSync: AccountSync, index: number, cycle: number, initalSync: boolean = false) {
+    // let syncTracker = { range: {}, queueEntries: [], cycle, index, syncStarted: false, syncFinished: false,
+    //isGlobalSyncTracker: true, globalAddressMap: {}, isPartOfInitialSync:initalSync, keys:{} } as SyncTracker // partition,
     this.reset()
     this.accountSync = accountSync
     this.range = undefined //was {} before..
@@ -102,11 +104,7 @@ export default class SyncTracker {
     this.keys = {}
 
     this.dataSourceHelper = new DataSourceHelper(this.accountSync.stateManager)
-
   }
-
-
-
 
   /***
    *     ######  ##    ## ##    ##  ######   ######  ########    ###    ######## ######## ########     ###    ########    ###    ########  #######  ########  ########     ###    ##    ##  ######   ########
@@ -118,7 +116,7 @@ export default class SyncTracker {
    *     ######     ##    ##    ##  ######   ######     ##    ##     ##    ##    ######## ########  ##     ##    ##    ##     ## ##        #######  ##     ## ##     ## ##     ## ##    ##  ######   ########
    */
 
-   async syncStateDataForRange2() {
+  async syncStateDataForRange2() {
     try {
       let partition = 'notUsed'
       this.currentRange = this.range
@@ -131,18 +129,19 @@ export default class SyncTracker {
       partition = `${utils.stringifyReduce(lowAddress)} - ${utils.stringifyReduce(highAddress)}`
 
       nestedCountersInstance.countEvent('sync', `sync partition: ${partition} start: ${this.accountSync.stateManager.currentCycleShardData.cycleNumber}`)
-      
+
       this.accountSync.readyforTXs = true // open the floodgates of queuing stuffs.
 
       let accountsSaved = await this.syncAccountData2(lowAddress, highAddress)
       if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: partition: ${partition}, syncAccountData2 done.`)
 
-      nestedCountersInstance.countEvent('sync', `sync partition: ${partition} end: ${this.accountSync.stateManager.currentCycleShardData.cycleNumber} accountsSynced:${accountsSaved} failedHashes:${this.failedAccounts.length}`)
+      nestedCountersInstance.countEvent(
+        'sync',
+        `sync partition: ${partition} end: ${this.accountSync.stateManager.currentCycleShardData.cycleNumber} accountsSynced:${accountsSaved} failedHashes:${this.failedAccounts.length}`
+      )
       this.failedAccounts = [] //clear failed hashes.  We dont try to fix them for now.  let the patcher handle it.  could bring back old code if we change mind
-
     } catch (error) {
-      if(error.message.includes('reset-sync-ranges')){
-
+      if (error.message.includes('reset-sync-ranges')) {
         this.accountSync.statemanager_fatal(`syncStateDataForRange_reset-sync-ranges`, 'DATASYNC: reset-sync-ranges: ' + errorToStringFull(error))
         //buble up:
         throw new Error('reset-sync-ranges')
@@ -158,8 +157,6 @@ export default class SyncTracker {
     }
   }
 
-
-  
   /***
    *     ######  ##    ## ##    ##  ######   ######  ########    ###    ######## ######## ########     ###    ########    ###     ######   ##        #######  ########     ###    ##        ######
    *    ##    ##  ##  ##  ###   ## ##    ## ##    ##    ##      ## ##      ##    ##       ##     ##   ## ##      ##      ## ##   ##    ##  ##       ##     ## ##     ##   ## ##   ##       ##    ##
@@ -174,7 +171,7 @@ export default class SyncTracker {
    * syncStateDataGlobals
    * @param syncTracker
    */
-   async syncStateDataGlobals() {
+  async syncStateDataGlobals() {
     try {
       let partition = 'globals!'
       // this.currentRange = range
@@ -195,8 +192,7 @@ export default class SyncTracker {
 
       let globalReport: GlobalAccountReportResp = await this.accountSync.getRobustGlobalReport()
 
-       this.dataSourceHelper.initWithList(this.accountSync.lastWinningGlobalReportNodes)
-      
+      this.dataSourceHelper.initWithList(this.accountSync.lastWinningGlobalReportNodes)
 
       let hasAllGlobalData = false
 
@@ -264,7 +260,6 @@ export default class SyncTracker {
         globalReport2 = await this.accountSync.getRobustGlobalReport()
 
         this.dataSourceHelper.initWithList(this.accountSync.lastWinningGlobalReportNodes)
-      
 
         let accountReportsByID2: { [id: string]: { id: string; hash: string; timestamp: number } } = {}
         for (let report of globalReport2.accounts) {
@@ -361,12 +356,11 @@ export default class SyncTracker {
     let startTime = 0
     let lowTimeQuery = startTime
 
-    
     //this.dataSourceHelper.dataSourceNode = null
     //this.dataSourceHelper.getDataSourceNode(lowAddress, highAddress)
     this.dataSourceHelper.initByRange(lowAddress, highAddress)
 
-    if(this.dataSourceHelper.dataSourceNode == null){
+    if (this.dataSourceHelper.dataSourceNode == null) {
       if (logFlags.error) this.accountSync.mainLogger.error(`syncAccountData: dataSourceNode == null ${lowAddress} - ${highAddress}`)
       //if we see this then getDataSourceNode failed.
       // this is most likely because the ranges selected when we started sync are now invalid and too wide to be filled.
@@ -397,21 +391,19 @@ export default class SyncTracker {
       // max records artificially low to make testing coverage better.  todo refactor: make it a config or calculate based on data size
       let message = { accountStart: queryLow, accountEnd: queryHigh, tsStart: startTime, maxRecords: this.accountSync.config.stateManager.accountBucketSize, offset }
       let r: GetAccountData3Resp | boolean
-      try{
+      try {
         r = await Comms.ask(this.dataSourceHelper.dataSourceNode, 'get_account_data3', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
-      } catch(ex){
-
+      } catch (ex) {
         this.accountSync.statemanager_fatal(`syncAccountData2`, `syncAccountData2 retries:${retriesLeft} ask: ` + errorToStringFull(ex))
         //wait 5 sec
         await utils.sleep(5000)
         //max retries
-        if(retriesLeft > 0){
+        if (retriesLeft > 0) {
           retriesLeft--
           continue
         } else {
           throw new Error('out of account sync retries')
         }
-        
       }
 
       // TSConversion need to consider better error handling here!
@@ -450,14 +442,14 @@ export default class SyncTracker {
       let sameAsLastTS = 0
       let lastLoopTS = -1
       //need to track some counters to help with offset calculations
-      for(let account of accountData){
-        if(account.timestamp === lastLowQuery){
+      for (let account of accountData) {
+        if (account.timestamp === lastLowQuery) {
           sameAsStartTS++
         }
-        if(account.timestamp === lastLoopTS){
+        if (account.timestamp === lastLoopTS) {
           sameAsLastTS++
         } else {
-          sameAsLastTS=0
+          sameAsLastTS = 0
           lastLoopTS = account.timestamp
         }
       }
@@ -489,20 +481,20 @@ export default class SyncTracker {
       }
 
       //finish our calculations related to offset
-      if(lastLowQuery === lowTimeQuery){
+      if (lastLowQuery === lowTimeQuery) {
         //update offset, so we can get next page of data
         //offset+= (result.data.wrappedAccounts.length + result.data.wrappedAccounts2.length)
-        offset+=sameAsLastTS //conservative offset!
+        offset += sameAsLastTS //conservative offset!
       } else {
         //clear offset
-        offset=0 
+        offset = 0
       }
-      if(accountData.length < message.maxRecords){
+      if (accountData.length < message.maxRecords) {
         //bump clock up because we didn't get a full data return
-        startTime++;            
+        startTime++
         //dont need offset because we should already have all the records
         offset = 0
-      }      
+      }
 
       // if we have any accounts in wrappedAccounts2
       let accountData2 = result.data.wrappedAccounts2
@@ -528,23 +520,23 @@ export default class SyncTracker {
       }
 
       if (lastUpdateNeeded || (accountData2.length === 0 && accountData.length === 0)) {
-        if(lastUpdateNeeded){
+        if (lastUpdateNeeded) {
           //we are done
-          moreDataRemaining = false    
+          moreDataRemaining = false
         } else {
-          if(stopIfNextLoopHasNoResults === true){
+          if (stopIfNextLoopHasNoResults === true) {
             //we are done
-            moreDataRemaining = false           
-          } else{
+            moreDataRemaining = false
+          } else {
             //bump start time and loop once more!
             //If we don't get anymore accounts on that loopl then we will quit for sure
             //If we do get more accounts then stopIfNextLoopHasNoResults will reset in a branch below
             startTime++
-            loopCount++  
-            stopIfNextLoopHasNoResults = true            
-          }    
+            loopCount++
+            stopIfNextLoopHasNoResults = true
+          }
         }
-        
+
         if (logFlags.debug)
           this.accountSync.mainLogger.debug(
             `DATASYNC: syncAccountData3 got ${accountData.length} more records.  last update: ${lastUpdateNeeded} extra records: ${result.data.wrappedAccounts2.length} tsStart: ${lastLowQuery} highestTS1: ${result.data.highestTs} delta:${result.data.delta} offset:${offset} sameAsStartTS:${sameAsStartTS}`
@@ -568,14 +560,12 @@ export default class SyncTracker {
       }
 
       //process combinedAccountData right away and then clear it
-      if(this.combinedAccountData.length > 0){
+      if (this.combinedAccountData.length > 0) {
         let accountToSave = this.combinedAccountData.length
         let accountsSaved = await this.processAccountDataNoStateTable2()
-        totalAccountsSaved+=accountsSaved
+        totalAccountsSaved += accountsSaved
         if (logFlags.debug)
-          this.accountSync.mainLogger.debug(
-            `DATASYNC: syncAccountData3 accountToSave: ${accountToSave} accountsSaved: ${accountsSaved}  offset:${offset} sameAsStartTS:${sameAsStartTS}`
-          )
+          this.accountSync.mainLogger.debug(`DATASYNC: syncAccountData3 accountToSave: ${accountToSave} accountsSaved: ${accountsSaved}  offset:${offset} sameAsStartTS:${sameAsStartTS}`)
         //clear data
         this.combinedAccountData = []
       }
@@ -585,7 +575,7 @@ export default class SyncTracker {
     return totalAccountsSaved
   }
 
-  async processAccountDataNoStateTable2() : Promise<number> {
+  async processAccountDataNoStateTable2(): Promise<number> {
     this.missingAccountData = []
     this.mapAccountData = {}
     // create a fast lookup map for the accounts we have.  Perf.  will need to review if this fits into memory.  May need a novel structure.
@@ -616,12 +606,8 @@ export default class SyncTracker {
 
     // let missingAccountIDs: { [id: string]: boolean } = {}
 
-    if (logFlags.debug)
-      this.accountSync.mainLogger.debug(
-        `DATASYNC: processAccountData unique accounts: ${uniqueAccounts}  initial combined len: ${initialCombinedAccountLength}`
-      )
+    if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: processAccountData unique accounts: ${uniqueAccounts}  initial combined len: ${initialCombinedAccountLength}`)
     // For each account in the Account data make sure the entry in the Account State Table has the same State_after value; if not remove the record from the Account data
-
 
     //   For each account in the Account State Table make sure the entry in Account data has the same State_after value; if not save the account id to be looked up later
     this.accountsWithStateConflict = []
@@ -682,7 +668,4 @@ export default class SyncTracker {
 
     return accountsSaved
   }
-
-
-
 }
