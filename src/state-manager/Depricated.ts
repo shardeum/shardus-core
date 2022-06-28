@@ -6810,6 +6810,24 @@ class Depricated {
       //   }
       // }
 
+
+  // /**
+  //  * failedAccountsRemain
+  //  */
+  //  failedAccountsRemain(): boolean {
+  //   // clean out account conflicts based on what TXs we we have in the queue that we can repair.
+  //   // also mark tx for scheduled repair..
+
+  //   // failed counts went way down after fixing liberdus end of things so putting this optimization on hold.
+
+  //   if (this.accountsWithStateConflict.length === 0 && this.missingAccountData.length === 0) {
+  //     return false
+  //   }
+  //   return true
+  // }
+
+
+
 }
 
 export default Depricated

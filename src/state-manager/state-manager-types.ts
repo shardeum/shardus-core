@@ -151,20 +151,20 @@ export type QueueEntry = {
   txDebug?: TxDebug
 };
 
-export type SyncTracker = {
-    syncStarted: boolean;
-    syncFinished: boolean;
-    range: StateManager.shardFunctionTypes.BasicAddressRange;
-    cycle: number;
-    index: number;
-    queueEntries: QueueEntry[];
+// export type SyncTracker = {
+//     syncStarted: boolean;
+//     syncFinished: boolean;
+//     range: StateManager.shardFunctionTypes.BasicAddressRange;
+//     cycle: number;
+//     index: number;
+//     queueEntries: QueueEntry[];
 
-    isGlobalSyncTracker:boolean;
-    globalAddressMap: {[address:string]:boolean}; //this appears to be unused?
-    isPartOfInitialSync:boolean;
+//     isGlobalSyncTracker:boolean;
+//     globalAddressMap: {[address:string]:boolean}; //this appears to be unused?
+//     isPartOfInitialSync:boolean;
 
-    keys: {[address:string]:boolean};
-};
+//     keys: {[address:string]:boolean};
+// };
 
 
 export type CycleShardData = {
