@@ -249,7 +249,7 @@ class MemoryReporting {
 
 
       for(let syncTracker of this.shardus.stateManager.accountSync.syncTrackers){
-        let partition = `${utils.stringifyReduce(syncTracker.range.low)} - ${utils.stringifyReduce(syncTracker.range.high)}`
+        let partition = `${utils.stringifyReduce(syncTracker.range?.low)} - ${utils.stringifyReduce(syncTracker.range?.high)}`
         this.addToReport('StateManager','SyncTracker', `isGlobal:${syncTracker.isGlobalSyncTracker} started:${syncTracker.syncStarted} finished:${syncTracker.syncFinished} partition:${partition}`, 1 )
       }
 
