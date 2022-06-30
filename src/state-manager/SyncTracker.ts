@@ -117,42 +117,49 @@ export default class SyncTracker {
    */
 
   async syncStateDataForRange2() {
-    try {
-      let partition = 'notUsed'
-      this.currentRange = this.range
-      this.addressRange = this.range // this.partitionToAddressRange(partition)
+    let retry = true
+    while (retry) {
+      retry = false
 
-      this.partitionStartTimeStamp = Date.now()
+      try {
+        let partition = 'notUsed'
+        this.currentRange = this.range
+        this.addressRange = this.range // this.partitionToAddressRange(partition)
 
-      let lowAddress = this.addressRange.low
-      let highAddress = this.addressRange.high
-      partition = `${utils.stringifyReduce(lowAddress)} - ${utils.stringifyReduce(highAddress)}`
+        this.partitionStartTimeStamp = Date.now()
 
-      nestedCountersInstance.countEvent('sync', `sync partition: ${partition} start: ${this.accountSync.stateManager.currentCycleShardData.cycleNumber}`)
+        let lowAddress = this.addressRange.low
+        let highAddress = this.addressRange.high
+        partition = `${utils.stringifyReduce(lowAddress)} - ${utils.stringifyReduce(highAddress)}`
 
-      this.accountSync.readyforTXs = true // open the floodgates of queuing stuffs.
+        nestedCountersInstance.countEvent('sync', `sync partition: ${partition} start: ${this.accountSync.stateManager.currentCycleShardData.cycleNumber}`)
 
-      let accountsSaved = await this.syncAccountData2(lowAddress, highAddress)
-      if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: partition: ${partition}, syncAccountData2 done.`)
+        //this.accountSync.readyforTXs = true //Do not open the floodgates of queuing stuffs.
 
-      nestedCountersInstance.countEvent(
-        'sync',
-        `sync partition: ${partition} end: ${this.accountSync.stateManager.currentCycleShardData.cycleNumber} accountsSynced:${accountsSaved} failedHashes:${this.failedAccounts.length}`
-      )
-      this.failedAccounts = [] //clear failed hashes.  We dont try to fix them for now.  let the patcher handle it.  could bring back old code if we change mind
-    } catch (error) {
-      if (error.message.includes('reset-sync-ranges')) {
-        this.accountSync.statemanager_fatal(`syncStateDataForRange_reset-sync-ranges`, 'DATASYNC: reset-sync-ranges: ' + errorToStringFull(error))
-        //buble up:
-        throw new Error('reset-sync-ranges')
-      } else if (error.message.includes('FailAndRestartPartition')) {
-        if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: Error Failed at: ${error.stack}`)
-        this.accountSync.statemanager_fatal(`syncStateDataForRange_ex_failandrestart`, 'DATASYNC: FailAndRestartPartition: ' + errorToStringFull(error))
-        await this.failandRestart()
-      } else {
-        this.accountSync.statemanager_fatal(`syncStateDataForRange_ex`, 'syncStateDataForPartition failed: ' + errorToStringFull(error))
-        if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
-        await this.failandRestart()
+        let accountsSaved = await this.syncAccountData2(lowAddress, highAddress)
+        if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: partition: ${partition}, syncAccountData2 done.`)
+
+        nestedCountersInstance.countEvent(
+          'sync',
+          `sync partition: ${partition} end: ${this.accountSync.stateManager.currentCycleShardData.cycleNumber} accountsSynced:${accountsSaved} failedHashes:${this.failedAccounts.length}`
+        )
+        this.failedAccounts = [] //clear failed hashes.  We dont try to fix them for now.  let the patcher handle it.  could bring back old code if we change mind
+      } catch (error) {
+        if (error.message.includes('reset-sync-ranges')) {
+          this.accountSync.statemanager_fatal(`syncStateDataForRange_reset-sync-ranges`, 'DATASYNC: reset-sync-ranges: ' + errorToStringFull(error))
+          //buble up:
+          throw new Error('reset-sync-ranges')
+        } else if (error.message.includes('FailAndRestartPartition')) {
+          if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: Error Failed at: ${error.stack}`)
+          this.accountSync.statemanager_fatal(`syncStateDataForRange_ex_failandrestart`, 'DATASYNC: FailAndRestartPartition: ' + errorToStringFull(error))
+          
+          retry = await this.tryRetry()
+        } else {
+          this.accountSync.statemanager_fatal(`syncStateDataForRange_ex`, 'syncStateDataForPartition failed: ' + errorToStringFull(error))
+          if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
+          
+          retry = await this.tryRetry()
+        }
       }
     }
   }
@@ -172,167 +179,178 @@ export default class SyncTracker {
    * @param syncTracker
    */
   async syncStateDataGlobals() {
-    try {
-      let partition = 'globals!'
-      // this.currentRange = range
-      // this.addressRange = range // this.partitionToAddressRange(partition)
+    let retry = true
+    while (retry) {
+      retry = false
 
-      let globalAccounts = []
-      let remainingAccountsToSync = []
-      this.partitionStartTimeStamp = Date.now()
+      try {
+        let partition = 'globals!'
 
-      // let lowAddress = this.addressRange.low
-      // let highAddress = this.addressRange.high
+        let globalAccounts = []
+        let remainingAccountsToSync = []
+        this.partitionStartTimeStamp = Date.now()
 
-      if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals partition: ${partition} `)
+        if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals partition: ${partition} `)
 
-      this.accountSync.readyforTXs = true // open the floodgates of queuing stuffs.
+        //this.accountSync.readyforTXs = true //Do not open the floodgates of queuing stuffs.
 
-      //Get globals list and hash.
+        //Get globals list and hash.
 
-      let globalReport: GlobalAccountReportResp = await this.accountSync.getRobustGlobalReport()
+        let globalReport: GlobalAccountReportResp = await this.accountSync.getRobustGlobalReport()
 
-      this.dataSourceHelper.initWithList(this.accountSync.lastWinningGlobalReportNodes)
-
-      let hasAllGlobalData = false
-
-      if (globalReport.accounts.length === 0) {
-        if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC:  syncStateDataGlobals no global accounts `)
-        this.accountSync.globalSyncFinished()
-        return // no global accounts
-      }
-      if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC:  syncStateDataGlobals globalReport: ${utils.stringifyReduce(globalReport)} `)
-
-      let accountReportsByID: { [id: string]: { id: string; hash: string; timestamp: number } } = {}
-      for (let report of globalReport.accounts) {
-        remainingAccountsToSync.push(report.id)
-
-        accountReportsByID[report.id] = report
-      }
-      let accountData: Shardus.WrappedData[] = []
-      let accountDataById: { [id: string]: Shardus.WrappedData } = {}
-      let globalReport2: GlobalAccountReportResp = { ready: false, combinedHash: '', accounts: [] }
-      let maxTries = 10
-      while (hasAllGlobalData === false) {
-        maxTries--
-        if (maxTries <= 0) {
-          if (logFlags.error) this.accountSync.mainLogger.error(`DATASYNC: syncStateDataGlobals max tries excceded `)
-          return
-        }
-        if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals hasAllGlobalData === false `)
-        //Get accounts.
-        //this.combinedAccountData = []
-
-        // Node Precheck!
-        if (this.accountSync.stateManager.isNodeValidForInternalMessage(this.dataSourceHelper.dataSourceNode.id, 'syncStateDataGlobals', true, true) === false) {
-          if (this.dataSourceHelper.tryNextDataSourceNode('syncStateDataGlobals') == false) {
-            break
-          }
-          continue
-        }
-
-        let message = { accountIds: remainingAccountsToSync }
-        let result = await Comms.ask(this.dataSourceHelper.dataSourceNode, 'get_account_data_by_list', message)
-
-        if (result == null) {
-          if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error('ASK FAIL syncStateTableData result == null')
-          if (this.dataSourceHelper.tryNextDataSourceNode('syncStateDataGlobals') == false) {
-            break
-          }
-          continue
-        }
-        if (result.accountData == null) {
-          if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error('ASK FAIL syncStateTableData result.accountData == null')
-          if (this.dataSourceHelper.tryNextDataSourceNode('syncStateDataGlobals') == false) {
-            break
-          }
-          continue
-        }
-        //{ accountData: Shardus.WrappedData[] | null }
-        //this.combinedAccountData = this.combinedAccountData.concat(result.accountData)
-        accountData = accountData.concat(result.accountData)
-
-        //Get globals list and hash (if changes then update said accounts and repeath)
-        //diff the list and update remainingAccountsToSync
-        // add any new accounts to globalAccounts
-        if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals get_account_data_by_list ${utils.stringifyReduce(result)} `)
-
-        globalReport2 = await this.accountSync.getRobustGlobalReport()
-
+        //TODO should convert to a larger list of valid nodes
         this.dataSourceHelper.initWithList(this.accountSync.lastWinningGlobalReportNodes)
 
-        let accountReportsByID2: { [id: string]: { id: string; hash: string; timestamp: number } } = {}
-        for (let report of globalReport2.accounts) {
-          accountReportsByID2[report.id] = report
+        let hasAllGlobalData = false
+
+        if (globalReport.accounts.length === 0) {
+          if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC:  syncStateDataGlobals no global accounts `)
+          this.accountSync.setGlobalSyncFinished()
+          return // no global accounts
+        }
+        if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC:  syncStateDataGlobals globalReport: ${utils.stringifyReduce(globalReport)} `)
+
+        let accountReportsByID: { [id: string]: { id: string; hash: string; timestamp: number } } = {}
+        for (let report of globalReport.accounts) {
+          remainingAccountsToSync.push(report.id)
+
+          accountReportsByID[report.id] = report
+        }
+        let accountData: Shardus.WrappedData[] = []
+        let accountDataById: { [id: string]: Shardus.WrappedData } = {}
+        let globalReport2: GlobalAccountReportResp = { ready: false, combinedHash: '', accounts: [] }
+        let maxTries = 20
+
+        //This normally should complete in one pass, but we allow 20 retries.
+        //It can fail for a few reasons:
+        //  -the node asked for data fails to respond, or doesn't give us any/all accounts needed
+        //  -the global accounts we got back
+        //  
+        while (hasAllGlobalData === false) {
+          maxTries--
+          if (maxTries <= 0) {
+            if (logFlags.error) this.accountSync.mainLogger.error(`DATASYNC: syncStateDataGlobals max tries excceded `)
+            return
+          }
+          if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals hasAllGlobalData === false `)
+
+          // Node Precheck!
+          if (this.accountSync.stateManager.isNodeValidForInternalMessage(this.dataSourceHelper.dataSourceNode.id, 'syncStateDataGlobals', true, true) === false) {
+            if (this.dataSourceHelper.tryNextDataSourceNode('syncStateDataGlobals') == false) {
+              break
+            }
+            continue
+          }
+
+          //TODO, long term. need to support cases where we could have 100k+ global accounts, and be able to make 
+          //paged requests.
+          //This is a current non issue though.
+
+          //Get accounts.
+          let message = { accountIds: remainingAccountsToSync }
+          let result = await Comms.ask(this.dataSourceHelper.dataSourceNode, 'get_account_data_by_list', message)
+
+          if (result == null) {
+            if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error('ASK FAIL syncStateTableData result == null')
+            if (this.dataSourceHelper.tryNextDataSourceNode('syncStateDataGlobals') == false) {
+              break
+            }
+            continue
+          }
+          if (result.accountData == null) {
+            if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error('ASK FAIL syncStateTableData result.accountData == null')
+            if (this.dataSourceHelper.tryNextDataSourceNode('syncStateDataGlobals') == false) {
+              break
+            }
+            continue
+          }
+
+          accountData = accountData.concat(result.accountData)
+
+          //Get globals list and hash (if changes then update said accounts and repeath)
+          //diff the list and update remainingAccountsToSync
+          // add any new accounts to globalAccounts
+          if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals get_account_data_by_list ${utils.stringifyReduce(result)} `)
+
+          globalReport2 = await this.accountSync.getRobustGlobalReport()
+
+          this.dataSourceHelper.initWithList(this.accountSync.lastWinningGlobalReportNodes)
+
+          let accountReportsByID2: { [id: string]: { id: string; hash: string; timestamp: number } } = {}
+          for (let report of globalReport2.accounts) {
+            accountReportsByID2[report.id] = report
+          }
+
+          hasAllGlobalData = true
+          remainingAccountsToSync = []
+          for (let account of accountData) {
+            accountDataById[account.accountId] = account
+            //newer copies will overwrite older ones in this map
+          }
+          //check the full report for any missing data
+          for (let report of globalReport2.accounts) {
+            if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals loop globalReport2.accounts `)
+            let data = accountDataById[report.id]
+            if (data == null) {
+              //we dont have the data
+              hasAllGlobalData = false
+              remainingAccountsToSync.push(report.id)
+              if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals remainingAccountsToSync data===null ${utils.makeShortHash(report.id)} `)
+            } else if (data.stateId !== report.hash) {
+              //we have the data but he hash is wrong
+              hasAllGlobalData = false
+              remainingAccountsToSync.push(report.id)
+              if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals remainingAccountsToSync data.stateId !== report.hash ${utils.makeShortHash(report.id)} `)
+            }
+          }
+          //set this report to the last report and continue.
+          accountReportsByID = accountReportsByID2
         }
 
-        hasAllGlobalData = true
-        remainingAccountsToSync = []
-        for (let account of accountData) {
-          accountDataById[account.accountId] = account
-          //newer copies will overwrite older ones in this map
-        }
-        //check the full report for any missing data
+        let dataToSet = []
+        let cycleNumber = this.accountSync.stateManager.currentCycleShardData.cycleNumber // Math.max(1, this.accountSync.stateManager.currentCycleShardData.cycleNumber-1 ) //kinda hacky?
+
+        let goodAccounts: Shardus.WrappedData[] = []
+
+        //Write the data! and set global memory data!.  set accounts copy data too.
         for (let report of globalReport2.accounts) {
-          if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals loop globalReport2.accounts `)
-          let data = accountDataById[report.id]
-          if (data == null) {
-            //we dont have the data
-            hasAllGlobalData = false
-            remainingAccountsToSync.push(report.id)
-            if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals remainingAccountsToSync data===null ${utils.makeShortHash(report.id)} `)
-          } else if (data.stateId !== report.hash) {
-            //we have the data but he hash is wrong
-            hasAllGlobalData = false
-            remainingAccountsToSync.push(report.id)
-            if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals remainingAccountsToSync data.stateId !== report.hash ${utils.makeShortHash(report.id)} `)
+          if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals loop globalReport2.accounts 2`)
+          let accountData = accountDataById[report.id]
+          if (accountData != null) {
+            dataToSet.push(accountData)
+            goodAccounts.push(accountData)
           }
         }
-        //set this report to the last report and continue.
-        accountReportsByID = accountReportsByID2
-      }
 
-      let dataToSet = []
-      let cycleNumber = this.accountSync.stateManager.currentCycleShardData.cycleNumber // Math.max(1, this.accountSync.stateManager.currentCycleShardData.cycleNumber-1 ) //kinda hacky?
+        let failedHashes = await this.accountSync.stateManager.checkAndSetAccountData(dataToSet, 'syncStateDataGlobals', true)
 
-      let goodAccounts: Shardus.WrappedData[] = []
+        this.accountSync.syncStatement.numGlobalAccounts += dataToSet.length
 
-      //Write the data! and set global memory data!.  set accounts copy data too.
-      for (let report of globalReport2.accounts) {
-        if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals loop globalReport2.accounts 2`)
-        let accountData = accountDataById[report.id]
-        if (accountData != null) {
-          dataToSet.push(accountData)
-          goodAccounts.push(accountData)
+        if (logFlags.console) console.log('DBG goodAccounts', goodAccounts)
+
+        await this.accountSync.stateManager.writeCombinedAccountDataToBackups(goodAccounts, failedHashes)
+
+        if (failedHashes && failedHashes.length > 0) {
+          throw new Error('setting global data falied')
         }
-      }
+        if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals complete synced ${dataToSet.length} accounts `)
+      } catch (error) {
+        if (error.message.includes('FailAndRestartPartition')) {
+          if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals Error Failed at: ${error.stack}`)
+          this.accountSync.statemanager_fatal(`syncStateDataGlobals_ex_failandrestart`, 'DATASYNC: syncStateDataGlobals FailAndRestartPartition: ' + errorToStringFull(error))
+          
+          retry = await this.tryRetry()
+        } else {
+          this.accountSync.statemanager_fatal(`syncStateDataGlobals_ex`, 'syncStateDataGlobals failed: ' + errorToStringFull(error))
+          if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
 
-      let failedHashes = await this.accountSync.stateManager.checkAndSetAccountData(dataToSet, 'syncStateDataGlobals', true)
-
-      this.accountSync.syncStatement.numGlobalAccounts += dataToSet.length
-
-      if (logFlags.console) console.log('DBG goodAccounts', goodAccounts)
-
-      await this.accountSync.stateManager.writeCombinedAccountDataToBackups(goodAccounts, failedHashes)
-
-      if (failedHashes && failedHashes.length > 0) {
-        throw new Error('setting data falied no error handling for this yet')
-      }
-      if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals complete synced ${dataToSet.length} accounts `)
-    } catch (error) {
-      if (error.message.includes('FailAndRestartPartition')) {
-        if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals Error Failed at: ${error.stack}`)
-        this.accountSync.statemanager_fatal(`syncStateDataGlobals_ex_failandrestart`, 'DATASYNC: syncStateDataGlobals FailAndRestartPartition: ' + errorToStringFull(error))
-        await this.failandRestart()
-      } else {
-        this.accountSync.statemanager_fatal(`syncStateDataGlobals_ex`, 'syncStateDataGlobals failed: ' + errorToStringFull(error))
-        if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
-        await this.failandRestart()
+          retry = await this.tryRetry()
+        }
       }
     }
 
     if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC:  syncStateDataGlobals complete ${this.accountSync.syncStatement.numGlobalAccounts}`)
-    this.accountSync.globalSyncFinished()
+    this.accountSync.setGlobalSyncFinished()
   }
 
   async syncAccountData2(lowAddress: string, highAddress: string): Promise<number> {
@@ -376,7 +394,7 @@ export default class SyncTracker {
 
     let offset = 0
 
-    let retriesLeft = 10
+    let askRetriesLeft = 10
 
     // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
     while (moreDataRemaining) {
@@ -394,12 +412,12 @@ export default class SyncTracker {
       try {
         r = await Comms.ask(this.dataSourceHelper.dataSourceNode, 'get_account_data3', message) // need the repeatable form... possibly one that calls apply to allow for datasets larger than memory
       } catch (ex) {
-        this.accountSync.statemanager_fatal(`syncAccountData2`, `syncAccountData2 retries:${retriesLeft} ask: ` + errorToStringFull(ex))
+        this.accountSync.statemanager_fatal(`syncAccountData2`, `syncAccountData2 retries:${askRetriesLeft} ask: ` + errorToStringFull(ex))
         //wait 5 sec
         await utils.sleep(5000)
         //max retries
-        if (retriesLeft > 0) {
-          retriesLeft--
+        if (askRetriesLeft > 0) {
+          askRetriesLeft--
           continue
         } else {
           throw new Error('out of account sync retries')
@@ -597,19 +615,13 @@ export default class SyncTracker {
       }
     }
 
-    // let missingButOkAccounts = 0
     let missingTXs = 0
     let handledButOk = 0
     let otherMissingCase = 0
     let futureStateTableEntry = 0
-    // let missingButOkAccountIDs: { [id: string]: boolean } = {}
-
-    // let missingAccountIDs: { [id: string]: boolean } = {}
 
     if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: processAccountData unique accounts: ${uniqueAccounts}  initial combined len: ${initialCombinedAccountLength}`)
-    // For each account in the Account data make sure the entry in the Account State Table has the same State_after value; if not remove the record from the Account data
 
-    //   For each account in the Account State Table make sure the entry in Account data has the same State_after value; if not save the account id to be looked up later
     this.accountsWithStateConflict = []
     let goodAccounts: Shardus.WrappedData[] = []
     let noSyncData = 0
@@ -630,34 +642,17 @@ export default class SyncTracker {
 
     this.accountSync.syncStatement.numAccounts += goodAccounts.length
 
-    //TODO need to reconsider this, there are normal cases where accounts can have a bad hash now?
-    // should get more details out of checkAndSetAccountData
     if (failedHashes.length > 1000) {
       if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
-      // state -> try another node. TODO record/eval/report blame?
+      // recordPotentialBadnode is not implemented yet but we have it as a placeholder
       this.accountSync.stateManager.recordPotentialBadnode()
       throw new Error('FailAndRestartPartition_processAccountData_A')
     }
     if (failedHashes.length > 0) {
       if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: processAccountData failed hashes:  ${failedHashes.length} will have to download them again`)
-      // TODO ? record/eval/report blame?
+      // recordPotentialBadnode is not implemented yet but we have it as a placeholder
       this.accountSync.stateManager.recordPotentialBadnode()
       this.failedAccounts = this.failedAccounts.concat(failedHashes)
-
-      // for (let accountId of failedHashes) {
-      //   account = this.mapAccountData[accountId]
-      //   if (logFlags.verbose) this.accountSync.mainLogger.debug(`DATASYNC: processAccountData ${accountId}  data: ${utils.stringifyReduce(account)}`)
-      //   if (account != null) {
-      //     if (logFlags.verbose) this.accountSync.mainLogger.debug(`DATASYNC: processAccountData adding account to list`)
-      //     this.accountsWithStateConflict.push(account)
-      //   } else {
-      //     if (logFlags.verbose) this.accountSync.mainLogger.debug(`DATASYNC: processAccountData cant find data: ${accountId}`)
-      //     if (accountId) {
-      //       //this.accountsWithStateConflict.push({ address: accountId,  }) //NOTE: fixed with refactor
-      //       this.accountsWithStateConflict.push({ accountId: accountId, data: null, stateId: null, timestamp: 0 })
-      //     }
-      //   }
-      // }
     }
 
     let accountsSaved = await this.accountSync.stateManager.writeCombinedAccountDataToBackups(goodAccounts, failedHashes)
@@ -667,5 +662,29 @@ export default class SyncTracker {
     this.combinedAccountData = [] // we can clear this now.
 
     return accountsSaved
+  }
+
+  async tryRetry(): Promise<boolean> {
+    this.accountSync.mainLogger.info(`DATASYNC: tryRetry`)
+    this.accountSync.logger.playbackLogState('datasyncFail', '', '')
+
+    await utils.sleep(1000)
+
+    if (this.accountSync.forceSyncComplete) {
+      nestedCountersInstance.countEvent('sync', 'forceSyncComplete')
+      this.accountSync.syncStatmentIsComplete()
+      this.accountSync.clearSyncData()
+      this.accountSync.skipSync()
+      //make sync trackers clean up
+      for (let syncTracker of this.accountSync.syncTrackers) {
+        syncTracker.syncFinished = true
+      }
+      return false
+    }
+
+    nestedCountersInstance.countEvent('sync', `fail and restart isGlobal:${this.isGlobalSyncTracker} `)
+    this.accountSync.syncStatement.failAndRestart++
+
+    return true
   }
 }

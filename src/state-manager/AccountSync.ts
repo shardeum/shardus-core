@@ -599,6 +599,11 @@ class AccountSync {
           homePartition = nodeShardData.homePartition
           console.log(`RETRYSYNC: homePartition: ${homePartition} storedPartitions: ${utils.stringifyReduce(nodeShardData.storedPartitions)}`)
 
+          //init global if we did not complete syncing them before
+          if (this.globalAccountsSynced === false && useGlobalAccounts === true) {
+            this.createSyncTrackerByForGlobals(cycle, true)
+          }
+
           //init new non global trackers
           rangesToSync = this.initRangesToSync(nodeShardData, homePartition, 4, 4)
           this.syncStatement.syncRanges = rangesToSync.length
@@ -606,6 +611,7 @@ class AccountSync {
             this.createSyncTrackerByRange(range, cycle, true)
             newTrackers++
           }
+
           nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: lastCycle: ${lastCycle} cycle: ${cycle} ${JSON.stringify({ cleared, kept, newTrackers })}`)
 
           continue //resume loop at top!
@@ -847,8 +853,9 @@ class AccountSync {
 
   /**
    * failandRestart
+   *     this is going away
    */
-  async failandRestart() {
+  async failandRestart_depricated() {
     this.mainLogger.info(`DATASYNC: failandRestart`)
     this.logger.playbackLogState('datasyncFail', '', '')
     this.clearSyncData()
@@ -883,7 +890,7 @@ class AccountSync {
     this.syncStatement.failAndRestart++
 
     //TODO proper restart not useing global var
-    await this.syncStateDataForRange2() //this.currentRange)
+    //await this.syncStateDataForRange2() //this.currentRange)
   }
 
   /**
@@ -1186,6 +1193,8 @@ class AccountSync {
   syncStatmentIsComplete() {
     this.syncStatement.totalSyncTime = (Date.now() - Self.p2pSyncStart) / 1000
 
+    this.readyforTXs = true
+
     // place to hook in and read or send the sync statement
     this.isSyncStatementCompleted = true
     Context.reporter.reportSyncStatement(Self.id, this.syncStatement)
@@ -1205,7 +1214,7 @@ class AccountSync {
     return
   }
 
-  globalSyncFinished() {
+  setGlobalSyncFinished() {
     this.globalAccountsSynced = true
   }
 

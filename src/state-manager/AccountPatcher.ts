@@ -1374,7 +1374,7 @@ class AccountPatcher {
    * @param radixHashEntries
    * @param cycle
    */
-  async getChildAccountHashes(radixHashEntries:RadixAndHash[], cycle:number) : Promise<{radixAndChildHashes:RadixAndChildHashes[], getAccountStats:any}> {
+  async getChildAccountHashes(radixHashEntries:RadixAndHash[], cycle:number) : Promise<{radixAndChildHashes:RadixAndChildHashes[], getAccountHashStats:any}> {
     let result:HashTrieAccountsResp
     let nodeChildHashes: RadixAndChildHashes[] = []
     let allHashes: AccountIDAndHash[] = []
@@ -1419,7 +1419,7 @@ class AccountPatcher {
       }
     }
 
-    let getAccountStats = { matched:0, visisted:0, empty:0, nullResults:0, numRequests:requestMap.size, responses:0 }
+    let getAccountHashStats = { matched:0, visisted:0, empty:0, nullResults:0, numRequests:requestMap.size, responses:0 }
 
     try{
       //TODO should we convert to Promise.allSettled?
@@ -1430,10 +1430,10 @@ class AccountPatcher {
           // for(let childHashes of result.nodeChildHashes){
           //   allHashes = allHashes.concat(childHashes.childAccounts)
           // }
-          utils.sumObject(getAccountStats, result.stats)
-          getAccountStats.responses++
+          utils.sumObject(getAccountHashStats, result.stats)
+          getAccountHashStats.responses++
         } else {
-          getAccountStats.nullResults++
+          getAccountHashStats.nullResults++
         }
       }
     } catch (error) {
@@ -1445,10 +1445,10 @@ class AccountPatcher {
     }
 
     if(logFlags.debug){
-      this.mainLogger.debug(`getChildAccountHashes ${utils.stringifyReduce(getAccountStats)}`)
+      this.mainLogger.debug(`getChildAccountHashes ${utils.stringifyReduce(getAccountHashStats)}`)
     }
 
-    return {radixAndChildHashes:nodeChildHashes, getAccountStats}
+    return {radixAndChildHashes:nodeChildHashes, getAccountHashStats: getAccountHashStats}
   }
 
   /***
@@ -1582,7 +1582,7 @@ class AccountPatcher {
       checkedLevel: 0,
       leafsChecked:0,
       leafResponses:0,
-      getAccountStats:{}
+      getAccountHashStats:{}
     }
     let extraBadKeys = []
 
@@ -1671,8 +1671,8 @@ class AccountPatcher {
 
     stats.leafsChecked = toFix.length
     //get bad accounts
-    let {radixAndChildHashes, getAccountStats} = await this.getChildAccountHashes(toFix, cycle)
-    stats.getAccountStats = getAccountStats
+    let {radixAndChildHashes, getAccountHashStats} = await this.getChildAccountHashes(toFix, cycle)
+    stats.getAccountHashStats = getAccountHashStats
 
     stats.leafResponses = radixAndChildHashes.length
 

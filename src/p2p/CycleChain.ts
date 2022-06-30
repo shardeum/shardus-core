@@ -3,6 +3,7 @@ import { crypto, logger, stateManager } from './Context'
 import { P2P } from '@shardus/types'
 import { nodes } from './NodeList'
 import { nestedCountersInstance } from '../utils/nestedCounters'
+import { logFlags } from '../logger'
 
 /** STATE */
 
@@ -173,7 +174,7 @@ export function getCycleNumberFromTimestamp(timestamp : number, allowOlder: bool
         if(cycleEstimate < 1){
           cycleEstimate = 1
         }
-        nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle: ' + cycleEstimate)
+        if(logFlags.verbose) nestedCountersInstance.countEvent('getCycleNumberFromTimestamp', 'p2p lookup fail -estimate cycle: ' + cycleEstimate)
         return cycleEstimate
       }
     }
