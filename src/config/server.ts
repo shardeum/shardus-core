@@ -124,7 +124,10 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     stateTableBucketSize: 500, 
     accountBucketSize: 200,
     patcherAccountsPerRequest: 250,
-    patcherAccountsPerUpdate: 2500 
+    patcherAccountsPerUpdate: 2500, 
+    patcherMaxHashesPerRequest: 300,
+    patcherMaxLeafHashesPerRequest: 300,
+    patcherMaxChildHashResponses: 2000
   },
   sharding: { nodesPerConsensusGroup: 5, executeInOneShard: false },
   mode: ServerMode.Debug,

@@ -985,7 +985,8 @@ export type HashTrieAccountsResp = {
     stats: {
         matched:number,
         visisted:number,
-        empty:number
+        empty:number,
+        childCount:number
     }
 };
 

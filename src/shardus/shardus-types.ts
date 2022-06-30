@@ -768,7 +768,13 @@ export interface ServerConfiguration {
     /** number of accounts that the patcher can get per request */
     patcherAccountsPerRequest: number,
     /** number of accounts that the patcher can get per upddate (cycle) */
-    patcherAccountsPerUpdate: number
+    patcherAccountsPerUpdate: number,
+    /** number of hashes we can ask for per request (non leaf) , not enabled yet. not sure if we want or need it*/
+    patcherMaxHashesPerRequest: number,
+    /** number of hashes we can ask for child nodes per request */
+    patcherMaxLeafHashesPerRequest: number,
+    /** max number of child hashes that we can respond with */
+    patcherMaxChildHashResponses: number
   }
   /** Options for sharding calculations */
   sharding?: {

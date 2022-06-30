@@ -172,9 +172,8 @@ class AccountPatcher {
   setupHandlers() {
     Comms.registerInternal('get_trie_hashes', async (payload: HashTrieReq, respond: (arg0: HashTrieResp) => any, sender, tracker: string, msgSize: number) => {
       profilerInstance.scopedProfileSectionStart('get_trie_hashes', false, msgSize)
-
       let result = {nodeHashes:[]} as HashTrieResp
-
+      let responseCount = 0
       for(let radix of payload.radixList){
 
         let level = radix.length
@@ -185,20 +184,20 @@ class AccountPatcher {
           for(let childTreeNode of hashTrieNode.children){
             if(childTreeNode != null){
               result.nodeHashes.push({radix:childTreeNode.radix, hash:childTreeNode.hash})
+              responseCount++
             }
           }
-
-          //result.nodeHashes.push({radix, hash:hashTrieNode.hash})
         }
       }
+
+      nestedCountersInstance.countEvent('accountPatcher', `get_trie_hashes c:${this.stateManager.currentCycleShardData.cycleNumber}`, responseCount)
+
       // todo could recored a split time here.. so we know time spend on handling the request vs sending the response?
       // that would not be completely accurate because the time to get the data is outide of this handler...
       let respondSize = await respond(result)
       profilerInstance.scopedProfileSectionEnd('get_trie_hashes', respondSize)
     })
 
-
-    //this should be a tell to X..  robust tell? if a node does not get enough it can just query for more.
     Comms.registerInternal('sync_trie_hashes', async (payload: HashTrieSyncTell, respondWrapped, sender:string, tracker:string, msgSize: number) => {
 
       profilerInstance.scopedProfileSectionStart('sync_trie_hashes', false, msgSize)
@@ -267,9 +266,11 @@ class AccountPatcher {
 
     //get child accountHashes for radix.  //get the hashes and ids so we know what to fix.
     Comms.registerInternal('get_trie_accountHashes', async (payload: HashTrieReq, respond: (arg0: HashTrieAccountsResp) => any, sender:string, tracker:string, msgSize: number) => {
-      profilerInstance.scopedProfileSectionStart('get_trie_hashes', false, msgSize)
+      profilerInstance.scopedProfileSectionStart('get_trie_accountHashes', false, msgSize)
       //nodeChildHashes: {radix:string, childAccounts:{accountID:string, hash:string}[]}[]
-      let result = {nodeChildHashes:[], stats:{ matched:0, visisted:0, empty:0}} as HashTrieAccountsResp
+      let result = {nodeChildHashes:[], stats:{ matched:0, visisted:0, empty:0, childCount:0}} as HashTrieAccountsResp
+
+      let patcherMaxChildHashResponses = this.config.stateManager.patcherMaxChildHashResponses
 
       for(let radix of payload.radixList){
         result.stats.visisted++
@@ -283,15 +284,24 @@ class AccountPatcher {
           result.nodeChildHashes.push({radix, childAccounts})
           for(let account of hashTrieNode.accounts){
             childAccounts.push({accountID:account.accountID, hash: account.hash})
+            result.stats.childCount++
           }
           if(hashTrieNode.accounts.length === 0){
             result.stats.empty++
           }
 
         }
+
+        //some protection on how many responses we can send
+        if(result.stats.childCount > patcherMaxChildHashResponses){
+          break
+        }
       }
+
+      nestedCountersInstance.countEvent('accountPatcher', `get_trie_accountHashes c:${this.stateManager.currentCycleShardData.cycleNumber}`, result.stats.childCount)
+
       let respondSize = await respond(result)
-      profilerInstance.scopedProfileSectionEnd('get_trie_hashes', respondSize)
+      profilerInstance.scopedProfileSectionEnd('get_trie_accountHashes', respondSize)
     })
 
     Comms.registerInternal('get_account_data_by_hashes', async (payload: HashTrieAccountDataRequest, respond: (arg0: HashTrieAccountDataResponse) => any, sender:string, tracker:string, msgSize: number) => {
@@ -1379,6 +1389,9 @@ class AccountPatcher {
     let nodeChildHashes: RadixAndChildHashes[] = []
     let allHashes: AccountIDAndHash[] = []
     let requestMap:Map<Shardus.Node, HashTrieReq> = new Map()
+    let actualRadixRequests = 0
+
+    let patcherMaxLeafHashesPerRequest = this.config.stateManager.patcherMaxLeafHashesPerRequest
     for(let radixHash of radixHashEntries ){
       let node = this.getNodeForQuery(radixHash.radix, cycle)
       if(node == null){
@@ -1389,6 +1402,13 @@ class AccountPatcher {
       if(existingRequest == null){
         existingRequest = {radixList:[]}
         requestMap.set(node, existingRequest)
+      }
+
+      if(existingRequest.radixList.length > patcherMaxLeafHashesPerRequest){
+        //dont request more than patcherMaxLeafHashesPerRequest  nodes to investigate
+        continue
+      } else {
+        actualRadixRequests++
       }
 
       existingRequest.radixList.push(radixHash.radix)
@@ -1419,7 +1439,19 @@ class AccountPatcher {
       }
     }
 
-    let getAccountHashStats = { matched:0, visisted:0, empty:0, nullResults:0, numRequests:requestMap.size, responses:0 }
+    let getAccountHashStats = { 
+      matched:0, 
+      visisted:0, 
+      empty:0, 
+      nullResults:0, 
+      numRequests:requestMap.size, 
+      responses:0,
+      exceptions:0,
+      radixToReq:radixHashEntries.length,
+      actualRadixRequests
+     }
+
+    //let result = {nodeChildHashes:[], stats:{ matched:0, visisted:0, empty:0}} as HashTrieAccountsResp
 
     try{
       //TODO should we convert to Promise.allSettled?
@@ -1438,6 +1470,7 @@ class AccountPatcher {
       }
     } catch (error) {
       this.statemanager_fatal('getChildAccountHashes failed', `getChildAccountHashes failed: ` + errorToStringFull(error))
+      getAccountHashStats.exceptions++
     }
 
     if(nodeChildHashes.length > 0){
@@ -2121,7 +2154,7 @@ class AccountPatcher {
       }
 
       //request data for the list of bad accounts then update.
-      let {wrappedDataList, stateTableDataMap, stats:getAccountStats} = await this.getAccountRepairData(cycle, results.badAccounts )
+      let {wrappedDataList, stateTableDataMap, getAccountStats} = await this.getAccountRepairData(cycle, results.badAccounts )
 
       //we need filter our list of possible account data to use for corrections.
       //it is possible the majority voters could send us account data that is older than what we have.
@@ -2344,7 +2377,7 @@ class AccountPatcher {
    * @param cycle
    * @param badAccounts
    */
-  async getAccountRepairData(cycle:number, badAccounts:AccountIDAndHash[] ): Promise<{wrappedDataList:Shardus.WrappedData[], stateTableDataMap:Map<string, Shardus.StateTableObject>, stats:any}> {
+  async getAccountRepairData(cycle:number, badAccounts:AccountIDAndHash[] ): Promise<{wrappedDataList:Shardus.WrappedData[], stateTableDataMap:Map<string, Shardus.StateTableObject>, getAccountStats:any}> {
     //pick which nodes to ask! /    //build up requests
     let nodesBySyncRadix:Map<string, {node:Shardus.Node, request:{cycle, accounts:AccountIDAndHash[]} }> = new Map()
     let accountHashMap = new Map()
@@ -2352,7 +2385,7 @@ class AccountPatcher {
     let wrappedDataList:Shardus.WrappedData[] = []
     let stateTableDataMap:Map<string, Shardus.StateTableObject> = new Map()
 
-    let stats= {
+    let getAccountStats= {
       skipping:0,
       multiRequests:0,
       requested:0,
@@ -2397,19 +2430,19 @@ class AccountPatcher {
             let promise = this.p2p.ask(requestEntry.node, 'get_account_data_by_hashes', requestEntry.request)
             promises.push(promise)
             offset = offset + accountPerRequest
-            stats.multiRequests++
+            getAccountStats.multiRequests++
             thisAskCount = requestEntry.request.accounts.length
           }
 
-          stats.skipping += Math.max(0,allAccounts.length - thisAskCount)
-          stats.requested += thisAskCount
+          getAccountStats.skipping += Math.max(0,allAccounts.length - thisAskCount)
+          getAccountStats.requested += thisAskCount
 
           //would it be better to resync if we have a high number of errors?  not easy to answer this.
 
         } else {
           let promise = this.p2p.ask(requestEntry.node, 'get_account_data_by_hashes', requestEntry.request)
           promises.push(promise)
-          stats.requested = requestEntry.request.accounts.length
+          getAccountStats.requested = requestEntry.request.accounts.length
         }
       }
 
@@ -2454,7 +2487,7 @@ class AccountPatcher {
       this.statemanager_fatal('getAccountRepairData fatal ' + wrappedDataList.length, 'getAccountRepairData fatal ' + wrappedDataList.length + ' ' + errorToStringFull(error))
     }
 
-    return {wrappedDataList, stateTableDataMap, stats}
+    return {wrappedDataList, stateTableDataMap, getAccountStats}
   }
 
   /***
