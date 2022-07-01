@@ -774,7 +774,11 @@ export interface ServerConfiguration {
     /** number of hashes we can ask for child nodes per request */
     patcherMaxLeafHashesPerRequest: number,
     /** max number of child hashes that we can respond with */
-    patcherMaxChildHashResponses: number
+    patcherMaxChildHashResponses: number,
+    /** max number of sync restarts allowed due to thrown exceptions before we go apop */
+    maxDataSyncRestarts: number
+    /** max number of sync restarts allowed due to thrown exceptions for each tracker instance */
+    maxTrackerRestarts: number
   }
   /** Options for sharding calculations */
   sharding?: {

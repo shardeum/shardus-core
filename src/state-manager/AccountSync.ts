@@ -452,27 +452,7 @@ class AccountSync {
     }
 
     //wait untill we have valid shard data
-    while (hasValidShardData === false) {
-      this.stateManager.getCurrentCycleShardData()
-      await utils.sleep(1000)
-      if (this.stateManager.currentCycleShardData == null) {
-        if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_waitForShardData', ` `, ` ${utils.stringifyReduce(this.stateManager.currentCycleShardData)} `)
-        hasValidShardData = false
-      }
-      if (this.stateManager.currentCycleShardData != null) {
-        if (this.stateManager.currentCycleShardData.hasCompleteData == false) {
-          let temp = this.p2p.state.getActiveNodes(null)
-          if (logFlags.playback)
-            this.logger.playbackLogNote(
-              'shrd_sync_waitForShardData',
-              ` `,
-              `hasCompleteData:${this.stateManager.currentCycleShardData.hasCompleteData} active:${utils.stringifyReduce(temp)} ${utils.stringifyReduce(this.stateManager.currentCycleShardData)} `
-            )
-        } else {
-          hasValidShardData = true
-        }
-      }
-    }
+    hasValidShardData = await this.waitForValidShardData(hasValidShardData)
 
     this.syncStatement.cycleStarted = this.stateManager.currentCycleShardData.cycleNumber
     this.syncStatement.syncStartTime = Date.now()
@@ -566,11 +546,15 @@ class AccountSync {
         if (error.message.includes('reset-sync-ranges')) {
           this.statemanager_fatal(`mainSyncLoop_reset-sync-ranges`, 'DATASYNC: reset-sync-ranges: ' + errorToStringFull(error))
 
-          if (breakCount > 5) {
+          if (breakCount > this.config.stateManager.maxDataSyncRestarts) {
             this.statemanager_fatal(`mainSyncLoop_reset-sync-ranges-givingUP`, 'too many tries')
             running = false
             this.syncTrackers = []
-            continue
+
+            nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: too many exceptions in accound data sync.  Init apop`)
+            this.stateManager.initApoptosisAndQuitSyncing("too many exceptions in accound data sync")
+
+            return
           }
 
           breakCount++
@@ -622,6 +606,32 @@ class AccountSync {
     }
     // if (logFlags.playback ) this.logger.playbackLogNote('shrd_sync_queued_and_set_syncing', `${txQueueEntry.acceptedTx.id}`, ` qId: ${txQueueEntry.entryID}`)
     if (logFlags.console) console.log('syncStateData end' + '   time:' + Date.now())
+  }
+
+  private async waitForValidShardData(hasValidShardData: boolean) {
+    while (hasValidShardData === false) {
+      this.stateManager.getCurrentCycleShardData()
+      await utils.sleep(1000)
+      if (this.stateManager.currentCycleShardData == null) {
+        if (logFlags.playback)
+          this.logger.playbackLogNote('shrd_sync_waitForShardData', ` `, ` ${utils.stringifyReduce(this.stateManager.currentCycleShardData)} `)
+        hasValidShardData = false
+      }
+      if (this.stateManager.currentCycleShardData != null) {
+        if (this.stateManager.currentCycleShardData.hasCompleteData == false) {
+          let temp = this.p2p.state.getActiveNodes(null)
+          if (logFlags.playback)
+            this.logger.playbackLogNote(
+              'shrd_sync_waitForShardData',
+              ` `,
+              `hasCompleteData:${this.stateManager.currentCycleShardData.hasCompleteData} active:${utils.stringifyReduce(temp)} ${utils.stringifyReduce(this.stateManager.currentCycleShardData)} `
+            )
+        } else {
+          hasValidShardData = true
+        }
+      }
+    }
+    return hasValidShardData
   }
 
   private initRangesToSync(
@@ -1133,10 +1143,20 @@ class AccountSync {
     return syncTracker
   }
 
+  /**
+   * not used, consider removal
+   * @param address 
+   * @returns 
+   */
   getSyncTracker(address: string): SyncTracker | null {
     // return the sync tracker.
     for (let i = 0; i < this.syncTrackers.length; i++) {
       let syncTracker = this.syncTrackers[i]
+
+      // test global first, because it wont have a range
+      if (syncTracker.isGlobalSyncTracker === true && syncTracker.globalAddressMap[address] === true) {
+        return syncTracker
+      }
 
       // need to see if address is in range. if so return the tracker.
       // if (ShardFunctions.testAddressInRange(address, syncTracker.range)) {
@@ -1145,9 +1165,7 @@ class AccountSync {
         return syncTracker
       }
       //}else{
-      if (syncTracker.isGlobalSyncTracker === true && syncTracker.globalAddressMap[address] === true) {
-        return syncTracker
-      }
+
       //}
     }
     return null

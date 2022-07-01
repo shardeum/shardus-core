@@ -113,8 +113,10 @@ export default class DataSourceHelper {
     if (this.dataSourceNodeIndex >= this.dataSourceNodeList.length) {
       if (logFlags.error) this.stateManager.mainLogger.error(`tryNextDataSourceNode ${debugString} ran out of nodes ask for data`)
       this.dataSourceNodeIndex = 0
+      nestedCountersInstance.countEvent('sync', `tryNextDataSourceNode Out of tries: ${this.dataSourceNodeIndex} of ${this.dataSourceNodeList.length} `, 1)
       return false
     }
+    nestedCountersInstance.countEvent('sync', `tryNextDataSourceNode next try: ${this.dataSourceNodeIndex} of ${this.dataSourceNodeList.length} `, 1)
     // pick new data source node
     this.dataSourceNode = this.dataSourceNodeList[this.dataSourceNodeIndex]
     return true

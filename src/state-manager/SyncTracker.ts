@@ -26,6 +26,7 @@ import * as Comms from '../p2p/Comms'
 
 import DataSourceHelper from './DataSourceHelper'
 
+
 export default class SyncTracker {
   accountSync: AccountSync //parent sync manager
 
@@ -60,6 +61,8 @@ export default class SyncTracker {
 
   partitionStartTimeStamp: number
 
+  restartCount: number
+
   reset() {
     this.addressRange = null
 
@@ -71,6 +74,8 @@ export default class SyncTracker {
 
     this.syncStarted = false
     this.syncFinished = false
+
+    this.restartCount = 0
   }
 
   initByRange(accountSync: AccountSync, index: number, range: StateManagerTypes.shardFunctionTypes.BasicAddressRange, cycle: number, initalSync: boolean = false) {
@@ -153,12 +158,12 @@ export default class SyncTracker {
           if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: Error Failed at: ${error.stack}`)
           this.accountSync.statemanager_fatal(`syncStateDataForRange_ex_failandrestart`, 'DATASYNC: FailAndRestartPartition: ' + errorToStringFull(error))
           
-          retry = await this.tryRetry()
+          retry = await this.tryRetry('syncStateDataForRange 1')
         } else {
           this.accountSync.statemanager_fatal(`syncStateDataForRange_ex`, 'syncStateDataForPartition failed: ' + errorToStringFull(error))
           if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
           
-          retry = await this.tryRetry()
+          retry = await this.tryRetry('syncStateDataForRange 2')
         }
       }
     }
@@ -236,7 +241,7 @@ export default class SyncTracker {
 
           // Node Precheck!
           if (this.accountSync.stateManager.isNodeValidForInternalMessage(this.dataSourceHelper.dataSourceNode.id, 'syncStateDataGlobals', true, true) === false) {
-            if (this.dataSourceHelper.tryNextDataSourceNode('syncStateDataGlobals') == false) {
+            if (this.dataSourceHelper.tryNextDataSourceNode('syncStateDataGlobals1') == false) {
               break
             }
             continue
@@ -252,14 +257,14 @@ export default class SyncTracker {
 
           if (result == null) {
             if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error('ASK FAIL syncStateTableData result == null')
-            if (this.dataSourceHelper.tryNextDataSourceNode('syncStateDataGlobals') == false) {
+            if (this.dataSourceHelper.tryNextDataSourceNode('syncStateDataGlobals2') == false) {
               break
             }
             continue
           }
           if (result.accountData == null) {
             if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error('ASK FAIL syncStateTableData result.accountData == null')
-            if (this.dataSourceHelper.tryNextDataSourceNode('syncStateDataGlobals') == false) {
+            if (this.dataSourceHelper.tryNextDataSourceNode('syncStateDataGlobals3') == false) {
               break
             }
             continue
@@ -339,12 +344,12 @@ export default class SyncTracker {
           if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals Error Failed at: ${error.stack}`)
           this.accountSync.statemanager_fatal(`syncStateDataGlobals_ex_failandrestart`, 'DATASYNC: syncStateDataGlobals FailAndRestartPartition: ' + errorToStringFull(error))
           
-          retry = await this.tryRetry()
+          retry = await this.tryRetry('syncStateDataGlobals 1 ')
         } else {
           this.accountSync.statemanager_fatal(`syncStateDataGlobals_ex`, 'syncStateDataGlobals failed: ' + errorToStringFull(error))
           if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: unexpected error. restaring sync:` + errorToStringFull(error))
 
-          retry = await this.tryRetry()
+          retry = await this.tryRetry('syncStateDataGlobals 2')
         }
       }
     }
@@ -394,13 +399,13 @@ export default class SyncTracker {
 
     let offset = 0
 
-    let askRetriesLeft = 10
+    let askRetriesLeft = 20
 
     // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
     while (moreDataRemaining) {
       // Node Precheck!
       if (this.accountSync.stateManager.isNodeValidForInternalMessage(this.dataSourceHelper.dataSourceNode.id, 'syncAccountData', true, true) === false) {
-        if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData') == false) {
+        if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData1') == false) {
           break
         }
         continue
@@ -429,14 +434,14 @@ export default class SyncTracker {
 
       if (result == null) {
         if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error(`ASK FAIL syncAccountData result == null node:${this.dataSourceHelper.dataSourceNode.id}`)
-        if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData') == false) {
+        if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData2') == false) {
           break
         }
         continue
       }
       if (result.data == null) {
         if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error(`ASK FAIL syncAccountData result.data == null node:${this.dataSourceHelper.dataSourceNode.id}`)
-        if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData') == false) {
+        if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData3') == false) {
           break
         }
         continue
@@ -643,13 +648,13 @@ export default class SyncTracker {
     this.accountSync.syncStatement.numAccounts += goodAccounts.length
 
     if (failedHashes.length > 1000) {
-      if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
+        if (logFlags.error) this.accountSync.mainLogger.error(`DATASYNC: processAccountData failed hashes over 1000:  ${failedHashes.length} restarting sync process`)
       // recordPotentialBadnode is not implemented yet but we have it as a placeholder
       this.accountSync.stateManager.recordPotentialBadnode()
       throw new Error('FailAndRestartPartition_processAccountData_A')
     }
     if (failedHashes.length > 0) {
-      if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: processAccountData failed hashes:  ${failedHashes.length} will have to download them again`)
+        if (logFlags.error) this.accountSync.mainLogger.error(`DATASYNC: processAccountData failed hashes:  ${failedHashes.length} will have to download them again`)
       // recordPotentialBadnode is not implemented yet but we have it as a placeholder
       this.accountSync.stateManager.recordPotentialBadnode()
       this.failedAccounts = this.failedAccounts.concat(failedHashes)
@@ -664,9 +669,17 @@ export default class SyncTracker {
     return accountsSaved
   }
 
-  async tryRetry(): Promise<boolean> {
+  async tryRetry(message: string): Promise<boolean> {
     this.accountSync.mainLogger.info(`DATASYNC: tryRetry`)
     this.accountSync.logger.playbackLogState('datasyncFail', '', '')
+
+    this.restartCount++
+
+    if(this.restartCount > this.accountSync.config.stateManager.maxTrackerRestarts){
+        if (logFlags.error) this.accountSync.mainLogger.error(`DATASYNC: tryRetry: max tries excceded  ${this.restartCount} ${message} `)
+        nestedCountersInstance.countEvent('sync', `tryRetry Out of tries ${message}`)
+        throw new Error('tryRetry out of tries')
+    }
 
     await utils.sleep(1000)
 
@@ -679,10 +692,15 @@ export default class SyncTracker {
       for (let syncTracker of this.accountSync.syncTrackers) {
         syncTracker.syncFinished = true
       }
+
+      if (logFlags.error) this.accountSync.mainLogger.error(`DATASYNC: tryRetry: forceSyncComplete ${this.restartCount} ${message} `)
+
+      nestedCountersInstance.countEvent('sync', `tryRetry: forceSyncComplete. ${this.restartCount} ${message}`)
       return false
     }
 
-    nestedCountersInstance.countEvent('sync', `fail and restart isGlobal:${this.isGlobalSyncTracker} `)
+    if (logFlags.error) this.accountSync.mainLogger.error(`DATASYNC: tryRetry: ${this.restartCount} ${message} `)
+    nestedCountersInstance.countEvent('sync', `tryRetry ${this.restartCount} ${message}`)
     this.accountSync.syncStatement.failAndRestart++
 
     return true
