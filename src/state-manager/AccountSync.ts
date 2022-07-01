@@ -552,7 +552,7 @@ class AccountSync {
             this.syncTrackers = []
 
             nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: too many exceptions in accound data sync.  Init apop`)
-            this.stateManager.initApoptosisAndQuitSyncing("too many exceptions in accound data sync")
+            this.stateManager.initApoptosisAndQuitSyncing('too many exceptions in accound data sync')
 
             return
           }
@@ -613,8 +613,7 @@ class AccountSync {
       this.stateManager.getCurrentCycleShardData()
       await utils.sleep(1000)
       if (this.stateManager.currentCycleShardData == null) {
-        if (logFlags.playback)
-          this.logger.playbackLogNote('shrd_sync_waitForShardData', ` `, ` ${utils.stringifyReduce(this.stateManager.currentCycleShardData)} `)
+        if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_waitForShardData', ` `, ` ${utils.stringifyReduce(this.stateManager.currentCycleShardData)} `)
         hasValidShardData = false
       }
       if (this.stateManager.currentCycleShardData != null) {
@@ -1145,8 +1144,8 @@ class AccountSync {
 
   /**
    * not used, consider removal
-   * @param address 
-   * @returns 
+   * @param address
+   * @returns
    */
   getSyncTracker(address: string): SyncTracker | null {
     // return the sync tracker.
