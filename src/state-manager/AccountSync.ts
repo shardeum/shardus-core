@@ -205,6 +205,11 @@ class AccountSync {
     this.stateManager.fifoLocks = {}
   }
 
+  clearSyncTrackers() {
+    //this seems out of place need to review it.
+    this.syncTrackers = []
+  }
+
   /***
    *    ##     ##    ###    ##    ## ########  ##       ######## ########   ######
    *    ##     ##   ## ##   ###   ## ##     ## ##       ##       ##     ## ##    ##
@@ -549,7 +554,7 @@ class AccountSync {
           if (breakCount > this.config.stateManager.maxDataSyncRestarts) {
             this.statemanager_fatal(`mainSyncLoop_reset-sync-ranges-givingUP`, 'too many tries')
             running = false
-            this.syncTrackers = []
+            this.clearSyncTrackers()
 
             nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: too many exceptions in accound data sync.  Init apop`)
             this.stateManager.initApoptosisAndQuitSyncing('too many exceptions in accound data sync')
@@ -564,11 +569,13 @@ class AccountSync {
           let kept = 0
           let newTrackers = 0
           let trackersToKeep = []
+          let keptGlobal = false
           for (let syncTracker of this.syncTrackers) {
             //keep unfinished global sync trackers
             if (syncTracker.isGlobalSyncTracker === true && syncTracker.syncFinished === false) {
               trackersToKeep.push(syncTracker)
               kept++
+              keptGlobal = true
             } else {
               cleared++
             }
@@ -584,7 +591,7 @@ class AccountSync {
           console.log(`RETRYSYNC: homePartition: ${homePartition} storedPartitions: ${utils.stringifyReduce(nodeShardData.storedPartitions)}`)
 
           //init global if we did not complete syncing them before
-          if (this.globalAccountsSynced === false && useGlobalAccounts === true) {
+          if (keptGlobal === false && this.globalAccountsSynced === false && useGlobalAccounts === true) {
             this.createSyncTrackerByForGlobals(cycle, true)
           }
 
@@ -600,7 +607,12 @@ class AccountSync {
 
           continue //resume loop at top!
         } else {
+
+          this.statemanager_fatal(`initialSyncMain unhandledEX`, 'initialSyncMain unhandledEX:' + errorToStringFull(error))
           running = false
+
+          nestedCountersInstance.countRareEvent('sync', `initialSyncMain unhandledEX.  Init apop`)
+          this.stateManager.initApoptosisAndQuitSyncing('initialSyncMain unhandledEX')
         }
       }
     }
@@ -909,7 +921,7 @@ class AccountSync {
     this.mainLogger.info(`DATASYNC: failAndDontRestartSync`)
     // need to clear more?
     this.clearSyncData()
-    this.syncTrackers = []
+    this.clearSyncTrackers()
   }
 
   /***
@@ -1089,7 +1101,7 @@ class AccountSync {
       nestedCountersInstance.countRareEvent('sync', `RETRYSYNC: runtime. lastCycle: ${lastCycle} cycle: ${cycle} ${JSON.stringify({ cleared, kept, newTrackers })}`)
 
       // clear all sync trackers.
-      this.syncTrackers = []
+      this.clearSyncTrackers()
       // may need to think more about this.. what if multiple nodes fail sync and then cast bad votes in subsequent updates?
     } finally {
       this.runtimeSyncTrackerSyncing = false
@@ -1211,6 +1223,7 @@ class AccountSync {
     this.syncStatement.totalSyncTime = (Date.now() - Self.p2pSyncStart) / 1000
 
     this.readyforTXs = true
+    this.clearSyncTrackers()
 
     // place to hook in and read or send the sync statement
     this.isSyncStatementCompleted = true

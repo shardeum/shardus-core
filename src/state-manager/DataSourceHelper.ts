@@ -50,7 +50,10 @@ export default class DataSourceHelper {
   }
 
   initByRange(lowAddress: string, highAddress: string) {
+    this.dataSourceNodeList = []
+
     if (this.stateManager.currentCycleShardData == null) {
+      if (logFlags.error) this.stateManager.mainLogger.error(`getDataSourceNode: initByRange currentCycleShardData == null`)
       return
     }
 
@@ -94,6 +97,7 @@ export default class DataSourceHelper {
     nodes = filteredNodes
     let filteredNodes2 = nodes.length
     if (nodes.length > 0) {
+      this.dataSourceNodeList = nodes
       this.dataSourceNode = nodes[Math.floor(Math.random() * nodes.length)]
       //this next line is not an error: comment it out later
       if (logFlags.error)

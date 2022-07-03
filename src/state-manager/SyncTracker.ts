@@ -677,7 +677,7 @@ export default class SyncTracker {
     if (this.restartCount > this.accountSync.config.stateManager.maxTrackerRestarts) {
       if (logFlags.error) this.accountSync.mainLogger.error(`DATASYNC: tryRetry: max tries excceded  ${this.restartCount} ${message} `)
       nestedCountersInstance.countEvent('sync', `tryRetry Out of tries ${message}`)
-      throw new Error('tryRetry out of tries')
+      throw new Error('reset-sync-ranges tryRetry out of tries')
     }
 
     await utils.sleep(1000)
