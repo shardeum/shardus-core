@@ -50,6 +50,7 @@ export default class DataSourceHelper {
   }
 
   initByRange(lowAddress: string, highAddress: string) {
+    this.dataSourceNodeIndex = 0
     this.dataSourceNodeList = []
 
     if (this.stateManager.currentCycleShardData == null) {
@@ -120,9 +121,19 @@ export default class DataSourceHelper {
       nestedCountersInstance.countEvent('sync', `tryNextDataSourceNode Out of tries: ${this.dataSourceNodeIndex} of ${this.dataSourceNodeList.length} `, 1)
       return false
     }
-    nestedCountersInstance.countEvent('sync', `tryNextDataSourceNode next try: ${this.dataSourceNodeIndex} of ${this.dataSourceNodeList.length} `, 1)
+    
     // pick new data source node
     this.dataSourceNode = this.dataSourceNodeList[this.dataSourceNodeIndex]
+
+    if (this.dataSourceNode == null) {
+        nestedCountersInstance.countEvent('sync', `tryNextDataSourceNode next try: ${this.dataSourceNodeIndex} of ${this.dataSourceNodeList.length} NODE==null`, 1)
+      return false
+    }
+
+    if (logFlags.error) this.stateManager.mainLogger.error(`tryNextDataSourceNode ${debugString} found: ${this.dataSourceNode.externalIp} ${this.dataSourceNode.externalPort} `)
+
+    nestedCountersInstance.countEvent('sync', `tryNextDataSourceNode next try: ${this.dataSourceNodeIndex} of ${this.dataSourceNodeList.length}`, 1)
+
     return true
   }
 

@@ -110,6 +110,17 @@ class AccountSync {
 
   forceSyncComplete: boolean
 
+  /** at the start of a sync operation go ahead and ask for the next data source */
+  dataSourceTest: boolean
+  /** thow assert in the top level loop that managed sync trackers. Causes reset-sync-ranges.*/
+  debugFail1: boolean
+  /** thow assert in the top level loop that managed sync trackers. Causes APOP. Auto reverts debugFail2 to false*/
+  debugFail2: boolean
+  /** throw assert in the sync tracker loop that gets accounts. */
+  debugFail3: boolean
+  /** if dataSourceTest is true, then keep asking for a new node every one second until things break. */
+  debugFail4: boolean
+
   constructor(
     stateManager: StateManager,
 
@@ -190,6 +201,12 @@ class AccountSync {
     this.initalSyncRemaining = 0
 
     this.forceSyncComplete = false
+
+    this.dataSourceTest = false
+    this.debugFail1 = false
+    this.debugFail2 = false
+    this.debugFail3 = false
+    this.debugFail4 = false
 
     this.lastWinningGlobalReportNodes = []
 
@@ -373,6 +390,34 @@ class AccountSync {
       this.forceSyncComplete = true
       res.end()
     })
+
+    Context.network.registerExternalGet('dataSourceTest', isDebugModeMiddleware, (req, res) => {
+      this.dataSourceTest = !this.dataSourceTest
+      res.write(`dataSourceTest = ${this.dataSourceTest} \n`)
+      res.end()
+    })
+    Context.network.registerExternalGet('syncFail1', isDebugModeMiddleware, (req, res) => {
+      this.debugFail1 = !this.debugFail1
+      res.write(`debugFail1 = ${this.debugFail1} \n`)
+      res.end()
+    })
+    Context.network.registerExternalGet('syncFail2', isDebugModeMiddleware, (req, res) => {
+      this.debugFail2 = !this.debugFail2
+      res.write(`debugFail2 = ${this.debugFail2} \n`)
+      res.end()
+    })
+    Context.network.registerExternalGet('syncFail3', isDebugModeMiddleware, (req, res) => {
+      this.debugFail3 = !this.debugFail3
+      res.write(`debugFail3 = ${this.debugFail3} \n`)
+      res.end()
+    })
+    Context.network.registerExternalGet('syncFail4', isDebugModeMiddleware, (req, res) => {
+      this.debugFail4 = !this.debugFail4
+      res.write(`debugFail4 = ${this.debugFail4} \n`)
+      res.end()
+    })
+    
+
   }
 
   /***
@@ -523,6 +568,21 @@ class AccountSync {
             running = false
             break
           }
+
+          if(this.debugFail1){
+            nestedCountersInstance.countEvent('sync', `syncStateDataGlobals: debugFail1 reset-sync-ranges`)
+            await utils.sleep(3000)
+            //will cause a sync reset of all trackers
+            throw new Error('reset-sync-ranges debugFail1')
+          }
+          if(this.debugFail2){
+            nestedCountersInstance.countEvent('sync', `syncStateDataGlobals: debugFail2 cause apop`)
+            await utils.sleep(3000)
+            this.debugFail2 = false
+            //should cause apop
+            throw new Error('debugFail2 causes apop')
+          }
+
           // let partition = syncTracker.partition
           if (logFlags.console) console.log(`syncTracker start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
           if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)

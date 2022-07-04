@@ -126,6 +126,14 @@ export default class SyncTracker {
       retry = false
 
       try {
+
+        if(this.accountSync.debugFail3){
+            nestedCountersInstance.countEvent('sync', `syncStateDataForRange2: debugFail3`)
+            await utils.sleep(3000)
+            //should cause apop
+            throw new Error('debugFail3 syncStateDataForRange2')
+        }
+
         let partition = 'notUsed'
         this.currentRange = this.range
         this.addressRange = this.range // this.partitionToAddressRange(partition)
@@ -190,9 +198,16 @@ export default class SyncTracker {
       try {
         let partition = 'globals!'
 
-        let globalAccounts = []
         let remainingAccountsToSync = []
         this.partitionStartTimeStamp = Date.now()
+
+
+        if(this.accountSync.debugFail3){
+            nestedCountersInstance.countEvent('sync', `syncStateDataGlobals: debugFail3`)
+            await utils.sleep(3000)
+            //should cause apop
+            throw new Error('debugFail3 syncStateDataGlobals')
+        }
 
         if (logFlags.debug) this.accountSync.mainLogger.debug(`DATASYNC: syncStateDataGlobals partition: ${partition} `)
 
@@ -225,6 +240,18 @@ export default class SyncTracker {
         let globalReport2: GlobalAccountReportResp = { ready: false, combinedHash: '', accounts: [] }
         let maxTries = 20
 
+        if (this.accountSync.dataSourceTest === true) {
+          if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData1') == false) {
+            throw new Error('out of account nodes to ask: dataSourceTest')
+          }
+          while(this.accountSync.debugFail4){
+            utils.sleep(1000)
+            if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData1 debugFail4') == false) {
+                throw new Error('out of account nodes to ask: dataSourceTest debugFail4')
+            }   
+          }          
+        }
+
         //This normally should complete in one pass, but we allow 20 retries.
         //It can fail for a few reasons:
         //  -the node asked for data fails to respond, or doesn't give us any/all accounts needed
@@ -241,7 +268,7 @@ export default class SyncTracker {
           // Node Precheck!
           if (this.accountSync.stateManager.isNodeValidForInternalMessage(this.dataSourceHelper.dataSourceNode.id, 'syncStateDataGlobals', true, true) === false) {
             if (this.dataSourceHelper.tryNextDataSourceNode('syncStateDataGlobals1') == false) {
-              break
+              throw new Error('out of account nodes to ask: syncStateDataGlobals1')
             }
             continue
           }
@@ -257,14 +284,14 @@ export default class SyncTracker {
           if (result == null) {
             if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error('ASK FAIL syncStateTableData result == null')
             if (this.dataSourceHelper.tryNextDataSourceNode('syncStateDataGlobals2') == false) {
-              break
+              throw new Error('out of account nodes to ask: syncStateDataGlobals2')
             }
             continue
           }
           if (result.accountData == null) {
             if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error('ASK FAIL syncStateTableData result.accountData == null')
             if (this.dataSourceHelper.tryNextDataSourceNode('syncStateDataGlobals3') == false) {
-              break
+              throw new Error('out of account nodes to ask: syncStateDataGlobals3')
             }
             continue
           }
@@ -388,7 +415,7 @@ export default class SyncTracker {
       // this is most likely because the ranges selected when we started sync are now invalid and too wide to be filled.
 
       //throwing this specific error text will bubble us up to the main sync loop and cause re-init of all the non global sync ranges/trackers
-      throw new Error('reset-sync-ranges')
+      throw new Error('reset-sync-ranges syncAccountData2: dataSourceNode == null')
     }
 
     // This flag is kind of tricky.  It tells us that the loop can go one more time after bumping up the min timestamp to check
@@ -400,12 +427,25 @@ export default class SyncTracker {
 
     let askRetriesLeft = 20
 
+    if (this.accountSync.dataSourceTest === true) {
+      if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData1') == false) {
+        throw new Error('out of account nodes to ask: dataSourceTest')
+      }
+
+      while(this.accountSync.debugFail4){
+        utils.sleep(1000)
+        if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData1 debugFail4') == false) {
+            throw new Error('out of account nodes to ask: dataSourceTest debugFail4')
+        }   
+      }
+    }
+
     // this loop is required since after the first query we may have to adjust the address range and re-request to get the next N data entries.
     while (moreDataRemaining) {
       // Node Precheck!
       if (this.accountSync.stateManager.isNodeValidForInternalMessage(this.dataSourceHelper.dataSourceNode.id, 'syncAccountData', true, true) === false) {
         if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData1') == false) {
-          break
+          throw new Error('out of account nodes to ask: syncAccountData1')
         }
         continue
       }
@@ -434,14 +474,14 @@ export default class SyncTracker {
       if (result == null) {
         if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error(`ASK FAIL syncAccountData result == null node:${this.dataSourceHelper.dataSourceNode.id}`)
         if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData2') == false) {
-          break
+          throw new Error('out of account nodes to ask: syncAccountData2')
         }
         continue
       }
       if (result.data == null) {
         if (logFlags.verbose) if (logFlags.error) this.accountSync.mainLogger.error(`ASK FAIL syncAccountData result.data == null node:${this.dataSourceHelper.dataSourceNode.id}`)
         if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData3') == false) {
-          break
+          throw new Error('out of account nodes to ask: syncAccountData3')
         }
         continue
       }
@@ -677,6 +717,8 @@ export default class SyncTracker {
     if (this.restartCount > this.accountSync.config.stateManager.maxTrackerRestarts) {
       if (logFlags.error) this.accountSync.mainLogger.error(`DATASYNC: tryRetry: max tries excceded  ${this.restartCount} ${message} `)
       nestedCountersInstance.countEvent('sync', `tryRetry Out of tries ${message}`)
+      //reset-sync-ranges is code that gets special exception handling.
+      //todo: replace this with something that does not rely on string operations
       throw new Error('reset-sync-ranges tryRetry out of tries')
     }
 
