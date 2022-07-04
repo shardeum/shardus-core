@@ -245,7 +245,7 @@ export default class SyncTracker {
             throw new Error('out of account nodes to ask: dataSourceTest')
           }
           while(this.accountSync.debugFail4){
-            utils.sleep(1000)
+            await utils.sleep(1000)
             if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData1 debugFail4') == false) {
                 throw new Error('out of account nodes to ask: dataSourceTest debugFail4')
             }   
@@ -433,7 +433,7 @@ export default class SyncTracker {
       }
 
       while(this.accountSync.debugFail4){
-        utils.sleep(1000)
+        await utils.sleep(1000)
         if (this.dataSourceHelper.tryNextDataSourceNode('syncAccountData1 debugFail4') == false) {
             throw new Error('out of account nodes to ask: dataSourceTest debugFail4')
         }   
