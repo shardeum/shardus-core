@@ -109,6 +109,11 @@ class TransactionRepair {
 
       this.profiler.profileSectionEnd('repair_init')
 
+
+      // Looks like this does not work well for shardeum.
+      // need to get list of accounts in the vote!
+      // why are we facing some many timeouts and repairs.
+
       // STEP 1
       // Build a list of request objects
       for (let key of queueEntry.uniqueKeys) {
@@ -494,14 +499,14 @@ class TransactionRepair {
       if(queueEntry.repairFinished === true){
         queueEntry.hasValidFinalData = true
 
-        let repairLogString = `tx:${queueEntry.logID} updatedAccountAndHashes:${utils.stringifyReduce(updatedAccountAndHashes)} counters:${utils.stringifyReduce({ requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash, numUpToDateAccounts})}`
+        let repairLogString = `tx:${queueEntry.logID} updatedAccountAndHashes:${utils.stringifyReduce(updatedAccountAndHashes)} state:${queueEntry.state} counters:${utils.stringifyReduce({ requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash, numUpToDateAccounts})}`
         if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_success', queueEntry.logID, repairLogString)
         this.mainLogger.debug('shrd_repairToMatchReceipt_success ' + repairLogString)
         nestedCountersInstance.countEvent('repair1', 'success')
 
       } else {
         queueEntry.repairFailed = true
-        this.statemanager_fatal(`repairToMatchReceipt_failed`, `tx:${queueEntry.logID} counters:${utils.stringifyReduce({requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash})}  keys ${utils.stringifyReduce(allKeys)}  `)        
+        this.statemanager_fatal(`repairToMatchReceipt_failed`, `tx:${queueEntry.logID} state:${queueEntry.state} counters:${utils.stringifyReduce({requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash})}  keys ${utils.stringifyReduce(allKeys)}  `)        
         nestedCountersInstance.countEvent('repair1', 'failed')
       }
 

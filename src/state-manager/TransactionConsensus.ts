@@ -515,8 +515,12 @@ class TransactionConsenus {
           mostVotes = updatedVoteCount
           winningVoteHash = currentVote.voteHash
         }
-
       }
+
+      if(mostVotes < requiredVotes){
+        return null
+      }
+
       if(winningVoteHash != undefined){
         //make the new receipt.
         let appliedReceipt2: AppliedReceipt2 = {
