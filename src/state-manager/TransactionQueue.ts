@@ -82,6 +82,8 @@ class TransactionQueue {
 
   txCoverageMap: any
 
+  queueTimingFixes: boolean
+
   constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.StrictServerConfiguration) {
     this.crypto = crypto
     this.app = app
@@ -130,6 +132,8 @@ class TransactionQueue {
     }
 
     this.txCoverageMap = new Map()
+
+    this.queueTimingFixes = true
   }
 
   /***
@@ -2650,22 +2654,23 @@ class TransactionQueue {
             continue
           }
 
+          //This case should not happen now. but we may add it back in later.
           //TXs that synced get much longer to have a chance to repair
-          if (txAge > timeM3 * 50 && queueEntry.didSync == true) {
-            //this.statistics.incrementCounter('txExpired')
+          // if (txAge > timeM3 * 50 && queueEntry.didSync == true) {
+          //   //this.statistics.incrementCounter('txExpired')
 
-            this.statemanager_fatal(`txExpired2 > M3 * 50. SyncedTX Timed out.`, `txExpired txAge > timeM3 * 50 && queueEntry.didSync == true. ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} hasReceivedApplyReceiptForRepair:${hasReceivedApplyReceiptForRepair} receiptEverRequested:${queueEntry.receiptEverRequested} age:${txAge} syncCounter${queueEntry.syncCounter} ${utils.stringifyReduce(queueEntry.uniqueWritableKeys)}`)
-            if (queueEntry.globalModification) {
-              this.statemanager_fatal(`txExpired2 > M3 * 50. SyncedTX -GlobalModification!!`, `txExpired txAge > timeM3*2 && queueEntry.didSync == false. !receiptEverRequested ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} hasReceivedApplyReceiptForRepair:${hasReceivedApplyReceiptForRepair} receiptEverRequested:${queueEntry.receiptEverRequested} age:${txAge}`)
-            }
-            if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 2  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
-            if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 2: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+          //   this.statemanager_fatal(`txExpired2 > M3 * 50. SyncedTX Timed out.`, `txExpired txAge > timeM3 * 50 && queueEntry.didSync == true. ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} hasReceivedApplyReceiptForRepair:${hasReceivedApplyReceiptForRepair} receiptEverRequested:${queueEntry.receiptEverRequested} age:${txAge} syncCounter${queueEntry.syncCounter} ${utils.stringifyReduce(queueEntry.uniqueWritableKeys)}`)
+          //   if (queueEntry.globalModification) {
+          //     this.statemanager_fatal(`txExpired2 > M3 * 50. SyncedTX -GlobalModification!!`, `txExpired txAge > timeM3*2 && queueEntry.didSync == false. !receiptEverRequested ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} hasReceivedApplyReceiptForRepair:${hasReceivedApplyReceiptForRepair} receiptEverRequested:${queueEntry.receiptEverRequested} age:${txAge}`)
+          //   }
+          //   if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 2  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
+          //   if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 2: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
 
-            nestedCountersInstance.countEvent('txExpired', `> M3 * 50. SyncedTX Timed out. didSync == true. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
-            queueEntry.state = 'expired'
-            this.removeFromQueue(queueEntry, currentIndex)
-            continue
-          }
+          //   nestedCountersInstance.countEvent('txExpired', `> M3 * 50. SyncedTX Timed out. didSync == true. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
+          //   queueEntry.state = 'expired'
+          //   this.removeFromQueue(queueEntry, currentIndex)
+          //   continue
+          // }
 
           // This is the expiry case where requestingReceiptFailed
           if (txAge > timeM3 && queueEntry.requestingReceiptFailed) {
@@ -2761,6 +2766,21 @@ class TransactionQueue {
           }
         }
 
+        if(this.queueTimingFixes === true){
+          //if we are still waiting on an upstream TX at this stage in the pipeline,
+          //then kill the TX
+          if(queueEntry.state === 'processing' || queueEntry.state === 'awaiting data'){
+            if (this.processQueue_accountSeen(seenAccounts, queueEntry) === true) {
+              if (txAge > timeM2) {
+                nestedCountersInstance.countEvent('txExpired', `> M2 canceled due to upstream TXs. state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification}`)
+                queueEntry.state = 'expired'
+                this.removeFromQueue(queueEntry, currentIndex)
+                continue
+              }
+            }            
+          }
+        } 
+
         // HANDLE TX logic based on state.
         try {
           this.profiler.profileSectionStart(`process-${queueEntry.state}`)
@@ -2789,6 +2809,7 @@ class TransactionQueue {
             ///////////////////////////////////////////--aging--////////////////////////////////////////////////////////////////
             // We wait in the aging phase, and mark accounts as seen to prevent a TX that is after this from using or changing data
             // on the accounts in this TX
+            // note that code much earlier in the loop rejects any queueEntries younger than time M
             queueEntry.state = 'processing'
             this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
           }
@@ -2834,22 +2855,36 @@ class TransactionQueue {
             // Once we have all the data we need we can move to consensing phase.
             // IF this is a global account it will go strait to commiting phase since the data was shared by other means.
 
-            // catch all in case we get waiting for data
-            if (txAge > timeM2_5) {
-              this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
-              nestedCountersInstance.countEvent('processing', `awaiting data txAge > m2.5 set to consensing hasAll:${queueEntry.hasAll} hasReceivedApplyReceipt:${hasReceivedApplyReceipt}`)
+            if(this.queueTimingFixes === true){
+              if (txAge > timeM2_5) {
+                //need to review this in context of sharding
+                nestedCountersInstance.countEvent('txExpired', `> M2.5 canceled due to lack of progress. state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification}`)
+                queueEntry.state = 'expired'
+                this.removeFromQueue(queueEntry, currentIndex)
+                continue
+              }    
 
-              queueEntry.waitForReceiptOnly = true
-              queueEntry.state = 'consensing'
-              continue
+            } else {
+              // catch all in case we get waiting for data
+              if (txAge > timeM2_5) {
+                this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
+                nestedCountersInstance.countEvent('processing', `awaiting data txAge > m2.5 set to consensing hasAll:${queueEntry.hasAll} hasReceivedApplyReceipt:${hasReceivedApplyReceipt}`)
+
+                queueEntry.waitForReceiptOnly = true
+                queueEntry.state = 'consensing'
+                continue
+              }              
             }
 
+
+            // TODO review this block below in more detail.
             // check if we have all accounts
             if (queueEntry.hasAll === false && txAge > timeM2) {
-              this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
+              this.processQueue_markAccountsSeen(seenAccounts, queueEntry)  
 
               if (queueEntry.pendingDataRequest === true) {
                 //early out after marking seen, because we are already asking for data
+                //need to review this in context of sharding
                 continue
               }
 
@@ -2857,6 +2892,14 @@ class TransactionQueue {
                 // I think this can't happen
                 nestedCountersInstance.countEvent('processing', 'data missing at t>M2. but not really. investigate further')
                 if (logFlags.playback) this.logger.playbackLogNote('shrd_hadDataAfterall', `${shortID}`, `This is kind of an error, and should not happen`)
+                continue
+              }
+
+              if (this.queueTimingFixes === true && this.processQueue_accountSeen(seenAccounts, queueEntry) === true){
+                //we are stuck in line so no cause to ask for data yet.
+
+                //TODO may need a flag that know if a TX was stuck until time m.. then let it not 
+                //ask for other accoun data right away...
                 continue
               }
 
