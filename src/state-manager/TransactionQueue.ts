@@ -2672,48 +2672,79 @@ class TransactionQueue {
           //   continue
           // }
 
-          // This is the expiry case where requestingReceiptFailed
-          if (txAge > timeM3 && queueEntry.requestingReceiptFailed) {
-            //this.statistics.incrementCounter('txExpired')
+          // lots of logic about when we can repair or not repair/when to wait etc.
+          if(this.queueTimingFixes === false){
+            // This is the expiry case where requestingReceiptFailed
+            if (txAge > timeM3 && queueEntry.requestingReceiptFailed) {
+              //this.statistics.incrementCounter('txExpired')
 
-            this.statemanager_fatal(`txExpired3 > M3. receiptRequestFail after Timed Out`, `txExpired txAge > timeM3 && queueEntry.requestingReceiptFailed ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
-            if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 3 requestingReceiptFailed  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
-            if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+              this.statemanager_fatal(`txExpired3 > M3. receiptRequestFail after Timed Out`, `txExpired txAge > timeM3 && queueEntry.requestingReceiptFailed ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+              if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 3 requestingReceiptFailed  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
+              if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
 
-            nestedCountersInstance.countEvent('txExpired', `> M3. receiptRequestFail after Timed Out. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
-            queueEntry.state = 'expired'
-            this.removeFromQueue(queueEntry, currentIndex)
-            continue
-          }
+              nestedCountersInstance.countEvent('txExpired', `> M3. receiptRequestFail after Timed Out. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
+              queueEntry.state = 'expired'
+              this.removeFromQueue(queueEntry, currentIndex)
+              continue
+            }
 
-          // This is the expiry case where repairFailed
-          //     TODO.  I think as soon as a repair as marked as failed we can expire and remove it from the queue
-          //            But I am leaving this optimizaiton out for now since we really don't want to plan on repairs failing
-          if (txAge > timeM3 && queueEntry.repairFailed) {
-            //this.statistics.incrementCounter('txExpired')
+            // This is the expiry case where repairFailed
+            //     TODO.  I think as soon as a repair as marked as failed we can expire and remove it from the queue
+            //            But I am leaving this optimizaiton out for now since we really don't want to plan on repairs failing
+            if (txAge > timeM3 && queueEntry.repairFailed) {
+              //this.statistics.incrementCounter('txExpired')
 
-            this.statemanager_fatal(`txExpired3 > M3. repairFailed after Timed Out`, `txExpired txAge > timeM3 && queueEntry.repairFailed ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
-            if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 3 repairFailed  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
-            if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 repairFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+              this.statemanager_fatal(`txExpired3 > M3. repairFailed after Timed Out`, `txExpired txAge > timeM3 && queueEntry.repairFailed ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+              if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 3 repairFailed  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
+              if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 repairFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
 
-            nestedCountersInstance.countEvent('txExpired', `> M3. repairFailed after Timed Out. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
-            queueEntry.state = 'expired'
-            this.removeFromQueue(queueEntry, currentIndex)
-            continue
-          }
+              nestedCountersInstance.countEvent('txExpired', `> M3. repairFailed after Timed Out. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
+              queueEntry.state = 'expired'
+              this.removeFromQueue(queueEntry, currentIndex)
+              continue
+            }
+          
+            // a few cases to wait for a receipt or request a receipt
+            if (queueEntry.state != 'await repair' && queueEntry.state != 'commiting') {
+              //Not yet expired case: getting close to expire so just move to consensing and wait.
+              //Just wait for receipt only if we are awaiting data and it is getting late
+              if (txAge > timeM2_5 && queueEntry.m2TimeoutReached === false && queueEntry.globalModification === false && queueEntry.requestingReceipt === false) {
+                if (queueEntry.state == 'awaiting data') {
+                  // no receipt yet, and state not committing
+                  if (queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null) {
+                    if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`Wait for reciept only: txAge > timeM2_5 txid:${shortID} `)
+                    if (logFlags.playback) this.logger.playbackLogNote('txMissingReceipt3', `${shortID}`, `processAcceptedTxQueue ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
 
-          // a few cases to wait for a receipt or request a receipt
-          if (queueEntry.state != 'await repair' && queueEntry.state != 'commiting') {
-            //Not yet expired case: getting close to expire so just move to consensing and wait.
-            //Just wait for receipt only if we are awaiting data and it is getting late
-            if (txAge > timeM2_5 && queueEntry.m2TimeoutReached === false && queueEntry.globalModification === false && queueEntry.requestingReceipt === false) {
-              if (queueEntry.state == 'awaiting data') {
-                // no receipt yet, and state not committing
-                if (queueEntry.recievedAppliedReceipt == null && queueEntry.appliedReceipt == null) {
-                  if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`Wait for reciept only: txAge > timeM2_5 txid:${shortID} `)
-                  if (logFlags.playback) this.logger.playbackLogNote('txMissingReceipt3', `${shortID}`, `processAcceptedTxQueue ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+                    nestedCountersInstance.countEvent('txMissingReceipt', `Wait for reciept only: txAge > timeM2.5. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
+                    queueEntry.waitForReceiptOnly = true
+                    queueEntry.m2TimeoutReached = true
+                    queueEntry.state = 'consensing'
+                    continue
+                  }
+                }
+              }
 
-                  nestedCountersInstance.countEvent('txMissingReceipt', `Wait for reciept only: txAge > timeM2.5. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
+              if (queueEntry.requestingReceipt === true) {
+                this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
+                continue
+              }
+
+              // The TX technically expired past M3, but we will now request reciept in hope that we can repair the tx
+              if (txAge > timeM3 && queueEntry.requestingReceiptFailed === false && queueEntry.globalModification === false) {
+                if ((this.stateManager.hasReceipt(queueEntry) === false) && queueEntry.requestingReceipt === false) {
+                  if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`txAge > timeM3 => ask for receipt now ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+                  if (logFlags.playback) this.logger.playbackLogNote('txMissingReceipt1', `txAge > timeM3 ${shortID}`, `syncNeedsReceipt ${shortID}`)
+
+                  let seen = this.processQueue_accountSeen(seenAccounts, queueEntry)
+
+                  this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
+                  if(this.config.debug.optimizedTXConsenus){
+                    this.queueEntryRequestMissingReceipt(queueEntry)                  
+                  } else {
+                    this.queueEntryRequestMissingReceipt_old(queueEntry)   
+                  }
+
+                  nestedCountersInstance.countEvent('txMissingReceipt', `txAge > timeM3 => ask for receipt now. state:${queueEntry.state} globalMod:${queueEntry.globalModification} seen:${seen}`)
                   queueEntry.waitForReceiptOnly = true
                   queueEntry.m2TimeoutReached = true
                   queueEntry.state = 'consensing'
@@ -2722,34 +2753,9 @@ class TransactionQueue {
               }
             }
 
-            if (queueEntry.requestingReceipt === true) {
-              this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
-              continue
-            }
-
-            // The TX technically expired past M3, but we will now request reciept in hope that we can repair the tx
-            if (txAge > timeM3 && queueEntry.requestingReceiptFailed === false && queueEntry.globalModification === false) {
-              if ((this.stateManager.hasReceipt(queueEntry) === false) && queueEntry.requestingReceipt === false) {
-                if (logFlags.verbose) if (logFlags.error) this.mainLogger.error(`txAge > timeM3 => ask for receipt now ` + `txid: ${shortID} state: ${queueEntry.state} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
-                if (logFlags.playback) this.logger.playbackLogNote('txMissingReceipt1', `txAge > timeM3 ${shortID}`, `syncNeedsReceipt ${shortID}`)
-
-                let seen = this.processQueue_accountSeen(seenAccounts, queueEntry)
-
-                this.processQueue_markAccountsSeen(seenAccounts, queueEntry)
-                if(this.config.debug.optimizedTXConsenus){
-                  this.queueEntryRequestMissingReceipt(queueEntry)                  
-                } else {
-                  this.queueEntryRequestMissingReceipt_old(queueEntry)   
-                }
-
-                nestedCountersInstance.countEvent('txMissingReceipt', `txAge > timeM3 => ask for receipt now. state:${queueEntry.state} globalMod:${queueEntry.globalModification} seen:${seen}`)
-                queueEntry.waitForReceiptOnly = true
-                queueEntry.m2TimeoutReached = true
-                queueEntry.state = 'consensing'
-                continue
-              }
-            }
           }
+
+
         } else {
           //check for TX older than 30x M3 and expire them
           if (txAge > timeM3 * 50) {
@@ -2768,7 +2774,8 @@ class TransactionQueue {
 
         if(this.queueTimingFixes === true){
           //if we are still waiting on an upstream TX at this stage in the pipeline,
-          //then kill the TX
+          //then kill the TX because there is not much hope for it
+          //This will help make way for other TXs with a better chance
           if(queueEntry.state === 'processing' || queueEntry.state === 'awaiting data'){
             if (this.processQueue_accountSeen(seenAccounts, queueEntry) === true) {
               if (txAge > timeM2) {
@@ -2779,6 +2786,46 @@ class TransactionQueue {
               }
             }            
           }
+
+          //If we are past time M2 there are few cases where we should give up on a TX right away
+          //Handle that here
+          if (txAge > timeM2) {
+            let expireTx = false
+            let reason = ''
+            //not sure this path can even happen.  but we addding it for completeness in case it comes back (abilty to requets receipt)
+            if(queueEntry.requestingReceiptFailed){
+              expireTx = true
+              reason = 'requestingReceiptFailed'
+            }
+            if(queueEntry.repairFailed){
+              expireTx = true
+              reason = 'repairFailed' 
+            }
+            if(expireTx){
+              this.statemanager_fatal(`txExpired3 > M2. fail ${reason}`, `txExpired txAge > timeM2 fail ${reason} ` + `txid: ${shortID} state: ${queueEntry.state} hasAll:${queueEntry.hasAll} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+              if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired >m2 fail ${reason}  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
+              //if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+
+              nestedCountersInstance.countEvent('txExpired', `> timeM2 fail ${reason} state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification} `)
+              queueEntry.state = 'expired'
+              this.removeFromQueue(queueEntry, currentIndex)              
+            }
+          }
+
+          //Have a hard cap where we expire and remove TXs after time > M3
+          if (txAge > timeM3) {
+            this.statemanager_fatal(`txExpired3 > M3. general case`, `txExpired txAge > timeM3 general case ` + `txid: ${shortID} state: ${queueEntry.state} hasAll:${queueEntry.hasAll} applyReceipt:${hasApplyReceipt} recievedAppliedReceipt:${hasReceivedApplyReceipt} age:${txAge}`)
+            if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} txExpired 3 requestingReceiptFailed  ${utils.stringifyReduce(queueEntry.acceptedTx)} ${queueEntry.didWakeup}`)
+            //if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
+
+            nestedCountersInstance.countEvent('txExpired', `> M3. general case state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification} `)
+            queueEntry.state = 'expired'
+            this.removeFromQueue(queueEntry, currentIndex)
+            continue
+          }
+
+          //TODO? could we remove a TX from the queu as soon as a receit was requested?
+          //TODO?2 should we allow a TX to use a repair op shortly after being expired? (it would have to be carefull, and maybe use some locking)
         } 
 
         // HANDLE TX logic based on state.
