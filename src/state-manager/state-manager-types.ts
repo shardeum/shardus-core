@@ -149,6 +149,7 @@ export type QueueEntry = {
 
   executionDebug?:any
   txDebug?: TxDebug
+  txSieveTime: number
 };
 
 // export type SyncTracker = {

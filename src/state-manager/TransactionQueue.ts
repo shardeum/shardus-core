@@ -953,7 +953,8 @@ class TransactionQueue {
           enqueueHrTime: process.hrtime(),
           duration: {},
         },
-        executionIdSet: new Set()
+        executionIdSet: new Set(),
+        txSieveTime:0
       } // age comes from timestamp
 
       // todo faster hash lookup for this maybe?
@@ -1190,6 +1191,8 @@ class TransactionQueue {
         } else {
           throw new Error('missing shard info')
         }
+
+        this.computeTxSieveTime(txQueueEntry)
 
         this.newAcceptedTxQueueTempInjest.push(txQueueEntry)
         this.newAcceptedTxQueueTempInjestByID.set(txQueueEntry.acceptedTx.txId, txQueueEntry)
@@ -2778,8 +2781,12 @@ class TransactionQueue {
           //This will help make way for other TXs with a better chance
           if(queueEntry.state === 'processing' || queueEntry.state === 'awaiting data'){
             if (this.processQueue_accountSeen(seenAccounts, queueEntry) === true) {
-              if (txAge > timeM2) {
+              //adding txSieve time!
+              if (txAge > timeM2 + queueEntry.txSieveTime) {
                 nestedCountersInstance.countEvent('txExpired', `> M2 canceled due to upstream TXs. state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification}`)
+                //todo only keep on for temporarliy
+                nestedCountersInstance.countEvent('txExpired', `> M2 canceled due to upstream TXs. sieveT:${queueEntry.txSieveTime}`)
+                
                 queueEntry.state = 'expired'
                 this.removeFromQueue(queueEntry, currentIndex)
                 continue
@@ -2819,6 +2826,7 @@ class TransactionQueue {
             //if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
 
             nestedCountersInstance.countEvent('txExpired', `> M3. general case state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification} `)
+            nestedCountersInstance.countEvent('txExpired', `> M3. general case sieveT:${queueEntry.txSieveTime}`)
             queueEntry.state = 'expired'
             this.removeFromQueue(queueEntry, currentIndex)
             continue
@@ -3794,6 +3802,66 @@ class TransactionQueue {
     }
     return true
   }
+
+  /**
+   * Computes a sieve time for a TX.  This is a deterministic time bonus that is given so that
+   * when TXs older than time M2 are getting culled due waiting on an older upstream TX
+   * that we thin the list between time M2 and M2.5.  The idea is that this thinning 
+   * makes next in line TXs that are close to M2.5 more rare.  Node processing loops are not time synced with
+   * each other at a real time level so different nodes may resolve TX as slightly different times.
+   * This method hopes to improve the probablity nodes choose the same TX to work on after a TX has timed out.
+   * TXs may time out if they are prepetually too old. Simply cutting off the younger TXs as an earlier time when blocked
+   * such as time = M2 is not good enough because there is too much time jitter between nodes are working on that part of the list
+   * this was causing nodes to all pick different TXs to work on.  When nodes pick differnt TXs the are all likely to just 
+   * age out to time M3 without ever getting enough votes.  The could happen at even 5tps for the same contract.
+   * The time sieve helps this situation.
+   * 
+   * At high TPS per single problems there are still issues recovering.  extraRare is feature designed to help
+   * give scores in the top 1% an extra second of queue life.  hopefully if the list is thrahsing badly due to too many TXs
+   * and nodes having bad luck picking the next one to work on that this extra second will give a better chance that everything syncs
+   * back up.  This may not bee enough yet. but probably good for 1.2 refresh 1.  The downside to extra rare is that it makes the
+   * tx only about 2 seconds away from the hard M3 timeout.  But this is a rare event also, so if it backfires then the impact should also be
+   * low.  There may even be a chance that this would still help nodes sync up a bit.
+   * @param queueEntry 
+   */
+  computeTxSieveTime(queueEntry: QueueEntry){
+    //TODO need to make this non-exploitable.  Need to include factors
+    //that could not be set by the transaction creator, but are deterministic in the network.
+
+    let score = 0
+    //queueEntry.cycleToRecordOn
+    let fourByteString = queueEntry.acceptedTx.txId.slice(0,8)
+    let intScore = Number.parseInt(fourByteString, 16)
+    score = intScore / 4294967296.0 //2147483648.0   // 0-1 range
+
+    score = Math.abs(score) 
+
+    let extraRare = false
+    if(score > 0.99){
+      extraRare = true
+    }
+
+    //shape the curve so that smaller values are more common
+    score = score * score * score
+
+    score = Math.round(score * 10) / 10
+
+    if(score > 1){
+      nestedCountersInstance.countEvent('stateManager', `computeTxSieveTime score > 1 ${score}`)
+      score = 1
+    } else {
+
+      if(extraRare){
+        score = score + 0.3 //this may help sync things if there is a very high volume of TX to the same contract
+      }
+
+      nestedCountersInstance.countEvent('stateManager', `computeTxSieveTime score ${score}`)
+    }
+
+    //The score can give us up to one half of M extra time after M2 timeout.  (but a bit extra if extraRare)
+    queueEntry.txSieveTime = 0.5 * (this.stateManager.queueSitTime) * score
+  }
+
 }
 
 export default TransactionQueue
