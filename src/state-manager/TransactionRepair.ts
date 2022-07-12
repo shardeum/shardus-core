@@ -74,6 +74,10 @@ class TransactionRepair {
     let updatedAccountAndHashes = []
 
     let allKeys = []
+    let repairFix = false
+    let keysList = []
+    let voteHashMap = new Map()
+
     try {
       this.stateManager.dataRepairsStarted++
 
@@ -96,6 +100,12 @@ class TransactionRepair {
       utils.shuffleArray(voters)
 
 
+      if(queueEntry.ourVoteHash != null){
+        if(queueEntry.ourVoteHash === this.crypto.hash(queueEntry.appliedReceiptForRepair2.appliedVote)){
+          nestedCountersInstance.countEvent('repair1', 'error, should not try to repair this TX')
+          return
+        }
+      }
 
       if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `appliedVoters ${utils.stringifyReduce(voters)}  `)
       if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_note', `${shortHash}`, `queueEntry.uniqueKeys ${utils.stringifyReduce(queueEntry.uniqueKeys)}`)
@@ -110,13 +120,28 @@ class TransactionRepair {
       this.profiler.profileSectionEnd('repair_init')
 
 
-      // Looks like this does not work well for shardeum.
-      // need to get list of accounts in the vote!
-      // why are we facing some many timeouts and repairs.
+      //slightly redundant, clean this up
+      for(let i=0; i<appliedVote.account_id.length; i++){
+        voteHashMap.set(appliedVote.account_id[i], appliedVote.account_state_hash_after[i])
+      }
+
+
+      if(repairFix){
+        //look at the vote to get the list of keys to repair
+        let uniqueKeysSet = new Set()
+        for(let key of appliedVote.account_id){
+          uniqueKeysSet.add(key)
+        }
+        keysList = Array.from(uniqueKeysSet)
+        if (logFlags.debug) this.mainLogger.debug(`repairToMatchReceipt: ${shortHash} uniqueKeysSet ${utils.stringifyReduce(uniqueKeysSet)}`)
+      } else {
+        keysList = Array.from(queueEntry.uniqueKeys)
+      }
+
 
       // STEP 1
       // Build a list of request objects
-      for (let key of queueEntry.uniqueKeys) {
+      for (let key of keysList) {
         let coveredKey = false
 
         let isGlobal = this.stateManager.accountGlobals.isGlobalAccount(key)
@@ -147,6 +172,13 @@ class TransactionRepair {
                   break
                 }
               }    
+
+              if(repairFix){
+                if(hashObj != null && hashObj.t > queueEntry.acceptedTx.timestamp){
+                  nestedCountersInstance.countEvent('repair1', 'skip account repair, we have a newer copy')
+                  continue
+                }
+              }
               
               if (requestObjects[key] != null) {
                 //todo perf delay these checks for jit.
@@ -201,7 +233,7 @@ class TransactionRepair {
 
       // STEP 2
       // repair each unique key, if needed by asking an appropirate node for account state
-      for (let key of queueEntry.uniqueKeys) {
+      for (let key of allKeys) {
         let shortKey = utils.stringifyReduce(key)
         if (requestObjects[key] != null) {
           let requestObject = requestObjects[key]
@@ -443,8 +475,14 @@ class TransactionRepair {
                     }
 
                     if (updateStateTable === true) {
-                      nestedCountersInstance.countEvent('repair1', 'addAccountStates')
-                      await this.storage.addAccountStates(stateTableResults)
+                      if(stateTableResults.stateBefore == null){
+                        nestedCountersInstance.countEvent('repair1', 'addAccountStates-null')
+                        stateTableResults.stateBefore = '0000'
+                        await this.storage.addAccountStates(stateTableResults)
+                      } else {
+                        nestedCountersInstance.countEvent('repair1', 'addAccountStates')
+                        await this.storage.addAccountStates(stateTableResults)
+                      }
                     }
 
                     //update hash
@@ -497,12 +535,33 @@ class TransactionRepair {
     } finally {
 
       if(queueEntry.repairFinished === true){
+
+        let allGood = false
+        let repairsGoodCount = 0
+        for (let key of keysList) {
+          let hashObj = this.stateManager.accountCache.getAccountHash(key)
+          if(hashObj == null){
+            continue
+          }
+          if(hashObj.h === voteHashMap.get(key)){
+            repairsGoodCount++
+          }
+        }
+
+        if(repairsGoodCount === keysList.length){
+          allGood = true
+          nestedCountersInstance.countEvent('repair1', 'AllGood')
+        } else {
+          nestedCountersInstance.countEvent('repair1', 'AllGood-failed')
+        }
+        
         queueEntry.hasValidFinalData = true
 
-        let repairLogString = `tx:${queueEntry.logID} updatedAccountAndHashes:${utils.stringifyReduce(updatedAccountAndHashes)} state:${queueEntry.state} counters:${utils.stringifyReduce({ requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash, numUpToDateAccounts})}`
+        let repairLogString = `tx:${queueEntry.logID} updatedAccountAndHashes:${utils.stringifyReduce(updatedAccountAndHashes)} state:${queueEntry.state} counters:${utils.stringifyReduce({ requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash, numUpToDateAccounts, repairsGoodCount})}`
         if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_success', queueEntry.logID, repairLogString)
         this.mainLogger.debug('shrd_repairToMatchReceipt_success ' + repairLogString)
         nestedCountersInstance.countEvent('repair1', 'success')
+        nestedCountersInstance.countEvent('repair1', `success: req:${requestsMade} apl:${dataApplied} allGood:${allGood}`)
 
       } else {
         queueEntry.repairFailed = true

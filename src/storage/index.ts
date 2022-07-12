@@ -574,7 +574,7 @@ class Storage {
       })
     } catch (e) {
       this.fatalLogger.fatal(
-        'addAccountStates db failure.  start apoptosis ' + JSON.stringify(e)
+        'addAccountStates db failure.  start apoptosis ' + JSON.stringify(e.message) + ' ' + JSON.stringify(accountStates)
       )
       this.stateManager.initApoptosisAndQuitSyncing('addAccountStates')
     }

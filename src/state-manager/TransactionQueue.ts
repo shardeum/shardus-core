@@ -3208,7 +3208,7 @@ class TransactionQueue {
 
             // Special state that we are put in if we are waiting for a repair to receipt operation to conclude
             if (queueEntry.repairFinished === true) {
-              if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitRepair_repairFinished', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} `)
+              if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitRepair_repairFinished', `${shortID}`, `qId: ${queueEntry.entryID} result:${queueEntry.appliedReceiptForRepair.result} txAge:${txAge} `)
               if (queueEntry.appliedReceiptForRepair.result === true) {
                 queueEntry.state = 'pass'
               } else {
@@ -3217,6 +3217,8 @@ class TransactionQueue {
               }
               // most remove from queue at the end because it compacts the queue entry
               this.removeFromQueue(queueEntry, currentIndex)
+
+              nestedCountersInstance.countEvent('stateManager', 'repairFinished')
               continue
             }
           }
@@ -3538,9 +3540,11 @@ class TransactionQueue {
           }
           if (queueEntry.state === 'canceled') {
             ///////////////////////////////////////////////--canceled--////////////////////////////////////////////////////////////
+            //need to review this state look unused
             this.processQueue_clearAccountsSeen(seenAccounts, queueEntry)
             this.removeFromQueue(queueEntry, currentIndex)
             if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 canceled : ${queueEntry.logID} `)
+            nestedCountersInstance.countEvent('stateManager', 'canceled')
           }
         } finally {
           this.profiler.profileSectionEnd(`process-${pushedProfilerTag}`)
