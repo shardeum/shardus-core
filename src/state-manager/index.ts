@@ -2869,7 +2869,10 @@ class StateManager {
         }
         if (receipt == null) {
           //check  && queueEntry.globalModification === false
-          if(logFlags.error && queueEntry.globalModification === false) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in archivedQueueEntries. ${utils.stringifyReduce(queueEntry.acceptedTx)}`)
+          //we dont expect expired TXs to have a receipt.  this should reduce log spam
+          if(queueEntry.state != 'expired'){
+            if(logFlags.error && queueEntry.globalModification === false) this.mainLogger.error(`generateReceiptMapResults found entry in with no receipt in archivedQueueEntries. ${utils.stringifyReduce(queueEntry.acceptedTx)} state:${queueEntry.state}`)
+          }
         } else {
           queueEntriesToSave.push(queueEntry)
         }

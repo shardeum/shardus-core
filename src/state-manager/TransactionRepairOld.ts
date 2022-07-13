@@ -64,6 +64,8 @@ class TransactionRepairOld {
       throw new Error('repairToMatchReceipt queueEntry.uniqueKeys == null')
     }
 
+    queueEntry.repairStarted = true
+    
     let requestObjectCount = 0
     let requestsMade = 0
     let responseFails = 0

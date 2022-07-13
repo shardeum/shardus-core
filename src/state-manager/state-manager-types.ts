@@ -110,6 +110,8 @@ export type QueueEntry = {
     // receipt coalesced in getReceipt().
     appliedReceiptFinal2?: AppliedReceipt2;
     
+
+    repairStarted: boolean;
     repairFinished?: boolean;
     repairFailed: boolean;
 

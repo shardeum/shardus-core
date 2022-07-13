@@ -170,10 +170,23 @@ class TransactionConsenus {
 
         let receiptNotNull = appliedReceipt != null
 
+        if(queueEntry.state === 'expired'){
+          //have we tried to repair this yet?
+          let startRepair = queueEntry.repairStarted === false
+          if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt2. tx expired. start repair:${startRepair}. update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`)
+          if(queueEntry.repairStarted === false){
+            nestedCountersInstance.countEvent('repair1', 'got receipt for expiredTX start repair')
+            queueEntry.appliedReceiptForRepair2 = appliedReceipt
+            //todo any limits to how many repairs at once to allow?
+            this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
+          }
+          //dont forward gossip, it is probably too late?
+          return
+        }
+
         if (queueEntry.gossipedReceipt === false){
           queueEntry.gossipedReceipt = true
           if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt2 update ${queueEntry.logID} receiptNotNull:${receiptNotNull}`)
-
 
           if(queueEntry.archived === false){
             queueEntry.recievedAppliedReceipt2 = appliedReceipt

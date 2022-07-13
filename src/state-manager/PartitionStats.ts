@@ -524,7 +524,7 @@ class PartitionStats {
     if (this.accountCache.hasAccount(accountId)) {
       let accountMemData: AccountHashCache = this.accountCache.getAccountHash(accountId)
       if (accountMemData.t > timestamp) {
-        if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}`)
+        if (logFlags.error) this.mainLogger.error(`statsDataSummaryUpdate: good error?: 2: dont update stats with older data skipping update ${utils.makeShortHash(accountId)}  ${debugMsg}  ${accountMemData.t} > ${timestamp}  afterHash:${utils.makeShortHash(accountDataAfter.stateId)}`)
         return
       }
     } else {
