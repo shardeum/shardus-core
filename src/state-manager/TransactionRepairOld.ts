@@ -88,7 +88,7 @@ class TransactionRepairOld {
         nestedCountersInstance.countEvent('repair1', 'init-normal')
       }
 
-      let shortHash = utils.makeShortHash(queueEntry.acceptedTx.txId)
+      let shortHash = queueEntry.logID
       // Need to build a list of what accounts we need, what state they should be in and who to get them from
       let requestObjects: { [id: string]: { appliedVote: AppliedVote; voteIndex: number; accountHash: string; accountId: string; nodeShardInfo: StateManagerTypes.shardFunctionTypes.NodeShardData; alternates: string[] } } = {}
       let appliedVotes = queueEntry.appliedReceiptForRepair.appliedVotes

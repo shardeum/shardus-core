@@ -135,7 +135,7 @@ export type QueueEntry = {
     debugFail_voteFlip:boolean;
 
     debugFail_failNoRepair:Boolean;
-    //short log id
+    /**Short hash string for the TX ID. for logging  */
     logID:string;
 
     //true once our data matches the receipt

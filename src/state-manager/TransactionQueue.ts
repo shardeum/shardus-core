@@ -1313,7 +1313,7 @@ class TransactionQueue {
       delete data.localCache
     }
 
-    if (logFlags.playback) this.logger.playbackLogNote('shrd_addData', `${utils.makeShortHash(queueEntry.acceptedTx.txId)}`, `key ${utils.makeShortHash(data.accountId)} hash: ${utils.makeShortHash(data.stateId)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}  ${queueEntry.acceptedTx.timestamp}`)
+    if (logFlags.playback) this.logger.playbackLogNote('shrd_addData', `${queueEntry.logID}`, `key ${utils.makeShortHash(data.accountId)} hash: ${utils.makeShortHash(data.stateId)} hasAll:${queueEntry.hasAll} collected:${queueEntry.dataCollected}  ${queueEntry.acceptedTx.timestamp}`)
   }
 
   /**
@@ -1414,7 +1414,7 @@ class TransactionQueue {
             node = homeNodeShardData.consensusNodeForOurNodeFull[randomIndex]
             if (maxTries < 0) {
               //FAILED
-              this.statemanager_fatal(`queueEntryRequestMissingData`, `queueEntryRequestMissingData: unable to find node to ask after 1000 tries tx:${utils.makeShortHash(queueEntry.acceptedTx.txId)} key: ${utils.makeShortHash(key)} ${utils.stringifyReduce(homeNodeShardData.consensusNodeForOurNodeFull.map((x) => (x != null ? x.id : 'null')))}`)
+              this.statemanager_fatal(`queueEntryRequestMissingData`, `queueEntryRequestMissingData: unable to find node to ask after 1000 tries tx:${queueEntry.logID} key: ${utils.makeShortHash(key)} ${utils.stringifyReduce(homeNodeShardData.consensusNodeForOurNodeFull.map((x) => (x != null ? x.id : 'null')))}`)
               break
             }
             if (node == null) {
@@ -1443,7 +1443,7 @@ class TransactionQueue {
           }
 
           let relationString = ShardFunctions.getNodeRelation(homeNodeShardData, this.stateManager.currentCycleShardData.ourNode.id)
-          if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_ask', `${utils.makeShortHash(queueEntry.acceptedTx.txId)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
+          if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_ask', `${queueEntry.logID}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} AccountsMissing:${utils.stringifyReduce(allKeys)}`)
 
           // Node Precheck!
           if (this.stateManager.isNodeValidForInternalMessage(node.id, 'queueEntryRequestMissingData', true, true) === false) {
@@ -1460,12 +1460,12 @@ class TransactionQueue {
             if (logFlags.verbose) {
               if (logFlags.error) this.mainLogger.error('ASK FAIL request_state_for_tx')
             }
-            if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.txId)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+            if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry', `${queueEntry.logID}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
             continue
           }
           if (result.success !== true) {
             if (logFlags.error) this.mainLogger.error('ASK FAIL queueEntryRequestMissingData 9')
-            if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry2', `${utils.makeShortHash(queueEntry.acceptedTx.txId)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+            if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_askfailretry2', `${queueEntry.logID}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
             continue
           }
           let dataCountReturned = 0
@@ -1483,7 +1483,7 @@ class TransactionQueue {
             //This will time out and go to reciept repair mode if it does not get more data sent to it.
           }
 
-          if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_result', `${utils.makeShortHash(queueEntry.acceptedTx.txId)}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
+          if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingData_result', `${queueEntry.logID}`, `r:${relationString}   result:${queueEntry.logstate} dataCount:${dataCountReturned} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID}  AccountsMissing:${utils.stringifyReduce(allKeys)} AccountsReturned:${utils.stringifyReduce(accountIdsReturned)}`)
 
           // queueEntry.homeNodes[key] = null
           for (let key2 of allKeys) {
@@ -1575,7 +1575,7 @@ class TransactionQueue {
         }
 
         let relationString = ShardFunctions.getNodeRelation(homeNodeShardData, this.stateManager.currentCycleShardData.ourNode.id)
-        if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_ask', `${utils.makeShortHash(queueEntry.acceptedTx.txId)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+        if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_ask', `${queueEntry.logID}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
 
         // Node Precheck!
         if (this.stateManager.isNodeValidForInternalMessage(node.id, 'queueEntryRequestMissingReceipt', true, true) === false) {
@@ -1592,7 +1592,7 @@ class TransactionQueue {
           if (logFlags.verbose) {
             if (logFlags.error) this.mainLogger.error(`ASK FAIL request_receipt_for_tx ${triesLeft} ${utils.makeShortHash(node.id)}`)
           }
-          if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.txId)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+          if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_askfailretry', `${queueEntry.logID}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
           continue
         }
         if (result.success !== true) {
@@ -1600,7 +1600,7 @@ class TransactionQueue {
           continue
         }
 
-        if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_result', `${utils.makeShortHash(queueEntry.acceptedTx.txId)}`, `r:${relationString}   result:${queueEntry.logstate} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} result: ${utils.stringifyReduce(result)}`)
+        if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_result', `${queueEntry.logID}`, `r:${relationString}   result:${queueEntry.logstate} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} result: ${utils.stringifyReduce(result)}`)
 
         if (result.success === true && result.receipt != null) {
           //TODO implement this!!!
@@ -1608,7 +1608,7 @@ class TransactionQueue {
           keepTrying = false
           gotReceipt = true
 
-          this.mainLogger.debug(`queueEntryRequestMissingReceipt got good receipt for: ${utils.makeShortHash(queueEntry.acceptedTx.txId)} from: ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)}`)
+          this.mainLogger.debug(`queueEntryRequestMissingReceipt got good receipt for: ${queueEntry.logID} from: ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)}`)
         }
       }
 
@@ -1681,7 +1681,7 @@ class TransactionQueue {
         }
 
         let relationString = ShardFunctions.getNodeRelation(homeNodeShardData, this.stateManager.currentCycleShardData.ourNode.id)
-        if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_ask', `${utils.makeShortHash(queueEntry.acceptedTx.txId)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+        if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_ask', `${queueEntry.logID}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
 
         // Node Precheck!
         if (this.stateManager.isNodeValidForInternalMessage(node.id, 'queueEntryRequestMissingReceipt', true, true) === false) {
@@ -1698,7 +1698,7 @@ class TransactionQueue {
           if (logFlags.verbose) {
             if (logFlags.error) this.mainLogger.error(`ASK FAIL request_receipt_for_tx_old ${triesLeft} ${utils.makeShortHash(node.id)}`)
           }
-          if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_askfailretry', `${utils.makeShortHash(queueEntry.acceptedTx.txId)}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
+          if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_askfailretry', `${queueEntry.logID}`, `r:${relationString}   asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} `)
           continue
         }
         if (result.success !== true) {
@@ -1706,7 +1706,7 @@ class TransactionQueue {
           continue
         }
 
-        if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_result', `${utils.makeShortHash(queueEntry.acceptedTx.txId)}`, `r:${relationString}   result:${queueEntry.logstate} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} result: ${utils.stringifyReduce(result)}`)
+        if (logFlags.playback) this.logger.playbackLogNote('shrd_queueEntryRequestMissingReceipt_result', `${queueEntry.logID}`, `r:${relationString}   result:${queueEntry.logstate} asking: ${utils.makeShortHash(node.id)} qId: ${queueEntry.entryID} result: ${utils.stringifyReduce(result)}`)
 
         if (result.success === true && result.receipt != null) {
           //TODO implement this!!!
@@ -1714,7 +1714,7 @@ class TransactionQueue {
           keepTrying = false
           gotReceipt = true
 
-          this.mainLogger.debug(`queueEntryRequestMissingReceipt got good receipt for: ${utils.makeShortHash(queueEntry.acceptedTx.txId)} from: ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)}`)
+          this.mainLogger.debug(`queueEntryRequestMissingReceipt got good receipt for: ${queueEntry.logID} from: ${utils.makeShortHash(node.id)}:${utils.makeShortHash(node.internalPort)}`)
         }
       }
 
@@ -1771,7 +1771,7 @@ class TransactionQueue {
       // If this is not a global TX then skip tracking of nodes for global accounts used as a reference.
       if (queueEntry.globalModification === false) {
         if (this.stateManager.accountGlobals.isGlobalAccount(key) === true) {
-          if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetTransactionGroup skipping: ${utils.makeShortHash(key)} tx: ${utils.makeShortHash(queueEntry.acceptedTx.txId)}`)
+          if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetTransactionGroup skipping: ${utils.makeShortHash(key)} tx: ${queueEntry.logID}`)
           continue
         } else {
           hasNonGlobalKeys = true
@@ -1848,7 +1848,7 @@ class TransactionQueue {
     queueEntry.ourNodeInTransactionGroup = true
     if (uniqueNodes[this.stateManager.currentCycleShardData.ourNode.id] == null) {
       queueEntry.ourNodeInTransactionGroup = false
-      if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetTransactionGroup not involved: hasNonG:${hasNonGlobalKeys} tx ${utils.makeShortHash(queueEntry.acceptedTx.txId)}`)
+      if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetTransactionGroup not involved: hasNonG:${hasNonGlobalKeys} tx ${queueEntry.logID}`)
     }
 
     // make sure our node is included: needed for gossip! - although we may not care about the data!
@@ -1930,7 +1930,7 @@ class TransactionQueue {
       // If this is not a global TX then skip tracking of nodes for global accounts used as a reference.
       if (queueEntry.globalModification === false) {
         if (this.stateManager.accountGlobals.isGlobalAccount(key) === true) {
-          if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetConsensusGroup skipping: ${utils.makeShortHash(key)} tx: ${utils.makeShortHash(queueEntry.acceptedTx.txId)}`)
+          if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetConsensusGroup skipping: ${utils.makeShortHash(key)} tx: ${queueEntry.logID}`)
           continue
         } else {
           hasNonGlobalKeys = true
@@ -1947,7 +1947,7 @@ class TransactionQueue {
     queueEntry.ourNodeInConsensusGroup = true
     if (uniqueNodes[this.stateManager.currentCycleShardData.ourNode.id] == null) {
       queueEntry.ourNodeInConsensusGroup = false
-      if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetConsensusGroup not involved: hasNonG:${hasNonGlobalKeys} tx ${utils.makeShortHash(queueEntry.acceptedTx.txId)}`)
+      if (logFlags.verbose) this.mainLogger.debug(`queueEntryGetConsensusGroup not involved: hasNonG:${hasNonGlobalKeys} tx ${queueEntry.logID}`)
     }
 
     // make sure our node is included: needed for gossip! - although we may not care about the data!
@@ -3735,7 +3735,7 @@ class TransactionQueue {
     //if (logFlags.verbose) { //this function is always verbose
     if (queueEntry.uniqueKeys == null) {
       //TSConversion double check if this needs extra logging
-      return utils.makeShortHash(queueEntry.acceptedTx.txId) + ' uniqueKeys empty error'
+      return queueEntry.logID + ' uniqueKeys empty error'
     }
     for (let key of queueEntry.uniqueKeys) {
       if (queueEntry.collectedData[key] != null) {
