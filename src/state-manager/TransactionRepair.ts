@@ -15,7 +15,7 @@ import { json } from 'sequelize/types'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { potentiallyRemoved } from '../p2p/NodeList'
 import * as CycleChain from '../p2p/CycleChain'
-import { QueueEntry, AppliedVote, AccountHashCache, RequestStateForTxResp, AppliedReceipt, RequestTxResp, RequestReceiptForTxResp, AppliedReceipt2 } from './state-manager-types'
+import { QueueEntry, AppliedVote, AccountHashCache, RequestStateForTxResp, AppliedReceipt, RequestTxResp, RequestReceiptForTxResp, AppliedReceipt2, WrappedResponses } from './state-manager-types'
 
 class TransactionRepair {
   app: Shardus.App
@@ -74,11 +74,14 @@ class TransactionRepair {
     let failedHash = 0
     let numUpToDateAccounts = 0
     let updatedAccountAndHashes = []
+    let localUpdatedAccountAndHashes = []
+    let localAccUsed = 0
 
     let allKeys = []
     let repairFix = true
     let keysList = []
-    let voteHashMap = new Map()
+    let voteHashMap:Map<string,string> = new Map()
+    let localReadyRepairs:Map<string, Shardus.WrappedResponse> = new Map()
 
     try {
       this.stateManager.dataRepairsStarted++
@@ -121,29 +124,77 @@ class TransactionRepair {
 
       this.profiler.profileSectionEnd('repair_init')
 
-
-      //slightly redundant, clean this up
       for(let i=0; i<appliedVote.account_id.length; i++){
         voteHashMap.set(appliedVote.account_id[i], appliedVote.account_state_hash_after[i])
       }
 
-
       if(repairFix){
         //look at the vote to get the list of keys to repair
-        let uniqueKeysSet = new Set()
-        for(let key of appliedVote.account_id){
-          uniqueKeysSet.add(key)
-        }
-        keysList = Array.from(uniqueKeysSet)
-        if (logFlags.debug) this.mainLogger.debug(`repairToMatchReceipt: ${txLogID} uniqueKeysSet ${utils.stringifyReduce(uniqueKeysSet)}`)
+        // let uniqueKeysSet = new Set()
+        // for(let key of appliedVote.account_id){
+        //   uniqueKeysSet.add(key)
+        // }
+        //keysList = Array.from(uniqueKeysSet)
+        keysList = Array.from(voteHashMap.keys())
+        if (logFlags.debug) this.mainLogger.debug(`repairToMatchReceipt: ${txLogID} uniqueKeysSet ${utils.stringifyReduce(keysList)}`)
       } else {
         keysList = Array.from(queueEntry.uniqueKeys)
       }
 
+      //if we have some pre applied data that results in the correct states we can use it instead of asking other nodeds for data
+      if(repairFix){
+        let applyResponse = queueEntry?.preApplyTXResult?.applyResponse
+        if(applyResponse != null){
+          if(applyResponse.accountWrites != null && applyResponse.accountWrites.length > 0){
+            for (let writtenAccount of applyResponse.accountWrites) {
+              let key = writtenAccount.accountId
+              let shortKey = utils.stringifyReduce(key)
+              let goalHash = voteHashMap.get(key)
+              let data = writtenAccount.data
+              let hashObj = this.stateManager.accountCache.getAccountHash(key)
+
+              if(goalHash != null && goalHash === data.stateId){
+                localReadyRepairs.set(key, data)
+                if(hashObj != null && hashObj.t > data.timestamp){
+                  nestedCountersInstance.countEvent('repair1', 'skip account repair 4, we have a newer copy')
+                  continue
+                }
+                if(hashObj != null && hashObj.h === data.stateId){
+                  nestedCountersInstance.countEvent('repair1', 'skip account repair 4, already have hash')
+                  continue
+                }
+
+                let dataToSet = [data]
+                let failedHashes = await this.stateManager.checkAndSetAccountData(dataToSet, `tx:${txLogID} repairToMatchReceipt`, true)
+
+                if(failedHashes.length === 0){
+                  //dataApplied++
+                  localAccUsed++
+                  nestedCountersInstance.countEvent('repair1', `q.repair applied cycle: ${this.stateManager.currentCycleShardData.cycleNumber}`)
+                } else {
+                  failedHash++
+                  this.statemanager_fatal(`repairToMatchReceipt_failedhash 2`, ` tx:${txLogID}  failed:${failedHashes[0]} acc:${shortKey}`)
+                }
+
+                nestedCountersInstance.countEvent('repair1', 'writeCombinedAccountDataToBackups')
+                await this.stateManager.writeCombinedAccountDataToBackups(dataToSet, failedHashes)
+                
+                localUpdatedAccountAndHashes.push({accountID: data.accountId, hash: data.stateId})
+                //todo state table updates
+              }
+            }
+          }        
+        }
+      }
 
       // STEP 1
       // Build a list of request objects
       for (let key of keysList) {
+
+        if(localReadyRepairs.has(key)){
+          continue //can skip this data, we already have it
+        }
+
         let coveredKey = false
 
         let isGlobal = this.stateManager.accountGlobals.isGlobalAccount(key)
@@ -532,6 +583,9 @@ class TransactionRepair {
               // }
             } 
           }
+
+
+
         }
         // next account
       }
@@ -570,11 +624,11 @@ class TransactionRepair {
         
         queueEntry.hasValidFinalData = true
 
-        let repairLogString = `tx:${queueEntry.logID} updatedAccountAndHashes:${utils.stringifyReduce(updatedAccountAndHashes)} state:${queueEntry.state} counters:${utils.stringifyReduce({ requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash, numUpToDateAccounts, repairsGoodCount})}`
+        let repairLogString = `tx:${queueEntry.logID} updatedAccountAndHashes:${utils.stringifyReduce(updatedAccountAndHashes)}  localUpdatedAccountAndHashes:${utils.stringifyReduce(localUpdatedAccountAndHashes)} state:${queueEntry.state} counters:${utils.stringifyReduce({ requestObjectCount,requestsMade,responseFails,dataRecieved,dataApplied,failedHash, numUpToDateAccounts, repairsGoodCount})}`
         if (logFlags.playback) this.logger.playbackLogNote('shrd_repairToMatchReceipt_success', queueEntry.logID, repairLogString)
         this.mainLogger.debug('shrd_repairToMatchReceipt_success ' + repairLogString)
         nestedCountersInstance.countEvent('repair1', 'success')
-        nestedCountersInstance.countEvent('repair1', `success: req:${requestsMade} apl:${dataApplied} allGood:${allGood}`)
+        nestedCountersInstance.countEvent('repair1', `success: req:${requestsMade} apl:${dataApplied} localAccUsed:${localAccUsed} key count:${voteHashMap.size} allGood:${allGood}`)
         nestedCountersInstance.countEvent('repair1', `success: key count:${voteHashMap.size}`)
         nestedCountersInstance.countEvent('repair1', `success: state:${queueEntry.state} allGood:${allGood}`)
 
