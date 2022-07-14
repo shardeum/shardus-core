@@ -448,6 +448,20 @@ class AccountPatcher {
       }
       res.end()
     })
+    Context.network.registerExternalGet('debug-patcher-toggle-skip', isDebugModeMiddleware, (req, res) => {
+      try{
+        if(this.stateManager.debugSkipPatcherRepair === false){
+          this.stateManager.debugSkipPatcherRepair = true
+        } else {
+          this.stateManager.debugSkipPatcherRepair = false
+        }
+
+        res.write(`this.debugSkipPatcherRepair: ${this.stateManager.debugSkipPatcherRepair}\n`)
+      } catch(e){
+        res.write(`${e}\n`)
+      }
+      res.end()
+    })
     Context.network.registerExternalGet('debug-patcher-dumpTree', isDebugModeMiddleware, (req, res) => {
       try{
         // this.statemanager_fatal('debug shardTrie',`temp shardTrie ${utils.stringifyReduce(this.shardTrie.layerMaps[0].values().next().value)}`)
@@ -2122,6 +2136,10 @@ class AccountPatcher {
     }
 
     if(this.isInSync(cycle) === false){
+      if (this.stateManager.debugSkipPatcherRepair) {
+        this.failedLastTrieSync = true
+        return
+      }
       let failHistoryObject
       if(lastFail === false){
         this.failStartCycle = cycle

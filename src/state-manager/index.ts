@@ -105,6 +105,7 @@ class StateManager {
   appFinishedSyncing: boolean
 
   debugNoTxVoting: boolean
+  debugSkipPatcherRepair: boolean
 
   ignoreRecieptChance: number
   ignoreVoteChance: number
@@ -254,6 +255,7 @@ class StateManager {
     // this.oldFeature_BroadCastPartitionReport = true // leaving this true since it depends on the above value
 
     this.processCycleSummaries = false //starts false and get enabled when startProcessingCycleSummaries() is called
+    this.debugSkipPatcherRepair = config.debug.skipPatcherRepair
 
     this.feature_receiptMapResults = true
     this.feature_partitionHashes = true

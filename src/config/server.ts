@@ -95,6 +95,7 @@ const SERVER_CONFIG: StrictServerConfiguration = {
     ignoreVoteChance: 0,
     failReceiptChance: 0,
     voteFlipChance: 0,
+    skipPatcherRepair: false,
     failNoRepairTxChance: 0,
     useNewParitionReport: false,
     oldPartitionSystem: false,

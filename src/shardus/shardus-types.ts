@@ -684,6 +684,8 @@ export interface ServerConfiguration {
     failReceiptChance?: number
     /** chance to flip our vote */
     voteFlipChance?: number
+    /** should skip patcher repair system */
+    skipPatcherRepair?: boolean
     /** chance to fail a TX and the TX repair */
     failNoRepairTxChance?: number
     /** use the new stats data for partition state reports to monitor server */
