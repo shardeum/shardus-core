@@ -207,7 +207,8 @@ class TransactionConsenus {
           // we get here if the receipt has already been shared
           if (logFlags.debug) this.mainLogger.debug(`spread_appliedReceipt2 skipped ${queueEntry.logID} receiptNotNull:${receiptNotNull} Already Shared`)
         }
-
+      } catch(ex){
+        this.statemanager_fatal(`spread_appliedReceipt2_ex`, 'spread_appliedReceipt2 endpoint failed: ' + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       } finally {
         profilerInstance.scopedProfileSectionEnd('spread_appliedReceipt2', respondSize)
       }

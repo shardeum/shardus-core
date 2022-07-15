@@ -2655,8 +2655,8 @@ class TransactionQueue {
               if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
 
               nestedCountersInstance.countEvent('txExpired', `> M3 * 2. NormalTX Timed out. didSync == false. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
-              queueEntry.state = 'expired'
-              this.removeFromQueue(queueEntry, currentIndex)
+  
+              this.setTXExpired(queueEntry, currentIndex, 'old, timeM3 * 2')
               continue
             }
 
@@ -2689,8 +2689,8 @@ class TransactionQueue {
                 if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
 
                 nestedCountersInstance.countEvent('txExpired', `> M3. receiptRequestFail after Timed Out. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
-                queueEntry.state = 'expired'
-                this.removeFromQueue(queueEntry, currentIndex)
+                
+                this.setTXExpired(queueEntry, currentIndex, 'old, timeM3, requestingReceiptFailed')
                 continue
               }
 
@@ -2705,8 +2705,8 @@ class TransactionQueue {
                 if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 repairFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
 
                 nestedCountersInstance.countEvent('txExpired', `> M3. repairFailed after Timed Out. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
-                queueEntry.state = 'expired'
-                this.removeFromQueue(queueEntry, currentIndex)
+                
+                this.setTXExpired(queueEntry, currentIndex, 'old, timeM3, repairFailed')
                 continue
               }
             
@@ -2773,8 +2773,9 @@ class TransactionQueue {
               if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 4: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
 
               nestedCountersInstance.countEvent('txExpired', `txExpired txAge > timeM3 * 50. still syncing. state:${queueEntry.state} globalMod:${queueEntry.globalModification}`)
-              queueEntry.state = 'expired'
-              this.removeFromQueue(queueEntry, currentIndex)
+              
+              this.setTXExpired(queueEntry, currentIndex, 'old, timeM3 * 50!!')
+
               continue
             }
           }
@@ -2792,8 +2793,7 @@ class TransactionQueue {
                 //todo only keep on for temporarliy
                 nestedCountersInstance.countEvent('txExpired', `> M2 canceled due to upstream TXs. sieveT:${queueEntry.txSieveTime}`)
                 
-                queueEntry.state = 'expired'
-                this.removeFromQueue(queueEntry, currentIndex)
+                this.setTXExpired(queueEntry, currentIndex, 'm2, processing or awaiting')
                 continue
               }
             }            
@@ -2819,8 +2819,8 @@ class TransactionQueue {
               //if (logFlags.playback) this.logger.playbackLogNote('txExpired', `${shortID}`, `${queueEntry.txGroupDebug} queueEntry.recievedAppliedReceipt 3 requestingReceiptFailed: ${utils.stringifyReduce(queueEntry.recievedAppliedReceipt)}`)
 
               nestedCountersInstance.countEvent('txExpired', `> timeM2 fail ${reason} state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification} `)
-              queueEntry.state = 'expired'
-              this.removeFromQueue(queueEntry, currentIndex)              
+              
+              this.setTXExpired(queueEntry, currentIndex, 'm2 ' + reason)
             }
           }
 
@@ -2832,8 +2832,8 @@ class TransactionQueue {
 
             nestedCountersInstance.countEvent('txExpired', `> M3. general case state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification} `)
             nestedCountersInstance.countEvent('txExpired', `> M3. general case sieveT:${queueEntry.txSieveTime}`)
-            queueEntry.state = 'expired'
-            this.removeFromQueue(queueEntry, currentIndex)
+            
+            this.setTXExpired(queueEntry, currentIndex, 'm3 general')
             continue
           }
 
@@ -2919,8 +2919,7 @@ class TransactionQueue {
               if (txAge > timeM2_5) {
                 //need to review this in context of sharding
                 nestedCountersInstance.countEvent('txExpired', `> M2.5 canceled due to lack of progress. state:${queueEntry.state} hasAll:${queueEntry.hasAll} globalMod:${queueEntry.globalModification}`)
-                queueEntry.state = 'expired'
-                this.removeFromQueue(queueEntry, currentIndex)
+                this.setTXExpired(queueEntry, currentIndex, 'm2.5 awaiting data' )
                 continue
               }    
 
@@ -3591,6 +3590,25 @@ class TransactionQueue {
       this.stateManager.lastSeenAccountsMap = seenAccounts
 
       this.profiler.profileSectionEnd('processQ')
+    }
+  }
+
+  private setTXExpired(queueEntry: QueueEntry, currentIndex: number, message:string) {
+    if (logFlags.verbose) this.mainLogger.debug(`setTXExpired ${message} tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp}`)
+    queueEntry.state = 'expired'
+    this.removeFromQueue(queueEntry, currentIndex)
+
+    //This is really important.  If we are going to expire a TX, then look to see if we already have a receipt for it.
+    //If so, then just go into async receipt repair mode for the TX AFTER it has been expired and removed from the queue
+    if(queueEntry.appliedReceiptFinal2 != null){
+      let startRepair = queueEntry.repairStarted === false
+      if (logFlags.debug) this.mainLogger.debug(`setTXExpired. start repair:${startRepair}. update ${queueEntry.logID}`)
+      if(startRepair){
+        nestedCountersInstance.countEvent('repair1', 'setTXExpired: start repair')
+        queueEntry.appliedReceiptForRepair2 = queueEntry.appliedReceiptFinal2
+        //todo any limits to how many repairs at once to allow?
+        this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
+      }
     }
   }
 
