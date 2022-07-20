@@ -82,7 +82,11 @@ class TransactionQueue {
 
   txCoverageMap: any
 
+  /** This is a set of updates to rework how TXs can time out in the queue.  After a enough testing this should become the default and we can remove the old code */
   queueTimingFixes: boolean
+
+  /** process loop stats.  This map contains the latest and the last of each time overage category */
+  lastProcessStats: {[limitName:string]:ProcessQueueStats}
 
   constructor(stateManager: StateManager, profiler: Profiler, app: Shardus.App, logger: Logger, storage: Storage, p2p: P2P, crypto: Crypto, config: Shardus.StrictServerConfiguration) {
     this.crypto = crypto
@@ -134,6 +138,8 @@ class TransactionQueue {
     this.txCoverageMap = new Map()
 
     this.queueTimingFixes = true
+
+    this.lastProcessStats = {}
   }
 
   /***
@@ -277,6 +283,8 @@ class TransactionQueue {
         profilerInstance.scopedProfileSectionEnd('request_state_for_tx')
       }
     })
+
+
   }
 
   handleSharedTX(tx: Shardus.OpaqueTransaction, sender: Shardus.Node): QueueEntry {
@@ -337,6 +345,8 @@ class TransactionQueue {
 
     return queueEntry
   }
+
+
 
   /***
    *       ###    ########  ########   ######  ########    ###    ######## ########
@@ -2467,6 +2477,7 @@ class TransactionQueue {
 
 
     let processStats:ProcessQueueStats = {
+      totalTime:0,
       inserted:0,
       sameState:0,
       stateChanged:0,
@@ -3441,7 +3452,7 @@ class TransactionQueue {
 
                   //try {
                   this.profiler.profileSectionStart('commit')
-                  
+
                   let awaitStart = Date.now()
                   let commitResult = await this.commitConsensedTransaction(queueEntry)
                   this.updateSimpleStatsObject(processStats.awaitStats, 'commitConsensedTransaction', Date.now() - awaitStart)
@@ -3608,19 +3619,31 @@ class TransactionQueue {
         pushedProfilerTag = null
       }
 
-      let processTime = Date.now() - startTime
+      let processTime = Date.now() - startTime   
+
+      processStats.totalTime = processTime
+
+      this.finalizeSimpleStatsObject(processStats.awaitStats)
+      this.finalizeSimpleStatsObject(processStats.sameStateStats)
+      this.finalizeSimpleStatsObject(processStats.stateChangedStats)
+
+      this.lastProcessStats['latest'] = processStats
       if (processTime > 10000) {
         nestedCountersInstance.countEvent('stateManager', 'processTime > 10s')
         this.statemanager_fatal(`processAcceptedTxQueue excceded time ${processTime / 1000} firstTime:${firstTime}`, `processAcceptedTxQueue excceded time ${processTime / 1000} firstTime:${firstTime} stats:${JSON.stringify(processStats)}`)
+        this.lastProcessStats['10+'] = processStats
       } else if (processTime > 5000) {
         nestedCountersInstance.countEvent('stateManager', 'processTime > 5s')
         if (logFlags.error) this.mainLogger.error(`processTime > 5s ${processTime / 1000} stats:${JSON.stringify(processStats)}`)
+        this.lastProcessStats['5+'] = processStats
       } else if (processTime > 2000) {
         nestedCountersInstance.countEvent('stateManager', 'processTime > 2s')
         if (logFlags.error && logFlags.verbose) this.mainLogger.error(`processTime > 2s ${processTime / 1000} stats:${JSON.stringify(processStats)}`)
+        this.lastProcessStats['2+'] = processStats
       } else if (processTime > 1000) {
         nestedCountersInstance.countEvent('stateManager', 'processTime > 1s')
         if (logFlags.error && logFlags.verbose) this.mainLogger.error(`processTime > 1s ${processTime / 1000} stats:${JSON.stringify(processStats)}`)
+        this.lastProcessStats['1+'] = processStats
       }
 
       // restart loop if there are still elements in it
@@ -3944,7 +3967,8 @@ class TransactionQueue {
         min: Number.MAX_SAFE_INTEGER,
         max: 0,
         total: 0,
-        count: 0
+        count: 0,
+        average: 0
       }
       statsObj[statName] = statsEntry
     }
@@ -3954,6 +3978,17 @@ class TransactionQueue {
     statsEntry.total += duration
   }
 
+  finalizeSimpleStatsObject(statsObj:{[statName:string]:SimpleNumberStats}){
+    for(const [key, value] of Object.entries(statsObj)){
+      if(value.count){
+        value.average = value.total / value.count
+      }
+      value.average = Math.round(value.average * 100) / 100
+      value.max = Math.round(value.max * 100) / 100
+      value.min = Math.round(value.min * 100) / 100
+      value.total = Math.round(value.total * 100) / 100
+    }
+  }
 }
 
 export default TransactionQueue

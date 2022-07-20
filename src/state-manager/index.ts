@@ -1377,6 +1377,13 @@ class StateManager {
       res.write(result)
       res.end()
     })
+
+    Context.network.registerExternalGet('last_process_stats', isDebugModeMiddleware, (req, res) => {
+      const result = JSON.stringify(this.transactionQueue.lastProcessStats, null, 2)
+      res.write(result)
+      res.end()
+    })
+    
   }
 
   _unregisterEndpoints() {

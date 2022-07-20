@@ -1029,9 +1029,11 @@ export type SimpleNumberStats = {
     max:number
     count:number
     total:number
+    average:number
 }
 
 export type ProcessQueueStats = {
+    totalTime:number,
     inserted:number,
     sameState:number,
     stateChanged:number,
