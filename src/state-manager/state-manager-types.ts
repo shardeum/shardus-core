@@ -1023,3 +1023,20 @@ export type CycleDebugNotes = {
     badAccounts: number
     noRcptRepairs: number
 }
+
+export type SimpleNumberStats = {
+    min:number
+    max:number
+    count:number
+    total:number
+}
+
+export type ProcessQueueStats = {
+    inserted:number,
+    sameState:number,
+    stateChanged:number,
+    //expired:0,
+    sameStateStats:{[statName:string]:SimpleNumberStats},
+    stateChangedStats:{[statName:string]:SimpleNumberStats},
+    awaitStats:{[statName:string]:SimpleNumberStats}
+}

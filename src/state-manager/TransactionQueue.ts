@@ -25,7 +25,7 @@ import {
   SeenAccounts,
   StringBoolObjectMap,
   StringNodeObjectMap,
-  WrappedResponses, Cycle, AppliedReceipt, RequestReceiptForTxResp_old
+  WrappedResponses, Cycle, AppliedReceipt, RequestReceiptForTxResp_old, ProcessQueueStats, SimpleNumberStats
 } from './state-manager-types'
 
 
@@ -2464,6 +2464,19 @@ class TransactionQueue {
     seenAccounts = {}
     let pushedProfilerTag = null
     let startTime = Date.now()
+
+
+    let processStats:ProcessQueueStats = {
+      inserted:0,
+      sameState:0,
+      stateChanged:0,
+      //expired:0,
+      sameStateStats:{},
+      stateChangedStats:{},
+      awaitStats:{}
+    }
+
+
     try {
       if (this.newAcceptedTxQueueRunning === true) {
         return
@@ -2549,6 +2562,8 @@ class TransactionQueue {
           //insert this tx into the main queue
           this.newAcceptedTxQueue.splice(index + 1, 0, txQueueEntry)
           this.newAcceptedTxQueueByID.set(txQueueEntry.acceptedTx.txId, txQueueEntry)
+
+          processStats.inserted++
 
           if (logFlags.playback) this.logger.playbackLogNote('shrd_addToQueue', `${txId}`, `AcceptedTransaction: ${txQueueEntry.logID} ts: ${txQueueEntry.txKeys.timestamp} acc: ${utils.stringifyReduce(txQueueEntry.txKeys.allKeys)} indexInserted: ${index + 1}`)
           this.stateManager.eventEmitter.emit('txQueued', acceptedTx.txId)
@@ -2840,10 +2855,14 @@ class TransactionQueue {
           //TODO? could we remove a TX from the queu as soon as a receit was requested?
           //TODO?2 should we allow a TX to use a repair op shortly after being expired? (it would have to be carefull, and maybe use some locking)
         } 
+        
 
+        let txStartTime = Date.now()
+        
         // HANDLE TX logic based on state.
         try {
           this.profiler.profileSectionStart(`process-${queueEntry.state}`)
+          profilerInstance.scopedProfileSectionStart(`scoped-process-${queueEntry.state}`, false)
           pushedProfilerTag = queueEntry.state
 
           if (queueEntry.state === 'syncing') {
@@ -2884,7 +2903,10 @@ class TransactionQueue {
               try {
                 // TODO re-evaluate if it is correct for us to share info for a global modifing TX.
                 //if(queueEntry.globalModification === false) {
+                let awaitStart = Date.now() 
                 await this.tellCorrespondingNodes(queueEntry)
+                this.updateSimpleStatsObject(processStats.awaitStats, 'tellCorrespondingNodes', Date.now() - awaitStart)
+
                 if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_processing', `${shortID}`, `qId: ${queueEntry.entryID} qRst:${localRestartCounter}  values: ${this.processQueue_debugAccountData(queueEntry, app)}`)
                 //}
               } catch (ex) {
@@ -3008,8 +3030,9 @@ class TransactionQueue {
                     continue
                   }
                   queueEntry.executionDebug.log2 = 'call pre apply'
-
+                  let awaitStart = Date.now() 
                   let txResult = await this.preApplyTransaction(queueEntry)
+                  this.updateSimpleStatsObject(processStats.awaitStats, 'preApplyTransaction', Date.now() - awaitStart)
 
                   queueEntry.executionDebug.log3 = 'called pre apply'
                   queueEntry.executionDebug.txResult = txResult
@@ -3050,7 +3073,9 @@ class TransactionQueue {
                     } else {
                       if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_preApplyTx_createAndShareVote', `${shortID}`, ``)
                       if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 createAndShareVote : ${queueEntry.logID} `)
+                      let awaitStart = Date.now()                       
                       await this.stateManager.transactionConsensus.createAndShareVote(queueEntry)
+                      this.updateSimpleStatsObject(processStats.awaitStats, 'createAndShareVote', Date.now() - awaitStart)
                     }
                   } else {
                     //There was some sort of error when we tried to apply the TX
@@ -3100,12 +3125,16 @@ class TransactionQueue {
                     if(this.config.debug.optimizedTXConsenus ){
                       if(queueEntry.appliedReceipt2){
                         // Broadcast the receipt, only if we made one (try produce can early out if we received one)
-                        await this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)                          
+                        let awaitStart = Date.now()                           
+                        await this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)    
+                        this.updateSimpleStatsObject(processStats.awaitStats, 'shareAppliedReceipt', Date.now() - awaitStart)
                       }
 
                     } else {
                       // Broadcast the receipt
-                      await this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)                      
+                      let awaitStart = Date.now()                        
+                      await this.stateManager.transactionConsensus.shareAppliedReceipt(queueEntry)      
+                      this.updateSimpleStatsObject(processStats.awaitStats, 'shareAppliedReceipt', Date.now() - awaitStart)
                     }
 
                   } else {
@@ -3129,8 +3158,9 @@ class TransactionQueue {
 
                   if(queueEntry.globalModification === false && finishedConsensing === true && this.executeInOneShard && queueEntry.isInExecutionHome ){
                     //forward all finished data to corresponding nodes
-                    //tellFinalDataToCorrespondingNodes()
+                    let awaitStart = Date.now()                       
                     await this.tellCorrespondingNodesFinalData(queueEntry)
+                    this.updateSimpleStatsObject(processStats.awaitStats, 'tellCorrespondingNodesFinalData', Date.now() - awaitStart)
                   }
                   //continue
                 } else {
@@ -3286,8 +3316,9 @@ class TransactionQueue {
                     accountRecords.push(wrappedAccount)
                   }
                   //await this.app.setAccountData(rawAccounts)
-
+                  let awaitStart = Date.now()   
                   await this.stateManager.checkAndSetAccountData(accountRecords, 'awaitFinalData_passed', false)
+                  this.updateSimpleStatsObject(processStats.awaitStats, 'checkAndSetAccountData', Date.now() - awaitStart)
 
                   //log tx processed if needed
                   if (queueEntry != null && queueEntry.transactionGroup != null && this.p2p.getNodeId() === queueEntry.transactionGroup[0].id) {
@@ -3410,8 +3441,10 @@ class TransactionQueue {
 
                   //try {
                   this.profiler.profileSectionStart('commit')
-
+                  
+                  let awaitStart = Date.now()
                   let commitResult = await this.commitConsensedTransaction(queueEntry)
+                  this.updateSimpleStatsObject(processStats.awaitStats, 'commitConsensedTransaction', Date.now() - awaitStart)
 
                   if (queueEntry.repairFinished) {
                     // saw a TODO comment above and befor I axe it want to confirm what is happening after we repair a receipt.
@@ -3552,6 +3585,18 @@ class TransactionQueue {
           }
         } finally {
           this.profiler.profileSectionEnd(`process-${pushedProfilerTag}`)
+          profilerInstance.scopedProfileSectionEnd(`scoped-process-${pushedProfilerTag}`)
+
+          //let do some more stats work
+          let txElapsed = Date.now() - txStartTime          
+          if(queueEntry.state != pushedProfilerTag){
+            processStats.stateChanged++
+            this.updateSimpleStatsObject(processStats.stateChangedStats, pushedProfilerTag, txElapsed)
+          } else{
+            processStats.sameState++
+            this.updateSimpleStatsObject(processStats.sameStateStats, pushedProfilerTag, txElapsed)
+          }
+
           pushedProfilerTag = null // clear the tag
         }
       }
@@ -3566,13 +3611,16 @@ class TransactionQueue {
       let processTime = Date.now() - startTime
       if (processTime > 10000) {
         nestedCountersInstance.countEvent('stateManager', 'processTime > 10s')
-        this.statemanager_fatal(`processAcceptedTxQueue excceded time ${processTime / 1000} firstTime:${firstTime}`, `processAcceptedTxQueue excceded time ${processTime / 1000} firstTime:${firstTime}`)
+        this.statemanager_fatal(`processAcceptedTxQueue excceded time ${processTime / 1000} firstTime:${firstTime}`, `processAcceptedTxQueue excceded time ${processTime / 1000} firstTime:${firstTime} stats:${JSON.stringify(processStats)}`)
       } else if (processTime > 5000) {
         nestedCountersInstance.countEvent('stateManager', 'processTime > 5s')
+        if (logFlags.error) this.mainLogger.error(`processTime > 5s ${processTime / 1000} stats:${JSON.stringify(processStats)}`)
       } else if (processTime > 2000) {
         nestedCountersInstance.countEvent('stateManager', 'processTime > 2s')
+        if (logFlags.error && logFlags.verbose) this.mainLogger.error(`processTime > 2s ${processTime / 1000} stats:${JSON.stringify(processStats)}`)
       } else if (processTime > 1000) {
         nestedCountersInstance.countEvent('stateManager', 'processTime > 1s')
+        if (logFlags.error && logFlags.verbose) this.mainLogger.error(`processTime > 1s ${processTime / 1000} stats:${JSON.stringify(processStats)}`)
       }
 
       // restart loop if there are still elements in it
@@ -3887,6 +3935,23 @@ class TransactionQueue {
 
     //The score can give us up to one half of M extra time after M2 timeout.  (but a bit extra if extraRare)
     queueEntry.txSieveTime = 0.5 * (this.stateManager.queueSitTime) * score
+  }
+
+  updateSimpleStatsObject(statsObj:{[statName:string]:SimpleNumberStats}, statName:string, duration:number){
+    let statsEntry = statsObj[statName]
+    if(statsEntry == null){
+      statsEntry = {
+        min: Number.MAX_SAFE_INTEGER,
+        max: 0,
+        total: 0,
+        count: 0
+      }
+      statsObj[statName] = statsEntry
+    }
+    statsEntry.count++
+    statsEntry.max = Math.max(statsEntry.max, duration)
+    statsEntry.min = Math.min(statsEntry.min, duration)
+    statsEntry.total += duration
   }
 
 }
