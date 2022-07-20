@@ -107,8 +107,12 @@ class TransactionRepair {
 
       if(queueEntry.ourVoteHash != null){
         if(queueEntry.ourVoteHash === this.crypto.hash(queueEntry.appliedReceiptForRepair2.appliedVote)){
-          nestedCountersInstance.countEvent('repair1', 'error, should not try to repair this TX')
-          return
+          //This case is ok.  A tx in the queue may get expired after it pre-applied and cast a vote.
+          //This method should detect that we already have correct state available for the accounts and 
+          //simply apply this repair with 100% local data.
+          nestedCountersInstance.countEvent('repair1', 'ourVoteHash matched receipt')
+          //In the past we errored out here.  But that causes us to miss the repair opportunity in
+          //some valid cases
         }
       }
 
