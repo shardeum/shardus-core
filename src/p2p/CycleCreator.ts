@@ -24,6 +24,7 @@ import { compareQuery, Comparison } from './Utils'
 import { errorToStringFull } from '../utils'
 import { nestedCountersInstance } from '../utils/nestedCounters'
 import { reportLost  } from './Lost'
+import { randomBytes } from '@shardus/crypto-utils'
 
 /** CONSTANTS */
 
@@ -516,7 +517,7 @@ function makeCycleRecord(
   prevRecord?: P2P.CycleCreatorTypes.CycleRecord
 ): P2P.CycleCreatorTypes.CycleRecord {
   const baseRecord: P2P.CycleCreatorTypes.BaseRecord = {
-    networkId: crypto.hash({ rand: Math.floor(Math.random() * 1000000) }),
+    networkId: prevRecord ? prevRecord.networkId : randomBytes(32),
     counter: prevRecord ? prevRecord.counter + 1 : 0,
     previous: prevRecord ? makeCycleMarker(prevRecord) : '0'.repeat(64),
     start: prevRecord
