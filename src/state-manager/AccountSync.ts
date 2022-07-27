@@ -584,8 +584,8 @@ class AccountSync {
           }
 
           // let partition = syncTracker.partition
-          if (logFlags.console) console.log(`syncTracker start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
-          if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+          if (logFlags.console) console.log(`syncTracker start. time:${Date.now()} data: ${utils.stringifyReduceLimit(syncTracker)}}`)
+          if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduceLimit(syncTracker.range)} `)
 
           syncTracker.syncStarted = true
 
@@ -597,12 +597,12 @@ class AccountSync {
               await syncTracker.syncStateDataForRange2() //syncTracker.range)
             }
           } else {
-            if (logFlags.console) console.log(`syncTracker syncStateDataGlobals start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
+            if (logFlags.console) console.log(`syncTracker syncStateDataGlobals start. time:${Date.now()} data: ${utils.stringifyReduceLimit(syncTracker)}}`)
             await syncTracker.syncStateDataGlobals() //syncTracker)
           }
           syncTracker.syncFinished = true
 
-          if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
+          if (logFlags.playback) this.logger.playbackLogNote('shrd_sync_trackerRangeEnd', ` `, ` ${utils.stringifyReduceLimit(syncTracker.range)} `)
           this.clearSyncData()
         }
         //if we get here without an exception that we are finished with the outer loop
@@ -1133,7 +1133,7 @@ class AccountSync {
         for (let syncTracker of arrayCopy) {
           if (syncTracker.syncStarted === false) {
             // let partition = syncTracker.partition
-            if (logFlags.console) console.log(`rtsyncTracker start. time:${Date.now()} data: ${utils.stringifyReduce(syncTracker)}}`)
+            if (logFlags.console) console.log(`rtsyncTracker start. time:${Date.now()} data: ${utils.stringifyReduceLimit(syncTracker)}}`)
             if (logFlags.playback) this.logger.playbackLogNote('rt_shrd_sync_trackerRangeStart', ` `, ` ${utils.stringifyReduce(syncTracker.range)} `)
 
             syncTracker.syncStarted = true

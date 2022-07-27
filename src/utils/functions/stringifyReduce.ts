@@ -75,6 +75,9 @@ export const stringifyReduce = (val, isArrayProp?: boolean) => {
       const reduced = makeShortHash(val)
       return JSON.stringify(reduced)
     default:
+      if (typeof val === 'bigint') {
+        val = val.toString()
+      }
       return isFinite(val) ? val : null
   }
 }
@@ -149,6 +152,9 @@ export const stringifyReduceLimit = (
       const reduced = makeShortHash(val)
       return JSON.stringify(reduced)
     default:
+      if (typeof val === 'bigint') {
+        val = val.toString()
+      }
       return isFinite(val) ? val : null
   }
 }
@@ -158,7 +164,7 @@ export const replacer = (key, value) => {
   if (originalObject instanceof Map) {
     return {
       dataType: 'stringifyReduce_map_2_array',
-      value: Array.from(originalObject.entries()), // or with spread: value: [...originalObject]
+      value: Array.from(originalObject.entries()) // or with spread: value: [...originalObject]
     }
   } else {
     return value
@@ -188,7 +194,8 @@ export const reviverExpander = (key, value) => {
 }
 
 //Figure out certain chunky objects and store them in their own table
-export const stringifyReduceMemoize = (val, isArrayProp?: boolean) => {}
+export const stringifyReduceMemoize = (val, isArrayProp?: boolean) => {
+}
 
 export const reviverMemoize = (key, value) => {
   if (typeof value === 'object' && value !== null) {
@@ -203,17 +210,17 @@ export const reviverMemoize = (key, value) => {
 export const debugReplacer = (key, value) => {
   const originalObject = value // this[key]
 
-  if(key === 'accountTempMap'){
+  if (key === 'accountTempMap') {
     return {}
   }
-  if(typeof originalObject === 'string'){
+  if (typeof originalObject === 'string') {
     const reduced = makeShortHash(originalObject)
     return reduced
   }
   if (originalObject instanceof Map) {
     return {
       dataType: 'stringifyReduce_map_2_array',
-      value: Array.from(originalObject.entries()), // or with spread: value: [...originalObject]
+      value: Array.from(originalObject.entries()) // or with spread: value: [...originalObject]
     }
   } else {
     return value
