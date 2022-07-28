@@ -69,7 +69,8 @@ export type QueueEntry = {
     uniqueWritableKeys?: string[];
     ourNodeInTransactionGroup: boolean;
     ourNodeInConsensusGroup: boolean;
-    ourTXGroupIndex: number;
+    ourTXGroupIndex: number; //our index in the transaction group
+    ourExGroupIndex: number; //our index in the execution group
     conensusGroup?: Shardus.Node[];
     transactionGroup?: Shardus.Node[];
     executionGroup?: Shardus.Node[]; //List of nodes that are in the execution group

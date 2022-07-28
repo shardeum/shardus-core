@@ -240,7 +240,7 @@ class TransactionQueue {
           return
         }
         if (transactionGroup.length > 1) {
-          this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `gossip to neighbors`, transactionGroup)
+          this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `spread_tx_to_group to neighbors`, transactionGroup)
           respondSize = await this.p2p.sendGossipIn('spread_tx_to_group', payload, tracker, sender, transactionGroup, false)
         }
       } finally {
@@ -496,6 +496,11 @@ class TransactionQueue {
         applyResult = 'applied'
       }
       if (logFlags.verbose) this.mainLogger.debug(`preApplyTransaction  post apply wrappedStates: ${utils.stringifyReduce(wrappedStates)}`)
+
+      //applyResponse = queueEntry?.preApplyTXResult?.applyResponse
+      //super verbose option:
+      if (logFlags.verbose && applyResponse != null) this.mainLogger.debug(`preApplyTransaction  post applyResponse: ${utils.stringifyReduce(applyResponse)}`)
+
     } catch (ex) {
       if (logFlags.error) this.mainLogger.error(`preApplyTransaction failed id:${utils.makeShortHash(acceptedTX.txId)}: ` + ex.name + ': ' + ex.message + ' at ' + ex.stack)
       if (logFlags.error) this.mainLogger.error(`preApplyTransaction failed id:${utils.makeShortHash(acceptedTX.txId)}  ${utils.stringifyReduce(acceptedTX)}`)
@@ -958,6 +963,7 @@ class TransactionQueue {
         gossipedReceipt: false,
         archived: false,
         ourTXGroupIndex: -1,
+        ourExGroupIndex: -1,
         involvedReads: {},
         involvedWrites: {},
         txDebug: {
@@ -1032,10 +1038,16 @@ class TransactionQueue {
           //set the nodes that are in the executionGroup.
           //This is needed so that consensus will expect less nodes to be voting
           txQueueEntry.executionGroup = homeShardData.homeNodes[0].consensusNodeForOurNodeFull.slice()
-          for(let node of txQueueEntry.executionGroup){
+          let ourID = this.stateManager.currentCycleShardData.ourNode.id
+          for (let idx = 0; idx < txQueueEntry.executionGroup.length; idx++) {
+            let node = txQueueEntry.executionGroup[idx]
             txQueueEntry.executionIdSet.add(node.id)
-
+            if (node.id === ourID) {
+              txQueueEntry.ourExGroupIndex = idx
+              break
+            }
           }
+
           //if we are not in the execution group then set isInExecutionHome to false
           if(txQueueEntry.executionIdSet.has(this.stateManager.currentCycleShardData.ourNode.id) === false){
             txQueueEntry.isInExecutionHome = false
@@ -3122,7 +3134,11 @@ class TransactionQueue {
               // try to produce a receipt
               if (logFlags.debug) this.mainLogger.debug(`processAcceptedTxQueue2 consensing : ${queueEntry.logID} receiptRcv:${hasReceivedApplyReceipt}`)
               let result = this.stateManager.transactionConsensus.tryProduceReceipt(queueEntry)
-              if (result != null) {
+
+
+              //todo this is false.. and prevents some important stuff.
+              //need to look at appliedReceipt2
+              if (result != null || queueEntry.appliedReceipt2 != null) {
 
                 //TODO share receipt with corresponding index
 

@@ -284,16 +284,28 @@ class TransactionConsenus {
         return
       }
 
-      if(queueEntry.ourTXGroupIndex > 0){
-        let everyN = Math.max(1,Math.floor(gossipGroup.length * 0.4))
+      //look at our index in the consensus.
+      //only have certain nodes sharde gossip the receipt.
+      let ourIndex = queueEntry.ourTXGroupIndex
+      let groupLength = gossipGroup.length
+      if(this.stateManager.transactionQueue.executeInOneShard){
+        //we have to use different inputs if executeInOneShard is true
+        ourIndex = queueEntry.ourExGroupIndex
+        groupLength = queueEntry.executionGroup.length
+      }
+
+      if(ourIndex > 0){
+        let everyN = Math.max(1,Math.floor(groupLength * 0.4))
         let nonce = parseInt('0x' + queueEntry.acceptedTx.txId.substr(0,2))
-        let idxPlusNonce = queueEntry.ourTXGroupIndex + nonce
+        let idxPlusNonce = ourIndex + nonce
         let idxModEveryN = idxPlusNonce % everyN
         if(idxModEveryN > 0){
           nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-skipped')
+          if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shareAppliedReceipt-skipped', `${queueEntry.acceptedTx.txId}`, `ourIndex:${ourIndex} groupLength:${ourIndex} `)
           return
         }
       }
+
       nestedCountersInstance.countEvent('transactionQueue', 'shareAppliedReceipt-notSkipped')
       // should consider only forwarding in some cases?
       this.stateManager.debugNodeGroup(queueEntry.acceptedTx.txId, queueEntry.acceptedTx.timestamp, `share appliedReceipt to neighbors`, gossipGroup)
@@ -826,6 +838,12 @@ class TransactionConsenus {
     let wrappedStates = queueEntry.collectedData
 
     let applyResponse = queueEntry?.preApplyTXResult?.applyResponse
+
+    let stats = {
+      usedApplyResponse:false,
+      wrappedStateSet:0,
+      optimized:false
+    }
     //if we have values for accountWrites, then build a list wrappedStates from it and use this list instead
     //of the collected data list
     if(applyResponse != null){
@@ -837,6 +855,9 @@ class TransactionConsenus {
         //override wrapped states with writtenAccountsMap which should be more complete if it included
         wrappedStates = writtenAccountsMap
       }
+
+      stats.usedApplyResponse = true
+      stats.wrappedStateSet = Object.keys(wrappedStates).length
       //Issue that could happen with sharded network:
       //Need to figure out where to put the logic that knows which nodes need final data forwarded to them
       //A receipt aline may not be enough, remote shards will need an updated copy of the data.
@@ -848,6 +869,7 @@ class TransactionConsenus {
 
   
       if(config.debug.optimizedTXConsenus){
+        stats.optimized = true
         //need to sort our parallel lists so that they are deterministic!!
         let wrappedStatesList = [...Object.values(wrappedStates)]
 
@@ -920,8 +942,8 @@ class TransactionConsenus {
       // TODO STATESHARDING4 ENDPOINTS this needs to change from gossip to a tell
       //this.p2p.sendGossipIn('spread_appliedVote', ourVote, '', sender, consensusGroup)
 
-      if (logFlags.debug) this.mainLogger.debug(`createAndShareVote numNodes: ${consensusGroup.length} ourVote: ${utils.stringifyReduce(ourVote)} `)
-      if (logFlags.playback) this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.txId}`, `numNodes: ${consensusGroup.length} ourVote: ${utils.stringifyReduce(ourVote)} `)
+      if (logFlags.debug) this.mainLogger.debug(`createAndShareVote numNodes: ${consensusGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)}`)
+      if (logFlags.playback) this.logger.playbackLogNote('createAndShareVote', `${queueEntry.acceptedTx.txId}`, `numNodes: ${consensusGroup.length} stats:${utils.stringifyReduce(stats)} ourVote: ${utils.stringifyReduce(ourVote)} `)
 
       // Filter nodes before we send tell()
       let filteredNodes = this.stateManager.filterValidNodesForInternalMessage(consensusGroup, 'createAndShareVote', true, true)
