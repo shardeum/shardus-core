@@ -1164,7 +1164,11 @@ class Shardus extends EventEmitter {
     return replyObject
   }
 
-  applyResponseAddReceiptData(resultObject: ShardusTypes.ApplyResponse, appReceiptData:unknown, appReceiptDataHash:string){
+  applyResponseAddReceiptData(
+    resultObject: ShardusTypes.ApplyResponse,
+    appReceiptData: ShardusTypes.WrappedResponse,
+    appReceiptDataHash: string
+  ) {
     resultObject.appReceiptData = appReceiptData
     resultObject.appReceiptDataHash = appReceiptDataHash
   }

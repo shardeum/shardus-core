@@ -3993,8 +3993,13 @@ class TransactionQueue {
         let accountCopy = {...acc}
         delete accountCopy.localCache
         return accountCopy
-      })
+      }),
+      receipt : queueEntry.preApplyTXResult.applyResponse.appReceiptData || null
     }
+
+    // console.log('App Receipt', queueEntry.preApplyTXResult.applyResponse.appReceiptData)
+    // console.log('App Receipt Data Hash', queueEntry.preApplyTXResult.applyResponse.appReceiptDataHash)
+    
     const signedTxReceiptToPass = this.crypto.sign(txReceiptToPass)
     this.receiptsToForward.push(signedTxReceiptToPass)
   }

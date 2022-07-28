@@ -366,7 +366,7 @@ export interface ApplyResponse {
    * a blob of dapp data returned. This can attach to the receipt for a pass
    * or fail vote
    */
-  appReceiptData: unknown
+  appReceiptData: WrappedResponse
   appReceiptDataHash: string
 }
 
