@@ -1801,6 +1801,19 @@ class Shardus extends EventEmitter {
         res.json({ config: this.config })
       }
     )
+    this.network.registerExternalGet(
+      'netconfig',
+      async (req, res) => {
+        // This is to expose network configs only; open to all.
+        const netconfig = {...this.config};
+        delete netconfig.baseDir;
+        delete netconfig.ip;
+        delete netconfig.p2p.existingArchivers; // I think we shouldn't include this
+        delete netconfig.reporting; // I think we don't need this also
+        delete netconfig.debug // Seems we shouldn't include this in prod net
+        res.json({ config: netconfig })
+      }
+    )
     // FOR internal testing. NEEDS to be removed for security purposes
     this.network.registerExternalPost(
       'testGlobalAccountTX',
