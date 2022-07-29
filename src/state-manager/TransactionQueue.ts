@@ -971,7 +971,8 @@ class TransactionQueue {
           duration: {},
         },
         executionIdSet: new Set(),
-        txSieveTime:0
+        txSieveTime:0,
+        debug:{}
       } // age comes from timestamp
 
       // todo faster hash lookup for this maybe?
@@ -1021,6 +1022,8 @@ class TransactionQueue {
 
         //set the executionShardKey for the transaction
         if(txQueueEntry.globalModification === false && this.executeInOneShard){
+          //USE the first key in the list of all keys.  Applications much carefully sort this list
+          //so that we start in the optimal shard.  This will matter less when shard hopping is implemented
           txQueueEntry.executionShardKey = txQueueEntry.txKeys.allKeys[0]
           if (logFlags.verbose) this.mainLogger.debug(`routeAndQueueAcceptedTransaction set executionShardKey tx:${txQueueEntry.logID} ts:${timestamp} accounts: ${utils.stringifyReduce(Object.keys(txQueueEntry.executionShardKey))}  `)
 
@@ -3301,16 +3304,28 @@ class TransactionQueue {
 
               //collectedFinalData
               let vote = this.stateManager.getReceiptVote(queueEntry)
+              let accountsNotStored = new Set()
               if(vote){
                 let failed = false
                 let incomplete = false
+                let skipped = 0
+                let nodeShardData: StateManagerTypes.shardFunctionTypes.NodeShardData = this.stateManager.currentCycleShardData.nodeShardData
+
                 for(let i=0; i<vote.account_id.length; i++ ){
                   let accountID = vote.account_id[i]
                   let accountHash = vote.account_state_hash_after[i]
 
+                  //only check for stored keys.
+                  if(ShardFunctions.testAddressInRange(accountID, nodeShardData.storedPartitions) === false){
+                    skipped++
+                    accountsNotStored.add(accountID)
+                    continue
+                  }
+       
                   let wrappedAccount = queueEntry.collectedFinalData[accountID]
                   if(wrappedAccount == null){
                     incomplete = true
+                    queueEntry.debug.waitingOn = accountID
                     break
                   }
                   if(wrappedAccount.stateId != accountHash){
@@ -3321,24 +3336,25 @@ class TransactionQueue {
                 if(failed === true){
                   this.stateManager.getTxRepair().repairToMatchReceipt(queueEntry)
                   queueEntry.state = 'await repair'
-                  if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitFinalData_failed', `${shortID}`, `qId: ${queueEntry.entryID} `)
+                  if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitFinalData_failed', `${shortID}`, `qId: ${queueEntry.entryID} skipped:${skipped}`)
                   if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData_failed : ${queueEntry.logID} `)
                   continue
                 }
                 if(failed === false && incomplete === false){
-                  if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitFinalData_passed', `${shortID}`, `qId: ${queueEntry.entryID} `)
-                  if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData_passed : ${queueEntry.logID} `)
-
-                  //we let commiting handle this before but we need to just set account!
-                  //queueEntry.state = 'commiting'
+                  if (logFlags.verbose) if (logFlags.playback) this.logger.playbackLogNote('shrd_awaitFinalData_passed', `${shortID}`, `qId: ${queueEntry.entryID} skipped:${skipped}`)
+                  if (logFlags.debug) this.mainLogger.error(`shrd_awaitFinalData_passed : ${queueEntry.logID} skipped:${skipped}`)
 
                   //TODO vote order should be in apply response order!
+                  //This matters for certain daps only.  No longer important to shardeum
                   let rawAccounts = []
                   let accountRecords:Shardus.WrappedData[] = []
                   for(let i=0; i<vote.account_id.length; i++ ){
                     let accountID = vote.account_id[i]
+                    //skip accounts we don't store
+                    if(accountsNotStored.has(accountID)){
+                      continue
+                    }
                     let wrappedAccount = queueEntry.collectedFinalData[accountID]
-
                     rawAccounts.push(wrappedAccount.data)
                     accountRecords.push(wrappedAccount)
                   }
@@ -3681,7 +3697,7 @@ class TransactionQueue {
   }
 
   private setTXExpired(queueEntry: QueueEntry, currentIndex: number, message:string) {
-    if (logFlags.verbose) this.mainLogger.debug(`setTXExpired ${message} tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp}`)
+    if (logFlags.verbose) this.mainLogger.debug(`setTXExpired ${message} tx:${queueEntry.logID} ts:${queueEntry.acceptedTx.timestamp} debug:${utils.stringifyReduce(queueEntry.debug)}`)
     queueEntry.state = 'expired'
     this.removeFromQueue(queueEntry, currentIndex)
 

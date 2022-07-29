@@ -49,6 +49,7 @@ export type QueueEntry = {
      * based on the incrementing queueEntryCounter
      */
     entryID: number;
+    /** This is only getting set in tellCorrespondingNodes() so is not a reliable list of local keys  */
     localKeys: {
         [x: string]: boolean;
     };
@@ -153,6 +154,12 @@ export type QueueEntry = {
   executionDebug?:any
   txDebug?: TxDebug
   txSieveTime: number
+
+  /** todo start migrating stuff that is truely debug only into this object */
+  debug: {
+      /** Final data that we are waiting for */
+      waitingOn?:string
+  }
 };
 
 // export type SyncTracker = {
